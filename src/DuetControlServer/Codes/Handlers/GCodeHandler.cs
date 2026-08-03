@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Motion;
+using DuetControlServer.Motion.Kinematics;
 using Microsoft.Extensions.Logging;
 
 namespace DuetControlServer.Codes.Handlers;
@@ -123,7 +125,12 @@ internal sealed class GCodeHandler(
                     return new Message(MessageType.Error, "No axes have been configured");
                 }
 
-                RawMove move = BuildRawMove(code, input, isCoordinated);
+                RawMove move = BuildRawMove(code, input, isCoordinated, out Message? endstopError);
+                if (endstopError is not null)
+                {
+                    return endstopError;
+                }
+
                 result = planner.QueueMove(move);
 
                 if (result is MoveSubmitResult.Queued or MoveSubmitResult.NoMovement)
@@ -160,10 +167,12 @@ internal sealed class GCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="input">The channel's interpreter state</param>
     /// <param name="isCoordinated">Whether this is a G1</param>
+    /// <param name="endstopError">Receives why the move cannot be armed, if it cannot</param>
     /// <returns>The move</returns>
     /// <remarks>The caller must hold the object model write lock</remarks>
-    private RawMove BuildRawMove(Commands.Code code, InputChannel input, bool isCoordinated)
+    private RawMove BuildRawMove(Commands.Code code, InputChannel input, bool isCoordinated, out Message? endstopError)
     {
+        endstopError = null;
         MotionParameters parameters = planner.Parameters;
         int numAxes = Math.Min(parameters.NumAxes, model.Move.Axes.Count);
         float unitScale = input.DistanceUnit == DistanceUnit.Inch ? MmPerInch : 1.0f;
@@ -215,7 +224,7 @@ internal sealed class GCodeHandler(
         move.CheckEndstops = move.MoveType is 1 or 3 or 4;
         if (move.CheckEndstops)
         {
-            ApplyEndstops(code, move, numAxes);
+            endstopError = ApplyEndstops(code, move, numAxes);
         }
 
         // Babystepping shifts where the machine goes without changing the coordinate the user asked
@@ -279,24 +288,34 @@ internal sealed class GCodeHandler(
     }
 
     /// <summary>
-    /// Say which endstop stops each drive of a homing move
+    /// Say which endstop stops which drive of a homing move
     /// </summary>
     /// <param name="code">The code</param>
     /// <param name="move">The move being built</param>
     /// <param name="numAxes">Number of axes to consider</param>
+    /// <returns>An error if the move cannot be armed, else null</returns>
     /// <remarks>
     /// <para>
-    /// Only the axes the code actually moves are given an endstop. A homing move that mentions X and
-    /// Y must not be stopped by Z's switch happening to be closed already.
+    /// RepRapFirmware picks one of three actions when an endstop fires, and which one depends on the
+    /// geometry rather than on the endstop. If moving an axis needs drives other than its own - X on
+    /// a CoreXY needs both motors - then stopping only that axis' drivers would leave the others
+    /// running and drag the head diagonally into the switch, so the whole move has to stop. That is
+    /// RRF's <c>stopAll</c>, and it is decided by exactly the test below. Otherwise the axis is
+    /// independent and stopping its own drivers is enough, which is <c>stopAxis</c>.
     /// </para>
     /// <para>
-    /// The identity travels with the move all the way to the controller, which is what watches for
-    /// the input change and stops the drives; nothing on this side is fast enough. See section 10 of
-    /// docs/devel/MCODE_MIGRATION.md
+    /// Only the axes the code actually moves are armed. A homing move naming X and Y must not be
+    /// stopped by Z's switch happening to be closed already
     /// </para>
     /// </remarks>
-    private void ApplyEndstops(Commands.Code code, RawMove move, int numAxes)
+    private Message? ApplyEndstops(Commands.Code code, RawMove move, int numAxes)
     {
+        KinematicsEngine geometry = planner.Parameters.Geometry;
+
+        int stopAllAxis = -1;
+        uint stopAllInput = 0;
+        List<(int Axis, uint StopInput)> perAxis = [];
+
         for (int axis = 0; axis < numAxes; axis++)
         {
             if (!code.HasParameter(model.Move.Axes[axis].Letter))
@@ -305,11 +324,52 @@ internal sealed class GCodeHandler(
             }
 
             Endstop? endstop = axis < model.Sensors.Endstops.Count ? model.Sensors.Endstops[axis] : null;
-            if (endstop is not null && RemoteEndstops.TryGetStopInput(endstop, axis, out uint stopInput))
+            if (endstop is null || !RemoteEndstops.TryGetStopInput(endstop, axis, out uint stopInput))
             {
-                move.StopOnInput[axis] = stopInput;
+                continue;                       // no endstop, or one no move can stop on
+            }
+
+            // The axis needs a drive that is not its own, so it cannot be stopped by itself
+            if ((geometry.GetControllingDrives(axis) & ~(1u << axis)) != 0)
+            {
+                if (stopAllAxis >= 0)
+                {
+                    return new Message(MessageType.Error,
+                        $"Cannot home {model.Move.Axes[stopAllAxis].Letter} and {model.Move.Axes[axis].Letter} together: "
+                        + "on this kinematics either endstop has to stop every drive");
+                }
+                stopAllAxis = axis;
+                stopAllInput = stopInput;
+            }
+            else
+            {
+                perAxis.Add((axis, stopInput));
             }
         }
+
+        if (stopAllAxis >= 0)
+        {
+            if (perAxis.Count > 0)
+            {
+                return new Message(MessageType.Error,
+                    $"Cannot home {model.Move.Axes[stopAllAxis].Letter} with another axis: "
+                    + "its endstop has to stop every drive, which would disarm the others");
+            }
+
+            // Every drive watches the one input, so whichever driver sees the change first, they all
+            // stop. That is what makes this stopAll rather than stopAxis
+            for (int drive = 0; drive < move.StopOnInput.Length; drive++)
+            {
+                move.StopOnInput[drive] = stopAllInput;
+            }
+            return null;
+        }
+
+        foreach ((int axis, uint stopInput) in perAxis)
+        {
+            move.StopOnInput[axis] = stopInput;
+        }
+        return null;
     }
 
     /// <summary>

@@ -884,6 +884,29 @@ move naming X and Y must not be stopped by Z's switch happening to be closed alr
 the states, which the board manager keeps current from the same `InputChanged` messages the
 controller acts on.
 
+### The three stop actions
+
+RepRapFirmware picks one of four actions when an endstop fires, and which one it picks depends on the
+**geometry**, not on the endstop:
+
+| RRF action | When | Here |
+|---|---|---|
+| `none` | The axis has no endstop | No stop input is written, so nothing watches |
+| `stopAxis` | The axis is independently driven | Its drive carries the endstop's input; the controller stops that axis' drivers |
+| `stopAll` | Moving the axis needs drives other than its own | **Every** drive in the move carries that one input, so whichever driver sees the change first, they all stop |
+| `stopDriver` | Several switches on one axis, one per driver | Not supported: M574 takes one port per axis, and the handle's minor field is always zero |
+
+`stopAll` is the one that matters for correctness rather than tidiness. On a CoreXY, holding X still
+needs both motors, so stopping only "X's drivers" would leave the other motor running and drag the
+head diagonally into the switch. The test is exactly RepRapFirmware's, from
+`SwitchEndstop::PrimeAxis`: the axis needs `stopAll` if its controlling drives include anything other
+than itself. `KinematicsEngine.GetControllingDrives` already answered that question for the planner.
+
+Because a drive can carry only one stop input, a `stopAll` axis cannot be armed alongside anything
+else - the second endstop would have nowhere to live. `G1 H1` rejects that combination rather than
+silently arming one of them, which also matches how a CoreXY `homeall.g` is written in practice: the
+coupled axes are homed one at a time.
+
 `Motion/RemoteEndstops.cs` holds the naming the three places have to agree on: M574 when it asks for
 the monitor, the move when it says what stops it, and the receiver when a change comes back. They
 agree because the handle is derived from the axis rather than allocated, so nothing has to remember

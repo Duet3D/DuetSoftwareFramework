@@ -1,6 +1,7 @@
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Motion;
+using DuetControlServer.Motion.Kinematics;
 using NUnit.Framework;
 
 namespace UnitTests.Motion;
@@ -67,6 +68,36 @@ public class RemoteEndstopsTests
             Assert.That(RemoteEndstops.TryGetStopInput(new Endstop { Type = EndstopType.ZProbeAsEndstop }, 0, out _), Is.False);
             Assert.That(RemoteEndstops.TryGetStopInput(new Endstop { Type = EndstopType.InputPin }, 0, out _), Is.False, "no port named");
         });
+    }
+
+    // RepRapFirmware picks between stopping one driver, one axis, or everything, and which it picks
+    // depends on the geometry rather than on the endstop. The deciding question is whether moving an
+    // axis needs drives other than its own, which is what the engines answer below - the same
+    // property RRF's SwitchEndstop::PrimeAxis tests.
+    private static bool StoppingTheAxisStopsEverything(string geometry, int axis)
+    {
+        KinematicsEngine engine = CoreKinematicsEngine.TryCreate(geometry)!;
+        return (engine.GetControllingDrives(axis) & ~(1u << axis)) != 0;
+    }
+
+    [Test]
+    public void AnIndependentAxisStopsOnlyItself()
+    {
+        // On a Cartesian each axis has its own motor, so stopping that motor is the whole job
+        Assert.That(StoppingTheAxisStopsEverything("cartesian", 0), Is.False, "X");
+        Assert.That(StoppingTheAxisStopsEverything("cartesian", 1), Is.False, "Y");
+    }
+
+    [Test]
+    public void ACoupledAxisHasToStopEverything()
+    {
+        // Holding X still on a CoreXY needs both motors, so stopping only "X's drivers" would leave
+        // the other one running and drag the head diagonally into the switch
+        Assert.That(StoppingTheAxisStopsEverything("corexy", 0), Is.True, "X");
+        Assert.That(StoppingTheAxisStopsEverything("corexy", 1), Is.True, "Y");
+
+        // Z is still its own motor even on a CoreXY, so homing it need not stop everything
+        Assert.That(StoppingTheAxisStopsEverything("corexy", 2), Is.False, "Z");
     }
 
     [Test]
