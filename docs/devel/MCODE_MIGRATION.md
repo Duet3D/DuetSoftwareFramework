@@ -117,7 +117,7 @@ what the machine half now does (or does not yet) do.
 | Group | ✅ Done | 🔵 SBC half | Rows (excl. ⛔) |
 |---|---|---|---|
 | §5.1 Motion — drives and axes | 26 | 0 | 26 |
-| §5.2 Motion — kinematics and geometry | 3 | 0 | 12 |
+| §5.2 Motion — kinematics and geometry | 8 | 0 | 12 |
 | §5.3 Motion — compensation and probing | 0 | 0 | 14 |
 | §5.4 Motion — queue, sync and shaping | 3 | 1 | 9 |
 | §5.5 Heat | 0 | 0 | 19 |
@@ -127,7 +127,7 @@ what the machine half now does (or does not yet) do.
 | §5.9 Job, files and SD | 17 | 4 | 29 |
 | §5.10 Network | 4 | 1 | 13 |
 | §5.11 I/O, expansion and miscellaneous | 6 | 5 | 38 |
-| **Total** | **60** | **11** | **186** |
+| **Total** | **65** | **11** | **186** |
 
 Update these counts as boxes are ticked.
 
@@ -219,14 +219,14 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M425 | 3223 | Backlash compensation | `move.axes[].backlash`, `move.backlashFactor` | yes | ✅ |
 | M556 | 3653 | Axis skew compensation | `move.compensation.skew` | no | ✅ |
 | M579 | 3925 | Scale Cartesian axes | needs new field — §6 | no | ⬜ |
-| M665 | 4052 | Delta configuration | `move.kinematics` (`DeltaKinematics`) | yes | ⬜ engine ported, M-code not |
-| M666 | 4082 | Delta endstop adjustments | `move.kinematics` (`DeltaKinematics`) | yes | ⬜ engine ported, M-code not |
-| M667 | 4099 | CoreXY mode (legacy, superseded by M669) | `move.kinematics` (`CoreKinematics`) | yes | ⬜ |
-| M669 | 4104 | Kinematics selection and parameters | `move.kinematics` | yes | ⬜ every geometry has an engine now |
-| M671 | 4152 | Z leadscrew positions | `move.kinematics.tiltCorrection` | no | ⬜ |
-| M673 | 4168 | Align plane on rotary axis | `move.rotation` | yes | ⬜ |
-| M674 | 4275 | Set Z to centre point | — | yes | ⬜ |
-| M675 | 4311 | Find centre of cavity | — | yes | ⬜ |
+| M665 | 4052 | Delta configuration | `move.kinematics` (`DeltaKinematics`) | yes | ✅ |
+| M666 | 4082 | Delta endstop adjustments | `move.kinematics` (`DeltaKinematics`) | yes | ✅ |
+| M667 | 4099 | CoreXY mode (legacy, superseded by M669) | `move.kinematics` (`CoreKinematics`) | yes | ✅ |
+| M669 | 4104 | Kinematics selection and parameters | `move.kinematics` | yes | ✅ |
+| M671 | 4152 | Z leadscrew positions | `move.kinematics.tiltCorrection` | no | ✅ |
+| M673 | 4168 | Align plane on rotary axis | `move.rotation` | yes | ⬜ blocked: needs homing |
+| M674 | 4275 | Set Z to centre point | — | yes | ⬜ blocked: needs probe points |
+| M675 | 4311 | Find centre of cavity | — | yes | ⬜ blocked: needs probing |
 
 ### 5.3 Motion — compensation and probing
 
@@ -456,9 +456,8 @@ Each phase leaves the tree in a state where the machine is more usable than befo
    **Done** — see §8.
 3. ~~**Phase 3 — interpreter state and reporting.** M82, M83, M114, M120, M121, M220, M221, M290,
    M425, M556, M564.~~ **Done** — see §8.
-4. **Phase 4 — geometry.** M667, M669 (Cartesian and CoreXY first), M671, M673-M675, then M665/M666.
-   The engines all exist (§4), so this phase is the M-codes that set their parameters and the object
-   model fields some of those parameters still have nowhere to live.
+4. ~~**Phase 4 — geometry.** M665, M666, M667, M669, M671.~~ **Done** — see §8. M673-M675 move
+   to phase 5: they need homed axes and probe points.
 5. **Phase 5 — endstops and probing.** Needs the input-monitor plumbing first: M119, M574, M558, M401,
    M402, M577, M585, M851, then the height map codes M374-M376, M557, M561.
 6. **Phase 6 — queue and multi-system.** M595, M596, M597, M598, M599.
@@ -544,6 +543,34 @@ driver numbering, which only this side can work out after grouping the drivers b
 **M593 writes the configuration, not the impulses.** `move.shaping` carries type, frequency and
 damping; the amplitudes and delays are the motion engine's to derive. Naming a frequency or damping
 without a type switches the shaper on, as in RRF.
+
+### Phase 4 (M665, M666, M667, M669, M671)
+
+**M667 is retired in RepRapFirmware itself**, which replies "M667 is no longer supported - use M669
+instead" and treats it as an error. Ported verbatim rather than reimplemented.
+
+**M669 K has its own numbering.** The K values are RepRapFirmware's `KinematicsType` enum, which is
+ordered differently from the object model's `KinematicsName`. The mapping is spelled out rather than
+derived from either enum, because it is part of the interface a config.g depends on.
+
+**Selecting a geometry replaces the object model instance.** Several geometries share one class and
+differ only by name, so `Kinematics.Create` was added to the object model - `Name` has a protected
+setter, so only something inside that hierarchy can apply it. Selecting a named core geometry also
+writes the matrix that name implies, because the matrix is what the planner uses and the name is what
+everything else reads; leaving them disagreeing would describe a machine that does not move the way
+it says it does.
+
+**M669's S and T are only read for geometries that do not use those letters.** SCARA and polar both
+take S and T for their own parameters, so treating them as segmentation everywhere would silently
+capture them.
+
+**Hangprinter is rejected rather than half-supported.** `Kinematics.Create` makes the object model
+instance, but M669 reports that hangprinter is not supported: its anchors need array handling the
+other geometries do not, and `MotionParameters.BuildHangprinter` has not been exercised. Saying so is
+better than accepting the parameters and behaving as something else.
+
+**M673, M674 and M675 moved to phase 5.** M673 needs every axis homed, and M674 and M675 need probe
+points, so all three depend on the endstop and probe work rather than on geometry.
 
 ### Phase 3 (M82, M83, M114, M120, M121, M220, M221, M290, M425, M556, M564)
 

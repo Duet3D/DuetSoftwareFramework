@@ -5,6 +5,7 @@ using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Link;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
 using System.Text;
@@ -67,6 +68,12 @@ internal partial class MCodeHandler
 
     /// <summary>How far one relative M290 may babystep, in mm</summary>
     private const float MaxRelativeBabystep = 1.0f;
+
+    /// <summary>How many towers a linear delta has</summary>
+    private const int DeltaTowers = 3;
+
+    /// <summary>Axis letters the delta towers are named by, in tower order</summary>
+    private static readonly char[] DeltaAxisLetters = ['X', 'Y', 'Z', 'U', 'V', 'W'];
 
     /// <summary>
     /// M92: set or report the steps per mm of each drive
@@ -1768,7 +1775,538 @@ internal partial class MCodeHandler
         return new Message();
     }
 
+    /// <summary>
+    /// M665 and M666: configure a delta geometry and its endstop adjustments
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// M665 switches the machine to a linear delta if it is not one already, which is how a delta
+    /// config.g is usually written. Changing any of this invalidates where the machine thinks it is,
+    /// so every axis stops counting as homed
+    /// </remarks>
+    private async ValueTask<Message?> HandleDeltaConfigAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        bool seen = false;
+        string? report = null;
+
+        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
+        {
+            throw new OperationCanceledException();
+        }
+
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            Move move = model.Move;
+
+            if (code.MajorNumber == 665 && move.Kinematics is not DeltaKinematics && (code.HasParameter('L') || code.HasParameter('D')))
+            {
+                move.Kinematics = DuetAPI.ObjectModel.Kinematics.Create(KinematicsName.LinearDelta);
+                seen = true;
+            }
+
+            if (move.Kinematics is not DeltaKinematics delta)
+            {
+                return new Message(MessageType.Error, $"M{code.MajorNumber} is only applicable to delta kinematics");
+            }
+
+            // The towers hold the per-tower parameters, so they have to exist before anything is read
+            while (delta.Towers.Count < DeltaTowers)
+            {
+                delta.Towers.Add(new DeltaTower());
+            }
+
+            if (code.MajorNumber == 665)
+            {
+                if (code.TryGetFloatArray('L', out float[]? diagonals) && diagonals.Length > 0)
+                {
+                    for (int tower = 0; tower < delta.Towers.Count; tower++)
+                    {
+                        delta.Towers[tower].Diagonal = diagonals.Length == 1 ? diagonals[0]
+                                                       : tower < diagonals.Length ? diagonals[tower]
+                                                       : delta.Towers[tower].Diagonal;
+                    }
+                    seen = true;
+                }
+                if (code.TryGetFloat('R', out float deltaRadius))
+                {
+                    delta.DeltaRadius = deltaRadius;
+                    seen = true;
+                }
+                if (code.TryGetFloat('B', out float printRadius))
+                {
+                    delta.PrintRadius = printRadius;
+                    seen = true;
+                }
+                if (code.TryGetFloat('H', out float homedHeight))
+                {
+                    delta.HomedHeight = homedHeight;
+                    seen = true;
+                }
+
+                // X, Y and Z are the angular corrections of the three towers
+                seen |= TrySetTowerValue(code, delta, 'X', 0, (tower, value) => tower.AngleCorrection = value);
+                seen |= TrySetTowerValue(code, delta, 'Y', 1, (tower, value) => tower.AngleCorrection = value);
+                seen |= TrySetTowerValue(code, delta, 'Z', 2, (tower, value) => tower.AngleCorrection = value);
+
+                if (!seen)
+                {
+                    report = string.Format(CultureInfo.InvariantCulture,
+                                           "Diagonals {0:F3}:{1:F3}:{2:F3}, delta radius {3:F3}, homed height {4:F3}, bed radius {5:F1}, "
+                                           + "X {6:F3}{7}, Y {8:F3}{7}, Z {9:F3}{7}",
+                                           delta.Towers[0].Diagonal, delta.Towers[1].Diagonal, delta.Towers[2].Diagonal,
+                                           delta.DeltaRadius, delta.HomedHeight, delta.PrintRadius,
+                                           delta.Towers[0].AngleCorrection, "\u00b0",
+                                           delta.Towers[1].AngleCorrection, delta.Towers[2].AngleCorrection);
+                }
+            }
+            else
+            {
+                // M666: the endstop adjustments, one per tower in axis order, plus the bed tilt
+                for (int tower = 0; tower < delta.Towers.Count && tower < DeltaAxisLetters.Length; tower++)
+                {
+                    seen |= TrySetTowerValue(code, delta, DeltaAxisLetters[tower], tower,
+                                             (t, value) => t.EndstopAdjustment = value);
+                }
+                if (code.TryGetFloat('A', out float xTilt))
+                {
+                    delta.XTilt = xTilt;
+                    seen = true;
+                }
+                if (code.TryGetFloat('B', out float yTilt))
+                {
+                    delta.YTilt = yTilt;
+                    seen = true;
+                }
+
+                if (!seen)
+                {
+                    report = string.Format(CultureInfo.InvariantCulture,
+                                           "Endstop adjustments X{0:F2} Y{1:F2} Z{2:F2}, tilt X{3:F2}% Y{4:F2}%",
+                                           delta.Towers[0].EndstopAdjustment, delta.Towers[1].EndstopAdjustment,
+                                           delta.Towers[2].EndstopAdjustment, delta.XTilt * 100.0f, delta.YTilt * 100.0f);
+                }
+            }
+
+            if (seen)
+            {
+                // The geometry moved underneath the machine, so nothing is where it was
+                foreach (Axis axis in move.Axes)
+                {
+                    axis.Homed = false;
+                }
+            }
+        }
+
+        if (!seen)
+        {
+            return new Message(MessageType.Success, report!);
+        }
+
+        await planner.ReconfigureAsync(cancellationToken);
+        return new Message();
+    }
+
+    /// <summary>
+    /// M669: select the kinematics and configure them
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    private async ValueTask<Message?> HandleKinematicsAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        bool seen = false;
+        string? report = null;
+
+        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
+        {
+            throw new OperationCanceledException();
+        }
+
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            Move move = model.Move;
+
+            if (code.TryGetInt('K', out int kinematicsType))
+            {
+                KinematicsName? name = KinematicsNameFor(kinematicsType);
+                if (name is null)
+                {
+                    return new Message(MessageType.Error, $"Unknown kinematics type {kinematicsType}");
+                }
+
+                if (move.Kinematics.Name != name.Value)
+                {
+                    move.Kinematics = DuetAPI.ObjectModel.Kinematics.Create(name.Value);
+                    ApplyCoreMatrix(move.Kinematics);
+                }
+                seen = true;
+            }
+
+            // S and T are the segmentation parameters and apply to every geometry. They are only
+            // read here for the geometries that do not use those letters for something of their own
+            bool segmentationLettersAreFree = move.Kinematics is not (ScaraKinematics or PolarKinematics);
+            if (segmentationLettersAreFree && (code.HasParameter('S') || code.HasParameter('T')))
+            {
+                MoveSegmentation segmentation = move.Kinematics.Segmentation ?? new MoveSegmentation();
+                if (code.TryGetFloat('S', out float segmentsPerSecond))
+                {
+                    segmentation.SegmentsPerSec = segmentsPerSecond;
+                }
+                if (code.TryGetFloat('T', out float minSegmentLength))
+                {
+                    segmentation.MinSegLength = minSegmentLength;
+                }
+                move.Kinematics.Segmentation = segmentation;
+                seen = true;
+            }
+
+            switch (move.Kinematics)
+            {
+                case CoreKinematics core:
+                    seen |= ApplyCoreParameters(code, core);
+                    break;
+
+                case ScaraKinematics scara:
+                    seen |= ApplyScaraParameters(code, scara);
+                    break;
+
+                case PolarKinematics polar:
+                    seen |= ApplyPolarParameters(code, polar);
+                    break;
+
+                case HangprinterKinematics:
+                    return new Message(MessageType.Error, "Hangprinter kinematics are not supported yet");
+            }
+
+            if (seen)
+            {
+                foreach (Axis axis in move.Axes)
+                {
+                    axis.Homed = false;
+                }
+            }
+            else
+            {
+                report = $"Kinematics is {move.Kinematics.Name.ToString().ToLowerInvariant()}";
+            }
+        }
+
+        if (!seen)
+        {
+            return new Message(MessageType.Success, report!);
+        }
+
+        await planner.ReconfigureAsync(cancellationToken);
+        return new Message();
+    }
+
+    /// <summary>
+    /// M671: set the positions of the Z leadscrews or bed levelling screws
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    private async ValueTask<Message?> HandleLeadscrewsAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        bool seen = false;
+        string? report = null;
+
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (model.Move.Kinematics is not ZLeadscrewKinematics leadscrewKinematics)
+            {
+                return new Message(MessageType.Error, "M671 is not applicable to this kinematics");
+            }
+
+            TiltCorrection tilt = leadscrewKinematics.TiltCorrection;
+
+            if (code.TryGetFloatArray('X', out float[]? screwX))
+            {
+                tilt.ScrewX.Clear();
+                foreach (float x in screwX)
+                {
+                    tilt.ScrewX.Add(x);
+                }
+                seen = true;
+            }
+            if (code.TryGetFloatArray('Y', out float[]? screwY))
+            {
+                tilt.ScrewY.Clear();
+                foreach (float y in screwY)
+                {
+                    tilt.ScrewY.Add(y);
+                }
+                seen = true;
+            }
+
+            if (seen && tilt.ScrewX.Count != tilt.ScrewY.Count)
+            {
+                return new Message(MessageType.Error, "M671: must have the same number of X and Y coordinates");
+            }
+
+            if (code.TryGetFloat('S', out float maxCorrection))
+            {
+                tilt.MaxCorrection = maxCorrection;
+                seen = true;
+            }
+            if (code.TryGetFloat('P', out float screwPitch))
+            {
+                tilt.ScrewPitch = screwPitch;
+                seen = true;
+            }
+            if (code.TryGetFloat('F', out float correctionFactor))
+            {
+                tilt.CorrectionFactor = correctionFactor;
+                seen = true;
+            }
+
+            if (!seen)
+            {
+                StringBuilder builder = new("Leadscrew/levelling screw coordinates");
+                for (int screw = 0; screw < tilt.ScrewX.Count; screw++)
+                {
+                    builder.Append(CultureInfo.InvariantCulture, $" {tilt.ScrewX[screw]:F1},{tilt.ScrewY[screw]:F1}");
+                }
+                builder.Append(CultureInfo.InvariantCulture,
+                               $", maximum correction {tilt.MaxCorrection:F2}mm, manual adjusting screw pitch {tilt.ScrewPitch:F2}mm");
+                report = builder.ToString();
+            }
+        }
+
+        if (!seen)
+        {
+            return new Message(MessageType.Success, report!);
+        }
+
+        await planner.ReconfigureAsync(cancellationToken);
+        return new Message();
+    }
+
     #region Helpers
+
+    /// <summary>
+    /// Apply the M669 parameters that belong to a core geometry
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="core">The geometry</param>
+    /// <returns>True if anything was set</returns>
+    /// <remarks>
+    /// A core geometry is a matrix, and M669 can set an arbitrary one row by row - which is the point
+    /// of the matrix form, and how a machine that is not one of the named arrangements is described
+    /// </remarks>
+    private static bool ApplyCoreParameters(Commands.Code code, CoreKinematics core)
+    {
+        bool seen = false;
+        for (int row = 0; row < Axis.Letters.Length && row < core.InverseMatrix.Count; row++)
+        {
+            if (code.TryGetFloatArray(Axis.Letters[row], out float[]? values) && values.Length > 0)
+            {
+                float[] existing = core.InverseMatrix[row];
+                float[] updated = new float[existing.Length];
+                for (int column = 0; column < updated.Length; column++)
+                {
+                    updated[column] = column < values.Length ? values[column] : existing[column];
+                }
+                core.InverseMatrix[row] = updated;
+                seen = true;
+            }
+        }
+        return seen;
+    }
+
+    /// <summary>
+    /// Give a core geometry the matrix its name implies
+    /// </summary>
+    /// <param name="kinematics">The geometry</param>
+    /// <remarks>
+    /// The name and the matrix have to agree, because the matrix is what the planner uses and the
+    /// name is what everything else reads. Selecting CoreXY with M669 K1 has to leave a CoreXY matrix
+    /// behind or the object model would describe a machine that does not move like one
+    /// </remarks>
+    private static void ApplyCoreMatrix(DuetAPI.ObjectModel.Kinematics kinematics)
+    {
+        if (kinematics is not CoreKinematics core)
+        {
+            return;
+        }
+
+        float[][]? matrix = core.Name switch
+        {
+            KinematicsName.Cartesian => [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+            KinematicsName.CoreXY => [[1, 1, 0], [1, -1, 0], [0, 0, 1]],
+            KinematicsName.CoreXZ => [[1, 0, 1], [0, 1, 0], [1, 0, -1]],
+            KinematicsName.CoreXYU => [[1, 1, 0, 0], [1, -1, 0, 0], [0, 0, 1, 0], [1, -1, 0, -2]],
+            KinematicsName.CoreXYUV =>
+            [
+                [1, 1, 0, 0, 0],
+                [1, -1, 0, 0, 0],
+                [0, 0, 1, 0, 0],
+                [1, -1, 0, -2, 0],
+                [1, 1, 0, 0, -2]
+            ],
+            KinematicsName.MarkForged => [[1, 0, 0], [-1, 1, 0], [0, 0, 1]],
+            _ => null
+        };
+
+        if (matrix is not null)
+        {
+            core.InverseMatrix.Clear();
+            foreach (float[] row in matrix)
+            {
+                core.InverseMatrix.Add(row);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Apply the M669 parameters that belong to a SCARA geometry
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="scara">The geometry</param>
+    /// <returns>True if anything was set</returns>
+    private static bool ApplyScaraParameters(Commands.Code code, ScaraKinematics scara)
+    {
+        bool seen = false;
+        if (code.TryGetFloat('P', out float proximal))
+        {
+            scara.ProximalLength = proximal;
+            seen = true;
+        }
+        if (code.TryGetFloat('D', out float distal))
+        {
+            scara.DistalLength = distal;
+            seen = true;
+        }
+        if (code.TryGetFloat('X', out float xOffset))
+        {
+            scara.XOffset = xOffset;
+            seen = true;
+        }
+        if (code.TryGetFloat('Y', out float yOffset))
+        {
+            scara.YOffset = yOffset;
+            seen = true;
+        }
+        if (code.TryGetFloat('R', out float minRadius))
+        {
+            scara.MinRadius = minRadius;
+            seen = true;
+        }
+        seen |= ReplaceFloats(code, 'A', scara.ThetaLimits);
+        seen |= ReplaceFloats(code, 'B', scara.PsiLimits);
+        seen |= ReplaceFloats(code, 'C', scara.Crosstalk);
+        return seen;
+    }
+
+    /// <summary>
+    /// Apply the M669 parameters that belong to a polar geometry
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="polar">The geometry</param>
+    /// <returns>True if anything was set</returns>
+    private static bool ApplyPolarParameters(Commands.Code code, PolarKinematics polar)
+    {
+        bool seen = false;
+        if (code.TryGetFloatArray('R', out float[]? radiusLimits) && radiusLimits.Length > 0)
+        {
+            // One value is the maximum with the minimum left alone; two are minimum and maximum
+            if (radiusLimits.Length == 1)
+            {
+                polar.RadiusMax = radiusLimits[0];
+            }
+            else
+            {
+                polar.RadiusMin = radiusLimits[0];
+                polar.RadiusMax = radiusLimits[1];
+            }
+            seen = true;
+        }
+        if (code.TryGetFloat('H', out float homedRadius))
+        {
+            polar.RadiusHomed = homedRadius;
+            seen = true;
+        }
+        if (code.TryGetFloat('F', out float maxSpeed))
+        {
+            polar.TTSpeedMax = maxSpeed;
+            seen = true;
+        }
+        if (code.TryGetFloat('A', out float maxAcceleration))
+        {
+            polar.TTAccMax = maxAcceleration;
+            seen = true;
+        }
+        return seen;
+    }
+
+    /// <summary>
+    /// Replace the contents of an object model float collection from a code parameter
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="letter">Parameter letter</param>
+    /// <param name="target">Collection to replace</param>
+    /// <returns>True if the parameter was there</returns>
+    private static bool ReplaceFloats(Commands.Code code, char letter, ObservableCollection<float> target)
+    {
+        if (!code.TryGetFloatArray(letter, out float[]? values))
+        {
+            return false;
+        }
+
+        target.Clear();
+        foreach (float value in values)
+        {
+            target.Add(value);
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Set one value on one delta tower from a code parameter
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="letter">Parameter letter</param>
+    /// <param name="delta">The geometry</param>
+    /// <param name="tower">Tower index</param>
+    /// <param name="apply">Applies the value</param>
+    /// <returns>True if the parameter was there</returns>
+    private static bool TrySetTowerValue(Commands.Code code, DeltaKinematics delta, char letter, int tower, Action<DeltaTower, float> apply)
+    {
+        if (tower >= delta.Towers.Count || !code.TryGetFloat(letter, out float value))
+        {
+            return false;
+        }
+        apply(delta.Towers[tower], value);
+        return true;
+    }
+
+    /// <summary>
+    /// The geometry a M669 K number selects
+    /// </summary>
+    /// <param name="type">The K value</param>
+    /// <returns>The geometry, or null if there is no such type</returns>
+    /// <remarks>
+    /// The numbering is RepRapFirmware's <c>KinematicsType</c> and is part of the interface, so it is
+    /// spelled out rather than derived from the object model's own enum, which is ordered differently
+    /// </remarks>
+    private static KinematicsName? KinematicsNameFor(int type) => type switch
+    {
+        0 => KinematicsName.Cartesian,
+        1 => KinematicsName.CoreXY,
+        2 => KinematicsName.CoreXZ,
+        3 => KinematicsName.LinearDelta,
+        4 => KinematicsName.Scara,
+        5 => KinematicsName.CoreXYU,
+        6 => KinematicsName.Hangprinter,
+        7 => KinematicsName.Polar,
+        8 => KinematicsName.CoreXYUV,
+        9 => KinematicsName.FiveBarScara,
+        10 => KinematicsName.RotaryDelta,
+        11 => KinematicsName.MarkForged,
+        _ => null
+    };
 
     /// <summary>
     /// Flush the code pipeline and then wait for the machine to come to a stop

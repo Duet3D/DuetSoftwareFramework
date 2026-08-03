@@ -212,6 +212,14 @@ internal partial class MCodeHandler(
             586 => await HandleNetworkProtocolsAsync(code, cancellationToken),
             // Fork input reader
             606 => await HandleForkInputReaderAsync(code, cancellationToken),
+            // Delta configuration and delta endstop adjustments
+            665 or 666 => await HandleDeltaConfigAsync(code, cancellationToken),
+            // Retired in RepRapFirmware in favour of M669
+            667 => new Message(MessageType.Error, "M667 is no longer supported - use M669 instead"),
+            // Select the kinematics and configure them
+            669 => await HandleKinematicsAsync(code, cancellationToken),
+            // Z leadscrew positions
+            671 => await HandleLeadscrewsAsync(code, cancellationToken),
             // Set motor currents, current percentage and standstill current percentage
             906 or 913 or 917 => await HandleMotorCurrentsAsync(code, cancellationToken),
             // Configure stall detection
