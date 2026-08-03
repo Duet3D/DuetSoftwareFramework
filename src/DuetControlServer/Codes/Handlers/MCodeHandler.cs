@@ -146,6 +146,8 @@ internal partial class MCodeHandler(
             114 => await HandleReportPositionAsync(code, cancellationToken),
             // Publish MQTT message
             118 => await HandlePublishMqttAsync(code, cancellationToken),
+            // Report the endstop states
+            119 => await HandleReportEndstopsAsync(code, cancellationToken),
             // Push and pop the interpreter state
             120 or 121 => await HandleStateStackAsync(code, cancellationToken),
             // Immediate DSF diagnostics
@@ -206,6 +208,8 @@ internal partial class MCodeHandler(
             584 => await HandleDriveMappingAsync(code, cancellationToken),
             // Configure nonlinear extrusion
             592 => await HandleNonlinearExtrusionAsync(code, cancellationToken),
+            // Configure the endstops
+            574 => await HandleEndstopConfigAsync(code, cancellationToken),
             // Configure input shaping
             593 => await HandleInputShapingAsync(code, cancellationToken),
             // Configure network protocols

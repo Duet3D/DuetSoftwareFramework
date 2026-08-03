@@ -118,7 +118,7 @@ what the machine half now does (or does not yet) do.
 |---|---|---|---|
 | §5.1 Motion — drives and axes | 26 | 0 | 26 |
 | §5.2 Motion — kinematics and geometry | 8 | 0 | 12 |
-| §5.3 Motion — compensation and probing | 0 | 0 | 14 |
+| §5.3 Motion — compensation and probing | 2 | 0 | 14 |
 | §5.4 Motion — queue, sync and shaping | 3 | 1 | 9 |
 | §5.5 Heat | 0 | 0 | 19 |
 | §5.6 Fans | 0 | 0 | 3 |
@@ -127,7 +127,7 @@ what the machine half now does (or does not yet) do.
 | §5.9 Job, files and SD | 17 | 4 | 29 |
 | §5.10 Network | 4 | 1 | 13 |
 | §5.11 I/O, expansion and miscellaneous | 6 | 5 | 38 |
-| **Total** | **65** | **11** | **186** |
+| **Total** | **67** | **11** | **186** |
 
 Update these counts as boxes are ticked.
 
@@ -232,7 +232,7 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 
 | M-code | RRF | Purpose | Object model home | Standstill | Status |
 |---|---|---|---|---|---|
-| M119 | 2206 | Report endstop status | `sensors.endstops[]` | no | ⬜ blocked |
+| M119 | 2206 | Report endstop status | `sensors.endstops[]` | no | ✅ |
 | M374 | 3089 | Save height map to file | `move.compensation.file` | no | ⬜ |
 | M375 | 3093 | Load height map and enable compensation | `move.compensation` | no | ⬜ |
 | M376 | 3102 | Set taper height | `move.compensation.fadeHeight` | no | ⬜ |
@@ -241,7 +241,7 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M557 | 3686 | Probe grid definition | `move.compensation.probeGrid` | no | ⬜ |
 | M558 | 3690 | Z probe type/configuration; `.1`/`.2` scanning probe calibration | `sensors.probes[]` | no | ⬜ blocked |
 | M561 | 3730 | Identity transform, disable height map | `move.compensation.type` | no | ⬜ |
-| M574 | 3897 | Endstop configuration | `sensors.endstops[]` | no | ⬜ blocked |
+| M574 | 3897 | Endstop configuration | `sensors.endstops[]` | no | ✅ |
 | M577 | 3919 | Wait for endstop trigger | `sensors.endstops[]` | no | ⬜ blocked |
 | M585 | 3960 | Probe tool | `sensors.probes[]`, tools | yes | ⬜ blocked |
 | M672 | 4164 | Program Z probe | CAN to the probe's board | no | ⬜ blocked |
@@ -874,5 +874,21 @@ the same declaration. `lib/CANlib/CANlib.cmake` gained an `MCU HOST` variant mir
 - **`HandleMotionStopped` is not covered by tests.** It needs a `MotionService`, populated rings and
   a link, which the harness does not stand up. The ring scan and the forced DDA endpoint are verified
   by inspection only, and are the first things to exercise on hardware.
-- **Nothing sets `RawMove.StopOnInput` yet.** M574 is what will; the path above is complete but not
-  yet reachable from a G-code.
+### Reaching it from a G-code
+
+M574 configures the endstops and asks the board carrying each port to watch it
+(`CanMessageCreateInputMonitorV1`); without that request the input is never reported at all, so an
+endstop that is configured but not monitored would silently never trigger. `G1 H1`, `H3` and `H4` set
+`CheckEndstops` and fill in `RawMove.StopOnInput` for the axes the code actually mentions - a homing
+move naming X and Y must not be stopped by Z's switch happening to be closed already. M119 reports
+the states, which the board manager keeps current from the same `InputChanged` messages the
+controller acts on.
+
+`Motion/RemoteEndstops.cs` holds the naming the three places have to agree on: M574 when it asks for
+the monitor, the move when it says what stops it, and the receiver when a change comes back. They
+agree because the handle is derived from the axis rather than allocated, so nothing has to remember
+or look up an allocation.
+
+Still not reachable: **G28**. Homing runs `homeall.g` or `home<axis>.g`, which needs the homing
+macros and the `G1 H` moves inside them - the macros work now, so this is the next step rather than a
+blocker.

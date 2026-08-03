@@ -26,6 +26,21 @@ public partial class Endstop : ModelObject, IStaticModelObject
     private int? _probe;
 
     /// <summary>
+    /// Port of this endstop as given to M574, or null if it has none
+    /// </summary>
+    /// <remarks>
+    /// The expansion board carrying the port is what watches the input, but the port is recorded
+    /// here because the object model has to hold enough to recreate the machine: a board that
+    /// reconnects is given its input monitor again from this, and M500 writes it back out
+    /// </remarks>
+    public string? Port
+    {
+        get => _port;
+        set => SetPropertyValue(ref _port, value);
+    }
+    private string? _port;
+
+    /// <summary>
     /// Whether or not the endstop is hit
     /// </summary>
     [Live]

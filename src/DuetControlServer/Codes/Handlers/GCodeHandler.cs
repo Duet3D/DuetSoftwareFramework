@@ -209,6 +209,15 @@ internal sealed class GCodeHandler(
             }
         }
 
+        // H selects what kind of move this is. H1, H3 and H4 stop on the endstops - that is homing -
+        // and H2 is an individual motor move that ignores them
+        move.MoveType = code.GetInt('H', 0);
+        move.CheckEndstops = move.MoveType is 1 or 3 or 4;
+        if (move.CheckEndstops)
+        {
+            ApplyEndstops(code, move, numAxes);
+        }
+
         // Babystepping shifts where the machine goes without changing the coordinate the user asked
         // for, so it is added to the target here and taken back off in CommitPositions. RRF applies a
         // change as a small move of its own; here it takes effect on the next commanded move instead
@@ -265,6 +274,40 @@ internal sealed class GCodeHandler(
             if (movement != 0.0f)
             {
                 move.UsePressureAdvance = true;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Say which endstop stops each drive of a homing move
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="move">The move being built</param>
+    /// <param name="numAxes">Number of axes to consider</param>
+    /// <remarks>
+    /// <para>
+    /// Only the axes the code actually moves are given an endstop. A homing move that mentions X and
+    /// Y must not be stopped by Z's switch happening to be closed already.
+    /// </para>
+    /// <para>
+    /// The identity travels with the move all the way to the controller, which is what watches for
+    /// the input change and stops the drives; nothing on this side is fast enough. See section 10 of
+    /// docs/devel/MCODE_MIGRATION.md
+    /// </para>
+    /// </remarks>
+    private void ApplyEndstops(Commands.Code code, RawMove move, int numAxes)
+    {
+        for (int axis = 0; axis < numAxes; axis++)
+        {
+            if (!code.HasParameter(model.Move.Axes[axis].Letter))
+            {
+                continue;
+            }
+
+            Endstop? endstop = axis < model.Sensors.Endstops.Count ? model.Sensors.Endstops[axis] : null;
+            if (endstop is not null && RemoteEndstops.TryGetStopInput(endstop, axis, out uint stopInput))
+            {
+                move.StopOnInput[axis] = stopInput;
             }
         }
     }

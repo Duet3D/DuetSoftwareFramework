@@ -3,6 +3,7 @@ using DuetAPI.Utility;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Link;
+using DuetControlServer.Motion;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -68,6 +69,15 @@ internal partial class MCodeHandler
 
     /// <summary>How far one relative M290 may babystep, in mm</summary>
     private const float MaxRelativeBabystep = 1.0f;
+
+    /// <summary>
+    /// Shortest interval in ms between an endstop reporting twice
+    /// </summary>
+    /// <remarks>
+    /// Zero, because an endstop change is what stops a move: delaying a report to debounce it would
+    /// delay the stop by the same amount
+    /// </remarks>
+    private const ushort EndstopMinReportInterval = 0;
 
     /// <summary>How many towers a linear delta has</summary>
     private const int DeltaTowers = 3;
@@ -2084,6 +2094,144 @@ internal partial class MCodeHandler
         return new Message();
     }
 
+    /// <summary>
+    /// M574: configure the endstops
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// Each axis letter carries where its endstop is - 0 none, 1 low end, 2 high end - S says what
+    /// kind of input it is, and P names the port. The board carrying that port is asked to watch it
+    /// and to report changes, which is what turns an endstop into something a move can stop on
+    /// </remarks>
+    private async ValueTask<Message?> HandleEndstopConfigAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        // S defaults to a switch on an input pin, which is what almost every endstop is
+        int inputType = code.GetInt('S', (int)RrfEndstopType.InputPin);
+        if (!Enum.IsDefined((RrfEndstopType)inputType))
+        {
+            return new Message(MessageType.Error, "Invalid endstop input type");
+        }
+
+        List<(int Axis, int Position)> configured = [];
+        string? report = null;
+
+        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
+        {
+            throw new OperationCanceledException();
+        }
+
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            Move move = model.Move;
+
+            for (int axis = 0; axis < move.Axes.Count; axis++)
+            {
+                if (code.TryGetInt(move.Axes[axis].Letter, out int position))
+                {
+                    if (position is < 0 or > (int)EndstopPosition.HighEnd)
+                    {
+                        return new Message(MessageType.Error, "Invalid endstop position");
+                    }
+                    configured.Add((axis, position));
+                }
+            }
+
+            if (configured.Count == 0)
+            {
+                StringBuilder builder = new("Endstop configuration:");
+                for (int axis = 0; axis < move.Axes.Count; axis++)
+                {
+                    builder.Append(CultureInfo.InvariantCulture, $"\n{move.Axes[axis].Letter}: ");
+                    Endstop? endstop = axis < model.Sensors.Endstops.Count ? model.Sensors.Endstops[axis] : null;
+                    builder.Append(endstop is null
+                                   ? "none"
+                                   : $"{(endstop.HighEnd ? "high end" : "low end")} {DescribeEndstop(endstop)}");
+                }
+                report = builder.ToString();
+            }
+            else
+            {
+                // A port can only be named for one axis at a time, because it names one input
+                bool hasPort = code.TryGetString('P', out string? port);
+                if (hasPort && (configured.Count > 1 || inputType != (int)RrfEndstopType.InputPin))
+                {
+                    return new Message(MessageType.Error, "Invalid use of P parameter");
+                }
+
+                foreach ((int axis, int position) in configured)
+                {
+                    if (position == (int)EndstopPosition.None)
+                    {
+                        // Removing an endstop leaves the slot empty rather than absent, so the
+                        // collection stays indexed by axis
+                        if (axis < model.Sensors.Endstops.Count)
+                        {
+                            model.Sensors.Endstops[axis] = null;
+                        }
+                        continue;
+                    }
+
+                    Endstop endstop = GetOrCreateEndstop(axis);
+                    endstop.HighEnd = position == (int)EndstopPosition.HighEnd;
+                    endstop.Type = ToEndstopType((RrfEndstopType)inputType);
+                    if (hasPort)
+                    {
+                        endstop.Port = port;
+                    }
+                }
+            }
+        }
+
+        if (report is not null)
+        {
+            return new Message(MessageType.Success, report);
+        }
+
+        // Tell the boards to watch the ports. Done outside the model lock because it goes over CAN
+        List<string> replies = [];
+        foreach ((int axis, int position) in configured)
+        {
+            if (position == (int)EndstopPosition.None)
+            {
+                continue;
+            }
+
+            string? failure = await CreateEndstopMonitorAsync(axis, cancellationToken);
+            if (failure is not null)
+            {
+                replies.Add(failure);
+            }
+        }
+
+        return replies.Count > 0 ? new Message(MessageType.Warning, string.Join('\n', replies)) : new Message();
+    }
+
+    /// <summary>
+    /// M119: report which endstops are triggered
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    private async ValueTask<Message?> HandleReportEndstopsAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        _ = code;
+        StringBuilder builder = new("Endstops - ");
+
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            for (int axis = 0; axis < model.Move.Axes.Count; axis++)
+            {
+                Endstop? endstop = axis < model.Sensors.Endstops.Count ? model.Sensors.Endstops[axis] : null;
+                string state = endstop is null ? "no endstop" : endstop.Triggered ? "at min stop" : "not stopped";
+                builder.Append(CultureInfo.InvariantCulture, $"{model.Move.Axes[axis].Letter}: {state}, ");
+            }
+            builder.Append("Z probe: ").Append(model.Sensors.Probes.Count > 0 ? "not stopped" : "not stopped");
+        }
+        return new Message(MessageType.Success, builder.ToString());
+    }
+
     #region Helpers
 
     /// <summary>
@@ -2307,6 +2455,136 @@ internal partial class MCodeHandler
         11 => KinematicsName.MarkForged,
         _ => null
     };
+
+    /// <summary>
+    /// Where an endstop sits, as the M574 axis parameter spells it
+    /// </summary>
+    private enum EndstopPosition
+    {
+        /// <summary>The axis has no endstop</summary>
+        None = 0,
+
+        /// <summary>At the low end of the axis</summary>
+        LowEnd = 1,
+
+        /// <summary>At the high end of the axis</summary>
+        HighEnd = 2
+    }
+
+    /// <summary>
+    /// What kind of input an endstop is, as the M574 S parameter spells it
+    /// </summary>
+    /// <remarks>
+    /// The numbering is RepRapFirmware's and is part of the interface a config.g depends on, so it
+    /// is spelled out rather than derived from the object model's own enum, which is ordered
+    /// differently and has no equivalent of the retired first entry
+    /// </remarks>
+    private enum RrfEndstopType
+    {
+        /// <summary>Retired: used to select an active-low input</summary>
+        ActiveLow = 0,
+
+        /// <summary>A switch on an input pin</summary>
+        InputPin = 1,
+
+        /// <summary>The Z probe stands in for the endstop</summary>
+        ZProbeAsEndstop = 2,
+
+        /// <summary>Any driver of the axis stalling</summary>
+        MotorStallAny = 3,
+
+        /// <summary>Each driver of the axis stalling individually</summary>
+        MotorStallIndividual = 4
+    }
+
+    /// <summary>
+    /// The object model's endstop type for an M574 S value
+    /// </summary>
+    /// <param name="type">The S value</param>
+    /// <returns>The object model type</returns>
+    private static EndstopType ToEndstopType(RrfEndstopType type) => type switch
+    {
+        RrfEndstopType.InputPin => EndstopType.InputPin,
+        RrfEndstopType.ZProbeAsEndstop => EndstopType.ZProbeAsEndstop,
+        RrfEndstopType.MotorStallAny => EndstopType.MotorStallAny,
+        RrfEndstopType.MotorStallIndividual => EndstopType.MotorStallIndividual,
+        _ => EndstopType.Unknown
+    };
+
+    /// <summary>
+    /// Describe an endstop the way M574 reports it
+    /// </summary>
+    /// <param name="endstop">The endstop</param>
+    /// <returns>The description</returns>
+    private static string DescribeEndstop(Endstop endstop) => endstop.Type switch
+    {
+        EndstopType.InputPin => $"switch connected to pin {endstop.Port ?? "(none)"}",
+        EndstopType.ZProbeAsEndstop => "Z probe",
+        EndstopType.MotorStallAny => "motor stall (any driver)",
+        EndstopType.MotorStallIndividual => "motor stall (individual drivers)",
+        _ => "unknown"
+    };
+
+    /// <summary>
+    /// Find an axis' endstop, adding it if the axis has none yet
+    /// </summary>
+    /// <param name="axis">Axis number</param>
+    /// <returns>The endstop</returns>
+    /// <remarks>The caller must hold the object model write lock</remarks>
+    private Endstop GetOrCreateEndstop(int axis)
+    {
+        while (model.Sensors.Endstops.Count <= axis)
+        {
+            model.Sensors.Endstops.Add(null);
+        }
+        return model.Sensors.Endstops[axis] ??= new Endstop();
+    }
+
+    /// <summary>
+    /// Ask the board carrying an endstop's port to watch it and report changes
+    /// </summary>
+    /// <param name="axis">Axis the endstop belongs to</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>What the board objected to, or null if it accepted</returns>
+    /// <remarks>
+    /// Until this is done the input is not reported at all, so an endstop that is configured but not
+    /// monitored would silently never trigger
+    /// </remarks>
+    private async ValueTask<string?> CreateEndstopMonitorAsync(int axis, CancellationToken cancellationToken)
+    {
+        string? port;
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            Endstop? endstop = axis < model.Sensors.Endstops.Count ? model.Sensors.Endstops[axis] : null;
+            if (endstop is null || endstop.Type != EndstopType.InputPin)
+            {
+                return null;                    // nothing to monitor: not a switch on a pin
+            }
+            port = endstop.Port;
+        }
+
+        if (string.IsNullOrWhiteSpace(port))
+        {
+            return null;                        // no port named yet, so there is nothing to ask for
+        }
+
+        if (!RemoteEndstops.TrySplitPort(port, out byte board, out string localPort))
+        {
+            return $"Invalid endstop port '{port}'";
+        }
+
+        CanMessageCreateInputMonitorV1 message = new()
+        {
+            Handle = RemoteEndstops.HandleFor(axis),
+            Threshold = 0,
+            MinInterval = EndstopMinReportInterval
+        };
+        CanText.SetString(message.PinName, localPort);
+
+        CanResponse response = await linkInterface.SendCanMessageAsync(board, in message, CanMessageType.StandardReply,
+                                                                      cancellationToken: cancellationToken);
+        return string.IsNullOrWhiteSpace(response.PayloadString) ? null : response.PayloadString;
+    }
 
     /// <summary>
     /// Flush the code pipeline and then wait for the machine to come to a stop

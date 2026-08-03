@@ -404,8 +404,13 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, ILogger<Exp
     /// <param name="getHandle">Reads the n'th handle</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <remarks>
-    /// Only the general-purpose inputs are applied. The endstop and Z probe handles in the same
-    /// message address sensors that M574 and M558 have not created yet
+    /// General-purpose inputs and endstops are applied. A Z probe handle is not: M558 has not been
+    /// ported, so nothing has created the probe it would refer to.
+    /// <para>
+    /// This only records the state. Stopping a move on an endstop is decided by the controller,
+    /// which is the only place close enough to the bus for the latency - see section 10 of
+    /// docs/devel/MCODE_MIGRATION.md
+    /// </para>
     /// </remarks>
     private async ValueTask ApplyInputChangedAsync(ushort states, byte numHandles, Func<uint, RemoteInputHandle> getHandle,
                                                    CancellationToken cancellationToken)
@@ -417,16 +422,28 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, ILogger<Exp
             for (int i = 0; i < handles; i++)
             {
                 RemoteInputHandle handle = getHandle((uint)i);
-                if (handle.Type != RemoteInputHandle.TypeGpIn)
-                {
-                    continue;
-                }
 
-                GpInputPort? port = GetOrCreate(model.Sensors.GpIn, handle.Major, () => new GpInputPort());
-                if (port is not null)
+                // Bit i of States is the digital level of the i'th handle in this message
+                bool active = (states & (1 << i)) != 0;
+
+                if (handle.Type == RemoteInputHandle.TypeGpIn)
                 {
-                    // Bit i of States is the digital level of the i'th handle in this message
-                    port.Value = (states & (1 << i)) != 0 ? 1.0f : 0.0f;
+                    GpInputPort? port = GetOrCreate(model.Sensors.GpIn, handle.Major, () => new GpInputPort());
+                    if (port is not null)
+                    {
+                        port.Value = active ? 1.0f : 0.0f;
+                    }
+                }
+                else if (handle.Type == RemoteInputHandle.TypeEndstop)
+                {
+                    // Major is the axis the endstop belongs to, which is how M574 registered it
+                    Endstop? endstop = handle.Major < model.Sensors.Endstops.Count
+                        ? model.Sensors.Endstops[handle.Major]
+                        : null;
+                    if (endstop is not null)
+                    {
+                        endstop.Triggered = active;
+                    }
                 }
             }
         }
