@@ -9,6 +9,7 @@ using DuetControlServer.Link;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Model;
+using DuetControlServer.Motion;
 using DuetControlServer.Utility;
 using DuetSharedLibrary;
 using Microsoft.Extensions.Hosting;
@@ -41,8 +42,9 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="logger">Logger</param>
 /// <param name="loggerFactory">Logger factory</param>
 /// <param name="lifetime">Host application lifetime</param>
+/// <param name="planner">Where G-codes become queued moves, and what holds the machine description</param>
 /// <param name="settings">Settings</param>
-public class MCodeHandler(
+internal partial class MCodeHandler(
     CodeProcessor codeProcessor,
     CommandFactory commandFactory,
     DiagnosticsProvider diagnosticsProvider,
@@ -57,6 +59,7 @@ public class MCodeHandler(
     ILogger<MCodeHandler> logger,
     ILoggerFactory loggerFactory,
     IHostApplicationLifetime lifetime,
+    MovePlanner planner,
     IOptions<Settings> settings) : ICodeHandler
 {
     private MessageLoggerProvider? _messageLoggerProvider;
@@ -1341,7 +1344,10 @@ public class MCodeHandler(
                 }
                 break;
         }
-        return null;
+
+        // Machine configuration and motion codes live in MCodeHandler.Motion.cs. None of them share a
+        // number with the cases above, so falling through to them here is unambiguous
+        return await ProcessMotionCodeAsync(code, cancellationToken);
     }
 
     /// <summary>

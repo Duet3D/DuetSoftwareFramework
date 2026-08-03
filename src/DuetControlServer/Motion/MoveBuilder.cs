@@ -88,6 +88,20 @@ internal sealed class MoveBuilder(MotionParameters parameters)
     }
 
     /// <summary>
+    /// Re-derive the motor endpoints from the axis coordinates
+    /// </summary>
+    /// <remarks>
+    /// For when steps per mm or microstepping changed underneath: the endpoints are in microsteps, so
+    /// the same count means a different position once the conversion changes. Recomputing them from
+    /// the axis coordinates keeps the machine where it was in mm, which is what the user asked for by
+    /// changing a calibration constant rather than commanding a move. RepRapFirmware does the same
+    /// thing by scaling each endpoint by the ratio the steps per mm changed by
+    /// </remarks>
+    public void RecalculateEndPoints()
+        => Parameters.Geometry.CartesianToMotorSteps(
+            _startCoordinates, Parameters.StepsPerMm, Parameters.NumAxes, Parameters.NumAxes, _endPoints);
+
+    /// <summary>
     /// Set the axis coordinates without moving anything (G92)
     /// </summary>
     /// <param name="axis">Axis to redefine</param>

@@ -34,10 +34,15 @@ public class MoveBuilderTests
     {
         Move move = new()
         {
-            PrintingAcceleration = 10000.0f,
-            TravelAcceleration = 10000.0f,
             MinimumMovementSpeed = 0.5f
         };
+
+        // The move-wide acceleration caps live on the motion system, which is where M204 writes them
+        move.MotionSystems.Add(new MotionSystem
+        {
+            PrintingAcceleration = 10000.0f,
+            TravelAcceleration = 10000.0f
+        });
 
         AddAxis(move, 'X', stepsPerMm: 80.0f, speedMmPerMin: 300.0f * 60.0f, acceleration: 1000.0f, board: 0, port: 0);
         AddAxis(move, 'Y', stepsPerMm: 80.0f, speedMmPerMin: 300.0f * 60.0f, acceleration: 1000.0f, board: 0, port: 1);
@@ -350,8 +355,8 @@ public class MoveBuilderTests
     public void M204CapsTravelAndPrintingMovesSeparately()
     {
         Move machine = CartesianMachine();
-        machine.TravelAcceleration = 500.0f;
-        machine.PrintingAcceleration = 200.0f;
+        machine.MotionSystems[0].TravelAcceleration = 500.0f;
+        machine.MotionSystems[0].PrintingAcceleration = 200.0f;
 
         MoveBuilder builder = NewBuilder(machine);
         float clockSquared = StepClockRate * StepClockRate;

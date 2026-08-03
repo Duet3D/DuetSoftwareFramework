@@ -36,6 +36,15 @@ internal sealed class MotionParameters
     /// <summary>Seconds per minute, for the object model's mm/min speeds</summary>
     private const float SecondsPerMinute = 60.0f;
 
+    /// <summary>
+    /// Acceleration cap to use before a motion system exists to carry one, in mm/s^2
+    /// </summary>
+    /// <remarks>
+    /// Matches the object model's own default for <see cref="MotionSystem.PrintingAcceleration"/>, so
+    /// the limit does not change the moment the first motion system appears
+    /// </remarks>
+    private const float DefaultAcceleration = 10000.0f;
+
     /// <summary>Axes the user can refer to</summary>
     public int NumAxes { get; private init; }
 
@@ -157,6 +166,10 @@ internal sealed class MotionParameters
 
         float clockSquared = MotionLimits.StepClockRate * MotionLimits.StepClockRate;
 
+        // M204 is per motion system, which is where the object model keeps it. The planner is not
+        // per motion system yet, so the first one sets the limits for all of them
+        MotionSystem? motionSystem = move.MotionSystems.Count > 0 ? move.MotionSystems[0] : null;
+
         MotionParameters parameters = new()
         {
             NumAxes = numAxes,
@@ -164,8 +177,8 @@ internal sealed class MotionParameters
             Geometry = BuildGeometry(move.Kinematics),
             LinearAxes = linearAxes,
             RotationalAxes = rotationalAxes,
-            MaxPrintingAcceleration = move.PrintingAcceleration / clockSquared,
-            MaxTravelAcceleration = move.TravelAcceleration / clockSquared,
+            MaxPrintingAcceleration = (motionSystem?.PrintingAcceleration ?? DefaultAcceleration) / clockSquared,
+            MaxTravelAcceleration = (motionSystem?.TravelAcceleration ?? DefaultAcceleration) / clockSquared,
             MinFeedrate = move.MinimumMovementSpeed / MotionLimits.StepClockRate
         };
 

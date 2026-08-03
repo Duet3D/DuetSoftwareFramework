@@ -26,12 +26,17 @@ public class MotionParametersTests
     {
         Move move = new()
         {
-            PrintingAcceleration = 500.0f,
-            TravelAcceleration = 1000.0f,
             MinimumMovementSpeed = 0.5f,
             JerkPolicy = 1,
             BacklashFactor = 7
         };
+
+        // The move-wide acceleration caps live on the motion system, which is where M204 writes them
+        move.MotionSystems.Add(new MotionSystem
+        {
+            PrintingAcceleration = 500.0f,
+            TravelAcceleration = 1000.0f
+        });
 
         Axis x = new()
         {

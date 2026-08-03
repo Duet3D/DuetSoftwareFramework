@@ -53,6 +53,11 @@ internal sealed class MovePlanner(
     Model.ObjectModel model,
     ILogger<MovePlanner> logger)
 {
+    /// <summary>
+    /// How often to re-check whether the rings have drained
+    /// </summary>
+    private static readonly TimeSpan StandstillPollInterval = TimeSpan.FromMilliseconds(5);
+
     private readonly Lock _lock = new();
     private readonly byte[] _buffer = new byte[MoveParams.Length(MotionLimits.MaxAxesPlusExtruders)];
     private readonly int[] _resyncBuffer = new int[MotionLimits.MaxAxesPlusExtruders];
@@ -113,8 +118,55 @@ internal sealed class MovePlanner(
 
             Parameters = parameters;
             Builder.Reconfigure(parameters);
+
+            // Motor positions are microstep counts, and the new description may convert them to a
+            // different position in mm. Both sides have to be brought back to the position the
+            // machine is actually at, or the next move is planned as a delta from somewhere else
+            Builder.RecalculateEndPoints();
+            uint driveMask = parameters.NumAxes >= 32 ? uint.MaxValue : (1u << parameters.NumAxes) - 1;
+            linkInterface.Native.SetMotorPositions(driveMask, Builder.EndPoints);
             return true;
         }
+    }
+
+    /// <summary>
+    /// Wait until every ring has run out the moves it was given
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>True if the machine reached standstill</returns>
+    /// <remarks>
+    /// The counterpart of RepRapFirmware's <c>LockAllMovementSystemsAndWaitForStandstill</c>. Codes
+    /// that change what a microstep means - steps per mm, microstepping, driver mapping, geometry -
+    /// must not take effect while a move planned under the old description is still running, because
+    /// the endpoints it was planned against would be executed under the new one.
+    /// <para>
+    /// Flushing the code pipeline is not enough on its own: that only guarantees the moves have been
+    /// submitted, not that they have been executed
+    /// </para>
+    /// </remarks>
+    public async ValueTask<bool> WaitForStandstillAsync(CancellationToken cancellationToken = default)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            bool moving = false;
+            for (int ring = 0; ring < MotionLimits.MaxRings; ring++)
+            {
+                // An unconfigured ring reads zero for both, so this is safe over all of them
+                if (linkInterface.Native.GetScheduledMoves(ring) != linkInterface.Native.GetCompletedMoves(ring))
+                {
+                    moving = true;
+                    break;
+                }
+            }
+
+            if (!moving)
+            {
+                return true;
+            }
+
+            await Task.Delay(StandstillPollInterval, cancellationToken);
+        }
+        return false;
     }
 
     /// <summary>

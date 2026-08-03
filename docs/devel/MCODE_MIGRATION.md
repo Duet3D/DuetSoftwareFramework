@@ -103,7 +103,7 @@ This is additional to the ⬜ rows. Do not read 🔵 as "nearly done".
 
 | Group | ✅ Done | 🔵 SBC half | Rows (excl. ⛔) |
 |---|---|---|---|
-| §5.1 Motion — drives and axes | 0 | 0 | 26 |
+| §5.1 Motion — drives and axes | 11 | 0 | 26 |
 | §5.2 Motion — kinematics and geometry | 0 | 0 | 12 |
 | §5.3 Motion — compensation and probing | 0 | 0 | 14 |
 | §5.4 Motion — queue, sync and shaping | 0 | 1 | 9 |
@@ -114,7 +114,7 @@ This is additional to the ⬜ rows. Do not read 🔵 as "nearly done".
 | §5.9 Job, files and SD | 17 | 4 | 29 |
 | §5.10 Network | 4 | 1 | 13 |
 | §5.11 I/O, expansion and miscellaneous | 5 | 5 | 38 |
-| **Total** | **26** | **11** | **186** |
+| **Total** | **37** | **11** | **186** |
 
 Update these counts as boxes are ticked.
 
@@ -149,23 +149,23 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M82 | 1600 | Absolute extruder positioning | `inputs[].drivesRelative = false` | no | ⬜ |
 | M83 | 1605 | Relative extruder positioning | `inputs[].drivesRelative = true` | no | ⬜ |
 | M85 | 1612 | Set inactive time | `move.idle.timeout` | no | ⬜ |
-| M92 | 1615 | Steps per mm | `move.axes[].stepsPerMm`, `move.extruders[].stepsPerMm` → CAN `MultipleDrivesRequestStepsPerUnitAndMicrostepping` | yes | ⬜ |
+| M92 | 1615 | Steps per mm | `move.axes[].stepsPerMm`, `move.extruders[].stepsPerMm` → CAN `MultipleDrivesRequestStepsPerUnitAndMicrostepping` | yes | ✅ |
 | M114 | 1945 | Report position | reads `move.axes[].machinePosition` / `userPosition` | no | ⬜ |
 | M120 | 2210 | Push machine state | `inputs[].stack` | no | ⬜ |
 | M121 | 2214 | Pop machine state | `inputs[].stack` | no | ⬜ |
-| M201 | 2527 | Axis/extruder accelerations | `move.axes[].acceleration`, `move.extruders[].acceleration` | yes | ⬜ |
-| M201.1 | 2527 | Reduced accelerations for probing and stall homing | `move.axes[].reducedAcceleration` | yes | ⬜ |
-| M203 | 2612 | Min/max feedrates | `move.axes[].speed`, `move.extruders[].speed`, `move.minimumMovementSpeed` | yes | ⬜ |
-| M204 | 2670 | Print/travel acceleration | `move.printingAcceleration`, `move.travelAcceleration` | no | ⬜ |
-| M205 / M566 | 3782 | Jerk (mm/s and mm/min forms), jerk policy | `move.axes[].jerk` / `.printingJerk`, `move.jerkPolicy` | yes | ⬜ |
-| M208 | 2701 | Axis minima/maxima | `move.axes[].min` / `.max` | no | ⬜ |
+| M201 | 2527 | Axis/extruder accelerations | `move.axes[].acceleration`, `move.extruders[].acceleration` | yes | ✅ |
+| M201.1 | 2527 | Reduced accelerations for probing and stall homing | `move.axes[].reducedAcceleration` | yes | ✅ |
+| M203 | 2612 | Min/max feedrates | `move.axes[].speed`, `move.extruders[].speed`, `move.minimumMovementSpeed` | yes | ✅ |
+| M204 | 2670 | Print/travel acceleration | `move.motionSystems[].printingAcceleration` / `.travelAcceleration` | no | ✅ |
+| M205 / M566 | 3782 | Jerk (mm/s and mm/min forms), jerk policy | `move.axes[].jerk` / `.printingJerk`, `move.jerkPolicy` | yes | ✅ |
+| M208 | 2701 | Axis minima/maxima | `move.axes[].min` / `.max` | no | ✅ |
 | M220 | 2705 | Speed factor override | `move.speedFactor` | no | ⬜ |
 | M221 | 2734 | Extrusion factor override | `move.extruders[].factor` | no | ⬜ |
-| M350 | 2996 | Microstepping | `move.axes[].microstepping` → CAN `MultipleDrivesRequestStepsPerUnitAndMicrostepping` | yes | ⬜ |
-| M400 | 3120 | Wait for moves to finish | — (flush and drain) | n/a | ⬜ |
+| M350 | 2996 | Microstepping | `move.axes[].microstepping` → CAN `MultipleDrivesRequestStepsPerUnitAndMicrostepping` | yes | ✅ |
+| M400 | 3120 | Wait for moves to finish | — (flush and drain) | n/a | ✅ |
 | M569 | 3878 | Driver configuration (direction, mode, timings) | `boards[].drivers[]` → CAN generic `M569Params` (+ `.1`/`.2`/`.4`/`.6`/`.7`) | yes | ⬜ |
-| M584 | 3956 | Axis/extruder → driver mapping | `move.axes[].drivers`, `move.extruders[].driver` | yes | ⬜ |
-| M906 | 4377 | Motor currents | `move.axes[].current` → CAN `MultipleDrivesRequestMotorCurrents` | no | ⬜ |
+| M584 | 3956 | Axis/extruder → driver mapping | `move.axes[].drivers`, `move.extruders[].driver` | yes | ✅ |
+| M906 | 4377 | Motor currents | `move.axes[].current` → CAN `MultipleDrivesRequestMotorCurrents` | no | ✅ |
 | M913 | 4378 | Motor current percentage | `move.axes[].percentCurrent` | no | ⬜ |
 | M915 | 4539 | Stall detection | `boards[].drivers[]` → CAN generic `M915Params`, `CanMessageEnableStallEndstop` | no | ⬜ |
 | M917 | 4380 | Standstill current percentage | `move.axes[].percentStstCurrent` → CAN `MultipleDrivesRequestStandstillCurrentFactor` | no | ⬜ |
@@ -409,9 +409,9 @@ Add to this list as ports uncover more; extending the object model is the expect
 
 Each phase leaves the tree in a state where the machine is more usable than before.
 
-1. **Phase 1 — make an axis movable.** M92, M201, M203, M204, M205/M566, M208, M350, M400, M584,
-   M906. With G0/G1/G92 already ported, this is the minimum needed to configure a machine and have it
-   move correctly.
+1. ~~**Phase 1 — make an axis movable.** M92, M201, M203, M204, M205/M566, M208, M350, M400, M584,
+   M906.~~ **Done** — see §8. Lives in
+   [MCodeHandler.Motion.cs](../../src/DuetControlServer/Codes/Handlers/MCodeHandler.Motion.cs).
 2. **Phase 2 — driver detail.** M17, M18/M84, M85, M569, M913, M915, M917, M970, M572, M593, M592.
    All of these are CAN-message-shaped and the generated helpers already exist.
 3. **Phase 3 — interpreter state and reporting.** M82, M83, M114, M120, M121, M220, M221, M290, M425,
@@ -432,4 +432,45 @@ Each phase leaves the tree in a state where the machine is more usable than befo
 
 Record decisions here as they are made, so a later reader does not have to re-derive them from RRF.
 
-- *(nothing yet)*
+### Phase 1 (M92, M201, M203, M204, M205/M566, M208, M350, M400, M584, M906)
+
+**M584 is what creates an axis.** Nothing in DuetControlServer populated `move.axes[]`,
+`move.extruders[]` or `move.motionSystems[]` — RepRapFirmware used to, over SPI. `move.axes[]` starts
+empty and stays empty until M584 names a letter, exactly as in RRF, so M584 has to run before any of
+the other motion codes have anything to configure. This is the reason a machine could not be set up
+at all before this phase.
+
+**M204 writes `move.motionSystems[].printingAcceleration`, not `move.printingAcceleration`.** The
+latter is `[Obsolete]` in the object model. `MotionParameters.FromObjectModel` was reading the
+obsolete pair, so writing to the correct one would have made M204 silently do nothing; it now reads
+`motionSystems[0]`, falling back to the object model's own default when no motion system exists yet.
+The planner is not per motion system, so the first one sets the limits for all of them. Two tests in
+`MoveBuilderTests`/`MotionParametersTests` were setting the deprecated fields and were moved with it.
+
+**Reconfiguring preserves the machine position.** Motor positions are microstep counts, so changing
+steps per mm or microstepping changes where a given count is in mm. `MovePlanner.ReconfigureAsync`
+now re-derives the endpoints from the axis coordinates (`MoveBuilder.RecalculateEndPoints`) and
+pushes them to the engine, which is what RRF achieves with `AdjustEndpoint` scaling each endpoint by
+the ratio the steps per mm changed by.
+
+**Standstill is a real wait, not just a flush.** `MovePlanner.WaitForStandstillAsync` polls the
+engine's scheduled-versus-completed move counts per ring. Flushing the code pipeline only guarantees
+the moves have been *submitted*; RRF's `LockAllMovementSystemsAndWaitForStandstill` waits for them to
+have been *run*, and M92, M350, M584 and M906 all need the latter. It is applied only when the code
+actually names a drive, so that a bare `M92` or `M906` — which DWC polls — does not stall mid-print.
+
+**Per-driver CAN messages are grouped by board.** `CanMessageMultipleDrivesRequest` addresses one
+board with a bitmap in that board's local driver numbers, and the receiver pairs the n'th value with
+the n'th set bit. `Link/Protocol/CanMessages/RemoteDrivers.cs` does the split, the ascending-order
+packing and the chunking at eight drivers per message; the ordering is what
+`UnitTests/Link/RemoteDriversTests.cs` covers, because getting it wrong applies settings to the wrong
+motors rather than failing.
+
+**`MCodeHandler` became `internal partial`.** Internal to match `GCodeHandler` and because it now
+takes `MovePlanner`, which is internal; partial so the motion codes live in their own file rather
+than extending an already long switch. Nothing outside the assembly referenced it.
+
+**Not carried over from RRF's versions of these codes:** M201's `T` acceleration-time parameter and
+the S-curve flag (`SUPPORT_3RD_ORDER`), M584's `MinVisibleAxes` lower bound, and M350/M92's
+recalculation of backlash steps (`UpdateBacklashSteps`) — backlash arrives with M425 in phase 3.
+M906's `I` and `T` set `move.idle`, but nothing acts on idle current yet; that needs M18/M84 in phase 2.
