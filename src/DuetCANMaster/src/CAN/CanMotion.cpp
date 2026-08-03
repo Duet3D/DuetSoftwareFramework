@@ -407,15 +407,78 @@ namespace CanMotion
 
 	// Which input stops which driver, for the move being accumulated or executed. One entry per
 	// driver that watches something, which is at most the drivers a move can carry.
+	//
+	// totalSteps is kept because correcting for message latency needs it: the endstop reports when it
+	// triggered, and the position to revert to is the fraction of this driver's steps that had been
+	// taken by that instant
 	struct EndstopWatch
 	{
 		DriverId driver;
 		uint8_t inputBoard;
 		uint16_t inputHandle;
+		int32_t totalSteps;
 	};
 
 	static EndstopWatch endstopWatches[SbcProtocol::MaxScheduleMoveDrivers];
 	static size_t numEndstopWatches = 0;
+
+	// The velocity profile of the move the watches belong to, needed to work out how far it had got
+	// when the endstop triggered. Distances are normalised so that the whole move is 1.0, which is
+	// how the profile reaches the boards
+	struct EndstopMoveProfile
+	{
+		uint32_t whenToExecute;
+		uint32_t accelClocks;
+		uint32_t steadyClocks;
+		uint32_t decelClocks;
+		float acceleration;						// per unit distance, positive
+		float deceleration;						// per unit distance, positive
+	};
+
+	static EndstopMoveProfile endstopProfile{};
+
+	// Fraction of the move completed `clocks` after it started, in the range 0..1.
+	//
+	// This is the controller's equivalent of the firmware's DriveMovement::GetCurrentPosition: the
+	// controller does not generate the steps, so it cannot ask a drive how far it has gone, but it
+	// planned the profile and can evaluate it at the instant the endstop reported
+	static float FractionCompletedAt(uint32_t clocks) noexcept
+	{
+		const EndstopMoveProfile& p = endstopProfile;
+		const uint32_t totalClocks = p.accelClocks + p.steadyClocks + p.decelClocks;
+		if (totalClocks == 0)
+		{
+			return 0.0;
+		}
+		if (clocks >= totalClocks)
+		{
+			return 1.0;
+		}
+
+		// The profile carries the phase durations and the accelerations but not the speeds, so the
+		// top speed is recovered from the fact that the three phases cover unit distance
+		const float a = p.acceleration, d = p.deceleration;
+		const float A = (float)p.accelClocks, S = (float)p.steadyClocks, D = (float)p.decelClocks;
+		const float denominator = A + S + D;
+		const float topSpeed = (1.0 + (0.5 * a * fsquare(A)) + (0.5 * d * fsquare(D))) / denominator;
+
+		if (clocks <= p.accelClocks)
+		{
+			// Starting speed is topSpeed - a*A, so the distance is the area under the ramp
+			const float t = (float)clocks;
+			const float startSpeed = topSpeed - (a * A);
+			return (startSpeed * t) + (0.5 * a * fsquare(t));
+		}
+
+		const float accelDistance = (topSpeed * A) - (0.5 * a * fsquare(A));
+		if (clocks <= p.accelClocks + p.steadyClocks)
+		{
+			return accelDistance + (topSpeed * (float)(clocks - p.accelClocks));
+		}
+
+		const float t = (float)(clocks - p.accelClocks - p.steadyClocks);
+		return accelDistance + (topSpeed * S) + (topSpeed * t) - (0.5 * d * fsquare(t));
+	}
 } // namespace CanMotion
 
 void CanMotion::ScheduleFromSbc(const SbcProtocol::ScheduleMoveHeader& header,
@@ -430,6 +493,8 @@ void CanMotion::ScheduleFromSbc(const SbcProtocol::ScheduleMoveHeader& header,
 		sbcMoveId = header.moveId;
 		sbcMoveInProgress = true;
 		numEndstopWatches = 0;			// the watches belong to the move being abandoned, not the new one
+		endstopProfile = EndstopMoveProfile{header.whenToExecute, header.accelClocks, header.steadyClocks,
+											header.decelClocks, header.acceleration, -header.deceleration};
 	}
 
 	// Rebuild PrepParams from the packet. The SBC plans second-order moves - it has no S-curve
@@ -492,6 +557,7 @@ void CanMotion::ScheduleFromSbc(const SbcProtocol::ScheduleMoveHeader& header,
 			endstopWatches[numEndstopWatches].driver = driver;
 			endstopWatches[numEndstopWatches].inputBoard = d.stopOnBoard;
 			endstopWatches[numEndstopWatches].inputHandle = d.stopOnHandle;
+			endstopWatches[numEndstopWatches].totalSteps = d.steps;
 			++numEndstopWatches;
 		}
 	}
@@ -605,8 +671,15 @@ void CanMotion::StopDriverWhenProvisional(DriverId driver) noexcept
 
 #  if HAS_SBC_INTERFACE
 
-bool CanMotion::StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHandle) noexcept
+bool CanMotion::StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHandle, uint32_t whenTriggered) noexcept
 {
+	// How far into the move the endstop actually fired. The message took time to arrive, so the
+	// drives have run on past that point; this is what the revert corrects for
+	const uint32_t elapsed = whenTriggered - endstopProfile.whenToExecute;
+	const float fractionDone =
+		((int32_t)elapsed < 0) ? 0.0							// triggered before the move started
+			: FractionCompletedAt(elapsed);
+
 	bool stoppedAnything = false;
 	for (size_t i = 0; i < numEndstopWatches; ++i)
 	{
@@ -625,10 +698,11 @@ bool CanMotion::StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHandl
 		}
 		else
 		{
-			// The move is running on the boards. Zero net steps means "stop where you are": the
-			// controller never generated the steps, so it does not know how far this driver got, and
-			// the accurate position comes back through the revert mechanism instead
-			if (StopDriverWhenExecuting(watch.driver, 0))
+			// The move is running on the boards, so the position to revert to is where this driver
+			// had got to when the endstop fired, not where it is now. That is the whole point of the
+			// timestamp: without it the drive would be sent back to the start of the move
+			const int32_t netStepsTaken = lrintf(fractionDone * (float)watch.totalSteps);
+			if (StopDriverWhenExecuting(watch.driver, netStepsTaken))
 			{
 				stoppedAnything = true;
 			}

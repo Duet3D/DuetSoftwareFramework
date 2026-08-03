@@ -62,7 +62,9 @@ namespace CanMotion
 	//
 	// Returns true if anything was stopped, in which case the caller should wake the async sender.
 	// Called from the CAN receiver task
-	bool StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHandle) noexcept;
+	// whenTriggered is the master-clock time the endstop reported, used to revert the drives to
+	// where they were at that instant rather than where the stop message found them
+	bool StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHandle, uint32_t whenTriggered) noexcept;
 #  endif
 
 	// The next 4 functions may be called from the step ISR, so they can't send CAN messages directly

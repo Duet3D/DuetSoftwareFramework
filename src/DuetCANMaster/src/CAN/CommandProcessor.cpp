@@ -170,7 +170,9 @@ static void HandleInputStateChanged(CanMessageBuffer& buf, CanMessageType id) no
 			// Bit i of states is the level of the i'th handle. Only a handle that went active stops
 			// anything; a release is just as much a change, and stopping on one would end the move
 			// the moment the axis backed off the endstop
-			if ((msg.states & (1u << i)) != 0 && CanMotion::StopDriversWatchingInput(src, msg.results[i].handle.asU16()))
+			if ((msg.states & (1u << i)) != 0
+				&& CanMotion::StopDriversWatchingInput(src, msg.results[i].handle.asU16(),
+													   CanInterface::Convert16bitReceivedTimeStampTo32bits(msg.GetWhen(i))))
 			{
 				stoppedAnything = true;
 			}
@@ -178,10 +180,14 @@ static void HandleInputStateChanged(CanMessageBuffer& buf, CanMessageType id) no
 	}
 	else
 	{
+		// V1 carries no trigger timestamp, so the best that can be done is to treat the stop as
+		// having happened now. The drives then revert to where the message found them rather than to
+		// where the endstop fired, which is the overshoot V2 exists to remove
 		const CanMessageInputChangedV1& msg = buf.msg.inputChangedV1;
 		for (unsigned int i = 0; i < msg.numHandles && i < ARRAY_SIZE(msg.results); ++i)
 		{
-			if ((msg.states & (1u << i)) != 0 && CanMotion::StopDriversWatchingInput(src, msg.results[i].handle.asU16()))
+			if ((msg.states & (1u << i)) != 0
+				&& CanMotion::StopDriversWatchingInput(src, msg.results[i].handle.asU16(), StepTimer::GetTimerTicks()))
 			{
 				stoppedAnything = true;
 			}
