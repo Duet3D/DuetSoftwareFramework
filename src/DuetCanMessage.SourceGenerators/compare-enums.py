@@ -21,6 +21,10 @@ import os
 import re
 import sys
 
+# csharpSource is recorded relative to the repository root, which is where this file's own directory puts it,
+# rather than to whatever directory the tool was started from: the build invokes it from the DCS project.
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 def parse_canlib(path, name):
     """CANlib declares these either as an enum class or through the NamedEnum macro."""
@@ -134,7 +138,7 @@ def main():
 
         # An enum generated elsewhere is only tied to CANlib if its own file is checked too
         if definition.get("csharpSource"):
-            csharp = parse_csharp(definition["csharpSource"])
+            csharp = parse_csharp(os.path.join(REPO_ROOT, definition["csharpSource"]))
             expected = {n[0].upper() + n[1:]: v for n, v in schema_live.items()}
             compare(f"{name} (C#)", expected, csharp, set(), problems,
                     reference_name="the schema", other_name=definition["csharpSource"])
