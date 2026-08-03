@@ -22,6 +22,7 @@ public static partial class ServiceCollectionExtensions
             .AddSingleton<CodeProcessor>()
             .AddSingleton<IDiagnostics, CodeProcessor>(services => services.GetRequiredService<CodeProcessor>())
             .AddHostedService<CodeProcessorService>()
+            .AddSingleton<InterpreterStateStack>()
             .AddKeyedSingleton<Handlers.ICodeHandler, Handlers.GCodeHandler>(Handlers.Keys.GCodes)
             .AddKeyedSingleton<Handlers.ICodeHandler, Handlers.MCodeHandler>(Handlers.Keys.MCodes)
             .AddKeyedSingleton<Handlers.ICodeHandler, Handlers.TCodeHandler>(Handlers.Keys.TCodes)

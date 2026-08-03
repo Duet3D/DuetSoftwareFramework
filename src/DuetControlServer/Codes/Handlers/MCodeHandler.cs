@@ -43,6 +43,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="loggerFactory">Logger factory</param>
 /// <param name="lifetime">Host application lifetime</param>
 /// <param name="macroRunner">Runs macro files</param>
+/// <param name="stateStack">Interpreter state saved by M120 and restored by M121</param>
 /// <param name="planner">Where G-codes become queued moves, and what holds the machine description</param>
 /// <param name="settings">Settings</param>
 internal partial class MCodeHandler(
@@ -61,6 +62,7 @@ internal partial class MCodeHandler(
     ILoggerFactory loggerFactory,
     IHostApplicationLifetime lifetime,
     MacroRunner macroRunner,
+    InterpreterStateStack stateStack,
     MovePlanner planner,
     IOptions<Settings> settings) : ICodeHandler
 {
@@ -126,6 +128,8 @@ internal partial class MCodeHandler(
             39 => await HandleSDCardInfoAsync(code, cancellationToken),
             // Motors on / motors off
             17 or 18 or 84 => await HandleDriverStateAsync(code, cancellationToken),
+            // Absolute / relative extruder positioning
+            82 or 83 => await HandleExtruderPositioningAsync(code, cancellationToken),
             // Set the idle timeout
             85 => await HandleIdleTimeoutAsync(code, cancellationToken),
             // Set steps per mm
@@ -138,8 +142,12 @@ internal partial class MCodeHandler(
             112 => await HandleEmergencyStopAsync(code, cancellationToken),
             // Report firmware version
             115 => await HandleFirmwareVersionAsync(code, cancellationToken),
+            // Report the current position
+            114 => await HandleReportPositionAsync(code, cancellationToken),
             // Publish MQTT message
             118 => await HandlePublishMqttAsync(code, cancellationToken),
+            // Push and pop the interpreter state
+            120 or 121 => await HandleStateStackAsync(code, cancellationToken),
             // Immediate DSF diagnostics
             122 => await HandleDiagnosticsAsync(code, cancellationToken),
             // Set axis and extruder accelerations
@@ -152,10 +160,18 @@ internal partial class MCodeHandler(
             205 or 566 => await HandleJerkAsync(code, cancellationToken),
             // Set axis limits
             208 => await HandleAxisLimitsAsync(code, cancellationToken),
+            // Set the speed factor
+            220 => await HandleSpeedFactorAsync(code, cancellationToken),
+            // Set the extrusion factor
+            221 => await HandleExtrusionFactorAsync(code, cancellationToken),
+            // Babystepping
+            290 => await HandleBabysteppingAsync(code, cancellationToken),
             // Set microstepping
             350 => await HandleMicrosteppingAsync(code, cancellationToken),
             // Wait for the current moves to finish
             400 => await HandleWaitForMovesAsync(code, cancellationToken),
+            // Backlash compensation
+            425 => await HandleBacklashAsync(code, cancellationToken),
             // Query object model
             409 => await HandleQueryObjectModelAsync(code, cancellationToken),
             // Create directory on SD card
@@ -170,6 +186,10 @@ internal partial class MCodeHandler(
             503 => await HandlePrintSettingsAsync(code, cancellationToken),
             // Set configuration file folder
             505 => await HandleSetFolderAsync(code, cancellationToken),
+            // Axis compensation
+            556 => await HandleAxisCompensationAsync(code, cancellationToken),
+            // Limit axes and movement before homing
+            564 => await HandleMovementLimitsAsync(code, cancellationToken),
             // Set machine name
             550 => await HandleSetNameAsync(code, cancellationToken),
             // Set password

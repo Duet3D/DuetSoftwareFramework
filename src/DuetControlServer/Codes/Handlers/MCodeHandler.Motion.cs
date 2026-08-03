@@ -62,6 +62,12 @@ internal partial class MCodeHandler
     /// <summary>Highest input shaping frequency RepRapFirmware accepts, in Hz</summary>
     private const float MaxShapingFrequency = 1000.0f;
 
+    /// <summary>Smallest speed or extrusion factor M220 and M221 accept, as a fraction</summary>
+    private const float MinOverrideFactor = 0.01f;
+
+    /// <summary>How far one relative M290 may babystep, in mm</summary>
+    private const float MaxRelativeBabystep = 1.0f;
+
     /// <summary>
     /// M92: set or report the steps per mm of each drive
     /// </summary>
@@ -1351,6 +1357,405 @@ internal partial class MCodeHandler
                     ? "Input shaping is disabled"
                     : string.Format(CultureInfo.InvariantCulture, "Input shaping '{0}' at {1:F1}Hz damping factor {2:F2}",
                                     shaping.Type.ToString().ToLowerInvariant(), shaping.Frequency, shaping.Damping);
+            }
+        }
+
+        if (!seen)
+        {
+            return new Message(MessageType.Success, report!);
+        }
+
+        await planner.ReconfigureAsync(cancellationToken);
+        return new Message();
+    }
+
+    /// <summary>
+    /// M82 and M83: whether extruder coordinates are absolute or relative
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// This overrides what G90 and G91 set for the extruders only, which is why it is a setting of
+    /// its own rather than a synonym
+    /// </remarks>
+    private async ValueTask<Message?> HandleExtruderPositioningAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            InputChannel? input = model.Inputs[code.Channel];
+            if (input is null)
+            {
+                return new Message(MessageType.Error, $"Unknown code channel {code.Channel}");
+            }
+            input.DrivesRelative = code.MajorNumber == 83;
+        }
+        return new Message();
+    }
+
+    /// <summary>
+    /// M114: report where the machine is
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// The shape is RepRapFirmware's, which is in turn Marlin's with the machine coordinates and step
+    /// counts appended. There is deliberately no space after each axis colon: Pronterface misparses
+    /// the reply if there is one
+    /// </remarks>
+    private async ValueTask<Message?> HandleReportPositionAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        _ = code;
+        StringBuilder builder = new();
+
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            Move move = model.Move;
+
+            foreach (Axis axis in move.Axes)
+            {
+                if (axis.Visible)
+                {
+                    builder.Append(CultureInfo.InvariantCulture, $"{axis.Letter}:{axis.UserPosition:F3} ");
+                }
+            }
+
+            // The virtual extruder position, which is what OctoPrint reads
+            float virtualEPos = move.MotionSystems.Count > 0 ? move.MotionSystems[0].VirtualEPos : 0.0f;
+            builder.Append(CultureInfo.InvariantCulture, $"E:{virtualEPos:F3} ");
+
+            for (int extruder = 0; extruder < move.Extruders.Count; extruder++)
+            {
+                builder.Append(CultureInfo.InvariantCulture, $"E{extruder}:{move.Extruders[extruder].Position:F1} ");
+            }
+
+            builder.Append("Count");
+            foreach (Axis axis in move.Axes)
+            {
+                if (axis.Visible)
+                {
+                    builder.Append(CultureInfo.InvariantCulture, $" {axis.StepPos}");
+                }
+            }
+
+            builder.Append(" Machine");
+            foreach (Axis axis in move.Axes)
+            {
+                if (axis.Visible)
+                {
+                    builder.Append(CultureInfo.InvariantCulture, $" {axis.MachinePosition ?? 0.0f:F3}");
+                }
+            }
+        }
+        return new Message(MessageType.Success, builder.ToString());
+    }
+
+    /// <summary>
+    /// M120 and M121: save and restore the interpreter state of this channel
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    private async ValueTask<Message?> HandleStateStackAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            InputChannel? input = model.Inputs[code.Channel];
+            if (input is null)
+            {
+                return new Message(MessageType.Error, $"Unknown code channel {code.Channel}");
+            }
+
+            if (code.MajorNumber == 120)
+            {
+                if (!stateStack.TryPush(code.Channel, input))
+                {
+                    return new Message(MessageType.Error, "Push(): stack overflow");
+                }
+            }
+            else if (!stateStack.TryPop(code.Channel, input))
+            {
+                return new Message(MessageType.Error, "Pop(): stack underflow");
+            }
+        }
+        return new Message();
+    }
+
+    /// <summary>
+    /// M220: set or report the speed factor applied to every move
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    private async ValueTask<Message?> HandleSpeedFactorAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (!code.TryGetFloat('S', out float percentage))
+            {
+                return new Message(MessageType.Success,
+                                   string.Format(CultureInfo.InvariantCulture, "Speed factor: {0:F1}%", model.Move.SpeedFactor * 100.0f));
+            }
+
+            float factor = percentage * 0.01f;
+            if (factor < MinOverrideFactor)
+            {
+                return new Message(MessageType.Error, "Invalid speed factor");
+            }
+            model.Move.SpeedFactor = factor;
+        }
+        return new Message();
+    }
+
+    /// <summary>
+    /// M221: set or report the extrusion factor
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// Without D the code applies to the extruders of the current tool, which needs a tool subsystem.
+    /// Until then D is required rather than silently applying to everything, which would be worse
+    /// than saying so
+    /// </remarks>
+    private async ValueTask<Message?> HandleExtrusionFactorAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (!code.TryGetInt('D', out int extruderNumber))
+            {
+                return new Message(MessageType.Error, "No tool selected");
+            }
+            if (extruderNumber < 0 || extruderNumber >= model.Move.Extruders.Count)
+            {
+                return new Message(MessageType.Error, $"Invalid extruder number '{extruderNumber}'");
+            }
+
+            Extruder extruder = model.Move.Extruders[extruderNumber];
+            if (!code.TryGetFloat('S', out float percentage))
+            {
+                return new Message(MessageType.Success,
+                                   string.Format(CultureInfo.InvariantCulture, "Extrusion factor for extruder {0}: {1:F1}%",
+                                                 extruderNumber, extruder.Factor * 100.0f));
+            }
+
+            float factor = percentage * 0.01f;
+            if (factor >= MinOverrideFactor)
+            {
+                extruder.Factor = factor;
+            }
+        }
+        return new Message();
+    }
+
+    /// <summary>
+    /// M290: babystepping
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// The offset is applied to every move built afterwards rather than by moving now, which is what
+    /// lets it be adjusted while a print is running. S is a synonym for Z, and R0 makes the values
+    /// absolute rather than a change to what is already applied
+    /// </remarks>
+    private async ValueTask<Message?> HandleBabysteppingAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        bool absolute = code.GetInt('R', 1) == 0;
+        bool seen = false;
+        string? report = null;
+
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            Move move = model.Move;
+
+            for (int index = 0; index < move.Axes.Count; index++)
+            {
+                Axis axis = move.Axes[index];
+
+                // S has meant "the Z axis" since before M290 took axis letters
+                bool haveValue = code.TryGetFloat(axis.Letter, out float value);
+                if (!haveValue && index == 2)
+                {
+                    haveValue = code.TryGetFloat('S', out value);
+                }
+                if (!haveValue)
+                {
+                    continue;
+                }
+
+                axis.Babystep = absolute ? value : axis.Babystep + Math.Clamp(value, -MaxRelativeBabystep, MaxRelativeBabystep);
+                seen = true;
+            }
+
+            if (!seen)
+            {
+                StringBuilder builder = new("Baby stepping offsets (mm):");
+                foreach (Axis axis in move.Axes)
+                {
+                    builder.Append(CultureInfo.InvariantCulture, $" {axis.Letter}:{axis.Babystep:F3}");
+                }
+                report = builder.ToString();
+            }
+        }
+
+        if (!seen)
+        {
+            return new Message(MessageType.Success, report!);
+        }
+
+        await planner.ReconfigureAsync(cancellationToken);
+        return new Message();
+    }
+
+    /// <summary>
+    /// M425: configure backlash compensation
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    private async ValueTask<Message?> HandleBacklashAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        bool seen = false;
+        string? report = null;
+
+        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
+        {
+            throw new OperationCanceledException();
+        }
+
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            Move move = model.Move;
+
+            foreach (Axis axis in move.Axes)
+            {
+                if (code.TryGetFloat(axis.Letter, out float backlash))
+                {
+                    axis.Backlash = MathF.Max(backlash, 0.0f);
+                    seen = true;
+                }
+            }
+
+            if (code.TryGetIntLimited('S', 1, 100, out int factor))
+            {
+                move.BacklashFactor = factor;
+                seen = true;
+            }
+
+            if (!seen)
+            {
+                StringBuilder builder = new("Backlash correction (mm)");
+                foreach (Axis axis in move.Axes)
+                {
+                    builder.Append(CultureInfo.InvariantCulture, $" {axis.Letter}: {axis.Backlash:F3}");
+                }
+                builder.Append(CultureInfo.InvariantCulture, $", correction distance multiplier {move.BacklashFactor}");
+                report = builder.ToString();
+            }
+        }
+
+        if (!seen)
+        {
+            return new Message(MessageType.Success, report!);
+        }
+
+        await planner.ReconfigureAsync(cancellationToken);
+        return new Message();
+    }
+
+    /// <summary>
+    /// M556: configure axis skew compensation
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// The values given are deviations measured over the distance S, and what is stored is the
+    /// tangent of the resulting angle. X is the XY skew, Y the YZ skew and Z the XZ skew
+    /// </remarks>
+    private async ValueTask<Message?> HandleAxisCompensationAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        bool seen = false;
+        string? report = null;
+
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            Skew skew = model.Move.Compensation.Skew;
+
+            if (code.TryGetFloat('S', out float measuredOver))
+            {
+                if (measuredOver <= 0.0f)
+                {
+                    return new Message(MessageType.Error, "S parameter must be greater than zero");
+                }
+
+                if (code.TryGetFloat('X', out float xDeviation))
+                {
+                    skew.TanXY = xDeviation / measuredOver;
+                    seen = true;
+                }
+                if (code.TryGetFloat('Y', out float yDeviation))
+                {
+                    skew.TanYZ = yDeviation / measuredOver;
+                    seen = true;
+                }
+                if (code.TryGetFloat('Z', out float zDeviation))
+                {
+                    skew.TanXZ = zDeviation / measuredOver;
+                    seen = true;
+                }
+            }
+
+            if (code.TryGetInt('P', out int compensateXY))
+            {
+                skew.CompensateXY = compensateXY <= 0;
+                seen = true;
+            }
+
+            if (!seen)
+            {
+                report = string.Format(CultureInfo.InvariantCulture,
+                                       "Axis compensations - {0}: {1:F5}, YZ: {2:F5}, ZX: {3:F5}",
+                                       skew.CompensateXY ? "XY" : "YX", skew.TanXY, skew.TanYZ, skew.TanXZ);
+            }
+        }
+
+        return seen ? new Message() : new Message(MessageType.Success, report!);
+    }
+
+    /// <summary>
+    /// M564: whether moves are limited to the axis travel and whether they are allowed before homing
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    private async ValueTask<Message?> HandleMovementLimitsAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        bool seen = false;
+        string? report = null;
+
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            Move move = model.Move;
+
+            if (code.TryGetInt('S', out int limitAxes))
+            {
+                move.LimitAxes = limitAxes > 0;
+                seen = true;
+            }
+            if (code.TryGetInt('H', out int noMovesBeforeHoming))
+            {
+                move.NoMovesBeforeHoming = noMovesBeforeHoming > 0;
+                seen = true;
+            }
+
+            if (!seen)
+            {
+                report = string.Format("Movement outside the bed is {0}permitted, movement before homing is {1}permitted",
+                                       move.LimitAxes ? "not " : string.Empty,
+                                       move.NoMovesBeforeHoming ? "not " : string.Empty);
             }
         }
 

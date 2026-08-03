@@ -209,6 +209,14 @@ internal sealed class GCodeHandler(
             }
         }
 
+        // Babystepping shifts where the machine goes without changing the coordinate the user asked
+        // for, so it is added to the target here and taken back off in CommitPositions. RRF applies a
+        // change as a small move of its own; here it takes effect on the next commanded move instead
+        for (int axis = 0; axis < numAxes; axis++)
+        {
+            move.Coords[axis] += model.Move.Axes[axis].Babystep;
+        }
+
         ApplyExtrusion(code, input, move, unitScale);
 
         // F persists across codes, which is why it is stored on the channel rather than the move
@@ -274,8 +282,12 @@ internal sealed class GCodeHandler(
         for (int axis = 0; axis < numAxes; axis++)
         {
             Axis axisConfig = model.Move.Axes[axis];
-            axisConfig.MachinePosition = move.Coords[axis];
-            axisConfig.UserPosition = move.Coords[axis] - WorkplaceOffset(axisConfig, model.Move.WorkplaceNumber);
+
+            // The babystep offset is invisible to the reported coordinates, so it comes back off
+            // whatever was actually commanded
+            float commanded = move.Coords[axis] - axisConfig.Babystep;
+            axisConfig.MachinePosition = commanded;
+            axisConfig.UserPosition = commanded - WorkplaceOffset(axisConfig, model.Move.WorkplaceNumber);
         }
 
         int numExtruders = Math.Min(parameters.NumExtruders, model.Move.Extruders.Count);

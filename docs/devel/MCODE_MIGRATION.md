@@ -116,8 +116,8 @@ what the machine half now does (or does not yet) do.
 
 | Group | ✅ Done | 🔵 SBC half | Rows (excl. ⛔) |
 |---|---|---|---|
-| §5.1 Motion — drives and axes | 20 | 0 | 26 |
-| §5.2 Motion — kinematics and geometry | 0 | 0 | 12 |
+| §5.1 Motion — drives and axes | 26 | 0 | 26 |
+| §5.2 Motion — kinematics and geometry | 3 | 0 | 12 |
 | §5.3 Motion — compensation and probing | 0 | 0 | 14 |
 | §5.4 Motion — queue, sync and shaping | 3 | 1 | 9 |
 | §5.5 Heat | 0 | 0 | 19 |
@@ -126,8 +126,8 @@ what the machine half now does (or does not yet) do.
 | §5.8 Spindles, laser and machine mode | 0 | 0 | 9 |
 | §5.9 Job, files and SD | 17 | 4 | 29 |
 | §5.10 Network | 4 | 1 | 13 |
-| §5.11 I/O, expansion and miscellaneous | 5 | 5 | 38 |
-| **Total** | **49** | **11** | **186** |
+| §5.11 I/O, expansion and miscellaneous | 6 | 5 | 38 |
+| **Total** | **60** | **11** | **186** |
 
 Update these counts as boxes are ticked.
 
@@ -186,21 +186,21 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 |---|---|---|---|---|---|
 | M17 | 910 | Motors on | `move.axes[].drivers` → CAN `MultipleDrivesRequestDriverStateControl` | no | ✅ |
 | M18 / M84 | 911 | Motors off, set idle timeout | `move.idle.timeout`, `move.idle.factor` | yes | ✅ |
-| M82 | 1600 | Absolute extruder positioning | `inputs[].drivesRelative = false` | no | ⬜ |
-| M83 | 1605 | Relative extruder positioning | `inputs[].drivesRelative = true` | no | ⬜ |
+| M82 | 1600 | Absolute extruder positioning | `inputs[].drivesRelative = false` | no | ✅ |
+| M83 | 1605 | Relative extruder positioning | `inputs[].drivesRelative = true` | no | ✅ |
 | M85 | 1612 | Set inactive time | `move.idle.timeout` | no | ✅ |
 | M92 | 1615 | Steps per mm | `move.axes[].stepsPerMm`, `move.extruders[].stepsPerMm` → CAN `MultipleDrivesRequestStepsPerUnitAndMicrostepping` | yes | ✅ |
-| M114 | 1945 | Report position | reads `move.axes[].machinePosition` / `userPosition` | no | ⬜ |
-| M120 | 2210 | Push machine state | `inputs[].stack` | no | ⬜ |
-| M121 | 2214 | Pop machine state | `inputs[].stack` | no | ⬜ |
+| M114 | 1945 | Report position | reads `move.axes[].machinePosition` / `userPosition` | no | ✅ |
+| M120 | 2210 | Push machine state | `inputs[].stack` | no | ✅ |
+| M121 | 2214 | Pop machine state | `inputs[].stack` | no | ✅ |
 | M201 | 2527 | Axis/extruder accelerations | `move.axes[].acceleration`, `move.extruders[].acceleration` | yes | ✅ |
 | M201.1 | 2527 | Reduced accelerations for probing and stall homing | `move.axes[].reducedAcceleration` | yes | ✅ |
 | M203 | 2612 | Min/max feedrates | `move.axes[].speed`, `move.extruders[].speed`, `move.minimumMovementSpeed` | yes | ✅ |
 | M204 | 2670 | Print/travel acceleration | `move.motionSystems[].printingAcceleration` / `.travelAcceleration` | no | ✅ |
 | M205 / M566 | 3782 | Jerk (mm/s and mm/min forms), jerk policy | `move.axes[].jerk` / `.printingJerk`, `move.jerkPolicy` | yes | ✅ |
 | M208 | 2701 | Axis minima/maxima | `move.axes[].min` / `.max` | no | ✅ |
-| M220 | 2705 | Speed factor override | `move.speedFactor` | no | ⬜ |
-| M221 | 2734 | Extrusion factor override | `move.extruders[].factor` | no | ⬜ |
+| M220 | 2705 | Speed factor override | `move.speedFactor` | no | ✅ |
+| M221 | 2734 | Extrusion factor override | `move.extruders[].factor` | no | ✅ |
 | M350 | 2996 | Microstepping | `move.axes[].microstepping` → CAN `MultipleDrivesRequestStepsPerUnitAndMicrostepping` | yes | ✅ |
 | M400 | 3120 | Wait for moves to finish | — (flush and drain) | n/a | ✅ |
 | M569 | 3878 | Driver configuration (direction, mode, timings) | `boards[].drivers[]` → CAN generic `M569Params` (+ `.1`/`.2`/`.4`/`.6`/`.7`) | yes | ✅ |
@@ -215,9 +215,9 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 
 | M-code | RRF | Purpose | Object model home | Standstill | Status |
 |---|---|---|---|---|---|
-| M290 | 2812 | Babystepping | `move.axes[].babystep` | no | ⬜ |
-| M425 | 3223 | Backlash compensation | `move.axes[].backlash`, `move.backlashFactor` | yes | ⬜ |
-| M556 | 3653 | Axis skew compensation | `move.compensation.skew` | no | ⬜ |
+| M290 | 2812 | Babystepping | `move.axes[].babystep` | no | ✅ |
+| M425 | 3223 | Backlash compensation | `move.axes[].backlash`, `move.backlashFactor` | yes | ✅ |
+| M556 | 3653 | Axis skew compensation | `move.compensation.skew` | no | ✅ |
 | M579 | 3925 | Scale Cartesian axes | needs new field — §6 | no | ⬜ |
 | M665 | 4052 | Delta configuration | `move.kinematics` (`DeltaKinematics`) | yes | ⬜ engine ported, M-code not |
 | M666 | 4082 | Delta endstop adjustments | `move.kinematics` (`DeltaKinematics`) | yes | ⬜ engine ported, M-code not |
@@ -402,7 +402,7 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M292 | 2910 | Acknowledge message box | `state.messageBox` | ⬜ |
 | M300 | 2914 | Beep | `state.beep` | ⬜ |
 | M409 | 3169 | Object model query | — | 🔵 patches RRF's JSON |
-| M564 | 3758 | Limit axes / allow movement before homing | `move.limitAxes`, `move.noMovesBeforeHoming` | ⬜ |
+| M564 | 3758 | Limit axes / allow movement before homing | `move.limitAxes`, `move.noMovesBeforeHoming` | ✅ |
 | M581 | 3948 | Configure external trigger | `sensors.gpIn[]` | 🔵 SBC-side expressions only |
 | M582 | 3952 | Check external trigger | `sensors.gpIn[]` | ⬜ |
 | M594 | 4002 | Height following mode | — | ⬜ |
@@ -454,8 +454,8 @@ Each phase leaves the tree in a state where the machine is more usable than befo
    [MCodeHandler.Motion.cs](../../src/DuetControlServer/Codes/Handlers/MCodeHandler.Motion.cs).
 2. ~~**Phase 2 — driver detail.** M17, M18/M84, M85, M569, M913, M915, M917, M970, M572, M593, M592.~~
    **Done** — see §8.
-3. **Phase 3 — interpreter state and reporting.** M82, M83, M114, M120, M121, M220, M221, M290, M425,
-   M556, M564.
+3. ~~**Phase 3 — interpreter state and reporting.** M82, M83, M114, M120, M121, M220, M221, M290,
+   M425, M556, M564.~~ **Done** — see §8.
 4. **Phase 4 — geometry.** M667, M669 (Cartesian and CoreXY first), M671, M673-M675, then M665/M666.
    The engines all exist (§4), so this phase is the M-codes that set their parameters and the object
    model fields some of those parameters still have nowhere to live.
@@ -544,6 +544,30 @@ driver numbering, which only this side can work out after grouping the drivers b
 **M593 writes the configuration, not the impulses.** `move.shaping` carries type, frequency and
 damping; the amplitudes and delays are the motion engine's to derive. Naming a frequency or damping
 without a type switches the shaper on, as in RRF.
+
+### Phase 3 (M82, M83, M114, M120, M121, M220, M221, M290, M425, M556, M564)
+
+**M120/M121 keep their stack outside the object model.** What they save is how the next code will be
+read - feed rate, relative flags, units, selected plane - not anything about the machine, so it is
+transient state and rule §1.1 exempts it. `InterpreterStateStack` holds one stack per channel and
+maintains `inputs[].stackDepth`, which is the part the object model does carry. RepRapFirmware does
+not expose the saved values either. The depth is capped at 10, because a macro looping over M120
+without a matching M121 would otherwise grow it without bound.
+
+**M290 now has an effect rather than only being recorded.** The offset is added to the target of
+every move built afterwards and taken back off in `CommitPositions`, so it shifts where the machine
+goes without appearing in the reported coordinates - which is what makes it adjustable during a
+print. This differs from RepRapFirmware in one respect worth knowing: RRF applies a change as a small
+move of its own, so it takes effect immediately, whereas here it takes effect on the next commanded
+move.
+
+**M221 requires D for now.** Without it the code applies to the extruders of the current tool, and
+there is no tool subsystem. Reporting "No tool selected" is what RRF does in the same situation, and
+is better than silently applying the factor to every extruder.
+
+**M114 reports positions the machine has been commanded to**, not measured ones. `axis.stepPos` is
+whatever the object model holds; the live motor counts the engine could report are not plumbed
+through to it yet, so the `Count` field is only as good as that.
 
 ### Audit against "the object model must recreate the machine"
 
