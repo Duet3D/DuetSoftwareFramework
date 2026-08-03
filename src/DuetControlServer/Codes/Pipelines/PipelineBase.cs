@@ -245,6 +245,20 @@ public abstract class PipelineBase
     }
 
     /// <summary>
+    /// How many levels this pipeline's stack holds, counting the base level
+    /// </summary>
+    public int StackDepth
+    {
+        get
+        {
+            lock (_stack)
+            {
+                return _stack.Count;
+            }
+        }
+    }
+
+    /// <summary>
     /// Push a new element onto the stack
     /// </summary>
     /// <param name="file">Code file or null if waiting for acknowledgment</param>

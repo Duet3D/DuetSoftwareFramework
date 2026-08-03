@@ -9,6 +9,7 @@ using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Codes.Handlers;
 using DuetControlServer.IPC;
+using DuetControlServer.Files;
 using DuetControlServer.IPC.Processors;
 using DuetControlServer.Link;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +33,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     private readonly KeywordHandler _keywords;
     private readonly IHostApplicationLifetime _lifetime;
     private readonly LinkInterface _linkInterface;
+    private readonly MacroRunner _macroRunner;
     private readonly ILogger<Code> _logger;
     private readonly Settings _settings;
 
@@ -46,6 +48,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <param name="keywords">Keyword handler</param>
     /// <param name="lifetime">Host application lifetime</param>
     /// <param name="linkInterface">Link interface</param>
+    /// <param name="macroRunner">Runs macro files</param>
     /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
     public Code(Codes.CodeProcessor codeProcessor,
@@ -56,6 +59,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         [FromKeyedServices(Keys.Keywords)] ICodeHandler keywords,
         IHostApplicationLifetime lifetime,
         LinkInterface linkInterface,
+        MacroRunner macroRunner,
         ILogger<Code> logger,
         IOptions<Settings> settings) : base()
     {
@@ -67,6 +71,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         _keywords = (KeywordHandler)keywords;
         _lifetime = lifetime;
         _linkInterface = linkInterface;
+        _macroRunner = macroRunner;
         _logger = logger;
         _settings = settings.Value;
     }
@@ -83,6 +88,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <param name="keywords">Keyword handler</param>
     /// <param name="lifetime">Host application lifetime</param>
     /// <param name="linkInterface">Link interface</param>
+    /// <param name="macroRunner">Runs macro files</param>
     /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
     public Code(string code,
@@ -94,6 +100,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         [FromKeyedServices(Keys.Keywords)] ICodeHandler keywords,
         IHostApplicationLifetime lifetime,
         LinkInterface linkInterface,
+        MacroRunner macroRunner,
         ILogger<Code> logger,
         IOptions<Settings> settings) : base(code)
     {
@@ -105,6 +112,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         _keywords = (KeywordHandler)keywords;
         _lifetime = lifetime;
         _linkInterface = linkInterface;
+        _macroRunner = macroRunner;
         _logger = logger;
         _settings = settings.Value;
     }
@@ -339,10 +347,39 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
             return true;
         }
 
-        // Nothing has claimed this code. DuetControlServer is the only thing that executes codes
-        // now, so a code no handler recognised is not deferred anywhere - it is unsupported
+        // No handler recognised this code, so try a macro named after it. This is how a machine adds
+        // a code of its own in RepRapFirmware - M1234 runs sys/M1234.g - and it has to be tried
+        // before the code is called unsupported, or those machines stop working
+        if (await TryRunCodeMacroAsync())
+        {
+            Result ??= new Message();
+            return true;
+        }
+
         ResolveAsUnsupported();
         return true;
+    }
+
+    /// <summary>
+    /// Run the macro file named after this code, if there is one
+    /// </summary>
+    /// <returns>True if such a macro existed and was run</returns>
+    /// <remarks>
+    /// RepRapFirmware looks for <c>&lt;letter&gt;&lt;number&gt;.g</c>, or
+    /// <c>&lt;letter&gt;&lt;number&gt;.&lt;fraction&gt;.g</c> for a code with a fraction, in the
+    /// system directory. It also exposes the code's own parameters to the macro as variables, which
+    /// is not done here yet
+    /// </remarks>
+    private async ValueTask<bool> TryRunCodeMacroAsync()
+    {
+        if (Type is not (CodeType.GCode or CodeType.MCode) || MajorNumber is null or < 0 or >= 10000)
+        {
+            return false;
+        }
+
+        char letter = Type == CodeType.GCode ? 'G' : 'M';
+        string macroName = MinorNumber > 0 ? $"{letter}{MajorNumber}.{MinorNumber}.g" : $"{letter}{MajorNumber}.g";
+        return await _macroRunner.TryRunAsync(Channel, macroName, this, cancellationToken: CancellationToken);
     }
 
     /// <summary>
@@ -351,13 +388,13 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <remarks>
     /// There used to be a firmware behind DuetControlServer that unrecognised codes were passed to,
     /// and "no handler here" meant "let RepRapFirmware try". It no longer does: a code is either
-    /// executed here or it is not executed at all, and saying so is better than silently succeeding.
-    /// The wording matches what RepRapFirmware replied in the same situation, because macros and user
-    /// interfaces have been reading it for years
+    /// executed here or it is not executed at all. The wording and the severity match what
+    /// RepRapFirmware replied in the same situation - a warning, not an error - because macros and
+    /// user interfaces have been reading it for years
     /// </remarks>
     internal void ResolveAsUnsupported()
     {
-        Result ??= new Message(MessageType.Error, $"Unsupported command: {ToShortString()}");
+        Result ??= new Message(MessageType.Warning, $"{ToShortString()}: Command is not supported");
     }
 
     /// <summary>

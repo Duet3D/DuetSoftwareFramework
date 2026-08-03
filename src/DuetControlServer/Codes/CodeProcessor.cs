@@ -70,6 +70,13 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     public void Pop(CodeChannel channel) => Processors.Value[(int)channel].Pop();
 
     /// <summary>
+    /// How many stack levels a channel has pushed, counting the base level
+    /// </summary>
+    /// <param name="channel">Code channel</param>
+    /// <returns>Stack depth</returns>
+    public int GetStackDepth(CodeChannel channel) => Processors.Value[(int)channel].StackDepth;
+
+    /// <summary>
     /// The file the given channel is currently executing, if any
     /// </summary>
     /// <param name="channel">Code channel</param>

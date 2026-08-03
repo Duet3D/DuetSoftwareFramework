@@ -39,6 +39,7 @@ namespace DuetControlServer.Link;
 /// </remarks>
 /// <param name="eventLogger">Event logger</param>
 /// <param name="expansionBoardManager">Receiver for expansion board status reports</param>
+/// <param name="macroRunner">Runs macro files</param>
 /// <param name="jobProcessor">Job processor</param>
 /// <param name="nativeLink">Native SPI transfer loop</param>
 /// <param name="linkInterface">Link interface</param>
@@ -51,6 +52,7 @@ namespace DuetControlServer.Link;
 internal sealed class LinkService(
     EventLogger eventLogger,
     Expansion.ExpansionBoardManager expansionBoardManager,
+    MacroRunner macroRunner,
     JobProcessor jobProcessor,
     NativeLink nativeLink,
     LinkInterface linkInterface,
@@ -278,6 +280,57 @@ internal sealed class LinkService(
             eventLogger.LogOutput(MessageType.Warning, "Incompatible firmware, please upgrade as soon as possible");
         }
         eventLogger.LogOutput(MessageType.Success, "Connection to Duet established");
+
+        // The machine is only configured once config.g has run, and nothing else runs it
+        _ = RunStartupFilesAsync();
+    }
+
+    /// <summary>
+    /// Run the files that configure the machine, in the order RepRapFirmware runs them
+    /// </summary>
+    /// <returns>Asynchronous task</returns>
+    /// <remarks>
+    /// config.g is what turns an unconfigured process into a machine: until it has run there are no
+    /// axes, no drivers and no way to move. It runs on the trigger channel, as it does in
+    /// RepRapFirmware, so that it does not consume the job or user channels. runonce.g follows it and
+    /// is deleted afterwards, which is the whole point of it
+    /// </remarks>
+    private async Task RunStartupFilesAsync()
+    {
+        try
+        {
+            if (!await macroRunner.TryRunAsync(CodeChannel.Trigger, FilePathResolver.ConfigFile,
+                                               cancellationToken: lifetime.ApplicationStopping) &&
+                !await macroRunner.TryRunAsync(CodeChannel.Trigger, FilePathResolver.ConfigFileFallback,
+                                               cancellationToken: lifetime.ApplicationStopping))
+            {
+                eventLogger.LogOutput(MessageType.Warning, "Configuration file not found, the machine is unconfigured");
+                return;
+            }
+
+            if (await macroRunner.TryRunAsync(CodeChannel.Trigger, FilePathResolver.RunOnceFile,
+                                              cancellationToken: lifetime.ApplicationStopping))
+            {
+                // runonce.g is meant to run exactly once, so it removes itself
+                try
+                {
+                    System.IO.File.Delete(await filePathResolver.ToPhysicalAsync(FilePathResolver.RunOnceFile, FileDirectory.System,
+                                                                                 lifetime.ApplicationStopping));
+                }
+                catch (Exception e)
+                {
+                    logger.LogWarning(e, "Failed to delete {File} after running it", FilePathResolver.RunOnceFile);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Shutting down
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "Failed to run the startup files");
+        }
     }
 
     /// <summary>

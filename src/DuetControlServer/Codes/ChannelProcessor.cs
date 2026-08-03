@@ -119,6 +119,11 @@ public sealed class ChannelProcessor
     }
 
     /// <summary>
+    /// How many levels this channel's stack holds, counting the base level
+    /// </summary>
+    public int StackDepth => _pipelines.Value[(int)PipelineStage.Start].StackDepth;
+
+    /// <summary>
     /// File on top of this channel's stack, or null if it is not running one
     /// </summary>
     public CodeFile? CurrentFile => _pipelines.Value[(int)PipelineStage.Start].CurrentStackItem.File;

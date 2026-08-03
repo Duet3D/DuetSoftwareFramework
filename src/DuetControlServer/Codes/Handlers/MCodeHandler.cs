@@ -42,6 +42,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="logger">Logger</param>
 /// <param name="loggerFactory">Logger factory</param>
 /// <param name="lifetime">Host application lifetime</param>
+/// <param name="macroRunner">Runs macro files</param>
 /// <param name="planner">Where G-codes become queued moves, and what holds the machine description</param>
 /// <param name="settings">Settings</param>
 internal partial class MCodeHandler(
@@ -59,6 +60,7 @@ internal partial class MCodeHandler(
     ILogger<MCodeHandler> logger,
     ILoggerFactory loggerFactory,
     IHostApplicationLifetime lifetime,
+    MacroRunner macroRunner,
     MovePlanner planner,
     IOptions<Settings> settings) : ICodeHandler
 {
@@ -158,6 +160,8 @@ internal partial class MCodeHandler(
             471 => await HandleRenameFileAsync(code, cancellationToken),
             // Delete file or directory
             472 => await HandleDeleteFileOrDirectoryAsync(code, cancellationToken),
+            // Load parameters from config-override.g
+            501 => await HandleLoadConfigOverrideAsync(code, cancellationToken),
             // Print settings
             503 => await HandlePrintSettingsAsync(code, cancellationToken),
             // Set configuration file folder
@@ -787,24 +791,41 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message?> HandleMacroPausableAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (code.TryGetInt('R', out int rParam))
+        // R on its own flags the macro that is already running rather than starting a new one
+        if (code.TryGetInt('R', out int rParam) && !code.HasParameter('P'))
         {
-            if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
-            {
-                if (codeProcessor.GetCurrentFile(code.Channel) is MacroFile macro)
-                {
-                    using (await macro.LockAsync(cancellationToken))
-                    {
-                        macro.IsPausable = rParam == 1;
-                    }
-                }
-            }
-            else
+            if (!await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
             {
                 throw new OperationCanceledException();
             }
+
+            if (codeProcessor.GetCurrentFile(code.Channel) is MacroFile currentMacro)
+            {
+                using (await currentMacro.LockAsync(cancellationToken))
+                {
+                    currentMacro.IsPausable = rParam == 1;
+                }
+            }
+            return new Message();
         }
-        return null;
+
+        if (!code.TryGetString('P', out string? fileName))
+        {
+            return new Message(MessageType.Error, "Filename expected");
+        }
+
+        if (!await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        {
+            throw new OperationCanceledException();
+        }
+
+        // A macro named without a directory is looked up in the system directory, which is what makes
+        // M98 P"homex.g" find sys/homex.g the way it does in RepRapFirmware
+        if (!await macroRunner.TryRunAsync(code.Channel, fileName, code, cancellationToken: cancellationToken))
+        {
+            return new Message(MessageType.Error, $"Macro file {fileName} not found");
+        }
+        return new Message();
     }
 
     /// <summary>
@@ -1114,6 +1135,30 @@ internal partial class MCodeHandler(
             }
         }
         throw new OperationCanceledException();
+    }
+
+    /// <summary>
+    /// M501: load the saved settings from config-override.g
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result, or null to let the code carry on</returns>
+    /// <remarks>
+    /// config-override.g is a macro like any other - it holds the M-codes M500 wrote - so loading it
+    /// is running it
+    /// </remarks>
+    private async ValueTask<Message?> HandleLoadConfigOverrideAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        if (!await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        {
+            throw new OperationCanceledException();
+        }
+
+        if (!await macroRunner.TryRunAsync(code.Channel, FilePathResolver.ConfigOverrideFile, code, cancellationToken: cancellationToken))
+        {
+            return new Message(MessageType.Error, $"Macro file {FilePathResolver.ConfigOverrideFile} not found");
+        }
+        return new Message();
     }
 
     /// <summary>

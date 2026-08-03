@@ -546,3 +546,69 @@ a reading to the wrong device rather than failing.
 
 The V1 and V2 input messages have different per-handle entry sizes, so each is deserialized as
 itself. Reading one as the other shifts every handle silently.
+
+---
+
+## 9. Macro files
+
+Macros were opened because RepRapFirmware asked for one over SPI. Nothing asked once that link was
+removed, so `MacroFile` — which is complete, and reads, executes, error-handles and aborts on its own
+— was never started by anything. [MacroRunner.cs](../../src/DuetControlServer/Files/MacroRunner.cs)
+is the missing piece: it pushes a stack level onto the channel's pipeline, starts the macro, waits for
+it and pops the level again. Running on its own level is what makes a flush inside a macro wait for
+the macro's codes rather than for whatever started it, and what lets macros nest without interleaving.
+Nesting is capped at 10 levels, as RepRapFirmware caps its own stack.
+
+### The macros RepRapFirmware runs
+
+Every macro RRF invokes, taken from its `DoFileMacro` call sites and the filename constants in
+`GCodes.h`.
+
+| Macro | What runs it | Status |
+|---|---|---|
+| `config.g`, falling back to `config.g.bak` | Boot | ✅ run on the trigger channel when the link comes up |
+| `runonce.g` | After config.g, then deleted | ✅ |
+| `config-override.g` | M501 | ✅ M501 implemented |
+| `dsf-config.g` | After the plugins start | ✅ already issued as `M98 P"dsf-config.g"`, which now works |
+| `<letter><number>[.<fraction>].g` | Any code no handler recognises | ✅ see below |
+| Any file | `M98 P"..."` | ✅ |
+| `start.g` | Start of a job | ⬜ needs a job lifecycle hook |
+| `stop.g` | M0, M2 | ⬜ |
+| `cancel.g` | A job being cancelled | ⬜ |
+| `pause.g` | M25 and pause requests | ⬜ M25 is not implemented |
+| `resume.g` | M24 resuming a paused job | ⬜ |
+| `filament-change.g` | M600 | ⬜ |
+| `resurrect.g`, `resurrect-prologue.g` | M916 after a power fail | ⬜ |
+| `daemon.g` | Repeatedly on the daemon channel | ⬜ |
+| `trigger<n>.g` | An external trigger firing (M581) | ⬜ |
+| `network-override.g` | Network configuration | ⬜ |
+| `homeall.g`, `home<axis>.g` | G28 | ⬜ blocked: no endstops |
+| `homedelta.g`, `homebed.g`, `homeradius.g`, `homeproximal.g`, `homedistal.g`, `home5barscara.g` | G28 on those kinematics | ⬜ blocked: kinematics and endstops |
+| `bed.g` | G32 | ⬜ blocked: no probes |
+| `mesh.g` | G29 | ⬜ blocked: no probes |
+| `deployprobe<n>.g`, `retractprobe<n>.g` | M401, M402 and probing moves | ⬜ blocked: no probes |
+| `tfree<n>.g`, `tpre<n>.g`, `tpost<n>.g` | T-codes | ⬜ blocked: no tool subsystem |
+| `filaments/<name>/load.g`, `unload.g`, `config.g` | M701, M702, M703 | ⬜ blocked: no tool subsystem |
+
+### A code no handler recognises runs a macro named after it
+
+This is how a machine adds a code of its own in RepRapFirmware, and it is why §2's change had to be
+finished rather than left at "unsupported". `GCodes::TryMacroFile` looks for
+`sys/<letter><number>.g`, or `sys/<letter><number>.<fraction>.g` when the code has a fraction, and
+only reports the code unsupported if there is no such file. `Code.TryRunCodeMacroAsync` does the same.
+
+The reply when there is no such macro now matches RRF exactly: `<code>: Command is not supported`, as
+a **warning** rather than an error. The earlier `Unsupported command: <code>` error was mine and was
+wrong on both counts.
+
+One difference remains: RRF passes the code's own parameters into the macro as variables
+(`DoFileMacroWithParameters`), so `M1234 X5` can read `param.X`. That needs variable plumbing through
+`MacroFile` and is not done, so a macro implementing a code cannot see its parameters yet.
+
+### Consequences worth knowing
+
+M98 previously did nothing but handle its `R` parameter, so **every macro-based feature of a machine
+was silently inert**. It now runs the file, which means config.g takes effect and the rest of the
+inventory above becomes reachable rather than dead. Expect a machine's config.g to report errors for
+the codes still on the ⬜ list in §5 — that is the visible-error change from §2 doing its job, not a
+regression in macro handling.
