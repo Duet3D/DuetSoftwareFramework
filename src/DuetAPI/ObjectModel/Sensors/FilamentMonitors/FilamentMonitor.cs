@@ -34,6 +34,17 @@ public partial class FilamentMonitor : ModelObject, IDynamicModelObject
     private FilamentMonitorEnableMode _enableMode = FilamentMonitorEnableMode.Disabled;
 
     /// <summary>
+    /// Indicates if filament is present in this filament monitor (null if unknown)
+    /// </summary>
+    [Live]
+    public bool? FilamentPresent
+    {
+        get => _filamentPresent;
+        set => SetPropertyValue(ref _filamentPresent, value);
+    }
+    private bool? _filamentPresent;
+
+    /// <summary>
     /// Last reported status of this filament monitor
     /// </summary>
     [Live]
