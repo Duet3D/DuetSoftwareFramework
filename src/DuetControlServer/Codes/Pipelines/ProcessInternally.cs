@@ -41,7 +41,7 @@ public sealed class ProcessInternally(ChannelProcessor channelProcessor, CodePro
         else
         {
             IPC.Processors.CodeInterception.GetCodeBeingIntercepted(code.Connection, out InterceptionMode mode);
-            await ChannelProcessor.WriteCodeAsync(code, (mode != InterceptionMode.Post) ? PipelineStage.Post : PipelineStage.Firmware);
+            await ChannelProcessor.WriteCodeAsync(code, (mode != InterceptionMode.Post) ? PipelineStage.Post : PipelineStage.Executed);
         }
     }
 }

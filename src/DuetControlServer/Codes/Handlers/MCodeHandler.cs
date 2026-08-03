@@ -223,12 +223,15 @@ internal partial class MCodeHandler(
                 }
             }
 
-            // Reassign the code's cancellation token to ensure M0/M1/M2 is forwarded to RRF
+            // Cancelling the job cancels this code with it, so give it a fresh token to report on
             if (code.IsFromFileChannel)
             {
                 code.ResetCancellationToken();
             }
-            return null;
+
+            // The machine-side of a stop - heaters off, spindles off, motors idle - belongs to
+            // subsystems that are not ported yet, so this is only the job half for now
+            return new Message();
         }
         throw new OperationCanceledException();
     }
@@ -383,8 +386,7 @@ internal partial class MCodeHandler(
                 }
             }
 
-            // Let RRF do everything else
-            return null;
+            return new Message();
         }
         throw new OperationCanceledException();
     }
@@ -410,8 +412,9 @@ internal partial class MCodeHandler(
                 }
             }
 
-            // Let RepRapFirmware process this request so it can invoke resume.g. When M24 completes, the file is resumed
-            return null;
+            // resume.g is not run: macro execution is not wired up yet. The job itself resumes from
+            // CodeExecutedAsync once this code completes
+            return new Message();
         }
         throw new OperationCanceledException();
     }
@@ -692,8 +695,7 @@ internal partial class MCodeHandler(
                 }
             }
 
-            // Let RRF do everything else
-            return null;
+            return new Message();
         }
         throw new OperationCanceledException();
     }
@@ -789,7 +791,13 @@ internal partial class MCodeHandler(
         {
             if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
             {
-                await linkInterface.SetMacroPausableAsync(code.Channel, rParam == 1, cancellationToken);
+                if (codeProcessor.GetCurrentFile(code.Channel) is MacroFile macro)
+                {
+                    using (await macro.LockAsync(cancellationToken))
+                    {
+                        macro.IsPausable = rParam == 1;
+                    }
+                }
             }
             else
             {
@@ -864,8 +872,9 @@ internal partial class MCodeHandler(
                 }
                 return new Message(MessageType.Success, $"Current DCS log level: {settings.Value.LogLevel}");
             }
+            throw new OperationCanceledException();
         }
-        return null;
+        return new Message(MessageType.Success, $"Current DCS log level: {settings.Value.LogLevel}");
     }
 
     /// <summary>
@@ -960,12 +969,14 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message?> HandleDiagnosticsAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (code.GetInt('B', 0) == 0 && code.GetUnprecedentedString() == "DSF")
+        int board = code.GetInt('B', 0);
+        if (board != 0)
         {
-            string diagnostics = await diagnosticsProvider.PrintAsync();
-            return new Message(MessageType.Success, diagnostics);
+            return new Message(MessageType.Error, $"Diagnostics for expansion board {board} are not supported yet");
         }
-        return null;
+
+        string diagnostics = await diagnosticsProvider.PrintAsync();
+        return new Message(MessageType.Success, diagnostics);
     }
 
     /// <summary>
@@ -978,12 +989,9 @@ internal partial class MCodeHandler(
     {
         if (code.TryGetString('K', out string? key) && (!code.TryGetInt('R', out int rParam) || rParam == 0))
         {
-            string trimmedKey = key.TrimStart('#');
-            if (!trimmedKey.StartsWith("network") && !trimmedKey.StartsWith("plugins") && !trimmedKey.StartsWith("sbc") && !trimmedKey.StartsWith("volumes"))
-            {
-                // Only return query results for network/plugins/sbc/volume keys as part of M409
-                return null;
-            }
+            // This used to answer only for the keys the SBC owned - network, plugins, sbc, volumes -
+            // and leave the rest to the firmware's copy of the object model. There is one object
+            // model now and it is this one, so every key is answered here
 
             // Wait until pending codes have finished
             if (!await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
@@ -1148,7 +1156,9 @@ internal partial class MCodeHandler(
         {
             if (code.TryGetString('P', out string? directory))
             {
-                await using (await linkInterface.LockAllMovementSystemsAndWaitForStandstill(code.Channel))
+                // Changing the system folder under a running job would change which macros a queued
+                // move's callbacks resolve to, so wait for the machine to stop first
+                if (await planner.WaitForStandstillAsync(cancellationToken))
                 {
                     string physicalDirectory = (code.MinorNumber != 1)
                         ? await filePathResolver.ToPhysicalAsync(directory, "sys", cancellationToken)
@@ -1224,9 +1234,18 @@ internal partial class MCodeHandler(
                     return new Message(MessageType.Error, "Machine name must consist of the same letters and digits as configured by the Linux hostname");
                 }
 
-                // Hostname is legit - pass this code on to RRF so it can update the name too
+                // The name matches the Linux hostname, so it is safe to adopt
+                using (await model.AccessReadWriteAsync(cancellationToken))
+                {
+                    model.Network.Name = newName;
+                }
+                return new Message();
             }
-            return null;
+
+            using (await model.AccessReadOnlyAsync(cancellationToken))
+            {
+                return new Message(MessageType.Success, $"RepRap name: {model.Network.Name}");
+            }
         }
         throw new OperationCanceledException();
     }
@@ -1248,7 +1267,7 @@ internal partial class MCodeHandler(
                     model.Password = password;
                 }
             }
-            return null;
+            return new Message();
         }
         throw new OperationCanceledException();
     }
@@ -1296,12 +1315,14 @@ internal partial class MCodeHandler(
             throw new OperationCanceledException();
         }
 
-        // Plain M581 hands ownership back to RRF — clear any DSF-managed trigger for this slot
+        // The plain form used to hand the slot back to the firmware's own trigger system; there is
+        // no such system now, so all this can do is drop the trigger managed here
         if (code.TryGetInt('T', out int triggerNumber))
         {
             sbcTriggerService.Remove(triggerNumber);
+            return new Message();
         }
-        return null;
+        return new Message(MessageType.Error, "Only the expression form M581.1 is supported");
     }
 
     /// <summary>
@@ -1379,8 +1400,7 @@ internal partial class MCodeHandler(
                 }
             }
 
-            // Let RRF carry on
-            return null;
+            return new Message();
         }
         throw new OperationCanceledException();
     }
@@ -1713,8 +1733,7 @@ internal partial class MCodeHandler(
 
         switch (code.MajorNumber)
         {
-            // Stop or Unconditional stop
-            // Sleep or Conditional stop
+            // Stop or unconditional stop, sleep or conditional stop
             // Resume print
             // Select file and start SD print
             // Simulate file
@@ -1725,76 +1744,15 @@ internal partial class MCodeHandler(
             case 37:
                 using (await jobProcessor.LockAsync(cancellationToken))
                 {
-                    // Start sending file instructions to RepRapFirmware or finish the cancellation process
+                    // Start reading from the job file, or finish the cancellation process
                     jobProcessor.Resume();
                 }
-                break;
-
-            // Pop
-            case 121:
-                {
-                    bool usingMMS;
-                    using (await model.AccessReadOnlyAsync(cancellationToken))
-                    {
-                        usingMMS = model.Move.MotionSystems.Count > 1;
-                    }
-
-                    if (usingMMS)
-                    {
-                        // This may change inputs[].active, so sync the OM here
-                        await model.WaitForFullUpdateAsync(cancellationToken);
-                    }
-                }
-                break;
-
-            // Diagnostics
-            case 122:
-                if (code.GetInt('B', 0) == 0 && code.GetInt('P', 0) == 0 && code.GetUnprecedentedString() != "DSF" && !string.IsNullOrEmpty(code.Result.Content))
-                {
-                    // Append our own diagnostics to RRF's M122 output
-                    string diagnostics = await diagnosticsProvider.PrintAsync();
-                    code.Result.Append(MessageType.Success, diagnostics);
-                }
-                break;
-
-            // Send/receive data
-            case 260:
-            case 261:
-                if (code.File != null && code.TryGetString('V', out string? varName))
-                {
-                    // These codes can create local variables, so keep track of them
-                    using (await code.File.LockAsync(cancellationToken))
-                    {
-                        code.File.AddLocalVariable(varName);
-                    }
-                }
-                break;
-
-            // Query object model
-            case 409:
-                if (code.HasParameter('I') && !string.IsNullOrWhiteSpace(code.Result.Content))
-                {
-                    // Clear output of M409 K"..." I1 case an outdated firmware version is used with this DSF build
-                    code.Result.Content = string.Empty;
-                }
-                break;
-
-            // Select movement queue number
-            case 596:
-                logger.LogDebug("Requesting full model update after M596");
-                await model.WaitForFullUpdateAsync(cancellationToken);        // This changes inputs[].active, so sync the OM here
-                logger.LogDebug("Requested full model update after M596");
                 break;
 
             // Fork input reader
             case 606:
                 if (code.TryGetInt('S', out int sParam) && sParam == 1)
                 {
-                    logger.LogDebug("Requesting full model update after M606 S1");
-                    await model.WaitForFullUpdateAsync(cancellationToken);    // This changes inputs[].active, so sync the OM here
-                    logger.LogDebug("Requested full model update after M606 S1");
-
-                    Link.Channel.Processor.StartCopiedMacros();
                     using (await jobProcessor.LockAsync(cancellationToken))
                     {
                         jobProcessor.StartSecondJob();

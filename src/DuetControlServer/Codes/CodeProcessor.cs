@@ -57,24 +57,49 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     }
 
     /// <summary>
-    /// Get the pipeline state of the firmware stage from a given channel
-    /// </summary>
-    /// <param name="channel"></param>
-    public Pipelines.PipelineStackItem GetFirmwareState(CodeChannel channel) => Processors.Value[(int)channel].FirmwareStackItem;
-
-    /// <summary>
-    /// Push a new state on the stack of a given channel procesor. Only to be used by the SPI channel processor!
+    /// Push a new state on the stack of a given channel processor
     /// </summary>
     /// <param name="channel">Code channel</param>
     /// <param name="file">Optional file</param>
-    /// <returns>Pipeline state</returns>
-    public Pipelines.PipelineStackItem Push(CodeChannel channel, CodeFile? file = null) => Processors.Value[(int)channel].Push(file);
+    public void Push(CodeChannel channel, CodeFile? file = null) => Processors.Value[(int)channel].Push(file);
 
     /// <summary>
-    /// Push a new state on the stack of a given pipeline. Only to be used by the SPI channel processor!
+    /// Pop the last state from the stack of a given channel processor
     /// </summary>
     /// <param name="channel">Code channel</param>
     public void Pop(CodeChannel channel) => Processors.Value[(int)channel].Pop();
+
+    /// <summary>
+    /// The file the given channel is currently executing, if any
+    /// </summary>
+    /// <param name="channel">Code channel</param>
+    /// <returns>The file on top of the channel's stack, or null if it is not running one</returns>
+    public CodeFile? GetCurrentFile(CodeChannel channel) => Processors.Value[(int)channel].CurrentFile;
+
+    /// <summary>
+    /// Abort every file running on a code channel
+    /// </summary>
+    /// <param name="channel">Code channel</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    /// <remarks>
+    /// Aborting used to be driven by the firmware telling us it had abandoned its own stack, and this
+    /// side followed. There is no second stack to agree with now: the files here are the only ones
+    /// there are, so aborting them is the whole operation
+    /// </remarks>
+    public async Task AbortAllFilesAsync(CodeChannel channel, CancellationToken cancellationToken = default)
+    {
+        await Processors.Value[(int)channel].AbortAllFilesAsync(cancellationToken);
+
+        if (channel is CodeChannel.File or CodeChannel.File2)
+        {
+            JobProcessor jobProcessor = serviceProvider.GetRequiredService<JobProcessor>();
+            using (await jobProcessor.LockAsync(cancellationToken))
+            {
+                jobProcessor.Abort();
+            }
+        }
+    }
 
     /// <summary>
     /// Assign the job file to the given channel. Only used by the job tasks!

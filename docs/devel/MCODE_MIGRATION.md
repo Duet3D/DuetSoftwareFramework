@@ -64,7 +64,7 @@ These rules come from the architecture already established on this branch — se
 | | Meaning |
 |---|---|
 | ✅ | Fully handled inside DSF |
-| 🔵 | **SBC half only** — implemented in `MCodeHandler`, but still defers the machine half to RRF. See §2 |
+| 🔵 | ~~SBC half only~~ — resolved, see §2 |
 | 🟡 | Partially ported — see the note |
 | ⬜ | Not started |
 | ⛔ | Out of scope: handled elsewhere in the pipeline, local-hardware only, or withdrawn in RRF |
@@ -91,11 +91,15 @@ There is a second switch in `MCodeHandler.CodeExecutedAsync` that is *entirely* 
 reply RRF produced: M122 appends DSF diagnostics to RRF's output, M409 patches RRF's JSON, and M596
 and M606 re-sync the object model after RRF changed `inputs[].active`.
 
-**Consequence for this migration:** with RRF gone there is no second half. Every 🔵 row below needs
-its RRF-side behaviour absorbed into DSF, and every `CodeExecutedAsync` hook needs re-examining — the
-ones that patch up an RRF reply become dead code once DSF produces the reply itself.
+**This has now been resolved.** The split is gone: `PipelineStage.Firmware` and the whole
+`Link/Channel` namespace have been deleted, a code that no handler claims resolves as
+`Unsupported command: ...` rather than being forwarded anywhere, and every code that used to return
+"not finished here" now returns a real result. `CodeExecutedAsync` keeps only the two hooks that were
+never about RRF replies — resuming the job after M0/M1/M2/M24/M32/M37, and starting the second job
+after M606 S1.
 
-This is additional to the ⬜ rows. Do not read 🔵 as "nearly done".
+The remaining 🔵 marks below are historical; treat them as ✅ for the SBC half and read the note for
+what the machine half now does (or does not yet) do.
 
 ---
 
@@ -474,3 +478,71 @@ than extending an already long switch. Nothing outside the assembly referenced i
 the S-curve flag (`SUPPORT_3RD_ORDER`), M584's `MinVisibleAxes` lower bound, and M350/M92's
 recalculation of backlash steps (`UpdateBacklashSteps`) — backlash arrives with M425 in phase 3.
 M906's `I` and `T` set `move.idle`, but nothing acts on idle current yet; that needs M18/M84 in phase 2.
+
+### Removing the DSF/RRF split
+
+**`Link/Channel` is gone** (`Processor`, `Manager`, `StackState` — 1,444 lines). It maintained a
+second per-channel stack that mirrored the code pipeline's own, plus the RRF-specific state around
+it: waiting-for-acknowledgement levels, start codes, lock/unlock requests, suspended codes and reply
+routing. Most of it was already dead — `DoFirmwareCode`, `MacroFileClosed`, `MessageAcknowledged`,
+`PrintPaused`, `WaitForAcknowledgement` and `ResourceLocked` had no callers at all.
+
+**The flush machinery did not need rewriting.** `PipelineStackItem` already implements flush natively
+with an idle event per stack level, and `ChannelProcessor.FlushAsync` already walks every stage. Only
+the Firmware stage delegated elsewhere, so deleting that stage *was* the replacement. What did need
+writing was `ChannelProcessor.AbortAllFilesAsync` and `CodeProcessor.GetCurrentFile`, which are the
+two things callers actually wanted from the old channel processor.
+
+**Macro execution is not wired up at all.** `FileFactory.CreateMacro(virtualFile, physicalFile, …)`
+has no callers and nothing calls `MacroFile.Start()`; the only macro ever constructed was the *copy*
+made when forking a channel. Macros used to be opened because RepRapFirmware asked for one over SPI,
+and nothing asks now. This is why deleting the channel stack broke no working behaviour — and it
+means **M98 is not implemented**, despite being marked ✅ in §5.9: it only handles the `R` parameter.
+The same gap means M24 cannot run `resume.g` and M0/M1/M2 cannot run `stop.g`. Wiring macro execution
+DSF-side is a prerequisite for a usable machine and is not covered by any phase in §7 yet.
+
+**What the absorbed codes now do.** M0/M1/M2 cancel the job and return, but the machine half — heaters
+off, spindles off, motors idle — belongs to subsystems that are not ported. M409 answers for every
+object model key rather than only `network`/`plugins`/`sbc`/`volumes`, because there is only one
+object model now. M122 always reports DSF diagnostics. M550 writes `network.name`. M581 without the
+expression form can only drop a DSF-managed trigger and reports that the plain form is unsupported.
+
+**Unsupported codes error rather than pass through.** `Code.ResolveAsUnsupported` produces
+`Unsupported command: <code>` with `MessageType.Error`, matching RepRapFirmware's wording. Note the
+consequence: every ⬜ row in §5 is now a *visible* error at runtime rather than a silent no-op, which
+is the point, but it also means a config.g written for RRF will report a lot of errors until the
+remaining phases land.
+
+### Expansion board manager
+
+`Link/Expansion/ExpansionBoardManager.cs` receives what the boards broadcast and writes it to the
+object model. It is a `BackgroundService` with a bounded queue: `LinkService` recognises the report
+types and hands over raw payloads on the dispatch thread, and decoding plus the object model write
+lock happen on the manager's own task. The queue drops the oldest entry when full, because these are
+periodic reports where the newest is worth more than a backlog, and because blocking the dispatch
+thread would stall move completions and message output.
+
+| Report | Object model |
+|---|---|
+| `AnnounceV0` / `AnnounceV1` | `boards[]` — short name, firmware version and date (split from the `type|version|date` string Duet3Expansion sends), unique id, `maxMotors`, `state` |
+| `BoardStatusReportV0` / `V1` | `boards[].vIn`, `.v12`, `.mcuTemp` (min/current/max), `.freeRam` |
+| `DriversStatusReport` | `boards[].drivers[].status` |
+| `SensorTemperaturesReport` | `sensors.analog[].lastReading`, `.state` |
+| `HeatersStatusReport` | `heat.heaters[].current`, `.avgPwm`, `.state` |
+| `FansReport` | `fans[].actualValue`, `.rpm` |
+| `InputStateChangedV1` / `V2` | `sensors.gpIn[].value` |
+| `Event` | logged as a warning |
+| `DebugText` | logged at debug level |
+
+Two things it deliberately does not do yet. `FilamentMonitorsStatusReportV2` is logged but not
+applied: `sensors.filamentMonitors[]` is keyed by extruder, and nothing populates that mapping until
+M591 is ported. Endstop and Z probe handles in the input messages are skipped for the same reason —
+M574 and M558 have not created those sensors.
+
+The readings in these messages are positional, not indexed: a board status report packs only the
+values it has, in a fixed order, and the temperature/heater/fan reports pair the n'th value with the
+n'th set bit of a bitmap. Both are handled the way the boards expect; getting either wrong attributes
+a reading to the wrong device rather than failing.
+
+The V1 and V2 input messages have different per-handle entry sizes, so each is deserialized as
+itself. Reading one as the other shifts every handle silently.

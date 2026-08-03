@@ -23,13 +23,11 @@ namespace DuetControlServer.Link;
 /// <summary>
 /// Main firmware interface
 /// </summary>
-/// <param name="channels">Channel manager</param>
 /// <param name="nativeLink">Native SPI transfer loop</param>
 /// <param name="logger">Logger instance</param>
 /// <param name="settings">Settings</param>
 [DiagnosticsPriority(-5)]
 public sealed partial class LinkInterface(
-    Channel.Manager channels,
     NativeLink nativeLink,
     ILogger<LinkInterface> logger,
     IOptions<Settings> settings) : IDiagnostics
@@ -246,74 +244,6 @@ public sealed partial class LinkInterface(
     }
 
     /// <summary>
-    /// Wait for all pending codes of the first or last stack item to finish
-    /// </summary>
-    /// <param name="channel">Code channel to wait for</param>
-    /// <param name="flushAll">Flush everything</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Whether the codes have been flushed successfully</returns>
-    public async ValueTask<bool> FlushAsync(CodeChannel channel, bool flushAll, CancellationToken cancellationToken = default)
-    {
-        ValueTask<bool> flushTask;
-        using (await channels[channel].LockAsync(cancellationToken))
-        {
-            flushTask = flushAll ? channels[channel].FlushAllAsync(cancellationToken) : channels[channel].FlushAsync(cancellationToken);
-        }
-        return await flushTask;
-    }
-
-    /// <summary>
-    /// Wait for all pending codes to finish
-    /// </summary>
-    /// <param name="file">Code file</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Whether the codes have been flushed successfully</returns>
-    public async ValueTask<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default)
-    {
-        ValueTask<bool> flushTask;
-        using (await channels[file.Channel].LockAsync(cancellationToken))
-        {
-            flushTask = channels[file.Channel].FlushAsync(file, cancellationToken);
-        }
-        return await flushTask;
-    }
-
-    /// <summary>
-    /// Wait for all pending codes on the same stack level as the given code to finish.
-    /// By default this replaces all expressions as well for convenient parsing by the code processors.
-    /// </summary>
-    /// <param name="code">Code waiting for the flush</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Whether the codes have been flushed successfully</returns>
-    public async ValueTask<bool> FlushAsync(Code code, CancellationToken cancellationToken = default)
-    {
-        ValueTask<bool> flushTask;
-        using (await channels[code.Channel].LockAsync(cancellationToken))
-        {
-            flushTask = (code.File == null) ? channels[code.Channel].FlushAsync(cancellationToken) : channels[code.Channel].FlushAsync(code.File, cancellationToken);
-        }
-        return await flushTask;
-    }
-
-    /// <summary>
-    /// Copy the state from one channel processor to another
-    /// </summary>
-    /// <param name="from">Source channel</param>
-    /// <param name="to">Target channel</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    public async Task CopyStateAsync(CodeChannel from, CodeChannel to, CancellationToken cancellationToken = default)
-    {
-        using (await channels[to].LockAsync(cancellationToken))
-        {
-            using (await channels[from].LockAsync(cancellationToken))
-            {
-                channels[to].CopyState(channels[from]);
-            }
-        }
-    }
-
-    /// <summary>
     /// Request an immediate emergency stop
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
@@ -351,21 +281,6 @@ public sealed partial class LinkInterface(
     }
 
     /// <summary>
-    /// Attempt to flag the currently executing macro file as (not) pausable
-    /// </summary>
-    /// <param name="channel">Code channel where the macro is being executed</param>
-    /// <param name="isPausable">Whether or not the macro file is pausable</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    public async Task SetMacroPausableAsync(CodeChannel channel, bool isPausable, CancellationToken cancellationToken = default)
-    {
-        using (await channels[channel].LockAsync(cancellationToken))
-        {
-            await channels[channel].SetMacroPausable(isPausable).WaitAsync(cancellationToken);
-        }
-    }
-
-    /// <summary>
     /// Update the print file info in the firmware
     /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>
@@ -400,64 +315,6 @@ public sealed partial class LinkInterface(
             onPrintStopped = StopPrintRequest.Task;
         }
         await onPrintStopped.WaitAsync(cancellationToken);
-    }
-
-    /// <summary>
-    /// Class representing an acquired movement lock
-    /// </summary>
-    /// <param name="channel">Locked code channel</param>
-    /// <param name="linkInterface">Link interface</param>
-    private class MovementLock(CodeChannel channel, LinkInterface linkInterface) : IAsyncDisposable
-    {
-        /// <summary>
-        /// Called when this instance is being disposed
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        public async ValueTask DisposeAsync()
-        {
-            GC.SuppressFinalize(this);
-            await linkInterface.UnlockAll(channel);
-        }
-    }
-
-    /// <summary>
-    /// Lock all movement systems and wait for standstill
-    /// </summary>
-    /// <param name="channel">Code channel acquiring the lock</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Disposable lock object that releases the lock when disposed</returns>
-    /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    /// <exception cref="OperationCanceledException">Failed to get movement lock</exception>
-    public async Task<IAsyncDisposable> LockAllMovementSystemsAndWaitForStandstill(CodeChannel channel, CancellationToken cancellationToken = default)
-    {
-        Task<bool> lockTask;
-        using (await channels[channel].LockAsync(cancellationToken))
-        {
-            lockTask = channels[channel].LockAllMovementSystemsAndWaitForStandstill();
-        }
-
-        if (await lockTask.WaitAsync(cancellationToken))
-        {
-            return new MovementLock(channel, this);
-        }
-        throw new OperationCanceledException();
-    }
-
-    /// <summary>
-    /// Unlock all resources occupied by the given channel
-    /// </summary>
-    /// <param name="channel">Channel holding the resources</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    internal async Task UnlockAll(CodeChannel channel, CancellationToken cancellationToken = default)
-    {
-        Task unlockTask;
-        using (await channels[channel].LockAsync(cancellationToken))
-        {
-            unlockTask = channels[channel].UnlockAll();
-        }
-        await unlockTask.WaitAsync(cancellationToken);
     }
 
     /// <summary>
@@ -538,18 +395,6 @@ public sealed partial class LinkInterface(
     /// <summary>
     /// Abort all files in RRF on the given channel asynchronously
     /// </summary>
-    /// <param name="channel">Channel where all the files have been aborted</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    public async Task AbortAllAsync(CodeChannel channel, CancellationToken cancellationToken = default)
-    {
-        using (await channels[channel].LockAsync(cancellationToken))
-        {
-            await channels[channel].AbortAllFilesAsync().WaitAsync(cancellationToken);
-        }
-    }
-
     /// <summary>
     /// Invalidate pending codes and code-relevant requests due to an emergency stop
     /// </summary>
@@ -570,14 +415,6 @@ public sealed partial class LinkInterface(
             }
         }
 
-        // Resolve pending macros, unbuffered (system) codes and flush requests
-        foreach (Channel.Processor channel in channels)
-        {
-            using (channel.Lock())
-            {
-                channel.Invalidate();
-            }
-        }
         BytesReserved = BufferSpace = 0;
 
         // Resolve pending CAN requests
@@ -622,14 +459,6 @@ public sealed partial class LinkInterface(
             }
         }
 
-        // Resolve pending macros, unbuffered (system) codes and flush requests
-        foreach (Channel.Processor channel in channels)
-        {
-            using (await channel.LockAsync(cancellationToken))
-            {
-                channel.Invalidate();
-            }
-        }
         BytesReserved = BufferSpace = 0;
 
         // Resolve pending CAN requests

@@ -48,7 +48,6 @@ public sealed class ChannelProcessor
             ActivatorUtilities.CreateInstance<Pipelines.Pre>(serviceProvider, this),
             ActivatorUtilities.CreateInstance<Pipelines.ProcessInternally>(serviceProvider, this),
             ActivatorUtilities.CreateInstance<Pipelines.Post>(serviceProvider, this),
-            ActivatorUtilities.CreateInstance<Pipelines.Firmware>(serviceProvider, this),
             ActivatorUtilities.CreateInstance<Pipelines.Executed>(serviceProvider, this)
         ]);
     }
@@ -57,11 +56,6 @@ public sealed class ChannelProcessor
     /// Pipeline stages that support push/pop
     /// </summary>
     private readonly PipelineStage[] StagesWithStack = [.. Enum.GetValues<PipelineStage>().Where(value => value != PipelineStage.Executed)];
-
-    /// <summary>
-    /// Retrieve the firmware state
-    /// </summary>
-    internal Pipelines.PipelineStackItem FirmwareStackItem => _pipelines.Value[(int)PipelineStage.Firmware].CurrentStackItem;
 
     /// <summary>
     /// Lifecycle of this pipeline
@@ -77,32 +71,20 @@ public sealed class ChannelProcessor
     {
         foreach (Pipelines.PipelineBase pipeline in _pipelines.Value)
         {
-            if (pipeline.Stage != PipelineStage.Firmware)
-            {
-                pipeline.Diagnostics(builder);
-            }
+            pipeline.Diagnostics(builder);
         }
     }
 
     /// <summary>
     /// Push a new state on the stack
     /// </summary>
-    /// <returns>New pipeline state of the firmware for the SPI connector</returns>
-    public Pipelines.PipelineStackItem Push(CodeFile? file)
+    /// <param name="file">File the new state executes, if any</param>
+    public void Push(CodeFile? file)
     {
-        Pipelines.PipelineStackItem? newState = null;
         foreach (PipelineStage stage in StagesWithStack)
         {
-            if (stage == PipelineStage.Firmware)
-            {
-                newState = _pipelines.Value[(int)stage].Push(file);
-            }
-            else
-            {
-                _pipelines.Value[(int)stage].Push(file);
-            }
+            _pipelines.Value[(int)stage].Push(file);
         }
-        return newState!;
     }
 
     /// <summary>
@@ -134,6 +116,28 @@ public sealed class ChannelProcessor
     public bool HasValidJobFile
     {
         get => _pipelines.Value[0].HasValidJobFile;
+    }
+
+    /// <summary>
+    /// File on top of this channel's stack, or null if it is not running one
+    /// </summary>
+    public CodeFile? CurrentFile => _pipelines.Value[(int)PipelineStage.Start].CurrentStackItem.File;
+
+    /// <summary>
+    /// Abort every file on this channel's stack, unwinding it back to the base level
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public async Task AbortAllFilesAsync(CancellationToken cancellationToken = default)
+    {
+        while (CurrentFile is MacroFile macro)
+        {
+            using (await macro.LockAsync(cancellationToken))
+            {
+                macro.Abort();
+            }
+            Pop();
+        }
     }
 
     /// <summary>

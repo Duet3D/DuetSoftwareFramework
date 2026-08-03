@@ -1,5 +1,5 @@
-﻿using DuetControlServer.IPC;
-using DuetControlServer.Link;
+﻿using DuetControlServer.Codes;
+using DuetControlServer.IPC;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,9 +9,9 @@ namespace DuetControlServer.Commands;
 /// <summary>
 /// Implementation of the <see cref="DuetAPI.Commands.InvalidateChannel"/> command
 /// </summary>
-/// <param name="linkInterface">Link interface</param>
+/// <param name="codeProcessor">Code processor</param>
 /// <param name="model">Object model</param>
-public sealed class InvalidateChannel(LinkInterface linkInterface, Model.ObjectModel model) : DuetAPI.Commands.InvalidateChannel, IConnectionCommand
+public sealed class InvalidateChannel(CodeProcessor codeProcessor, Model.ObjectModel model) : DuetAPI.Commands.InvalidateChannel, IConnectionCommand
 {
     /// <inheritdoc />
     public Connection? Connection { get; set; }
@@ -33,6 +33,6 @@ public sealed class InvalidateChannel(LinkInterface linkInterface, Model.ObjectM
         }
 
         // Wait for all codes and files to be invalidated
-        await linkInterface.AbortAllAsync(Channel, cancellationToken);
+        await codeProcessor.AbortAllFilesAsync(Channel, cancellationToken);
     }
 }

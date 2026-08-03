@@ -29,11 +29,6 @@ public enum PipelineStage
     Post,
 
     /// <summary>
-    /// Code is processed by the firmware
-    /// </summary>
-    Firmware,
-
-    /// <summary>
     /// Code has been executed (resolved or cancelled). It is intercepted by third-party plugins
     /// </summary>
     /// <seealso cref="DuetAPI.Connection.InterceptionMode.Executed"/>

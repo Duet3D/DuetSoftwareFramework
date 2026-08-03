@@ -1,5 +1,4 @@
 ﻿using DuetAPI.Commands;
-using DuetControlServer.Link.Channel;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -12,12 +11,11 @@ namespace DuetControlServer.Codes.Pipelines;
 /// <summary>
 /// Initial pipeline element for codes being started
 /// </summary>
-/// <param name="channelManager">Channel manager</param>
 /// <param name="channelProcessor">Channel processor</param>
 /// <param name="codeProcessor">Code processor</param>
 /// <param name="lifetime">Application lifetime</param>
 /// <param name="settings">Settings</param>
-public sealed class Start(Manager channelManager, ChannelProcessor channelProcessor, CodeProcessor codeProcessor, IHostApplicationLifetime lifetime, IOptions<Settings> settings)
+public sealed class Start(ChannelProcessor channelProcessor, CodeProcessor codeProcessor, IHostApplicationLifetime lifetime, IOptions<Settings> settings)
     : PipelineBase(PipelineStage.Start, channelProcessor, codeProcessor, lifetime, settings)
 {
     /// <summary>
@@ -51,10 +49,6 @@ public sealed class Start(Manager channelManager, ChannelProcessor channelProces
             else if (code.Flags.HasFlag(CodeFlags.IsFromMacro))
             {
                 ChannelProcessor.Logger.LogDebug("Starting code {Code} (macro code)", code);
-            }
-            else if (channelManager.IsWaitingForAcknowledgment(code.Channel))
-            {
-                ChannelProcessor.Logger.LogDebug("Starting code {Code} (acknowledgment)", code);
             }
             else
             {

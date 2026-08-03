@@ -37,8 +37,8 @@ namespace DuetControlServer.Link;
 /// stall an SPI transfer in flight.
 /// </para>
 /// </remarks>
-/// <param name="channels">Channel manager</param>
 /// <param name="eventLogger">Event logger</param>
+/// <param name="expansionBoardManager">Receiver for expansion board status reports</param>
 /// <param name="jobProcessor">Job processor</param>
 /// <param name="nativeLink">Native SPI transfer loop</param>
 /// <param name="linkInterface">Link interface</param>
@@ -49,8 +49,8 @@ namespace DuetControlServer.Link;
 /// <param name="logger">Logger</param>
 /// <param name="settings">Settings</param>
 internal sealed class LinkService(
-    Channel.Manager channels,
     EventLogger eventLogger,
+    Expansion.ExpansionBoardManager expansionBoardManager,
     JobProcessor jobProcessor,
     NativeLink nativeLink,
     LinkInterface linkInterface,
@@ -494,11 +494,10 @@ internal sealed class LinkService(
         // Check if this is a code reply
         if (flags.HasFlag(MessageTypeFlags.BinaryCodeReplyFlag))
         {
-            if (!channels.HandleReply(flags, reply))
-            {
-                // Must be a left-over error message...
-                OutputGenericMessage(flags, reply);
-            }
+            // Codes are resolved where they are executed now, so nothing is waiting to be matched
+            // up with a reply arriving separately. Anything still flagged as one is an unsolicited
+            // message from the link itself
+            OutputGenericMessage(flags, reply);
         }
         else if ((flags & MessageTypeFlags.GenericMessage) == MessageTypeFlags.GenericMessage)
         {
@@ -587,8 +586,14 @@ internal sealed class LinkService(
     /// <param name="payload">CAN payload</param>
     private void HandleUnsolicitedCanMessage(CanMessageType msgType, byte srcAddress, byte flags, CanStatus status, byte[] payload)
     {
-        // TODO: route unsolicited CAN messages (e.g. events, status reports, announcements) to their consumers
-        logger.LogDebug("Received unsolicited CAN message of type {MsgType} from address {SrcAddress} ({Length} bytes)", msgType, srcAddress, payload.Length);
+        logger.LogTrace("Received unsolicited CAN message of type {MsgType} from address {SrcAddress} ({Length} bytes)", msgType, srcAddress, payload.Length);
+
+        // The status reports the expansion boards broadcast are decoded and applied to the object
+        // model on the board manager's own task, so nothing is deserialized on this thread
+        if (expansionBoardManager.TryEnqueue(msgType, srcAddress, payload))
+        {
+            return;
+        }
 
         // Route on the message type and deserialize straight into the concrete struct. Switching here rather than
         // on the runtime type keeps this allocation-free (no boxing) on a path that runs in the kHz range.
@@ -848,15 +853,6 @@ internal sealed class LinkService(
         using (jobProcessor.Lock())
         {
             jobProcessor.Abort();
-        }
-
-        // Resolve pending macros, unbuffered (system) codes and flush requests
-        foreach (Channel.Processor channel in channels)
-        {
-            using (channel.Lock())
-            {
-                channel.Invalidate();
-            }
         }
     }
 

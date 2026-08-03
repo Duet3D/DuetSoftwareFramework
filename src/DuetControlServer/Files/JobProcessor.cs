@@ -321,9 +321,9 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
         // Ignore the command if already forked
         if (_file2 is null)
         {
-            // Copy the stack in case this is invoked from a macro file.
-            // We need to pass the macro file position as well if applicable to resume the second macro file from the right position
-            await _linkInterface.CopyStateAsync(CodeChannel.File, CodeChannel.File2, cancellationToken);
+            // The firmware used to keep its own copy of the channel's macro stack, which had to be
+            // duplicated onto File2 before the fork could start. There is only one stack now and
+            // File2 builds its own as it executes, so there is nothing left to copy across
 
             // Start printing using the second file channel if applicable.
             // Lock the file here because the copy constructor accesses file.NextFilePosition

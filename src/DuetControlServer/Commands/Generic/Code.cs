@@ -332,15 +332,32 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
             }
         }
 
-        // Do not send comments that may not be interpreted by RRF
+        // A comment carries no instruction, so there is nothing left to interpret
         if (IsNonFirmwareComment)
         {
             Result = new Message();
             return true;
         }
 
-        // Code has not been interpreted yet - let RRF deal with it
-        return false;
+        // Nothing has claimed this code. DuetControlServer is the only thing that executes codes
+        // now, so a code no handler recognised is not deferred anywhere - it is unsupported
+        ResolveAsUnsupported();
+        return true;
+    }
+
+    /// <summary>
+    /// Resolve this code as one nothing supports
+    /// </summary>
+    /// <remarks>
+    /// There used to be a firmware behind DuetControlServer that unrecognised codes were passed to,
+    /// and "no handler here" meant "let RepRapFirmware try". It no longer does: a code is either
+    /// executed here or it is not executed at all, and saying so is better than silently succeeding.
+    /// The wording matches what RepRapFirmware replied in the same situation, because macros and user
+    /// interfaces have been reading it for years
+    /// </remarks>
+    internal void ResolveAsUnsupported()
+    {
+        Result ??= new Message(MessageType.Error, $"Unsupported command: {ToShortString()}");
     }
 
     /// <summary>

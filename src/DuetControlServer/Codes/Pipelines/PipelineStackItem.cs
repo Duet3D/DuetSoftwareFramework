@@ -56,50 +56,43 @@ public sealed class PipelineStackItem
         File = file;
 
         // Feed incoming codes to the code handler
-        if (pipeline.Stage != PipelineStage.Firmware)
+        ProcessorTask = Task.Factory.StartNew(async delegate
         {
-            ProcessorTask = Task.Factory.StartNew(async delegate
+            await foreach (Code code in PendingCodes.Reader.ReadAllAsync(_lifetime.ApplicationStopping))
             {
-                await foreach (Code code in PendingCodes.Reader.ReadAllAsync(_lifetime.ApplicationStopping))
+                // Set it up
+                lock (this)
                 {
-                    // Set it up
-                    lock (this)
-                    {
-                        CodeBeingExecuted = code;
-                    }
-                    code.Stage = pipeline.Stage;
+                    CodeBeingExecuted = code;
+                }
+                code.Stage = pipeline.Stage;
 
-                    // Process it
-                    try
+                // Process it
+                try
+                {
+                    if (code.CancellationToken.IsCancellationRequested && pipeline.Stage != PipelineStage.Executed)
                     {
-                        if (code.CancellationToken.IsCancellationRequested && pipeline.Stage != PipelineStage.Executed)
-                        {
-                            // Do not deal with cancelled codes
-                            codeProcessor.CancelCode(code);
-                        }
-                        else
-                        {
-                            await pipeline.ProcessCodeAsync(code);
-                        }
+                        // Do not deal with cancelled codes
+                        codeProcessor.CancelCode(code);
                     }
-                    catch (Exception e)
+                    else
                     {
-                        pipeline.ChannelProcessor.Logger.LogError(e, "Failed to process code in stage {0}", pipeline.Stage);
-                    }
-
-                    // Code processed, see if there is more to do
-                    lock (this)
-                    {
-                        Busy = PendingCodes.Reader.TryPeek(out _);
-                        CodeBeingExecuted = null;
+                        await pipeline.ProcessCodeAsync(code);
                     }
                 }
-            }).Unwrap();
-        }
-        else
-        {
-            ProcessorTask = Task.CompletedTask;
-        }
+                catch (Exception e)
+                {
+                    pipeline.ChannelProcessor.Logger.LogError(e, "Failed to process code in stage {0}", pipeline.Stage);
+                }
+
+                // Code processed, see if there is more to do
+                lock (this)
+                {
+                    Busy = PendingCodes.Reader.TryPeek(out _);
+                    CodeBeingExecuted = null;
+                }
+            }
+        }).Unwrap();
     }
 
     /// <summary>

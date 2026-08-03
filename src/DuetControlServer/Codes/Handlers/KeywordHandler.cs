@@ -20,10 +20,9 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="codeProcessor">Code processor</param>
 /// <param name="expressions">Meta G-code expression parser</param>
 /// <param name="filePathResolver">File path resolver</param>
-/// <param name="linkInterface">Link interface</param>
 /// <param name="logger">Logger</param>
 /// <param name="settings">Settings</param>
-public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expressions, FilePathResolver filePathResolver, LinkInterface linkInterface, ILogger<KeywordHandler> logger, IOptions<Settings> settings) : ICodeHandler
+public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expressions, FilePathResolver filePathResolver, ILogger<KeywordHandler> logger, IOptions<Settings> settings) : ICodeHandler
 {
     // Private fields
     private readonly ILogger<KeywordHandler> _logger = logger;
@@ -162,7 +161,7 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
 
                 if (code.Keyword == KeywordType.Abort)
                 {
-                    await linkInterface.AbortAllAsync(code.Channel, cancellationToken);
+                    await codeProcessor.AbortAllFilesAsync(code.Channel, cancellationToken);
                 }
                 return new Message(MessageType.Success, result ?? string.Empty);
 
