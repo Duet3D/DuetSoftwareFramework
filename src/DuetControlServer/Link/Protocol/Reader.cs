@@ -461,6 +461,30 @@ public static class Reader
     }
 
     /// <summary>
+    /// Read a request for part of a directory listing
+    /// </summary>
+    /// <param name="from">Origin</param>
+    /// <param name="directory">Directory to list</param>
+    /// <param name="startIndex">Index of the first entry to return</param>
+    /// <param name="maxLength">Maximum number of bytes of entry data the firmware can accept</param>
+    /// <returns>Number of bytes read</returns>
+    public static int ReadGetFileList(ReadOnlySpan<byte> from, out string directory, out uint startIndex, out uint maxLength)
+    {
+        GetFileListHeader header = MemoryMarshal.Read<GetFileListHeader>(from);
+        int bytesRead = Marshal.SizeOf<GetFileListHeader>();
+
+        // Read header
+        startIndex = header.StartIndex;
+        maxLength = header.MaxLength;
+
+        // Read directory name
+        directory = Encoding.UTF8.GetString(from.Slice(bytesRead, header.DirectoryLength));
+        bytesRead += header.DirectoryLength;
+
+        return AddPadding(bytesRead);
+    }
+
+    /// <summary>
     /// Read a UTF-8 encoded string request from a memory span
     /// </summary>
     /// <param name="from">Origin</param>

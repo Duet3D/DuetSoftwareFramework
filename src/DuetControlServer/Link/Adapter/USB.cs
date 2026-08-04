@@ -568,6 +568,17 @@ public class USB : IDiagnostics, ILinkAdapter
     }
 
     /// <summary>
+    /// Read a request for part of a directory listing
+    /// </summary>
+    /// <param name="directory">Directory to list</param>
+    /// <param name="startIndex">Index of the first entry to return</param>
+    /// <param name="maxLength">Maximum number of bytes of entry data the firmware can accept</param>
+    public void ReadGetFileList(out string directory, out uint startIndex, out uint maxLength)
+    {
+        Protocol.Reader.ReadGetFileList(_packetData.Span, out directory, out startIndex, out maxLength);
+    }
+
+    /// <summary>
     /// Read an open file request
     /// </summary>
     /// <param name="filename">Filename to open</param>
@@ -1475,6 +1486,30 @@ public class USB : IDiagnostics, ILinkAdapter
 
         WritePacket(Protocol.SbcRequests.Request.FileDeleteResult, dataLength);
         Protocol.Writer.WriteBoolean(GetWriteBuffer(dataLength), success);
+        return true;
+    }
+
+    /// <summary>
+    /// Send back part of a directory listing
+    /// </summary>
+    /// <param name="entries">Entries to send back</param>
+    /// <param name="endOfList">Whether the final entry of the directory is part of this response</param>
+    /// <returns>If the packet could be written</returns>
+    public bool WriteFileListResult(IList<FileSystemInfo> entries, bool endOfList)
+    {
+        // Serialize the request first to see how much space it requires
+        Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
+        int dataLength = Protocol.Writer.WriteFileList(span, entries, endOfList);
+
+        // See if the request fits into the buffer
+        if (!CanWritePacket(dataLength))
+        {
+            return false;
+        }
+
+        // Write it
+        WritePacket(Protocol.SbcRequests.Request.FileListResult, dataLength);
+        span[..dataLength].CopyTo(GetWriteBuffer(dataLength));
         return true;
     }
 

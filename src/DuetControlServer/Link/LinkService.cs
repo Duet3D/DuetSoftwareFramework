@@ -575,6 +575,9 @@ public sealed class LinkService(
             case Request.SecureDeleteFile:
                 HandleSecureDeleteFile();
                 break;
+            case Request.GetFileList:
+                HandleGetFileList();
+                break;
             case Request.OpenFile:
                 HandleOpenFile();
                 break;
@@ -1130,6 +1133,56 @@ public sealed class LinkService(
             }
             linkAdapter.WriteFileDeleteResult(false);
         }
+    }
+
+    /// <summary>
+    /// Send back part of a directory listing.
+    /// The firmware pages through the listing by entry index, so the order must be the same for every
+    /// request of the same directory - hence the explicit sort instead of the order the filesystem returns
+    /// </summary>
+    private void HandleGetFileList()
+    {
+        linkAdapter.ReadGetFileList(out string directory, out uint startIndex, out uint maxLength);
+        logger.LogDebug("Listing {Directory} from entry {StartIndex}", directory, startIndex);
+
+        List<FileSystemInfo> entries = [];
+        bool endOfList = true;
+        try
+        {
+            // The requested length comes from the wire and can never legitimately exceed the transfer buffer size
+            maxLength = Math.Min(maxLength, (uint)settings.Value.SbcBufferSize);
+
+            DirectoryInfo directoryInfo = new(filePathResolver.ToPhysical(directory));
+            if (directoryInfo.Exists)
+            {
+                FileSystemInfo[] allEntries = directoryInfo.GetFileSystemInfos();
+                Array.Sort(allEntries, (a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+
+                int bytesUsed = 0;
+                for (int i = (int)startIndex; i < allEntries.Length; i++)
+                {
+                    int entrySize = Protocol.Writer.GetFileListEntrySize(allEntries[i].Name);
+                    if (bytesUsed + entrySize > maxLength)
+                    {
+                        endOfList = false;
+                        break;
+                    }
+
+                    bytesUsed += entrySize;
+                    entries.Add(allEntries[i]);
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            if (!settings.Value.UpdateOnly)
+            {
+                logger.LogError(e, "Failed to list {Directory}", directory);
+            }
+            entries.Clear();
+            endOfList = true;
+        }
+        linkAdapter.WriteFileListResult(entries, endOfList);
     }
 
     /// <summary>

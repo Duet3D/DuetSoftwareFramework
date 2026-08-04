@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using DuetAPI;
@@ -627,6 +628,52 @@ else {              // Character parameters are not supported yet, they are wrap
             bytesWritten += data.Length;
         }
         return AddPadding(to, bytesWritten);
+    }
+
+    /// <summary>
+    /// Get the number of bytes one entry of a file list occupies
+    /// </summary>
+    /// <param name="name">Name of the file or directory</param>
+    /// <returns>Number of bytes</returns>
+    public static int GetFileListEntrySize(string name) => (Marshal.SizeOf<FileListEntry>() + Encoding.UTF8.GetByteCount(name) + 3) & ~3;
+
+    /// <summary>
+    /// Write part of a directory listing
+    /// </summary>
+    /// <param name="to">Destination</param>
+    /// <param name="entries">Entries to write, already limited to what the firmware asked for</param>
+    /// <param name="endOfList">Whether the final entry of the directory is part of this response</param>
+    /// <returns>Number of bytes written</returns>
+    public static int WriteFileList(Span<byte> to, IList<FileSystemInfo> entries, bool endOfList)
+    {
+        int bytesWritten = Marshal.SizeOf<FileListHeader>();
+
+        // Write entries
+        foreach (FileSystemInfo entry in entries)
+        {
+            byte[] unicodeName = Encoding.UTF8.GetBytes(entry.Name);
+            FileListEntry entryHeader = new()
+            {
+                Size = (entry is FileInfo file) ? (uint)Math.Min(file.Length, uint.MaxValue) : 0,
+                LastModified = (uint)Math.Max(new DateTimeOffset(entry.LastWriteTimeUtc).ToUnixTimeSeconds(), 0),
+                NameLength = (ushort)unicodeName.Length,
+                IsDirectory = Convert.ToByte(entry is DirectoryInfo)
+            };
+            MemoryMarshal.Write(to[bytesWritten..], in entryHeader);
+            bytesWritten += Marshal.SizeOf<FileListEntry>();
+
+            unicodeName.CopyTo(to[bytesWritten..]);
+            bytesWritten = AddPadding(to, bytesWritten + unicodeName.Length);
+        }
+
+        // Write header
+        FileListHeader header = new()
+        {
+            DataLength = (uint)(bytesWritten - Marshal.SizeOf<FileListHeader>()),
+            EndOfList = Convert.ToByte(endOfList)
+        };
+        MemoryMarshal.Write(to, in header);
+        return bytesWritten;
     }
 
     /// <summary>

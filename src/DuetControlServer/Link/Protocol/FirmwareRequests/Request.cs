@@ -153,5 +153,10 @@ public enum Request : ushort
     /// Securely delete a file (overwrite contents with zeros + fsync, then unlink).
     /// Files only - directories are rejected. Payload is identical to <see cref="DeleteFileOrDirectory"/>.
     /// </summary>
-    SecureDeleteFile = 26
+    SecureDeleteFile = 26,
+
+    /// <summary>
+    /// Request part of a directory listing, starting at the given entry index
+    /// </summary>
+    GetFileList = 27
 }

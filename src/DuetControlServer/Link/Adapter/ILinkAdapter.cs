@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using DuetAPI;
@@ -137,6 +138,14 @@ public interface ILinkAdapter
     /// </summary>
     /// <param name="filename">Name of the file</param>
     void ReadDeleteFileOrDirectory(out string filename);
+
+    /// <summary>
+    /// Read a request for part of a directory listing
+    /// </summary>
+    /// <param name="directory">Directory to list</param>
+    /// <param name="startIndex">Index of the first entry to return</param>
+    /// <param name="maxLength">Maximum number of bytes of entry data the firmware can accept</param>
+    void ReadGetFileList(out string directory, out uint startIndex, out uint maxLength);
 
     /// <summary>
     /// Read an open file request
@@ -359,6 +368,14 @@ public interface ILinkAdapter
     /// <param name="success">Whether the file operation was successful</param>
     /// <returns>If the packet could be written</returns>
     bool WriteFileDeleteResult(bool success);
+
+    /// <summary>
+    /// Send back part of a directory listing
+    /// </summary>
+    /// <param name="entries">Entries to send back</param>
+    /// <param name="endOfList">Whether the final entry of the directory is part of this response</param>
+    /// <returns>If the packet could be written</returns>
+    bool WriteFileListResult(IList<FileSystemInfo> entries, bool endOfList);
 
     /// <summary>
     /// Write the new file handle and file length of the file that has just been opened

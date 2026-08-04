@@ -185,5 +185,10 @@ public enum Request : ushort
     /// <summary>
     /// Increment the sequence number of an object model key provided exclusively by DSF
     /// </summary>
-    ObjectModelKeyChanged = 30
+    ObjectModelKeyChanged = 30,
+
+    /// <summary>
+    /// Result of a directory listing request
+    /// </summary>
+    FileListResult = 31
 }
