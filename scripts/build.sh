@@ -239,9 +239,39 @@ build_sbc_interface() {
         && cmake --preset "$preset" "${cmake_args[@]}" \
         && cmake --build --preset "$preset" --target duet_sbc_shared -j"$(nproc)")
 
+    verify_sbc_arch "$build_dir/src/$SBC_LIB_NAME" "$build_dir"
+
     # Land it next to the managed assemblies so default P/Invoke probing resolves it
     cp "$build_dir/src/$SBC_LIB_NAME" "$BUILD_DIR/"
     echo "=== $SBC_LIB_NAME -> $BUILD_DIR/ ==="
+}
+
+# verify_sbc_arch <library> <build directory>
+# Check that the library was built for the architecture that was asked for.
+#
+# A build directory first configured without a toolchain file keeps the host compiler forever after:
+# the toolchain's set(CMAKE_CXX_COMPILER) is a plain set, which does not override a value already in
+# the cache. Pointing a preset at a toolchain afterwards therefore changes nothing, the build still
+# succeeds, and it quietly produces host binaries. Nothing notices until the target tries to load
+# one, and the loader's message for a shared object of the wrong architecture is "cannot open shared
+# object file: No such file or directory" - about a file that is plainly there.
+verify_sbc_arch() {
+    local lib="$1" build_dir="$2" expected actual
+    case "$ARCH" in
+        linux-arm64) expected="AArch64" ;;
+        linux-arm)   expected="ARM" ;;
+        linux-x64)   expected="X86-64" ;;
+        *)           return 0 ;;
+    esac
+
+    actual="$(readelf -h "$lib" 2>/dev/null | sed -n 's/^ *Machine: *//p')"
+    if [[ "$actual" != *"$expected"* ]]; then
+        echo "Error: $SBC_LIB_NAME was built for '$actual', but $ARCH needs '$expected'." >&2
+        echo "       The CMake cache in $build_dir predates the toolchain file, so it is still" >&2
+        echo "       using the compiler it was first configured with. Build again after:" >&2
+        echo "           rm -rf $build_dir" >&2
+        exit 1
+    fi
 }
 
 # --- Build ---
