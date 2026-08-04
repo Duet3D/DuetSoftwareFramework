@@ -142,10 +142,10 @@ internal partial class MCodeHandler(
             111 => await HandleDebugLevelAsync(code, cancellationToken),
             // Emergency stop
             112 => await HandleEmergencyStopAsync(code, cancellationToken),
-            // Report firmware version
-            115 => await HandleFirmwareVersionAsync(code, cancellationToken),
             // Report the current position
             114 => await HandleReportPositionAsync(code, cancellationToken),
+            // Report firmware version
+            115 => await HandleFirmwareVersionAsync(code, cancellationToken),
             // Publish MQTT message
             118 => await HandlePublishMqttAsync(code, cancellationToken),
             // Report the endstop states
@@ -172,12 +172,19 @@ internal partial class MCodeHandler(
             290 => await HandleBabysteppingAsync(code, cancellationToken),
             // Set microstepping
             350 => await HandleMicrosteppingAsync(code, cancellationToken),
+            // Save and load the height map, and set the compensation taper
+            374 => await HandleSaveHeightMapAsync(code, cancellationToken),
+            375 => await HandleLoadHeightMapAsync(code, cancellationToken),
+            376 => await HandleTaperHeightAsync(code, cancellationToken),
             // Wait for the current moves to finish
             400 => await HandleWaitForMovesAsync(code, cancellationToken),
-            // Backlash compensation
-            425 => await HandleBacklashAsync(code, cancellationToken),
+            // Deploy and retract the Z probe
+            401 => await HandleDeployProbeAsync(code, cancellationToken),
+            402 => await HandleRetractProbeAsync(code, cancellationToken),
             // Query object model
             409 => await HandleQueryObjectModelAsync(code, cancellationToken),
+            // Backlash compensation
+            425 => await HandleBacklashAsync(code, cancellationToken),
             // Create directory on SD card
             470 => await HandleCreateDirectoryAsync(code, cancellationToken),
             // Rename file or directory on SD card
@@ -190,47 +197,40 @@ internal partial class MCodeHandler(
             503 => await HandlePrintSettingsAsync(code, cancellationToken),
             // Set configuration file folder
             505 => await HandleSetFolderAsync(code, cancellationToken),
-            // Axis compensation
-            556 => await HandleAxisCompensationAsync(code, cancellationToken),
-            // Limit axes and movement before homing
-            564 => await HandleMovementLimitsAsync(code, cancellationToken),
             // Set machine name
             550 => await HandleSetNameAsync(code, cancellationToken),
             // Set password
             551 => await HandleSetPasswordAsync(code, cancellationToken),
             // Set IP address
             552 => await HandleSetIPAddressAsync(code, cancellationToken),
-            // Configure external trigger
-            581 => await HandleConfigureTriggerAsync(code, cancellationToken),
-            // Configure a stepper driver
-            569 => await HandleDriverConfigAsync(code, cancellationToken),
-            // Set pressure advance
-            572 => await HandlePressureAdvanceAsync(code, cancellationToken),
-            // Map axes and extruders onto stepper drivers
-            584 => await HandleDriveMappingAsync(code, cancellationToken),
-            // Configure nonlinear extrusion
-            592 => await HandleNonlinearExtrusionAsync(code, cancellationToken),
-            // Save and load the height map, and set the compensation taper
-            374 => await HandleSaveHeightMapAsync(code, cancellationToken),
-            375 => await HandleLoadHeightMapAsync(code, cancellationToken),
-            376 => await HandleTaperHeightAsync(code, cancellationToken),
-            // Deploy and retract the Z probe
-            401 => await HandleDeployProbeAsync(code, cancellationToken),
-            402 => await HandleRetractProbeAsync(code, cancellationToken),
+            // Axis compensation
+            556 => await HandleAxisCompensationAsync(code, cancellationToken),
             // Define the mesh compensation grid
             557 => await HandleProbeGridAsync(code, cancellationToken),
             // Configure a Z probe
             558 => await HandleProbeConfigAsync(code, cancellationToken),
             // Stop applying bed compensation
             561 => await HandleClearCompensationAsync(code, cancellationToken),
-            // Wait for an endstop or input to reach a state
-            577 => await HandleWaitForInputAsync(code, cancellationToken),
+            // Limit axes and movement before homing
+            564 => await HandleMovementLimitsAsync(code, cancellationToken),
+            // Configure a stepper driver
+            569 => await HandleDriverConfigAsync(code, cancellationToken),
+            // Set pressure advance
+            572 => await HandlePressureAdvanceAsync(code, cancellationToken),
             // Configure the endstops
             574 => await HandleEndstopConfigAsync(code, cancellationToken),
-            // Configure input shaping
-            593 => await HandleInputShapingAsync(code, cancellationToken),
+            // Wait for an endstop or input to reach a state
+            577 => await HandleWaitForInputAsync(code, cancellationToken),
+            // Configure external trigger
+            581 => await HandleConfigureTriggerAsync(code, cancellationToken),
+            // Map axes and extruders onto stepper drivers
+            584 => await HandleDriveMappingAsync(code, cancellationToken),
             // Configure network protocols
             586 => await HandleNetworkProtocolsAsync(code, cancellationToken),
+            // Configure nonlinear extrusion
+            592 => await HandleNonlinearExtrusionAsync(code, cancellationToken),
+            // Configure input shaping
+            593 => await HandleInputShapingAsync(code, cancellationToken),
             // Fork input reader
             606 => await HandleForkInputReaderAsync(code, cancellationToken),
             // Delta configuration and delta endstop adjustments
@@ -241,20 +241,20 @@ internal partial class MCodeHandler(
             669 => await HandleKinematicsAsync(code, cancellationToken),
             // Z leadscrew positions
             671 => await HandleLeadscrewsAsync(code, cancellationToken),
-            // Set motor currents, current percentage and standstill current percentage
-            906 or 913 or 917 => await HandleMotorCurrentsAsync(code, cancellationToken),
             // Z probe offset, for Marlin compatibility
             851 => await HandleProbeOffsetAsync(code, cancellationToken),
+            // Set motor currents, current percentage and standstill current percentage
+            906 or 913 or 917 => await HandleMotorCurrentsAsync(code, cancellationToken),
             // Configure stall detection
             915 => await HandleStallDetectionAsync(code, cancellationToken),
-            // Configure phase stepping
-            970 => await HandlePhaseSteppingAsync(code, cancellationToken),
             // Start/stop event logging to SD card
             929 => await HandleEventLoggingAsync(code, cancellationToken),
             // Configure CAN
             952 => await HandleConfigureCanAsync(code, cancellationToken),
             // Enable CAN
             953 => await HandleEnableCanAsync(code, cancellationToken),
+            // Configure phase stepping
+            970 => await HandlePhaseSteppingAsync(code, cancellationToken),
             // Update the firmware
             997 => await HandleFirmwareUpdateAsync(code, cancellationToken),
             // Request resend of line
