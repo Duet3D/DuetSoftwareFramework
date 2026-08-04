@@ -1006,13 +1006,15 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message?> HandleFirmwareVersionAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        int board = code.GetInt('B', 0);
-        if (board == 0)
+        // Like M122, M115 is about the program rather than about attached hardware, so board 0 is a
+        // real answer here rather than the mistake it is everywhere else
+        int board = code.GetInt('B', CanId.MasterAddress);
+        if (board == CanId.MasterAddress)
         {
             // TODO reply with DSF firmware info
             return new Message(MessageType.Success, "DSF firmware version");
         }
-        else if (board > 0 && board <= 127)
+        else if (board > CanId.MasterAddress && board <= CanId.BroadcastAddress)
         {
             logger.LogDebug("Requesting firmware version for board {Board}", board);
             CanMessageReturnInfo msg = new()
@@ -1057,8 +1059,10 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message?> HandleDiagnosticsAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        int board = code.GetInt('B', 0);
-        if (board != 0)
+        // M122 is one of the codes board 0 does answer for: DuetCANMaster and this program are what
+        // there is to report on, whatever hardware is or is not attached to it
+        int board = code.GetInt('B', CanId.MasterAddress);
+        if (board != CanId.MasterAddress)
         {
             return new Message(MessageType.Error, $"Diagnostics for expansion board {board} are not supported yet");
         }

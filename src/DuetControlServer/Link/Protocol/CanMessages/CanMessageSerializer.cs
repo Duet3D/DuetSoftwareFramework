@@ -13,16 +13,26 @@ public static class CanMessageSerializer
     /// Deserialize a payload as a concrete CAN message body type.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Allocation-free: the payload is copied into a zero-initialized value on the stack, so payloads
     /// shorter than <typeparamref name="T"/> are zero-padded without touching the heap. Callers on the
     /// hot path (e.g. unsolicited message handling) should prefer this generic overload and switch on the
     /// CAN message type themselves rather than going through a boxed, runtime-typed dispatch.
+    /// </para>
+    /// <para>
+    /// A payload longer than <typeparamref name="T"/> keeps its leading bytes and the rest is ignored.
+    /// CAN messages grow by appending - that is why they carry reserved fields and why a changed layout
+    /// gets a new message type - so trailing bytes are either data a newer firmware appended or a
+    /// variable-length tail this side does not model. <c>CanMessageBoardStatusV1</c> is the second:
+    /// its fixed part is followed by one entry per analog handle the board reports, which is data for
+    /// a reader that wants it rather than a sign that anything is wrong. Refusing the message would
+    /// throw away the part that was understood.
+    /// </para>
     /// </remarks>
     /// <typeparam name="T">Target CAN message type.</typeparam>
     /// <param name="payload">Raw payload bytes.</param>
     /// <returns>Deserialized message body.</returns>
     /// <exception cref="InvalidOperationException">Thrown if <typeparamref name="T"/> is not blittable.</exception>
-    /// <exception cref="ArgumentException">Thrown if payload is longer than the target type.</exception>
     public static T Deserialize<T>(ReadOnlySpan<byte> payload) where T : struct, ICanMessageBody<T>
     {
         if (RuntimeHelpers.IsReferenceOrContainsReferences<T>())
@@ -31,13 +41,8 @@ public static class CanMessageSerializer
         }
 
         int size = Unsafe.SizeOf<T>();
-        if (payload.Length > size)
-        {
-            throw new ArgumentException($"Payload too long for {typeof(T).Name}: expected at most {size} bytes but got {payload.Length}", nameof(payload));
-        }
-
         T result = default;
-        payload.CopyTo(MemoryMarshal.AsBytes(new Span<T>(ref result)));
+        payload[..Math.Min(payload.Length, size)].CopyTo(MemoryMarshal.AsBytes(new Span<T>(ref result)));
         return result;
     }
 

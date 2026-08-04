@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -144,7 +145,8 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, ILogger<Exp
                 break;
 
             case CanMessageType.BoardStatusReportV1:
-                await ApplyBoardStatusAsync(report.Source, CanMessageSerializer.Deserialize<CanMessageBoardStatusV1>(report.Payload), cancellationToken);
+                await ApplyBoardStatusAsync(report.Source, CanMessageSerializer.Deserialize<CanMessageBoardStatusV1>(report.Payload),
+                                            report.Payload, cancellationToken);
                 break;
 
             case CanMessageType.DriversStatusReport:
@@ -251,7 +253,8 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, ILogger<Exp
     /// <param name="source">CAN address of the board</param>
     /// <param name="status">The report</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    private async ValueTask ApplyBoardStatusAsync(byte source, CanMessageBoardStatusV1 status, CancellationToken cancellationToken)
+    private async ValueTask ApplyBoardStatusAsync(byte source, CanMessageBoardStatusV1 status,
+                                                  byte[] payload, CancellationToken cancellationToken)
     {
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
@@ -270,6 +273,57 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, ILogger<Exp
             board.VIn = status.HasVin ? ToMinMaxCurrent(status.ShortValues[index++]) : null;
             board.V12 = status.HasV12 ? ToMinMaxCurrent(status.ShortValues[index++]) : null;
             board.McuTemp = status.HasMcuTemp ? ToMinMaxCurrent(status.ShortValues[index]) : null;
+
+            ApplyAnalogHandles(status, payload);
+        }
+    }
+
+    /// <summary>
+    /// Apply the analog readings a board appends to its status report
+    /// </summary>
+    /// <param name="status">The report</param>
+    /// <param name="payload">The raw report, which is where the readings are</param>
+    /// <remarks>
+    /// <para>
+    /// A board status report is variable length: the packed min/current/max values are followed by
+    /// one <see cref="AnalogHandleDataV1"/> per analog input the board is watching. They are not part
+    /// of the fixed struct, because where they start depends on how many of Vin, V12 and MCU
+    /// temperature that board has - which is why they are read from the payload rather than from a
+    /// field.
+    /// </para>
+    /// <para>
+    /// Only Z probes use analog handles, as in RepRapFirmware. This is where an analog or scanning
+    /// probe's reading comes from; a digital probe reports a level through
+    /// <c>InputStateChanged</c> instead
+    /// </para>
+    /// </remarks>
+    /// <remarks>The caller must hold the object model write lock</remarks>
+    private void ApplyAnalogHandles(CanMessageBoardStatusV1 status, byte[] payload)
+    {
+        int offset = (int)status.GetAnalogHandlesOffset();
+        int entrySize = Marshal.SizeOf<AnalogHandleDataV1>();
+
+        for (int i = 0; i < status.NumAnalogHandles && offset + entrySize <= payload.Length; i++)
+        {
+            AnalogHandleDataV1 data = MemoryMarshal.Read<AnalogHandleDataV1>(payload.AsSpan(offset));
+            offset += entrySize;
+
+            if (data.Handle.Type != RemoteInputHandle.TypeZprobe)
+            {
+                continue;
+            }
+
+            Probe? probe = data.Handle.Major < model.Sensors.Probes.Count
+                ? model.Sensors.Probes[data.Handle.Major]
+                : null;
+            if (probe is not null)
+            {
+                while (probe.Value.Count < 1)
+                {
+                    probe.Value.Add(0);
+                }
+                probe.Value[0] = data.Reading;
+            }
         }
     }
 

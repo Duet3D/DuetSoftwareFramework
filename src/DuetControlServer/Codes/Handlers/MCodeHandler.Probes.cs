@@ -89,6 +89,20 @@ internal partial class MCodeHandler
             return new Message(MessageType.Error, "Missing Z probe type number");
         }
 
+        // Checked before anything is written, so a port that cannot work leaves no half-configured
+        // probe behind
+        if (seenPort && !string.IsNullOrWhiteSpace(port))
+        {
+            if (!RemoteEndstops.TrySplitPort(port, out byte portBoard, out _))
+            {
+                return new Message(MessageType.Error, $"Invalid Z probe port '{port}'");
+            }
+            if (CanAddresses.HasNoHardware(portBoard))
+            {
+                return new Message(MessageType.Error, CanAddresses.NoHardwareMessage($"Z probe port '{port}'"));
+            }
+        }
+
         if (seenType && type is not (ProbeType.None or ProbeType.ZMotorStall) && !seenPort)
         {
             // The board has to be told which pin to watch, and there is no default: a probe with no
