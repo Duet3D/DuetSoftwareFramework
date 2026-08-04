@@ -34,15 +34,22 @@ using EventNumber = uint8_t;  ///< A type that represents an event number (used 
 // themselves - ShortMinCurMax and the pressure advance parameters - so widening it to float changes
 // the size of a CAN message and trips CANlib's own "CAN message too big" assertion.
 //
-// _Float16 is the portable spelling and is what x86-64 needs; __fp16 is the ARM one, which is what
-// upstream uses.
+// The two compilers spell it differently and each rejects the other's spelling. __fp16 is the ARM
+// one, which is what upstream uses and what the aarch64 cross compiler provides; _Float16 is the
+// standard one, which is what x86-64 has.
+//
+// The choice is made on the target architecture rather than on __FLT16_MANT_DIG__, which looks like
+// the right question but is not: the aarch64 compiler defines that macro while still rejecting
+// _Float16, so asking it builds on the host and fails to cross compile - which is exactly how this
+// got here.
 #ifndef FLOAT16_T_DEFINED
 # define FLOAT16_T_DEFINED
-# if defined(__FLT16_MANT_DIG__)
-using float16_t = _Float16;
-# else
+# if defined(__ARM_FP16_FORMAT_IEEE) || defined(__ARM_FP16_FORMAT_ALTERNATIVE)
 using float16_t = __fp16;
+# else
+using float16_t = _Float16;
 # endif
+static_assert(sizeof(float16_t) == 2, "float16_t must be 16 bits wide or CAN messages change size");
 #endif
 
 #endif /* SRC_COMPAT_COREN2G_CORETYPES_H_ */

@@ -237,7 +237,8 @@ static void TestPositionAtMoveStartMeasuresTheCurrentMove()
 	const uint32_t partWay = profile.TotalClocks() + (profile.TotalClocks() / 2);
 	t.Advance(partWay);
 	const int32_t stoppedAt = lrintf(t.GetCurrentPosition(partWay));
-	CHECK(stoppedAt > 100 && stoppedAt < 140, "the drive is part way through the second move");
+	const bool insideTheSecondMove = stoppedAt > 100 && stoppedAt < 140;
+	CHECK(insideTheSecondMove, "the drive is part way through the second move");
 	CHECK(stoppedAt - t.GetPositionAtMoveStart() == stoppedAt - 100,
 		  "net steps for the revert count only this move");
 }

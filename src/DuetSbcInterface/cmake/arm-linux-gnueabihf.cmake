@@ -12,6 +12,12 @@ set(CMAKE_SYSTEM_PROCESSOR arm)
 set(CMAKE_C_COMPILER arm-linux-gnueabihf-gcc)
 set(CMAKE_CXX_COMPILER arm-linux-gnueabihf-g++)
 
+# 32-bit ARM has no half-precision float type unless one is asked for, and CANlib's messages contain
+# one: ShortMinCurMax and the pressure advance parameters are float16_t on the wire, so without this
+# the type does not exist and nothing that includes a CAN message header compiles. IEEE is the format
+# the Duet boards use; aarch64 has it by default, which is why only this toolchain needs to say so.
+add_compile_options(-mfp16-format=ieee)
+
 # Optional Bookworm sysroot for a glibc-matched dynamic build (mainly for the .so). Empty means
 # "none"; a non-empty path that is not there is an error rather than something to ignore. See
 # aarch64-linux-gnu.cmake for the reasoning.

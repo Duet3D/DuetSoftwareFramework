@@ -267,7 +267,7 @@ static void TestDriverIndexWithinAnAxis()
 	config.axisDrivers[zAxis].driverNumbers[0] = DriverId((CanAddress)1, 2);
 	config.axisDrivers[zAxis].driverNumbers[1] = DriverId((CanAddress)1, 5);
 
-	MotionSystem& move = FreshSystem(config);
+	const MotionSystem& move = FreshSystem(config);
 
 	CHECK(move.GetNumDriversForDrive(zAxis) == 2, "a dual-motor axis reports both drivers");
 	CHECK(move.GetDriverIndexInDrive(zAxis, DriverId((CanAddress)1, 2)) == 0, "the first driver watches switch 0");
