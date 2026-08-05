@@ -320,11 +320,8 @@ internal sealed partial class GCodeHandler
                             using (planner.Lock())
                             {
                                 planner.ResyncFromEngine();
+                                RedefineMachinePosition(zAxis, planner.Builder.StartCoordinates[zAxis]);
                             }
-                            Axis zAxisConfig = model.Move.Axes[zAxis];
-                            zAxisConfig.MachinePosition = planner.Builder.StartCoordinates[zAxis];
-                            zAxisConfig.UserPosition = zAxisConfig.MachinePosition
-                                - WorkplaceOffset(zAxisConfig, model.Move.WorkplaceNumber);
                         }
                     }
                     return true;
@@ -419,14 +416,14 @@ internal sealed partial class GCodeHandler
             // the trigger height now, whatever the axis thought before. That is what levels a machine
             Axis zAxisConfig = model.Move.Axes[settings.ZAxis];
             float correction = stoppedHeight - probe.TriggerHeight;
-            float position = (zAxisConfig.MachinePosition ?? 0.0f) - correction;
 
             using (planner.Lock())
             {
-                planner.Builder.SetAxisPosition(settings.ZAxis, position);
+                // Taken from the planner rather than the object model: the object model's machine
+                // position is live and this has to be measured from where the last move left Z
+                float position = planner.Builder.StartCoordinates[settings.ZAxis] - correction;
+                RedefineMachinePosition(settings.ZAxis, position);
             }
-            zAxisConfig.MachinePosition = position;
-            zAxisConfig.UserPosition = position - WorkplaceOffset(zAxisConfig, model.Move.WorkplaceNumber);
             zAxisConfig.Homed = true;
         }
         return new Message();

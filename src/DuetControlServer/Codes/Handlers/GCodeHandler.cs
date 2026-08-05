@@ -1,7 +1,9 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Motion;
 using DuetControlServer.Motion.Native;
@@ -143,21 +145,47 @@ internal sealed partial class GCodeHandler(
                     return new Message(MessageType.Error, "No axes have been configured");
                 }
 
-                RawMove move = BuildRawMove(code, input, isCoordinated, out Message? endstopError);
-                if (endstopError is not null)
+                // Held across building and queueing, because the move is a delta from the state the
+                // planner holds: another channel building in between would measure from the wrong
+                // place. Building also advances that state, which is what makes the rollback below
+                // necessary - and why the retry path must not simply build the same code again
+                using (planner.Lock())
                 {
-                    return endstopError;
-                }
+                    MovementState state = planner.State;
+                    float[] positionBeforeMove = ArrayPool<float>.Shared.Rent(MotionLimits.MaxAxes);
+                    try
+                    {
+                        state.CurrentUserPosition.CopyTo(positionBeforeMove, 0);
 
-                homingAxes = move.HomingAxes;
-                result = planner.QueueMove(move);
+                        RawMove move = BuildRawMove(code, input, isCoordinated, out Message? endstopError);
+                        if (endstopError is not null)
+                        {
+                            positionBeforeMove.AsSpan(0, MotionLimits.MaxAxes).CopyTo(state.CurrentUserPosition);
+                            return endstopError;
+                        }
 
-                if (result is MoveSubmitResult.Queued or MoveSubmitResult.NoMovement)
-                {
-                    // The move is committed, so the reported position is where it will leave the
-                    // machine. Recording it now rather than on completion is what lets the next code
-                    // be interpreted without waiting for the machine to catch up
-                    CommitPositions(move);
+                        homingAxes = move.HomingAxes;
+                        result = planner.QueueMove(move);
+
+                        if (result is MoveSubmitResult.Queued or MoveSubmitResult.NoMovement)
+                        {
+                            // The move is committed, so the reported position is where it will leave
+                            // the machine. Recording it now rather than on completion is what lets the
+                            // next code be interpreted without waiting for the machine to catch up
+                            CommitPositions(move);
+                        }
+                        else
+                        {
+                            // RepRapFirmware's abandonMove: the move is not going to happen, so the
+                            // interpreter has to be put back where it was. Busy retries the same code,
+                            // and a relative move applied twice would be a real movement error
+                            positionBeforeMove.AsSpan(0, MotionLimits.MaxAxes).CopyTo(state.CurrentUserPosition);
+                        }
+                    }
+                    finally
+                    {
+                        ArrayPool<float>.Shared.Return(positionBeforeMove);
+                    }
                 }
             }
 
@@ -203,6 +231,7 @@ internal sealed partial class GCodeHandler(
         MotionParameters parameters = planner.Parameters;
         int numAxes = Math.Min(parameters.NumAxes, model.Move.Axes.Count);
         float unitScale = input.DistanceUnit == DistanceUnit.Inch ? MmPerInch : 1.0f;
+        MovementState state = planner.State;
 
         RawMove raw = new()
         {
@@ -212,58 +241,98 @@ internal sealed partial class GCodeHandler(
             YAxes = AxisBitmap(model.Move, 'Y')
         };
 
-        // Start from where the machine already is, so an axis the user did not mention keeps its
-        // position rather than being commanded to zero
-        for (int axis = 0; axis < numAxes; axis++)
-        {
-            raw.Coords[axis] = model.Move.Axes[axis].MachinePosition ?? 0.0f;
-        }
-
-        for (int axis = 0; axis < numAxes; axis++)
-        {
-            Axis axisConfig = model.Move.Axes[axis];
-            if (!code.TryGetFloat(axisConfig.Letter, out float value))
-            {
-                continue;
-            }
-
-            float moveArg = axisConfig.Rotational ? value : value * unitScale;
-            float requested = input.AxesRelative
-                ? (axisConfig.UserPosition ?? 0.0f) + moveArg
-                : moveArg;
-
-            // The workplace offset is what separates the coordinate the user typed from the machine
-            // coordinate the kinematics work in
-            raw.Coords[axis] = requested + WorkplaceOffset(axisConfig, model.Move.WorkplaceNumber);
-
-            if (axisConfig.Rotational)
-            {
-                raw.RotationalAxesMentioned = true;
-            }
-            else
-            {
-                raw.LinearAxesMentioned = true;
-            }
-        }
-
         // H selects what kind of move this is. H1, H3 and H4 stop on the endstops - that is homing -
         // and H2 is an individual motor move that ignores them
         raw.MoveType = code.GetInt('H', 0);
         raw.CheckEndstops = raw.MoveType is 1 or 3 or 4;
+
+        // G53 asks for machine coordinates on this line only, so neither the workplace offset nor
+        // (once tools exist) the tool offset applies to it
+        bool machineCoordinates = code.Flags.HasFlag(CodeFlags.EnforceAbsolutePosition);
+
+        if (raw.MoveType == 0)
+        {
+            for (int axis = 0; axis < numAxes; axis++)
+            {
+                Axis axisConfig = model.Move.Axes[axis];
+                if (!code.TryGetFloat(axisConfig.Letter, out float value))
+                {
+                    continue;
+                }
+
+                float moveArg = axisConfig.Rotational ? value : value * unitScale;
+
+                // The interpreter's own position is what a move is measured from and written back
+                // to. It runs ahead of the machine by however many moves are still queued, which is
+                // exactly why it cannot be read back out of the object model's reported positions
+                if (input.AxesRelative)
+                {
+                    state.CurrentUserPosition[axis] += moveArg;
+                }
+                else
+                {
+                    state.CurrentUserPosition[axis] = machineCoordinates
+                        ? moveArg
+                        : moveArg + WorkplaceOffset(axisConfig, model.Move.WorkplaceNumber);
+                }
+
+                if (axisConfig.Rotational)
+                {
+                    raw.RotationalAxesMentioned = true;
+                }
+                else
+                {
+                    raw.LinearAxesMentioned = true;
+                }
+            }
+
+            // Every axis is transformed, not just the ones mentioned: an axis the user left out still
+            // has to be commanded to where the interpreter thinks it is, and babystepping may have
+            // moved that since the last move
+            ApplyAxisTransform(state.CurrentUserPosition, raw.Coords, numAxes);
+            ApplyBedCompensation(raw, numAxes);
+        }
+        else
+        {
+            // A special move bypasses the user coordinate system entirely: no workplace offset, no
+            // babystepping and no bed compensation, and the interpreter's position is left alone
+            // because a motor position is not an axis position. RepRapFirmware does the same, which
+            // is why it never writes currentUserPosition on this path
+            SeedSpecialMoveCoordinates(raw, numAxes);
+
+            for (int axis = 0; axis < numAxes; axis++)
+            {
+                Axis axisConfig = model.Move.Axes[axis];
+                if (!code.TryGetFloat(axisConfig.Letter, out float value))
+                {
+                    continue;
+                }
+
+                float moveArg = axisConfig.Rotational ? value : value * unitScale;
+                if (input.AxesRelative)
+                {
+                    raw.Coords[axis] += moveArg;
+                }
+                else
+                {
+                    raw.Coords[axis] = moveArg;
+                }
+
+                if (axisConfig.Rotational)
+                {
+                    raw.RotationalAxesMentioned = true;
+                }
+                else
+                {
+                    raw.LinearAxesMentioned = true;
+                }
+            }
+        }
+
         if (raw.CheckEndstops)
         {
             endstopError = ApplyEndstops(code, raw, numAxes);
         }
-
-        // Babystepping shifts where the machine goes without changing the coordinate the user asked
-        // for, so it is added to the target here and taken back off in CommitPositions. RRF applies a
-        // change as a small move of its own; here it takes effect on the next commanded move instead
-        for (int axis = 0; axis < numAxes; axis++)
-        {
-            raw.Coords[axis] += model.Move.Axes[axis].Babystep;
-        }
-
-        ApplyBedCompensation(raw, numAxes);
 
         ApplyExtrusion(code, input, raw, unitScale);
 
@@ -276,6 +345,69 @@ internal sealed partial class GCodeHandler(
         raw.FeedRateMmPerSec = input.FeedRate * model.Move.SpeedFactor;
 
         return raw;
+    }
+
+    /// <summary>
+    /// Fill in where a special move starts from
+    /// </summary>
+    /// <param name="move">The move being built</param>
+    /// <param name="numAxes">Number of axes to consider</param>
+    /// <remarks>
+    /// Ported from the <c>moveType != 0</c> block of <c>GCodes::DoStraightMove</c>. A raw motor move
+    /// is measured in motor positions, so it starts from the motor endpoints converted back to mm per
+    /// drive; anything else is still an axis move and starts from the axis coordinates. Both come
+    /// from the planner rather than the object model, because the planner's copy is where the last
+    /// queued move left the machine and the object model's is where the machine has got to
+    /// </remarks>
+    private void SeedSpecialMoveCoordinates(RawMove move, int numAxes)
+    {
+        MotionParameters parameters = planner.Parameters;
+        if (parameters.Geometry.IsRawMotorMove(move.MoveType))
+        {
+            ReadOnlySpan<int> endPoints = planner.Builder.EndPoints;
+            for (int axis = 0; axis < numAxes; axis++)
+            {
+                float stepsPerMm = parameters.StepsPerMm[axis];
+                move.Coords[axis] = stepsPerMm != 0.0f ? endPoints[axis] / stepsPerMm : 0.0f;
+            }
+        }
+        else
+        {
+            ReadOnlySpan<float> startCoordinates = planner.Builder.StartCoordinates;
+            for (int axis = 0; axis < numAxes; axis++)
+            {
+                move.Coords[axis] = startCoordinates[axis];
+            }
+        }
+    }
+
+    /// <summary>
+    /// Convert user coordinates into the machine coordinates a move is planned in
+    /// </summary>
+    /// <param name="userPosition">User coordinates, workplace offset already included</param>
+    /// <param name="coords">Receives the machine coordinates</param>
+    /// <param name="numAxes">Number of axes to convert</param>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>ToolOffsetTransform</c>. Today it applies babystepping alone; tool offsets,
+    /// X/Y/Z axis mapping, axis scale factors and Z hop are terms to be added here as they are ported.
+    /// </para>
+    /// <para>
+    /// The direction matters. This is the only way user coordinates become machine coordinates, so
+    /// every term added here applies everywhere at once, and nothing needs a matching inverse: the
+    /// interpreter never reconstructs its position from a machine coordinate on the normal path. See
+    /// <see cref="RedefineMachinePosition"/> for the cases where it has to
+    /// </para>
+    /// </remarks>
+    private void ApplyAxisTransform(ReadOnlySpan<float> userPosition, float[] coords, int numAxes)
+    {
+        for (int axis = 0; axis < numAxes; axis++)
+        {
+            // Babystepping shifts where the machine goes without changing the coordinate the user
+            // asked for. RepRapFirmware applies a change as a small move of its own; here it takes
+            // effect on the next commanded move instead
+            coords[axis] = userPosition[axis] + model.Move.Axes[axis].Babystep;
+        }
     }
 
     /// <summary>
@@ -452,28 +584,31 @@ internal sealed partial class GCodeHandler(
     }
 
     /// <summary>
-    /// Record the positions a committed move will leave the machine at
+    /// Publish the positions a committed move will leave the machine at
     /// </summary>
     /// <param name="move">The move</param>
-    /// <remarks>The caller must hold the object model write lock</remarks>
+    /// <remarks>
+    /// <para>
+    /// A projection of the interpreter's state, not a derivation from the move. The move's
+    /// coordinates have been through the axis transform and the bed compensation on the way out, and
+    /// inverting all of that to recover what the user asked for is exactly what the interpreter's own
+    /// position exists to avoid.
+    /// </para>
+    /// <para>
+    /// <c>machinePosition</c> is deliberately not written here. It is the live position, published
+    /// from the engine by <see cref="MotionService"/>, and a move that has only been queued has not
+    /// moved the machine yet
+    /// </para>
+    /// <para>The caller must hold the object model write lock and the planner lock</para>
+    /// </remarks>
     private void CommitPositions(RawMove move)
     {
         MotionParameters parameters = planner.Parameters;
         int numAxes = Math.Min(parameters.NumAxes, model.Move.Axes.Count);
 
-        RemoveBedCompensation(move, numAxes);
-
-        for (int axis = 0; axis < numAxes; axis++)
+        if (move.MoveType == 0)
         {
-            Axis axisConfig = model.Move.Axes[axis];
-
-            // The babystep offset is invisible to the reported coordinates, so it comes back off
-            // whatever was actually commanded. So does the bed correction, which is why the height
-            // map is inverted first: the correction depends on where the nozzle is, so removing it
-            // has to happen before anything else that shifts the same coordinate
-            float commanded = move.Coords[axis] - axisConfig.Babystep;
-            axisConfig.MachinePosition = commanded;
-            axisConfig.UserPosition = commanded - WorkplaceOffset(axisConfig, model.Move.WorkplaceNumber);
+            PublishUserPositions(numAxes);
         }
 
         int numExtruders = Math.Min(parameters.NumExtruders, model.Move.Extruders.Count);
@@ -504,7 +639,11 @@ internal sealed partial class GCodeHandler(
 
             using (planner.Lock())
             {
-                for (int axis = 0; axis < model.Move.Axes.Count; axis++)
+                MovementState state = planner.State;
+                int numAxes = Math.Min(planner.Parameters.NumAxes, model.Move.Axes.Count);
+                List<int> axesIncluded = [];
+
+                for (int axis = 0; axis < numAxes; axis++)
                 {
                     Axis axisConfig = model.Move.Axes[axis];
                     if (!code.TryGetFloat(axisConfig.Letter, out float value))
@@ -512,15 +651,26 @@ internal sealed partial class GCodeHandler(
                         continue;
                     }
 
-                    float userPosition = value * unitScale;
-                    float machinePosition = userPosition + WorkplaceOffset(axisConfig, model.Move.WorkplaceNumber);
+                    // RepRapFirmware assigns the raw value rather than adding the workplace offset,
+                    // so G92 names a machine coordinate and the reported user position moves by the
+                    // offset. Keeping that convention is what makes G92 and G1 agree about where the
+                    // machine is
+                    state.CurrentUserPosition[axis] = value * unitScale;
+                    axesIncluded.Add(axis);
+                }
 
-                    axisConfig.UserPosition = userPosition;
-                    axisConfig.MachinePosition = machinePosition;
-
+                if (axesIncluded.Count > 0)
+                {
                     // The planner keeps its own machine position, and this changes what that
                     // position is called without moving anything
-                    planner.Builder.SetAxisPosition(axis, machinePosition);
+                    float[] coords = new float[MotionLimits.MaxAxes];
+                    ApplyAxisTransform(state.CurrentUserPosition, coords, numAxes);
+                    foreach (int axis in axesIncluded)
+                    {
+                        planner.Builder.SetAxisPosition(axis, coords[axis]);
+                    }
+
+                    PublishUserPositions(numAxes);
                 }
 
                 if (code.TryGetFloat('E', out float extruderPosition))
@@ -550,6 +700,50 @@ internal sealed partial class GCodeHandler(
             {
                 update(input);
             }
+        }
+    }
+
+    /// <summary>
+    /// Publish the interpreter's position into the object model
+    /// </summary>
+    /// <param name="numAxes">Number of axes to publish</param>
+    /// <remarks>
+    /// RepRapFirmware's <c>GetUserCoordinate</c>: the workplace offset is included in the interpreter's
+    /// position and taken back off for reporting, so the number the user sees is the one they typed.
+    /// The caller must hold the object model write lock and the planner lock
+    /// </remarks>
+    private void PublishUserPositions(int numAxes)
+    {
+        MovementState state = planner.State;
+        for (int axis = 0; axis < numAxes; axis++)
+        {
+            Axis axisConfig = model.Move.Axes[axis];
+            axisConfig.UserPosition = state.CurrentUserPosition[axis]
+                - WorkplaceOffset(axisConfig, model.Move.WorkplaceNumber);
+        }
+    }
+
+    /// <summary>
+    /// Redefine where the machine is, from outside the interpreter
+    /// </summary>
+    /// <param name="axis">Axis to redefine</param>
+    /// <param name="machinePosition">Its machine position in mm</param>
+    /// <remarks>
+    /// For homing and probing, where the machine turns out to be somewhere other than the interpreter
+    /// commanded it to. This is the one direction the inverse transform is for: the position is known
+    /// in machine coordinates and the interpreter's own position has to be brought back into step with
+    /// it. The caller must hold the object model write lock and the planner lock
+    /// </remarks>
+    private void RedefineMachinePosition(int axis, float machinePosition)
+    {
+        planner.Builder.SetAxisPosition(axis, machinePosition);
+
+        MovementState state = planner.State;
+        int numAxes = Math.Min(planner.Parameters.NumAxes, model.Move.Axes.Count);
+        if (axis >= 0 && axis < numAxes)
+        {
+            state.CurrentUserPosition[axis] = machinePosition - model.Move.Axes[axis].Babystep;
+            PublishUserPositions(numAxes);
         }
     }
 

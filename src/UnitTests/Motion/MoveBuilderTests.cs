@@ -515,4 +515,45 @@ public class MoveBuilderTests
             Assert.That(z[2], Is.Zero, "a drive with no endstop watches nothing");
         });
     }
+
+    [Test]
+    public void AnH1MoveOnACoreXyGoesThroughTheKinematics()
+    {
+        // RepRapFirmware's Move::IsRawMotorMove: a homing move is a raw motor move only where the
+        // geometry homes individual drives. On a CoreXY the endstop belongs to an axis, so G1 H1 X-10
+        // has to be transformed like any other axis move - both motors turn
+        MoveBuilder builder = NewBuilder(CartesianMachine("corexy"));
+
+        RawMove move = LinearMove(1, -10.0f, 0.0f, 0.0f);
+        move.MoveType = 1;
+        move.CheckEndstops = true;
+
+        (_, Submission? built) = Build(builder, move);
+
+        Assert.Multiple(() =>
+        {
+            // X = -10 on a CoreXY is both motors turning by -10mm worth of steps, in opposite senses
+            Assert.That(built!.EndPoints[0], Is.EqualTo(-800), "motor A");
+            Assert.That(built.EndPoints[1], Is.EqualTo(-800), "motor B");
+        });
+    }
+
+    [Test]
+    public void AnH2MoveAddressesTheMotorsDirectly()
+    {
+        // H2 is a raw motor move on every geometry, so the coordinate is that one motor's position
+        // and the kinematics are bypassed
+        MoveBuilder builder = NewBuilder(CartesianMachine("corexy"));
+
+        RawMove move = LinearMove(1, -10.0f, 0.0f, 0.0f);
+        move.MoveType = 2;
+
+        (_, Submission? built) = Build(builder, move);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(built!.EndPoints[0], Is.EqualTo(-800), "motor A alone");
+            Assert.That(built.EndPoints[1], Is.Zero, "motor B does not move");
+        });
+    }
 }

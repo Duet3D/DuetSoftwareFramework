@@ -66,6 +66,10 @@ internal sealed class HangprinterKinematicsEngine : KinematicsEngine
     /// <inheritdoc />
     public override string Name => "Hangprinter";
 
+    /// <inheritdoc />
+    /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
+    public override bool HomesIndividualDrives => true;
+
     /// <summary>
     /// Create a hangprinter geometry
     /// </summary>

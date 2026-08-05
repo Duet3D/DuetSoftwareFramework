@@ -192,27 +192,11 @@ internal sealed partial class GCodeHandler
         move.Coords[zAxis] += bedCompensation.GetCorrection(axis0, axis1, move.Coords[zAxis]);
     }
 
-    /// <summary>
-    /// Take the bed correction back off a committed move, recovering the coordinate that was asked for
-    /// </summary>
-    /// <param name="move">The move that was committed</param>
-    /// <param name="numAxes">Number of axes to consider</param>
-    private void RemoveBedCompensation(RawMove move, int numAxes)
-    {
-        if (!bedCompensation.IsActive)
-        {
-            return;
-        }
-
-        int zAxis = ZAxisIndex(model.Move);
-        if (zAxis < 0 || zAxis >= numAxes)
-        {
-            return;
-        }
-
-        (float axis0, float axis1) = GridCoordinates(move, numAxes);
-        move.Coords[zAxis] = bedCompensation.GetRequestedHeight(axis0, axis1, move.Coords[zAxis]);
-    }
+    // The bed correction used to be taken back off a committed move to recover the coordinate the
+    // user asked for. It no longer is: the interpreter keeps its own position, so what was asked for
+    // is still known and does not have to be reconstructed. That is the point of MovementState -
+    // GetRequestedHeight is only an approximate inverse, because the correction depends on where the
+    // nozzle ends up, which is what the correction is being removed from
 
     /// <summary>
     /// Where a move ends up, in the two axes the height map is measured over

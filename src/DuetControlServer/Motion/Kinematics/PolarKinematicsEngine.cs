@@ -46,6 +46,10 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
     public override string Name => "Polar";
 
     /// <inheritdoc />
+    /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
+    public override bool HomesIndividualDrives => true;
+
+    /// <inheritdoc />
     /// <remarks>The turntable turns all the way round, so a move may take the short way there</remarks>
     public override uint ContinuousRotationAxes => 1u << TurntableDrive;
 

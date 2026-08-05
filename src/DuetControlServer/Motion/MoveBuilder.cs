@@ -144,7 +144,13 @@ internal sealed class MoveBuilder(MotionParameters parameters)
         bool linearAxesMoving = false, rotationalAxesMoving = false;
         bool xyMoving = false;
 
-        if (move.MoveType == 0)
+        // Whether the coordinates are axis positions to be put through the kinematics, or motor
+        // positions to be taken as they are. RepRapFirmware's doMotorMapping, and the distinction is
+        // the geometry's rather than the move's: G1 H1 on a CoreXY homes an axis through the
+        // kinematics, while the same code on a delta addresses one tower's motor
+        bool doMotorMapping = !Parameters.Geometry.IsRawMotorMove(move.MoveType);
+
+        if (doMotorMapping)
         {
             NativeMovementError error = Parameters.Geometry.CartesianToMotorSteps(
                 move.Coords, stepsPerMm, numAxes, numAxes, _newEndPoints, move.IsCoordinated);
@@ -288,7 +294,7 @@ internal sealed class MoveBuilder(MotionParameters parameters)
         {
             // The axis coordinates still advance. The user asked to go somewhere that rounds to no
             // steps; the next move should be measured from there, or the rounding accumulates
-            if (move.MoveType == 0)
+            if (doMotorMapping)
             {
                 for (int axis = 0; axis < numAxes; axis++)
                 {
@@ -368,6 +374,24 @@ internal sealed class MoveBuilder(MotionParameters parameters)
         float feedRate = move.FeedRateMmPerSec / MotionLimits.StepClockRate;
         float requestedSpeed = move.InverseTimeMode ? totalDistance / feedRate : feedRate;
 
+        if (!doMotorMapping && Parameters.Geometry is LinearDeltaKinematicsEngine)
+        {
+            // A raw motor move is run through the Cartesian motion system, so the feed rate would be
+            // read as a speed through Cartesian space. On a delta that is not what the user meant:
+            // homing a tower should run that tower at the requested speed, so scale the feed rate up
+            // by the largest component of the unit vector. RepRapFirmware limits this correction to
+            // linear deltas, which are the geometry where a homing move is a tower move
+            float maxComponent = 0.0f;
+            for (int axis = 0; axis < numAxes; axis++)
+            {
+                maxComponent = MathF.Max(maxComponent, _normalisedDirection[axis]);
+            }
+            if (maxComponent > 0.0f)
+            {
+                requestedSpeed /= maxComponent;
+            }
+        }
+
         // The minimum comes first and the maximum second, deliberately. A move with a tiny XY
         // component and a lot of extrusion may have to run slower than the configured minimum, and
         // clamping to a range would raise it back up
@@ -375,7 +399,7 @@ internal sealed class MoveBuilder(MotionParameters parameters)
         requestedSpeed = MathF.Min(requestedSpeed, MoveVector.VectorBoxIntersection(_normalisedDirection, Parameters.MaxFeedrates));
 
         MoveLimits limits = new() { RequestedSpeed = requestedSpeed, MaxAcceleration = maxAcceleration };
-        if (move.MoveType == 0)
+        if (doMotorMapping)
         {
             PlannedMove plannedMove = new()
             {

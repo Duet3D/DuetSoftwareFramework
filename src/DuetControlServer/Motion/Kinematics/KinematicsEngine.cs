@@ -208,6 +208,30 @@ internal abstract class KinematicsEngine
     public virtual uint ContinuousRotationAxes => 0;
 
     /// <summary>
+    /// Whether homing this geometry moves axes or individual motors
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>HomingMode</c>. False - <c>homeCartesianAxes</c> - means an endstop belongs
+    /// to an axis and a homing move is an ordinary move through the kinematics; true -
+    /// <c>homeIndividualDrives</c> - means an endstop belongs to a motor, as on a delta where each
+    /// tower has its own switch, and a homing move has to address the motors directly
+    /// </remarks>
+    public virtual bool HomesIndividualDrives => false;
+
+    /// <summary>
+    /// Whether a move of the given type addresses the motors directly rather than the axes
+    /// </summary>
+    /// <param name="moveType">The move's H parameter</param>
+    /// <returns>True if the coordinates are per-motor rather than per-axis</returns>
+    /// <remarks>
+    /// Ported from <c>Move::IsRawMotorMove</c>. H2 always is, by definition. Every other special move
+    /// is one only where the geometry homes individual drives, because on such a geometry there is no
+    /// axis for the endstop to belong to - which is why the same <c>G1 H1</c> means different things
+    /// on a CoreXY and on a delta
+    /// </remarks>
+    public bool IsRawMotorMove(int moveType) => moveType == 2 || (moveType != 0 && HomesIndividualDrives);
+
+    /// <summary>
     /// Macro that homes everything, as in RepRapFirmware's <c>HomeAllFileName</c>
     /// </summary>
     public const string HomeAllFile = "homeall.g";

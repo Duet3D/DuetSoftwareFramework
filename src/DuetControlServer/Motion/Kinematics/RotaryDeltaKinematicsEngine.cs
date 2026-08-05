@@ -65,6 +65,10 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
     /// <inheritdoc />
     public override string Name => "Rotary delta";
 
+    /// <inheritdoc />
+    /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
+    public override bool HomesIndividualDrives => true;
+
     /// <summary>Arm length RepRapFirmware assumes until M669 says otherwise, mm</summary>
     public const float DefaultArmLength = 100.0f;
 

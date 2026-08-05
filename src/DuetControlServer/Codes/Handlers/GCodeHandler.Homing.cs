@@ -71,9 +71,7 @@ internal sealed partial class GCodeHandler
                     }
 
                     float position = endstop.HighEnd ? axisConfig.Max : axisConfig.Min;
-                    planner.Builder.SetAxisPosition(axis, position);
-                    axisConfig.MachinePosition = position;
-                    axisConfig.UserPosition = position - WorkplaceOffset(axisConfig, model.Move.WorkplaceNumber);
+                    RedefineMachinePosition(axis, position);
                     axisConfig.Homed = true;
                 }
             }

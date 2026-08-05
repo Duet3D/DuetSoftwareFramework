@@ -9,6 +9,10 @@ RRF's switch has **204 case labels** covering **~190 distinct M-codes**. This do
 inventory: what each one does, where its configuration belongs in the object model, and whether it is
 done.
 
+The G-codes that share the same subsystems are tracked here too where they matter: §10 covers the
+`G1 H` endstop moves, §11 audits G0/G1 straight moves against `GCodes::DoStraightMove` and holds the
+plan for closing the gaps.
+
 ---
 
 ## 1. The contract every ported M-code follows
@@ -1101,3 +1105,456 @@ preparation can say so, and probes directly only if there is no such file.
 - **M585** and **M675** probe against a workpiece rather than the bed; both need G30 P.
 - **M558.1** and **M558.2** calibrate a scanning probe, which needs the probe read back over CAN while
   it moves.
+
+---
+
+## 11. G0/G1 straight moves: audit against RepRapFirmware
+
+An audit of [BuildRawMove](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L200) and
+[ApplyExtrusion](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L289) against
+`GCodes::DoStraightMove` (`lib/RepRapFirmware/src/GCodes/GCodes.cpp:2200-2754`),
+`GCodes::LoadFeedrateFromGCode` (`:1963-2002`) and `GCodes::LoadExtrusionFromGCode` (`:2006-2174`).
+
+The comparison is against a **Duet 3 MB6HC** build, because that is what decides which of RRF's
+conditional halves count. From `Config/Pins_Duet3_MB6HC.h` and `Config/Pins.h`:
+
+| Feature | 6HC | Consequence for this port |
+|---|---|---|
+| `SUPPORT_LASER` | 1 | `G1 S` laser power and pixel data are in scope |
+| `SUPPORT_IOBITS` | 1 | `G1 P` I/O bits are in scope |
+| `SUPPORT_COORDINATE_ROTATION` | 1 (default) | G68/G69 are in scope |
+| `SUPPORT_ASYNC_MOVES` | 1 | Axis allocation and collision checking are in scope |
+| `SUPPORT_KEEPOUT_ZONES` | 1 | M599 keepout zones are in scope |
+| `SUPPORT_SCANNING_PROBES` | 1 (implied by CAN expansion) | `scanningProbeMove` is in scope |
+
+So none of the reported gaps can be dismissed as "not built on this hardware".
+
+### 11.1 Verdict on each reported issue
+
+| # | Issue | Verdict |
+|---|---|---|
+| 1 | No `R` restore-point parameter | **Valid** — blocked on restore points |
+| 2 | No arc restart after pause | **Valid**, but two things — see below |
+| 3 | No `SUPPORT_LASER` | **Valid** — blocked on machine mode and the laser subsystem |
+| 4 | No `SUPPORT_IOBITS` | **Valid** — needs a move field and a native consumer |
+| 5 | Move type != 0 does not wait for standstill | **Valid** |
+| 6 | Move type != 0 does not set the coords correctly | **Valid, and worse than reported** |
+| 7 | Move type == 0 uses `userPosition` as the base | **Valid** — and so is the `machinePosition` seed; both violate the object model contract |
+| 8 | No "special move on a delta" check | **Valid** |
+| 9 | No move segmentation | **Valid** — nothing segments, anywhere; RRF's `ReadMove` half is missing too |
+| 10 | M220 applied to all move types and system macros | **Valid**, and M221 has the same defect |
+| 11 | G0 feed rate handled differently | **Conditionally valid**; G93 inverse time is outright broken |
+| 12 | Endstop types not supported properly | **Valid, and silently so** — only `InputPin` of the four works |
+| 13 | No coordinate rotation | **Valid** |
+| 14 | `ApplyExtrusion` much shorter than RRF | **Valid** — nine distinct omissions |
+| 15 | Extruder mixing ratios not handled | **Valid** — blocked on the Tool subsystem |
+| 16 | Extruder endstops not handled | **Valid** |
+
+### 11.2 Detail, and what each one actually costs
+
+**1. `R` restore point.** RRF `:2276-2289` reads `R` and `:2406-2412` makes each mentioned axis
+relative to `restorePoints[R].moveCoords[]`; axes *not* mentioned are deliberately left alone.
+`R` is also what carries `laserPwmOrIoBits` and `laserPixelData` back from the restore point
+(`:2293-2299`). There is no `restorePoints[]` anywhere in DSF, so this is blocked on pause/resume.
+
+**2. Restart after pause.** Two separable things, and only one of them is arc-specific:
+
+- `initialUserC0` / `initialUserC1` (`:2264-2274`) are the arc-plane start coordinates. G2/G3 are not
+  ported at all, so this follows arcs whenever they land.
+- `moveFractionToSkip` is *not* arc-specific. It scales relative moves (`:2399`, `:2415` —
+  `moveArg * (1.0 - moveFractionToSkip)`) and picks the segment to resume from (`:3236-3243`). It is
+  set from `GetPauseRestorePoint().proportionDone` (`Movement/RawMove.cpp:314`). A straight move
+  interrupted by a pause will be re-run in full by DSF.
+
+**3. Laser.** `:2300-2318` reads `G1 S` as either a single power or up to `MaxLaserPixelsPerMove`
+pixel values, honours `laserPowerSticky`, and `:2704-2708` forces one segment per pixel. `:3215-3223`
+also drops laser power to zero when the current object is cancelled. Blocked on `state.machineMode`
+(M451/M453, §5.8 ⬜) and a laser subsystem.
+
+**4. I/O bits.** `:2319-2332` — `G1 P` sets `laserPwmOrIoBits.ioBits`, and the value is *sticky*
+across moves. It shares a union with the laser PWM, so the two are mutually exclusive by
+construction. Needs a field on `RawMove`, a slot in `MoveParams`, and something on the native side to
+apply it as the move starts.
+
+**5. Standstill for move type != 0.** RRF locks and waits for standstill **before** building
+(`:2229`), so the raw motor positions it then reads are real, and sets
+`GCodeState::waitingForSpecialMoveToComplete` **after** (`:2581`) so the next code is not interpreted
+until the move has actually finished. DSF does neither. `MoveFlags.IsolatedMove`
+([MoveBuilder.cs:314](src/DuetControlServer/Motion/MoveBuilder.cs#L314)) stops the *native ring*
+overlapping the move, which is not the same thing: DCS still advances its own idea of the position to
+the planned endpoint and interprets the next code against it. For an endstop move that stops short,
+that position is wrong. `HandleMoveAsync` only waits when `HomingAxes` is non-empty, so an `H2` raw
+motor move never waits, and neither does an `H1` whose axis had no usable endstop.
+
+**6. Coordinates for move type != 0.** Four defects, not one:
+
+- **Initial coordinates.** RRF `:2335-2353`: for a raw motor move (`Move::IsRawMotorMove`) it reads
+  the last endpoints and converts them with `MotorStepsToMovement`; otherwise it uses
+  `GetCurrentMachinePosition`, explicitly so that no axis or bed transform is baked in. DSF always
+  seeds from `move.axes[].machinePosition`, which for `H2` is an axis position, not a motor position.
+  On any non-Cartesian kinematics those are different numbers.
+- **Relative and absolute.** RRF `:2394-2405` writes `raw.coords` **directly** — relative adds,
+  absolute assigns — with **no workplace offset**. DSF applies `UserPosition + moveArg` and adds
+  `WorkplaceOffset` for every move type.
+- **Babystepping and bed compensation.** [GCodeHandler.cs:261-266](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L261)
+  applies both unconditionally. RRF applies babystepping only inside `ToolOffsetTransform` and the bed
+  transform only below it, and both are on the `moveType == 0` branch (`:2589-2601`). So an `H1`
+  homing move currently has the height map and the babystep offset added to its target.
+- **Tool.** RRF sets `ms.raw.movementTool = nullptr` for `moveType != 0` (`:2234`), so tool offsets
+  and X/Y axis mapping do not apply. DSF has no tools yet, so this only matters once they land.
+
+**7. The interpreter has no position state of its own.** This is the structural finding of the audit,
+and it must be fixed before tool offsets, axis mapping, `axisScaleFactors` or Z hop are ported rather
+than after. There are two halves and both are wrong.
+
+*The object model fields do not mean what the object model says they mean.* RRF publishes them from
+two different places:
+
+```cpp
+// Movement/Move.cpp:264
+{ "machinePosition", OBJECT_MODEL_FUNC_NOSELF(... .LiveMachineCoordinate(...)), ObjectModelEntryFlags::live },
+// Movement/Move.cpp:282
+{ "userPosition",    OBJECT_MODEL_FUNC_NOSELF(reprap.GetGCodes().GetUserCoordinate(...)), ObjectModelEntryFlags::live },
+```
+
+`machinePosition` is the **live** coordinate the machine is at right now; `userPosition` is derived
+from `ms.currentUserPosition`, which is the **look-ahead** interpreter state. DuetAPI already
+documents exactly this split — [Axis.cs](src/DuetAPI/ObjectModel/Move/Axis.cs) says `machinePosition`
+"reflects the machine position of the move being performed or of the last one", and `userPosition`
+"reflects the target position of the last move fed into the look-ahead buffer".
+
+DSF publishes neither. `CommitPositions` writes the *planned endpoint* of the move just queued into
+`machinePosition`, so the field reports where the machine will eventually be rather than where it is,
+and nothing ever writes a live position into it. Every other writer does the same thing
+([GCodeHandler.Homing.cs:75](src/DuetControlServer/Codes/Handlers/GCodeHandler.Homing.cs#L75),
+[GCodeHandler.Probing.cs:325](src/DuetControlServer/Codes/Handlers/GCodeHandler.Probing.cs#L325)).
+
+*And the interpreter reads its own base back out of those fields.* `BuildRawMove` seeds `raw.Coords`
+from `machinePosition` and takes the relative base from `userPosition`. Both are the wrong source
+regardless of what the fields hold:
+
+- Seeding from `machinePosition` is only correct **because** the field is currently mis-populated with
+  the planned endpoint. The moment it carries a live position — which it must, to honour the contract
+  above — the G-code parser would be measuring the next move from wherever the machine happens to be,
+  several moves behind. The correct look-ahead base already exists and is already maintained:
+  `MoveBuilder.StartCoordinates`, which is RRF's `ms.initialCoords`.
+- Deriving the relative base by subtracting the workplace offset back out of a committed machine
+  position happens to round-trip today, because there is nothing else in the transform. It stops being
+  an inverse the moment `ToolOffsetTransform` (`:4919-4954`) gains what it has in RRF: tool offsets,
+  X/Y/Z axis mapping, `axisScaleFactors` (M579, a *divide* on the way back), and Z hop.
+  `ToolOffsetInverseTransform` is deliberately not the exact inverse when an axis is mapped — it picks
+  one axis of the map to report — which is precisely why RRF keeps `currentUserPosition` as forward
+  state and never reconstructs it.
+
+**What DSF needs is the state RRF calls `MovementState`**: a `currentUserPosition[]` array living
+beside `MoveBuilder`'s `_startCoordinates` in `MovePlanner`, one per motion system, owned by the
+planner lock. `BuildRawMove` then reads and writes `currentUserPosition` and transforms *forwards* into
+`raw.Coords`; the object model's `userPosition` becomes a projection written on commit, and
+`machinePosition` becomes a projection of the live position from `MotionTracker`. Doing it in this
+order means the transform can grow tool offsets, mapping, scale factors and Z hop without any of them
+needing a matching inverse.
+
+Two more things belong in the same transform and are cheap once the state exists:
+
+- **G53** (`:2417-2420`) — ignore workplace offsets *and* tool offsets for one line.
+- **`runningSystemMacro`** (`:2421-2424`) — do not apply workplace offsets to moves inside system
+  macros. This matters immediately: `homeall.g` and friends are system macros.
+
+**8. Special move on a delta.** `:2377-2380` throws "attempt to move individual motors of a delta
+machine to absolute positions" when `moveType != 0`, the machine is a linear delta, and positioning is
+absolute. Four lines; no reason not to have it.
+
+**9. Segmentation.** Confirmed absent everywhere. Not in `MoveBuilder`, not in `MovePlanner`, and the
+native `Motion/SegmentBuilder` is `Move::AddSegment` / the segment-building half of
+`AddLinearSegments` — turning one move's velocity profile into a per-drive `MoveSegment` chain, which
+is a different job.
+
+RRF splits the work across two functions, and DSF needs both halves:
+
+- **`DoStraightMove` decides the count** (`:2692-2746`), storing `ms.totalSegments` and leaving
+  `ms.raw.coords` at the *final* endpoint. `NewSegmentableMoveAvailable` (`:3423`) does the same for
+  moves generated internally rather than from a G1.
+- **`GCodes::ReadMove` generates each segment** (`:3280-3409`). It is called by the Move task once per
+  segment and walks `ms.initialCoords` toward `ms.raw.coords` one `(target - initial)/segmentsLeft`
+  step at a time (`:3368-3371`), emitting a `RawMove` per step. That loop is also where four other
+  things happen per segment, all of which DSF would otherwise get wrong or lose:
+  - `Kinematics::LimitPosition` is re-applied to every segment (`:3381-3392`), with the comment that
+    this is needed "for segmented straight moves on SCARA printers" — the endpoints of a bowed path
+    can both be in range while the middle is not.
+  - The collision checker is re-run per segment (`:3384`).
+  - `firstSegmentFractionToSkip` scales the extrusion of the segment a resume starts at
+    (`:3394-3401`), and `segmentsLeftToStartAt` skips the segments already printed (`:3374-3379`).
+  - `proportionDone` is set per segment (`:3404`), which is what pause and M26 record.
+  - Under `SUPPORT_LASER`, the per-pixel laser PWM is picked per segment (`:3290-3300`).
+
+In DSF the natural seam is `MovePlanner`: `BuildRawMove` produces one logical move with its segment
+count, and the planner emits N `RawMove`s through `MoveBuilder`, exactly as `ReadMove` feeds the DDA
+ring. That keeps the segment loop on the same side of the lock as `MoveBuilder.StartCoordinates`,
+which is what each segment has to be measured from.
+
+What DSF loses without it:
+
+- Kinematics segmentation (`:2714-2718`). Every non-linear engine here — SCARA, five-bar SCARA,
+  polar, both deltas, hangprinter — reports a segmentation type in RRF and relies on it to make a
+  straight line straight. Transforming only the endpoints bows the path.
+- Mesh segmentation (`:2724-2741`). The height map is already ported, and applying it only at the
+  endpoints means the correction is a chord across each mesh cell rather than following it.
+- The `MaxSegmentTime` cap (`:2746`). The step clock wraps roughly every 45 minutes, so RRF forces a
+  move longer than about five minutes to be split regardless.
+
+Agreed that it should be mandatory in DSF rather than optional. Two things travel with it: the
+extrusion has to be divided by the segment count (`:3233`), and the segment count is the **maximum**
+of the kinematics count, the mesh count and the `MaxSegmentTime` count.
+
+Note that once segmentation exists, mesh bed compensation moves *into* the segment loop and out of
+`BuildRawMove`. Applying the height map per segment is the whole point of the mesh segment count —
+applying it only at the endpoints, as
+[ApplyBedCompensation](src/DuetControlServer/Codes/Handlers/GCodeHandler.Probes.cs#L178) does now,
+makes the correction a chord across each cell.
+
+**10. M220 and M221.** RRF `:1968`:
+
+```cpp
+ms.raw.applyM220M221 = (ms.raw.moveType == 0
+                        && (ms.raw.linearAxesMentioned || ms.raw.rotationalAxesMentioned)
+                        && !gb.LatestMachineState().runningSystemMacro);
+```
+
+DSF multiplies by `move.SpeedFactor` unconditionally
+([GCodeHandler.cs:276](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L276)). **M221 has the
+identical defect**: `extruderConfig.Factor` is applied unconditionally at
+[GCodeHandler.cs:312](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L312), where RRF gates it
+at `:2090` and `:2135`. The practical effect is that a speed or extrusion override leaks into homing
+moves, probe moves and every system macro. Note also that in inverse time mode RRF **divides** by the
+speed factor (`:1977-1979`) rather than multiplying, because the quantity is a duration.
+
+**11. Feed rate.** Three separate findings.
+
+- *G0 versus G1.* RRF only falls back to `MaximumG0FeedRate` (60000 mm/min) when
+  `!isCoordinated && machineType != fff` (`:1966`, `:1997`), and clears `usingStandardFeedrate` when
+  it does. On an FFF machine G0 uses the F feed rate exactly as DSF does. Since `state.machineMode` is
+  not ported (M451/M453 ⬜), today's behaviour is equivalent — this becomes a real bug the moment CNC
+  or laser mode lands. `RawMove.UsingStandardFeedrate` defaults to `true` and is never assigned, which
+  is correct only for the same reason.
+- *G93 inverse time is broken now.* RRF converts F into a **move duration in step clocks**:
+  `feedRate = (StepClockRate * 60) / F` (`:1976`), and `DDA::InitStandardMove` then computes
+  `reqSpeed = totalDistance / feedRate` (`Movement/DDA.cpp:565`). DSF stores
+  `input.FeedRate = F * unitScale / 60` in mm/s
+  ([GCodeHandler.cs:274](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L274)) and
+  [MoveBuilder.cs:368-369](src/DuetControlServer/Motion/MoveBuilder.cs#L368) divides `totalDistance`
+  by `FeedRateMmPerSec / StepClockRate`. The result has units of step clocks, not mm per step clock —
+  it is the RRF formula fed a quantity that was never converted. Also, RRF **throws** if F is absent
+  on an inverse-time move (`:1972-1975`); DSF silently reuses the previous F. And DSF applies the
+  inch scale factor to an inverse-time F, which is a reciprocal time, not a distance.
+- *Inch conversion for rotational axes.* `gb.ConvertSpeed(feedRate, linearAxesMentioned ||
+  !rotationalAxesMentioned)` (`:1987`) skips the inch conversion for a rotational-only move. DSF
+  applies `unitScale` unconditionally, so `G20` followed by a rotary-only `G1 A… F…` runs 25.4x too
+  fast.
+
+**12. Endstops.** [RemoteEndstops.TryGetStopInput](src/DuetControlServer/Motion/RemoteEndstops.cs#L101)
+returns false for anything that is not `EndstopType.InputPin`, and
+[ApplyEndstops](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L341) then just `continue`s. So a
+`G1 H1 X-300` on a stall-detect or probe-as-endstop axis is **armed on nothing and runs the full
+300 mm silently**. RRF's `EnableAxisEndstops` throws if the endstops cannot be enabled. That is the
+most serious single finding in this audit.
+
+**Every endstop type RRF supports has to work in DSF, and behave the same to the user.** All four are
+already in the object model — M574 stores them
+([MCodeHandler.Motion.cs:2528-2532](src/DuetControlServer/Codes/Handlers/MCodeHandler.Motion.cs#L2528))
+and reports them back — so the gap is entirely in arming a move, and the CAN protocol needed for each
+already exists on both sides of the wire:
+
+| `EndstopType` | RRF | What arming it needs in DSF | Status of the plumbing |
+|---|---|---|---|
+| `InputPin` | `SwitchEndstop` | `typeEndstop` handle per axis or per driver | ✅ done |
+| `ZProbeAsEndstop` | `ZProbeEndstop` | `typeZprobe` handle for the axis' probe | [RemoteProbes.TryGetStopInput](src/DuetControlServer/Motion/RemoteProbes.cs#L62) already builds exactly this; it is only used by G30 |
+| `MotorStallAny` | `StallDetectionEndstop`, `stopAll` | `CanMessageEnableStallEndstop` per driver, then the `typeStallEndstop` handle | Message generated, Duet3Expansion implements it — nothing on the DCS side |
+| `MotorStallIndividual` | `StallDetectionEndstop`, `stopDriver` | same, but per driver rather than shared | as above |
+
+Stall detection is the one with real work in it, and it is what forces the missing speed calculation:
+`StallDetectionEndstop::PrimeAxis` (`Endstops/StallDetectionEndstop.cpp:55-79`) walks
+`kin.GetControllingDrives(axis, true)` and calls `CanInterface::EnableRemoteStallEndstop(driver,
+|speed| * stepsPerMm)` for each driver on it — **the speed is per driver, in steps per second**, which
+is why RRF has to compute approximate axis speeds before arming (`:2498-2542`) rather than after. It
+also decides `stopAll` from `GetControllingDrives(axis, true)` intersecting anything other than the
+axis itself, which is the same test `ApplyEndstops` already does for the input-pin case
+([GCodeHandler.cs:377](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L377)) — so that logic is
+shared, not duplicated. `StallDetectionEndstop::ShouldReduceAcceleration()` returns true
+unconditionally, which is where `reduceAcceleration` comes from.
+
+Alongside all of that:
+
+- DSF never sets `RawMove.ReduceAcceleration` from an endstop, so M201.1's reduced accelerations never
+  reach a stall-homing move even though `MotionParameters.ReducedAccelerations` is ported and
+  `MoveBuilder` honours the flag.
+- RRF separates `moveType == 1` (`axesToHome`) from `moveType == 3` (`axesToSenseLength`) and
+  `moveType == 4` (`:2484-2496`); DSF treats all three identically and puts everything into
+  `HomingAxes`.
+- RRF rejects axis and extruder endstops in the same move (`:2478-2482`).
+- RRF skips priming entirely while simulating (`EndstopsManager.cpp:207-210`), specifically so that a
+  stall endstop does not validate driver settings M569 never applied.
+- The endstops have to be *disabled* again after the move — `DisableRemoteStallEndstops` per board,
+  and `ClearEndstops` after a `DoStraightMove` that threw (`GCodes2.cpp:246`).
+
+**13. Coordinate rotation.** G68/G69 are absent. RRF widens `axesMentioned` to both X and Y whenever
+either is mentioned under an active rotation (`:2437-2447`), because rotation couples them, and
+rotates the user coordinates before the tool transform (`:2589-2596`).
+
+**14. `ApplyExtrusion` versus `LoadExtrusionFromGCode`.** Nine omissions:
+
+1. **No tool, no extrusion.** `:2021-2026` refuses and raises `displayNoToolWarning`. DSF extrudes
+   regardless.
+2. **Tool drive mapping.** RRF indexes through `tool->GetDrive(eDrive)`; DSF uses extruder index
+   `0..n` directly.
+3. **Mixing** (`:2072-2105`) — one E value fans out across the tool's drives by `tool->GetMix()`.
+4. **Virtual extruder position.** RRF tracks one `latestVirtualExtruderPosition` per movement system
+   and derives per-drive amounts from it; DSF keeps a per-extruder `RawPosition`. For a mixing tool
+   these are different models, not different spellings of the same one.
+5. **Volumetric extrusion** (`:2081-2084`, `:2125-2128`) — M200, ⬜ in §5.7.
+6. **`rawExtruderTotal` / `rawExtruderTotalByDrive`** (`:2067-2070`, `:2085-2088`) — print progress.
+   RRF deliberately measures the *requested* extrusion before mixing and factors, and excludes macros
+   and `moveType != 0`.
+7. **Feed rate scaled by `totalMix`** for extruder-only moves (`:2101-2105`).
+8. **Multiple E values in absolute mode must throw** (`:2147`).
+9. **Extruder endstops for move types 1 and 4** (`:2155-2171`), including the per-extruder speed
+   calculation that validates them and the `reduceAcceleration` it returns.
+
+Also `usePressureAdvance`: RRF sets it only when there is forward extrusion **and** a non-Z axis is
+mentioned (`:2685-2690`). DSF sets it for any non-zero E, including pure retraction and Z-only moves.
+`MoveBuilder` re-gates the acceleration cap on `xyMoving`, so the arithmetic survives, but
+`MoveFlags.UsePressureAdvance` is set on moves RRF would not set it on.
+
+**15 and 16** are covered by 14.4, 14.3 and 14.9. Both are blocked on the Tool subsystem (§4).
+
+### 11.3 Further gaps found during the audit
+
+Not on the original list, found by walking the rest of `DoStraightMove`:
+
+| Gap | RRF | Cost of not having it |
+|---|---|---|
+| **`CheckEnoughAxesHomed`** | `:2176-2180`, `:2470-2474` | DSF never refuses a move because an axis is unhomed. RRF throws "insufficient axes homed" and rolls the user position back |
+| **`Kinematics::LimitPosition`** | `:2633-2674`, and again per segment at `:3382` | **No M208 axis limits are applied to any move.** `MoveBuilder` only rejects a move whose kinematics transform outright fails. RRF also has the rule that an unreachable *absolute* move is an error while a relative one is clamped, and the fallback of retrying a travel move uncoordinated |
+| **Keepout zones** | `:2603-2609` | M599, ⬜ in §5.4 |
+| **Collision checking** | `:2611-2617` | M597, ⬜ in §5.4 |
+| **`canPauseAfter`** | `:3210` | `RawMove.CanPauseAfter` defaults to `true` and is never cleared, so `MoveFlags.CanPauseAfter` is set on homing and probing moves. RRF clears it for any endstop move and any arc |
+| **Object cancellation** | `:2568-2573`, `:3215-3223` | M486 ⬜: the move is dropped when the current object is cancelled, and printing moves update the object's coordinate bounds |
+| **`IsFirstMoveSincePrintingResumed`** | `:2554-2566` | After skipping an object, the first extruding move must first travel to its start point rather than printing a line from wherever the head was |
+| **`filePos` and `MotionCommanded`** | `:3211-3213` | The file position stored with each move is what pause and M26 restore against |
+| **Axis scale factors** | `:4925`, `:4950` | M579, applied in `ToolOffsetTransform` |
+| **Tool offsets and axis mapping** | `:2449-2468`, `:4919-4954` | `AxisBitmap` in `GCodeHandler` is the axes *literally* named X or Y, as its own comment says. `realAxesMoving` and the printing-jerk decision both differ once tools land |
+
+### 11.4 Plan
+
+Three things set the order, and they are structural rather than a matter of severity:
+
+- **The interpreter's own position state (item 7) comes first**, because every later item either reads
+  it or extends the transform that produces it. Tool offsets, axis mapping, `axisScaleFactors`, Z hop,
+  G53 and G68 all add a term to the forward transform; each one added while the reverse derivation is
+  still in place is a hidden bug that has to be unpicked later. Doing it first means each of those is
+  a term in one function rather than a term plus its inverse.
+- **Segmentation (item 9) is a seam, not a feature.** It moves mesh compensation, `LimitPosition` and
+  the collision check out of "once per G-code" into "once per segment". Anything written against the
+  once-per-G-code shape has to be rewritten when it lands, so it comes before the things that sit
+  inside the loop.
+- **Endstop types (item 12) are self-contained** and can proceed in parallel with either.
+
+**Phase A — interpreter position state.** No new subsystem; this is a refactor of what is already
+there, and it is a prerequisite for phases D and E.
+
+1. ✅ Introduce a [MovementState](src/DuetControlServer/Motion/MovementState.cs) owned by
+   `MovePlanner` under the planner lock, holding `currentUserPosition[]` beside `MoveBuilder`'s
+   existing `_startCoordinates`. One per motion system, so M596 has somewhere to go later.
+2. ✅ Rewrite `BuildRawMove` to read and write `currentUserPosition` and transform *forwards* into
+   `raw.Coords` through a single `ToolOffsetTransform` equivalent — today that is workplace offsets
+   and babystepping only, but it is the function every later term is added to.
+3. ✅ Make the object model a projection rather than the source: `axes[].userPosition` written from
+   `currentUserPosition` on commit, `axes[].machinePosition` fed from the engine's live snapshot by
+   `MotionService` so the field finally means what
+   [Axis.cs](src/DuetAPI/ObjectModel/Move/Axis.cs) says it means. `G92`, `FinishHomingMoveAsync` and
+   the probing handlers write through `RedefineMachinePosition`, which is the one place the inverse
+   transform is used.
+4. **G53** ✅; **`runningSystemMacro`** ⬜ — needs a `CodeFlags` value plumbed through `MacroFile` and
+   inherited by nested macros, which is its own change. *(item 7)*
+5. ✅ Add the `abandonMove` rollback — `currentUserPosition` is now updated before the move can be
+   rejected, which is exactly the situation RRF's lambda exists for. It matters immediately, not just
+   for phase D: the ring-full path retries the same code, and a relative move applied twice is a real
+   movement error.
+
+**Phase B — silently wrong, and independent of the above**
+
+6. ✅ **Stop applying babystepping and bed compensation to `moveType != 0`.** *(item 6)*
+7. ✅ **Fix the coordinates for `moveType != 0`.** Write `raw.Coords` directly with no workplace offset
+   and no user-position base; seed from `MoveBuilder`'s motor endpoints for a raw motor move and from
+   `StartCoordinates` otherwise — never from the object model. *(item 6)*
+
+   Doing this surfaced a further bug not in the original audit: `MoveBuilder` treated **every**
+   `moveType != 0` as a raw motor move, where RRF's `Move::IsRawMotorMove` is
+   `moveType == 2 || (moveType != 0 && homingMode != homeCartesianAxes)`. On a CoreXY, `G1 H1 X-10`
+   was moving motor A alone instead of transforming through the kinematics. `KinematicsEngine` now
+   carries `HomesIndividualDrives` and `IsRawMotorMove`, and `MoveBuilder` branches on the latter —
+   which also restores RRF's rule that a raw move on a linear delta has its feed rate scaled to the
+   fastest-moving tower.
+8. **Wait for standstill before a `moveType != 0` move, and for its completion afterwards.** *(item 5)*
+9. **Gate M220 and M221 on `applyM220M221`.** *(item 10)*
+10. **Fix G93 inverse time**, including throwing when F is missing and not inch-scaling an
+    inverse-time F. *(item 11)*
+11. **Skip the inch conversion for rotational-only moves.** *(item 11)*
+12. **Clear `CanPauseAfter` for endstop moves.** *(§11.3)*
+13. **Reject the delta absolute individual-motor move.** *(item 8)*
+14. **`usePressureAdvance` only for forward extrusion with a non-Z axis mentioned.** *(item 14)*
+
+**Phase C — all endstop types.** Independent of A and B; the object model and the CAN messages are
+already in place, so this is DCS-side only.
+
+15. Compute the approximate per-axis and per-drive speeds before arming (`:2498-2542`). Everything
+    below needs them, and they are what make `ReduceAcceleration` reachable.
+16. **`ZProbeAsEndstop`** — route the axis' probe through the existing
+    [RemoteProbes.TryGetStopInput](src/DuetControlServer/Motion/RemoteProbes.cs#L62).
+17. **`MotorStallAny` / `MotorStallIndividual`** — send `CanMessageEnableStallEndstop(driver, |speed| *
+    stepsPerMm)` to every board carrying a controlling driver, arm on the `typeStallEndstop` handle,
+    set `ReduceAcceleration`, and disable them again when the move ends or is abandoned. Reuse the
+    existing `GetControllingDrives` test for `stopAll` versus `stopDriver`.
+18. **Fail loudly** when an axis named by an endstop move has no endstop that can be armed, matching
+    `EnableAxisEndstops`. This is the change that removes the silent 300 mm runaway, and it should go
+    in first as the backstop even though 16 and 17 are what make it rare.
+19. Separate `moveType` 1 / 3 / 4, reject axis-plus-extruder endstops in one move, and skip priming
+    while simulating.
+
+**Phase D — axis limits and homed checks.** Needs A5.
+
+20. Port `Kinematics::LimitPosition` onto `KinematicsEngine`, plus `limitAxes` / `axesVirtuallyHomed`
+    (M564), the absolute-versus-relative rule, and the uncoordinated-retry fallback.
+21. Port `CheckEnoughAxesHomed` and `MustBeHomedAxes`.
+
+**Phase E — segmentation.** Needs A, and D so that `LimitPosition` exists to be called per segment.
+
+22. Add `GetSegmentationType` / `GetReciprocalMinSegmentLength` / `GetSegmentsPerSecond` to
+    `KinematicsEngine` and give each engine RRF's values.
+23. Compute the segment count in `BuildRawMove` as the maximum of the kinematics, mesh and
+    `MaxSegmentTime` counts, leaving `raw.Coords` at the final endpoint — RRF's `DoStraightMove` half.
+24. Emit the segments in `MovePlanner` — RRF's `ReadMove` half: walk `StartCoordinates` toward the
+    endpoint, divide the extrusion by the segment count, and per segment apply mesh compensation,
+    `LimitPosition` and (later) the collision check.
+25. Move `ApplyBedCompensation` into that loop and out of `BuildRawMove`.
+26. Only now does `moveFractionToSkip` have anything to attach to — `segmentsLeftToStartAt`,
+    `firstSegmentFractionToSkip` and `proportionDone` are all per-segment quantities.
+
+**Phase F — needs new object model or subsystems**
+
+27. **`G1 P` I/O bits** — field on `RawMove`, slot in `MoveParams`, native consumer. *(item 4)*
+28. **G68/G69 coordinate rotation** — needs `g68Angle` per motion system; a term in the phase A
+    transform. *(item 13)*
+29. **Restore points** — `R`, `moveFractionToSkip`, `filePos`, and pause/resume generally.
+    *(items 1, 2)*
+30. **Tools** — mixing, tool drive mapping, tool offsets, axis mapping, axis scale factors, no-tool
+    refusal, `rawExtruderTotal`. Offsets, mapping and scale factors are terms in the phase A
+    transform. *(items 14, 15)*
+31. **Extruder endstops** — the extruder speed calculation and `EnableExtruderEndstops`, on top of
+    phase C. *(item 16)*
+32. **Machine mode** — G0 maximum feed rate, then laser (which also needs a per-segment hook from
+    phase E for pixel data). *(items 3, 11)*
+33. **Arc moves (G2/G3)**, and with them `initialUserC0` / `initialUserC1`. The arc generator is the
+    other half of the phase E segment loop. *(item 2)*
+34. **M486 object cancellation** — dropping the move, the object coordinate bounds, and
+    `IsFirstMoveSincePrintingResumed` / `TravelToStartPoint`. **M597 collision checking**,
+    **M599 keepout zones**. *(§11.3)*

@@ -72,6 +72,10 @@ internal sealed class FiveBarScaraKinematicsEngine : KinematicsEngine
     public override string Name => "FiveBarScara";
 
     /// <inheritdoc />
+    /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
+    public override bool HomesIndividualDrives => true;
+
+    /// <inheritdoc />
     /// <remarks>Both actuators turn about a fixed point with nothing to stop them going round</remarks>
     public override uint ContinuousRotationAxes => (1u << XAxis) | (1u << YAxis);
 

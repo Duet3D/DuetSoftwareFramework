@@ -76,6 +76,10 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
     public override string Name => "Scara";
 
     /// <inheritdoc />
+    /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
+    public override bool HomesIndividualDrives => true;
+
+    /// <inheritdoc />
     public override uint ContinuousRotationAxes
         => (_supportsContinuousRotation[0] ? 1u << XAxis : 0u) | (_supportsContinuousRotation[1] ? 1u << YAxis : 0u);
 

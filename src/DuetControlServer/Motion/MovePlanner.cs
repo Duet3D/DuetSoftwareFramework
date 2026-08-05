@@ -76,6 +76,17 @@ internal sealed class MovePlanner(
     public MoveBuilder Builder { get; }  = new(MotionParameters.CreateDefault());
 
     /// <summary>
+    /// Where the interpreter thinks the machine is going, in user coordinates
+    /// </summary>
+    /// <remarks>
+    /// One per motion system once M596 is ported; one for now. It lives here rather than on a code
+    /// channel because it is a property of the machine's motion, not of who is commanding it: two
+    /// channels feeding the same motion system have to agree about where the head is. Read and
+    /// written under <see cref="Lock"/>, for the same reason <see cref="Builder"/> is
+    /// </remarks>
+    public MovementState State { get; } = new();
+
+    /// <summary>
     /// Take the lock that orders move building
     /// </summary>
     /// <returns>The lock scope</returns>

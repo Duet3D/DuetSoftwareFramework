@@ -93,6 +93,10 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
     /// <inheritdoc />
     public override string Name => "delta";
 
+    /// <inheritdoc />
+    /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
+    public override bool HomesIndividualDrives => true;
+
     /// <summary>
     /// Create a delta geometry
     /// </summary>

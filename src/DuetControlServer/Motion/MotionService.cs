@@ -33,11 +33,20 @@ internal sealed class MotionService(
     // EventLogger eventLogger,
     LinkInterface linkInterface,
     MovePlanner planner,
-    // Model.ObjectModel model,
+    Model.ObjectModel model,
     // IHostApplicationLifetime lifetime,
     ILogger<MotionService> logger,
     IOptions<Settings> settings) : BackgroundService
 {
+    /// <summary>
+    /// How often the live machine position is republished
+    /// </summary>
+    private static readonly TimeSpan LivePositionInterval = TimeSpan.FromMilliseconds(50);
+
+    /// <summary>Scratch buffers for the live position, so publishing does not allocate</summary>
+    private readonly int[] _liveEndPoints = new int[MotionLimits.MaxAxesPlusExtruders];
+    private readonly float[] _livePosition = new float[MotionLimits.MaxAxesPlusExtruders];
+
     /// <inheritdoc />
     public override Task StartAsync(CancellationToken cancellationToken)
     {
@@ -181,15 +190,60 @@ internal sealed class MotionService(
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                // The engine runs its own thread natively; there is nothing to drive from here. This
-                // loop exists to hold the engine open for the lifetime of the service and to notice
-                // cancellation promptly
-                Thread.Sleep(TimeSpan.FromMilliseconds(50));
+                // The engine runs its own thread natively, so nothing here drives the motion. What
+                // this loop does drive is the reported position: the object model's machinePosition
+                // is the live one, which means it has to be read back from the engine rather than
+                // written by whoever queued the last move
+                PublishLivePosition(stoppingToken);
+                Thread.Sleep(LivePositionInterval);
             }
         }
         finally
         {
             linkInterface.Native.StopMotion();
+        }
+    }
+
+    /// <summary>
+    /// Report where the machine actually is
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <remarks>
+    /// <para>
+    /// <c>move.axes[].machinePosition</c> is the position of the move being executed, which is
+    /// several moves behind whatever the G-code interpreter has queued. That lag is the whole point
+    /// of a look-ahead, and it is why nothing may plan a move from this number -
+    /// <see cref="MovementState"/> is what a move is measured from.
+    /// </para>
+    /// <para>
+    /// The motor positions are the engine's own snapshot, so they are converted back through the
+    /// kinematics rather than tracked separately: two ideas of where the machine is could disagree,
+    /// and one of them would be wrong
+    /// </para>
+    /// </remarks>
+    private void PublishLivePosition(CancellationToken cancellationToken)
+    {
+        MotionParameters parameters;
+        int numAxes;
+        using (planner.Lock())
+        {
+            if (linkInterface.Native.GetMotorPositions(_liveEndPoints, out _) <= 0)
+            {
+                return;
+            }
+            parameters = planner.Parameters;
+            numAxes = parameters.NumAxes;
+            parameters.Geometry.MotorStepsToCartesian(
+                _liveEndPoints, parameters.StepsPerMm, numAxes, numAxes, _livePosition);
+        }
+
+        using (model.AccessReadWriteAsync(cancellationToken).AsTask().GetAwaiter().GetResult())
+        {
+            int count = Math.Min(numAxes, model.Move.Axes.Count);
+            for (int axis = 0; axis < count; axis++)
+            {
+                model.Move.Axes[axis].MachinePosition = _livePosition[axis];
+            }
         }
     }
 }
