@@ -66,14 +66,12 @@ internal sealed partial class GCodeHandler(
                 await UpdateInputAsync(code, input => input.DistanceUnit = code.MajorNumber == 20 ? DistanceUnit.Inch : DistanceUnit.MM, cancellationToken);
                 return new Message();
 
-            // Absolute / relative positioning. These set the extrusion mode too unless M82 or M83
-            // has overridden it, which is what RepRapFirmware does in its native mode
+            // Absolute / relative positioning.
             case 90:
             case 91:
                 await UpdateInputAsync(code, input =>
                 {
                     input.AxesRelative = code.MajorNumber == 91;
-                    input.DrivesRelative = code.MajorNumber == 91;
                 }, cancellationToken);
                 return new Message();
 
@@ -206,7 +204,7 @@ internal sealed partial class GCodeHandler(
         int numAxes = Math.Min(parameters.NumAxes, model.Move.Axes.Count);
         float unitScale = input.DistanceUnit == DistanceUnit.Inch ? MmPerInch : 1.0f;
 
-        RawMove move = new()
+        RawMove raw = new()
         {
             IsCoordinated = isCoordinated,
             InverseTimeMode = input.InverseTimeMode,
@@ -218,7 +216,7 @@ internal sealed partial class GCodeHandler(
         // position rather than being commanded to zero
         for (int axis = 0; axis < numAxes; axis++)
         {
-            move.Coords[axis] = model.Move.Axes[axis].MachinePosition ?? 0.0f;
+            raw.Coords[axis] = model.Move.Axes[axis].MachinePosition ?? 0.0f;
         }
 
         for (int axis = 0; axis < numAxes; axis++)
@@ -229,31 +227,32 @@ internal sealed partial class GCodeHandler(
                 continue;
             }
 
+            float moveArg = axisConfig.Rotational ? value : value * unitScale;
             float requested = input.AxesRelative
-                ? (axisConfig.UserPosition ?? 0.0f) + (value * unitScale)
-                : value * unitScale;
+                ? (axisConfig.UserPosition ?? 0.0f) + moveArg
+                : moveArg;
 
             // The workplace offset is what separates the coordinate the user typed from the machine
             // coordinate the kinematics work in
-            move.Coords[axis] = requested + WorkplaceOffset(axisConfig, model.Move.WorkplaceNumber);
+            raw.Coords[axis] = requested + WorkplaceOffset(axisConfig, model.Move.WorkplaceNumber);
 
             if (axisConfig.Rotational)
             {
-                move.RotationalAxesMentioned = true;
+                raw.RotationalAxesMentioned = true;
             }
             else
             {
-                move.LinearAxesMentioned = true;
+                raw.LinearAxesMentioned = true;
             }
         }
 
         // H selects what kind of move this is. H1, H3 and H4 stop on the endstops - that is homing -
         // and H2 is an individual motor move that ignores them
-        move.MoveType = code.GetInt('H', 0);
-        move.CheckEndstops = move.MoveType is 1 or 3 or 4;
-        if (move.CheckEndstops)
+        raw.MoveType = code.GetInt('H', 0);
+        raw.CheckEndstops = raw.MoveType is 1 or 3 or 4;
+        if (raw.CheckEndstops)
         {
-            endstopError = ApplyEndstops(code, move, numAxes);
+            endstopError = ApplyEndstops(code, raw, numAxes);
         }
 
         // Babystepping shifts where the machine goes without changing the coordinate the user asked
@@ -261,12 +260,12 @@ internal sealed partial class GCodeHandler(
         // change as a small move of its own; here it takes effect on the next commanded move instead
         for (int axis = 0; axis < numAxes; axis++)
         {
-            move.Coords[axis] += model.Move.Axes[axis].Babystep;
+            raw.Coords[axis] += model.Move.Axes[axis].Babystep;
         }
 
-        ApplyBedCompensation(move, numAxes);
+        ApplyBedCompensation(raw, numAxes);
 
-        ApplyExtrusion(code, input, move, unitScale);
+        ApplyExtrusion(code, input, raw, unitScale);
 
         // F persists across codes, which is why it is stored on the channel rather than the move
         if (code.TryGetFloat('F', out float feedRate))
@@ -274,9 +273,9 @@ internal sealed partial class GCodeHandler(
             // G-code feed rates are per minute
             input.FeedRate = feedRate * unitScale / 60.0f;
         }
-        move.FeedRateMmPerSec = input.FeedRate * model.Move.SpeedFactor;
+        raw.FeedRateMmPerSec = input.FeedRate * model.Move.SpeedFactor;
 
-        return move;
+        return raw;
     }
 
     /// <summary>
