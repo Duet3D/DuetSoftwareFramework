@@ -1731,7 +1731,8 @@ Compare against what native computes for the same stop before cutting over.
 **Step 4 - move the decision.** DCS applies the corrected positions through `SetMotorPositions` and
 resyncs `MoveBuilder` from them, taking over `NoteDriverStopped`'s job with the per-driver mapping it
 already has. `FinishSpecialMoveAsync` is where this lands, since it already waits for standstill and
-resyncs.
+resyncs. It also gains the wait for the boards to finish winding back - see §12.7, which is a gap
+that exists today and that this step is the right place to close.
 
 **Step 5 - delete the native half.** `HandleMotionStopped`'s revert construction, the ring scan,
 `DDA::SetDriveCoordinate`, `NoteDriverStopped`, `IsCheckingEndstops` in `MotionService`, and the
@@ -1744,3 +1745,58 @@ DCS with the message.
 
 Steps 1 to 3 are additive and leave the existing path working, so they can land separately. Step 4 is
 the cutover. Do the whole thing before §11.4 phase E, for the reason in §12.3.
+
+### 12.7 Does this end up behaving like RepRapFirmware?
+
+Checked against RRF's path end to end: `Move::CheckEndstops` → `EndstopsManager::CheckEndstops` →
+`CanMotion::StopDriverWhenExecuting` → `CanMotion::GetUrgentMessage` →
+`GCodes::WaitForEndstopOrProbingMoveToFinish` → `GCodeState::waitingForSpecialMoveToComplete`.
+
+**Where §12 lands: no behavioural change.** The quantity in the revert message is the same one RRF
+sends. RRF captures `dm->GetNetStepsTakenThisMove(whenTriggered)` in the step interrupt, on the board
+that generated the steps; §12 asks `DriveTracker` where the drive was at the same `whenTriggered` and
+expresses it the same way, as steps since the move began. `CanMessageRevertPosition.finalStepCounts`
+means the same thing on both sides of the wire, and the board's handling of it is untouched. The four
+stop actions, the per-driver squaring rule, and which axes end up homed and at what coordinate are all
+decided before any of this and are not moved.
+
+**Ordering is safe by construction.** RRF is careful that `CanMessageStopMovement` goes out before
+`CanMessageRevertPosition` - `GetUrgentMessage` prioritises stops explicitly. After §12 the two come
+from different places, but the ordering still holds and for a stronger reason: the controller stops
+the drivers *before* it reports `MotionStopped`, so the stop is already on the CAN bus by the time DCS
+has anything to react to.
+
+**What §12 costs is latency, and the plan has to absorb one consequence of it.** See below.
+
+#### One gap §12 must close
+
+**Nothing waits for the wind-back to finish.** RRF's `WaitForEndstopOrProbingMoveToFinish` is
+standstill **and** `CanMotion::RevertStoppedDrivers()`, and that second term does not return true
+until `TotalDriverPositionRevertMillis` - 50 ms - after the reverts were sent. That is what stops the
+next move being scheduled onto a driver that is still winding back.
+
+DCS has no equivalent. `MovePlanner.WaitForStandstillAsync` compares `GetScheduledMoves` against
+`GetCompletedMoves`, which are the SBC's own ring counters, and the corrective move is **synthesised
+on the board** from the revert message - the SBC never scheduled it, so the counters know nothing
+about it. So DCS can consider a homing move finished and queue the next one while the boards are
+still moving.
+
+This is a pre-existing gap rather than one §12 introduces, but §12 widens the window by an SPI round
+trip and is the change that should fix it. Step 4 gains: after sending the reverts, hold the move
+complete until `TotalDriverPositionRevertMillis` has elapsed, as RRF does. It only costs 50 ms per
+homing move that actually triggered something.
+
+#### Gaps this does not touch, and does not claim to
+
+Found while checking, all pre-existing and none of them affected by §12:
+
+| Gap | RRF | Status here |
+|---|---|---|
+| **Delta homing sets the wrong thing** | For `homeIndividualDrives`, RRF sets a per-drive *step* position from `GetEndstopPositionSteps(drive, high)` and then recomputes the axis coordinates through `MotorStepsToCartesian` (`GCodes4.cpp:107-131`) | [FinishSpecialMoveAsync](src/DuetControlServer/Codes/Handlers/GCodeHandler.Homing.cs#L75) only implements the `homeCartesianAxes` branch - it sets the axis to `axes[].max`/`min`. On a delta the endstop is a tower's, not an axis', so this is wrong |
+| **`G1 H3` does not set axis limits** | `axesToSenseLength` → `SetAxisMaximum`/`SetAxisMinimum` from where the move stopped (`GCodes4.cpp:132-148`) | §11.4 phase C stopped H3 marking axes homed, which was the harmful half. Actually measuring the axis is not ported |
+| **`zProbeTriggered`** | `MoveStoppedByZProbe` sets a flag the probing state machine consumes | DCS's G30 path reads the probe state separately; equivalent in effect but not verified against the same cases |
+
+Not a gap: RRF's `EndstopHitDetails::setAxisLow` / `setAxisHigh` are assigned by `ZProbeEndstop` and
+`StallDetectionEndstop` but read nowhere in 3.7-dev. §10 lists them as "not carried over"; they are
+dead in the firmware too, and the live mechanism - `GetEndStopPosition` → axis maximum or minimum -
+**is** ported.
