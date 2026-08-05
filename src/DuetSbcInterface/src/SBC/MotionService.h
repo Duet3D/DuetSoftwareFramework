@@ -82,18 +82,23 @@ namespace Duet::Sbc
 		// Force motor positions, after homing or a move that was cut short.
 		static void SetMotorPositions(uint32_t driveMask, std::span<const int32_t> positions);
 
-		// Correct the drives an endstop cut short, and tell the boards where to end up.
+		// Where a drive was at a given step-clock time, and where it was when the current move began.
 		//
-		// The controller stops the drives itself, because only it is close enough to the CAN bus for
-		// the latency to be acceptable, but it cannot say where they should stop: it never generated
-		// the steps. This side did, and evaluates the same motion anyway to report live positions, so
-		// it works out where each drive was when the endstop reported, adopts that as the position,
-		// and sends CanMessageRevertPosition so the boards wind back the overshoot.
+		// This is the one question only this side can answer: it planned the motion and holds the
+		// segment chain, so it can evaluate the profile at an instant that has already passed. That is
+		// what undoing an endstop overshoot needs - the position at the moment the switch fired, not
+		// the position the stop message happened to catch.
 		//
-		// `whenTriggered` is zero when the report came from a board using the older message, which
-		// carries no timestamp; the drives are then left where the stop found them
-		void HandleMotionStopped(uint32_t whenTriggered,
-								 std::span<const duet::spi::protocol::MotionStoppedDriver> drivers);
+		// `usedTimestamp` says whether the answer came from evaluating at `whenTicks` or from where
+		// the drive is now. It is false when `whenTicks` is zero, which is what a board using the
+		// older message reports, and when the step-clock fit is not yet trusted - the two clocks then
+		// share nothing but their rate, so evaluating at a controller timestamp would extrapolate far
+		// outside the move. Falling back leaves the overshoot, which is a small error rather than a
+		// wild one. The caller has to know which it got, because it decides what to do about it.
+		//
+		// Returns false if `drive` is out of range.
+		static bool GetPositionAt(size_t drive, uint32_t whenTicks, int32_t& position,
+								  int32_t& positionAtMoveStart, bool& usedTimestamp);
 
 		// What DCS decides from its own state each cycle, stored rather than called: the motion
 		// thread must never wait on the managed side to answer a question.
@@ -122,6 +127,12 @@ namespace Duet::Sbc
 		[[nodiscard]] static bool IsWellFormedSubmission(std::span<const uint8_t> record) noexcept;
 
 		static void OnMoveRetired(const DDA& dda, void *context) noexcept;
+
+		// Hand the controller's stop report to DCS unchanged, so it can decide what the drives should
+		// have ended up at. Raw rather than a conclusion: this side knows where the drives were, but
+		// only DCS knows what the move was for and what should be done about it.
+		void PostMotionStopped(uint32_t whenTriggered,
+							   std::span<const duet::spi::protocol::MotionStoppedDriver> drivers);
 
 		void PostMoveCompleted(unsigned int ring, uint32_t moveId);
 		void PostMoveFailed(unsigned int ring, uint32_t moveId, MovementError error);

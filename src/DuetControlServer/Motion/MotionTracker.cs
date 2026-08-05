@@ -108,68 +108,6 @@ internal sealed class MotionTracker(ILogger<MotionTracker> logger)
     }
 
     /// <summary>
-    /// Record where the drives actually ended up after a move that could stop early
-    /// </summary>
-    /// <param name="ring">Ring the move was queued on</param>
-    /// <param name="moveId">Id this side gave the move</param>
-    /// <param name="driveMask">Which drives <paramref name="endpoints"/> describes, as a bitmap</param>
-    /// <param name="endpoints">Machine position each drive ended at, in microsteps</param>
-    public void EndpointsReported(int ring, uint moveId, uint driveMask, ReadOnlySpan<int> endpoints)
-    {
-        if (!IsValidRing(ring))
-        {
-            return;
-        }
-
-        lock (_lock)
-        {
-            RingState state = _rings[ring];
-            int count = Math.Min(endpoints.Length, state.Endpoints.Length);
-            for (int drive = 0; drive < count; drive++)
-            {
-                if ((driveMask & (1u << drive)) != 0)
-                {
-                    state.Endpoints[drive] = endpoints[drive];
-                }
-            }
-            state.EndpointsPending = true;
-        }
-
-        logger.LogDebug("Move {MoveId} on ring {Ring} reported endpoints for drives {Mask:X8}", moveId, ring, driveMask);
-    }
-
-    /// <summary>
-    /// Take the endpoints reported since this was last called, if there are any
-    /// </summary>
-    /// <param name="ring">Ring to read</param>
-    /// <param name="endpoints">Filled in with the reported endpoints</param>
-    /// <returns>True if there was a reading to take</returns>
-    /// <remarks>
-    /// Taking rather than peeking, so the caller cannot apply the same correction twice
-    /// </remarks>
-    public bool TryTakeEndpoints(int ring, Span<int> endpoints)
-    {
-        if (!IsValidRing(ring))
-        {
-            return false;
-        }
-
-        lock (_lock)
-        {
-            RingState state = _rings[ring];
-            if (!state.EndpointsPending)
-            {
-                return false;
-            }
-
-            int count = Math.Min(endpoints.Length, state.Endpoints.Length);
-            state.Endpoints.AsSpan(0, count).CopyTo(endpoints);
-            state.EndpointsPending = false;
-            return true;
-        }
-    }
-
-    /// <summary>
     /// The number of moves the given ring has completed, or 0 if it has not reported yet
     /// </summary>
     /// <param name="ring">Ring to read</param>

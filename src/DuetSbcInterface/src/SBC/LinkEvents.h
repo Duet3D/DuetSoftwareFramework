@@ -54,9 +54,10 @@ namespace Duet::Sbc
 		MoveCompleted = 11,
 		// MoveFailedEvent, no tail. A move was rejected or could not be sent
 		MoveFailed = 12,
-		// MotionEndpointsEvent + int32_t[] tail. Where the drives actually ended up after a move
-		// that could stop early, so DCS can resynchronise the shadow endpoints it plans against
-		MotionEndpoints = 13,
+		// MotionStoppedEvent + MotionStoppedDriverEntry[] tail. An endstop cut a move short. DCS
+		// works out where the drives were when it fired and tells the boards to wind back, which is
+		// why this carries the raw report rather than a conclusion
+		MotionStopped = 13,
 	};
 
 	// Severity for InboundEventType::Log, mirroring the subset of MessageType DCS logs at.
@@ -170,15 +171,22 @@ namespace Duet::Sbc
 		uint16_t padding;
 	};
 
-	struct MotionEndpointsEvent
+	// One driver an endstop stopped, as the controller named it. Mirrors MotionStoppedDriver in the
+	// SPI protocol; repeated here so the event tail is described where the other events are.
+	struct MotionStoppedDriverEntry
+	{
+		uint8_t boardAddress;
+		uint8_t driverNumber;
+		uint16_t padding;
+	};
+
+	struct MotionStoppedEvent
 	{
 		InboundEventHeader header;
-		uint32_t moveId;
-		uint32_t driveMask; // LogicalDrivesBitmap of the entries that follow
-		uint8_t ring;
-		uint8_t numDrives;
-		uint16_t padding;
-		// int32_t endPoint[numDrives] follows, in microsteps
+		uint32_t whenTriggered; // master step-clock time the endstop reported, 0 if it sent none
+		uint8_t numDrivers;
+		uint8_t padding[3];
+		// MotionStoppedDriverEntry driver[numDrivers] follows
 	};
 
 	// ---------------------------------------------------------------------------
@@ -264,7 +272,8 @@ namespace Duet::Sbc
 	static_assert(sizeof(MalformedPacketEvent) == 12, "MalformedPacketEvent must be 12 bytes");
 	static_assert(sizeof(MoveCompletedEvent) == 16, "MoveCompletedEvent must be 16 bytes");
 	static_assert(sizeof(MoveFailedEvent) == 12, "MoveFailedEvent must be 12 bytes");
-	static_assert(sizeof(MotionEndpointsEvent) == 16, "MotionEndpointsEvent must be 16 bytes");
+	static_assert(sizeof(MotionStoppedDriverEntry) == 4, "MotionStoppedDriverEntry must be 4 bytes");
+	static_assert(sizeof(MotionStoppedEvent) == 12, "MotionStoppedEvent must be 12 bytes");
 
 	static_assert(sizeof(OutboundCommandHeader) == 4, "OutboundCommandHeader must be 4 bytes");
 	static_assert(sizeof(MessageCommand) == 8, "MessageCommand must be 8 bytes");

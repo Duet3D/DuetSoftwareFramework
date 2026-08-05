@@ -1595,7 +1595,8 @@ scanning the rings" harder, and §12 deletes that scan rather than complicating 
 
 ## 12. Moving the endstop correction into DuetControlServer
 
-Planned, not done. §10 describes the arrangement as built; this is the change to it and why.
+**Done.** §10 describes the arrangement it replaced; this is the change and why. Section 12.6's
+steps are all landed, including the wind-back wait from §12.7 and both homing gaps in §12.8.
 
 ### 12.1 What it looks like today
 
@@ -1713,39 +1714,41 @@ what is added is exported functions DCS calls afterwards.
 
 ### 12.6 The plan
 
-**Step 1 - expose the position query.** `DuetSbc_MotionGetPositionAt` over `Motion::DriveTracker`,
+**Step 1 ✅ expose the position query.** `DuetSbc_MotionGetPositionAt` over `Motion::DriveTracker`,
 returning both the position and whether the trigger timestamp was usable. Independent of everything
 else and testable on its own against a known segment chain.
 
-**Step 2 - forward the stop to DCS.** New `InboundEventType.MotionStopped` carrying `whenTriggered`
+**Step 2 ✅ forward the stop to DCS.** New `InboundEventType.MotionStopped` carrying `whenTriggered`
 and the stopped drivers, mirroring `MotionStoppedHeader` / `MotionStoppedDriver`. Handled in
 `LinkService` alongside `MotionEndpoints`. At this point DCS sees the stop but still does nothing
 with it, and native still does everything it does today - the two paths run side by side, which is
 what makes the next step verifiable.
 
-**Step 3 - build the revert in DCS.** `MovePlanner` (or a new `EndstopCorrection`) turns the stopped
+**Step 3 ✅ build the revert in DCS.** `MovePlanner` (or a new `EndstopCorrection`) turns the stopped
 drivers into `CanMessageRevertPosition` per board: map driver → logical drive through
 `move.axes[].drivers`, query the position, express it as steps since the move began, group by board.
 Compare against what native computes for the same stop before cutting over.
 
-**Step 4 - move the decision.** DCS applies the corrected positions through `SetMotorPositions` and
+**Step 4 ✅ move the decision.** DCS applies the corrected positions through `SetMotorPositions` and
 resyncs `MoveBuilder` from them, taking over `NoteDriverStopped`'s job with the per-driver mapping it
 already has. `FinishSpecialMoveAsync` is where this lands, since it already waits for standstill and
 resyncs. It also gains the wait for the boards to finish winding back - see §12.7, which is a gap
 that exists today and that this step is the right place to close.
 
-**Step 5 - delete the native half.** `HandleMotionStopped`'s revert construction, the ring scan,
+**Step 5 ✅ delete the native half.** `HandleMotionStopped`'s revert construction, the ring scan,
 `DDA::SetDriveCoordinate`, `NoteDriverStopped`, `IsCheckingEndstops` in `MotionService`, and the
 `MotionEndpoints` event if nothing else needs it.
 
-**Step 6 - drop CANlib.** Remove it from `src/DuetSbcInterface/src/CMakeLists.txt` along with the
+**Step 6 ✅ drop CANlib.** Remove it from `src/DuetSbcInterface/src/CMakeLists.txt` along with the
 `Compat/CoreN2G/CoreTypes.h` shim, and delete the `MCU HOST` variant from `lib/CANlib/CANlib.cmake`
 if nothing else uses it. `MaxLinearDriversPerCanSlave` and `BasicDriverPositionRevertMillis` move to
 DCS with the message.
 
-Steps 1 to 3 are additive and leave the existing path working, so they can land separately. Step 4 is
-the cutover, and it also absorbs the two homing gaps in §12.8, which live in the same function. Do the
-whole thing before §11.4 phase E, for the reason in §12.3.
+One thing came out differently from the plan. `MotionEndpoints` was not merely unneeded but actively
+wrong to keep: it reported a stopped move's *planned* endpoints, so leaving it would have overwritten
+the corrected position with the one that was never reached. It is gone rather than reserved, and
+`MotionTracker`'s endpoint half and `MovePlanner.ApplyPendingResync` went with it - the correction now
+sets the builder's endpoints directly, under the planner lock, so there is no pending state to apply.
 
 ### 12.7 Does this end up behaving like RepRapFirmware?
 

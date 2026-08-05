@@ -63,10 +63,14 @@ internal enum InboundEventType : ushort
     MoveFailed = 12,
 
     /// <summary>
-    /// Where the drives actually ended up after a move that could stop early:
-    /// <see cref="MotionEndpointsEvent"/> plus one <c>int</c> per drive
+    /// An endstop cut a move short: <see cref="MotionStoppedEvent"/> plus one
+    /// <see cref="MotionStoppedDriverEntry"/> per stopped driver
     /// </summary>
-    MotionEndpoints = 13
+    /// <remarks>
+    /// The controller's report, unchanged. Where the drives should end up is not in it, because the
+    /// controller never generated the steps; that is worked out here from the trigger timestamp
+    /// </remarks>
+    MotionStopped = 13
 }
 
 /// <summary>
@@ -360,32 +364,51 @@ internal struct MoveFailedEvent
 }
 
 /// <summary>
-/// Where the drives actually ended up after a move that could stop early. One <c>int</c> per drive
-/// follows, in microsteps
+/// One driver an endstop stopped, as the controller named it
+/// </summary>
+[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 4)]
+internal struct MotionStoppedDriverEntry
+{
+    /// <summary>CAN address of the board carrying the driver</summary>
+    public byte BoardAddress;
+
+    /// <summary>Driver number on that board</summary>
+    public byte DriverNumber;
+
+    /// <summary>Padding</summary>
+    public ushort Padding;
+}
+
+/// <summary>
+/// The drives an endstop stopped, and when it fired
 /// </summary>
 /// <remarks>
-/// Moves are planned as a delta from the previous move's endpoints, so this side keeps its own copy
-/// of them. A move that watches endstops can stop short, which makes that copy wrong; this is how it
-/// is put right, and it must be applied before another move is submitted
+/// <para>
+/// The controller stops the drives because it is the only component close enough to the CAN bus for
+/// the latency to be acceptable, but it cannot say where they should end up: it never generated the
+/// steps. This is the raw report, and what to do about it is decided here - see
+/// <c>EndstopCorrection</c>.
+/// </para>
+/// <para>
+/// <see cref="WhenTriggered"/> is in the controller's step clock and is zero when the board that
+/// reported it is too old to send one
+/// </para>
 /// </remarks>
-[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 16)]
-internal struct MotionEndpointsEvent
+[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 12)]
+internal struct MotionStoppedEvent
 {
     /// <summary>Record header</summary>
     public InboundEventHeader Header;
 
-    /// <summary>The move that produced these endpoints</summary>
-    public uint MoveId;
-
-    /// <summary>Which drives the trailing array describes, as a logical-drive bitmap</summary>
-    public uint DriveMask;
-
-    /// <summary>Which ring the move was queued on</summary>
-    public byte Ring;
+    /// <summary>Master step-clock time the endstop reported, zero if it sent none</summary>
+    public uint WhenTriggered;
 
     /// <summary>Entries in the trailing array</summary>
-    public byte NumDrives;
+    public byte NumDrivers;
 
     /// <summary>Padding</summary>
-    public ushort Padding;
+    public byte Padding0;
+
+    /// <summary>Padding</summary>
+    public ushort Padding1;
 }

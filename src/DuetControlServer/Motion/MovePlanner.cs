@@ -193,10 +193,6 @@ internal sealed class MovePlanner(
     {
         using (_lock.EnterScope())
         {
-            // Endpoints reported after a move that stopped short have to be applied before the next
-            // move is planned, because that move is a delta from them
-            ApplyPendingResync(move.RingNumber);
-
             if (!linkInterface.Native.CanAddMove(move.RingNumber))
             {
                 return MoveSubmitResult.Busy;
@@ -233,23 +229,6 @@ internal sealed class MovePlanner(
 
             return MoveSubmitResult.Queued;
         }
-    }
-
-    /// <summary>
-    /// Apply any endpoints the engine has reported since the last move
-    /// </summary>
-    /// <param name="ring">Ring to check</param>
-    /// <returns>True if a correction was applied</returns>
-    private bool ApplyPendingResync(int ring)
-    {
-        if (!motionTracker.TryTakeEndpoints(ring, _resyncBuffer))
-        {
-            return false;
-        }
-
-        Builder.ResyncEndpoints(_resyncBuffer);
-        logger.LogDebug("Resynchronised the planner from the engine's reported endpoints");
-        return true;
     }
 
     /// <summary>

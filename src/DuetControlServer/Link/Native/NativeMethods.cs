@@ -378,6 +378,26 @@ internal static partial class NativeMethods
     internal static partial int DuetSbc_MotionGetMotorPositions(IntPtr handle, Span<int> steps, int count, out uint whenTicks);
 
     /// <summary>
+    /// Where one drive was at a given step-clock time, and where it was when its move began
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <param name="drive">Logical drive</param>
+    /// <param name="whenTicks">Master step-clock time to evaluate at, zero if none was reported</param>
+    /// <param name="position">Receives the position in microsteps</param>
+    /// <param name="positionAtMoveStart">Receives where the drive was when its current move began</param>
+    /// <param name="usedTimestamp">Receives 1 if the answer came from <paramref name="whenTicks"/></param>
+    /// <returns>1 on success, 0 if the drive is out of range</returns>
+    /// <remarks>
+    /// The one question only the native side can answer: it planned the motion and holds the segment
+    /// chain, so it can evaluate the profile at an instant that has already passed. Undoing an endstop
+    /// overshoot needs the position at the moment the switch fired, not the one the stop report caught
+    /// </remarks>
+    [LibraryImport(LibraryName)]
+    internal static partial int DuetSbc_MotionGetPositionAt(IntPtr handle, int drive, uint whenTicks,
+                                                            out int position, out int positionAtMoveStart,
+                                                            out int usedTimestamp);
+
+    /// <summary>
     /// Force motor positions, after homing or a move that stopped early
     /// </summary>
     /// <param name="handle">Interface handle</param>

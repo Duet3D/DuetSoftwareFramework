@@ -20,6 +20,11 @@ namespace DuetControlServer.Codes.Handlers;
 internal sealed partial class GCodeHandler
 {
     /// <summary>
+    /// How often to re-check whether the boards have finished winding back
+    /// </summary>
+    private static readonly TimeSpan RevertPollInterval = TimeSpan.FromMilliseconds(5);
+
+    /// <summary>
     /// Wait for a special move to finish and find out where it left the machine
     /// </summary>
     /// <param name="armedAxes">Axes the move was armed for, empty if it watched no endstop</param>
@@ -49,6 +54,16 @@ internal sealed partial class GCodeHandler
                                                    CancellationToken cancellationToken)
     {
         await planner.WaitForStandstillAsync(cancellationToken);
+
+        // Draining the rings is not enough on its own. A move that stopped short leaves the boards
+        // winding back the overshoot, and that corrective move is synthesised on the board from the
+        // revert message - the engine never scheduled it, so its ring counters never see it. Letting
+        // the next move go out now would have the two overlap on the same driver. RepRapFirmware
+        // waits the same time for the same reason, in CanMotion::RevertStoppedDrivers
+        while (endstopCorrection.IsReverting && !cancellationToken.IsCancellationRequested)
+        {
+            await Task.Delay(RevertPollInterval, cancellationToken);
+        }
 
         using (await model.AccessReadWriteAsync(cancellationToken))
         {

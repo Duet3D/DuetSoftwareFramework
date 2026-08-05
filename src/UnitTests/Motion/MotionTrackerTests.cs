@@ -51,81 +51,17 @@ public class MotionTrackerTests
     }
 
     [Test]
-    public void EndpointsAreTakenOnceAndOnlyForTheMaskedDrives()
+    public void InvalidateForgetsEveryRing()
     {
-        MotionTracker tracker = NewTracker();
-        int[] reported = new int[MotionLimits.MaxAxesPlusExtruders];
-        reported[0] = 111;
-        reported[1] = 222;
-        reported[2] = 333;
-
-        // Only X and Z, so the Y entry must be left as it was rather than overwritten with the
-        // value that happened to be in the record
-        tracker.EndpointsReported(0, moveId: 1, driveMask: 0b101, reported);
-
-        int[] taken = new int[MotionLimits.MaxAxesPlusExtruders];
-        Assert.That(tracker.TryTakeEndpoints(0, taken), Is.True);
-        Assert.Multiple(() =>
-        {
-            Assert.That(taken[0], Is.EqualTo(111));
-            Assert.That(taken[1], Is.EqualTo(0), "an unmasked drive keeps its previous endpoint");
-            Assert.That(taken[2], Is.EqualTo(333));
-        });
-
-        // Taking rather than peeking: applying the same correction twice would move the machine by
-        // the discrepancy a second time
-        Assert.That(tracker.TryTakeEndpoints(0, taken), Is.False);
-    }
-
-    [Test]
-    public void EndpointsDoNotLeakBetweenRings()
-    {
-        MotionTracker tracker = NewTracker();
-        int[] reported = new int[MotionLimits.MaxAxesPlusExtruders];
-        reported[0] = 4242;
-        tracker.EndpointsReported(1, moveId: 1, driveMask: 0b1, reported);
-
-        int[] taken = new int[MotionLimits.MaxAxesPlusExtruders];
-        Assert.Multiple(() =>
-        {
-            Assert.That(tracker.TryTakeEndpoints(0, taken), Is.False, "ring 0 has nothing pending");
-            Assert.That(tracker.TryTakeEndpoints(1, taken), Is.True);
-        });
-        Assert.That(taken[0], Is.EqualTo(4242));
-    }
-
-    [Test]
-    public void ShortEndpointArraysAreAccepted()
-    {
-        // The event carries numDrives entries, which need not be the full drive space
-        MotionTracker tracker = NewTracker();
-        tracker.EndpointsReported(0, moveId: 1, driveMask: uint.MaxValue, new int[] { 5, 6, 7 });
-
-        int[] taken = new int[MotionLimits.MaxAxesPlusExtruders];
-        Assert.That(tracker.TryTakeEndpoints(0, taken), Is.True);
-        Assert.Multiple(() =>
-        {
-            Assert.That(taken[0], Is.EqualTo(5));
-            Assert.That(taken[2], Is.EqualTo(7));
-            Assert.That(taken[3], Is.EqualTo(0));
-        });
-    }
-
-    [Test]
-    public void InvalidateDropsPendingEndpoints()
-    {
-        // The moves those endpoints refer to are gone with the link. Applying the reading to a move
-        // planned after the reconnect would be a jump
+        // The moves those totals refer to are gone with the link, so a move planned after the
+        // reconnect must not be checked against them
         MotionTracker tracker = NewTracker();
         tracker.MoveCompleted(0, moveId: 3, completedMoves: 3);
-        tracker.EndpointsReported(0, moveId: 3, driveMask: 0b1, new int[] { 900 });
 
         tracker.Invalidate();
 
-        int[] taken = new int[MotionLimits.MaxAxesPlusExtruders];
         Assert.Multiple(() =>
         {
-            Assert.That(tracker.TryTakeEndpoints(0, taken), Is.False);
             Assert.That(tracker.GetCompletedMoves(0), Is.EqualTo(0u));
             Assert.That(tracker.GetLastCompletedMoveId(0), Is.EqualTo(0u));
         });

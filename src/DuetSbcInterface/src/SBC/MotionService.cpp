@@ -4,10 +4,6 @@
 
 #include "MotionService.h"
 
-#include <CanMessageFormats.h>
-#include <Duet3Common.h>
-
-
 #include "SbcInterface.h"
 
 #include <Movement/MoveTiming.h>
@@ -39,10 +35,13 @@ namespace Duet::Sbc
 	{
 		// The controller stops an endstop move itself; correcting where the drives ended up is this
 		// side's job, because the trackers that know are here
+		// The controller stops an endstop move itself. Where the drives should end up is decided in
+		// DuetControlServer, from the positions this side can evaluate - see GetPositionAt - so all
+		// that happens here is handing the report on
 		link.SetMotionStoppedCallback(
 			[this](uint32_t whenTriggered, std::span<const duet::spi::protocol::MotionStoppedDriver> drivers)
 			{
-				HandleMotionStopped(whenTriggered, drivers);
+				PostMotionStopped(whenTriggered, drivers);
 			});
 	}
 
@@ -253,118 +252,26 @@ namespace Duet::Sbc
 		reprap.GetMove().SetMotorPositions(LogicalDrivesBitmap(driveMask), positions);
 	}
 
-	void MotionService::HandleMotionStopped(uint32_t whenTriggered,
-											std::span<const duet::spi::protocol::MotionStoppedDriver> drivers)
+	bool MotionService::GetPositionAt(size_t drive, uint32_t whenTicks, int32_t& position,
+									  int32_t& positionAtMoveStart, bool& usedTimestamp)
 	{
-		if (drivers.empty())
+		if (drive >= maxAxesPlusExtruders)
 		{
-			return;
+			return false;
 		}
-
-		Move& move = reprap.GetMove();
-		const uint32_t now = StepTimer::GetTimerTicks();
 
 		// A trigger timestamp is in the controller's step clock, and this side only has one of those
-		// once the fit has enough MasterClock samples to trust. Before then the two clocks share
-		// nothing but their rate, so asking where a drive was at that timestamp would extrapolate far
-		// outside the move and revert to a position with no relation to where it stopped. Falling
-		// back to where the report found the drives leaves the overshoot the timestamp exists to
-		// remove, which is a small error rather than a wild one
-		const bool haveControllerClock = StepTimer::GetClockStats().synced;
+		// once the fit has enough MasterClock samples to trust. Before then, asking where a drive was
+		// at that timestamp would extrapolate far outside the move
+		const bool canUseTimestamp = whenTicks != 0 && StepTimer::GetClockStats().synced;
 
-		// The move that is being cut short. Its endpoints are what OnMoveRetired reports to DCS when
-		// it retires, so the correction has to reach them as well as the trackers: DCS plans the next
-		// move as a delta from what it is told, and being told the planned endpoint would undo all of
-		// this. An endstop move is always isolated, so at most one ring can be running one
-		DDA *_ecv_null endstopMove = nullptr;
-		for (unsigned int ring = 0; ring < numRings && endstopMove == nullptr; ++ring)
-		{
-			DDA *_ecv_null const current = m_rings[ring].GetCurrentDDA();
-			if (current != nullptr && current->IsCheckingEndstops())
-			{
-				endstopMove = current;
-			}
-		}
+		Motion::DriveTracker& tracker = reprap.GetMove().GetDriveTracker(drive);
+		tracker.Advance(StepTimer::GetTimerTicks());
 
-		// One revert message per board, so the report is walked board by board. There are only ever a
-		// handful of entries: a move cannot watch more endstops than it has drivers
-		for (size_t first = 0; first < drivers.size(); ++first)
-		{
-			const uint8_t board = drivers[first].boardAddress;
-
-			bool alreadyDone = false;
-			for (size_t earlier = 0; earlier < first; ++earlier)
-			{
-				alreadyDone = alreadyDone || (drivers[earlier].boardAddress == board);
-			}
-			if (alreadyDone)
-			{
-				continue;
-			}
-
-			CanMessageRevertPosition revert{};
-			revert.clocksAllowed = MillisToStepClocks(BasicDriverPositionRevertMillis);
-			size_t numReverting = 0;
-
-			for (size_t i = first; i < drivers.size() && numReverting < MaxLinearDriversPerCanSlave; ++i)
-			{
-				if (drivers[i].boardAddress != board)
-				{
-					continue;
-				}
-
-				// The controller only knows drivers, so each one is mapped back through the
-				// configuration that placed it before anything here can be indexed by it
-				const DriverId driver(board, drivers[i].driverNumber);
-				const size_t drive = move.GetLogicalDriveForDriver(driver);
-				if (drive >= maxAxesPlusExtruders)
-				{
-					continue;					// a driver this side does not know about
-				}
-
-				// Where the drive was when the endstop fired, rather than where the stop message
-				// caught it. A report from a board using the older message carries no timestamp, and
-				// neither does an unsynchronised clock give one that means anything; either way there
-				// is nothing better than where it is now
-				Motion::DriveTracker& tracker = move.GetDriveTracker(drive);
-				tracker.Advance(now);
-				const int32_t position = (whenTriggered != 0 && haveControllerClock)
-					? lrintf(tracker.GetCurrentPosition(whenTriggered))
-						: tracker.GetMotorPosition();
-
-				// A revert says what the move should have amounted to, so it is expressed as steps
-				// since the move began rather than as an absolute position
-				revert.finalStepCounts[numReverting] = position - tracker.GetPositionAtMoveStart();
-				revert.whichDrives |= 1u << drivers[i].driverNumber;
-				++numReverting;
-
-				// Adopting the position also drops the rest of the move: this drive is not going to
-				// finish it, and the next move is planned as a delta from where this one ended.
-				//
-				// An axis with a switch per driver stops them one at a time, and until the last one
-				// has stopped the tracker is still what tells the drivers yet to stop where they
-				// were when their own switch fired, so it is left running
-				const bool driveHasStopped = endstopMove == nullptr
-					|| endstopMove->NoteDriverStopped(drive, move.GetDriverIndexInDrive(drive, driver),
-													  move.GetNumDriversForDrive(drive));
-				if (driveHasStopped)
-				{
-					tracker.SetMotorPosition(position);
-					if (endstopMove != nullptr)
-					{
-						endstopMove->SetDriveCoordinate(drive, position);
-					}
-				}
-			}
-
-			if (numReverting != 0 && m_link != nullptr)
-			{
-				m_link->QueueCanMessage(0, static_cast<uint16_t>(CanMessageRevertPosition::messageType),
-										static_cast<uint16_t>(CanMessageType::unusedMessageType), board, false,
-										reinterpret_cast<const uint8_t *>(&revert),
-										CanMessageRevertPosition::GetActualDataLength(numReverting));
-			}
-		}
+		position = canUseTimestamp ? lrintf(tracker.GetCurrentPosition(whenTicks)) : tracker.GetMotorPosition();
+		positionAtMoveStart = tracker.GetPositionAtMoveStart();
+		usedTimestamp = canUseTimestamp;
+		return true;
 	}
 
 	bool MotionService::CanAddMove(unsigned int ring) const
@@ -413,23 +320,37 @@ namespace Duet::Sbc
 		MotionService& self = *ctx.service;
 		self.PostMoveCompleted(ctx.ring, dda.GetMoveId());
 
-		if (dda.IsCheckingEndstops())
-		{
-			// A move that watches endstops can stop short, so where the drives actually ended up is
-			// not what DCS planned. It plans the next move as a delta from its own copy of the
-			// endpoints, so it has to be told before it sends another one.
-			MotionEndpointsEvent event{};
-			event.header.type = static_cast<uint16_t>(InboundEventType::MotionEndpoints);
-			event.moveId = dda.GetMoveId();
-			event.driveMask = 0xFFFFFFFFu;
-			event.ring = static_cast<uint8_t>(ctx.ring);
-			event.numDrives = static_cast<uint8_t>(maxAxesPlusExtruders);
+		// Nothing is reported for an endstop move. Its planned endpoints are not where the machine
+		// ended up - that is the whole point of it stopping short - and DCS has already been told the
+		// stop and worked out the real position from the trigger timestamp. Sending the planned
+		// endpoints afterwards would overwrite the corrected ones with the ones that were never
+		// reached, which is the failure this arrangement exists to remove
+	}
 
-			int32_t endPoints[maxAxesPlusExtruders]{};
-			std::memcpy(endPoints, dda.DriveCoordinates(), sizeof(endPoints));
-			self.m_link->PostEventFromOtherThread(
-				InboundEventType::MotionEndpoints, &event, sizeof(event), endPoints, sizeof(endPoints));
+	void MotionService::PostMotionStopped(uint32_t whenTriggered,
+										  std::span<const duet::spi::protocol::MotionStoppedDriver> drivers)
+	{
+		if (drivers.empty() || m_link == nullptr)
+		{
+			return;
 		}
+
+		const size_t numDrivers = std::min(drivers.size(), duet::spi::protocol::MaxMotionStoppedDrivers);
+
+		MotionStoppedEvent event{};
+		event.header.type = static_cast<uint16_t>(InboundEventType::MotionStopped);
+		event.whenTriggered = whenTriggered;
+		event.numDrivers = static_cast<uint8_t>(numDrivers);
+
+		MotionStoppedDriverEntry entries[duet::spi::protocol::MaxMotionStoppedDrivers]{};
+		for (size_t i = 0; i < numDrivers; ++i)
+		{
+			entries[i].boardAddress = drivers[i].boardAddress;
+			entries[i].driverNumber = drivers[i].driverNumber;
+		}
+
+		m_link->PostEventFromOtherThread(InboundEventType::MotionStopped, &event, sizeof(event),
+										 entries, numDrivers * sizeof(MotionStoppedDriverEntry));
 	}
 
 	void MotionService::PostMoveCompleted(unsigned int ring, uint32_t moveId)

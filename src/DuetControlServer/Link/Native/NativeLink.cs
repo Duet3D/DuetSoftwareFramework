@@ -103,7 +103,8 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
         Check<MalformedPacketEvent>(12);
         Check<MoveCompletedEvent>(16);
         Check<MoveFailedEvent>(12);
-        Check<MotionEndpointsEvent>(16);
+        Check<MotionStoppedEvent>(12);
+        Check<MotionStoppedDriverEntry>(4);
         Check<MoveParamsHeader>(28);
     }
 
@@ -626,6 +627,40 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
             return 0;
         }
         return NativeMethods.DuetSbc_MotionGetMotorPositions(_handle, steps, steps.Length, out whenTicks);
+    }
+
+    /// <summary>
+    /// Where one drive was at a given step-clock time
+    /// </summary>
+    /// <param name="drive">Logical drive</param>
+    /// <param name="whenTicks">Master step-clock time to evaluate at, zero if none was reported</param>
+    /// <param name="position">Receives the position in microsteps</param>
+    /// <param name="positionAtMoveStart">Receives where the drive was when its current move began</param>
+    /// <param name="usedTimestamp">
+    /// Receives whether the answer came from <paramref name="whenTicks"/> rather than from where the
+    /// drive is now, which it does not when no timestamp was reported or the step clock is not yet
+    /// synchronised
+    /// </param>
+    /// <returns>True on success</returns>
+    /// <remarks>
+    /// Only the engine can answer this: it planned the motion and holds the segment chain, so it can
+    /// evaluate the profile at an instant that has already passed. That is what undoing an endstop
+    /// overshoot needs - where the drive was when the switch fired, not where the report caught it
+    /// </remarks>
+    public bool GetPositionAt(int drive, uint whenTicks, out int position, out int positionAtMoveStart,
+                              out bool usedTimestamp)
+    {
+        position = positionAtMoveStart = 0;
+        usedTimestamp = false;
+        if (_handle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        int ok = NativeMethods.DuetSbc_MotionGetPositionAt(_handle, drive, whenTicks, out position,
+                                                           out positionAtMoveStart, out int usedTimestampFlag);
+        usedTimestamp = usedTimestampFlag != 0;
+        return ok != 0;
     }
 
     /// <summary>

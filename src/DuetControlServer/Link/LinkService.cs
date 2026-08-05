@@ -59,6 +59,7 @@ internal sealed class LinkService(
     Model.ObjectModel model,
     FilePathResolver filePathResolver,
     Motion.MotionTracker motionTracker,
+    Motion.EndstopCorrection endstopCorrection,
     IHostApplicationLifetime lifetime,
     ILogger<LinkService> logger,
     IOptions<Settings> settings) : BackgroundService
@@ -242,8 +243,8 @@ internal sealed class LinkService(
             case InboundEventType.MoveFailed:
                 HandleMoveFailed(record);
                 break;
-            case InboundEventType.MotionEndpoints:
-                HandleMotionEndpoints(record);
+            case InboundEventType.MotionStopped:
+                HandleMotionStopped(record);
                 break;
             case InboundEventType.FatalError:
                 HandleFatalError(record);
@@ -430,35 +431,37 @@ internal sealed class LinkService(
     }
 
     /// <summary>
-    /// Handle a report of where the drives actually ended up after a move that could stop early
+    /// Undo the overshoot of a move an endstop cut short
     /// </summary>
     /// <param name="record">Raw event record</param>
     /// <remarks>
-    /// This has to reach the move generator before it submits another move: moves are planned as a
-    /// delta from the previous endpoints, so continuing from the planned ones after a move stopped
-    /// short would move the machine by the whole difference
+    /// The controller stopped the drives but cannot say where they should end up - it never generated
+    /// the steps. This is its report, and <see cref="Motion.EndstopCorrection"/> is what turns it into
+    /// a position and a message telling the boards to wind back
     /// </remarks>
-    private void HandleMotionEndpoints(ReadOnlySpan<byte> record)
+    private void HandleMotionStopped(ReadOnlySpan<byte> record)
     {
-        int headerSize = Marshal.SizeOf<MotionEndpointsEvent>();
+        int headerSize = Marshal.SizeOf<MotionStoppedEvent>();
         if (record.Length < headerSize)
         {
-            logger.LogError("Discarding truncated MotionEndpoints event ({Length} bytes)", record.Length);
+            logger.LogError("Discarding truncated MotionStopped event ({Length} bytes)", record.Length);
             return;
         }
 
-        MotionEndpointsEvent endpointsEvent = MemoryMarshal.Read<MotionEndpointsEvent>(record);
+        MotionStoppedEvent stoppedEvent = MemoryMarshal.Read<MotionStoppedEvent>(record);
         ReadOnlySpan<byte> tail = record[headerSize..];
-        if (tail.Length < endpointsEvent.NumDrives * sizeof(int))
+        int entrySize = Marshal.SizeOf<MotionStoppedDriverEntry>();
+        if (tail.Length < stoppedEvent.NumDrivers * entrySize)
         {
             logger.LogError(
-                "Discarding MotionEndpoints event claiming {NumDrives} drives but carrying {Length} bytes",
-                endpointsEvent.NumDrives, tail.Length);
+                "Discarding MotionStopped event claiming {NumDrivers} drivers but carrying {Length} bytes",
+                stoppedEvent.NumDrivers, tail.Length);
             return;
         }
 
-        ReadOnlySpan<int> endpoints = MemoryMarshal.Cast<byte, int>(tail[..(endpointsEvent.NumDrives * sizeof(int))]);
-        motionTracker.EndpointsReported(endpointsEvent.Ring, endpointsEvent.MoveId, endpointsEvent.DriveMask, endpoints);
+        ReadOnlySpan<MotionStoppedDriverEntry> drivers =
+            MemoryMarshal.Cast<byte, MotionStoppedDriverEntry>(tail[..(stoppedEvent.NumDrivers * entrySize)]);
+        endstopCorrection.Apply(stoppedEvent.WhenTriggered, drivers);
     }
 
     /// <summary>

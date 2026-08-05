@@ -150,6 +150,21 @@ extern "C"
 	// thread and never tears.
 	int32_t DuetSbc_MotionGetMotorPositions(DuetSbcHandle* h, int32_t* stepsOut, int32_t count, uint32_t* whenTicks);
 
+	// Where one drive was at a given step-clock time, and where it was when its current move began.
+	// This is what undoing an endstop overshoot needs: the position at the instant the switch fired
+	// rather than the one the stop message caught. Only this side can answer it, because only this
+	// side holds the segment chain the move was planned into.
+	//
+	// `usedTimestamp` reports whether the answer came from evaluating at `whenTicks` or from where the
+	// drive is now. It is 0 when `whenTicks` is 0 - what a board using the older message reports - and
+	// when the step-clock fit is not yet trusted. Falling back leaves the overshoot uncorrected, which
+	// the caller has to be able to tell.
+	//
+	// Returns 1 on success, 0 if `drive` is out of range.
+	int32_t DuetSbc_MotionGetPositionAt(DuetSbcHandle* h, int32_t drive, uint32_t whenTicks,
+										int32_t* positionOut, int32_t* positionAtMoveStartOut,
+										int32_t* usedTimestampOut);
+
 	// Force motor positions, after homing or a move that stopped early.
 	void DuetSbc_MotionSetMotorPositions(DuetSbcHandle* h, uint32_t driveMask, const int32_t* positions, int32_t count);
 

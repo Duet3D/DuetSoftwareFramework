@@ -33,6 +33,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="bedCompensation">Height map correction</param>
 /// <param name="macroRunner">Runs the machine's own macro files</param>
 /// <param name="linkInterface">Link interface, for the endstops a move has to arm over CAN</param>
+/// <param name="endstopCorrection">Undoes the overshoot of a move an endstop cut short</param>
 /// <param name="logger">Logger</param>
 internal sealed partial class GCodeHandler(
     Model.ObjectModel model,
@@ -40,6 +41,7 @@ internal sealed partial class GCodeHandler(
     BedCompensation bedCompensation,
     Files.MacroRunner macroRunner,
     Link.LinkInterface linkInterface,
+    EndstopCorrection endstopCorrection,
     ILogger<GCodeHandler> logger) : ICodeHandler
 {
     /// <summary>

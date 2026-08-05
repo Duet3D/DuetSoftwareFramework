@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Motion.Kinematics;
 using DuetControlServer.Motion.Native;
@@ -56,6 +57,24 @@ internal sealed class MotionParameters
 
     /// <summary>Microsteps per mm, by logical drive</summary>
     public float[] StepsPerMm { get; } = new float[NumDrives];
+
+    /// <summary>
+    /// Which logical drive each physical driver belongs to, keyed by board and driver number
+    /// </summary>
+    /// <remarks>
+    /// The controller names a stopped driver by the board it is on and its number there, because that
+    /// is all it knows; everything on this side is indexed by logical drive. RepRapFirmware keeps the
+    /// same lookup as <c>Move::GetLogicalDriveForDriver</c>
+    /// </remarks>
+    private readonly Dictionary<DuetAPI.Utility.DriverId, int> _driveForDriver = [];
+
+    /// <summary>
+    /// The logical drive a physical driver belongs to
+    /// </summary>
+    /// <param name="driver">The driver</param>
+    /// <returns>The drive, or -1 if no drive claims it</returns>
+    public int DriveForDriver(DuetAPI.Utility.DriverId driver)
+        => _driveForDriver.TryGetValue(driver, out int drive) ? drive : -1;
 
     /// <summary>Maximum speed in mm per step clock, by logical drive</summary>
     public float[] MaxFeedrates { get; } = new float[NumDrives];
@@ -190,6 +209,11 @@ internal sealed class MotionParameters
             parameters.Accelerations[axis] = a.Acceleration / clockSquared;
             parameters.ReducedAccelerations[axis] = (a.ReducedAcceleration > 0.0f ? a.ReducedAcceleration : a.Acceleration) / clockSquared;
             parameters.InstantDvs[axis] = a.Jerk / SecondsPerMinute / MotionLimits.StepClockRate;
+
+            foreach (DuetAPI.Utility.DriverId driver in a.Drivers)
+            {
+                parameters._driveForDriver[driver] = axis;
+            }
         }
 
         for (int extruder = 0; extruder < numExtruders; extruder++)
@@ -205,6 +229,11 @@ internal sealed class MotionParameters
 
             // Pressure advance is a time, so it converts to step clocks rather than dividing by them
             parameters.PressureAdvanceClocks[drive] = e.PressureAdvance * MotionLimits.StepClockRate;
+
+            if (e.Driver is not null)
+            {
+                parameters._driveForDriver[e.Driver] = drive;
+            }
         }
 
         return parameters;

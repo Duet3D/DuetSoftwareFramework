@@ -142,7 +142,6 @@ add_subdirectory("${DUET_LIBRARIES_DIR}/DuetSpiInterface" duet_spi_protocol)
 set(LIBRARIES_DIR "${DUET_LIBRARIES_DIR}")
 include("${DUET_LIBRARIES_DIR}/DuetArch.cmake")
 include("${DUET_LIBRARIES_DIR}/RRFLibraries/RRFLibraries.cmake")
-include("${DUET_LIBRARIES_DIR}/CANlib/CANlib.cmake")
 duet_arch_target(HOST DUET_ARCH_HOST)
 # The interface target carries the include directory and must exist first: rrflibraries_add_library
 # links its own interface target publicly, which is how a consumer picks that directory up.
@@ -154,21 +153,10 @@ rrflibraries_add_library(RRFLIBRARIES_TARGET
 # Imported upstream source: linted by its own project, not by this one.
 set_target_properties(${RRFLIBRARIES_TARGET} PROPERTIES CXX_CLANG_TIDY "")
 
-# CANlib, built for this host for the same reason and in the same way. The SBC side needs the CAN
-# message definitions - CanMessageFormats, CanId, RemoteInputHandle - so that a message it builds is
-# declared once and shared with the boards that read it, rather than copied into a local struct that
-# can drift.
-canlib_add_interface(CANLIB_INTERFACE MCU HOST)
-canlib_add_library(CANLIB_TARGET
-    MCU HOST
-    ARCH ${DUET_ARCH_HOST}
-    RRFLIBRARIES_INTERFACE ${RRFLIBRARIES_INTERFACE})
-# CANlib's headers include <CoreTypes.h>, which upstream comes from CoreN2G - the Duet hardware
-# abstraction, none of which means anything here. Compat/CoreN2G supplies just that header. It goes
-# on the interface target so that anything including a CANlib header finds it too, not only CANlib's
-# own translation units.
-target_include_directories(${CANLIB_INTERFACE} INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src/Compat/CoreN2G")
-set_target_properties(${CANLIB_TARGET} PROPERTIES CXX_CLANG_TIDY "")
+# No CANlib here. It was pulled in for one message: the SBC used to build CanMessageRevertPosition
+# itself, which made this the only CAN message that did not originate in DuetControlServer. That
+# calculation is now a query - see MotionService::GetPositionAt - and DCS builds the message, so the
+# dependency and the CoreN2G shim it needed are both gone.
 
 add_subdirectory(src)
 add_subdirectory(harness)
