@@ -48,6 +48,10 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
     /// <inheritdoc />
     /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
     public override bool HomesIndividualDrives => true;
+    /// <inheritdoc />
+    /// <remarks>A straight line across the bed is an arc in radius and angle; Z is independent</remarks>
+    public override SegmentationType Segmentation => SegmentationType.Segment;
+
 
     /// <inheritdoc />
     /// <remarks>

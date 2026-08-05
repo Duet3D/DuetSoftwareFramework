@@ -71,6 +71,30 @@ internal readonly ref struct PlannedMove
 }
 
 /// <summary>
+/// Which movement a geometry needs broken into segments
+/// </summary>
+/// <remarks>
+/// Ported from RepRapFirmware's <c>SegmentationType</c> bitfield. The distinctions are not
+/// decoration: a geometry whose Z is linear does not need Z movement counted towards the segment
+/// length, and one whose travel moves bow as badly as its printing moves has to segment those too
+/// </remarks>
+[Flags]
+internal enum SegmentationType : byte
+{
+    /// <summary>The transform is linear, so a straight line stays straight</summary>
+    None = 0,
+
+    /// <summary>Straight moves have to be approximated by short ones</summary>
+    Segment = 1,
+
+    /// <summary>Z movement counts towards how long the move is, because Z is not independent either</summary>
+    IncludeZ = 2,
+
+    /// <summary>Uncoordinated moves are segmented as well, not only printing ones</summary>
+    IncludeG0 = 4
+}
+
+/// <summary>
 /// What limiting a target position came to
 /// </summary>
 /// <remarks>
@@ -254,6 +278,38 @@ internal abstract class KinematicsEngine
     /// on a CoreXY and on a delta
     /// </remarks>
     public bool IsRawMotorMove(int moveType) => moveType == 2 || (moveType != 0 && HomesIndividualDrives);
+
+    /// <summary>
+    /// Whether this geometry needs a straight move broken into short ones, and along which axes
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>SegmentationType</c>. A geometry that maps axis space onto its motors
+    /// non-linearly cannot draw a straight line by transforming the two ends of one: the motors would
+    /// interpolate linearly between motor positions, and the head would bow. Chopping the move into
+    /// pieces short enough that the bow is smaller than a step is how every such machine does it.
+    /// </para>
+    /// <para>
+    /// A Cartesian machine needs none of this, because the transform is the identity and a straight
+    /// line in motor space already is one
+    /// </para>
+    /// </remarks>
+    public virtual SegmentationType Segmentation => SegmentationType.None;
+
+    /// <summary>
+    /// How many segments per second of movement this geometry wants
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>DefaultSegmentsPerSecond</c>, configurable there by M669</remarks>
+    public virtual float SegmentsPerSecond => 100.0f;
+
+    /// <summary>
+    /// Shortest segment worth producing, mm
+    /// </summary>
+    /// <remarks>
+    /// The other half of the pair: a slow move would otherwise be cut into far more pieces than the
+    /// error justifies, and each one costs a transform and a submission
+    /// </remarks>
+    public virtual float MinSegmentLength => 0.2f;
 
     /// <summary>
     /// Which axes have to be homed before a move may touch the given ones

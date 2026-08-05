@@ -204,6 +204,77 @@ internal sealed partial class GCodeHandler
     /// <param name="move">The move</param>
     /// <param name="numAxes">Number of axes to consider</param>
     /// <returns>The two coordinates</returns>
+    /// <summary>
+    /// How many segments the height map needs a move broken into
+    /// </summary>
+    /// <param name="deltaAxis0">Movement along the map's first axis, mm</param>
+    /// <param name="deltaAxis1">Movement along its second, mm</param>
+    /// <returns>The minimum number of segments</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>HeightMap::GetMinimumSegments</c>: two segments per grid cell crossed, so
+    /// the correction is sampled inside each cell rather than only where the move happens to end. A
+    /// correction applied at the ends alone is a chord across the bed's actual shape
+    /// </remarks>
+    private int MeshSegments(float deltaAxis0, float deltaAxis1)
+    {
+        ProbeGrid grid = model.Move.Compensation.LiveGrid ?? model.Move.Compensation.ProbeGrid;
+        if (grid.Spacings.Count < 2)
+        {
+            return 1;
+        }
+
+        int Segments(float distance, float spacing)
+            => spacing > 0.0f ? (int)(2.0f * MathF.Abs(distance) / spacing) + 1 : 1;
+
+        return Math.Max(Segments(deltaAxis0, grid.Spacings[0]), Segments(deltaAxis1, grid.Spacings[1]));
+    }
+
+    /// <summary>
+    /// Whether the height map applies to this move at all
+    /// </summary>
+    /// <param name="move">The move</param>
+    /// <param name="numAxes">Number of axes to consider</param>
+    /// <returns>True if the correction will be applied</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>IsUsingMeshCompensation</c>. Above the taper height the correction has
+    /// faded to nothing, so there is nothing to follow and nothing to segment for
+    /// </remarks>
+    private bool IsUsingMeshCompensation(RawMove move, int numAxes)
+    {
+        if (!bedCompensation.IsActive)
+        {
+            return false;
+        }
+
+        int zAxis = ZAxisIndex(model.Move);
+        return zAxis < 0 || zAxis >= numAxes || bedCompensation.AppliesAt(move.Coords[zAxis]);
+    }
+
+    /// <summary>
+    /// The height map's two coordinates for an arbitrary position
+    /// </summary>
+    /// <param name="coords">Axis coordinates</param>
+    /// <param name="numAxes">Number of axes to consider</param>
+    /// <returns>The pair the map is indexed by</returns>
+    private (float Axis0, float Axis1) GridCoordinatesOf(ReadOnlySpan<float> coords, int numAxes)
+    {
+        float[] coordinates = [0.0f, 0.0f];
+        ProbeGrid grid = model.Move.Compensation.LiveGrid ?? model.Move.Compensation.ProbeGrid;
+
+        for (int i = 0; i < 2; i++)
+        {
+            for (int axis = 0; axis < numAxes && axis < coords.Length; axis++)
+            {
+                if (model.Move.Axes[axis].Letter == grid.Axes[i])
+                {
+                    coordinates[i] = coords[axis];
+                    break;
+                }
+            }
+        }
+        return (coordinates[0], coordinates[1]);
+    }
+
     private (float Axis0, float Axis1) GridCoordinates(RawMove move, int numAxes)
     {
         float[] coordinates = [0.0f, 0.0f];

@@ -96,6 +96,11 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
     /// <inheritdoc />
     /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
     public override bool HomesIndividualDrives => true;
+    /// <inheritdoc />
+    /// <remarks>Z is one of the towers, so a Z-only move is already three motor moves; but its length is not what
+    /// decides the segment count, which is why Z is left out</remarks>
+    public override SegmentationType Segmentation => SegmentationType.Segment | SegmentationType.IncludeG0;
+
 
     /// <inheritdoc />
     /// <remarks>

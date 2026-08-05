@@ -69,6 +69,10 @@ internal sealed class HangprinterKinematicsEngine : KinematicsEngine
     /// <inheritdoc />
     /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
     public override bool HomesIndividualDrives => true;
+    /// <inheritdoc />
+    /// <remarks>Every line length depends on all three coordinates, Z included</remarks>
+    public override SegmentationType Segmentation => SegmentationType.Segment | SegmentationType.IncludeZ | SegmentationType.IncludeG0;
+
 
     /// <inheritdoc />
     /// <remarks>

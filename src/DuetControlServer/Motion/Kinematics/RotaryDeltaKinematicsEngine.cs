@@ -68,6 +68,10 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
     /// <inheritdoc />
     /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
     public override bool HomesIndividualDrives => true;
+    /// <inheritdoc />
+    /// <remarks>Every axis of the head is an arm angle, so Z bows like the rest</remarks>
+    public override SegmentationType Segmentation => SegmentationType.Segment | SegmentationType.IncludeZ | SegmentationType.IncludeG0;
+
 
     /// <inheritdoc />
     /// <remarks>

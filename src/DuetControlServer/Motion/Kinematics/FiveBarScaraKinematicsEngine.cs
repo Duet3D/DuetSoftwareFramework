@@ -74,6 +74,10 @@ internal sealed class FiveBarScaraKinematicsEngine : KinematicsEngine
     /// <inheritdoc />
     /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
     public override bool HomesIndividualDrives => true;
+    /// <inheritdoc />
+    /// <remarks>The arms bow in XY; Z is an ordinary leadscrew and travel moves may be left alone</remarks>
+    public override SegmentationType Segmentation => SegmentationType.Segment;
+
 
     /// <inheritdoc />
     /// <remarks>

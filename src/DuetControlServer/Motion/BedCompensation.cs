@@ -35,6 +35,18 @@ public sealed class BedCompensation(Model.ObjectModel model)
     public bool IsActive => _map is not null;
 
     /// <summary>
+    /// Whether the correction still has any effect at the given height
+    /// </summary>
+    /// <param name="height">Height above the bed, mm</param>
+    /// <returns>True if the correction applies</returns>
+    /// <remarks>
+    /// M376 tapers the correction off with height, on the grounds that a tall print should end up
+    /// square even if it starts on a bed that is not flat. Above the taper height there is nothing
+    /// left to apply, which is also what decides whether a move has to be segmented to follow the map
+    /// </remarks>
+    public bool AppliesAt(float height) => IsActive && (_taperHeight <= 0.0f || height < _taperHeight);
+
+    /// <summary>
     /// Load a height map and start applying it
     /// </summary>
     /// <param name="reader">Source of the file</param>

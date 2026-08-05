@@ -187,13 +187,17 @@ internal sealed partial class GCodeHandler(
     private async ValueTask<Message?> SubmitMoveAsync(Commands.Code code, bool isCoordinated, int moveType,
                                                      CancellationToken cancellationToken)
     {
+        RawMove? move = null;
+        SegmentedMove segments = default;
+        List<int> armedAxes = [];
+        int submitted = 0;
+
         // Retrying rather than failing when the ring is full is what applies back-pressure: it is the
         // normal state when moves are commanded faster than the machine can run them, and it is what
         // keeps the G-code stream in step with the machine
         while (!cancellationToken.IsCancellationRequested)
         {
-            MoveSubmitResult result;
-            List<int> armedAxes = [];
+            MoveSubmitResult result = MoveSubmitResult.Busy;
 
             using (await model.AccessReadWriteAsync(cancellationToken))
             {
@@ -210,72 +214,191 @@ internal sealed partial class GCodeHandler(
                 // Held across building and queueing, because the move is a delta from the state the
                 // planner holds: another channel building in between would measure from the wrong
                 // place. Building also advances that state, which is what makes the rollback below
-                // necessary - and why the retry path must not simply build the same code again
+                // necessary
                 using (planner.Lock())
                 {
                     MovementState state = planner.State;
-                    float[] positionBeforeMove = ArrayPool<float>.Shared.Rent(MotionLimits.MaxAxes);
-                    try
-                    {
-                        state.CurrentUserPosition.CopyTo(positionBeforeMove, 0);
 
-                        RawMove move = BuildRawMove(code, input, isCoordinated, out Message? error);
-                        if (error is not null)
+                    if (move is null)
+                    {
+                        // Built once, however many segments it turns into and however many times the
+                        // ring is too full to take the next one. Rebuilding would apply a relative
+                        // move a second time, and cannot be done at all once a segment has gone out
+                        float[] positionBeforeMove = ArrayPool<float>.Shared.Rent(MotionLimits.MaxAxes);
+                        try
                         {
-                            positionBeforeMove.AsSpan(0, MotionLimits.MaxAxes).CopyTo(state.CurrentUserPosition);
-                            return error;
+                            state.CurrentUserPosition.CopyTo(positionBeforeMove, 0);
+
+                            move = BuildRawMove(code, input, isCoordinated, out Message? error);
+                            if (error is not null)
+                            {
+                                positionBeforeMove.AsSpan(0, MotionLimits.MaxAxes).CopyTo(state.CurrentUserPosition);
+                                return error;
+                            }
+                        }
+                        finally
+                        {
+                            ArrayPool<float>.Shared.Return(positionBeforeMove);
                         }
 
                         armedAxes = move.ArmedAxes;
-                        result = planner.QueueMove(move);
+                        segments = SegmentedMove.From(move, planner.Builder.StartCoordinates,
+                                                      Math.Min(planner.Parameters.NumAxes, model.Move.Axes.Count),
+                                                      planner.Parameters.FirstExtruderDrive);
 
-                        if (result is MoveSubmitResult.Queued or MoveSubmitResult.NoMovement)
-                        {
-                            // The move is committed, so the reported position is where it will leave
-                            // the machine. Recording it now rather than on completion is what lets the
-                            // next code be interpreted without waiting for the machine to catch up
-                            CommitPositions(move);
-                        }
-                        else
-                        {
-                            // RepRapFirmware's abandonMove: the move is not going to happen, so the
-                            // interpreter has to be put back where it was. Busy retries the same code,
-                            // and a relative move applied twice would be a real movement error
-                            positionBeforeMove.AsSpan(0, MotionLimits.MaxAxes).CopyTo(state.CurrentUserPosition);
-                        }
+                        // The whole move is committed as soon as it is built, not segment by segment.
+                        // What the user asked for is the end of it, and the next code is interpreted
+                        // against that; the segments are how the machine gets there
+                        CommitPositions(move);
                     }
-                    finally
+
+                    // As many segments as the engine will take. Stopping when it is full and picking
+                    // up from the same place is what keeps a long segmented move from blocking
+                    while (submitted < segments.Count)
                     {
-                        ArrayPool<float>.Shared.Return(positionBeforeMove);
+                        PrepareSegment(move, segments, submitted + 1);
+
+                        result = planner.QueueMove(move);
+                        if (result is MoveSubmitResult.Busy or MoveSubmitResult.Rejected)
+                        {
+                            break;
+                        }
+                        submitted++;
                     }
                 }
             }
 
-            switch (result)
+            if (result == MoveSubmitResult.Rejected)
             {
-                case MoveSubmitResult.Queued:
-                case MoveSubmitResult.NoMovement:
-                    if (moveType != 0)
-                    {
-                        // A special move is where the machine finds out where it is, so the code has
-                        // to wait for it rather than queue it and move on. Every ordinary move is
-                        // committed at its planned endpoint and the next code interpreted straight
-                        // away, which is what keeps the queue full
-                        await FinishSpecialMoveAsync(moveType, armedAxes, cancellationToken);
-                    }
-                    return new Message();
-
-                case MoveSubmitResult.Rejected:
-                    logger.LogError("Rejected {Code}", code);
-                    return new Message(MessageType.Error, "Move could not be planned; see the log for details");
-
-                default:
-                    await Task.Delay(RingFullRetryDelay, cancellationToken);
-                    break;
+                logger.LogError("Rejected {Code}", code);
+                return new Message(MessageType.Error, "Move could not be planned; see the log for details");
             }
+
+            if (submitted >= segments.Count)
+            {
+                if (moveType != 0)
+                {
+                    // A special move is where the machine finds out where it is, so the code has to
+                    // wait for it rather than queue it and move on. Every ordinary move is committed
+                    // at its planned endpoint and the next code interpreted straight away, which is
+                    // what keeps the queue full
+                    await FinishSpecialMoveAsync(moveType, armedAxes, cancellationToken);
+                }
+                return new Message();
+            }
+
+            await Task.Delay(RingFullRetryDelay, cancellationToken);
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// What a move is broken into, and what each piece has to be worked out from
+    /// </summary>
+    /// <remarks>
+    /// The move's own coordinates are overwritten segment by segment as it is submitted, so where it
+    /// started and where it is going have to be kept somewhere else
+    /// </remarks>
+    private readonly struct SegmentedMove
+    {
+        /// <summary>How many pieces the move is in</summary>
+        public int Count { get; private init; }
+
+        /// <summary>Number of axes the move touches</summary>
+        public int NumAxes { get; private init; }
+
+        /// <summary>Where the move began, in machine coordinates</summary>
+        public float[] Start { get; private init; }
+
+        /// <summary>Where it ends, in machine coordinates</summary>
+        public float[] Target { get; private init; }
+
+        /// <summary>Extrusion for one segment, by logical drive</summary>
+        public float[] ExtrusionPerSegment { get; private init; }
+
+        /// <summary>First logical drive that is an extruder</summary>
+        public int FirstExtruderDrive { get; private init; }
+
+        /// <summary>
+        /// Take a built move apart into what its segments need
+        /// </summary>
+        /// <param name="move">The move</param>
+        /// <param name="start">Where the machine is, which is where the move begins</param>
+        /// <param name="numAxes">Number of axes to consider</param>
+        /// <param name="firstExtruderDrive">First logical drive that is an extruder</param>
+        /// <returns>The pieces</returns>
+        public static SegmentedMove From(RawMove move, ReadOnlySpan<float> start, int numAxes, int firstExtruderDrive)
+        {
+            SegmentedMove segmented = new()
+            {
+                Count = Math.Max(1, move.SegmentCount),
+                NumAxes = numAxes,
+                FirstExtruderDrive = firstExtruderDrive,
+                Start = new float[MotionLimits.MaxAxes],
+                Target = new float[MotionLimits.MaxAxes],
+                ExtrusionPerSegment = new float[MotionLimits.MaxAxesPlusExtruders]
+            };
+
+            start[..numAxes].CopyTo(segmented.Start);
+            move.Coords.AsSpan(0, numAxes).CopyTo(segmented.Target);
+
+            // Divided rather than repeated: the extrusion belongs to the whole move, so each segment
+            // gets its share. RepRapFirmware does the same in FinaliseMove
+            for (int drive = firstExtruderDrive; drive < MotionLimits.MaxAxesPlusExtruders; drive++)
+            {
+                segmented.ExtrusionPerSegment[drive] = move.Coords[drive] / segmented.Count;
+            }
+            return segmented;
+        }
+    }
+
+    /// <summary>
+    /// Point a move at the end of one of its segments
+    /// </summary>
+    /// <param name="move">The move, whose coordinates are overwritten</param>
+    /// <param name="segments">What the move was broken into</param>
+    /// <param name="segment">Which segment to prepare, counting from one</param>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>GCodes::ReadMove</c>. Each segment ends a fraction of the way along the
+    /// line, and the last one ends exactly at the target rather than at the sum of the fractions -
+    /// otherwise a long move would accumulate rounding and stop short of where it was asked to go.
+    /// </para>
+    /// <para>
+    /// The bed compensation is applied here rather than to the move as a whole, which is the point of
+    /// the mesh segment count: the correction depends on where the nozzle is, so following the bed
+    /// means sampling it along the way. Applied once at the end it is a chord across the bed's shape
+    /// </para>
+    /// </remarks>
+    private void PrepareSegment(RawMove move, in SegmentedMove segments, int segment)
+    {
+        if (segment >= segments.Count)
+        {
+            segments.Target.AsSpan(0, segments.NumAxes).CopyTo(move.Coords);
+        }
+        else
+        {
+            float fraction = (float)segment / segments.Count;
+            for (int axis = 0; axis < segments.NumAxes; axis++)
+            {
+                move.Coords[axis] = segments.Start[axis]
+                    + ((segments.Target[axis] - segments.Start[axis]) * fraction);
+            }
+        }
+
+        for (int drive = segments.FirstExtruderDrive; drive < MotionLimits.MaxAxesPlusExtruders; drive++)
+        {
+            move.Coords[drive] = segments.ExtrusionPerSegment[drive];
+        }
+
+        if (move.MoveType == 0)
+        {
+            ApplyBedCompensation(move, segments.NumAxes);
+        }
+
+        // Each segment is its own move to the engine, so it needs its own correlation id
+        move.MoveId = 0;
     }
 
     /// <summary>
@@ -463,7 +586,9 @@ internal sealed partial class GCodeHandler(
                 return raw;
             }
 
-            ApplyBedCompensation(raw, numAxes);
+            // The bed compensation is deliberately not applied here. It is a correction that depends
+            // on where the nozzle is, so it belongs to each segment rather than to the move
+            raw.SegmentCount = SegmentCountFor(raw, hasForwardExtrusion, numAxes);
         }
 
         return raw;
@@ -542,6 +667,93 @@ internal sealed partial class GCodeHandler(
         }
         return false;
     }
+
+    /// <summary>
+    /// How many pieces this move has to be broken into
+    /// </summary>
+    /// <param name="move">The move, with its target already limited</param>
+    /// <param name="hasForwardExtrusion">Whether the move extrudes</param>
+    /// <param name="numAxes">Number of axes to consider</param>
+    /// <returns>The segment count, at least one</returns>
+    /// <remarks>
+    /// <para>
+    /// Ported from the segmentation block of <c>GCodes::DoStraightMove</c>. Three separate reasons a
+    /// move may need splitting, and the answer is the largest of them, because each is a lower bound
+    /// on what makes the move come out right:
+    /// </para>
+    /// <list type="bullet">
+    /// <item>the geometry bows a straight line, so it has to be approximated by short ones;</item>
+    /// <item>the height map has to be followed across the bed rather than applied at the ends;</item>
+    /// <item>the move takes so long that the step clock would wrap during it.</item>
+    /// </list>
+    /// <para>
+    /// RepRapFirmware makes the first of these optional and skips it while simulating. Here it is not
+    /// optional: there is no local step generation to fall back on, so a move that is not segmented is
+    /// simply executed as the wrong shape
+    /// </para>
+    /// </remarks>
+    private int SegmentCountFor(RawMove move, bool hasForwardExtrusion, int numAxes)
+    {
+        KinematicsEngine geometry = planner.Parameters.Geometry;
+        ReadOnlySpan<float> start = planner.Builder.StartCoordinates;
+
+        // How far the move goes, counting the axes this geometry's error depends on
+        float lengthSquared = 0.0f;
+        for (int axis = 0; axis < numAxes && axis < 3; axis++)
+        {
+            bool counts = axis < 2 || geometry.Segmentation.HasFlag(SegmentationType.IncludeZ);
+            if (counts)
+            {
+                float delta = move.Coords[axis] - start[axis];
+                lengthSquared += delta * delta;
+            }
+        }
+        float length = MathF.Sqrt(lengthSquared);
+
+        int segments = 1;
+        if (geometry.Segmentation.HasFlag(SegmentationType.Segment)
+            && (hasForwardExtrusion || move.IsCoordinated || geometry.Segmentation.HasFlag(SegmentationType.IncludeG0)))
+        {
+            // Short enough that the bow is below a step, but not so short that the move is chopped
+            // into more pieces than the error justifies
+            float speed = move.InverseTimeMode
+                ? (move.DurationSec > 0.0f ? length / move.DurationSec : 0.0f)
+                : move.FeedRateMmPerSec;
+            float seconds = speed > 0.0f ? length / speed : 0.0f;
+
+            float byLength = geometry.MinSegmentLength > 0.0f ? length / geometry.MinSegmentLength : 0.0f;
+            float byTime = seconds * geometry.SegmentsPerSecond;
+            segments = Math.Max(1, (int)MathF.Round(MathF.Min(byLength, byTime)));
+        }
+
+        if (IsUsingMeshCompensation(move, numAxes))
+        {
+            (float axis0, float axis1) = GridCoordinates(move, numAxes);
+            (float startAxis0, float startAxis1) = GridCoordinatesOf(start, numAxes);
+            segments = Math.Max(segments, MeshSegments(axis0 - startAxis0, axis1 - startAxis1));
+        }
+
+        // The step clock wraps roughly every 45 minutes, so a move that would take a large fraction
+        // of that has to be split whatever the geometry says
+        {
+            float speed = move.InverseTimeMode ? 0.0f : move.FeedRateMmPerSec;
+            float seconds = move.InverseTimeMode
+                ? move.DurationSec
+                : (speed > 0.0f ? length / speed : 0.0f);
+            segments = Math.Max(segments, (int)(seconds / MaxSegmentSeconds));
+        }
+
+        return Math.Max(1, segments);
+    }
+
+    /// <summary>
+    /// Longest a single segment may take, seconds
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>MaxSegmentTime</c>. The step clock is 32 bits at 750kHz, so it wraps in
+    /// under an hour; a move that occupies a large part of that cannot be timed against it
+    /// </remarks>
+    private const float MaxSegmentSeconds = 5.0f * 60.0f;
 
     /// <summary>
     /// Axes the code names, as a bitmap

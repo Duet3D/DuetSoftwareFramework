@@ -144,6 +144,17 @@ internal sealed class RawMove
     /// <summary>Logical drives this move is allowed to touch, as a bitmap</summary>
     public uint OwnedDrives { get; set; } = uint.MaxValue;
 
+    /// <summary>
+    /// How many pieces this move has to be broken into
+    /// </summary>
+    /// <remarks>
+    /// One for a move that can be executed as it stands, which is every move on a Cartesian machine
+    /// with no height map. More where the geometry bows a straight line, where the height map has to
+    /// be followed rather than applied at the ends, or where the move is long enough for the step
+    /// clock to wrap during it
+    /// </remarks>
+    public int SegmentCount { get; set; } = 1;
+
     /// <summary>Which ring to queue this move on</summary>
     public byte RingNumber { get; set; }
 
