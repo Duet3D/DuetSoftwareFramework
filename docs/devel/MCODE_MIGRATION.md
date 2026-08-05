@@ -1744,7 +1744,8 @@ if nothing else uses it. `MaxLinearDriversPerCanSlave` and `BasicDriverPositionR
 DCS with the message.
 
 Steps 1 to 3 are additive and leave the existing path working, so they can land separately. Step 4 is
-the cutover. Do the whole thing before §11.4 phase E, for the reason in §12.3.
+the cutover, and it also absorbs the two homing gaps in §12.8, which live in the same function. Do the
+whole thing before §11.4 phase E, for the reason in §12.3.
 
 ### 12.7 Does this end up behaving like RepRapFirmware?
 
@@ -1786,17 +1787,110 @@ trip and is the change that should fix it. Step 4 gains: after sending the rever
 complete until `TotalDriverPositionRevertMillis` has elapsed, as RRF does. It only costs 50 ms per
 homing move that actually triggered something.
 
-#### Gaps this does not touch, and does not claim to
+#### Gaps found while checking
 
-Found while checking, all pre-existing and none of them affected by §12:
+Both pre-existing and neither affected by §12, but both are in the same function §12's step 4 rewrites,
+so §12.8 folds them in.
 
 | Gap | RRF | Status here |
 |---|---|---|
-| **Delta homing sets the wrong thing** | For `homeIndividualDrives`, RRF sets a per-drive *step* position from `GetEndstopPositionSteps(drive, high)` and then recomputes the axis coordinates through `MotorStepsToCartesian` (`GCodes4.cpp:107-131`) | [FinishSpecialMoveAsync](src/DuetControlServer/Codes/Handlers/GCodeHandler.Homing.cs#L75) only implements the `homeCartesianAxes` branch - it sets the axis to `axes[].max`/`min`. On a delta the endstop is a tower's, not an axis', so this is wrong |
+| **Homing a non-Cartesian machine sets the wrong thing** | For `homeIndividualDrives`, RRF sets a per-drive *step* position from `GetEndstopPositionSteps(drive, high)` and then recomputes the axis coordinates through `MotorStepsToCartesian` (`GCodes4.cpp:107-131`) | [FinishSpecialMoveAsync](src/DuetControlServer/Codes/Handlers/GCodeHandler.Homing.cs#L75) only implements the `homeCartesianAxes` branch - it sets the axis to `axes[].max`/`min`. On a delta the endstop belongs to a tower, not an axis, so this is wrong |
 | **`G1 H3` does not set axis limits** | `axesToSenseLength` → `SetAxisMaximum`/`SetAxisMinimum` from where the move stopped (`GCodes4.cpp:132-148`) | §11.4 phase C stopped H3 marking axes homed, which was the harmful half. Actually measuring the axis is not ported |
-| **`zProbeTriggered`** | `MoveStoppedByZProbe` sets a flag the probing state machine consumes | DCS's G30 path reads the probe state separately; equivalent in effect but not verified against the same cases |
 
-Not a gap: RRF's `EndstopHitDetails::setAxisLow` / `setAxisHigh` are assigned by `ZProbeEndstop` and
-`StallDetectionEndstop` but read nowhere in 3.7-dev. §10 lists them as "not carried over"; they are
-dead in the firmware too, and the live mechanism - `GetEndStopPosition` → axis maximum or minimum -
-**is** ported.
+Two things checked that turned out **not** to be gaps:
+
+- **`zProbeTriggered`.** RRF latches a flag in the step interrupt and the probing state machine errors
+  with "Probe was not triggered during probing move" if it is clear. DCS reaches the same place from
+  the other direction - [GCodeHandler.Probing.cs:216](src/DuetControlServer/Codes/Handlers/GCodeHandler.Probing.cs#L216)
+  reads the probe's state after standstill and raises the same message, word for word. The only case
+  that could differ is a probe that triggers and releases before the move ends, which does not happen
+  to a probe pressed into a bed.
+- **`EndstopHitDetails::setAxisLow` / `setAxisHigh`.** Assigned by `ZProbeEndstop` and
+  `StallDetectionEndstop` but read nowhere in 3.7-dev. §10 lists them as "not carried over"; they are
+  dead in the firmware too, and the live mechanism - `GetEndStopPosition` → axis maximum or minimum -
+  **is** ported.
+
+### 12.8 Closing the two homing gaps
+
+Both live in `FinishSpecialMoveAsync`, which §12 step 4 rewrites anyway. Doing them with §12 rather
+than before it avoids touching the same function twice; doing them at all is independent of §12 and
+either could land first.
+
+#### The endstop position belongs to the kinematics
+
+RRF asks the kinematics where an endstop is, because the answer is not "the axis limit" on anything
+but a Cartesian machine: `Kinematics::GetEndstopPosition(drive, highEnd)` defaults to
+`AxisMaximum`/`AxisMinimum` and is overridden by every geometry that homes individual drives.
+
+| Engine | RRF's answer | Field here |
+|---|---|---|
+| `CoreKinematicsEngine` | axis maximum or minimum | base |
+| `LinearDeltaKinematicsEngine` | `homedCarriageHeights[tower]` at the high end | `GetHomedCarriageHeight(tower)`, already there |
+| `RotaryDeltaKinematicsEngine` | `maxArmAngle + endstopAdjustments[tower]` at the high end | `MaxArmAngle`, `GetEndstopAdjustment(tower)`, already there |
+| `PolarKinematicsEngine` | radius → `homedRadius`, turntable → 0 | `HomedRadius`, already there |
+| `ScaraKinematicsEngine` | theta or psi limit, **less the crosstalk from the joints already homed** | `_thetaLimits`, `_psiLimits`, `_crosstalk`, already there |
+| `FiveBarScaraKinematicsEngine` | `homingAngleL` / `homingAngleR` | needs checking against what M669 configures |
+| `HangprinterKinematicsEngine` | base - homing is not supported | base |
+
+SCARA is the one that shapes the signature: its answer depends on where the *other* joints already
+are, because turning the proximal joint drags the distal one. So the method needs the current motor
+endpoints and the steps per mm, not just the drive number:
+
+```csharp
+public virtual float GetEndstopPosition(int drive, bool highEnd, float axisMin, float axisMax,
+                                        ReadOnlySpan<int> endPoints, ReadOnlySpan<float> stepsPerMm)
+```
+
+The base implementation ignores everything but `axisMin` and `axisMax`.
+
+#### Setting the position afterwards
+
+`FinishSpecialMoveAsync` branches on `HomesIndividualDrives`, which §11.4 phase B already added for
+`IsRawMotorMove`:
+
+- **`homeCartesianAxes`** - what happens today. The axis takes its own limit, and
+  `SetAxisPosition` recomputes the endpoints from it.
+- **`homeIndividualDrives`** - the endpoint comes first and the coordinates follow from it. For each
+  drive whose endstop triggered, `endPoint = round(GetEndstopPosition(...) * stepsPerMm[drive])`;
+  then the axis coordinates are re-derived through `MotorStepsToCartesian`. That is the direction
+  RRF goes (`ChangeSingleEndpointAfterHoming` then `MotorStepsToCartesian`) and it is the only one
+  that makes sense: on a delta there is no axis coordinate the tower switch corresponds to.
+
+`MoveBuilder` needs the operation that does not exist yet - it has `SetAxisPosition` (coordinate in,
+endpoints out) and `ResyncEndpoints` (all endpoints in, coordinates out), but not one drive's
+endpoint in. `SetDriveEndpoint(drive, steps)` sets `_endPoints[drive]` and re-derives
+`_startCoordinates`, which is `ResyncEndpoints` for a single drive.
+
+`SyncInterpreterToMachine` then brings `currentUserPosition` into step, as it already does.
+
+#### `G1 H3`: measuring an axis rather than homing it
+
+H3 runs an axis onto its endstop to find out how long the axis is, and RRF writes the answer into the
+axis limit rather than into its position: `SetAxisMaximum(axis, coords[axis], true)` for a high-end
+endstop, `SetAxisMinimum` for a low one. The axis is *not* marked homed.
+
+`RawMove.HomingAxes` is populated only for H1 since §11.4 phase C, so H3 currently records nothing.
+Rename it to `ArmedAxes` - it always meant "axes this move armed an endstop for" - and let
+`FinishSpecialMoveAsync` decide what that means from `MoveType`:
+
+| Move type | What the armed axes get |
+|---|---|
+| 1 | position set from `GetEndstopPosition`, `homed` set |
+| 3 | `axes[].max` or `axes[].min` set from where the move stopped; `homed` untouched |
+| 4 | nothing - a `G1 H4` is a probing move and the probe path owns the outcome |
+
+Only an axis whose endstop actually triggered is acted on, in all three cases, which is the rule that
+already applies to H1.
+
+#### Steps
+
+1. `KinematicsEngine.GetEndstopPosition` plus the six overrides, with unit tests per engine against
+   RRF's values. Self-contained and testable without a move.
+2. `MoveBuilder.SetDriveEndpoint`, with a test that a delta's tower endpoint re-derives the expected
+   carriage coordinates.
+3. `FinishSpecialMoveAsync` branches on `HomesIndividualDrives`.
+4. `HomingAxes` → `ArmedAxes`, and the H3 limit-setting.
+
+Steps 1 and 2 are additive. Step 3 is the behaviour change for non-Cartesian machines, and is the one
+to be careful with: nothing in the test suite exercises homing on a delta, so it wants a test written
+against `LinearDeltaKinematicsEngine` before the change rather than after.
