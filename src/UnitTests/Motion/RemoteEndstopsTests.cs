@@ -1,4 +1,5 @@
 using DuetAPI.ObjectModel;
+using OmDriverId = DuetAPI.Utility.DriverId;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Motion;
 using DuetControlServer.Motion.Kinematics;
@@ -172,5 +173,55 @@ public class RemoteEndstopsTests
         stopInput.SetShared(0x1234, 5);
         RemoteEndstops.TryGetStopInput(new Endstop { Type = EndstopType.MotorStallAny }, 0, 1, stopInput);
         Assert.That(stopInput.NumSwitches, Is.Zero, "a refused endstop leaves the drive watching nothing");
+    }
+
+    [Test]
+    public void AStallEndstopIsOneHandleAndABoardPerDriver()
+    {
+        // A board reports every driver that stalled under one board-wide handle, so what tells one
+        // driver's stall from another's is the board. That is the opposite way round from a switch
+        // per driver, where the handle's minor field selects the switch and the boards may repeat
+        MoveStopInput stopInput = new();
+        OmDriverId[] drivers = [new OmDriverId(1, 0), new OmDriverId(4, 2)];
+
+        Assert.That(RemoteEndstops.TryGetStallStopInput(drivers, stopInput), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(stopInput.Handle, Is.EqualTo(RemoteEndstops.StallHandle().All));
+            Assert.That(stopInput.NumSwitches, Is.EqualTo(2));
+            Assert.That(stopInput.Boards[0], Is.EqualTo(1), "the first driver's board");
+            Assert.That(stopInput.Boards[1], Is.EqualTo(4), "the second driver's board");
+        });
+    }
+
+    [Test]
+    public void AStallEndstopOnOneDriverStopsEveryDriverOfTheDrive()
+    {
+        // Written as shared rather than as a one-entry per-driver list, so that a dual-motor axis
+        // with one stall-detecting driver still stops both motors
+        MoveStopInput stopInput = new();
+        Assert.That(RemoteEndstops.TryGetStallStopInput([new OmDriverId(2, 1)], stopInput), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(stopInput.NumSwitches, Is.EqualTo(1), "shared, so every driver watches it");
+            Assert.That(stopInput.Boards[0], Is.EqualTo(2));
+        });
+
+        Assert.That(RemoteEndstops.TryGetStallStopInput([], stopInput), Is.False, "nothing to watch");
+        Assert.That(stopInput.NumSwitches, Is.Zero);
+    }
+
+    [Test]
+    public void TheStallHandleIsBoardWideRatherThanPerAxis()
+    {
+        // Duet3Expansion reports stalls under RemoteInputHandle(typeStallEndstop, 0, 0) whatever the
+        // driver, so neither field may vary or the move would name a handle no board ever reports
+        RemoteInputHandle handle = RemoteEndstops.StallHandle();
+        Assert.Multiple(() =>
+        {
+            Assert.That(handle.Type, Is.EqualTo(RemoteInputHandle.TypeStallEndstop));
+            Assert.That(handle.Major, Is.Zero);
+            Assert.That(handle.Minor, Is.Zero);
+        });
     }
 }

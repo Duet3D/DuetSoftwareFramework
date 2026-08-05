@@ -124,15 +124,24 @@ namespace Duet::Sbc::Motion
 	//   0  this drive watches nothing during this move
 	//   1  every driver of the drive watches boards[0], so the first to trigger stops the axis
 	//   n  driver i watches boards[i], so each motor runs on to its own switch
+	//
+	// A stall endstop is the case where n switches are not n handles. A board reports every driver
+	// that stalled under one board-wide handle, RemoteInputHandle(typeStallEndstop, 0, 0), so what
+	// tells one driver's stall from another's is the board rather than the handle. See below.
 	struct MoveStopInput
 	{
-		// RemoteInputHandle the switches are registered under, with a minor field of zero. Driver i
-		// watches minor i, which is why only one handle has to be carried
+		// RemoteInputHandle the switches are registered under, with a minor field of zero. For an
+		// endstop handle driver i watches minor i, which is why only one handle has to be carried
 		uint16_t handle;
 		uint8_t numSwitches;
 		uint8_t boards[maxDriversPerAxis];		// CAN address of each switch, in driver order
 		uint8_t padding;						// declared so the C# mirror can match it
 	};
+
+	// The handle type field, which decides whether the minor field is per-driver. See
+	// RemoteInputHandle in CANlib: minor is bits 0-5, major 6-11, type 12-15.
+	inline constexpr uint16_t kHandleTypeShift = 12;
+	inline constexpr uint16_t kHandleTypeEndstop = 1;		// RemoteInputHandle::typeEndstop
 
 	static_assert(sizeof(MoveStopInput) == 4 + maxDriversPerAxis, "MoveStopInput layout");
 	static_assert(offsetof(MoveStopInput, boards) == 3);
@@ -145,6 +154,12 @@ namespace Duet::Sbc::Motion
 	// A driver past the end of a per-driver list watches nothing rather than falling back to the
 	// first switch: it has no switch of its own, and stopping it on another motor's would defeat the
 	// point of giving each motor one.
+	//
+	// The minor field is derived per driver only for an endstop handle. That convention comes from
+	// M574, which registers switch i of an axis under minor i; nothing else numbers its inputs that
+	// way. A stall endstop in particular is reported under one handle per board whatever the driver,
+	// so deriving a minor for it would name a handle the board never reports and the move would run
+	// on as if it had no endstop at all.
 	[[nodiscard]] constexpr uint32_t StopInputForDriver(const MoveStopInput& stop, size_t driverIndex) noexcept
 	{
 		if (stop.numSwitches == 0)
@@ -158,6 +173,11 @@ namespace Duet::Sbc::Motion
 		if (driverIndex >= stop.numSwitches || driverIndex >= maxDriversPerAxis)
 		{
 			return kNoStopInput;
+		}
+
+		if ((stop.handle >> kHandleTypeShift) != kHandleTypeEndstop)
+		{
+			return MakeStopInput(stop.boards[driverIndex], stop.handle);
 		}
 
 		constexpr uint16_t minorMask = 0x3F;			// RemoteInputHandle::minor is 6 bits wide

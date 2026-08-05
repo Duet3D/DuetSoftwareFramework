@@ -193,6 +193,24 @@ void TestStopInputPerDriver() noexcept
 
 	// A drive with no endstop has to stay without one, or it would start watching switch 0
 	CHECK(StopInputForDriver(kNoStopSwitches, 1) == kNoStopInput, "a drive watching nothing keeps the sentinel");
+
+	// A stall endstop is n boards but one handle: a board reports every driver that stalled under
+	// RemoteInputHandle(typeStallEndstop, 0, 0), so the board tells one driver's stall from
+	// another's. Deriving a minor per driver here would name a handle no board ever reports, and the
+	// move would run on as though it had no endstop
+	constexpr uint16_t stallHandle = 5u << 12;			// type 5 (stall endstop), major 0, minor 0
+	MoveStopInput stall{};
+	stall.handle = stallHandle;
+	stall.numSwitches = 3;
+	stall.boards[0] = 1;
+	stall.boards[1] = 4;
+	stall.boards[2] = 0;
+	for (size_t driver = 0; driver < stall.numSwitches; ++driver)
+	{
+		const uint32_t forDriver = StopInputForDriver(stall, driver);
+		CHECK(StopInputBoard(forDriver) == stall.boards[driver], "each driver watches its own board");
+		CHECK(StopInputHandle(forDriver) == stallHandle, "under the one board-wide stall handle");
+	}
 }
 
 int main()

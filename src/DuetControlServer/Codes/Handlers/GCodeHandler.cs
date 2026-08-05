@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
@@ -29,12 +30,16 @@ namespace DuetControlServer.Codes.Handlers;
 /// </remarks>
 /// <param name="model">Object model</param>
 /// <param name="planner">Where G-codes become queued moves</param>
+/// <param name="bedCompensation">Height map correction</param>
+/// <param name="macroRunner">Runs the machine's own macro files</param>
+/// <param name="linkInterface">Link interface, for the endstops a move has to arm over CAN</param>
 /// <param name="logger">Logger</param>
 internal sealed partial class GCodeHandler(
     Model.ObjectModel model,
     MovePlanner planner,
     BedCompensation bedCompensation,
     Files.MacroRunner macroRunner,
+    Link.LinkInterface linkInterface,
     ILogger<GCodeHandler> logger) : ICodeHandler
 {
     /// <summary>
@@ -139,6 +144,46 @@ internal sealed partial class GCodeHandler(
             await planner.WaitForStandstillAsync(cancellationToken);
         }
 
+        // A stall-homed axis has to have its drivers told what speed to expect before the move runs,
+        // which is a CAN round trip and so cannot happen with the object model lock held. Nothing is
+        // sent for a move whose axes all home on switches
+        HashSet<byte> armedBoards = [];
+        if (moveType is 1 or 3 or 4)
+        {
+            (armedBoards, Message? armError) = await ArmStallEndstopsAsync(code, cancellationToken);
+            if (armError is not null)
+            {
+                await DisarmStallEndstopsAsync(armedBoards, cancellationToken);
+                return armError;
+            }
+        }
+
+        try
+        {
+            return await SubmitMoveAsync(code, isCoordinated, moveType, cancellationToken);
+        }
+        finally
+        {
+            // However the move ended. A driver left armed would report a stall during an ordinary
+            // move, and the next move naming the stall handle would stop on it
+            if (armedBoards.Count > 0)
+            {
+                await DisarmStallEndstopsAsync(armedBoards, CancellationToken.None);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Build a move and get it into the queue, retrying while the queue is full
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="isCoordinated">Whether the axes move together (G1) or independently (G0)</param>
+    /// <param name="moveType">The move's H parameter</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    private async ValueTask<Message?> SubmitMoveAsync(Commands.Code code, bool isCoordinated, int moveType,
+                                                     CancellationToken cancellationToken)
+    {
         // Retrying rather than failing when the ring is full is what applies back-pressure: it is the
         // normal state when moves are commanded faster than the machine can run them, and it is what
         // keeps the G-code stream in step with the machine
@@ -255,8 +300,9 @@ internal sealed partial class GCodeHandler(
             YAxes = AxisBitmap(model.Move, 'Y')
         };
 
-        // H selects what kind of move this is. H1, H3 and H4 stop on the endstops - that is homing -
-        // and H2 is an individual motor move that ignores them
+        // H selects what kind of move this is. H1, H3 and H4 stop on the endstops - that is homing,
+        // measuring an axis' length, and probing - and H2 is an individual motor move that ignores
+        // them
         raw.MoveType = code.GetInt('H', 0);
         raw.CheckEndstops = raw.MoveType is 1 or 3 or 4;
 
@@ -366,7 +412,21 @@ internal sealed partial class GCodeHandler(
 
         if (raw.CheckEndstops)
         {
+            if (code.HasParameter('E'))
+            {
+                // The extruder speeds an extruder endstop is validated against are worked out from
+                // the move's total extrusion, which an axis moving at the same time invalidates.
+                // RepRapFirmware refuses the combination rather than arming both badly
+                error = new Message(MessageType.Error,
+                    "Cannot enable both axis and extruder endstops in the same move");
+                return raw;
+            }
+
             error = ApplyEndstops(code, raw, numAxes);
+            if (error is not null)
+            {
+                return raw;
+            }
         }
 
         bool hasForwardExtrusion = ApplyExtrusion(code, input, raw, unitScale);
@@ -601,10 +661,27 @@ internal sealed partial class GCodeHandler(
             }
 
             Endstop? endstop = axis < model.Sensors.Endstops.Count ? model.Sensors.Endstops[axis] : null;
-            if (endstop is null ||
-                !RemoteEndstops.TryGetStopInput(endstop, axis, model.Move.Axes[axis].Drivers.Count, move.StopOnInput[axis]))
+            if (endstop is null)
             {
-                continue;                       // no endstop, or one no move can stop on
+                return new Message(MessageType.Error,
+                    $"No endstop configured for axis {model.Move.Axes[axis].Letter}");
+            }
+
+            if (!TryArmAxis(endstop, axis, move))
+            {
+                // Refusing is the point. Leaving the axis unarmed and carrying on would run the move
+                // to its full commanded length with nothing to stop it, which for a homing move means
+                // driving into the end of the axis. RepRapFirmware's EnableAxisEndstops throws here
+                // for the same reason
+                return new Message(MessageType.Error,
+                    $"Cannot home {model.Move.Axes[axis].Letter}: {DescribeUnusableEndstop(endstop)}");
+            }
+
+            if (endstop.Type is EndstopType.MotorStallAny or EndstopType.MotorStallIndividual)
+            {
+                // The driver has to be turning slowly enough to tell a stall from normal load, which
+                // is what M201.1 configures
+                move.ReduceAcceleration = true;
             }
 
             if (endstop.Triggered)
@@ -630,12 +707,12 @@ internal sealed partial class GCodeHandler(
                 }
                 stopAllAxis = axis;
                 stopAllInput.CopyFrom(move.StopOnInput[axis]);
-                move.HomingAxes.Add(axis);
+                AddHomingAxis(move, axis);
             }
             else
             {
                 perAxisCount++;
-                move.HomingAxes.Add(axis);
+                AddHomingAxis(move, axis);
             }
         }
 
@@ -673,6 +750,88 @@ internal sealed partial class GCodeHandler(
         }
         return null;
     }
+
+    /// <summary>
+    /// Record an axis as one this move will leave at a known position
+    /// </summary>
+    /// <param name="move">The move being built</param>
+    /// <param name="axis">Axis to record</param>
+    /// <remarks>
+    /// Only H1 homes. RepRapFirmware keeps three separate sets - <c>axesToHome</c> for H1,
+    /// <c>axesToSenseLength</c> for H3, and probing for H4 - because only H1 means "this axis is now
+    /// where its endstop is". H3 measures how long the axis turned out to be and H4 is a probe, and
+    /// treating either as homing would mark an axis homed at a coordinate it was never at
+    /// </remarks>
+    private static void AddHomingAxis(RawMove move, int axis)
+    {
+        if (move.MoveType == 1)
+        {
+            move.HomingAxes.Add(axis);
+        }
+    }
+
+    /// <summary>
+    /// Fill in what stops one axis of an endstop move, whatever kind of endstop it has
+    /// </summary>
+    /// <param name="endstop">The axis' endstop</param>
+    /// <param name="axis">Axis number</param>
+    /// <param name="move">The move being built</param>
+    /// <returns>True if the axis can be stopped, false if its endstop cannot arm a move</returns>
+    /// <remarks>
+    /// The four kinds are RepRapFirmware's four endstop classes. A switch and a Z probe are inputs a
+    /// board watches, so they name a handle the board already knows; a stall is detected by the driver
+    /// itself, so what the move watches is the board's stall report and the drivers were armed before
+    /// the move was built - see <see cref="ArmStallEndstopsAsync"/>
+    /// </remarks>
+    private bool TryArmAxis(Endstop endstop, int axis, RawMove move)
+    {
+        switch (endstop.Type)
+        {
+            case EndstopType.InputPin:
+                return RemoteEndstops.TryGetStopInput(endstop, axis, model.Move.Axes[axis].Drivers.Count,
+                                                      move.StopOnInput[axis]);
+
+            case EndstopType.ZProbeAsEndstop:
+                {
+                    int probeNumber = endstop.Probe ?? 0;
+                    Probe? probe = probeNumber < model.Sensors.Probes.Count ? model.Sensors.Probes[probeNumber] : null;
+                    return probe is not null && RemoteProbes.TryGetStopInput(probe, probeNumber, move.StopOnInput[axis]);
+                }
+
+            case EndstopType.MotorStallAny:
+            case EndstopType.MotorStallIndividual:
+                {
+                    // Which drivers to watch is the geometry's answer, not the axis': stopping on a
+                    // CoreXY's X stall means watching both motors, because moving X turns both
+                    uint drives = planner.Parameters.Geometry.GetControllingDrives(axis);
+                    List<DuetAPI.Utility.DriverId> drivers = [];
+                    for (int drive = 0; drive < model.Move.Axes.Count && drive < 32; drive++)
+                    {
+                        if ((drives & (1u << drive)) != 0)
+                        {
+                            drivers.AddRange(model.Move.Axes[drive].Drivers);
+                        }
+                    }
+                    return RemoteEndstops.TryGetStallStopInput(CollectionsMarshal.AsSpan(drivers), move.StopOnInput[axis]);
+                }
+
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>
+    /// Why an endstop cannot stop a move, for the error the user sees
+    /// </summary>
+    /// <param name="endstop">The endstop</param>
+    /// <returns>The reason</returns>
+    private static string DescribeUnusableEndstop(Endstop endstop) => endstop.Type switch
+    {
+        EndstopType.InputPin => "its endstop has no port assigned",
+        EndstopType.ZProbeAsEndstop => "its endstop is a Z probe that cannot stop a move; check M558",
+        EndstopType.MotorStallAny or EndstopType.MotorStallIndividual => "no driver is assigned to it",
+        _ => "its endstop type is not one a move can be stopped by"
+    };
 
     /// <summary>
     /// Command an axis to stay where it is

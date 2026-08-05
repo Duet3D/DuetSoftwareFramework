@@ -1517,19 +1517,32 @@ there, and it is a prerequisite for phases D and E.
 **Phase C — all endstop types.** Independent of A and B; the object model and the CAN messages are
 already in place, so this is DCS-side only.
 
-15. Compute the approximate per-axis and per-drive speeds before arming (`:2498-2542`). Everything
-    below needs them, and they are what make `ReduceAcceleration` reachable.
-16. **`ZProbeAsEndstop`** — route the axis' probe through the existing
-    [RemoteProbes.TryGetStopInput](src/DuetControlServer/Motion/RemoteProbes.cs#L62).
-17. **`MotorStallAny` / `MotorStallIndividual`** — send `CanMessageEnableStallEndstop(driver, |speed| *
-    stepsPerMm)` to every board carrying a controlling driver, arm on the `typeStallEndstop` handle,
-    set `ReduceAcceleration`, and disable them again when the move ends or is abandoned. Reuse the
-    existing `GetControllingDrives` test for `stopAll` versus `stopDriver`.
-18. **Fail loudly** when an axis named by an endstop move has no endstop that can be armed, matching
-    `EnableAxisEndstops`. This is the change that removes the silent 300 mm runaway, and it should go
-    in first as the backstop even though 16 and 17 are what make it rare.
-19. Separate `moveType` 1 / 3 / 4, reject axis-plus-extruder endstops in one move, and skip priming
-    while simulating.
+15. ✅ Compute the approximate speed before arming. Taken from the code's own F rather than from the
+    built move, because arming is a CAN round trip and so must happen before the object model lock is
+    taken. RepRapFirmware's calculation is explicitly an approximation of the same quantity — it says
+    so, and notes that it duplicates `DDA::InitStandardMove` — and a homing move is one axis or a
+    coupled set of them going one way, so its share of the feed rate is the whole feed rate.
+16. ✅ **`ZProbeAsEndstop`** — routed through the existing
+    [RemoteProbes.TryGetStopInput](src/DuetControlServer/Motion/RemoteProbes.cs#L62) via
+    `sensors.endstops[].probe`.
+17. ✅ **`MotorStallAny` / `MotorStallIndividual`** — `CanMessageEnableStallEndstop(driver, |speed| *
+    stepsPerMm)` to every board carrying a controlling driver before the move, the `typeStallEndstop`
+    handle as the stop input, `ReduceAcceleration` set, and `DisableAll` per board however the move
+    ends. `GetControllingDrives` decides which drivers to watch, which is the same test the switch
+    case already used for `stopAll`.
+
+    This needed a native change. `MoveStopInput` derived each driver's handle by OR-ing the driver
+    index into the minor field whenever there was more than one switch, which is M574's convention
+    for switch *i* of an axis and nothing else's. A board reports every driver that stalled under one
+    board-wide `RemoteInputHandle(typeStallEndstop, 0, 0)`, so a stall endstop is one handle and a
+    board per driver — the opposite way round. `StopInputForDriver` now derives the minor only for an
+    endstop handle; deriving it for a stall handle named a handle no board ever reports, so the move
+    would have run on as though it had no endstop at all.
+18. ✅ **Fail loudly** when an axis named by an endstop move has no endstop that can be armed, matching
+    `EnableAxisEndstops`. This is the change that removes the silent 300 mm runaway.
+19. ✅ Separate `moveType` 1 / 3 / 4 — only H1 marks an axis homed — and reject axis-plus-extruder
+    endstops in one move. Skipping the priming while simulating waits for simulation mode, which is
+    not ported.
 
 **Phase D — axis limits and homed checks.** Needs A5.
 

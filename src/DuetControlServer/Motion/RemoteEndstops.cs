@@ -81,17 +81,36 @@ internal static class RemoteEndstops
     }
 
     /// <summary>
+    /// The input handle a board reports its stalled drivers under
+    /// </summary>
+    /// <remarks>
+    /// One handle for the whole board, not one per driver or per axis: a board reports a bitmap of
+    /// the drivers that stalled under <c>RemoteInputHandle(typeStallEndstop, 0, 0)</c>. So the board
+    /// address is what distinguishes one stall endstop from another, which is why
+    /// <see cref="TryGetStallStopInput"/> fills in a board per driver but leaves the handle alone
+    /// </remarks>
+    public static RemoteInputHandle StallHandle()
+    {
+        RemoteInputHandle handle = default;
+        handle.Type = (byte)RemoteInputHandle.TypeStallEndstop;
+        handle.Major = 0;
+        handle.Minor = 0;
+        return handle;
+    }
+
+    /// <summary>
     /// Fill in the switches a homing move should stop an axis on
     /// </summary>
     /// <param name="endstop">The axis' endstop</param>
     /// <param name="axis">Axis number</param>
     /// <param name="numDrivers">How many drivers the axis has</param>
     /// <param name="stopInput">Entry to fill in; left watching nothing if the axis cannot be stopped</param>
-    /// <returns>True if the axis has an endstop a move can stop on</returns>
+    /// <returns>True if the axis has a switch a move can stop on</returns>
     /// <remarks>
     /// <para>
-    /// Only a switch on an input pin qualifies. A stall endstop is detected by the driver rather than
-    /// by an input, and a Z probe standing in for an endstop needs M558, which is not ported.
+    /// Only a switch on an input pin qualifies. A Z probe standing in for an endstop is registered
+    /// under a probe handle, so it goes through <see cref="RemoteProbes"/>, and a stall is detected by
+    /// the driver rather than by an input, so it goes through <see cref="TryGetStallStopInput"/>.
     /// </para>
     /// <para>
     /// An axis with as many switches as drivers stops each driver on its own switch, which is what
@@ -131,6 +150,48 @@ internal static class RemoteEndstops
         {
             stopInput.SetShared(HandleFor(axis).All, boards[0]);
         }
+        return true;
+    }
+
+    /// <summary>
+    /// Fill in the stall reports a homing move should stop an axis on
+    /// </summary>
+    /// <param name="drivers">Drivers to watch, in driver order</param>
+    /// <param name="stopInput">Entry to fill in; left watching nothing if there is nothing to watch</param>
+    /// <returns>True if there is at least one driver to watch</returns>
+    /// <remarks>
+    /// <para>
+    /// A stall is detected by the driver, so what stops the move is a report from the board carrying
+    /// it rather than an input on a pin. Every board reports under the one <see cref="StallHandle"/>,
+    /// so unlike a switch per driver this is one handle and a board per driver - which is why the
+    /// native side only derives a per-driver minor field for an endstop handle.
+    /// </para>
+    /// <para>
+    /// A single driver is written as shared rather than per-driver so that every driver of the drive
+    /// watches it. That is what makes <c>MotorStallAny</c> stop a dual-motor axis on either motor
+    /// stalling, and it is also the right thing for the coupled case
+    /// </para>
+    /// </remarks>
+    public static bool TryGetStallStopInput(ReadOnlySpan<DuetAPI.Utility.DriverId> drivers, MoveStopInput stopInput)
+    {
+        stopInput.Clear();
+        if (drivers.Length == 0)
+        {
+            return false;
+        }
+
+        if (drivers.Length == 1)
+        {
+            stopInput.SetShared(StallHandle().All, (byte)drivers[0].Board);
+            return true;
+        }
+
+        Span<byte> boards = stackalloc byte[drivers.Length];
+        for (int i = 0; i < drivers.Length; i++)
+        {
+            boards[i] = (byte)drivers[i].Board;
+        }
+        stopInput.SetPerDriver(StallHandle().All, boards);
         return true;
     }
 }
