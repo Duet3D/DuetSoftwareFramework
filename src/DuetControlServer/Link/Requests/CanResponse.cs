@@ -13,14 +13,14 @@ namespace DuetControlServer.Link;
 /// <param name="ResponseType">Actual type of the reply</param>
 /// <param name="SrcAddress">Source address of the replying board</param>
 /// <param name="Payload">Reassembled payload of the reply</param>
-public readonly record struct CanResponse(CanStatus Status, CanMessageType ResponseType, byte SrcAddress, byte[] Payload)
+public readonly record struct CanResponse(CanStatus Status, CanMessageType ResponseType, byte SrcAddress, byte[] Payload, byte Extra)
 {
     /// <summary>
     /// Create a response from a completed request
     /// </summary>
     /// <param name="request">Completed CAN request</param>
     internal static CanResponse FromRequest(CanRequest request)
-        => new(request.Status, request.ResponseType, request.SrcAddress, request.ResponsePayload);
+        => new(request.Status, request.ResponseType, request.SrcAddress, request.ResponsePayload, request.Extra);
 
     /// <summary>
     /// Interpret the start of the reply payload as a CAN message body struct

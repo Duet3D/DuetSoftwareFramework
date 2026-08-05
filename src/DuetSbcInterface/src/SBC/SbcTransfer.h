@@ -104,6 +104,12 @@ namespace Duet::Sbc
 
 		// --- Reading incoming packets ---
 		[[nodiscard]] int PacketsToRead() const noexcept { return m_rxHeader.numPackets; }
+
+		// The controller's step clock as of the transfer just completed, and the movement delay it
+		// has accumulated. Both ride in the header rather than in a packet so that the delay between
+		// the reading and its local timestamp does not depend on what else the transfer carried
+		[[nodiscard]] uint32_t RxMasterClock() const noexcept { return m_rxHeader.masterClock; }
+		[[nodiscard]] uint32_t RxHiccupTime() const noexcept { return m_rxHeader.hiccupTime; }
 		// Read the next packet header, or return false if none remain. Advances to the payload.
 		bool ReadNextPacket(proto::PacketHeader& packet);
 		// The payload of the packet most recently returned by ReadNextPacket.

@@ -26,7 +26,7 @@ inline constexpr uint8_t FormatCodeStandalone = 0x60;
 inline constexpr uint8_t InvalidFormatCode = 0xC9;
 
 // Protocol version. Incremented whenever the protocol details change. CRC32 is used for version >= 4.
-inline constexpr uint16_t ProtocolVersion = 7;
+inline constexpr uint16_t ProtocolVersion = 8;
 
 // Default size of a data transfer buffer. Must be a multiple of 4 and kept in sync with both sides.
 inline constexpr size_t BufferSize = 8192;
@@ -91,7 +91,8 @@ enum class FirmwareRequest : uint16_t {
     ResendPacket = 0,      // Request retransmission of the given packet
     CodeBufferUpdate = 2,  // Update about the available code buffer size
     Message = 3,           // Message from the firmware
-    MasterClock = 4,       // The current master clock time
+    MasterClock = 4,       // Retired: the master clock rides in SpiTransferHeader. Not reused, so
+                           // that a mismatched pair fails on the protocol version rather than here
     CANResponse = 5,       // Forwarded CAN message from expansion boards
     MotionStopped = 6,     // Drive(s) that have stopped
 };
@@ -112,6 +113,13 @@ enum class CanStatus : uint8_t {
 
 // Header describing the content of a full SPI transfer (Shared/TransferHeader.cs).
 // For protocol version >= 4 the checksum fields carry CRC32 values (crcData/crcHeader).
+//
+// masterClock and hiccupTime ride in the header rather than in a packet of their own. The SBC has no
+// step clock - it fits one to these samples and schedules every move by absolute start time in the
+// result - so the pairing between the tick count and the local time it is stamped with is what
+// decides how well moves land. A packet is read after an unknown number of others, so that pairing
+// varies by however long they took; the header arrives at a fixed point in every transfer, so it
+// does not. crcHeader must stay last: the header checksum covers everything before it.
 struct SpiTransferHeader {
     uint8_t formatCode;
     uint8_t numPackets;
@@ -119,6 +127,8 @@ struct SpiTransferHeader {
     uint16_t sequenceNumber;
     uint16_t dataLength;
     uint32_t crcData;
+    uint32_t masterClock; // the controller's step clock at the moment this transfer was armed
+    uint32_t hiccupTime;  // total movement delay the controller has accumulated, in step clocks
     uint32_t crcHeader;
 };
 
@@ -260,12 +270,6 @@ struct CodeBufferUpdateHeader {
     uint16_t padding;
 };
 
-// The current master clock time (FirmwareRequests/MasterClockHeader.cs)
-struct MasterClockHeader {
-    uint32_t masterClock;
-    uint32_t hiccupTime;
-};
-
 // CAN bus message received by the SBC (FirmwareRequests/CanResponse.cs)
 // One driver whose motion an endstop cut short (FirmwareRequest::MotionStopped).
 struct MotionStoppedDriver {
@@ -310,12 +314,22 @@ struct CanResponseHeader {
 // ---------------------------------------------------------------------------
 // Compile-time layout guarantees. These must match the [StructLayout(Size=...)] in C#.
 // ---------------------------------------------------------------------------
-static_assert(sizeof(SpiTransferHeader) == 16, "SpiTransferHeader must be 16 bytes");
+static_assert(sizeof(SpiTransferHeader) == 24, "SpiTransferHeader must be 24 bytes");
 static_assert(offsetof(SpiTransferHeader, protocolVersion) == 2, "");
 static_assert(offsetof(SpiTransferHeader, sequenceNumber) == 4, "");
 static_assert(offsetof(SpiTransferHeader, dataLength) == 6, "");
 static_assert(offsetof(SpiTransferHeader, crcData) == 8, "");
-static_assert(offsetof(SpiTransferHeader, crcHeader) == 12, "");
+static_assert(offsetof(SpiTransferHeader, masterClock) == 12, "");
+static_assert(offsetof(SpiTransferHeader, hiccupTime) == 16, "");
+static_assert(offsetof(SpiTransferHeader, crcHeader) == 20, "");
+
+// The header checksum covers everything up to itself, so both sides derive the length rather than
+// writing it out; a hard-coded one is what breaks the next time a field is added
+inline constexpr size_t SpiTransferHeaderCrcLength = offsetof(SpiTransferHeader, crcHeader);
+
+// How many bytes a pre-version-4 peer exchanges for its header. That layout ended at a CRC16 pair,
+// so it is shorter than this struct and is written out rather than derived
+inline constexpr size_t LegacyTransferHeaderSize = 12;
 
 static_assert(sizeof(PacketHeader) == 8, "PacketHeader must be 8 bytes");
 static_assert(sizeof(MessageHeader) == 8, "MessageHeader must be 8 bytes");
@@ -336,7 +350,6 @@ static_assert(offsetof(ScheduleMoveDriver, stopOnHandle) == 12, "");
 static_assert(sizeof(SendCanMessageHeader) == 12, "SendCanMessageHeader must be 12 bytes");
 static_assert(sizeof(FlashVerify) == 8, "FlashVerify must be 8 bytes");
 static_assert(sizeof(CodeBufferUpdateHeader) == 4, "CodeBufferUpdateHeader must be 4 bytes");
-static_assert(sizeof(MasterClockHeader) == 8, "MasterClockHeader must be 8 bytes");
 static_assert(sizeof(CanResponseHeader) == 12, "CanResponseHeader must be 12 bytes");
 
 // Round a length up to the next 4-byte boundary, matching the padding rules used by both sides.

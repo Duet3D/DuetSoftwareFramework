@@ -104,10 +104,12 @@ public class CanMessages
     public void StandardReplyFragmentInfo()
     {
         byte[] fragment = BuildStandardReplyFragment("Hello ", fragmentNumber: 0, moreFollows: true);
-        CanFragmentation.GetFragmentInfo(CanMessageType.StandardReply, fragment, out int fragmentNumber, out bool moreFollows, out ReadOnlySpan<byte> content);
+        CanFragmentation.GetFragmentInfo(CanMessageType.StandardReply, fragment, out int fragmentNumber, out bool moreFollows,
+                                         out byte extra, out ReadOnlySpan<byte> content);
 
         Assert.That(fragmentNumber, Is.EqualTo(0));
         Assert.That(moreFollows, Is.True);
+        Assert.That(extra, Is.Zero);
         Assert.That(Encoding.UTF8.GetString(content), Is.EqualTo("Hello "));
     }
 
@@ -115,7 +117,8 @@ public class CanMessages
     public void NonFragmentedReplyIsSingleFragment()
     {
         byte[] payload = [1, 2, 3];
-        CanFragmentation.GetFragmentInfo(CanMessageType.AnnounceV1, payload, out int fragmentNumber, out bool moreFollows, out ReadOnlySpan<byte> content);
+        CanFragmentation.GetFragmentInfo(CanMessageType.AnnounceV1, payload, out int fragmentNumber, out bool moreFollows,
+                                         out _, out ReadOnlySpan<byte> content);
 
         Assert.That(fragmentNumber, Is.EqualTo(0));
         Assert.That(moreFollows, Is.False);
@@ -133,8 +136,9 @@ public class CanMessages
 
         foreach (byte[] fragment in new[] { second, first })
         {
-            CanFragmentation.GetFragmentInfo(CanMessageType.StandardReply, fragment, out int fragmentNumber, out _, out ReadOnlySpan<byte> content);
-            request.AddFragment(fragmentNumber, content);
+            CanFragmentation.GetFragmentInfo(CanMessageType.StandardReply, fragment, out int fragmentNumber, out _,
+                                             out byte extra, out ReadOnlySpan<byte> content);
+            request.AddFragment(fragmentNumber, extra, content);
         }
 
         request.SetResult(CanStatus.Ok, CanMessageType.StandardReply, srcAddress: 7);
@@ -149,18 +153,39 @@ public class CanMessages
     public void DuplicateFragmentIgnored()
     {
         CanRequest request = new(CanMessageType.Reset, CanMessageType.StandardReply, txToken: 1, dstAddress: 0, isResponse: false, requestPayload: []);
-        request.AddFragment(0, "ab"u8);
-        request.AddFragment(0, "XY"u8);     // duplicate fragment number -- ignored
+        request.AddFragment(0, 1, "ab"u8);
+        request.AddFragment(0, 2, "XY"u8);  // duplicate fragment number -- ignored
         request.SetResult(CanStatus.Ok, CanMessageType.StandardReply, srcAddress: 0);
 
         Assert.That(Encoding.UTF8.GetString(request.ResponsePayload), Is.EqualTo("ab"));
+        Assert.That(request.Extra, Is.EqualTo(1), "the duplicate must not overwrite the answer either");
     }
 
-    private static byte[] BuildStandardReplyFragment(string text, byte fragmentNumber, bool moreFollows)
+    [Test]
+    public void TheExtraByteOfTheFirstFragmentIsKept()
+    {
+        // Creating an input monitor answers in `extra` rather than in the text: it is the input's
+        // current state, and the only way to learn a switch that is already closed. The boards report
+        // changes, and a switch that never changes never reports one
+        byte[] fragment = BuildStandardReplyFragment("", fragmentNumber: 0, moreFollows: false, extra: 1);
+        CanFragmentation.GetFragmentInfo(CanMessageType.StandardReply, fragment, out _, out _,
+                                         out byte extra, out _);
+        Assert.That(extra, Is.EqualTo(1));
+
+        CanRequest request = new(CanMessageType.Reset, CanMessageType.StandardReply, txToken: 1, dstAddress: 0, isResponse: false, requestPayload: []);
+        request.AddFragment(0, extra, ReadOnlySpan<byte>.Empty);
+
+        // A later fragment carries no answer, so it must not clear the one the first fragment gave
+        request.AddFragment(1, 0, "text"u8);
+        request.SetResult(CanStatus.Ok, CanMessageType.StandardReply, srcAddress: 0);
+        Assert.That(request.Extra, Is.EqualTo(1));
+    }
+
+    private static byte[] BuildStandardReplyFragment(string text, byte fragmentNumber, bool moreFollows, byte extra = 0)
     {
         byte[] textBytes = Encoding.UTF8.GetBytes(text);
         byte[] payload = new byte[sizeof(uint) + textBytes.Length];
-        uint header = ((uint)fragmentNumber << 16) | (moreFollows ? 1u << 23 : 0);
+        uint header = ((uint)fragmentNumber << 16) | (moreFollows ? 1u << 23 : 0) | ((uint)extra << 24);
         BinaryPrimitives.WriteUInt32LittleEndian(payload, header);
         textBytes.CopyTo(payload, sizeof(uint));
         return payload;

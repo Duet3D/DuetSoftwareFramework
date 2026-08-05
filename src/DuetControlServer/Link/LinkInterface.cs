@@ -93,6 +93,17 @@ public sealed partial class LinkInterface(
     public void PrintDiagnostics(StringBuilder builder)
     {
         builder.AppendLine($"Code buffer space: {BufferSpace}");
+
+        // Every move is scheduled by absolute start time in the controller's step clock, which this
+        // side has no counter for and fits to the samples the controller sends. Whether that fit has
+        // taken is not visible anywhere else, and an unfitted clock does not stop anything working
+        // until an endstop fires and the position it reverts to has no relation to where it stopped
+        NativeClockStats clock = Native.GetClockStats();
+        builder.AppendLine(clock.Synced != 0
+            ? $"Step clock: synchronised, {clock.NumSamples} samples, drift {clock.DriftPpm:F1}ppm, "
+              + $"peak residual {clock.PeakResidualNs / 1000}us, {clock.NumBackwardClamps} clamps, "
+              + $"{clock.NumRejectedSamples} rejected"
+            : $"Step clock: NOT synchronised, {clock.NumSamples} samples, {clock.NumRejectedSamples} rejected");
     }
 
     public Task<CanResponse> ConfigCanAsync(byte dstAddress, byte? newAddress, CanTiming timing, CancellationToken cancellationToken = default)

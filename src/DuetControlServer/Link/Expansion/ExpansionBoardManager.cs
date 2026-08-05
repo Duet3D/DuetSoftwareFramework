@@ -468,16 +468,6 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, ILogger<Exp
     /// </para>
     /// </remarks>
     /// <summary>
-    /// Reading reported for a triggered digital probe
-    /// </summary>
-    /// <remarks>
-    /// A digital probe has no reading of its own, but <c>sensors.probes[].value</c> is an analog
-    /// scale and a client compares it against the threshold. The top of the scale is what
-    /// RepRapFirmware reports for a closed digital probe
-    /// </remarks>
-    private const int MaxProbeReading = 1000;
-
-    /// <summary>
     /// Which switches of each endstop are currently closed, one bit per switch
     /// </summary>
     /// <remarks>
@@ -554,7 +544,7 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, ILogger<Exp
                         {
                             probe.Value.Add(0);
                         }
-                        probe.Value[0] = active ? MaxProbeReading : 0;
+                        probe.Value[0] = active ? Motion.RemoteProbes.MaxReading : 0;
                     }
                 }
             }

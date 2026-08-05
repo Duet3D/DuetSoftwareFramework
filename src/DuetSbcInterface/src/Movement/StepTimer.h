@@ -10,10 +10,11 @@
  * absolute start time in those ticks, and DriveTracker asks "where is this drive at time t".
  *
  * So this is a clock model rather than a clock. CLOCK_MONOTONIC provides the local time base, and a
- * linear fit maps it onto the controller's step clock. The fit is disciplined by the MasterClock
- * packet the controller already sends (FirmwareRequest::MasterClock), so no new protocol is
- * involved: RecordMasterClockSample is called with the tick count the controller reported and the
- * local time at which that transfer completed.
+ * linear fit maps it onto the controller's step clock. The fit is disciplined by the reading the
+ * controller puts in every SPI transfer header: RecordMasterClockSample is called with that tick
+ * count and the local time at which the transfer completed. It rides in the header rather than in a
+ * packet because the pairing between the two is what the fit rests on, and a packet is reached after
+ * however long the packets before it took to process.
  *
  * Accuracy needed: moves are prepared MoveTiming::AbsoluteMinimumPreparedTime (25ms) before they
  * start, so an error well below a millisecond is invisible. Drift matters more than offset - the

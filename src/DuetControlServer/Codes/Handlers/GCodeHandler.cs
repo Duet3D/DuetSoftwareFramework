@@ -346,6 +346,7 @@ internal sealed partial class GCodeHandler(
         int stopAllAxis = -1;
         MoveStopInput stopAllInput = new();
         int perAxisCount = 0;
+        List<int> alreadyTriggered = [];
 
         for (int axis = 0; axis < numAxes; axis++)
         {
@@ -359,6 +360,18 @@ internal sealed partial class GCodeHandler(
                 !RemoteEndstops.TryGetStopInput(endstop, axis, model.Move.Axes[axis].Drivers.Count, move.StopOnInput[axis]))
             {
                 continue;                       // no endstop, or one no move can stop on
+            }
+
+            if (endstop.Triggered)
+            {
+                // Already at the switch. The controller only stops a move when an input *changes*,
+                // so a switch that is closed before the move starts would never report anything and
+                // the axis would drive into it until the user opened and closed the switch by hand.
+                // RepRapFirmware ends up in the same place from the other direction: its step
+                // interrupt tests the endstop before the first step, so the move ends on the step it
+                // began. Recorded here and applied below, once it is known whether this axis can be
+                // held on its own
+                alreadyTriggered.Add(axis);
             }
 
             // The axis needs a drive that is not its own, so it cannot be stopped by itself
@@ -399,8 +412,44 @@ internal sealed partial class GCodeHandler(
             {
                 move.StopOnInput[drive].SetShared(stopAllInput.Handle, stopAllInput.Boards[0]);
             }
+
+            // On coupled kinematics the whole move stops on the one endstop, so an endstop that is
+            // already closed holds every drive rather than only its own axis
+            if (alreadyTriggered.Contains(stopAllAxis))
+            {
+                HoldAxes(move, numAxes);
+                return null;
+            }
+        }
+
+        foreach (int axis in alreadyTriggered)
+        {
+            HoldAxis(move, axis);
         }
         return null;
+    }
+
+    /// <summary>
+    /// Command an axis to stay where it is
+    /// </summary>
+    /// <param name="move">The move being built</param>
+    /// <param name="axis">Axis to hold</param>
+    /// <remarks>The caller must hold the object model lock</remarks>
+    private void HoldAxis(RawMove move, int axis)
+        => move.Coords[axis] = model.Move.Axes[axis].MachinePosition ?? move.Coords[axis];
+
+    /// <summary>
+    /// Command every axis to stay where it is
+    /// </summary>
+    /// <param name="move">The move being built</param>
+    /// <param name="numAxes">Number of axes to consider</param>
+    /// <remarks>The caller must hold the object model lock</remarks>
+    private void HoldAxes(RawMove move, int numAxes)
+    {
+        for (int axis = 0; axis < numAxes; axis++)
+        {
+            HoldAxis(move, axis);
+        }
     }
 
     /// <summary>

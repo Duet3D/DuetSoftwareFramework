@@ -60,6 +60,14 @@ namespace CanInterface
 	uint16_t GetTimeStampPeriod() noexcept; // return the period of the time stamp counter in units of 48MHz CAN clocks
 #  endif
 
+	// Widen a 16-bit timestamp an expansion board reported to a full step clock reading.
+	//
+	// The boards' step clocks track this one, because CanMessageTimeSync keeps them there, so a
+	// board's low 16 bits are directly comparable with ours. What they are not is a whole reading:
+	// 16 bits of step clock wrap in well under a second, so the value only means anything relative
+	// to now.
+	uint32_t Convert16bitReceivedTimeStampTo32bits(uint16_t ts) noexcept;
+
 	// Info functions
 	GCodeResult GetRemoteFirmwareDetails(uint32_t boardAddress, const StringRef& reply) THROWS(CanException);
 	GCodeResult RemoteDiagnostics(MessageType mt, uint32_t boardAddress, unsigned int type, const StringRef& reply)

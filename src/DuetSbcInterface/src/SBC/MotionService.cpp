@@ -264,6 +264,14 @@ namespace Duet::Sbc
 		Move& move = reprap.GetMove();
 		const uint32_t now = StepTimer::GetTimerTicks();
 
+		// A trigger timestamp is in the controller's step clock, and this side only has one of those
+		// once the fit has enough MasterClock samples to trust. Before then the two clocks share
+		// nothing but their rate, so asking where a drive was at that timestamp would extrapolate far
+		// outside the move and revert to a position with no relation to where it stopped. Falling
+		// back to where the report found the drives leaves the overshoot the timestamp exists to
+		// remove, which is a small error rather than a wild one
+		const bool haveControllerClock = StepTimer::GetClockStats().synced;
+
 		// The move that is being cut short. Its endpoints are what OnMoveRetired reports to DCS when
 		// it retires, so the correction has to reach them as well as the trackers: DCS plans the next
 		// move as a delta from what it is told, and being told the planned endpoint would undo all of
@@ -316,10 +324,11 @@ namespace Duet::Sbc
 
 				// Where the drive was when the endstop fired, rather than where the stop message
 				// caught it. A report from a board using the older message carries no timestamp, and
-				// then there is nothing better than where it is now
+				// neither does an unsynchronised clock give one that means anything; either way there
+				// is nothing better than where it is now
 				Motion::DriveTracker& tracker = move.GetDriveTracker(drive);
 				tracker.Advance(now);
-				const int32_t position = (whenTriggered != 0)
+				const int32_t position = (whenTriggered != 0 && haveControllerClock)
 					? lrintf(tracker.GetCurrentPosition(whenTriggered))
 						: tracker.GetMotorPosition();
 

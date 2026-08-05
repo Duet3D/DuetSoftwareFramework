@@ -381,8 +381,18 @@ namespace Duet::Sbc
 				m_transfer.PerformFullTransfer();
 
 				// Timestamp every transfer at the same point, from the same clock the step-time model
-				// is fitted against. The MasterClock packet this transfer may carry is paired with it.
+				// is fitted against, and pair it with the reading the header carried. Doing it here
+				// rather than while walking the packets is what makes the pairing constant: a packet
+				// is reached after however long the ones before it took to process, and that
+				// variation is exactly what the fit cannot remove.
 				m_lastTransferNs = StepTimer::GetLocalTimeNs();
+				if (m_transfer.IsConnected())
+				{
+					StepTimer::RecordMasterClockSample(m_transfer.RxMasterClock(), m_lastTransferNs);
+
+					// The controller reports its movement delay as a total, not a change
+					StepTimer::RaiseMovementDelayTo(m_transfer.RxHiccupTime());
+				}
 
 				// Report connection state transitions
 				const bool connected = m_transfer.IsConnected();
@@ -613,24 +623,6 @@ namespace Duet::Sbc
 			event.header.type = static_cast<uint16_t>(InboundEventType::Message);
 			event.flags = header.messageType;
 			PostEvent(InboundEventType::Message, &event, sizeof(event), data + sizeof(header), header.length);
-			break;
-		}
-		case proto::FirmwareRequest::MasterClock:
-		{
-			if (dataLength < sizeof(proto::MasterClockHeader))
-			{
-				break;
-			}
-			proto::MasterClockHeader header{};
-			std::memcpy(&header, data, sizeof(header));
-
-			// Stamped when the transfer completed rather than now: this packet may be preceded by
-			// any number of others, and how long those take to process varies. A constant offset
-			// between the two clocks disappears into the fit; a varying one does not.
-			StepTimer::RecordMasterClockSample(header.masterClock, m_lastTransferNs);
-
-			// The controller reports its movement delay as a total, not a change.
-			StepTimer::RaiseMovementDelayTo(header.hiccupTime);
 			break;
 		}
 		case proto::FirmwareRequest::CANResponse:

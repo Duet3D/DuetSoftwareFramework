@@ -5,8 +5,16 @@ the DuetSoftwareFramework SBC ↔ RepRapFirmware SPI link. It annotates the fram
 of every transfer:
 
 - **Transfer headers** — `formatCode`, `numPackets`, `protocolVersion`,
-  `sequenceNumber`, `dataLength`, header/data CRC (16 bytes for protocol ≥ 4,
-  12 bytes for the legacy CRC16 protocol).
+  `sequenceNumber`, `dataLength`, header/data CRC, and from protocol 8 the
+  controller's step clock and accumulated movement delay (24 bytes for
+  protocol ≥ 8, 16 bytes for protocol 4–7, 12 bytes for the legacy CRC16
+  protocol).
+
+  The step clock is shown raw, in the controller's tick units. What a capture is
+  usually being read for is whether it advances smoothly from one transfer to
+  the next: the SBC fits its own clock to these readings and schedules every move
+  by absolute start time in the result, so a reading that jumps or stalls is a
+  reading that will put moves in the wrong place.
 - **Header / data responses** — `Success`, `BadFormat`, `BadProtocolVersion`,
   `BadDataLength`, `BadHeaderChecksum`, `BadDataChecksum`, `BadResponse`, and the
   `LowPin`/`HighPin` stuck-line values.
@@ -24,7 +32,6 @@ of every transfer:
   | MOSI | `Message` | `MessageHeader` (destination flags, length) |
   | MISO | `CodeBufferUpdate` | `CodeBufferUpdateHeader` (bufferSpace) |
   | MISO | `Message` | `MessageHeader` (destination flags, length) |
-  | MISO | `MasterClock` | `MasterClockHeader` (masterClock, hiccupTime) |
   | MISO | `CANResponse` | `CanResponseHeader` (txToken, CAN type, len, src, flags, status) |
 
   CAN message types (`CanMessageType`), message destination flags
@@ -53,7 +60,7 @@ assertion and gated by `TfrRdy` (see
 
 | # | Sub-exchange | Size | Decoded as |
 | - | ------------ | ---- | ---------- |
-| 1 | Header | 16 B (12 B if protocol < 4) | `header` |
+| 1 | Header | 24 B (16 B if protocol 4–7, 12 B if protocol < 4) | `header` |
 | 2 | Header response | 4 B | `response` |
 | 3 | Data | `max(rxLength, txLength)` | one `packet` per packet header |
 | 4 | Data response | 4 B | `response` |
@@ -98,18 +105,15 @@ header / response / packet is listed.
 
 - Constants are mirrored from the protocol source of truth. If the protocol
   changes, update the tables at the top of
-  [`HighLevelAnalyzer.py`](HighLevelAnalyzer.py):
-  - `src/DuetControlServer/Link/Protocol/Shared/TransferHeader.cs`
-  - `src/DuetControlServer/Link/Protocol/Shared/TransferResponse.cs`
-  - `src/DuetControlServer/Link/Protocol/Shared/PacketHeader.cs`
-  - `src/DuetControlServer/Link/Protocol/Shared/Consts.cs`
-  - `src/DuetControlServer/Link/Protocol/SbcRequests/Request.cs`
-  - `src/DuetControlServer/Link/Protocol/FirmwareRequests/Request.cs`
-  - the payload-header structs in `SbcRequests/` and `FirmwareRequests/`
-    (`ConfigCanHeader`, `EnableCanHeader`, `SendCanMessageHeader`,
-    `CanResponseHeader`, `CodeBufferUpdateHeader`, `MasterClockHeader`) and
-    `Shared/MessageHeader.cs`, plus the `CanMessageType`, `MessageTypeFlags` and
-    `CanStatus` enums used to name their fields
+  [`HighLevelAnalyzer.py`](HighLevelAnalyzer.py) from:
+  - `lib/DuetSpiInterface/include/DuetSpiProtocol/MessageFormats.h` — the wire
+    structs (`SpiTransferHeader`, `PacketHeader`, and the per-request payload
+    headers), both request enums, `ScheduleMoveFlags` and `CanStatus`. This one
+    header is shared by DuetCANMaster and DuetSbcInterface, so it is the only
+    place a layout is defined
+  - `src/DuetControlServer/Link/Protocol/Shared/Consts.cs` — format codes and
+    transfer responses
+  - the `CanMessageType` and `MessageTypeFlags` enums used to name fields
   - `lib/DuetSpiInterface/include/DuetSpiProtocol/MessageFormats.h` for
     `ScheduleMoveHeader`, `ScheduleMoveDriver` and `ScheduleMoveFlags`
 - If a capture starts in the middle of a data phase (no preceding header seen),

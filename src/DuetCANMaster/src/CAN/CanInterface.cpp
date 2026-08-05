@@ -429,6 +429,18 @@ uint16_t CanInterface::GetTimeStampPeriod() noexcept
 
 #  endif
 
+uint32_t CanInterface::Convert16bitReceivedTimeStampTo32bits(uint16_t ts) noexcept
+{
+	const uint32_t now = StepTimer::GetTimerTicks();
+	const uint16_t delay = (uint16_t)now - ts;
+
+	// A timestamp more than 10ms old is not late, it is wrong: either the message sat somewhere it
+	// should not have, or the board's clock has not been synchronised yet. Reporting now instead
+	// gives up the correction the timestamp exists for, which costs the message's own latency;
+	// trusting it would place the event up to a whole 16-bit period away
+	return (delay < MillisToStepClocks(10)) ? now - (uint32_t)delay : now;
+}
+
 // Send a message on the CAN FD channel and record any errors
 static void SendCanMessage(CanDevice::TxBufferNumber whichBuffer, uint32_t timeout, CanMessageBuffer& buffer) noexcept
 {

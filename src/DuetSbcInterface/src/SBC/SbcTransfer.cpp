@@ -459,10 +459,13 @@ namespace Duet::Sbc
 		if (m_txHeader.protocolVersion >= 4)
 		{
 			m_txHeader.crcData = Crc32(txData, m_txPointer);
-			m_txHeader.crcHeader = Crc32(hdr, 12);
+			m_txHeader.crcHeader = Crc32(hdr, proto::SpiTransferHeaderCrcLength);
 		}
 		else
 		{
+			// The pre-version-4 layout, whose CRC16 pair sat at offsets 8 and 10. Those offsets
+			// describe that layout rather than this struct, so they stay written out; a peer that old
+			// cannot pair with this build anyway, because the header length is negotiated first
 			const uint16_t data16 = Crc16(txData, m_txPointer);
 			WriteU16(hdr + 8, data16);
 			const uint16_t header16 = Crc16(hdr, 10);
@@ -482,13 +485,18 @@ namespace Duet::Sbc
 		{
 			// Perform SPI header exchange
 			WaitForTransfer(false);
-			const size_t headerLen = (m_txHeader.protocolVersion >= 4) ? 16 : 12;
+			// The header grew when the step clock moved into it, so this follows the struct rather
+			// than a number: clocking the old length truncates before crcHeader, and the far side
+			// then fails its own checksum on a header it never finished receiving
+			const size_t headerLen = (m_txHeader.protocolVersion >= 4)
+				? sizeof(proto::SpiTransferHeader)
+				: proto::LegacyTransferHeaderSize;
 			m_spiDevice->TransferFullDuplex(txHdr, rxHdr, headerLen);
 
 			// Check for a possible response code. BadResponse always means "abandon this transfer and start
 			// over", and DuetCANMaster only ever sends it on its way back to a header exchange. Restart the
 			// full transfer so that both sides line up on a header. Answering with a data response instead
-			// would pit our 4-byte response against its 16-byte header and oscillate: it would truncate the
+			// would pit our 4-byte response against its full-length header and oscillate: it would truncate the
 			// header, reply BadHeaderChecksum, re-arm the header, and we would repeat
 			const uint32_t responseCode = ReadU32(rxHdr);
 			if (responseCode == proto::TransferResponse::BadResponse)
@@ -522,7 +530,7 @@ namespace Duet::Sbc
 			// Verify header checksum
 			if (m_rxHeader.protocolVersion >= 4)
 			{
-				const uint32_t computedCrc = Crc32(rxHdr, 12);
+				const uint32_t computedCrc = Crc32(rxHdr, proto::SpiTransferHeaderCrcLength);
 				if (m_rxHeader.crcHeader != computedCrc)
 				{
 					const uint32_t rc = ExchangeResponse(proto::TransferResponse::BadHeaderChecksum);

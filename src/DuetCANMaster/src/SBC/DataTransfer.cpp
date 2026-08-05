@@ -831,7 +831,7 @@ TransferState DataTransfer::DoTransfer() noexcept
 			}
 
 			const uint32_t checksum =
-				CalcCRC32(reinterpret_cast<const char*>(&rxHeader), sizeof(SpiTransferHeader) - sizeof(uint32_t));
+				CalcCRC32(reinterpret_cast<const char*>(&rxHeader), SbcProtocol::SpiTransferHeaderCrcLength);
 			if (rxHeader.crcHeader != checksum)
 			{
 				if (reprap.Debug(Module::SbcInterface))
@@ -1098,9 +1098,16 @@ void DataTransfer::StartNextTransfer(bool keepSequence) noexcept
 		txHeader.sequenceNumber++;
 	}
 	txHeader.dataLength = m_txPointer;
+
+	// Sampled here rather than when the transfer was assembled: this is the last thing done before
+	// the exchange is armed, so the delay between the reading and the SBC receiving it is as near
+	// constant as it can be. The SBC fits its step clock to these, and a varying delay is what that
+	// fit cannot remove
+	txHeader.masterClock = StepTimer::GetTimerTicks();
+	txHeader.hiccupTime = StepTimer::GetMovementDelay();
+
 	txHeader.crcData = CalcCRC32(m_txBuffer, m_txPointer);
-	txHeader.crcHeader =
-		CalcCRC32(reinterpret_cast<const char*>(&txHeader), sizeof(SpiTransferHeader) - sizeof(uint32_t));
+	txHeader.crcHeader = CalcCRC32(reinterpret_cast<const char*>(&txHeader), SbcProtocol::SpiTransferHeaderCrcLength);
 
 	// Tell the SBC whether this armed transfer carries outgoing data. When set, the SBC will clock a
 	// transfer even if it has nothing of its own to send, so our data gets pulled promptly.
@@ -1265,20 +1272,6 @@ bool DataTransfer::WriteMotionStopped(const MotionStoppedHeader& header, const M
 		WriteData(reinterpret_cast<const char*>(drivers), driversBytes);
 	}
 	return true;
-}
-
-// Write the master clock packet. This must be the first packet of every transfer so the SBC processes it first.
-void DataTransfer::WriteMasterClock() noexcept
-{
-	if (!CanWritePacket(sizeof(MasterClockHeader)))
-	{
-		return;
-	}
-
-	(void)WritePacketHeader(FirmwareRequest::MasterClock, sizeof(MasterClockHeader));
-	auto* header = WriteDataHeader<MasterClockHeader>();
-	header->masterClock = StepTimer::GetTimerTicks();
-	header->hiccupTime = StepTimer::GetMovementDelay();
 }
 
 PacketHeader* DataTransfer::WritePacketHeader(FirmwareRequest request,

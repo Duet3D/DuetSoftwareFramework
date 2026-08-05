@@ -21,6 +21,16 @@ internal static class RemoteProbes
     public const int MaxProbes = 4;
 
     /// <summary>
+    /// Reading reported for a triggered digital probe
+    /// </summary>
+    /// <remarks>
+    /// A digital probe has no reading of its own, but <c>sensors.probes[].value</c> is an analog
+    /// scale and a client compares it against the threshold. The top of the scale is what
+    /// RepRapFirmware reports for a closed digital probe
+    /// </remarks>
+    public const int MaxReading = 1000;
+
+    /// <summary>
     /// The input handle a probe is monitored under
     /// </summary>
     /// <param name="probeNumber">Probe number</param>

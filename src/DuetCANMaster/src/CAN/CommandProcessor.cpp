@@ -188,7 +188,10 @@ static void HandleInputStateChanged(CanMessageBuffer& buf, CanMessageType id) no
 				std::span{stopped + numStopped, ARRAY_SIZE(stopped) - numStopped});
 			if (added != 0)
 			{
-				whenTriggered = msg.GetWhen(i);
+				// The board reports its own low 16 bits. Widened here rather than on the SBC,
+				// because this is the side whose clock they are comparable with: the SBC's is a
+				// model fitted to this one, and the boards are synchronised to this one
+				whenTriggered = CanInterface::Convert16bitReceivedTimeStampTo32bits(msg.GetWhen(i));
 				numStopped += added;
 			}
 		}

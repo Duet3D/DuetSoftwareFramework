@@ -84,6 +84,12 @@ public class CanRequest(CanMessageType messageType, CanMessageType replyType, us
     public byte[] ResponsePayload { get; private set; } = [];
 
     /// <summary>
+    /// The reply's <c>extra</c> byte, which a few requests answer in rather than in the text
+    /// </summary>
+    /// <remarks>Taken from the first fragment, which is where the answer is when there is one</remarks>
+    public byte Extra { get; private set; }
+
+    /// <summary>
     /// Received reply fragments, keyed by fragment number to handle out-of-order delivery
     /// </summary>
     private readonly SortedDictionary<int, byte[]> _fragments = [];
@@ -103,11 +109,15 @@ public class CanRequest(CanMessageType messageType, CanMessageType replyType, us
     /// </summary>
     /// <param name="fragmentNumber">Zero-based index of the fragment</param>
     /// <param name="content">Reassembly-relevant content of the fragment</param>
-    public void AddFragment(int fragmentNumber, ReadOnlySpan<byte> content)
+    public void AddFragment(int fragmentNumber, byte extra, ReadOnlySpan<byte> content)
     {
         if (!_fragments.ContainsKey(fragmentNumber))
         {
             _fragments[fragmentNumber] = content.ToArray();
+            if (fragmentNumber == 0)
+            {
+                Extra = extra;
+            }
         }
     }
 

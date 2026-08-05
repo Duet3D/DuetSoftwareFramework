@@ -777,8 +777,46 @@ notion of what an endstop is: each move tells it which input stops which driver,
 incoming change against that directly. The message is still forwarded to DCS, because the object
 model has to see the input change whether or not anything was moving.
 
-An endstop already triggered when the move starts is handled as RepRapFirmware handles it - the
-driver is simply given no steps before the move goes out (`StopDriverWhenProvisional`).
+### An endstop that is already closed
+
+The controller stops a move when an input **changes**. A switch that is already closed when the move
+starts never changes, so nothing would arrive and the axis would drive into it - until the user opened
+and closed the switch by hand, which is what makes this a silent fault rather than a visible one.
+
+So the state is tested where it is known. DCS holds `sensors.endstops[].triggered` for every endstop,
+updated from the same change messages, and `ApplyEndstops` commands an axis that is already at its
+switch to stay where it is. RepRapFirmware reaches the same place from the other direction: its step
+interrupt tests the endstop before the first step, so the move ends on the step it began. On coupled
+kinematics one closed switch holds every drive, because there the one endstop stops the whole move.
+
+The controller's `StopDriverWhenProvisional` still covers the race it was written for - a change that
+arrives after the move was scheduled but before it went out - which is a window, not the general case.
+
+### The step clock has to be shared
+
+Every move is scheduled by absolute start time in the controller's step clock, and an endstop report
+carries the tick count at which the switch fired. The SBC has no such counter: `StepTimer` fits a
+linear model of the controller's clock onto `CLOCK_MONOTONIC`, disciplined by a reading the controller
+puts in **every SPI transfer header**.
+
+The header rather than a packet, because what the fit rests on is the pairing between the reading and
+the local time it is stamped with. A packet is reached after however long the packets ahead of it took
+to process, and that variation is exactly what a linear fit cannot remove; the header is read at a
+fixed point in every transfer. The controller samples it as the last thing before arming the exchange,
+for the same reason.
+
+A board's timestamp is 16 bits of its own step clock, and the boards are synchronised to the
+controller by `CanMessageTimeSync`. The controller widens it to a full reading before passing it on
+(`Convert16bitReceivedTimeStampTo32bits`, as in RepRapFirmware): 16 bits of step clock wrap in well
+under a second, so the value only means anything relative to *now*, and only the controller has a
+*now* the boards are synchronised to. A timestamp that comes out more than 10ms old is discarded in
+favour of the present, because at that age it is wrong rather than late.
+
+Until the fit has enough samples to trust, `HandleMotionStopped` ignores the trigger timestamp and
+corrects to where the report found the drives - the same fallback as a board too old to send one. That
+leaves the overshoot the timestamp exists to remove, which is a small error; using an unsynchronised
+clock gives a position with no relation to where the move stopped. `M122` reports whether the clock is
+synchronised, because nothing else shows it and an unfitted clock breaks nothing until an endstop fires.
 
 ### The stop identity travels with the move, per driver
 

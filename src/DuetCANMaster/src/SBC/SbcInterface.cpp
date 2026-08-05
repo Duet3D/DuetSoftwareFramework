@@ -457,11 +457,6 @@ bool SbcInterface::ProcessCanResponses() noexcept
 
 void SbcInterface::ExchangeData() noexcept
 {
-#  if 0
-	// The master clock must be the first packet of the transfer so the SBC processes it first.
-	// packetId/txPointer were reset to 0 when the previous transfer completed, so this becomes packet 0.
-	transfer.WriteMasterClock();
-#  endif
 
 // Process incoming packets
 #  if 0

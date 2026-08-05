@@ -297,7 +297,7 @@ internal static partial class NativeMethods
     /// <param name="handle">Interface handle</param>
     /// <returns>Step clock ticks</returns>
     /// <remarks>
-    /// The SBC has no step clock of its own: it models the controller's, from the MasterClock packet
+    /// The SBC has no step clock of its own: it models the controller's, from the MasterClock reading the SPI transfer header carries
     /// the controller sends every transfer. Move start times are in that timebase
     /// </remarks>
     [LibraryImport(LibraryName)]

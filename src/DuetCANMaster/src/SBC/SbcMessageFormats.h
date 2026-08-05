@@ -62,7 +62,6 @@ using ScheduleMoveDriver = SbcProtocol::ScheduleMoveDriver;
 using MotionStoppedHeader = SbcProtocol::MotionStoppedHeader;
 using MotionStoppedDriver = SbcProtocol::MotionStoppedDriver;
 namespace ScheduleMoveFlags = SbcProtocol::ScheduleMoveFlags;
-using MasterClockHeader = SbcProtocol::MasterClockHeader;
 
 // ---------------------------------------------------------------------------
 // Firmware-local constants and structures (never sent over SPI as-is)
