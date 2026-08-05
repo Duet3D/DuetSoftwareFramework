@@ -210,6 +210,11 @@ internal sealed class MotionParameters
             parameters.ReducedAccelerations[axis] = (a.ReducedAcceleration > 0.0f ? a.ReducedAcceleration : a.Acceleration) / clockSquared;
             parameters.InstantDvs[axis] = a.Jerk / SecondsPerMinute / MotionLimits.StepClockRate;
 
+            // The geometry limits positions as well as speeds, and M208's box is the part of that
+            // every geometry shares, so it holds the limits rather than being handed them per call
+            parameters.Geometry.AxisMinima[axis] = a.Min;
+            parameters.Geometry.AxisMaxima[axis] = a.Max;
+
             foreach (DuetAPI.Utility.DriverId driver in a.Drivers)
             {
                 parameters._driveForDriver[driver] = axis;

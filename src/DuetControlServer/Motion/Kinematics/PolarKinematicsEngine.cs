@@ -51,6 +51,64 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
 
     /// <inheritdoc />
     /// <remarks>
+    /// The radius arm and the turntable together decide where the head is, so neither is known until
+    /// both are homed - whatever M564 says about moving before homing
+    /// </remarks>
+    public override uint MustBeHomedAxes(uint axesMoving, bool disallowMovesBeforeHoming)
+    {
+        const uint xyAxes = (1u << RadiusDrive) | (1u << TurntableDrive);
+        return (axesMoving & xyAxes) != 0 ? axesMoving | xyAxes : axesMoving;
+    }
+
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The reachable region is an annulus, not a box: the arm cannot retract past its minimum radius
+    /// nor extend past its maximum, and a point outside either is pulled onto the nearer circle rather
+    /// than clamped per axis. X and Y are radius and bed angle here, so the M208 box applies only from
+    /// Z upwards
+    /// </remarks>
+    public override LimitPositionResult LimitPosition(Span<float> finalCoords, ReadOnlySpan<float> initialCoords,
+                                                      int numVisibleAxes, uint axesToLimit, bool isCoordinated,
+                                                      bool applyM208Limits)
+    {
+        bool m208Limited = applyM208Limits && LimitToAxisRange(finalCoords, ZAxis, numVisibleAxes, axesToLimit);
+
+        bool radiusLimited = false;
+        if ((axesToLimit & ((1u << RadiusDrive) | (1u << TurntableDrive))) != 0)
+        {
+            float r2 = (finalCoords[RadiusDrive] * finalCoords[RadiusDrive]) + (finalCoords[TurntableDrive] * finalCoords[TurntableDrive]);
+            if (r2 < MinRadius * MinRadius)
+            {
+                radiusLimited = true;
+                float r = MathF.Sqrt(r2);
+                if (r < 0.01f)
+                {
+                    // The user asked for the middle of the bed, which has no direction to push out in
+                    finalCoords[RadiusDrive] = MinRadius;
+                    finalCoords[TurntableDrive] = 0.0f;
+                }
+                else
+                {
+                    finalCoords[RadiusDrive] *= MinRadius / r;
+                    finalCoords[TurntableDrive] *= MinRadius / r;
+                }
+            }
+            else if (r2 > MaxRadius * MaxRadius)
+            {
+                radiusLimited = true;
+                float r = MathF.Sqrt(r2);
+                finalCoords[RadiusDrive] *= MaxRadius / r;
+                finalCoords[TurntableDrive] *= MaxRadius / r;
+            }
+        }
+
+        return m208Limited || radiusLimited ? LimitPositionResult.Adjusted : LimitPositionResult.Ok;
+    }
+
+
+    /// <inheritdoc />
+    /// <remarks>
     /// The radius arm homes to a known radius; the turntable homes to zero degrees, whichever end its
     /// switch is at
     /// </remarks>

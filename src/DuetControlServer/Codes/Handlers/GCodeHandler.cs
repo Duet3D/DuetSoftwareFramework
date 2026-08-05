@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
@@ -311,6 +312,7 @@ internal sealed partial class GCodeHandler(
         // G53 asks for machine coordinates on this line only, so neither the workplace offset nor
         // (once tools exist) the tool offset applies to it
         bool machineCoordinates = code.Flags.HasFlag(CodeFlags.EnforceAbsolutePosition);
+        uint axesMentioned = 0;
 
         if (raw.MoveType == 0)
         {
@@ -348,11 +350,20 @@ internal sealed partial class GCodeHandler(
                 }
             }
 
+            // An axis the machine does not know the position of cannot be moved to a coordinate,
+            // because there is no coordinate system to move it in. M564 decides whether that is
+            // refused outright, and the geometry widens the set where its axes are coupled
+            axesMentioned = AxesMentioned(code, numAxes);
+            error = CheckEnoughAxesHomed(axesMentioned, numAxes);
+            if (error is not null)
+            {
+                return raw;
+            }
+
             // Every axis is transformed, not just the ones mentioned: an axis the user left out still
             // has to be commanded to where the interpreter thinks it is, and babystepping may have
             // moved that since the last move
             ApplyAxisTransform(state.CurrentUserPosition, raw.Coords, numAxes);
-            ApplyBedCompensation(raw, numAxes);
         }
         else
         {
@@ -441,6 +452,20 @@ internal sealed partial class GCodeHandler(
             raw.UsePressureAdvance = MentionsAxisOtherThanZ(code, numAxes);
         }
 
+        if (raw.MoveType == 0 && axesMentioned != 0)
+        {
+            // After the extrusion, because whether the move prints decides what may be done about a
+            // target that cannot be reached in a straight line, and before the bed compensation,
+            // because the height map is a correction to a position the machine can already reach
+            error = LimitPosition(raw, state, input.AxesRelative, axesMentioned, hasForwardExtrusion, numAxes);
+            if (error is not null)
+            {
+                return raw;
+            }
+
+            ApplyBedCompensation(raw, numAxes);
+        }
+
         return raw;
     }
 
@@ -516,6 +541,176 @@ internal sealed partial class GCodeHandler(
             }
         }
         return false;
+    }
+
+    /// <summary>
+    /// Axes the code names, as a bitmap
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="numAxes">Number of axes to consider</param>
+    /// <returns>The bitmap</returns>
+    private uint AxesMentioned(Commands.Code code, int numAxes)
+    {
+        uint mentioned = 0;
+        for (int axis = 0; axis < numAxes && axis < 32; axis++)
+        {
+            if (code.HasParameter(model.Move.Axes[axis].Letter))
+            {
+                mentioned |= 1u << axis;
+            }
+        }
+        return mentioned;
+    }
+
+    /// <summary>
+    /// Refuse a move that would touch an axis whose position is not known
+    /// </summary>
+    /// <param name="axesMentioned">Axes the code names, as a bitmap</param>
+    /// <param name="numAxes">Number of axes to consider</param>
+    /// <returns>An error if the move must not run, else null</returns>
+    /// <remarks>
+    /// <para>
+    /// Ported from <c>GCodes::CheckEnoughAxesHomed</c>. M564 S0 allows moving an unhomed axis, which
+    /// is what makes a homing macro's own moves possible; the geometry gets to add to the set anyway,
+    /// because on a delta or a SCARA the axes are not independently positioned and a coordinate in one
+    /// of them means nothing until all of them are known.
+    /// </para>
+    /// <para>
+    /// An extruder-only move is deliberately allowed either way - it names no axis, so there is
+    /// nothing to be unsure of
+    /// </para>
+    /// </remarks>
+    private Message? CheckEnoughAxesHomed(uint axesMentioned, int numAxes)
+    {
+        uint mustBeHomed = planner.Parameters.Geometry.MustBeHomedAxes(axesMentioned, model.Move.NoMovesBeforeHoming);
+
+        uint unhomed = 0;
+        for (int axis = 0; axis < numAxes && axis < 32; axis++)
+        {
+            if ((mustBeHomed & (1u << axis)) != 0 && !model.Move.Axes[axis].Homed)
+            {
+                unhomed |= 1u << axis;
+            }
+        }
+
+        if (unhomed == 0)
+        {
+            return null;
+        }
+
+        StringBuilder letters = new();
+        for (int axis = 0; axis < numAxes && axis < 32; axis++)
+        {
+            if ((unhomed & (1u << axis)) != 0)
+            {
+                letters.Append(model.Move.Axes[axis].Letter);
+            }
+        }
+        return new Message(MessageType.Error, $"Insufficient axes homed ({letters})");
+    }
+
+    /// <summary>
+    /// Bring a move within what the machine can reach, or refuse it
+    /// </summary>
+    /// <param name="move">The move being built, whose coordinates may be adjusted</param>
+    /// <param name="state">Interpreter state, brought back into step if the target was adjusted</param>
+    /// <param name="axesRelative">Whether the move was commanded relative to where the machine is</param>
+    /// <param name="axesMentioned">Axes the code names, as a bitmap</param>
+    /// <param name="hasForwardExtrusion">Whether the move extrudes, so its path is being printed</param>
+    /// <param name="numAxes">Number of axes to consider</param>
+    /// <returns>An error if the move cannot be made possible, else null</returns>
+    /// <remarks>
+    /// <para>
+    /// Ported from the <c>LimitPosition</c> block of <c>GCodes::DoStraightMove</c>. Only axes that are
+    /// both homed and actually moving are limited. RepRapFirmware gives two reasons and both apply
+    /// here: an axis whose position is not known has nothing to limit against, and limiting an axis
+    /// the move does not touch could turn a rotational-only move into one that moves a linear axis
+    /// too, which the planner would then throw away as having no movement.
+    /// </para>
+    /// <para>
+    /// Whether an unreachable target is an error or is quietly clamped depends on how it was asked
+    /// for. An absolute move names a place, and moving somewhere else instead would be wrong; a
+    /// relative move names a direction, so going as far as the machine can is the sensible reading.
+    /// </para>
+    /// <para>
+    /// The last resort is for a target that is reachable by a path other than a straight line, which
+    /// is a delta near the top of its travel or a SCARA passing its inner radius. A travel move can
+    /// simply be uncoordinated - the axes each go their own way and the head takes some curve - but a
+    /// printing move cannot, because the curve would be extruded
+    /// </para>
+    /// </remarks>
+    private Message? LimitPosition(RawMove move, MovementState state, bool axesRelative, uint axesMentioned,
+                                   bool hasForwardExtrusion, int numAxes)
+    {
+        uint axesToLimit = 0;
+        for (int axis = 0; axis < numAxes && axis < 32; axis++)
+        {
+            if ((axesMentioned & (1u << axis)) != 0 && model.Move.Axes[axis].Homed)
+            {
+                axesToLimit |= 1u << axis;
+            }
+        }
+
+        KinematicsEngine geometry = planner.Parameters.Geometry;
+        ReadOnlySpan<float> initialCoords = planner.Builder.StartCoordinates[..numAxes];
+
+        LimitPositionResult result = geometry.LimitPosition(
+            move.Coords.AsSpan(0, numAxes), initialCoords, numAxes, axesToLimit,
+            move.IsCoordinated, model.Move.LimitAxes);
+
+        if (result is LimitPositionResult.Adjusted or LimitPositionResult.AdjustedAndIntermediateUnreachable)
+        {
+            if (!axesRelative)
+            {
+                return new Message(MessageType.Error, "Target position not reachable");
+            }
+
+            // The move was clamped, so the interpreter has to be told where it is really going or the
+            // next relative move would be measured from a position the machine never reached
+            SyncInterpreterToTarget(move, state, numAxes);
+
+            if (result == LimitPositionResult.Adjusted)
+            {
+                return null;
+            }
+        }
+
+        if (result is LimitPositionResult.IntermediateUnreachable or LimitPositionResult.AdjustedAndIntermediateUnreachable)
+        {
+            bool canGoRoundTheHouses = move.IsCoordinated && !hasForwardExtrusion;
+            if (canGoRoundTheHouses)
+            {
+                LimitPositionResult uncoordinated = geometry.LimitPosition(
+                    move.Coords.AsSpan(0, numAxes), initialCoords, numAxes, axesToLimit,
+                    isCoordinated: false, model.Move.LimitAxes);
+                if (uncoordinated == LimitPositionResult.Ok)
+                {
+                    move.IsCoordinated = false;
+                    return null;
+                }
+            }
+            return new Message(MessageType.Error, "Target position not reachable from current position");
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Bring the interpreter's position into step with a target that was clamped
+    /// </summary>
+    /// <param name="move">The move, whose coordinates are now what the machine will do</param>
+    /// <param name="state">Interpreter state</param>
+    /// <param name="numAxes">Number of axes to consider</param>
+    /// <remarks>
+    /// RepRapFirmware's <c>ToolOffsetInverseTransform</c> after a limit was applied, and one of the
+    /// few places the transform is inverted. Bed compensation has not been applied yet, so the only
+    /// term to undo is the one <see cref="ApplyAxisTransform"/> added
+    /// </remarks>
+    private void SyncInterpreterToTarget(RawMove move, MovementState state, int numAxes)
+    {
+        for (int axis = 0; axis < numAxes; axis++)
+        {
+            state.CurrentUserPosition[axis] = move.Coords[axis] - model.Move.Axes[axis].Babystep;
+        }
     }
 
     /// <summary>

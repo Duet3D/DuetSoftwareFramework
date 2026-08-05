@@ -77,6 +77,18 @@ internal sealed class FiveBarScaraKinematicsEngine : KinematicsEngine
 
     /// <inheritdoc />
     /// <remarks>
+    /// X and Y are the two joints together, so neither is known until both are homed - whatever M564
+    /// says about moving before homing
+    /// </remarks>
+    public override uint MustBeHomedAxes(uint axesMoving, bool disallowMovesBeforeHoming)
+    {
+        const uint xyAxes = (1u << XAxis) | (1u << YAxis);
+        return (axesMoving & xyAxes) != 0 ? axesMoving | xyAxes : axesMoving;
+    }
+
+
+    /// <inheritdoc />
+    /// <remarks>
     /// Each actuator homes to a known angle rather than to an axis limit. RepRapFirmware takes these
     /// from M669 B and falls back to a pair per work mode; nothing in the object model configures a
     /// five-bar SCARA yet, so the defaults are all there is - see <see cref="HomingAngleLeft"/>

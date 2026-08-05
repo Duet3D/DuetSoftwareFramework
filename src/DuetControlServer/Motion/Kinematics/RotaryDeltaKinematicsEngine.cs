@@ -70,6 +70,18 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
     public override bool HomesIndividualDrives => true;
 
     /// <inheritdoc />
+    /// <remarks>
+    /// The effector's position is a function of all three towers, so none of them means anything
+    /// until every one is homed - whatever M564 says about moving before homing
+    /// </remarks>
+    public override uint MustBeHomedAxes(uint axesMoving, bool disallowMovesBeforeHoming)
+    {
+        const uint xyzAxes = (1u << XAxis) | (1u << YAxis) | (1u << ZAxis);
+        return (axesMoving & xyzAxes) != 0 ? axesMoving | xyzAxes : axesMoving;
+    }
+
+
+    /// <inheritdoc />
     /// <remarks>An arm's switch is at the top of its swing, adjusted per tower by M666</remarks>
     public override float GetEndstopPosition(int drive, bool highEnd, float axisMin, float axisMax,
                                              ReadOnlySpan<int> endPoints, ReadOnlySpan<float> stepsPerMm)

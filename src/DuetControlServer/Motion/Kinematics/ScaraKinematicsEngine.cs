@@ -81,6 +81,18 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
 
     /// <inheritdoc />
     /// <remarks>
+    /// X and Y are the two joints together, so neither is known until both are homed - whatever M564
+    /// says about moving before homing
+    /// </remarks>
+    public override uint MustBeHomedAxes(uint axesMoving, bool disallowMovesBeforeHoming)
+    {
+        const uint xyAxes = (1u << XAxis) | (1u << YAxis);
+        return (axesMoving & xyAxes) != 0 ? axesMoving | xyAxes : axesMoving;
+    }
+
+
+    /// <inheritdoc />
+    /// <remarks>
     /// The joint limits, less the crosstalk from the joints already homed. Turning the proximal arm
     /// drags the distal one, and turning either drags Z on machines that are belted that way, so
     /// where a switch sits depends on where the other joints are - which is why homing a SCARA has to

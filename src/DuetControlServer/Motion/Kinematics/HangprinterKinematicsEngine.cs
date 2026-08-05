@@ -70,6 +70,18 @@ internal sealed class HangprinterKinematicsEngine : KinematicsEngine
     /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
     public override bool HomesIndividualDrives => true;
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// The effector's position is a function of all three towers, so none of them means anything
+    /// until every one is homed - whatever M564 says about moving before homing
+    /// </remarks>
+    public override uint MustBeHomedAxes(uint axesMoving, bool disallowMovesBeforeHoming)
+    {
+        const uint xyzAxes = 0b111;             // X, Y and Z, which the four lines position together
+        return (axesMoving & xyzAxes) != 0 ? axesMoving | xyzAxes : axesMoving;
+    }
+
+
     /// <summary>
     /// Create a hangprinter geometry
     /// </summary>

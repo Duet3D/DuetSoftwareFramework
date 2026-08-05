@@ -1,5 +1,6 @@
 using System;
 using DuetControlServer.Link.Native;
+using DuetControlServer.Motion.Native;
 
 namespace DuetControlServer.Motion.Kinematics;
 
@@ -67,6 +68,29 @@ internal readonly ref struct PlannedMove
 
     /// <summary>Whether a continuous rotation axis may take the short way round</summary>
     public bool ContinuousRotationShortcut { get; init; }
+}
+
+/// <summary>
+/// What limiting a target position came to
+/// </summary>
+/// <remarks>
+/// Ported from RepRapFirmware's <c>LimitPositionResult</c>. The two "intermediate" cases are the
+/// interesting ones: a straight move between two reachable points can still pass through somewhere
+/// the machine cannot go, which is what a delta's towers and a SCARA's inner radius both do
+/// </remarks>
+internal enum LimitPositionResult : byte
+{
+    /// <summary>The move is possible as asked, all the way along</summary>
+    Ok,
+
+    /// <summary>The end was out of reach and has been brought in; the path to it is fine</summary>
+    Adjusted,
+
+    /// <summary>The end is reachable but the straight line to it is not</summary>
+    IntermediateUnreachable,
+
+    /// <summary>The end had to be brought in and the line to it is still not reachable</summary>
+    AdjustedAndIntermediateUnreachable
 }
 
 /// <summary>
@@ -230,6 +254,105 @@ internal abstract class KinematicsEngine
     /// on a CoreXY and on a delta
     /// </remarks>
     public bool IsRawMotorMove(int moveType) => moveType == 2 || (moveType != 0 && HomesIndividualDrives);
+
+    /// <summary>
+    /// Which axes have to be homed before a move may touch the given ones
+    /// </summary>
+    /// <param name="axesMoving">Axes the move wants to touch, as a bitmap</param>
+    /// <param name="disallowMovesBeforeHoming">Whether M564 forbids moving an unhomed axis at all</param>
+    /// <returns>Axes that must be homed first, as a bitmap</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>Kinematics::MustBeHomedAxes</c>. Where an axis is driven on its own, this
+    /// is M564's answer and nothing more. Where the geometry couples them it is not optional: on a
+    /// delta the head's position is a function of all three towers, so moving in X alone is not a
+    /// thing the machine can do, and none of it means anything until every tower is homed - which is
+    /// why the coupled geometries widen the set regardless of what M564 says
+    /// </remarks>
+    public virtual uint MustBeHomedAxes(uint axesMoving, bool disallowMovesBeforeHoming)
+        => disallowMovesBeforeHoming ? axesMoving : 0;
+
+    /// <summary>
+    /// Bring a target position within what the machine can reach
+    /// </summary>
+    /// <param name="finalCoords">Target position, adjusted in place if it is out of reach</param>
+    /// <param name="initialCoords">
+    /// Where the move starts, so that the path can be checked as well as its end; empty to check the
+    /// end alone
+    /// </param>
+    /// <param name="numVisibleAxes">Number of axes to consider</param>
+    /// <param name="axesToLimit">Axes that may be adjusted, as a bitmap</param>
+    /// <param name="isCoordinated">Whether the axes move together, which decides what path is taken</param>
+    /// <param name="applyM208Limits">Whether the configured axis minima and maxima apply</param>
+    /// <returns>What had to be done to make the move possible</returns>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>Kinematics::LimitPosition</c>. The base implementation is the M208 box and
+    /// nothing more, which is the whole answer for a Cartesian machine. Every other geometry has a
+    /// reachable region that is not a box - a delta's is a cylinder capped by the towers, a polar's an
+    /// annulus, a SCARA's the reach of two arms - and overrides this.
+    /// </para>
+    /// <para>
+    /// <paramref name="initialCoords"/> is what separates "can it get there" from "can it get there
+    /// in a straight line". On a delta the highest point of a straight move is not either end of it,
+    /// so a move between two reachable points can pass through one that is not
+    /// </para>
+    /// </remarks>
+    public virtual LimitPositionResult LimitPosition(Span<float> finalCoords, ReadOnlySpan<float> initialCoords,
+                                                     int numVisibleAxes, uint axesToLimit, bool isCoordinated,
+                                                     bool applyM208Limits)
+        => applyM208Limits && LimitToAxisRange(finalCoords, 0, numVisibleAxes, axesToLimit)
+            ? LimitPositionResult.Adjusted
+            : LimitPositionResult.Ok;
+
+    /// <summary>
+    /// Clamp axes to their configured minimum and maximum
+    /// </summary>
+    /// <param name="coords">Coordinates, adjusted in place</param>
+    /// <param name="firstAxis">First axis to consider, for geometries that handle the lower ones themselves</param>
+    /// <param name="numVisibleAxes">Number of axes to consider</param>
+    /// <param name="axesToLimit">Axes that may be adjusted, as a bitmap</param>
+    /// <returns>True if anything was adjusted</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>LimitPositionFromAxis</c>, tolerance included. Homing converts an axis
+    /// limit to motor steps and back again, and that round trip does not land exactly on the limit
+    /// when the steps per mm is not a whole number. Without the tolerance an axis would be reported
+    /// out of range the moment it was homed to its own maximum
+    /// </remarks>
+    protected bool LimitToAxisRange(Span<float> coords, int firstAxis, int numVisibleAxes, uint axesToLimit)
+    {
+        bool limited = false;
+        for (int axis = firstAxis; axis < numVisibleAxes && axis < coords.Length; axis++)
+        {
+            if ((axesToLimit & (1u << axis)) == 0)
+            {
+                continue;
+            }
+
+            if (coords[axis] < AxisMinima[axis] - AxisRoundingError)
+            {
+                coords[axis] = AxisMinima[axis];
+                limited = true;
+            }
+            else if (coords[axis] > AxisMaxima[axis] + AxisRoundingError)
+            {
+                coords[axis] = AxisMaxima[axis];
+                limited = true;
+            }
+        }
+        return limited;
+    }
+
+    /// <summary>
+    /// How far outside its limit an axis may be before it counts as out of range, mm
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>AxisRoundingError</c></remarks>
+    public const float AxisRoundingError = 0.02f;
+
+    /// <summary>Configured minimum of each axis, mm</summary>
+    public float[] AxisMinima { get; } = new float[MotionLimits.MaxAxes];
+
+    /// <summary>Configured maximum of each axis, mm</summary>
+    public float[] AxisMaxima { get; } = new float[MotionLimits.MaxAxes];
 
     /// <summary>
     /// Where a drive is when its endstop fires

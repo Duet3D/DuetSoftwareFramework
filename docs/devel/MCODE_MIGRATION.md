@@ -1552,9 +1552,15 @@ already in place, so this is DCS-side only.
 
 **Phase D — axis limits and homed checks.** Needs A5.
 
-20. Port `Kinematics::LimitPosition` onto `KinematicsEngine`, plus `limitAxes` / `axesVirtuallyHomed`
-    (M564), the absolute-versus-relative rule, and the uncoordinated-retry fallback.
-21. Port `CheckEnoughAxesHomed` and `MustBeHomedAxes`.
+20. ✅ `Kinematics::LimitPosition` on `KinematicsEngine`, with the overrides for the geometries whose
+    reachable region is not a box - a delta's cylinder capped by the towers, a polar's annulus - plus
+    `limitAxes` (M564), the absolute-versus-relative rule, and the uncoordinated-retry fallback. The
+    delta's along-the-line check comes with it, which is the one that matters: the ceiling is lowest
+    where the effector passes closest to a tower, so a move can pass under an obstruction that is not
+    at either of its ends.
+21. ✅ `CheckEnoughAxesHomed` and `MustBeHomedAxes`. M564 decides for an independently driven axis;
+    the coupled geometries widen the set regardless, because a coordinate in one axis of a delta means
+    nothing until every tower is homed.
 
 **Phase E — segmentation.** Needs A, and D so that `LimitPosition` exists to be called per segment.
 §12 should land first: segmenting a move makes `HandleMotionStopped`'s "find the endstop move by
