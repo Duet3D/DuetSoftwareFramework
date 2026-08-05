@@ -190,7 +190,7 @@ internal sealed partial class GCodeHandler(
         while (!cancellationToken.IsCancellationRequested)
         {
             MoveSubmitResult result;
-            List<int> homingAxes = [];
+            List<int> armedAxes = [];
 
             using (await model.AccessReadWriteAsync(cancellationToken))
             {
@@ -223,7 +223,7 @@ internal sealed partial class GCodeHandler(
                             return error;
                         }
 
-                        homingAxes = move.HomingAxes;
+                        armedAxes = move.ArmedAxes;
                         result = planner.QueueMove(move);
 
                         if (result is MoveSubmitResult.Queued or MoveSubmitResult.NoMovement)
@@ -258,7 +258,7 @@ internal sealed partial class GCodeHandler(
                         // to wait for it rather than queue it and move on. Every ordinary move is
                         // committed at its planned endpoint and the next code interpreted straight
                         // away, which is what keeps the queue full
-                        await FinishSpecialMoveAsync(homingAxes, cancellationToken);
+                        await FinishSpecialMoveAsync(moveType, armedAxes, cancellationToken);
                     }
                     return new Message();
 
@@ -707,12 +707,12 @@ internal sealed partial class GCodeHandler(
                 }
                 stopAllAxis = axis;
                 stopAllInput.CopyFrom(move.StopOnInput[axis]);
-                AddHomingAxis(move, axis);
+                move.ArmedAxes.Add(axis);
             }
             else
             {
                 perAxisCount++;
-                AddHomingAxis(move, axis);
+                move.ArmedAxes.Add(axis);
             }
         }
 
@@ -749,25 +749,6 @@ internal sealed partial class GCodeHandler(
             HoldAxis(move, axis);
         }
         return null;
-    }
-
-    /// <summary>
-    /// Record an axis as one this move will leave at a known position
-    /// </summary>
-    /// <param name="move">The move being built</param>
-    /// <param name="axis">Axis to record</param>
-    /// <remarks>
-    /// Only H1 homes. RepRapFirmware keeps three separate sets - <c>axesToHome</c> for H1,
-    /// <c>axesToSenseLength</c> for H3, and probing for H4 - because only H1 means "this axis is now
-    /// where its endstop is". H3 measures how long the axis turned out to be and H4 is a probe, and
-    /// treating either as homing would mark an axis homed at a coordinate it was never at
-    /// </remarks>
-    private static void AddHomingAxis(RawMove move, int axis)
-    {
-        if (move.MoveType == 1)
-        {
-            move.HomingAxes.Add(axis);
-        }
     }
 
     /// <summary>

@@ -97,6 +97,15 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
     /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
     public override bool HomesIndividualDrives => true;
 
+    /// <inheritdoc />
+    /// <remarks>A tower's switch is at the top of its travel, so the answer is the carriage height</remarks>
+    public override float GetEndstopPosition(int drive, bool highEnd, float axisMin, float axisMax,
+                                             ReadOnlySpan<int> endPoints, ReadOnlySpan<float> stepsPerMm)
+        => drive < NumTowers && highEnd
+            ? GetHomedCarriageHeight(drive)
+            : base.GetEndstopPosition(drive, highEnd, axisMin, axisMax, endPoints, stepsPerMm);
+
+
     /// <summary>
     /// Create a delta geometry
     /// </summary>

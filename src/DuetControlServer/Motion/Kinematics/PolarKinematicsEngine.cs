@@ -50,6 +50,21 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
     public override bool HomesIndividualDrives => true;
 
     /// <inheritdoc />
+    /// <remarks>
+    /// The radius arm homes to a known radius; the turntable homes to zero degrees, whichever end its
+    /// switch is at
+    /// </remarks>
+    public override float GetEndstopPosition(int drive, bool highEnd, float axisMin, float axisMax,
+                                             ReadOnlySpan<int> endPoints, ReadOnlySpan<float> stepsPerMm)
+        => drive switch
+        {
+            RadiusDrive => HomedRadius,
+            TurntableDrive => 0.0f,
+            _ => base.GetEndstopPosition(drive, highEnd, axisMin, axisMax, endPoints, stepsPerMm)
+        };
+
+
+    /// <inheritdoc />
     /// <remarks>The turntable turns all the way round, so a move may take the short way there</remarks>
     public override uint ContinuousRotationAxes => 1u << TurntableDrive;
 

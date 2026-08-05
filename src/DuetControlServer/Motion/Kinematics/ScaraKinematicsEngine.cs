@@ -80,6 +80,55 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
     public override bool HomesIndividualDrives => true;
 
     /// <inheritdoc />
+    /// <remarks>
+    /// The joint limits, less the crosstalk from the joints already homed. Turning the proximal arm
+    /// drags the distal one, and turning either drags Z on machines that are belted that way, so
+    /// where a switch sits depends on where the other joints are - which is why homing a SCARA has to
+    /// be done in a fixed order and why this needs the current endpoints
+    /// </remarks>
+    public override float GetEndstopPosition(int drive, bool highEnd, float axisMin, float axisMax,
+                                             ReadOnlySpan<int> endPoints, ReadOnlySpan<float> stepsPerMm)
+    {
+        switch (drive)
+        {
+            case XAxis:                 // proximal joint, which nothing else drags
+                return highEnd ? _thetaLimits[1] : _thetaLimits[0];
+
+            case YAxis:                 // distal joint, dragged by the proximal one
+                return (highEnd ? _psiLimits[1] : _psiLimits[0])
+                    - Crosstalk(endPoints, stepsPerMm, XAxis, YAxis, _crosstalk[0]);
+
+            case ZAxis:                 // dragged by both arms
+                return (highEnd ? axisMax : axisMin)
+                    - Crosstalk(endPoints, stepsPerMm, XAxis, ZAxis, _crosstalk[1])
+                    - Crosstalk(endPoints, stepsPerMm, YAxis, ZAxis, _crosstalk[2]);
+
+            default:
+                return base.GetEndstopPosition(drive, highEnd, axisMin, axisMax, endPoints, stepsPerMm);
+        }
+    }
+
+    /// <summary>
+    /// How far one joint's position drags another, in the dragged joint's own units
+    /// </summary>
+    /// <param name="endPoints">Current motor positions in microsteps</param>
+    /// <param name="stepsPerMm">Steps per mm per drive</param>
+    /// <param name="from">Drive doing the dragging</param>
+    /// <param name="to">Drive being dragged</param>
+    /// <param name="factor">Crosstalk factor between them</param>
+    /// <returns>The amount to subtract</returns>
+    private static float Crosstalk(ReadOnlySpan<int> endPoints, ReadOnlySpan<float> stepsPerMm,
+                                   int from, int to, float factor)
+    {
+        if (factor == 0.0f || to >= stepsPerMm.Length || stepsPerMm[to] == 0.0f || from >= endPoints.Length)
+        {
+            return 0.0f;
+        }
+        return endPoints[from] * factor * stepsPerMm[from] / stepsPerMm[to];
+    }
+
+
+    /// <inheritdoc />
     public override uint ContinuousRotationAxes
         => (_supportsContinuousRotation[0] ? 1u << XAxis : 0u) | (_supportsContinuousRotation[1] ? 1u << YAxis : 0u);
 

@@ -76,6 +76,32 @@ internal sealed class FiveBarScaraKinematicsEngine : KinematicsEngine
     public override bool HomesIndividualDrives => true;
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Each actuator homes to a known angle rather than to an axis limit. RepRapFirmware takes these
+    /// from M669 B and falls back to a pair per work mode; nothing in the object model configures a
+    /// five-bar SCARA yet, so the defaults are all there is - see <see cref="HomingAngleLeft"/>
+    /// </remarks>
+    public override float GetEndstopPosition(int drive, bool highEnd, float axisMin, float axisMax,
+                                             ReadOnlySpan<int> endPoints, ReadOnlySpan<float> stepsPerMm)
+        => drive switch
+        {
+            XAxis => HomingAngleLeft,
+            YAxis => HomingAngleRight,
+            _ => base.GetEndstopPosition(drive, highEnd, axisMin, axisMax, endPoints, stepsPerMm)
+        };
+
+    /// <summary>Angle the left actuator is at when its switch fires, degrees</summary>
+    /// <remarks>
+    /// RepRapFirmware's default for the work mode, from <c>FiveBarScaraKinematics::Configure</c>.
+    /// M669 B overrides it there; there is nothing to override it with here yet
+    /// </remarks>
+    public float HomingAngleLeft => WorkMode switch { 1 => 20.0f, 2 => 110.0f, 4 => 110.0f, _ => 90.0f };
+
+    /// <summary>Angle the right actuator is at when its switch fires, degrees</summary>
+    public float HomingAngleRight => WorkMode switch { 1 => 10.0f, 2 => 20.0f, 4 => 100.0f, _ => 90.0f };
+
+
+    /// <inheritdoc />
     /// <remarks>Both actuators turn about a fixed point with nothing to stop them going round</remarks>
     public override uint ContinuousRotationAxes => (1u << XAxis) | (1u << YAxis);
 

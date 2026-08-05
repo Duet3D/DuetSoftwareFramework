@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
 using DuetControlServer.Motion;
+using DuetControlServer.Motion.Kinematics;
 using DuetControlServer.Motion.Native;
 using NUnit.Framework;
 using OmDriverId = DuetAPI.Utility.DriverId;
@@ -535,6 +536,43 @@ public class MoveBuilderTests
             // X = -10 on a CoreXY is both motors turning by -10mm worth of steps, in opposite senses
             Assert.That(built!.EndPoints[0], Is.EqualTo(-800), "motor A");
             Assert.That(built.EndPoints[1], Is.EqualTo(-800), "motor B");
+        });
+    }
+
+    [Test]
+    public void ADeltaTowerEndpointReDerivesTheCarriagePosition()
+    {
+        // Homing a delta knows where a tower's motor is, not where the head is: the switch is at the
+        // top of the tower and the head position follows from all three carriages. So the endpoint is
+        // set and the coordinates fall out of it, which is the opposite direction from SetAxisPosition
+        Move machine = CartesianMachine();
+        machine.Kinematics = new DeltaKinematics
+        {
+            DeltaRadius = LinearDeltaKinematicsEngine.DefaultDeltaRadius,
+            HomedHeight = LinearDeltaKinematicsEngine.DefaultHomedHeight,
+            PrintRadius = LinearDeltaKinematicsEngine.DefaultPrintRadius
+        };
+        foreach (DeltaTower tower in machine.Kinematics is DeltaKinematics d ? d.Towers : [])
+        {
+            tower.Diagonal = LinearDeltaKinematicsEngine.DefaultDiagonal;
+        }
+
+        MoveBuilder builder = NewBuilder(machine);
+        LinearDeltaKinematicsEngine engine = (LinearDeltaKinematicsEngine)MotionParameters.FromObjectModel(machine).Geometry;
+
+        // Put all three carriages at their homed heights, which is what homing a delta ends up doing
+        for (int tower = 0; tower < LinearDeltaKinematicsEngine.UsualNumTowers; tower++)
+        {
+            int steps = (int)MathF.Round(engine.GetHomedCarriageHeight(tower) * machine.Axes[tower].StepsPerMm);
+            builder.SetDriveEndpoint(tower, steps);
+        }
+
+        Assert.Multiple(() =>
+        {
+            // All three carriages level means the head is on the axis, at the homed height
+            Assert.That(builder.StartCoordinates[0], Is.EqualTo(0.0f).Within(0.01f), "X");
+            Assert.That(builder.StartCoordinates[1], Is.EqualTo(0.0f).Within(0.01f), "Y");
+            Assert.That(builder.StartCoordinates[2], Is.EqualTo(engine.HomedHeight).Within(0.01f), "Z");
         });
     }
 

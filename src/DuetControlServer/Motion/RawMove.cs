@@ -74,14 +74,21 @@ internal sealed class RawMove
     public Native.MoveStopInput[] StopOnInput { get; } = CreateStopInputs();
 
     /// <summary>
-    /// Axes this move is homing, i.e. the ones whose own endstop it was armed on
+    /// Axes this move armed an endstop for, i.e. the ones whose own endstop it watches
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Not the same as the drives that carry a stop input. An axis on coupled kinematics arms every
     /// drive with its one endstop, because they all have to stop together, but only that axis ends up
-    /// at a known position
+    /// at a known position.
+    /// </para>
+    /// <para>
+    /// What being armed means depends on <see cref="MoveType"/>, which is why this is not called
+    /// "homing axes": H1 homes them, H3 measures how long they turned out to be, and H4 is probing.
+    /// RepRapFirmware keeps the three in separate sets for the same reason
+    /// </para>
     /// </remarks>
-    public List<int> HomingAxes { get; } = [];
+    public List<int> ArmedAxes { get; } = [];
 
     /// <summary>
     /// A stop input array with nothing being watched

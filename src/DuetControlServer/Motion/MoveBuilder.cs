@@ -102,6 +102,31 @@ internal sealed class MoveBuilder(MotionParameters parameters)
             _startCoordinates, Parameters.StepsPerMm, Parameters.NumAxes, Parameters.NumAxes, _endPoints);
 
     /// <summary>
+    /// Force one drive's motor position, after homing a geometry that homes individual drives
+    /// </summary>
+    /// <param name="drive">Drive to redefine</param>
+    /// <param name="steps">Its new motor position in microsteps</param>
+    /// <remarks>
+    /// The direction <see cref="SetAxisPosition"/> cannot go. On a Cartesian machine an endstop is at
+    /// the end of an axis, so homing knows a coordinate and the endpoints follow from it; on a delta
+    /// the switch is at the top of a tower and what is known is that motor's position, with the axis
+    /// coordinates following from all three. So the endpoint is set and the coordinates re-derived,
+    /// which is what RepRapFirmware's <c>ChangeSingleEndpointAfterHoming</c> followed by
+    /// <c>MotorStepsToCartesian</c> does
+    /// </remarks>
+    public void SetDriveEndpoint(int drive, int steps)
+    {
+        if (drive < 0 || drive >= NumDrives)
+        {
+            return;
+        }
+
+        _endPoints[drive] = steps;
+        Parameters.Geometry.MotorStepsToCartesian(
+            _endPoints, Parameters.StepsPerMm, Parameters.NumAxes, Parameters.NumAxes, _startCoordinates);
+    }
+
+    /// <summary>
     /// Set the axis coordinates without moving anything (G92)
     /// </summary>
     /// <param name="axis">Axis to redefine</param>

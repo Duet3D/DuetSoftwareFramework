@@ -232,6 +232,34 @@ internal abstract class KinematicsEngine
     public bool IsRawMotorMove(int moveType) => moveType == 2 || (moveType != 0 && HomesIndividualDrives);
 
     /// <summary>
+    /// Where a drive is when its endstop fires
+    /// </summary>
+    /// <param name="drive">Logical drive the endstop belongs to</param>
+    /// <param name="highEnd">Whether the endstop is at the high end of travel</param>
+    /// <param name="axisMin">The axis' configured minimum, for geometries where that is the answer</param>
+    /// <param name="axisMax">The axis' configured maximum</param>
+    /// <param name="endPoints">Current motor positions in microsteps, for geometries whose joints interact</param>
+    /// <param name="stepsPerMm">Steps per mm per drive, to convert those</param>
+    /// <returns>The position in mm, or degrees for a rotary joint</returns>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>Kinematics::GetEndstopPosition</c>. On a Cartesian machine the endstop is
+    /// at the end of an axis, so the answer is the axis limit and this is trivial. On anything that
+    /// homes individual drives it is not: a delta tower's switch is at a carriage height, a rotary
+    /// delta's at an arm angle, a polar's at a radius. The value is a drive position, not an axis
+    /// coordinate, and the axis coordinates are derived from it afterwards.
+    /// </para>
+    /// <para>
+    /// <paramref name="endPoints"/> is here for SCARA, where turning one joint drags another: where
+    /// the distal joint's switch sits depends on where the proximal joint already is. Every other
+    /// geometry ignores it
+    /// </para>
+    /// </remarks>
+    public virtual float GetEndstopPosition(int drive, bool highEnd, float axisMin, float axisMax,
+                                            ReadOnlySpan<int> endPoints, ReadOnlySpan<float> stepsPerMm)
+        => highEnd ? axisMax : axisMin;
+
+    /// <summary>
     /// Macro that homes everything, as in RepRapFirmware's <c>HomeAllFileName</c>
     /// </summary>
     public const string HomeAllFile = "homeall.g";

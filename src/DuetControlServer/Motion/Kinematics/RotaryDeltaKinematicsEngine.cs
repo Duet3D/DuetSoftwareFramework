@@ -69,6 +69,15 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
     /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
     public override bool HomesIndividualDrives => true;
 
+    /// <inheritdoc />
+    /// <remarks>An arm's switch is at the top of its swing, adjusted per tower by M666</remarks>
+    public override float GetEndstopPosition(int drive, bool highEnd, float axisMin, float axisMax,
+                                             ReadOnlySpan<int> endPoints, ReadOnlySpan<float> stepsPerMm)
+        => drive < DeltaAxes && highEnd
+            ? MaxArmAngle + GetEndstopAdjustment(drive)
+            : base.GetEndstopPosition(drive, highEnd, axisMin, axisMax, endPoints, stepsPerMm);
+
+
     /// <summary>Arm length RepRapFirmware assumes until M669 says otherwise, mm</summary>
     public const float DefaultArmLength = 100.0f;
 

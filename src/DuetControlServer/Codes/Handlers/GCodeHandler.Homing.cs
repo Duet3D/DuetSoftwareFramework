@@ -45,7 +45,8 @@ internal sealed partial class GCodeHandler
     /// failed homing move visible rather than silently believed
     /// </para>
     /// </remarks>
-    private async ValueTask FinishSpecialMoveAsync(IReadOnlyList<int> armedAxes, CancellationToken cancellationToken)
+    private async ValueTask FinishSpecialMoveAsync(int moveType, IReadOnlyList<int> armedAxes,
+                                                   CancellationToken cancellationToken)
     {
         await planner.WaitForStandstillAsync(cancellationToken);
 
@@ -65,16 +66,29 @@ internal sealed partial class GCodeHandler
                         continue;
                     }
 
-                    Axis axisConfig = model.Move.Axes[axis];
                     Endstop? endstop = axis < model.Sensors.Endstops.Count ? model.Sensors.Endstops[axis] : null;
                     if (endstop is null || !endstop.Triggered)
                     {
                         continue;               // the move ran its full length, so nothing is known
                     }
 
-                    float position = endstop.HighEnd ? axisConfig.Max : axisConfig.Min;
-                    planner.Builder.SetAxisPosition(axis, position);
-                    axisConfig.Homed = true;
+                    switch (moveType)
+                    {
+                        case 1:
+                            AdoptEndstopPosition(axis, endstop.HighEnd);
+                            model.Move.Axes[axis].Homed = true;
+                            break;
+
+                        case 3:
+                            // H3 asks how long the axis turned out to be rather than where it is, so
+                            // the answer goes into the limit and the axis is left unhomed
+                            RecordAxisLength(axis, endstop.HighEnd);
+                            break;
+
+                        default:
+                            // H4 is a probing move; the probe path owns what comes of it
+                            break;
+                    }
                 }
 
                 // The interpreter's position was left alone while the special move ran, because a
@@ -83,6 +97,75 @@ internal sealed partial class GCodeHandler
                 // the inverse transform is for
                 SyncInterpreterToMachine();
             }
+        }
+    }
+
+    /// <summary>
+    /// Put an axis where its endstop says it is
+    /// </summary>
+    /// <param name="axis">Axis whose endstop fired</param>
+    /// <param name="highEnd">Whether that endstop is at the high end of travel</param>
+    /// <remarks>
+    /// <para>
+    /// Which way round this works is the geometry's decision. Where the endstop belongs to an axis,
+    /// homing knows a coordinate and the motor endpoints follow from it. Where it belongs to a drive -
+    /// a delta tower, a SCARA joint, a polar radius arm - what is known is that motor's position, and
+    /// the axis coordinates follow from all of them together. A delta's carriage height is not an axis
+    /// coordinate at all, so setting the axis to its limit would put the machine somewhere it has
+    /// never been.
+    /// </para>
+    /// <para>
+    /// RepRapFirmware splits the same two cases in <c>waitingForSpecialMoveToComplete</c>, and asks
+    /// the kinematics for the position either way - see
+    /// <see cref="KinematicsEngine.GetEndstopPosition"/>
+    /// </para>
+    /// </remarks>
+    private void AdoptEndstopPosition(int axis, bool highEnd)
+    {
+        MotionParameters parameters = planner.Parameters;
+        Axis axisConfig = model.Move.Axes[axis];
+
+        float position = parameters.Geometry.GetEndstopPosition(
+            axis, highEnd, axisConfig.Min, axisConfig.Max,
+            planner.Builder.EndPoints, parameters.StepsPerMm);
+
+        if (parameters.Geometry.HomesIndividualDrives)
+        {
+            float stepsPerMm = axis < parameters.StepsPerMm.Length ? parameters.StepsPerMm[axis] : 0.0f;
+            if (stepsPerMm != 0.0f)
+            {
+                planner.Builder.SetDriveEndpoint(axis, (int)MathF.Round(position * stepsPerMm));
+            }
+        }
+        else
+        {
+            planner.Builder.SetAxisPosition(axis, position);
+        }
+    }
+
+    /// <summary>
+    /// Record how long an axis turned out to be (G1 H3)
+    /// </summary>
+    /// <param name="axis">Axis that was measured</param>
+    /// <param name="highEnd">Whether its endstop is at the high end of travel</param>
+    /// <remarks>
+    /// RepRapFirmware's <c>axesToSenseLength</c> handling: the position the move stopped at becomes
+    /// the axis limit, which is what M208 would otherwise have to be told by hand. The axis is
+    /// deliberately not marked homed - knowing where the end is is not the same as knowing where the
+    /// head is
+    /// </remarks>
+    private void RecordAxisLength(int axis, bool highEnd)
+    {
+        float stoppedAt = planner.Builder.StartCoordinates[axis];
+        Axis axisConfig = model.Move.Axes[axis];
+
+        if (highEnd)
+        {
+            axisConfig.Max = stoppedAt;
+        }
+        else
+        {
+            axisConfig.Min = stoppedAt;
         }
     }
 
