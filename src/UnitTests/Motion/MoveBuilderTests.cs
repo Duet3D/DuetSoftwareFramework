@@ -539,6 +539,22 @@ public class MoveBuilderTests
     }
 
     [Test]
+    public void InverseTimeModeTurnsTheDurationIntoASpeed()
+    {
+        // G93 F30 asks for the move to take one thirtieth of a minute, i.e. 2 seconds. Over 10mm
+        // that is 5mm/sec, whatever F would have meant in G94
+        MoveBuilder builder = NewBuilder(CartesianMachine());
+
+        RawMove move = LinearMove(1, 10.0f, 0.0f, 0.0f);
+        move.InverseTimeMode = true;
+        move.DurationSec = 2.0f;
+
+        (_, Submission? built) = Build(builder, move);
+
+        Assert.That(built!.Header.RequestedSpeed * StepClockRate, Is.EqualTo(5.0f).Within(1e-4f));
+    }
+
+    [Test]
     public void AnH2MoveAddressesTheMotorsDirectly()
     {
         // H2 is a raw motor move on every geometry, so the coordinate is that one motor's position

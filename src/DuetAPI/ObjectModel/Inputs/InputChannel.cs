@@ -72,12 +72,18 @@ public partial class InputChannel : ModelObject, IStaticModelObject
     /// <summary>
     /// Current feedrate as passed by the last G0/G1 F... command
     /// </summary>
+    /// <remarks>
+    /// The raw value, so it is per minute and in whichever unit <see cref="DistanceUnit"/> selects.
+    /// It is kept unconverted because whether G20 applies to it depends on the axes of the move it
+    /// ends up being used for, which is not known when the F is read. RepRapFirmware's
+    /// <c>DefaultFeedRate</c> of 3000 mm/min is the same 50 mm/s this used to default to
+    /// </remarks>
     public float FeedRate
     {
         get => _feedRate;
         set => SetPropertyValue(ref _feedRate, value);
     }
-    private float _feedRate = 50.0F;
+    private float _feedRate = 3000.0F;
 
     /// <summary>
     /// Whether a macro file is being processed

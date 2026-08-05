@@ -20,12 +20,19 @@ namespace DuetControlServer.Codes.Handlers;
 internal sealed partial class GCodeHandler
 {
     /// <summary>
-    /// Adopt the position of every axis a homing move stopped at its endstop
+    /// Wait for a special move to finish and find out where it left the machine
     /// </summary>
-    /// <param name="armedAxes">Axes the move was armed for</param>
+    /// <param name="armedAxes">Axes the move was armed for, empty if it watched no endstop</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>An awaitable task</returns>
     /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>waitingForSpecialMoveToComplete</c> state. Every <c>G1 H</c> move waits,
+    /// not only one that watches an endstop: it may stop short, and even an H2 that does not is
+    /// planned in motor coordinates the interpreter's own position knows nothing about. Interpreting
+    /// the next code before the machine has settled would measure it from a position that was never
+    /// reached.
+    /// </para>
     /// <para>
     /// The move ended wherever the endstop fired, which the engine has already corrected for the
     /// latency of the report. That position is not what the axis is set to, though: the switch is at
@@ -38,13 +45,8 @@ internal sealed partial class GCodeHandler
     /// failed homing move visible rather than silently believed
     /// </para>
     /// </remarks>
-    private async ValueTask FinishHomingMoveAsync(IReadOnlyList<int> armedAxes, CancellationToken cancellationToken)
+    private async ValueTask FinishSpecialMoveAsync(IReadOnlyList<int> armedAxes, CancellationToken cancellationToken)
     {
-        if (armedAxes.Count == 0)
-        {
-            return;
-        }
-
         await planner.WaitForStandstillAsync(cancellationToken);
 
         using (await model.AccessReadWriteAsync(cancellationToken))
@@ -71,9 +73,15 @@ internal sealed partial class GCodeHandler
                     }
 
                     float position = endstop.HighEnd ? axisConfig.Max : axisConfig.Min;
-                    RedefineMachinePosition(axis, position);
+                    planner.Builder.SetAxisPosition(axis, position);
                     axisConfig.Homed = true;
                 }
+
+                // The interpreter's position was left alone while the special move ran, because a
+                // motor position is not an axis position. Now that the machine has settled somewhere
+                // definite, it has to be brought back into step with it - which is the one direction
+                // the inverse transform is for
+                SyncInterpreterToMachine();
             }
         }
     }

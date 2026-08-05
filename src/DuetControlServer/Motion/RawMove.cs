@@ -27,8 +27,19 @@ internal sealed class RawMove
     /// </summary>
     public float[] Coords { get; } = new float[MotionLimits.MaxAxesPlusExtruders];
 
-    /// <summary>Requested speed in mm/sec</summary>
+    /// <summary>Requested speed in mm/sec, meaningless when <see cref="InverseTimeMode"/> is set</summary>
     public float FeedRateMmPerSec { get; set; } = 50.0f;
+
+    /// <summary>
+    /// How long the whole move should take, in seconds; only used when <see cref="InverseTimeMode"/>
+    /// is set
+    /// </summary>
+    /// <remarks>
+    /// A separate field rather than another meaning for <see cref="FeedRateMmPerSec"/>. G93's F is
+    /// one over a time, so it describes this move and cannot carry over to the next one, and the
+    /// speed it works out to is not known until the move's length is
+    /// </remarks>
+    public float DurationSec { get; set; }
 
     /// <summary>
     /// Whether the axes move together as one coordinated motion (G1) or independently (G0)
@@ -88,6 +99,17 @@ internal sealed class RawMove
 
     /// <summary>Whether the move runs at the standard feed rate, so a later change may apply to it</summary>
     public bool UsingStandardFeedrate { get; set; } = true;
+
+    /// <summary>
+    /// Whether the M220 speed factor and the M221 extrusion factors apply to this move
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>applyM220M221</c>. The overrides are the operator adjusting a print, so
+    /// they apply to ordinary moves that name an axis and to nothing else: not to raw motor or
+    /// homing moves, and not to the moves inside a macro the firmware asked for, which are the
+    /// machine's own and not part of what is being printed
+    /// </remarks>
+    public bool ApplyM220M221 { get; set; }
 
     /// <summary>Whether pressure advance applies to forward extrusion in this move</summary>
     public bool UsePressureAdvance { get; set; }

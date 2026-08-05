@@ -48,6 +48,11 @@ internal sealed partial class GCodeHandler(
     private const float MmPerInch = 25.4f;
 
     /// <summary>
+    /// G-code feed rates are per minute; everything below the interpreter is per second
+    /// </summary>
+    private const float SecondsPerMinute = 60.0f;
+
+    /// <summary>
     /// Process a G-code that should be interpreted by the control server
     /// </summary>
     /// <param name="code">Code to process</param>
@@ -125,6 +130,15 @@ internal sealed partial class GCodeHandler(
     /// <returns>The result</returns>
     private async ValueTask<Message?> HandleMoveAsync(Commands.Code code, bool isCoordinated, CancellationToken cancellationToken)
     {
+        // A special move is planned against the motor positions rather than the axis positions, so
+        // the machine has to have settled before it is built - as in RepRapFirmware, which locks and
+        // waits for standstill before reading them
+        int moveType = code.GetInt('H', 0);
+        if (moveType != 0)
+        {
+            await planner.WaitForStandstillAsync(cancellationToken);
+        }
+
         // Retrying rather than failing when the ring is full is what applies back-pressure: it is the
         // normal state when moves are commanded faster than the machine can run them, and it is what
         // keeps the G-code stream in step with the machine
@@ -157,11 +171,11 @@ internal sealed partial class GCodeHandler(
                     {
                         state.CurrentUserPosition.CopyTo(positionBeforeMove, 0);
 
-                        RawMove move = BuildRawMove(code, input, isCoordinated, out Message? endstopError);
-                        if (endstopError is not null)
+                        RawMove move = BuildRawMove(code, input, isCoordinated, out Message? error);
+                        if (error is not null)
                         {
                             positionBeforeMove.AsSpan(0, MotionLimits.MaxAxes).CopyTo(state.CurrentUserPosition);
-                            return endstopError;
+                            return error;
                         }
 
                         homingAxes = move.HomingAxes;
@@ -193,13 +207,13 @@ internal sealed partial class GCodeHandler(
             {
                 case MoveSubmitResult.Queued:
                 case MoveSubmitResult.NoMovement:
-                    if (homingAxes.Count > 0)
+                    if (moveType != 0)
                     {
-                        // A homing move is where the machine finds out where it is, so the code has
-                        // to wait for it rather than queue it and move on. Every other move is
+                        // A special move is where the machine finds out where it is, so the code has
+                        // to wait for it rather than queue it and move on. Every ordinary move is
                         // committed at its planned endpoint and the next code interpreted straight
                         // away, which is what keeps the queue full
-                        await FinishHomingMoveAsync(homingAxes, cancellationToken);
+                        await FinishSpecialMoveAsync(homingAxes, cancellationToken);
                     }
                     return new Message();
 
@@ -222,12 +236,12 @@ internal sealed partial class GCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="input">The channel's interpreter state</param>
     /// <param name="isCoordinated">Whether this is a G1</param>
-    /// <param name="endstopError">Receives why the move cannot be armed, if it cannot</param>
+    /// <param name="error">Receives why the move cannot be built, if it cannot</param>
     /// <returns>The move</returns>
     /// <remarks>The caller must hold the object model write lock</remarks>
-    private RawMove BuildRawMove(Commands.Code code, InputChannel input, bool isCoordinated, out Message? endstopError)
+    private RawMove BuildRawMove(Commands.Code code, InputChannel input, bool isCoordinated, out Message? error)
     {
-        endstopError = null;
+        error = null;
         MotionParameters parameters = planner.Parameters;
         int numAxes = Math.Min(parameters.NumAxes, model.Move.Axes.Count);
         float unitScale = input.DistanceUnit == DistanceUnit.Inch ? MmPerInch : 1.0f;
@@ -308,6 +322,16 @@ internal sealed partial class GCodeHandler(
                     continue;
                 }
 
+                if (!input.AxesRelative && parameters.Geometry is LinearDeltaKinematicsEngine)
+                {
+                    // A delta's motor positions are carriage heights, and where a carriage has to be
+                    // for the head to reach a point depends on the other two. So there is no absolute
+                    // position to give one motor, only an amount to move it by
+                    error = new Message(MessageType.Error,
+                        "Attempt to move individual motors of a delta machine to absolute positions");
+                    return raw;
+                }
+
                 float moveArg = axisConfig.Rotational ? value : value * unitScale;
                 if (input.AxesRelative)
                 {
@@ -329,22 +353,107 @@ internal sealed partial class GCodeHandler(
             }
         }
 
+        // Pausing during an endstop move is not safe: it may stop short, so where it would resume
+        // from is not known until it has finished
+        raw.CanPauseAfter = !raw.CheckEndstops;
+
+        // Before the endstops, because arming a stall endstop needs the speeds this works out
+        error = LoadFeedRate(code, input, raw);
+        if (error is not null)
+        {
+            return raw;
+        }
+
         if (raw.CheckEndstops)
         {
-            endstopError = ApplyEndstops(code, raw, numAxes);
+            error = ApplyEndstops(code, raw, numAxes);
         }
 
-        ApplyExtrusion(code, input, raw, unitScale);
+        bool hasForwardExtrusion = ApplyExtrusion(code, input, raw, unitScale);
 
-        // F persists across codes, which is why it is stored on the channel rather than the move
-        if (code.TryGetFloat('F', out float feedRate))
+        // Pressure advance is for a printing move, so it needs forward extrusion and movement in
+        // something other than Z. RepRapFirmware excludes Z because a move that only changes height
+        // while extruding is not laying a line down
+        if (hasForwardExtrusion)
         {
-            // G-code feed rates are per minute
-            input.FeedRate = feedRate * unitScale / 60.0f;
+            raw.UsePressureAdvance = MentionsAxisOtherThanZ(code, numAxes);
         }
-        raw.FeedRateMmPerSec = input.FeedRate * model.Move.SpeedFactor;
 
         return raw;
+    }
+
+    /// <summary>
+    /// Work out how fast the move should go
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="input">The channel's interpreter state</param>
+    /// <param name="move">The move being built, with its move type and mentioned axes already set</param>
+    /// <returns>An error if the feed rate cannot be determined, else null</returns>
+    /// <remarks>
+    /// Ported from <c>GCodes::LoadFeedrateFromGCode</c>. F persists across codes, so the value the
+    /// user typed is kept on the channel - unconverted, because whether inches apply depends on the
+    /// axes of the move it is eventually used for, which is not known when it is read
+    /// </remarks>
+    private Message? LoadFeedRate(Commands.Code code, InputChannel input, RawMove move)
+    {
+        // The overrides belong to the print, so they apply to an ordinary move that names an axis and
+        // to nothing else
+        move.ApplyM220M221 = move.MoveType == 0
+            && (move.LinearAxesMentioned || move.RotationalAxesMentioned)
+            && !code.Flags.HasFlag(CodeFlags.IsFromSystemMacro);
+        move.UsingStandardFeedrate = true;
+
+        if (input.InverseTimeMode)
+        {
+            // G93: F is one over the time the move should take, in minutes, so it is a duration and
+            // not a speed. It cannot carry over from a previous move because it describes this move's
+            // length, and it is not a distance, so the inch scale does not apply to it
+            if (!code.TryGetFloat('F', out float inverseTime) || inverseTime <= 0.0f)
+            {
+                return new Message(MessageType.Error,
+                    "Feed rate must be specified with every move when using inverse time mode");
+            }
+
+            // A duration, so the speed factor divides it rather than multiplying: M220 S200 should
+            // make the move take half as long, not twice as long
+            float duration = SecondsPerMinute / inverseTime;
+            move.DurationSec = move.ApplyM220M221 ? duration / model.Move.SpeedFactor : duration;
+            return null;
+        }
+
+        if (code.TryGetFloat('F', out float feedRate))
+        {
+            // Kept raw, which is also what inputs[].feedRate reports
+            input.FeedRate = feedRate;
+        }
+
+        // A move that names only rotational axes is measured in degrees, so G20 does not scale its
+        // feed rate even though the same F would be inches per minute for a linear move
+        bool convertInches = move.LinearAxesMentioned || !move.RotationalAxesMentioned;
+        float unitScale = convertInches && input.DistanceUnit == DistanceUnit.Inch ? MmPerInch : 1.0f;
+        float converted = input.FeedRate * unitScale / SecondsPerMinute;
+
+        move.FeedRateMmPerSec = move.ApplyM220M221 ? converted * model.Move.SpeedFactor : converted;
+        return null;
+    }
+
+    /// <summary>
+    /// Whether the code moves anything other than Z
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="numAxes">Number of axes to consider</param>
+    /// <returns>True if some axis other than Z was named</returns>
+    private bool MentionsAxisOtherThanZ(Commands.Code code, int numAxes)
+    {
+        for (int axis = 0; axis < numAxes; axis++)
+        {
+            Axis axisConfig = model.Move.Axes[axis];
+            if (char.ToUpperInvariant(axisConfig.Letter) != 'Z' && code.HasParameter(axisConfig.Letter))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// <summary>
@@ -417,12 +526,13 @@ internal sealed partial class GCodeHandler(
     /// <param name="input">The channel's interpreter state</param>
     /// <param name="move">Move to fill in</param>
     /// <param name="unitScale">Millimetres per user unit</param>
+    /// <returns>True if the move extrudes forwards, which is what pressure advance applies to</returns>
     /// <remarks>The caller must hold the object model lock</remarks>
-    private void ApplyExtrusion(Commands.Code code, InputChannel input, RawMove move, float unitScale)
+    private bool ApplyExtrusion(Commands.Code code, InputChannel input, RawMove move, float unitScale)
     {
         if (!code.TryGetFloatArray('E', out float[]? extrusion) || extrusion.Length == 0)
         {
-            return;
+            return false;
         }
 
         MotionParameters parameters = planner.Parameters;
@@ -432,6 +542,7 @@ internal sealed partial class GCodeHandler(
         // mixing ratios are not ported yet, so a lone E does not fan out
         int count = extrusion.Length == 1 ? Math.Min(1, numExtruders) : Math.Min(extrusion.Length, numExtruders);
 
+        bool hasForwardExtrusion = false;
         for (int extruder = 0; extruder < count; extruder++)
         {
             Extruder extruderConfig = model.Move.Extruders[extruder];
@@ -440,13 +551,16 @@ internal sealed partial class GCodeHandler(
             // Absolute extrusion is a running total, so the movement is the difference from where
             // the extruder was last told it had reached
             float movement = input.DrivesRelative ? requestedMm : requestedMm - extruderConfig.RawPosition;
-
-            move.Coords[MotionParameters.ExtruderToDrive(extruder)] = movement * extruderConfig.Factor;
-            if (movement != 0.0f)
+            if (movement > 0.0f)
             {
-                move.UsePressureAdvance = true;
+                hasForwardExtrusion = true;
             }
+
+            // M221 is the operator adjusting a print, so it applies to the same moves M220 does
+            move.Coords[MotionParameters.ExtruderToDrive(extruder)] =
+                move.ApplyM220M221 ? movement * extruderConfig.Factor : movement;
         }
+        return hasForwardExtrusion;
     }
 
     /// <summary>
@@ -737,14 +851,29 @@ internal sealed partial class GCodeHandler(
     private void RedefineMachinePosition(int axis, float machinePosition)
     {
         planner.Builder.SetAxisPosition(axis, machinePosition);
+        SyncInterpreterToMachine();
+    }
 
+    /// <summary>
+    /// Bring the interpreter's position back into step with where the machine actually is
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>ToolOffsetInverseTransform</c> after a homing or probing move, and the
+    /// only place the transform is inverted. Everywhere else the interpreter is authoritative and the
+    /// machine follows it; here the machine is somewhere the interpreter did not put it. The caller
+    /// must hold the object model write lock and the planner lock
+    /// </remarks>
+    private void SyncInterpreterToMachine()
+    {
         MovementState state = planner.State;
         int numAxes = Math.Min(planner.Parameters.NumAxes, model.Move.Axes.Count);
-        if (axis >= 0 && axis < numAxes)
+        ReadOnlySpan<float> machinePosition = planner.Builder.StartCoordinates;
+
+        for (int axis = 0; axis < numAxes; axis++)
         {
-            state.CurrentUserPosition[axis] = machinePosition - model.Move.Axes[axis].Babystep;
-            PublishUserPositions(numAxes);
+            state.CurrentUserPosition[axis] = machinePosition[axis] - model.Move.Axes[axis].Babystep;
         }
+        PublishUserPositions(numAxes);
     }
 
     /// <summary>

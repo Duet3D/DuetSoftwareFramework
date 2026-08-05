@@ -47,6 +47,15 @@ public sealed class MacroFile : CodeFile, IDisposable
     public bool IsPausable { get; set; }
 
     /// <summary>
+    /// Indicates if the firmware asked for this macro rather than the user invoking it
+    /// </summary>
+    /// <remarks>
+    /// See <see cref="CodeFlags.IsFromSystemMacro"/>, which this becomes on every code the file
+    /// produces. Set by <see cref="MacroRunner"/>, which is where the distinction is known
+    /// </remarks>
+    public bool IsSystemMacro { get; set; }
+
+    /// <summary>
     /// Internal cancellation token source used for codes
     /// </summary>
     private readonly CancellationTokenSource _cts;
@@ -191,6 +200,7 @@ public sealed class MacroFile : CodeFile, IDisposable
         SourceConnection = copyFrom.SourceConnection;
         IsNested = copyFrom.IsNested;
         IsPausable = copyFrom.IsPausable;
+        IsSystemMacro = copyFrom.IsSystemMacro;
         IsConfig = copyFrom.IsConfig;
         IsConfigOverride = copyFrom.IsConfigOverride;
         IsDsfConfig = copyFrom.IsDsfConfig;
@@ -332,6 +342,7 @@ public sealed class MacroFile : CodeFile, IDisposable
             if (IsConfig) { result.Flags |= CodeFlags.IsFromConfig; }
             if (IsConfigOverride) { result.Flags |= CodeFlags.IsFromConfigOverride; }
             if (IsNested) { result.Flags |= CodeFlags.IsNestedMacro; }
+            if (IsSystemMacro) { result.Flags |= CodeFlags.IsFromSystemMacro; }
             result.SourceConnection = SourceConnection;
             return result;
         }

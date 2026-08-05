@@ -888,7 +888,10 @@ internal partial class MCodeHandler(
 
         // A macro named without a directory is looked up in the system directory, which is what makes
         // M98 P"homex.g" find sys/homex.g the way it does in RepRapFirmware
-        if (!await macroRunner.TryRunAsync(code.Channel, fileName, code, cancellationToken: cancellationToken))
+        // M98 is the user invoking a macro, not the firmware asking for one, so workplace offsets
+        // and the speed and extrusion overrides still apply to the moves inside it
+        if (!await macroRunner.TryRunAsync(code.Channel, fileName, code, isSystemMacro: false,
+                                           cancellationToken: cancellationToken))
         {
             return new Message(MessageType.Error, $"Macro file {fileName} not found");
         }

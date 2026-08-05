@@ -1473,8 +1473,11 @@ there, and it is a prerequisite for phases D and E.
    [Axis.cs](src/DuetAPI/ObjectModel/Move/Axis.cs) says it means. `G92`, `FinishHomingMoveAsync` and
    the probing handlers write through `RedefineMachinePosition`, which is the one place the inverse
    transform is used.
-4. **G53** ✅; **`runningSystemMacro`** ⬜ — needs a `CodeFlags` value plumbed through `MacroFile` and
-   inherited by nested macros, which is its own change. *(item 7)*
+4. ✅ Add **G53** and **`runningSystemMacro`** while the transform is being touched. The latter is
+   `CodeFlags.IsFromSystemMacro`, set by `MacroRunner` — every caller there is the firmware asking
+   for a file of its own except M98 and the code-named-after-itself fallback, which say so. It is
+   inherited from the start code, which is the same link RepRapFirmware inherits it down the machine
+   state stack for. *(item 7)*
 5. ✅ Add the `abandonMove` rollback — `currentUserPosition` is now updated before the move can be
    rejected, which is exactly the situation RRF's lambda exists for. It matters immediately, not just
    for phase D: the ring-full path retries the same code, and a relative move applied twice is a real
@@ -1494,14 +1497,22 @@ there, and it is a prerequisite for phases D and E.
    carries `HomesIndividualDrives` and `IsRawMotorMove`, and `MoveBuilder` branches on the latter —
    which also restores RRF's rule that a raw move on a linear delta has its feed rate scaled to the
    fastest-moving tower.
-8. **Wait for standstill before a `moveType != 0` move, and for its completion afterwards.** *(item 5)*
-9. **Gate M220 and M221 on `applyM220M221`.** *(item 10)*
-10. **Fix G93 inverse time**, including throwing when F is missing and not inch-scaling an
-    inverse-time F. *(item 11)*
-11. **Skip the inch conversion for rotational-only moves.** *(item 11)*
-12. **Clear `CanPauseAfter` for endstop moves.** *(§11.3)*
-13. **Reject the delta absolute individual-motor move.** *(item 8)*
-14. **`usePressureAdvance` only for forward extrusion with a non-Z axis mentioned.** *(item 14)*
+8. ✅ **Wait for standstill before a `moveType != 0` move, and for its completion afterwards.** Every
+   `G1 H` move waits now, not only one that armed an endstop, and the interpreter's position is
+   brought back into step with the machine afterwards. *(item 5)*
+9. ✅ **Gate M220 and M221 on `applyM220M221`.** *(item 10)*
+10. ✅ **Fix G93 inverse time.** F is now read as a duration rather than a speed, is required on every
+    inverse-time move, is not inch-scaled, and divides by the speed factor instead of multiplying.
+    `RawMove.DurationSec` carries it, deliberately not as another meaning for `FeedRateMmPerSec`.
+    *(item 11)*
+11. ✅ **Skip the inch conversion for rotational-only moves.** This meant `inputs[].feedRate` now
+    holds the raw F value rather than mm/s, which is what its documentation already said and what RRF
+    publishes — the conversion depends on the axes of the move the F is eventually used for, which is
+    not known when it is read. The default moves from 50 to RRF's `DefaultFeedRate` of 3000 mm/min,
+    which is the same speed. *(item 11)*
+12. ✅ **Clear `CanPauseAfter` for endstop moves.** *(§11.3)*
+13. ✅ **Reject the delta absolute individual-motor move.** *(item 8)*
+14. ✅ **`usePressureAdvance` only for forward extrusion with a non-Z axis mentioned.** *(item 14)*
 
 **Phase C — all endstop types.** Independent of A and B; the object model and the CAN messages are
 already in place, so this is DCS-side only.

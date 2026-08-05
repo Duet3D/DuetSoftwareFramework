@@ -51,15 +51,27 @@ public sealed class MacroRunner(
     /// <param name="fileName">Virtual filename of the macro</param>
     /// <param name="startCode">Code that asked for the macro, if any</param>
     /// <param name="directory">Directory the macro is looked up in</param>
+    /// <param name="isSystemMacro">Whether the firmware asked for this macro rather than the user</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True if the macro was found and run, false if there is no such file</returns>
     /// <remarks>
+    /// <para>
     /// A missing macro is not an error here. Most of the macros the machine runs are optional - a
     /// machine with no <c>stop.g</c> simply has nothing to do when it stops - so whether that matters
-    /// is the caller's decision, not this one's
+    /// is the caller's decision, not this one's.
+    /// </para>
+    /// <para>
+    /// <paramref name="isSystemMacro"/> defaults to true because nearly every caller here is the
+    /// firmware asking for a file of its own - homing, probe deploy, config.g. M98 and the
+    /// code-named-after-itself fallback are the exceptions, and they say so. The flag is also
+    /// inherited from the code that started the macro, which is how <c>homeall.g</c> calling
+    /// <c>homez.g</c> keeps it: RepRapFirmware inherits it down the machine state stack, and the
+    /// start code is the same link here
+    /// </para>
     /// </remarks>
     public async ValueTask<bool> TryRunAsync(CodeChannel channel, string fileName, Code? startCode = null,
                                              FileDirectory directory = FileDirectory.System,
+                                             bool isSystemMacro = true,
                                              CancellationToken cancellationToken = default)
     {
         if (codeProcessor.GetStackDepth(channel) >= MaxNesting)
@@ -80,6 +92,7 @@ public sealed class MacroRunner(
         {
             return false;
         }
+        macro.IsSystemMacro = isSystemMacro || startCode?.Flags.HasFlag(CodeFlags.IsFromSystemMacro) == true;
 
         // The stack level has to exist before the macro starts reading, because its codes are routed
         // to the level whose file they belong to

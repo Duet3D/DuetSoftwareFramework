@@ -379,7 +379,10 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
 
         char letter = Type == CodeType.GCode ? 'G' : 'M';
         string macroName = MinorNumber > 0 ? $"{letter}{MajorNumber}.{MinorNumber}.g" : $"{letter}{MajorNumber}.g";
-        return await _macroRunner.TryRunAsync(Channel, macroName, this, cancellationToken: CancellationToken);
+        // A macro standing in for a code the user typed, so it is not a system macro unless the
+        // code that reached here came from one
+        return await _macroRunner.TryRunAsync(Channel, macroName, this, isSystemMacro: false,
+                                              cancellationToken: CancellationToken);
     }
 
     /// <summary>

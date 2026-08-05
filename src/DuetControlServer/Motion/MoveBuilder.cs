@@ -371,8 +371,23 @@ internal sealed class MoveBuilder(MotionParameters parameters)
 
         // --- 6. Requested speed ---------------------------------------------------------------------------
 
-        float feedRate = move.FeedRateMmPerSec / MotionLimits.StepClockRate;
-        float requestedSpeed = move.InverseTimeMode ? totalDistance / feedRate : feedRate;
+        float requestedSpeed;
+        if (move.InverseTimeMode)
+        {
+            // G93 names a time for the whole move, so how fast it has to go is only known now that
+            // the distance is. This is RepRapFirmware's totalDistance/feedRate, with the duration in
+            // step clocks
+            float durationClocks = move.DurationSec * MotionLimits.StepClockRate;
+            if (durationClocks <= 0.0f)
+            {
+                return new MoveBuildResult(NativeMovementError.NoMovement, 0);
+            }
+            requestedSpeed = totalDistance / durationClocks;
+        }
+        else
+        {
+            requestedSpeed = move.FeedRateMmPerSec / MotionLimits.StepClockRate;
+        }
 
         if (!doMotorMapping && Parameters.Geometry is LinearDeltaKinematicsEngine)
         {

@@ -36,6 +36,17 @@ public enum CodeFlags : int
     IsInternallyProcessed = 4096,
 
     /// <summary>
+    /// Code comes from a macro the firmware asked for rather than one the user invoked
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>runningSystemMacro</c>. Homing files, probe deploy and retract,
+    /// <c>config.g</c> and the tool change files are all written in machine coordinates, so workplace
+    /// offsets and the M220 and M221 overrides do not apply to the moves inside them. A macro the user
+    /// invoked with M98 is not one of these. The flag is inherited by whatever a system macro calls
+    /// </remarks>
+    IsFromSystemMacro = 8192,
+
+    /// <summary>
     /// Code has been postprocessed (i.e. it has been processed by the internal DCS code processor)
     /// </summary>
     IsPostProcessed = 4,
