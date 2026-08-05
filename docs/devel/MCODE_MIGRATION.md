@@ -1566,16 +1566,27 @@ already in place, so this is DCS-side only.
 §12 should land first: segmenting a move makes `HandleMotionStopped`'s "find the endstop move by
 scanning the rings" harder, and §12 deletes that scan rather than complicating it.
 
-22. Add `GetSegmentationType` / `GetReciprocalMinSegmentLength` / `GetSegmentsPerSecond` to
-    `KinematicsEngine` and give each engine RRF's values.
-23. Compute the segment count in `BuildRawMove` as the maximum of the kinematics, mesh and
+22. ✅ `SegmentationType`, `SegmentsPerSecond` and `MinSegmentLength` on `KinematicsEngine`, with
+    RepRapFirmware's values per geometry.
+23. ✅ Compute the segment count in `BuildRawMove` as the maximum of the kinematics, mesh and
     `MaxSegmentTime` counts, leaving `raw.Coords` at the final endpoint — RRF's `DoStraightMove` half.
-24. Emit the segments in `MovePlanner` — RRF's `ReadMove` half: walk `StartCoordinates` toward the
-    endpoint, divide the extrusion by the segment count, and per segment apply mesh compensation,
-    `LimitPosition` and (later) the collision check.
-25. Move `ApplyBedCompensation` into that loop and out of `BuildRawMove`.
-26. Only now does `moveFractionToSkip` have anything to attach to — `segmentsLeftToStartAt`,
-    `firstSegmentFractionToSkip` and `proportionDone` are all per-segment quantities.
+24. ✅ Emit the segments — RRF's `ReadMove` half. This landed in `SubmitMoveAsync` rather than
+    `MovePlanner`: the loop has to give the ring up and come back when it is full, and the planner
+    lock cannot be held across that wait. Building happens once and submission resumes from the
+    segment it reached, which is also what stops a relative move being applied twice.
+25. ✅ Move `ApplyBedCompensation` into that loop and out of `BuildRawMove`.
+26. ⬜ Only now does `moveFractionToSkip` have anything to attach to — `segmentsLeftToStartAt`,
+    `firstSegmentFractionToSkip` and `proportionDone` are all per-segment quantities. Still blocked on
+    restore points (phase F).
+
+`LimitPosition` is deliberately **not** re-applied per segment, where RRF's `ReadMove` does. RRF needs
+it there because that function also generates arc segments, whose intermediate points are not on the
+line between the ends; a straight move's segments all lie on a line whose ends have already been
+limited, so there is nothing left to find. It goes back in with arcs.
+
+How much this matters, measured rather than assumed: on a default delta a 120 mm move across the bed
+sags nearly **12 mm** in the middle when only its endpoints go through the kinematics, and stays
+within **15 microns** of the line when cut into 32 segments.
 
 **Phase F — needs new object model or subsystems**
 
