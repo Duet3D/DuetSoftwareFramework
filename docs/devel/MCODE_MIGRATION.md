@@ -11,7 +11,8 @@ done.
 
 The G-codes that share the same subsystems are tracked here too where they matter: §10 covers the
 `G1 H` endstop moves, §11 audits G0/G1 straight moves against `GCodes::DoStraightMove` and holds the
-plan for closing the gaps.
+plan for closing the gaps, and §12 is a planned change to §10's architecture that should land before
+§11's phase E.
 
 ---
 
@@ -872,6 +873,11 @@ correction is required regardless, because DCS plans each move as a delta from t
 endpoints, so emitting the revert from the same place keeps one operation atomic rather than opening
 a window where the trackers and the boards disagree.
 
+> **Superseded - see §12.** That paragraph rejected reimplementing the evaluation in C#. The second
+> option it names in passing, *calling back into native for it*, is the one that turns out to be
+> right, and §12 is the plan for it: the evaluation stays where it is and becomes a query, while the
+> decision and the CAN message move to DCS.
+
 The cost is worth knowing: this is the **only** native-originated CAN message. Every other one goes
 DCS → `DuetSbc_QueueCanMessage` → link, and that invariant is why DuetSbcInterface had no CANlib
 dependency before this work.
@@ -1551,6 +1557,8 @@ already in place, so this is DCS-side only.
 21. Port `CheckEnoughAxesHomed` and `MustBeHomedAxes`.
 
 **Phase E — segmentation.** Needs A, and D so that `LimitPosition` exists to be called per segment.
+§12 should land first: segmenting a move makes `HandleMotionStopped`'s "find the endstop move by
+scanning the rings" harder, and §12 deletes that scan rather than complicating it.
 
 22. Add `GetSegmentationType` / `GetReciprocalMinSegmentLength` / `GetSegmentsPerSecond` to
     `KinematicsEngine` and give each engine RRF's values.
@@ -1582,3 +1590,157 @@ already in place, so this is DCS-side only.
 34. **M486 object cancellation** — dropping the move, the object coordinate bounds, and
     `IsFirstMoveSincePrintingResumed` / `TravelToStartPoint`. **M597 collision checking**,
     **M599 keepout zones**. *(§11.3)*
+
+---
+
+## 12. Moving the endstop correction into DuetControlServer
+
+Planned, not done. §10 describes the arrangement as built; this is the change to it and why.
+
+### 12.1 What it looks like today
+
+```
+board          controller                        DuetSbcInterface              DCS
+  |                |                                    |                       |
+  |-- InputChanged->|                                   |                       |
+  |                 |-- stop matching drivers           |                       |
+  |<- StopMovement -|                                   |                       |
+  |                 |-- MotionStopped (SPI) ----------->|                       |
+  |                 |                    position at whenTriggered              |
+  |                 |                    correct DriveTracker + DDA endpoint    |
+  |<---------------- CanMessageRevertPosition ----------|                       |
+  |                 |                                   |-- MotionEndpoints --->|
+  |                 |                                   |            resync the planner
+```
+
+`MotionStopped` never reaches DCS. It is handled entirely inside
+[MotionService::HandleMotionStopped](src/DuetSbcInterface/src/SBC/MotionService.cpp#L256), which
+works out where each drive was when the endstop fired, corrects the tracker and the DDA, and emits
+the revert itself. DCS only learns the outcome afterwards, as a `MotionEndpoints` event.
+
+### 12.2 The change
+
+Split *computing* the position from *deciding what to do about it*. The computation stays native,
+because that is where the segment chain is; the decision and the CAN message move to DCS.
+
+```
+board          controller                        DuetSbcInterface              DCS
+  |                |                                    |                       |
+  |-- InputChanged->|                                   |                       |
+  |                 |-- stop matching drivers           |                       |
+  |<- StopMovement -|                                   |                       |
+  |                 |-- MotionStopped (SPI) ----------->|-- MotionStopped ----->|
+  |                 |                                   |<- GetPositionAt ------|
+  |                 |                                   |-- position ---------->|
+  |                 |                                   |<- SetMotorPositions --|
+  |<---------------- QueueCanMessage(RevertPosition) <--------------------------|
+```
+
+### 12.3 The case for it
+
+- **It restores the layering.** §10 already records the cost of the current shape: this is the
+  **only** native-originated CAN message, and every other one goes DCS →
+  `DuetSbc_QueueCanMessage` → link. One exception to an otherwise clean invariant is worth removing.
+- **CANlib leaves DuetSbcInterface.** [CMakeLists.txt:54](src/DuetSbcInterface/src/CMakeLists.txt#L54)
+  says the dependency exists for this message, and the only includes are `CanMessageFormats.h` and
+  `Duet3Common.h` in `MotionService.cpp`. Going with it: the `Compat/CoreN2G/CoreTypes.h` shim, and
+  the `-fsingle-precision-constant` and float16 friction §10's "Building CANlib for the SBC" records.
+  None of that exists for any other reason.
+- **The revert is not deadline-critical**, which is the fact that makes the round trip affordable.
+  The board handles it statelessly
+  ([CanInterface.cpp:593](src/Duet3Expansion/src/CAN/CanInterface.cpp#L593)): it reads
+  `GetLastMoveStepsTaken(driver)`, takes the difference from the step count the message asks for, and
+  synthesises an ordinary `CanMessageMovementLinearShaped`. `clocksAllowed` is the **duration of that
+  corrective move**, not a window for the message to arrive in. The real constraint is ordering - the
+  revert must reach a driver before the next move does - and DCS already guarantees that: an endstop
+  move is isolated, and since §11.4 phase B every `G1 H` move waits for standstill before the next
+  code is interpreted.
+- **Segmentation makes the current shape worse.** `HandleMotionStopped` finds the move being cut
+  short by scanning the rings for one with `IsCheckingEndstops()`. Once §11.4 phase E splits a move
+  into segments that becomes "which segment of which move", while DCS's view of it stays a single
+  logical move. Cheaper before phase E than after.
+- **The query is reusable.** "Where was drive D at tick T" is also what `proportionDone` needs for
+  pause and resume (§11.2 item 2), so this is not a single-purpose hook.
+
+### 12.4 What has to be got right
+
+**The DDA endpoint is the real hazard.** Today `HandleMotionStopped` patches
+`DDA::SetDriveCoordinate` before the move can retire, so `OnMoveRetired` reports the corrected
+endpoint. Route the correction through DCS and the DDA can retire first, reporting the *planned*
+endpoint - which is the silent homing offset §10 warns about.
+
+The answer is not to hold the DDA open waiting for DCS, which would add a synchronisation problem
+and a new way to hang. It is to **stop patching the DDA at all**: DCS computes the corrected
+position, sends the revert, and pushes the position down through the existing `SetMotorPositions`.
+`OnMoveRetired`'s endpoints for an endstop move then stop being authoritative, which they never
+should have been. That deletes the ring scan, `IsCheckingEndstops` in `MotionService`, and
+`SetDriveCoordinate`'s only caller, rather than adding machinery.
+
+**`NoteDriverStopped` has to go somewhere.** An axis with a switch per driver stops its motors one at
+a time, and until the last has stopped the tracker still has to be running, because it is what tells
+the drivers yet to stop where they were when their own switch fired. DCS owns the per-driver mapping
+already - it built `RawMove.StopOnInput` - so DCS should own the decision, and the native surface
+becomes "position of drive D at tick T" plus "freeze drive D at P".
+
+**The clock fallback has to travel with the position.** A trigger timestamp is in the controller's
+step clock, which only `StepTimer`'s fit can interpret, and before the fit is trusted the answer is
+meaningless. Native currently falls back to `GetMotorPosition()` when
+`StepTimer::GetClockStats().synced` is false. DCS cannot apply the same rule unless the query says
+which of the two it returned.
+
+**Latency, and what it costs.** One SPI round trip is added between the stop and the wind-back. Not a
+correctness problem per above, but the window in which `move.axes[].machinePosition` reports the
+overshoot gets wider, and the budget is worth knowing: `BasicDriverPositionRevertMillis` is 40 ms and
+`TotalDriverPositionRevertMillis` allows 10 ms on top for message transit.
+
+**Endstops do not leave DuetSbcInterface.** The stop *identity* still passes through - `MoveParams`
+→ `DDA::m_stopOnInput[]` → `ScheduleMoveDriver` - because `ScheduleMoveBuilder` is what builds the
+schedule message. What goes is the *semantic* knowledge: the ring scan, `IsCheckingEndstops` in
+`MotionService`, `NoteDriverStopped`, and the revert construction.
+
+### 12.5 The surface
+
+| Direction | Now | After |
+|---|---|---|
+| Stop reported | `SbcInterface` callback → `MotionService::HandleMotionStopped` | same callback, forwarded as a new `InboundEventType.MotionStopped` |
+| Position at trigger | internal to `HandleMotionStopped` | `DuetSbc_MotionGetPositionAt(drive, whenTicks, out position, out usedTimestamp)` |
+| Position adopted | `DriveTracker::SetMotorPosition` + `DDA::SetDriveCoordinate` | existing `DuetSbc_MotionSetMotorPositions` |
+| Revert sent | native `QueueCanMessage` | DCS `DuetSbc_QueueCanMessage`, as every other CAN message |
+| Outcome to DCS | `InboundEventType.MotionEndpoints` (13) | no longer needed for endstop moves - DCS already knows |
+
+`MotionStopped` stays a one-way firmware → SBC notification. Nothing becomes a request/response pair;
+what is added is exported functions DCS calls afterwards.
+
+### 12.6 The plan
+
+**Step 1 - expose the position query.** `DuetSbc_MotionGetPositionAt` over `Motion::DriveTracker`,
+returning both the position and whether the trigger timestamp was usable. Independent of everything
+else and testable on its own against a known segment chain.
+
+**Step 2 - forward the stop to DCS.** New `InboundEventType.MotionStopped` carrying `whenTriggered`
+and the stopped drivers, mirroring `MotionStoppedHeader` / `MotionStoppedDriver`. Handled in
+`LinkService` alongside `MotionEndpoints`. At this point DCS sees the stop but still does nothing
+with it, and native still does everything it does today - the two paths run side by side, which is
+what makes the next step verifiable.
+
+**Step 3 - build the revert in DCS.** `MovePlanner` (or a new `EndstopCorrection`) turns the stopped
+drivers into `CanMessageRevertPosition` per board: map driver → logical drive through
+`move.axes[].drivers`, query the position, express it as steps since the move began, group by board.
+Compare against what native computes for the same stop before cutting over.
+
+**Step 4 - move the decision.** DCS applies the corrected positions through `SetMotorPositions` and
+resyncs `MoveBuilder` from them, taking over `NoteDriverStopped`'s job with the per-driver mapping it
+already has. `FinishSpecialMoveAsync` is where this lands, since it already waits for standstill and
+resyncs.
+
+**Step 5 - delete the native half.** `HandleMotionStopped`'s revert construction, the ring scan,
+`DDA::SetDriveCoordinate`, `NoteDriverStopped`, `IsCheckingEndstops` in `MotionService`, and the
+`MotionEndpoints` event if nothing else needs it.
+
+**Step 6 - drop CANlib.** Remove it from `src/DuetSbcInterface/src/CMakeLists.txt` along with the
+`Compat/CoreN2G/CoreTypes.h` shim, and delete the `MCU HOST` variant from `lib/CANlib/CANlib.cmake`
+if nothing else uses it. `MaxLinearDriversPerCanSlave` and `BasicDriverPositionRevertMillis` move to
+DCS with the message.
+
+Steps 1 to 3 are additive and leave the existing path working, so they can land separately. Step 4 is
+the cutover. Do the whole thing before §11.4 phase E, for the reason in §12.3.
