@@ -186,11 +186,12 @@ jobs:
       - name: Verify the CAN message layouts against CANlib
         run: make can-messages-verify
 
-      # UnitTests.HttpClient talks to a real Duet/SBC at a hard-coded hostname, so it cannot run here
+      # Tests in the RequiresMachine category talk to a real Duet/SBC over HTTP. They skip themselves
+      # unless DSF_TEST_MACHINE_URL is set, but exclude them explicitly so they cannot stall the runner.
       - name: Run unit tests
         run: |
           dotnet test src/UnitTests/UnitTests.csproj -c Debug \
-            --filter "FullyQualifiedName!~UnitTests.HttpClient" \
+            --filter "TestCategory!=RequiresMachine" \
             --logger "trx;LogFileName=UnitTests.trx" --results-directory test-results
 
       # The DuetSbcInterface tests are host-side and only get built when not cross-compiling, so
