@@ -312,25 +312,6 @@ project_publish_dir() {
     echo "${matches[0]}"
 }
 
-# write_solution_filter <path>
-# The whole solution cannot be published as-is: the multi-target libraries (DuetAPI,
-# DuetHttpClient) fail with NETSDK1129 unless a target framework is given, and the test and
-# documentation projects are not deployed. A filter narrows the publish to the deployable projects;
-# their project references are still built as dependencies.
-write_solution_filter() {
-    local filter="$1" project first=true
-    {
-        printf '{\n  "solution": {\n    "path": "%s",\n    "projects": [\n' "$SOLUTION"
-        for project in "${DOTNET_PROJECTS[@]}"; do
-            $first || printf ',\n'
-            first=false
-            # Paths in a filter are relative to the solution, which lives in src/
-            printf '      "%s/%s.csproj"' "${PROJECT_SRC[$project]#src/}" "$project"
-        done
-        printf '\n    ]\n  }\n}\n'
-    } > "$filter"
-}
-
 # Merge the per-project publish directories into BUILD_DIR. The projects share most of their
 # dependencies, so the copies overlap; later copies simply overwrite identical files.
 collect_output() {
@@ -357,12 +338,12 @@ if ! $SKIP_BUILD; then
     done
 
     if $ALL; then
-        # A single publish of the solution; MSBuild builds the projects in parallel itself
+        # A single publish of the solution; MSBuild builds the projects in parallel itself. Only the
+        # deployable projects publish: the libraries, tests, source generators and documentation are
+        # all marked IsPublishable=false, so they are built as dependencies but produce no output
+        # here.
         echo "=== Building solution ($BUILD_LABEL) ==="
-        FILTER_DIR="$(mktemp -d)"
-        write_solution_filter "$FILTER_DIR/DuetSoftwareFramework.slnf"
-        dotnet_publish "$FILTER_DIR/DuetSoftwareFramework.slnf"
-        rm -rf "$FILTER_DIR"
+        dotnet_publish "$SOLUTION"
     elif [[ ${#DOTNET_PROJECTS[@]} -eq 1 ]]; then
         echo "=== Building ${DOTNET_PROJECTS[0]} ($BUILD_LABEL) ==="
         dotnet_publish "$REPO_ROOT/${PROJECT_SRC[${DOTNET_PROJECTS[0]}]}"

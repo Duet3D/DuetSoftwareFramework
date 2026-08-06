@@ -8,6 +8,9 @@
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<IsTrimmable>true</IsTrimmable>
 		<NoWarn>NETSDK1212</NoWarn>
+		<!-- Shipped as a NuGet package, not deployed. Publishing it as part of the solution would
+		     fail with NETSDK1129 because no single target framework can be picked. -->
+		<IsPublishable>false</IsPublishable>
 	</PropertyGroup>
 
 	<ItemGroup>

@@ -5,6 +5,7 @@
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<IsPackable>false</IsPackable>
+		<IsPublishable>false</IsPublishable>
 		<RootNamespace>DuetCanMessage.SourceGenerators</RootNamespace>
 		<InvariantGlobalization>true</InvariantGlobalization>
 		<!-- This is a build-time tool that DCS runs on the host, not something it links against or ships

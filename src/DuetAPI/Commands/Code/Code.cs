@@ -497,7 +497,7 @@ public partial class Code : Command<Message?>
     /// <returns>Parameter value clamped between min and max</returns>
     /// <exception cref="MissingParameterException">Parameter not found</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public float GetFloatLimited(char letter, float min, float max) => Math.Clamp(GetFloat(letter), min, max);
+    public float GetFloatLimited(char letter, float min, float max) => MathCompat.Clamp(GetFloat(letter), min, max);
 
     /// <summary>
     /// Get a float parameter value clamped between a minimum and maximum value
@@ -508,7 +508,7 @@ public partial class Code : Command<Message?>
     /// <param name="defaultValue">Default value to return if no parameter could be found</param>
     /// <returns>Parameter value clamped between min and max</returns>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public float GetFloatLimited(char letter, float min, float max, float defaultValue) => Math.Clamp(GetFloat(letter, defaultValue), min, max);
+    public float GetFloatLimited(char letter, float min, float max, float defaultValue) => MathCompat.Clamp(GetFloat(letter, defaultValue), min, max);
 
     /// <summary>
     /// Try to get a float parameter value by letter clamped between a minimum and maximum value
@@ -523,7 +523,7 @@ public partial class Code : Command<Message?>
     {
         if (TryGetFloat(letter, out parameter))
         {
-            parameter = Math.Clamp(parameter, min, max);
+            parameter = MathCompat.Clamp(parameter, min, max);
             return true;
         }
         return false;
@@ -542,7 +542,7 @@ public partial class Code : Command<Message?>
     {
         if (TryGetFloat(letter, out float value))
         {
-            parameter = Math.Clamp(value, min, max);
+            parameter = MathCompat.Clamp(value, min, max);
             return true;
         }
         parameter = null;
@@ -558,7 +558,7 @@ public partial class Code : Command<Message?>
     /// <returns>Parameter value clamped between min and max</returns>
     /// <exception cref="MissingParameterException">Parameter not found</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public int GetIntLimited(char letter, int min, int max) => Math.Clamp(GetInt(letter), min, max);
+    public int GetIntLimited(char letter, int min, int max) => MathCompat.Clamp(GetInt(letter), min, max);
 
     /// <summary>
     /// Get an integer parameter value clamped between a minimum and maximum value
@@ -569,7 +569,7 @@ public partial class Code : Command<Message?>
     /// <param name="defaultValue">Default value to return if no parameter could be found</param>
     /// <returns>Parameter value clamped between min and max</returns>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public int GetIntLimited(char letter, int min, int max, int defaultValue) => Math.Clamp(GetInt(letter, defaultValue), min, max);
+    public int GetIntLimited(char letter, int min, int max, int defaultValue) => MathCompat.Clamp(GetInt(letter, defaultValue), min, max);
 
     /// <summary>
     /// Try to get an integer parameter value by letter clamped between a minimum and maximum value
@@ -584,7 +584,7 @@ public partial class Code : Command<Message?>
     {
         if (TryGetInt(letter, out parameter))
         {
-            parameter = Math.Clamp(parameter, min, max);
+            parameter = MathCompat.Clamp(parameter, min, max);
             return true;
         }
         return false;
@@ -603,7 +603,7 @@ public partial class Code : Command<Message?>
     {
         if (TryGetInt(letter, out int value))
         {
-            parameter = Math.Clamp(value, min, max);
+            parameter = MathCompat.Clamp(value, min, max);
             return true;
         }
         parameter = null;
@@ -619,7 +619,7 @@ public partial class Code : Command<Message?>
     /// <returns>Parameter value clamped between min and max</returns>
     /// <exception cref="MissingParameterException">Parameter not found</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public uint GetUIntLimited(char letter, uint min, uint max) => Math.Clamp(GetUInt(letter), min, max);
+    public uint GetUIntLimited(char letter, uint min, uint max) => MathCompat.Clamp(GetUInt(letter), min, max);
 
     /// <summary>
     /// Get an unsigned integer parameter value clamped between a minimum and maximum value
@@ -630,7 +630,7 @@ public partial class Code : Command<Message?>
     /// <param name="defaultValue">Default value to return if no parameter could be found</param>
     /// <returns>Parameter value clamped between min and max</returns>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public uint GetUIntLimited(char letter, uint min, uint max, uint defaultValue) => Math.Clamp(GetUInt(letter, defaultValue), min, max);
+    public uint GetUIntLimited(char letter, uint min, uint max, uint defaultValue) => MathCompat.Clamp(GetUInt(letter, defaultValue), min, max);
 
     /// <summary>
     /// Try to get an unsigned integer parameter value by letter clamped between a minimum and maximum value
@@ -645,7 +645,7 @@ public partial class Code : Command<Message?>
     {
         if (TryGetUInt(letter, out parameter))
         {
-            parameter = Math.Clamp(parameter, min, max);
+            parameter = MathCompat.Clamp(parameter, min, max);
             return true;
         }
         return false;
@@ -664,7 +664,7 @@ public partial class Code : Command<Message?>
     {
         if (TryGetUInt(letter, out uint value))
         {
-            parameter = Math.Clamp(value, min, max);
+            parameter = MathCompat.Clamp(value, min, max);
             return true;
         }
         parameter = null;
@@ -680,7 +680,7 @@ public partial class Code : Command<Message?>
     /// <returns>Parameter value clamped between min and max</returns>
     /// <exception cref="MissingParameterException">Parameter not found</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public long GetLongLimited(char letter, long min, long max) => Math.Clamp(GetLong(letter), min, max);
+    public long GetLongLimited(char letter, long min, long max) => MathCompat.Clamp(GetLong(letter), min, max);
 
     /// <summary>
     /// Get a long parameter value clamped between a minimum and maximum value
@@ -691,7 +691,7 @@ public partial class Code : Command<Message?>
     /// <param name="defaultValue">Default value to return if no parameter could be found</param>
     /// <returns>Parameter value clamped between min and max</returns>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public long GetLongLimited(char letter, long min, long max, long defaultValue) => Math.Clamp(GetLong(letter, defaultValue), min, max);
+    public long GetLongLimited(char letter, long min, long max, long defaultValue) => MathCompat.Clamp(GetLong(letter, defaultValue), min, max);
 
     /// <summary>
     /// Try to get a long parameter value by letter clamped between a minimum and maximum value
@@ -706,7 +706,7 @@ public partial class Code : Command<Message?>
     {
         if (TryGetLong(letter, out parameter))
         {
-            parameter = Math.Clamp(parameter, min, max);
+            parameter = MathCompat.Clamp(parameter, min, max);
             return true;
         }
         return false;
@@ -725,7 +725,7 @@ public partial class Code : Command<Message?>
     {
         if (TryGetLong(letter, out long value))
         {
-            parameter = Math.Clamp(value, min, max);
+            parameter = MathCompat.Clamp(value, min, max);
             return true;
         }
         parameter = null;
