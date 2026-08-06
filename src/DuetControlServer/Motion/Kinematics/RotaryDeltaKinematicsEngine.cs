@@ -29,7 +29,7 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
     public const int DeltaAxes = 3;
 
     private const int TowerA = 0, TowerB = 1, TowerC = 2;
-    private const int XAxis = 0, YAxis = 1, ZAxis = 2;
+    private const int XAxis = 0, YAxis = 1;
 
     private const float DegreesToRadians = MathF.PI / 180.0f;
     private const float RadiansToDegrees = 180.0f / MathF.PI;

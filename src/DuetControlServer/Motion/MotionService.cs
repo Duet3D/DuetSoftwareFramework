@@ -22,11 +22,9 @@ namespace DuetControlServer.Motion;
 /// <summary>
 /// This class accesses RepRapFirmware via SPI and deals with general communication
 /// </summary>
-/// <param name="eventLogger">Event logger</param>
 /// <param name="linkInterface">Link interface</param>
 /// <param name="planner">Where G-codes become queued moves</param>
 /// <param name="model">Object model</param>
-/// <param name="lifetime">Host application lifetime</param>
 /// <param name="logger">Logger</param>
 /// <param name="settings">Settings</param>
 internal sealed class MotionService(

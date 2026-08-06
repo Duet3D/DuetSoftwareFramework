@@ -351,8 +351,16 @@ public sealed class Settings
     /// </summary>
     public int ModelUpdateInterval { get; set; } = 100;
 
+    /// <summary>
+    /// Prefix of the main firmware file an expansion board is served, the rest of the name being the
+    /// board type it asked for and either .bin or .uf2
+    /// </summary>
     public string FirmwareFilePrefix { get; set; } = "Duet3Firmware_";
 
+    /// <summary>
+    /// Prefix of the bootloader file an expansion board is served, made up the same way as
+    /// <see cref="FirmwareFilePrefix" />
+    /// </summary>
     public string BootloaderFilePrefix { get; set; } = "Duet3Bootloader_";
 
     /// <summary>

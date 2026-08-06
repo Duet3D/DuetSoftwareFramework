@@ -233,7 +233,7 @@ internal sealed class MotionParameters
             parameters.InstantDvs[drive] = e.Jerk / SecondsPerMinute / MotionLimits.StepClockRate;
 
             // Pressure advance is a time, so it converts to step clocks rather than dividing by them
-            parameters.PressureAdvanceClocks[drive] = e.PressureAdvance * MotionLimits.StepClockRate;
+            parameters.PressureAdvanceClocks[drive] = e.PressAdv.K0 * MotionLimits.StepClockRate;
 
             if (e.Driver is not null)
             {
@@ -491,7 +491,7 @@ internal sealed class MotionParameters
             config.DriveStepsPerMm[drive] = e.StepsPerMm;
             config.InstantDvs[drive] = e.Jerk / SecondsPerMinute / MotionLimits.StepClockRate;
             config.PrintingInstantDvs[drive] = e.PrintingJerk / SecondsPerMinute / MotionLimits.StepClockRate;
-            config.PressureAdvanceClocks[drive] = e.PressureAdvance * MotionLimits.StepClockRate;
+            config.PressureAdvanceClocks[drive] = e.PressAdv.K0 * MotionLimits.StepClockRate;
             config.ExtruderDrivers[extruder] = e.Driver is not null ? ToNativeDriver(e.Driver) : DriverId.None;
         }
 

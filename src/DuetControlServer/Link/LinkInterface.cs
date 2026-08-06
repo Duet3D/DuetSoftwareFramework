@@ -106,6 +106,14 @@ public sealed partial class LinkInterface(
             : $"Step clock: NOT synchronised, {clock.NumSamples} samples, {clock.NumRejectedSamples} rejected");
     }
 
+    /// <summary>
+    /// Set the CAN address and bit timing of an expansion board, which it saves in non-volatile memory
+    /// </summary>
+    /// <param name="dstAddress">Address the board has now</param>
+    /// <param name="newAddress">Address to give it, or null to leave the address alone</param>
+    /// <param name="timing">Arbitration phase bit timing to give it</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>The board's reply</returns>
     public Task<CanResponse> ConfigCanAsync(byte dstAddress, byte? newAddress, CanTiming timing, CancellationToken cancellationToken = default)
     {
         CanMessageSetAddressAndNormalTiming message = new()
@@ -120,6 +128,12 @@ public sealed partial class LinkInterface(
         return SendCanMessageAsync(dstAddress, in message, cancellationToken: cancellationToken);
     }
 
+    /// <summary>
+    /// Ask an expansion board to report its CAN address and bit timing, changing neither
+    /// </summary>
+    /// <param name="dstAddress">CAN address of the board</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>The board's reply</returns>
     public Task<CanResponse> ReportCanConfigAsync(byte dstAddress, CancellationToken cancellationToken = default)
     {
         CanMessageSetAddressAndNormalTiming message = new()
@@ -131,6 +145,12 @@ public sealed partial class LinkInterface(
         return SendCanMessageAsync(dstAddress, message, CanMessageType.StandardReply, cancellationToken: cancellationToken);
     }
 
+    /// <summary>
+    /// Turn the controller's CAN interface on or off
+    /// </summary>
+    /// <param name="enable">True to turn it on</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>An awaitable task that completes once the request has been written to the controller</returns>
     public async Task EnableCanAsync(bool enable, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -147,7 +167,7 @@ public sealed partial class LinkInterface(
     /// <param name="dstAddress">CAN destination: up to <see cref="CanId.MaxCanAddress" />, or <see cref="CanId.BroadcastAddress" /></param>
     /// <param name="message">CAN message body to send</param>
     /// <param name="replyType">Expected reply type (<see cref="CanMessageType.NoReply"/> if none)</param>
-    /// <param name="flags">Flags for the CAN message</param>
+    /// <param name="isResponse">True if this message is a response to something an expansion board sent, rather than a request</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Reassembled reply (empty if no reply was expected)</returns>
     public Task<CanResponse> SendCanMessageAsync<TReq>(byte dstAddress, in TReq message, CanMessageType replyType = CanMessageType.NoReply, bool isResponse = false, CancellationToken cancellationToken = default)
@@ -167,7 +187,7 @@ public sealed partial class LinkInterface(
     /// <param name="replyType">Expected reply type (<see cref="CanMessageType.NoReply"/> if none)</param>
     /// <param name="dstAddress">CAN destination: up to <see cref="CanId.MaxCanAddress" />, or <see cref="CanId.BroadcastAddress" /></param>
     /// <param name="payload">Serialized CAN message payload</param>
-    /// <param name="flags">Flags for the CAN message</param>
+    /// <param name="isResponse">True if this message is a response to something an expansion board sent, rather than a request</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Reassembled reply (empty if no reply was expected)</returns>
     private async Task<CanResponse> SendCanMessageAsync(CanMessageType messageType, CanMessageType replyType, byte dstAddress, byte[] payload, bool isResponse, CancellationToken cancellationToken)

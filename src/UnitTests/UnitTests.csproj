@@ -3,7 +3,10 @@
 		<TargetFramework>net10.0</TargetFramework>
 		<IsPackable>false</IsPackable>
 		<IsPublishable>false</IsPublishable>
-		<Nullable>disable</Nullable>
+		<!-- The older tests were written before the rest of the tree turned nullability on and would
+		     produce a lot of noise under the full 'enable'. 'annotations' lets the newer tests write
+		     '?' where they mean it without asking the old ones to be annotated first. -->
+		<Nullable>annotations</Nullable>
 	</PropertyGroup>
 
 	<ItemGroup>

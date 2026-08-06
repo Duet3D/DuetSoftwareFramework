@@ -25,8 +25,6 @@ namespace DuetControlServer.Model;
 /// <summary>
 /// Static class that updates the machine model in certain intervals
 /// </summary>
-/// <param name="codeFactory">Code factory to create codes</param>
-/// <param name="linkInterface">Link interface to the machine</param>
 /// <param name="model">Object model</param>
 /// <param name="logger">Logger instance</param>
 /// <param name="settings">Settings of the application</param>

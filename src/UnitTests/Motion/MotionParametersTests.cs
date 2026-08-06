@@ -61,9 +61,9 @@ public class MotionParametersTests
             Speed = 3600.0f,            // mm/min, i.e. 60 mm/sec
             Acceleration = 2000.0f,
             Jerk = 120.0f,              // mm/min, i.e. 2 mm/sec
-            PressureAdvance = 0.05f,    // seconds
             Driver = new OmDriverId(1, 3)
         };
+        e.PressAdv.K0 = 0.05f;          // seconds
         move.Extruders.Add(e);
 
         MoveQueueItem queue = new() { Length = 30, GracePeriod = 0.02f };

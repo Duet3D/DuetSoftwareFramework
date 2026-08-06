@@ -2526,11 +2526,6 @@ internal partial class MCodeHandler
     };
 
     /// <summary>
-    /// Describe an endstop the way M574 reports it
-    /// </summary>
-    /// <param name="endstop">The endstop</param>
-    /// <returns>The description</returns>
-    /// <summary>
     /// How M119 reports the state of a Z probe
     /// </summary>
     /// <param name="probe">The probe, or null if none is configured</param>
@@ -2546,6 +2541,11 @@ internal partial class MCodeHandler
         return reading >= probe.Threshold ? "at min stop" : "not stopped";
     }
 
+    /// <summary>
+    /// Describe an endstop the way M574 reports it
+    /// </summary>
+    /// <param name="endstop">The endstop</param>
+    /// <returns>The description</returns>
     private static string DescribeEndstop(Endstop endstop) => endstop.Type switch
     {
         EndstopType.InputPin => RemoteEndstops.PortsOf(endstop) is { Length: > 1 } ports
@@ -2572,16 +2572,6 @@ internal partial class MCodeHandler
         return model.Sensors.Endstops[axis] ??= new Endstop();
     }
 
-    /// <summary>
-    /// Ask the board carrying an endstop's port to watch it and report changes
-    /// </summary>
-    /// <param name="axis">Axis the endstop belongs to</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>What the board objected to, or null if it accepted</returns>
-    /// <remarks>
-    /// Until this is done the input is not reported at all, so an endstop that is configured but not
-    /// monitored would silently never trigger
-    /// </remarks>
     /// <summary>
     /// Check the P parameter of M574 against the axis it is being given to
     /// </summary>
@@ -2617,6 +2607,16 @@ internal partial class MCodeHandler
         return null;
     }
 
+    /// <summary>
+    /// Ask the board carrying an endstop's port to watch it and report changes
+    /// </summary>
+    /// <param name="axis">Axis the endstop belongs to</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>What the board had to say, which is an empty message if there was nothing to ask for</returns>
+    /// <remarks>
+    /// Until this is done the input is not reported at all, so an endstop that is configured but not
+    /// monitored would silently never trigger
+    /// </remarks>
     private async ValueTask<Message> CreateEndstopMonitorAsync(int axis, CancellationToken cancellationToken)
     {
         List<Message> replies = [];

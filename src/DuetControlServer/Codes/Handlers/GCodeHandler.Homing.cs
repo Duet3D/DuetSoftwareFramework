@@ -27,6 +27,7 @@ internal sealed partial class GCodeHandler
     /// <summary>
     /// Wait for a special move to finish and find out where it left the machine
     /// </summary>
+    /// <param name="moveType">The H parameter the move was given</param>
     /// <param name="armedAxes">Axes the move was armed for, empty if it watched no endstop</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>An awaitable task</returns>

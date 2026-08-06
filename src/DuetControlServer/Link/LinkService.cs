@@ -46,6 +46,7 @@ namespace DuetControlServer.Link;
 /// <param name="model">Object model</param>
 /// <param name="filePathResolver">File path resolver</param>
 /// <param name="motionTracker">Where what the native motion engine reports is recorded</param>
+/// <param name="endstopCorrection">Applies the position an endstop actually fired at</param>
 /// <param name="lifetime">Host application lifetime</param>
 /// <param name="logger">Logger</param>
 /// <param name="settings">Settings</param>

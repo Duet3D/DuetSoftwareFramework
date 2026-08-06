@@ -199,12 +199,6 @@ internal sealed partial class GCodeHandler
     // nozzle ends up, which is what the correction is being removed from
 
     /// <summary>
-    /// Where a move ends up, in the two axes the height map is measured over
-    /// </summary>
-    /// <param name="move">The move</param>
-    /// <param name="numAxes">Number of axes to consider</param>
-    /// <returns>The two coordinates</returns>
-    /// <summary>
     /// How many segments the height map needs a move broken into
     /// </summary>
     /// <param name="deltaAxis0">Movement along the map's first axis, mm</param>
@@ -275,6 +269,12 @@ internal sealed partial class GCodeHandler
         return (coordinates[0], coordinates[1]);
     }
 
+    /// <summary>
+    /// Where a move ends up, in the two axes the height map is measured over
+    /// </summary>
+    /// <param name="move">The move</param>
+    /// <param name="numAxes">Number of axes to consider</param>
+    /// <returns>The two coordinates</returns>
     private (float Axis0, float Axis1) GridCoordinates(RawMove move, int numAxes)
     {
         float[] coordinates = [0.0f, 0.0f];

@@ -22,7 +22,6 @@ namespace DuetControlServer.Motion.Kinematics;
 internal sealed class PolarKinematicsEngine : KinematicsEngine
 {
     private const int RadiusDrive = 0, TurntableDrive = 1;
-    private const int ZAxis = 2;
 
     private const float DegreesToRadians = MathF.PI / 180.0f;
     private const float RadiansToDegrees = 180.0f / MathF.PI;

@@ -30,7 +30,7 @@ namespace DuetControlServer.Motion.Kinematics;
 /// </remarks>
 internal sealed class FiveBarScaraKinematicsEngine : KinematicsEngine
 {
-    private const int XAxis = 0, YAxis = 1, ZAxis = 2;
+    private const int XAxis = 0, YAxis = 1;
     private const int XyzAxes = 3;
 
     private const float DegreesToRadians = MathF.PI / 180.0f;

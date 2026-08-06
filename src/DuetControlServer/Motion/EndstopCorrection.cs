@@ -33,6 +33,7 @@ namespace DuetControlServer.Motion;
 /// <para>
 /// RepRapFirmware does the equivalent in <c>CanMotion::GetUrgentMessage</c>, from step counts its own
 /// step interrupt captured at the trigger. The quantity on the wire is the same one
+/// </para>
 /// </remarks>
 internal sealed class EndstopCorrection(
     NativeLink nativeLink,

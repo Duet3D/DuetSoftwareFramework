@@ -252,6 +252,7 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, ILogger<Exp
     /// </summary>
     /// <param name="source">CAN address of the board</param>
     /// <param name="status">The report</param>
+    /// <param name="payload">The raw report, which is where the analog handle readings are</param>
     /// <param name="cancellationToken">Cancellation token</param>
     private async ValueTask ApplyBoardStatusAsync(byte source, CanMessageBoardStatusV1 status,
                                                   byte[] payload, CancellationToken cancellationToken)
@@ -452,22 +453,6 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, ILogger<Exp
     }
 
     /// <summary>
-    /// Apply an input change notification
-    /// </summary>
-    /// <param name="states">Digital level of each reported handle, one per bit</param>
-    /// <param name="numHandles">How many handles the message carries</param>
-    /// <param name="getHandle">Reads the n'th handle</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <remarks>
-    /// General-purpose inputs and endstops are applied. A Z probe handle is not: M558 has not been
-    /// ported, so nothing has created the probe it would refer to.
-    /// <para>
-    /// This only records the state. Stopping a move on an endstop is decided by the controller,
-    /// which is the only place close enough to the bus for the latency - see section 10 of
-    /// docs/devel/MCODE_MIGRATION.md
-    /// </para>
-    /// </remarks>
-    /// <summary>
     /// Which switches of each endstop are currently closed, one bit per switch
     /// </summary>
     /// <remarks>
@@ -494,6 +479,22 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, ILogger<Exp
         return switches != 0;
     }
 
+    /// <summary>
+    /// Apply an input change notification
+    /// </summary>
+    /// <param name="states">Digital level of each reported handle, one per bit</param>
+    /// <param name="numHandles">How many handles the message carries</param>
+    /// <param name="getHandle">Reads the n'th handle</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <remarks>
+    /// General-purpose inputs and endstops are applied. A Z probe handle is not: M558 has not been
+    /// ported, so nothing has created the probe it would refer to.
+    /// <para>
+    /// This only records the state. Stopping a move on an endstop is decided by the controller,
+    /// which is the only place close enough to the bus for the latency - see section 10 of
+    /// docs/devel/MCODE_MIGRATION.md
+    /// </para>
+    /// </remarks>
     private async ValueTask ApplyInputChangedAsync(ushort states, byte numHandles, Func<uint, RemoteInputHandle> getHandle,
                                                    CancellationToken cancellationToken)
     {

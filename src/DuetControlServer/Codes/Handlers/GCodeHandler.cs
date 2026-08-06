@@ -502,7 +502,7 @@ internal sealed partial class GCodeHandler(
                 {
                     state.CurrentUserPosition[axis] = machineCoordinates
                         ? moveArg
-                        : moveArg + WorkplaceOffset(axisConfig, model.Move.WorkplaceNumber);
+                        : moveArg + WorkplaceOffset(axisConfig, WorkplaceNumber);
                 }
 
                 if (axisConfig.Rotational)
@@ -1424,7 +1424,7 @@ internal sealed partial class GCodeHandler(
         {
             Axis axisConfig = model.Move.Axes[axis];
             axisConfig.UserPosition = state.CurrentUserPosition[axis]
-                - WorkplaceOffset(axisConfig, model.Move.WorkplaceNumber);
+                - WorkplaceOffset(axisConfig, WorkplaceNumber);
         }
     }
 
@@ -1475,6 +1475,16 @@ internal sealed partial class GCodeHandler(
     /// <returns>The offset in mm</returns>
     private static float WorkplaceOffset(Axis axis, int workplace)
         => workplace >= 0 && workplace < axis.WorkplaceOffsets.Count ? axis.WorkplaceOffsets[workplace] : 0.0f;
+
+    /// <summary>
+    /// The selected workplace, which is a property of the motion system rather than of the machine
+    /// </summary>
+    /// <remarks>
+    /// Only the first motion system is read, as everywhere else here: several of them is a
+    /// RepRapFirmware feature that has not been ported, so there is never more than one
+    /// </remarks>
+    private int WorkplaceNumber
+        => model.Move.MotionSystems.Count > 0 ? model.Move.MotionSystems[0].WorkplaceNumber : 0;
 
     /// <summary>
     /// Bitmap of the axes carrying the given letter

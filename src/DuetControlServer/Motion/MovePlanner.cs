@@ -44,12 +44,10 @@ internal enum MoveSubmitResult
 /// </para>
 /// </remarks>
 /// <param name="linkInterface">Link interface</param>
-/// <param name="motionTracker">What the engine has reported about submitted moves</param>
 /// <param name="model">Object model, which is where the machine configuration lives</param>
 /// <param name="logger">Logger</param>
 internal sealed class MovePlanner(
     LinkInterface linkInterface,
-    MotionTracker motionTracker,
     Model.ObjectModel model,
     ILogger<MovePlanner> logger)
 {
