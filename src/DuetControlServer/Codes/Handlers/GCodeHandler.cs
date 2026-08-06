@@ -131,6 +131,35 @@ internal sealed partial class GCodeHandler(
     public ValueTask CodeExecutedAsync(Commands.Code code, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
     /// <summary>
+    /// Read what kind of move a G0 or G1 asked for
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="moveType">Receives the kind of move</param>
+    /// <param name="error">Receives why the H parameter cannot be used, if it cannot</param>
+    /// <returns>True if the move can be built</returns>
+    /// <remarks>
+    /// The value is checked rather than cast, because every later decision branches on it and an
+    /// unrecognised one would fall through those branches as though it were something else - an H7
+    /// would arm no endstop and yet still bypass the user coordinate system, which is not a
+    /// combination anything below here is written for. RepRapFirmware refuses the same values, in
+    /// <c>gb.TryGetLimitedUIValue('H', moveType, dummy, 5)</c>, and reports it the same way
+    /// </remarks>
+    private static bool TryGetMoveType(Commands.Code code, out MoveType moveType, out Message? error)
+    {
+        int value = code.GetInt('H', 0);
+        if (!Enum.IsDefined(typeof(MoveType), value))
+        {
+            moveType = MoveType.Normal;
+            error = new Message(MessageType.Error, value < 0 ? "parameter 'H' too low" : "parameter 'H' too high");
+            return false;
+        }
+
+        moveType = (MoveType)value;
+        error = null;
+        return true;
+    }
+
+    /// <summary>
     /// Turn a G0 or G1 into a queued move
     /// </summary>
     /// <param name="code">The code</param>
@@ -139,11 +168,15 @@ internal sealed partial class GCodeHandler(
     /// <returns>The result</returns>
     private async ValueTask<Message?> HandleMoveAsync(Commands.Code code, bool isCoordinated, CancellationToken cancellationToken)
     {
+        if (!TryGetMoveType(code, out MoveType moveType, out Message? typeError))
+        {
+            return typeError;
+        }
+
         // A special move is planned against the motor positions rather than the axis positions, so
         // the machine has to have settled before it is built - as in RepRapFirmware, which locks and
         // waits for standstill before reading them
-        int moveType = code.GetInt('H', 0);
-        if (moveType != 0)
+        if (moveType != MoveType.Normal)
         {
             // TODO when multiple motion systems are implemented this will likely need to change to only wait for standstill on the active MS
             await planner.WaitForStandstillAsync(cancellationToken);
@@ -154,7 +187,7 @@ internal sealed partial class GCodeHandler(
         // sent for a move whose axes all home on switches
         HashSet<byte> armedBoards = [];
         Message? armReply = null;
-        if (moveType is 1 or 3 or 4)
+        if (moveType.ChecksEndstops())
         {
             (armedBoards, armReply) = await ArmStallEndstopsAsync(code, cancellationToken);
             if (armReply is { Type: MessageType.Error })
@@ -188,10 +221,10 @@ internal sealed partial class GCodeHandler(
     /// </summary>
     /// <param name="code">The code</param>
     /// <param name="isCoordinated">Whether the axes move together (G1) or independently (G0)</param>
-    /// <param name="moveType">The move's H parameter</param>
+    /// <param name="moveType">What kind of move the H parameter asked for</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> SubmitMoveAsync(Commands.Code code, bool isCoordinated, int moveType,
+    private async ValueTask<Message?> SubmitMoveAsync(Commands.Code code, bool isCoordinated, MoveType moveType,
                                                      CancellationToken cancellationToken)
     {
         RawMove? move = null;
@@ -236,7 +269,7 @@ internal sealed partial class GCodeHandler(
                         {
                             state.CurrentUserPosition.CopyTo(positionBeforeMove, 0);
 
-                            move = BuildRawMove(code, input, isCoordinated, out Message? error);
+                            move = BuildRawMove(code, input, isCoordinated, moveType, out Message? error);
                             if (error is not null)
                             {
                                 positionBeforeMove.AsSpan(0, MotionLimits.MaxAxes).CopyTo(state.CurrentUserPosition);
@@ -283,7 +316,7 @@ internal sealed partial class GCodeHandler(
 
             if (submitted >= segments.Count)
             {
-                if (moveType != 0)
+                if (moveType != MoveType.Normal)
                 {
                     // A special move is where the machine finds out where it is, so the code has to
                     // wait for it rather than queue it and move on. Every ordinary move is committed
@@ -399,7 +432,7 @@ internal sealed partial class GCodeHandler(
             move.Coords[drive] = segments.ExtrusionPerSegment[drive];
         }
 
-        if (move.MoveType == 0)
+        if (move.MoveType == MoveType.Normal)
         {
             ApplyBedCompensation(move, segments.NumAxes);
         }
@@ -414,10 +447,12 @@ internal sealed partial class GCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="input">The channel's interpreter state</param>
     /// <param name="isCoordinated">Whether this is a G1</param>
+    /// <param name="moveType">What kind of move the H parameter asked for</param>
     /// <param name="error">Receives why the move cannot be built, if it cannot</param>
     /// <returns>The move</returns>
     /// <remarks>The caller must hold the object model write lock</remarks>
-    private RawMove BuildRawMove(Commands.Code code, InputChannel input, bool isCoordinated, out Message? error)
+    private RawMove BuildRawMove(Commands.Code code, InputChannel input, bool isCoordinated, MoveType moveType,
+                                 out Message? error)
     {
         error = null;
         MotionParameters parameters = planner.Parameters;
@@ -430,21 +465,21 @@ internal sealed partial class GCodeHandler(
             IsCoordinated = isCoordinated,
             InverseTimeMode = input.InverseTimeMode,
             XAxes = AxisBitmap(model.Move, 'X'),
-            YAxes = AxisBitmap(model.Move, 'Y')
-        };
+            YAxes = AxisBitmap(model.Move, 'Y'),
 
-        // H selects what kind of move this is. H1, H3 and H4 stop on the endstops - that is homing,
-        // measuring an axis' length, and probing - and H2 is an individual motor move that ignores
-        // them
-        raw.MoveType = code.GetInt('H', 0);
-        raw.CheckEndstops = raw.MoveType is 1 or 3 or 4;
+            // H selected what kind of move this is. H1, H3 and H4 stop on the endstops - that is
+            // homing, measuring an axis' length, and probing - and H2 is an individual motor move
+            // that ignores them
+            MoveType = moveType,
+            CheckEndstops = moveType.ChecksEndstops()
+        };
 
         // G53 asks for machine coordinates on this line only, so neither the workplace offset nor
         // (once tools exist) the tool offset applies to it
         bool machineCoordinates = code.Flags.HasFlag(CodeFlags.EnforceAbsolutePosition);
         uint axesMentioned = 0;
 
-        if (raw.MoveType == 0)
+        if (moveType == MoveType.Normal)
         {
             for (int axis = 0; axis < numAxes; axis++)
             {
@@ -582,7 +617,7 @@ internal sealed partial class GCodeHandler(
             raw.UsePressureAdvance = MentionsAxisOtherThanZ(code, numAxes);
         }
 
-        if (raw.MoveType == 0 && axesMentioned != 0)
+        if (moveType == MoveType.Normal && axesMentioned != 0)
         {
             // After the extrusion, because whether the move prints decides what may be done about a
             // target that cannot be reached in a straight line, and before the bed compensation,
@@ -617,7 +652,7 @@ internal sealed partial class GCodeHandler(
     {
         // The overrides belong to the print, so they apply to an ordinary move that names an axis and
         // to nothing else
-        move.ApplyM220M221 = move.MoveType == 0
+        move.ApplyM220M221 = move.MoveType == MoveType.Normal
             && (move.LinearAxesMentioned || move.RotationalAxesMentioned)
             && !code.Flags.HasFlag(CodeFlags.IsFromSystemMacro);
         move.UsingStandardFeedrate = true;
@@ -1276,7 +1311,7 @@ internal sealed partial class GCodeHandler(
         MotionParameters parameters = planner.Parameters;
         int numAxes = Math.Min(parameters.NumAxes, model.Move.Axes.Count);
 
-        if (move.MoveType == 0)
+        if (move.MoveType == MoveType.Normal)
         {
             PublishUserPositions(numAxes);
         }

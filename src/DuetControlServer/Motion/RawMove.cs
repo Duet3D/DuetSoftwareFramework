@@ -131,9 +131,9 @@ internal sealed class RawMove
     public bool ReduceAcceleration { get; set; }
 
     /// <summary>
-    /// 0 for an ordinary move; non-zero for a raw motor move or one that bypasses the kinematics
+    /// What kind of move this is, as chosen by the H parameter
     /// </summary>
-    public int MoveType { get; set; }
+    public MoveType MoveType { get; set; }
 
     /// <summary>Axes the current tool maps X onto, as a bitmap</summary>
     public uint XAxes { get; set; } = 1;
@@ -175,6 +175,6 @@ internal sealed class RawMove
         CheckEndstops = false;
         UsePressureAdvance = false;
         ReduceAcceleration = false;
-        MoveType = 0;
+        MoveType = MoveType.Normal;
     }
 }

@@ -342,8 +342,8 @@ internal sealed class MoveBuilder(MotionParameters parameters)
         if (isPrintingMove) { flags |= MoveFlags.IsPrintingMove; }
         if (extrudersMoving && !isPrintingMove) { flags |= MoveFlags.IsNonPrintingExtruderMove; }
         if (hasForwardExtrusion) { flags |= MoveFlags.HasForwardExtrusion; }
-        if (move.CheckEndstops || move.MoveType != 0) { flags |= MoveFlags.IsolatedMove; }
-        if (move.MoveType == 0) { flags |= MoveFlags.ContinuousRotationShortcut; }
+        if (move.CheckEndstops || move.MoveType != MoveType.Normal) { flags |= MoveFlags.IsolatedMove; }
+        if (move.MoveType == MoveType.Normal) { flags |= MoveFlags.ContinuousRotationShortcut; }
 
         // --- 4. Normalise the direction vector and get the distance ------------------------------------
 

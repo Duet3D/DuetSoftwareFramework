@@ -50,7 +50,7 @@ internal sealed partial class GCodeHandler
     /// failed homing move visible rather than silently believed
     /// </para>
     /// </remarks>
-    private async ValueTask FinishSpecialMoveAsync(int moveType, IReadOnlyList<int> armedAxes,
+    private async ValueTask FinishSpecialMoveAsync(MoveType moveType, IReadOnlyList<int> armedAxes,
                                                    CancellationToken cancellationToken)
     {
         await planner.WaitForStandstillAsync(cancellationToken);
@@ -89,19 +89,20 @@ internal sealed partial class GCodeHandler
 
                     switch (moveType)
                     {
-                        case 1:
+                        case MoveType.Homing:
                             AdoptEndstopPosition(axis, endstop.HighEnd);
                             model.Move.Axes[axis].Homed = true;
                             break;
 
-                        case 3:
+                        case MoveType.SenseLength:
                             // H3 asks how long the axis turned out to be rather than where it is, so
                             // the answer goes into the limit and the axis is left unhomed
                             RecordAxisLength(axis, endstop.HighEnd);
                             break;
 
                         default:
-                            // H4 is a probing move; the probe path owns what comes of it
+                            // H4 is a probing move; the probe path owns what comes of it. H0 and H2
+                            // never arm an axis, so they never reach here
                             break;
                     }
                 }

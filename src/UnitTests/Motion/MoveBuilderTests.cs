@@ -526,7 +526,7 @@ public class MoveBuilderTests
         MoveBuilder builder = NewBuilder(CartesianMachine("corexy"));
 
         RawMove move = LinearMove(1, -10.0f, 0.0f, 0.0f);
-        move.MoveType = 1;
+        move.MoveType = MoveType.Homing;
         move.CheckEndstops = true;
 
         (_, Submission? built) = Build(builder, move);
@@ -600,7 +600,7 @@ public class MoveBuilderTests
         MoveBuilder builder = NewBuilder(CartesianMachine("corexy"));
 
         RawMove move = LinearMove(1, -10.0f, 0.0f, 0.0f);
-        move.MoveType = 2;
+        move.MoveType = MoveType.RawMotor;
 
         (_, Submission? built) = Build(builder, move);
 

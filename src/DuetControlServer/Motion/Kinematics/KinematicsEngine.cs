@@ -269,7 +269,7 @@ internal abstract class KinematicsEngine
     /// <summary>
     /// Whether a move of the given type addresses the motors directly rather than the axes
     /// </summary>
-    /// <param name="moveType">The move's H parameter</param>
+    /// <param name="moveType">What kind of move the H parameter asked for</param>
     /// <returns>True if the coordinates are per-motor rather than per-axis</returns>
     /// <remarks>
     /// Ported from <c>Move::IsRawMotorMove</c>. H2 always is, by definition. Every other special move
@@ -277,7 +277,8 @@ internal abstract class KinematicsEngine
     /// axis for the endstop to belong to - which is why the same <c>G1 H1</c> means different things
     /// on a CoreXY and on a delta
     /// </remarks>
-    public bool IsRawMotorMove(int moveType) => moveType == 2 || (moveType != 0 && HomesIndividualDrives);
+    public bool IsRawMotorMove(MoveType moveType)
+        => moveType == MoveType.RawMotor || (moveType != MoveType.Normal && HomesIndividualDrives);
 
     /// <summary>
     /// Whether this geometry needs a straight move broken into short ones, and along which axes
