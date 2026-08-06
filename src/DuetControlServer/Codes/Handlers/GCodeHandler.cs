@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Link;
 using DuetControlServer.Motion;
 using DuetControlServer.Motion.Native;
 using DuetControlServer.Motion.Kinematics;
@@ -144,6 +145,7 @@ internal sealed partial class GCodeHandler(
         int moveType = code.GetInt('H', 0);
         if (moveType != 0)
         {
+            // TODO when multiple motion systems are implemented this will likely need to change to only wait for standstill on the active MS
             await planner.WaitForStandstillAsync(cancellationToken);
         }
 
@@ -151,19 +153,24 @@ internal sealed partial class GCodeHandler(
         // which is a CAN round trip and so cannot happen with the object model lock held. Nothing is
         // sent for a move whose axes all home on switches
         HashSet<byte> armedBoards = [];
+        Message? armReply = null;
         if (moveType is 1 or 3 or 4)
         {
-            (armedBoards, Message? armError) = await ArmStallEndstopsAsync(code, cancellationToken);
-            if (armError is not null)
+            (armedBoards, armReply) = await ArmStallEndstopsAsync(code, cancellationToken);
+            if (armReply is { Type: MessageType.Error })
             {
                 await DisarmStallEndstopsAsync(armedBoards, cancellationToken);
-                return armError;
+                return armReply;
             }
         }
 
         try
         {
-            return await SubmitMoveAsync(code, isCoordinated, moveType, cancellationToken);
+            // A board that armed the driver but had something to say about it is reported alongside
+            // whatever the move itself came back with, rather than being dropped for not being an
+            // error. A move that never completed still returns null, which is what says so
+            Message? result = await SubmitMoveAsync(code, isCoordinated, moveType, cancellationToken);
+            return result is null || armReply is null ? result : new[] { armReply, result }.ToMessage();
         }
         finally
         {

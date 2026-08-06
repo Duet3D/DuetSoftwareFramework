@@ -1,3 +1,4 @@
+using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
 using DuetControlServer.Link.Protocol.Shared;
 using System;
@@ -69,9 +70,10 @@ public class CanRequest(CanMessageType messageType, CanMessageType replyType, us
     public byte SrcAddress { get; private set; }
 
     /// <summary>
-    /// Actual type of the received reply
+    /// Actual type of the received reply, which stays <see cref="CanMessageType.NoReply"/> for a request
+    /// that never expected one
     /// </summary>
-    public CanMessageType ResponseType { get; private set; }
+    public CanMessageType ResponseType { get; private set; } = CanMessageType.NoReply;
 
     /// <summary>
     /// Status of the received reply
@@ -88,6 +90,15 @@ public class CanRequest(CanMessageType messageType, CanMessageType replyType, us
     /// </summary>
     /// <remarks>Taken from the first fragment, which is where the answer is when there is one</remarks>
     public byte Extra { get; private set; }
+
+    /// <summary>
+    /// Result code the board reported, or null if the reply type carries none
+    /// </summary>
+    /// <remarks>
+    /// Taken from the first fragment. Every fragment of a reply repeats it, but only the first one is
+    /// guaranteed to have arrived when a later fragment is being added
+    /// </remarks>
+    public CodeResult? ResultCode { get; private set; }
 
     /// <summary>
     /// Received reply fragments, keyed by fragment number to handle out-of-order delivery
@@ -107,16 +118,16 @@ public class CanRequest(CanMessageType messageType, CanMessageType replyType, us
     /// <summary>
     /// Add a received reply fragment. Duplicate fragment numbers are ignored.
     /// </summary>
-    /// <param name="fragmentNumber">Zero-based index of the fragment</param>
-    /// <param name="content">Reassembly-relevant content of the fragment</param>
-    public void AddFragment(int fragmentNumber, byte extra, ReadOnlySpan<byte> content)
+    /// <param name="fragment">Decoded reply fragment</param>
+    public void AddFragment(in CanFragment fragment)
     {
-        if (!_fragments.ContainsKey(fragmentNumber))
+        if (!_fragments.ContainsKey(fragment.Number))
         {
-            _fragments[fragmentNumber] = content.ToArray();
-            if (fragmentNumber == 0)
+            _fragments[fragment.Number] = fragment.Content.ToArray();
+            if (fragment.Number == 0)
             {
-                Extra = extra;
+                Extra = fragment.Extra;
+                ResultCode = fragment.ResultCode;
             }
         }
     }

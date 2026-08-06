@@ -1026,8 +1026,8 @@ internal partial class MCodeHandler(
                 Param = 0
             };
             CanResponse response = await linkInterface.SendCanMessageAsync((byte)board, msg, CanMessageType.StandardReply, cancellationToken: cancellationToken);
-            logger.LogDebug("Received firmware version for board {Board}: {Payload}", board, response.PayloadString);
-            return new Message(MessageType.Success, response.PayloadString);
+            logger.LogDebug("Received firmware version for board {Board}: {Payload}", board, response.Text);
+            return response.ToMessage();
         }
         else
         {
@@ -1613,7 +1613,7 @@ internal partial class MCodeHandler(
         else
         {
             CanResponse response = await linkInterface.ReportCanConfigAsync((byte)oldAddress, cancellationToken);
-            return new Message(MessageType.Success, response.PayloadString);
+            return response.ToMessage();
         }
         return new Message();
     }

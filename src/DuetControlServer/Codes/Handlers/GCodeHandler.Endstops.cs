@@ -8,6 +8,7 @@ using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Motion;
+using DuetControlServer.Motion.Native;
 using Microsoft.Extensions.Logging;
 
 namespace DuetControlServer.Codes.Handlers;
@@ -38,24 +39,25 @@ internal sealed partial class GCodeHandler
     /// </summary>
     /// <param name="Driver">The driver</param>
     /// <param name="StepsPerSecond">Speed it will turn at, which is what sets the stall threshold</param>
-    private readonly record struct StallArming(DriverId Driver, float StepsPerSecond);
+    private readonly record struct StallArming(DuetAPI.Utility.DriverId Driver, float StepsPerSecond);
 
     /// <summary>
     /// Tell every driver of a stall-homed axis what speed to expect
     /// </summary>
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>The boards that were armed and an error if one refused</returns>
+    /// <returns>The boards that were armed and what they said about it, if anything</returns>
     /// <remarks>
     /// Ported from <c>StallDetectionEndstop::PrimeAxis</c> by way of
     /// <c>CanInterface::EnableRemoteStallEndstop</c>. Nothing happens for a move whose axes are all
     /// homed by switches, which is the common case
     /// </remarks>
-    private async ValueTask<(HashSet<byte> Boards, Message? Error)> ArmStallEndstopsAsync(
+    private async ValueTask<(HashSet<byte> Boards, Message Reply)> ArmStallEndstopsAsync(
         Commands.Code code, CancellationToken cancellationToken)
     {
         List<StallArming> toArm = [];
         HashSet<byte> boards = [];
+        List<Message> replies = [];
 
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
@@ -78,7 +80,7 @@ internal sealed partial class GCodeHandler
                 // Every drive that has to turn for this axis to move, which on coupled kinematics is
                 // more than the axis' own
                 uint drives = planner.Parameters.Geometry.GetControllingDrives(axis);
-                for (int drive = 0; drive < numAxes && drive < 32; drive++)
+                for (int drive = 0; drive < numAxes && drive < MotionLimits.MaxAxesPlusExtruders; drive++)
                 {
                     if ((drives & (1u << drive)) == 0)
                     {
@@ -87,7 +89,7 @@ internal sealed partial class GCodeHandler
 
                     // The driver is told steps per second, because that is what it compares against
                     float stepsPerSecond = MathF.Abs(feedRateMmPerSec * planner.Parameters.StepsPerMm[drive]);
-                    foreach (DriverId driver in model.Move.Axes[drive].Drivers)
+                    foreach (DuetAPI.Utility.DriverId driver in model.Move.Axes[drive].Drivers)
                     {
                         toArm.Add(new StallArming(driver, stepsPerSecond));
                     }
@@ -108,13 +110,19 @@ internal sealed partial class GCodeHandler
                 board, in message, CanMessageType.StandardReply, cancellationToken: cancellationToken);
             boards.Add(board);
 
-            if (!string.IsNullOrWhiteSpace(response.PayloadString))
+            Message reply = response.ToMessage();
+            if (reply.Type == MessageType.Error)
             {
                 // Some drivers may already be armed, so the caller still has to disarm what it got
-                return (boards, new Message(MessageType.Error, response.PayloadString));
+                return (boards, reply);
             }
+
+            // The driver was armed but the board may still have had something to say about it, which
+            // the move carries back rather than dropping: a warning here is the only sign the user
+            // gets that the stall threshold may not be what they asked for
+            replies.Add(reply);
         }
-        return (boards, null);
+        return (boards, replies.ToMessage());
     }
 
     /// <summary>
@@ -141,8 +149,16 @@ internal sealed partial class GCodeHandler
 
             try
             {
-                await linkInterface.SendCanMessageAsync(board, in message, CanMessageType.StandardReply,
-                                                        cancellationToken: cancellationToken);
+                CanResponse response = await linkInterface.SendCanMessageAsync(board, in message, CanMessageType.StandardReply,
+                                                                               cancellationToken: cancellationToken);
+
+                // The move this cleans up after has already run, so there is nobody left to answer;
+                // a board that would not disarm is still worth a line in the log, because the next
+                // move naming the stall handle is what will notice
+                if (response.Severity != MessageType.Success)
+                {
+                    logger.LogWarning("Board {Board} did not disable its stall endstops: {Reply}", board, response.ToMessage().Content);
+                }
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {

@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Link;
 using DuetControlServer.Link.Protocol;
 using DuetControlServer.Link.Protocol.CanMessages;
@@ -103,26 +104,26 @@ public class CanMessages
     [Test]
     public void StandardReplyFragmentInfo()
     {
-        byte[] fragment = BuildStandardReplyFragment("Hello ", fragmentNumber: 0, moreFollows: true);
-        CanFragmentation.GetFragmentInfo(CanMessageType.StandardReply, fragment, out int fragmentNumber, out bool moreFollows,
-                                         out byte extra, out ReadOnlySpan<byte> content);
+        byte[] payload = BuildStandardReplyFragment("Hello ", fragmentNumber: 0, moreFollows: true, resultCode: CodeResult.Warning);
+        CanFragment fragment = CanFragmentation.Parse(CanMessageType.StandardReply, payload);
 
-        Assert.That(fragmentNumber, Is.EqualTo(0));
-        Assert.That(moreFollows, Is.True);
-        Assert.That(extra, Is.Zero);
-        Assert.That(Encoding.UTF8.GetString(content), Is.EqualTo("Hello "));
+        Assert.That(fragment.Number, Is.EqualTo(0));
+        Assert.That(fragment.MoreFollows, Is.True);
+        Assert.That(fragment.Extra, Is.Zero);
+        Assert.That(fragment.ResultCode, Is.EqualTo(CodeResult.Warning));
+        Assert.That(Encoding.UTF8.GetString(fragment.Content), Is.EqualTo("Hello "));
     }
 
     [Test]
     public void NonFragmentedReplyIsSingleFragment()
     {
         byte[] payload = [1, 2, 3];
-        CanFragmentation.GetFragmentInfo(CanMessageType.AnnounceV1, payload, out int fragmentNumber, out bool moreFollows,
-                                         out _, out ReadOnlySpan<byte> content);
+        CanFragment fragment = CanFragmentation.Parse(CanMessageType.AnnounceV1, payload);
 
-        Assert.That(fragmentNumber, Is.EqualTo(0));
-        Assert.That(moreFollows, Is.False);
-        Assert.That(content.ToArray(), Is.EqualTo(payload));
+        Assert.That(fragment.Number, Is.EqualTo(0));
+        Assert.That(fragment.MoreFollows, Is.False);
+        Assert.That(fragment.ResultCode, Is.Null, "a reply type with no result code of its own must not invent one");
+        Assert.That(fragment.Content.ToArray(), Is.EqualTo(payload));
     }
 
     [Test]
@@ -134,11 +135,10 @@ public class CanMessages
         byte[] second = BuildStandardReplyFragment("World", fragmentNumber: 1, moreFollows: false);
         byte[] first = BuildStandardReplyFragment("Hello ", fragmentNumber: 0, moreFollows: true);
 
-        foreach (byte[] fragment in new[] { second, first })
+        foreach (byte[] payload in new[] { second, first })
         {
-            CanFragmentation.GetFragmentInfo(CanMessageType.StandardReply, fragment, out int fragmentNumber, out _,
-                                             out byte extra, out ReadOnlySpan<byte> content);
-            request.AddFragment(fragmentNumber, extra, content);
+            CanFragment fragment = CanFragmentation.Parse(CanMessageType.StandardReply, payload);
+            request.AddFragment(in fragment);
         }
 
         request.SetResult(CanStatus.Ok, CanMessageType.StandardReply, srcAddress: 7);
@@ -153,12 +153,13 @@ public class CanMessages
     public void DuplicateFragmentIgnored()
     {
         CanRequest request = new(CanMessageType.Reset, CanMessageType.StandardReply, txToken: 1, dstAddress: 0, isResponse: false, requestPayload: []);
-        request.AddFragment(0, 1, "ab"u8);
-        request.AddFragment(0, 2, "XY"u8);  // duplicate fragment number -- ignored
+        request.AddFragment(new CanFragment(0, true, 1, CodeResult.Ok, "ab"u8));
+        request.AddFragment(new CanFragment(0, false, 2, CodeResult.Error, "XY"u8));  // duplicate fragment number -- ignored
         request.SetResult(CanStatus.Ok, CanMessageType.StandardReply, srcAddress: 0);
 
         Assert.That(Encoding.UTF8.GetString(request.ResponsePayload), Is.EqualTo("ab"));
         Assert.That(request.Extra, Is.EqualTo(1), "the duplicate must not overwrite the answer either");
+        Assert.That(request.ResultCode, Is.EqualTo(CodeResult.Ok), "nor the result code");
     }
 
     [Test]
@@ -167,25 +168,125 @@ public class CanMessages
         // Creating an input monitor answers in `extra` rather than in the text: it is the input's
         // current state, and the only way to learn a switch that is already closed. The boards report
         // changes, and a switch that never changes never reports one
-        byte[] fragment = BuildStandardReplyFragment("", fragmentNumber: 0, moreFollows: false, extra: 1);
-        CanFragmentation.GetFragmentInfo(CanMessageType.StandardReply, fragment, out _, out _,
-                                         out byte extra, out _);
-        Assert.That(extra, Is.EqualTo(1));
+        byte[] payload = BuildStandardReplyFragment("", fragmentNumber: 0, moreFollows: true, extra: 1);
+        CanFragment first = CanFragmentation.Parse(CanMessageType.StandardReply, payload);
+        Assert.That(first.Extra, Is.EqualTo(1));
 
         CanRequest request = new(CanMessageType.Reset, CanMessageType.StandardReply, txToken: 1, dstAddress: 0, isResponse: false, requestPayload: []);
-        request.AddFragment(0, extra, ReadOnlySpan<byte>.Empty);
+        request.AddFragment(in first);
 
         // A later fragment carries no answer, so it must not clear the one the first fragment gave
-        request.AddFragment(1, 0, "text"u8);
+        request.AddFragment(new CanFragment(1, false, 0, CodeResult.Ok, "text"u8));
         request.SetResult(CanStatus.Ok, CanMessageType.StandardReply, srcAddress: 0);
         Assert.That(request.Extra, Is.EqualTo(1));
     }
 
-    private static byte[] BuildStandardReplyFragment(string text, byte fragmentNumber, bool moreFollows, byte extra = 0)
+    [Test]
+    public void ARefusedRequestIsAnErrorEvenWithoutText()
+    {
+        // The board said no and did not say why, which used to read as success because the only thing
+        // anyone looked at was whether there was any text
+        CanResponse response = Reply(CodeResult.BadOrMissingParameter, "");
+
+        Assert.That(response.Severity, Is.EqualTo(MessageType.Error));
+        Assert.That(response.ToMessage().Type, Is.EqualTo(MessageType.Error));
+        Assert.That(response.ToMessage().Content, Does.Contain("21").And.Contain("BadOrMissingParameter"));
+    }
+
+    [Test]
+    public void AWarningKeepsItsTextAndIsNotAFailure()
+    {
+        CanResponse response = Reply(CodeResult.WarningNotSupported, "M569.7 is not supported");
+
+        Assert.That(response.Severity, Is.EqualTo(MessageType.Warning));
+        Assert.That(response.ToMessage().Content, Is.EqualTo("M569.7 is not supported"));
+    }
+
+    [Test]
+    public void ASuccessfulReplyReportsItsText()
+    {
+        CanResponse response = Reply(CodeResult.Ok, "Duet3Expansion firmware version 3.7.0");
+
+        Assert.That(response.Severity, Is.EqualTo(MessageType.Success));
+        Assert.That(response.Text, Is.EqualTo("Duet3Expansion firmware version 3.7.0"));
+    }
+
+    [Test]
+    public void AReplyThatNeverArrivedSaysWhichBoardDidNotAnswer()
+    {
+        CanResponse response = new(CanStatus.Timeout, CanMessageType.StandardReply, SrcAddress: 0, DstAddress: 21,
+                                   Payload: [], Extra: 0, ResultCode: null);
+
+        Assert.That(response.Severity, Is.EqualTo(MessageType.Error));
+        Assert.That(response.ToMessage().Content, Does.Contain("21").And.Contain("Timeout"));
+    }
+
+    [Test]
+    public void ARequestExpectingNoReplyHasNothingToReport()
+    {
+        CanResponse response = new(CanStatus.Ok, CanMessageType.NoReply, SrcAddress: 0, DstAddress: 21,
+                                   Payload: [], Extra: 0, ResultCode: null);
+
+        Assert.That(response.Severity, Is.EqualTo(MessageType.Success));
+        Assert.That(response.Text, Is.Empty);
+        Assert.That(() => response.AsCanMessage<CanMessageHeaterModelReport>(), Throws.InvalidOperationException);
+    }
+
+    [Test]
+    public void AReplyIsOnlyReadAsTheMessageItWasSentAs()
+    {
+        CanMessageHeaterModelReport report = new() { HeaterNumber = 3, ResultCode = CodeResult.Ok };
+        byte[] payload = new byte[Unsafe.SizeOf<CanMessageHeaterModelReport>()];
+        CanMessageSerializer.Serialize(in report, payload);
+        CanResponse response = new(CanStatus.Ok, CanMessageType.HeaterModelReport, SrcAddress: 21, DstAddress: 21,
+                                   payload, Extra: 0, CodeResult.Ok);
+
+        Assert.That(response.AsCanMessage<CanMessageHeaterModelReport>().HeaterNumber, Is.EqualTo(3));
+
+        // Naming another message type would otherwise read the same bytes as something they are not
+        Assert.That(() => response.AsCanMessage<CanMessageReadInputsReplyV1>(), Throws.InvalidOperationException);
+    }
+
+    [Test]
+    public void ASilentSuccessIsAnEmptyMessageThatCollectingDropsAgain()
+    {
+        // The one message every caller gets means the decision a warning would be lost by is never
+        // theirs to make: a board that did the work without comment is an empty success, which says
+        // "done, nothing to report" as a code result and disappears when replies are collected
+        Assert.That(Reply(CodeResult.Ok, "").ToMessage().Content, Is.Empty);
+        Assert.That(Reply(CodeResult.Warning, "stall threshold clamped").ToMessage().Type, Is.EqualTo(MessageType.Warning));
+
+        Message combined = new[] { Reply(CodeResult.Ok, "").ToMessage(), Reply(CodeResult.Warning, "clamped").ToMessage() }.ToMessage();
+        Assert.That(combined.Type, Is.EqualTo(MessageType.Warning));
+        Assert.That(combined.Content, Is.EqualTo("clamped"));
+    }
+
+    [Test]
+    public void CollectedRepliesKeepTheWorstOfWhatTheBoardsSaid()
+    {
+        Message combined = new Message?[]
+        {
+            null,
+            new Message(MessageType.Success, ""),
+            new Message(MessageType.Warning, "board 21: driver 0 not present"),
+            new Message(MessageType.Error, "board 22: bad parameter")
+        }.ToMessage();
+
+        Assert.That(combined.Type, Is.EqualTo(MessageType.Error));
+        Assert.That(combined.Content, Is.EqualTo("board 21: driver 0 not present\nboard 22: bad parameter"));
+    }
+
+    /// <summary>A standard reply from board 21, as the link would hand it over once reassembled</summary>
+    private static CanResponse Reply(CodeResult resultCode, string text)
+        => new(CanStatus.Ok, CanMessageType.StandardReply, SrcAddress: 21, DstAddress: 21,
+               Encoding.ASCII.GetBytes(text), Extra: 0, resultCode);
+
+    private static byte[] BuildStandardReplyFragment(string text, byte fragmentNumber, bool moreFollows, byte extra = 0,
+                                                     CodeResult resultCode = CodeResult.Ok)
     {
         byte[] textBytes = Encoding.UTF8.GetBytes(text);
         byte[] payload = new byte[sizeof(uint) + textBytes.Length];
-        uint header = ((uint)fragmentNumber << 16) | (moreFollows ? 1u << 23 : 0) | ((uint)extra << 24);
+        uint header = ((uint)resultCode << 12) | ((uint)fragmentNumber << 16) | (moreFollows ? 1u << 23 : 0) | ((uint)extra << 24);
         BinaryPrimitives.WriteUInt32LittleEndian(payload, header);
         textBytes.CopyTo(payload, sizeof(uint));
         return payload;

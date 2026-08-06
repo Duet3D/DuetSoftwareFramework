@@ -779,10 +779,10 @@ internal partial class MCodeHandler
 
         // The standstill percentage is its own setting on the driver; the other two both end up as
         // the current the driver should run at
-        IList<string> replies = which == 917
+        IList<Message> replies = which == 917
             ? await RemoteDrivers.SetStandstillCurrentFactorAsync(linkInterface, toUpdate, cancellationToken)
             : await RemoteDrivers.SetMotorCurrentsAsync(linkInterface, toUpdate, cancellationToken);
-        return replies.Count > 0 ? new Message(MessageType.Warning, string.Join('\n', replies)) : new Message();
+        return replies.ToMessage();
     }
 
     /// <summary>
@@ -868,8 +868,8 @@ internal partial class MCodeHandler
             return new Message();
         }
 
-        IList<string> replies = await RemoteDrivers.SetDriverStatesAsync(linkInterface, toUpdate, cancellationToken);
-        return replies.Count > 0 ? new Message(MessageType.Warning, string.Join('\n', replies)) : new Message();
+        IList<Message> replies = await RemoteDrivers.SetDriverStatesAsync(linkInterface, toUpdate, cancellationToken);
+        return replies.ToMessage();
     }
 
     /// <summary>
@@ -948,7 +948,7 @@ internal partial class MCodeHandler
         {
             await RecordDriverConfigAsync(driver, code, cancellationToken);
         }
-        return new Message(MessageType.Success, response.PayloadString);
+        return response.ToMessage();
     }
 
     /// <summary>
@@ -1108,7 +1108,7 @@ internal partial class MCodeHandler
             return new Message(MessageType.Error, "No drivers specified");
         }
 
-        List<string> replies = [];
+        List<Message> replies = [];
         foreach (IGrouping<int, DriverId> board in drivers.GroupBy(driver => driver.Board))
         {
             CanMessageM915 message = default;
@@ -1132,14 +1132,11 @@ internal partial class MCodeHandler
 
             CanResponse response = await linkInterface.SendCanMessageAsync((byte)board.Key, in message, CanMessageType.StandardReply,
                                                                            cancellationToken: cancellationToken);
-            if (!string.IsNullOrWhiteSpace(response.PayloadString))
-            {
-                replies.Add(response.PayloadString);
-            }
+            replies.Add(response.ToMessage());
         }
 
         await RecordStallDetectionAsync(drivers, code, cancellationToken);
-        return new Message(MessageType.Success, string.Join('\n', replies));
+        return replies.ToMessage();
     }
 
     /// <summary>
@@ -1278,8 +1275,8 @@ internal partial class MCodeHandler
             return new Message();
         }
 
-        IList<string> replies = await RemoteDrivers.SetPressureAdvanceAsync(linkInterface, toUpdate, cancellationToken);
-        return replies.Count > 0 ? new Message(MessageType.Warning, string.Join('\n', replies)) : new Message();
+        IList<Message> replies = await RemoteDrivers.SetPressureAdvanceAsync(linkInterface, toUpdate, cancellationToken);
+        return replies.ToMessage();
     }
 
     /// <summary>
@@ -2208,7 +2205,7 @@ internal partial class MCodeHandler
         }
 
         // Tell the boards to watch the ports. Done outside the model lock because it goes over CAN
-        List<string> replies = [];
+        List<Message> replies = [];
         foreach ((int axis, int position) in configured)
         {
             if (position == (int)EndstopPosition.None)
@@ -2216,14 +2213,10 @@ internal partial class MCodeHandler
                 continue;
             }
 
-            string? failure = await CreateEndstopMonitorAsync(axis, cancellationToken);
-            if (failure is not null)
-            {
-                replies.Add(failure);
-            }
+            replies.Add(await CreateEndstopMonitorAsync(axis, cancellationToken));
         }
 
-        return replies.Count > 0 ? new Message(MessageType.Warning, string.Join('\n', replies)) : new Message();
+        return replies.ToMessage();
     }
 
     /// <summary>
@@ -2624,22 +2617,23 @@ internal partial class MCodeHandler
         return null;
     }
 
-    private async ValueTask<string?> CreateEndstopMonitorAsync(int axis, CancellationToken cancellationToken)
+    private async ValueTask<Message> CreateEndstopMonitorAsync(int axis, CancellationToken cancellationToken)
     {
+        List<Message> replies = [];
         string[] ports;
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
             Endstop? endstop = axis < model.Sensors.Endstops.Count ? model.Sensors.Endstops[axis] : null;
             if (endstop is null || endstop.Type != EndstopType.InputPin)
             {
-                return null;                    // nothing to monitor: not a switch on a pin
+                return new Message();           // nothing to monitor: not a switch on a pin
             }
             ports = RemoteEndstops.PortsOf(endstop);
         }
 
         if (ports.Length == 0)
         {
-            return null;                        // no port named yet, so there is nothing to ask for
+            return new Message();               // no port named yet, so there is nothing to ask for
         }
 
         // An axis with a switch per driver needs one monitor per switch, each under the handle that
@@ -2648,7 +2642,7 @@ internal partial class MCodeHandler
         {
             if (!RemoteEndstops.TrySplitPort(ports[switchIndex], out byte board, out string localPort))
             {
-                return $"Invalid endstop port '{ports[switchIndex]}'";
+                return new Message(MessageType.Error, $"Invalid endstop port '{ports[switchIndex]}'");
             }
 
             CanMessageCreateInputMonitorV1 message = new()
@@ -2661,12 +2655,17 @@ internal partial class MCodeHandler
 
             CanResponse response = await linkInterface.SendCanMessageAsync(board, in message, CanMessageType.StandardReply,
                                                                           cancellationToken: cancellationToken);
-            if (!string.IsNullOrWhiteSpace(response.PayloadString))
+            Message reply = response.ToMessage();
+            if (reply.Type == MessageType.Error)
             {
-                return response.PayloadString;
+                return reply;                   // the switch is not being watched, so stop here
             }
+
+            // The board took the port but may still have had something to say about it, which the
+            // code carries back rather than dropping for not being an error
+            replies.Add(reply);
         }
-        return null;
+        return replies.ToMessage();
     }
 
     /// <summary>
@@ -2992,8 +2991,8 @@ internal partial class MCodeHandler
             return new Message();
         }
 
-        IList<string> replies = await RemoteDrivers.SetStepsPerMmAndMicrosteppingAsync(linkInterface, toUpdate, cancellationToken);
-        return replies.Count > 0 ? new Message(MessageType.Warning, string.Join('\n', replies)) : new Message();
+        IList<Message> replies = await RemoteDrivers.SetStepsPerMmAndMicrosteppingAsync(linkInterface, toUpdate, cancellationToken);
+        return replies.ToMessage();
     }
 
     /// <summary>
@@ -3010,8 +3009,8 @@ internal partial class MCodeHandler
             return new Message();
         }
 
-        IList<string> replies = await RemoteDrivers.SetMotorCurrentsAsync(linkInterface, toUpdate, cancellationToken);
-        return replies.Count > 0 ? new Message(MessageType.Warning, string.Join('\n', replies)) : new Message();
+        IList<Message> replies = await RemoteDrivers.SetMotorCurrentsAsync(linkInterface, toUpdate, cancellationToken);
+        return replies.ToMessage();
     }
 
     /// <summary>

@@ -621,11 +621,10 @@ internal sealed class LinkService(
             }
 
             // Reassemble the (possibly fragmented) reply
-            CanFragmentation.GetFragmentInfo(request.ReplyType, payload, out int fragmentNumber, out bool moreFollows,
-                                             out byte extra, out ReadOnlySpan<byte> content);
-            logger.LogDebug("Received CAN response fragment {FragmentNumber} of type {MsgType} from address {SrcAddress} ({Length} bytes, more follows: {MoreFollows})", fragmentNumber, msgType, srcAddress, content.Length, moreFollows);
-            request.AddFragment(fragmentNumber, extra, content);
-            if (!moreFollows)
+            CanFragment fragment = CanFragmentation.Parse(request.ReplyType, payload);
+            logger.LogDebug("Received CAN response fragment {FragmentNumber} of type {MsgType} from address {SrcAddress} ({Length} bytes, result {ResultCode}, more follows: {MoreFollows})", fragment.Number, msgType, srcAddress, fragment.Content.Length, fragment.ResultCode, fragment.MoreFollows);
+            request.AddFragment(in fragment);
+            if (!fragment.MoreFollows)
             {
                 request.SetResult(status, msgType, srcAddress);
                 linkInterface.CanRequests.Remove(request);

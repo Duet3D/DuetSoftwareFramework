@@ -160,12 +160,17 @@ internal partial class MCodeHandler
             }
         }
 
-        if (monitorPort is not null &&
-            await CreateProbeMonitorAsync(probeNumber, monitorPort, cancellationToken) is string monitorError)
+        Message monitorReply = monitorPort is not null
+            ? await CreateProbeMonitorAsync(probeNumber, monitorPort, cancellationToken)
+            : new Message();
+        if (monitorReply.Type == MessageType.Error)
         {
-            return new Message(MessageType.Error, monitorError);
+            return monitorReply;
         }
-        return report is null ? new Message() : new Message(MessageType.Success, report);
+
+        // A board that took the port but had something to say about it is reported too, since M558
+        // otherwise looks like it configured exactly what was asked for
+        return new[] { monitorReply, new Message(MessageType.Success, report ?? string.Empty) }.ToMessage();
     }
 
     /// <summary>
@@ -283,12 +288,12 @@ internal partial class MCodeHandler
     /// <param name="probeNumber">Probe number</param>
     /// <param name="port">Port as given to M558</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>What the board objected to, or null if it accepted</returns>
-    private async ValueTask<string?> CreateProbeMonitorAsync(int probeNumber, string port, CancellationToken cancellationToken)
+    /// <returns>What the board said about it, empty if it accepted without comment</returns>
+    private async ValueTask<Message> CreateProbeMonitorAsync(int probeNumber, string port, CancellationToken cancellationToken)
     {
         if (!RemoteEndstops.TrySplitPort(port, out byte board, out string localPort))
         {
-            return $"Invalid Z probe port '{port}'";
+            return new Message(MessageType.Error, $"Invalid Z probe port '{port}'");
         }
 
         int threshold;
@@ -313,7 +318,7 @@ internal partial class MCodeHandler
 
         CanResponse response = await linkInterface.SendCanMessageAsync(board, in message, CanMessageType.StandardReply,
                                                                       cancellationToken: cancellationToken);
-        return string.IsNullOrWhiteSpace(response.PayloadString) ? null : response.PayloadString;
+        return response.ToMessage();
     }
 
     /// <summary>

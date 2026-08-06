@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.Link.Protocol.Shared;
 
@@ -50,13 +51,13 @@ internal static class RemoteDrivers
     /// <param name="linkInterface">Link interface</param>
     /// <param name="values">Drivers with their steps per mm, microstepping and interpolation flag</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>What the boards reported, empty if they were all happy</returns>
-    public static async ValueTask<IList<string>> SetStepsPerMmAndMicrosteppingAsync(
+    /// <returns>What each board made of it</returns>
+    public static async ValueTask<IList<Message>> SetStepsPerMmAndMicrosteppingAsync(
         LinkInterface linkInterface,
         IEnumerable<DriverValue<(float StepsPerMm, int Microstepping, bool Interpolated)>> values,
         CancellationToken cancellationToken = default)
     {
-        List<string> replies = [];
+        List<Message> replies = [];
         foreach ((byte board, ushort bitmap, (float StepsPerMm, int Microstepping, bool Interpolated)[] ordered) in GroupByBoard(values))
         {
             CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping message = new()
@@ -82,11 +83,11 @@ internal static class RemoteDrivers
     /// <param name="linkInterface">Link interface</param>
     /// <param name="values">Drivers and their currents in mA</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>What the boards reported, empty if they were all happy</returns>
-    public static async ValueTask<IList<string>> SetMotorCurrentsAsync(LinkInterface linkInterface, IEnumerable<DriverValue<float>> values,
+    /// <returns>What each board made of it</returns>
+    public static async ValueTask<IList<Message>> SetMotorCurrentsAsync(LinkInterface linkInterface, IEnumerable<DriverValue<float>> values,
                                                                       CancellationToken cancellationToken = default)
     {
-        List<string> replies = [];
+        List<Message> replies = [];
         foreach ((byte board, ushort bitmap, float[] ordered) in GroupByBoard(values))
         {
             CanMessageMultipleDrivesRequestMotorCurrents message = new()
@@ -109,12 +110,12 @@ internal static class RemoteDrivers
     /// <param name="linkInterface">Link interface</param>
     /// <param name="values">Drivers and the state to put each in, with the idle current percentage</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>What the boards reported, empty if they were all happy</returns>
-    public static async ValueTask<IList<string>> SetDriverStatesAsync(LinkInterface linkInterface,
+    /// <returns>What each board made of it</returns>
+    public static async ValueTask<IList<Message>> SetDriverStatesAsync(LinkInterface linkInterface,
                                                                      IEnumerable<DriverValue<(ushort Mode, ushort IdlePercent)>> values,
                                                                      CancellationToken cancellationToken = default)
     {
-        List<string> replies = [];
+        List<Message> replies = [];
         foreach ((byte board, ushort bitmap, (ushort Mode, ushort IdlePercent)[] ordered) in GroupByBoard(values))
         {
             CanMessageMultipleDrivesRequestDriverStateControl message = new()
@@ -137,12 +138,12 @@ internal static class RemoteDrivers
     /// <param name="linkInterface">Link interface</param>
     /// <param name="values">Drivers and their standstill current percentages</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>What the boards reported, empty if they were all happy</returns>
-    public static async ValueTask<IList<string>> SetStandstillCurrentFactorAsync(LinkInterface linkInterface,
+    /// <returns>What each board made of it</returns>
+    public static async ValueTask<IList<Message>> SetStandstillCurrentFactorAsync(LinkInterface linkInterface,
                                                                                 IEnumerable<DriverValue<float>> values,
                                                                                 CancellationToken cancellationToken = default)
     {
-        List<string> replies = [];
+        List<Message> replies = [];
         foreach ((byte board, ushort bitmap, float[] ordered) in GroupByBoard(values))
         {
             CanMessageMultipleDrivesRequestStandstillCurrentFactor message = new()
@@ -165,11 +166,11 @@ internal static class RemoteDrivers
     /// <param name="linkInterface">Link interface</param>
     /// <param name="values">Drivers and their pressure advance in seconds</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>What the boards reported, empty if they were all happy</returns>
-    public static async ValueTask<IList<string>> SetPressureAdvanceAsync(LinkInterface linkInterface, IEnumerable<DriverValue<float>> values,
+    /// <returns>What each board made of it</returns>
+    public static async ValueTask<IList<Message>> SetPressureAdvanceAsync(LinkInterface linkInterface, IEnumerable<DriverValue<float>> values,
                                                                         CancellationToken cancellationToken = default)
     {
-        List<string> replies = [];
+        List<Message> replies = [];
         foreach ((byte board, ushort bitmap, float[] ordered) in GroupByBoard(values))
         {
             CanMessageMultipleDrivesRequestPressureAdvanceV1 message = new()
@@ -193,18 +194,15 @@ internal static class RemoteDrivers
     /// <param name="linkInterface">Link interface</param>
     /// <param name="board">CAN address to send to</param>
     /// <param name="message">The message</param>
-    /// <param name="replies">Where to add the board's reply if it made one</param>
+    /// <param name="replies">Where to add what the board made of it</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    private static async ValueTask SendAsync<TMessage>(LinkInterface linkInterface, byte board, TMessage message, List<string> replies,
+    private static async ValueTask SendAsync<TMessage>(LinkInterface linkInterface, byte board, TMessage message, List<Message> replies,
                                                        CancellationToken cancellationToken)
         where TMessage : struct, ICanMessage<TMessage>
     {
         CanResponse response = await linkInterface.SendCanMessageAsync(board, in message, CanMessageType.StandardReply,
                                                                        cancellationToken: cancellationToken);
-        if (!string.IsNullOrWhiteSpace(response.PayloadString))
-        {
-            replies.Add(response.PayloadString);
-        }
+        replies.Add(response.ToMessage());
     }
 
     /// <summary>
