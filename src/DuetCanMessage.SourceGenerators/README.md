@@ -151,6 +151,20 @@ struct. Bitfields may be marked `bool` (a `bool` property in C#) or `signed` (si
 makes the C++ side use the `LoadLE`/`StoreLE` helpers. `cppAccessPath` records that CANlib reaches the
 member through a sub-struct, which only affects the C++ probe.
 
+A bitfield that carries one of the [enums](#enums-constants-and-addresses) names it with `enum`, which types
+the C# property as that enum rather than as the integer it travels as:
+
+```jsonc
+{ "name": "resultCode", "width": 4, "enum": "GCodeResult" }   // public CodeResult ResultCode { ... }
+```
+
+The name is CANlib's, as in the `enums` section; the C# property uses that enum's `csharpName`, so the four
+replies that carry a result code expose a `CodeResult` and a caller cannot pass an unrelated number for one.
+C++ is untouched: CANlib declares these as plain unsigned bitfields and assigns casts to them, so the
+generated header would stop being a drop-in if it named the enum. The generator checks that the enum is one
+it emits and that every enumerator fits in the field's width, and rejects an enum-typed field that is also
+`reserved` or cleared by `SetRequestId`, since those clears are generated as an assignment of `0`.
+
 ### Methods
 
 Method bodies are written once, in a small neutral language, and rendered into both targets:

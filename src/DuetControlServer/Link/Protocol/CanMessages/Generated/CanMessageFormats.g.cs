@@ -2252,9 +2252,9 @@ public struct CanMessageHeaterModelReport : ICanMessage<CanMessageHeaterModelRep
     /// Normally a GCodeResult; must be in the same place as in a standard reply
     /// (4-bit field, bits 12-15 of the message)
     /// </summary>
-    public byte ResultCode
+    public CodeResult ResultCode
     {
-        readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
+        readonly get => (CodeResult)((((uint)_bits0) >> 12) & 0xFU);
         set => _bits0 = (uint)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
@@ -2508,9 +2508,9 @@ public struct CanMessageStandardReply : ICanMessage<CanMessageStandardReply>
     /// Normally a GCodeResult
     /// (4-bit field, bits 12-15 of the message)
     /// </summary>
-    public byte ResultCode
+    public CodeResult ResultCode
     {
-        readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
+        readonly get => (CodeResult)((((uint)_bits0) >> 12) & 0xFU);
         set => _bits0 = (uint)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
@@ -2586,9 +2586,9 @@ public struct CanMessageReadInputsReplyV0 : ICanMessage<CanMessageReadInputsRepl
     /// Normally a GCodeResult
     /// (4-bit field, bits 12-15 of the message)
     /// </summary>
-    public byte ResultCode
+    public CodeResult ResultCode
     {
-        readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
+        readonly get => (CodeResult)((((uint)_bits0) >> 12) & 0xFU);
         set => _bits0 = (uint)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
@@ -2649,9 +2649,9 @@ public struct CanMessageReadInputsReplyV1 : ICanMessage<CanMessageReadInputsRepl
     /// Normally a GCodeResult
     /// (4-bit field, bits 12-15 of the message)
     /// </summary>
-    public byte ResultCode
+    public CodeResult ResultCode
     {
-        readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
+        readonly get => (CodeResult)((((uint)_bits0) >> 12) & 0xFU);
         set => _bits0 = (uint)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 

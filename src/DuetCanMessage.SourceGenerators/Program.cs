@@ -23,6 +23,7 @@ public static class Program
             schema = CanSchema.Load(schemaPath);
             ExpandTemplates(schema);
             CheckEveryMessageCanNameItsType(schema);
+            CheckEnumBitFields(schema);
             LayoutEngine.ComputeAll(schema);
         }
         catch (Exception e) when (e is InvalidDataException or InvalidOperationException)
@@ -126,6 +127,57 @@ public static class Program
     }
 
     /// <summary>
+    /// Check the enums that bitfields carry. Such a field is typed as the enum on the C# side, so the enum
+    /// has to exist, has to be one this generator emits into the shared namespace the message files import,
+    /// and has to fit in the field: an enumerator too wide for the bitfield would be truncated on the wire.
+    /// A field that is cleared by SetRequestId or ClearReservedFields is rejected as well, because those are
+    /// generated as an assignment of 0, which is not a value of an enum type in C#.
+    /// </summary>
+    private static void CheckEnumBitFields(CanSchema schema)
+    {
+        foreach (StructDef s in schema.Structs)
+        {
+            foreach (BitFieldDef f in s.AllBitFields.Where(f => f.Enum is not null))
+            {
+                MessageTypeEnumDef e = schema.FindEnum(f.Enum!)
+                    ?? throw new InvalidDataException($"{s.Name}.{f.Name} carries enum '{f.Enum}', which the schema does not declare");
+                if (e.CheckOnly)
+                {
+                    throw new InvalidDataException(
+                        $"{s.Name}.{f.Name} carries enum '{f.Enum}', which is checked rather than generated. "
+                        + "The generated messages can only name an enum this generator emits alongside them");
+                }
+                if (f.Bool || f.Signed)
+                {
+                    throw new InvalidDataException($"{s.Name}.{f.Name} carries enum '{f.Enum}' as well as being bool or signed");
+                }
+                if (f.Reserved || s.SetRequestIdAlsoClears.Contains(f.Name) || s.ClearAlsoClears.Contains(f.Name))
+                {
+                    throw new InvalidDataException(
+                        $"{s.Name}.{f.Name} carries enum '{f.Enum}' and is also cleared by SetRequestId or ClearReservedFields, "
+                        + "which are generated as an assignment of 0. Drop the \"enum\" key or stop clearing the field");
+                }
+
+                MessageTypeDef? tooWide = e.Values.FirstOrDefault(v => v.Section is null && !v.IsAlias && !FitsIn(v.Value, f.Width));
+                if (tooWide is not null)
+                {
+                    throw new InvalidDataException(
+                        $"{s.Name}.{f.Name} is {f.Width} bits wide but {f.Enum}.{tooWide.Name} is {tooWide.Value}, which does not fit");
+                }
+            }
+        }
+    }
+
+    /// <summary>True if an enumerator value can be carried in a bitfield of the given width.</summary>
+    private static bool FitsIn(string value, int width)
+    {
+        long parsed = value.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+            ? Convert.ToInt64(value[2..], 16)
+            : long.Parse(value);
+        return parsed >= 0 && (width >= 63 || parsed < 1L << width);
+    }
+
+    /// <summary>
     /// Replace each template struct with the concrete instantiations that the C# side needs. C++ keeps
     /// the template itself, so the template's own definition stays in the C++ output only.
     /// </summary>
@@ -192,7 +244,7 @@ public static class Program
         Fields = [.. m.Fields.Select(f => new BitFieldDef
         {
             Name = f.Name, Width = f.Width, Bool = f.Bool, Signed = f.Signed, Reserved = f.Reserved,
-            Doc = f.Doc, CppAccessPath = f.CppAccessPath
+            Enum = f.Enum, Doc = f.Doc, CppAccessPath = f.CppAccessPath
         })],
         Anonymous = m.Anonymous,
         Alternatives = [.. m.Alternatives.Select(CloneMember)],

@@ -637,6 +637,11 @@
           "description": "A spare bit that the generated SetRequestId or ClearReservedFields zeroes.",
           "default": false
         },
+        "enum": {
+          "type": "string",
+          "description": "CANlib name of an enum declared under \"enums\" that this field carries. The C# property is typed as that enum instead of as a bare integer; C++ keeps the plain bitfield CANlib declares.",
+          "examples": ["GCodeResult"]
+        },
         "doc": { "$ref": "#/$defs/docText" }
       }
     },

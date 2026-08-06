@@ -17,13 +17,26 @@ public sealed class CSharpEmitter(CanSchema schema)
     private readonly SortedSet<string> _buffers = [];
     private readonly List<(string Field, string? Doc)> _stringAccessors = [];
 
-    /// <summary>The schema type used for the C# property of a bitfield.</summary>
+    /// <summary>The schema type used for the C# property of a bitfield, ignoring any enum it carries.</summary>
     public static string BitFieldSchemaType(BitFieldDef f) => f.Bool ? "bool"
         : f.Signed ? (f.Width <= 32 ? "i32" : "i64")
         : f.Width <= 8 ? "u8"
         : f.Width <= 16 ? "u16"
         : f.Width <= 32 ? "u32"
         : "u64";
+
+    /// <summary>
+    /// The C# type of a bitfield property. A field that carries an enum is typed as that enum rather than
+    /// as the integer it travels as, so a caller cannot pass an unrelated number where a result code is
+    /// expected. C++ keeps the plain bitfield, because its header has to stay a drop-in for CANlib's.
+    /// </summary>
+    public static string BitFieldCSharpType(CanSchema schema, BitFieldDef f) => f.Enum is null
+        ? Types.CSharp(schema, BitFieldSchemaType(f))
+        : CSharpEnumName(schema, f.Enum);
+
+    /// <summary>How the C# side spells a schema enum, which is not always what CANlib calls it.</summary>
+    public static string CSharpEnumName(CanSchema schema, string name) =>
+        (schema.FindEnum(name) ?? throw new InvalidDataException($"unknown enum '{name}'")).CSharpName;
 
     public string EmitStructs()
     {
@@ -390,7 +403,7 @@ public sealed class CSharpEmitter(CanSchema schema)
                 }
                 needsBlank = true;
 
-                string type = Types.CSharp(schema, BitFieldSchemaType(f));
+                string type = BitFieldCSharpType(schema, f);
                 // Reserved fields stay public, exactly as they are in the C++ structs, so that the
                 // generated conformance test can pin down their bit positions too
                 const string visibility = "public";

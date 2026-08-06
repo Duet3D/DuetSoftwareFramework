@@ -42,7 +42,7 @@ public class CanMessages
         CanMessageStandardReply reply = new()
         {
             RequestId = 0xABC,
-            ResultCode = 0x5,
+            ResultCode = CodeResult.ErrorNotSupported,
             FragmentNumber = 0x42,
             MoreFollows = true,
             Extra = 0x9A
@@ -50,7 +50,7 @@ public class CanMessages
 
         // Property round-trips
         Assert.That(reply.RequestId, Is.EqualTo(0xABC));
-        Assert.That(reply.ResultCode, Is.EqualTo(0x5));
+        Assert.That(reply.ResultCode, Is.EqualTo(CodeResult.ErrorNotSupported));
         Assert.That(reply.FragmentNumber, Is.EqualTo(0x42));
         Assert.That(reply.MoreFollows, Is.True);
         Assert.That(reply.Extra, Is.EqualTo(0x9A));
@@ -58,7 +58,7 @@ public class CanMessages
         // Bit layout: requestId:12, resultCode:4, fragmentNumber:7, moreFollows:1, extra:8
         Span<byte> bytes = stackalloc byte[Unsafe.SizeOf<CanMessageStandardReply>()];
         MemoryMarshal.Write(bytes, in reply);
-        uint expected = 0xABCu | (0x5u << 12) | (0x42u << 16) | (1u << 23) | (0x9Au << 24);
+        uint expected = 0xABCu | ((uint)CodeResult.ErrorNotSupported << 12) | (0x42u << 16) | (1u << 23) | (0x9Au << 24);
         Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(bytes), Is.EqualTo(expected));
     }
 

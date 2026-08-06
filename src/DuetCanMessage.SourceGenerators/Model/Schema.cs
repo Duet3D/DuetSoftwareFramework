@@ -36,6 +36,12 @@ public sealed class BitFieldDef
     public bool Reserved;
     public string? Doc;
 
+    /// <summary>
+    /// CANlib name of the enum this field carries, where it carries one. The C# property is typed as that
+    /// enum instead of a bare integer; C++ keeps the plain bitfield CANlib declares.
+    /// </summary>
+    public string? Enum;
+
     /// <summary>How the field is reached in CANlib's own C++ struct, when that differs from the flat schema view.</summary>
     public string? CppAccessPath;
 
@@ -563,6 +569,9 @@ public sealed class CanSchema
 
     public StructDef? Find(string name) => ByName.GetValueOrDefault(name);
 
+    /// <summary>Find an enum by the name CANlib gives it, which is how the schema refers to it.</summary>
+    public MessageTypeEnumDef? FindEnum(string name) => Enums.FirstOrDefault(e => e.Name == name);
+
     public static CanSchema Load(string path)
     {
         JsonNode root = JsonNode.Parse(File.ReadAllText(path), documentOptions: new JsonDocumentOptions
@@ -946,6 +955,7 @@ public sealed class CanSchema
                 Bool = Bool(f, "bool") ?? false,
                 Signed = Bool(f, "signed") ?? false,
                 Reserved = Bool(f, "reserved") ?? false,
+                Enum = Str(f, "enum"),
                 Doc = Doc(f),
                 CppAccessPath = m.CppAccessPath
             });

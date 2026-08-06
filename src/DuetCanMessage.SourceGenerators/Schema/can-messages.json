@@ -1300,7 +1300,7 @@
           "kind": "bitfield", "storage": "u32",
           "fields": [
             { "name": "requestId", "width": 12, "doc": "The request ID of the message we are replying to; must be in the same place as in a standard reply" },
-            { "name": "resultCode", "width": 4, "doc": "Normally a GCodeResult; must be in the same place as in a standard reply" },
+            { "name": "resultCode", "width": 4, "enum": "GCodeResult", "doc": "Normally a GCodeResult; must be in the same place as in a standard reply" },
             { "name": "heaterNumber", "width": 6, "doc": "Number of the heater reported" },
             { "name": "zero", "width": 10, "reserved": true }
           ]
@@ -1402,7 +1402,7 @@
           "kind": "bitfield", "storage": "u32",
           "fields": [
             { "name": "requestId", "width": 12, "doc": "The request ID of the message we are replying to" },
-            { "name": "resultCode", "width": 4, "doc": "Normally a GCodeResult" },
+            { "name": "resultCode", "width": 4, "enum": "GCodeResult", "doc": "Normally a GCodeResult" },
             { "name": "fragmentNumber", "width": 7, "doc": "The fragment number of this message" },
             { "name": "moreFollows", "width": 1, "bool": true, "doc": "Set if this is not the last fragment of the reply" },
             { "name": "extra", "width": 8, "doc": "Normally unused, but occasionally carries extra data" }
@@ -1434,7 +1434,7 @@
           "kind": "bitfield", "storage": "u32",
           "fields": [
             { "name": "requestId", "width": 12, "doc": "The request ID of the message we are replying to" },
-            { "name": "resultCode", "width": 4, "doc": "Normally a GCodeResult" },
+            { "name": "resultCode", "width": 4, "enum": "GCodeResult", "doc": "Normally a GCodeResult" },
             { "name": "numReported", "width": 4, "doc": "Number of input handles reported" },
             { "name": "zero", "width": 12, "reserved": true }
           ]
@@ -1459,7 +1459,7 @@
           "kind": "bitfield", "storage": "u32",
           "fields": [
             { "name": "requestId", "width": 12, "doc": "The request ID of the message we are replying to" },
-            { "name": "resultCode", "width": 4, "doc": "Normally a GCodeResult" },
+            { "name": "resultCode", "width": 4, "enum": "GCodeResult", "doc": "Normally a GCodeResult" },
             { "name": "numReported", "width": 4, "doc": "Number of input handles reported" },
             { "name": "zero", "width": 12, "reserved": true }
           ]
