@@ -4,6 +4,11 @@ using DuetCanMessage.SourceGenerators.Model;
 namespace DuetCanMessage.SourceGenerators.Emit;
 
 /// <summary>
+/// The C# spelling of an enum a field carries, and the namespace it has to be imported from.
+/// </summary>
+public sealed record CSharpEnumRef(string Name, string Namespace);
+
+/// <summary>
 /// Emits the C# side of the CAN message formats.
 /// </summary>
 /// <remarks>
@@ -32,11 +37,24 @@ public sealed class CSharpEmitter(CanSchema schema)
     /// </summary>
     public static string BitFieldCSharpType(CanSchema schema, BitFieldDef f) => f.Enum is null
         ? Types.CSharp(schema, BitFieldSchemaType(f))
-        : CSharpEnumName(schema, f.Enum);
+        : EnumRef(schema, f.Enum).Name;
 
-    /// <summary>How the C# side spells a schema enum, which is not always what CANlib calls it.</summary>
-    public static string CSharpEnumName(CanSchema schema, string name) =>
-        (schema.FindEnum(name) ?? throw new InvalidDataException($"unknown enum '{name}'")).CSharpName;
+    /// <summary>How the C# side spells a schema enum, and where it lives.</summary>
+    public static CSharpEnumRef EnumRef(CanSchema schema, string name)
+    {
+        MessageTypeEnumDef definition = schema.EnumNamed(name);
+        return new CSharpEnumRef(definition.CSharpName, schema.CSharpNamespaceOf(definition));
+    }
+
+    /// <summary>Namespaces the generated messages have to import for the enums their fields carry.</summary>
+    private IEnumerable<string> EnumUsings() => schema.Structs
+        .Where(s => s.IsGenerated(Language.CSharp))
+        .SelectMany(s => s.FlatMembers.Select(m => m.Enum).Concat(s.AllBitFields.Select(f => f.Enum)))
+        .Where(e => e is not null)
+        .Select(e => EnumRef(schema, e!).Namespace)
+        .Where(ns => !schema.CSharpUsings.Contains(ns))
+        .Distinct()
+        .OrderBy(ns => ns, StringComparer.Ordinal);
 
     public string EmitStructs()
     {
@@ -45,7 +63,7 @@ public sealed class CSharpEmitter(CanSchema schema)
         writer.Line("using System;");
         writer.Line("using System.Numerics;");
         writer.Line("using System.Runtime.InteropServices;");
-        foreach (string u in schema.CSharpUsings)
+        foreach (string u in schema.CSharpUsings.Concat(EnumUsings()))
         {
             writer.Line($"using {u};");
         }
@@ -328,8 +346,11 @@ public sealed class CSharpEmitter(CanSchema schema)
             {
                 writer.XmlDoc(member.Doc);
                 string visibility = member.CppPrivate ? "private" : "public";
+                // A field that carries an enum is declared as that enum. Its storage is the integer the
+                // enum is built on, so the layout is the one the schema computed either way
                 string type = member.Kind == MemberKind.Array
                     ? BufferName(member.Type == "char" ? "char" : Types.CSharpIn(schema, s, member.Type), member.ResolvedLength)
+                    : member.Enum is not null ? EnumRef(schema, member.Enum).Name
                     : Types.CSharpIn(schema, s, member.Type);
                 writer.Line($"[FieldOffset({member.Offset})] {visibility} {type} {Naming.Pascal(member.Name)};");
                 if (member.Kind == MemberKind.Array && member.Type == "char")

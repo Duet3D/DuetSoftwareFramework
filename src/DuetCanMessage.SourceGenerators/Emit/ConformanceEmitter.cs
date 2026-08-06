@@ -19,7 +19,7 @@ public sealed record LayoutFacts(
     string CppName,
     int Size,
     List<(string Name, int Offset)> FieldOffsets,
-    List<(string Name, int Width, bool Signed, bool Bool, string? CSharpEnum, byte[] Pattern)> BitPatterns);
+    List<(string Name, int Width, bool Signed, bool Bool, CSharpEnumRef? CSharpEnum, byte[] Pattern)> BitPatterns);
 
 /// <summary>
 /// Emits the conformance harnesses that verify the generated layouts.
@@ -54,7 +54,7 @@ public sealed class ConformanceEmitter(CanSchema schema)
                 .Where(m => m.Kind is MemberKind.Field or MemberKind.Array && !m.CppPrivate)
                 .Select(m => (CppPath(m.CppAccessPath, m.Name), m.Offset))];
 
-            List<(string, int, bool, bool, string?, byte[])> patterns = [];
+            List<(string, int, bool, bool, CSharpEnumRef?, byte[])> patterns = [];
             // A bitfield in a private member is out of reach of the probe, exactly as a private plain member
             // is; the struct size and the members around it still pin where it sits
             foreach (BitFieldDef f in s.FlatMembers.Where(m => m.Kind == MemberKind.Bitfield && !m.CppPrivate).SelectMany(m => m.Fields))
@@ -64,7 +64,7 @@ public sealed class ConformanceEmitter(CanSchema schema)
                 {
                     pattern[bit / 8] |= (byte)(1 << (bit % 8));
                 }
-                string? csharpEnum = f.Enum is null ? null : CSharpEmitter.CSharpEnumName(schema, f.Enum);
+                CSharpEnumRef? csharpEnum = f.Enum is null ? null : CSharpEmitter.EnumRef(schema, f.Enum);
                 patterns.Add((CppPath(f.CppAccessPath, f.Name), f.Width, f.Signed, f.Bool, csharpEnum, pattern));
             }
 
@@ -378,10 +378,6 @@ public sealed class ConformanceEmitter(CanSchema schema)
         w.Line("using System.Collections.Immutable;");
         w.Line("using NUnit.Framework;");
         w.Line($"using {schema.CSharpNamespace};");
-        if (facts.Any(f => f.BitPatterns.Any(b => b.CSharpEnum is not null)))
-        {
-            w.Line($"using {schema.CSharpSharedNamespace};");     // where the enums a bitfield may carry live
-        }
         w.Line();
         w.Line($"namespace {testNamespace};");
         w.Line();
@@ -409,12 +405,14 @@ public sealed class ConformanceEmitter(CanSchema schema)
                         w.Line($"Assert.That(Marshal.OffsetOf<{f.Struct}>(\"{Naming.Pascal(Flat(name))}\").ToInt32(), Is.EqualTo({offset}), \"offset of {f.Struct}.{Naming.Pascal(name)}\");");
                     }
 
-                    foreach ((string name, int width, bool signed, bool isBool, string? csharpEnum, byte[] pattern) in f.BitPatterns)
+                    foreach ((string name, int width, bool signed, bool isBool, CSharpEnumRef? csharpEnum, byte[] pattern) in f.BitPatterns)
                     {
                         string property = Naming.Pascal(Flat(name));
                         // An enum-typed field is set through a cast, since the all-ones probe value is
-                        // deliberately not one of the enumerators
-                        string allOnes = csharpEnum is not null ? $"({csharpEnum})0x{(1UL << width) - 1:X}"
+                        // deliberately not one of the enumerators. The enum is named in full: this fixture
+                        // imports both the messages and DuetAPI's object model, which share type names
+                        string allOnes = csharpEnum is not null
+                            ? $"({csharpEnum.Namespace}.{csharpEnum.Name})0x{(1UL << width) - 1:X}"
                             : isBool ? "true"
                             : signed ? "-1"
                             : width switch

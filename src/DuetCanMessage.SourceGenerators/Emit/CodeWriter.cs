@@ -112,12 +112,13 @@ public static partial class Naming
     }
 
     /// <summary>
-    /// The C# spelling of a <c>CanMessageType</c> enumerator. Capitalising the first letter covers almost
-    /// all of them; the exception is the G-code subcommand types, where CANlib writes <c>m569p1</c> and the
-    /// C# enum has <c>M569P1</c>.
+    /// The C# spelling of an enumerator. PascalCasing covers almost all of them; the exception is the
+    /// G-code subcommand message types, where CANlib writes <c>m569p1</c> and the C# enum has
+    /// <c>M569P1</c>. The snake_case names CANlib uses for retired ids and for event types lose their
+    /// underscores, exactly as a struct member's would.
     /// </summary>
     public static string MessageTypeMember(string cppName) =>
-        SubcommandLetter().Replace(char.ToUpperInvariant(cppName[0]) + cppName[1..], m => m.Value.ToUpperInvariant());
+        SubcommandLetter().Replace(Pascal(cppName), m => m.Value.ToUpperInvariant());
 
     [GeneratedRegex(@"(?<=[0-9])p(?=[0-9])")]
     private static partial Regex SubcommandLetter();

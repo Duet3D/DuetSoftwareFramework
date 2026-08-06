@@ -23,7 +23,7 @@ public static class Program
             schema = CanSchema.Load(schemaPath);
             ExpandTemplates(schema);
             CheckEveryMessageCanNameItsType(schema);
-            CheckEnumBitFields(schema);
+            CheckEnumFields(schema);
             LayoutEngine.ComputeAll(schema);
         }
         catch (Exception e) when (e is InvalidDataException or InvalidOperationException)
@@ -127,36 +127,24 @@ public static class Program
     }
 
     /// <summary>
-    /// Check the enums that bitfields carry. Such a field is typed as the enum on the C# side, so the enum
-    /// has to exist, has to be one this generator emits into the shared namespace the message files import,
-    /// and has to fit in the field: an enumerator too wide for the bitfield would be truncated on the wire.
-    /// A field that is cleared by SetRequestId or ClearReservedFields is rejected as well, because those are
-    /// generated as an assignment of 0, which is not a value of an enum type in C#.
+    /// Check the enums that fields carry. Such a field is typed as the enum on the C# side, so the enum has
+    /// to exist and the generated file has to be able to name it, and the field has to be able to hold every
+    /// enumerator: one too wide would be truncated on the wire. A field that SetRequestId or
+    /// ClearReservedFields zeroes is rejected as well, because those are generated as an assignment of 0,
+    /// which is not a value of an enum type in C#.
     /// </summary>
-    private static void CheckEnumBitFields(CanSchema schema)
+    private static void CheckEnumFields(CanSchema schema)
     {
         foreach (StructDef s in schema.Structs)
         {
             foreach (BitFieldDef f in s.AllBitFields.Where(f => f.Enum is not null))
             {
-                MessageTypeEnumDef e = schema.FindEnum(f.Enum!)
-                    ?? throw new InvalidDataException($"{s.Name}.{f.Name} carries enum '{f.Enum}', which the schema does not declare");
-                if (e.CheckOnly)
-                {
-                    throw new InvalidDataException(
-                        $"{s.Name}.{f.Name} carries enum '{f.Enum}', which is checked rather than generated. "
-                        + "The generated messages can only name an enum this generator emits alongside them");
-                }
+                MessageTypeEnumDef e = Carried(schema, s, f.Name, f.Enum!);
                 if (f.Bool || f.Signed)
                 {
                     throw new InvalidDataException($"{s.Name}.{f.Name} carries enum '{f.Enum}' as well as being bool or signed");
                 }
-                if (f.Reserved || s.SetRequestIdAlsoClears.Contains(f.Name) || s.ClearAlsoClears.Contains(f.Name))
-                {
-                    throw new InvalidDataException(
-                        $"{s.Name}.{f.Name} carries enum '{f.Enum}' and is also cleared by SetRequestId or ClearReservedFields, "
-                        + "which are generated as an assignment of 0. Drop the \"enum\" key or stop clearing the field");
-                }
+                CheckNotCleared(s, f.Name, f.Enum!, f.Reserved);
 
                 MessageTypeDef? tooWide = e.Values.FirstOrDefault(v => v.Section is null && !v.IsAlias && !FitsIn(v.Value, f.Width));
                 if (tooWide is not null)
@@ -165,6 +153,49 @@ public static class Program
                         $"{s.Name}.{f.Name} is {f.Width} bits wide but {f.Enum}.{tooWide.Name} is {tooWide.Value}, which does not fit");
                 }
             }
+
+            foreach (MemberDef m in s.FlatMembers.Where(m => m.Enum is not null))
+            {
+                MessageTypeEnumDef e = Carried(schema, s, m.Name, m.Enum!);
+                if (m.Kind != MemberKind.Field)
+                {
+                    throw new InvalidDataException($"{s.Name}.{m.Name} carries enum '{m.Enum}' but is not a scalar field");
+                }
+                CheckNotCleared(s, m.Name, m.Enum!, m.Reserved);
+
+                // The declared type is what the field takes on the wire and what C# lays out, so an enum
+                // built on a different integer would silently change the size of the message
+                string storage = Types.CSharp(schema, m.Type);
+                if (storage != e.UnderlyingType)
+                {
+                    throw new InvalidDataException(
+                        $"{s.Name}.{m.Name} is a {m.Type} ({storage}) but enum '{m.Enum}' is built on {e.UnderlyingType}");
+                }
+            }
+        }
+    }
+
+    /// <summary>Resolve the enum a field says it carries, and check that the generated C# can name it.</summary>
+    private static MessageTypeEnumDef Carried(CanSchema schema, StructDef s, string field, string name)
+    {
+        MessageTypeEnumDef e = schema.FindEnum(name)
+            ?? throw new InvalidDataException($"{s.Name}.{field} carries enum '{name}', which the schema does not declare");
+        if (e.CheckOnly && e.CSharpNamespace is null)
+        {
+            throw new InvalidDataException(
+                $"{s.Name}.{field} carries enum '{name}', which is checked rather than generated and does not say "
+                + "where its C# counterpart lives. Give it a \"csharpNamespace\" so the generated messages can import it");
+        }
+        return e;
+    }
+
+    private static void CheckNotCleared(StructDef s, string field, string name, bool reserved)
+    {
+        if (reserved || s.SetRequestIdAlsoClears.Contains(field) || s.ClearAlsoClears.Contains(field))
+        {
+            throw new InvalidDataException(
+                $"{s.Name}.{field} carries enum '{name}' and is also cleared by SetRequestId or ClearReservedFields, "
+                + "which are generated as an assignment of 0. Drop the \"enum\" key or stop clearing the field");
         }
     }
 
@@ -239,6 +270,7 @@ public static class Program
         Name = m.Name,
         Type = m.Type,
         Doc = m.Doc,
+        Enum = m.Enum,
         Length = m.Length,
         Storage = m.Storage,
         Fields = [.. m.Fields.Select(f => new BitFieldDef

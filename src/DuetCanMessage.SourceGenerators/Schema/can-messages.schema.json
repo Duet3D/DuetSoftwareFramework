@@ -215,6 +215,11 @@
           "type": "string",
           "description": "Name of the generated C# enum, where DCS calls it something else. Defaults to \"name\"."
         },
+        "csharpNamespace": {
+          "type": "string",
+          "description": "Namespace of the C# counterpart of a checkOnly enum, so that a message field carrying it can be typed as it. A generated enum always lands in the shared namespace and does not need this.",
+          "examples": ["DuetAPI.ObjectModel"]
+        },
         "cppHeader": {
           "type": "string",
           "description": "CANlib header the enum is declared in, relative to its src directory.",
@@ -587,6 +592,11 @@
         "cppAccessPath": {
           "type": "string",
           "description": "How CANlib reaches the member, where it does so through a sub-struct that the flat schema view does not have. Affects only the C++ probe."
+        },
+        "enum": {
+          "type": "string",
+          "description": "CANlib name of an enum declared under \"enums\" that this scalar field carries. The C# field is typed as that enum instead of as the integer it travels as; C++ keeps the plain member CANlib declares.",
+          "examples": ["TemperatureError", "HeaterMode"]
         }
       },
       "allOf": [

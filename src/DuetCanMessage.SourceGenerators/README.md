@@ -151,19 +151,24 @@ struct. Bitfields may be marked `bool` (a `bool` property in C#) or `signed` (si
 makes the C++ side use the `LoadLE`/`StoreLE` helpers. `cppAccessPath` records that CANlib reaches the
 member through a sub-struct, which only affects the C++ probe.
 
-A bitfield that carries one of the [enums](#enums-constants-and-addresses) names it with `enum`, which types
-the C# property as that enum rather than as the integer it travels as:
+A field that carries one of the [enums](#enums-constants-and-addresses) names it with `enum`, which types the
+C# side as that enum rather than as the integer it travels as. It works on a bitfield and on a scalar field:
 
 ```jsonc
-{ "name": "resultCode", "width": 4, "enum": "GCodeResult" }   // public CodeResult ResultCode { ... }
+{ "name": "resultCode", "width": 4, "enum": "GCodeResult" }                    // public CodeResult ResultCode { ... }
+{ "kind": "field", "name": "errorCode", "type": "u8", "enum": "TemperatureError" }   // public TemperatureError ErrorCode;
 ```
 
-The name is CANlib's, as in the `enums` section; the C# property uses that enum's `csharpName`, so the four
-replies that carry a result code expose a `CodeResult` and a caller cannot pass an unrelated number for one.
-C++ is untouched: CANlib declares these as plain unsigned bitfields and assigns casts to them, so the
-generated header would stop being a drop-in if it named the enum. The generator checks that the enum is one
-it emits and that every enumerator fits in the field's width, and rejects an enum-typed field that is also
-`reserved` or cleared by `SetRequestId`, since those clears are generated as an assignment of `0`.
+The name is CANlib's, as in the `enums` section; the C# side uses that enum's `csharpName`, so a caller
+cannot pass an unrelated number where a result code or a sensor error is expected. Nine fields carry one:
+the four `resultCode`s, `CanSensorReport.errorCode`, `CanHeaterReport.mode`, `heaterFunction`, a filament
+monitor's `status` and an event's `eventType`. C++ is untouched: CANlib declares all of these as plain
+integers and assigns casts to them, so the generated header would stop being a drop-in if it named the enum.
+
+The generator checks that the enum exists and that the generated file can name it, that every enumerator
+fits — in the field's width for a bitfield, in the same underlying integer for a scalar field — and rejects
+an enum-typed field that is also `reserved` or cleared by `SetRequestId`, since those clears are generated
+as an assignment of `0`.
 
 ### Methods
 
@@ -337,7 +342,7 @@ message that means something else, which no layout check can see, so these are g
 
 | Schema section | Generated as | Checked against |
 | --- | --- | --- |
-| `enums` | `CanMessageType`, `CodeResult`, `FirmwareFlashErrorCode` | `CanId.h`, `GCodeResult.h`, `Duet3Common.h` |
+| `enums` | `CanMessageType`, `CodeResult`, `FirmwareFlashErrorCode`, `HeaterMode`, `HeaterFunction`, `EventType` | `CanId.h`, `GCodeResult.h`, `Duet3Common.h`, `RRF3Common.h` |
 | `constantGroups` | `CanId` addresses, masks and shifts | `CanId.h` |
 | struct `constants` | members of the generated structs | every CANlib header |
 
@@ -355,12 +360,17 @@ message that means something else, which no layout check can see, so these are g
 ```
 
 An enum may be `checkOnly` with a `csharpSource`, for one that has to agree with CANlib but is generated
-elsewhere: `TemperatureError` is part of DuetAPI's public object model, so the checker parses that file and
-compares its ordinals rather than relocating a published API.
+elsewhere: `TemperatureError` and `FilamentSensorStatus` (which DuetAPI calls `FilamentMonitorStatus`) are
+part of DuetAPI's public object model, so the checker parses those files and compares their ordinals rather
+than relocating a published API. Such an enum adds `csharpNamespace` if a message field is typed as it, since
+that is the only way the generated messages can import it; a generated enum lands in the shared namespace
+they already import.
 
 `compare-enums.py` and `compare-constants.py` do the comparing, both in both directions, and both understand
-the spellings the two sides use for the same thing — CANlib's `enum class` and `NamedEnum` forms, implicit
-enumerator values, integer suffixes, digit separators, casts, and a length written as `sizeof(thatBuffer)`.
+the spellings the two sides use for the same thing — CANlib's `enum class` and `NamedEnum` forms, the latter
+written on one line or many, implicit enumerator values, an alias of an earlier enumerator and the implicit
+values that carry on from it, integer suffixes, digit separators, casts, and a length written as
+`sizeof(thatBuffer)`.
 Retired message ids are compared too, so that a number CANlib reuses does not quietly contradict the comment
 recording that it was spent.
 

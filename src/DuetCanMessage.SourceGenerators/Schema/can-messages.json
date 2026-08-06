@@ -1283,7 +1283,7 @@
           "$comment": "This group is 17 bits wide, which makes the message 5 bytes long. That is how CANlib declares it and must not be 'fixed' without a new message type.",
           "fields": [
             { "name": "heater", "width": 6 },
-            { "name": "heaterFunction", "width": 3 },
+            { "name": "heaterFunction", "width": 3, "enum": "HeaterFunction" },
             { "name": "zero2", "width": 8, "reserved": true }
           ]
         }
@@ -1510,7 +1510,7 @@
       "name": "CanSensorReport",
       "doc": "One sensor reading within a CanMessageSensorTemperatures",
       "members": [
-        { "kind": "field", "name": "errorCode", "type": "u8", "doc": "This holds a TemperatureError" },
+        { "kind": "field", "name": "errorCode", "type": "u8", "enum": "TemperatureError", "doc": "This holds a TemperatureError" },
         { "kind": "field", "name": "temperature", "type": "f32", "unaligned": true, "cppPrivate": true, "doc": "The last temperature we read" }
       ],
       "methods": [
@@ -1547,7 +1547,7 @@
       "name": "CanHeaterReport",
       "doc": "One heater status within a CanMessageHeatersStatus",
       "members": [
-        { "kind": "field", "name": "mode", "type": "u8", "doc": "A HeaterMode value" },
+        { "kind": "field", "name": "mode", "type": "u8", "enum": "HeaterMode", "doc": "A HeaterMode value" },
         { "kind": "field", "name": "averagePwm", "type": "u8", "doc": "Scaled to 0-255 to save space" },
         { "kind": "field", "name": "temperature", "type": "f32", "unaligned": true, "cppPrivate": true, "doc": "The last temperature we read" }
       ],
@@ -1968,7 +1968,7 @@
           "fields": [
             { "name": "position", "width": 12, "doc": "Raw position from the sensor" },
             { "name": "zero1", "width": 12, "reserved": true },
-            { "name": "status", "width": 4, "doc": "Standard filament status" },
+            { "name": "status", "width": 4, "enum": "FilamentSensorStatus", "doc": "Standard filament status" },
             { "name": "zero2", "width": 2, "reserved": true },
             { "name": "hasLiveData", "width": 1, "bool": true, "doc": "True if the following fields are meaningful for this sensor" }
           ]
@@ -2134,7 +2134,7 @@
         {
           "kind": "bitfield", "storage": "u32",
           "fields": [
-            { "name": "eventType", "width": 8, "doc": "The event type (what happened)" },
+            { "name": "eventType", "width": 8, "enum": "EventType", "doc": "The event type (what happened)" },
             { "name": "deviceNumber", "width": 8, "doc": "The device number that it happened to" },
             { "name": "eventParam", "width": 16, "doc": "More info about the event" }
           ]
@@ -2375,6 +2375,7 @@
     "underlyingType": "byte",
     "checkOnly": true,
     "csharpSource": "src/DuetAPI/ObjectModel/Sensors/TemperatureError.cs",
+    "csharpNamespace": "DuetAPI.ObjectModel",
     "doc": [
       "Result codes returned by temperature sensor drivers.",
       "Mirrors TemperatureError in CANlib's TemperatureError.h. The value travels on the wire as the",
@@ -2405,6 +2406,103 @@
       { "name": "ambientReadingTooLow", "value": 20, "doc": "for composite sensors that need to read ambient temperature to calculate object temperature" },
       { "name": "ambientReadingTooHigh", "value": 21, "doc": "for composite sensors that need to read ambient temperature to calculate object temperature" },
       { "name": "unknownError", "value": 22 }
+    ]
+   },
+   {
+    "name": "FilamentSensorStatus",
+    "csharpName": "FilamentMonitorStatus",
+    "cppHeader": "RRF3Common.h",
+    "underlyingType": "byte",
+    "checkOnly": true,
+    "csharpSource": "src/DuetAPI/ObjectModel/Sensors/FilamentMonitors/FilamentMonitorStatus.cs",
+    "csharpNamespace": "DuetAPI.ObjectModel",
+    "doc": [
+      "State of a filament monitor.",
+      "Mirrors FilamentSensorStatus in CANlib's RRF3Common.h. The value travels on the wire as the 4-bit",
+      "status of a filament monitor report, so the ordinals have to match. DuetAPI already declares this",
+      "enum as FilamentMonitorStatus in its public object model, so it is checked here rather than generated."
+    ],
+    "values": [
+      { "name": "noMonitor", "value": 0 },
+      { "name": "ok", "value": 1 },
+      { "name": "noDataReceived", "value": 2 },
+      { "name": "noFilament", "value": 3 },
+      { "name": "tooLittleMovement", "value": 4 },
+      { "name": "tooMuchMovement", "value": 5 },
+      { "name": "sensorError", "value": 6 }
+    ]
+   },
+   {
+    "name": "HeaterMode",
+    "cppHeader": "RRF3Common.h",
+    "underlyingType": "byte",
+    "output": "src/DuetControlServer/Link/Protocol/Shared/HeaterMode.g.cs",
+    "doc": [
+      "What a heater is doing, as reported by the board that owns it.",
+      "Mirrors HeaterMode in CANlib's RRF3Common.h. The value travels on the wire as the mode of a heater",
+      "report, so it has to keep CANlib's numbering. The order matters beyond the individual values:",
+      "the firmware tests mode > suspended to decide whether a heater is active, mode >= off to decide",
+      "whether it is active or suspended, and the tuning states must stay last."
+    ],
+    "values": [
+      { "name": "fault", "value": 0 },
+      { "name": "offline", "value": 1 },
+      { "name": "off", "value": 2 },
+      { "name": "suspended", "value": 3 },
+      { "name": "cooling", "value": 4, "doc": "the first of the three modes the PID controller uses" },
+      { "name": "stable", "value": 5 },
+      { "name": "heating", "value": 6 },
+      { "name": "firstPidMode", "value": "cooling" },
+      { "name": "lastPidMode", "value": "heating" },
+      { "name": "tuning0_settling", "value": 7 },
+      { "name": "tuning0a_calibrating_heater", "value": 8 },
+      { "name": "tuning1_heating_up", "value": 9 },
+      { "name": "tuning2_heater_off", "value": 10 },
+      { "name": "tuning3_heater_on", "value": 11 },
+      { "name": "firstTuningMode", "value": "tuning0_settling" },
+      { "name": "lastTuningMode", "value": "tuning3_heater_on" }
+    ]
+   },
+   {
+    "name": "HeaterFunction",
+    "cppHeader": "RRF3Common.h",
+    "underlyingType": "byte",
+    "output": "src/DuetControlServer/Link/Protocol/Shared/HeaterFunction.g.cs",
+    "doc": [
+      "What a heater is for, which decides the minimum temperature rise that does not count as a fault.",
+      "Mirrors HeaterFunction in CANlib's RRF3Common.h. The value travels on the wire as the 3-bit",
+      "heaterFunction of a set-default-heater-model request, so it has to keep CANlib's numbering."
+    ],
+    "values": [
+      { "name": "tool", "value": 0 },
+      { "name": "bed", "value": 1 },
+      { "name": "chamber", "value": 2 },
+      { "name": "numValues", "value": 3, "doc": "not a function, but how many there are" }
+    ]
+   },
+   {
+    "name": "EventType",
+    "cppHeader": "RRF3Common.h",
+    "underlyingType": "byte",
+    "output": "src/DuetControlServer/Link/Protocol/Shared/EventType.g.cs",
+    "doc": [
+      "What happened, in an event message sent by an expansion board.",
+      "Mirrors EventType in CANlib's RRF3Common.h. The value travels on the wire as the 8-bit eventType",
+      "of an event message, so it has to keep CANlib's numbering. Earlier values have higher priority,",
+      "and the names are also the names of the macro files run in response to the event."
+    ],
+    "values": [
+      { "name": "main_board_power_fail", "value": 0, "doc": "a placeholder: main board power failure is not currently handled by the event system" },
+      { "name": "expansion_reconnect", "value": 1 },
+      { "name": "expansion_timeout", "value": 2 },
+      { "name": "heater_fault", "value": 3 },
+      { "name": "driver_error", "value": 4 },
+      { "name": "filament_error", "value": 5 },
+      { "name": "driver_stall", "value": 6 },
+      { "name": "driver_warning", "value": 7 },
+      { "name": "mcu_temperature_warning", "value": 8, "doc": "not currently used" },
+      { "name": "overvoltage", "value": 9 },
+      { "name": "undervoltage", "value": 10 }
     ]
    }
   ],

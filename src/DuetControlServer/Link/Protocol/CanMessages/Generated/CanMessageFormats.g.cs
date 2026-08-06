@@ -9,6 +9,7 @@ using System;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using DuetControlServer.Link.Protocol.Shared;
+using DuetAPI.ObjectModel;
 
 namespace DuetControlServer.Link.Protocol.CanMessages;
 
@@ -2199,9 +2200,9 @@ public struct CanMessageSetDefaultHeaterModel : ICanMessage<CanMessageSetDefault
     }
 
     /// <summary>HeaterFunction (3-bit field, bits 22-24 of the message)</summary>
-    public byte HeaterFunction
+    public HeaterFunction HeaterFunction
     {
-        readonly get => (byte)CanBitFields.Get(_bits1, 6, 3);
+        readonly get => (HeaterFunction)CanBitFields.Get(_bits1, 6, 3);
         set => CanBitFields.Set(_bits1, 6, 3, unchecked((ulong)value));
     }
 
@@ -2729,7 +2730,7 @@ public struct CanMessageGeneric : ICanMessageBody<CanMessageGeneric>
 public struct CanSensorReport
 {
     /// <summary>This holds a TemperatureError</summary>
-    [FieldOffset(0)] public byte ErrorCode;
+    [FieldOffset(0)] public TemperatureError ErrorCode;
 
     /// <summary>The last temperature we read</summary>
     [FieldOffset(1)] private float Temperature;
@@ -2774,7 +2775,7 @@ public struct CanMessageSensorTemperatures : ICanMessage<CanMessageSensorTempera
 public struct CanHeaterReport
 {
     /// <summary>A HeaterMode value</summary>
-    [FieldOffset(0)] public byte Mode;
+    [FieldOffset(0)] public HeaterMode Mode;
 
     /// <summary>Scaled to 0-255 to save space</summary>
     [FieldOffset(1)] public byte AveragePwm;
@@ -3484,9 +3485,9 @@ public struct FilamentMonitorDataV2
     /// Standard filament status
     /// (4-bit field, bits 24-27 of the message)
     /// </summary>
-    public byte Status
+    public FilamentMonitorStatus Status
     {
-        readonly get => (byte)CanBitFields.Get(_bits0, 24, 4);
+        readonly get => (FilamentMonitorStatus)CanBitFields.Get(_bits0, 24, 4);
         set => CanBitFields.Set(_bits0, 24, 4, unchecked((ulong)value));
     }
 
@@ -3909,9 +3910,9 @@ public struct CanMessageEvent : ICanMessage<CanMessageEvent>
     /// The event type (what happened)
     /// (8-bit field, bits 0-7 of the message)
     /// </summary>
-    public byte EventType
+    public EventType EventType
     {
-        readonly get => (byte)(((uint)_bits0) & 0xFFU);
+        readonly get => (EventType)(((uint)_bits0) & 0xFFU);
         set => _bits0 = (uint)((((uint)_bits0) & ~0xFFU) | (unchecked((uint)value) & 0xFFU));
     }
 

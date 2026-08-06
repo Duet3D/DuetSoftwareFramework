@@ -32,7 +32,8 @@ def parse_canlib(path, name):
     body = re.search(r"enum class " + name + r"\s*:\s*[\w ]+\s*\{(.*?)\n\};", text, re.S)
     implicit = False
     if body is None:
-        body = re.search(r"NamedEnum\(" + name + r",\s*\w+,(.*?)\n\);", text, re.S)
+        # The macro is written across several lines for a long enum and on one line for a short one
+        body = re.search(r"NamedEnum\(" + name + r",\s*\w+,(.*?)\s*\);", text, re.S)
         implicit = True
     if body is None:
         raise SystemExit(f"error: no {name} enum found in {path}")
@@ -49,17 +50,27 @@ def parse_canlib(path, name):
             if entry:
                 retired[entry.group(1)] = int(entry.group(2))
             continue
-        entry = re.match(r"^(\w+)\s*(?:=\s*([^,/]+?))?\s*,?\s*(?://.*)?$", line)
-        if not entry:
-            raise SystemExit(f"error: cannot parse {line!r}")
-        member, value = entry.group(1), (entry.group(2) or "").strip()
-        if not value:
-            live[member] = auto                             # implicit, one past the previous value
-        elif re.match(r"^(0x[0-9A-Fa-f]+|\d+)$", value):
-            live[member] = int(value, 0)
-        else:
-            pending[member] = value                         # an alias of another enumerator
-        auto = live.get(member, auto) + 1
+        # A NamedEnum is often written on one line, so an enumerator is a comma-separated item rather
+        # than a line of its own
+        for item in re.sub(r"//.*$", "", line).split(","):
+            item = item.strip()
+            if not item:
+                continue
+            entry = re.match(r"^(\w+)\s*(?:=\s*(.+?))?$", item)
+            if not entry:
+                raise SystemExit(f"error: cannot parse {item!r}")
+            member, value = entry.group(1), (entry.group(2) or "").strip()
+            if not value:
+                live[member] = auto                         # implicit, one past the previous value
+            elif re.match(r"^(0x[0-9A-Fa-f]+|\d+)$", value):
+                live[member] = int(value, 0)
+            elif value in live:
+                # An alias of an enumerator already seen. It has to be resolved here rather than at the
+                # end, because C++ counts the next implicit value on from whatever this one resolves to
+                live[member] = live[value]
+            else:
+                pending[member] = value                     # an alias of one declared further down
+            auto = live.get(member, auto) + 1
     for member, target in pending.items():
         live[member] = live[target]
     return live, retired

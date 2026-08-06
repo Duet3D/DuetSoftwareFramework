@@ -59,6 +59,12 @@ public sealed class MemberDef
     public string Type = "";
     public string? Doc;
 
+    /// <summary>
+    /// CANlib name of the enum a scalar field carries, where it carries one. The field keeps the integer
+    /// type it travels as, which is what decides the layout; only the C# view of it is the enum.
+    /// </summary>
+    public string? Enum;
+
     // Array members
     public string? Length;
     public int ResolvedLength;
@@ -498,6 +504,12 @@ public sealed class MessageTypeEnumDef
     /// <summary>Name of the generated C# enum, where DCS calls it something else.</summary>
     public string CSharpName = "";
 
+    /// <summary>
+    /// Namespace of the C# counterpart, for an enum that is checked rather than generated. A generated one
+    /// always lands in the shared namespace, so it does not need this.
+    /// </summary>
+    public string? CSharpNamespace;
+
     /// <summary>CANlib header the enum is declared in, relative to its src directory.</summary>
     public string CppHeader = "";
 
@@ -571,6 +583,16 @@ public sealed class CanSchema
 
     /// <summary>Find an enum by the name CANlib gives it, which is how the schema refers to it.</summary>
     public MessageTypeEnumDef? FindEnum(string name) => Enums.FirstOrDefault(e => e.Name == name);
+
+    /// <summary>The enum a field says it carries, which the generator has already checked exists.</summary>
+    public MessageTypeEnumDef EnumNamed(string name) =>
+        FindEnum(name) ?? throw new InvalidDataException($"unknown enum '{name}'");
+
+    /// <summary>
+    /// Where the C# counterpart of an enum lives. The ones this tool generates go to the shared namespace
+    /// the message files already import; a checked one says for itself where it is.
+    /// </summary>
+    public string CSharpNamespaceOf(MessageTypeEnumDef definition) => definition.CSharpNamespace ?? CSharpSharedNamespace;
 
     public static CanSchema Load(string path)
     {
@@ -812,6 +834,7 @@ public sealed class CanSchema
         {
             Name = name,
             CSharpName = Str(o, "csharpName") ?? name,
+            CSharpNamespace = Str(o, "csharpNamespace"),
             CppHeader = Str(o, "cppHeader") ?? "",
             UnderlyingType = Str(o, "underlyingType") ?? "ushort",
             OutputPath = Str(o, "output"),
@@ -936,6 +959,7 @@ public sealed class CanSchema
             Name = Str(o, "name") ?? "",
             Type = Str(o, "type") ?? "",
             Doc = Doc(o),
+            Enum = Str(o, "enum"),
             Length = Str(o, "length"),
             Storage = Str(o, "storage") ?? "u32",
             Anonymous = Bool(o, "anonymous") ?? false,
