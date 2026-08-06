@@ -15,21 +15,51 @@ namespace DuetControlServer.Link.Protocol.Shared;
 /// </summary>
 public enum HeaterMode : byte
 {
+    /// <summary>the heater has been shut down because a fault was detected</summary>
     Fault = 0,
+
+    /// <summary>the board that owns the heater is not responding</summary>
     Offline = 1,
+
+    /// <summary>the heater is configured but switched off</summary>
     Off = 2,
+
+    /// <summary>the heater has been switched off temporarily, e.g. while a tool change or a filament change is in progress</summary>
     Suspended = 3,
+
     /// <summary>the first of the three modes the PID controller uses</summary>
     Cooling = 4,
+
+    /// <summary>the temperature is within the allowed band around the setpoint</summary>
     Stable = 5,
+
+    /// <summary>the temperature is below the allowed band around the setpoint</summary>
     Heating = 6,
+
+    /// <summary>not a mode, but the lowest of the three modes the PID controller uses</summary>
     FirstPidMode = Cooling,
+
+    /// <summary>not a mode, but the highest of the three modes the PID controller uses</summary>
     LastPidMode = Heating,
+
+    /// <summary>waiting for the temperature to settle before tuning starts</summary>
     Tuning0Settling = 7,
+
+    /// <summary>calibrating the heater itself, which only inductive heaters need</summary>
     Tuning0aCalibratingHeater = 8,
+
+    /// <summary>heating up to the upper tuning temperature for the first time</summary>
     Tuning1HeatingUp = 9,
+
+    /// <summary>heater off, measuring how fast the temperature falls</summary>
     Tuning2HeaterOff = 10,
+
+    /// <summary>heater on, measuring how fast the temperature rises</summary>
     Tuning3HeaterOn = 11,
+
+    /// <summary>not a mode, but the first of the tuning states</summary>
     FirstTuningMode = Tuning0Settling,
+
+    /// <summary>not a mode, but the last of the tuning states</summary>
     LastTuningMode = Tuning3HeaterOn,
 }

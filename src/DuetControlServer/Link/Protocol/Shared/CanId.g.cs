@@ -16,23 +16,31 @@ public static class CanId
     /// <summary>main boards (except ATE main boards) have address 0</summary>
     public const byte MasterAddress = 0;
 
+    /// <summary>first address of the run of addresses given to ATE control and monitoring boards</summary>
     public const byte ATECMBoardFirstAddress = 90;
 
+    /// <summary>first address of the run of addresses given to ATE I/O boards</summary>
     public const byte ATEIOBoardFirstAddress = 95;
 
+    /// <summary>address an ATE control and monitoring board uses until it is given one</summary>
     public const byte ATECMBoardDefaultAddress = 118;
 
+    /// <summary>address an ATE I/O board uses until it is given one</summary>
     public const byte ATEIOBoardDefaultAddress = 119;
 
+    /// <summary>default address for scanning Z probes</summary>
     public const byte SZPDefaultAddress = 120;
 
     /// <summary>default address for tool boards</summary>
     public const byte ToolBoardDefaultAddress = 121;
 
+    /// <summary>default address for EXP1XD boards</summary>
     public const byte Exp1XDBoardDefaultAddress = 122;
 
+    /// <summary>default address for EXP1HCL boards</summary>
     public const byte Exp1HCLBoardDefaultAddress = 123;
 
+    /// <summary>default address for SAMMYC21 boards</summary>
     public const byte SammyC21DefaultAddress = 124;
 
     /// <summary>the address of the ATE main board</summary>
@@ -44,19 +52,27 @@ public static class CanId
     /// <summary>maximum CAN address including the firmware update address</summary>
     public const byte MaxCanAddress = 126;
 
+    /// <summary>messages sent to this address are received by every board</summary>
     public const byte BroadcastAddress = 127;
 
+    /// <summary>not an address: used where no board is meant</summary>
     public const byte NoAddress = 255;
 
+    /// <summary>an address occupies the low 7 bits of its field</summary>
     public const uint BoardAddressMask = 0x7F;
 
+    /// <summary>position of the destination address in the CAN id</summary>
     public const uint DstAddressShift = 0;
 
+    /// <summary>position of the source address in the CAN id</summary>
     public const uint SrcAddressShift = 8;
 
+    /// <summary>set in the CAN id of a response, clear in that of a request</summary>
     public const uint ResponseBit = 1u << 15;
 
+    /// <summary>position of the message type in the CAN id</summary>
     public const uint MessageTypeShift = 16;
 
+    /// <summary>the message type is 13 bits wide, so lower numbers win arbitration and have higher priority</summary>
     public const uint MessageTypeMask = 0x1FFF;
 }

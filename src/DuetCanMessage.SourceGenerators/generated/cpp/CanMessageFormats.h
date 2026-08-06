@@ -85,7 +85,7 @@ struct __attribute__((packed)) CanMessageEnterTestMode
 {
 	static constexpr CanMessageType messageType = CanMessageType::enterTestMode;
 
-	uint16_t requestId : 12,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
 	         zero1 : 4;
 	uint16_t address : 7,		// CAN address to use
 	         zero2 : 9;
@@ -123,7 +123,7 @@ struct __attribute__((packed)) CanMessageReset
 {
 	static constexpr CanMessageType messageType = CanMessageType::reset;
 
-	uint16_t requestId : 12,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
 	         zero : 4;
 
 	// Set the request ID of this message and clear its reserved fields
@@ -162,6 +162,7 @@ struct __attribute__((packed)) CanMessageRevertPosition
 	// Net number of steps of the last move that were required
 	int32_t finalStepCounts[MaxLinearDriversPerCanSlave];
 
+	// Length of the message when step counts for numReverting drivers are sent
 	static constexpr size_t GetActualDataLength(size_t numReverting) noexcept { return (2 * sizeof(uint32_t)) + (numReverting * sizeof(int32_t)); }
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept { zero = 0; }
@@ -182,6 +183,7 @@ struct __attribute__((packed)) CanMessageMovementLinearShaped final
 		// How many steps of extrusion to do (for extruders), including fractional parts
 		float extrusion;
 
+		// Set the value to zero, which means no steps and no extrusion
 		void Init() noexcept { steps = 0; }
 	};
 
@@ -198,16 +200,19 @@ struct __attribute__((packed)) CanMessageMovementLinearShaped final
 	         seq : 4,		// Sequence number
 	         zero1 : 8,		// Was used to hold the input shaping plan for this move
 	         usePressureAdvance : 1,		// True to apply pressure advance to the extruders and accumulate partial steps
-	         useLateInputShaping : 1,
+	         useLateInputShaping : 1,		// Set if the receiving board is to apply input shaping to this segment itself
 	         zero2 : 6;
 	// Base acceleration during the acceleration segment when the total distance is normalised to 1.0. Always positive or zero.
 	float acceleration;
 	// Negative of the base deceleration during the deceleration segment when the total distance is normalised to 1.0. Always positive or zero.
 	float deceleration;
+	// Steps or extrusion for each driver, in ascending driver number order. Only the first numDrivers entries are sent.
 	PerDriveValues perDrive[MaxLinearDriversPerCanSlave];
 
+	// mask of the sequence number, which wraps round after 16 moves
 	static constexpr uint8_t SeqMask = 0x0f;
 
+	// Length of the message when only the first numDrivers entries of perDrive are sent
 	size_t GetActualDataLength() const noexcept { return (sizeof(*this) - sizeof(perDrive)) + (numDrivers * sizeof(perDrive[0])); }
 	// Return true if any of the included drives actually moves. Relies on a floating point zero also being an all-bits-zero integer.
 	bool HasMotion() const noexcept
@@ -221,6 +226,7 @@ struct __attribute__((packed)) CanMessageMovementLinearShaped final
 		}
 		return false;
 	}
+	// Print the move to the debug channel
 	void DebugPrint() const noexcept;
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept
@@ -240,16 +246,22 @@ struct __attribute__((packed)) CanMessageSetAddressAndNormalTiming
 {
 	static constexpr CanMessageType messageType = CanMessageType::setAddressAndNormalTiming;
 
-	uint16_t requestId : 12,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
 	         zero : 4;
+	// The address the board is expected to have. A board whose address differs ignores the message.
 	uint8_t oldAddress;
+	// The address to change to, or 0 to leave the address alone
 	uint8_t newAddress;
+	// The complement of newAddress. The board ignores the new address unless the two agree.
 	uint8_t newAddressInverted;
+	// DoSetTimingYes to also save normalTiming, DoSetTimingNo to leave the timing alone
 	uint8_t doSetTiming;
+	// The arbitration phase bit timing to save, used only if doSetTiming is DoSetTimingYes
 	CanTiming normalTiming;
 
 	// Magic byte indicating that we do want to write the timing data
 	static constexpr uint8_t DoSetTimingYes = 0xB6;
+	// value of doSetTiming that means leave the timing alone
 	static constexpr uint8_t DoSetTimingNo = 0;
 
 	// Set the request ID of this message and clear its reserved fields
@@ -268,12 +280,16 @@ static_assert(sizeof(CanMessageSetAddressAndNormalTiming) == 16);
 //  - driver states: 0 = disabled, 1 = idle, 2 = active.
 template<class T> struct __attribute__((packed)) CanMessageMultipleDrivesRequest
 {
-	uint16_t requestId : 12,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
 	         zero : 4;
+	// Bitmap of the drivers this message carries a value for
 	uint16_t driversToUpdate;
+	// The values, one per set bit of driversToUpdate in ascending driver number order
 	T values[MaxLinearDriversPerCanSlave];
 
+	// Length of the message when values for numDrivers drivers are sent
 	static constexpr size_t GetActualDataLength(size_t numDrivers) noexcept { return sizeof(uint16_t) * 2 + numDrivers * sizeof(T); }
+	// How many drivers' values fit in one 64-byte message
 	static constexpr size_t MaxDrivesPerMessage() noexcept { return (64 - 2 * sizeof(uint16_t)) / sizeof(T); }
 	// Set the request ID of this message and clear its reserved fields
 	void SetRequestId(CanRequestId rid) noexcept
@@ -286,10 +302,14 @@ template<class T> struct __attribute__((packed)) CanMessageMultipleDrivesRequest
 // Steps/mm and microstepping data sent in a CanMessageMultipleDrivesRequest
 struct __attribute__((packed)) StepsPerUnitAndMicrostepping
 {
+	// Steps per mm, stored little-endian because the field is not aligned
 	float stepsPerUnit;
+	// Microstepping in bits 0-9, with bit 15 set to ask for interpolation
 	uint16_t microstepping;
 
+	// Read the steps per mm, allowing for the field being unaligned
 	float GetStepsPerUnit() const noexcept { return LoadLEF32(&stepsPerUnit); }
+	// Read the microstepping and interpolation bits
 	uint16_t GetMicrostepping() const noexcept { return microstepping; }
 	StepsPerUnitAndMicrostepping(float spu, uint16_t ms) noexcept
 	{
@@ -308,10 +328,13 @@ struct __attribute__((packed)) DriverStateControl
 {
 	uint16_t mode : 2,		// See the driver... constants
 	         zero : 6,
-	         idlePercent : 8;
+	         idlePercent : 8;		// Idle current percentage or brake delay, depending on the mode
 
+	// value of mode meaning disable the driver
 	static constexpr uint16_t driverDisabled = 0;
+	// value of mode meaning put the driver into its idle current
 	static constexpr uint16_t driverIdle = 1;
+	// value of mode meaning enable the driver at full current
 	static constexpr uint16_t driverActive = 2;
 
 	DriverStateControl() noexcept : mode(0), zero(0), idlePercent(0) { }
@@ -324,16 +347,22 @@ struct __attribute__((packed)) CanMessageReturnInfo
 {
 	static constexpr CanMessageType messageType = CanMessageType::returnInfo;
 
-	uint16_t requestId : 12,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
 	         param : 4;		// M122 P parameter
 	// Type of info requested
 	uint8_t type;
 
+	// ask for the firmware version string
 	static constexpr uint8_t typeFirmwareVersion = 0;
+	// ask for the short board type name
 	static constexpr uint8_t typeBoardName = 1;
+	// retired: pressure advance is no longer read back this way
 	static constexpr uint8_t unused_was_typePressureAdvance = 2;
+	// retired: status was never reported this way
 	static constexpr uint8_t unused_was_typeM408 = 3;
+	// ask for the bootloader name
 	static constexpr uint8_t typeBootloaderName = 4;
+	// ask for the unique id of the board
 	static constexpr uint8_t typeBoardUniqueId = 5;
 	// Other parts of the diagnostics reply use 101, 102 etc. so keep those free
 	static constexpr uint8_t typeDiagnosticsPart0 = 100;
@@ -348,7 +377,7 @@ struct __attribute__((packed)) CanMessageDiagnosticTest
 {
 	static constexpr CanMessageType messageType = CanMessageType::diagnosticTest;
 
-	uint16_t requestId : 12,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
 	         zero : 4;
 	// The M122 P parameter
 	uint16_t testType;
@@ -373,20 +402,27 @@ struct __attribute__((packed)) CanMessageSetHeaterTemperatureV1
 {
 	static constexpr CanMessageType messageType = CanMessageType::setHeaterTemperatureV1;
 
-	uint16_t requestId : 12,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
 	         zero : 4;
-	uint16_t heaterNumber : 8,
+	uint16_t heaterNumber : 8,		// Number of the heater this message is about
 	         zero2 : 5,
-	         function : 3;
+	         function : 3;		// What the heater is for, as a HeaterFunction, which fixes how slowly it may heat up before that counts as a fault
+	// Target temperature in degC, applied by every command except commandSuspend
 	float setPoint;
-	uint8_t command : 4,
+	uint8_t command : 4,		// What to do with the heater; see the command... constants
 	        zero3 : 4;
 
+	// change the setpoint without changing whether the heater is on
 	static constexpr uint8_t commandNone = 0;
+	// switch the heater off
 	static constexpr uint8_t commandOff = 1;
+	// switch the heater on
 	static constexpr uint8_t commandOn = 2;
+	// clear a heater fault and resume normal control
 	static constexpr uint8_t commandResetFault = 3;
+	// switch the heater off temporarily, remembering its setpoint
 	static constexpr uint8_t commandSuspend = 4;
+	// resume a suspended heater
 	static constexpr uint8_t commandUnsuspend = 5;
 	// Reset the heater after a failed model update
 	static constexpr uint8_t commandReset = 6;
@@ -407,9 +443,11 @@ static_assert(sizeof(CanMessageSetHeaterTemperatureV1) == 9);
 // generated header stays a drop-in for CANlib's, but there is no message type that would carry it.
 struct __attribute__((packed)) CanMessageM303
 {
-	uint16_t requestId : 12,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
 	         zero : 4;
+	// Number of the heater to tune
 	uint16_t heaterNumber;
+	// Temperature in degC to tune the heater at
 	float targetTemperature;
 
 	// Set the request ID of this message and clear its reserved fields
@@ -426,14 +464,16 @@ struct __attribute__((packed)) CanMessageHeaterModelV3
 {
 	static constexpr CanMessageType messageType = CanMessageType::heaterModelV3;
 
-	uint16_t requestId : 12,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
 	         zero : 4;
-	uint16_t heater : 8,
-	         enabled : 1,
-	         inverted : 1,
+	uint16_t heater : 8,		// Number of the heater this model is for
+	         enabled : 1,		// Set if the heater may be switched on
+	         inverted : 1,		// Set if the PWM output drives the heater the other way round, i.e. 0 is full power
 	         _obsolete_was_pidParametersOverridden : 1,		// Unused because we no longer support overriding PID parameters
 	         zero2 : 5;
+	// The heating and cooling rates, dead time and other parameters of the model
 	HeaterModel basicModel;
+	// Highest PWM the heater may be driven at, 0 to 1
 	float maxPwm;
 	// Controller (not model) gain; obsolete
 	float _obsolete_was_kP;
@@ -460,11 +500,14 @@ struct __attribute__((packed)) CanMessageSetHeaterFaultDetectionParameters
 {
 	static constexpr CanMessageType messageType = CanMessageType::setHeaterFaultDetection;
 
-	uint16_t requestId : 12,
-	         version35 : 1,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
+	         version35 : 1,		// Set if maxBadTemperatureCount is present. A board must ignore that field unless this bit is set.
 	         zero : 3;
+	// Number of the heater these parameters apply to
 	uint16_t heater;
+	// How far the temperature may stray from the setpoint, in degC, before a fault is raised
 	float maxTempExcursion;
+	// How long the heater may fail to heat as expected, in seconds, before a fault is raised
 	float maxFaultTime;
 	// Added at version 3.5; only present if the version35 flag is set
 	uint32_t maxBadTemperatureCount;
@@ -487,18 +530,26 @@ struct __attribute__((packed)) CanMessageSetHeaterMonitors
 	// One heater monitor within a CanMessageSetHeaterMonitors
 	struct __attribute__((packed)) CanHeaterMonitor
 	{
+		// Temperature limit in degC that triggers the monitor
 		float limit;
+		// Number of the sensor the monitor watches, or -1 if the monitor is unused
 		int8_t sensor;
+		// What to do when the monitor triggers: 0 = raise a heater fault, 1 = switch the heater off permanently, 2 = switch it off temporarily
 		uint8_t action;
+		// What counts as a trigger: -1 = disabled, 0 = temperature exceeded, 1 = temperature too low
 		int8_t trigger;
+		// Reserved for future use; set to 0
 		uint8_t zero;
 	};
 
-	uint16_t requestId : 12,
-	         numMonitors : 4;
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
+	         numMonitors : 4;		// How many entries of monitors are present
+	// Number of the heater whose monitors are being set
 	uint16_t heater;
+	// The monitors, of which only the first numMonitors entries are sent
 	CanHeaterMonitor monitors[7];
 
+	// Length of the message when only the first numMonitors monitors are sent
 	size_t GetActualDatalength() const noexcept { return (2 * sizeof(uint16_t)) + (numMonitors * sizeof(CanHeaterMonitor)); }
 	// Set the request ID of this message and clear its reserved fields
 	void SetRequestId(CanRequestId rid) noexcept { requestId = rid; }
@@ -511,10 +562,12 @@ struct __attribute__((packed)) CanMessageUpdateYourFirmware
 {
 	static constexpr CanMessageType messageType = CanMessageType::updateFirmware;
 
-	uint16_t requestId : 12,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
 	         module : 2,		// 0 = main firmware, 1 = bootloader, 2 and 3 reserved
 	         zero : 2;
+	// The address of the board that is to update itself. A board whose address differs ignores the message.
 	uint8_t boardId;
+	// The complement of boardId, as an integrity check
 	uint8_t invertedBoardId;
 
 	// Set the request ID of this message and clear its reserved fields
@@ -531,15 +584,21 @@ struct __attribute__((packed)) CanMessageFanParameters
 {
 	static constexpr CanMessageType messageType = CanMessageType::fanParameters;
 
-	uint16_t requestId : 12,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
 	         zero : 4;
+	// Number of the fan being configured
 	uint16_t fanNumber;
 	// In milliseconds
 	uint16_t blipTime;
+	// Requested fan speed as a fraction of the range minVal to maxVal, used when no sensors are monitored
 	float val;
+	// Lowest PWM the fan runs at when it is on
 	float minVal;
+	// Highest PWM the fan runs at
 	float maxVal;
+	// Temperatures in degC between which the fan speed ramps from minVal to maxVal. If the second is not above the first the fan runs bang-bang.
 	float triggerTemperatures[2];
+	// Bitmap of the sensors that drive the fan thermostatically, or zero for a fan under direct control
 	uint64_t sensorsMonitored;
 
 	// Set the request ID of this message and clear its reserved fields
@@ -556,9 +615,11 @@ struct __attribute__((packed)) CanMessageSetFanSpeed
 {
 	static constexpr CanMessageType messageType = CanMessageType::setFanSpeed;
 
-	uint16_t requestId : 12,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
 	         zero : 4;
+	// Number of the fan whose speed is being set
 	uint16_t fanNumber;
+	// Requested PWM, 0 to 1
 	float pwm;
 
 	// Set the request ID of this message and clear its reserved fields
@@ -575,16 +636,20 @@ struct __attribute__((packed)) CanMessageCreateInputMonitorV1
 {
 	static constexpr CanMessageType messageType = CanMessageType::createInputMonitorV1;
 
-	uint16_t requestId : 12,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
 	         zero : 4;
+	// Handle the main board will use to refer to this input
 	RemoteInputHandle handle;
 	// Analog threshold, or zero if digital
 	int32_t threshold;
+	// Shortest interval in milliseconds between reports of a change to this input
 	uint16_t minInterval;
 	// Null terminated
 	char pinName[54];
 
+	// Length of the message with the pin name truncated to its terminating null
 	size_t GetActualDataLength() const noexcept { return 2 * sizeof(uint16_t) + sizeof(uint32_t) + sizeof(RemoteInputHandle) + Strnlen(pinName, ARRAY_SIZE(pinName)); }
+	// How much of a message of the given length is pin name
 	size_t GetMaxPinNameLength(size_t dataLength) const noexcept { return dataLength - (2 * sizeof(uint16_t) + sizeof(uint32_t) + sizeof(RemoteInputHandle)); }
 	// Set the request ID of this message and clear its reserved fields
 	void SetRequestId(CanRequestId rid) noexcept
@@ -600,10 +665,13 @@ struct __attribute__((packed)) CanMessageChangeInputMonitorV1
 {
 	static constexpr CanMessageType messageType = CanMessageType::changeInputMonitorV1;
 
-	uint16_t requestId : 12,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
 	         zero : 4;
+	// Handle of the input monitor to change
 	RemoteInputHandle handle;
+	// The new value, whose meaning depends on the action
 	uint32_t param;
+	// What to change; see the action... constants
 	uint8_t action;
 
 	// Stop sending status change messages
@@ -622,12 +690,15 @@ struct __attribute__((packed)) CanMessageChangeInputMonitorV1
 	static constexpr uint8_t actionSetDriveLevel = 6;
 	// Select touch mode and set the sensitivity to param, only for scanning Z probes
 	static constexpr uint8_t actionSelectTouchMode = 7;
+	// value of param, with action actionSetDriveLevel, that asks for the drive level to be calibrated and reported
 	static constexpr uint32_t paramAutoCalibrateDriveLevelAndReport = 0xFFFFFFFF;
+	// value of param, with action actionSetDriveLevel, that asks for the current drive level to be reported
 	static constexpr uint32_t paramReportDriveLevel = 0xFFFFFFFE;
 	// Bottom 5 bits are the drive level
 	static constexpr uint32_t paramDriveLevelMask = 0x1F;
 	// The remaining bits are the offset
 	static constexpr uint32_t paramOffsetShift = 5;
+	// largest offset that fits in param alongside the drive level
 	static constexpr uint32_t maxParamOffset = (1 << (32 - paramOffsetShift)) - 1;
 
 	// Set the request ID of this message and clear its reserved fields
@@ -642,6 +713,7 @@ static_assert(sizeof(CanMessageChangeInputMonitorV1) == 9);
 // An analog handle and the reading from it. Allocated in arrays starting on a 2- or 4-byte boundary, so 'handle' is aligned but 'reading' is not.
 struct __attribute__((packed)) AnalogHandleDataV0
 {
+	// Handle of the input this reading came from
 	RemoteInputHandle handle;
 	// Note, this will not be aligned!
 	int32_t reading;
@@ -651,6 +723,7 @@ static_assert(sizeof(AnalogHandleDataV0) == 6);
 // An analog handle and the reading from it. Allocated in arrays starting on a 4-byte boundary, so all fields are correctly aligned.
 struct __attribute__((packed)) AnalogHandleDataV1
 {
+	// Handle of the input this reading came from
 	RemoteInputHandle handle;
 	// Lower 16 bits of the system step tick count when the new value was recorded
 	uint16_t when;
@@ -685,8 +758,9 @@ struct __attribute__((packed)) CanMessageStartAccelerometer
 {
 	static constexpr CanMessageType messageType = CanMessageType::startAccelerometer;
 
-	uint16_t requestId : 12,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
 	         zero1 : 4;
+	// Number of the accelerometer to collect from
 	uint8_t deviceNumber;
 	uint8_t axes : 3,		// Bitmap of axes to collect
 	        delayedStart : 1,		// True to delay starting until startTime
@@ -711,7 +785,7 @@ struct __attribute__((packed)) CanMessageStartClosedLoopDataCollection
 {
 	static constexpr CanMessageType messageType = CanMessageType::startClosedLoopDataCollection;
 
-	uint16_t requestId : 12,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
 	         zero1 : 4;
 	// The sample rate at which to collect
 	uint16_t rate;
@@ -740,10 +814,12 @@ struct __attribute__((packed)) CanMessageWriteGpio
 {
 	static constexpr CanMessageType messageType = CanMessageType::writeGpio;
 
-	uint16_t requestId : 12,
-	         isServo : 1,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
+	         isServo : 1,		// Set if the port is a servo, in which case pwm is a servo position rather than a duty cycle
 	         zero : 3;
+	// PWM to write, 0 to 1, or the servo position if isServo is set
 	float pwm;
+	// Number of the GPIO port on the receiving board
 	uint8_t portNumber;
 
 	// Set the request ID of this message and clear its reserved fields
@@ -760,11 +836,11 @@ struct __attribute__((packed)) CanMessageCreateFilamentMonitor
 {
 	static constexpr CanMessageType messageType = CanMessageType::createFilamentMonitor;
 
-	uint16_t requestId : 12,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
 	         zero : 4;
-	uint16_t driver : 8,
+	uint16_t driver : 8,		// Number of the driver the monitor watches
 	         zero2 : 4,
-	         type : 8;
+	         type : 8;		// Type of monitor to create, i.e. the M591 P parameter: 1 and 2 are simple switches, 3 and 4 rotating magnet, 5 and 6 laser, 7 pulsed
 
 	// Set the request ID of this message and clear its reserved fields
 	void SetRequestId(CanRequestId rid) noexcept
@@ -781,9 +857,9 @@ struct __attribute__((packed)) CanMessageDeleteFilamentMonitor
 {
 	static constexpr CanMessageType messageType = CanMessageType::deleteFilamentMonitor;
 
-	uint16_t requestId : 12,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
 	         zero : 4;
-	uint16_t driver : 8,
+	uint16_t driver : 8,		// Number of the driver whose monitor is to be deleted
 	         zero2 : 12;
 
 	// Set the request ID of this message and clear its reserved fields
@@ -804,15 +880,19 @@ struct __attribute__((packed)) CanMessageHeaterTuningCommand
 {
 	static constexpr CanMessageType messageType = CanMessageType::heaterTuningCommand;
 
-	uint16_t requestId : 12,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
 	         zero : 4;
-	uint32_t heaterNumber : 8,
-	         on : 1,
+	uint32_t heaterNumber : 8,		// Number of the heater to tune
+	         on : 1,		// Set to start tuning, clear to stop it. With calibrate also set, this starts calibration instead.
 	         calibrate : 1,		// Added for 3.7.0-beta.2
 	         zero2 : 22;
+	// PWM to drive the heater at during tuning, 0 to 1
 	float pwm;
+	// Temperature in degC at which each cycle turns the heater back on
 	float lowTemp;
+	// Temperature in degC at which each cycle turns the heater off
 	float highTemp;
+	// How far the temperature must move away from a peak, in degC, before that peak is taken as final
 	float peakTempDrop;
 
 	// Set the request ID of this message and clear its reserved fields
@@ -830,11 +910,15 @@ struct __attribute__((packed)) CanMessageHeaterFeedForwardV1
 {
 	static constexpr CanMessageType messageType = CanMessageType::heaterFeedForwardV1;
 
+	// Reserved so that the heater number lands where SetRequestId expects it; set to 0
 	uint16_t zero;
-	uint16_t heaterNumber : 8,
+	uint16_t heaterNumber : 8,		// Number of the heater this feedforward is for
 	         zero2 : 8;
+	// Current PWM of the print cooling fan, 0 to 1, from which the extra heater power needed is worked out
 	float fanPwmFraction;
+	// Extra heater PWM to allow for the current extrusion rate
 	float extrusionPwmBoost;
+	// Amount in degC to raise the target temperature by while extruding
 	float extrusionTemperatureBoost;
 
 	// Clear the reserved fields of this message so that it stays compatible with future uses
@@ -854,17 +938,20 @@ struct __attribute__((packed)) CanMessageSetInputShapingV1
 	// The coefficient and duration of one input shaping impulse
 	struct ShapingPair
 	{
+		// Fraction of the move this impulse carries. The coefficients of all the impulses must add up to 1.
 		float coefficient;
+		// Start delay of this impulse in step clocks, which is normally zero for the first impulse
 		uint32_t impulseDelay;
 	};
 
-	uint16_t requestId : 12,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
 	         zero : 4;
 	// The total number of impulses
 	uint16_t numImpulses;
 	// The coefficients and durations of the impulses
 	ShapingPair impulses[7];
 
+	// Length of the message when only the first numImpulses impulses are sent
 	size_t GetActualDataLength() const noexcept { return (2 * sizeof(uint16_t)) + (numImpulses * sizeof(ShapingPair)); }
 	// Set the request ID of this message and clear its reserved fields
 	void SetRequestId(CanRequestId rid) noexcept
@@ -881,7 +968,7 @@ struct __attribute__((packed)) CanMessageEnableStallEndstop
 {
 	static constexpr CanMessageType messageType = CanMessageType::enableStallEndstop;
 
-	uint16_t requestId : 12,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
 	         zero : 4;
 	// The number of the driver we want to enable a stall endstop for
 	uint16_t driverNumber;
@@ -905,10 +992,10 @@ struct __attribute__((packed)) CanMessageSetDefaultHeaterModel
 {
 	static constexpr CanMessageType messageType = CanMessageType::setDefaultHeaterModel;
 
-	uint16_t requestId : 12,
+	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
 	         zero : 4;
-	uint16_t heater : 6,
-	         heaterFunction : 3,
+	uint16_t heater : 6,		// Number of the heater whose default model is wanted
+	         heaterFunction : 3,		// What the heater is for, which decides which set of default parameters is returned
 	         zero2 : 8;
 
 	// Set the request ID of this message and clear its reserved fields
@@ -956,9 +1043,12 @@ struct __attribute__((packed)) CanMessageFirmwareUpdateRequest
 	// Null-terminated board type name (firmware request) or bootloader class name (bootloader request)
 	char boardType[56];
 
+	// the only bootloader protocol version defined so far
 	static constexpr uint32_t BootloaderVersion0 = 0;
 
+	// Length of the message with the board type truncated to its terminating null
 	size_t GetActualDataLength() const noexcept { return 2 * sizeof(uint32_t) + Strnlen(boardType, ARRAY_SIZE(boardType)); }
+	// How much of a message of the given length is board type
 	size_t GetBoardTypeLength(size_t dataLength) const noexcept { return dataLength - 2 * sizeof(uint32_t); }
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept
@@ -980,11 +1070,16 @@ struct __attribute__((packed)) CanMessageFirmwareUpdateResponse
 	// Up to 56 bytes of data
 	uint8_t data[56];
 
+	// the block is present in the message
 	static constexpr uint32_t ErrNone = 0;
+	// the main board does not have the requested file
 	static constexpr uint32_t ErrNoFile = 1;
+	// the requested offset is past the end of the file
 	static constexpr uint32_t ErrBadOffset = 2;
+	// the block could not be supplied for some other reason
 	static constexpr uint32_t ErrOther = 3;
 
+	// Length of the message when only dataLength bytes of data are sent
 	size_t GetActualDataLength() const noexcept { return dataLength + 2 * sizeof(uint32_t); }
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept { zero = 0; }
@@ -1003,11 +1098,15 @@ struct __attribute__((packed)) CanMessageStandardReply
 	         fragmentNumber : 7,		// The fragment number of this message
 	         moreFollows : 1,		// Set if this is not the last fragment of the reply
 	         extra : 8;		// Normally unused, but occasionally carries extra data
+	// The reply text, which is not null terminated if it fills the field
 	char text[60];
 
+	// how much text one fragment can carry
 	static constexpr size_t MaxTextLength = 60;
 
+	// How much of a message of the given length is text, stopping at the first null
 	size_t GetTextLength(size_t dataLength) const noexcept { return Strnlen(text, (dataLength < sizeof(uint32_t) + sizeof(text)) ? dataLength - sizeof(uint32_t) : sizeof(text)); }
+	// Length of the message when textLength characters of text are sent
 	size_t GetActualDataLength(size_t textLength) const noexcept { return textLength + sizeof(uint32_t); }
 	// Set the request ID of this message and clear its reserved fields
 	void SetRequestId(CanRequestId rid) noexcept
@@ -1027,8 +1126,10 @@ struct __attribute__((packed)) CanMessageReadInputsReplyV0
 	         resultCode : 4,		// Normally a GCodeResult
 	         numReported : 4,		// Number of input handles reported
 	         zero : 12;
+	// The readings, of which only the first numReported entries are sent
 	AnalogHandleDataV0 results[10];
 
+	// Length of the message when only the first numReported readings are sent
 	size_t GetActualDataLength() const noexcept { return sizeof(uint32_t) + numReported * sizeof(results[0]); }
 	// Set the request ID of this message and clear its reserved fields
 	void SetRequestId(CanRequestId rid) noexcept
@@ -1048,8 +1149,10 @@ struct __attribute__((packed)) CanMessageReadInputsReplyV1
 	         resultCode : 4,		// Normally a GCodeResult
 	         numReported : 4,		// Number of input handles reported
 	         zero : 12;
+	// The readings, of which only the first numReported entries are sent
 	AnalogHandleDataV1 results[7];
 
+	// Length of the message when only the first numReported readings are sent
 	size_t GetActualDataLength() const noexcept { return sizeof(uint32_t) + numReported * sizeof(results[0]); }
 	// Set the request ID of this message and clear its reserved fields
 	void SetRequestId(CanRequestId rid) noexcept
@@ -1065,11 +1168,14 @@ static_assert(sizeof(CanMessageReadInputsReplyV1) == 60);
 // The paramMap bitmap indicates which parameters are present in the data. They are provided in the same order as in the ParamTable.
 struct __attribute__((packed)) CanMessageGeneric
 {
-	uint32_t requestId : 12,
-	         paramMap : 20;
+	uint32_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
+	         paramMap : 20;		// Bitmap of which of the parameter table's parameters are present in the data, in table order
+	// The parameter values, packed in the order the parameter table lists them
 	uint8_t data[60];
 
+	// Length of the message when the packed parameters occupy paramLength bytes
 	static constexpr size_t GetActualDataLength(size_t paramLength) noexcept { return paramLength + sizeof(uint32_t); }
+	// Print the parameters to the debug channel, decoding them with the given parameter table
 	void DebugPrint(const ParamDescriptor *_ecv_array _ecv_null pt = nullptr) const noexcept;
 	// Set the request ID of this message and clear its reserved fields
 	void SetRequestId(CanRequestId rid) noexcept { requestId = rid; }
@@ -1086,7 +1192,9 @@ private:                                    // unaligned members are private so 
 	float temperature;
 public:
 
+	// Read the temperature, allowing for the field being unaligned
 	float GetTemperature() const noexcept { return LoadLEF32(&temperature); }
+	// Store the temperature, allowing for the field being unaligned
 	void SetTemperature(float t) noexcept
 	{
 		StoreLEF32(&temperature, t);
@@ -1104,6 +1212,7 @@ struct __attribute__((packed)) CanMessageSensorTemperatures
 	// The error codes and temperatures of the ones we have, lowest sensor number first
 	CanSensorReport temperatureReports[11];
 
+	// Length of the message when only the first numSensors reports are sent
 	size_t GetActualDataLength(uint32_t numSensors) const noexcept { return numSensors * sizeof(CanSensorReport) + sizeof(uint64_t); }
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept
@@ -1124,7 +1233,9 @@ private:                                    // unaligned members are private so 
 	float temperature;
 public:
 
+	// Read the temperature, allowing for the field being unaligned
 	float GetTemperature() const noexcept { return LoadLEF32(&temperature); }
+	// Store the temperature, allowing for the field being unaligned
 	void SetTemperature(float t) noexcept
 	{
 		StoreLEF32(&temperature, t);
@@ -1142,6 +1253,7 @@ struct __attribute__((packed)) CanMessageHeatersStatus
 	// The status and temperatures of the ones we have, lowest heater number first
 	CanHeaterReport reports[9];
 
+	// Length of the message when only the first numHeaters reports are sent
 	size_t GetActualDataLength(uint32_t numHeaters) const noexcept { return numHeaters * sizeof(CanHeaterReport) + sizeof(uint64_t); }
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept
@@ -1162,7 +1274,9 @@ struct __attribute__((packed)) CanMessageAnnounceV0
 	// The short type name of this board followed by '|' and the firmware version
 	char boardTypeAndFirmwareVersion[56];
 
+	// Length of the message with the board type and firmware version truncated to their terminating null
 	size_t GetActualDataLength() const noexcept { return (2 * sizeof(uint32_t)) + Strnlen(boardTypeAndFirmwareVersion, ARRAY_SIZE(boardTypeAndFirmwareVersion)); }
+	// How much of a message of the given length is board type and firmware version
 	static constexpr size_t GetMaxTextLength(size_t dataLength) noexcept { return dataLength - (2 * sizeof(uint32_t)); }
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept { zero = 0; }
@@ -1186,7 +1300,9 @@ struct __attribute__((packed)) CanMessageAnnounceV1
 	// The short type name of this board followed by '|' and the firmware version
 	char boardTypeAndFirmwareVersion[43];
 
+	// Length of the message with the board type and firmware version truncated to their terminating null
 	size_t GetActualDataLength() const noexcept { return sizeof(timeSinceStarted) + sizeof(uniqueId) + sizeof(uint8_t) + Strnlen(boardTypeAndFirmwareVersion, ARRAY_SIZE(boardTypeAndFirmwareVersion)); }
+	// How much of a message of the given length is board type and firmware version
 	static constexpr size_t GetMaxTextLength(size_t dataLength) noexcept { return dataLength - (sizeof(uint32_t) + 16 + sizeof(uint8_t)); }
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept { zero = 0; }
@@ -1213,6 +1329,7 @@ struct __attribute__((packed)) CanMessageFansReport
 	// The actual PWM and RPM readings of the fans
 	FanReport fanReports[14];
 
+	// Length of the message when only the first numReported fan reports are sent
 	size_t GetActualDataLength(uint32_t numReported) const noexcept { return numReported * sizeof(fanReports[0]) + sizeof(uint64_t); }
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept
@@ -1228,8 +1345,11 @@ struct __attribute__((packed)) CanMessageInputChangedV1
 
 	// 1 bit per reported handle
 	uint16_t states;
+	// How many entries of results are present
 	uint8_t numHandles;
+	// Reserved for future use; set to 0
 	uint8_t zero;
+	// The handles and their readings, of which only the first numHandles entries are sent
 	AnalogHandleDataV0 results[10];
 
 	// Add an entry. 'states' and 'numHandles' must be cleared to zero before adding the first one. Returns true if successful, false if the message is full.
@@ -1252,6 +1372,7 @@ struct __attribute__((packed)) CanMessageInputChangedV1
 	RemoteInputHandle GetEntryHandle(size_t index) const noexcept { return results[index].handle; }
 	// Get the reading from one of the result values. 'results' is 4-byte allocated and each entry is 6 bytes long, so the 4-byte reading is not always 4-byte aligned.
 	int32_t GetEntryReading(size_t index) const noexcept { return LoadLEI32(&results[index].reading); }
+	// Length of the message when only the first numHandles entries are sent
 	size_t GetActualDataLength() const noexcept { return sizeof(states) + sizeof(numHandles) + sizeof(zero) + (numHandles * sizeof(results[0])); }
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept { zero = 0; }
@@ -1265,7 +1386,9 @@ struct __attribute__((packed)) CanMessageInputChangedV2
 
 	// 1 bit per reported handle
 	uint16_t states;
+	// How many entries of results are present
 	uint8_t numHandles;
+	// Reserved for future use; set to 0
 	uint8_t zero;
 	// This is on a 4-byte boundary
 	AnalogHandleDataV1 results[7];
@@ -1287,10 +1410,13 @@ struct __attribute__((packed)) CanMessageInputChangedV2
 		}
 		return false;
 	}
+	// Read the handle of one entry
 	RemoteInputHandle GetEntryHandle(size_t index) const noexcept { return results[index].handle; }
+	// Read the value of one entry
 	int32_t GetEntryReading(size_t index) const noexcept { return results[index].reading; }
 	// Get the change time stamp for one of the result values
 	uint16_t GetWhen(size_t index) const noexcept { return results[index].when; }
+	// Length of the message when only the first numHandles entries are sent
 	size_t GetActualDataLength() const noexcept { return sizeof(states) + sizeof(numHandles) + sizeof(zero) + (numHandles * sizeof(results[0])); }
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept { zero = 0; }
@@ -1302,14 +1428,14 @@ struct __attribute__((packed)) CanMessageBoardStatusV0
 {
 	static constexpr CanMessageType messageType = CanMessageType::boardStatusReportV0;
 
-	uint32_t hasVin : 1,
-	         hasV12 : 1,
-	         hasMcuTemp : 1,
-	         hasAccelerometer : 1,
-	         hasClosedLoop : 1,
-	         hasInductiveSensor : 1,
+	uint32_t hasVin : 1,		// Set if the first values entry is the VIN supply voltage
+	         hasV12 : 1,		// Set if the next values entry is the 12V rail voltage
+	         hasMcuTemp : 1,		// Set if the next values entry is the MCU temperature
+	         hasAccelerometer : 1,		// Set if the board has an accelerometer
+	         hasClosedLoop : 1,		// Set if the board supports closed loop control
+	         hasInductiveSensor : 1,		// Set if the board has an inductive sensor
 	         zero : 10,
-	         hasMovementDelay : 1,
+	         hasMovementDelay : 1,		// Set if the union carries the cumulative hiccup time rather than the never-used RAM
 	         numAnalogHandles : 3,		// How many instances of AnalogHandleDataV0 we append
 	         zero2 : 12;
 	union
@@ -1322,6 +1448,7 @@ struct __attribute__((packed)) CanMessageBoardStatusV0
 	// Values of none, some or all of Vin, V12 and CPU temperature. The data for some analog handles follows the last present value (max 4 if all of Vin/V12/mcuTemp are supported).
 	MinCurMax values[3];
 
+	// Clear every has... flag and the analog handle count, ready for the fields that are present to be filled in
 	void Clear() noexcept
 	{
 		hasVin = false;
@@ -1333,12 +1460,15 @@ struct __attribute__((packed)) CanMessageBoardStatusV0
 		hasInductiveSensor = false;
 		numAnalogHandles = 0;
 	}
+	// Offset of the analog handle data, which follows however many MinCurMax values the has... flags say are present
 	size_t GetAnalogHandlesOffset() const noexcept
 	{
 		const uint32_t numMinCurMaxValues = (uint32_t)(hasVin) + (uint32_t)(hasV12) + (uint32_t)(hasMcuTemp);
 		return 2 * sizeof(uint32_t) + numMinCurMaxValues * sizeof(values[0]);
 	}
+	// How many bytes are left for analog handle data
 	size_t GetMaxAnalogHandleSpace() const noexcept { return 64 - GetAnalogHandlesOffset(); }
+	// Length of the message given which values and how many analog handles are present
 	size_t GetActualDataLength() const noexcept { return GetAnalogHandlesOffset() + numAnalogHandles * sizeof(AnalogHandleDataV0); }
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept
@@ -1354,14 +1484,14 @@ struct __attribute__((packed)) CanMessageBoardStatusV1
 {
 	static constexpr CanMessageType messageType = CanMessageType::boardStatusReportV1;
 
-	uint32_t hasVin : 1,
-	         hasV12 : 1,
-	         hasMcuTemp : 1,
-	         hasAccelerometer : 1,
-	         hasClosedLoop : 1,
-	         hasInductiveSensor : 1,
+	uint32_t hasVin : 1,		// Set if the first shortValues entry is the VIN supply voltage
+	         hasV12 : 1,		// Set if the next shortValues entry is the 12V rail voltage
+	         hasMcuTemp : 1,		// Set if the next shortValues entry is the MCU temperature
+	         hasAccelerometer : 1,		// Set if the board has an accelerometer
+	         hasClosedLoop : 1,		// Set if the board supports closed loop control
+	         hasInductiveSensor : 1,		// Set if the board has an inductive sensor
 	         zero : 10,
-	         hasMovementDelay : 1,
+	         hasMovementDelay : 1,		// Set if the union carries the cumulative hiccup time rather than the never-used RAM
 	         numAnalogHandles : 3,		// How many instances of AnalogHandleDataV1 we append
 	         zero2 : 12;
 	union
@@ -1374,6 +1504,7 @@ struct __attribute__((packed)) CanMessageBoardStatusV1
 	// Values of none, some or all of Vin, V12 and CPU temperature. The data for some analog handles follows the last present value (max 5 if all of Vin/V12/mcuTemp are supported).
 	ShortMinCurMax shortValues[3];
 
+	// Clear every has... flag and the analog handle count, ready for the fields that are present to be filled in
 	void Clear() noexcept
 	{
 		hasVin = false;
@@ -1385,12 +1516,15 @@ struct __attribute__((packed)) CanMessageBoardStatusV1
 		hasInductiveSensor = false;
 		numAnalogHandles = 0;
 	}
+	// Offset of the analog handle data, which follows however many ShortMinCurMax values the has... flags say are present
 	size_t GetAnalogHandlesOffset() const noexcept
 	{
 		const uint32_t numMinCurMaxValues = (uint32_t)(hasVin) + (uint32_t)(hasV12) + (uint32_t)(hasMcuTemp);
 		return 2 * sizeof(uint32_t) + numMinCurMaxValues * sizeof(shortValues[0]);
 	}
+	// How many bytes are left for analog handle data
 	size_t GetMaxAnalogHandleSpace() const noexcept { return 64 - GetAnalogHandlesOffset(); }
+	// Length of the message given which values and how many analog handles are present
 	size_t GetActualDataLength() const noexcept { return GetAnalogHandlesOffset() + numAnalogHandles * sizeof(AnalogHandleDataV1); }
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept
@@ -1404,6 +1538,7 @@ static_assert(sizeof(CanMessageBoardStatusV1) == 26);
 // Driver status. If this is changed then CanMessageDriversStatus must be replaced by a new version.
 struct __attribute__((packed)) OpenLoopStatus
 {
+	// The driver status flags, as a StandardDriverStatus bitmap
 	uint32_t status;
 };
 static_assert(sizeof(OpenLoopStatus) == 4);
@@ -1411,10 +1546,15 @@ static_assert(sizeof(OpenLoopStatus) == 4);
 // Driver status including closed loop data. If this is changed then CanMessageDriversStatus must be replaced by a new version.
 struct __attribute__((packed)) ClosedLoopStatus
 {
+	// The driver status flags, as a StandardDriverStatus bitmap
 	uint32_t status;
+	// Mean motor current over the reporting period, as a fraction of the configured current
 	float16_t averageCurrentFraction;
+	// Highest motor current over the reporting period, as a fraction of the configured current
 	float16_t maxCurrentFraction;
+	// Root mean square position error over the reporting period, in full steps
 	float16_t rmsPositionError;
+	// Largest position error either way over the reporting period, in full steps
 	float16_t maxAbsPositionError;
 };
 static_assert(sizeof(ClosedLoopStatus) == 12);
@@ -1424,8 +1564,8 @@ struct __attribute__((packed)) CanMessageDriversStatus
 {
 	static constexpr CanMessageType messageType = CanMessageType::driversStatusReport;
 
-	uint16_t numDriversReported : 4,
-	         hasClosedLoopData : 1,
+	uint16_t numDriversReported : 4,		// How many drivers this message reports on
+	         hasClosedLoopData : 1,		// Set if the entries are ClosedLoopStatus rather than OpenLoopStatus
 	         zero : 11;
 	// For alignment
 	uint16_t zero2;
@@ -1437,7 +1577,9 @@ struct __attribute__((packed)) CanMessageDriversStatus
 		ClosedLoopStatus closedLoopData[5];
 	};
 
+	// Length of the message when only the first numDriversReported entries are sent
 	size_t GetActualDataLength() const noexcept { return 2 * sizeof(uint16_t) + numDriversReported * (hasClosedLoopData ? sizeof(closedLoopData[0]) : sizeof(openLoopData[0])); }
+	// Record how many drivers are reported and whether the entries carry closed loop data
 	void SetStandardFields(uint32_t numReported, bool closedLoop) noexcept
 	{
 		numDriversReported = numReported;
@@ -1463,11 +1605,11 @@ struct __attribute__((packed)) FilamentMonitorDataV2
 	         status : 4,		// Standard filament status
 	         zero2 : 2,
 	         hasLiveData : 1;		// True if the following fields are meaningful for this sensor
-	int32_t minPercentage : 10,
-	        maxPercentage : 10,
-	        avgPercentage : 10,
+	int32_t minPercentage : 10,		// Smallest measured movement over the calibration run, as a percentage of the extrusion commanded
+	        maxPercentage : 10,		// Largest measured movement over the calibration run, as a percentage of the extrusion commanded
+	        avgPercentage : 10,		// Mean measured movement over the calibration run, as a percentage of the extrusion commanded
 	        lastPercentage : 10,		// Declaring this struct packed allows this to straddle word boundaries
-	        calibrationLength : 24;
+	        calibrationLength : 24;		// Total extrusion commanded during the calibration run, in mm
 
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept
@@ -1485,9 +1627,12 @@ struct __attribute__((packed)) CanMessageFilamentMonitorsStatusV2
 
 	uint32_t driversReported : 8,		// Bitmap of driver numbers with associated filament monitors reported in this message
 	         zero : 24;
+	// The reports, one per set bit of driversReported in ascending driver number order
 	FilamentMonitorDataV2 data[5];
 
+	// Length of the message when only the drivers named by driversReported are sent
 	size_t GetActualDataLength() const noexcept { return sizeof(uint32_t) + (Bitmap<uint32_t>(driversReported).CountSetBits() * sizeof(data[0])); }
+	// Record which drivers this message reports on
 	void SetStandardFields(uint32_t drivers) noexcept { driversReported = drivers; }
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept { zero = 0; }
@@ -1499,17 +1644,25 @@ struct __attribute__((packed)) CanMessageHeaterTuningReport
 {
 	static constexpr CanMessageType messageType = CanMessageType::heaterTuningReport;
 
-	uint32_t heater : 8,
+	uint32_t heater : 8,		// Number of the heater this report is for
 	         zero : 8,
-	         cyclesDone : 16;
+	         cyclesDone : 16;		// How many tuning cycles have finished, including this one
+	// How long the heater was on during this cycle, in milliseconds
 	uint32_t ton;
+	// How long the heater was off during this cycle, in milliseconds
 	uint32_t toff;
+	// Dead time in milliseconds after the heater was turned on, i.e. how long the temperature kept falling
 	uint32_t dlow;
+	// Dead time in milliseconds after the heater was turned off, i.e. how long the temperature kept rising
 	uint32_t dhigh;
+	// Rate at which the temperature rose with the heater on, in degC per second
 	float heatingRate;
+	// Rate at which the temperature fell with the heater off, in degC per second
 	float coolingRate;
+	// VIN voltage measured while the heater was on, or 0 if the board cannot measure it
 	float voltage;
 
+	// Record which heater this report is for
 	void SetStandardFields(uint32_t heaterNumber) noexcept { heater = heaterNumber; }
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept { zero = 0; }
@@ -1530,6 +1683,7 @@ struct __attribute__((packed)) CanMessageAccelerometerData
 	         zero : 3;
 	// The number of the first sample
 	uint16_t firstSampleNumber;
+	// The samples, packed end to end using bitsPerSampleMinusOne + 1 bits each
 	uint16_t data[29];
 
 	// Get the actual amount of data. SetAxesAndResolution must have been called first to set up bitsPerSampleMinusOne.
@@ -1564,8 +1718,10 @@ struct __attribute__((packed)) CanMessageClosedLoopData
 	         zero : 8;
 	uint32_t firstSampleNumber : 20,		// The number of the first sample
 	         zero2 : 12;
+	// The samples, packed end to end in the order the filter bits select
 	uint8_t data[56];
 
+	// Length of the message when numDataBytes bytes of samples are sent
 	size_t GetActualDataLength(size_t numDataBytes) const noexcept { return 2 * sizeof(uint32_t) + numDataBytes; }
 	// Get the number of data bytes in a message, given the message length (which will have been rounded up to the next CAN-FD value)
 	static constexpr size_t GetNumDataBytes(size_t msglen) noexcept { return msglen - 2 * sizeof(uint32_t); }
@@ -1586,11 +1742,14 @@ struct __attribute__((packed)) CanMessageEvent
 	uint32_t eventType : 8,		// The event type (what happened)
 	         deviceNumber : 8,		// The device number that it happened to
 	         eventParam : 16;		// More info about the event
+	// Reserved for future use; set to 0
 	uint32_t zero;
 	// Other information about the event, to display to the user
 	char text[56];
 
+	// Length of the message with the text truncated to its terminating null
 	size_t GetActualDataLength() const noexcept { return 2 * sizeof(uint32_t) + Strnlen(text, ARRAY_SIZE(text)); }
+	// How much of a message of the given length is text
 	size_t GetMaxTextLength(size_t msgLen) const noexcept { return msgLen - 2 * sizeof(uint32_t); }
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept { zero = 0; }
@@ -1605,7 +1764,9 @@ struct __attribute__((packed)) CanMessageDebugText
 	// Text to display to the user
 	char text[64];
 
+	// Length of the message with the text truncated to its terminating null
 	size_t GetActualDataLength() const noexcept { return Strnlen(text, ARRAY_SIZE(text)); }
+	// How much of a message of the given length is text
 	size_t GetMaxTextLength(size_t msgLen) const noexcept { return msgLen; }
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept

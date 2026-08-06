@@ -114,7 +114,7 @@ public readonly record struct CanParamDescriptor(char Letter, CanParamType Type,
 public static class CanGenericTables
 {
     /// <summary>
-    /// Parameters of M150
+    /// M150 parameters, i.e. the colours to write to an LED strip
     /// Sent as <see cref="CanMessageType.WriteLedStrip" />.
     /// </summary>
     public static ImmutableArray<CanParamDescriptor> M150Params { get; } =
@@ -131,7 +131,7 @@ public static class CanGenericTables
     ];
 
     /// <summary>
-    /// Parameters of M308V1
+    /// M308 parameters, i.e. how a temperature sensor is configured
     /// Sent as <see cref="CanMessageType.M308V1" />.
     /// </summary>
     public static ImmutableArray<CanParamDescriptor> M308V1Params { get; } =
@@ -153,7 +153,7 @@ public static class CanGenericTables
     ];
 
     /// <summary>
-    /// Parameters of M569
+    /// M569 parameters, i.e. how a driver is configured
     /// Sent as <see cref="CanMessageType.M569" />.
     /// </summary>
     public static ImmutableArray<CanParamDescriptor> M569Params { get; } =
@@ -237,7 +237,7 @@ public static class CanGenericTables
     ];
 
     /// <summary>
-    /// Parameters of M569Point7
+    /// M569.7 parameters, i.e. the brake port of a driver and its timing
     /// Sent as <see cref="CanMessageType.M569P7" />.
     /// </summary>
     public static ImmutableArray<CanParamDescriptor> M569Point7Params { get; } =
@@ -249,7 +249,7 @@ public static class CanGenericTables
     ];
 
     /// <summary>
-    /// Parameters of M915
+    /// M915 parameters, i.e. the stall detection settings of one or more drivers
     /// Sent as <see cref="CanMessageType.M915" />.
     /// </summary>
     public static ImmutableArray<CanParamDescriptor> M915Params { get; } =
@@ -263,7 +263,7 @@ public static class CanGenericTables
     ];
 
     /// <summary>
-    /// Parameters of M950Heater
+    /// M950 H parameters, i.e. how a heater is created
     /// Sent as <see cref="CanMessageType.M950Heater" />.
     /// </summary>
     public static ImmutableArray<CanParamDescriptor> M950HeaterParams { get; } =
@@ -276,7 +276,7 @@ public static class CanGenericTables
     ];
 
     /// <summary>
-    /// Parameters of M950Fan
+    /// M950 F parameters, i.e. how a fan is created
     /// Sent as <see cref="CanMessageType.M950Fan" />.
     /// </summary>
     public static ImmutableArray<CanParamDescriptor> M950FanParams { get; } =
@@ -288,7 +288,7 @@ public static class CanGenericTables
     ];
 
     /// <summary>
-    /// Parameters of M950Gpio
+    /// M950 P and M950 S parameters, i.e. how a GPIO or servo port is created
     /// Sent as <see cref="CanMessageType.M950Gpio" />.
     /// </summary>
     public static ImmutableArray<CanParamDescriptor> M950GpioParams { get; } =
@@ -300,7 +300,7 @@ public static class CanGenericTables
     ];
 
     /// <summary>
-    /// Parameters of M950Led
+    /// M950 E parameters, i.e. how an LED strip is created
     /// Sent as <see cref="CanMessageType.M950Led" />.
     /// </summary>
     public static ImmutableArray<CanParamDescriptor> M950LedParams { get; } =

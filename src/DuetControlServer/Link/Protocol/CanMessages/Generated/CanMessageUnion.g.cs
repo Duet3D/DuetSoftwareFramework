@@ -13,66 +13,449 @@ namespace DuetControlServer.Link.Protocol.CanMessages;
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
 public struct CanMessage
 {
+    /// <summary>The whole buffer as bytes, used to copy a message about without knowing its type</summary>
     [FieldOffset(0)] public ByteArray64 Raw;
+
+    /// <summary>The whole buffer as 32-bit words, which is how the aligned parts of a message are copied</summary>
     [FieldOffset(0)] public UintArray16 Raw32;
+
+    /// <summary>
+    /// Generic message. These are always used in conjunction with a ParamTable that is known to both sender and receiver.
+    /// The table lists the parameters, each one defined by the parameter letter and the type of parameter.
+    /// The paramMap bitmap indicates which parameters are present in the data. They are provided in the same order as in the ParamTable.
+    ///
+    /// Mirrors CanMessageGeneric in CANlib's CanMessageFormats.h. This layout is 64 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <summary>
+    /// Time sync message. The realTime field was added at RRF 3.2 so it is not transmitted by main boards running 3.1.1 and earlier.
+    /// Time sync messages are always transmitted without using BRS.
+    ///
+    /// Mirrors CanMessageTimeSync in CANlib's CanMessageFormats.h. This layout is 20 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageTimeSync Sync;
+
+    /// <summary>
+    /// Emergency stop message
+    ///
+    /// Mirrors CanMessageEmergencyStop in CANlib's CanMessageFormats.h. This layout is 1 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageEmergencyStop EStop;
+
+    /// <summary>
+    /// Enter test mode message, used to force a main board to behave like a CAN expansion board
+    ///
+    /// Mirrors CanMessageEnterTestMode in CANlib's CanMessageFormats.h. This layout is 8 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageEnterTestMode EnterTestMode;
+
+    /// <summary>
+    /// Stop movement on specific drivers
+    ///
+    /// Mirrors CanMessageStopMovement in CANlib's CanMessageFormats.h. This layout is 2 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageStopMovement StopMovement;
+
+    /// <summary>
+    /// Revert position on specific drivers
+    ///
+    /// Mirrors CanMessageRevertPosition in CANlib's CanMessageFormats.h. This layout is 40 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageRevertPosition RevertPosition;
+
+    /// <summary>
+    /// Reset message
+    ///
+    /// Mirrors CanMessageReset in CANlib's CanMessageFormats.h. This layout is 2 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageReset Reset;
+
+    /// <summary>
+    /// Linear movement message with input shaping applied by the receiving board
+    ///
+    /// Mirrors CanMessageMovementLinearShaped in CANlib's CanMessageFormats.h. This layout is 60 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageMovementLinearShaped MoveLinearShaped;
+
+    /// <summary>
+    /// Request board information
+    ///
+    /// Mirrors CanMessageReturnInfo in CANlib's CanMessageFormats.h. This layout is 3 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageReturnInfo GetInfo;
+
+    /// <summary>
+    /// Set the target temperature of a heater
+    ///
+    /// Mirrors CanMessageSetHeaterTemperatureV1 in CANlib's CanMessageFormats.h. This layout is 9 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageSetHeaterTemperatureV1 SetTemp;
+
+    /// <summary>
+    /// The standard reply used by many calls. It carries a GCodeResult, some text, and in some cases 8 bits of
+    /// additional information. It can be split into multiple fragments so that the text is not constrained to 60 characters.
+    /// The layout of requestId and resultCode is common to more than one reply type.
+    ///
+    /// Mirrors CanMessageStandardReply in CANlib's CanMessageFormats.h. This layout is 64 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageStandardReply StandardReply;
+
+    /// <summary>
+    /// Request to send a chunk of a firmware or bootloader file
+    ///
+    /// Mirrors CanMessageFirmwareUpdateRequest in CANlib's CanMessageFormats.h. This layout is 64 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageFirmwareUpdateRequest FirmwareUpdateRequest;
+
+    /// <summary>
+    /// Firmware update response
+    ///
+    /// Mirrors CanMessageFirmwareUpdateResponse in CANlib's CanMessageFormats.h. This layout is 64 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageFirmwareUpdateResponse FirmwareUpdateResponse;
+
+    /// <summary>
+    /// Message broadcast by expansion boards and the main board to provide sensor temperatures
+    ///
+    /// Mirrors CanMessageSensorTemperatures in CANlib's CanMessageFormats.h. This layout is 63 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageSensorTemperatures SensorTemperaturesBroadcast;
+
+    /// <summary>
+    /// Message broadcast by expansion boards to send heater status to the main board
+    ///
+    /// Mirrors CanMessageHeatersStatus in CANlib's CanMessageFormats.h. This layout is 62 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageHeatersStatus HeatersStatusBroadcast;
+
+    /// <summary>
+    /// Send a heater model to an expansion board
+    ///
+    /// Mirrors CanMessageHeaterModelV3 in CANlib's CanMessageFormats.h. This layout is 60 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageHeaterModelV3 HeaterModelV3;
+
+    /// <summary>
+    /// Legacy: the uint16 forms of microstepping and standstill current were retired (see unused_was_setMicrostepping and unused_was_setStandstillCurrentFactor). CANlib still declares this arm of the union, so the type is kept, but nothing sends it.
+    ///
+    /// Instantiation of CANlib's CanMessageMultipleDrivesRequest&amp;lt;uint16_t&amp;gt;. This layout is 20 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageMultipleDrivesRequestUint16 MultipleDrivesRequestUint16;
+
+    /// <summary>
+    /// Set a per-driver parameter for multiple drivers. The meaning of the values depends on the message type:
+    ///  - motor currents: currents in mA;
+    ///  - microstepping: microstepping (bits 0-8) and interpolation enable (bit 15);
+    ///  - standstill current percentages: the percentages;
+    ///  - driver states: 0 = disabled, 1 = idle, 2 = active.
+    ///
+    /// Instantiation of CANlib's CanMessageMultipleDrivesRequest&amp;lt;float&amp;gt;. This layout is 36 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageMultipleDrivesRequestMotorCurrents MultipleDrivesRequestFloat;
+
+    /// <summary>
+    /// Set a per-driver parameter for multiple drivers. The meaning of the values depends on the message type:
+    ///  - motor currents: currents in mA;
+    ///  - microstepping: microstepping (bits 0-8) and interpolation enable (bit 15);
+    ///  - standstill current percentages: the percentages;
+    ///  - driver states: 0 = disabled, 1 = idle, 2 = active.
+    ///
+    /// Instantiation of CANlib's CanMessageMultipleDrivesRequest&amp;lt;StepsPerUnitAndMicrostepping&amp;gt;. This layout is 52 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping MultipleDrivesStepsPerUnitAndMicrostepping;
+
+    /// <summary>
+    /// Set a per-driver parameter for multiple drivers. The meaning of the values depends on the message type:
+    ///  - motor currents: currents in mA;
+    ///  - microstepping: microstepping (bits 0-8) and interpolation enable (bit 15);
+    ///  - standstill current percentages: the percentages;
+    ///  - driver states: 0 = disabled, 1 = idle, 2 = active.
+    ///
+    /// Instantiation of CANlib's CanMessageMultipleDrivesRequest&amp;lt;DriverStateControl&amp;gt;. This layout is 20 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageMultipleDrivesRequestDriverStateControl MultipleDrivesRequestDriverState;
+
+    /// <summary>
+    /// Set a per-driver parameter for multiple drivers. The meaning of the values depends on the message type:
+    ///  - motor currents: currents in mA;
+    ///  - microstepping: microstepping (bits 0-8) and interpolation enable (bit 15);
+    ///  - standstill current percentages: the percentages;
+    ///  - driver states: 0 = disabled, 1 = idle, 2 = active.
+    ///
+    /// Instantiation of CANlib's CanMessageMultipleDrivesRequest&amp;lt;ShortPressureAdvanceParameters&amp;gt;. This layout is 52 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageMultipleDrivesRequestShortPressureAdvanceParameters MultipleDrivesRequestPressureAdvance;
+
+    /// <summary>
+    /// Tell an expansion board to update its firmware
+    ///
+    /// Mirrors CanMessageUpdateYourFirmware in CANlib's CanMessageFormats.h. This layout is 4 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageUpdateYourFirmware UpdateYourFirmware;
+
+    /// <summary>
+    /// Configure a fan
+    ///
+    /// Mirrors CanMessageFanParameters in CANlib's CanMessageFormats.h. This layout is 34 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageFanParameters FanParameters;
+
+    /// <summary>
+    /// Set the speed of a fan
+    ///
+    /// Mirrors CanMessageSetFanSpeed in CANlib's CanMessageFormats.h. This layout is 8 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageSetFanSpeed SetFanSpeed;
+
+    /// <summary>
+    /// M570 parameters.
+    /// IMPORTANT! Field maxBadTemperatureCount was added at version 3.5. Boards receiving this message
+    /// must not use maxBadTemperatureCount unless the version35 bit is set.
+    ///
+    /// Mirrors CanMessageSetHeaterFaultDetectionParameters in CANlib's CanMessageFormats.h. This layout is 16 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageSetHeaterFaultDetectionParameters SetHeaterFaultDetection;
+
+    /// <summary>
+    /// Configure the monitors of a heater
+    ///
+    /// Mirrors CanMessageSetHeaterMonitors in CANlib's CanMessageFormats.h. This layout is 60 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageSetHeaterMonitors SetHeaterMonitors;
+
+    /// <summary>
+    /// Configure input shaping
+    ///
+    /// Mirrors CanMessageSetInputShapingV1 in CANlib's CanMessageFormats.h. This layout is 60 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageSetInputShapingV1 SetInputShapingV1;
+
+    /// <summary>
+    /// Request to create an input monitor
+    ///
+    /// Mirrors CanMessageCreateInputMonitorV1 in CANlib's CanMessageFormats.h. This layout is 64 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageCreateInputMonitorV1 CreateInputMonitorV1;
+
+    /// <summary>
+    /// Request to reconfigure an input monitor
+    ///
+    /// Mirrors CanMessageChangeInputMonitorV1 in CANlib's CanMessageFormats.h. This layout is 9 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageChangeInputMonitorV1 ChangeInputMonitorV1;
+
+    /// <summary>
+    /// Message sent by an expansion board when one of its monitored inputs has changed state
+    ///
+    /// Mirrors CanMessageInputChangedV1 in CANlib's CanMessageFormats.h. This layout is 64 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageInputChangedV1 InputChangedV1;
+
+    /// <summary>
+    /// Message sent by an expansion board when one of its monitored inputs has changed state
+    ///
+    /// Mirrors CanMessageInputChangedV2 in CANlib's CanMessageFormats.h. This layout is 60 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageInputChangedV2 InputChangedV2;
+
+    /// <summary>
+    /// Message used to broadcast the status of fans
+    ///
+    /// Mirrors CanMessageFansReport in CANlib's CanMessageFormats.h. This layout is 64 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageFansReport FansReport;
+
+    /// <summary>
+    /// M42 or M280
+    ///
+    /// Mirrors CanMessageWriteGpio in CANlib's CanMessageFormats.h. This layout is 7 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageWriteGpio WriteGpio;
+
+    /// <summary>
+    /// Change CAN address and normal timing message
+    ///
+    /// Mirrors CanMessageSetAddressAndNormalTiming in CANlib's CanMessageFormats.h. This layout is 16 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageSetAddressAndNormalTiming SetAddressAndNormalTiming;
+
+    /// <summary>
+    /// Message used by expansion boards running firmware 3.4.0beta4 and earlier to announce their presence on the CAN bus
+    ///
+    /// Mirrors CanMessageAnnounceV0 in CANlib's CanMessageFormats.h. This layout is 64 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageAnnounceV0 AnnounceV0;
+
+    /// <summary>
+    /// Message used by expansion boards running firmware 3.4.0beta5 and later to announce their presence on the CAN bus
+    ///
+    /// Mirrors CanMessageAnnounceV1 in CANlib's CanMessageFormats.h. This layout is 64 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageAnnounceV1 AnnounceV1;
+
+    /// <summary>
+    /// Announce acknowledgement message
+    ///
+    /// Mirrors CanMessageAcknowledgeAnnounce in CANlib's CanMessageFormats.h. This layout is 1 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageAcknowledgeAnnounce AcknowledgeAnnounce;
+
+    /// <summary>
+    /// Run a diagnostic test (M122 P parameter)
+    ///
+    /// Mirrors CanMessageDiagnosticTest in CANlib's CanMessageFormats.h. This layout is 20 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageDiagnosticTest DiagnosticTest;
+
+    /// <summary>
+    /// Request to read inputs, including analog inputs
+    ///
+    /// Mirrors CanMessageReadInputsRequest in CANlib's CanMessageFormats.h. This layout is 8 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageReadInputsRequest ReadInputsRequest;
+
+    /// <summary>
+    /// Response to a CanMessageReadInputsRequest. The requestId and resultCode must be in the same place as for a standard reply.
+    ///
+    /// Mirrors CanMessageReadInputsReplyV0 in CANlib's CanMessageFormats.h. This layout is 64 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageReadInputsReplyV0 ReadInputsReplyV0;
+
+    /// <summary>
+    /// Response to a CanMessageReadInputsRequest. The requestId and resultCode must be in the same place as for a standard reply.
+    ///
+    /// Mirrors CanMessageReadInputsReplyV1 in CANlib's CanMessageFormats.h. This layout is 60 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageReadInputsReplyV1 ReadInputsReplyV1;
+
+    /// <summary>
+    /// Message sent by expansion boards to report their general health
+    ///
+    /// Mirrors CanMessageBoardStatusV0 in CANlib's CanMessageFormats.h. This layout is 44 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageBoardStatusV0 BoardStatusV0;
+
+    /// <summary>
+    /// Message sent by expansion boards to report their general health
+    ///
+    /// Mirrors CanMessageBoardStatusV1 in CANlib's CanMessageFormats.h. This layout is 26 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageBoardStatusV1 BoardStatusV1;
+
+    /// <summary>
+    /// Message sent by expansion boards to report the status of their drivers
+    ///
+    /// Mirrors CanMessageDriversStatus in CANlib's CanMessageFormats.h. This layout is 64 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageDriversStatus DriversStatus;
+
+    /// <summary>
+    /// Message sent by expansion boards to report the status of their filament monitors
+    ///
+    /// Mirrors CanMessageFilamentMonitorsStatusV2 in CANlib's CanMessageFormats.h. This layout is 64 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageFilamentMonitorsStatusV2 FilamentMonitorsStatusV2;
+
+    /// <summary>
+    /// Create a filament monitor (M591). A separate message is used to configure it.
+    ///
+    /// Mirrors CanMessageCreateFilamentMonitor in CANlib's CanMessageFormats.h. This layout is 5 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageCreateFilamentMonitor CreateFilamentMonitor;
+
+    /// <summary>
+    /// Delete a filament monitor (M591)
+    ///
+    /// Mirrors CanMessageDeleteFilamentMonitor in CANlib's CanMessageFormats.h. This layout is 5 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageDeleteFilamentMonitor DeleteFilamentMonitor;
+
+    /// <summary>
+    /// Enter tuning mode (used by M303). This causes the heater to cycle between two temperatures, reporting data at the end of each cycle.
+    /// If just the 'on' bit is set, we are asking for heater tuning to start.
+    /// If 'on' and 'calibrate' are both set, we are asking for calibration to start.
+    /// If just 'calibrate' is set, we are asking whether calibration has completed.
+    ///
+    /// Mirrors CanMessageHeaterTuningCommand in CANlib's CanMessageFormats.h. This layout is 22 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageHeaterTuningCommand HeaterTuningCommand;
+
+    /// <summary>
+    /// Message used by expansion boards to report the results of one heater tuning cycle
+    ///
+    /// Mirrors CanMessageHeaterTuningReport in CANlib's CanMessageFormats.h. This layout is 32 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageHeaterTuningReport HeaterTuningReport;
+
+    /// <summary>
+    /// Set heater feedforward. The receiving board does not reply to this message.
+    ///
+    /// Mirrors CanMessageHeaterFeedForwardV1 in CANlib's CanMessageFormats.h. This layout is 16 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageHeaterFeedForwardV1 HeaterFeedForwardV1;
+
+    /// <summary>
+    /// Request to start sending accelerometer data
+    ///
+    /// Mirrors CanMessageStartAccelerometer in CANlib's CanMessageFormats.h. This layout is 12 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageStartAccelerometer StartAccelerometer;
+
+    /// <summary>
+    /// Message used to send accelerometer data from an expansion board to the main board
+    ///
+    /// Mirrors CanMessageAccelerometerData in CANlib's CanMessageFormats.h. This layout is 64 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageAccelerometerData AccelerometerData;
+
+    /// <summary>
+    /// Request to start sending closed loop data
+    ///
+    /// Mirrors CanMessageStartClosedLoopDataCollection in CANlib's CanMessageFormats.h. This layout is 11 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageStartClosedLoopDataCollection StartClosedLoopDataCollection;
+
+    /// <summary>
+    /// Message used to send closed loop data from an expansion board to the main board
+    ///
+    /// Mirrors CanMessageClosedLoopData in CANlib's CanMessageFormats.h. This layout is 64 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageClosedLoopData ClosedLoopData;
+
+    /// <summary>
+    /// Message sent by an expansion board to the main board to indicate an event
+    ///
+    /// Mirrors CanMessageEvent in CANlib's CanMessageFormats.h. This layout is 64 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageEvent Event;
+
+    /// <summary>
+    /// Debug text message, sent by an expansion board to the main board
+    ///
+    /// Mirrors CanMessageDebugText in CANlib's CanMessageFormats.h. This layout is 64 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageDebugText DebugText;
+
+    /// <summary>
+    /// Enable a stall endstop, or clear all stall endstops
+    ///
+    /// Mirrors CanMessageEnableStallEndstop in CANlib's CanMessageFormats.h. This layout is 8 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageEnableStallEndstop EnableStallEndstop;
+
+    /// <summary>
+    /// Request to set and return the default model for a heater
+    ///
+    /// Mirrors CanMessageSetDefaultHeaterModel in CANlib's CanMessageFormats.h. This layout is 5 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageSetDefaultHeaterModel SetDefaultHeaterModel;
+
+    /// <summary>
+    /// Reply to CanMessageSetDefaultHeaterModel
+    ///
+    /// Mirrors CanMessageHeaterModelReport in CANlib's CanMessageFormats.h. This layout is 44 bytes.
+    /// </summary>
     [FieldOffset(0)] public CanMessageHeaterModelReport HeaterModelReport;
 }
 

@@ -45,8 +45,22 @@
 
     "constants": {
       "type": "object",
-      "description": "Schema-wide integer constants. They may be used wherever an array length or an expression names a value, and are emitted into both languages.",
-      "additionalProperties": { "type": "integer" }
+      "description": "Schema-wide integer constants. They may be used wherever an array length or an expression names a value, and are emitted into both languages. A constant is written either as the bare value or as an object carrying the value and its documentation.",
+      "additionalProperties": {
+        "oneOf": [
+          { "type": "integer" },
+          {
+            "type": "object",
+            "required": ["value"],
+            "additionalProperties": false,
+            "properties": {
+              "$comment": { "$ref": "#/$defs/docText" },
+              "value": { "type": "integer" },
+              "doc": { "$ref": "#/$defs/docText" }
+            }
+          }
+        ]
+      }
     },
 
     "cppHeaders": {
@@ -884,6 +898,10 @@
         "$comment": { "$ref": "#/$defs/docText" },
         "name": { "type": "string" },
         "type": { "$ref": "#/$defs/typeName" },
+        "doc": {
+          "$ref": "#/$defs/docText",
+          "description": "Documentation of this arm. Omit it for an arm that names a struct: the generator then uses that struct's own documentation, so the two cannot drift apart."
+        },
         "csharpType": {
           "type": "string",
           "description": "The C# type of this arm, where it differs from the schema type - as it does for the expansions of a template struct."

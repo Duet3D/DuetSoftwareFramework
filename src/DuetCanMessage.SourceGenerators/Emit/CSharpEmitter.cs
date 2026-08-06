@@ -124,8 +124,15 @@ public sealed class CSharpEmitter(CanSchema schema)
             writer.Outdent();
             writer.Line("{");
             writer.Indent();
+            bool firstConstant = true;
             foreach ((string name, int value) in schema.Constants)
             {
+                if (!firstConstant)
+                {
+                    writer.Line();
+                }
+                firstConstant = false;
+                writer.XmlDoc(schema.ConstantDocs.GetValueOrDefault(name) ?? name);
                 writer.Line($"public const int {name} = {value};");
             }
         }
@@ -245,6 +252,7 @@ public sealed class CSharpEmitter(CanSchema schema)
             writer.Outdent();
             writer.Line("{");
             writer.Indent();
+            bool needsBlank = false;
             foreach (UnionMemberDef m in union.Members)
             {
                 string type;
@@ -257,6 +265,17 @@ public sealed class CSharpEmitter(CanSchema schema)
                 {
                     type = m.CSharpType ?? m.Type;
                 }
+
+                if (needsBlank)
+                {
+                    writer.Line();
+                }
+                needsBlank = true;
+
+                // An arm that names a message struct is documented by that struct, so repeat its
+                // description here rather than have the schema say the same thing twice
+                StructDef? body = m.Length is null ? schema.Find(type) : null;
+                writer.XmlDoc(m.Doc ?? (body is not null ? Describe(body) : $"The buffer read as {type}"));
                 writer.Line($"[FieldOffset(0)] public {type} {Naming.Pascal(m.Name)};");
             }
         }
@@ -334,6 +353,13 @@ public sealed class CSharpEmitter(CanSchema schema)
         return $"{doc}\n\n{origin} This layout is {Math.Max(s.Size, 1)} bytes.";
     }
 
+    /// <summary>
+    /// What a field marked reserved in the schema is documented as. Saying it once here rather than on
+    /// every such field keeps the schema to the one fact it knows - that the field is spare.
+    /// </summary>
+    private static string? ReservedDoc(bool reserved) =>
+        reserved ? "Reserved for future use; must be set to 0 so that a later firmware can use it" : null;
+
     private void EmitFields(CodeWriter writer, StructDef s, ref bool needsBlank)
     {
         // Declare the storage in offset order so that the layout can be read straight off the file
@@ -344,7 +370,7 @@ public sealed class CSharpEmitter(CanSchema schema)
             MemberDef member = m;
             declarations.Add((member.Offset, () =>
             {
-                writer.XmlDoc(member.Doc);
+                writer.XmlDoc(member.Doc ?? ReservedDoc(member.Reserved));
                 string visibility = member.CppPrivate ? "private" : "public";
                 // A field that carries an enum is declared as that enum. Its storage is the integer the
                 // enum is built on, so the layout is the one the schema computed either way
@@ -429,9 +455,10 @@ public sealed class CSharpEmitter(CanSchema schema)
                 // generated conformance test can pin down their bit positions too
                 const string visibility = "public";
                 string range = f.Width == 1 ? $"bit {f.BitOffset}" : $"bits {f.BitOffset}-{f.BitOffset + f.Width - 1}";
-                string doc = f.Doc is null
+                string? fieldDoc = f.Doc ?? ReservedDoc(f.Reserved);
+                string doc = fieldDoc is null
                     ? $"{Naming.Pascal(f.Name)} ({f.Width}-bit field, {range} of the message)"
-                    : $"{f.Doc}\n({f.Width}-bit field, {range} of the message)";
+                    : $"{fieldDoc}\n({f.Width}-bit field, {range} of the message)";
                 writer.XmlDoc(doc);
 
                 using (writer.Block($"{visibility} {type} {Naming.Pascal(f.Name)}", "}"))

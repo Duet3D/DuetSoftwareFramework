@@ -541,6 +541,12 @@ public sealed class UnionMemberDef
     public string Type = "";
     public string? CSharpType;
     public string? Length;
+
+    /// <summary>
+    /// Documentation for this arm. An arm that names a struct needs none: the generator falls back to
+    /// that struct's own documentation rather than have the two say the same thing in two places.
+    /// </summary>
+    public string? Doc;
 }
 
 /// <summary>
@@ -568,6 +574,9 @@ public sealed class CanSchema
     public string CSharpSharedNamespace = "";
     public List<string> CSharpUsings = [];
     public Dictionary<string, int> Constants = [];
+
+    /// <summary>Documentation of the schema-wide constants, by name.</summary>
+    public Dictionary<string, string?> ConstantDocs = [];
     public List<StructDef> Structs = [];
     public List<GenericTableDef> GenericTables = [];
     public List<MessageTypeEnumDef> Enums = [];
@@ -621,7 +630,17 @@ public sealed class CanSchema
         {
             foreach (KeyValuePair<string, JsonNode?> kv in constants)
             {
-                schema.Constants[kv.Key] = kv.Value!.GetValue<int>();
+                // A constant is either the bare value or an object carrying the value and its documentation
+                if (kv.Value is JsonObject definition)
+                {
+                    schema.Constants[kv.Key] = Int(definition, "value")
+                        ?? throw new InvalidDataException($"constant '{kv.Key}' has no value");
+                    schema.ConstantDocs[kv.Key] = Doc(definition);
+                }
+                else
+                {
+                    schema.Constants[kv.Key] = kv.Value!.GetValue<int>();
+                }
             }
         }
 
@@ -691,7 +710,8 @@ public sealed class CanSchema
                     Name = Str(n!.AsObject(), "name") ?? "",
                     Type = Str(n.AsObject(), "type") ?? "",
                     CSharpType = Str(n.AsObject(), "csharpType"),
-                    Length = Str(n.AsObject(), "length")
+                    Length = Str(n.AsObject(), "length"),
+                    Doc = Doc(n.AsObject())
                 })]
             };
         }

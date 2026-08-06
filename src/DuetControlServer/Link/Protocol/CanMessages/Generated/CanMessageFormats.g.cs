@@ -21,18 +21,25 @@ namespace DuetControlServer.Link.Protocol.CanMessages;
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 2)]
 public struct RemoteInputHandle
 {
+    /// <summary>the handle has not been set up</summary>
     public const ushort TypeUnset = unchecked((ushort)(0));
 
+    /// <summary>the handle refers to an endstop switch</summary>
     public const ushort TypeEndstop = unchecked((ushort)(1));
 
+    /// <summary>the handle refers to a general purpose input</summary>
     public const ushort TypeGpIn = unchecked((ushort)(2));
 
+    /// <summary>the handle refers to a Z probe</summary>
     public const ushort TypeZprobe = unchecked((ushort)(3));
 
+    /// <summary>the handle refers to an input on an ATE board</summary>
     public const ushort TypeAte = unchecked((ushort)(4));
 
+    /// <summary>the handle refers to a stall detection endstop</summary>
     public const ushort TypeStallEndstop = unchecked((ushort)(5));
 
+    /// <summary>not a type: the lowest value that is not one of the types above</summary>
     public const ushort LowestBadType = unchecked((ushort)(6));
 
     /// <summary>The whole handle as a single 16-bit value</summary>
@@ -71,8 +78,10 @@ public struct RemoteInputHandle
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
+    /// <summary>True if the handle names one of the known input types</summary>
     public readonly bool IsValid() => Type > TypeUnset && Type < LowestBadType;
 
+    /// <summary>Set the type, major and minor parts of the handle</summary>
     public void Set(byte p_type, byte p_major, byte p_minor)
     {
         Type = (byte)(p_type);
@@ -119,14 +128,20 @@ public struct HeaterModel
     /// <summary>Backing storage for the bitfields usePid:1, zero:31</summary>
     [FieldOffset(36)] private uint _bits0;
 
-    /// <summary>UsePid (1-bit field, bit 288 of the message)</summary>
+    /// <summary>
+    /// Set if the heater is controlled by PID, clear if it is controlled bang-bang
+    /// (1-bit field, bit 288 of the message)
+    /// </summary>
     public bool UsePid
     {
         readonly get => (((uint)_bits0) & 1U) != 0;
         set => _bits0 = (uint)((((uint)_bits0) & ~0x1U) | (value ? 1U : 0U));
     }
 
-    /// <summary>Zero (31-bit field, bits 289-319 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (31-bit field, bits 289-319 of the message)
+    /// </summary>
     public uint Zero
     {
         readonly get => (uint)((((uint)_bits0) >> 1) & 0x7FFFFFFFU);
@@ -142,10 +157,13 @@ public struct HeaterModel
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 12)]
 public struct MinCurMax
 {
+    /// <summary>Lowest value seen since the previous report</summary>
     [FieldOffset(0)] public float Minimum;
 
+    /// <summary>Value at the time of the report</summary>
     [FieldOffset(4)] public float Current;
 
+    /// <summary>Highest value seen since the previous report</summary>
     [FieldOffset(8)] public float Maximum;
 }
 
@@ -157,10 +175,13 @@ public struct MinCurMax
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 6)]
 public struct ShortMinCurMax
 {
+    /// <summary>Lowest value seen since the previous report</summary>
     [FieldOffset(0)] public Half Minimum;
 
+    /// <summary>Value at the time of the report</summary>
     [FieldOffset(2)] public Half Current;
 
+    /// <summary>Highest value seen since the previous report</summary>
     [FieldOffset(4)] public Half Maximum;
 }
 
@@ -172,8 +193,10 @@ public struct ShortMinCurMax
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 6)]
 public struct ShortPressureAdvanceParameters
 {
+    /// <summary>k[0] is the pressure advance constant in seconds; k[1] is the slope of pressure advance distance against speed once the distance exceeds dk</summary>
     [FieldOffset(0)] public HalfArray2 K;
 
+    /// <summary>The pressure advance distance in mm up to which k[0] applies</summary>
     [FieldOffset(4)] public Half Dk;
 }
 
@@ -188,6 +211,7 @@ public struct CanTiming
     /// <summary>CAN clock used by all Duet 3 boards</summary>
     public const uint ClockFrequency = unchecked((uint)(48000000));
 
+    /// <summary>bit rate a board uses until the main board gives it a different one</summary>
     public const uint DefaultCanBitRate = unchecked((uint)(1000000));
 
     /// <summary>how far we sample into the bit during the arbitration and CRC phases</summary>
@@ -231,7 +255,10 @@ public struct CanTiming
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFFU << 4)) | ((unchecked((uint)value) & 0xFFU) << 4));
     }
 
-    /// <summary>Spare1 (4-bit field, bits 60-63 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 60-63 of the message)
+    /// </summary>
     public byte Spare1
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
@@ -401,7 +428,10 @@ public struct CanMessageTimeSync : ICanMessage<CanMessageTimeSync>
         set => _bits0 = (uint)((((uint)_bits0) & ~(0xFFU << 20)) | ((unchecked((uint)value) & 0xFFU) << 20));
     }
 
-    /// <summary>Zero (4-bit field, bits 92-95 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 92-95 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 28) & 0xFU);
@@ -453,14 +483,20 @@ public struct CanMessageEnterTestMode : ICanMessage<CanMessageEnterTestMode>
     /// <summary>Integrity check</summary>
     [FieldOffset(4)] public uint Passwd;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero1 (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero1
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
@@ -477,7 +513,10 @@ public struct CanMessageEnterTestMode : ICanMessage<CanMessageEnterTestMode>
         set => _bits1 = (ushort)((((uint)_bits1) & ~0x7FU) | (unchecked((uint)value) & 0x7FU));
     }
 
-    /// <summary>Zero2 (9-bit field, bits 23-31 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (9-bit field, bits 23-31 of the message)
+    /// </summary>
     public ushort Zero2
     {
         readonly get => (ushort)((((uint)_bits1) >> 7) & 0x1FFU);
@@ -522,14 +561,20 @@ public struct CanMessageReset : ICanMessage<CanMessageReset>
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
@@ -592,13 +637,17 @@ public struct CanMessageRevertPosition : ICanMessage<CanMessageRevertPosition>
         set => _bits0 = (uint)((((uint)_bits0) & ~0xFFFFU) | (unchecked((uint)value) & 0xFFFFU));
     }
 
-    /// <summary>Zero (16-bit field, bits 16-31 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (16-bit field, bits 16-31 of the message)
+    /// </summary>
     public ushort Zero
     {
         readonly get => (ushort)((((uint)_bits0) >> 16) & 0xFFFFU);
         set => _bits0 = (uint)((((uint)_bits0) & ~(0xFFFFU << 16)) | ((unchecked((uint)value) & 0xFFFFU) << 16));
     }
 
+    /// <summary>Length of the message when step counts for numReverting drivers are sent</summary>
     public static uint GetActualDataLength(uint numReverting) => (uint)((2 * 4) + (numReverting * 4));
 
     /// <summary>Clear the reserved fields of this message so that it stays compatible with future uses</summary>
@@ -622,6 +671,7 @@ public struct PerDriveValues
     /// <summary>How many steps of extrusion to do (for extruders), including fractional parts</summary>
     [FieldOffset(0)] public float Extrusion;
 
+    /// <summary>Set the value to zero, which means no steps and no extrusion</summary>
     public void Init()
     {
         Steps = 0;
@@ -639,6 +689,7 @@ public struct CanMessageMovementLinearShaped : ICanMessage<CanMessageMovementLin
     /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
     public static CanMessageType MessageType => CanMessageType.MovementLinearShaped;
 
+    /// <summary>mask of the sequence number, which wraps round after 16 moves</summary>
     public const byte SeqMask = unchecked((byte)(0x0f));
 
     /// <summary>The master clock time at which this move should start</summary>
@@ -662,6 +713,7 @@ public struct CanMessageMovementLinearShaped : ICanMessage<CanMessageMovementLin
     /// <summary>Negative of the base deceleration during the deceleration segment when the total distance is normalised to 1.0. Always positive or zero.</summary>
     [FieldOffset(24)] public float Deceleration;
 
+    /// <summary>Steps or extrusion for each driver, in ascending driver number order. Only the first numDrivers entries are sent.</summary>
     [FieldOffset(28)] public PerDriveValuesArray8 PerDrive;
 
     /// <summary>
@@ -714,20 +766,27 @@ public struct CanMessageMovementLinearShaped : ICanMessage<CanMessageMovementLin
         set => _bits0 = (uint)((((uint)_bits0) & ~(0x1U << 24)) | ((value ? 1U : 0U) << 24));
     }
 
-    /// <summary>UseLateInputShaping (1-bit field, bit 153 of the message)</summary>
+    /// <summary>
+    /// Set if the receiving board is to apply input shaping to this segment itself
+    /// (1-bit field, bit 153 of the message)
+    /// </summary>
     public bool UseLateInputShaping
     {
         readonly get => ((((uint)_bits0) >> 25) & 1U) != 0;
         set => _bits0 = (uint)((((uint)_bits0) & ~(0x1U << 25)) | ((value ? 1U : 0U) << 25));
     }
 
-    /// <summary>Zero2 (6-bit field, bits 154-159 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (6-bit field, bits 154-159 of the message)
+    /// </summary>
     public byte Zero2
     {
         readonly get => (byte)((((uint)_bits0) >> 26) & 0x3FU);
         set => _bits0 = (uint)((((uint)_bits0) & ~(0x3FU << 26)) | ((unchecked((uint)value) & 0x3FU) << 26));
     }
 
+    /// <summary>Length of the message when only the first numDrivers entries of perDrive are sent</summary>
     public readonly uint GetActualDataLength() => (uint)((60 - 32) + (NumDrivers * 4));
 
     /// <summary>Return true if any of the included drives actually moves. Relies on a floating point zero also being an all-bits-zero integer.</summary>
@@ -768,29 +827,41 @@ public struct CanMessageSetAddressAndNormalTiming : ICanMessage<CanMessageSetAdd
     /// <summary>Magic byte indicating that we do want to write the timing data</summary>
     public const byte DoSetTimingYes = unchecked((byte)(0xB6));
 
+    /// <summary>value of doSetTiming that means leave the timing alone</summary>
     public const byte DoSetTimingNo = unchecked((byte)(0));
 
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;
 
+    /// <summary>The address the board is expected to have. A board whose address differs ignores the message.</summary>
     [FieldOffset(2)] public byte OldAddress;
 
+    /// <summary>The address to change to, or 0 to leave the address alone</summary>
     [FieldOffset(3)] public byte NewAddress;
 
+    /// <summary>The complement of newAddress. The board ignores the new address unless the two agree.</summary>
     [FieldOffset(4)] public byte NewAddressInverted;
 
+    /// <summary>DoSetTimingYes to also save normalTiming, DoSetTimingNo to leave the timing alone</summary>
     [FieldOffset(5)] public byte DoSetTiming;
 
+    /// <summary>The arbitration phase bit timing to save, used only if doSetTiming is DoSetTimingYes</summary>
     [FieldOffset(6)] public CanTiming NormalTiming;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
@@ -813,14 +884,19 @@ public struct CanMessageSetAddressAndNormalTiming : ICanMessage<CanMessageSetAdd
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 6)]
 public struct StepsPerUnitAndMicrostepping
 {
+    /// <summary>Steps per mm, stored little-endian because the field is not aligned</summary>
     [FieldOffset(0)] public float StepsPerUnit;
 
+    /// <summary>Microstepping in bits 0-9, with bit 15 set to ask for interpolation</summary>
     [FieldOffset(4)] public ushort Microstepping;
 
+    /// <summary>Read the steps per mm, allowing for the field being unaligned</summary>
     public readonly float GetStepsPerUnit() => (float)(StepsPerUnit);
 
+    /// <summary>Read the microstepping and interpolation bits</summary>
     public readonly ushort GetMicrostepping() => (ushort)(Microstepping);
 
+    /// <summary>Set the steps per mm and the microstepping</summary>
     public void Set(float spu, ushort ms)
     {
         StepsPerUnit = (float)(spu);
@@ -839,10 +915,13 @@ public struct StepsPerUnitAndMicrostepping
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 2)]
 public struct DriverStateControl
 {
+    /// <summary>value of mode meaning disable the driver</summary>
     public const ushort DriverDisabled = unchecked((ushort)(0));
 
+    /// <summary>value of mode meaning put the driver into its idle current</summary>
     public const ushort DriverIdle = unchecked((ushort)(1));
 
+    /// <summary>value of mode meaning enable the driver at full current</summary>
     public const ushort DriverActive = unchecked((ushort)(2));
 
     /// <summary>Backing storage for the bitfields mode:2, zero:6, idlePercent:8</summary>
@@ -858,20 +937,27 @@ public struct DriverStateControl
         set => _bits0 = (ushort)((((uint)_bits0) & ~0x3U) | (unchecked((uint)value) & 0x3U));
     }
 
-    /// <summary>Zero (6-bit field, bits 2-7 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (6-bit field, bits 2-7 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 2) & 0x3FU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0x3FU << 2)) | ((unchecked((uint)value) & 0x3FU) << 2));
     }
 
-    /// <summary>IdlePercent (8-bit field, bits 8-15 of the message)</summary>
+    /// <summary>
+    /// Idle current percentage or brake delay, depending on the mode
+    /// (8-bit field, bits 8-15 of the message)
+    /// </summary>
     public byte IdlePercent
     {
         readonly get => (byte)((((uint)_bits0) >> 8) & 0xFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFFU << 8)) | ((unchecked((uint)value) & 0xFFU) << 8));
     }
 
+    /// <summary>Set the mode and the accompanying idle percentage or delay</summary>
     public void Set(ushort m, ushort idlePc)
     {
         Mode = (byte)(m);
@@ -891,16 +977,22 @@ public struct CanMessageReturnInfo : ICanMessage<CanMessageReturnInfo>
     /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
     public static CanMessageType MessageType => CanMessageType.ReturnInfo;
 
+    /// <summary>ask for the firmware version string</summary>
     public const byte TypeFirmwareVersion = unchecked((byte)(0));
 
+    /// <summary>ask for the short board type name</summary>
     public const byte TypeBoardName = unchecked((byte)(1));
 
+    /// <summary>retired: pressure advance is no longer read back this way</summary>
     public const byte UnusedWasTypePressureAdvance = unchecked((byte)(2));
 
+    /// <summary>retired: status was never reported this way</summary>
     public const byte UnusedWasTypeM408 = unchecked((byte)(3));
 
+    /// <summary>ask for the bootloader name</summary>
     public const byte TypeBootloaderName = unchecked((byte)(4));
 
+    /// <summary>ask for the unique id of the board</summary>
     public const byte TypeBoardUniqueId = unchecked((byte)(5));
 
     /// <summary>Other parts of the diagnostics reply use 101, 102 etc. so keep those free</summary>
@@ -912,7 +1004,10 @@ public struct CanMessageReturnInfo : ICanMessage<CanMessageReturnInfo>
     /// <summary>Type of info requested</summary>
     [FieldOffset(2)] public byte Type;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
@@ -962,14 +1057,20 @@ public struct CanMessageDiagnosticTest : ICanMessage<CanMessageDiagnosticTest>
     /// <summary>Possible 32-bit parameters</summary>
     [FieldOffset(8)] public UintArray3 Param32;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
@@ -995,16 +1096,22 @@ public struct CanMessageSetHeaterTemperatureV1 : ICanMessage<CanMessageSetHeater
     /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
     public static CanMessageType MessageType => CanMessageType.SetHeaterTemperatureV1;
 
+    /// <summary>change the setpoint without changing whether the heater is on</summary>
     public const byte CommandNone = unchecked((byte)(0));
 
+    /// <summary>switch the heater off</summary>
     public const byte CommandOff = unchecked((byte)(1));
 
+    /// <summary>switch the heater on</summary>
     public const byte CommandOn = unchecked((byte)(2));
 
+    /// <summary>clear a heater fault and resume normal control</summary>
     public const byte CommandResetFault = unchecked((byte)(3));
 
+    /// <summary>switch the heater off temporarily, remembering its setpoint</summary>
     public const byte CommandSuspend = unchecked((byte)(4));
 
+    /// <summary>resume a suspended heater</summary>
     public const byte CommandUnsuspend = unchecked((byte)(5));
 
     /// <summary>Reset the heater after a failed model update</summary>
@@ -1016,54 +1123,76 @@ public struct CanMessageSetHeaterTemperatureV1 : ICanMessage<CanMessageSetHeater
     /// <summary>Backing storage for the bitfields heaterNumber:8, zero2:5, function:3</summary>
     [FieldOffset(2)] private ushort _bits1;
 
+    /// <summary>Target temperature in degC, applied by every command except commandSuspend</summary>
     [FieldOffset(4)] public float SetPoint;
 
     /// <summary>Backing storage for the bitfields command:4, zero3:4</summary>
     [FieldOffset(8)] private byte _bits2;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
-    /// <summary>HeaterNumber (8-bit field, bits 16-23 of the message)</summary>
+    /// <summary>
+    /// Number of the heater this message is about
+    /// (8-bit field, bits 16-23 of the message)
+    /// </summary>
     public byte HeaterNumber
     {
         readonly get => (byte)(((uint)_bits1) & 0xFFU);
         set => _bits1 = (ushort)((((uint)_bits1) & ~0xFFU) | (unchecked((uint)value) & 0xFFU));
     }
 
-    /// <summary>Zero2 (5-bit field, bits 24-28 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (5-bit field, bits 24-28 of the message)
+    /// </summary>
     public byte Zero2
     {
         readonly get => (byte)((((uint)_bits1) >> 8) & 0x1FU);
         set => _bits1 = (ushort)((((uint)_bits1) & ~(0x1FU << 8)) | ((unchecked((uint)value) & 0x1FU) << 8));
     }
 
-    /// <summary>Function (3-bit field, bits 29-31 of the message)</summary>
+    /// <summary>
+    /// What the heater is for, as a HeaterFunction, which fixes how slowly it may heat up before that counts as a fault
+    /// (3-bit field, bits 29-31 of the message)
+    /// </summary>
     public byte Function
     {
         readonly get => (byte)((((uint)_bits1) >> 13) & 0x7U);
         set => _bits1 = (ushort)((((uint)_bits1) & ~(0x7U << 13)) | ((unchecked((uint)value) & 0x7U) << 13));
     }
 
-    /// <summary>Command (4-bit field, bits 64-67 of the message)</summary>
+    /// <summary>
+    /// What to do with the heater; see the command... constants
+    /// (4-bit field, bits 64-67 of the message)
+    /// </summary>
     public byte Command
     {
         readonly get => (byte)(((uint)_bits2) & 0xFU);
         set => _bits2 = (byte)((((uint)_bits2) & ~0xFU) | (unchecked((uint)value) & 0xFU));
     }
 
-    /// <summary>Zero3 (4-bit field, bits 68-71 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 68-71 of the message)
+    /// </summary>
     public byte Zero3
     {
         readonly get => (byte)((((uint)_bits2) >> 4) & 0xFU);
@@ -1097,8 +1226,10 @@ public struct CanMessageHeaterModelV3 : ICanMessage<CanMessageHeaterModelV3>
     /// <summary>Backing storage for the bitfields heater:8, enabled:1, inverted:1, _obsolete_was_pidParametersOverridden:1, zero2:5</summary>
     [FieldOffset(2)] private ushort _bits1;
 
+    /// <summary>The heating and cooling rates, dead time and other parameters of the model</summary>
     [FieldOffset(4)] public HeaterModel BasicModel;
 
+    /// <summary>Highest PWM the heater may be driven at, 0 to 1</summary>
     [FieldOffset(44)] public float MaxPwm;
 
     /// <summary>Controller (not model) gain; obsolete</summary>
@@ -1110,35 +1241,50 @@ public struct CanMessageHeaterModelV3 : ICanMessage<CanMessageHeaterModelV3>
     /// <summary>Controller differential time; obsolete</summary>
     [FieldOffset(56)] public float ObsoleteWasTD;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
-    /// <summary>Heater (8-bit field, bits 16-23 of the message)</summary>
+    /// <summary>
+    /// Number of the heater this model is for
+    /// (8-bit field, bits 16-23 of the message)
+    /// </summary>
     public byte Heater
     {
         readonly get => (byte)(((uint)_bits1) & 0xFFU);
         set => _bits1 = (ushort)((((uint)_bits1) & ~0xFFU) | (unchecked((uint)value) & 0xFFU));
     }
 
-    /// <summary>Enabled (1-bit field, bit 24 of the message)</summary>
+    /// <summary>
+    /// Set if the heater may be switched on
+    /// (1-bit field, bit 24 of the message)
+    /// </summary>
     public bool Enabled
     {
         readonly get => ((((uint)_bits1) >> 8) & 1U) != 0;
         set => _bits1 = (ushort)((((uint)_bits1) & ~(0x1U << 8)) | ((value ? 1U : 0U) << 8));
     }
 
-    /// <summary>Inverted (1-bit field, bit 25 of the message)</summary>
+    /// <summary>
+    /// Set if the PWM output drives the heater the other way round, i.e. 0 is full power
+    /// (1-bit field, bit 25 of the message)
+    /// </summary>
     public bool Inverted
     {
         readonly get => ((((uint)_bits1) >> 9) & 1U) != 0;
@@ -1155,7 +1301,10 @@ public struct CanMessageHeaterModelV3 : ICanMessage<CanMessageHeaterModelV3>
         set => _bits1 = (ushort)((((uint)_bits1) & ~(0x1U << 10)) | ((value ? 1U : 0U) << 10));
     }
 
-    /// <summary>Zero2 (5-bit field, bits 27-31 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (5-bit field, bits 27-31 of the message)
+    /// </summary>
     public byte Zero2
     {
         readonly get => (byte)((((uint)_bits1) >> 11) & 0x1FU);
@@ -1188,30 +1337,42 @@ public struct CanMessageSetHeaterFaultDetectionParameters : ICanMessage<CanMessa
     /// <summary>Backing storage for the bitfields requestId:12, version35:1, zero:3</summary>
     [FieldOffset(0)] private ushort _bits0;
 
+    /// <summary>Number of the heater these parameters apply to</summary>
     [FieldOffset(2)] public ushort Heater;
 
+    /// <summary>How far the temperature may stray from the setpoint, in degC, before a fault is raised</summary>
     [FieldOffset(4)] public float MaxTempExcursion;
 
+    /// <summary>How long the heater may fail to heat as expected, in seconds, before a fault is raised</summary>
     [FieldOffset(8)] public float MaxFaultTime;
 
     /// <summary>Added at version 3.5; only present if the version35 flag is set</summary>
     [FieldOffset(12)] public uint MaxBadTemperatureCount;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Version35 (1-bit field, bit 12 of the message)</summary>
+    /// <summary>
+    /// Set if maxBadTemperatureCount is present. A board must ignore that field unless this bit is set.
+    /// (1-bit field, bit 12 of the message)
+    /// </summary>
     public bool Version35
     {
         readonly get => ((((uint)_bits0) >> 12) & 1U) != 0;
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0x1U << 12)) | ((value ? 1U : 0U) << 12));
     }
 
-    /// <summary>Zero (3-bit field, bits 13-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (3-bit field, bits 13-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 13) & 0x7U);
@@ -1235,14 +1396,19 @@ public struct CanMessageSetHeaterFaultDetectionParameters : ICanMessage<CanMessa
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 8)]
 public struct CanHeaterMonitor
 {
+    /// <summary>Temperature limit in degC that triggers the monitor</summary>
     [FieldOffset(0)] public float Limit;
 
+    /// <summary>Number of the sensor the monitor watches, or -1 if the monitor is unused</summary>
     [FieldOffset(4)] public sbyte Sensor;
 
+    /// <summary>What to do when the monitor triggers: 0 = raise a heater fault, 1 = switch the heater off permanently, 2 = switch it off temporarily</summary>
     [FieldOffset(5)] public byte Action;
 
+    /// <summary>What counts as a trigger: -1 = disabled, 0 = temperature exceeded, 1 = temperature too low</summary>
     [FieldOffset(6)] public sbyte Trigger;
 
+    /// <summary>Reserved for future use; set to 0</summary>
     [FieldOffset(7)] public byte Zero;
 }
 
@@ -1260,24 +1426,33 @@ public struct CanMessageSetHeaterMonitors : ICanMessage<CanMessageSetHeaterMonit
     /// <summary>Backing storage for the bitfields requestId:12, numMonitors:4</summary>
     [FieldOffset(0)] private ushort _bits0;
 
+    /// <summary>Number of the heater whose monitors are being set</summary>
     [FieldOffset(2)] public ushort Heater;
 
+    /// <summary>The monitors, of which only the first numMonitors entries are sent</summary>
     [FieldOffset(4)] public CanHeaterMonitorArray7 Monitors;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>NumMonitors (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// How many entries of monitors are present
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte NumMonitors
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
+    /// <summary>Length of the message when only the first numMonitors monitors are sent</summary>
     public readonly uint GetActualDatalength() => (uint)((2 * 2) + (NumMonitors * 8));
 
     /// <summary>Set the request ID of this message and clear its reserved fields</summary>
@@ -1301,11 +1476,16 @@ public struct CanMessageUpdateYourFirmware : ICanMessage<CanMessageUpdateYourFir
     /// <summary>Backing storage for the bitfields requestId:12, module:2, zero:2</summary>
     [FieldOffset(0)] private ushort _bits0;
 
+    /// <summary>The address of the board that is to update itself. A board whose address differs ignores the message.</summary>
     [FieldOffset(2)] public byte BoardId;
 
+    /// <summary>The complement of boardId, as an integrity check</summary>
     [FieldOffset(3)] public byte InvertedBoardId;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
@@ -1322,7 +1502,10 @@ public struct CanMessageUpdateYourFirmware : ICanMessage<CanMessageUpdateYourFir
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0x3U << 12)) | ((unchecked((uint)value) & 0x3U) << 12));
     }
 
-    /// <summary>Zero (2-bit field, bits 14-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (2-bit field, bits 14-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 14) & 0x3U);
@@ -1351,29 +1534,41 @@ public struct CanMessageFanParameters : ICanMessage<CanMessageFanParameters>
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;
 
+    /// <summary>Number of the fan being configured</summary>
     [FieldOffset(2)] public ushort FanNumber;
 
     /// <summary>In milliseconds</summary>
     [FieldOffset(4)] public ushort BlipTime;
 
+    /// <summary>Requested fan speed as a fraction of the range minVal to maxVal, used when no sensors are monitored</summary>
     [FieldOffset(6)] public float Val;
 
+    /// <summary>Lowest PWM the fan runs at when it is on</summary>
     [FieldOffset(10)] public float MinVal;
 
+    /// <summary>Highest PWM the fan runs at</summary>
     [FieldOffset(14)] public float MaxVal;
 
+    /// <summary>Temperatures in degC between which the fan speed ramps from minVal to maxVal. If the second is not above the first the fan runs bang-bang.</summary>
     [FieldOffset(18)] public FloatArray2 TriggerTemperatures;
 
+    /// <summary>Bitmap of the sensors that drive the fan thermostatically, or zero for a fan under direct control</summary>
     [FieldOffset(26)] public ulong SensorsMonitored;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
@@ -1402,18 +1597,26 @@ public struct CanMessageSetFanSpeed : ICanMessage<CanMessageSetFanSpeed>
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;
 
+    /// <summary>Number of the fan whose speed is being set</summary>
     [FieldOffset(2)] public ushort FanNumber;
 
+    /// <summary>Requested PWM, 0 to 1</summary>
     [FieldOffset(4)] public float Pwm;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
@@ -1442,11 +1645,13 @@ public struct CanMessageCreateInputMonitorV1 : ICanMessage<CanMessageCreateInput
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;
 
+    /// <summary>Handle the main board will use to refer to this input</summary>
     [FieldOffset(2)] public RemoteInputHandle Handle;
 
     /// <summary>Analog threshold, or zero if digital</summary>
     [FieldOffset(4)] public int Threshold;
 
+    /// <summary>Shortest interval in milliseconds between reports of a change to this input</summary>
     [FieldOffset(8)] public ushort MinInterval;
 
     /// <summary>Null terminated</summary>
@@ -1462,22 +1667,30 @@ public struct CanMessageCreateInputMonitorV1 : ICanMessage<CanMessageCreateInput
         set => CanText.SetString(PinName, value);
     }
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
+    /// <summary>Length of the message with the pin name truncated to its terminating null</summary>
     public readonly uint GetActualDataLength() => (uint)(2 * 2 + 4 + 2 + CanText.Strnlen(PinName, 54));
 
+    /// <summary>How much of a message of the given length is pin name</summary>
     public readonly uint GetMaxPinNameLength(uint dataLength) => (uint)(dataLength - (2 * 2 + 4 + 2));
 
     /// <summary>Set the request ID of this message and clear its reserved fields</summary>
@@ -1523,8 +1736,10 @@ public struct CanMessageChangeInputMonitorV1 : ICanMessage<CanMessageChangeInput
     /// <summary>Select touch mode and set the sensitivity to param, only for scanning Z probes</summary>
     public const byte ActionSelectTouchMode = unchecked((byte)(7));
 
+    /// <summary>value of param, with action actionSetDriveLevel, that asks for the drive level to be calibrated and reported</summary>
     public const uint ParamAutoCalibrateDriveLevelAndReport = unchecked((uint)(0xFFFFFFFF));
 
+    /// <summary>value of param, with action actionSetDriveLevel, that asks for the current drive level to be reported</summary>
     public const uint ParamReportDriveLevel = unchecked((uint)(0xFFFFFFFE));
 
     /// <summary>Bottom 5 bits are the drive level</summary>
@@ -1533,25 +1748,35 @@ public struct CanMessageChangeInputMonitorV1 : ICanMessage<CanMessageChangeInput
     /// <summary>The remaining bits are the offset</summary>
     public const uint ParamOffsetShift = unchecked((uint)(5));
 
+    /// <summary>largest offset that fits in param alongside the drive level</summary>
     public const uint MaxParamOffset = unchecked((uint)((1 << (int)((32 - ParamOffsetShift))) - 1));
 
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;
 
+    /// <summary>Handle of the input monitor to change</summary>
     [FieldOffset(2)] public RemoteInputHandle Handle;
 
+    /// <summary>The new value, whose meaning depends on the action</summary>
     [FieldOffset(4)] public uint Param;
 
+    /// <summary>What to change; see the action... constants</summary>
     [FieldOffset(8)] public byte Action;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
@@ -1574,6 +1799,7 @@ public struct CanMessageChangeInputMonitorV1 : ICanMessage<CanMessageChangeInput
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 6)]
 public struct AnalogHandleDataV0
 {
+    /// <summary>Handle of the input this reading came from</summary>
     [FieldOffset(0)] public RemoteInputHandle Handle;
 
     /// <summary>Note, this will not be aligned!</summary>
@@ -1588,6 +1814,7 @@ public struct AnalogHandleDataV0
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 8)]
 public struct AnalogHandleDataV1
 {
+    /// <summary>Handle of the input this reading came from</summary>
     [FieldOffset(0)] public RemoteInputHandle Handle;
 
     /// <summary>Lower 16 bits of the system step tick count when the new value was recorded</summary>
@@ -1627,7 +1854,10 @@ public struct CanMessageReadInputsRequest : ICanMessage<CanMessageReadInputsRequ
         set => _bits0 = (uint)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (20-bit field, bits 12-31 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (20-bit field, bits 12-31 of the message)
+    /// </summary>
     public uint Zero
     {
         readonly get => (uint)((((uint)_bits0) >> 12) & 0xFFFFFU);
@@ -1656,6 +1886,7 @@ public struct CanMessageStartAccelerometer : ICanMessage<CanMessageStartAccelero
     /// <summary>Backing storage for the bitfields requestId:12, zero1:4</summary>
     [FieldOffset(0)] private ushort _bits0;
 
+    /// <summary>Number of the accelerometer to collect from</summary>
     [FieldOffset(2)] public byte DeviceNumber;
 
     /// <summary>Backing storage for the bitfields axes:3, delayedStart:1, zero2:4</summary>
@@ -1667,14 +1898,20 @@ public struct CanMessageStartAccelerometer : ICanMessage<CanMessageStartAccelero
     /// <summary>Step timer ticks at which to start collecting, if delayedStart is set</summary>
     [FieldOffset(8)] public uint StartTime;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero1 (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero1
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
@@ -1701,7 +1938,10 @@ public struct CanMessageStartAccelerometer : ICanMessage<CanMessageStartAccelero
         set => _bits1 = (byte)((((uint)_bits1) & ~(0x1U << 3)) | ((value ? 1U : 0U) << 3));
     }
 
-    /// <summary>Zero2 (4-bit field, bits 28-31 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 28-31 of the message)
+    /// </summary>
     public byte Zero2
     {
         readonly get => (byte)((((uint)_bits1) >> 4) & 0xFU);
@@ -1749,14 +1989,20 @@ public struct CanMessageStartClosedLoopDataCollection : ICanMessage<CanMessageSt
     /// <summary>Which (if any) movement was requested</summary>
     [FieldOffset(10)] public byte Movement;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero1 (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero1
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
@@ -1785,25 +2031,36 @@ public struct CanMessageWriteGpio : ICanMessage<CanMessageWriteGpio>
     /// <summary>Backing storage for the bitfields requestId:12, isServo:1, zero:3</summary>
     [FieldOffset(0)] private ushort _bits0;
 
+    /// <summary>PWM to write, 0 to 1, or the servo position if isServo is set</summary>
     [FieldOffset(2)] public float Pwm;
 
+    /// <summary>Number of the GPIO port on the receiving board</summary>
     [FieldOffset(6)] public byte PortNumber;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>IsServo (1-bit field, bit 12 of the message)</summary>
+    /// <summary>
+    /// Set if the port is a servo, in which case pwm is a servo position rather than a duty cycle
+    /// (1-bit field, bit 12 of the message)
+    /// </summary>
     public bool IsServo
     {
         readonly get => ((((uint)_bits0) >> 12) & 1U) != 0;
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0x1U << 12)) | ((value ? 1U : 0U) << 12));
     }
 
-    /// <summary>Zero (3-bit field, bits 13-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (3-bit field, bits 13-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 13) & 0x7U);
@@ -1835,35 +2092,50 @@ public struct CanMessageCreateFilamentMonitor : ICanMessage<CanMessageCreateFila
     /// <summary>Backing storage for the bitfields driver:8, zero2:4, type:8</summary>
     [FieldOffset(2)] private ByteArray3 _bits1;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
-    /// <summary>Driver (8-bit field, bits 16-23 of the message)</summary>
+    /// <summary>
+    /// Number of the driver the monitor watches
+    /// (8-bit field, bits 16-23 of the message)
+    /// </summary>
     public byte Driver
     {
         readonly get => (byte)CanBitFields.Get(_bits1, 0, 8);
         set => CanBitFields.Set(_bits1, 0, 8, unchecked((ulong)value));
     }
 
-    /// <summary>Zero2 (4-bit field, bits 24-27 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 24-27 of the message)
+    /// </summary>
     public byte Zero2
     {
         readonly get => (byte)CanBitFields.Get(_bits1, 8, 4);
         set => CanBitFields.Set(_bits1, 8, 4, unchecked((ulong)value));
     }
 
-    /// <summary>Type (8-bit field, bits 28-35 of the message)</summary>
+    /// <summary>
+    /// Type of monitor to create, i.e. the M591 P parameter: 1 and 2 are simple switches, 3 and 4 rotating magnet, 5 and 6 laser, 7 pulsed
+    /// (8-bit field, bits 28-35 of the message)
+    /// </summary>
     public byte Type
     {
         readonly get => (byte)CanBitFields.Get(_bits1, 12, 8);
@@ -1896,28 +2168,40 @@ public struct CanMessageDeleteFilamentMonitor : ICanMessage<CanMessageDeleteFila
     /// <summary>Backing storage for the bitfields driver:8, zero2:12</summary>
     [FieldOffset(2)] private ByteArray3 _bits1;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
-    /// <summary>Driver (8-bit field, bits 16-23 of the message)</summary>
+    /// <summary>
+    /// Number of the driver whose monitor is to be deleted
+    /// (8-bit field, bits 16-23 of the message)
+    /// </summary>
     public byte Driver
     {
         readonly get => (byte)CanBitFields.Get(_bits1, 0, 8);
         set => CanBitFields.Set(_bits1, 0, 8, unchecked((ulong)value));
     }
 
-    /// <summary>Zero2 (12-bit field, bits 24-35 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (12-bit field, bits 24-35 of the message)
+    /// </summary>
     public ushort Zero2
     {
         readonly get => (ushort)CanBitFields.Get(_bits1, 8, 12);
@@ -1953,36 +2237,52 @@ public struct CanMessageHeaterTuningCommand : ICanMessage<CanMessageHeaterTuning
     /// <summary>Backing storage for the bitfields heaterNumber:8, on:1, calibrate:1, zero2:22</summary>
     [FieldOffset(2)] private uint _bits1;
 
+    /// <summary>PWM to drive the heater at during tuning, 0 to 1</summary>
     [FieldOffset(6)] public float Pwm;
 
+    /// <summary>Temperature in degC at which each cycle turns the heater back on</summary>
     [FieldOffset(10)] public float LowTemp;
 
+    /// <summary>Temperature in degC at which each cycle turns the heater off</summary>
     [FieldOffset(14)] public float HighTemp;
 
+    /// <summary>How far the temperature must move away from a peak, in degC, before that peak is taken as final</summary>
     [FieldOffset(18)] public float PeakTempDrop;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
-    /// <summary>HeaterNumber (8-bit field, bits 16-23 of the message)</summary>
+    /// <summary>
+    /// Number of the heater to tune
+    /// (8-bit field, bits 16-23 of the message)
+    /// </summary>
     public byte HeaterNumber
     {
         readonly get => (byte)(((uint)_bits1) & 0xFFU);
         set => _bits1 = (uint)((((uint)_bits1) & ~0xFFU) | (unchecked((uint)value) & 0xFFU));
     }
 
-    /// <summary>On (1-bit field, bit 24 of the message)</summary>
+    /// <summary>
+    /// Set to start tuning, clear to stop it. With calibrate also set, this starts calibration instead.
+    /// (1-bit field, bit 24 of the message)
+    /// </summary>
     public bool On
     {
         readonly get => ((((uint)_bits1) >> 8) & 1U) != 0;
@@ -1999,7 +2299,10 @@ public struct CanMessageHeaterTuningCommand : ICanMessage<CanMessageHeaterTuning
         set => _bits1 = (uint)((((uint)_bits1) & ~(0x1U << 9)) | ((value ? 1U : 0U) << 9));
     }
 
-    /// <summary>Zero2 (22-bit field, bits 26-47 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (22-bit field, bits 26-47 of the message)
+    /// </summary>
     public uint Zero2
     {
         readonly get => (uint)((((uint)_bits1) >> 10) & 0x3FFFFFU);
@@ -2026,25 +2329,35 @@ public struct CanMessageHeaterFeedForwardV1 : ICanMessage<CanMessageHeaterFeedFo
     /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
     public static CanMessageType MessageType => CanMessageType.HeaterFeedForwardV1;
 
+    /// <summary>Reserved so that the heater number lands where SetRequestId expects it; set to 0</summary>
     [FieldOffset(0)] public ushort Zero;
 
     /// <summary>Backing storage for the bitfields heaterNumber:8, zero2:8</summary>
     [FieldOffset(2)] private ushort _bits0;
 
+    /// <summary>Current PWM of the print cooling fan, 0 to 1, from which the extra heater power needed is worked out</summary>
     [FieldOffset(4)] public float FanPwmFraction;
 
+    /// <summary>Extra heater PWM to allow for the current extrusion rate</summary>
     [FieldOffset(8)] public float ExtrusionPwmBoost;
 
+    /// <summary>Amount in degC to raise the target temperature by while extruding</summary>
     [FieldOffset(12)] public float ExtrusionTemperatureBoost;
 
-    /// <summary>HeaterNumber (8-bit field, bits 16-23 of the message)</summary>
+    /// <summary>
+    /// Number of the heater this feedforward is for
+    /// (8-bit field, bits 16-23 of the message)
+    /// </summary>
     public byte HeaterNumber
     {
         readonly get => (byte)(((uint)_bits0) & 0xFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFU) | (unchecked((uint)value) & 0xFFU));
     }
 
-    /// <summary>Zero2 (8-bit field, bits 24-31 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (8-bit field, bits 24-31 of the message)
+    /// </summary>
     public byte Zero2
     {
         readonly get => (byte)((((uint)_bits0) >> 8) & 0xFFU);
@@ -2067,8 +2380,10 @@ public struct CanMessageHeaterFeedForwardV1 : ICanMessage<CanMessageHeaterFeedFo
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 8)]
 public struct ShapingPair
 {
+    /// <summary>Fraction of the move this impulse carries. The coefficients of all the impulses must add up to 1.</summary>
     [FieldOffset(0)] public float Coefficient;
 
+    /// <summary>Start delay of this impulse in step clocks, which is normally zero for the first impulse</summary>
     [FieldOffset(4)] public uint ImpulseDelay;
 }
 
@@ -2092,20 +2407,27 @@ public struct CanMessageSetInputShapingV1 : ICanMessage<CanMessageSetInputShapin
     /// <summary>The coefficients and durations of the impulses</summary>
     [FieldOffset(4)] public ShapingPairArray7 Impulses;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
+    /// <summary>Length of the message when only the first numImpulses impulses are sent</summary>
     public readonly uint GetActualDataLength() => (uint)((2 * 2) + (NumImpulses * 8));
 
     /// <summary>Set the request ID of this message and clear its reserved fields</summary>
@@ -2139,14 +2461,20 @@ public struct CanMessageEnableStallEndstop : ICanMessage<CanMessageEnableStallEn
     /// <summary>The speed we will use for the homing move; not relevant if driverNumber == disableAll</summary>
     [FieldOffset(4)] public float Speed;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
@@ -2178,35 +2506,50 @@ public struct CanMessageSetDefaultHeaterModel : ICanMessage<CanMessageSetDefault
     /// <summary>Backing storage for the bitfields heater:6, heaterFunction:3, zero2:8</summary>
     [FieldOffset(2)] private ByteArray3 _bits1;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
-    /// <summary>Heater (6-bit field, bits 16-21 of the message)</summary>
+    /// <summary>
+    /// Number of the heater whose default model is wanted
+    /// (6-bit field, bits 16-21 of the message)
+    /// </summary>
     public byte Heater
     {
         readonly get => (byte)CanBitFields.Get(_bits1, 0, 6);
         set => CanBitFields.Set(_bits1, 0, 6, unchecked((ulong)value));
     }
 
-    /// <summary>HeaterFunction (3-bit field, bits 22-24 of the message)</summary>
+    /// <summary>
+    /// What the heater is for, which decides which set of default parameters is returned
+    /// (3-bit field, bits 22-24 of the message)
+    /// </summary>
     public HeaterFunction HeaterFunction
     {
         readonly get => (HeaterFunction)CanBitFields.Get(_bits1, 6, 3);
         set => CanBitFields.Set(_bits1, 6, 3, unchecked((ulong)value));
     }
 
-    /// <summary>Zero2 (8-bit field, bits 25-32 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (8-bit field, bits 25-32 of the message)
+    /// </summary>
     public byte Zero2
     {
         readonly get => (byte)CanBitFields.Get(_bits1, 9, 8);
@@ -2269,7 +2612,10 @@ public struct CanMessageHeaterModelReport : ICanMessage<CanMessageHeaterModelRep
         set => _bits0 = (uint)((((uint)_bits0) & ~(0x3FU << 16)) | ((unchecked((uint)value) & 0x3FU) << 16));
     }
 
-    /// <summary>Zero (10-bit field, bits 22-31 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (10-bit field, bits 22-31 of the message)
+    /// </summary>
     public ushort Zero
     {
         readonly get => (ushort)((((uint)_bits0) >> 22) & 0x3FFU);
@@ -2295,6 +2641,7 @@ public struct CanMessageFirmwareUpdateRequest : ICanMessage<CanMessageFirmwareUp
     /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
     public static CanMessageType MessageType => CanMessageType.FirmwareBlockRequest;
 
+    /// <summary>the only bootloader protocol version defined so far</summary>
     public const uint BootloaderVersion0 = unchecked((uint)(0));
 
     /// <summary>Backing storage for the bitfields fileOffset:24, bootloaderVersion:5, uf2Format:1, fileWanted:2</summary>
@@ -2376,8 +2723,10 @@ public struct CanMessageFirmwareUpdateRequest : ICanMessage<CanMessageFirmwareUp
         set => _bits1 = (uint)((((uint)_bits1) & ~(0xFFU << 24)) | ((unchecked((uint)value) & 0xFFU) << 24));
     }
 
+    /// <summary>Length of the message with the board type truncated to its terminating null</summary>
     public readonly uint GetActualDataLength() => (uint)(2 * 4 + CanText.Strnlen(BoardType, 56));
 
+    /// <summary>How much of a message of the given length is board type</summary>
     public readonly uint GetBoardTypeLength(uint dataLength) => (uint)(dataLength - 2 * 4);
 
     /// <summary>Clear the reserved fields of this message so that it stays compatible with future uses</summary>
@@ -2395,12 +2744,16 @@ public struct CanMessageFirmwareUpdateResponse : ICanMessage<CanMessageFirmwareU
     /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
     public static CanMessageType MessageType => CanMessageType.FirmwareBlockResponse;
 
+    /// <summary>the block is present in the message</summary>
     public const uint ErrNone = unchecked((uint)(0));
 
+    /// <summary>the main board does not have the requested file</summary>
     public const uint ErrNoFile = unchecked((uint)(1));
 
+    /// <summary>the requested offset is past the end of the file</summary>
     public const uint ErrBadOffset = unchecked((uint)(2));
 
+    /// <summary>the block could not be supplied for some other reason</summary>
     public const uint ErrOther = unchecked((uint)(3));
 
     /// <summary>Backing storage for the bitfields fileOffset:24, dataLength:6, err:2</summary>
@@ -2452,13 +2805,17 @@ public struct CanMessageFirmwareUpdateResponse : ICanMessage<CanMessageFirmwareU
         set => _bits1 = (uint)((((uint)_bits1) & ~0xFFFFFFU) | (unchecked((uint)value) & 0xFFFFFFU));
     }
 
-    /// <summary>Zero (8-bit field, bits 56-63 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (8-bit field, bits 56-63 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits1) >> 24) & 0xFFU);
         set => _bits1 = (uint)((((uint)_bits1) & ~(0xFFU << 24)) | ((unchecked((uint)value) & 0xFFU) << 24));
     }
 
+    /// <summary>Length of the message when only dataLength bytes of data are sent</summary>
     public readonly uint GetActualDataLength() => (uint)(DataLength + 2 * 4);
 
     /// <summary>Clear the reserved fields of this message so that it stays compatible with future uses</summary>
@@ -2481,14 +2838,19 @@ public struct CanMessageStandardReply : ICanMessage<CanMessageStandardReply>
     /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
     public static CanMessageType MessageType => CanMessageType.StandardReply;
 
+    /// <summary>how much text one fragment can carry</summary>
     public const uint MaxTextLength = unchecked((uint)(60));
 
     /// <summary>Backing storage for the bitfields requestId:12, resultCode:4, fragmentNumber:7, moreFollows:1, extra:8</summary>
     [FieldOffset(0)] private uint _bits0;
 
+    /// <summary>The reply text, which is not null terminated if it fills the field</summary>
     [FieldOffset(4)] public CharArray60 Text;
 
-    /// <summary>Text as a string, decoded up to the first null byte</summary>
+    /// <summary>
+    /// The reply text, which is not null terminated if it fills the field
+    /// (decoded up to the first null byte; setting it truncates to the field size and zero-fills the rest)
+    /// </summary>
     public string TextString
     {
         readonly get => CanText.GetString(Text);
@@ -2545,8 +2907,10 @@ public struct CanMessageStandardReply : ICanMessage<CanMessageStandardReply>
         set => _bits0 = (uint)((((uint)_bits0) & ~(0xFFU << 24)) | ((unchecked((uint)value) & 0xFFU) << 24));
     }
 
+    /// <summary>How much of a message of the given length is text, stopping at the first null</summary>
     public readonly uint GetTextLength(uint dataLength) => (uint)(CanText.Strnlen(Text, (int)((dataLength < 4 + 60) ? dataLength - 4 : 60)));
 
+    /// <summary>Length of the message when textLength characters of text are sent</summary>
     public readonly uint GetActualDataLength(uint textLength) => (uint)(textLength + 4);
 
     /// <summary>Set the request ID of this message and clear its reserved fields</summary>
@@ -2571,6 +2935,7 @@ public struct CanMessageReadInputsReplyV0 : ICanMessage<CanMessageReadInputsRepl
     /// <summary>Backing storage for the bitfields requestId:12, resultCode:4, numReported:4, zero:12</summary>
     [FieldOffset(0)] private uint _bits0;
 
+    /// <summary>The readings, of which only the first numReported entries are sent</summary>
     [FieldOffset(4)] public AnalogHandleDataV0Array10 Results;
 
     /// <summary>
@@ -2603,13 +2968,17 @@ public struct CanMessageReadInputsReplyV0 : ICanMessage<CanMessageReadInputsRepl
         set => _bits0 = (uint)((((uint)_bits0) & ~(0xFU << 16)) | ((unchecked((uint)value) & 0xFU) << 16));
     }
 
-    /// <summary>Zero (12-bit field, bits 20-31 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (12-bit field, bits 20-31 of the message)
+    /// </summary>
     public ushort Zero
     {
         readonly get => (ushort)((((uint)_bits0) >> 20) & 0xFFFU);
         set => _bits0 = (uint)((((uint)_bits0) & ~(0xFFFU << 20)) | ((unchecked((uint)value) & 0xFFFU) << 20));
     }
 
+    /// <summary>Length of the message when only the first numReported readings are sent</summary>
     public readonly uint GetActualDataLength() => (uint)(4 + NumReported * 6);
 
     /// <summary>Set the request ID of this message and clear its reserved fields</summary>
@@ -2634,6 +3003,7 @@ public struct CanMessageReadInputsReplyV1 : ICanMessage<CanMessageReadInputsRepl
     /// <summary>Backing storage for the bitfields requestId:12, resultCode:4, numReported:4, zero:12</summary>
     [FieldOffset(0)] private uint _bits0;
 
+    /// <summary>The readings, of which only the first numReported entries are sent</summary>
     [FieldOffset(4)] public AnalogHandleDataV1Array7 Results;
 
     /// <summary>
@@ -2666,13 +3036,17 @@ public struct CanMessageReadInputsReplyV1 : ICanMessage<CanMessageReadInputsRepl
         set => _bits0 = (uint)((((uint)_bits0) & ~(0xFU << 16)) | ((unchecked((uint)value) & 0xFU) << 16));
     }
 
-    /// <summary>Zero (12-bit field, bits 20-31 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (12-bit field, bits 20-31 of the message)
+    /// </summary>
     public ushort Zero
     {
         readonly get => (ushort)((((uint)_bits0) >> 20) & 0xFFFU);
         set => _bits0 = (uint)((((uint)_bits0) & ~(0xFFFU << 20)) | ((unchecked((uint)value) & 0xFFFU) << 20));
     }
 
+    /// <summary>Length of the message when only the first numReported readings are sent</summary>
     public readonly uint GetActualDataLength() => (uint)(4 + NumReported * 8);
 
     /// <summary>Set the request ID of this message and clear its reserved fields</summary>
@@ -2696,22 +3070,30 @@ public struct CanMessageGeneric : ICanMessageBody<CanMessageGeneric>
     /// <summary>Backing storage for the bitfields requestId:12, paramMap:20</summary>
     [FieldOffset(0)] private uint _bits0;
 
+    /// <summary>The parameter values, packed in the order the parameter table lists them</summary>
     [FieldOffset(4)] public ByteArray60 Data;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (uint)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>ParamMap (20-bit field, bits 12-31 of the message)</summary>
+    /// <summary>
+    /// Bitmap of which of the parameter table's parameters are present in the data, in table order
+    /// (20-bit field, bits 12-31 of the message)
+    /// </summary>
     public uint ParamMap
     {
         readonly get => (uint)((((uint)_bits0) >> 12) & 0xFFFFFU);
         set => _bits0 = (uint)((((uint)_bits0) & ~(0xFFFFFU << 12)) | ((unchecked((uint)value) & 0xFFFFFU) << 12));
     }
 
+    /// <summary>Length of the message when the packed parameters occupy paramLength bytes</summary>
     public static uint GetActualDataLength(uint paramLength) => (uint)(paramLength + 4);
 
     /// <summary>Set the request ID of this message and clear its reserved fields</summary>
@@ -2735,8 +3117,10 @@ public struct CanSensorReport
     /// <summary>The last temperature we read</summary>
     [FieldOffset(1)] private float Temperature;
 
+    /// <summary>Read the temperature, allowing for the field being unaligned</summary>
     public readonly float GetTemperature() => (float)(Temperature);
 
+    /// <summary>Store the temperature, allowing for the field being unaligned</summary>
     public void SetTemperature(float t)
     {
         Temperature = (float)(t);
@@ -2760,6 +3144,7 @@ public struct CanMessageSensorTemperatures : ICanMessage<CanMessageSensorTempera
     /// <summary>The error codes and temperatures of the ones we have, lowest sensor number first</summary>
     [FieldOffset(8)] public CanSensorReportArray11 TemperatureReports;
 
+    /// <summary>Length of the message when only the first numSensors reports are sent</summary>
     public readonly uint GetActualDataLength(uint numSensors) => (uint)(numSensors * 5 + 8);
 
     /// <summary>Clear the reserved fields of this message so that it stays compatible with future uses</summary>
@@ -2783,8 +3168,10 @@ public struct CanHeaterReport
     /// <summary>The last temperature we read</summary>
     [FieldOffset(2)] private float Temperature;
 
+    /// <summary>Read the temperature, allowing for the field being unaligned</summary>
     public readonly float GetTemperature() => (float)(Temperature);
 
+    /// <summary>Store the temperature, allowing for the field being unaligned</summary>
     public void SetTemperature(float t)
     {
         Temperature = (float)(t);
@@ -2808,6 +3195,7 @@ public struct CanMessageHeatersStatus : ICanMessage<CanMessageHeatersStatus>
     /// <summary>The status and temperatures of the ones we have, lowest heater number first</summary>
     [FieldOffset(8)] public CanHeaterReportArray9 Reports;
 
+    /// <summary>Length of the message when only the first numHeaters reports are sent</summary>
     public readonly uint GetActualDataLength(uint numHeaters) => (uint)(numHeaters * 6 + 8);
 
     /// <summary>Clear the reserved fields of this message so that it stays compatible with future uses</summary>
@@ -2854,15 +3242,20 @@ public struct CanMessageAnnounceV0 : ICanMessage<CanMessageAnnounceV0>
         set => _bits0 = (uint)((((uint)_bits0) & ~0xFFU) | (unchecked((uint)value) & 0xFFU));
     }
 
-    /// <summary>Zero (24-bit field, bits 40-63 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (24-bit field, bits 40-63 of the message)
+    /// </summary>
     public uint Zero
     {
         readonly get => (uint)((((uint)_bits0) >> 8) & 0xFFFFFFU);
         set => _bits0 = (uint)((((uint)_bits0) & ~(0xFFFFFFU << 8)) | ((unchecked((uint)value) & 0xFFFFFFU) << 8));
     }
 
+    /// <summary>Length of the message with the board type and firmware version truncated to their terminating null</summary>
     public readonly uint GetActualDataLength() => (uint)((2 * 4) + CanText.Strnlen(BoardTypeAndFirmwareVersion, 56));
 
+    /// <summary>How much of a message of the given length is board type and firmware version</summary>
     public static uint GetMaxTextLength(uint dataLength) => (uint)(dataLength - (2 * 4));
 
     /// <summary>Clear the reserved fields of this message so that it stays compatible with future uses</summary>
@@ -2945,15 +3338,20 @@ public struct CanMessageAnnounceV1 : ICanMessage<CanMessageAnnounceV1>
         set => _bits0 = (byte)((((uint)_bits0) & ~(0x1U << 6)) | ((value ? 1U : 0U) << 6));
     }
 
-    /// <summary>Zero (1-bit field, bit 167 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (1-bit field, bit 167 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 7) & 0x1U);
         set => _bits0 = (byte)((((uint)_bits0) & ~(0x1U << 7)) | ((unchecked((uint)value) & 0x1U) << 7));
     }
 
+    /// <summary>Length of the message with the board type and firmware version truncated to their terminating null</summary>
     public readonly uint GetActualDataLength() => (uint)(4 + 16 + 1 + CanText.Strnlen(BoardTypeAndFirmwareVersion, 43));
 
+    /// <summary>How much of a message of the given length is board type and firmware version</summary>
     public static uint GetMaxTextLength(uint dataLength) => (uint)(dataLength - (4 + 16 + 1));
 
     /// <summary>Clear the reserved fields of this message so that it stays compatible with future uses</summary>
@@ -2995,6 +3393,7 @@ public struct CanMessageFansReport : ICanMessage<CanMessageFansReport>
     /// <summary>The actual PWM and RPM readings of the fans</summary>
     [FieldOffset(8)] public FanReportArray14 FanReports;
 
+    /// <summary>Length of the message when only the first numReported fan reports are sent</summary>
     public readonly uint GetActualDataLength(uint numReported) => (uint)(numReported * 4 + 8);
 
     /// <summary>Clear the reserved fields of this message so that it stays compatible with future uses</summary>
@@ -3015,10 +3414,13 @@ public struct CanMessageInputChangedV1 : ICanMessage<CanMessageInputChangedV1>
     /// <summary>1 bit per reported handle</summary>
     [FieldOffset(0)] public ushort States;
 
+    /// <summary>How many entries of results are present</summary>
     [FieldOffset(2)] public byte NumHandles;
 
+    /// <summary>Reserved for future use; set to 0</summary>
     [FieldOffset(3)] public byte Zero;
 
+    /// <summary>The handles and their readings, of which only the first numHandles entries are sent</summary>
     [FieldOffset(4)] public AnalogHandleDataV0Array10 Results;
 
     /// <summary>Add an entry. 'states' and 'numHandles' must be cleared to zero before adding the first one. Returns true if successful, false if the message is full.</summary>
@@ -3044,6 +3446,7 @@ public struct CanMessageInputChangedV1 : ICanMessage<CanMessageInputChangedV1>
     /// <summary>Get the reading from one of the result values. 'results' is 4-byte allocated and each entry is 6 bytes long, so the 4-byte reading is not always 4-byte aligned.</summary>
     public readonly int GetEntryReading(uint index) => (int)(Results[(int)(index)].Reading);
 
+    /// <summary>Length of the message when only the first numHandles entries are sent</summary>
     public readonly uint GetActualDataLength() => (uint)(2 + 1 + 1 + (NumHandles * 6));
 
     /// <summary>Clear the reserved fields of this message so that it stays compatible with future uses</summary>
@@ -3067,8 +3470,10 @@ public struct CanMessageInputChangedV2 : ICanMessage<CanMessageInputChangedV2>
     /// <summary>1 bit per reported handle</summary>
     [FieldOffset(0)] public ushort States;
 
+    /// <summary>How many entries of results are present</summary>
     [FieldOffset(2)] public byte NumHandles;
 
+    /// <summary>Reserved for future use; set to 0</summary>
     [FieldOffset(3)] public byte Zero;
 
     /// <summary>This is on a 4-byte boundary</summary>
@@ -3092,13 +3497,16 @@ public struct CanMessageInputChangedV2 : ICanMessage<CanMessageInputChangedV2>
         return false;
     }
 
+    /// <summary>Read the handle of one entry</summary>
     public readonly RemoteInputHandle GetEntryHandle(uint index) => Results[(int)(index)].Handle;
 
+    /// <summary>Read the value of one entry</summary>
     public readonly int GetEntryReading(uint index) => (int)(Results[(int)(index)].Reading);
 
     /// <summary>Get the change time stamp for one of the result values</summary>
     public readonly ushort GetWhen(uint index) => (ushort)(Results[(int)(index)].When);
 
+    /// <summary>Length of the message when only the first numHandles entries are sent</summary>
     public readonly uint GetActualDataLength() => (uint)(2 + 1 + 1 + (NumHandles * 8));
 
     /// <summary>Clear the reserved fields of this message so that it stays compatible with future uses</summary>
@@ -3131,56 +3539,80 @@ public struct CanMessageBoardStatusV0 : ICanMessage<CanMessageBoardStatusV0>
     /// <summary>Values of none, some or all of Vin, V12 and CPU temperature. The data for some analog handles follows the last present value (max 4 if all of Vin/V12/mcuTemp are supported).</summary>
     [FieldOffset(8)] public MinCurMaxArray3 Values;
 
-    /// <summary>HasVin (1-bit field, bit 0 of the message)</summary>
+    /// <summary>
+    /// Set if the first values entry is the VIN supply voltage
+    /// (1-bit field, bit 0 of the message)
+    /// </summary>
     public bool HasVin
     {
         readonly get => (((uint)_bits0) & 1U) != 0;
         set => _bits0 = (uint)((((uint)_bits0) & ~0x1U) | (value ? 1U : 0U));
     }
 
-    /// <summary>HasV12 (1-bit field, bit 1 of the message)</summary>
+    /// <summary>
+    /// Set if the next values entry is the 12V rail voltage
+    /// (1-bit field, bit 1 of the message)
+    /// </summary>
     public bool HasV12
     {
         readonly get => ((((uint)_bits0) >> 1) & 1U) != 0;
         set => _bits0 = (uint)((((uint)_bits0) & ~(0x1U << 1)) | ((value ? 1U : 0U) << 1));
     }
 
-    /// <summary>HasMcuTemp (1-bit field, bit 2 of the message)</summary>
+    /// <summary>
+    /// Set if the next values entry is the MCU temperature
+    /// (1-bit field, bit 2 of the message)
+    /// </summary>
     public bool HasMcuTemp
     {
         readonly get => ((((uint)_bits0) >> 2) & 1U) != 0;
         set => _bits0 = (uint)((((uint)_bits0) & ~(0x1U << 2)) | ((value ? 1U : 0U) << 2));
     }
 
-    /// <summary>HasAccelerometer (1-bit field, bit 3 of the message)</summary>
+    /// <summary>
+    /// Set if the board has an accelerometer
+    /// (1-bit field, bit 3 of the message)
+    /// </summary>
     public bool HasAccelerometer
     {
         readonly get => ((((uint)_bits0) >> 3) & 1U) != 0;
         set => _bits0 = (uint)((((uint)_bits0) & ~(0x1U << 3)) | ((value ? 1U : 0U) << 3));
     }
 
-    /// <summary>HasClosedLoop (1-bit field, bit 4 of the message)</summary>
+    /// <summary>
+    /// Set if the board supports closed loop control
+    /// (1-bit field, bit 4 of the message)
+    /// </summary>
     public bool HasClosedLoop
     {
         readonly get => ((((uint)_bits0) >> 4) & 1U) != 0;
         set => _bits0 = (uint)((((uint)_bits0) & ~(0x1U << 4)) | ((value ? 1U : 0U) << 4));
     }
 
-    /// <summary>HasInductiveSensor (1-bit field, bit 5 of the message)</summary>
+    /// <summary>
+    /// Set if the board has an inductive sensor
+    /// (1-bit field, bit 5 of the message)
+    /// </summary>
     public bool HasInductiveSensor
     {
         readonly get => ((((uint)_bits0) >> 5) & 1U) != 0;
         set => _bits0 = (uint)((((uint)_bits0) & ~(0x1U << 5)) | ((value ? 1U : 0U) << 5));
     }
 
-    /// <summary>Zero (10-bit field, bits 6-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (10-bit field, bits 6-15 of the message)
+    /// </summary>
     public ushort Zero
     {
         readonly get => (ushort)((((uint)_bits0) >> 6) & 0x3FFU);
         set => _bits0 = (uint)((((uint)_bits0) & ~(0x3FFU << 6)) | ((unchecked((uint)value) & 0x3FFU) << 6));
     }
 
-    /// <summary>HasMovementDelay (1-bit field, bit 16 of the message)</summary>
+    /// <summary>
+    /// Set if the union carries the cumulative hiccup time rather than the never-used RAM
+    /// (1-bit field, bit 16 of the message)
+    /// </summary>
     public bool HasMovementDelay
     {
         readonly get => ((((uint)_bits0) >> 16) & 1U) != 0;
@@ -3197,13 +3629,17 @@ public struct CanMessageBoardStatusV0 : ICanMessage<CanMessageBoardStatusV0>
         set => _bits0 = (uint)((((uint)_bits0) & ~(0x7U << 17)) | ((unchecked((uint)value) & 0x7U) << 17));
     }
 
-    /// <summary>Zero2 (12-bit field, bits 20-31 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (12-bit field, bits 20-31 of the message)
+    /// </summary>
     public ushort Zero2
     {
         readonly get => (ushort)((((uint)_bits0) >> 20) & 0xFFFU);
         set => _bits0 = (uint)((((uint)_bits0) & ~(0xFFFU << 20)) | ((unchecked((uint)value) & 0xFFFU) << 20));
     }
 
+    /// <summary>Clear every has... flag and the analog handle count, ready for the fields that are present to be filled in</summary>
     public void Clear()
     {
         HasVin = false;
@@ -3216,14 +3652,17 @@ public struct CanMessageBoardStatusV0 : ICanMessage<CanMessageBoardStatusV0>
         NumAnalogHandles = 0;
     }
 
+    /// <summary>Offset of the analog handle data, which follows however many MinCurMax values the has... flags say are present</summary>
     public readonly uint GetAnalogHandlesOffset()
     {
         uint numMinCurMaxValues = (uint)((HasVin ? (uint)1 : (uint)0) + (HasV12 ? (uint)1 : (uint)0) + (HasMcuTemp ? (uint)1 : (uint)0));
         return (uint)(2 * 4 + numMinCurMaxValues * 12);
     }
 
+    /// <summary>How many bytes are left for analog handle data</summary>
     public readonly uint GetMaxAnalogHandleSpace() => (uint)(64 - GetAnalogHandlesOffset());
 
+    /// <summary>Length of the message given which values and how many analog handles are present</summary>
     public readonly uint GetActualDataLength() => (uint)(GetAnalogHandlesOffset() + NumAnalogHandles * 6);
 
     /// <summary>Clear the reserved fields of this message so that it stays compatible with future uses</summary>
@@ -3257,56 +3696,80 @@ public struct CanMessageBoardStatusV1 : ICanMessage<CanMessageBoardStatusV1>
     /// <summary>Values of none, some or all of Vin, V12 and CPU temperature. The data for some analog handles follows the last present value (max 5 if all of Vin/V12/mcuTemp are supported).</summary>
     [FieldOffset(8)] public ShortMinCurMaxArray3 ShortValues;
 
-    /// <summary>HasVin (1-bit field, bit 0 of the message)</summary>
+    /// <summary>
+    /// Set if the first shortValues entry is the VIN supply voltage
+    /// (1-bit field, bit 0 of the message)
+    /// </summary>
     public bool HasVin
     {
         readonly get => (((uint)_bits0) & 1U) != 0;
         set => _bits0 = (uint)((((uint)_bits0) & ~0x1U) | (value ? 1U : 0U));
     }
 
-    /// <summary>HasV12 (1-bit field, bit 1 of the message)</summary>
+    /// <summary>
+    /// Set if the next shortValues entry is the 12V rail voltage
+    /// (1-bit field, bit 1 of the message)
+    /// </summary>
     public bool HasV12
     {
         readonly get => ((((uint)_bits0) >> 1) & 1U) != 0;
         set => _bits0 = (uint)((((uint)_bits0) & ~(0x1U << 1)) | ((value ? 1U : 0U) << 1));
     }
 
-    /// <summary>HasMcuTemp (1-bit field, bit 2 of the message)</summary>
+    /// <summary>
+    /// Set if the next shortValues entry is the MCU temperature
+    /// (1-bit field, bit 2 of the message)
+    /// </summary>
     public bool HasMcuTemp
     {
         readonly get => ((((uint)_bits0) >> 2) & 1U) != 0;
         set => _bits0 = (uint)((((uint)_bits0) & ~(0x1U << 2)) | ((value ? 1U : 0U) << 2));
     }
 
-    /// <summary>HasAccelerometer (1-bit field, bit 3 of the message)</summary>
+    /// <summary>
+    /// Set if the board has an accelerometer
+    /// (1-bit field, bit 3 of the message)
+    /// </summary>
     public bool HasAccelerometer
     {
         readonly get => ((((uint)_bits0) >> 3) & 1U) != 0;
         set => _bits0 = (uint)((((uint)_bits0) & ~(0x1U << 3)) | ((value ? 1U : 0U) << 3));
     }
 
-    /// <summary>HasClosedLoop (1-bit field, bit 4 of the message)</summary>
+    /// <summary>
+    /// Set if the board supports closed loop control
+    /// (1-bit field, bit 4 of the message)
+    /// </summary>
     public bool HasClosedLoop
     {
         readonly get => ((((uint)_bits0) >> 4) & 1U) != 0;
         set => _bits0 = (uint)((((uint)_bits0) & ~(0x1U << 4)) | ((value ? 1U : 0U) << 4));
     }
 
-    /// <summary>HasInductiveSensor (1-bit field, bit 5 of the message)</summary>
+    /// <summary>
+    /// Set if the board has an inductive sensor
+    /// (1-bit field, bit 5 of the message)
+    /// </summary>
     public bool HasInductiveSensor
     {
         readonly get => ((((uint)_bits0) >> 5) & 1U) != 0;
         set => _bits0 = (uint)((((uint)_bits0) & ~(0x1U << 5)) | ((value ? 1U : 0U) << 5));
     }
 
-    /// <summary>Zero (10-bit field, bits 6-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (10-bit field, bits 6-15 of the message)
+    /// </summary>
     public ushort Zero
     {
         readonly get => (ushort)((((uint)_bits0) >> 6) & 0x3FFU);
         set => _bits0 = (uint)((((uint)_bits0) & ~(0x3FFU << 6)) | ((unchecked((uint)value) & 0x3FFU) << 6));
     }
 
-    /// <summary>HasMovementDelay (1-bit field, bit 16 of the message)</summary>
+    /// <summary>
+    /// Set if the union carries the cumulative hiccup time rather than the never-used RAM
+    /// (1-bit field, bit 16 of the message)
+    /// </summary>
     public bool HasMovementDelay
     {
         readonly get => ((((uint)_bits0) >> 16) & 1U) != 0;
@@ -3323,13 +3786,17 @@ public struct CanMessageBoardStatusV1 : ICanMessage<CanMessageBoardStatusV1>
         set => _bits0 = (uint)((((uint)_bits0) & ~(0x7U << 17)) | ((unchecked((uint)value) & 0x7U) << 17));
     }
 
-    /// <summary>Zero2 (12-bit field, bits 20-31 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (12-bit field, bits 20-31 of the message)
+    /// </summary>
     public ushort Zero2
     {
         readonly get => (ushort)((((uint)_bits0) >> 20) & 0xFFFU);
         set => _bits0 = (uint)((((uint)_bits0) & ~(0xFFFU << 20)) | ((unchecked((uint)value) & 0xFFFU) << 20));
     }
 
+    /// <summary>Clear every has... flag and the analog handle count, ready for the fields that are present to be filled in</summary>
     public void Clear()
     {
         HasVin = false;
@@ -3342,14 +3809,17 @@ public struct CanMessageBoardStatusV1 : ICanMessage<CanMessageBoardStatusV1>
         NumAnalogHandles = 0;
     }
 
+    /// <summary>Offset of the analog handle data, which follows however many ShortMinCurMax values the has... flags say are present</summary>
     public readonly uint GetAnalogHandlesOffset()
     {
         uint numMinCurMaxValues = (uint)((HasVin ? (uint)1 : (uint)0) + (HasV12 ? (uint)1 : (uint)0) + (HasMcuTemp ? (uint)1 : (uint)0));
         return (uint)(2 * 4 + numMinCurMaxValues * 6);
     }
 
+    /// <summary>How many bytes are left for analog handle data</summary>
     public readonly uint GetMaxAnalogHandleSpace() => (uint)(64 - GetAnalogHandlesOffset());
 
+    /// <summary>Length of the message given which values and how many analog handles are present</summary>
     public readonly uint GetActualDataLength() => (uint)(GetAnalogHandlesOffset() + NumAnalogHandles * 8);
 
     /// <summary>Clear the reserved fields of this message so that it stays compatible with future uses</summary>
@@ -3368,6 +3838,7 @@ public struct CanMessageBoardStatusV1 : ICanMessage<CanMessageBoardStatusV1>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 4)]
 public struct OpenLoopStatus
 {
+    /// <summary>The driver status flags, as a StandardDriverStatus bitmap</summary>
     [FieldOffset(0)] public uint Status;
 }
 
@@ -3379,14 +3850,19 @@ public struct OpenLoopStatus
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 12)]
 public struct ClosedLoopStatus
 {
+    /// <summary>The driver status flags, as a StandardDriverStatus bitmap</summary>
     [FieldOffset(0)] public uint Status;
 
+    /// <summary>Mean motor current over the reporting period, as a fraction of the configured current</summary>
     [FieldOffset(4)] public Half AverageCurrentFraction;
 
+    /// <summary>Highest motor current over the reporting period, as a fraction of the configured current</summary>
     [FieldOffset(6)] public Half MaxCurrentFraction;
 
+    /// <summary>Root mean square position error over the reporting period, in full steps</summary>
     [FieldOffset(8)] public Half RmsPositionError;
 
+    /// <summary>Largest position error either way over the reporting period, in full steps</summary>
     [FieldOffset(10)] public Half MaxAbsPositionError;
 }
 
@@ -3413,29 +3889,40 @@ public struct CanMessageDriversStatus : ICanMessage<CanMessageDriversStatus>
     /// <summary>Status of each driver if closed loop</summary>
     [FieldOffset(4)] public ClosedLoopStatusArray5 ClosedLoopData;
 
-    /// <summary>NumDriversReported (4-bit field, bits 0-3 of the message)</summary>
+    /// <summary>
+    /// How many drivers this message reports on
+    /// (4-bit field, bits 0-3 of the message)
+    /// </summary>
     public byte NumDriversReported
     {
         readonly get => (byte)(((uint)_bits0) & 0xFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFU) | (unchecked((uint)value) & 0xFU));
     }
 
-    /// <summary>HasClosedLoopData (1-bit field, bit 4 of the message)</summary>
+    /// <summary>
+    /// Set if the entries are ClosedLoopStatus rather than OpenLoopStatus
+    /// (1-bit field, bit 4 of the message)
+    /// </summary>
     public bool HasClosedLoopData
     {
         readonly get => ((((uint)_bits0) >> 4) & 1U) != 0;
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0x1U << 4)) | ((value ? 1U : 0U) << 4));
     }
 
-    /// <summary>Zero (11-bit field, bits 5-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (11-bit field, bits 5-15 of the message)
+    /// </summary>
     public ushort Zero
     {
         readonly get => (ushort)((((uint)_bits0) >> 5) & 0x7FFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0x7FFU << 5)) | ((unchecked((uint)value) & 0x7FFU) << 5));
     }
 
+    /// <summary>Length of the message when only the first numDriversReported entries are sent</summary>
     public readonly uint GetActualDataLength() => (uint)(2 * 2 + NumDriversReported * (HasClosedLoopData ? 12 : 4));
 
+    /// <summary>Record how many drivers are reported and whether the entries carry closed loop data</summary>
     public void SetStandardFields(uint numReported, bool closedLoop)
     {
         NumDriversReported = (byte)(numReported);
@@ -3474,7 +3961,10 @@ public struct FilamentMonitorDataV2
         set => CanBitFields.Set(_bits0, 0, 12, unchecked((ulong)value));
     }
 
-    /// <summary>Zero1 (12-bit field, bits 12-23 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (12-bit field, bits 12-23 of the message)
+    /// </summary>
     public ushort Zero1
     {
         readonly get => (ushort)CanBitFields.Get(_bits0, 12, 12);
@@ -3491,7 +3981,10 @@ public struct FilamentMonitorDataV2
         set => CanBitFields.Set(_bits0, 24, 4, unchecked((ulong)value));
     }
 
-    /// <summary>Zero2 (2-bit field, bits 28-29 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (2-bit field, bits 28-29 of the message)
+    /// </summary>
     public byte Zero2
     {
         readonly get => (byte)CanBitFields.Get(_bits0, 28, 2);
@@ -3508,21 +4001,30 @@ public struct FilamentMonitorDataV2
         set => CanBitFields.Set(_bits0, 30, 1, (value ? 1UL : 0UL));
     }
 
-    /// <summary>MinPercentage (10-bit field, bits 31-40 of the message)</summary>
+    /// <summary>
+    /// Smallest measured movement over the calibration run, as a percentage of the extrusion commanded
+    /// (10-bit field, bits 31-40 of the message)
+    /// </summary>
     public int MinPercentage
     {
         readonly get => CanBitFields.SignExtend(CanBitFields.Get(_bits0, 31, 10), 10);
         set => CanBitFields.Set(_bits0, 31, 10, unchecked((ulong)value));
     }
 
-    /// <summary>MaxPercentage (10-bit field, bits 41-50 of the message)</summary>
+    /// <summary>
+    /// Largest measured movement over the calibration run, as a percentage of the extrusion commanded
+    /// (10-bit field, bits 41-50 of the message)
+    /// </summary>
     public int MaxPercentage
     {
         readonly get => CanBitFields.SignExtend(CanBitFields.Get(_bits0, 41, 10), 10);
         set => CanBitFields.Set(_bits0, 41, 10, unchecked((ulong)value));
     }
 
-    /// <summary>AvgPercentage (10-bit field, bits 51-60 of the message)</summary>
+    /// <summary>
+    /// Mean measured movement over the calibration run, as a percentage of the extrusion commanded
+    /// (10-bit field, bits 51-60 of the message)
+    /// </summary>
     public int AvgPercentage
     {
         readonly get => CanBitFields.SignExtend(CanBitFields.Get(_bits0, 51, 10), 10);
@@ -3539,7 +4041,10 @@ public struct FilamentMonitorDataV2
         set => CanBitFields.Set(_bits0, 61, 10, unchecked((ulong)value));
     }
 
-    /// <summary>CalibrationLength (24-bit field, bits 71-94 of the message)</summary>
+    /// <summary>
+    /// Total extrusion commanded during the calibration run, in mm
+    /// (24-bit field, bits 71-94 of the message)
+    /// </summary>
     public int CalibrationLength
     {
         readonly get => CanBitFields.SignExtend(CanBitFields.Get(_bits0, 71, 24), 24);
@@ -3568,6 +4073,7 @@ public struct CanMessageFilamentMonitorsStatusV2 : ICanMessage<CanMessageFilamen
     /// <summary>Backing storage for the bitfields driversReported:8, zero:24</summary>
     [FieldOffset(0)] private uint _bits0;
 
+    /// <summary>The reports, one per set bit of driversReported in ascending driver number order</summary>
     [FieldOffset(4)] public FilamentMonitorDataV2Array5 Data;
 
     /// <summary>
@@ -3580,15 +4086,20 @@ public struct CanMessageFilamentMonitorsStatusV2 : ICanMessage<CanMessageFilamen
         set => _bits0 = (uint)((((uint)_bits0) & ~0xFFU) | (unchecked((uint)value) & 0xFFU));
     }
 
-    /// <summary>Zero (24-bit field, bits 8-31 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (24-bit field, bits 8-31 of the message)
+    /// </summary>
     public uint Zero
     {
         readonly get => (uint)((((uint)_bits0) >> 8) & 0xFFFFFFU);
         set => _bits0 = (uint)((((uint)_bits0) & ~(0xFFFFFFU << 8)) | ((unchecked((uint)value) & 0xFFFFFFU) << 8));
     }
 
+    /// <summary>Length of the message when only the drivers named by driversReported are sent</summary>
     public readonly uint GetActualDataLength() => (uint)(4 + (BitOperations.PopCount(DriversReported) * 12));
 
+    /// <summary>Record which drivers this message reports on</summary>
     public void SetStandardFields(uint drivers)
     {
         DriversReported = (byte)(drivers);
@@ -3615,41 +4126,58 @@ public struct CanMessageHeaterTuningReport : ICanMessage<CanMessageHeaterTuningR
     /// <summary>Backing storage for the bitfields heater:8, zero:8, cyclesDone:16</summary>
     [FieldOffset(0)] private uint _bits0;
 
+    /// <summary>How long the heater was on during this cycle, in milliseconds</summary>
     [FieldOffset(4)] public uint Ton;
 
+    /// <summary>How long the heater was off during this cycle, in milliseconds</summary>
     [FieldOffset(8)] public uint Toff;
 
+    /// <summary>Dead time in milliseconds after the heater was turned on, i.e. how long the temperature kept falling</summary>
     [FieldOffset(12)] public uint Dlow;
 
+    /// <summary>Dead time in milliseconds after the heater was turned off, i.e. how long the temperature kept rising</summary>
     [FieldOffset(16)] public uint Dhigh;
 
+    /// <summary>Rate at which the temperature rose with the heater on, in degC per second</summary>
     [FieldOffset(20)] public float HeatingRate;
 
+    /// <summary>Rate at which the temperature fell with the heater off, in degC per second</summary>
     [FieldOffset(24)] public float CoolingRate;
 
+    /// <summary>VIN voltage measured while the heater was on, or 0 if the board cannot measure it</summary>
     [FieldOffset(28)] public float Voltage;
 
-    /// <summary>Heater (8-bit field, bits 0-7 of the message)</summary>
+    /// <summary>
+    /// Number of the heater this report is for
+    /// (8-bit field, bits 0-7 of the message)
+    /// </summary>
     public byte Heater
     {
         readonly get => (byte)(((uint)_bits0) & 0xFFU);
         set => _bits0 = (uint)((((uint)_bits0) & ~0xFFU) | (unchecked((uint)value) & 0xFFU));
     }
 
-    /// <summary>Zero (8-bit field, bits 8-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (8-bit field, bits 8-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 8) & 0xFFU);
         set => _bits0 = (uint)((((uint)_bits0) & ~(0xFFU << 8)) | ((unchecked((uint)value) & 0xFFU) << 8));
     }
 
-    /// <summary>CyclesDone (16-bit field, bits 16-31 of the message)</summary>
+    /// <summary>
+    /// How many tuning cycles have finished, including this one
+    /// (16-bit field, bits 16-31 of the message)
+    /// </summary>
     public ushort CyclesDone
     {
         readonly get => (ushort)((((uint)_bits0) >> 16) & 0xFFFFU);
         set => _bits0 = (uint)((((uint)_bits0) & ~(0xFFFFU << 16)) | ((unchecked((uint)value) & 0xFFFFU) << 16));
     }
 
+    /// <summary>Record which heater this report is for</summary>
     public void SetStandardFields(uint heaterNumber)
     {
         Heater = (byte)(heaterNumber);
@@ -3679,6 +4207,7 @@ public struct CanMessageAccelerometerData : ICanMessage<CanMessageAccelerometerD
     /// <summary>The number of the first sample</summary>
     [FieldOffset(4)] public ushort FirstSampleNumber;
 
+    /// <summary>The samples, packed end to end using bitsPerSampleMinusOne + 1 bits each</summary>
     [FieldOffset(6)] public UshortArray29 Data;
 
     /// <summary>
@@ -3741,7 +4270,10 @@ public struct CanMessageAccelerometerData : ICanMessage<CanMessageAccelerometerD
         set => _bits0 = (uint)((((uint)_bits0) & ~(0x1U << 28)) | ((value ? 1U : 0U) << 28));
     }
 
-    /// <summary>Zero (3-bit field, bits 29-31 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (3-bit field, bits 29-31 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 29) & 0x7U);
@@ -3788,6 +4320,7 @@ public struct CanMessageClosedLoopData : ICanMessage<CanMessageClosedLoopData>
     /// <summary>Backing storage for the bitfields firstSampleNumber:20, zero2:12</summary>
     [FieldOffset(4)] private uint _bits1;
 
+    /// <summary>The samples, packed end to end in the order the filter bits select</summary>
     [FieldOffset(8)] public ByteArray56 Data;
 
     /// <summary>
@@ -3840,7 +4373,10 @@ public struct CanMessageClosedLoopData : ICanMessage<CanMessageClosedLoopData>
         set => _bits0 = (uint)((((uint)_bits0) & ~(0x1U << 23)) | ((value ? 1U : 0U) << 23));
     }
 
-    /// <summary>Zero (8-bit field, bits 24-31 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (8-bit field, bits 24-31 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 24) & 0xFFU);
@@ -3857,13 +4393,17 @@ public struct CanMessageClosedLoopData : ICanMessage<CanMessageClosedLoopData>
         set => _bits1 = (uint)((((uint)_bits1) & ~0xFFFFFU) | (unchecked((uint)value) & 0xFFFFFU));
     }
 
-    /// <summary>Zero2 (12-bit field, bits 52-63 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (12-bit field, bits 52-63 of the message)
+    /// </summary>
     public ushort Zero2
     {
         readonly get => (ushort)((((uint)_bits1) >> 20) & 0xFFFU);
         set => _bits1 = (uint)((((uint)_bits1) & ~(0xFFFU << 20)) | ((unchecked((uint)value) & 0xFFFU) << 20));
     }
 
+    /// <summary>Length of the message when numDataBytes bytes of samples are sent</summary>
     public readonly uint GetActualDataLength(uint numDataBytes) => (uint)(2 * 4 + numDataBytes);
 
     /// <summary>Get the number of data bytes in a message, given the message length (which will have been rounded up to the next CAN-FD value)</summary>
@@ -3891,6 +4431,7 @@ public struct CanMessageEvent : ICanMessage<CanMessageEvent>
     /// <summary>Backing storage for the bitfields eventType:8, deviceNumber:8, eventParam:16</summary>
     [FieldOffset(0)] private uint _bits0;
 
+    /// <summary>Reserved for future use; set to 0</summary>
     [FieldOffset(4)] public uint Zero;
 
     /// <summary>Other information about the event, to display to the user</summary>
@@ -3936,8 +4477,10 @@ public struct CanMessageEvent : ICanMessage<CanMessageEvent>
         set => _bits0 = (uint)((((uint)_bits0) & ~(0xFFFFU << 16)) | ((unchecked((uint)value) & 0xFFFFU) << 16));
     }
 
+    /// <summary>Length of the message with the text truncated to its terminating null</summary>
     public readonly uint GetActualDataLength() => (uint)(2 * 4 + CanText.Strnlen(Text, 56));
 
+    /// <summary>How much of a message of the given length is text</summary>
     public readonly uint GetMaxTextLength(uint msgLen) => (uint)(msgLen - 2 * 4);
 
     /// <summary>Clear the reserved fields of this message so that it stays compatible with future uses</summary>
@@ -3971,8 +4514,10 @@ public struct CanMessageDebugText : ICanMessage<CanMessageDebugText>
         set => CanText.SetString(Text, value);
     }
 
+    /// <summary>Length of the message with the text truncated to its terminating null</summary>
     public readonly uint GetActualDataLength() => (uint)(CanText.Strnlen(Text, 64));
 
+    /// <summary>How much of a message of the given length is text</summary>
     public readonly uint GetMaxTextLength(uint msgLen) => (uint)(msgLen);
 
     /// <summary>Clear the reserved fields of this message so that it stays compatible with future uses</summary>
@@ -3990,26 +4535,36 @@ public struct CanMessageMultipleDrivesRequestUint16 : ICanMessageBody<CanMessage
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;
 
+    /// <summary>Bitmap of the drivers this message carries a value for</summary>
     [FieldOffset(2)] public ushort DriversToUpdate;
 
+    /// <summary>The values, one per set bit of driversToUpdate in ascending driver number order</summary>
     [FieldOffset(4)] public UshortArray8 Values;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
+    /// <summary>Length of the message when values for numDrivers drivers are sent</summary>
     public static uint GetActualDataLength(uint numDrivers) => (uint)(2 * 2 + numDrivers * 2);
 
+    /// <summary>How many drivers' values fit in one 64-byte message</summary>
     public static uint MaxDrivesPerMessage() => (uint)((64 - 2 * 2) / 2);
 
     /// <summary>Set the request ID of this message and clear its reserved fields</summary>
@@ -4038,26 +4593,36 @@ public struct CanMessageMultipleDrivesRequestMotorCurrents : ICanMessage<CanMess
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;
 
+    /// <summary>Bitmap of the drivers this message carries a value for</summary>
     [FieldOffset(2)] public ushort DriversToUpdate;
 
+    /// <summary>The values, one per set bit of driversToUpdate in ascending driver number order</summary>
     [FieldOffset(4)] public FloatArray8 Values;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
+    /// <summary>Length of the message when values for numDrivers drivers are sent</summary>
     public static uint GetActualDataLength(uint numDrivers) => (uint)(2 * 2 + numDrivers * 4);
 
+    /// <summary>How many drivers' values fit in one 64-byte message</summary>
     public static uint MaxDrivesPerMessage() => (uint)((64 - 2 * 2) / 4);
 
     /// <summary>Set the request ID of this message and clear its reserved fields</summary>
@@ -4086,26 +4651,36 @@ public struct CanMessageMultipleDrivesRequestStandstillCurrentFactor : ICanMessa
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;
 
+    /// <summary>Bitmap of the drivers this message carries a value for</summary>
     [FieldOffset(2)] public ushort DriversToUpdate;
 
+    /// <summary>The values, one per set bit of driversToUpdate in ascending driver number order</summary>
     [FieldOffset(4)] public FloatArray8 Values;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
+    /// <summary>Length of the message when values for numDrivers drivers are sent</summary>
     public static uint GetActualDataLength(uint numDrivers) => (uint)(2 * 2 + numDrivers * 4);
 
+    /// <summary>How many drivers' values fit in one 64-byte message</summary>
     public static uint MaxDrivesPerMessage() => (uint)((64 - 2 * 2) / 4);
 
     /// <summary>Set the request ID of this message and clear its reserved fields</summary>
@@ -4134,26 +4709,36 @@ public struct CanMessageMultipleDrivesRequestPressureAdvanceV1 : ICanMessage<Can
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;
 
+    /// <summary>Bitmap of the drivers this message carries a value for</summary>
     [FieldOffset(2)] public ushort DriversToUpdate;
 
+    /// <summary>The values, one per set bit of driversToUpdate in ascending driver number order</summary>
     [FieldOffset(4)] public FloatArray8 Values;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
+    /// <summary>Length of the message when values for numDrivers drivers are sent</summary>
     public static uint GetActualDataLength(uint numDrivers) => (uint)(2 * 2 + numDrivers * 4);
 
+    /// <summary>How many drivers' values fit in one 64-byte message</summary>
     public static uint MaxDrivesPerMessage() => (uint)((64 - 2 * 2) / 4);
 
     /// <summary>Set the request ID of this message and clear its reserved fields</summary>
@@ -4182,26 +4767,36 @@ public struct CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping : ICan
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;
 
+    /// <summary>Bitmap of the drivers this message carries a value for</summary>
     [FieldOffset(2)] public ushort DriversToUpdate;
 
+    /// <summary>The values, one per set bit of driversToUpdate in ascending driver number order</summary>
     [FieldOffset(4)] public StepsPerUnitAndMicrosteppingArray8 Values;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
+    /// <summary>Length of the message when values for numDrivers drivers are sent</summary>
     public static uint GetActualDataLength(uint numDrivers) => (uint)(2 * 2 + numDrivers * 6);
 
+    /// <summary>How many drivers' values fit in one 64-byte message</summary>
     public static uint MaxDrivesPerMessage() => (uint)((64 - 2 * 2) / 6);
 
     /// <summary>Set the request ID of this message and clear its reserved fields</summary>
@@ -4230,26 +4825,36 @@ public struct CanMessageMultipleDrivesRequestDriverStateControl : ICanMessage<Ca
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;
 
+    /// <summary>Bitmap of the drivers this message carries a value for</summary>
     [FieldOffset(2)] public ushort DriversToUpdate;
 
+    /// <summary>The values, one per set bit of driversToUpdate in ascending driver number order</summary>
     [FieldOffset(4)] public DriverStateControlArray8 Values;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
+    /// <summary>Length of the message when values for numDrivers drivers are sent</summary>
     public static uint GetActualDataLength(uint numDrivers) => (uint)(2 * 2 + numDrivers * 2);
 
+    /// <summary>How many drivers' values fit in one 64-byte message</summary>
     public static uint MaxDrivesPerMessage() => (uint)((64 - 2 * 2) / 2);
 
     /// <summary>Set the request ID of this message and clear its reserved fields</summary>
@@ -4278,26 +4883,36 @@ public struct CanMessageMultipleDrivesRequestShortPressureAdvanceParameters : IC
     /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
     [FieldOffset(0)] private ushort _bits0;
 
+    /// <summary>Bitmap of the drivers this message carries a value for</summary>
     [FieldOffset(2)] public ushort DriversToUpdate;
 
+    /// <summary>The values, one per set bit of driversToUpdate in ascending driver number order</summary>
     [FieldOffset(4)] public ShortPressureAdvanceParametersArray8 Values;
 
-    /// <summary>RequestId (12-bit field, bits 0-11 of the message)</summary>
+    /// <summary>
+    /// Identifies this request, so that the reply can be matched to it
+    /// (12-bit field, bits 0-11 of the message)
+    /// </summary>
     public ushort RequestId
     {
         readonly get => (ushort)(((uint)_bits0) & 0xFFFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~0xFFFU) | (unchecked((uint)value) & 0xFFFU));
     }
 
-    /// <summary>Zero (4-bit field, bits 12-15 of the message)</summary>
+    /// <summary>
+    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// (4-bit field, bits 12-15 of the message)
+    /// </summary>
     public byte Zero
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
+    /// <summary>Length of the message when values for numDrivers drivers are sent</summary>
     public static uint GetActualDataLength(uint numDrivers) => (uint)(2 * 2 + numDrivers * 6);
 
+    /// <summary>How many drivers' values fit in one 64-byte message</summary>
     public static uint MaxDrivesPerMessage() => (uint)((64 - 2 * 2) / 6);
 
     /// <summary>Set the request ID of this message and clear its reserved fields</summary>

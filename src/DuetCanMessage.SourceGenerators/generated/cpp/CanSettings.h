@@ -32,6 +32,7 @@ struct __attribute__((packed)) CanTiming
 
 	// CAN clock used by all Duet 3 boards
 	static constexpr uint32_t ClockFrequency = 48000000;
+	// bit rate a board uses until the main board gives it a different one
 	static constexpr uint32_t DefaultCanBitRate = 1000000;
 	// how far we sample into the bit during the arbitration and CRC phases
 	static constexpr float DefaultNormalSamplePoint = 0.78;
@@ -105,6 +106,7 @@ private:
 	uint8_t canAddress;
 	// the inverted CAN address of this board, or 0xFF if it has not been set
 	uint8_t invertedCanAddress;
+	// the CAN bit timing to use, valid only if timingV1NotSet is clear
 	CanTiming timing;
 	// checksum word to make the XOR of all eight 16-bit words the magic value
 	uint16_t checksum;
@@ -113,14 +115,23 @@ public:
 	// the expected XOR of all eight 16-bit words
 	static constexpr uint16_t magic = 0x4321;
 
+	// Set every field to all ones, i.e. to the state of erased flash
 	void Clear() noexcept;
+	// True if the XOR of the eight 16-bit words is the magic value
 	bool IsValid() const noexcept;
+	// Store the CAN address and its complement, and clear canIdV1NotSet
 	void SetCanAddress(CanAddress address) noexcept;
+	// True if the address has been set and agrees with its stored complement
 	bool AddressValid() const noexcept;
+	// The stored CAN address, or the given default if none has been stored
 	CanAddress GetCanAddress(CanAddress defaultAddress) const noexcept;
+	// Store the CAN bit timing and clear timingV1NotSet
 	void SetTiming(const CanTiming& data) noexcept;
+	// Copy out the stored CAN bit timing
 	void GetTiming(CanTiming& data) const noexcept;
+	// The checksum word that would make the XOR of all eight 16-bit words the magic value
 	uint16_t GetChecksum() const noexcept;
+	// Recompute the checksum word, which must be done before the data is written to flash
 	void UpdateChecksum() noexcept;
 };
 static_assert(sizeof(CanUserAreaData) == 16);

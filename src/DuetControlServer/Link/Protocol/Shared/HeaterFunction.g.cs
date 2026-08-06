@@ -13,9 +13,15 @@ namespace DuetControlServer.Link.Protocol.Shared;
 /// </summary>
 public enum HeaterFunction : byte
 {
+    /// <summary>a tool heater, which is expected to heat up quickly</summary>
     Tool = 0,
+
+    /// <summary>a bed heater, which is allowed to heat up more slowly than a tool heater</summary>
     Bed = 1,
+
+    /// <summary>a chamber heater, which is allowed to heat up more slowly still</summary>
     Chamber = 2,
+
     /// <summary>not a function, but how many there are</summary>
     NumValues = 3,
 }

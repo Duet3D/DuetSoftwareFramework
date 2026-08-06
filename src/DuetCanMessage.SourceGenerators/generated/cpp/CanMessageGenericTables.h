@@ -27,6 +27,7 @@ constexpr ParamDescriptor M42Params[] =
 	{ 0, ParamDescriptor::none, 0 }
 };
 
+// M150 parameters, i.e. the colours to write to an LED strip
 constexpr ParamDescriptor M150Params[] =
 {
 	{ 'E', ParamDescriptor::uint16, 0 },  // strip number
@@ -51,6 +52,7 @@ constexpr ParamDescriptor M280Params[] =
 	{ 0, ParamDescriptor::none, 0 }
 };
 
+// M308 parameters, i.e. how a temperature sensor is configured
 constexpr ParamDescriptor M308V1Params[] =
 {
 	{ 'T', ParamDescriptor::float_p, 0 },
@@ -70,6 +72,7 @@ constexpr ParamDescriptor M308V1Params[] =
 	{ 0, ParamDescriptor::none, 0 }
 };
 
+// M569 parameters, i.e. how a driver is configured
 constexpr ParamDescriptor M569Params[] =
 {
 	{ 'P', ParamDescriptor::localDriver, 0 },
@@ -141,6 +144,7 @@ constexpr ParamDescriptor M569Point6Params_StatusOnly[] =
 	{ 0, ParamDescriptor::none, 0 }
 };
 
+// M569.7 parameters, i.e. the brake port of a driver and its timing
 constexpr ParamDescriptor M569Point7Params[] =
 {
 	{ 'P', ParamDescriptor::localDriver, 0 },    // drive number
@@ -150,6 +154,7 @@ constexpr ParamDescriptor M569Point7Params[] =
 	{ 0, ParamDescriptor::none, 0 }
 };
 
+// M915 parameters, i.e. the stall detection settings of one or more drivers
 constexpr ParamDescriptor M915Params[] =
 {
 	{ 'd', ParamDescriptor::uint16, 0 },  // this is the bitmap of driver numbers to change the parameters for
@@ -161,6 +166,7 @@ constexpr ParamDescriptor M915Params[] =
 	{ 0, ParamDescriptor::none, 0 }
 };
 
+// M950 H parameters, i.e. how a heater is created
 constexpr ParamDescriptor M950HeaterParams[] =
 {
 	{ 'H', ParamDescriptor::uint16, 0 },
@@ -171,6 +177,7 @@ constexpr ParamDescriptor M950HeaterParams[] =
 	{ 0, ParamDescriptor::none, 0 }
 };
 
+// M950 F parameters, i.e. how a fan is created
 constexpr ParamDescriptor M950FanParams[] =
 {
 	{ 'F', ParamDescriptor::uint16, 0 },
@@ -180,6 +187,7 @@ constexpr ParamDescriptor M950FanParams[] =
 	{ 0, ParamDescriptor::none, 0 }
 };
 
+// M950 P and M950 S parameters, i.e. how a GPIO or servo port is created
 constexpr ParamDescriptor M950GpioParams[] =
 {
 	{ 'P', ParamDescriptor::uint16, 0 },
@@ -189,6 +197,7 @@ constexpr ParamDescriptor M950GpioParams[] =
 	{ 0, ParamDescriptor::none, 0 }
 };
 
+// M950 E parameters, i.e. how an LED strip is created
 constexpr ParamDescriptor M950LedParams[] =
 {
 	{ 'E', ParamDescriptor::uint16, 0 },         // Strip number

@@ -15,35 +15,69 @@ public enum CanMessageType : ushort
 {
 
     // High-priority requests sent by the main board
+    /// <summary>Emergency stop. The receiving board turns its outputs off immediately and resets.</summary>
     EmergencyStop = 0,
+
+    /// <summary>Broadcast by the main board when it starts up. A board that has already been programmed treats this as an emergency stop; one that has only just powered up merely arranges to announce itself again.</summary>
     Startup = 10,
+
+    /// <summary>Reserved for a controlled (as opposed to emergency) stop. Expansion board firmware currently ignores it.</summary>
     ControlledStop = 20,
+
+    /// <summary>Time sync broadcast that keeps the step clocks of every board aligned. Always sent without bit rate switching.</summary>
     TimeSync = 30,
+
+    /// <summary>Reserved to warn expansion boards that the power supply is failing. Nothing in this repository sends or handles it.</summary>
     PowerFailing = 40,
+
+    /// <summary>Stop the moves in progress on the given drivers.</summary>
     StopMovement = 45,
+
+    /// <summary>Reserved for asking a board to insert a hiccup into the moves in progress. Nothing in this repository sends or handles it.</summary>
     InsertHiccup = 46,
+
+    /// <summary>Move the given drivers back to the step counts the moves should have reached, after movement was cut short.</summary>
     RevertPosition = 47,
     // UnusedWasMovement = 50,
     // UnusedWasMovementLinear = 51,
+    /// <summary>One segment of a move, already broken into the input shaping impulses the receiving board is to execute.</summary>
     MovementLinearShaped = 52,
 
     // High priority responses sent by expansion boards and Smart Tools
     // UnusedWasInputStateChangedV0 = 100,
+    /// <summary>An event raised by an expansion board, such as a heater fault, driver error or filament error.</summary>
     Event = 102,
+
     /// <summary>sent by the ATE to the main board</summary>
     EnterTestMode = 104,
+
+    /// <summary>One or more monitored inputs changed state. The readings are AnalogHandleDataV0 entries.</summary>
     InputStateChangedV1 = 105,
+
+    /// <summary>One or more monitored inputs changed state. The readings are AnalogHandleDataV1 entries, which also carry when the change happened.</summary>
     InputStateChangedV2 = 106,
 
     // Configuration messages sent by the main board
+    /// <summary>Set the CAN address of a board and, optionally, the arbitration phase bit timing. The board saves both in non-volatile memory.</summary>
     SetAddressAndNormalTiming = 2010,
+
+    /// <summary>Set the data phase timing used when bit rate switching is enabled. Expansion board firmware does not currently implement it.</summary>
     SetFastTiming = 2011,
+
+    /// <summary>Ask a board to reset.</summary>
     Reset = 2012,
 
     // Medium priority messages sent by the main board
+    /// <summary>Write a GPIO or servo port (M42 or M280).</summary>
     WriteGpio = 4012,
+
+    /// <summary>Read the inputs whose handles match a mask and pattern. This request has its own reply type rather than a standard reply.</summary>
     ReadInputsRequest = 4013,
+
+    /// <summary>Start collecting accelerometer samples (M956).</summary>
     StartAccelerometer = 4014,
+
+    /// <summary>Start collecting closed loop data (M569.5).</summary>
     StartClosedLoopDataCollection = 4015,
 
     // Configuration messages sent by the main board
@@ -53,47 +87,106 @@ public enum CanMessageType : ushort
 
     // unused was setHeaterTemperatureV0 = 6013,
     // UnusedWasSetPressureAdvanceV0 = 6014,
+    /// <summary>Set the date and time on an expansion board. Nothing in this repository sends or handles it; the real time is carried by the time sync message instead.</summary>
     SetDateTime = 6015,
+
+    /// <summary>Send delta kinematics parameters to an expansion board. Nothing in this repository sends or handles it.</summary>
     UpdateDeltaParameters = 6016,
     // UnusedWasSetMotorCurrents = 6017,
+    /// <summary>M569: configure a driver, e.g. its direction, enable polarity and step pulse timing.</summary>
     M569 = 6018,
+
+    /// <summary>Configure a fan on the receiving board, including its thermostatic control (M106).</summary>
     FanParameters = 6019,
+
+    /// <summary>M915: configure stall detection for one or more smart drivers.</summary>
     M915 = 6020,
     // UnusedWasSetMicrostepping = 6021,
     // UnusedWasSetStandstillCurrentFactor = 6022,
+    /// <summary>Enable, idle or disable several drivers at once.</summary>
     SetDriverStates = 6023,
+
+    /// <summary>Ask a board for its firmware version, board name, bootloader name, unique id or diagnostics.</summary>
     ReturnInfo = 6024,
+
+    /// <summary>Tell a board to start updating its main firmware or its bootloader.</summary>
     UpdateFirmware = 6025,
+
+    /// <summary>M950 H: create, configure or report a heater.</summary>
     M950Heater = 6026,
+
+    /// <summary>M950 F: create, configure or report a fan.</summary>
     M950Fan = 6027,
+
+    /// <summary>M950 P: create, configure or report a GPIO or servo port.</summary>
     M950Gpio = 6028,
+
+    /// <summary>Set the PWM of a fan.</summary>
     SetFanSpeed = 6029,
+
+    /// <summary>M570: set the heater fault detection parameters.</summary>
     SetHeaterFaultDetection = 6030,
+
+    /// <summary>M308: create, configure or report a temperature sensor.</summary>
     M308V1 = 6031,
+
+    /// <summary>M303: start or stop heater tuning, or ask whether heater calibration has finished.</summary>
     HeaterTuningCommand = 6032,
     // UnusedWasHeaterFeedForward = 6033,
+    /// <summary>M955: configure the accelerometer on a board.</summary>
     AccelerometerConfig = 6034,
+
+    /// <summary>M950 E: create, configure or report an LED strip.</summary>
     M950Led = 6035,
     // UnusedWasCreateInputMonitorV0 = 6036,
     // UnusedWasChangeInputMonitorV0 = 6037,
+    /// <summary>Sent by the main board to acknowledge a board's announcement. Until it arrives the board keeps announcing itself.</summary>
     AcknowledgeAnnounce = 6038,
+
+    /// <summary>M143: set the temperature monitors of a heater.</summary>
     SetHeaterMonitors = 6039,
+
+    /// <summary>M122 P: run a diagnostic test, most of which deliberately crash the board.</summary>
     DiagnosticTest = 6040,
+
+    /// <summary>M569.1: configure closed loop control for a driver.</summary>
     M569P1 = 6041,
+
+    /// <summary>M92 and M350: set the steps/mm and microstepping of several drivers at once.</summary>
     SetStepsPerMmAndMicrostepping = 6042,
+
+    /// <summary>M906: set the motor currents of several drivers at once.</summary>
     SetMotorCurrents = 6043,
+
+    /// <summary>M572: set the pressure advance of several drivers at once, as a single coefficient each.</summary>
     SetPressureAdvanceV1 = 6044,
+
+    /// <summary>M917: set the standstill current percentage of several drivers at once.</summary>
     SetStandstillCurrentFactor = 6045,
+
+    /// <summary>M591: create a filament monitor on a driver. It is configured by a separate message.</summary>
     CreateFilamentMonitor = 6046,
+
+    /// <summary>M591: delete a filament monitor.</summary>
     DeleteFilamentMonitor = 6047,
+
+    /// <summary>M591: configure an existing filament monitor.</summary>
     ConfigureFilamentMonitor = 6048,
     // UnusedWasUpdateHeaterModelV1 = 6049,
+    /// <summary>M569.2: read or write a smart driver register.</summary>
     M569P2 = 6050,
+
+    /// <summary>M569.6: run a closed loop tuning manoeuvre for a driver, or ask for the result of the previous one.</summary>
     M569P6 = 6051,
+
+    /// <summary>M569.7: configure the brake port of a driver.</summary>
     M569P7 = 6052,
     // UnusedWasHeaterModelV2 = 6053,
     // UnusedWasSetInputShaping = 6054,
+    /// <summary>M150: set the colours of an LED strip.</summary>
     WriteLedStrip = 6055,
+
+    /// <summary>M569.4: put a driver into torque mode, or take it out again.</summary>
     M569P4 = 6056,
 
     // In RRF 3.5.0rc3 the message sent to report an input monitor state change has changed.
@@ -103,18 +196,30 @@ public enum CanMessageType : ushort
     // With luck this will abort any moves involving endstops with "Failed to enable endstops".
     // UnusedWasCreateInputMonitorV1 = 6057,
     // UnusedWasChangeInputMonitorV1 = 6058,
+    /// <summary>Ask a board to run its production test report.</summary>
     TestReport = 6059,
+
     /// <summary>was 6057 before 3.5.0-rc.3</summary>
     CreateInputMonitorV1 = 6060,
 
     /// <summary>was 6058 before 3.5.0-rc.3</summary>
     ChangeInputMonitorV1 = 6061,
+
+    /// <summary>M593: send the input shaping impulses to a board.</summary>
     SetInputShapingV1 = 6062,
+
+    /// <summary>Tell a board about a fan PWM or extrusion change so that it can apply heater feedforward. No reply is sent.</summary>
     HeaterFeedForwardV1 = 6063,
+
     /// <summary>for M655, added in RRF 3.6</summary>
     M655 = 6064,
+
+    /// <summary>Enable a stall detection endstop on one driver, or disable all of them.</summary>
     EnableStallEndstop = 6065,
+
+    /// <summary>M111: set the debug flags of a board.</summary>
     M111 = 6066,
+
     /// <summary>added in RRF 3.7</summary>
     SetDefaultHeaterModel = 6067,
 
@@ -123,43 +228,80 @@ public enum CanMessageType : ushort
 
     /// <summary>added in RRF 3.7</summary>
     HeaterModelV3 = 6069,
+
+    /// <summary>M572: set the pressure advance of several drivers at once, with the full set of coefficients.</summary>
     SetPressureAdvanceV2 = 6070,
+
     /// <summary>for M959, added in RRF 3.7</summary>
     SetConnectionTimeout = 6071,
 
     // Responses, broadcasts etc. sent by expansion boards
+    /// <summary>The standard reply to a request: a result code, some text, and sometimes 8 bits of extra data.</summary>
     StandardReply = 4510,
+
+    /// <summary>Board health report using full precision MinCurMax values.</summary>
     BoardStatusReportV0 = 4511,
+
     /// <summary>announce message sent by firmware 3.4.0beta4 and earlier</summary>
     AnnounceV0 = 4512,
 
     // fanTachoReport = 4513,					// unused
+    /// <summary>Broadcast of the readings of the temperature sensors a board owns.</summary>
     SensorTemperaturesReport = 4514,
+
+    /// <summary>Broadcast of the mode, average PWM and temperature of the heaters a board owns.</summary>
     HeatersStatusReport = 4515,
 
     // unused_was_fansRpmReport = 4516,			// replaced by fansReport
+    /// <summary>Broadcast of the actual PWM and tacho reading of the fans a board owns.</summary>
     FansReport = 4517,
+
+    /// <summary>Reply to a read inputs request, using AnalogHandleDataV0 entries.</summary>
     ReadInputsReplyV0 = 4518,
+
+    /// <summary>Report of the status of the drivers on a board, with closed loop statistics if it collects them.</summary>
     DriversStatusReport = 4519,
     // UnusedWasFilamentMonitorsStatusReportV0 = 4520,
+    /// <summary>Report of the measurements taken during one heater tuning cycle.</summary>
     HeaterTuningReport = 4521,
+
+    /// <summary>A packet of accelerometer samples.</summary>
     AccelerometerData = 4522,
+
+    /// <summary>A packet of closed loop samples.</summary>
     ClosedLoopData = 4523,
+
+    /// <summary>Reserved for sending a message to the main board's log. Nothing in this repository sends or handles it; debugText is used instead.</summary>
     LogMessage = 4524,
+
     /// <summary>announce message sent by firmware 3.4.0beta5 and later</summary>
     AnnounceV1 = 4525,
+
+    /// <summary>Debug text from an expansion board, to be printed by the main board.</summary>
     DebugText = 4526,
     // UnusedWasFilamentMonitorsStatusReportV1 = 4527,
+    /// <summary>Report of the status of the filament monitors on a board.</summary>
     FilamentMonitorsStatusReportV2 = 4528,
+
+    /// <summary>Reply to a read inputs request, using AnalogHandleDataV1 entries, which also carry when each reading was taken.</summary>
     ReadInputsReplyV1 = 4529,
+
+    /// <summary>Board health report using ShortMinCurMax values, which leaves room for more analog handles.</summary>
     BoardStatusReportV1 = 4530,
+
     /// <summary>added in firmware 3.7</summary>
     HeaterModelReport = 4531,
 
     // Firmware updates
+    /// <summary>Request from a board, or from its bootloader, for a chunk of a firmware or bootloader file.</summary>
     FirmwareBlockRequest = 5000,
+
+    /// <summary>A chunk of a firmware or bootloader file, or the reason why none could be supplied.</summary>
     FirmwareBlockResponse = 5001,
+
+    /// <summary>Not a real message type: the value used wherever no message type applies.</summary>
     UnusedMessageType = 0xFFFF,
+
     /// <summary>Alias used as the ReplyType of a CAN request when no reply is expected</summary>
     NoReply = UnusedMessageType,
 }

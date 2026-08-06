@@ -13,7 +13,7 @@ using DuetControlServer.Link.Protocol.Shared;
 namespace DuetControlServer.Link.Protocol.CanMessages;
 
 /// <summary>
-/// The M150 generic message.
+/// M150 parameters, i.e. the colours to write to an LED strip
 ///
 /// Sent as <see cref="CanMessageType.WriteLedStrip" />.
 /// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
@@ -116,7 +116,7 @@ public struct CanMessageM150 : ICanGenericMessage<CanMessageM150>
 }
 
 /// <summary>
-/// The M308V1 generic message.
+/// M308 parameters, i.e. how a temperature sensor is configured
 ///
 /// Sent as <see cref="CanMessageType.M308V1" />.
 /// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
@@ -254,7 +254,7 @@ public struct CanMessageM308V1 : ICanGenericMessage<CanMessageM308V1>
 }
 
 /// <summary>
-/// The M569 generic message.
+/// M569 parameters, i.e. how a driver is configured
 ///
 /// Sent as <see cref="CanMessageType.M569" />.
 /// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
@@ -748,7 +748,7 @@ public struct CanMessageM569Point6StatusOnly : ICanGenericMessage<CanMessageM569
 }
 
 /// <summary>
-/// The M569Point7 generic message.
+/// M569.7 parameters, i.e. the brake port of a driver and its timing
 ///
 /// Sent as <see cref="CanMessageType.M569P7" />.
 /// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
@@ -816,7 +816,7 @@ public struct CanMessageM569Point7 : ICanGenericMessage<CanMessageM569Point7>
 }
 
 /// <summary>
-/// The M915 generic message.
+/// M915 parameters, i.e. the stall detection settings of one or more drivers
 ///
 /// Sent as <see cref="CanMessageType.M915" />.
 /// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
@@ -899,7 +899,7 @@ public struct CanMessageM915 : ICanGenericMessage<CanMessageM915>
 }
 
 /// <summary>
-/// The M950Heater generic message.
+/// M950 H parameters, i.e. how a heater is created
 ///
 /// Sent as <see cref="CanMessageType.M950Heater" />.
 /// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
@@ -974,7 +974,7 @@ public struct CanMessageM950Heater : ICanGenericMessage<CanMessageM950Heater>
 }
 
 /// <summary>
-/// The M950Fan generic message.
+/// M950 F parameters, i.e. how a fan is created
 ///
 /// Sent as <see cref="CanMessageType.M950Fan" />.
 /// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
@@ -1042,7 +1042,7 @@ public struct CanMessageM950Fan : ICanGenericMessage<CanMessageM950Fan>
 }
 
 /// <summary>
-/// The M950Gpio generic message.
+/// M950 P and M950 S parameters, i.e. how a GPIO or servo port is created
 ///
 /// Sent as <see cref="CanMessageType.M950Gpio" />.
 /// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
@@ -1110,7 +1110,7 @@ public struct CanMessageM950Gpio : ICanGenericMessage<CanMessageM950Gpio>
 }
 
 /// <summary>
-/// The M950Led generic message.
+/// M950 E parameters, i.e. how an LED strip is created
 ///
 /// Sent as <see cref="CanMessageType.M950Led" />.
 /// Carries a <see cref="CanMessageGeneric" /> body: the parameters of

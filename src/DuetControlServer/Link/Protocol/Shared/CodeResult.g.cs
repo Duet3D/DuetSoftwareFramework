@@ -42,7 +42,10 @@ public enum CodeResult : byte
 
     /// <summary>only used if CAN expansion is supported - can be sent by expansion boards, so don't change its number!</summary>
     RemoteInternalError = 9,
+
+    /// <summary>the message box put up by M291 was cancelled by the user</summary>
     M291Cancelled = 10,
+
     /// <summary>we are waiting for a message box to be acknowledged so the command has been ignored</summary>
     WaitingForAckSoIgnored = 11,
 

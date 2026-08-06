@@ -16,15 +16,34 @@ public enum EventType : byte
 {
     /// <summary>a placeholder: main board power failure is not currently handled by the event system</summary>
     MainBoardPowerFail = 0,
+
+    /// <summary>an expansion board re-announced itself after losing and regaining time sync, without having reset</summary>
     ExpansionReconnect = 1,
+
+    /// <summary>an expansion board stopped responding</summary>
     ExpansionTimeout = 2,
+
+    /// <summary>a heater was shut down because its temperature did not follow the model</summary>
     HeaterFault = 3,
+
+    /// <summary>a driver reported an error serious enough to stop the print, such as a short circuit or over temperature</summary>
     DriverError = 4,
+
+    /// <summary>a filament monitor reported that the filament is missing or not moving as expected</summary>
     FilamentError = 5,
+
+    /// <summary>a driver reported a stall</summary>
     DriverStall = 6,
+
+    /// <summary>a driver reported a condition that is not yet an error, such as approaching its temperature limit</summary>
     DriverWarning = 7,
+
     /// <summary>not currently used</summary>
     McuTemperatureWarning = 8,
+
+    /// <summary>the VIN supply rose above the safe limit</summary>
     Overvoltage = 9,
+
+    /// <summary>the VIN supply fell below the safe limit</summary>
     Undervoltage = 10,
 }

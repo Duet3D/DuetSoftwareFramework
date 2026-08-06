@@ -13,7 +13,10 @@ namespace DuetControlServer.Link.Protocol.CanMessages;
 /// <summary>System-wide limits shared by the CAN message formats</summary>
 public static class CanLimits
 {
+    /// <summary>Most drivers any one expansion board may have, which is what fixes the per-drive array length of a movement message</summary>
     public const int MaxLinearDriversPerCanSlave = 8;
+
+    /// <summary>Most heaters any one expansion board may have</summary>
     public const int MaxHeatersPerCanSlave = 6;
 }
 

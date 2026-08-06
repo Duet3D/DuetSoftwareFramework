@@ -111,6 +111,9 @@ def main():
 
     for name, want in schema.get("constants", {}).items():
         checks += 1
+        # a schema-level constant is either the bare value or an object carrying the value and its doc
+        if isinstance(want, dict):
+            want = want["value"]
         if name not in canlib:
             problems.append(f"FAIL {name} = {want} is not declared by CANlib")
         elif normalise(want, canlib, arrays) != normalise(canlib[name], canlib, arrays):
