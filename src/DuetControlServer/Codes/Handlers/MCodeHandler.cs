@@ -1085,13 +1085,13 @@ public class MCodeHandler(
                         string? iapFile, firmwareFile;
                         using (await model.AccessReadOnlyAsync(cancellationToken))
                         {
-                            if (model.Boards.Count == 0)
+                            if (model.Boards.Count == 0 || model.Boards[0] is not MainBoard mainBoard)
                             {
                                 return new Message(MessageType.Error, "No boards have been detected");
                             }
 
                             // There are now two different IAP binaries, check which one to use
-                            iapFile = model.Boards[0].IapFileNameSBC;
+                            iapFile = mainBoard.IapFileNameSBC;
                             if (!code.TryGetString('P', out firmwareFile))
                             {
                                 firmwareFile = model.Boards[0].FirmwareFileName;

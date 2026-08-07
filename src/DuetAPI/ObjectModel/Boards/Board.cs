@@ -1,10 +1,16 @@
-﻿using System;
+using System.Text.Json.Serialization;
 
 namespace DuetAPI.ObjectModel;
 
 /// <summary>
 /// Information about a connected board
 /// </summary>
+/// <remarks>
+/// Every item of the boards array is either a <see cref="MainBoard"/> or an <see cref="ExpansionBoard"/>,
+/// which is decided by its position, see <see cref="Boards"/>
+/// </remarks>
+[JsonDerivedType(typeof(MainBoard))]
+[JsonDerivedType(typeof(ExpansionBoard))]
 public partial class Board : ModelObject, IStaticModelObject
 {
     /// <summary>
@@ -26,26 +32,6 @@ public partial class Board : ModelObject, IStaticModelObject
         set => SetPropertyValue(ref _canAddress, value);
     }
     private int? _canAddress;
-
-    /// <summary>
-    /// Closed loop data of this board or null if unknown
-    /// </summary>
-    public BoardClosedLoop? ClosedLoop
-    {
-        get => _closedLoop;
-        set => SetPropertyValue(ref _closedLoop, value);
-    }
-    private BoardClosedLoop? _closedLoop;
-
-    /// <summary>
-    /// Details about a connected display or null if none is connected
-    /// </summary>
-    public DirectDisplay? DirectDisplay
-    {
-        get => _directDisplay;
-        set => SetPropertyValue(ref _directDisplay, value);
-    }
-    private DirectDisplay? _directDisplay;
 
     /// <summary>
     /// Drivers of this board
@@ -78,16 +64,6 @@ public partial class Board : ModelObject, IStaticModelObject
     private string _firmwareFileName = string.Empty;
 
     /// <summary>
-    /// Name of the firmware build
-    /// </summary>
-    public string FirmwareName
-    {
-        get => _firmwareName;
-        set => SetPropertyValue(ref _firmwareName, value);
-    }
-    private string _firmwareName = string.Empty;
-
-    /// <summary>
     /// Version of the firmware build
     /// </summary>
     public string FirmwareVersion
@@ -98,19 +74,6 @@ public partial class Board : ModelObject, IStaticModelObject
     private string _firmwareVersion = string.Empty;
 
     /// <summary>
-    /// Filename of the IAP binary that is used for updates from the SBC or null if unsupported
-    /// </summary>
-    /// <remarks>
-    /// This is only available for the mainboard (first board item)
-    /// </remarks>
-    public string? IapFileNameSBC
-    {
-        get => _iapFileNameSBC;
-        set => SetPropertyValue(ref _iapFileNameSBC, value);
-    }
-    private string? _iapFileNameSBC;
-
-    /// <summary>
     /// Amount of free RAM on this board (in bytes or null if unknown)
     /// </summary>
     public int? FreeRam
@@ -119,39 +82,6 @@ public partial class Board : ModelObject, IStaticModelObject
         set => SetPropertyValue(ref _freeRam, value);
     }
     private int? _freeRam;
-
-    /// <summary>
-    /// Filename of the IAP binary that is used for updates from the SD card or null if unsupported
-    /// </summary>
-    /// <remarks>
-    /// This is only available for the mainboard (first board item)
-    /// </remarks>
-    public string? IapFileNameSD
-    {
-        get => _iapFileNameSD;
-        set => SetPropertyValue(ref _iapFileNameSD, value);
-    }
-    private string? _iapFileNameSD;
-
-    /// <summary>
-    /// Information about an inductive sensor or null if not present
-    /// </summary>
-    public InductiveSensor? InductiveSensor
-    {
-        get => _inductiveSensor;
-        set => SetPropertyValue(ref _inductiveSensor, value);
-    }
-    private InductiveSensor? _inductiveSensor;
-
-    /// <summary>
-    /// Maximum number of heaters this board can control
-    /// </summary>
-    public int MaxHeaters
-    {
-        get => _maxHeaters;
-        set => SetPropertyValue(ref _maxHeaters, value);
-    }
-    private int _maxHeaters;
 
     /// <summary>
     /// Maximum number of motors this board can drive
@@ -194,36 +124,6 @@ public partial class Board : ModelObject, IStaticModelObject
     private string _shortName = string.Empty;
 
     /// <summary>
-    /// State of this board
-    /// </summary>
-    public BoardState State
-    {
-        get => _state;
-        set => SetPropertyValue(ref _state, value);
-    }
-    private BoardState _state;
-
-    /// <summary>
-    /// Indicates if this board supports external displays
-    /// </summary>
-    public bool SupportsDirectDisplay
-    {
-        get => _supportsDirectDisplay;
-        set => SetPropertyValue(ref _supportsDirectDisplay, value);
-    }
-    private bool _supportsDirectDisplay;
-
-    /// <summary>
-    /// Connection timeout of this board (in s)
-    /// </summary>
-    public int Timeout
-    {
-        get => _timeout;
-        set => SetPropertyValue(ref _timeout, value);
-    }
-    private int _timeout = 10;
-
-    /// <summary>
     /// Unique identifier of the board or null if unknown
     /// </summary>
     public string? UniqueId
@@ -252,14 +152,4 @@ public partial class Board : ModelObject, IStaticModelObject
         set => SetPropertyValue(ref _vIn, value);
     }
     private MinMaxCurrent? _vIn;
-
-    /// <summary>
-    /// Filename of the on-board WiFi chip or null if not present
-    /// </summary>
-    public string? WifiFirmwareFileName
-    {
-        get => _wifiFirmwareFileName;
-        set => SetPropertyValue(ref _wifiFirmwareFileName, value);
-    }
-    private string? _wifiFirmwareFileName;
 }

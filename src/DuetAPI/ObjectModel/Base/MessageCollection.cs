@@ -83,7 +83,7 @@ public class MessageCollection : ObservableCollection<Message>, IModelCollection
     public void UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties, int offset = 0, bool last = true) => UpdateFromJson(jsonElement, ignoreSbcProperties);
 
     /// <inheritdoc />
-    public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, int offset = 0, bool last = true)
+    public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, int offset = 0, bool last = true, ModelUpdateScope scope = ModelUpdateScope.Patch)
     {
         if (reader.TokenType != JsonTokenType.StartArray)
         {
@@ -107,5 +107,5 @@ public class MessageCollection : ObservableCollection<Message>, IModelCollection
     }
 
     /// <inheritdoc />
-    public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties) => UpdateFromJsonReader(ref reader, ignoreSbcProperties, 0, true);
+    public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, ModelUpdateScope scope) => UpdateFromJsonReader(ref reader, ignoreSbcProperties, 0, true, scope);
 }

@@ -318,7 +318,7 @@ public sealed class JsonModelDictionary(bool nullRemovesItems) : IDictionary<str
     }
 
     /// <inheritdoc />
-    public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
+    public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, ModelUpdateScope scope = ModelUpdateScope.Patch)
     {
         if (reader.TokenType == JsonTokenType.Null)
         {

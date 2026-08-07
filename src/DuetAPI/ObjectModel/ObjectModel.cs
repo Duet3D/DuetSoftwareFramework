@@ -15,7 +15,7 @@ public partial class ObjectModel : ModelObject, IStaticModelObject
     /// <remarks>
     /// The first item represents the main board
     /// </remarks>
-    public StaticModelCollection<Board> Boards { get; } = [];
+    public Boards Boards { get; } = [];
 
     /// <summary>
     /// Information about the individual directories
@@ -161,8 +161,9 @@ public partial class ObjectModel : ModelObject, IStaticModelObject
     /// <param name="reader">JSON reader</param>
     /// <param name="offset">Index offset</param>
     /// <param name="last">Whether this is the last update. May be used to flag whether move.axes is about to be updated, too</param>
+    /// <param name="scope">Extent of this update</param>
     /// <returns>Whether the key could be updated</returns>
-    public bool UpdateFromFirmwareJsonReader(string? key, ref Utf8JsonReader reader, int offset = 0, bool last = true) => GeneratedUpdateFromJsonReader(key, ref reader, true, offset, last);
+    public bool UpdateFromFirmwareJsonReader(string? key, ref Utf8JsonReader reader, int offset = 0, bool last = true, ModelUpdateScope scope = ModelUpdateScope.Patch) => GeneratedUpdateFromJsonReader(key, ref reader, true, offset, last, scope);
 
     /// <summary>
     /// Update this instance from a given JSON element

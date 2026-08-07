@@ -29,6 +29,7 @@ public interface IStaticModelObject : IModelObject
     /// </summary>
     /// <param name="reader">JSON reader</param>
     /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+    /// <param name="scope">Extent of this update</param>
     /// <exception cref="JsonException">Failed to deserialize data</exception>
-    void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties);
+    void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, ModelUpdateScope scope = ModelUpdateScope.Patch);
 }

@@ -154,26 +154,26 @@ internal static class Generator
                                 writer.WriteLine("}");
                                 if (propType is "DynamicModelCollection" or "StaticModelCollection" or "MessageCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
                                 {
-                                    writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, offset, last);");
+                                    writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, offset, last, scope);");
                                 }
                                 else
                                 {
-                                    writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties);");
+                                    writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);");
                                 }
                                 writer.Indent--;
                                 writer.WriteLine("}");
                             }
                             else if (propType is "DynamicModelCollection" or "StaticModelCollection" or "MessageCollection" || receiver.ModelCollectionMembers.ContainsKey(propType))
                             {
-                                writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, offset, last);");
+                                writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, offset, last, scope);");
                             }
                             else if (prop.Identifier.ValueText == "Move")
                             {
-                                writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, last);");
+                                writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, last, scope);");
                             }
                             else
                             {
-                                writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties);");
+                                writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);");
                             }
                         }
 
@@ -256,19 +256,20 @@ public partial class ObjectModel : IModelObjectAccessor
     /// <param name=""reader"">JSON reader</param> /// <param name=""ignoreSbcProperties"">Whether SBC properties are ignored</param>
     /// <param name=""offset"">Index offset (collection keys only)</param>
     /// <param name=""last"">Whether this is the last update (collection keys only)</param>
+    /// <param name=""scope"">Extent of this update</param>
     /// <returns>Whether the key could be updated</returns>
-    private bool GeneratedUpdateFromJsonReader(string? key, ref Utf8JsonReader reader, bool ignoreSbcProperties, int offset = 0, bool last = true)
+    private bool GeneratedUpdateFromJsonReader(string? key, ref Utf8JsonReader reader, bool ignoreSbcProperties, int offset = 0, bool last = true, ModelUpdateScope scope = ModelUpdateScope.Patch)
     {{
         if (string.IsNullOrEmpty(key))
         {{
-            UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+            UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);
             return true;
         }}
 
 {WritePropertyReadCalls()}
         if (key == ""move.axes"")
         {{
-            Move.Axes.UpdateFromJsonReader(ref reader, ignoreSbcProperties, offset, last);
+            Move.Axes.UpdateFromJsonReader(ref reader, ignoreSbcProperties, offset, last, scope);
             return true;
         }}
         return false;

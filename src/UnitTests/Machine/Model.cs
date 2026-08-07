@@ -1,6 +1,7 @@
 ﻿using DuetAPI.ObjectModel;
 using NUnit.Framework;
 using System.IO;
+using System.Text;
 using System.Text.Json;
 
 namespace UnitTests.Machine
@@ -136,13 +137,90 @@ namespace UnitTests.Machine
             Assert.That(success, Is.True);
         }
 
+        [Test]
+        public void UpdateFromFirmwareScopes()
+        {
+            byte[] stateKey = Encoding.UTF8.GetBytes("{\"atxPower\":true}");
+
+            ObjectModel model = new();
+            void ResetModel()
+            {
+                model.Job.LastFileName = "0:/gcodes/test.g";
+                model.State.LaserPwm = 0.5F;
+                model.State.LogFile = "0:/sys/eventlog.txt";
+                model.State.MessageBox = new MessageBox() { Message = "message" };
+                model.State.ThisInput = 3;
+            }
+
+            // Patches do not reset anything
+            ResetModel();
+            Utf8JsonReader reader = new(stateKey);
+            reader.Read();
+            Assert.That(model.UpdateFromFirmwareJsonReader("state", ref reader), Is.True);
+            Assert.That(model.State.LaserPwm, Is.EqualTo(0.5F));
+            Assert.That(model.State.MessageBox, Is.Not.Null);
+
+            // Live updates only reset live properties
+            ResetModel();
+            reader = new(stateKey);
+            reader.Read();
+            Assert.That(model.UpdateFromFirmwareJsonReader("state", ref reader, 0, true, ModelUpdateScope.Live), Is.True);
+            Assert.That(model.State.LaserPwm, Is.Null);
+            Assert.That(model.State.MessageBox, Is.Not.Null);
+
+            // Full updates reset the key they contain but leave other keys, SBC and verbose properties alone
+            ResetModel();
+            reader = new(stateKey);
+            reader.Read();
+            Assert.That(model.UpdateFromFirmwareJsonReader("state", ref reader, 0, true, ModelUpdateScope.Full), Is.True);
+            Assert.That(model.State.LaserPwm, Is.Null);
+            Assert.That(model.State.MessageBox, Is.Null);
+            Assert.That(model.State.LogFile, Is.EqualTo("0:/sys/eventlog.txt"));
+            Assert.That(model.State.ThisInput, Is.EqualTo(3));
+            Assert.That(model.Job.LastFileName, Is.EqualTo("0:/gcodes/test.g"));
+
+            // Verbose properties are reset as well if the query asked for them
+            ResetModel();
+            reader = new(stateKey);
+            reader.Read();
+            Assert.That(model.UpdateFromFirmwareJsonReader("state", ref reader, 0, true, ModelUpdateScope.Full | ModelUpdateScope.Verbose), Is.True);
+            Assert.That(model.State.ThisInput, Is.Null);
+        }
+
+        [Test]
+        public void BoardTypes()
+        {
+            ObjectModel model = new();
+            Utf8JsonReader reader = new(Encoding.UTF8.GetBytes("[{\"canAddress\":0,\"firmwareName\":\"RepRapFirmware for Duet 3 MB6HC\"},{\"canAddress\":1,\"state\":\"running\"}]"));
+            reader.Read();
+            Assert.That(model.UpdateFromFirmwareJsonReader("boards", ref reader), Is.True);
+
+            Assert.That(model.Boards[0], Is.TypeOf<MainBoard>());
+            Assert.That(((MainBoard)model.Boards[0]).FirmwareName, Is.EqualTo("RepRapFirmware for Duet 3 MB6HC"));
+            Assert.That(model.Boards[1], Is.TypeOf<ExpansionBoard>());
+            Assert.That(((ExpansionBoard)model.Boards[1]).State, Is.EqualTo(BoardState.Running));
+
+            // Live payloads carry nothing to tell the board types apart, so the classes must survive them
+            reader = new(Encoding.UTF8.GetBytes("[{\"freeRam\":1234},{\"freeRam\":5678}]"));
+            reader.Read();
+            Assert.That(model.UpdateFromFirmwareJsonReader("boards", ref reader, 0, true, ModelUpdateScope.Live), Is.True);
+            Assert.That(model.Boards[0], Is.TypeOf<MainBoard>());
+            Assert.That(model.Boards[1], Is.TypeOf<ExpansionBoard>());
+            Assert.That(model.Boards[0].FreeRam, Is.EqualTo(1234));
+
+            // Both derived types must serialize their own properties
+            string json = JsonSerializer.Serialize(model.Boards, DuetAPI.Utility.JsonHelper.DefaultJsonOptions);
+            Assert.That(json, Does.Contain("\"firmwareName\":\"RepRapFirmware for Duet 3 MB6HC\""));
+            Assert.That(json, Does.Contain("\"state\":\"running\""));
+        }
+
         private static readonly int[][] expectedBedHeaterMapping = [[0], [1]];
 
         [Test]
         public void UpdateFromOther()
         {
             ObjectModel modelToUpdate = new();
-            modelToUpdate.Boards.Add(new Board
+            modelToUpdate.Boards.Add(new MainBoard
             {
                 FirmwareName = "Foobar"
             });
@@ -161,7 +239,7 @@ namespace UnitTests.Machine
             modelToUpdate.State.Status = MachineStatus.Busy;
 
             ObjectModel updatedModel = new();
-            updatedModel.Boards.Add(new Board
+            updatedModel.Boards.Add(new MainBoard
             {
                 FirmwareName = "Yum"
             });
@@ -187,7 +265,7 @@ namespace UnitTests.Machine
             using JsonDocument jsonPatch = JsonDocument.Parse(json);
             modelToUpdate.UpdateFromJson(jsonPatch.RootElement, false);
 
-            Assert.That(modelToUpdate.Boards[0]!.FirmwareName, Is.EqualTo("Yum"));
+            Assert.That(((MainBoard)modelToUpdate.Boards[0]!).FirmwareName, Is.EqualTo("Yum"));
             Assert.That(modelToUpdate.Heat.BedHeaterMapping, Is.EquivalentTo(expectedBedHeaterMapping));
             Assert.That(modelToUpdate.Heat.Heaters[0]!.Active, Is.EqualTo(90F));
             Assert.That(modelToUpdate.Heat.Heaters[0]!.Standby, Is.EqualTo(21F));
@@ -211,7 +289,7 @@ namespace UnitTests.Machine
             using JsonDocument patchJson = JsonDocument.Parse(patchText);
             model.UpdateFromJson(patchJson.RootElement, false);
 
-            Assert.That(model.Boards[0].FirmwareName, Is.EqualTo("Test"));
+            Assert.That(((MainBoard)model.Boards[0]).FirmwareName, Is.EqualTo("Test"));
         }
 
         [Test]

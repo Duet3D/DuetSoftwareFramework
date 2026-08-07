@@ -29,6 +29,70 @@ internal static class UpdateFromJsonReader
         bool isDynamic = receiver.DynamicModelObjectClasses.Contains(cls);
         bool isInherited = receiver.InheritedClasses.Any(ic => ic.Key.Identifier.ValueText == cls), isInheritedFrom = receiver.InheritedClasses.Any(ic => ic.Value == cls);
 
+        // Properties that an authoritative update may reset. Their presence is tracked in bitmasks while reading
+        // because the streaming reader cannot tell afterwards which properties the payload contained
+        List<PropertyDeclarationSyntax> resettableProperties = properties.Where(prop => prop.Type is NullableTypeSyntax && prop.HasSetter()).ToList();
+        int maskCount = (resettableProperties.Count + 63) / 64;
+
+        string GetSeenMask(int index) => $"seen{index / 64} & 0x{1UL << (index % 64):X}UL";
+
+        string GenerateSeenDeclarations()
+        {
+            StringBuilder builder = new();
+            for (int i = 0; i < maskCount; i++)
+            {
+                builder.AppendLine($"        ulong seen{i} = 0;");
+            }
+            return builder.ToString();
+        }
+
+        string GenerateResets()
+        {
+            if (resettableProperties.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            using StringWriter stringWriter = new();
+            using IndentedTextWriter writer = new(stringWriter)
+            {
+                Indent = 2
+            };
+
+            writer.WriteLine("if (scope != ModelUpdateScope.Patch)");
+            writer.WriteLine("{");
+            writer.Indent++;
+            for (int i = 0; i < resettableProperties.Count; i++)
+            {
+                PropertyDeclarationSyntax prop = resettableProperties[i];
+
+                // Which query the payload came from decides if an absent property means null
+                string condition = prop.IsLiveProperty() ? "(scope & (ModelUpdateScope.Live | ModelUpdateScope.Full)) != 0" : "(scope & ModelUpdateScope.Full) != 0";
+                if (prop.IsVerboseProperty())
+                {
+                    condition += " && (scope & ModelUpdateScope.Verbose) != 0";
+                }
+                if (prop.IsObsoleteProperty())
+                {
+                    condition += " && (scope & ModelUpdateScope.Obsolete) != 0";
+                }
+                if (prop.IsSbcProperty())
+                {
+                    condition = $"!ignoreSbcProperties && {condition}";
+                }
+
+                writer.WriteLine($"if (({GetSeenMask(i)}) == 0 && {condition})");
+                writer.WriteLine("{");
+                writer.Indent++;
+                writer.WriteLine($"{prop.Identifier.ValueText} = null;");
+                writer.Indent--;
+                writer.WriteLine("}");
+            }
+            writer.Indent--;
+            writer.WriteLine("}");
+            return "\n" + stringWriter.ToString().TrimEnd();
+        }
+
         string GeneratePropertyReadCalls()
         {
             using StringWriter stringWriter = new();
@@ -46,6 +110,11 @@ internal static class UpdateFromJsonReader
                 writer.WriteLine($"{(first ? "if" : "else if")} (reader.ValueTextEquals(\"{jsonPropertyName}\"u8))");
                 writer.WriteLine("{");
                 writer.Indent++;
+                int resetIndex = resettableProperties.IndexOf(prop);
+                if (resetIndex >= 0)
+                {
+                    writer.WriteLine($"seen{resetIndex / 64} |= 0x{1UL << (resetIndex % 64):X}UL;");
+                }
                 writer.WriteLine("reader.Read();");
                 first = false;
 
@@ -81,26 +150,26 @@ internal static class UpdateFromJsonReader
                         writer.WriteLine("}");
                         if (receiver.DynamicModelObjectClasses.Contains(nts.ElementType.ToString()))
                         {
-                            writer.WriteLine($"{prop.Identifier.ValueText} = ({nts.ElementType}){prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties);");
+                            writer.WriteLine($"{prop.Identifier.ValueText} = ({nts.ElementType}){prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);");
                         }
                         else
                         {
-                            writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties);");
+                            writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);");
                         }
                         writer.Indent--;
                         writer.WriteLine("}");
                     }
                     else if (receiver.DynamicModelObjectClasses.Contains(propType))
                     {
-                        writer.WriteLine($"{prop.Identifier.ValueText} = ({propType}){prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties)!;");
+                        writer.WriteLine($"{prop.Identifier.ValueText} = ({propType}){prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope)!;");
                     }
                     else if (cls == "Move" && prop.Identifier.ValueText == "Axes")
                     {
-                        writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, 0, last);");
+                        writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, 0, last, scope);");
                     }
                     else
                     {
-                        writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties);");
+                        writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);");
                     }
                 }
                 else if (propType is "ObservableCollection")
@@ -418,7 +487,7 @@ internal static class UpdateFromJsonReader
         }
 
         // Check if we need to generate the UpdateFromJson(Reader) methods
-        bool useGeneratedUpdateFromJsonReader = methods.Any(mds => mds.Identifier.ValueText == "UpdateFromJsonReader" && mds.ParameterList.Parameters.Count == 2 && mds.ParameterList.Parameters[0].Identifier.ValueText == "reader" && mds.ParameterList.Parameters[1].Identifier.ValueText == "ignoreSbcProperties");
+        bool useGeneratedUpdateFromJsonReader = methods.Any(mds => mds.Identifier.ValueText == "UpdateFromJsonReader" && mds.ParameterList.Parameters.Count >= 2 && mds.ParameterList.Parameters[0].Identifier.ValueText == "reader" && mds.ParameterList.Parameters[1].Identifier.ValueText == "ignoreSbcProperties");
 
         // Generate method
         return SourceText.From($@"/// <summary>
@@ -427,8 +496,9 @@ internal static class UpdateFromJsonReader
     /// <remarks>This method is auto-generated</remarks>
     /// <param name=""reader"">Reader to update this intance from</param>
     /// <param name=""ignoreSbcProperties"">Whether SBC properties are ignored</param>{(isDynamic ? "\n        /// <returns>Updated instance</returns>" : "")}{(cls == "Move" ? "\n        /// <param name=\"last\">Whether Move.Axes is final</param>" : "")}
+    /// <param name=""scope"">Extent of this update</param>
     /// <exception cref=""JsonException"">Failed to deserialize data</exception>
-    public {(isInherited ? "override " : isInheritedFrom ? "virtual " : "") + (isDynamic ? "IDynamicModelObject?" : "void")} {(useGeneratedUpdateFromJsonReader ? "Generated" : "")}UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties{(cls == "Move" ? ", bool last" : string.Empty)})
+    public {(isInherited ? "override " : isInheritedFrom ? "virtual " : "") + (isDynamic ? "IDynamicModelObject?" : "void")} {(useGeneratedUpdateFromJsonReader ? "Generated" : "")}UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties{(cls == "Move" ? ", bool last" : string.Empty)}, ModelUpdateScope scope = ModelUpdateScope.Patch)
     {{
         if (reader.TokenType == JsonTokenType.None && !reader.Read())
         {{
@@ -439,7 +509,7 @@ internal static class UpdateFromJsonReader
             throw new JsonException(""expected start of object"");
         }}
 
-        while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
+{GenerateSeenDeclarations()}        while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
         {{
             if (reader.TokenType == JsonTokenType.PropertyName)
             {{
@@ -462,7 +532,7 @@ internal static class UpdateFromJsonReader
 #endif 
                 }}
             }}
-        }}{(isDynamic ? "\n            return this;" : "")}
-    }}{(cls == "Move" ? "\n        /// <summary>Wrapper function for JSON updates</summary>\n        /// <param name=\"reader\">JSON reader</param>\n        /// <param name=\"ignoreSbcProperties\">Ignore SBC properties</param>\n        public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties) => UpdateFromJsonReader(ref reader, ignoreSbcProperties, true);" : "")}", Encoding.UTF8);
+        }}{GenerateResets()}{(isDynamic ? "\n            return this;" : "")}
+    }}{(cls == "Move" ? "\n        /// <summary>Wrapper function for JSON updates</summary>\n        /// <param name=\"reader\">JSON reader</param>\n        /// <param name=\"ignoreSbcProperties\">Ignore SBC properties</param>\n        /// <param name=\"scope\">Extent of this update</param>\n        public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, ModelUpdateScope scope = ModelUpdateScope.Patch) => UpdateFromJsonReader(ref reader, ignoreSbcProperties, true, scope);" : "")}", Encoding.UTF8);
     }
 }

@@ -445,8 +445,9 @@ public sealed class StaticModelDictionary<TValue>(bool nullRemovesItems, bool ca
     /// </summary>
     /// <param name="reader">JSON reader</param>
     /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+    /// <param name="scope">Extent of this update</param>
     /// <exception cref="JsonException">Failed to deserialize data</exception>
-    public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
+    public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, ModelUpdateScope scope = ModelUpdateScope.Patch)
     {
         if (reader.TokenType == JsonTokenType.None && !reader.Read())
         {
@@ -482,19 +483,19 @@ public sealed class StaticModelDictionary<TValue>(bool nullRemovesItems, bool ca
                         if (reader.TokenType != JsonTokenType.Null)
                         {
                             item = new();
-                            item.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            item.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);
                             this[key] = item;
                         }
                     }
                     else
                     {
-                        item.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                        item.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);
                     }
                 }
                 else
                 {
                     TValue newItem = new();
-                    newItem.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                    newItem.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);
                     Add(key, newItem);
                 }
             }

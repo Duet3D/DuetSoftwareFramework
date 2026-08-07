@@ -24,5 +24,6 @@ public interface IModelCollection : IStaticModelObject, INotifyCollectionChanged
     /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
     /// <param name="offset">Index offset</param>
     /// <param name="last">Whether this is the last update</param>
-    void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, int offset = 0, bool last = true);
+    /// <param name="scope">Extent of this update</param>
+    void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, int offset = 0, bool last = true, ModelUpdateScope scope = ModelUpdateScope.Patch);
 }

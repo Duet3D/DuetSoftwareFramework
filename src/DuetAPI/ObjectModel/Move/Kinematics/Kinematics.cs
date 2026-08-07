@@ -105,9 +105,10 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
     /// </summary>
     /// <param name="reader">JSON reader</param>
     /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+    /// <param name="scope">Extent of this update</param>
     /// <returns>Updated instance</returns>
     /// <exception cref="JsonException">Failed to deserialize data</exception>
-    public IDynamicModelObject? UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
+    public IDynamicModelObject? UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, ModelUpdateScope scope = ModelUpdateScope.Patch)
     {
         if (reader.TokenType == JsonTokenType.None && !reader.Read())
         {
@@ -136,7 +137,7 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
                         if (this is not CoreKinematics)
                         {
                             Kinematics newKinematics = new CoreKinematics();
-                            return newKinematics.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            return newKinematics.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);
                         }
                     }
                     else if (name is "delta" or "lineardelta")
@@ -144,7 +145,7 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
                         if (this is not DeltaKinematics)
                         {
                             Kinematics newKinematics = new DeltaKinematics();
-                            return newKinematics.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            return newKinematics.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);
                         }
                     }
                     else if (name is "hangprinter")
@@ -152,7 +153,7 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
                         if (this is not HangprinterKinematics)
                         {
                             Kinematics newKinematics = new HangprinterKinematics();
-                            return newKinematics.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            return newKinematics.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);
                         }
                     }
                     else if (name is "fivebarscara" or "scara")
@@ -160,7 +161,7 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
                         if (this is not ScaraKinematics)
                         {
                             Kinematics newKinematics = new ScaraKinematics();
-                            return newKinematics.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            return newKinematics.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);
                         }
                     }
                     else if (name is "polar")
@@ -168,13 +169,13 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
                         if (this is not PolarKinematics)
                         {
                             Kinematics newKinematics = new PolarKinematics();
-                            return newKinematics.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            return newKinematics.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);
                         }
                     }
                     else if (this is CoreKinematics or DeltaKinematics or HangprinterKinematics or ScaraKinematics or PolarKinematics)
                     {
                         Kinematics newKinematics = new();
-                        return newKinematics.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                        return newKinematics.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);
                     }
                 }
                 else
@@ -187,6 +188,6 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
                 readerCopy.Skip();
             }
         }
-        return GeneratedUpdateFromJsonReader(ref reader, ignoreSbcProperties);
+        return GeneratedUpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);
     }
 }

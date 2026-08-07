@@ -199,7 +199,7 @@ public class DynamicModelCollection<T> : ObservableCollection<T>, IModelCollecti
     void IStaticModelObject.UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties) => UpdateFromJson(jsonElement, ignoreSbcProperties, 0, true);
 
     /// <inheritdoc />
-    public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, int offset = 0, bool last = true)
+    public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, int offset = 0, bool last = true, ModelUpdateScope scope = ModelUpdateScope.Patch)
     {
         if (reader.TokenType != JsonTokenType.StartArray)
         {
@@ -219,7 +219,7 @@ public class DynamicModelCollection<T> : ObservableCollection<T>, IModelCollecti
                     if (i >= Count)
                     {
                         T newItem = new();
-                        newItem = (T)newItem.UpdateFromJsonReader(ref reader, ignoreSbcProperties)!;
+                        newItem = (T)newItem.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope)!;
                         Add(newItem);
                     }
                     else
@@ -228,12 +228,12 @@ public class DynamicModelCollection<T> : ObservableCollection<T>, IModelCollecti
                         if (item == null)
                         {
                             item = new T();
-                            item = (T)item.UpdateFromJsonReader(ref reader, ignoreSbcProperties)!;
+                            item = (T)item.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope)!;
                             this[i] = item;
                         }
                         else
                         {
-                            T? newItem = (T?)item.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            T? newItem = (T?)item.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);
                             if (!ReferenceEquals(item, newItem))
                             {
                                 this[i] = newItem!;
@@ -273,5 +273,5 @@ public class DynamicModelCollection<T> : ObservableCollection<T>, IModelCollecti
     }
 
     /// <inheritdoc />
-    public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties) => UpdateFromJsonReader(ref reader, ignoreSbcProperties, 0, true);
+    public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, ModelUpdateScope scope) => UpdateFromJsonReader(ref reader, ignoreSbcProperties, 0, true, scope);
 }

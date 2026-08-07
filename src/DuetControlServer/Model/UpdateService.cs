@@ -81,9 +81,10 @@ public class UpdateService : BackgroundService
     /// <summary>
     /// Update the object model from the JSON data received from the firmware
     /// </summary>
+    /// <param name="scope">Extent of the received data</param>
     /// <param name="offset">Optional array start offset</param>
     /// <returns>Next array offset to query</returns>
-    private int UpdateModel(int? offset = null)
+    private int UpdateModel(ModelUpdateScope scope, int? offset = null)
     {
         bool last = true;
         Utf8JsonReader reader;
@@ -202,7 +203,7 @@ public class UpdateService : BackgroundService
                     }
 
                     // Update object model
-                    _keyUpdated = _model.UpdateFromFirmwareJsonReader(_requestedKey, ref reader, offset ?? 0, last);
+                    _keyUpdated = _model.UpdateFromFirmwareJsonReader(_requestedKey, ref reader, offset ?? 0, last, scope);
                 }
                 else
                 {
@@ -246,8 +247,19 @@ public class UpdateService : BackgroundService
                 _verboseQueries = IPC.Processors.ModelSubscription.VerboseSubscribers;
                 _obsoleteQueries = IPC.Processors.ModelSubscription.ObsoleteSubscribers;
 
-                bool initialQuery = _model.Seqs.Count == 0;
-                string keyFlags = "d99n" + ((_verboseQueries || initialQuery) ? "v" : string.Empty) + ((_obsoleteQueries || initialQuery) ? "o" : string.Empty);
+                // Nulls are no longer requested from RRF but reconstructed from the properties missing in the
+                // response, so every scope must mirror the flags of the query that delivered the data
+                bool initialQuery = _model.Seqs.Count == 0, queryVerbose = _verboseQueries || initialQuery, queryObsolete = _obsoleteQueries || initialQuery;
+                string keyFlags = "d99" + (queryVerbose ? "v" : string.Empty) + (queryObsolete ? "o" : string.Empty);
+                ModelUpdateScope keyScope = ModelUpdateScope.Full;
+                if (queryVerbose)
+                {
+                    keyScope |= ModelUpdateScope.Verbose;
+                }
+                if (queryObsolete)
+                {
+                    keyScope |= ModelUpdateScope.Obsolete;
+                }
 
                 // Request the limits if no sequence numbers have been set yet
                 if (_model.Seqs.Count == 0)
@@ -257,7 +269,7 @@ public class UpdateService : BackgroundService
                     await RequestModelAsync("limits", keyFlags, stoppingToken);
                     using (await _model.AccessReadWriteAsync(stoppingToken))
                     {
-                        UpdateModel();
+                        UpdateModel(keyScope);
                         if (_keyUpdated)
                         {
                             _logger.LogDebug("Updated key limits");
@@ -267,12 +279,12 @@ public class UpdateService : BackgroundService
 
                 // Request the next status update. Obsolete fields are left out unless somebody wants them,
                 // else every poll would carry the deprecated live values for nobody's benefit
-                await RequestModelAsync(string.Empty, _obsoleteQueries ? "d99fno" : "d99fn", stoppingToken);
+                await RequestModelAsync(string.Empty, _obsoleteQueries ? "d99fo" : "d99f", stoppingToken);
 
                 // Update frequently changing properties
                 using (await _model.AccessReadWriteAsync(stoppingToken))
                 {
-                    UpdateModel();
+                    UpdateModel(_obsoleteQueries ? (ModelUpdateScope.Live | ModelUpdateScope.Obsolete) : ModelUpdateScope.Live);
                     if (_model.IsUpdating && _model.State.Status != MachineStatus.Updating)
                     {
                         _model.State.Status = MachineStatus.Updating;
@@ -296,7 +308,7 @@ public class UpdateService : BackgroundService
                             int offset = next;
                             using (await _model.AccessReadWriteAsync(stoppingToken))
                             {
-                                next = UpdateModel(offset);
+                                next = UpdateModel(keyScope, offset);
                                 if (_keyUpdated)
                                 {
                                     _logger.LogDebug("Updated key {Key}{Annotation}", key, (offset + next != 0) ? $" starting from {offset}, next {next}" : string.Empty);

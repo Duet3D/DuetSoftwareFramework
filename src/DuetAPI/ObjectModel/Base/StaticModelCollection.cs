@@ -29,6 +29,14 @@ public class StaticModelCollection<T> : ObservableCollection<T>, IModelCollectio
     /// <param name="list">List to use for items</param>
     public StaticModelCollection(List<T> list) : base(list) { }
 
+    /// <summary>
+    /// Create a new item for the given index
+    /// </summary>
+    /// <param name="index">Index the new item is going to be stored at</param>
+    /// <returns>New item</returns>
+    /// <remarks>Overridden by collections whose item class depends on the position, see <see cref="Boards"/></remarks>
+    protected virtual T CreateItem(int index) => new();
+
     /// <inheritdoc />
     protected override void ClearItems()
     {
@@ -156,7 +164,7 @@ public class StaticModelCollection<T> : ObservableCollection<T>, IModelCollectio
                 {
                     if (item == null)
                     {
-                        item = new T();
+                        item = CreateItem(i)!;
                         item.UpdateFromJson(jsonItem, ignoreSbcProperties);
                         this[i] = item;
                     }
@@ -184,7 +192,7 @@ public class StaticModelCollection<T> : ObservableCollection<T>, IModelCollectio
             {
                 try
                 {
-                    T newItem = new();
+                    T newItem = CreateItem(i)!;
                     newItem.UpdateFromJson(jsonItem, ignoreSbcProperties);
                     Add(newItem);
                 }
@@ -200,7 +208,7 @@ public class StaticModelCollection<T> : ObservableCollection<T>, IModelCollectio
     void IStaticModelObject.UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties) => UpdateFromJson(jsonElement, ignoreSbcProperties, 0, true);
 
     /// <inheritdoc />
-    public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, int offset = 0, bool last = true)
+    public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, int offset = 0, bool last = true, ModelUpdateScope scope = ModelUpdateScope.Patch)
     {
         if (reader.TokenType != JsonTokenType.StartArray)
         {
@@ -219,8 +227,8 @@ public class StaticModelCollection<T> : ObservableCollection<T>, IModelCollectio
                 {
                     if (i >= Count)
                     {
-                        T newItem = new();
-                        newItem.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                        T newItem = CreateItem(i)!;
+                        newItem.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);
                         Add(newItem);
                     }
                     else
@@ -228,13 +236,13 @@ public class StaticModelCollection<T> : ObservableCollection<T>, IModelCollectio
                         T? item = this[i];
                         if (item == null)
                         {
-                            item = new T();
-                            item.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            item = CreateItem(i)!;
+                            item.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);
                             this[i] = item;
                         }
                         else
                         {
-                            item.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            item.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);
                         }
                     }
                 }
@@ -270,5 +278,5 @@ public class StaticModelCollection<T> : ObservableCollection<T>, IModelCollectio
     }
 
     /// <inheritdoc />
-    public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties) => UpdateFromJsonReader(ref reader, ignoreSbcProperties, 0, true);
+    public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, ModelUpdateScope scope) => UpdateFromJsonReader(ref reader, ignoreSbcProperties, 0, true, scope);
 }

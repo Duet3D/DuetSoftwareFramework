@@ -97,10 +97,11 @@ public partial class DirectDisplayScreen : ModelObject, IDynamicModelObject
     /// </summary>
     /// <param name="reader">JSON reader</param>
     /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+    /// <param name="scope">Extent of this update</param>
     /// <returns>Updated instance</returns>
     /// <exception cref="JsonException">Failed to deserialize data</exception>
 
-    public IDynamicModelObject? UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
+    public IDynamicModelObject? UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, ModelUpdateScope scope = ModelUpdateScope.Patch)
     {
         if (reader.TokenType == JsonTokenType.None && !reader.Read())
         {
@@ -127,13 +128,13 @@ public partial class DirectDisplayScreen : ModelObject, IDynamicModelObject
                         if (this is not DirectDisplayScreenST7567)
                         {
                             DirectDisplayScreenST7567 newInstance = new();
-                            return newInstance.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            return newInstance.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);
                         }
                     }
                     else if (this is DirectDisplayScreenST7567)
                     {
                         DirectDisplayScreen newInstance = new();
-                        return newInstance.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                        return newInstance.UpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);
                     }
                 }
                 else
@@ -142,6 +143,6 @@ public partial class DirectDisplayScreen : ModelObject, IDynamicModelObject
                 }
             }
         }
-        return GeneratedUpdateFromJsonReader(ref reader, ignoreSbcProperties);
+        return GeneratedUpdateFromJsonReader(ref reader, ignoreSbcProperties, scope);
     }
 }
