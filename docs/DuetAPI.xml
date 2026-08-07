@@ -3755,10 +3755,10 @@
         <member name="M:DuetAPI.ObjectModel.DynamicModelCollection`1.DuetAPI#ObjectModel#IStaticModelObject#UpdateFromJson(System.Text.Json.JsonElement,System.Boolean)">
             <inheritdoc />
         </member>
-        <member name="M:DuetAPI.ObjectModel.DynamicModelCollection`1.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,System.Int32,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.DynamicModelCollection`1.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,System.Int32,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <inheritdoc />
         </member>
-        <member name="M:DuetAPI.ObjectModel.DynamicModelCollection`1.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.DynamicModelCollection`1.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <inheritdoc />
         </member>
         <member name="T:DuetAPI.ObjectModel.IDynamicModelObject">
@@ -3783,12 +3783,13 @@
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.IDynamicModelObject.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.IDynamicModelObject.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON reader
             </summary>
             <param name="reader">JSON reader</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
@@ -3806,7 +3807,7 @@
             <param name="offset">Index offset</param>
             <param name="last">Whether this is the last update</param>
         </member>
-        <member name="M:DuetAPI.ObjectModel.IModelCollection.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,System.Int32,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.IModelCollection.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,System.Int32,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this collection from a given JSON reader
             </summary>
@@ -3814,6 +3815,7 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <param name="offset">Index offset</param>
             <param name="last">Whether this is the last update</param>
+            <param name="scope">Extent of this update</param>
         </member>
         <member name="T:DuetAPI.ObjectModel.IModelDictionary">
             <summary>
@@ -3895,12 +3897,13 @@
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.IStaticModelObject.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.IStaticModelObject.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON reader
             </summary>
             <param name="reader">JSON reader</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="T:DuetAPI.ObjectModel.JsonModelDictionary">
@@ -4068,7 +4071,7 @@
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
             <remarks>Accepts null as the JSON value to clear existing items</remarks>
         </member>
-        <member name="M:DuetAPI.ObjectModel.JsonModelDictionary.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.JsonModelDictionary.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <inheritdoc />
         </member>
         <member name="T:DuetAPI.ObjectModel.JsonModelDictionaryConverter">
@@ -4131,10 +4134,10 @@
         <member name="M:DuetAPI.ObjectModel.MessageCollection.UpdateFromJson(System.Text.Json.JsonElement,System.Boolean,System.Int32,System.Boolean)">
             <inheritdoc />
         </member>
-        <member name="M:DuetAPI.ObjectModel.MessageCollection.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,System.Int32,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.MessageCollection.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,System.Int32,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <inheritdoc />
         </member>
-        <member name="M:DuetAPI.ObjectModel.MessageCollection.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.MessageCollection.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <inheritdoc />
         </member>
         <member name="T:DuetAPI.ObjectModel.ModelObject">
@@ -4308,6 +4311,40 @@
             Plain observable collection of values
             </summary>
         </member>
+        <member name="T:DuetAPI.ObjectModel.ModelUpdateScope">
+            <summary>
+            Extent of a JSON update telling which missing properties may be reset to null
+            </summary>
+            <remarks>
+            Firmware responses omit null values unless they are explicitly requested, so a missing property only
+            means "null" if the request asked for the category of values that property belongs to
+            </remarks>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.ModelUpdateScope.Patch">
+            <summary>
+            Update holds changed values only, so nothing is reset
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.ModelUpdateScope.Live">
+            <summary>
+            Update holds every live value, see <see cref="T:DuetAPI.ObjectModel.LiveAttribute"/>
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.ModelUpdateScope.Full">
+            <summary>
+            Update is a complete snapshot of the keys it contains
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.ModelUpdateScope.Verbose">
+            <summary>
+            Update holds verbose values, see <see cref="T:DuetAPI.ObjectModel.VerboseAttribute"/>
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.ModelUpdateScope.Obsolete">
+            <summary>
+            Update holds values of properties flagged as obsolete
+            </summary>
+        </member>
         <member name="T:DuetAPI.ObjectModel.SbcPropertyAttribute">
             <summary>
             Attribute used to mark properties that are overridden by the control server
@@ -4348,6 +4385,14 @@
             </summary>
             <param name="list">List to use for items</param>
         </member>
+        <member name="M:DuetAPI.ObjectModel.StaticModelCollection`1.CreateItem(System.Int32)">
+            <summary>
+            Create a new item for the given index
+            </summary>
+            <param name="index">Index the new item is going to be stored at</param>
+            <returns>New item</returns>
+            <remarks>Overridden by collections whose item class depends on the position, see <see cref="T:DuetAPI.ObjectModel.Boards"/></remarks>
+        </member>
         <member name="M:DuetAPI.ObjectModel.StaticModelCollection`1.ClearItems">
             <inheritdoc />
         </member>
@@ -4376,10 +4421,10 @@
         <member name="M:DuetAPI.ObjectModel.StaticModelCollection`1.DuetAPI#ObjectModel#IStaticModelObject#UpdateFromJson(System.Text.Json.JsonElement,System.Boolean)">
             <inheritdoc />
         </member>
-        <member name="M:DuetAPI.ObjectModel.StaticModelCollection`1.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,System.Int32,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.StaticModelCollection`1.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,System.Int32,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <inheritdoc />
         </member>
-        <member name="M:DuetAPI.ObjectModel.StaticModelCollection`1.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.StaticModelCollection`1.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <inheritdoc />
         </member>
         <member name="T:DuetAPI.ObjectModel.StaticModelDictionary`1">
@@ -4627,12 +4672,13 @@
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
             <remarks>Accepts null as the JSON value to clear existing items</remarks>
         </member>
-        <member name="M:DuetAPI.ObjectModel.StaticModelDictionary`1.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.StaticModelDictionary`1.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON reader
             </summary>
             <param name="reader">JSON reader</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="T:DuetAPI.ObjectModel.VerboseAttribute">
@@ -4687,13 +4733,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Accelerometer.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Accelerometer.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Accelerometer.TypeDescriptor">
@@ -4721,6 +4768,10 @@
             <summary>
             Information about a connected board
             </summary>
+            <remarks>
+            Every item of the boards array is either a <see cref="T:DuetAPI.ObjectModel.MainBoard"/> or an <see cref="T:DuetAPI.ObjectModel.ExpansionBoard"/>,
+            which is decided by its position, see <see cref="T:DuetAPI.ObjectModel.Boards"/>
+            </remarks>
         </member>
         <member name="P:DuetAPI.ObjectModel.Board.Accelerometer">
             <summary>
@@ -4730,16 +4781,6 @@
         <member name="P:DuetAPI.ObjectModel.Board.CanAddress">
             <summary>
             CAN address of this board or null if not applicable
-            </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.Board.ClosedLoop">
-            <summary>
-            Closed loop data of this board or null if unknown
-            </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.Board.DirectDisplay">
-            <summary>
-            Details about a connected display or null if none is connected
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.Board.Drivers">
@@ -4757,45 +4798,14 @@
             Filename of the firmware binary
             </summary>
         </member>
-        <member name="P:DuetAPI.ObjectModel.Board.FirmwareName">
-            <summary>
-            Name of the firmware build
-            </summary>
-        </member>
         <member name="P:DuetAPI.ObjectModel.Board.FirmwareVersion">
             <summary>
             Version of the firmware build
             </summary>
         </member>
-        <member name="P:DuetAPI.ObjectModel.Board.IapFileNameSBC">
-            <summary>
-            Filename of the IAP binary that is used for updates from the SBC or null if unsupported
-            </summary>
-            <remarks>
-            This is only available for the mainboard (first board item)
-            </remarks>
-        </member>
         <member name="P:DuetAPI.ObjectModel.Board.FreeRam">
             <summary>
             Amount of free RAM on this board (in bytes or null if unknown)
-            </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.Board.IapFileNameSD">
-            <summary>
-            Filename of the IAP binary that is used for updates from the SD card or null if unsupported
-            </summary>
-            <remarks>
-            This is only available for the mainboard (first board item)
-            </remarks>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.Board.InductiveSensor">
-            <summary>
-            Information about an inductive sensor or null if not present
-            </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.Board.MaxHeaters">
-            <summary>
-            Maximum number of heaters this board can control
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.Board.MaxMotors">
@@ -4818,21 +4828,6 @@
             Short name of this board
             </summary>
         </member>
-        <member name="P:DuetAPI.ObjectModel.Board.State">
-            <summary>
-            State of this board
-            </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.Board.SupportsDirectDisplay">
-            <summary>
-            Indicates if this board supports external displays
-            </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.Board.Timeout">
-            <summary>
-            Connection timeout of this board (in s)
-            </summary>
-        </member>
         <member name="P:DuetAPI.ObjectModel.Board.UniqueId">
             <summary>
             Unique identifier of the board or null if unknown
@@ -4846,11 +4841,6 @@
         <member name="P:DuetAPI.ObjectModel.Board.VIn">
             <summary>
             Minimum, maximum, and current voltages on the input rail or null if unknown
-            </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.Board.WifiFirmwareFileName">
-            <summary>
-            Filename of the on-board WiFi chip or null if not present
             </summary>
         </member>
         <member name="M:DuetAPI.ObjectModel.Board.Assign(DuetAPI.ObjectModel.IStaticModelObject)">
@@ -4876,13 +4866,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Board.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Board.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Board.TypeDescriptor">
@@ -4944,13 +4935,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.BoardClosedLoop.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.BoardClosedLoop.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.BoardClosedLoop.TypeDescriptor">
@@ -4973,6 +4965,15 @@
             <returns>Property value</returns>
             <exception cref="T:System.ArgumentOutOfRangeException">Property index is invalid</exception>
             <remarks>This method is auto-generated</remarks>
+        </member>
+        <member name="T:DuetAPI.ObjectModel.Boards">
+            <summary>
+            List of connected boards
+            </summary>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.Boards.CreateItem(System.Int32)">
+            <inheritdoc />
+            <remarks>The first board is the mainboard, every other one is an expansion board connected over CAN</remarks>
         </member>
         <member name="T:DuetAPI.ObjectModel.BoardState">
             <summary>
@@ -5047,13 +5048,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.DirectDisplay.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.DirectDisplay.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.DirectDisplay.TypeDescriptor">
@@ -5130,13 +5132,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.DirectDisplayEncoder.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.DirectDisplayEncoder.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.DirectDisplayEncoder.TypeDescriptor">
@@ -5199,12 +5202,13 @@
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.DirectDisplayScreen.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.DirectDisplayScreen.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON reader
             </summary>
             <param name="reader">JSON reader</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
@@ -5233,7 +5237,7 @@
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.DirectDisplayScreen.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.DirectDisplayScreen.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
@@ -5241,6 +5245,7 @@
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <returns>Updated instance</returns>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.DirectDisplayScreen.TypeDescriptor">
@@ -5304,7 +5309,7 @@
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.DirectDisplayScreenST7567.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.DirectDisplayScreenST7567.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
@@ -5312,6 +5317,7 @@
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <returns>Updated instance</returns>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.DirectDisplayScreenST7567.TypeDescriptor">
@@ -5381,13 +5387,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Driver.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Driver.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Driver.TypeDescriptor">
@@ -5449,13 +5456,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.ClosedLoopCurrentFraction.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.ClosedLoopCurrentFraction.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.ClosedLoopCurrentFraction.TypeDescriptor">
@@ -5517,13 +5525,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.ClosedLoopPositionError.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.ClosedLoopPositionError.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.ClosedLoopPositionError.TypeDescriptor">
@@ -5585,13 +5594,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.DriverClosedLoop.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.DriverClosedLoop.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.DriverClosedLoop.TypeDescriptor">
@@ -5653,13 +5663,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.DriverConfig.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.DriverConfig.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.DriverConfig.TypeDescriptor">
@@ -5718,6 +5729,85 @@
             Driver mode is unknown
             </summary>
         </member>
+        <member name="T:DuetAPI.ObjectModel.ExpansionBoard">
+            <summary>
+            Information about an expansion board connected over CAN
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ExpansionBoard.ClosedLoop">
+            <summary>
+            Closed loop data of this board or null if unknown
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ExpansionBoard.InductiveSensor">
+            <summary>
+            Information about an inductive sensor or null if not present
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ExpansionBoard.State">
+            <summary>
+            State of this board
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ExpansionBoard.Timeout">
+            <summary>
+            Connection timeout of this board (in s)
+            </summary>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.ExpansionBoard.Assign(DuetAPI.ObjectModel.IStaticModelObject)">
+            <summary>
+            Assign the properties from another instance.
+            This is required to update model properties which do not have a setter
+            </summary>
+            <param name="from">Other instance</param>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.ExpansionBoard.Clone">
+            <summary>
+            Clone this instance
+            </summary>
+            <remarks>This method is auto-generated</remarks>
+            <returns>Cloned instance</returns>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.ExpansionBoard.UpdateFromJson(System.Text.Json.JsonElement,System.Boolean)">
+            <summary>
+            Update this instance from a given JSON element
+            </summary>
+            <remarks>This method is auto-generated</remarks>
+            <param name="jsonElement">Element to update this intance from</param>
+            <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.ExpansionBoard.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
+            <summary>
+            Update this instance from a given JSON element
+            </summary>
+            <remarks>This method is auto-generated</remarks>
+            <param name="reader">Reader to update this intance from</param>
+            <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
+            <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ExpansionBoard.TypeDescriptor">
+            <summary>
+            Static description of this type
+            </summary>
+            <remarks>This property is auto-generated</remarks>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ExpansionBoard.Descriptor">
+            <summary>
+            Static description of this instance's type
+            </summary>
+            <remarks>This property is auto-generated</remarks>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.ExpansionBoard.GetPropertyValue(System.Int32)">
+            <summary>
+            Read the value of the property with the given index
+            </summary>
+            <param name="index">Index of the property</param>
+            <returns>Property value</returns>
+            <exception cref="T:System.ArgumentOutOfRangeException">Property index is invalid</exception>
+            <remarks>This method is auto-generated</remarks>
+        </member>
         <member name="T:DuetAPI.ObjectModel.InductiveSensor">
             <summary>
             Information about an inductive sensor
@@ -5746,13 +5836,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.InductiveSensor.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.InductiveSensor.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.InductiveSensor.TypeDescriptor">
@@ -5768,6 +5859,100 @@
             <remarks>This property is auto-generated</remarks>
         </member>
         <member name="M:DuetAPI.ObjectModel.InductiveSensor.GetPropertyValue(System.Int32)">
+            <summary>
+            Read the value of the property with the given index
+            </summary>
+            <param name="index">Index of the property</param>
+            <returns>Property value</returns>
+            <exception cref="T:System.ArgumentOutOfRangeException">Property index is invalid</exception>
+            <remarks>This method is auto-generated</remarks>
+        </member>
+        <member name="T:DuetAPI.ObjectModel.MainBoard">
+            <summary>
+            Information about the mainboard, which is always the first item of the boards array
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MainBoard.DirectDisplay">
+            <summary>
+            Details about a connected display or null if none is connected
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MainBoard.FirmwareName">
+            <summary>
+            Name of the firmware build
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MainBoard.IapFileNameSBC">
+            <summary>
+            Filename of the IAP binary that is used for updates from the SBC or null if unsupported
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MainBoard.IapFileNameSD">
+            <summary>
+            Filename of the IAP binary that is used for updates from the SD card or null if unsupported
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MainBoard.MaxHeaters">
+            <summary>
+            Maximum number of heaters this board can control
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MainBoard.SupportsDirectDisplay">
+            <summary>
+            Indicates if this board supports external displays
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MainBoard.WifiFirmwareFileName">
+            <summary>
+            Filename of the on-board WiFi chip or null if not present
+            </summary>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.MainBoard.Assign(DuetAPI.ObjectModel.IStaticModelObject)">
+            <summary>
+            Assign the properties from another instance.
+            This is required to update model properties which do not have a setter
+            </summary>
+            <param name="from">Other instance</param>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.MainBoard.Clone">
+            <summary>
+            Clone this instance
+            </summary>
+            <remarks>This method is auto-generated</remarks>
+            <returns>Cloned instance</returns>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.MainBoard.UpdateFromJson(System.Text.Json.JsonElement,System.Boolean)">
+            <summary>
+            Update this instance from a given JSON element
+            </summary>
+            <remarks>This method is auto-generated</remarks>
+            <param name="jsonElement">Element to update this intance from</param>
+            <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.MainBoard.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
+            <summary>
+            Update this instance from a given JSON element
+            </summary>
+            <remarks>This method is auto-generated</remarks>
+            <param name="reader">Reader to update this intance from</param>
+            <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
+            <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MainBoard.TypeDescriptor">
+            <summary>
+            Static description of this type
+            </summary>
+            <remarks>This property is auto-generated</remarks>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MainBoard.Descriptor">
+            <summary>
+            Static description of this instance's type
+            </summary>
+            <remarks>This property is auto-generated</remarks>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.MainBoard.GetPropertyValue(System.Int32)">
             <summary>
             Read the value of the property with the given index
             </summary>
@@ -5819,13 +6004,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.MinMaxCurrent.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.MinMaxCurrent.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.MinMaxCurrent.TypeDescriptor">
@@ -5915,13 +6101,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Directories.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Directories.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Directories.TypeDescriptor">
@@ -6023,13 +6210,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Fan.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Fan.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Fan.TypeDescriptor">
@@ -6099,13 +6287,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.FanThermostaticControl.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.FanThermostaticControl.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.FanThermostaticControl.TypeDescriptor">
@@ -6207,13 +6396,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Heat.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Heat.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Heat.TypeDescriptor">
@@ -6346,13 +6536,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Heater.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Heater.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Heater.TypeDescriptor">
@@ -6454,13 +6645,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.HeaterModel.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.HeaterModel.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.HeaterModel.TypeDescriptor">
@@ -6532,13 +6724,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.HeaterModelPID.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.HeaterModelPID.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.HeaterModelPID.TypeDescriptor">
@@ -6610,13 +6803,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.HeaterMonitor.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.HeaterMonitor.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.HeaterMonitor.TypeDescriptor">
@@ -6903,13 +7097,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.InputChannel.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.InputChannel.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.InputChannel.TypeDescriptor">
@@ -7131,13 +7326,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Build.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Build.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Build.TypeDescriptor">
@@ -7209,13 +7405,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.BuildObject.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.BuildObject.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.BuildObject.TypeDescriptor">
@@ -7327,13 +7524,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.GCodeFileInfo.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.GCodeFileInfo.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.GCodeFileInfo.TypeDescriptor">
@@ -7477,13 +7675,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Job.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Job.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Job.TypeDescriptor">
@@ -7566,13 +7765,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Layer.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Layer.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Layer.TypeDescriptor">
@@ -7657,13 +7857,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.ThumbnailInfo.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.ThumbnailInfo.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.ThumbnailInfo.TypeDescriptor">
@@ -7755,13 +7956,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.TimesLeft.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.TimesLeft.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.TimesLeft.TypeDescriptor">
@@ -7843,13 +8045,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.LedStrip.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.LedStrip.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.LedStrip.TypeDescriptor">
@@ -8098,13 +8301,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Limits.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Limits.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Limits.TypeDescriptor">
@@ -8373,13 +8577,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Axis.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Axis.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Axis.TypeDescriptor">
@@ -8476,13 +8681,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.CurrentMove.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.CurrentMove.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.CurrentMove.TypeDescriptor">
@@ -8629,13 +8835,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Extruder.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Extruder.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Extruder.TypeDescriptor">
@@ -8702,13 +8909,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.ExtruderNonlinear.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.ExtruderNonlinear.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.ExtruderNonlinear.TypeDescriptor">
@@ -8775,13 +8983,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.ExtruderPressureAdvance.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.ExtruderPressureAdvance.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.ExtruderPressureAdvance.TypeDescriptor">
@@ -8858,13 +9067,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.InputShaping.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.InputShaping.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.InputShaping.TypeDescriptor">
@@ -8971,13 +9181,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.KeepoutZoneCoordinates.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.KeepoutZoneCoordinates.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.KeepoutZoneCoordinates.TypeDescriptor">
@@ -9039,13 +9250,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.KeepoutZone.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.KeepoutZone.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.KeepoutZone.TypeDescriptor">
@@ -9114,7 +9326,7 @@
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.CoreKinematics.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.CoreKinematics.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
@@ -9122,6 +9334,7 @@
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <returns>Updated instance</returns>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.CoreKinematics.TypeDescriptor">
@@ -9205,7 +9418,7 @@
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.DeltaKinematics.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.DeltaKinematics.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
@@ -9213,6 +9426,7 @@
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <returns>Updated instance</returns>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.DeltaKinematics.TypeDescriptor">
@@ -9289,13 +9503,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.DeltaTower.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.DeltaTower.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.DeltaTower.TypeDescriptor">
@@ -9359,7 +9574,7 @@
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.HangprinterKinematics.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.HangprinterKinematics.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
@@ -9367,6 +9582,7 @@
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <returns>Updated instance</returns>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.HangprinterKinematics.TypeDescriptor">
@@ -9414,12 +9630,13 @@
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Kinematics.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Kinematics.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON reader
             </summary>
             <param name="reader">JSON reader</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
@@ -9448,7 +9665,7 @@
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Kinematics.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Kinematics.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
@@ -9456,6 +9673,7 @@
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <returns>Updated instance</returns>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Kinematics.TypeDescriptor">
@@ -9616,7 +9834,7 @@
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.PolarKinematics.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.PolarKinematics.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
@@ -9624,6 +9842,7 @@
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <returns>Updated instance</returns>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.PolarKinematics.TypeDescriptor">
@@ -9717,7 +9936,7 @@
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.ScaraKinematics.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.ScaraKinematics.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
@@ -9725,6 +9944,7 @@
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <returns>Updated instance</returns>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.ScaraKinematics.TypeDescriptor">
@@ -9806,13 +10026,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.TiltCorrection.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.TiltCorrection.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.TiltCorrection.TypeDescriptor">
@@ -9871,7 +10092,7 @@
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.ZLeadscrewKinematics.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.ZLeadscrewKinematics.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
@@ -9879,6 +10100,7 @@
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <returns>Updated instance</returns>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.ZLeadscrewKinematics.TypeDescriptor">
@@ -9940,13 +10162,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Microstepping.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Microstepping.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Microstepping.TypeDescriptor">
@@ -10063,13 +10286,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.MotionSystem.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.MotionSystem.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.MotionSystem.TypeDescriptor">
@@ -10131,13 +10355,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.MotorsIdleControl.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.MotorsIdleControl.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.MotorsIdleControl.TypeDescriptor">
@@ -10308,7 +10533,7 @@
             <param name="jsonElement">JSON element</param>
             <param name="ignoreSbcProperties">Ignore SBC properties</param>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Move.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Move.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
@@ -10316,12 +10541,14 @@
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <param name="last">Whether Move.Axes is final</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Move.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Move.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>Wrapper function for JSON updates</summary>
             <param name="reader">JSON reader</param>
             <param name="ignoreSbcProperties">Ignore SBC properties</param>
+            <param name="scope">Extent of this update</param>
         </member>
         <member name="P:DuetAPI.ObjectModel.Move.TypeDescriptor">
             <summary>
@@ -10387,13 +10614,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.MoveCalibration.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.MoveCalibration.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.MoveCalibration.TypeDescriptor">
@@ -10480,13 +10708,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.MoveCompensation.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.MoveCompensation.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.MoveCompensation.TypeDescriptor">
@@ -10563,13 +10792,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.MoveDeviations.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.MoveDeviations.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.MoveDeviations.TypeDescriptor">
@@ -10631,13 +10861,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.MoveQueueItem.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.MoveQueueItem.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.MoveQueueItem.TypeDescriptor">
@@ -10699,13 +10930,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.MoveRotation.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.MoveRotation.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.MoveRotation.TypeDescriptor">
@@ -10767,13 +10999,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.MoveSegmentation.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.MoveSegmentation.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.MoveSegmentation.TypeDescriptor">
@@ -10851,13 +11084,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.ProbeGrid.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.ProbeGrid.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.ProbeGrid.TypeDescriptor">
@@ -10929,13 +11163,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Skew.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Skew.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Skew.TypeDescriptor">
@@ -11023,13 +11258,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Network.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Network.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Network.TypeDescriptor">
@@ -11156,13 +11392,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.NetworkInterface.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.NetworkInterface.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.NetworkInterface.TypeDescriptor">
@@ -11429,7 +11666,7 @@
             <param name="last">Whether this is the last update</param>
             <returns>Whether the key could be updated</returns>
         </member>
-        <member name="M:DuetAPI.ObjectModel.ObjectModel.UpdateFromFirmwareJsonReader(System.String,System.Text.Json.Utf8JsonReader@,System.Int32,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.ObjectModel.UpdateFromFirmwareJsonReader(System.String,System.Text.Json.Utf8JsonReader@,System.Int32,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update a specific key of this instance from a given JSON reader as provided by the firmware
             </summary>
@@ -11437,6 +11674,7 @@
             <param name="reader">JSON reader</param>
             <param name="offset">Index offset</param>
             <param name="last">Whether this is the last update. May be used to flag whether move.axes is about to be updated, too</param>
+            <param name="scope">Extent of this update</param>
             <returns>Whether the key could be updated</returns>
         </member>
         <member name="M:DuetAPI.ObjectModel.ObjectModel.UpdateFromJson(System.Text.Json.JsonElement)">
@@ -11502,7 +11740,7 @@
             <param name="last">Whether this is the last update (collection keys only)</param>
             <returns>Whether the key could be updated</returns>
         </member>
-        <member name="M:DuetAPI.ObjectModel.ObjectModel.GeneratedUpdateFromJsonReader(System.String,System.Text.Json.Utf8JsonReader@,System.Boolean,System.Int32,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.ObjectModel.GeneratedUpdateFromJsonReader(System.String,System.Text.Json.Utf8JsonReader@,System.Boolean,System.Int32,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON reader
             </summary>
@@ -11511,6 +11749,7 @@
             <param name="reader">JSON reader</param> /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <param name="offset">Index offset (collection keys only)</param>
             <param name="last">Whether this is the last update (collection keys only)</param>
+            <param name="scope">Extent of this update</param>
             <returns>Whether the key could be updated</returns>
         </member>
         <member name="M:DuetAPI.ObjectModel.ObjectModel.Assign(DuetAPI.ObjectModel.IStaticModelObject)">
@@ -11536,13 +11775,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.ObjectModel.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.ObjectModel.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.ObjectModel.TypeDescriptor">
@@ -11699,6 +11939,11 @@
             Defines the source generated JSON serialization contract metadata for a given type.
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.ObjectModelContext.Boards">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
         <member name="P:DuetAPI.ObjectModel.ObjectModelContext.BoardState">
             <summary>
             Defines the source generated JSON serialization contract metadata for a given type.
@@ -11840,6 +12085,11 @@
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.ObjectModelContext.EventLogLevel">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ObjectModelContext.ExpansionBoard">
             <summary>
             Defines the source generated JSON serialization contract metadata for a given type.
             </summary>
@@ -12070,6 +12320,11 @@
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.ObjectModelContext.MachineStatus">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ObjectModelContext.MainBoard">
             <summary>
             Defines the source generated JSON serialization contract metadata for a given type.
             </summary>
@@ -12325,11 +12580,6 @@
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.ObjectModelContext.StaticModelCollectionAxis">
-            <summary>
-            Defines the source generated JSON serialization contract metadata for a given type.
-            </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.ObjectModelContext.StaticModelCollectionBoard">
             <summary>
             Defines the source generated JSON serialization contract metadata for a given type.
             </summary>
@@ -12696,13 +12946,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Plugin.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Plugin.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Plugin.TypeDescriptor">
@@ -12897,13 +13148,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.PluginManifest.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.PluginManifest.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.PluginManifest.TypeDescriptor">
@@ -12975,13 +13227,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.CPU.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.CPU.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.CPU.TypeDescriptor">
@@ -13091,13 +13344,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.DSF.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.DSF.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.DSF.TypeDescriptor">
@@ -13187,13 +13441,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.HttpEndpoint.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.HttpEndpoint.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.HttpEndpoint.TypeDescriptor">
@@ -13351,13 +13606,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.UserSession.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.UserSession.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.UserSession.TypeDescriptor">
@@ -13419,13 +13675,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Memory.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Memory.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Memory.TypeDescriptor">
@@ -13530,13 +13787,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.SBC.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.SBC.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.SBC.TypeDescriptor">
@@ -13598,13 +13856,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Upgrade.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Upgrade.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Upgrade.TypeDescriptor">
@@ -13727,13 +13986,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.AnalogSensor.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.AnalogSensor.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.AnalogSensor.TypeDescriptor">
@@ -13941,13 +14201,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Endstop.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Endstop.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Endstop.TypeDescriptor">
@@ -14062,7 +14323,7 @@
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Duet3DFilamentMonitor.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Duet3DFilamentMonitor.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
@@ -14070,6 +14331,7 @@
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <returns>Updated instance</returns>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Duet3DFilamentMonitor.TypeDescriptor">
@@ -14132,12 +14394,13 @@
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.FilamentMonitor.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.FilamentMonitor.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON reader
             </summary>
             <param type="reader">JSON reader</param>
             <param type="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param type="scope">Extent of this update</param>
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
@@ -14166,7 +14429,7 @@
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.FilamentMonitor.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.FilamentMonitor.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
@@ -14174,6 +14437,7 @@
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <returns>Updated instance</returns>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.FilamentMonitor.TypeDescriptor">
@@ -14335,13 +14599,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.LaserFilamentMonitorCalibrated.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.LaserFilamentMonitorCalibrated.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.LaserFilamentMonitorCalibrated.TypeDescriptor">
@@ -14418,13 +14683,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.LaserFilamentMonitorConfigured.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.LaserFilamentMonitorConfigured.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.LaserFilamentMonitorConfigured.TypeDescriptor">
@@ -14493,7 +14759,7 @@
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.LaserFilamentMonitor.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.LaserFilamentMonitor.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
@@ -14501,6 +14767,7 @@
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <returns>Updated instance</returns>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.LaserFilamentMonitor.TypeDescriptor">
@@ -14572,13 +14839,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.PulsedFilamentMonitorCalibrated.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.PulsedFilamentMonitorCalibrated.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.PulsedFilamentMonitorCalibrated.TypeDescriptor">
@@ -14650,13 +14918,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.PulsedFilamentMonitorConfigured.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.PulsedFilamentMonitorConfigured.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.PulsedFilamentMonitorConfigured.TypeDescriptor">
@@ -14730,7 +14999,7 @@
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.PulsedFilamentMonitor.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.PulsedFilamentMonitor.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
@@ -14738,6 +15007,7 @@
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <returns>Updated instance</returns>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.PulsedFilamentMonitor.TypeDescriptor">
@@ -14809,13 +15079,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.RotatingMagnetFilamentMonitorCalibrated.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.RotatingMagnetFilamentMonitorCalibrated.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.RotatingMagnetFilamentMonitorCalibrated.TypeDescriptor">
@@ -14892,13 +15163,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.RotatingMagnetFilamentMonitorConfigured.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.RotatingMagnetFilamentMonitorConfigured.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.RotatingMagnetFilamentMonitorConfigured.TypeDescriptor">
@@ -14972,7 +15244,7 @@
             <returns>Updated instance</returns>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.RotatingMagnetFilamentMonitor.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.RotatingMagnetFilamentMonitor.GeneratedUpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
@@ -14980,6 +15252,7 @@
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <returns>Updated instance</returns>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.RotatingMagnetFilamentMonitor.TypeDescriptor">
@@ -15036,13 +15309,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.GpInputPort.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.GpInputPort.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.GpInputPort.TypeDescriptor">
@@ -15202,13 +15476,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Probe.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Probe.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Probe.TypeDescriptor">
@@ -15280,13 +15555,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.ProbeTouchMode.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.ProbeTouchMode.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.ProbeTouchMode.TypeDescriptor">
@@ -15436,13 +15712,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Sensors.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Sensors.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Sensors.TypeDescriptor">
@@ -15669,13 +15946,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Spindle.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Spindle.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Spindle.TypeDescriptor">
@@ -15777,13 +16055,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.BeepRequest.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.BeepRequest.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.BeepRequest.TypeDescriptor">
@@ -15845,13 +16124,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.GpOutputPort.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.GpOutputPort.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.GpOutputPort.TypeDescriptor">
@@ -16081,13 +16361,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.MessageBox.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.MessageBox.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.MessageBox.TypeDescriptor">
@@ -16224,13 +16505,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.RestorePoint.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.RestorePoint.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.RestorePoint.TypeDescriptor">
@@ -16297,13 +16579,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.StartupError.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.StartupError.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.StartupError.TypeDescriptor">
@@ -16488,13 +16771,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.State.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.State.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.State.TypeDescriptor">
@@ -16665,13 +16949,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Tool.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Tool.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Tool.TypeDescriptor">
@@ -16748,13 +17033,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.ToolRetraction.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.ToolRetraction.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.ToolRetraction.TypeDescriptor">
@@ -16866,13 +17152,14 @@
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
-        <member name="M:DuetAPI.ObjectModel.Volume.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean)">
+        <member name="M:DuetAPI.ObjectModel.Volume.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
             <summary>
             Update this instance from a given JSON element
             </summary>
             <remarks>This method is auto-generated</remarks>
             <param name="reader">Reader to update this intance from</param>
             <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
             <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
         </member>
         <member name="P:DuetAPI.ObjectModel.Volume.TypeDescriptor">
