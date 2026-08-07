@@ -24,12 +24,17 @@ All endpoints except `connect` require an `X-Session-Key` header (or, for the We
 | Method & path | Purpose |
 | --- | --- |
 | `GET /machine/model` | Return the full [object model](object-model.md) as JSON |
-| `WS /machine?sessionKey={key}` | Subscribe to model updates over a WebSocket |
+| `WS /machine?sessionKey={key}&verbose={true\|false}&obsolete={true\|false}` | Subscribe to model updates over a WebSocket |
 
 The WebSocket sends the complete model first, then JSON [patches](object-model.md#observing-changes-and-patches)
 for each change. The client replies `OK\n` to acknowledge each message and may send `PING\n` (the
 server answers `PONG\n`) as a keep-alive. This path is backed by a [`Subscribe` connection](ipc.md#subscribe)
 to DCS.
+
+`verbose` and `obsolete` default to `false` and add the object model fields flagged as verbose or
+obsolete to the subscription, see the [`Subscribe` connection mode](ipc.md#subscribe). Both are
+properties of the connection rather than of a request, so a client that changes its mind has to open
+the WebSocket again.
 
 ## Code execution
 

@@ -116,6 +116,13 @@ Streams [object-model](object-model.md#observing-changes-and-patches) state to t
 set of filter paths restricts what is sent. The [DuetWebServer WebSocket](components.md#duetwebserver)
 and the `ModelObserver` tool both use this mode.
 
+Fields flagged as verbose or obsolete are left out unless the subscriber asks for them via the
+`Verbose` and `Obsolete` flags of `SubscribeInitMessage`. DCS reads those fields from RRF once on
+start-up and from then on only while at least one subscriber wants them, so a client that displays
+them has to keep the flag set for the lifetime of its connection. Both are properties of the
+connection and cannot be changed afterwards; the subscriber reconnects instead, which also delivers
+a fresh model carrying the extra fields.
+
 ### PluginService
 
 An internal mode used only by [DuetPluginService](plugins.md). It is bidirectional: DCS queues

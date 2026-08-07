@@ -93,6 +93,16 @@ merges each section with the generated `UpdateFromFirmwareJson` methods, skippin
 fields. Per-section sequence numbers (`Seqs`) tell DCS which sections actually changed since the last
 poll, so it only re-requests what moved.
 
+Those requests do not ask RRF for null values, which would otherwise be spelled out for every unset
+field on every poll. A property missing from the response is turned back into null by the generated
+`UpdateFromJsonReader` methods instead: each of them tracks in a bitmask which properties the payload
+contained and resets the nullable ones that were absent. Since RRF only reports a field if the query
+asked for its category, the reset is guarded by a `ModelUpdateScope` that mirrors the flags of the
+query the data came from - a live poll resets `[Live]` properties only, a full key query resets the
+rest as well, and verbose or obsolete properties are only reset when the query asked for them.
+Requests to DCS itself are unaffected: `GetObjectModel` and the subscriptions are patches, which
+never reset anything.
+
 `Model/PeriodicUpdateService.cs` fills in the host-side facts the firmware cannot know - network
 interfaces, storage volumes, SBC CPU/memory/distribution info. It gathers these asynchronously
 outside the lock, then applies them under a brief write lock.
