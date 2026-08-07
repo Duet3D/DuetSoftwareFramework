@@ -11,11 +11,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Install .NET environment
       - name: Set up .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10
 
@@ -49,13 +49,13 @@ jobs:
       contents: write
     steps:
       # The release ref is a tag, so check out the branch it was cut from to push the docs back
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.release.target_commitish }}
 
       # Install .NET environment
       - name: Set up .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10
 
