@@ -43,7 +43,7 @@ public class WebSocketEndpoint
     }
 
     /// <summary>
-    /// WS /machine?sessionKey=XXX
+    /// WS /machine?sessionKey=XXX&amp;verbose=true&amp;obsolete=true
     /// Provide WebSocket for continuous model updates. This is primarily used to keep DWC up-to-date
     /// </summary>
     /// <param name="context">HTTP context</param>
@@ -52,8 +52,10 @@ public class WebSocketEndpoint
     /// <param name="applicationLifetime">Application lifecycle instance</param>
     /// <param name="sessionStorage">Session storage singleton</param>
     /// <param name="sessionKey">Optional session key for authentication</param>
+    /// <param name="verbose">Whether object model fields flagged as verbose are required</param>
+    /// <param name="obsolete">Whether object model fields flagged as obsolete are required</param>
     /// <returns>Asynchronous task</returns>
-    private static async Task Get(HttpContext context, ILogger<WebSocketEndpoint> logger, IOptionsMonitor<Settings> settingsMonitor, IHostApplicationLifetime applicationLifetime, ISessionStorage sessionStorage, string? sessionKey)
+    private static async Task Get(HttpContext context, ILogger<WebSocketEndpoint> logger, IOptionsMonitor<Settings> settingsMonitor, IHostApplicationLifetime applicationLifetime, ISessionStorage sessionStorage, string? sessionKey, bool verbose = false, bool obsolete = false)
     {
         Settings settings = settingsMonitor.CurrentValue;
 
@@ -127,7 +129,7 @@ public class WebSocketEndpoint
                 sessionStorage.SetWebSocketState(sessionKey, true);
             }
             using WebSocket webSocket = await context.WebSockets.AcceptWebSocketAsync();
-            await Process(context, logger, settings, applicationLifetime, webSocket);
+            await Process(context, logger, settings, applicationLifetime, webSocket, verbose, obsolete);
         }
         finally
         {
@@ -150,14 +152,17 @@ public class WebSocketEndpoint
     /// <param name="settings">Application settings</param>
     /// <param name="applicationLifetime">Application lifecycle instance</param>
     /// <param name="webSocket">WebSocket connection</param>
+    /// <param name="verbose">Whether object model fields flagged as verbose are required</param>
+    /// <param name="obsolete">Whether object model fields flagged as obsolete are required</param>
     /// <returns>Asynchronous task</returns>
-    private static async Task Process(HttpContext context, ILogger logger, Settings settings, IHostApplicationLifetime applicationLifetime, WebSocket webSocket)
+    private static async Task Process(HttpContext context, ILogger logger, Settings settings, IHostApplicationLifetime applicationLifetime, WebSocket webSocket, bool verbose, bool obsolete)
     {
         using SubscribeConnection subscribeConnection = new();
         try
         {
-            // Subscribe to object model updates targeting the HTTP code channel
-            await subscribeConnection.ConnectAsync(SubscriptionMode.Patch, CodeChannel.HTTP, [], settings.SocketPath);
+            // Subscribe to object model updates targeting the HTTP code channel. Both are fixed for the
+            // lifetime of the connection, so a client that changes its mind has to open a new socket
+            await subscribeConnection.ConnectAsync(SubscriptionMode.Patch, CodeChannel.HTTP, [], settings.SocketPath, verbose, obsolete);
         }
         catch (Exception e)
         {

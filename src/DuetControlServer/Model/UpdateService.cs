@@ -56,6 +56,16 @@ public class UpdateService : BackgroundService
     private readonly List<string> _updatedKeys = [];
 
     /// <summary>
+    /// Whether the last object model queries asked RRF for fields flagged as verbose
+    /// </summary>
+    private bool _verboseQueries;
+
+    /// <summary>
+    /// Whether the last object model queries asked RRF for fields flagged as obsolete
+    /// </summary>
+    private bool _obsoleteQueries;
+
+    /// <summary>
     /// Request the object model from the firmware
     /// </summary>
     /// <param name="key">Key to query</param>
@@ -220,12 +230,31 @@ public class UpdateService : BackgroundService
                 updateInterface.WaitForConditionA = !updateInterface.WaitForConditionA;
 #endif
 
+                // Verbose and obsolete fields are read once on start-up and from then on only while a
+                // subscriber asks for them. Sequence numbers do not change just because a client changed its
+                // mind, so drop them to have every key read again. Losing the last subscriber needs no
+                // resync, the values that were already read simply go stale
+                if ((IPC.Processors.ModelSubscription.VerboseSubscribers && !_verboseQueries) ||
+                    (IPC.Processors.ModelSubscription.ObsoleteSubscribers && !_obsoleteQueries))
+                {
+                    _logger.LogDebug("Resyncing object model because a subscriber requires extra fields");
+                    using (await _model.AccessReadWriteAsync(stoppingToken))
+                    {
+                        _model.Seqs.Clear();
+                    }
+                }
+                _verboseQueries = IPC.Processors.ModelSubscription.VerboseSubscribers;
+                _obsoleteQueries = IPC.Processors.ModelSubscription.ObsoleteSubscribers;
+
+                bool initialQuery = _model.Seqs.Count == 0;
+                string keyFlags = "d99n" + ((_verboseQueries || initialQuery) ? "v" : string.Empty) + ((_obsoleteQueries || initialQuery) ? "o" : string.Empty);
+
                 // Request the limits if no sequence numbers have been set yet
                 if (_model.Seqs.Count == 0)
                 {
                     _logger.LogDebug("Requesting initial limits");
 
-                    await RequestModelAsync("limits", "d99vno", stoppingToken);
+                    await RequestModelAsync("limits", keyFlags, stoppingToken);
                     using (await _model.AccessReadWriteAsync(stoppingToken))
                     {
                         UpdateModel();
@@ -236,8 +265,9 @@ public class UpdateService : BackgroundService
                     }
                 }
 
-                // Request the next status update
-                await RequestModelAsync(string.Empty, "d99fno", stoppingToken);
+                // Request the next status update. Obsolete fields are left out unless somebody wants them,
+                // else every poll would carry the deprecated live values for nobody's benefit
+                await RequestModelAsync(string.Empty, _obsoleteQueries ? "d99fno" : "d99fn", stoppingToken);
 
                 // Update frequently changing properties
                 using (await _model.AccessReadWriteAsync(stoppingToken))
@@ -261,7 +291,7 @@ public class UpdateService : BackgroundService
                         int next = 0;
                         do
                         {
-                            await RequestModelAsync(key, (next == 0) ? "d99vno" : $"d99vnoa{next}", stoppingToken);
+                            await RequestModelAsync(key, (next == 0) ? keyFlags : $"{keyFlags}a{next}", stoppingToken);
 
                             int offset = next;
                             using (await _model.AccessReadWriteAsync(stoppingToken))

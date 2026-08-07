@@ -82,6 +82,38 @@ public sealed class ModelSubscription : IProcessor
     private readonly object[][] _filters;
 
     /// <summary>
+    /// Whether this subscriber requires object model fields flagged as verbose
+    /// </summary>
+    private readonly bool _verbose;
+
+    /// <summary>
+    /// Number of subscribers that require object model fields flagged as verbose
+    /// </summary>
+    private static int _verboseSubscribers;
+
+    /// <summary>
+    /// Whether any subscriber requires object model fields flagged as verbose.
+    /// Read by the update service to decide if the queries to RRF have to ask for them
+    /// </summary>
+    public static bool VerboseSubscribers => Volatile.Read(ref _verboseSubscribers) > 0;
+
+    /// <summary>
+    /// Whether this subscriber requires object model fields flagged as obsolete
+    /// </summary>
+    private readonly bool _obsolete;
+
+    /// <summary>
+    /// Number of subscribers that require object model fields flagged as obsolete
+    /// </summary>
+    private static int _obsoleteSubscribers;
+
+    /// <summary>
+    /// Whether any subscriber requires object model fields flagged as obsolete.
+    /// Read by the update service to decide if the queries to RRF have to ask for them
+    /// </summary>
+    public static bool ObsoleteSubscribers => Volatile.Read(ref _obsoleteSubscribers) > 0;
+
+    /// <summary>
     /// Dictionary of updated fields (in Patch mode)
     /// </summary>
     private readonly Dictionary<string, object?> _patch = [];
@@ -142,6 +174,18 @@ public sealed class ModelSubscription : IProcessor
         _logger = logger;
         _settings = settings.Value;
         _jsonWriter = new(_settings.IpcJsonBufferSize);
+
+        _verbose = subscribeInitMessage.Verbose;
+        if (_verbose)
+        {
+            Interlocked.Increment(ref _verboseSubscribers);
+        }
+
+        _obsolete = subscribeInitMessage.Obsolete;
+        if (_obsolete)
+        {
+            Interlocked.Increment(ref _obsoleteSubscribers);
+        }
 
         lock (_subscriptions)
         {
@@ -257,6 +301,16 @@ public sealed class ModelSubscription : IProcessor
         }
         finally
         {
+            if (_verbose)
+            {
+                Interlocked.Decrement(ref _verboseSubscribers);
+            }
+
+            if (_obsolete)
+            {
+                Interlocked.Decrement(ref _obsoleteSubscribers);
+            }
+
             lock (_subscriptions)
             {
                 _subscriptions.Remove(this);

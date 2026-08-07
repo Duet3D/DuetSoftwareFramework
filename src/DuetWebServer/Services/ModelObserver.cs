@@ -97,7 +97,7 @@ public sealed class ModelObserver(IOptionsMonitor<Settings> settings, ILogger<Mo
                         "messages/**",
                         "network/corsSite",
                         "sbc/dsf/httpEndpoints/**"
-                    ], Settings.SocketPath, cancellationToken);
+                    ], Settings.SocketPath, cancellationToken: cancellationToken);
                     await commandConnection.ConnectAsync(Settings.SocketPath, cancellationToken);
                     logger.LogInformation("Connections to DuetControlServer established");
 

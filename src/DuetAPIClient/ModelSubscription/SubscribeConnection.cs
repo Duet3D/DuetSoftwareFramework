@@ -45,24 +45,42 @@ public sealed class SubscribeConnection : BaseConnection
     public List<string> Filters { get; } = [];
 
     /// <summary>
+    /// Whether object model fields flagged as verbose are required. Decided when connecting and fixed
+    /// for the lifetime of the connection, so changing it means connecting again
+    /// </summary>
+    /// <seealso cref="SubscribeInitMessage.Verbose"/>
+    public bool Verbose { get; private set; }
+
+    /// <summary>
+    /// Whether object model fields flagged as obsolete are required. Decided when connecting and fixed
+    /// for the lifetime of the connection, so changing it means connecting again
+    /// </summary>
+    /// <seealso cref="SubscribeInitMessage.Obsolete"/>
+    public bool Obsolete { get; private set; }
+
+    /// <summary>
     /// Establishes a connection to the given UNIX socket file
     /// </summary>
     /// <param name="mode">Subscription mode</param>
     /// <param name="filters">Optional filter strings</param>
     /// <param name="socketPath">Optional path to the DCS UNIX socket file</param>
+    /// <param name="verbose">Whether object model fields flagged as verbose are required</param>
+    /// <param name="obsolete">Whether object model fields flagged as obsolete are required</param>
     /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
     /// <exception cref="IOException">Connection mode is unavailable</exception>
     /// <exception cref="SocketException">Init message could not be processed</exception>
-    public void Connect(SubscriptionMode mode, IEnumerable<string>? filters = null, string? socketPath = null)
+    public void Connect(SubscriptionMode mode, IEnumerable<string>? filters = null, string? socketPath = null, bool verbose = false, bool obsolete = false)
     {
         Mode = mode;
+        Verbose = verbose;
+        Obsolete = obsolete;
         Filters.Clear();
         if (filters is not null)
         {
             Filters.AddRange(filters);
         }
 
-        SubscribeInitMessage initMessage = new() { SubscriptionMode = mode, Filters = Filters };
+        SubscribeInitMessage initMessage = new() { SubscriptionMode = mode, Filters = Filters, Verbose = Verbose, Obsolete = Obsolete };
         Connect(initMessage, socketPath);
     }
 
@@ -72,22 +90,26 @@ public sealed class SubscribeConnection : BaseConnection
     /// <param name="mode">Subscription mode</param>
     /// <param name="filters">Optional filter strings</param>
     /// <param name="socketPath">Optional path to the DCS UNIX socket file</param>
+    /// <param name="verbose">Whether object model fields flagged as verbose are required</param>
+    /// <param name="obsolete">Whether object model fields flagged as obsolete are required</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
     /// <exception cref="IOException">Connection mode is unavailable</exception>
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Init message could not be processed</exception>
-    public async Task ConnectAsync(SubscriptionMode mode, IEnumerable<string>? filters = null, string? socketPath = null, CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(SubscriptionMode mode, IEnumerable<string>? filters = null, string? socketPath = null, bool verbose = false, bool obsolete = false, CancellationToken cancellationToken = default)
     {
         Mode = mode;
+        Verbose = verbose;
+        Obsolete = obsolete;
         Filters.Clear();
         if (filters is not null)
         {
             Filters.AddRange(filters);
         }
 
-        SubscribeInitMessage initMessage = new() { SubscriptionMode = mode, Filters = Filters };
+        SubscribeInitMessage initMessage = new() { SubscriptionMode = mode, Filters = Filters, Verbose = Verbose, Obsolete = Obsolete };
         await ConnectAsync(initMessage, socketPath, cancellationToken).ConfigureAwait(false);
     }
 
@@ -98,20 +120,24 @@ public sealed class SubscribeConnection : BaseConnection
     /// <param name="channel">Optional code channel to receive messages from (not applicable in Full mode)</param>
     /// <param name="filters">Optional filter strings</param>
     /// <param name="socketPath">Optional path to the DCS UNIX socket file</param>
+    /// <param name="verbose">Whether object model fields flagged as verbose are required</param>
+    /// <param name="obsolete">Whether object model fields flagged as obsolete are required</param>
     /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
     /// <exception cref="IOException">Connection mode is unavailable</exception>
     /// <exception cref="SocketException">Init message could not be processed</exception>
-    public void Connect(SubscriptionMode mode, CodeChannel? channel, IEnumerable<string>? filters = null, string? socketPath = null)
+    public void Connect(SubscriptionMode mode, CodeChannel? channel, IEnumerable<string>? filters = null, string? socketPath = null, bool verbose = false, bool obsolete = false)
     {
         Mode = mode;
         Channel = channel;
+        Verbose = verbose;
+        Obsolete = obsolete;
         Filters.Clear();
         if (filters is not null)
         {
             Filters.AddRange(filters);
         }
 
-        SubscribeInitMessage initMessage = new() { SubscriptionMode = mode, Channel = Channel, Filters = Filters };
+        SubscribeInitMessage initMessage = new() { SubscriptionMode = mode, Channel = Channel, Filters = Filters, Verbose = Verbose, Obsolete = Obsolete };
         Connect(initMessage, socketPath);
     }
 
@@ -122,23 +148,27 @@ public sealed class SubscribeConnection : BaseConnection
     /// <param name="channel">Optional code channel to receive messages from (not applicable in Full mode)</param>
     /// <param name="filters">Optional filter strings</param>
     /// <param name="socketPath">Optional path to the DCS UNIX socket file</param>
+    /// <param name="verbose">Whether object model fields flagged as verbose are required</param>
+    /// <param name="obsolete">Whether object model fields flagged as obsolete are required</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
     /// <exception cref="IncompatibleVersionException">API level is incompatible</exception>
     /// <exception cref="IOException">Connection mode is unavailable</exception>
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>
     /// <exception cref="SocketException">Init message could not be processed</exception>
-    public async Task ConnectAsync(SubscriptionMode mode, CodeChannel? channel, IEnumerable<string>? filters = null, string? socketPath = null, CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(SubscriptionMode mode, CodeChannel? channel, IEnumerable<string>? filters = null, string? socketPath = null, bool verbose = false, bool obsolete = false, CancellationToken cancellationToken = default)
     {
         Mode = mode;
         Channel = channel;
+        Verbose = verbose;
+        Obsolete = obsolete;
         Filters.Clear();
         if (filters is not null)
         {
             Filters.AddRange(filters);
         }
 
-        SubscribeInitMessage initMessage = new() { SubscriptionMode = mode, Channel = Channel, Filters = Filters };
+        SubscribeInitMessage initMessage = new() { SubscriptionMode = mode, Channel = Channel, Filters = Filters, Verbose = Verbose, Obsolete = Obsolete };
         await ConnectAsync(initMessage, socketPath, cancellationToken).ConfigureAwait(false);
     }
 

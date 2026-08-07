@@ -32,4 +32,22 @@ public class SubscribeInitMessage : ClientInitMessage
     /// however it can be only used at the end of a filter expression
     /// </remarks>
     public List<string> Filters { get; set; } = [];
+
+    /// <summary>
+    /// Whether object model fields flagged as verbose are required
+    /// </summary>
+    /// <remarks>
+    /// Verbose fields are read once when DCS starts up and then only while at least one subscriber asks for
+    /// them, so a client that displays them has to set this for the lifetime of its connection
+    /// </remarks>
+    public bool Verbose { get; set; }
+
+    /// <summary>
+    /// Whether object model fields flagged as obsolete are required
+    /// </summary>
+    /// <remarks>
+    /// Handled like <see cref="Verbose"/>: read once when DCS starts up and then only while at least one
+    /// subscriber asks for them. Only of interest to clients that still read deprecated fields
+    /// </remarks>
+    public bool Obsolete { get; set; }
 }

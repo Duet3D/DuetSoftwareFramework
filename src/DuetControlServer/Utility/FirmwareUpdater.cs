@@ -251,7 +251,7 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
             await commandConnection.ConnectAsync(settings.Value.FullSocketPath, cancellationToken);
             await commandConnection.SyncObjectModelAsync(cancellationToken);
 
-            await subscribeConnection.ConnectAsync(SubscriptionMode.Patch, ["boards/**", "directories/**", "state/status"], settings.Value.FullSocketPath, cancellationToken);
+            await subscribeConnection.ConnectAsync(SubscriptionMode.Patch, ["boards/**", "directories/**", "state/status"], settings.Value.FullSocketPath, cancellationToken: cancellationToken);
             objectModel = await subscribeConnection.GetObjectModelAsync(cancellationToken);
         }
         catch
