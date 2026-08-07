@@ -1,0 +1,51 @@
+name: Update DuetAPI documentation
+
+# The object model TypeScript library generates its documentation sidecar from DuetAPI.xml and cannot
+# build DSF itself, so the file is kept in docs/ where that library's release workflow fetches it from
+# the branch of the same name. The documentation job in release.yml refreshes it as well, but only per
+# release, which would leave the sidecar behind for as long as a release cycle lasts
+
+on:
+  push:
+    branches:
+      - v*-dev
+    paths:
+      - src/DuetAPI/**
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: api-documentation-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10
+
+      # Only this one project, not the solution - the XML doc file is all that is needed here and the
+      # source generators it references come along as a project reference
+      - name: Build DuetAPI
+        run: dotnet build -c Release src/DuetAPI/DuetAPI.csproj
+
+      # The commit touches docs/ only, which the paths filter above excludes, so this cannot retrigger
+      - name: Commit DuetAPI.xml
+        run: |
+          cp src/DuetAPI/DuetAPI.xml docs/DuetAPI.xml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/DuetAPI.xml
+          if git diff --staged --quiet; then
+            echo "DuetAPI.xml is already up to date"
+          else
+            git commit -m "Updated DuetAPI documentation"
+            git push
+          fi
