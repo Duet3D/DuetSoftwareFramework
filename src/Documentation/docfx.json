@@ -39,6 +39,12 @@
         "files": [
           "images/**"
         ]
+      },
+      {
+        "src": "../DuetAPI",
+        "files": [
+          "DuetAPI.xml"
+        ]
       }
     ],
     "overwrite": [
