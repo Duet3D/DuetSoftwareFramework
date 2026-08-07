@@ -113,6 +113,17 @@ public partial class RotatingMagnetFilamentMonitor : Duet3DFilamentMonitor
     public RotatingMagnetFilamentMonitor() => Type = FilamentMonitorType.RotatingMagnet;
 
     /// <summary>
+    /// AGC reading of this filament monitor (null if unknown)
+    /// </summary>
+    [Live]
+    public int? Agc
+    {
+        get => _agc;
+        set => SetPropertyValue(ref _agc, value);
+    }
+    private int? _agc;
+
+    /// <summary>
     /// Calibrated properties of this filament monitor
     /// </summary>
     public RotatingMagnetFilamentMonitorCalibrated? Calibrated
