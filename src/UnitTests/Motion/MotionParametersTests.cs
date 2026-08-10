@@ -427,4 +427,105 @@ public class MotionParametersTests
             Assert.That(parameters.NumExtruders, Is.Zero);
         });
     }
+
+    [Test]
+    public void ASnapshotMatchesTheMachineItWasTakenFrom()
+    {
+        Move move = MachineWithOneOfEach();
+        Assert.That(MotionParameters.FromObjectModel(move).MatchesObjectModel(move), Is.True);
+    }
+
+    [Test]
+    public void AnEmptySnapshotDoesNotMatchAConfiguredMachine()
+    {
+        // What the planner holds before the motion service has configured it. Planning against it
+        // would address no drives at all, so it has to be visible rather than silently do nothing
+        Assert.Multiple(() =>
+        {
+            Assert.That(MotionParameters.CreateDefault().MatchesObjectModel(MachineWithOneOfEach()), Is.False);
+            Assert.That(MotionParameters.CreateDefault().MatchesObjectModel(new Move()), Is.True);
+        });
+    }
+
+    [Test]
+    public void AnAxisAddedAfterTheSnapshotIsADivergence()
+    {
+        // M584 creates axes and reconfigures afterwards. If that reconfiguration did not happen the
+        // snapshot describes a machine that no longer exists, and every drive above the new axis has
+        // moved in the drive space
+        Move move = MachineWithOneOfEach();
+        MotionParameters parameters = MotionParameters.FromObjectModel(move);
+
+        move.Axes.Add(new Axis { Letter = 'Y', StepsPerMm = 80.0f });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(parameters.MatchesObjectModel(move), Is.False);
+            Assert.That(parameters.SharedAxisCount(move), Is.EqualTo(2), "bounded by what was snapshotted");
+        });
+    }
+
+    [Test]
+    public void AnAxisRemovedAfterTheSnapshotIsADivergence()
+    {
+        Move move = MachineWithOneOfEach();
+        MotionParameters parameters = MotionParameters.FromObjectModel(move);
+
+        move.Axes.RemoveAt(1);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(parameters.MatchesObjectModel(move), Is.False);
+            Assert.That(parameters.SharedAxisCount(move), Is.EqualTo(1), "bounded by what the object model still has");
+        });
+    }
+
+    [Test]
+    public void AnExtruderChangeAfterTheSnapshotIsADivergence()
+    {
+        Move move = MachineWithOneOfEach();
+        MotionParameters parameters = MotionParameters.FromObjectModel(move);
+
+        move.Extruders.Add(new Extruder());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(parameters.MatchesObjectModel(move), Is.False);
+            Assert.That(parameters.SharedExtruderCount(move), Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void SettingAnAxisLimitFollowsThroughToTheGeometry()
+    {
+        // G1 H3 measures an axis and writes the limit it found. The geometry holds the copy that
+        // every move is clamped against, so it has to follow without the whole snapshot being rebuilt
+        Move move = MachineWithOneOfEach();
+        move.Axes[0].Min = -5.0f;
+        move.Axes[0].Max = 200.0f;
+
+        MotionParameters parameters = MotionParameters.FromObjectModel(move);
+        Assert.That(parameters.Geometry.AxisMaxima[0], Is.EqualTo(200.0f));
+
+        parameters.SetAxisLimits(0, -5.0f, 187.5f);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(parameters.Geometry.AxisMinima[0], Is.EqualTo(-5.0f));
+            Assert.That(parameters.Geometry.AxisMaxima[0], Is.EqualTo(187.5f));
+        });
+    }
+
+    [Test]
+    public void SettingTheLimitOfAnAxisThatDoesNotExistDoesNothing()
+    {
+        MotionParameters parameters = MotionParameters.FromObjectModel(MachineWithOneOfEach());
+
+        Assert.DoesNotThrow(() =>
+        {
+            parameters.SetAxisLimits(-1, 0.0f, 100.0f);
+            parameters.SetAxisLimits(parameters.NumAxes, 0.0f, 100.0f);
+        });
+        Assert.That(parameters.Geometry.AxisMaxima[parameters.NumAxes], Is.Zero);
+    }
 }

@@ -112,10 +112,84 @@ internal sealed class MotionParameters
     /// <summary>Slowest a move may run, mm per step clock</summary>
     public float MinFeedrate { get; private init; }
 
+    /// <summary>Axes the object model held when this snapshot was taken</summary>
+    /// <remarks>
+    /// Kept unclamped, unlike <see cref="NumAxes"/>, because it is what the object model is compared
+    /// against rather than what can be planned for
+    /// </remarks>
+    private int ConfiguredAxes { get; init; }
+
+    /// <summary>Extruders the object model held when this snapshot was taken</summary>
+    private int ConfiguredExtruders { get; init; }
+
     /// <summary>
     /// First logical drive that is an extruder
     /// </summary>
     public int FirstExtruderDrive => NumDrives - NumExtruders;
+
+    /// <summary>
+    /// Whether this still describes the object model it was taken from
+    /// </summary>
+    /// <param name="move">The move subsystem of the object model</param>
+    /// <returns>True if the two agree about what the machine is made of</returns>
+    /// <remarks>
+    /// <para>
+    /// Only M584 changes how many axes and extruders there are, and it calls
+    /// <see cref="MovePlanner.ReconfigureAsync"/> after it has, so these agree in normal operation.
+    /// They diverge when that reconfiguration did not happen or did not succeed - the engine rejected
+    /// the description, or the motion service never started - and a planner working from a snapshot
+    /// of a machine that no longer exists would address the wrong drives.
+    /// </para>
+    /// <para>
+    /// Checked rather than clamped around, because there is no safe number of axes to plan for when
+    /// the two disagree: the snapshot has the geometry and steps per mm for axes the object model may
+    /// no longer have, and the object model has axes the snapshot knows nothing about
+    /// </para>
+    /// </remarks>
+    public bool MatchesObjectModel(Move move)
+        => move.Axes.Count == ConfiguredAxes && move.Extruders.Count == ConfiguredExtruders;
+
+    /// <summary>
+    /// Axes that can be addressed both here and in the object model
+    /// </summary>
+    /// <param name="move">The move subsystem of the object model</param>
+    /// <returns>The lower of the two counts</returns>
+    /// <remarks>
+    /// A bound for loops that read from both, so neither is indexed past its end. It is not a
+    /// substitute for <see cref="MatchesObjectModel"/>: where the two disagree this silently plans
+    /// for fewer axes than the machine has, which is why the move path refuses the move instead
+    /// </remarks>
+    public int SharedAxisCount(Move move) => Math.Min(NumAxes, move.Axes.Count);
+
+    /// <summary>
+    /// Extruders that can be addressed both here and in the object model
+    /// </summary>
+    /// <param name="move">The move subsystem of the object model</param>
+    /// <returns>The lower of the two counts</returns>
+    /// <remarks>The extruder counterpart of <see cref="SharedAxisCount"/></remarks>
+    public int SharedExtruderCount(Move move) => Math.Min(NumExtruders, move.Extruders.Count);
+
+    /// <summary>
+    /// Follow a change to one axis' travel limits
+    /// </summary>
+    /// <param name="axis">The axis whose limits changed</param>
+    /// <param name="min">Its new lower limit in mm</param>
+    /// <param name="max">Its new upper limit in mm</param>
+    /// <remarks>
+    /// The geometry holds the M208 box because every geometry limits positions with it, so it is a
+    /// copy of <c>move.axes[].min</c> and <c>max</c> and has to follow them. M208 goes through
+    /// <see cref="MovePlanner.ReconfigureAsync"/> and rebuilds the whole snapshot; G1 H3 writes the
+    /// limit it measured and nothing else, so it updates the copy here instead of rebuilding a
+    /// description that is otherwise unchanged
+    /// </remarks>
+    public void SetAxisLimits(int axis, float min, float max)
+    {
+        if (axis >= 0 && axis < NumAxes)
+        {
+            Geometry.AxisMinima[axis] = min;
+            Geometry.AxisMaxima[axis] = max;
+        }
+    }
 
     /// <summary>
     /// The logical drive an extruder occupies
@@ -193,6 +267,8 @@ internal sealed class MotionParameters
         {
             NumAxes = numAxes,
             NumExtruders = numExtruders,
+            ConfiguredAxes = move.Axes.Count,
+            ConfiguredExtruders = move.Extruders.Count,
             Geometry = BuildGeometry(move.Kinematics),
             LinearAxes = linearAxes,
             RotationalAxes = rotationalAxes,

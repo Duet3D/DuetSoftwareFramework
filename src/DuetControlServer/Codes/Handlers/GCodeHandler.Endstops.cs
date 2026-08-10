@@ -62,7 +62,7 @@ internal sealed partial class GCodeHandler
 
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            int numAxes = Math.Min(planner.Parameters.NumAxes, model.Move.Axes.Count);
+            int numAxes = planner.Parameters.SharedAxisCount(model.Move);
             float feedRateMmPerSec = StallHomingSpeed(code, numAxes);
 
             for (int axis = 0; axis < numAxes; axis++)

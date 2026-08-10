@@ -12,7 +12,10 @@ done.
 The G-codes that share the same subsystems are tracked here too where they matter: §10 covers the
 `G1 H` endstop moves, §11 audits G0/G1 straight moves against `GCodes::DoStraightMove` and holds the
 plan for closing the gaps, and §12 is a planned change to §10's architecture that should land before
-§11's phase E.
+§11's phase E. §11.5 is a second audit taken once phases A-E had landed, covering the code either
+side of `DoStraightMove` that those phases made reachable; §11.6 records what the SBC-side DDA ring
+no longer does. §13 reviews whether `MotionParameters` is still needed now that the planning path
+holds the object model lock, and records the two bugs that review found.
 
 ---
 
@@ -222,7 +225,7 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 |---|---|---|---|---|---|
 | M290 | 2812 | Babystepping | `move.axes[].babystep` | no | ✅ |
 | M425 | 3223 | Backlash compensation | `move.axes[].backlash`, `move.backlashFactor` | yes | ✅ |
-| M556 | 3653 | Axis skew compensation | `move.compensation.skew` | no | ✅ |
+| M556 | 3653 | Axis skew compensation | `move.compensation.skew` | no | 🟡 stored, never applied — §11.5 item 22 |
 | M579 | 3925 | Scale Cartesian axes | needs new field — §6 | no | ⬜ |
 | M665 | 4052 | Delta configuration | `move.kinematics` (`DeltaKinematics`) | yes | ✅ |
 | M666 | 4082 | Delta endstop adjustments | `move.kinematics` (`DeltaKinematics`) | yes | ✅ |
@@ -1479,11 +1482,15 @@ there, and it is a prerequisite for phases D and E.
    [Axis.cs](src/DuetAPI/ObjectModel/Move/Axis.cs) says it means. `G92`, `FinishHomingMoveAsync` and
    the probing handlers write through `RedefineMachinePosition`, which is the one place the inverse
    transform is used.
-4. ✅ Add **G53** and **`runningSystemMacro`** while the transform is being touched. The latter is
+4. 🟡 Add **G53** and **`runningSystemMacro`** while the transform is being touched. The latter is
    `CodeFlags.IsFromSystemMacro`, set by `MacroRunner` — every caller there is the firmware asking
    for a file of its own except M98 and the code-named-after-itself fallback, which say so. It is
    inherited from the start code, which is the same link RepRapFirmware inherits it down the machine
    state stack for. *(item 7)*
+
+   **G53 landed; `runningSystemMacro` did not** — the flag is set and is read for `applyM220M221`,
+   but `BuildRawMove` still adds the workplace offset inside a system macro. Reopened as §11.5 item
+   21.
 5. ✅ Add the `abandonMove` rollback — `currentUserPosition` is now updated before the move can be
    rejected, which is exactly the situation RRF's lambda exists for. It matters immediately, not just
    for phase D: the ring-full path retries the same code, and a relative move applied twice is a real
@@ -1607,6 +1614,183 @@ within **15 microns** of the line when cut into 32 segments.
 34. **M486 object cancellation** — dropping the move, the object coordinate bounds, and
     `IsFirstMoveSincePrintingResumed` / `TravelToStartPoint`. **M597 collision checking**,
     **M599 keepout zones**. *(§11.3)*
+
+### 11.5 Second audit, after phases A-E landed
+
+The first audit walked `DoStraightMove`, `LoadFeedrateFromGCode` and `LoadExtrusionFromGCode`. This
+one walks the parts of the pipeline either side of those, which phases A-E made reachable:
+`GCodes::ReadMove` (`:3280-3409`), `Move::Spin`'s transform hook (`Movement/Move.cpp:718-755`), the
+transforms themselves (`Movement/Move3.cpp`), the `waitingForSpecialMoveToComplete` state
+(`GCodes4.cpp:62-162`), and the SBC-side `DDA` / `DDARing` against RepRapFirmware's.
+
+Same 6HC assumptions as §11 — none of these can be dismissed as not built on this hardware.
+
+| # | Gap | RRF | Cost of not having it |
+|---|---|---|---|
+| 17 | **Bed compensation is baked into the segment interpolation base** | `:2356`, `:3368-3371` vs `Movement/DDA.cpp:319-321` | Z steps up by roughly the full mesh correction at the start of every segmented move and ramps back down across it |
+| 18 | **Only `InputPin` endstops complete a homing move** | `GCodes4.cpp:66-131` | A stall-homed or probe-as-endstop axis is never marked homed and never adopts its position, so G28 reports failure |
+| 19 | **The endstop state is re-read live rather than latched** | `GCodes.cpp:5530`, `ms.endstopsTriggered` | The switch is read after the wind-back has put the axis back on its threshold |
+| 20 | **`HoldAxis` writes an axis position into a raw motor move** | `:2335-2353` | Wrong coordinate space on every `HomesIndividualDrives` geometry when a switch is already closed |
+| 21 | **`runningSystemMacro` still applies workplace offsets** | `GCodeMachineState.h:310`, `:2421-2424` | Reopens phase A4: with a non-zero G54 offset every move in a system macro is shifted by it |
+| 22 | **M556 axis skew is stored but never applied** | `Move3.cpp:34-57` | The object model describes a skew correction the machine does not make |
+| 23 | **`zShift` missing from the height correction** | `Move3.cpp:113`, `:153-169` | A G30 cannot normalise the height map to zero error at the probe point |
+| 24 | **Segments from two channels can interleave** | `GCodes2.cpp:256` | Both locks are dropped between segments when the ring is full |
+| 25 | **`H` was not range-checked** | `:2225` | ✅ fixed, see below |
+
+**17. The segment interpolation base carries the previous move's mesh correction.** This is the one
+that changes printed output, and it is a consequence of collapsing two RepRapFirmware variables into
+one. RRF keeps them apart:
+
+- `ms.initialCoords` (`:2356`, advanced per segment at `:3369-3371`) is tool-transformed but
+  **not** bed-transformed. It is what `ReadMove` interpolates from, what `LimitPosition` gets as its
+  initial position, and what the segment count is measured against.
+- the ring's `startCoordinates` (`Movement/DDA.cpp:319-321`) **is** bed-transformed, because
+  `Move::Spin` applies `AxisAndBedTransform` to the copy `ReadMove` handed it (`Move.cpp:726-735`)
+  before `AddStandardMove` sees it. It exists only so the DDA can difference one move's target
+  against the last one's.
+
+DSF has one array for both roles: [MoveBuilder.StartCoordinates](src/DuetControlServer/Motion/MoveBuilder.cs#L58).
+[MoveBuilder.Build](src/DuetControlServer/Motion/MoveBuilder.cs#L199-L200) assigns it from
+`move.Coords`, and by then [PrepareSegment](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L435-L438)
+has already added the mesh correction. So `SegmentedMove.From` takes a `Start` whose Z includes the
+*previous* move's correction and a `Target` that includes none, interpolates between them, and then
+adds each segment's own correction on top.
+
+For a constant-Z printing move that comes out as `Z(k) = target + c_prev·(1 - k/N) + c(k)`: the
+first segment sits nearly two corrections high and the error decays linearly to zero at the end of
+the move. Since a Cartesian or CoreXY 6HC has `SegmentationType.None`, mesh compensation is the
+*only* thing that segments a move on that hardware — so this is not an edge case, it is every
+printing move with a height map loaded.
+
+The same conflation reaches two other places, both smaller:
+
+- [SyncInterpreterToMachine](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L1457) undoes only
+  babystepping, where RRF's `ToolOffsetInverseTransform` is preceded by `InverseBedTransform`
+  (`Move3.cpp:27-31`). After homing or probing with a map loaded, the interpreter's position picks
+  up the bed correction. [BedCompensation.GetRequestedHeight](src/DuetControlServer/Motion/BedCompensation.cs#L211)
+  is already written and already unused; this is the caller it was written for.
+- `SegmentCountFor` and `LimitPosition` both take their initial position from the same array. The
+  error there is one mesh correction in Z, which is negligible for both, but it is the same fix.
+
+The fix is to split the roles: keep an uncompensated copy of where the last move was *asked* to end
+for the G-code side, and leave `MoveBuilder`'s array as the compensated one the DDA differences
+against. Note the two must stay separately maintained through `ResyncFromEngine`, which derives
+`StartCoordinates` from motor positions and therefore always produces the compensated one.
+
+**18. Completing a homing move only works for switch endstops.** Phase C armed all four
+`EndstopType`s; the half that decides what the move *meant* was not updated with it.
+[FinishSpecialMoveAsync](src/DuetControlServer/Codes/Handlers/GCodeHandler.Homing.cs#L85) reads
+`endstop.Triggered` to decide whether the axis stopped on its switch, and that flag is only ever
+written by the `TypeEndstop` branch of
+[ExpansionBoardManager.ApplyInputChangedAsync](src/DuetControlServer/Link/Expansion/ExpansionBoardManager.cs#L519-L533).
+
+- A `ZProbeAsEndstop` axis reports under `typeZprobe`, which updates `sensors.probes[].value[0]` and
+  nothing else.
+- A `MotorStallAny` / `MotorStallIndividual` axis reports under `typeStallEndstop`, which has no
+  branch in that method at all.
+
+So `AdoptEndstopPosition` is never called and `Homed` is never set for either, and G28 then fails
+with "Failed to home axes" after a move that actually worked. RRF has no equivalent problem because
+it does not consult the endstop's current state: `RecordEndstopTriggered` (`GCodes.cpp:5530`) latches
+`ms.endstopsTriggered` when the stop is *reported*, and `GCodes4.cpp:77` intersects that with
+`axesToHome`.
+
+Two ways to close it, and the second is the one that also closes item 19: either give
+`ApplyInputChangedAsync` the missing branches so `Triggered` means what its name says for all four
+types, or carry the stopped axes back from the motion-stopped event that
+[EndstopCorrection.Apply](src/DuetControlServer/Motion/EndstopCorrection.cs#L122) already receives —
+it knows which drivers stopped and `MotionParameters.DriveForDriver` maps them back to axes.
+
+**19. The endstop is read live, after the wind-back.** `FinishSpecialMoveAsync` waits for standstill,
+then waits out `IsReverting`, and only then reads `endstop.Triggered`. The revert unwinds the drives
+to where they were at the trigger instant, which is the point at which the switch had just closed —
+so the flag is read with the axis sitting on the switch's threshold. RRF latches the fact at the
+moment of the report and never looks again. Fixing this the second way described under item 18 makes
+both a single change.
+
+**20. `HoldAxis` uses the wrong coordinate space for a raw motor move.**
+[HoldAxis](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L1274) writes
+`move.Axes[axis].MachinePosition` into `move.Coords[axis]` to keep an axis still when its endstop is
+already closed. For every geometry with `HomesIndividualDrives` — both deltas, both SCARAs, polar,
+hangprinter — `IsRawMotorMove(MoveType.Homing)` is true, so that slot holds a *motor* position in mm,
+not an axis coordinate. It should be a no-op there: `SeedSpecialMoveCoordinates` has already put the
+current motor position in it, which is exactly what "stay where you are" means. Does not affect a
+Cartesian or CoreXY 6HC.
+
+**21. `runningSystemMacro` was ticked but not implemented.** Phase A item 4 claims G53 *and*
+`runningSystemMacro`; only G53 landed.
+[BuildRawMove](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L503-L505) checks
+`CodeFlags.EnforceAbsolutePosition` and nothing else, where RRF's rule is
+`UsingMachineCoordinates() { return g53Active || runningSystemMacro; }`
+(`GCodeMachineState.h:310`) and `:2421-2424` assigns the raw value with no workplace offset for a
+system macro. The flag is present and correct — `CodeFlags.IsFromSystemMacro`, set by
+[MacroFile.cs:345](src/DuetControlServer/Files/MacroFile.cs#L345) — and is already read for
+`applyM220M221` a few lines away. A4 is reopened below.
+
+**22 and 23. Two halves of the transform that are stored but not applied.** M556 is ✅ in §5.3 and
+writes `move.compensation.skew`, but [ApplyAxisTransform](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L1022)
+adds babystepping and nothing else — RRF's `AxisTransform` (`Move3.cpp:34-57`) applies `tanXY`,
+`tanXZ` and `tanYZ` to every move. This is the "the object model must recreate the machine" rule
+holding while the machine does not do what the object model says. Separately,
+`ComputeHeightCorrection` adds `zShift` (`Move3.cpp:113`), which `SetZeroHeightError` (`:153-169`)
+sets so that a G30 normalises the map to zero error under the probe;
+[BedCompensation.GetCorrection](src/DuetControlServer/Motion/BedCompensation.cs#L177) has no
+equivalent term.
+
+**24. Two channels can interleave their segments.** [SubmitMoveAsync](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L330)
+drops the object model lock and the planner lock while it waits for the ring to drain, then resumes
+from the segment it reached. Another channel feeding the same motion system can build a move in that
+window, measured from a `StartCoordinates` that is part-way through the first move, and the two end
+up interleaved on the ring. RRF refuses a second G-code source before it even takes the movement
+lock — `if (GetMovementState(gb).segmentsLeft != 0) return false;` (`GCodes2.cpp:256`). Not
+reachable from a single channel, and the whole point of releasing the lock is that a long segmented
+move must not block; the fix is a "this motion system is part-way through a move" flag that other
+channels wait on, not holding the lock.
+
+**25. `H` is now range-checked, and `moveType` is an enum.** ✅ RRF reads the parameter with
+`gb.TryGetLimitedUIValue('H', moveType, dummy, 5)` (`:2225`) and throws for anything outside 0-4.
+DSF read it with `code.GetInt('H', 0)` and used the value unchecked, so `G1 H7` armed no endstop and
+yet still bypassed the user coordinate system, waited for standstill and was planned against the
+machine position — a combination nothing below `BuildRawMove` is written for.
+
+[MoveType](src/DuetControlServer/Motion/MoveType.cs) now names the five values, `RawMove.MoveType`
+and `KinematicsEngine.IsRawMotorMove` take it, and `TryGetMoveType` rejects anything else with RRF's
+own wording. `MoveTypeExtensions.ChecksEndstops()` replaces the two open-coded `is 1 or 3 or 4`
+tests. The parameter is read once in `HandleMoveAsync` and passed down rather than re-read in
+`BuildRawMove`.
+
+**Phase G — the second audit.** Ordered by what silently produces wrong movement, then by what
+silently produces no movement, then by the rest. Items 36 and 37 are one change; 39 and 40 are one
+change each but share the transform.
+
+35. ⬜ Split the interpolation base from the ring's start coordinates, and undo the bed transform in
+    `SyncInterpreterToMachine`. *(item 17)*
+36. ⬜ Carry the stopped axes back from the motion-stopped event so a homing move completes for every
+    endstop type. *(item 18)*
+37. ⬜ Latch which endstops stopped the move instead of re-reading them after the wind-back — the
+    same change as 36 if the event carries the axes. *(item 19)*
+38. ⬜ Make `HoldAxis` a no-op for a raw motor move. *(item 20)*
+39. ⬜ Suppress the workplace offset inside a system macro, reopening phase A item 4. *(item 21)*
+40. ⬜ Apply M556 in `ApplyAxisTransform`, and add `zShift` to the height correction.
+    *(items 22, 23)*
+41. ⬜ Stop two channels interleaving their segments. *(item 24)*
+42. ✅ Range-check `H` and give `moveType` a type. *(item 25)*
+
+### 11.6 What the SBC-side DDA ring no longer does
+
+For a given `MoveParams` the ring produces the same output as RepRapFirmware's: `DDA::InitFromParams`
+onward is upstream's step 7 verbatim — the same melding condition, `DoLookahead`, `MatchSpeeds`,
+`RecalculateMove`, `PrepParams::SetFromDDA` and `Prepare` — and `MoveBuilder` is a faithful port of
+steps 1-6. What is gone is gone by build switch or by deletion, not by divergence:
+
+| Dropped | Where | Consequence |
+|---|---|---|
+| `SUPPORT_S_CURVE 0` | `Compat/RepRapFirmware.h:48` | Trapezoidal profiles only; `DDA_3rdOrder` and `MovementProfile` are not ported |
+| `SUPPORT_LASER 0`, `SUPPORT_IOBITS 0` | `:49-50` | Follows §11.4 items 27 and 32 |
+| `SUPPORT_NONLINEAR_EXTRUSION 0` | `:55` | M592 |
+| `DDARing::PushBabyStepping` | `DDARing.cpp:462` | A babystep change takes effect on the next move built rather than being pushed into moves already queued — [ApplyAxisTransform](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L1022) says so |
+| `DDARing::PauseMoves`, `LowPowerOrStallPause` | `:592`, `:687` | No pausing part-way through a queued move; follows restore points (§11.4 item 29) |
+| `DDARing::AddSpecialMove` | `:194` | Bed levelling / leadscrew adjustment moves (M671) |
 
 ---
 
@@ -1914,3 +2098,119 @@ already applies to H1.
 Steps 1 and 2 are additive. Step 3 is the behaviour change for non-Cartesian machines, and is the one
 to be careful with: nothing in the test suite exercises homing on a delta, so it wants a test written
 against `LinearDeltaKinematicsEngine` before the change rather than after.
+
+---
+
+## 13. `MotionParameters`: whether the snapshot is still needed
+
+[MotionParameters](src/DuetControlServer/Motion/MotionParameters.cs) is a copy of the parts of
+`move.*` the planner uses, rebuilt by
+[MovePlanner.ReconfigureAsync](src/DuetControlServer/Motion/MovePlanner.cs#L108) whenever the
+configuration changes. It was written when the planning path did not hold the object model lock. It
+does now — every M-code handler in §5.1 takes the write lock, and
+[SubmitMoveAsync](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L231) holds it across building
+and queueing. So the question is whether the snapshot still earns its place, or whether the object
+model could simply be read where it is used.
+
+**It stays.** Reviewed below so a later reader does not have to re-derive it.
+
+### 13.1 Two consumers run with no object model lock, and cannot take one
+
+| Consumer | What it reads | Why it cannot take the lock |
+|---|---|---|
+| [EndstopCorrection.Apply](src/DuetControlServer/Motion/EndstopCorrection.cs#L123) → `TrySendRevert` | `DriveForDriver`, then `Geometry`/`StepsPerMm`/`NumAxes` via `SetDriveEndpoint` | Reached synchronously from [LinkService.HandleMotionStopped](src/DuetControlServer/Link/LinkService.cs#L443), a native event dispatch. `AccessReadOnlyAsync` is async-only, and the path is latency-critical — the CAN revert has to go out before the boards wind further (§12) |
+| [MotionService.PublishLivePosition](src/DuetControlServer/Motion/MotionService.cs#L222) | `Geometry`, `StepsPerMm`, `NumAxes` | Reads them inside `planner.Lock()` and takes the object model lock only afterwards. Reading the model inside the planner lock would invert the order every handler uses, which §11's header states as planner-inside-model |
+
+There is also a structural blocker for the move path itself.
+[MovePlanner.QueueMove](src/DuetControlServer/Motion/MovePlanner.cs#L190) holds a synchronous
+`System.Threading.Lock` and calls `MoveBuilder.Build` inside it; `Model.ObjectModel` uses a
+**non-reentrant** `AsyncReaderWriterLock` with no "is held" query. `MoveBuilder` therefore can never
+acquire the model lock itself — it would deadlock — and handing it a model reference would make
+correctness depend on an invariant nothing can check.
+
+### 13.2 What genuinely has to be held outside the object model
+
+Only four things:
+
+| Held | Why it cannot be read live |
+|---|---|
+| `Geometry` | **Not in the object model at all.** `KinematicsEngine` is an SBC-side object with precomputed state — `LinearDeltaKinematicsEngine` alone caches `_towerX`/`_towerY`, `_diagonalsSquared` and the forward-transform differences, rebuilt by `Recalculate()`. The object model holds M665/M669's *inputs*, not this |
+| `StepsPerMm` | Dense drive-indexed array; used by both lock-free consumers |
+| `NumAxes` / `NumExtruders` | Used by both lock-free consumers |
+| `_driveForDriver` | Reverse map from board+driver to logical drive, the equivalent of RRF's `Move::GetLogicalDriveForDriver`. Its only consumer is the lock-free endstop path |
+
+### 13.3 Why the rest stays in the snapshot as well
+
+`MaxFeedrates`, `Accelerations`, `ReducedAccelerations`, `PressureAdvanceClocks`, `InstantDvs`,
+`LinearAxes`, `RotationalAxes`, `MaxPrintingAcceleration`, `MaxTravelAcceleration` and `MinFeedrate`
+have exactly one consumer between them: `MoveBuilder.Build`, which is only reached under the model
+lock. In principle they could be read live. They should not be:
+
+- The five per-drive arrays feed vector maths that needs a contiguous `float[NumDrives]` —
+  `MoveVector.VectorBoxIntersection(_normalisedDirection, Parameters.MaxFeedrates)` and
+  `LimitSpeedAndAcceleration`. Reading them from the object model means materialising the same
+  arrays on **every move** instead of on every reconfiguration, which is rebuilding
+  `MotionParameters` per move under another name. The dense-indexing argument in the class doc is
+  the load-bearing one, and it holds.
+- The five scalars and bitmaps are cheap either way, and splitting them out would put the machine
+  description in two places for no gain.
+
+Nothing in the class is authoritative and nothing is a second copy of a setting — that part of the
+contract in §1 is intact. The class doc's stated reasons (unit conversion, dense drive indexing) are
+accurate; avoiding the model lock is a *third* reason that applies to §13.1's two call sites rather
+than to planning in general.
+
+### 13.4 Two problems the snapshot did cause
+
+Both found by the review above, both fixed.
+
+#### Stale axis limits after `G1 H3`
+
+The geometry keeps its own copy of the M208 box —
+`Geometry.AxisMinima`/`AxisMaxima`, assigned in `FromObjectModel` — because every geometry limits
+positions with it and `LimitPosition` clamps against it.
+[RecordAxisLength](src/DuetControlServer/Codes/Handlers/GCodeHandler.Homing.cs#L183), added by
+§12.8, wrote the measured length into `move.axes[].min`/`max` and returned. M208 goes through
+`ReconfigureAsync` and rebuilds the whole snapshot; `G1 H3` does not, so moves stayed clamped to the
+travel the axis was *assumed* to have until some later code happened to reconfigure — silently, and
+in exactly the situation where the operator has just measured the axis because they did not know.
+
+Fixed by `MotionParameters.SetAxisLimits(axis, min, max)`, called from `RecordAxisLength` after the
+object model write. One field changed, so one field is updated, rather than rebuilding a description
+that is otherwise unchanged.
+
+#### Snapshot/object model divergence was papered over
+
+Six call sites wrote `Math.Min(planner.Parameters.NumAxes, model.Move.Axes.Count)`. The clamp is the
+only safe *bound* — the snapshot has geometry and steps per mm for axes the model may no longer have,
+and the model has axes the snapshot knows nothing about — but it was also the only handling. A
+divergence made moves quietly plan for fewer axes than the machine has.
+
+Divergence has one cause: M584 is the only writer of those counts and it calls `ReconfigureAsync`
+straight afterwards, so the two disagree only when that reconfiguration did not happen or did not
+succeed (the engine rejected the description, or `MotionService` never started).
+
+`MotionParameters` now records the unclamped `move.Axes.Count`/`move.Extruders.Count` it was built
+from and exposes:
+
+| Member | Role |
+|---|---|
+| `MatchesObjectModel(move)` | Exact agreement check |
+| `SharedAxisCount(move)` / `SharedExtruderCount(move)` | The old `Math.Min`, named and documented as a bound rather than as a safety mechanism |
+
+[SubmitMoveAsync](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L262) now refuses the move on
+divergence — `"The motion configuration was not applied; no moves can be planned until it is"` —
+alongside the existing "No axes have been configured" check. The six `Math.Min` calls became
+`SharedAxisCount`/`SharedExtruderCount`; they still bound the loops, because G92, probing and homing
+reach them without going through the move check, but they are no longer what stands between the
+operator and a move planned against a machine that no longer exists.
+
+Seven tests in [MotionParametersTests](src/UnitTests/Motion/MotionParametersTests.cs) cover both.
+
+#### Left open
+
+Sixteen `await planner.ReconfigureAsync(cancellationToken)` call sites in
+[MCodeHandler.Motion.cs](src/DuetControlServer/Codes/Handlers/MCodeHandler.Motion.cs) discard the
+`bool` return. That is the actual origin of the divergence above: §13.4 makes the consequence
+visible at the next move, but the M-code that caused it still reports success. Worth folding into the
+next pass over that file.

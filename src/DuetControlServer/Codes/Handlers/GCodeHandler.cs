@@ -255,6 +255,16 @@ internal sealed partial class GCodeHandler(
                     return new Message(MessageType.Error, "No axes have been configured");
                 }
 
+                // Refused rather than planned for whichever axes both sides happen to agree on. The
+                // snapshot is only out of step with the object model when a reconfiguration did not
+                // happen or did not succeed, and a move planned from a description of a machine that
+                // no longer exists would address the wrong drives
+                if (!planner.Parameters.MatchesObjectModel(model.Move))
+                {
+                    return new Message(MessageType.Error,
+                                       "The motion configuration was not applied; no moves can be planned until it is");
+                }
+
                 // Held across building and queueing, because the move is a delta from the state the
                 // planner holds: another channel building in between would measure from the wrong
                 // place. Building also advances that state, which is what makes the rollback below
@@ -282,7 +292,7 @@ internal sealed partial class GCodeHandler(
 
                         armedAxes = raw.ArmedAxes;
                         segments = SegmentedMove.From(raw, planner.Builder.StartCoordinates,
-                                                      Math.Min(planner.Parameters.NumAxes, model.Move.Axes.Count),
+                                                      planner.Parameters.SharedAxisCount(model.Move),
                                                       planner.Parameters.FirstExtruderDrive);
                     }
 
@@ -452,7 +462,7 @@ internal sealed partial class GCodeHandler(
     private RawMove BuildRawMove(Commands.Code code, InputChannel input, bool isCoordinated, MoveType moveType)
     {
         MotionParameters parameters = planner.Parameters;
-        int numAxes = Math.Min(parameters.NumAxes, model.Move.Axes.Count);
+        int numAxes = parameters.SharedAxisCount(model.Move);
         float unitScale = input.DistanceUnit == DistanceUnit.Inch ? MmPerInch : 1.0f;
         MovementState state = planner.State;
 
@@ -1067,7 +1077,7 @@ internal sealed partial class GCodeHandler(
         // TODO get tool extruders
 
         MotionParameters parameters = planner.Parameters;
-        int numExtruders = Math.Min(parameters.NumExtruders, model.Move.Extruders.Count); // TODO use the tool extruders not all extruders
+        int numExtruders = parameters.SharedExtruderCount(model.Move); // TODO use the tool extruders not all extruders
 
         // One value per extruder for a mixing tool, or a single value for the first extruder. Tool
         // mixing ratios are not ported yet, so a lone E does not fan out
@@ -1327,6 +1337,7 @@ internal sealed partial class GCodeHandler(
     /// <returns>The result</returns>
     private async ValueTask<Message> HandleSetPositionAsync(Commands.Code code, CancellationToken cancellationToken)
     {
+        // TODO validate this against RRF
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             InputChannel? input = model.Inputs[code.Channel];
@@ -1335,7 +1346,7 @@ internal sealed partial class GCodeHandler(
             using (planner.Lock())
             {
                 MovementState state = planner.State;
-                int numAxes = Math.Min(planner.Parameters.NumAxes, model.Move.Axes.Count);
+                int numAxes = planner.Parameters.SharedAxisCount(model.Move);
                 List<int> axesIncluded = [];
 
                 for (int axis = 0; axis < numAxes; axis++)
@@ -1359,7 +1370,7 @@ internal sealed partial class GCodeHandler(
                     // The planner keeps its own machine position, and this changes what that
                     // position is called without moving anything
                     float[] coords = new float[MotionLimits.MaxAxes];
-                    ApplyAxisTransform(state.CurrentUserPosition, coords, numAxes);
+                    // TODO apply tool offsets?
                     foreach (int axis in axesIncluded)
                     {
                         planner.Builder.SetAxisPosition(axis, coords[axis]);
@@ -1447,7 +1458,7 @@ internal sealed partial class GCodeHandler(
     private void SyncInterpreterToMachine()
     {
         MovementState state = planner.State;
-        int numAxes = Math.Min(planner.Parameters.NumAxes, model.Move.Axes.Count);
+        int numAxes = planner.Parameters.SharedAxisCount(model.Move);
         ReadOnlySpan<float> machinePosition = planner.Builder.StartCoordinates;
 
         for (int axis = 0; axis < numAxes; axis++)

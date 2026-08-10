@@ -150,10 +150,18 @@ internal sealed class MoveBuilder(MotionParameters parameters)
     /// <param name="destination">Buffer of at least <see cref="MoveParams.Length"/> bytes</param>
     /// <returns>What came of it</returns>
     /// <remarks>
+    /// <para>
+    /// Equivalent to RRF <c>DDA::InitStandardMove()</c> steps 1-6, which is the part that depends on the move alone.
+    /// Step 7 onwards - lookahead, melding one move into the next, settling the actual start and end speeds - needs
+    /// the whole ring of queued moves, and the ring is native.
+    /// See <c>Motion/MoveParams.h</c> for the seam.
+    /// </para>
+    /// <para>
     /// On success the builder's idea of where the machine is has advanced to the end of this move, so
     /// a submission that is built must also be submitted. NoMovement still advances the axis
     /// coordinates - the user asked to go somewhere that rounds to no steps, and the next move should
     /// be measured from there rather than from where the machine happens to have stopped
+    /// </para>
     /// </remarks>
     public MoveBuildResult Build(RawMove move, Span<byte> destination)
     {

@@ -166,10 +166,19 @@ internal sealed partial class GCodeHandler
     /// <param name="axis">Axis that was measured</param>
     /// <param name="highEnd">Whether its endstop is at the high end of travel</param>
     /// <remarks>
+    /// <para>
     /// RepRapFirmware's <c>axesToSenseLength</c> handling: the position the move stopped at becomes
     /// the axis limit, which is what M208 would otherwise have to be told by hand. The axis is
     /// deliberately not marked homed - knowing where the end is is not the same as knowing where the
-    /// head is
+    /// head is.
+    /// </para>
+    /// <para>
+    /// The geometry keeps its own copy of the M208 box, and it is what every move is limited against,
+    /// so writing only the object model would leave moves clamped to the travel the axis was assumed
+    /// to have until the next code that rebuilds the whole description. M208 goes through
+    /// <see cref="MovePlanner.ReconfigureAsync"/> and gets that for free; this does not, so it
+    /// updates the copy itself
+    /// </para>
     /// </remarks>
     private void RecordAxisLength(int axis, bool highEnd)
     {
@@ -184,6 +193,8 @@ internal sealed partial class GCodeHandler
         {
             axisConfig.Min = stoppedAt;
         }
+
+        planner.Parameters.SetAxisLimits(axis, axisConfig.Min, axisConfig.Max);
     }
 
     /// <summary>

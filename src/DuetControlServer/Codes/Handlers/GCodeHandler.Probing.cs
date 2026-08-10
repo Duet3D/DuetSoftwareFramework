@@ -300,10 +300,6 @@ internal sealed partial class GCodeHandler
                 }
 
                 result = planner.QueueMove(move);
-                if (result is MoveSubmitResult.Queued or MoveSubmitResult.NoMovement)
-                {
-                    CommitPositions(move);
-                }
             }
 
             switch (result)
@@ -630,10 +626,6 @@ internal sealed partial class GCodeHandler
                 move.Coords[settings.ZAxis] = ProbeStartHeight(settings, 0);
 
                 result = planner.QueueMove(move);
-                if (result is MoveSubmitResult.Queued or MoveSubmitResult.NoMovement)
-                {
-                    CommitPositions(move);
-                }
             }
 
             if (result is MoveSubmitResult.Queued or MoveSubmitResult.NoMovement or MoveSubmitResult.Rejected)

@@ -201,6 +201,8 @@ internal sealed class MovePlanner(
                 move.MoveId = NextMoveId();
             }
 
+            // TODO RRF has a bed levelling move check (`Move::MoveLoop()`). It doesn't make sense in this function but the functionality will need to be ported.
+
             MoveBuildResult built = Builder.Build(move, _buffer);
             switch (built.Error)
             {
