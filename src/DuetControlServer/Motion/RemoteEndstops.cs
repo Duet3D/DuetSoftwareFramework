@@ -1,4 +1,5 @@
 using System;
+using DuetAPI;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Motion.Native;
@@ -67,13 +68,13 @@ internal static class RemoteEndstops
         int dot = port.IndexOf('.');
         if (dot <= 0)
         {
-            return true;                        // no prefix, so it is board 0's own port
+            return false;                        // no prefix, endstops must be on an expansion board so we require the
         }
 
         if (!byte.TryParse(port[..dot], out board))
         {
             board = 0;
-            return true;                        // the first segment is part of the port name
+            return false;                        // the first segment is part of the port name
         }
 
         localPort = port[(dot + 1)..];

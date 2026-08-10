@@ -91,7 +91,7 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> HandleStepsPerMmAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleStepsPerMmAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         // S is the microstepping the given values are quoted at, which lets a configuration be
         // written against one microstepping and used at another
@@ -155,7 +155,7 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> HandleAccelerationsAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleAccelerationsAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (code.MinorNumber > 1)
         {
@@ -224,7 +224,7 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> HandleMaxFeedratesAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleMaxFeedratesAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         // Values are in mm/min unless S1 says they are in mm/sec
         bool mmPerSec = code.GetInt('S', 0) == 1;
@@ -289,7 +289,7 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> HandleMoveAccelerationsAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleMoveAccelerationsAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         bool seen = false;
         string? report = null;
@@ -344,7 +344,7 @@ internal partial class MCodeHandler
     /// the jerk used while printing; M566 is in mm/min and sets the machine limit, which also pulls
     /// the printing jerk down to it
     /// </remarks>
-    private async ValueTask<Message?> HandleJerkAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleJerkAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         bool mmPerSec = code.MajorNumber == 205;
         bool setMax = code.MajorNumber == 566;
@@ -418,7 +418,7 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> HandleAxisLimitsAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleAxisLimitsAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         // A lone value is the maximum unless S1 says it is the minimum. Two values are min:max
         bool setMin = code.GetInt('S', 0) == 1;
@@ -483,7 +483,7 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> HandleMicrosteppingAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleMicrosteppingAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         bool interpolate = code.GetInt('I', 0) > 0;
         List<RemoteDrivers.DriverValue<(float, int, bool)>> toUpdate = [];
@@ -560,7 +560,7 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> HandleWaitForMovesAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleWaitForMovesAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
         {
@@ -580,7 +580,7 @@ internal partial class MCodeHandler
     /// letter named here for the first time adds an entry for it. Nothing can be moved or configured
     /// until that has happened, which is why config.g runs M584 before the rest of the motion setup
     /// </remarks>
-    private async ValueTask<Message?> HandleDriveMappingAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleDriveMappingAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (code.Parameters.Count > 0 && !await FlushAndWaitForStandstillAsync(code, cancellationToken))
         {
@@ -695,7 +695,7 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> HandleMotorCurrentsAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleMotorCurrentsAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         List<RemoteDrivers.DriverValue<float>> toUpdate = [];
         bool seen = false;
@@ -796,7 +796,7 @@ internal partial class MCodeHandler
     /// machine off. A de-energised axis is no longer known to be where it says it is, so it stops
     /// counting as homed
     /// </remarks>
-    private async ValueTask<Message?> HandleDriverStateAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleDriverStateAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         bool enable = code.MajorNumber == 17;
         List<RemoteDrivers.DriverValue<(ushort, ushort)>> toUpdate = [];
@@ -878,7 +878,7 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> HandleIdleTimeoutAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleIdleTimeoutAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
@@ -903,7 +903,7 @@ internal partial class MCodeHandler
     /// is repackaged into the CAN message its table describes and answered by the board that owns the
     /// driver. The sub-codes are separate message types over the same mechanism
     /// </remarks>
-    private async ValueTask<Message?> HandleDriverConfigAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleDriverConfigAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (!code.TryGetDriverId('P', out DriverId? driver))
         {
@@ -922,27 +922,16 @@ internal partial class MCodeHandler
         }
 
         CanResponse response;
-        try
+        response = code.MinorNumber switch
         {
-            response = code.MinorNumber switch
-            {
-                <= 0 => await SendDriverConfigAsync<CanMessageM569>(driver, code, cancellationToken),
-                1 => await SendDriverConfigAsync<CanMessageM569Point1>(driver, code, cancellationToken),
-                2 => await SendDriverConfigAsync<CanMessageM569Point2>(driver, code, cancellationToken),
-                4 => await SendDriverConfigAsync<CanMessageM569Point4>(driver, code, cancellationToken),
-                6 => await SendDriverConfigAsync<CanMessageM569Point6>(driver, code, cancellationToken),
-                7 => await SendDriverConfigAsync<CanMessageM569Point7>(driver, code, cancellationToken),
-                _ => throw new NotSupportedException($"M569.{code.MinorNumber} is not supported")
-            };
-        }
-        catch (NotSupportedException e)
-        {
-            return new Message(MessageType.Error, e.Message);
-        }
-        catch (CanGenericParamException e)
-        {
-            return new Message(MessageType.Error, e.Message);
-        }
+            <= 0 => await SendDriverConfigAsync<CanMessageM569>(driver, code, cancellationToken),
+            1 => await SendDriverConfigAsync<CanMessageM569Point1>(driver, code, cancellationToken),
+            2 => await SendDriverConfigAsync<CanMessageM569Point2>(driver, code, cancellationToken),
+            4 => await SendDriverConfigAsync<CanMessageM569Point4>(driver, code, cancellationToken),
+            6 => await SendDriverConfigAsync<CanMessageM569Point6>(driver, code, cancellationToken),
+            7 => await SendDriverConfigAsync<CanMessageM569Point7>(driver, code, cancellationToken),
+            _ => throw new NotSupportedException($"M569.{code.MinorNumber} is not supported")
+        };
 
         if (code.MinorNumber <= 0)
         {
@@ -1076,7 +1065,7 @@ internal partial class MCodeHandler
     /// The drivers may be named directly with P or by the axes they belong to, and either way they
     /// have to be grouped by the board that carries them before the message can go out
     /// </remarks>
-    private async ValueTask<Message?> HandleStallDetectionAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleStallDetectionAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         List<DriverId> drivers = [];
 
@@ -1188,11 +1177,11 @@ internal partial class MCodeHandler
     /// CAN, which RepRapFirmware enforces by refusing the mode for any axis with a remote driver.
     /// Every driver is remote here, so there is nothing this can ever do
     /// </remarks>
-    private ValueTask<Message?> HandlePhaseSteppingAsync(Commands.Code code, CancellationToken cancellationToken)
+    private ValueTask<Message> HandlePhaseSteppingAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         _ = code;
         _ = cancellationToken;
-        return ValueTask.FromResult<Message?>(new Message(MessageType.Error,
+        return ValueTask.FromResult(new Message(MessageType.Error,
             "Phase stepping is not supported on CAN-connected drivers"));
     }
 
@@ -1202,7 +1191,7 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> HandlePressureAdvanceAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandlePressureAdvanceAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (!code.TryGetFloatArray('S', out float[]? given) || given.Length == 0)
         {
@@ -1285,7 +1274,7 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> HandleNonlinearExtrusionAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleNonlinearExtrusionAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (!code.TryGetInt('D', out int extruderNumber))
         {
@@ -1338,7 +1327,7 @@ internal partial class MCodeHandler
     /// The shaper's impulses are computed by the motion engine from the type, frequency and damping,
     /// so what this writes is the configuration rather than the impulses themselves
     /// </remarks>
-    private async ValueTask<Message?> HandleInputShapingAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleInputShapingAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         bool seen = false;
         string? report = null;
@@ -1406,7 +1395,7 @@ internal partial class MCodeHandler
     /// This overrides what G90 and G91 set for the extruders only, which is why it is a setting of
     /// its own rather than a synonym
     /// </remarks>
-    private async ValueTask<Message?> HandleExtruderPositioningAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleExtruderPositioningAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
@@ -1431,7 +1420,7 @@ internal partial class MCodeHandler
     /// counts appended. There is deliberately no space after each axis colon: Pronterface misparses
     /// the reply if there is one
     /// </remarks>
-    private async ValueTask<Message?> HandleReportPositionAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleReportPositionAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         _ = code;
         StringBuilder builder = new();
@@ -1484,7 +1473,7 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> HandleStateStackAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleStateStackAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
@@ -1515,7 +1504,7 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> HandleSpeedFactorAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleSpeedFactorAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
@@ -1546,7 +1535,7 @@ internal partial class MCodeHandler
     /// Until then D is required rather than silently applying to everything, which would be worse
     /// than saying so
     /// </remarks>
-    private async ValueTask<Message?> HandleExtrusionFactorAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleExtrusionFactorAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
@@ -1587,7 +1576,7 @@ internal partial class MCodeHandler
     /// lets it be adjusted while a print is running. S is a synonym for Z, and R0 makes the values
     /// absolute rather than a change to what is already applied
     /// </remarks>
-    private async ValueTask<Message?> HandleBabysteppingAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleBabysteppingAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         bool absolute = code.GetInt('R', 1) == 0;
         bool seen = false;
@@ -1616,6 +1605,8 @@ internal partial class MCodeHandler
                 seen = true;
             }
 
+            // TODO push new babystep values into the DDARing so they happen ASAP rather than waiting for the next move to be built
+
             if (!seen)
             {
                 StringBuilder builder = new("Baby stepping offsets (mm):");
@@ -1642,7 +1633,7 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> HandleBacklashAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleBacklashAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         bool seen = false;
         string? report = null;
@@ -1702,7 +1693,7 @@ internal partial class MCodeHandler
     /// The values given are deviations measured over the distance S, and what is stored is the
     /// tangent of the resulting angle. X is the XY skew, Y the YZ skew and Z the XZ skew
     /// </remarks>
-    private async ValueTask<Message?> HandleAxisCompensationAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleAxisCompensationAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         bool seen = false;
         string? report = null;
@@ -1758,7 +1749,7 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> HandleMovementLimitsAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleMovementLimitsAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         bool seen = false;
         string? report = null;
@@ -1806,7 +1797,7 @@ internal partial class MCodeHandler
     /// config.g is usually written. Changing any of this invalidates where the machine thinks it is,
     /// so every axis stops counting as homed
     /// </remarks>
-    private async ValueTask<Message?> HandleDeltaConfigAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleDeltaConfigAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         bool seen = false;
         string? report = null;
@@ -1934,7 +1925,7 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> HandleKinematicsAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleKinematicsAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         bool seen = false;
         string? report = null;
@@ -2028,7 +2019,7 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> HandleLeadscrewsAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleLeadscrewsAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         bool seen = false;
         string? report = null;
@@ -2115,7 +2106,7 @@ internal partial class MCodeHandler
     /// kind of input it is, and P names the port. The board carrying that port is asked to watch it
     /// and to report changes, which is what turns an endstop into something a move can stop on
     /// </remarks>
-    private async ValueTask<Message?> HandleEndstopConfigAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleEndstopConfigAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         // S defaults to a switch on an input pin, which is what almost every endstop is
         int inputType = code.GetInt('S', (int)RrfEndstopType.InputPin);
@@ -2225,7 +2216,7 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> HandleReportEndstopsAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleReportEndstopsAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         _ = code;
         StringBuilder builder = new("Endstops - ");

@@ -35,7 +35,7 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result of the code if the code completed</returns>
     /// <exception cref="OperationCanceledException">The code was cancelled</exception>
-    public async ValueTask<Message?> ProcessAsync(Commands.Code code, CancellationToken cancellationToken)
+    public async ValueTask<Message> ProcessAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (code.KeywordArgument is null)
         {

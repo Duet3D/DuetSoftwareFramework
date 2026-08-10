@@ -15,7 +15,7 @@ public interface ICodeHandler
     /// <param name="code">Code to process</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result of the code if the code completed, else null</returns>
-    ValueTask<Message?> ProcessAsync(Commands.Code code, CancellationToken cancellationToken);
+    ValueTask<Message> ProcessAsync(Commands.Code code, CancellationToken cancellationToken);
 
     /// <summary>
     /// React to an executed code before its result is returned

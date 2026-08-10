@@ -135,7 +135,7 @@ internal sealed class MoveStopInput
     /// Remote input handle the switches are registered under, with a minor field of zero
     /// </summary>
     /// <remarks>Driver i watches minor i, which is why only one handle has to be carried</remarks>
-    public ushort Handle { get; set; }
+    public ushort Handle { get; set; } // CHECK can this be changed to RemoteInputHandle?
 
     /// <summary>How many switches the drive watches</summary>
     public byte NumSwitches { get; set; }

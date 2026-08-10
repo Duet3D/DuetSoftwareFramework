@@ -47,7 +47,7 @@ internal partial class MCodeHandler
     /// derives whichever of the two was not given, so that a grid can be described the way that suits
     /// the machine - a rectangular bed by its corners, a delta by its radius
     /// </remarks>
-    private async ValueTask<Message?> HandleProbeGridAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleProbeGridAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (!await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -273,7 +273,7 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> HandleSaveHeightMapAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleSaveHeightMapAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         string fileName = code.GetString('P', DefaultHeightMapFile);
         string physicalFile = await filePathResolver.ToPhysicalAsync(fileName, FileDirectory.System, cancellationToken);
@@ -296,7 +296,7 @@ internal partial class MCodeHandler
     /// The map replaces whatever was in effect, so the old one is dropped first: a load that fails
     /// part way through must not leave half of one map and half of another being applied
     /// </remarks>
-    private async ValueTask<Message?> HandleLoadHeightMapAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleLoadHeightMapAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
         {
@@ -326,7 +326,7 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> HandleTaperHeightAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleTaperHeightAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (!code.TryGetFloat('H', out float taperHeight))
         {
@@ -356,7 +356,7 @@ internal partial class MCodeHandler
     /// Waits for standstill first: the correction is applied when a move is built, so dropping it
     /// while moves are queued would leave the machine partway between two coordinate systems
     /// </remarks>
-    private async ValueTask<Message?> HandleClearCompensationAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleClearCompensationAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
         {

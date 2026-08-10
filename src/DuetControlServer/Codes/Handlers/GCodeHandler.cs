@@ -12,6 +12,7 @@ using DuetControlServer.Motion;
 using DuetControlServer.Motion.Native;
 using DuetControlServer.Motion.Kinematics;
 using Microsoft.Extensions.Logging;
+using DuetAPI;
 
 namespace DuetControlServer.Codes.Handlers;
 
@@ -67,20 +68,22 @@ internal sealed partial class GCodeHandler(
     /// <param name="code">Code to process</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result of the code if the code completed, else null</returns>
-    public async ValueTask<Message?> ProcessAsync(Commands.Code code, CancellationToken cancellationToken)
+    public async ValueTask<Message> ProcessAsync(Commands.Code code, CancellationToken cancellationToken)
     {
+        Message rslt = new();
         switch (code.MajorNumber)
         {
             // Rapid and coordinated moves
             case 0:
             case 1:
-                return await HandleMoveAsync(code, isCoordinated: code.MajorNumber == 1, cancellationToken);
+                rslt = await HandleMoveAsync(code, isCoordinated: code.MajorNumber == 1, cancellationToken);
+                break;
 
             // Set units to inches / millimetres
             case 20:
             case 21:
                 await UpdateInputAsync(code, input => input.DistanceUnit = code.MajorNumber == 20 ? DistanceUnit.Inch : DistanceUnit.MM, cancellationToken);
-                return new Message();
+                break;
 
             // Absolute / relative positioning.
             case 90:
@@ -89,37 +92,43 @@ internal sealed partial class GCodeHandler(
                 {
                     input.AxesRelative = code.MajorNumber == 91;
                 }, cancellationToken);
-                return new Message();
+                break;
 
             // Home the machine
             case 28:
-                return await HandleHomeAsync(code, cancellationToken);
+                rslt = await HandleHomeAsync(code, cancellationToken);
+                break;
 
             // Probe the grid and build a height map
             case 29:
-                return await HandleProbeGridAsync(code, cancellationToken);
+                rslt = await HandleProbeGridAsync(code, cancellationToken);
+                break;
 
             // Probe the bed
             case 30:
-                return await HandleProbeAsync(code, cancellationToken);
+                rslt = await HandleProbeAsync(code, cancellationToken);
+                break;
 
             // Set or report the Z probe trigger height, offsets and threshold
             case 31:
-                return await HandleProbeParametersAsync(code, cancellationToken);
+                rslt = await HandleProbeParametersAsync(code, cancellationToken);
+                break;
 
             // Set position without moving
             case 92:
-                return await HandleSetPositionAsync(code, cancellationToken);
+                rslt = await HandleSetPositionAsync(code, cancellationToken);
+                break;
 
             // Inverse time / feed rate mode
             case 93:
             case 94:
                 await UpdateInputAsync(code, input => input.InverseTimeMode = code.MajorNumber == 93, cancellationToken);
-                return new Message();
+                break;
 
             default:
-                return null;
+                throw new NotSupportedException($"Unsupported code '{code}'");
         }
+        return rslt;
     }
 
     /// <summary>
@@ -166,11 +175,11 @@ internal sealed partial class GCodeHandler(
     /// <param name="isCoordinated">Whether the axes move together (G1) or independently (G0)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> HandleMoveAsync(Commands.Code code, bool isCoordinated, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleMoveAsync(Commands.Code code, bool isCoordinated, CancellationToken cancellationToken)
     {
         if (!TryGetMoveType(code, out MoveType moveType, out Message? typeError))
         {
-            return typeError;
+            return typeError!;
         }
 
         // A special move is planned against the motor positions rather than the axis positions, so
@@ -187,23 +196,18 @@ internal sealed partial class GCodeHandler(
         // sent for a move whose axes all home on switches
         HashSet<byte> armedBoards = [];
         Message? armReply = null;
-        if (moveType.ChecksEndstops())
-        {
-            (armedBoards, armReply) = await ArmStallEndstopsAsync(code, cancellationToken);
-            if (armReply is { Type: MessageType.Error })
-            {
-                await DisarmStallEndstopsAsync(armedBoards, cancellationToken);
-                return armReply;
-            }
-        }
 
         try
         {
+            if (moveType.ChecksEndstops())
+            {
+                (armedBoards, armReply) = await ArmStallEndstopsAsync(code, cancellationToken);
+            }
             // A board that armed the driver but had something to say about it is reported alongside
             // whatever the move itself came back with, rather than being dropped for not being an
             // error. A move that never completed still returns null, which is what says so
-            Message? result = await SubmitMoveAsync(code, isCoordinated, moveType, cancellationToken);
-            return result is null || armReply is null ? result : new[] { armReply, result }.ToMessage();
+            Message result = await SubmitMoveAsync(code, isCoordinated, moveType, cancellationToken);
+            return new[] { armReply, result }.ToMessage();
         }
         finally
         {
@@ -224,10 +228,10 @@ internal sealed partial class GCodeHandler(
     /// <param name="moveType">What kind of move the H parameter asked for</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> SubmitMoveAsync(Commands.Code code, bool isCoordinated, MoveType moveType,
+    private async ValueTask<Message> SubmitMoveAsync(Commands.Code code, bool isCoordinated, MoveType moveType,
                                                      CancellationToken cancellationToken)
     {
-        RawMove? move = null;
+        RawMove? raw = null;
         SegmentedMove segments = default;
         List<int> armedAxes = [];
         int submitted = 0;
@@ -259,7 +263,7 @@ internal sealed partial class GCodeHandler(
                 {
                     MovementState state = planner.State;
 
-                    if (move is null)
+                    if (raw is null)
                     {
                         // Built once, however many segments it turns into and however many times the
                         // ring is too full to take the next one. Rebuilding would apply a relative
@@ -269,36 +273,26 @@ internal sealed partial class GCodeHandler(
                         {
                             state.CurrentUserPosition.CopyTo(positionBeforeMove, 0);
 
-                            move = BuildRawMove(code, input, isCoordinated, moveType, out Message? error);
-                            if (error is not null)
-                            {
-                                positionBeforeMove.AsSpan(0, MotionLimits.MaxAxes).CopyTo(state.CurrentUserPosition);
-                                return error;
-                            }
+                            raw = BuildRawMove(code, input, isCoordinated, moveType);
                         }
                         finally
                         {
                             ArrayPool<float>.Shared.Return(positionBeforeMove);
                         }
 
-                        armedAxes = move.ArmedAxes;
-                        segments = SegmentedMove.From(move, planner.Builder.StartCoordinates,
+                        armedAxes = raw.ArmedAxes;
+                        segments = SegmentedMove.From(raw, planner.Builder.StartCoordinates,
                                                       Math.Min(planner.Parameters.NumAxes, model.Move.Axes.Count),
                                                       planner.Parameters.FirstExtruderDrive);
-
-                        // The whole move is committed as soon as it is built, not segment by segment.
-                        // What the user asked for is the end of it, and the next code is interpreted
-                        // against that; the segments are how the machine gets there
-                        CommitPositions(move);
                     }
 
                     // As many segments as the engine will take. Stopping when it is full and picking
                     // up from the same place is what keeps a long segmented move from blocking
                     while (submitted < segments.Count)
                     {
-                        PrepareSegment(move, segments, submitted + 1);
+                        PrepareSegment(raw, segments, submitted + 1);
 
-                        result = planner.QueueMove(move);
+                        result = planner.QueueMove(raw);
                         if (result is MoveSubmitResult.Busy or MoveSubmitResult.Rejected)
                         {
                             break;
@@ -330,7 +324,7 @@ internal sealed partial class GCodeHandler(
             await Task.Delay(RingFullRetryDelay, cancellationToken);
         }
 
-        return null;
+        return new Message();
     }
 
     /// <summary>
@@ -363,16 +357,16 @@ internal sealed partial class GCodeHandler(
         /// <summary>
         /// Take a built move apart into what its segments need
         /// </summary>
-        /// <param name="move">The move</param>
+        /// <param name="raw">The move</param>
         /// <param name="start">Where the machine is, which is where the move begins</param>
         /// <param name="numAxes">Number of axes to consider</param>
         /// <param name="firstExtruderDrive">First logical drive that is an extruder</param>
         /// <returns>The pieces</returns>
-        public static SegmentedMove From(RawMove move, ReadOnlySpan<float> start, int numAxes, int firstExtruderDrive)
+        public static SegmentedMove From(RawMove raw, ReadOnlySpan<float> start, int numAxes, int firstExtruderDrive)
         {
             SegmentedMove segmented = new()
             {
-                Count = Math.Max(1, move.SegmentCount),
+                Count = Math.Max(1, raw.SegmentCount),
                 NumAxes = numAxes,
                 FirstExtruderDrive = firstExtruderDrive,
                 Start = new float[MotionLimits.MaxAxes],
@@ -381,13 +375,13 @@ internal sealed partial class GCodeHandler(
             };
 
             start[..numAxes].CopyTo(segmented.Start);
-            move.Coords.AsSpan(0, numAxes).CopyTo(segmented.Target);
+            raw.Coords.AsSpan(0, numAxes).CopyTo(segmented.Target);
 
             // Divided rather than repeated: the extrusion belongs to the whole move, so each segment
             // gets its share. RepRapFirmware does the same in FinaliseMove
             for (int drive = firstExtruderDrive; drive < MotionLimits.MaxAxesPlusExtruders; drive++)
             {
-                segmented.ExtrusionPerSegment[drive] = move.Coords[drive] / segmented.Count;
+                segmented.ExtrusionPerSegment[drive] = raw.Coords[drive] / segmented.Count;
             }
             return segmented;
         }
@@ -396,7 +390,7 @@ internal sealed partial class GCodeHandler(
     /// <summary>
     /// Point a move at the end of one of its segments
     /// </summary>
-    /// <param name="move">The move, whose coordinates are overwritten</param>
+    /// <param name="raw">The move, whose coordinates are overwritten</param>
     /// <param name="segments">What the move was broken into</param>
     /// <param name="segment">Which segment to prepare, counting from one</param>
     /// <remarks>
@@ -411,34 +405,38 @@ internal sealed partial class GCodeHandler(
     /// means sampling it along the way. Applied once at the end it is a chord across the bed's shape
     /// </para>
     /// </remarks>
-    private void PrepareSegment(RawMove move, in SegmentedMove segments, int segment)
+    private void PrepareSegment(RawMove raw, in SegmentedMove segments, int segment)
     {
         if (segment >= segments.Count)
         {
-            segments.Target.AsSpan(0, segments.NumAxes).CopyTo(move.Coords);
+            segments.Target.AsSpan(0, segments.NumAxes).CopyTo(raw.Coords);
         }
         else
         {
             float fraction = (float)segment / segments.Count;
             for (int axis = 0; axis < segments.NumAxes; axis++)
             {
-                move.Coords[axis] = segments.Start[axis]
+                raw.Coords[axis] = segments.Start[axis]
                     + ((segments.Target[axis] - segments.Start[axis]) * fraction);
+                // CHECK RRF updates the MovementState.initialCoords (ie the start of the next segment). This is probably for pausing mid-segment because of the way RRF has multiple threads for the motion pipeline. Might not be necessary here
             }
         }
 
+        // Limit the end position at each segment. This is needed for arc moves on any printer, and for [segmented] straight moves on SCARA printers.
+        // TODO check the segment end position to see if it is valid for the current kinematics
+
         for (int drive = segments.FirstExtruderDrive; drive < MotionLimits.MaxAxesPlusExtruders; drive++)
         {
-            move.Coords[drive] = segments.ExtrusionPerSegment[drive];
+            raw.Coords[drive] = segments.ExtrusionPerSegment[drive];
         }
 
-        if (move.MoveType == MoveType.Normal)
+        if (raw.MoveType == MoveType.Normal)
         {
-            ApplyBedCompensation(move, segments.NumAxes);
+            AxisAndBedTransform(raw, segments.NumAxes);
         }
 
         // Each segment is its own move to the engine, so it needs its own correlation id
-        move.MoveId = 0;
+        raw.MoveId = 0;
     }
 
     /// <summary>
@@ -451,10 +449,8 @@ internal sealed partial class GCodeHandler(
     /// <param name="error">Receives why the move cannot be built, if it cannot</param>
     /// <returns>The move</returns>
     /// <remarks>The caller must hold the object model write lock</remarks>
-    private RawMove BuildRawMove(Commands.Code code, InputChannel input, bool isCoordinated, MoveType moveType,
-                                 out Message? error)
+    private RawMove BuildRawMove(Commands.Code code, InputChannel input, bool isCoordinated, MoveType moveType)
     {
-        error = null;
         MotionParameters parameters = planner.Parameters;
         int numAxes = Math.Min(parameters.NumAxes, model.Move.Axes.Count);
         float unitScale = input.DistanceUnit == DistanceUnit.Inch ? MmPerInch : 1.0f;
@@ -477,7 +473,8 @@ internal sealed partial class GCodeHandler(
         // G53 asks for machine coordinates on this line only, so neither the workplace offset nor
         // (once tools exist) the tool offset applies to it
         bool machineCoordinates = code.Flags.HasFlag(CodeFlags.EnforceAbsolutePosition);
-        uint axesMentioned = 0;
+        bool runningSystemMacro = code.Flags.HasFlag(CodeFlags.IsFromSystemMacro);
+        uint axesMentioned = AxesMentioned(code, numAxes);
 
         if (moveType == MoveType.Normal)
         {
@@ -498,11 +495,20 @@ internal sealed partial class GCodeHandler(
                 {
                     state.CurrentUserPosition[axis] += moveArg;
                 }
+                else if (machineCoordinates)
+                {
+                    // g53 ignores tool offsets as well as workplace coordinates
+                    // TODO add the current tool offset / axisScaleFactor
+                    state.CurrentUserPosition[axis] = moveArg;
+                }
+                else if (runningSystemMacro)
+                {
+                    // don't apply workplace offsets to commands in system macros
+                    state.CurrentUserPosition[axis] = moveArg;
+                }
                 else
                 {
-                    state.CurrentUserPosition[axis] = machineCoordinates
-                        ? moveArg
-                        : moveArg + WorkplaceOffset(axisConfig, WorkplaceNumber);
+                    state.CurrentUserPosition[axis] = moveArg + WorkplaceOffset(axisConfig, WorkplaceNumber);
                 }
 
                 if (axisConfig.Rotational)
@@ -518,17 +524,9 @@ internal sealed partial class GCodeHandler(
             // An axis the machine does not know the position of cannot be moved to a coordinate,
             // because there is no coordinate system to move it in. M564 decides whether that is
             // refused outright, and the geometry widens the set where its axes are coupled
-            axesMentioned = AxesMentioned(code, numAxes);
-            error = CheckEnoughAxesHomed(axesMentioned, numAxes);
-            if (error is not null)
-            {
-                return raw;
-            }
-
-            // Every axis is transformed, not just the ones mentioned: an axis the user left out still
-            // has to be commanded to where the interpreter thinks it is, and babystepping may have
-            // moved that since the last move
-            ApplyAxisTransform(state.CurrentUserPosition, raw.Coords, numAxes);
+            // This might throw a GCodeException
+            // TODO use tool axis mapping to get the actual axes to move
+            CheckEnoughAxesHomed(axesMentioned, numAxes); // TODO if doingManualBedProbe then skip this check
         }
         else
         {
@@ -551,9 +549,7 @@ internal sealed partial class GCodeHandler(
                     // A delta's motor positions are carriage heights, and where a carriage has to be
                     // for the head to reach a point depends on the other two. So there is no absolute
                     // position to give one motor, only an amount to move it by
-                    error = new Message(MessageType.Error,
-                        "Attempt to move individual motors of a delta machine to absolute positions");
-                    return raw;
+                    throw new GCodeException("Attempt to move individual motors of a delta machine to absolute positions");
                 }
 
                 float moveArg = axisConfig.Rotational ? value : value * unitScale;
@@ -582,55 +578,85 @@ internal sealed partial class GCodeHandler(
         raw.CanPauseAfter = !raw.CheckEndstops;
 
         // Before the endstops, because arming a stall endstop needs the speeds this works out
-        error = LoadFeedRate(code, input, raw);
-        if (error is not null)
-        {
-            return raw;
-        }
+        LoadFeedRate(code, input, raw); // Can throw GCodeException
 
         if (raw.CheckEndstops)
         {
+            // TODO support extruder homing. This check should use `axesMentioned != 0 && code.HasParameter('E')` but `ApplyEndstops()` doesn't support extruders currently
             if (code.HasParameter('E'))
             {
                 // The extruder speeds an extruder endstop is validated against are worked out from
                 // the move's total extrusion, which an axis moving at the same time invalidates.
                 // RepRapFirmware refuses the combination rather than arming both badly
-                error = new Message(MessageType.Error,
-                    "Cannot enable both axis and extruder endstops in the same move");
-                return raw;
+                throw new GCodeException("Cannot enable both axis and extruder endstops in the same move");
             }
 
-            error = ApplyEndstops(code, raw, numAxes);
-            if (error is not null)
-            {
-                return raw;
-            }
+            // TODO calculate speeds for stall detect homing
+
+            ApplyEndstops(code, raw, numAxes); // can throw GCodeException
         }
 
-        bool hasForwardExtrusion = ApplyExtrusion(code, input, raw, unitScale);
-
-        // Pressure advance is for a printing move, so it needs forward extrusion and movement in
-        // something other than Z. RepRapFirmware excludes Z because a move that only changes height
-        // while extruding is not laying a line down
-        if (hasForwardExtrusion)
+        bool hasExtrusion = ApplyExtrusion(code, input, raw, unitScale);
+        if (hasExtrusion || axesMentioned != 0)
         {
-            raw.UsePressureAdvance = MentionsAxisOtherThanZ(code, numAxes);
-        }
+            // TODO check if first move since skipping an object
 
-        if (moveType == MoveType.Normal && axesMentioned != 0)
-        {
-            // After the extrusion, because whether the move prints decides what may be done about a
-            // target that cannot be reached in a straight line, and before the bed compensation,
-            // because the height map is a correction to a position the machine can already reach
-            error = LimitPosition(raw, state, input.AxesRelative, axesMentioned, hasForwardExtrusion, numAxes);
-            if (error is not null)
+            if (raw.HasPositiveExtrusion && axesMentioned != 0)
             {
-                return raw;
+                // TODO update the object coordinates list
             }
 
-            // The bed compensation is deliberately not applied here. It is a correction that depends
-            // on where the nozzle is, so it belongs to each segment rather than to the move
-            raw.SegmentCount = SegmentCountFor(raw, hasForwardExtrusion, numAxes);
+            if (moveType != MoveType.Normal)
+            {
+                // It is a raw motor move, so do it in a single semgnet and wait for it to complete
+                // TODO set the total segments to 1
+            }
+            else if (axesMentioned == 0)
+            {
+                // it is an extruder only move
+                // TODO set the total segments to 1
+            }
+            else
+            {
+                // TODO support coordinate rotation
+                // TODO apply tool offset, baby stepping, z hop, and axis scaling
+                // TODO supoort keepout zones, keep if move enters keepout zone
+                // TODO collision checker for multiple motion systems
+
+                // Only limit the positions of axes that have been mentioned explicitly.
+                // This avoids at least two problems:
+                // 1. When supporting multiple motion systems, if a M208 axis limit was changed and an axis coordinate was outside that limit,
+                //    but we don't own the axis, then if we move that axis there will be a problem when SaveOwnAxisCoordinates is called
+                //    because the new coordinate won't be saved.
+                // 2. If a linear axis is being limited, but the move is for a rotational axis that is already in the correct position,
+                //    then the code in DDA::InitStandardMove will throw it away because neither linearAxesMoving nor rotationalAxesMoving will be set.
+                //    This was an actual problem on my tool changer.
+                // After the extrusion, because whether the move prints decides what may be done about a
+                // target that cannot be reached in a straight line, and before the bed compensation,
+                // because the height map is a correction to a position the machine can already reach
+                // TODO Update the above comment with DSF specific details (instead of current RRF details) when the code is written.
+                LimitPosition(raw, state, input.AxesRelative, axesMentioned, raw.HasPositiveExtrusion, numAxes); // can throw GCodeException
+
+                // Flag whether we should use pressure advance, if there is any extrusion in this move.
+                // We assume it is a normal printing move needing pressure advance if there is forward extrusion and XYU... movement (we don't count Z).
+                // The movement code will only apply pressure advance if there is forward extrusion, so we only need to check for XYU... movement here.
+                // TODO with multi axis machines, the Z axis exclusion may be harmful. Some print tests are likely needed to see if this is the case
+                if (raw.HasPositiveExtrusion)
+                {
+                    raw.UsePressureAdvance = MentionsAxisOtherThanZ(code, numAxes);
+                }
+
+                // The bed compensation is deliberately not applied here. It is a correction that depends
+                // on where the nozzle is, so it belongs to each segment rather than to the move
+                raw.SegmentCount = SegmentCountFor(raw, numAxes);
+            }
+
+            // TODO `FinaliseMove()` in RRF does the following things:
+            // - adjust the move parameters to account for segmentation and/or part of the move having been done already
+            // - set `canPauseAfter`
+            // - set file position
+            // - change the extrusion to extrusion per segment - done in `SegmentedMove::From()` after this function returns
+            // - use `moveFractionToSkip` to skip some of the move if it has already been done (e.g. after a pause)
         }
 
         return raw;
@@ -641,21 +667,22 @@ internal sealed partial class GCodeHandler(
     /// </summary>
     /// <param name="code">The code</param>
     /// <param name="input">The channel's interpreter state</param>
-    /// <param name="move">The move being built, with its move type and mentioned axes already set</param>
+    /// <param name="raw">The move being built, with its move type and mentioned axes already set</param>
     /// <returns>An error if the feed rate cannot be determined, else null</returns>
     /// <remarks>
     /// Ported from <c>GCodes::LoadFeedrateFromGCode</c>. F persists across codes, so the value the
     /// user typed is kept on the channel - unconverted, because whether inches apply depends on the
     /// axes of the move it is eventually used for, which is not known when it is read
     /// </remarks>
-    private Message? LoadFeedRate(Commands.Code code, InputChannel input, RawMove move)
+    private void LoadFeedRate(Commands.Code code, InputChannel input, RawMove raw)
     {
+        // TODO handle G0 moves in CNC mode
         // The overrides belong to the print, so they apply to an ordinary move that names an axis and
         // to nothing else
-        move.ApplyM220M221 = move.MoveType == MoveType.Normal
-            && (move.LinearAxesMentioned || move.RotationalAxesMentioned)
+        raw.ApplyM220M221 = raw.MoveType == MoveType.Normal
+            && (raw.LinearAxesMentioned || raw.RotationalAxesMentioned)
             && !code.Flags.HasFlag(CodeFlags.IsFromSystemMacro);
-        move.UsingStandardFeedrate = true;
+        raw.UsingStandardFeedrate = true;
 
         if (input.InverseTimeMode)
         {
@@ -664,15 +691,15 @@ internal sealed partial class GCodeHandler(
             // length, and it is not a distance, so the inch scale does not apply to it
             if (!code.TryGetFloat('F', out float inverseTime) || inverseTime <= 0.0f)
             {
-                return new Message(MessageType.Error,
+                throw new GCodeException(
                     "Feed rate must be specified with every move when using inverse time mode");
             }
 
             // A duration, so the speed factor divides it rather than multiplying: M220 S200 should
             // make the move take half as long, not twice as long
             float duration = SecondsPerMinute / inverseTime;
-            move.DurationSec = move.ApplyM220M221 ? duration / model.Move.SpeedFactor : duration;
-            return null;
+            raw.DurationSec = raw.ApplyM220M221 ? duration / model.Move.SpeedFactor : duration;
+            return;
         }
 
         if (code.TryGetFloat('F', out float feedRate))
@@ -683,12 +710,12 @@ internal sealed partial class GCodeHandler(
 
         // A move that names only rotational axes is measured in degrees, so G20 does not scale its
         // feed rate even though the same F would be inches per minute for a linear move
-        bool convertInches = move.LinearAxesMentioned || !move.RotationalAxesMentioned;
+        bool convertInches = raw.LinearAxesMentioned || !raw.RotationalAxesMentioned;
         float unitScale = convertInches && input.DistanceUnit == DistanceUnit.Inch ? MmPerInch : 1.0f;
         float converted = input.FeedRate * unitScale / SecondsPerMinute;
 
-        move.FeedRateMmPerSec = move.ApplyM220M221 ? converted * model.Move.SpeedFactor : converted;
-        return null;
+        raw.FeedRateMmPerSec = raw.ApplyM220M221 ? converted * model.Move.SpeedFactor : converted;
+        return;
     }
 
     /// <summary>
@@ -713,8 +740,7 @@ internal sealed partial class GCodeHandler(
     /// <summary>
     /// How many pieces this move has to be broken into
     /// </summary>
-    /// <param name="move">The move, with its target already limited</param>
-    /// <param name="hasForwardExtrusion">Whether the move extrudes</param>
+    /// <param name="raw">The move, with its target already limited</param>
     /// <param name="numAxes">Number of axes to consider</param>
     /// <returns>The segment count, at least one</returns>
     /// <remarks>
@@ -734,7 +760,7 @@ internal sealed partial class GCodeHandler(
     /// simply executed as the wrong shape
     /// </para>
     /// </remarks>
-    private int SegmentCountFor(RawMove move, bool hasForwardExtrusion, int numAxes)
+    private int SegmentCountFor(RawMove raw, int numAxes)
     {
         KinematicsEngine geometry = planner.Parameters.Geometry;
         ReadOnlySpan<float> start = planner.Builder.StartCoordinates;
@@ -746,21 +772,23 @@ internal sealed partial class GCodeHandler(
             bool counts = axis < 2 || geometry.Segmentation.HasFlag(SegmentationType.IncludeZ);
             if (counts)
             {
-                float delta = move.Coords[axis] - start[axis];
+                float delta = raw.Coords[axis] - start[axis];
                 lengthSquared += delta * delta;
             }
         }
         float length = MathF.Sqrt(lengthSquared);
 
+        // TODO if machine type is a laser then we must use one segment per pixel
+
         int segments = 1;
         if (geometry.Segmentation.HasFlag(SegmentationType.Segment)
-            && (hasForwardExtrusion || move.IsCoordinated || geometry.Segmentation.HasFlag(SegmentationType.IncludeG0)))
+            && (raw.HasPositiveExtrusion || raw.IsCoordinated || geometry.Segmentation.HasFlag(SegmentationType.IncludeG0)))
         {
             // Short enough that the bow is below a step, but not so short that the move is chopped
             // into more pieces than the error justifies
-            float speed = move.InverseTimeMode
-                ? (move.DurationSec > 0.0f ? length / move.DurationSec : 0.0f)
-                : move.FeedRateMmPerSec;
+            float speed = raw.InverseTimeMode
+                ? (raw.DurationSec > 0.0f ? length / raw.DurationSec : 0.0f)
+                : raw.FeedRateMmPerSec;
             float seconds = speed > 0.0f ? length / speed : 0.0f;
 
             float byLength = geometry.MinSegmentLength > 0.0f ? length / geometry.MinSegmentLength : 0.0f;
@@ -768,9 +796,9 @@ internal sealed partial class GCodeHandler(
             segments = Math.Max(1, (int)MathF.Round(MathF.Min(byLength, byTime)));
         }
 
-        if (IsUsingMeshCompensation(move, numAxes))
+        if (IsUsingMeshCompensation(raw, numAxes))
         {
-            (float axis0, float axis1) = GridCoordinates(move, numAxes);
+            (float axis0, float axis1) = GridCoordinates(raw, numAxes);
             (float startAxis0, float startAxis1) = GridCoordinatesOf(start, numAxes);
             segments = Math.Max(segments, MeshSegments(axis0 - startAxis0, axis1 - startAxis1));
         }
@@ -778,9 +806,9 @@ internal sealed partial class GCodeHandler(
         // The step clock wraps roughly every 45 minutes, so a move that would take a large fraction
         // of that has to be split whatever the geometry says
         {
-            float speed = move.InverseTimeMode ? 0.0f : move.FeedRateMmPerSec;
-            float seconds = move.InverseTimeMode
-                ? move.DurationSec
+            float speed = raw.InverseTimeMode ? 0.0f : raw.FeedRateMmPerSec;
+            float seconds = raw.InverseTimeMode
+                ? raw.DurationSec
                 : (speed > 0.0f ? length / speed : 0.0f);
             segments = Math.Max(segments, (int)(seconds / MaxSegmentSeconds));
         }
@@ -834,7 +862,7 @@ internal sealed partial class GCodeHandler(
     /// nothing to be unsure of
     /// </para>
     /// </remarks>
-    private Message? CheckEnoughAxesHomed(uint axesMentioned, int numAxes)
+    private void CheckEnoughAxesHomed(uint axesMentioned, int numAxes)
     {
         uint mustBeHomed = planner.Parameters.Geometry.MustBeHomedAxes(axesMentioned, model.Move.NoMovesBeforeHoming);
 
@@ -849,7 +877,7 @@ internal sealed partial class GCodeHandler(
 
         if (unhomed == 0)
         {
-            return null;
+            return;
         }
 
         StringBuilder letters = new();
@@ -860,13 +888,13 @@ internal sealed partial class GCodeHandler(
                 letters.Append(model.Move.Axes[axis].Letter);
             }
         }
-        return new Message(MessageType.Error, $"Insufficient axes homed ({letters})");
+        throw new GCodeException($"Insufficient axes homed ({letters})");
     }
 
     /// <summary>
     /// Bring a move within what the machine can reach, or refuse it
     /// </summary>
-    /// <param name="move">The move being built, whose coordinates may be adjusted</param>
+    /// <param name="raw">The move being built, whose coordinates may be adjusted</param>
     /// <param name="state">Interpreter state, brought back into step if the target was adjusted</param>
     /// <param name="axesRelative">Whether the move was commanded relative to where the machine is</param>
     /// <param name="axesMentioned">Axes the code names, as a bitmap</param>
@@ -893,9 +921,10 @@ internal sealed partial class GCodeHandler(
     /// printing move cannot, because the curve would be extruded
     /// </para>
     /// </remarks>
-    private Message? LimitPosition(RawMove move, MovementState state, bool axesRelative, uint axesMentioned,
+    private void LimitPosition(RawMove raw, MovementState state, bool axesRelative, uint axesMentioned,
                                    bool hasForwardExtrusion, int numAxes)
     {
+        // CHECK this logic is comparable to RRF in `GCodes::DoStraightMove()`
         uint axesToLimit = 0;
         for (int axis = 0; axis < numAxes && axis < 32; axis++)
         {
@@ -909,49 +938,49 @@ internal sealed partial class GCodeHandler(
         ReadOnlySpan<float> initialCoords = planner.Builder.StartCoordinates[..numAxes];
 
         LimitPositionResult result = geometry.LimitPosition(
-            move.Coords.AsSpan(0, numAxes), initialCoords, numAxes, axesToLimit,
-            move.IsCoordinated, model.Move.LimitAxes);
+            raw.Coords.AsSpan(0, numAxes), initialCoords, numAxes, axesToLimit,
+            raw.IsCoordinated, model.Move.LimitAxes);
 
         if (result is LimitPositionResult.Adjusted or LimitPositionResult.AdjustedAndIntermediateUnreachable)
         {
             if (!axesRelative)
             {
-                return new Message(MessageType.Error, "Target position not reachable");
+                throw new GCodeException("Target position not reachable");
             }
 
             // The move was clamped, so the interpreter has to be told where it is really going or the
             // next relative move would be measured from a position the machine never reached
-            SyncInterpreterToTarget(move, state, numAxes);
+            SyncInterpreterToTarget(raw, state, numAxes);
 
             if (result == LimitPositionResult.Adjusted)
             {
-                return null;
+                return;
             }
         }
 
         if (result is LimitPositionResult.IntermediateUnreachable or LimitPositionResult.AdjustedAndIntermediateUnreachable)
         {
-            bool canGoRoundTheHouses = move.IsCoordinated && !hasForwardExtrusion;
+            bool canGoRoundTheHouses = raw.IsCoordinated && !hasForwardExtrusion;
             if (canGoRoundTheHouses)
             {
                 LimitPositionResult uncoordinated = geometry.LimitPosition(
-                    move.Coords.AsSpan(0, numAxes), initialCoords, numAxes, axesToLimit,
+                    raw.Coords.AsSpan(0, numAxes), initialCoords, numAxes, axesToLimit,
                     isCoordinated: false, model.Move.LimitAxes);
                 if (uncoordinated == LimitPositionResult.Ok)
                 {
-                    move.IsCoordinated = false;
-                    return null;
+                    raw.IsCoordinated = false;
+                    return;
                 }
             }
-            return new Message(MessageType.Error, "Target position not reachable from current position");
+            throw new GCodeException("Target position not reachable from current position");
         }
-        return null;
+        return;
     }
 
     /// <summary>
     /// Bring the interpreter's position into step with a target that was clamped
     /// </summary>
-    /// <param name="move">The move, whose coordinates are now what the machine will do</param>
+    /// <param name="raw">The move, whose coordinates are now what the machine will do</param>
     /// <param name="state">Interpreter state</param>
     /// <param name="numAxes">Number of axes to consider</param>
     /// <remarks>
@@ -959,18 +988,18 @@ internal sealed partial class GCodeHandler(
     /// few places the transform is inverted. Bed compensation has not been applied yet, so the only
     /// term to undo is the one <see cref="ApplyAxisTransform"/> added
     /// </remarks>
-    private void SyncInterpreterToTarget(RawMove move, MovementState state, int numAxes)
+    private void SyncInterpreterToTarget(RawMove raw, MovementState state, int numAxes)
     {
         for (int axis = 0; axis < numAxes; axis++)
         {
-            state.CurrentUserPosition[axis] = move.Coords[axis] - model.Move.Axes[axis].Babystep;
+            state.CurrentUserPosition[axis] = raw.Coords[axis] - model.Move.Axes[axis].Babystep;
         }
     }
 
     /// <summary>
     /// Fill in where a special move starts from
     /// </summary>
-    /// <param name="move">The move being built</param>
+    /// <param name="raw">The move being built</param>
     /// <param name="numAxes">Number of axes to consider</param>
     /// <remarks>
     /// Ported from the <c>moveType != 0</c> block of <c>GCodes::DoStraightMove</c>. A raw motor move
@@ -979,16 +1008,16 @@ internal sealed partial class GCodeHandler(
     /// from the planner rather than the object model, because the planner's copy is where the last
     /// queued move left the machine and the object model's is where the machine has got to
     /// </remarks>
-    private void SeedSpecialMoveCoordinates(RawMove move, int numAxes)
+    private void SeedSpecialMoveCoordinates(RawMove raw, int numAxes)
     {
         MotionParameters parameters = planner.Parameters;
-        if (parameters.Geometry.IsRawMotorMove(move.MoveType))
+        if (parameters.Geometry.IsRawMotorMove(raw.MoveType))
         {
             ReadOnlySpan<int> endPoints = planner.Builder.EndPoints;
             for (int axis = 0; axis < numAxes; axis++)
             {
                 float stepsPerMm = parameters.StepsPerMm[axis];
-                move.Coords[axis] = stepsPerMm != 0.0f ? endPoints[axis] / stepsPerMm : 0.0f;
+                raw.Coords[axis] = stepsPerMm != 0.0f ? endPoints[axis] / stepsPerMm : 0.0f;
             }
         }
         else
@@ -996,38 +1025,23 @@ internal sealed partial class GCodeHandler(
             ReadOnlySpan<float> startCoordinates = planner.Builder.StartCoordinates;
             for (int axis = 0; axis < numAxes; axis++)
             {
-                move.Coords[axis] = startCoordinates[axis];
+                raw.Coords[axis] = startCoordinates[axis];
             }
         }
     }
 
     /// <summary>
-    /// Convert user coordinates into the machine coordinates a move is planned in
+    /// Apply M556 axis skew compensation to a move's coordinates
     /// </summary>
     /// <param name="userPosition">User coordinates, workplace offset already included</param>
-    /// <param name="coords">Receives the machine coordinates</param>
-    /// <param name="numAxes">Number of axes to convert</param>
     /// <remarks>
     /// <para>
-    /// RepRapFirmware's <c>ToolOffsetTransform</c>. Today it applies babystepping alone; tool offsets,
-    /// X/Y/Z axis mapping, axis scale factors and Z hop are terms to be added here as they are ported.
-    /// </para>
-    /// <para>
-    /// The direction matters. This is the only way user coordinates become machine coordinates, so
-    /// every term added here applies everywhere at once, and nothing needs a matching inverse: the
-    /// interpreter never reconstructs its position from a machine coordinate on the normal path. See
-    /// <see cref="RedefineMachinePosition"/> for the cases where it has to
+    /// RepRapFirmware's <c>Move::AxisTransform()</c>.
     /// </para>
     /// </remarks>
-    private void ApplyAxisTransform(ReadOnlySpan<float> userPosition, float[] coords, int numAxes)
+    private void ApplyAxisSkewTransform(Span<float> userPosition)
     {
-        for (int axis = 0; axis < numAxes; axis++)
-        {
-            // Babystepping shifts where the machine goes without changing the coordinate the user
-            // asked for. RepRapFirmware applies a change as a small move of its own; here it takes
-            // effect on the next commanded move instead
-            coords[axis] = userPosition[axis] + model.Move.Axes[axis].Babystep;
-        }
+        // TODO actually apply skew transform
     }
 
     /// <summary>
@@ -1035,25 +1049,31 @@ internal sealed partial class GCodeHandler(
     /// </summary>
     /// <param name="code">The code</param>
     /// <param name="input">The channel's interpreter state</param>
-    /// <param name="move">Move to fill in</param>
+    /// <param name="raw">Move to fill in</param>
     /// <param name="unitScale">Millimetres per user unit</param>
     /// <returns>True if the move extrudes forwards, which is what pressure advance applies to</returns>
     /// <remarks>The caller must hold the object model lock</remarks>
-    private bool ApplyExtrusion(Commands.Code code, InputChannel input, RawMove move, float unitScale)
+    private bool ApplyExtrusion(Commands.Code code, InputChannel input, RawMove raw, float unitScale)
     {
+        bool hasExtrusion = false;
+        raw.HasPositiveExtrusion = false;
+
         if (!code.TryGetFloatArray('E', out float[]? extrusion) || extrusion.Length == 0)
         {
             return false;
         }
 
+        // TODO check that we have a tool to extrude with
+        // TODO get tool extruders
+
         MotionParameters parameters = planner.Parameters;
-        int numExtruders = Math.Min(parameters.NumExtruders, model.Move.Extruders.Count);
+        int numExtruders = Math.Min(parameters.NumExtruders, model.Move.Extruders.Count); // TODO use the tool extruders not all extruders
 
         // One value per extruder for a mixing tool, or a single value for the first extruder. Tool
         // mixing ratios are not ported yet, so a lone E does not fan out
         int count = extrusion.Length == 1 ? Math.Min(1, numExtruders) : Math.Min(extrusion.Length, numExtruders);
 
-        bool hasForwardExtrusion = false;
+        // TODO extend this with mixing extruders
         for (int extruder = 0; extruder < count; extruder++)
         {
             Extruder extruderConfig = model.Move.Extruders[extruder];
@@ -1062,23 +1082,33 @@ internal sealed partial class GCodeHandler(
             // Absolute extrusion is a running total, so the movement is the difference from where
             // the extruder was last told it had reached
             float movement = input.DrivesRelative ? requestedMm : requestedMm - extruderConfig.RawPosition;
-            if (movement > 0.0f)
+            if (movement != 0.0f)
             {
-                hasForwardExtrusion = true;
+                hasExtrusion = true;
+                if (movement > 0.0f)
+                {
+                    raw.HasPositiveExtrusion = true;
+                }
+
+                // TODO handle volumetric extrusion
             }
 
             // M221 is the operator adjusting a print, so it applies to the same moves M220 does
-            move.Coords[MotionParameters.ExtruderToDrive(extruder)] =
-                move.ApplyM220M221 ? movement * extruderConfig.Factor : movement;
+            raw.Coords[MotionParameters.ExtruderToDrive(extruder)] =
+                raw.ApplyM220M221 ? movement * extruderConfig.Factor : movement;
+
+            // TODO store which extruders are moving
         }
-        return hasForwardExtrusion;
+
+        // TODO handle endstop moves
+        return hasExtrusion;
     }
 
     /// <summary>
     /// Say which endstop stops which drive of a homing move
     /// </summary>
     /// <param name="code">The code</param>
-    /// <param name="move">The move being built</param>
+    /// <param name="raw">The move being built</param>
     /// <param name="numAxes">Number of axes to consider</param>
     /// <returns>An error if the move cannot be armed, else null</returns>
     /// <remarks>
@@ -1095,7 +1125,7 @@ internal sealed partial class GCodeHandler(
     /// stopped by Z's switch happening to be closed already
     /// </para>
     /// </remarks>
-    private Message? ApplyEndstops(Commands.Code code, RawMove move, int numAxes)
+    private void ApplyEndstops(Commands.Code code, RawMove raw, int numAxes)
     {
         KinematicsEngine geometry = planner.Parameters.Geometry;
 
@@ -1114,25 +1144,25 @@ internal sealed partial class GCodeHandler(
             Endstop? endstop = axis < model.Sensors.Endstops.Count ? model.Sensors.Endstops[axis] : null;
             if (endstop is null)
             {
-                return new Message(MessageType.Error,
-                    $"No endstop configured for axis {model.Move.Axes[axis].Letter}");
+                throw new GCodeException($"No endstop configured for axis {model.Move.Axes[axis].Letter}");
             }
 
-            if (!TryArmAxis(endstop, axis, move))
+            // TODO if simulating continue to next axis
+
+            if (!TryArmAxis(endstop, axis, raw))
             {
                 // Refusing is the point. Leaving the axis unarmed and carrying on would run the move
                 // to its full commanded length with nothing to stop it, which for a homing move means
                 // driving into the end of the axis. RepRapFirmware's EnableAxisEndstops throws here
                 // for the same reason
-                return new Message(MessageType.Error,
-                    $"Cannot home {model.Move.Axes[axis].Letter}: {DescribeUnusableEndstop(endstop)}");
+                throw new GCodeException($"Cannot home {model.Move.Axes[axis].Letter}: {DescribeUnusableEndstop(endstop)}");
             }
 
             if (endstop.Type is EndstopType.MotorStallAny or EndstopType.MotorStallIndividual)
             {
                 // The driver has to be turning slowly enough to tell a stall from normal load, which
                 // is what M201.1 configures
-                move.ReduceAcceleration = true;
+                raw.ReduceAcceleration = true;
             }
 
             if (endstop.Triggered)
@@ -1152,18 +1182,18 @@ internal sealed partial class GCodeHandler(
             {
                 if (stopAllAxis >= 0)
                 {
-                    return new Message(MessageType.Error,
+                    throw new GCodeException(
                         $"Cannot home {model.Move.Axes[stopAllAxis].Letter} and {model.Move.Axes[axis].Letter} together: "
                         + "on this kinematics either endstop has to stop every drive");
                 }
                 stopAllAxis = axis;
-                stopAllInput.CopyFrom(move.StopOnInput[axis]);
-                move.ArmedAxes.Add(axis);
+                stopAllInput.CopyFrom(raw.StopOnInput[axis]);
+                raw.ArmedAxes.Add(axis);
             }
             else
             {
                 perAxisCount++;
-                move.ArmedAxes.Add(axis);
+                raw.ArmedAxes.Add(axis);
             }
         }
 
@@ -1171,7 +1201,7 @@ internal sealed partial class GCodeHandler(
         {
             if (perAxisCount > 0)
             {
-                return new Message(MessageType.Error,
+                throw new GCodeException(
                     $"Cannot home {model.Move.Axes[stopAllAxis].Letter} with another axis: "
                     + "its endstop has to stop every drive, which would disarm the others");
             }
@@ -1181,25 +1211,25 @@ internal sealed partial class GCodeHandler(
             // demoted to its first switch here for the same reason RepRapFirmware demotes it: the
             // drives are coupled, so letting each motor wait for its own switch would keep the
             // others running
-            for (int drive = 0; drive < move.StopOnInput.Length; drive++)
+            for (int drive = 0; drive < raw.StopOnInput.Length; drive++)
             {
-                move.StopOnInput[drive].SetShared(stopAllInput.Handle, stopAllInput.Boards[0]);
+                raw.StopOnInput[drive].SetShared(stopAllInput.Handle, stopAllInput.Boards[0]);
             }
 
             // On coupled kinematics the whole move stops on the one endstop, so an endstop that is
             // already closed holds every drive rather than only its own axis
             if (alreadyTriggered.Contains(stopAllAxis))
             {
-                HoldAxes(move, numAxes);
-                return null;
+                HoldAxes(raw, numAxes);
+                return;
             }
         }
 
         foreach (int axis in alreadyTriggered)
         {
-            HoldAxis(move, axis);
+            HoldAxis(raw, axis);
         }
-        return null;
+        return;
     }
 
     /// <summary>
@@ -1207,7 +1237,7 @@ internal sealed partial class GCodeHandler(
     /// </summary>
     /// <param name="endstop">The axis' endstop</param>
     /// <param name="axis">Axis number</param>
-    /// <param name="move">The move being built</param>
+    /// <param name="raw">The move being built</param>
     /// <returns>True if the axis can be stopped, false if its endstop cannot arm a move</returns>
     /// <remarks>
     /// The four kinds are RepRapFirmware's four endstop classes. A switch and a Z probe are inputs a
@@ -1215,19 +1245,20 @@ internal sealed partial class GCodeHandler(
     /// itself, so what the move watches is the board's stall report and the drivers were armed before
     /// the move was built - see <see cref="ArmStallEndstopsAsync"/>
     /// </remarks>
-    private bool TryArmAxis(Endstop endstop, int axis, RawMove move)
+    private bool TryArmAxis(Endstop endstop, int axis, RawMove raw)
     {
         switch (endstop.Type)
         {
             case EndstopType.InputPin:
+                // CHECK should we send a CanMessageChangeInputMonitorV1 message to actually enable the endstops like in `SwitchEndstop::PrimeAxis()`?
                 return RemoteEndstops.TryGetStopInput(endstop, axis, model.Move.Axes[axis].Drivers.Count,
-                                                      move.StopOnInput[axis]);
+                                                      raw.StopOnInput[axis]);
 
             case EndstopType.ZProbeAsEndstop:
                 {
                     int probeNumber = endstop.Probe ?? 0;
                     Probe? probe = probeNumber < model.Sensors.Probes.Count ? model.Sensors.Probes[probeNumber] : null;
-                    return probe is not null && RemoteProbes.TryGetStopInput(probe, probeNumber, move.StopOnInput[axis]);
+                    return probe is not null && RemoteProbes.TryGetStopInput(probe, probeNumber, raw.StopOnInput[axis]);
                 }
 
             case EndstopType.MotorStallAny:
@@ -1244,7 +1275,7 @@ internal sealed partial class GCodeHandler(
                             drivers.AddRange(model.Move.Axes[drive].Drivers);
                         }
                     }
-                    return RemoteEndstops.TryGetStallStopInput(CollectionsMarshal.AsSpan(drivers), move.StopOnInput[axis]);
+                    return RemoteEndstops.TryGetStallStopInput(CollectionsMarshal.AsSpan(drivers), raw.StopOnInput[axis]);
                 }
 
             default:
@@ -1268,64 +1299,23 @@ internal sealed partial class GCodeHandler(
     /// <summary>
     /// Command an axis to stay where it is
     /// </summary>
-    /// <param name="move">The move being built</param>
+    /// <param name="raw">The move being built</param>
     /// <param name="axis">Axis to hold</param>
     /// <remarks>The caller must hold the object model lock</remarks>
-    private void HoldAxis(RawMove move, int axis)
-        => move.Coords[axis] = model.Move.Axes[axis].MachinePosition ?? move.Coords[axis];
+    private void HoldAxis(RawMove raw, int axis)
+        => raw.Coords[axis] = model.Move.Axes[axis].MachinePosition ?? raw.Coords[axis];
 
     /// <summary>
     /// Command every axis to stay where it is
     /// </summary>
-    /// <param name="move">The move being built</param>
+    /// <param name="raw">The move being built</param>
     /// <param name="numAxes">Number of axes to consider</param>
     /// <remarks>The caller must hold the object model lock</remarks>
-    private void HoldAxes(RawMove move, int numAxes)
+    private void HoldAxes(RawMove raw, int numAxes)
     {
         for (int axis = 0; axis < numAxes; axis++)
         {
-            HoldAxis(move, axis);
-        }
-    }
-
-    /// <summary>
-    /// Publish the positions a committed move will leave the machine at
-    /// </summary>
-    /// <param name="move">The move</param>
-    /// <remarks>
-    /// <para>
-    /// A projection of the interpreter's state, not a derivation from the move. The move's
-    /// coordinates have been through the axis transform and the bed compensation on the way out, and
-    /// inverting all of that to recover what the user asked for is exactly what the interpreter's own
-    /// position exists to avoid.
-    /// </para>
-    /// <para>
-    /// <c>machinePosition</c> is deliberately not written here. It is the live position, published
-    /// from the engine by <see cref="MotionService"/>, and a move that has only been queued has not
-    /// moved the machine yet
-    /// </para>
-    /// <para>The caller must hold the object model write lock and the planner lock</para>
-    /// </remarks>
-    private void CommitPositions(RawMove move)
-    {
-        MotionParameters parameters = planner.Parameters;
-        int numAxes = Math.Min(parameters.NumAxes, model.Move.Axes.Count);
-
-        if (move.MoveType == MoveType.Normal)
-        {
-            PublishUserPositions(numAxes);
-        }
-
-        int numExtruders = Math.Min(parameters.NumExtruders, model.Move.Extruders.Count);
-        for (int extruder = 0; extruder < numExtruders; extruder++)
-        {
-            float movement = move.Coords[MotionParameters.ExtruderToDrive(extruder)];
-            if (movement != 0.0f)
-            {
-                Extruder extruderConfig = model.Move.Extruders[extruder];
-                extruderConfig.Position += movement;
-                extruderConfig.RawPosition += movement;
-            }
+            HoldAxis(raw, axis);
         }
     }
 
@@ -1335,7 +1325,7 @@ internal sealed partial class GCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> HandleSetPositionAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleSetPositionAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         using (await model.AccessReadWriteAsync(cancellationToken))
         {

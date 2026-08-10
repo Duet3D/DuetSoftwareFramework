@@ -127,6 +127,11 @@ internal sealed class RawMove
     /// <summary>Whether the user mentioned any rotational axis</summary>
     public bool RotationalAxesMentioned { get; set; }
 
+    /// <summary>
+    /// true if the move includes positive extrusion
+    /// </summary>
+    public bool HasPositiveExtrusion { get; set; }
+
     /// <summary>Whether to use the reduced acceleration limits, e.g. while probing</summary>
     public bool ReduceAcceleration { get; set; }
 

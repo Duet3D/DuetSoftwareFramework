@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DuetAPI;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.Link.Protocol.CanMessages;
@@ -114,7 +115,7 @@ internal sealed partial class GCodeHandler
             if (reply.Type == MessageType.Error)
             {
                 // Some drivers may already be armed, so the caller still has to disarm what it got
-                return (boards, reply);
+                throw new GCodeException(reply.Content);
             }
 
             // The driver was armed but the board may still have had something to say about it, which

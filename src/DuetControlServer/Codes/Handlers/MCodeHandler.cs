@@ -88,12 +88,12 @@ internal partial class MCodeHandler(
     /// dispatched from the same switch as everything else; only their bodies live elsewhere
     /// </para>
     /// </remarks>
-    public async ValueTask<Message?> ProcessAsync(Commands.Code code, CancellationToken cancellationToken)
+    public async ValueTask<Message> ProcessAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (code.IsFromFileChannel && jobProcessor.IsSimulating && code.MajorNumber is not 0 and not 1 and not 2)
         {
             // Ignore most M-codes from files in simulation mode...
-            return null;
+            return new Message();
         }
 
         return code.MajorNumber switch
@@ -261,7 +261,7 @@ internal partial class MCodeHandler(
             998 => throw new NotSupportedException(),
             // Reset controller
             999 => await HandleResetAsync(code, cancellationToken),
-            _ => null
+            _ => throw new NotSupportedException($"Unsupported code '{code}'")
         };
     }
 
@@ -271,7 +271,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleStopAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleStopAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, syncFileStreams: true, cancellationToken: cancellationToken))
         {
@@ -313,7 +313,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleListFilesAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleListFilesAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -409,7 +409,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleInitializeSDCardAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleInitializeSDCardAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -429,7 +429,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleSelectFileAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleSelectFileAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, syncFileStreams: true, cancellationToken: cancellationToken))
         {
@@ -468,7 +468,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleResumePrintAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleResumePrintAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, syncFileStreams: true, cancellationToken: cancellationToken))
         {
@@ -496,7 +496,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleSetFilePositionAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleSetFilePositionAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -527,8 +527,8 @@ internal partial class MCodeHandler(
                 }
             }
 
-            // P parameter is handled by RRF if present
-            return null;
+            // TODO handle P parameter if present (used to be handled by RRF)
+            return new Message(MessageType.Warning, "Not implemented yet");
         }
         throw new OperationCanceledException();
     }
@@ -539,7 +539,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleReportPrintStatusAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleReportPrintStatusAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -570,7 +570,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleBeginFileWriteAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleBeginFileWriteAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -617,8 +617,8 @@ internal partial class MCodeHandler(
     /// </summary>
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleEndFileWriteAsync(Commands.Code code, CancellationToken cancellationToken)
+    /// <returns>The result</returns>
+    private async ValueTask<Message> HandleEndFileWriteAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -639,7 +639,8 @@ internal partial class MCodeHandler(
                     }
                     return new Message();
                 }
-                return null;
+                // TODO DSF used to let this fall through to RRF. Determine what actually needs to happen
+                return new Message(MessageType.Warning, "Possibly undefined behaviour");
             }
         }
         throw new OperationCanceledException();
@@ -651,7 +652,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleDeleteFileAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleDeleteFileAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -678,7 +679,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleFileInfoAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleFileInfoAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -739,7 +740,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleSimulateFileAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleSimulateFileAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, syncFileStreams: true, cancellationToken: cancellationToken))
         {
@@ -777,7 +778,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleFileChecksumAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleFileChecksumAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -807,7 +808,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleSDCardInfoAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleSDCardInfoAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -856,7 +857,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleMacroPausableAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleMacroPausableAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         // R on its own flags the macro that is already running rather than starting a new one
         if (code.TryGetInt('R', out int rParam) && !code.HasParameter('P'))
@@ -910,7 +911,7 @@ internal partial class MCodeHandler(
     /// forms - and Onnn turns logging via generic messages on or off, which is what makes it visible in
     /// the web interface
     /// </remarks>
-    private async ValueTask<Message?> HandleDebugLevelAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleDebugLevelAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (code.TryGetInt('P', out int pParam) && pParam == -1)
         {
@@ -974,7 +975,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleEmergencyStopAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleEmergencyStopAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (code.Flags.HasFlag(CodeFlags.IsPrioritized) || await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -1007,7 +1008,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleFirmwareVersionAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleFirmwareVersionAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         // Like M122, M115 is about the program rather than about attached hardware, so board 0 is a
         // real answer here rather than the mistake it is everywhere else
@@ -1041,7 +1042,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandlePublishMqttAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandlePublishMqttAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (code.TryGetInt('P', out int pParam) && pParam == 6)
         {
@@ -1051,7 +1052,8 @@ internal partial class MCodeHandler(
             }
             throw new OperationCanceledException();
         }
-        return null;
+        // TODO this used to fallthrough to RRF
+        return new Message(MessageType.Warning, "Not implemented");
     }
 
     /// <summary>
@@ -1060,7 +1062,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleDiagnosticsAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleDiagnosticsAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         // M122 is one of the codes board 0 does answer for: DuetCANMaster and this program are what
         // there is to report on, whatever hardware is or is not attached to it
@@ -1080,7 +1082,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleQueryObjectModelAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleQueryObjectModelAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (code.TryGetString('K', out string? key) && (!code.TryGetInt('R', out int rParam) || rParam == 0))
         {
@@ -1104,7 +1106,8 @@ internal partial class MCodeHandler(
             string json = queryResult.GetRawText();
             return new Message(MessageType.Success, (code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber}," + json[1..] : json);
         }
-        return null;
+        // TODO this used to fallthrough to RRF
+        return new Message(MessageType.Warning, "Not implemented");
     }
 
     /// <summary>
@@ -1113,7 +1116,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleCreateDirectoryAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleCreateDirectoryAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -1138,7 +1141,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleRenameFileAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleRenameFileAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -1184,7 +1187,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleDeleteFileOrDirectoryAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleDeleteFileOrDirectoryAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -1221,7 +1224,7 @@ internal partial class MCodeHandler(
     /// config-override.g is a macro like any other - it holds the M-codes M500 wrote - so loading it
     /// is running it
     /// </remarks>
-    private async ValueTask<Message?> HandleLoadConfigOverrideAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleLoadConfigOverrideAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (!await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -1241,7 +1244,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandlePrintSettingsAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandlePrintSettingsAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -1269,7 +1272,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleSetFolderAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleSetFolderAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -1316,7 +1319,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleSetNameAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleSetNameAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -1375,7 +1378,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleSetPasswordAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleSetPasswordAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -1397,7 +1400,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleSetIPAddressAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleSetIPAddressAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -1416,7 +1419,7 @@ internal partial class MCodeHandler(
     /// Only the expression form M581.1 is handled here, and only when the expression names SBC fields.
     /// Plain M581 hands the slot back to the firmware
     /// </remarks>
-    private async ValueTask<Message?> HandleConfigureTriggerAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleConfigureTriggerAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (code.MinorNumber == 1)
         {
@@ -1429,7 +1432,8 @@ internal partial class MCodeHandler(
                     return result;
                 }
                 // No SBC fields in the expression — let RRF handle M581.1 natively
-                return null;
+                // TODO this used to fallthrough to RRF
+                return new Message(MessageType.Warning, "Not implemented");
             }
             throw new OperationCanceledException();
         }
@@ -1450,7 +1454,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleNetworkProtocolsAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleNetworkProtocolsAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -1493,7 +1497,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleForkInputReaderAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleForkInputReaderAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -1504,7 +1508,8 @@ internal partial class MCodeHandler(
                     if (model.Inputs[CodeChannel.File2] is null)
                     {
                         // Command not supported. Let RRF decide what to do
-                        return null;
+                        // TODO this used to fallthrough to RRF
+                        return new Message(MessageType.Warning, "Not implemented");
                     }
                 }
 
@@ -1530,7 +1535,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleEventLoggingAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleEventLoggingAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
@@ -1582,7 +1587,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleConfigureCanAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleConfigureCanAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         uint oldAddress = code.GetUInt('B', 0);
 
@@ -1624,7 +1629,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleEnableCanAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleEnableCanAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         bool changeTiming = false;
         uint DefaultCanBitRate = CanTiming.DefaultCanBitRate / 1000;
@@ -1694,7 +1699,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleFirmwareUpdateAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleFirmwareUpdateAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (code.GetIntArray('S', [0]).Contains(0) && code.GetInt('B', 0) == 0)
         {
@@ -1790,7 +1795,8 @@ internal partial class MCodeHandler(
             }
             throw new OperationCanceledException();
         }
-        return null;
+        // TODO this used to fallthrough to RRF
+        return new Message(MessageType.Warning, "Not implemented");
     }
 
     /// <summary>
@@ -1799,7 +1805,7 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message?> HandleResetAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleResetAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (code.Parameters.Count == 0)
         {
@@ -1833,7 +1839,8 @@ internal partial class MCodeHandler(
             }
             throw new OperationCanceledException();
         }
-        return null;
+        // TODO this used to fallthrough to RRF
+        return new Message(MessageType.Warning, "Not implemented");
     }
 
     /// <summary>

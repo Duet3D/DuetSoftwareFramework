@@ -24,7 +24,7 @@ internal sealed partial class GCodeHandler
     /// stored, as RepRapFirmware stores both, because a user reads the trigger height and the
     /// kinematics read the offset
     /// </remarks>
-    private async ValueTask<Message?> HandleProbeParametersAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleProbeParametersAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         int probeNumber = code.GetInt('K', 0);
         if (probeNumber < 0 || probeNumber >= RemoteProbes.MaxProbes)
@@ -165,17 +165,27 @@ internal sealed partial class GCodeHandler
         return builder.ToString();
     }
 
+    private void AxisAndBedTransform(RawMove raw, int numAxes)
+    {
+        ApplyAxisSkewTransform(raw.Coords);
+        
+        if (IsUsingMeshCompensation(raw, numAxes))
+        {
+            ApplyBedCompensation(raw, numAxes);
+        }
+    }
+
     /// <summary>
     /// Raise or lower a move's Z target by however much the bed deviates under it
     /// </summary>
-    /// <param name="move">The move being built</param>
+    /// <param name="raw">The move being built</param>
     /// <param name="numAxes">Number of axes to consider</param>
     /// <remarks>
     /// The map is measured over two named axes rather than always X and Y, so the coordinates fed to
     /// it are looked up by letter. RepRapFirmware does the same, which is what lets an IDEX machine
     /// map its U axis
     /// </remarks>
-    private void ApplyBedCompensation(RawMove move, int numAxes)
+    private void ApplyBedCompensation(RawMove raw, int numAxes)
     {
         if (!bedCompensation.IsActive)
         {
@@ -188,8 +198,8 @@ internal sealed partial class GCodeHandler
             return;                             // nothing to correct on a machine with no Z
         }
 
-        (float axis0, float axis1) = GridCoordinates(move, numAxes);
-        move.Coords[zAxis] += bedCompensation.GetCorrection(axis0, axis1, move.Coords[zAxis]);
+        (float axis0, float axis1) = GridCoordinates(raw, numAxes);
+        raw.Coords[zAxis] += bedCompensation.GetCorrection(axis0, axis1, raw.Coords[zAxis]);
     }
 
     // The bed correction used to be taken back off a committed move to recover the coordinate the

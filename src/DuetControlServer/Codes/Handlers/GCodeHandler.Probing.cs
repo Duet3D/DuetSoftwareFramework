@@ -45,7 +45,7 @@ internal sealed partial class GCodeHandler
     /// which is what makes G30 the way a machine is levelled. S-1 only reports, S-3 calibrates the
     /// probe against a Z axis that is already trusted, and S-2 needs tools, which are not ported
     /// </remarks>
-    private async ValueTask<Message?> HandleProbeAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleProbeAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (code.HasParameter('P'))
         {
@@ -386,7 +386,7 @@ internal sealed partial class GCodeHandler
     /// <param name="settings">What the probe is configured to do</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message?> ApplyProbeResultAsync(int probeNumber, int sValue, float stoppedHeight,
+    private async ValueTask<Message> ApplyProbeResultAsync(int probeNumber, int sValue, float stoppedHeight,
                                                             ProbeSettings settings, CancellationToken cancellationToken)
     {
         if (sValue == ReportHeight)
@@ -440,7 +440,7 @@ internal sealed partial class GCodeHandler
     /// RepRapFirmware runs <c>mesh.g</c> if the machine has one, so that a bed that needs preparing
     /// before it is probed can say so; only if there is no such file does it probe directly
     /// </remarks>
-    private async ValueTask<Message?> HandleProbeGridAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleProbeGridAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (!code.TryGetInt('S', out int sValue))
         {
@@ -488,7 +488,7 @@ internal sealed partial class GCodeHandler
     /// skipped and then filled in from the ones that were probed, because the interpolation needs all
     /// four corners of whichever cell it lands in
     /// </remarks>
-    private async ValueTask<Message?> ProbeGridAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> ProbeGridAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         int probeNumber = code.GetInt('K', 0);
         if (probeNumber < 0 || probeNumber >= RemoteProbes.MaxProbes)

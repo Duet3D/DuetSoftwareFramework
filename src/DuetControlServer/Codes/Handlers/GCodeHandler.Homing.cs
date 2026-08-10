@@ -206,7 +206,7 @@ internal sealed partial class GCodeHandler
     /// not is worse than one that says it failed
     /// </para>
     /// </remarks>
-    private async ValueTask<Message?> HandleHomeAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleHomeAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (!await planner.WaitForStandstillAsync(cancellationToken))
         {

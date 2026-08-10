@@ -15,7 +15,10 @@ public sealed class TCodeHandler : ICodeHandler
     /// <param name="code">Code to process</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result of the code if the code completed, else null</returns>
-    public ValueTask<Message?> ProcessAsync(Commands.Code code, CancellationToken cancellationToken) => ValueTask.FromResult<Message?>(null);
+    public async ValueTask<Message> ProcessAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        return new Message(MessageType.Warning, "Not implemented yet");
+    }
 
     /// <summary>
     /// React to an executed T-code before its result is returned

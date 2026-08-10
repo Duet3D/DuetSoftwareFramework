@@ -56,7 +56,7 @@ internal partial class MCodeHandler
     /// there. That split is RepRapFirmware's, and it is why naming a port without a type is an error
     /// rather than a change to the existing probe: the type decides what the board is asked to watch
     /// </remarks>
-    private async ValueTask<Message?> HandleProbeConfigAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleProbeConfigAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (code.MinorNumber >= 0)
         {
@@ -371,7 +371,7 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private ValueTask<Message?> HandleDeployProbeAsync(Commands.Code code, CancellationToken cancellationToken)
+    private ValueTask<Message> HandleDeployProbeAsync(Commands.Code code, CancellationToken cancellationToken)
         => MoveProbeAsync(code, DeployProbeMacro, deploying: true, cancellationToken);
 
     /// <summary>
@@ -380,7 +380,7 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private ValueTask<Message?> HandleRetractProbeAsync(Commands.Code code, CancellationToken cancellationToken)
+    private ValueTask<Message> HandleRetractProbeAsync(Commands.Code code, CancellationToken cancellationToken)
         => MoveProbeAsync(code, RetractProbeMacro, deploying: false, cancellationToken);
 
     /// <summary>Macro that lowers a Z probe into place</summary>
@@ -410,7 +410,7 @@ internal partial class MCodeHandler
     /// meta G-code variables are not ported yet, so the unnumbered macro runs without it
     /// </para>
     /// </remarks>
-    private async ValueTask<Message?> MoveProbeAsync(Commands.Code code, string macro, bool deploying,
+    private async ValueTask<Message> MoveProbeAsync(Commands.Code code, string macro, bool deploying,
                                                      CancellationToken cancellationToken)
     {
         int probeNumber = code.GetInt('P', 0);
@@ -454,7 +454,7 @@ internal partial class MCodeHandler
     /// Marlin's Z offset is the negative of RepRapFirmware's trigger height, so this is G31 Z with
     /// the sign flipped and always for probe 0
     /// </remarks>
-    private async ValueTask<Message?> HandleProbeOffsetAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleProbeOffsetAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
@@ -501,7 +501,7 @@ internal partial class MCodeHandler
     /// Every named input has to be in the wanted state at the same time, not one after another: the
     /// code is used to wait for a door to be shut and a guard to be in place together
     /// </remarks>
-    private async ValueTask<Message?> HandleWaitForInputAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleWaitForInputAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         // S defaults to 1, so M577 with no S waits for the inputs to become active
         bool activeHigh = code.GetInt('S', 1) >= 1;
