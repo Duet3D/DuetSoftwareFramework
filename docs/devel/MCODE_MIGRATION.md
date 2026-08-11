@@ -95,6 +95,34 @@ These rules come from the architecture already established on this branch — se
    The tell is worth learning: when a symptom is fixed by *moving* something rather than by supplying
    what was missing, the thing that was missing is still missing.
 
+9. **A check the caller has to remember is a check that will be forgotten.** Where a value has to be
+   validated before it can be used, validate it where the value is *produced* — parsed, constructed,
+   looked up — and hand back the reason with the refusal, so that a caller cannot come away holding
+   the value without having passed the check. This architecture is full of such rules, because §1.4
+   makes whole categories of input impossible: a port on board 0, a driver on board 0, a heater the
+   main board would have owned. Each is one line to test and one line to leave out.
+
+   The worked example is §8's "A port name has to name an expansion board". `TrySplitPort` parsed and
+   `CanAddresses.HasNoHardware` judged, and **four of the six call sites never called the second** —
+   including the one that asks a board to watch the pin and the two that arm a move. Not because the
+   rule was subtle, but because nothing about holding a board number says a board number needs
+   checking.
+
+   Three corollaries, each of which cost something before it was learned:
+
+   - **Validate every spelling of the thing, not the one that happens to fail parsing.** Refusing
+     `io1.in` because it will not parse, while `0.io1.in` parses and sails through, is not a check —
+     it is a check for one input that resembles a check for the class.
+   - **The reason belongs with the refusal.** A caller that composes its own message has to know
+     *which* refusal it is looking at, and that is the forgotten check again in another costume. It
+     also produces messages like "invalid port" for a port that is perfectly valid and merely on the
+     wrong board, which sends the operator hunting a typo that is not there.
+   - **One grammar, one parser.** Two functions that read the same syntax will diverge, and they will
+     diverge silently because each is individually correct. `TrySplitPort` and
+     `CanGenericWriter.RemoveBoardAddress` both strip a board address off a port name; only the
+     second knows about the `!` and `^` modifiers, only the first knows board 0 is refused, and
+     neither knows about `*`. See §8.
+
 ### Recipe for porting one code
 
 1. Read the RRF implementation at the line given in the tables below.
@@ -721,6 +749,41 @@ Two things follow from that and are worth keeping:
 
 The driver checks in `MCodeHandler.Motion.cs` stay at their call sites: a driver is given as a
 `DriverId` rather than parsed out of a string, so there is no parse for the policy to attach to.
+
+#### There is a second parser, and the two have diverged
+
+A sweep for other port parsing found exactly one more, and it is the corollary in §1.9 already come
+true. `CanGenericWriter.RemoveBoardAddress` — reached from `FromCode` for any `ReducedString`
+parameter, which is how M950, M308, M955 and friends will carry a port — strips a board address off
+the same syntax, and the two disagree about what that syntax is:
+
+| | `TrySplitPort` | `RemoveBoardAddress` | RepRapFirmware |
+|---|---|---|---|
+| `!` and `^` modifiers | ✗ not handled | ✓ | ✓ |
+| `*` modifier | ✗ | ✗ | ✓ |
+| Board 0 refused | ✓ | ✗ — not looked at | n/a, the main board has ports |
+| Address is returned | ✓ | ✗ — discarded | ✓ |
+| Unparseable name | refused | passed through unchanged | treated as the local board |
+
+RepRapFirmware has one function, `IoPort::RemoveBoardAddress` (`Hardware/IoPorts.cpp:522`), and its
+grammar is *modifiers, then digits, then a dot*; a name that does not match means the local board.
+Both of the versions here are subsets of it, and different subsets.
+
+**Two consequences, one of them live.** `TrySplitPort` not knowing the modifiers means
+`M574 X1 S1 P"!1.io1.in"` — a normally-closed switch on expansion board 1, which is how most machines
+are wired — is refused today, and refused with the message for a port on the main board, which is
+doubly wrong. `M558 P8 C"^1.io2.in"` fails the same way. And `RemoveBoardAddress` discarding the
+address it strips means whoever ports M950 needs the address it just threw away, and will be tempted
+to write a third parser rather than change either of the two.
+
+The fix is one parser with RepRapFirmware's grammar, returning the address and refusing board 0, used
+by both paths. Not yet done — see the ⬜ below.
+
+| Item | Status |
+|---|---|
+| Refuse board 0 wherever a port is parsed | ✅ |
+| One parser with RRF's full grammar, `!`/`^`/`*` included | ⬜ |
+| M574 and M558 accept a modifier on the port name | ⬜ blocked on the above |
 
 ### Expansion board manager
 
