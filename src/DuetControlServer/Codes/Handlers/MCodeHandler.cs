@@ -1142,21 +1142,43 @@ public class MCodeHandler(
                         // Update the firmware
                         await using FileStream iapStream = new(physicalIapFile, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
                         await using FileStream firmwareStream = new(physicalFirmwareFile, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
-                        if (Path.GetExtension(firmwareFile) == ".uf2")
+                        Message result = new();
+                        try
                         {
-                            await using MemoryStream unpackedFirmwareStream = await Firmware.UnpackUF2Async(firmwareStream);
-                            await linkInterface.UpdateFirmware(iapStream, unpackedFirmwareStream, lifetime.ApplicationStopped);
+                            if (Path.GetExtension(firmwareFile) == ".uf2")
+                            {
+                                await using MemoryStream unpackedFirmwareStream = await Firmware.UnpackUF2Async(firmwareStream);
+                                await linkInterface.UpdateFirmware(iapStream, unpackedFirmwareStream, lifetime.ApplicationStopped);
+                            }
+                            else
+                            {
+                                await linkInterface.UpdateFirmware(iapStream, firmwareStream, lifetime.ApplicationStopped);
+                            }
                         }
-                        else
+                        catch (InvalidOperationException e)
                         {
-                            await linkInterface.UpdateFirmware(iapStream, firmwareStream, lifetime.ApplicationStopped);
+                            // Another update is already in progress and the link is still intact, no need to restart DCS
+                            return new Message(MessageType.Error, e.Message);
+                        }
+                        catch (Exception e) when (e is not OperationCanceledException)
+                        {
+                            // Save the reason in the start error file so DWS can report it while DCS restarts
+                            result = new Message(MessageType.Error, $"Failed to update firmware: {e.Message}");
+                            try
+                            {
+                                File.WriteAllText(settings.Value.StartErrorFile, result.Content);
+                            }
+                            catch (Exception fileException)
+                            {
+                                logger.LogWarning(fileException, "Failed to write start error file {File}", settings.Value.StartErrorFile);
+                            }
                         }
 
                         // Updating the firmware resets the controller, which invalidates every channel and cancels
-                        // this very code. Reassign its cancellation token so it can report success instead of cancelled
+                        // this very code. Reassign its cancellation token so it can report the result instead of cancelled
                         code.ResetCancellationToken();
 
-                        // Terminate the program once this code has finished. Give the success response a
+                        // Terminate the program once this code has finished. Give the response a
                         // moment to propagate through DWS to the clients first - stopping immediately tears
                         // down the IPC connections, which lets the reply race against the shutdown
                         _ = code.Task.ContinueWith(async task =>
@@ -1167,7 +1189,7 @@ public class MCodeHandler(
                         }, TaskContinuationOptions.RunContinuationsAsynchronously);
 
                         // Done
-                        return new Message();
+                        return result;
                     }
                     throw new OperationCanceledException();
                 }

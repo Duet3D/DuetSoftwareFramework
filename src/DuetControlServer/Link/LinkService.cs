@@ -143,9 +143,10 @@ public sealed class LinkService(
 
         if (numRetries == 3)
         {
-            // Failed to flash the firmware
+            // Failed to flash the firmware. Do not throw an OperationCanceledException here,
+            // it would be treated as a code cancellation and the reason would be lost
             eventLogger.LogOutput(MessageType.Error, "Could not update firmware after 3 attempts. Please install it manually.");
-            throw new OperationCanceledException("Failed to update firmware after 3 attempts");
+            throw new IOException("Checksum verification failed after 3 attempts");
         }
 
         // Wait for the IAP binary to restart the controller
@@ -301,14 +302,14 @@ public sealed class LinkService(
                     {
                         PerformFirmwareUpdate(lifetime.ApplicationStopped);
                         linkInterface.FirmwareUpdateRequest?.SetResult();
-                        linkInterface.FirmwareUpdateRequest = null;
                     }
                     catch (Exception e)
                     {
+                        // Pass the failure to the M997 handler, which reports it and stops DCS.
+                        // Rethrowing would stop the host before the error reply could go out
                         linkInterface.FirmwareUpdateRequest?.SetException(e);
-                        linkInterface.FirmwareUpdateRequest = null;
-                        throw;
                     }
+                    linkInterface.FirmwareUpdateRequest = null;
 
                     linkInterface.IapStream = linkInterface.FirmwareStream = null;
                     break;
