@@ -1640,7 +1640,7 @@ Same 6HC assumptions as §11 — none of these can be dismissed as not built on 
 
 | # | Gap | RRF | Cost of not having it |
 |---|---|---|---|
-| 17 | **Bed compensation is baked into the segment interpolation base** | `:2356`, `:3368-3371` vs `Movement/DDA.cpp:319-321` | Z steps up by roughly the full mesh correction at the start of every segmented move and ramps back down across it |
+| 17 | **Bed compensation is baked into the segment interpolation base** | `:2356`, `:3368-3371` vs `Movement/DDA.cpp:319-321` | ✅ fixed, see below |
 | 18 | **Only `InputPin` endstops complete a homing move** | `GCodes4.cpp:66-131` | ✅ fixed, see below |
 | 19 | **The endstop state is re-read live rather than latched** | `GCodes.cpp:5530`, `ms.endstopsTriggered` | ✅ fixed, the same change as 18 |
 | 20 | **`HoldAxis` writes an axis position into a raw motor move** | `:2335-2353` | ✅ fixed, see below |
@@ -1685,10 +1685,36 @@ The same conflation reaches two other places, both smaller:
 - `SegmentCountFor` and `LimitPosition` both take their initial position from the same array. The
   error there is one mesh correction in Z, which is negligible for both, but it is the same fix.
 
-The fix is to split the roles: keep an uncompensated copy of where the last move was *asked* to end
-for the G-code side, and leave `MoveBuilder`'s array as the compensated one the DDA differences
-against. Note the two must stay separately maintained through `ResyncFromEngine`, which derives
-`StartCoordinates` from motor positions and therefore always produces the compensated one.
+✅ **Fixed, and without a second thing to keep in step.** The plan here said to "keep an uncompensated
+copy" and warned that the two would have to be separately maintained through `ResyncFromEngine`. They
+do not, because the uncompensated start is not state at all — it is
+`ToolOffsetTransform(currentUserPosition)`, the same forward transform the *target* goes through,
+evaluated before the axis words move the interpreter on. `RawMove.InitialCoords` holds the result for
+the move being built, and `SegmentedMove.From`, `SegmentCountFor` and `LimitPosition` all take it.
+
+That is the property worth keeping: a term added to the transform reaches both ends of the line at
+once, so tool offsets, axis mapping, scale factors and Z hop cannot arrive at the target without
+arriving at the base. A stored copy would have to be updated in `SyncInterpreterToMachine`, in G92, in
+both homing paths and in the probing handlers, and would be one forgotten line away from the same
+class of bug.
+
+`SyncInterpreterToMachine` gained the inverse bed transform, which is the third place the conflation
+reached. `RemoveBedCompensation` wraps `BedCompensation.GetRequestedHeight`, the function §11.5 noted
+was already written and unused. It has exactly one caller and should keep exactly one: the taper makes
+the inverse approximate, so inverting anywhere the interpreter already knows what was asked for would
+be losing precision for nothing.
+
+**A second defect surfaced while fixing it, and is worse.** `ToolOffsetTransform`'s third parameter is
+an axis *count*; the call site passed the `axesMentioned` *bitmap*. So a move carried coordinates only
+for the first `axesMentioned` axes and left the rest at the zero `RawMove` is constructed with — a
+`G1 X10` on an XYZ machine copied one axis and commanded Y0 Z0, a dive to the origin. An extruder-only
+move did not reach the transform at all and commanded every axis to zero, so a retraction dove as
+well. A move commands an absolute position for **every** axis, including the ones it does not name;
+the transform now runs over the whole vector, once, where the interpreter's position has just been
+updated rather than in one branch of three.
+
+Nothing in the audit found this because both audits walked RepRapFirmware and asked what was missing.
+This is present, and wrong — the class of bug that only reading this side finds.
 
 **18. Completing a homing move only works for switch endstops.** Phase C armed all four
 `EndstopType`s; the half that decides what the move *meant* was not updated with it.
@@ -1802,7 +1828,7 @@ tests. The parameter is read once in `HandleMoveAsync` and passed down rather th
 silently produces no movement, then by the rest. Items 36 and 37 are one change; 39 and 40 are one
 change each but share the transform.
 
-35. ⬜ Split the interpolation base from the ring's start coordinates, and undo the bed transform in
+35. ✅ Split the interpolation base from the ring's start coordinates, and undo the bed transform in
     `SyncInterpreterToMachine`. *(item 17)*
 36. ✅ Carry the stopped axes back from the motion-stopped event so a homing move completes for every
     endstop type. *(item 18)*
