@@ -219,9 +219,9 @@ Update these counts as boxes are ticked.
 | Blocker | Blocks | Note |
 |---|---|---|
 | **Heat subsystem: partly there** | M143, M303, M307, M309, M562, M570, M568 | [HeatManager](src/DuetControlServer/Heat/HeatManager.cs) holds sensors, heaters, setpoints and waiting. What is left is tuning, the process model, the monitors and the fault codes — every one of them a CAN message that exists and a handler that does not |
-| **No Fan subsystem in DCS** | §5.6 | Same shape: `CanMessageFanParameters` / `CanMessageSetFanSpeed` / `CanMessageFansReport` exist, the service does not |
+| **Fan subsystem: partly there** | Thermostatic control | [FanManager](src/DuetControlServer/Fans/FanManager.cs) creates fans and sets speeds. `CanMessageFanParameters` carries the monitored sensors and trigger temperatures for `M106 H`/`T`; the mapping onto it is not written |
 | **Tool subsystem: partly there** | M116, M568, M701-M703 | [ToolManager](src/DuetControlServer/Tools/ToolManager.cs) holds definition, selection, offsets, axis mapping and mixing. What is left is what needs Heat: active and standby temperatures, the standby state on deselection, and M116 |
-| **No Spindle subsystem in DCS** | §5.8 | |
+| **No Spindle subsystem in DCS** | §5.8 | **Blocked on the GPIO port layer, which is itself unported.** A spindle is not a device on the CAN bus: CANlib has no spindle message at all, only a `MaxSpindles` constant. RepRapFirmware's `Spindle` is three `IoPort`s - PWM, on/off and reverse/forward - and a remote one is driven through `CanInterface::WriteGpio`. So spindles need M950 P/S creating remote GPIO and PWM outputs, `state.gpOut[]` holding them, and `CanMessageWriteGpio` writing them, before M3/M4/M5 have anything to address |
 | **No endstop/probe abstraction in DCS** | M119, M558, M574, M577, M585, M401, M402, M851 | Needs the input-monitor CAN messages (`CanMessageCreateInputMonitorV1`, `CanMessageChangeInputMonitorV1`, `CanMessageInputChangedV2`) wired to `sensors.endstops[]` / `sensors.probes[]` |
 
 Because of these, **§5.1-§5.4 (motion) is the tractable scope on this branch**; the rest is gated on
@@ -370,9 +370,9 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 
 | M-code | RRF | Purpose | Object model home | Status |
 |---|---|---|---|---|
-| M106 | 1755 | Set fan speed and parameters | `fans[]` → CAN `CanMessageSetFanSpeed` / `CanMessageFanParameters` | ⬜ blocked |
-| M107 | 1815 | Fan off (deprecated) | `fans[].requestedValue` | ⬜ blocked |
-| M950 (fan) | 4589 | Create fan | `fans[]` → CAN generic `M950FanParams` | ⬜ blocked |
+| M106 | 1755 | Set fan speed and parameters | `fans[]` → CAN `CanMessageSetFanSpeed` / `CanMessageFanParameters` | 🟡 speed and limits; `H`/`T` thermostatic control refused |
+| M107 | 1815 | Fan off (deprecated) | `fans[].requestedValue` | ✅ |
+| M950 (fan) | 4589 | Create fan | `fans[]` → CAN generic `M950FanParams` | ✅ |
 
 ### 5.7 Tools and filament — mostly blocked on a Tool subsystem (§4)
 
