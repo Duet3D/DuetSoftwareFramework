@@ -218,7 +218,7 @@ Update these counts as boxes are ticked.
 
 | Blocker | Blocks | Note |
 |---|---|---|
-| **No Heat subsystem in DCS** | §5.5, parts of §5.7 | `src/DuetControlServer/` has `Motion/` but no `Heat/`. The object model (`DuetAPI/ObjectModel/Heat/`) and the CAN messages (`CanMessageSetHeaterTemperatureV1`, `CanMessageHeaterModelV3`, `CanMessageSetHeaterMonitors`, `CanMessageHeaterTuningCommand`, …) both exist, so the gap is the service layer: heater state machine, tuning, fault handling, sensor polling |
+| **Heat subsystem: partly there** | M143, M303, M307, M309, M562, M570, M568 | [HeatManager](src/DuetControlServer/Heat/HeatManager.cs) holds sensors, heaters, setpoints and waiting. What is left is tuning, the process model, the monitors and the fault codes — every one of them a CAN message that exists and a handler that does not |
 | **No Fan subsystem in DCS** | §5.6 | Same shape: `CanMessageFanParameters` / `CanMessageSetFanSpeed` / `CanMessageFansReport` exist, the service does not |
 | **Tool subsystem: partly there** | M116, M568, M701-M703 | [ToolManager](src/DuetControlServer/Tools/ToolManager.cs) holds definition, selection, offsets, axis mapping and mixing. What is left is what needs Heat: active and standby temperatures, the standby state on deselection, and M116 |
 | **No Spindle subsystem in DCS** | §5.8 | |
@@ -346,22 +346,22 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 
 | M-code | RRF | Purpose | Object model home | Status |
 |---|---|---|---|---|
-| M104 | 1844 | Set extruder temperature (no wait) | `heat.heaters[].active` | ⬜ blocked |
-| M105 | 1749 | Report temperatures | `heat.heaters[]` | ⬜ blocked |
+| M104 | 1844 | Set extruder temperature (no wait) | `heat.heaters[].active` | ✅ |
+| M105 | 1749 | Report temperatures | `heat.heaters[]` | ✅ |
 | M108 | 1819 | Cancel wait for temperature | — | ⬜ blocked |
-| M109 | 1823 | Set extruder temperature and wait | `heat.heaters[].active` | ⬜ blocked |
-| M116 | 1991 | Wait for temperatures | `heat.heaters[]` | ⬜ blocked |
-| M140 | 2265 | Bed temperature | `heat.bedHeaters[]` | ⬜ blocked |
-| M141 | 2266 | Chamber temperature | `heat.chamberHeaters[]` | ⬜ blocked |
+| M109 | 1823 | Set extruder temperature and wait | `heat.heaters[].active` | ✅ |
+| M116 | 1991 | Wait for temperatures | `heat.heaters[]` | ✅ |
+| M140 | 2265 | Bed temperature | `heat.bedHeaterMapping[]` | ✅ |
+| M141 | 2266 | Chamber temperature | `heat.chamberHeaterMapping[]` | ✅ |
 | M143 | 2407 | Heater protection and limits | `heat.heaters[].monitors[]` → CAN `CanMessageSetHeaterMonitors` | ⬜ blocked |
 | M144 | 2411 | Bed to standby/active | `heat.bedHeaters[]` | ⬜ blocked |
-| M190 | 2432 | Set bed temperature and wait | `heat.bedHeaters[]` | ⬜ blocked |
-| M191 | 2433 | Set chamber temperature and wait | `heat.chamberHeaters[]` | ⬜ blocked |
-| M302 | 2927 | Cold extrude/retract permission and limits | `heat.coldExtrudeTemperature`, `heat.coldRetractTemperature` | ⬜ blocked |
+| M190 | 2432 | Set bed temperature and wait | `heat.bedHeaterMapping[]` | ✅ |
+| M191 | 2433 | Set chamber temperature and wait | `heat.chamberHeaterMapping[]` | ✅ |
+| M302 | 2927 | Cold extrude/retract permission and limits | `heat.coldExtrudeTemperature`, `heat.coldRetractTemperature` | ✅ |
 | M303 | 2972 | Run PID tuning | `heat.heaters[].model` → CAN `CanMessageHeaterTuningCommand` | ⬜ blocked |
 | M305 | 2976 | Legacy heater parameters | `heat.heaters[]` | ⬜ blocked |
 | M307 | 2981 | Heater process model | `heat.heaters[].model` → CAN `CanMessageHeaterModelV3` | ⬜ blocked |
-| M308 | 2985 | Configure sensor | `sensors.analog[]` → CAN generic `M308V1Params` | ⬜ blocked |
+| M308 | 2985 | Configure sensor | `sensors.analog[]` → CAN generic `M308V1Params` | ✅ |
 | M309 | 2989 | Tool feedforward | `tools[].feedForward` → CAN `CanMessageHeaterFeedForwardV1` | ⬜ blocked |
 | M562 | 3738 | Reset temperature fault | `heat.heaters[].state` | ⬜ blocked |
 | M570 | 3882 | Heater fault detection | → CAN `CanMessageSetHeaterFaultDetectionParameters` | ⬜ blocked |
