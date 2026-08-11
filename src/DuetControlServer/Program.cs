@@ -2,6 +2,7 @@
 using DuetControlServer;
 using DuetControlServer.Codes;
 using DuetControlServer.Commands;
+using DuetControlServer.Fans;
 using DuetControlServer.Files;
 using DuetControlServer.Heat;
 using DuetControlServer.IPC;
@@ -191,6 +192,7 @@ rootCommand.SetAction(async (parserResult) =>
                     .AddModel()
                     .AddLinkAdapter()
                     .AddMotion()
+                    .AddFans()
                     .AddHeat()
                     .AddTools()
                     .AddUtility();

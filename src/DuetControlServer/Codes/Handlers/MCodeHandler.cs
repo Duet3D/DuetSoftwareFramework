@@ -46,6 +46,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="bedCompensation">The height map in effect</param>
 /// <param name="stateStack">Interpreter state saved by M120 and restored by M121</param>
 /// <param name="planner">Where G-codes become queued moves, and what holds the machine description</param>
+/// <param name="fanManager">The fans the machine has, and what they are asked to run at</param>
 /// <param name="heatManager">The heaters the machine has, and what they are asked to reach</param>
 /// <param name="toolManager">The tools the machine has, and which one is selected</param>
 /// <param name="settings">Settings</param>
@@ -68,6 +69,7 @@ internal partial class MCodeHandler(
     Motion.BedCompensation bedCompensation,
     InterpreterStateStack stateStack,
     MovePlanner planner,
+    Fans.FanManager fanManager,
     Heat.HeatManager heatManager,
     Tools.ToolManager toolManager,
     IOptions<Settings> settings) : ICodeHandler
@@ -215,6 +217,10 @@ internal partial class MCodeHandler(
             558 => await HandleProbeConfigAsync(code, cancellationToken),
             // Stop applying bed compensation
             561 => await HandleClearCompensationAsync(code, cancellationToken),
+            // Set fan speed
+            106 => await HandleFanSpeedAsync(code, cancellationToken),
+            // Fan off
+            107 => await HandleFanOffAsync(code, cancellationToken),
             // Set extruder temperature without waiting
             104 => await SetTemperaturesAsync(code, await CurrentToolHeatersAsync(code, cancellationToken), wait: false, cancellationToken),
             // Report temperatures
@@ -235,6 +241,8 @@ internal partial class MCodeHandler(
             302 => await HandleColdExtrusionAsync(code, cancellationToken),
             // Configure a temperature sensor
             308 => await HandleConfigureSensorAsync(code, cancellationToken),
+            // Create a heater, fan or other I/O device
+            950 => await HandleCreateDeviceAsync(code, cancellationToken),
             // Define or delete a tool
             563 => await HandleDefineToolAsync(code, cancellationToken),
             // Set the mixing ratios of a tool
