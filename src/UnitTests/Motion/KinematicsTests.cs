@@ -1,4 +1,5 @@
 using System;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
 using DuetControlServer.Motion.Kinematics;
 using DuetControlServer.Motion.Native;
@@ -257,7 +258,7 @@ public class KinematicsTests
     {
         // Two axes driving the same motor identically: no set of motor positions distinguishes them,
         // so there is no forward transform and the geometry does not describe a real machine
-        CoreKinematicsEngine engine = new("broken", [[1, 0, 0], [1, 0, 0], [0, 0, 1]]);
+        CoreKinematicsEngine engine = new(KinematicsName.Cartesian, [[1, 0, 0], [1, 0, 0], [0, 0, 1]]);
         Assert.That(engine.IsValid, Is.False);
     }
 }

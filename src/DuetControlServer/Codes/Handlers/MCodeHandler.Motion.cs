@@ -4,6 +4,7 @@ using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Link;
 using DuetControlServer.Motion;
+using DuetControlServer.Motion.Kinematics;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -24,11 +25,18 @@ namespace DuetControlServer.Codes.Handlers;
 /// only their bodies live here, to keep that switch readable as it grows.
 /// </para>
 /// <para>
-/// Everything here writes the object model and nothing else: <c>move.axes[]</c>,
+/// Most of these write the object model and nothing else: <c>move.axes[]</c>,
 /// <c>move.extruders[]</c> and <c>move.motionSystems[]</c> are the configuration, and
 /// <see cref="Motion.MotionParameters"/> is rebuilt from them by
 /// <see cref="Motion.MovePlanner.ReconfigureAsync"/>. There is deliberately no second copy of a
 /// setting anywhere in this file.
+/// </para>
+/// <para>
+/// The geometry is the exception, and is being made the rule: M665, M666 and M669 configure
+/// <see cref="Motion.MovePlanner.Geometry"/> and write <c>move.kinematics</c> from it, rather than
+/// writing the object model and having the geometry derived back out of it. §14 of
+/// <c>docs/devel/MCODE_MIGRATION.md</c> is why, and step 4 there applies the same shape to the axes
+/// and extruders.
 /// </para>
 /// <para>
 /// RepRapFirmware supports drivers on the main board and drivers on CAN-connected expansion boards,
@@ -78,12 +86,6 @@ internal partial class MCodeHandler
     /// delay the stop by the same amount
     /// </remarks>
     private const ushort EndstopMinReportInterval = 0;
-
-    /// <summary>How many towers a linear delta has</summary>
-    private const int DeltaTowers = 3;
-
-    /// <summary>Axis letters the delta towers are named by, in tower order</summary>
-    private static readonly char[] DeltaAxisLetters = ['X', 'Y', 'Z', 'U', 'V', 'W'];
 
     /// <summary>
     /// M92: set or report the steps per mm of each drive
@@ -1787,226 +1789,56 @@ internal partial class MCodeHandler
     }
 
     /// <summary>
-    /// M665 and M666: configure a delta geometry and its endstop adjustments
+    /// M665, M666 and M669: select the machine's geometry and configure it
     /// </summary>
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
     /// <remarks>
-    /// M665 switches the machine to a linear delta if it is not one already, which is how a delta
-    /// config.g is usually written. Changing any of this invalidates where the machine thinks it is,
-    /// so every axis stops counting as homed
+    /// <para>
+    /// One handler for all three, because all three do the same thing to the same object: M669
+    /// selects a geometry and configures whichever one is selected, M665 configures a delta's
+    /// geometry, and M666 configures its corrections. Which parameters mean what is the geometry's
+    /// business rather than this handler's - see
+    /// <see cref="Motion.Kinematics.KinematicsConfigurator"/>.
+    /// </para>
+    /// <para>
+    /// The geometry is configured first and the object model written from it, which is the direction
+    /// §14 of <c>docs/devel/MCODE_MIGRATION.md</c> establishes. Configuring takes no locks, so the
+    /// model's write lock is held only for the projection - and the planner lock is taken inside it,
+    /// which is the order §13.1 fixes
+    /// </para>
     /// </remarks>
-    private async ValueTask<Message> HandleDeltaConfigAsync(Commands.Code code, CancellationToken cancellationToken)
-    {
-        bool seen = false;
-        string? report = null;
-
-        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
-        {
-            throw new OperationCanceledException();
-        }
-
-        using (await model.AccessReadWriteAsync(cancellationToken))
-        {
-            Move move = model.Move;
-
-            if (code.MajorNumber == 665 && move.Kinematics is not DeltaKinematics && (code.HasParameter('L') || code.HasParameter('D')))
-            {
-                move.Kinematics = DuetAPI.ObjectModel.Kinematics.Create(KinematicsName.LinearDelta);
-                seen = true;
-            }
-
-            if (move.Kinematics is not DeltaKinematics delta)
-            {
-                return new Message(MessageType.Error, $"M{code.MajorNumber} is only applicable to delta kinematics");
-            }
-
-            // The towers hold the per-tower parameters, so they have to exist before anything is read
-            while (delta.Towers.Count < DeltaTowers)
-            {
-                delta.Towers.Add(new DeltaTower());
-            }
-
-            if (code.MajorNumber == 665)
-            {
-                if (code.TryGetFloatArray('L', out float[]? diagonals) && diagonals.Length > 0)
-                {
-                    for (int tower = 0; tower < delta.Towers.Count; tower++)
-                    {
-                        delta.Towers[tower].Diagonal = diagonals.Length == 1 ? diagonals[0]
-                                                       : tower < diagonals.Length ? diagonals[tower]
-                                                       : delta.Towers[tower].Diagonal;
-                    }
-                    seen = true;
-                }
-                if (code.TryGetFloat('R', out float deltaRadius))
-                {
-                    delta.DeltaRadius = deltaRadius;
-                    seen = true;
-                }
-                if (code.TryGetFloat('B', out float printRadius))
-                {
-                    delta.PrintRadius = printRadius;
-                    seen = true;
-                }
-                if (code.TryGetFloat('H', out float homedHeight))
-                {
-                    delta.HomedHeight = homedHeight;
-                    seen = true;
-                }
-
-                // X, Y and Z are the angular corrections of the three towers
-                seen |= TrySetTowerValue(code, delta, 'X', 0, (tower, value) => tower.AngleCorrection = value);
-                seen |= TrySetTowerValue(code, delta, 'Y', 1, (tower, value) => tower.AngleCorrection = value);
-                seen |= TrySetTowerValue(code, delta, 'Z', 2, (tower, value) => tower.AngleCorrection = value);
-
-                if (!seen)
-                {
-                    report = string.Format(CultureInfo.InvariantCulture,
-                                           "Diagonals {0:F3}:{1:F3}:{2:F3}, delta radius {3:F3}, homed height {4:F3}, bed radius {5:F1}, "
-                                           + "X {6:F3}{7}, Y {8:F3}{7}, Z {9:F3}{7}",
-                                           delta.Towers[0].Diagonal, delta.Towers[1].Diagonal, delta.Towers[2].Diagonal,
-                                           delta.DeltaRadius, delta.HomedHeight, delta.PrintRadius,
-                                           delta.Towers[0].AngleCorrection, "\u00b0",
-                                           delta.Towers[1].AngleCorrection, delta.Towers[2].AngleCorrection);
-                }
-            }
-            else
-            {
-                // M666: the endstop adjustments, one per tower in axis order, plus the bed tilt
-                for (int tower = 0; tower < delta.Towers.Count && tower < DeltaAxisLetters.Length; tower++)
-                {
-                    seen |= TrySetTowerValue(code, delta, DeltaAxisLetters[tower], tower,
-                                             (t, value) => t.EndstopAdjustment = value);
-                }
-                if (code.TryGetFloat('A', out float xTilt))
-                {
-                    delta.XTilt = xTilt;
-                    seen = true;
-                }
-                if (code.TryGetFloat('B', out float yTilt))
-                {
-                    delta.YTilt = yTilt;
-                    seen = true;
-                }
-
-                if (!seen)
-                {
-                    report = string.Format(CultureInfo.InvariantCulture,
-                                           "Endstop adjustments X{0:F2} Y{1:F2} Z{2:F2}, tilt X{3:F2}% Y{4:F2}%",
-                                           delta.Towers[0].EndstopAdjustment, delta.Towers[1].EndstopAdjustment,
-                                           delta.Towers[2].EndstopAdjustment, delta.XTilt * 100.0f, delta.YTilt * 100.0f);
-                }
-            }
-
-            if (seen)
-            {
-                // The geometry moved underneath the machine, so nothing is where it was
-                foreach (Axis axis in move.Axes)
-                {
-                    axis.Homed = false;
-                }
-            }
-        }
-
-        if (!seen)
-        {
-            return new Message(MessageType.Success, report!);
-        }
-
-        await planner.ReconfigureAsync(cancellationToken);
-        return new Message();
-    }
-
-    /// <summary>
-    /// M669: select the kinematics and configure them
-    /// </summary>
-    /// <param name="code">The code</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>The result</returns>
     private async ValueTask<Message> HandleKinematicsAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        bool seen = false;
-        string? report = null;
-
         if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
         {
             throw new OperationCanceledException();
         }
 
-        using (await model.AccessReadWriteAsync(cancellationToken))
-        {
-            Move move = model.Move;
-
-            if (code.TryGetInt('K', out int kinematicsType))
-            {
-                KinematicsName? name = KinematicsNameFor(kinematicsType);
-                if (name is null)
-                {
-                    return new Message(MessageType.Error, $"Unknown kinematics type {kinematicsType}");
-                }
-
-                if (move.Kinematics.Name != name.Value)
-                {
-                    move.Kinematics = DuetAPI.ObjectModel.Kinematics.Create(name.Value);
-                    ApplyCoreMatrix(move.Kinematics);
-                }
-                seen = true;
-            }
-
-            // S and T are the segmentation parameters and apply to every geometry. They are only
-            // read here for the geometries that do not use those letters for something of their own
-            bool segmentationLettersAreFree = move.Kinematics is not (ScaraKinematics or PolarKinematics);
-            if (segmentationLettersAreFree && (code.HasParameter('S') || code.HasParameter('T')))
-            {
-                MoveSegmentation segmentation = move.Kinematics.Segmentation ?? new MoveSegmentation();
-                if (code.TryGetFloat('S', out float segmentsPerSecond))
-                {
-                    segmentation.SegmentsPerSec = segmentsPerSecond;
-                }
-                if (code.TryGetFloat('T', out float minSegmentLength))
-                {
-                    segmentation.MinSegLength = minSegmentLength;
-                }
-                move.Kinematics.Segmentation = segmentation;
-                seen = true;
-            }
-
-            switch (move.Kinematics)
-            {
-                case CoreKinematics core:
-                    seen |= ApplyCoreParameters(code, core);
-                    break;
-
-                case ScaraKinematics scara:
-                    seen |= ApplyScaraParameters(code, scara);
-                    break;
-
-                case PolarKinematics polar:
-                    seen |= ApplyPolarParameters(code, polar);
-                    break;
-
-                case HangprinterKinematics:
-                    return new Message(MessageType.Error, "Hangprinter kinematics are not supported yet");
-            }
-
-            if (seen)
-            {
-                foreach (Axis axis in move.Axes)
-                {
-                    axis.Homed = false;
-                }
-            }
-            else
-            {
-                report = $"Kinematics is {move.Kinematics.Name.ToString().ToLowerInvariant()}";
-            }
-        }
+        int mCode = code.MajorNumber!.Value;
+        bool seen = false;
+        KinematicsEngine geometry = KinematicsConfigurator.Apply(planner.Geometry, code, ref seen);
 
         if (!seen)
         {
-            return new Message(MessageType.Success, report!);
+            // Nothing to configure, so the code is asking rather than telling. A geometry that the
+            // code does not apply to says so, and that is an error rather than a report
+            StringBuilder builder = new();
+            bool applies = geometry.AppendReport(builder, mCode);
+            return new Message(applies ? MessageType.Success : MessageType.Error, builder.ToString());
+        }
+
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            planner.SetGeometry(geometry);
+            KinematicsConfigurator.WriteTo(geometry, model.Move);
+
+            // The geometry moved underneath the machine, so nothing is where it was
+            foreach (Axis axis in model.Move.Axes)
+            {
+                axis.Homed = false;
+            }
         }
 
         await planner.ReconfigureAsync(cancellationToken);
@@ -2238,228 +2070,6 @@ internal partial class MCodeHandler
     }
 
     #region Helpers
-
-    /// <summary>
-    /// Apply the M669 parameters that belong to a core geometry
-    /// </summary>
-    /// <param name="code">The code</param>
-    /// <param name="core">The geometry</param>
-    /// <returns>True if anything was set</returns>
-    /// <remarks>
-    /// A core geometry is a matrix, and M669 can set an arbitrary one row by row - which is the point
-    /// of the matrix form, and how a machine that is not one of the named arrangements is described
-    /// </remarks>
-    private static bool ApplyCoreParameters(Commands.Code code, CoreKinematics core)
-    {
-        bool seen = false;
-        for (int row = 0; row < Axis.Letters.Length && row < core.InverseMatrix.Count; row++)
-        {
-            if (code.TryGetFloatArray(Axis.Letters[row], out float[]? values) && values.Length > 0)
-            {
-                float[] existing = core.InverseMatrix[row];
-                float[] updated = new float[existing.Length];
-                for (int column = 0; column < updated.Length; column++)
-                {
-                    updated[column] = column < values.Length ? values[column] : existing[column];
-                }
-                core.InverseMatrix[row] = updated;
-                seen = true;
-            }
-        }
-        return seen;
-    }
-
-    /// <summary>
-    /// Give a core geometry the matrix its name implies
-    /// </summary>
-    /// <param name="kinematics">The geometry</param>
-    /// <remarks>
-    /// The name and the matrix have to agree, because the matrix is what the planner uses and the
-    /// name is what everything else reads. Selecting CoreXY with M669 K1 has to leave a CoreXY matrix
-    /// behind or the object model would describe a machine that does not move like one
-    /// </remarks>
-    private static void ApplyCoreMatrix(DuetAPI.ObjectModel.Kinematics kinematics)
-    {
-        if (kinematics is not CoreKinematics core)
-        {
-            return;
-        }
-
-        float[][]? matrix = core.Name switch
-        {
-            KinematicsName.Cartesian => [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-            KinematicsName.CoreXY => [[1, 1, 0], [1, -1, 0], [0, 0, 1]],
-            KinematicsName.CoreXZ => [[1, 0, 1], [0, 1, 0], [1, 0, -1]],
-            KinematicsName.CoreXYU => [[1, 1, 0, 0], [1, -1, 0, 0], [0, 0, 1, 0], [1, -1, 0, -2]],
-            KinematicsName.CoreXYUV =>
-            [
-                [1, 1, 0, 0, 0],
-                [1, -1, 0, 0, 0],
-                [0, 0, 1, 0, 0],
-                [1, -1, 0, -2, 0],
-                [1, 1, 0, 0, -2]
-            ],
-            KinematicsName.MarkForged => [[1, 0, 0], [-1, 1, 0], [0, 0, 1]],
-            _ => null
-        };
-
-        if (matrix is not null)
-        {
-            core.InverseMatrix.Clear();
-            foreach (float[] row in matrix)
-            {
-                core.InverseMatrix.Add(row);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Apply the M669 parameters that belong to a SCARA geometry
-    /// </summary>
-    /// <param name="code">The code</param>
-    /// <param name="scara">The geometry</param>
-    /// <returns>True if anything was set</returns>
-    private static bool ApplyScaraParameters(Commands.Code code, ScaraKinematics scara)
-    {
-        bool seen = false;
-        if (code.TryGetFloat('P', out float proximal))
-        {
-            scara.ProximalLength = proximal;
-            seen = true;
-        }
-        if (code.TryGetFloat('D', out float distal))
-        {
-            scara.DistalLength = distal;
-            seen = true;
-        }
-        if (code.TryGetFloat('X', out float xOffset))
-        {
-            scara.XOffset = xOffset;
-            seen = true;
-        }
-        if (code.TryGetFloat('Y', out float yOffset))
-        {
-            scara.YOffset = yOffset;
-            seen = true;
-        }
-        if (code.TryGetFloat('R', out float minRadius))
-        {
-            scara.MinRadius = minRadius;
-            seen = true;
-        }
-        seen |= ReplaceFloats(code, 'A', scara.ThetaLimits);
-        seen |= ReplaceFloats(code, 'B', scara.PsiLimits);
-        seen |= ReplaceFloats(code, 'C', scara.Crosstalk);
-        return seen;
-    }
-
-    /// <summary>
-    /// Apply the M669 parameters that belong to a polar geometry
-    /// </summary>
-    /// <param name="code">The code</param>
-    /// <param name="polar">The geometry</param>
-    /// <returns>True if anything was set</returns>
-    private static bool ApplyPolarParameters(Commands.Code code, PolarKinematics polar)
-    {
-        bool seen = false;
-        if (code.TryGetFloatArray('R', out float[]? radiusLimits) && radiusLimits.Length > 0)
-        {
-            // One value is the maximum with the minimum left alone; two are minimum and maximum
-            if (radiusLimits.Length == 1)
-            {
-                polar.RadiusMax = radiusLimits[0];
-            }
-            else
-            {
-                polar.RadiusMin = radiusLimits[0];
-                polar.RadiusMax = radiusLimits[1];
-            }
-            seen = true;
-        }
-        if (code.TryGetFloat('H', out float homedRadius))
-        {
-            polar.RadiusHomed = homedRadius;
-            seen = true;
-        }
-        if (code.TryGetFloat('F', out float maxSpeed))
-        {
-            polar.TTSpeedMax = maxSpeed;
-            seen = true;
-        }
-        if (code.TryGetFloat('A', out float maxAcceleration))
-        {
-            polar.TTAccMax = maxAcceleration;
-            seen = true;
-        }
-        return seen;
-    }
-
-    /// <summary>
-    /// Replace the contents of an object model float collection from a code parameter
-    /// </summary>
-    /// <param name="code">The code</param>
-    /// <param name="letter">Parameter letter</param>
-    /// <param name="target">Collection to replace</param>
-    /// <returns>True if the parameter was there</returns>
-    private static bool ReplaceFloats(Commands.Code code, char letter, ObservableCollection<float> target)
-    {
-        if (!code.TryGetFloatArray(letter, out float[]? values))
-        {
-            return false;
-        }
-
-        target.Clear();
-        foreach (float value in values)
-        {
-            target.Add(value);
-        }
-        return true;
-    }
-
-    /// <summary>
-    /// Set one value on one delta tower from a code parameter
-    /// </summary>
-    /// <param name="code">The code</param>
-    /// <param name="letter">Parameter letter</param>
-    /// <param name="delta">The geometry</param>
-    /// <param name="tower">Tower index</param>
-    /// <param name="apply">Applies the value</param>
-    /// <returns>True if the parameter was there</returns>
-    private static bool TrySetTowerValue(Commands.Code code, DeltaKinematics delta, char letter, int tower, Action<DeltaTower, float> apply)
-    {
-        if (tower >= delta.Towers.Count || !code.TryGetFloat(letter, out float value))
-        {
-            return false;
-        }
-        apply(delta.Towers[tower], value);
-        return true;
-    }
-
-    /// <summary>
-    /// The geometry a M669 K number selects
-    /// </summary>
-    /// <param name="type">The K value</param>
-    /// <returns>The geometry, or null if there is no such type</returns>
-    /// <remarks>
-    /// The numbering is RepRapFirmware's <c>KinematicsType</c> and is part of the interface, so it is
-    /// spelled out rather than derived from the object model's own enum, which is ordered differently
-    /// </remarks>
-    private static KinematicsName? KinematicsNameFor(int type) => type switch
-    {
-        0 => KinematicsName.Cartesian,
-        1 => KinematicsName.CoreXY,
-        2 => KinematicsName.CoreXZ,
-        3 => KinematicsName.LinearDelta,
-        4 => KinematicsName.Scara,
-        5 => KinematicsName.CoreXYU,
-        6 => KinematicsName.Hangprinter,
-        7 => KinematicsName.Polar,
-        8 => KinematicsName.CoreXYUV,
-        9 => KinematicsName.FiveBarScara,
-        10 => KinematicsName.RotaryDelta,
-        11 => KinematicsName.MarkForged,
-        _ => null
-    };
 
     /// <summary>
     /// Where an endstop sits, as the M574 axis parameter spells it

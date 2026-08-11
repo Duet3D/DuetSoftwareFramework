@@ -15,7 +15,9 @@ plan for closing the gaps, and §12 is a planned change to §10's architecture t
 §11's phase E. §11.5 is a second audit taken once phases A-E had landed, covering the code either
 side of `DoStraightMove` that those phases made reachable; §11.6 records what the SBC-side DDA ring
 no longer does. §13 reviews whether `MotionParameters` is still needed now that the planning path
-holds the object model lock, and records the two bugs that review found.
+holds the object model lock, and records the two bugs that review found. §14 revisits that from the
+other side — which end of the copy is authoritative — and holds the plan for making the object model a
+projection of the motion state rather than the source it is derived from.
 
 ---
 
@@ -2214,3 +2216,231 @@ Sixteen `await planner.ReconfigureAsync(cancellationToken)` call sites in
 `bool` return. That is the actual origin of the divergence above: §13.4 makes the consequence
 visible at the next move, but the M-code that caused it still reports success. Worth folding into the
 next pass over that file.
+
+---
+
+## 14. Kinematics ownership: making the object model a projection
+
+§13 asked whether `MotionParameters` still earns its place and concluded that it does. This section
+asks the different question that a bug found afterwards forced: not *whether* the derived copy should
+exist, but *which side of the copy is authoritative*, and what makes the two agree.
+
+### 14.1 The bug
+
+`M669 S`/`T` is write-only. [HandleKinematicsAsync](src/DuetControlServer/Codes/Handlers/MCodeHandler.Motion.cs#L1958)
+writes `move.kinematics.segmentation`, and the segment count is computed in
+[SegmentCountFor](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L813) from
+`geometry.MinSegmentLength` and `geometry.SegmentsPerSecond` — hardcoded `virtual` properties on
+[KinematicsEngine](src/DuetControlServer/Motion/Kinematics/KinematicsEngine.cs#L294) that no engine
+constructor ever receives and that `MotionParameters.BuildGeometry` never reads. So the code changes
+the object model, changes nothing about how the machine moves, and reports success.
+
+A second gap in the same code: RRF's no-parameter report is
+`"Kinematics is %s, %d segments/sec, min. segment length %.2fmm"`, or `", no segmentation"` when it is
+off (`Kinematics.cpp:63-72`). Here it is `"Kinematics is %s"` and nothing more, which §1's rule 5 says
+it may not be.
+
+### 14.2 What the bug is actually evidence of
+
+It is **not** a missed invalidation. M669 does call `ReconfigureAsync`; the snapshot was rebuilt on
+time. It is a **translation-coverage** failure: `BuildGeometry` is a hand-written switch that has to
+be kept in step with the object model class and with the M-code parser by memory alone. Three places,
+no compiler or test binding them together. Segmentation is the one that was missed; any parameter
+added to any geometry has the same odds.
+
+That distinction matters because it decides what the fix has to be. Reversing the direction of the
+copy does not, on its own, fix it — it mirrors it. If the engine is authoritative and pushes to the
+object model, then forgetting a line in the push gives a stale object model instead of a stale
+planner. What removes the class of bug is that the translation is **one mechanical operation per
+geometry, in one place, with a round-trip test asserting it loses nothing**.
+
+Both directions can have that. The reason to prefer the inverted one is separate, and it holds:
+
+- The internal store is already in the units and the dense drive indexing the planner needs, so the
+  conversion happens once when a code sets a value rather than on every reconfiguration.
+- The failure mode is less severe. A missed projection shows the wrong number in DWC; a missed
+  translation moves the machine wrongly.
+- It is what RepRapFirmware does, so the ports stop having to be re-imagined into the other shape.
+- `MatchesObjectModel` and `SharedAxisCount` (§13.4) stop being necessary, because divergence stops
+  being representable.
+
+**Precondition, checked:** DCS is the sole writer of `move.*`. Outside the handlers only
+`Model/UpdateService.cs`, `Motion/BedCompensation.cs`, `MovePlanner` and `MotionService` touch it, and
+[PatchObjectModel](src/DuetControlServer/Commands/ObjectModel/PatchObjectModel.cs#L24) is refused
+unless `AllowCustomModelPatches` is set in non-SPI mode. If a plugin could write `move.*` the
+inversion would not be safe, because the projection would fight the writer.
+
+**Where RepRapFirmware differs, and why it matters here.** RRF's object model is *generated on demand*:
+`GetObjectValue` walks a lookup table at read time, so its projection cannot be stale. DCS's is a
+materialised tree that gets diffed and patched out to clients, so the projection is a push and can be
+forgotten. That is the whole reason §14.4's round-trip test is load-bearing rather than optional.
+
+### 14.3 The shape
+
+Each geometry owns four things, in one file, next to each other:
+
+```csharp
+internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
+{
+    public bool Configure(Code code);                       // M665/M666/M669 → engine state
+    public void WriteTo(DuetAPI.ObjectModel.Kinematics om); // sync projection; caller holds the write lock
+    public void AppendReport(StringBuilder builder);        // the no-parameter report
+    // + the transforms it already has
+}
+```
+
+A new parameter has to appear in all four to work, and all four are visible in one screen, so a
+missed one is a review finding rather than a silent bug.
+
+**The engine does not know what an object model is beyond `WriteTo`.** It stays synchronous, takes no
+locks, and holds no `Model.ObjectModel` reference — `WriteTo` is handed the `Kinematics` node with the
+write lock already held by the caller. That preserves what makes the engines testable today: the
+existing per-geometry unit tests construct an engine and assert on transforms, with no model in sight.
+
+`MovePlanner` owns the engine instance. `MotionParameters.Geometry` becomes a reference to it rather
+than something `BuildGeometry` constructs, and `BuildGeometry` is deleted.
+
+### 14.4 What has to be got right
+
+**Lock order.** Today: model read lock → build snapshot → planner lock → install. Inverted: planner
+state changes, then the model write lock to project. §13.1 already fixes the order as
+**planner-inside-model**, and both orders will exist while the migration runs. The rule stays: the
+model lock is always outermost, and the projection happens with it already held on entry — the
+planner never acquires it from inside `Lock()`. `Model.ObjectModel`'s `AsyncReaderWriterLock` is
+non-reentrant with no "is held" query (§13.1), so this is a rule that cannot be checked at runtime and
+has to be kept by construction.
+
+**Do not round-trip values through the conversion.** M203 arrives in mm/min and is stored in step
+clocks. The object model must be written from the *code's* value, not from the internal one converted
+back, or reported numbers drift by float error over repeated sets.
+
+**A test that fails on an unread parameter.** Two forms, and both are wanted. The one that can be
+written today is *declarative*: reflection over the object model kinematics classes, asserting every
+property is classified as either read by the translation or explicitly recorded as not worth reading,
+with the reason. It does not prove the translation is correct, but it forces the decision to be made
+and reviewed, which is the step that was skipped. The stronger *round-trip* form —
+`parse M-code → configure engine → WriteTo → rebuild → assert identical` — needs `WriteTo`, so it
+arrives with step 3.
+
+**Reporting moves to the engine.** Once the engine is authoritative, `M669`, `M665`, `M666` with no
+parameters must report from `AppendReport`, not from the object model. Reporting from the projection
+means every report silently tests the projection and passes even when it is wrong.
+
+### 14.5 `MoveBuilder` and `MovePlanner`
+
+Worth merging, but not into RRF's `Move`, which is a ~4000-line class holding kinematics, the DDA
+ring, compensation, laser and object model reporting. Those are already separate collaborators here
+and should stay separate.
+
+What is worth merging is the ownership: `MovePlanner` holds `Parameters`, `Builder`, `State` and the
+lock, while [MoveBuilder](src/DuetControlServer/Motion/MoveBuilder.cs#L55) holds its *own*
+`Parameters` reference kept in step by hand through `Reconfigure`. Two objects holding the same
+configuration, synchronised manually, is a small instance of the problem this section is about. Fold
+the builder's state into the planner so there is one object, one lock and one copy; `Build` can stay
+in its own file. The name `Move` is not available in practice — `model.Move` and `Motion.Move` in the
+same file would need disambiguating in every handler — so the merged class keeps `MovePlanner`.
+
+### 14.6 Steps
+
+**Step 1 ✅ segmentation becomes configurable engine state.** Runs in the *existing* direction and
+fixes §14.1 on its own, with a small blast radius. `SegmentsPerSecond` and `MinSegmentLength` stopped
+being hardcoded virtuals and became engine state defaulted to RRF's 100 and 0.2;
+`KinematicsEngine.ConfigureSegmentation` reproduces `Kinematics::TryConfigureSegmentation`, including
+that `useSegmentation` is recomputed as `minSegmentLength > 0 && segmentsPerSecond > 0` — so `M669 S0`
+turns segmentation off on a delta, and `M669 S100 T0.2` turns it *on* for a Cartesian, both of which
+are RRF behaviour. `Segmentation` splits into the geometry's own `DefaultSegmentation`, which is what
+each engine overrides, and the public value that is that default as M669 has left it: only the
+`Segment` bit is configurable, because which axes count towards a segment's length is a property of
+the machine rather than of the configuration. No wasted work — `ConfigureSegmentation` is what step
+3's `Configure` calls.
+
+Three further defects surfaced while doing it and are fixed with it:
+
+- `MoveSegmentation` was created zeroed when M669 first set either parameter, so `M669 T0.5` alone
+  took the segment rate to zero and turned segmentation *off* on a machine that had just asked for
+  finer segments. RRF leaves the parameter the code did not give at its existing value; so does this
+  now, starting from RRF's defaults.
+- Selecting a geometry left `move.kinematics.segmentation` null, so the object model described a delta
+  that does not segment. RRF reports the key whenever `useSegmentation` is set, which for a delta is
+  from the moment it is constructed. `KinematicsFactory.DefaultSegmentationFor` now supplies it when
+  M669 K or M665's implicit switch changes the geometry — §1's first rule.
+- The no-parameter M669 report was `"Kinematics is %s"` with RRF's segmentation clause missing
+  (§1's rule 5). It now reports `", %d segments/sec, min. segment length %.2fmm"` or
+  `", no segmentation"` as RRF does.
+
+`MotionParameters.BuildGeometry` and its six helpers moved to
+[KinematicsFactory](src/DuetControlServer/Motion/Kinematics/KinematicsFactory.cs) unchanged, because
+the M669 handler needs to ask a geometry for its defaults and because that is where step 3's registry
+belongs. `MotionParameters` is ~190 lines shorter for it and now does only what its name says.
+
+**Step 2 ✅ a test that fails on an unread parameter.** The declarative form, in
+[KinematicsFactoryTests](src/UnitTests/Motion/KinematicsFactoryTests.cs): every property of every
+object model kinematics class is either in `Consumed` or in `NotConsumed` with a reason, and adding
+one without classifying it fails the build. A second test catches the other direction — a
+classification naming a property that no longer exists, which would silently stop covering its
+replacement. The round-trip form arrives with step 3.
+
+**Step 3 ✅ invert the kinematics.** Each engine gained `Configure` / `WriteTo` / `AppendReport`
+alongside its transforms, `KinematicsFactory.Create(KinematicsName)` builds a geometry with its own
+defaults, and [KinematicsConfigurator](src/DuetControlServer/Motion/Kinematics/KinematicsConfigurator.cs)
+holds the part that belongs to all of them: selecting a geometry by K number, M665's implicit switch to
+a delta, the segmentation parameters, and creating the object model node. `MovePlanner.Geometry` is the
+geometry now and `MotionParameters` is handed it rather than deriving it.
+
+`Configure` returns a new engine rather than mutating one. That was not the plan and is better than it:
+the geometry is read without a lock by §13.1's two consumers, and replacing a reference is atomic where
+mutating several fields is not. It also left every engine's derived state - the delta's tower positions,
+the SCARA's arm-length squares, the core matrix inverse - computed in one place, the constructor, rather
+than in a constructor and a reconfigure path that have to agree.
+
+M665, M666 and M669 became one handler, because all three do the same thing to the same object. Which
+parameters mean what is the geometry's business. The handler configures first, takes the model's write
+lock only for the projection, and takes the planner lock inside it - §14.4's order, and the reason
+`Configure` was kept free of locks and of the object model.
+
+`KinematicsFactory.Create(Kinematics)` stays, with a smaller job: `MovePlanner.ReconfigureAsync` calls
+it once at startup to adopt whatever the object model already describes, before any code has selected a
+geometry, and it is the inverse [KinematicsRoundTripTests](src/UnitTests/Motion/KinematicsRoundTripTests.cs)
+needs to show the projection loses nothing.
+
+Three more defects came out of it:
+
+- **A rotary delta was planned for as a linear one.** `Kinematics.Create` gives both deltas the same
+  object model class, so the factory's `case DeltaKinematics` matched a rotary delta and built a linear
+  delta engine - towers where the machine has arms. The `RotaryDelta` branch after the switch was
+  unreachable. Found by the round-trip test on its first run; fixed the way the SCARA case already
+  handled the same collision, by checking the name inside the branch.
+- **M666 A and B were off by a hundred.** RepRapFirmware's `xTilt = gb.GetFValue() * 0.01` takes them
+  as percentages, and the report prints `xTilt * 100`. The handler stored them raw and reported them
+  multiplied, so a machine configured with `M666 A1.5` was told to correct a tilt of 150%.
+- **The polar turntable limits round-tripped through a conversion.** The engine stored them in step
+  clocks, so projecting them back to the object model would have divided and multiplied by 750000.
+  The engine now stores what M669 F and A gave it and derives the step clock form, which is §14.4's
+  "do not round-trip values" made structural rather than remembered.
+
+RepRapFirmware's M669 report for a SCARA - arm lengths, joint ranges, crosstalk and bed origin - was
+not ported before and is now, per §1's rule 5.
+
+**Step 4 — invert axes and extruders.** The same pattern applied to `move.axes[]` and
+`move.extruders[]`, which is the bulk of `MCodeHandler.Motion.cs`. `MatchesObjectModel` and
+`SharedAxisCount`/`SharedExtruderCount` are deleted here, along with §13.4's divergence check, because
+divergence stops being representable. §1's rule 2 and the header comment on
+[MCodeHandler.Motion.cs:26](src/DuetControlServer/Codes/Handlers/MCodeHandler.Motion.cs#L26) are
+rewritten to say the opposite of what they say now.
+
+**Step 5 — merge `MoveBuilder` into `MovePlanner`** per §14.5.
+
+Steps 1 and 2 are independent of the rest and land first. Step 3 proves the pattern on the part with
+polymorphic structure — the part where the mess actually is — before step 4 applies it to the other
+~2100 lines. Between 3 and 4 the ownership is mixed: kinematics engine-authoritative, axes and
+extruders object-model-authoritative. That is ugly but bounded, and it is what keeps each step
+reviewable.
+
+### 14.7 What this does to §13
+
+§13's conclusion stands: the snapshot exists because two consumers run with no object model lock and
+cannot take one (§13.1), and because the planner needs dense `float[NumDrives]` arrays it would
+otherwise materialise per move (§13.3). Inverting ownership does not weaken either argument — it
+strengthens both, because the dense arrays become the authoritative store rather than a copy of one.
+What changes is §13.4: the two problems recorded there are both consequences of the copy being
+derived-and-possibly-stale, and step 4 removes the mechanism rather than the symptoms.

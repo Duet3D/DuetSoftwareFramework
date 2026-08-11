@@ -29,7 +29,14 @@ public class PolarKinematicsTests
         return stepsPerMm;
     }
 
-    /// <summary>A bed of 150mm radius with the turntable limits RepRapFirmware assumes</summary>
+    /// <summary>
+    /// A bed of 150mm radius with the turntable limits RepRapFirmware assumes
+    /// </summary>
+    /// <remarks>
+    /// The limits go in as M669 F and A give them, degrees per second. The engine converts to step
+    /// clocks for the planner, so a speed limit these tests assert on is expressed through
+    /// <see cref="PolarKinematicsEngine.MaxTurntableSpeed"/> rather than in degrees per second
+    /// </remarks>
     private static PolarKinematicsEngine CreatePolar(float maxTurntableSpeed = 30.0f, float maxTurntableAcceleration = 30.0f)
         => new(minRadius: 0.0f, maxRadius: 150.0f, homedRadius: 0.0f,
                maxTurntableSpeed: maxTurntableSpeed, maxTurntableAcceleration: maxTurntableAcceleration);
@@ -178,8 +185,8 @@ public class PolarKinematicsTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(limits.RequestedSpeed, Is.EqualTo(30.0f / 180.0f).Within(1.0e-4f));
-            Assert.That(limits.MaxAcceleration, Is.EqualTo(30.0f / 180.0f).Within(1.0e-4f));
+            Assert.That(limits.RequestedSpeed, Is.EqualTo(engine.MaxTurntableSpeed / 180.0f).Within(1.0e-10f));
+            Assert.That(limits.MaxAcceleration, Is.EqualTo(engine.MaxTurntableAcceleration / 180.0f).Within(1.0e-16f));
         });
     }
 
@@ -254,8 +261,8 @@ public class PolarKinematicsTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(shortcut.RequestedSpeed, Is.EqualTo(30.0f / 10.0f).Within(1.0e-4f), "ten degrees the short way");
-            Assert.That(longWay.RequestedSpeed, Is.EqualTo(30.0f / 350.0f).Within(1.0e-4f), "three hundred and fifty the long way");
+            Assert.That(shortcut.RequestedSpeed, Is.EqualTo(engine.MaxTurntableSpeed / 10.0f).Within(1.0e-10f), "ten degrees the short way");
+            Assert.That(longWay.RequestedSpeed, Is.EqualTo(engine.MaxTurntableSpeed / 350.0f).Within(1.0e-10f), "three hundred and fifty the long way");
         });
     }
 

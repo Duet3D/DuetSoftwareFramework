@@ -1,5 +1,10 @@
 using System;
+using System.Globalization;
+using System.Text;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
+
+using Code = DuetAPI.Commands.Code;
 
 namespace DuetControlServer.Motion.Kinematics;
 
@@ -91,7 +96,7 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
     public float AlwaysReachableHeight { get; private set; }
 
     /// <inheritdoc />
-    public override string Name => "delta";
+    public override KinematicsName Kind => KinematicsName.LinearDelta;
 
     /// <inheritdoc />
     /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
@@ -99,7 +104,7 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
     /// <inheritdoc />
     /// <remarks>Z is one of the towers, so a Z-only move is already three motor moves; but its length is not what
     /// decides the segment count, which is why Z is left out</remarks>
-    public override SegmentationType Segmentation => SegmentationType.Segment | SegmentationType.IncludeG0;
+    protected override SegmentationType DefaultSegmentation => SegmentationType.Segment | SegmentationType.IncludeG0;
 
 
     /// <inheritdoc />
@@ -370,6 +375,139 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
 
         Recalculate();
     }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Ported from <c>LinearDeltaKinematics::Configure</c>. M665 is the geometry - the rods, the
+    /// radius, how high the effector is when homed and how far out it may go - and M666 is the
+    /// correction: how far each endstop is from where it ought to be, and how far the bed is off
+    /// level
+    /// </remarks>
+    public override KinematicsEngine Configure(Code code, ref bool seen)
+    {
+        float radius = Radius, homedHeight = HomedHeight, printRadius = PrintRadius;
+        float xTilt = XTilt, yTilt = YTilt;
+        float[] diagonals = [.. _diagonals];
+        float[] angleCorrections = [.. _angleCorrections];
+        float[] endstopAdjustments = [.. _endstopAdjustments];
+        bool changed = false;
+
+        if (code.MajorNumber == 665)
+        {
+            // One rod length is all of them; several are one per tower, and a tower the parameter
+            // does not reach keeps the length it had
+            if (code.TryGetFloatArray('L', out float[]? rodLengths) && rodLengths.Length > 0)
+            {
+                for (int tower = 0; tower < NumTowers; tower++)
+                {
+                    diagonals[tower] = rodLengths.Length == 1 ? rodLengths[0]
+                                       : tower < rodLengths.Length ? rodLengths[tower]
+                                       : diagonals[tower];
+                }
+                changed = true;
+            }
+            changed |= TryUpdate(code, 'R', ref radius);
+            changed |= TryUpdate(code, 'B', ref printRadius);
+            changed |= TryUpdate(code, 'H', ref homedHeight);
+
+            // X, Y and Z are the angular corrections of the first three towers
+            for (int tower = 0; tower < UsualNumTowers; tower++)
+            {
+                changed |= TryUpdate(code, TowerLetters[tower], ref angleCorrections[tower]);
+            }
+        }
+        else
+        {
+            // M666: one endstop adjustment per tower, in axis order
+            for (int tower = 0; tower < NumTowers && tower < TowerLetters.Length; tower++)
+            {
+                changed |= TryUpdate(code, TowerLetters[tower], ref endstopAdjustments[tower]);
+            }
+
+            // A and B are percentages, which is how they are reported; the transform wants the
+            // fraction, so they are stored as one - RepRapFirmware's `xTilt = gb.GetFValue() * 0.01`
+            if (code.TryGetFloat('A', out float xTiltPercent))
+            {
+                xTilt = xTiltPercent * 0.01f;
+                changed = true;
+            }
+            if (code.TryGetFloat('B', out float yTiltPercent))
+            {
+                yTilt = yTiltPercent * 0.01f;
+                changed = true;
+            }
+        }
+
+        if (!changed)
+        {
+            return this;
+        }
+
+        seen = true;
+        return new LinearDeltaKinematicsEngine(NumTowers, radius, diagonals, angleCorrections, endstopAdjustments,
+                                               homedHeight, printRadius, xTilt, yTilt);
+    }
+
+    /// <inheritdoc />
+    public override void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics)
+    {
+        base.WriteTo(kinematics);
+
+        DeltaKinematics delta = (DeltaKinematics)kinematics;
+        delta.DeltaRadius = Radius;
+        delta.HomedHeight = HomedHeight;
+        delta.PrintRadius = PrintRadius;
+        delta.XTilt = XTilt;
+        delta.YTilt = YTilt;
+
+        while (delta.Towers.Count < NumTowers)
+        {
+            delta.Towers.Add(new DeltaTower());
+        }
+        while (delta.Towers.Count > NumTowers)
+        {
+            delta.Towers.RemoveAt(delta.Towers.Count - 1);
+        }
+
+        for (int tower = 0; tower < NumTowers; tower++)
+        {
+            DeltaTower configured = delta.Towers[tower];
+            configured.Diagonal = _diagonals[tower];
+            configured.EndstopAdjustment = _endstopAdjustments[tower];
+            configured.AngleCorrection = tower < UsualNumTowers ? _angleCorrections[tower] : 0.0f;
+
+            // Where the tower actually stands, which M665's radius and angle correction decide
+            // together. RepRapFirmware reports the same derived pair
+            configured.XPos = _towerX[tower];
+            configured.YPos = _towerY[tower];
+        }
+    }
+
+    /// <inheritdoc />
+    public override bool AppendReport(StringBuilder builder, int mCode)
+    {
+        if (mCode == 665)
+        {
+            builder.Append(CultureInfo.InvariantCulture,
+                           $"Diagonals {_diagonals[0]:F3}:{_diagonals[1]:F3}:{_diagonals[2]:F3}, ");
+            builder.Append(CultureInfo.InvariantCulture,
+                           $"delta radius {Radius:F3}, homed height {HomedHeight:F3}, bed radius {PrintRadius:F1}, ");
+            builder.Append(CultureInfo.InvariantCulture,
+                           $"X {_angleCorrections[0]:F3}°, Y {_angleCorrections[1]:F3}°, Z {_angleCorrections[2]:F3}°");
+            return true;
+        }
+        else if (mCode == 666)
+        {
+            builder.Append(CultureInfo.InvariantCulture,
+                           $"Endstop adjustments X{_endstopAdjustments[0]:F2} Y{_endstopAdjustments[1]:F2} Z{_endstopAdjustments[2]:F2}, ");
+            builder.Append(CultureInfo.InvariantCulture, $"tilt X{XTilt * 100.0f:F2}% Y{YTilt * 100.0f:F2}%");
+            return true;
+        }
+        return base.AppendReport(builder, mCode);
+    }
+
+    /// <summary>The letters M665 and M666 use for the first three towers</summary>
+    private static readonly char[] TowerLetters = ['X', 'Y', 'Z'];
 
     /// <summary>Rod length RepRapFirmware assumes until M665 says otherwise, mm</summary>
     public const float DefaultDiagonal = 215.0f;

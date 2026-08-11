@@ -1,4 +1,7 @@
 using System;
+using System.Globalization;
+using System.Text;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
 
 namespace DuetControlServer.Motion.Kinematics;
@@ -69,14 +72,27 @@ internal sealed class FiveBarScaraKinematicsEngine : KinematicsEngine
     public int WorkMode { get; }
 
     /// <inheritdoc />
-    public override string Name => "FiveBarScara";
+    public override KinematicsName Kind => KinematicsName.FiveBarScara;
+
+    /// <summary>
+    /// A five-bar parallel SCARA with the defaults its M669 documentation gives
+    /// </summary>
+    /// <returns>The engine</returns>
+    /// <remarks>
+    /// Nothing in the object model describes this geometry - RepRapFirmware reports only its name -
+    /// and M669 is not ported for it either, so these are the only parameters it ever has
+    /// </remarks>
+    public static FiveBarScaraKinematicsEngine CreateDefault()
+        => new(xOrigL: -50.0f, yOrigL: 0.0f, xOrigR: 50.0f, yOrigR: 0.0f,
+               proximalL: 100.0f, proximalR: 100.0f,
+               distalL: 100.0f, distalR: 100.0f);
 
     /// <inheritdoc />
     /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
     public override bool HomesIndividualDrives => true;
     /// <inheritdoc />
     /// <remarks>The arms bow in XY; Z is an ordinary leadscrew and travel moves may be left alone</remarks>
-    public override SegmentationType Segmentation => SegmentationType.Segment;
+    protected override SegmentationType DefaultSegmentation => SegmentationType.Segment;
 
 
     /// <inheritdoc />

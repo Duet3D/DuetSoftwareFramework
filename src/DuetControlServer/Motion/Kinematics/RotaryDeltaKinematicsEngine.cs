@@ -1,4 +1,7 @@
 using System;
+using System.Globalization;
+using System.Text;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
 
 namespace DuetControlServer.Motion.Kinematics;
@@ -63,14 +66,20 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
     public float MaxArmAngle { get; }
 
     /// <inheritdoc />
-    public override string Name => "Rotary delta";
+    public override KinematicsName Kind => KinematicsName.RotaryDelta;
+
+    /// <summary>
+    /// A rotary delta with RepRapFirmware's defaults, for before M669 has been seen
+    /// </summary>
+    /// <returns>The engine</returns>
+    public static RotaryDeltaKinematicsEngine CreateDefault() => new();
 
     /// <inheritdoc />
     /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
     public override bool HomesIndividualDrives => true;
     /// <inheritdoc />
     /// <remarks>Every axis of the head is an arm angle, so Z bows like the rest</remarks>
-    public override SegmentationType Segmentation => SegmentationType.Segment | SegmentationType.IncludeZ | SegmentationType.IncludeG0;
+    protected override SegmentationType DefaultSegmentation => SegmentationType.Segment | SegmentationType.IncludeZ | SegmentationType.IncludeG0;
 
 
     /// <inheritdoc />

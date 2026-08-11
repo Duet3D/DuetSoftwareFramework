@@ -169,7 +169,7 @@ internal sealed class MotionService(
     /// <param name="stoppingToken">Cancellation token</param>
     private void Execute(CancellationToken stoppingToken)
     {
-        if (!planner.ReconfigureAsync(stoppingToken).AsTask().GetAwaiter().GetResult())
+        if (!planner.ReconfigureAsync(stoppingToken, adoptGeometryFromObjectModel: true).AsTask().GetAwaiter().GetResult())
         {
             logger.LogError("Could not configure the native motion engine; no moves will be executed");
             return;

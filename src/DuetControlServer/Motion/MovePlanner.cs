@@ -1,8 +1,10 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Link;
 using DuetControlServer.Link.Native;
+using DuetControlServer.Motion.Kinematics;
 using DuetControlServer.Motion.Native;
 using Microsoft.Extensions.Logging;
 
@@ -70,6 +72,39 @@ internal sealed class MovePlanner(
     /// </remarks>
     public MotionParameters Parameters { get; private set; } = MotionParameters.CreateDefault();
 
+    /// <summary>
+    /// The machine's geometry
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Unlike the rest of <see cref="Parameters"/>, this is not derived from the object model: it is
+    /// where M665, M666 and M669 put what they were told, and the object model's
+    /// <c>move.kinematics</c> is written from it. See §14 of <c>docs/devel/MCODE_MIGRATION.md</c> for
+    /// why this one is the other way round.
+    /// </para>
+    /// <para>
+    /// A machine that has not been configured is Cartesian, which is what RepRapFirmware starts as
+    /// </para>
+    /// </remarks>
+    public KinematicsEngine Geometry { get; private set; } = KinematicsFactory.Create(KinematicsName.Cartesian);
+
+    /// <summary>
+    /// Adopt a geometry a configuring M-code has produced
+    /// </summary>
+    /// <param name="geometry">The new geometry</param>
+    /// <remarks>
+    /// The caller reconfigures afterwards, which is what puts the geometry into
+    /// <see cref="Parameters"/> and pushes the description that follows from it down to the engine.
+    /// Only safe at standstill, for the same reason <see cref="ReconfigureAsync"/> is
+    /// </remarks>
+    public void SetGeometry(KinematicsEngine geometry)
+    {
+        using (_lock.EnterScope())
+        {
+            Geometry = geometry;
+        }
+    }
+
     /// <summary>Where the last move left the machine, and the state that carries between moves</summary>
     public MoveBuilder Builder { get; }  = new(MotionParameters.CreateDefault());
 
@@ -99,13 +134,18 @@ internal sealed class MovePlanner(
     /// Re-read the machine description from the object model and push it down to the engine
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
+    /// <param name="adoptGeometryFromObjectModel">
+    /// Take the geometry from the object model rather than keeping the one this planner holds. Only
+    /// for the first configuration, before any M-code has selected one
+    /// </param>
     /// <returns>True if the engine accepted it</returns>
     /// <remarks>
     /// Only safe while nothing is in flight: steps per mm changing under a queued move would make the
     /// endpoints it was planned against mean something different from what the drives will do. The
     /// caller is responsible for having drained the ring first
     /// </remarks>
-    public async ValueTask<bool> ReconfigureAsync(CancellationToken cancellationToken = default)
+    public async ValueTask<bool> ReconfigureAsync(CancellationToken cancellationToken = default,
+                                                 bool adoptGeometryFromObjectModel = false)
     {
         MotionParameters parameters;
         byte[] configBuffer = new byte[MotionConfig.SerializedLength];
@@ -113,7 +153,15 @@ internal sealed class MovePlanner(
 
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            parameters = MotionParameters.FromObjectModel(model.Move);
+            if (adoptGeometryFromObjectModel)
+            {
+                // Before any code has configured a geometry, whatever the object model already
+                // describes is the best description of the machine there is - which matters when the
+                // model was populated by something other than this process's M-codes
+                Geometry = KinematicsFactory.Create(model.Move.Kinematics);
+            }
+
+            parameters = MotionParameters.FromObjectModel(model.Move, Geometry);
             length = parameters.ToMotionConfig(model.Move).Serialize(configBuffer);
         }
 
@@ -202,6 +250,7 @@ internal sealed class MovePlanner(
             }
 
             // TODO RRF has a bed levelling move check (`Move::MoveLoop()`). It doesn't make sense in this function but the functionality will need to be ported.
+            // TODO at some point we need to update the OM user position
 
             MoveBuildResult built = Builder.Build(move, _buffer);
             switch (built.Error)

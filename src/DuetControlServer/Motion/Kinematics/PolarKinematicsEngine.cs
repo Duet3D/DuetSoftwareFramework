@@ -1,5 +1,11 @@
 using System;
+using System.Globalization;
+using System.Text;
+using DuetAPI.ObjectModel;
+using DuetControlServer.Motion.Native;
 using DuetControlServer.Link.Native;
+
+using Code = DuetAPI.Commands.Code;
 
 namespace DuetControlServer.Motion.Kinematics;
 
@@ -35,21 +41,100 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
     /// <summary>Radius the head is at when homed, mm</summary>
     public float HomedRadius { get; }
 
+    /// <summary>How fast the turntable may turn, degrees per second</summary>
+    /// <remarks>
+    /// The configured value, in the units M669 F gives it and the object model reports it. The
+    /// per-step-clock form the planner uses is derived from this rather than stored instead of it, so
+    /// that what is reported is what was configured and not a value that has been through a
+    /// conversion and back
+    /// </remarks>
+    public float MaxTurntableSpeedPerSec { get; }
+
+    /// <summary>How hard the turntable may be accelerated, degrees per second squared</summary>
+    public float MaxTurntableAccelerationPerSec { get; }
+
     /// <summary>How fast the turntable may turn, degrees per step clock</summary>
-    public float MaxTurntableSpeed { get; }
+    public float MaxTurntableSpeed => MaxTurntableSpeedPerSec / MotionLimits.StepClockRate;
 
     /// <summary>How hard the turntable may be accelerated, degrees per step clock squared</summary>
-    public float MaxTurntableAcceleration { get; }
+    public float MaxTurntableAcceleration
+        => MaxTurntableAccelerationPerSec / (MotionLimits.StepClockRate * MotionLimits.StepClockRate);
 
     /// <inheritdoc />
-    public override string Name => "Polar";
+    public override KinematicsName Kind => KinematicsName.Polar;
+
+    /// <summary>
+    /// A polar machine with RepRapFirmware's defaults, for before M669 has been seen
+    /// </summary>
+    /// <returns>The engine</returns>
+    /// <remarks>
+    /// The bed reaches to its centre and the head is homed there, as <c>PolarKinematics</c>'s own
+    /// constructor leaves it
+    /// </remarks>
+    public static PolarKinematicsEngine CreateDefault()
+        => new(minRadius: 0.0f, maxRadius: DefaultMaxRadius, homedRadius: 0.0f);
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Ported from <c>PolarKinematics::Configure</c>. R carries the radius limits - one value is the
+    /// maximum on its own, two are the minimum and the maximum
+    /// </remarks>
+    public override KinematicsEngine Configure(Code code, ref bool seen)
+    {
+        if (code.MajorNumber != 669)
+        {
+            return this;
+        }
+
+        float minRadius = MinRadius, maxRadius = MaxRadius, homedRadius = HomedRadius;
+        float maxSpeed = MaxTurntableSpeedPerSec, maxAcceleration = MaxTurntableAccelerationPerSec;
+        bool changed = false;
+
+        if (code.TryGetFloatArray('R', out float[]? radiusLimits) && radiusLimits.Length > 0)
+        {
+            if (radiusLimits.Length == 1)
+            {
+                maxRadius = radiusLimits[0];
+            }
+            else
+            {
+                minRadius = radiusLimits[0];
+                maxRadius = radiusLimits[1];
+            }
+            changed = true;
+        }
+        changed |= TryUpdate(code, 'H', ref homedRadius);
+        changed |= TryUpdate(code, 'F', ref maxSpeed);
+        changed |= TryUpdate(code, 'A', ref maxAcceleration);
+
+        if (!changed)
+        {
+            return this;
+        }
+
+        seen = true;
+        return new PolarKinematicsEngine(minRadius, maxRadius, homedRadius, maxSpeed, maxAcceleration);
+    }
+
+    /// <inheritdoc />
+    public override void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics)
+    {
+        base.WriteTo(kinematics);
+
+        PolarKinematics polar = (PolarKinematics)kinematics;
+        polar.RadiusMin = MinRadius;
+        polar.RadiusMax = MaxRadius;
+        polar.RadiusHomed = HomedRadius;
+        polar.TTSpeedMax = MaxTurntableSpeedPerSec;
+        polar.TTAccMax = MaxTurntableAccelerationPerSec;
+    }
 
     /// <inheritdoc />
     /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
     public override bool HomesIndividualDrives => true;
     /// <inheritdoc />
     /// <remarks>A straight line across the bed is an arc in radius and angle; Z is independent</remarks>
-    public override SegmentationType Segmentation => SegmentationType.Segment;
+    protected override SegmentationType DefaultSegmentation => SegmentationType.Segment;
 
 
     /// <inheritdoc />
@@ -144,25 +229,25 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
     /// <param name="minRadius">Closest the head may come to the centre, mm</param>
     /// <param name="maxRadius">Furthest the head may go from the centre, mm</param>
     /// <param name="homedRadius">Radius the head is at when homed, mm</param>
-    /// <param name="maxTurntableSpeed">How fast the turntable may turn, degrees per step clock</param>
-    /// <param name="maxTurntableAcceleration">How hard it may be accelerated, degrees per step clock squared</param>
+    /// <param name="maxTurntableSpeed">How fast the turntable may turn, degrees per second</param>
+    /// <param name="maxTurntableAcceleration">How hard it may be accelerated, degrees per second squared</param>
     /// <remarks>
-    /// The turntable limits are in step clock units rather than the object model's per-second ones,
-    /// because that is what the move planner works in and converting once at configuration time is
-    /// cheaper than converting on every move
+    /// The turntable limits are in the units M669 gives them and the object model reports them. The
+    /// step clock form the planner works in is a derived property, so a configured value survives
+    /// being written to the object model and read back unchanged
     /// </remarks>
     public PolarKinematicsEngine(
         float minRadius,
         float maxRadius,
         float homedRadius,
-        float maxTurntableSpeed,
-        float maxTurntableAcceleration)
+        float maxTurntableSpeed = DefaultMaxTurntableSpeed,
+        float maxTurntableAcceleration = DefaultMaxTurntableAcceleration)
     {
         MinRadius = MathF.Max(minRadius, 0.0f);
         MaxRadius = maxRadius;
         HomedRadius = homedRadius;
-        MaxTurntableSpeed = maxTurntableSpeed;
-        MaxTurntableAcceleration = maxTurntableAcceleration;
+        MaxTurntableSpeedPerSec = maxTurntableSpeed;
+        MaxTurntableAccelerationPerSec = maxTurntableAcceleration;
     }
 
     /// <inheritdoc />

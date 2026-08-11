@@ -1,6 +1,9 @@
 using System;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
 using DuetControlServer.Motion.Native;
+
+using Code = DuetAPI.Commands.Code;
 
 namespace DuetControlServer.Motion.Kinematics;
 
@@ -49,7 +52,12 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
     private readonly bool[] _hasSharedMotor = new bool[MatrixSize];
 
     /// <inheritdoc />
-    public override string Name { get; }
+    /// <remarks>
+    /// Which core arrangement was selected, rather than what the matrix now says. M669 can set an
+    /// arbitrary matrix on top of a named geometry, and RepRapFirmware keeps reporting the name it
+    /// was given rather than trying to recognise the matrix
+    /// </remarks>
+    public override KinematicsName Kind { get; }
 
     /// <summary>
     /// Whether the forward matrix could be derived. False means the geometry is unusable
@@ -59,15 +67,15 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
     /// <summary>
     /// Create a geometry from its inverse matrix
     /// </summary>
-    /// <param name="name">Name of the geometry</param>
+    /// <param name="name">Which core arrangement this is</param>
     /// <param name="inverseMatrix">
     /// Rows are axes, columns are motors. Entries outside the given rows and columns are taken to be
     /// the identity, so a 3x3 matrix describes a machine whose fourth and later axes each have their
     /// own motor
     /// </param>
-    public CoreKinematicsEngine(string name, float[][] inverseMatrix)
+    public CoreKinematicsEngine(KinematicsName name, float[][] inverseMatrix)
     {
-        Name = name;
+        Kind = name;
 
         // Start from the identity so that axes the caller did not describe keep a motor of their own
         for (int i = 0; i < MatrixSize; i++)
@@ -95,19 +103,51 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
     /// </summary>
     /// <param name="name">Geometry name, case-insensitive</param>
     /// <returns>The engine, or null if the name is not a core geometry</returns>
-    /// <remarks>
-    /// The matrices are RepRapFirmware's, from <c>CoreKinematics::CoreKinematics</c>. Each row says
-    /// how much each motor turns per mm of that axis
-    /// </remarks>
-    public static CoreKinematicsEngine? TryCreate(string name)
+    public static CoreKinematicsEngine? TryCreate(string name) => TryCreate(KinematicsNameConverter.Parse(name));
+
+    /// <summary>
+    /// The well-known geometries, by name
+    /// </summary>
+    /// <param name="name">Which core arrangement</param>
+    /// <returns>The engine, or null if that geometry is not a core one</returns>
+    public static CoreKinematicsEngine? TryCreate(KinematicsName name)
     {
-        float[][]? matrix = name.ToLowerInvariant() switch
+        float[][]? matrix = DefaultMatrixFor(name);
+        return matrix is null ? null : new CoreKinematicsEngine(name, matrix);
+    }
+
+    /// <summary>
+    /// A core geometry with the matrix its name implies, for before M669 has been seen
+    /// </summary>
+    /// <param name="name">Which core arrangement</param>
+    /// <returns>The engine, Cartesian if the name is not a core geometry's</returns>
+    /// <remarks>
+    /// The counterpart of every other geometry's <c>CreateDefault</c>, taking a name because six of
+    /// them share this class and only the matrix tells them apart. Unlike <see cref="TryCreate"/> it
+    /// always returns a geometry: a machine whose kinematics could not be worked out is an
+    /// unconfigured one, and an unconfigured machine is Cartesian
+    /// </remarks>
+    public static CoreKinematicsEngine CreateDefault(KinematicsName name)
+        => TryCreate(name) ?? TryCreate(KinematicsName.Cartesian)!;
+
+    /// <summary>
+    /// The inverse matrix a named core geometry implies
+    /// </summary>
+    /// <param name="name">Which core arrangement</param>
+    /// <returns>Its matrix, or null if that geometry is not a core one</returns>
+    /// <remarks>
+    /// RepRapFirmware's, from <c>CoreKinematics::CoreKinematics</c>. Each row says how much each motor
+    /// turns per mm of that axis. Selecting a geometry by name is selecting one of these, and M669's
+    /// axis-letter parameters then replace individual rows of it
+    /// </remarks>
+    public static float[][]? DefaultMatrixFor(KinematicsName name)
+        => name switch
         {
-            "cartesian" => [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-            "corexy" => [[1, 1, 0], [1, -1, 0], [0, 0, 1]],
-            "corexz" => [[1, 0, 1], [0, 1, 0], [1, 0, -1]],
-            "corexyu" => [[1, 1, 0, 0], [1, -1, 0, 0], [0, 0, 1, 0], [1, -1, 0, -2]],
-            "corexyuv" =>
+            KinematicsName.Cartesian => [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+            KinematicsName.CoreXY => [[1, 1, 0], [1, -1, 0], [0, 0, 1]],
+            KinematicsName.CoreXZ => [[1, 0, 1], [0, 1, 0], [1, 0, -1]],
+            KinematicsName.CoreXYU => [[1, 1, 0, 0], [1, -1, 0, 0], [0, 0, 1, 0], [1, -1, 0, -2]],
+            KinematicsName.CoreXYUV =>
             [
                 [1, 1, 0, 0, 0],
                 [1, -1, 0, 0, 0],
@@ -115,11 +155,92 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
                 [1, -1, 0, -2, 0],
                 [1, 1, 0, 0, -2]
             ],
-            "markforged" => [[1, 0, 0], [-1, 1, 0], [0, 0, 1]],
+            KinematicsName.MarkForged => [[1, 0, 0], [-1, 1, 0], [0, 0, 1]],
             _ => null
         };
 
-        return matrix is null ? null : new CoreKinematicsEngine(name, matrix);
+    /// <summary>
+    /// One row of the inverse matrix: how much each motor turns per mm of that axis
+    /// </summary>
+    /// <param name="axis">Axis number</param>
+    /// <returns>The row, as long as the axis space</returns>
+    public float[] GetInverseMatrixRow(int axis)
+    {
+        float[] row = new float[MatrixSize];
+        for (int motor = 0; motor < MatrixSize; motor++)
+        {
+            row[motor] = _inverse[axis, motor];
+        }
+        return row;
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Ported from <c>CoreKinematics::Configure</c>. Each axis letter carries that axis' row of the
+    /// inverse matrix, which is how a machine that is none of the named arrangements is described.
+    /// A row shorter than the axis space leaves the rest of that row as it was, so a parameter can
+    /// correct the motors it mentions without restating the ones it does not
+    /// </remarks>
+    public override KinematicsEngine Configure(Code code, ref bool seen)
+    {
+        float[][]? updated = null;
+        for (int axis = 0; axis < Axis.Letters.Length && axis < MatrixSize; axis++)
+        {
+            if (code.TryGetFloatArray(Axis.Letters[axis], out float[]? values) && values.Length > 0)
+            {
+                updated ??= BuildMatrix();
+                for (int motor = 0; motor < MatrixSize; motor++)
+                {
+                    updated[axis][motor] = motor < values.Length ? values[motor] : updated[axis][motor];
+                }
+                seen = true;
+            }
+        }
+
+        if (updated is null)
+        {
+            return this;
+        }
+
+        // A matrix M669 cannot invert describes a machine whose motors cannot reach every position,
+        // so the geometry that was working is kept rather than replaced with one that cannot plan
+        CoreKinematicsEngine engine = new(Kind, updated);
+        return engine.IsValid ? engine : this;
+    }
+
+    /// <summary>
+    /// The inverse matrix as rows, for rebuilding a geometry from it
+    /// </summary>
+    /// <returns>The matrix</returns>
+    private float[][] BuildMatrix()
+    {
+        float[][] matrix = new float[MatrixSize][];
+        for (int axis = 0; axis < MatrixSize; axis++)
+        {
+            matrix[axis] = GetInverseMatrixRow(axis);
+        }
+        return matrix;
+    }
+
+    /// <inheritdoc />
+    public override void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics)
+    {
+        base.WriteTo(kinematics);
+
+        CoreKinematics core = (CoreKinematics)kinematics;
+        core.InverseMatrix.Clear();
+        core.ForwardMatrix.Clear();
+        for (int axis = 0; axis < MatrixSize; axis++)
+        {
+            core.InverseMatrix.Add(GetInverseMatrixRow(axis));
+
+            float[] forward = new float[MatrixSize];
+            for (int i = 0; i < MatrixSize; i++)
+            {
+                forward[i] = _forward[axis, i];
+            }
+            core.ForwardMatrix.Add(forward);
+        }
     }
 
     /// <inheritdoc />

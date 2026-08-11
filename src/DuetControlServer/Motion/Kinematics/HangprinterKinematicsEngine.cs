@@ -1,4 +1,7 @@
 using System;
+using System.Globalization;
+using System.Text;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
 
 namespace DuetControlServer.Motion.Kinematics;
@@ -64,14 +67,34 @@ internal sealed class HangprinterKinematicsEngine : KinematicsEngine
     public float PrintRadius { get; }
 
     /// <inheritdoc />
-    public override string Name => "Hangprinter";
+    public override KinematicsName Kind => KinematicsName.Hangprinter;
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// M669 is not ported for this geometry - the object model cannot express the line buildup and
+    /// flex compensation its parameters carry, so a partial port would describe a machine that is not
+    /// the configured one. What the geometry does have is still projected, so the object model
+    /// describes the constant-radius machine actually being planned for
+    /// </remarks>
+    public override void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics)
+    {
+        base.WriteTo(kinematics);
+
+        HangprinterKinematics hangprinter = (HangprinterKinematics)kinematics;
+        hangprinter.PrintRadius = PrintRadius;
+        hangprinter.Anchors.Clear();
+        for (int anchor = 0; anchor < NumAnchors; anchor++)
+        {
+            hangprinter.Anchors.Add([_anchors[anchor, 0], _anchors[anchor, 1], _anchors[anchor, 2]]);
+        }
+    }
 
     /// <inheritdoc />
     /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
     public override bool HomesIndividualDrives => true;
     /// <inheritdoc />
     /// <remarks>Every line length depends on all three coordinates, Z included</remarks>
-    public override SegmentationType Segmentation => SegmentationType.Segment | SegmentationType.IncludeZ | SegmentationType.IncludeG0;
+    protected override SegmentationType DefaultSegmentation => SegmentationType.Segment | SegmentationType.IncludeZ | SegmentationType.IncludeG0;
 
 
     /// <inheritdoc />

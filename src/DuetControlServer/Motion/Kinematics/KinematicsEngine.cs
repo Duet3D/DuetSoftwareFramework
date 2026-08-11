@@ -1,6 +1,11 @@
 using System;
+using System.Globalization;
+using System.Text;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
 using DuetControlServer.Motion.Native;
+
+using Code = DuetAPI.Commands.Code;
 
 namespace DuetControlServer.Motion.Kinematics;
 
@@ -131,9 +136,143 @@ internal enum LimitPositionResult : byte
 internal abstract class KinematicsEngine
 {
     /// <summary>
-    /// Name of this geometry, for diagnostics and the object model
+    /// Name of this geometry, as RepRapFirmware spells it
     /// </summary>
-    public abstract string Name { get; }
+    /// <remarks>
+    /// RepRapFirmware's <c>GetName()</c>. Derived from <see cref="Kind"/> rather than declared
+    /// alongside it, so a geometry has one name and the object model, the M669 report and the
+    /// diagnostics cannot disagree about what it is
+    /// </remarks>
+    public virtual string Name => KinematicsNameConverter.ToName(Kind);
+
+    /// <summary>
+    /// Which geometry this is, in the terms the object model names them
+    /// </summary>
+    /// <remarks>
+    /// The object model's <c>Name</c> is settable only from inside its own hierarchy, so the node that
+    /// carries a geometry's parameters is created from this rather than assigned by
+    /// <see cref="WriteTo"/>. Several geometries share one object model class - the two SCARAs do, and
+    /// every core arrangement does - so this is what tells them apart
+    /// </remarks>
+    public abstract KinematicsName Kind { get; }
+
+    /// <summary>
+    /// Apply the parameters of an M-code that configures this geometry
+    /// </summary>
+    /// <param name="code">The code, an M665, M666 or M669</param>
+    /// <param name="seen">Set when the code carried a parameter this geometry took</param>
+    /// <returns>The geometry the code leaves behind</returns>
+    /// <remarks>
+    /// <para>
+    /// Ported from each geometry's <c>Configure</c>. RepRapFirmware mutates its <c>Kinematics</c>
+    /// object in place; this returns a new one instead, because the geometry is read without a lock
+    /// by the endstop correction and the live position publisher (§13.1 of
+    /// <c>docs/devel/MCODE_MIGRATION.md</c>) and swapping a reference is atomic where mutating
+    /// several fields is not. The values the code did not give are carried over from the instance
+    /// this is called on, so successive codes accumulate as they do in RepRapFirmware.
+    /// </para>
+    /// <para>
+    /// The base implementation takes nothing, which is right for a geometry with no parameters of its
+    /// own. Segmentation is not handled here: M669 S and T mean the same thing on every geometry and
+    /// are applied by <see cref="KinematicsConfigurator"/> for all of them
+    /// </para>
+    /// </remarks>
+    public virtual KinematicsEngine Configure(Code code, ref bool seen) => this;
+
+    /// <summary>
+    /// Write this geometry's configuration into the object model
+    /// </summary>
+    /// <param name="kinematics">
+    /// The node to write to, which the caller has already created for <see cref="KinematicsName"/>
+    /// </param>
+    /// <remarks>
+    /// <para>
+    /// The projection §14 is about: this geometry is what the machine moves by, and the object model
+    /// is what describes it to everything else. Every parameter <see cref="Configure"/> reads has to
+    /// be written back here, or the object model would describe a machine that is not the one being
+    /// planned for - which is the failure this arrangement is meant to make loud rather than silent.
+    /// </para>
+    /// <para>
+    /// The caller holds the object model's write lock. This is synchronous and takes no locks of its
+    /// own, so that the geometry stays something a test can construct and assert on without a model
+    /// </para>
+    /// </remarks>
+    public virtual void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics)
+    {
+        // Reported only while it is in use, as RepRapFirmware reports it
+        kinematics.Segmentation = Segmentation.HasFlag(SegmentationType.Segment)
+            ? new MoveSegmentation { SegmentsPerSec = SegmentsPerSecond, MinSegLength = MinSegmentLength }
+            : null;
+    }
+
+    /// <summary>
+    /// Append what this geometry reports when its M-code is given no parameters
+    /// </summary>
+    /// <param name="builder">Builder to append to</param>
+    /// <param name="mCode">Which of M665, M666 and M669 is asking</param>
+    /// <returns>False if the code does not apply to this geometry, which is an error rather than a report</returns>
+    /// <remarks>
+    /// Reporting from the geometry rather than from the object model is deliberate: reporting from
+    /// the projection would mean every report silently tested it and passed even when it was wrong
+    /// </remarks>
+    public virtual bool AppendReport(StringBuilder builder, int mCode)
+    {
+        if (mCode != 669)
+        {
+            builder.Append(CultureInfo.InvariantCulture, $"M{mCode} parameters do not apply to {Name} kinematics");
+            return false;
+        }
+
+        builder.Append(CultureInfo.InvariantCulture, $"Kinematics is {Name}");
+        if (Segmentation.HasFlag(SegmentationType.Segment))
+        {
+            builder.Append(CultureInfo.InvariantCulture,
+                           $", {(int)SegmentsPerSecond} segments/sec, min. segment length {MinSegmentLength:F2}mm");
+        }
+        else
+        {
+            builder.Append(", no segmentation");
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Apply a code parameter to a value, leaving it alone if the code did not carry it
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="letter">Parameter letter</param>
+    /// <param name="value">Value to update</param>
+    /// <returns>True if the code carried the parameter</returns>
+    /// <remarks>
+    /// What every geometry's <c>Configure</c> does with every parameter it takes, and the reason
+    /// M665 R200 on its own does not reset the rest of the geometry to nothing
+    /// </remarks>
+    protected static bool TryUpdate(Code code, char letter, ref float value)
+    {
+        if (code.TryGetFloat(letter, out float parsed))
+        {
+            value = parsed;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Take the segmentation of the geometry this one replaces
+    /// </summary>
+    /// <param name="previous">The geometry being replaced</param>
+    /// <remarks>
+    /// <see cref="Configure"/> returns a new instance, and the new one would otherwise start from its
+    /// geometry's defaults and lose what M669 S and T had already set. Selecting a different geometry
+    /// with M669 K does start again, which is what RepRapFirmware's constructing a new
+    /// <c>Kinematics</c> does, so this is called only when the geometry itself has not changed
+    /// </remarks>
+    public void InheritSegmentationFrom(KinematicsEngine previous)
+    {
+        SegmentsPerSecond = previous.SegmentsPerSecond;
+        MinSegmentLength = previous.MinSegmentLength;
+        _segmentationEnabled = previous._segmentationEnabled;
+    }
 
     /// <summary>
     /// Convert a position in axis space to motor microsteps
@@ -276,37 +415,92 @@ internal abstract class KinematicsEngine
     public bool IsRawMotorMove(MoveType moveType)
         => moveType == MoveType.RawMotor || (moveType != MoveType.Normal && HomesIndividualDrives);
 
+    /// <summary>Segments per second before M669 has said otherwise</summary>
+    /// <remarks>RepRapFirmware's <c>Kinematics::DefaultSegmentsPerSecond</c></remarks>
+    public const float DefaultSegmentsPerSecond = 100.0f;
+
+    /// <summary>Shortest segment worth producing before M669 has said otherwise, in mm</summary>
+    /// <remarks>RepRapFirmware's <c>Kinematics::DefaultMinSegmentLength</c></remarks>
+    public const float DefaultMinSegmentLength = 0.2f;
+
     /// <summary>
-    /// Whether this geometry needs a straight move broken into short ones, and along which axes
+    /// Whether this geometry needs a straight move broken into short ones, and along which axes,
+    /// before M669 has said otherwise
     /// </summary>
     /// <remarks>
     /// <para>
-    /// RepRapFirmware's <c>SegmentationType</c>. A geometry that maps axis space onto its motors
-    /// non-linearly cannot draw a straight line by transforming the two ends of one: the motors would
-    /// interpolate linearly between motor positions, and the head would bow. Chopping the move into
-    /// pieces short enough that the bow is smaller than a step is how every such machine does it.
+    /// RepRapFirmware's <c>SegmentationType</c>, as each geometry's constructor passes it up. A
+    /// geometry that maps axis space onto its motors non-linearly cannot draw a straight line by
+    /// transforming the two ends of one: the motors would interpolate linearly between motor
+    /// positions, and the head would bow. Chopping the move into pieces short enough that the bow is
+    /// smaller than a step is how every such machine does it.
     /// </para>
     /// <para>
     /// A Cartesian machine needs none of this, because the transform is the identity and a straight
     /// line in motor space already is one
     /// </para>
     /// </remarks>
-    public virtual SegmentationType Segmentation => SegmentationType.None;
+    protected virtual SegmentationType DefaultSegmentation => SegmentationType.None;
+
+    /// <summary>
+    /// Whether this geometry needs a straight move broken into short ones, and along which axes
+    /// </summary>
+    /// <remarks>
+    /// <see cref="DefaultSegmentation"/> as M669 has left it. Only the <see cref="SegmentationType.Segment"/>
+    /// bit is configurable; which axes count towards a segment's length is a property of the geometry
+    /// and not of the configuration
+    /// </remarks>
+    public SegmentationType Segmentation
+    {
+        get
+        {
+            // Null until M669 has had an opinion, rather than resolved in a constructor: the default
+            // comes from a virtual property, and a base constructor reading one runs the override
+            // before the derived class has finished being built
+            bool enabled = _segmentationEnabled ?? DefaultSegmentation.HasFlag(SegmentationType.Segment);
+            return enabled ? DefaultSegmentation | SegmentationType.Segment : DefaultSegmentation & ~SegmentationType.Segment;
+        }
+    }
+    private bool? _segmentationEnabled;
 
     /// <summary>
     /// How many segments per second of movement this geometry wants
     /// </summary>
-    /// <remarks>RepRapFirmware's <c>DefaultSegmentsPerSecond</c>, configurable there by M669</remarks>
-    public virtual float SegmentsPerSecond => 100.0f;
+    /// <remarks>RepRapFirmware's <c>segmentsPerSecond</c>, set by M669 S</remarks>
+    public float SegmentsPerSecond { get; private set; } = DefaultSegmentsPerSecond;
 
     /// <summary>
     /// Shortest segment worth producing, mm
     /// </summary>
     /// <remarks>
-    /// The other half of the pair: a slow move would otherwise be cut into far more pieces than the
-    /// error justifies, and each one costs a transform and a submission
+    /// The other half of the pair, set by M669 T: a slow move would otherwise be cut into far more
+    /// pieces than the error justifies, and each one costs a transform and a submission
     /// </remarks>
-    public virtual float MinSegmentLength => 0.2f;
+    public float MinSegmentLength { get; private set; } = DefaultMinSegmentLength;
+
+    /// <summary>
+    /// Apply M669's segmentation parameters
+    /// </summary>
+    /// <param name="segmentsPerSecond">Segments per second of movement</param>
+    /// <param name="minSegmentLength">Shortest segment worth producing, in mm</param>
+    /// <remarks>
+    /// <para>
+    /// Ported from <c>Kinematics::TryConfigureSegmentation</c>, which every geometry's <c>Configure</c>
+    /// calls, so M669 S and T mean the same thing on all of them.
+    /// </para>
+    /// <para>
+    /// Whether the move is segmented at all is recomputed from the two values rather than being a
+    /// property of the geometry: either of them at zero turns segmentation off - which is how a delta
+    /// is told not to segment - and both above zero turn it on, including on a Cartesian, where
+    /// RepRapFirmware allows it even though the transform does not need it
+    /// </para>
+    /// </remarks>
+    public void ConfigureSegmentation(float segmentsPerSecond, float minSegmentLength)
+    {
+        SegmentsPerSecond = segmentsPerSecond;
+        MinSegmentLength = minSegmentLength;
+        _segmentationEnabled = segmentsPerSecond > 0.0f && minSegmentLength > 0.0f;
+    }
 
     /// <summary>
     /// Which axes have to be homed before a move may touch the given ones

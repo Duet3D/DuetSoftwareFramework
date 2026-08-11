@@ -1,5 +1,11 @@
 using System;
+using System.Collections.ObjectModel;
+using System.Globalization;
+using System.Text;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
+
+using Code = DuetAPI.Commands.Code;
 
 namespace DuetControlServer.Motion.Kinematics;
 
@@ -72,15 +78,141 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
     /// <summary>Furthest the head may go from the pillar, mm</summary>
     public float MaxRadius { get; }
 
+    /// <summary>
+    /// The minimum radius M669 R asked for, before the mechanics had their say
+    /// </summary>
+    /// <remarks>
+    /// <see cref="MinRadius"/> is the larger of this and how tightly the arms actually fold, so it is
+    /// not what was configured and is not what the object model reports. RepRapFirmware keeps the two
+    /// apart the same way, reporting <c>requestedMinRadius</c> as <c>minRadius</c>
+    /// </remarks>
+    public float RequestedMinRadius { get; }
+
     /// <inheritdoc />
-    public override string Name => "Scara";
+    public override KinematicsName Kind => KinematicsName.Scara;
+
+    /// <summary>
+    /// A SCARA with RepRapFirmware's defaults, for before M669 has been seen
+    /// </summary>
+    /// <returns>The engine</returns>
+    public static ScaraKinematicsEngine CreateDefault() => new();
+
+    /// <inheritdoc />
+    /// <remarks>Ported from <c>ScaraKinematics::Configure</c></remarks>
+    public override KinematicsEngine Configure(Code code, ref bool seen)
+    {
+        if (code.MajorNumber != 669)
+        {
+            return this;
+        }
+
+        float proximal = ProximalArmLength, distal = DistalArmLength;
+        float xOffset = XOffset, yOffset = YOffset, minRadius = RequestedMinRadius;
+        float[] thetaLimits = [.. _thetaLimits];
+        float[] psiLimits = [.. _psiLimits];
+        float[] crosstalk = [.. _crosstalk];
+
+        bool changed = TryUpdate(code, 'P', ref proximal);
+        changed |= TryUpdate(code, 'D', ref distal);
+        changed |= TryUpdate(code, 'X', ref xOffset);
+        changed |= TryUpdate(code, 'Y', ref yOffset);
+        changed |= TryUpdate(code, 'R', ref minRadius);
+        changed |= TryReplace(code, 'A', thetaLimits);
+        changed |= TryReplace(code, 'B', psiLimits);
+        changed |= TryReplace(code, 'C', crosstalk);
+
+        if (!changed)
+        {
+            return this;
+        }
+
+        seen = true;
+        return new ScaraKinematicsEngine(proximal, distal, thetaLimits, psiLimits, crosstalk, xOffset, yOffset, minRadius);
+    }
+
+    /// <summary>
+    /// Replace as much of an array as a code parameter carries values for
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="letter">Parameter letter</param>
+    /// <param name="values">Array to update</param>
+    /// <returns>True if the code carried the parameter</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>TryGetFloatArray</c> with a fixed length: a parameter that carries fewer
+    /// values than the array holds leaves the rest alone
+    /// </remarks>
+    private static bool TryReplace(Code code, char letter, float[] values)
+    {
+        if (!code.TryGetFloatArray(letter, out float[]? parsed))
+        {
+            return false;
+        }
+
+        for (int i = 0; i < values.Length && i < parsed.Length; i++)
+        {
+            values[i] = parsed[i];
+        }
+        return true;
+    }
+
+    /// <inheritdoc />
+    public override void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics)
+    {
+        base.WriteTo(kinematics);
+
+        ScaraKinematics scara = (ScaraKinematics)kinematics;
+        scara.ProximalLength = ProximalArmLength;
+        scara.DistalLength = DistalArmLength;
+        scara.XOffset = XOffset;
+        scara.YOffset = YOffset;
+        scara.MinRadius = RequestedMinRadius;
+        Replace(scara.ThetaLimits, _thetaLimits);
+        Replace(scara.PsiLimits, _psiLimits);
+        Replace(scara.Crosstalk, _crosstalk);
+    }
+
+    /// <summary>
+    /// Refill an object model collection from an array
+    /// </summary>
+    /// <param name="target">The collection</param>
+    /// <param name="values">The values</param>
+    private static void Replace(ObservableCollection<float> target, ReadOnlySpan<float> values)
+    {
+        target.Clear();
+        foreach (float value in values)
+        {
+            target.Add(value);
+        }
+    }
+
+    /// <inheritdoc />
+    public override bool AppendReport(StringBuilder builder, int mCode)
+    {
+        if (!base.AppendReport(builder, mCode))
+        {
+            return false;
+        }
+
+        // RepRapFirmware prints the proximal joint's continuous flag against both arms, which is a
+        // slip in the firmware rather than something to reproduce
+        builder.Append(CultureInfo.InvariantCulture,
+                       $", proximal arm {ProximalArmLength:F2}mm range {_thetaLimits[0]:F1} to {_thetaLimits[1]:F1}°{Continuous(0)}");
+        builder.Append(CultureInfo.InvariantCulture,
+                       $", distal arm {DistalArmLength:F2}mm range {_psiLimits[0]:F1} to {_psiLimits[1]:F1}°{Continuous(1)}");
+        builder.Append(CultureInfo.InvariantCulture,
+                       $", crosstalk {_crosstalk[0]:F1}:{_crosstalk[1]:F1}:{_crosstalk[2]:F1}");
+        builder.Append(CultureInfo.InvariantCulture, $", bed origin ({XOffset:F1}, {YOffset:F1})");
+        return true;
+
+        string Continuous(int joint) => _supportsContinuousRotation[joint] ? " (continuous)" : string.Empty;
+    }
 
     /// <inheritdoc />
     /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
     public override bool HomesIndividualDrives => true;
     /// <inheritdoc />
     /// <remarks>The arms bow in XY; Z is an ordinary leadscrew and travel moves may be left alone</remarks>
-    public override SegmentationType Segmentation => SegmentationType.Segment;
+    protected override SegmentationType DefaultSegmentation => SegmentationType.Segment;
 
 
     /// <inheritdoc />
@@ -185,6 +317,7 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
         DistalArmLength = distalArmLength;
         XOffset = xOffset;
         YOffset = yOffset;
+        RequestedMinRadius = requestedMinRadius;
 
         _thetaLimits[0] = thetaLimits.Length > 0 ? thetaLimits[0] : DefaultMinTheta;
         _thetaLimits[1] = thetaLimits.Length > 1 ? thetaLimits[1] : DefaultMaxTheta;

@@ -234,7 +234,7 @@ internal partial class MCodeHandler(
             // Fork input reader
             606 => await HandleForkInputReaderAsync(code, cancellationToken),
             // Delta configuration and delta endstop adjustments
-            665 or 666 => await HandleDeltaConfigAsync(code, cancellationToken),
+            665 or 666 => await HandleKinematicsAsync(code, cancellationToken),
             // Retired in RepRapFirmware in favour of M669
             667 => new Message(MessageType.Error, "M667 is no longer supported - use M669 instead"),
             // Select the kinematics and configure them
