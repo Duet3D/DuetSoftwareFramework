@@ -21,6 +21,9 @@ projection of the motion state rather than the source it is derived from. §15 i
 `TODO` comment in the motion pipeline, recording which were questions with answers, which are gaps
 already tracked, and which were not tracked anywhere.
 
+§11.5's phase G is complete. What is left of §11 is phase F, every item of which is gated on a
+subsystem that does not exist yet.
+
 ---
 
 ## 1. The contract every ported M-code follows
@@ -1644,10 +1647,10 @@ Same 6HC assumptions as §11 — none of these can be dismissed as not built on 
 | 18 | **Only `InputPin` endstops complete a homing move** | `GCodes4.cpp:66-131` | ✅ fixed, see below |
 | 19 | **The endstop state is re-read live rather than latched** | `GCodes.cpp:5530`, `ms.endstopsTriggered` | ✅ fixed, the same change as 18 |
 | 20 | **`HoldAxis` writes an axis position into a raw motor move** | `:2335-2353` | ✅ fixed, see below |
-| 21 | **`runningSystemMacro` still applies workplace offsets** | `GCodeMachineState.h:310`, `:2421-2424` | Reopens phase A4: with a non-zero G54 offset every move in a system macro is shifted by it |
-| 22 | **M556 axis skew is stored but never applied** | `Move3.cpp:34-57` | The object model describes a skew correction the machine does not make |
-| 23 | **`zShift` missing from the height correction** | `Move3.cpp:113`, `:153-169` | A G30 cannot normalise the height map to zero error at the probe point |
-| 24 | **Segments from two channels can interleave** | `GCodes2.cpp:256` | Both locks are dropped between segments when the ring is full |
+| 21 | **`runningSystemMacro` still applies workplace offsets** | `GCodeMachineState.h:310`, `:2421-2424` | ✅ not a gap — see below |
+| 22 | **M556 axis skew is stored but never applied** | `Move3.cpp:34-57` | ✅ fixed, see below |
+| 23 | **`zShift` missing from the height correction** | `Move3.cpp:113`, `:153-169` | ✅ fixed, see below |
+| 24 | **Segments from two channels can interleave** | `GCodes2.cpp:256` | ✅ fixed, see below |
 | 25 | **`H` was not range-checked** | `:2225` | ✅ fixed, see below |
 
 **17. The segment interpolation base carries the previous move's mesh correction.** This is the one
@@ -1782,35 +1785,53 @@ That method's body became a loop over a new `SeedSpecialMoveCoordinate(raw, axis
 now a call to it. The object model read is gone with it: `machinePosition` is a live projection of
 where the machine has got to, and the planner already holds where the move was measured from.
 
-**21. `runningSystemMacro` was ticked but not implemented.** Phase A item 4 claims G53 *and*
-`runningSystemMacro`; only G53 landed.
-[BuildRawMove](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L503-L505) checks
-`CodeFlags.EnforceAbsolutePosition` and nothing else, where RRF's rule is
-`UsingMachineCoordinates() { return g53Active || runningSystemMacro; }`
-(`GCodeMachineState.h:310`) and `:2421-2424` assigns the raw value with no workplace offset for a
-system macro. The flag is present and correct — `CodeFlags.IsFromSystemMacro`, set by
-[MacroFile.cs:345](src/DuetControlServer/Files/MacroFile.cs#L345) — and is already read for
-`applyM220M221` a few lines away. A4 is reopened below.
+**21. `runningSystemMacro` — the audit was wrong, and it was already implemented.** ✅ `BuildRawMove`
+has the branch, `CodeFlags.IsFromSystemMacro` is set by
+[MacroFile.cs:345](src/DuetControlServer/Files/MacroFile.cs#L345), and a system macro assigns the raw
+value with no workplace offset, which is RRF's
+`UsingMachineCoordinates() { return g53Active || runningSystemMacro; }`. Phase A item 4 was ticked
+correctly and this reopened it in error; the entry is left here rather than deleted so that the next
+reader does not go looking for it again.
 
-**22 and 23. Two halves of the transform that are stored but not applied.** M556 is ✅ in §5.3 and
-writes `move.compensation.skew`, but [ApplyAxisTransform](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L1022)
-adds babystepping and nothing else — RRF's `AxisTransform` (`Move3.cpp:34-57`) applies `tanXY`,
-`tanXZ` and `tanYZ` to every move. This is the "the object model must recreate the machine" rule
-holding while the machine does not do what the object model says. Separately,
-`ComputeHeightCorrection` adds `zShift` (`Move3.cpp:113`), which `SetZeroHeightError` (`:153-169`)
-sets so that a G30 normalises the map to zero error under the probe;
-[BedCompensation.GetCorrection](src/DuetControlServer/Motion/BedCompensation.cs#L177) has no
-equivalent term.
+**22 and 23. Two halves of the transform that were stored but not applied.** ✅ Both fixed. M556 is ✅
+in §5.3 and writes `move.compensation.skew`, and `ApplyAxisSkewTransform` was an empty body with a
+`TODO` on it — the "object model must recreate the machine" rule holding while the machine does not do
+what the object model says.
 
-**24. Two channels can interleave their segments.** [SubmitMoveAsync](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L330)
-drops the object model lock and the planner lock while it waits for the ring to drain, then resumes
-from the segment it reached. Another channel feeding the same motion system can build a move in that
-window, measured from a `StartCoordinates` that is part-way through the first move, and the two end
-up interleaved on the ring. RRF refuses a second G-code source before it even takes the movement
-lock — `if (GetMovementState(gb).segmentsLeft != 0) return false;` (`GCodes2.cpp:256`). Not
-reachable from a single channel, and the whole point of releasing the lock is that a long segmented
-move must not block; the fix is a "this motion system is part-way through a move" flag that other
-channels wait on, not holding the lock.
+`Move::AxisTransform` is ported with its inverse, which
+`SyncInterpreterToMachine` now applies after the inverse bed transform (RRF's
+`InverseAxisAndBedTransform` order). Two details of it are the reason it is a loop rather than three
+assignments, and both are RepRapFirmware's:
+
+- **The XY term goes on one axis or the other, never both.** `M556 P` chooses which, and correcting
+  both would apply the skew twice. Which one it is depends on which axis the machine was squared
+  against when it was measured.
+- **The references are read live as the loop runs.** With the correction on Y the term reads X, and X
+  may already have been corrected for its own Z skew by then. Second order, and a difference all the
+  same; the inverse undoes the pair in the opposite order for the same reason.
+
+`zShift` is `BedCompensation`'s now: `ComputeHeightCorrection` adds it, `SetZeroHeightError` sets it
+from a G30 that redefines Z, and it is cleared whenever the map it normalises is replaced or dropped —
+RRF clears it in `SetIdentityTransform`. Without it the map corrects the machine at the very point the
+probe was used to zero it, so the map fights the operation that defined its own datum. The coordinates
+it is measured at are the *probe's* rather than the nozzle's, which is why the caller adds the probe
+offsets and applies the axis transform before asking, exactly as RRF does.
+
+Both directions of the height transform go through one computation, so the shift cannot be applied to
+one and forgotten in the other — the same "one place per conversion" rule §14.6 arrived at.
+
+**24. Two channels could interleave their segments.** ✅ Fixed with
+`MovementState.SegmentsLeft`, which is RRF's `ms.segmentsLeft` and is tested for the reason RRF tests
+it: `if (GetMovementState(gb).segmentsLeft != 0) return false;` (`GCodes2.cpp:256`). `SubmitMoveAsync`
+drops the object model lock and the planner lock while it waits for the ring to drain, and a second
+channel building in that window would measure from a `StartCoordinates` part-way through the first
+move.
+
+The claim is taken when the move is *built* rather than as each segment goes out, because the windows
+between segments are exactly what it has to cover, and it is released in a `finally` — a move that was
+rejected, threw or was cancelled must not leave every other channel waiting on it. Deliberately not a
+lock held across the wait: giving the ring up is the point of segmenting a long move, so holding a
+lock there would be the thing that blocks.
 
 **25. `H` is now range-checked, and `moveType` is an enum.** ✅ RRF reads the parameter with
 `gb.TryGetLimitedUIValue('H', moveType, dummy, 5)` (`:2225`) and throws for anything outside 0-4.
@@ -1824,9 +1845,21 @@ own wording. `MoveTypeExtensions.ChecksEndstops()` replaces the two open-coded `
 tests. The parameter is read once in `HandleMoveAsync` and passed down rather than re-read in
 `BuildRawMove`.
 
-**Phase G — the second audit.** Ordered by what silently produces wrong movement, then by what
-silently produces no movement, then by the rest. Items 36 and 37 are one change; 39 and 40 are one
-change each but share the transform.
+**Phase G — the second audit. Complete.** Ordered by what silently produces wrong movement, then by
+what silently produces no movement, then by the rest. Items 36 and 37 turned out to be one change;
+39 turned out to be already done.
+
+Two of the seven landed differently from the plan, and both differences are worth carrying forward.
+The interpolation base is **derived** rather than stored, so a term added to the transform cannot
+reach one end of a line without reaching the other — a stored copy would have needed updating in
+`SyncInterpreterToMachine`, in G92, in both homing paths and in the probing handlers, and would be one
+forgotten line from the bug it was meant to fix. And `HoldAxis` re-seeds rather than special-casing the
+raw motor move, which is the same answer in either coordinate space and one branch fewer.
+
+One defect was found that neither audit could have: `ToolOffsetTransform` being passed a bitmap where
+it wanted a count. Both audits walked RepRapFirmware asking what was missing; this was present, and
+wrong. That is the class of finding that only reading this side produces, and it argues for a third
+pass of a different shape rather than a third pass of the same one.
 
 35. ✅ Split the interpolation base from the ring's start coordinates, and undo the bed transform in
     `SyncInterpreterToMachine`. *(item 17)*
@@ -1836,10 +1869,11 @@ change each but share the transform.
     same change as 36, since the event carries the drivers the axes follow from. *(item 19)*
 38. ✅ Re-seed rather than hold from the object model, which is a no-op for a raw motor move and the
     right value for every other. *(item 20)*
-39. ⬜ Suppress the workplace offset inside a system macro, reopening phase A item 4. *(item 21)*
-40. ⬜ Apply M556 in `ApplyAxisTransform`, and add `zShift` to the height correction.
+39. ✅ Suppress the workplace offset inside a system macro — already done when the audit was written;
+    phase A item 4 was ticked correctly. *(item 21)*
+40. ✅ Apply M556 in the axis transform, and add `zShift` to the height correction.
     *(items 22, 23)*
-41. ⬜ Stop two channels interleaving their segments. *(item 24)*
+41. ✅ Stop two channels interleaving their segments. *(item 24)*
 42. ✅ Range-check `H` and give `moveType` a type. *(item 25)*
 
 ### 11.6 What the SBC-side DDA ring no longer does
