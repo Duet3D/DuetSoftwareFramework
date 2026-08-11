@@ -220,7 +220,7 @@ Update these counts as boxes are ticked.
 |---|---|---|
 | **No Heat subsystem in DCS** | §5.5, parts of §5.7 | `src/DuetControlServer/` has `Motion/` but no `Heat/`. The object model (`DuetAPI/ObjectModel/Heat/`) and the CAN messages (`CanMessageSetHeaterTemperatureV1`, `CanMessageHeaterModelV3`, `CanMessageSetHeaterMonitors`, `CanMessageHeaterTuningCommand`, …) both exist, so the gap is the service layer: heater state machine, tuning, fault handling, sensor polling |
 | **No Fan subsystem in DCS** | §5.6 | Same shape: `CanMessageFanParameters` / `CanMessageSetFanSpeed` / `CanMessageFansReport` exist, the service does not |
-| **No Tool subsystem in DCS** | §5.7, M116, M568 | Tool selection, offsets, mix ratios, standby/active temperatures. [TCodeHandler.cs](src/DuetControlServer/Codes/Handlers/TCodeHandler.cs) is a 27-line stub |
+| **Tool subsystem: partly there** | M116, M568, M701-M703 | [ToolManager](src/DuetControlServer/Tools/ToolManager.cs) holds definition, selection, offsets, axis mapping and mixing. What is left is what needs Heat: active and standby temperatures, the standby state on deselection, and M116 |
 | **No Spindle subsystem in DCS** | §5.8 | |
 | **No endstop/probe abstraction in DCS** | M119, M558, M574, M577, M585, M401, M402, M851 | Needs the input-monitor CAN messages (`CanMessageCreateInputMonitorV1`, `CanMessageChangeInputMonitorV1`, `CanMessageInputChangedV2`) wired to `sensors.endstops[]` / `sensors.probes[]` |
 
@@ -386,9 +386,9 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M207 | 2680 | Firmware retraction | `tools[].retraction` | ⬜ blocked |
 | M404 | 3156 | Nominal filament width | see §6 | ⬜ |
 | M407 | 3163 | Report filament width | reads the above | ⬜ |
-| M563 | 3754 | Define tool | `tools[]` | ⬜ blocked |
-| M567 | 3843 | Tool mix ratios | `tools[].mix` | ⬜ blocked |
-| M568 | 3874 | Tool settings (active/standby/spindle RPM) | `tools[]` | ⬜ blocked |
+| M563 | 3754 | Define tool | `tools[]` | ✅ |
+| M567 | 3843 | Tool mix ratios | `tools[].mix` | ✅ |
+| M568 | 3874 | Tool settings (active/standby/spindle RPM) | `tools[]` | ⬜ blocked: every parameter is a temperature or a spindle |
 | M591 | 3984 | Configure filament sensor | `sensors.filamentMonitors[]` → CAN `CanMessageCreateFilamentMonitor` + generic `ConfigureFilamentMonitorParams` | ⬜ |
 | M701 | 4315 | Load filament | `tools[].filament` | ⬜ blocked |
 | M702 | 4319 | Unload filament | `tools[].filament` | ⬜ blocked |
@@ -2805,3 +2805,77 @@ Seven `TODO`s remain under `Motion/`, and every one of them now names the thing 
 rather than asking whether the code is right. The ones in `Codes/Handlers/` that are not motion - the
 expression evaluator, the keyword handler, and the "used to fall through to RRF" markers left by §2 -
 were not part of this pass.
+
+---
+
+## 16. Tools
+
+The subsystem §4 listed as a blocker for §5.7, M116 and M568. It is the thing a coordinate is
+measured *to*: a tool collects extruders, heaters and fans under one number and carries the offsets
+between where the machine thinks it is and where that nozzle is. So nothing in the move pipeline
+needs to know what a tool is — it asks for the offsets and the axis mapping and gets numbers.
+
+[ToolManager](src/DuetControlServer/Tools/ToolManager.cs) holds the operations on `tools[]` and no
+copy of it. That follows §14's step 4: a tool is a flat list of values with no derived state, unlike
+a kinematics engine, so a second representation would be something to keep in step rather than
+something that has to exist.
+
+### 16.1 What a tool change is
+
+A T-code selects; the machine's own macros know how to change a tool. `tfree<n>.g` for the one being
+put down, then `tpre<n>.g`, then the selection, then `tpost<n>.g`. The selection sits between the two
+so that tpre runs with the old tool's offsets and tpost with the new one's — a tpost that primes a
+nozzle has to be able to move to a coordinate measured against the tool it is priming. A missing
+macro is not an error, as in RepRapFirmware: a single-tool machine with nothing to park has no use
+for tfree.g. `T<n> P0` selects without running any of them, which is what restores state after a
+power failure when the tool is already in the head.
+
+### 16.2 Offsets, mapping and the transform
+
+This is the half that closes §11.4 item 30, and it is the reason `explicitAxes` was preserved when
+`ToolOffsetTransform` was otherwise a stub. The forward transform subtracts the tool offset, adds the
+Z hop while the tool is retracted, and uses the axis maps to decide which coordinate each axis takes:
+an axis the code named reads its own, an axis that is only in the X map reads X's. That last is what
+makes one X word move two carriages on an IDEX machine.
+
+Two things about it are RepRapFirmware's and neither is obvious:
+
+- **An axis that X is mapped away from is skipped, not written.** With X mapped to U and V, the X
+  slot holds no machine position at all, so writing one would move an axis the tool does not drive.
+- **The inverse is deliberately not an exact inverse.** Where a letter drives several axes the
+  forward transform sends one coordinate to all of them, so coming back it reports their *mean*.
+  That inexactness is the whole reason the interpreter keeps `currentUserPosition` as forward state
+  instead of reconstructing it (§11.2 item 7), and it is why the inverse runs only where the machine
+  has ended up somewhere the interpreter did not put it — homing, probing, G92, and a G10 that moves
+  the selected tool's offsets.
+
+`AxisBitmap` became the tool's mapping, which decides whether a move counts as XY movement in user
+space and therefore whether the printing jerk limits apply: a move that reached U through the X map
+is still an XY move.
+
+### 16.3 Extrusion
+
+`E` addresses the selected tool's drives rather than extruders 0..n. One value per drive means those
+values; a single value is divided between them by the M567 mix ratios, so the slicer commands the
+filament the nozzle consumes and the machine decides where it comes from. A count matching neither is
+refused rather than interpreted.
+
+An `E` word with no tool selected is refused, as RepRapFirmware refuses it. Extruding on whichever
+drive happens to be first would produce a plausible-looking failure instead of an obvious one, and a
+slicer that emits E before T is describing a print for a machine it thinks is set up.
+
+### 16.4 What is left, and what it is waiting for
+
+| Gap | Waiting on |
+|---|---|
+| Active and standby temperatures; a deselected tool goes to `Off` where RRF sets `Standby` | Heat (§4) |
+| **M116** wait for temperatures | Heat |
+| **M568** — every parameter it has is a temperature or a spindle RPM | Heat, Spindles |
+| Tool heaters and fans are recorded but not driven | Heat, Fans |
+| **M701-M703** filament load/unload/configure | The filaments directory and its macros |
+| Firmware retraction — **M207**, `G10` with no P, `G11` | Nothing; `tools[].retraction` is stored and `ActualZHop` already reads `isRetracted` |
+| Axis scale factors (M579) in the transform | `move.axes[].scale`, which does not exist (§6) |
+| `rawExtruderTotal`, the virtual extruder position, volumetric extrusion | §15.2 and M200 |
+| Extruder endstops (`G1 H1 E`) | The per-extruder speed calculation (§11.4 item 31) |
+
+Firmware retraction is the one with nothing in front of it, and is the obvious next piece here.
