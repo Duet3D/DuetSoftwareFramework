@@ -106,10 +106,19 @@ internal partial class MCodeHandler(
             return new Message();
         }
 
+        // Keep numerically ordered (where possible) for easier maintenance.
         return code.MajorNumber switch
         {
             // Stop or unconditional stop, sleep or conditional stop, program end
             0 or 1 or 2 => await HandleStopAsync(code, cancellationToken),
+            // Spindle clockwise / laser power
+            3 => await HandleSpindleOnAsync(code, reverse: false, cancellationToken),
+            // Spindle counter-clockwise
+            4 => await HandleSpindleOnAsync(code, reverse: true, cancellationToken),
+            // Spindle off
+            5 => await HandleSpindleOffAsync(code, cancellationToken),
+            // Motors on / motors off
+            17 or 18 or 84 => await HandleDriverStateAsync(code, cancellationToken),
             // List SD card
             20 => await HandleListFilesAsync(code, cancellationToken),
             // Initialize SD card
@@ -138,8 +147,8 @@ internal partial class MCodeHandler(
             38 => await HandleFileChecksumAsync(code, cancellationToken),
             // Report SD card information
             39 => await HandleSDCardInfoAsync(code, cancellationToken),
-            // Motors on / motors off
-            17 or 18 or 84 => await HandleDriverStateAsync(code, cancellationToken),
+            // Set output pin
+            42 => await HandleSetOutputAsync(code, cancellationToken),
             // Absolute / relative extruder positioning
             82 or 83 => await HandleExtruderPositioningAsync(code, cancellationToken),
             // Set the idle timeout
@@ -148,6 +157,16 @@ internal partial class MCodeHandler(
             92 => await HandleStepsPerMmAsync(code, cancellationToken),
             // Flag current macro file as (not) pausable
             98 => await HandleMacroPausableAsync(code, cancellationToken),
+            // Set extruder temperature without waiting
+            104 => await SetTemperaturesAsync(code, await CurrentToolHeatersAsync(code, cancellationToken), wait: false, cancellationToken),
+            // Report temperatures
+            105 => await ReportTemperaturesAsync(cancellationToken),
+            // Set fan speed
+            106 => await HandleFanSpeedAsync(code, cancellationToken),
+            // Fan off
+            107 => await HandleFanOffAsync(code, cancellationToken),
+            // Set extruder temperature and wait
+            109 => await SetTemperaturesAsync(code, await CurrentToolHeatersAsync(code, cancellationToken), wait: true, cancellationToken),
             // Set debug level
             111 => await HandleDebugLevelAsync(code, cancellationToken),
             // Emergency stop
@@ -156,6 +175,8 @@ internal partial class MCodeHandler(
             114 => await HandleReportPositionAsync(code, cancellationToken),
             // Report firmware version
             115 => await HandleFirmwareVersionAsync(code, cancellationToken),
+            // Wait for temperatures
+            116 => await HandleWaitForTemperaturesAsync(code, cancellationToken),
             // Publish MQTT message
             118 => await HandlePublishMqttAsync(code, cancellationToken),
             // Report the endstop states
@@ -164,6 +185,16 @@ internal partial class MCodeHandler(
             120 or 121 => await HandleStateStackAsync(code, cancellationToken),
             // Immediate DSF diagnostics
             122 => await HandleDiagnosticsAsync(code, cancellationToken),
+            // Set bed temperature without waiting
+            140 => await SetTemperaturesAsync(code, await BedOrChamberHeatersAsync(code, chamber: false, cancellationToken), wait: false, cancellationToken),
+            // Set chamber temperature without waiting
+            141 => await SetTemperaturesAsync(code, await BedOrChamberHeatersAsync(code, chamber: true, cancellationToken), wait: false, cancellationToken),
+            // Heater monitors
+            143 => await HandleHeaterMonitorAsync(code, cancellationToken),
+            // Set bed temperature and wait
+            190 => await SetTemperaturesAsync(code, await BedOrChamberHeatersAsync(code, chamber: false, cancellationToken), wait: true, cancellationToken),
+            // Set chamber temperature and wait
+            191 => await SetTemperaturesAsync(code, await BedOrChamberHeatersAsync(code, chamber: true, cancellationToken), wait: true, cancellationToken),
             // Set axis and extruder accelerations
             201 => await HandleAccelerationsAsync(code, cancellationToken),
             // Set maximum feedrates
@@ -178,8 +209,16 @@ internal partial class MCodeHandler(
             220 => await HandleSpeedFactorAsync(code, cancellationToken),
             // Set the extrusion factor
             221 => await HandleExtrusionFactorAsync(code, cancellationToken),
+            // Servo control
+            280 => await HandleServoAsync(code, cancellationToken),
             // Babystepping
             290 => await HandleBabysteppingAsync(code, cancellationToken),
+            // Cold extrude and retract limits
+            302 => await HandleColdExtrusionAsync(code, cancellationToken),
+            // Heater process model
+            307 => await HandleHeaterModelAsync(code, cancellationToken),
+            // Configure a temperature sensor
+            308 => await HandleConfigureSensorAsync(code, cancellationToken),
             // Set microstepping
             350 => await HandleMicrosteppingAsync(code, cancellationToken),
             // Save and load the height map, and set the compensation taper
@@ -221,60 +260,20 @@ internal partial class MCodeHandler(
             558 => await HandleProbeConfigAsync(code, cancellationToken),
             // Stop applying bed compensation
             561 => await HandleClearCompensationAsync(code, cancellationToken),
-            // Spindle clockwise / laser power
-            3 => await HandleSpindleOnAsync(code, reverse: false, cancellationToken),
-            // Spindle counter-clockwise
-            4 => await HandleSpindleOnAsync(code, reverse: true, cancellationToken),
-            // Spindle off
-            5 => await HandleSpindleOffAsync(code, cancellationToken),
-            // Set output pin
-            42 => await HandleSetOutputAsync(code, cancellationToken),
-            // Servo control
-            280 => await HandleServoAsync(code, cancellationToken),
-            // Set fan speed
-            106 => await HandleFanSpeedAsync(code, cancellationToken),
-            // Fan off
-            107 => await HandleFanOffAsync(code, cancellationToken),
-            // Set extruder temperature without waiting
-            104 => await SetTemperaturesAsync(code, await CurrentToolHeatersAsync(code, cancellationToken), wait: false, cancellationToken),
-            // Report temperatures
-            105 => await ReportTemperaturesAsync(cancellationToken),
-            // Set extruder temperature and wait
-            109 => await SetTemperaturesAsync(code, await CurrentToolHeatersAsync(code, cancellationToken), wait: true, cancellationToken),
-            // Wait for temperatures
-            116 => await HandleWaitForTemperaturesAsync(code, cancellationToken),
-            // Set bed temperature without waiting
-            140 => await SetTemperaturesAsync(code, await BedOrChamberHeatersAsync(code, chamber: false, cancellationToken), wait: false, cancellationToken),
-            // Set chamber temperature without waiting
-            141 => await SetTemperaturesAsync(code, await BedOrChamberHeatersAsync(code, chamber: true, cancellationToken), wait: false, cancellationToken),
-            // Set bed temperature and wait
-            190 => await SetTemperaturesAsync(code, await BedOrChamberHeatersAsync(code, chamber: false, cancellationToken), wait: true, cancellationToken),
-            // Set chamber temperature and wait
-            191 => await SetTemperaturesAsync(code, await BedOrChamberHeatersAsync(code, chamber: true, cancellationToken), wait: true, cancellationToken),
-            // Cold extrude and retract limits
-            302 => await HandleColdExtrusionAsync(code, cancellationToken),
-            // Configure a temperature sensor
-            308 => await HandleConfigureSensorAsync(code, cancellationToken),
-            // Create a heater, fan or other I/O device
-            950 => await HandleCreateDeviceAsync(code, cancellationToken),
-            // Define or delete a tool
-            563 => await HandleDefineToolAsync(code, cancellationToken),
-            // Heater monitors
-            143 => await HandleHeaterMonitorAsync(code, cancellationToken),
-            // Heater process model
-            307 => await HandleHeaterModelAsync(code, cancellationToken),
             // Clear a heater fault
             562 => await HandleClearHeaterFaultAsync(code, cancellationToken),
-            // Tool settings
-            568 => await HandleToolSettingsAsync(code, cancellationToken),
-            // Heater fault detection
-            570 => await HandleHeaterFaultDetectionAsync(code, cancellationToken),
-            // Set the mixing ratios of a tool
-            567 => await HandleMixRatiosAsync(code, cancellationToken),
+            // Define or delete a tool
+            563 => await HandleDefineToolAsync(code, cancellationToken),
             // Limit axes and movement before homing
             564 => await HandleMovementLimitsAsync(code, cancellationToken),
+            // Set the mixing ratios of a tool
+            567 => await HandleMixRatiosAsync(code, cancellationToken),
+            // Tool settings
+            568 => await HandleToolSettingsAsync(code, cancellationToken),
             // Configure a stepper driver
             569 => await HandleDriverConfigAsync(code, cancellationToken),
+            // Heater fault detection
+            570 => await HandleHeaterFaultDetectionAsync(code, cancellationToken),
             // Set pressure advance
             572 => await HandlePressureAdvanceAsync(code, cancellationToken),
             // Configure the endstops
@@ -309,6 +308,8 @@ internal partial class MCodeHandler(
             915 => await HandleStallDetectionAsync(code, cancellationToken),
             // Start/stop event logging to SD card
             929 => await HandleEventLoggingAsync(code, cancellationToken),
+            // Create a heater, fan or other I/O device
+            950 => await HandleCreateDeviceAsync(code, cancellationToken),
             // Configure CAN
             952 => await HandleConfigureCanAsync(code, cancellationToken),
             // Enable CAN
