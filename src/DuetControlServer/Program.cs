@@ -8,6 +8,8 @@ using DuetControlServer.Heat;
 using DuetControlServer.IPC;
 using DuetControlServer.Link;
 using DuetControlServer.Motion;
+using DuetControlServer.Ports;
+using DuetControlServer.Spindles;
 using DuetControlServer.Model;
 using DuetControlServer.Tools;
 using DuetControlServer.Utility;
@@ -192,6 +194,8 @@ rootCommand.SetAction(async (parserResult) =>
                     .AddModel()
                     .AddLinkAdapter()
                     .AddMotion()
+                    .AddPorts()
+                    .AddSpindles()
                     .AddFans()
                     .AddHeat()
                     .AddTools()

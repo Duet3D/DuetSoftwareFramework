@@ -41,11 +41,22 @@ internal partial class MCodeHandler
             return await HandleCreateFanAsync(code, cancellationToken);
         }
 
-        // TODO the remaining M950 devices: P and S create a GPIO output or servo, J a GPIO input,
-        // D a LED strip, R a spindle. The generic tables M950GpioParams and M950LedParams exist and
-        // CanMessageWriteGpio is what drives one; state.gpOut[] and sensors.gpIn[] are their homes
-        return new Message(MessageType.Warning,
-                           "M950 supports H and F so far; P, S, J, D and R are not ported yet");
+        if (code.HasParameter('P'))
+        {
+            return await HandleCreateOutputAsync(code, isServo: false, cancellationToken);
+        }
+        if (code.HasParameter('S'))
+        {
+            return await HandleCreateOutputAsync(code, isServo: true, cancellationToken);
+        }
+        if (code.HasParameter('R'))
+        {
+            return await HandleCreateSpindleAsync(code, cancellationToken);
+        }
+
+        // TODO J creates a general-purpose input and D a LED strip. sensors.gpIn[] is the home for
+        // the first and CanMessageCreateInputMonitorV1 the message; M950LedParams is the second
+        return new Message(MessageType.Warning, "M950 J and D are not ported yet");
     }
 
     /// <summary>
