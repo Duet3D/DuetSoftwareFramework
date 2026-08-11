@@ -518,6 +518,9 @@ Add to this list as ports uncover more; extending the object model is the expect
 
 | Setting | M-code | Proposed location | Note |
 |---|---|---|---|
+| ~~Fan port~~ | M950 F | `fans[].port` | ✅ added — a fan whose board is forgotten cannot be driven after a restart |
+| ~~Spindle ports~~ | M950 R | `spindles[].port` | ✅ added — one `+` separated string, as M950 R takes them |
+| ~~General-purpose output port~~ | M950 P/S | `state.gpOut[].port` | ✅ added — what M42 needs to know which board to address |
 | Cartesian axis scale factors | M579 | `move.axes[].scale` (float, default 1.0) | RRF keeps this in `GCodes::axisScaleFactors`, outside the object model |
 | Collision avoidance limits | M597 | `move.collisionAvoidance[]` | New model object; RRF stores a minimum separation per axis pair |
 | Nominal filament width | M404 / M407 | reconcile with `move.extruders[].filamentDiameter` | RRF has one global width; the object model has one per extruder. Decide which wins before porting either |
