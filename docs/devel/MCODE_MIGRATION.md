@@ -2461,7 +2461,17 @@ geometry)` is now called by `ReconfigureAsync` before the snapshot is taken, and
 This remains the one place the object model configures the geometry rather than the other way round,
 and now it says so.
 
-**Step 5 — merge `MoveBuilder` into `MovePlanner`** per §14.5.
+**Step 5 ✅ one copy of the configuration, and the builder stays its own class.** §14.5 proposed folding
+`MoveBuilder`'s state into `MovePlanner`. Doing it turned up the reason not to: `MoveBuilder` is
+constructible from a `MotionParameters` and nothing else, which is what lets
+[MoveBuilderTests](src/UnitTests/Motion/MoveBuilderTests.cs) exercise move building without a link
+interface, an object model or a logger. Folding it into `MovePlanner` would put all of that behind
+dependency injection to no benefit.
+
+What was actually wrong was the part §14.5 identified as the problem rather than the shape: two
+references to the same `MotionParameters`, one on each object, kept in step by hand in
+`ReconfigureAsync`. The builder holds it - it needs it on every move - and `MovePlanner.Parameters`
+reads through to it, so there is one copy and nothing to synchronise.
 
 Steps 1 and 2 are independent of the rest and land first. Step 3 proves the pattern on the part with
 polymorphic structure — the part where the mess actually is — before step 4 applies it to the other

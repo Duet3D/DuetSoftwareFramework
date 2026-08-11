@@ -67,10 +67,17 @@ internal sealed class MovePlanner(
     /// The machine being planned for, as last read from the object model
     /// </summary>
     /// <remarks>
+    /// <para>
     /// A derived snapshot, not a second copy of the configuration: the object model is authoritative
-    /// and <see cref="ReconfigureAsync"/> is what brings this back into step with it
+    /// and <see cref="ReconfigureAsync"/> is what brings this back into step with it.
+    /// </para>
+    /// <para>
+    /// Held by the builder rather than here, and read through it, because the builder needs it on
+    /// every move and two references to it would be two things to keep in step - which is what
+    /// <see cref="ReconfigureAsync"/> used to have to do by hand
+    /// </para>
     /// </remarks>
-    public MotionParameters Parameters { get; private set; } = MotionParameters.CreateDefault();
+    public MotionParameters Parameters => Builder.Parameters;
 
     /// <summary>
     /// The machine's geometry
@@ -177,7 +184,6 @@ internal sealed class MovePlanner(
                 return false;
             }
 
-            Parameters = parameters;
             Builder.Reconfigure(parameters);
 
             // Motor positions are microstep counts, and the new description may convert them to a
