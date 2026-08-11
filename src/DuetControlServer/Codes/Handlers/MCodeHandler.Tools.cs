@@ -222,4 +222,110 @@ internal partial class MCodeHandler
         }
         return values;
     }
+
+    /// <summary>
+    /// M568: set a tool's active and standby temperatures, its spindle speed, and whether it is on
+    /// </summary>
+    /// <remarks>
+    /// The temperatures belong to the tool rather than to the heaters, which is the distinction M104
+    /// cannot make: a tool carries what it should be at when it is in use and what it should idle at,
+    /// and selecting or deselecting it is what applies one or the other
+    /// </remarks>
+    private async ValueTask<Message> HandleToolSettingsAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        Tool? tool;
+        ToolState state;
+        bool apply = false;
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            tool = code.TryGetInt('P', out int toolNumber) ? toolManager.Find(toolNumber) : toolManager.Current;
+            if (tool is null)
+            {
+                return new Message(MessageType.Error, "No tool selected");
+            }
+
+            bool seen = false;
+            if (code.TryGetFloatArray('S', out float[]? active))
+            {
+                Assign(tool.Active, active);
+                seen = true;
+            }
+            if (code.TryGetFloatArray('R', out float[]? standby))
+            {
+                Assign(tool.Standby, standby);
+                seen = true;
+            }
+            if (code.TryGetInt('F', out int spindleRpm))
+            {
+                tool.SpindleRpm = spindleRpm;
+                seen = true;
+            }
+            if (code.TryGetInt('A', out int requested))
+            {
+                tool.State = (ToolState)requested;
+                seen = true;
+            }
+
+            if (!seen)
+            {
+                return ReportToolSettings(tool);
+            }
+
+            state = tool.State;
+            apply = tool.Heaters.Count > 0;
+        }
+
+        if (apply)
+        {
+            await heatManager.ApplyToolStateAsync(tool, state, cancellationToken);
+        }
+
+        // The spindle speed is applied when the spindle is started rather than now, which is what
+        // lets M568 F set it up before an M3 that carries no S
+        return new Message();
+    }
+
+    /// <summary>
+    /// Copy values into a tool's per-heater list, leaving entries the code did not give
+    /// </summary>
+    private static void Assign(System.Collections.ObjectModel.ObservableCollection<float> target, float[] values)
+    {
+        for (int index = 0; index < values.Length; index++)
+        {
+            if (index < target.Count)
+            {
+                target[index] = values[index];
+            }
+            else
+            {
+                target.Add(values[index]);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Report a tool's settings, as M568 with only P does
+    /// </summary>
+    private static Message ReportToolSettings(Tool tool)
+    {
+        StringBuilder builder = new();
+        builder.Append(CultureInfo.InvariantCulture, $"Tool {tool.Number} is {tool.State}");
+        if (tool.Active.Count > 0)
+        {
+            builder.Append(", active temperatures:");
+            foreach (float temperature in tool.Active)
+            {
+                builder.Append(CultureInfo.InvariantCulture, $" {temperature:F1}");
+            }
+        }
+        if (tool.Standby.Count > 0)
+        {
+            builder.Append(", standby temperatures:");
+            foreach (float temperature in tool.Standby)
+            {
+                builder.Append(CultureInfo.InvariantCulture, $" {temperature:F1}");
+            }
+        }
+        return new Message(MessageType.Success, builder.ToString());
+    }
 }

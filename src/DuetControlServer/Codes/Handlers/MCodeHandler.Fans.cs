@@ -5,7 +5,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Fans;
+using DuetControlServer.Link;
 using DuetControlServer.Link.Protocol.CanMessages;
+using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Motion;
 
 namespace DuetControlServer.Codes.Handlers;
@@ -175,13 +177,16 @@ internal partial class MCodeHandler
             seen = true;
         }
 
-        // TODO thermostatic control (M106 H and T) needs CanMessageFanParameters, which carries the
-        // monitored sensors and the trigger temperatures. The message exists; the mapping from H and
-        // T to its SensorsMonitored bitmap and TriggerTemperatures pair is not written
         if (code.HasParameter('H') || code.HasParameter('T'))
         {
-            return new Message(MessageType.Warning,
-                               "Thermostatic fan control is not supported yet; H and T were ignored");
+            foreach (int fanNumber in fans)
+            {
+                if (await SendFanParametersAsync(code, fanNumber, cancellationToken) is Message error)
+                {
+                    return error;
+                }
+            }
+            seen = true;
         }
 
         return seen ? new Message() : await ReportFanSpeedsAsync(fans, cancellationToken);
@@ -265,5 +270,77 @@ internal partial class MCodeHandler
     {
         float pwm = value > 1.0f ? value / 255.0f : value;
         return pwm < 0.0f ? 0.0f : pwm > 1.0f ? 1.0f : pwm;
+    }
+
+    /// <summary>
+    /// Send a fan's parameters, including the sensors it watches
+    /// </summary>
+    /// <returns>An error if the board refused them, else null</returns>
+    /// <remarks>
+    /// Thermostatic control belongs to the board because the board is what reads the sensors: a rule
+    /// applied from this side would be applied at the speed of the CAN bus, and a fan that cools a
+    /// stepper has to react faster than that. H names the sensors and T the temperatures they trigger
+    /// at, which is what the message carries
+    /// </remarks>
+    private async ValueTask<Message?> SendFanParametersAsync(Commands.Code code, int fanNumber,
+                                                             CancellationToken cancellationToken)
+    {
+        byte board;
+        CanMessageFanParameters message = new() { FanNumber = (ushort)fanNumber };
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (fanManager.Find(fanNumber) is not Fan fan)
+            {
+                return new Message(MessageType.Error, $"Fan {fanNumber} not found");
+            }
+            if (!fanManager.TryGetBoard(fanNumber, out board))
+            {
+                return new Message(MessageType.Error, $"Fan {fanNumber} is not on an expansion board");
+            }
+
+            if (code.TryGetIntArray('H', out int[]? sensors))
+            {
+                ulong monitored = 0;
+                foreach (int sensor in sensors)
+                {
+                    if (sensor >= 0 && sensor < 64)
+                    {
+                        monitored |= 1UL << sensor;
+                    }
+                }
+                fan.Thermostatic.Sensors.Clear();
+                foreach (int sensor in sensors)
+                {
+                    if (sensor >= 0)
+                    {
+                        fan.Thermostatic.Sensors.Add(sensor);
+                    }
+                }
+                message.SensorsMonitored = monitored;
+            }
+
+            // Two temperatures: the fan is off below the first and full on above the second, which is
+            // what makes it ramp rather than chatter around one threshold
+            if (code.TryGetFloatArray('T', out float[]? temperatures) && temperatures.Length > 0)
+            {
+                float low = temperatures[0];
+                float high = temperatures.Length > 1 ? temperatures[1] : temperatures[0];
+                fan.Thermostatic.LowTemperature = low;
+                fan.Thermostatic.HighTemperature = high;
+                message.TriggerTemperatures[0] = low;
+                message.TriggerTemperatures[1] = high;
+            }
+
+            message.Val = fan.RequestedValue;
+            message.MinVal = fan.Min;
+            message.MaxVal = fan.Max;
+            message.BlipTime = (ushort)(fan.Blip * 1000.0f);
+        }
+
+        CanResponse response = await linkInterface.SendCanMessageAsync(board, in message,
+                                                                       CanMessageType.StandardReply,
+                                                                       cancellationToken: cancellationToken);
+        Message reply = response.ToMessage();
+        return reply.Type == MessageType.Error ? reply : null;
     }
 }

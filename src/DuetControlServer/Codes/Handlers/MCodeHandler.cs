@@ -259,6 +259,16 @@ internal partial class MCodeHandler(
             950 => await HandleCreateDeviceAsync(code, cancellationToken),
             // Define or delete a tool
             563 => await HandleDefineToolAsync(code, cancellationToken),
+            // Heater monitors
+            143 => await HandleHeaterMonitorAsync(code, cancellationToken),
+            // Heater process model
+            307 => await HandleHeaterModelAsync(code, cancellationToken),
+            // Clear a heater fault
+            562 => await HandleClearHeaterFaultAsync(code, cancellationToken),
+            // Tool settings
+            568 => await HandleToolSettingsAsync(code, cancellationToken),
+            // Heater fault detection
+            570 => await HandleHeaterFaultDetectionAsync(code, cancellationToken),
             // Set the mixing ratios of a tool
             567 => await HandleMixRatiosAsync(code, cancellationToken),
             // Limit axes and movement before homing

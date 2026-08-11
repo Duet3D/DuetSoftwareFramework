@@ -109,7 +109,7 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
             {
                 return $"Heater {heaterNumber} not found";
             }
-            if (!TryGetHeaterBoard(heater, out board))
+            if (!TryGetBoard(heater, out board))
             {
                 return $"Heater {heaterNumber} has no sensor, so nothing knows how hot it is";
             }
@@ -140,7 +140,7 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
     /// has to be able to read the temperature without going over the bus for it. RepRapFirmware
     /// requires the same and refuses M950 H otherwise
     /// </remarks>
-    private bool TryGetHeaterBoard(Heater heater, out byte board)
+    public bool TryGetBoard(Heater heater, out byte board)
     {
         board = CanId.MasterAddress;
         AnalogSensor? sensor = heater.Sensor >= 0 && heater.Sensor < model.Sensors.Analog.Count

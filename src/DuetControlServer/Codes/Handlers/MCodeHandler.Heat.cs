@@ -432,4 +432,265 @@ internal partial class MCodeHandler
         }
         return heaters;
     }
+
+    /// <summary>
+    /// M143: set the limits a heater is monitored against
+    /// </summary>
+    /// <remarks>
+    /// A monitor is a sensor, a limit and what to do when the limit is crossed, and the board holds
+    /// all of them because the board is what reads the sensor - a limit enforced from this side would
+    /// be enforced at the speed of the CAN bus. RepRapFirmware sends the whole set each time for the
+    /// same reason it does elsewhere: the message carries the array, so a partial update would need
+    /// the board to remember which entries it had been given
+    /// </remarks>
+    private async ValueTask<Message> HandleHeaterMonitorAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        int heaterNumber = code.TryGetInt('H', out int given) ? given : -1;
+        if (heaterNumber < 0)
+        {
+            return new Message(MessageType.Error, "Missing heater number");
+        }
+
+        byte board;
+        CanMessageSetHeaterMonitors message = new() { Heater = (ushort)heaterNumber };
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (heatManager.Find(heaterNumber) is not Heater heater)
+            {
+                return new Message(MessageType.Error, $"Heater {heaterNumber} not found");
+            }
+            if (!heatManager.TryGetBoard(heater, out board))
+            {
+                return new Message(MessageType.Error, $"Heater {heaterNumber} is not on an expansion board");
+            }
+
+            if (code.TryGetFloat('S', out float limit))
+            {
+                int index = code.TryGetInt('P', out int monitorIndex) ? monitorIndex : 0;
+                while (heater.Monitors.Count <= index)
+                {
+                    heater.Monitors.Add(new HeaterMonitor());
+                }
+
+                HeaterMonitor monitor = heater.Monitors[index];
+                monitor.Limit = limit;
+                monitor.Sensor = code.TryGetInt('T', out int sensor) ? sensor : heater.Sensor;
+                monitor.Action = code.TryGetInt('A', out int action)
+                                 ? (HeaterMonitorAction)action
+                                 : HeaterMonitorAction.GenerateFault;
+                monitor.Condition = code.TryGetInt('C', out int condition)
+                                    ? (HeaterMonitorCondition)condition
+                                    : HeaterMonitorCondition.TooHigh;
+            }
+            else
+            {
+                return ReportHeaterMonitors(heaterNumber, heater);
+            }
+
+            for (int index = 0; index < heater.Monitors.Count && index < CanHeaterMonitorArray7.Length; index++)
+            {
+                HeaterMonitor monitor = heater.Monitors[index];
+                message.Monitors[index] = new CanHeaterMonitor
+                {
+                    Limit = monitor.Limit ?? 0.0f,
+                    Sensor = (sbyte)monitor.Sensor,
+                    Action = (byte)(monitor.Action ?? HeaterMonitorAction.GenerateFault),
+                    Trigger = (sbyte)monitor.Condition
+                };
+            }
+        }
+
+        CanResponse response = await linkInterface.SendCanMessageAsync(board, in message,
+                                                                       CanMessageType.StandardReply,
+                                                                       cancellationToken: cancellationToken);
+        return response.ToMessage();
+    }
+
+    /// <summary>
+    /// Report a heater's monitors, as M143 with only H does
+    /// </summary>
+    private static Message ReportHeaterMonitors(int heaterNumber, Heater heater)
+    {
+        StringBuilder builder = new();
+        for (int index = 0; index < heater.Monitors.Count; index++)
+        {
+            HeaterMonitor monitor = heater.Monitors[index];
+            builder.AppendLine(string.Create(CultureInfo.InvariantCulture,
+                $"Heater {heaterNumber} monitor {index}: sensor {monitor.Sensor}, "
+                + $"{monitor.Condition} {monitor.Limit:F1}C, action {monitor.Action}"));
+        }
+        return builder.Length == 0
+            ? new Message(MessageType.Success, $"Heater {heaterNumber} has no monitors")
+            : new Message(MessageType.Success, builder.ToString().TrimEnd());
+    }
+
+    /// <summary>
+    /// M570: how long a heater may misbehave before it is faulted
+    /// </summary>
+    private async ValueTask<Message> HandleHeaterFaultDetectionAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        if (!code.TryGetInt('H', out int heaterNumber))
+        {
+            return new Message(MessageType.Error, "Missing heater number");
+        }
+
+        byte board;
+        CanMessageSetHeaterFaultDetectionParameters message = new() { Heater = (ushort)heaterNumber };
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (heatManager.Find(heaterNumber) is not Heater heater)
+            {
+                return new Message(MessageType.Error, $"Heater {heaterNumber} not found");
+            }
+            if (!heatManager.TryGetBoard(heater, out board))
+            {
+                return new Message(MessageType.Error, $"Heater {heaterNumber} is not on an expansion board");
+            }
+
+            if (code.TryGetFloat('P', out float faultTime))
+            {
+                heater.MaxHeatingFaultTime = faultTime;
+            }
+            if (code.TryGetFloat('T', out float excursion))
+            {
+                heater.MaxTempExcursion = excursion;
+            }
+            if (code.TryGetInt('S', out int badReadings))
+            {
+                heater.MaxBadReadings = badReadings;
+            }
+
+            message.MaxFaultTime = heater.MaxHeatingFaultTime;
+            message.MaxTempExcursion = heater.MaxTempExcursion;
+            message.MaxBadTemperatureCount = (uint)heater.MaxBadReadings;
+        }
+
+        CanResponse response = await linkInterface.SendCanMessageAsync(board, in message,
+                                                                       CanMessageType.StandardReply,
+                                                                       cancellationToken: cancellationToken);
+        return response.ToMessage();
+    }
+
+    /// <summary>
+    /// M562: clear a heater fault
+    /// </summary>
+    /// <remarks>
+    /// The fault is the board's, so clearing it is a command to the board rather than a change to the
+    /// object model - the board reports the new state back and that is what <c>heat.heaters[].state</c>
+    /// then says. With no P every heater is cleared, as in RepRapFirmware
+    /// </remarks>
+    private async ValueTask<Message> HandleClearHeaterFaultAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        List<int> heaters = [];
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            if (code.TryGetInt('P', out int heaterNumber))
+            {
+                heaters.Add(heaterNumber);
+            }
+            else
+            {
+                for (int index = 0; index < model.Heat.Heaters.Count; index++)
+                {
+                    if (model.Heat.Heaters[index] is not null)
+                    {
+                        heaters.Add(index);
+                    }
+                }
+            }
+        }
+
+        foreach (int heaterNumber in heaters)
+        {
+            if (await heatManager.SetTemperatureAsync(heaterNumber, 0.0f,
+                                                      CanMessageSetHeaterTemperatureV1.CommandResetFault,
+                                                      cancellationToken) is string error)
+            {
+                return new Message(MessageType.Error, error);
+            }
+        }
+        return new Message();
+    }
+
+    /// <summary>
+    /// M307: set or report a heater's process model
+    /// </summary>
+    /// <remarks>
+    /// The model is what the board's controller is tuned to - gain, time constant, dead time - so it
+    /// goes to the board and is kept here so the machine can be rebuilt from the object model
+    /// </remarks>
+    private async ValueTask<Message> HandleHeaterModelAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        if (!code.TryGetInt('H', out int heaterNumber))
+        {
+            return new Message(MessageType.Error, "Missing heater number");
+        }
+
+        byte board;
+        CanMessageHeaterModelV3 message = new() { Heater = (byte)heaterNumber };
+        bool seen = false;
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (heatManager.Find(heaterNumber) is not Heater heater)
+            {
+                return new Message(MessageType.Error, $"Heater {heaterNumber} not found");
+            }
+            if (!heatManager.TryGetBoard(heater, out board))
+            {
+                return new Message(MessageType.Error, $"Heater {heaterNumber} is not on an expansion board");
+            }
+
+            DuetAPI.ObjectModel.HeaterModel heaterModel = heater.Model;
+            if (code.TryGetFloat('R', out float gain))
+            {
+                heaterModel.HeatingRate = gain;
+                seen = true;
+            }
+            if (code.TryGetFloat('C', out float timeConstant))
+            {
+                heaterModel.CoolingRate = timeConstant > 0.0f ? 1.0f / timeConstant : 0.0f;
+                seen = true;
+            }
+            if (code.TryGetFloat('D', out float deadTime))
+            {
+                heaterModel.DeadTime = deadTime;
+                seen = true;
+            }
+            if (code.TryGetFloat('S', out float maxPwm))
+            {
+                heaterModel.MaxPwm = maxPwm;
+                seen = true;
+            }
+            if (code.TryGetFloat('V', out float voltage))
+            {
+                heaterModel.StandardVoltage = voltage;
+                seen = true;
+            }
+            if (code.TryGetInt('B', out int bangBang))
+            {
+                heaterModel.PID.Used = bangBang == 0;
+                seen = true;
+            }
+
+            if (!seen)
+            {
+                return new Message(MessageType.Success, string.Create(CultureInfo.InvariantCulture,
+                    $"Heater {heaterNumber} model: heating rate {heaterModel.HeatingRate:F3}, "
+                    + $"cooling rate {heaterModel.CoolingRate:F3}, dead time {heaterModel.DeadTime:F1}s, "
+                    + $"max PWM {heaterModel.MaxPwm:F2}, mode {(heaterModel.PID.Used ? "PID" : "bang-bang")}"));
+            }
+
+            message.BasicModel.HeatingRate = heaterModel.HeatingRate;
+            message.BasicModel.BasicCoolingRate = heaterModel.CoolingRate;
+            message.BasicModel.DeadTime = heaterModel.DeadTime;
+            message.BasicModel.StandardVoltage = heaterModel.StandardVoltage;
+            message.BasicModel.UsePid = heaterModel.PID.Used;
+            message.MaxPwm = heaterModel.MaxPwm;
+        }
+
+        CanResponse response = await linkInterface.SendCanMessageAsync(board, in message,
+                                                                       CanMessageType.StandardReply,
+                                                                       cancellationToken: cancellationToken);
+        return response.ToMessage();
+    }
 }
