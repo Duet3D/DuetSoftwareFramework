@@ -297,7 +297,7 @@ internal sealed partial class GCodeHandler(
                         }
 
                         armedAxes = raw.ArmedAxes;
-                        segments = SegmentedMove.From(raw, planner.Builder.StartCoordinates,
+                        segments = SegmentedMove.From(raw, raw.InitialCoords,
                                                       planner.Parameters.SharedAxisCount(model.Move),
                                                       planner.Parameters.FirstExtruderDrive);
                     }
@@ -494,6 +494,12 @@ internal sealed partial class GCodeHandler(
 
         if (moveType == MoveType.Normal)
         {
+            // Where the move starts from, taken before the axis words below move the interpreter on.
+            // It is the same forward transform the target goes through, which is what keeps the two
+            // ends of the line in one coordinate space however many terms that transform grows.
+            // RepRapFirmware captures ms.initialCoords at the same instant and for the same reason
+            ToolOffsetTransform(state, raw.InitialCoords, (uint)numAxes);
+
             for (int axis = 0; axis < numAxes; axis++)
             {
                 Axis axisConfig = model.Move.Axes[axis];
@@ -543,6 +549,12 @@ internal sealed partial class GCodeHandler(
             // This might throw a GCodeException
             // TODO use tool axis mapping to get the actual axes to move
             CheckEnoughAxesHomed(axesMentioned, numAxes); // TODO if doingManualBedProbe then skip this check
+
+            // Every axis, not only the ones the code named. A move commands an absolute position for
+            // all of them - an axis the code says nothing about is being commanded to stay where it
+            // is, and it can only say so by carrying its own coordinate. RepRapFirmware's
+            // ToolOffsetTransform runs over the whole vector for the same reason
+            ToolOffsetTransform(state, raw.Coords, (uint)numAxes);
         }
         else
         {
@@ -551,6 +563,11 @@ internal sealed partial class GCodeHandler(
             // because a motor position is not an axis position. RepRapFirmware does the same, which
             // is why it never writes currentUserPosition on this path
             SeedSpecialMoveCoordinates(raw, numAxes);
+
+            // A special move carries no bed compensation, so where it starts is what the seed just
+            // wrote - in whichever coordinate space that was. Recorded for the same reason as above:
+            // whatever measures the move has to measure it against the space it is expressed in
+            raw.Coords.AsSpan(0, numAxes).CopyTo(raw.InitialCoords);
 
             for (int axis = 0; axis < numAxes; axis++)
             {
@@ -635,10 +652,7 @@ internal sealed partial class GCodeHandler(
             else
             {
                 // TODO support coordinate rotation
-                
-                // Apply tool offset, baby stepping, z hop, and axis scaling
-                ToolOffsetTransform(state, raw.Coords, axesMentioned);
-                
+
                 // TODO supoort keepout zones, keep if move enters keepout zone
                 // TODO collision checker for multiple motion systems
 
@@ -782,7 +796,11 @@ internal sealed partial class GCodeHandler(
     private int SegmentCountFor(RawMove raw, int numAxes)
     {
         KinematicsEngine geometry = planner.Parameters.Geometry;
-        ReadOnlySpan<float> start = planner.Builder.StartCoordinates;
+
+        // The move's own start, not the builder's. Both are where the last move left the machine,
+        // but the builder's carries the bed correction and raw.Coords does not, so differencing the
+        // two would count one mesh correction as movement
+        ReadOnlySpan<float> start = raw.InitialCoords;
 
         // How far the move goes, counting the axes this geometry's error depends on
         float lengthSquared = 0.0f;
@@ -954,7 +972,11 @@ internal sealed partial class GCodeHandler(
         }
 
         KinematicsEngine geometry = planner.Parameters.Geometry;
-        ReadOnlySpan<float> initialCoords = planner.Builder.StartCoordinates[..numAxes];
+
+        // RepRapFirmware passes ms.initialCoords here, which is the uncompensated start - the same
+        // space raw.Coords is still in at this point. The error from using the builder's compensated
+        // copy is only one mesh correction in Z, but it is the same conflation
+        ReadOnlySpan<float> initialCoords = raw.InitialCoords.AsSpan(0, numAxes);
 
         LimitPositionResult result = geometry.LimitPosition(
             raw.Coords.AsSpan(0, numAxes), initialCoords, numAxes, axesToLimit,
@@ -1512,10 +1534,19 @@ internal sealed partial class GCodeHandler(
     /// Bring the interpreter's position back into step with where the machine actually is
     /// </summary>
     /// <remarks>
+    /// <para>
     /// RepRapFirmware's <c>ToolOffsetInverseTransform</c> after a homing or probing move, and the
     /// only place the transform is inverted. Everywhere else the interpreter is authoritative and the
     /// machine follows it; here the machine is somewhere the interpreter did not put it. The caller
-    /// must hold the object model write lock and the planner lock
+    /// must hold the object model write lock and the planner lock.
+    /// </para>
+    /// <para>
+    /// The bed transform is undone first, as RepRapFirmware's <c>InverseBedTransform</c> is before
+    /// <c>ToolOffsetInverseTransform</c>. The builder's position is where the machine was
+    /// <em>commanded</em>, correction included, so leaving the correction in would hand the
+    /// interpreter a Z that is already compensated - and it would then be compensated a second time
+    /// on the next move
+    /// </para>
     /// </remarks>
     private void SyncInterpreterToMachine()
     {
@@ -1527,6 +1558,7 @@ internal sealed partial class GCodeHandler(
         {
             state.CurrentUserPosition[axis] = machinePosition[axis] - model.Move.Axes[axis].Babystep;
         }
+        RemoveBedCompensation(state.CurrentUserPosition, numAxes);
         PublishUserPositions(numAxes);
     }
 
@@ -1547,8 +1579,12 @@ internal sealed partial class GCodeHandler(
     /// <param name="numAxes"></param>
     private static void ToolOffsetTransform(MovementState state, Span<float> coords, uint numAxes)
     {
-        // TODO actually apply tool offset transform
-        state.CurrentUserPosition[..(int)numAxes].CopyTo(coords); // temporary until the transform is implemented
+        // TODO apply the tool offsets, axis mapping, axis scale factors (M579) and Z hop, once there
+        // is a tool subsystem to read them from. Babystepping belongs here too - it is a term of
+        // RepRapFirmware's ToolOffsetTransform - and nothing adds it in the forward direction yet,
+        // which is why SyncInterpreterToTarget and SyncInterpreterToMachine subtract a term that is
+        // never applied
+        state.CurrentUserPosition[..(int)numAxes].CopyTo(coords);
     }
 
     /// <summary>

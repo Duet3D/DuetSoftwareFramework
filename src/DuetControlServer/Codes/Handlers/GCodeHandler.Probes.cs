@@ -202,11 +202,41 @@ internal sealed partial class GCodeHandler
         raw.Coords[zAxis] += bedCompensation.GetCorrection(axis0, axis1, raw.Coords[zAxis]);
     }
 
-    // The bed correction used to be taken back off a committed move to recover the coordinate the
-    // user asked for. It no longer is: the interpreter keeps its own position, so what was asked for
-    // is still known and does not have to be reconstructed. That is the point of MovementState -
-    // GetRequestedHeight is only an approximate inverse, because the correction depends on where the
-    // nozzle ends up, which is what the correction is being removed from
+    /// <summary>
+    /// Take the bed correction back off a machine position
+    /// </summary>
+    /// <param name="position">Axis coordinates, corrected on the way in and requested on the way out</param>
+    /// <param name="numAxes">Number of axes to consider</param>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>InverseBedTransform</c>. There is exactly one caller and there should
+    /// remain exactly one: the interpreter keeps its own position, so what a move asked for is
+    /// already known everywhere except where the machine has ended up somewhere the interpreter did
+    /// not put it. That is homing and probing, and it is what <c>SyncInterpreterToMachine</c> is for.
+    /// </para>
+    /// <para>
+    /// It is an approximate inverse rather than an exact one, because the taper makes the correction
+    /// depend on the height being corrected - see <c>BedCompensation.GetRequestedHeight</c>. That is
+    /// a reason to invert in as few places as possible, not a reason not to invert here: leaving the
+    /// correction in would have the next move compensate an already-compensated Z
+    /// </para>
+    /// </remarks>
+    private void RemoveBedCompensation(Span<float> position, int numAxes)
+    {
+        if (!bedCompensation.IsActive)
+        {
+            return;
+        }
+
+        int zAxis = ZAxisIndex(model.Move);
+        if (zAxis < 0 || zAxis >= numAxes)
+        {
+            return;                             // nothing to correct on a machine with no Z
+        }
+
+        (float axis0, float axis1) = GridCoordinatesOf(position, numAxes);
+        position[zAxis] = bedCompensation.GetRequestedHeight(axis0, axis1, position[zAxis]);
+    }
 
     /// <summary>
     /// How many segments the height map needs a move broken into

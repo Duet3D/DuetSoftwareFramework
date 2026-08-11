@@ -27,6 +27,29 @@ internal sealed class RawMove
     /// </summary>
     public float[] Coords { get; } = new float[MotionLimits.MaxAxesPlusExtruders];
 
+    /// <summary>
+    /// Where the move starts from, in the same coordinates as <see cref="Coords"/>
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>ms.initialCoords</c>, and the distinction it draws is the reason this
+    /// exists separately from <see cref="MoveBuilder.StartCoordinates"/>. Both say where the last
+    /// move left the machine, but in different coordinates: this one has the tool transform applied
+    /// and <em>not</em> the bed transform, while the builder's has both, because the builder's job is
+    /// to difference one commanded position against the next and the bed correction is part of what
+    /// was commanded.
+    /// </para>
+    /// <para>
+    /// This is the one the G-code layer measures against - it is what the segments interpolate from,
+    /// what the segment count is measured over, and what <c>LimitPosition</c> gets as its starting
+    /// point - because <see cref="Coords"/> is uncompensated at that stage and the two ends of a line
+    /// have to be in the same space. Interpolating from a compensated start to an uncompensated
+    /// target and then compensating each segment applies the previous move's correction on top of
+    /// this move's, decaying across it
+    /// </para>
+    /// </remarks>
+    public float[] InitialCoords { get; } = new float[MotionLimits.MaxAxes];
+
     /// <summary>Requested speed in mm/sec, meaningless when <see cref="InverseTimeMode"/> is set</summary>
     public float FeedRateMmPerSec { get; set; } = 50.0f;
 
