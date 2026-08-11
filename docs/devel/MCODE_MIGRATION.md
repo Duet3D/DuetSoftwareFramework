@@ -516,11 +516,22 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 Most settings already have a home — the object model mirrors RRF's. These are the gaps found so far.
 Add to this list as ports uncover more; extending the object model is the expected fix, per §1.1.
 
+The four ports above were all found the same way, and it is worth stating the method rather than the
+results: ask rule 1's question of the **code**, not of the class. A manager that can address a device
+looks finished, so the gap hides behind whatever the addressing happens to be derived from — a fan's
+board came from a dictionary, a heater's from its sensor. The question that finds it is "if the
+process restarted and rebuilt the machine from `model` alone, could this code re-issue itself?"
+
+The same pass turned up something the object model could not have shown: nothing populated
+`heat.bedHeaterMapping`, so M140 and M141 addressed an empty list and silently did nothing. A field
+that exists and is never written looks identical, from the class, to one that is.
+
 | Setting | M-code | Proposed location | Note |
 |---|---|---|---|
 | ~~Fan port~~ | M950 F | `fans[].port` | ✅ added — a fan whose board is forgotten cannot be driven after a restart |
 | ~~Spindle ports~~ | M950 R | `spindles[].port` | ✅ added — one `+` separated string, as M950 R takes them |
 | ~~General-purpose output port~~ | M950 P/S | `state.gpOut[].port` | ✅ added — what M42 needs to know which board to address |
+| ~~Heater port and PWM frequency~~ | M950 H | `heat.heaters[].port`, `.frequency` | ✅ added — the sensor says which board a heater is on, so addressing worked and hid that the heater's own output port was never stored |
 | Cartesian axis scale factors | M579 | `move.axes[].scale` (float, default 1.0) | RRF keeps this in `GCodes::axisScaleFactors`, outside the object model |
 | Collision avoidance limits | M597 | `move.collisionAvoidance[]` | New model object; RRF stores a minimum separation per axis pair |
 | Nominal filament width | M404 / M407 | reconcile with `move.extruders[].filamentDiameter` | RRF has one global width; the object model has one per extruder. Decide which wins before porting either |
