@@ -1029,23 +1029,32 @@ internal sealed partial class GCodeHandler(
     /// </remarks>
     private void SeedSpecialMoveCoordinates(RawMove raw, int numAxes)
     {
+        for (int axis = 0; axis < numAxes; axis++)
+        {
+            SeedSpecialMoveCoordinate(raw, axis);
+        }
+    }
+
+    /// <summary>
+    /// Fill in where one axis of a special move starts from
+    /// </summary>
+    /// <param name="raw">The move being built</param>
+    /// <param name="axis">The axis</param>
+    /// <remarks>
+    /// One axis of <see cref="SeedSpecialMoveCoordinates"/>, because holding an axis still means
+    /// putting back exactly what the seed had left in its slot
+    /// </remarks>
+    private void SeedSpecialMoveCoordinate(RawMove raw, int axis)
+    {
         MotionParameters parameters = planner.Parameters;
         if (parameters.Geometry.IsRawMotorMove(raw.MoveType))
         {
-            ReadOnlySpan<int> endPoints = planner.Builder.EndPoints;
-            for (int axis = 0; axis < numAxes; axis++)
-            {
-                float stepsPerMm = parameters.StepsPerMm[axis];
-                raw.Coords[axis] = stepsPerMm != 0.0f ? endPoints[axis] / stepsPerMm : 0.0f;
-            }
+            float stepsPerMm = parameters.StepsPerMm[axis];
+            raw.Coords[axis] = stepsPerMm != 0.0f ? planner.Builder.EndPoints[axis] / stepsPerMm : 0.0f;
         }
         else
         {
-            ReadOnlySpan<float> startCoordinates = planner.Builder.StartCoordinates;
-            for (int axis = 0; axis < numAxes; axis++)
-            {
-                raw.Coords[axis] = startCoordinates[axis];
-            }
+            raw.Coords[axis] = planner.Builder.StartCoordinates[axis];
         }
     }
 
@@ -1148,6 +1157,11 @@ internal sealed partial class GCodeHandler(
     {
         KinematicsEngine geometry = planner.Parameters.Geometry;
 
+        // What stopped the last endstop move says nothing about this one. Cleared here rather than
+        // where the move finishes, so that a move which is never reported as stopped - because it
+        // ran its full length - leaves an empty latch rather than the previous move's
+        planner.State.ArmEndstops();
+
         int stopAllAxis = -1;
         MoveStopInput stopAllInput = new();
         int perAxisCount = 0;
@@ -1240,6 +1254,7 @@ internal sealed partial class GCodeHandler(
             if (alreadyTriggered.Contains(stopAllAxis))
             {
                 HoldAxes(raw, numAxes);
+                LatchAlreadyTriggered(alreadyTriggered);
                 return;
             }
         }
@@ -1248,7 +1263,32 @@ internal sealed partial class GCodeHandler(
         {
             HoldAxis(raw, axis);
         }
+        LatchAlreadyTriggered(alreadyTriggered);
         return;
+    }
+
+    /// <summary>
+    /// Count an endstop that was already closed as having stopped the move
+    /// </summary>
+    /// <param name="axes">Axes whose endstop was closed before the move started</param>
+    /// <remarks>
+    /// The axis is commanded to stay where it is, so nothing moves, so no input changes and no stop
+    /// is ever reported - and yet the axis is at its switch, which is the whole question a homing
+    /// move asks. RepRapFirmware arrives at the same answer by a different route: its step interrupt
+    /// tests the endstop before the first step, so the move stops on the step it began and the stop
+    /// is recorded like any other
+    /// </remarks>
+    private void LatchAlreadyTriggered(List<int> axes)
+    {
+        uint bitmap = 0;
+        foreach (int axis in axes)
+        {
+            if (axis < 32)
+            {
+                bitmap |= 1u << axis;
+            }
+        }
+        planner.State.RecordEndstopTriggered(bitmap);
     }
 
     /// <summary>
@@ -1320,9 +1360,22 @@ internal sealed partial class GCodeHandler(
     /// </summary>
     /// <param name="raw">The move being built</param>
     /// <param name="axis">Axis to hold</param>
-    /// <remarks>The caller must hold the object model lock</remarks>
-    private void HoldAxis(RawMove raw, int axis)
-        => raw.Coords[axis] = model.Move.Axes[axis].MachinePosition ?? raw.Coords[axis];
+    /// <remarks>
+    /// <para>
+    /// Undoing what the code asked for, so the value to put back is the one the move was seeded with -
+    /// which is the same slot's own meaning, whatever coordinate space that is. On a geometry that
+    /// homes individual drives the slot holds a motor position in mm rather than an axis coordinate,
+    /// so seeding it again is the only way to write something the rest of the move agrees with.
+    /// </para>
+    /// <para>
+    /// It is deliberately not read from <c>move.axes[].machinePosition</c>. That is a live projection
+    /// of where the machine is, published from the engine, and it is an axis coordinate on every
+    /// geometry - so on a delta or a SCARA it would put a carriage height's worth of arm angle into a
+    /// motor slot, and even on a Cartesian it is the object model answering a question the planner
+    /// already holds the answer to
+    /// </para>
+    /// </remarks>
+    private void HoldAxis(RawMove raw, int axis) => SeedSpecialMoveCoordinate(raw, axis);
 
     /// <summary>
     /// Command every axis to stay where it is

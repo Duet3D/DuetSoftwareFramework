@@ -48,7 +48,16 @@ internal sealed partial class GCodeHandler
     /// <para>
     /// Only an axis whose endstop actually triggered is homed. A move that ran to its full length
     /// without hitting anything leaves the axis where it was and unhomed, which is what makes a
-    /// failed homing move visible rather than silently believed
+    /// failed homing move visible rather than silently believed.
+    /// </para>
+    /// <para>
+    /// Which axes those are comes from <see cref="MovementState.EndstopsTriggered"/>, latched as the
+    /// stops were reported, and not from reading the endstops now. Reading them now would be wrong
+    /// twice over: only a switch ever writes <c>sensors.endstops[].triggered</c>, so a stall-homed or
+    /// probe-homed axis would never appear to have triggered at all, and by this point the drives
+    /// have been wound back to where they were at the trigger instant - which is the instant the
+    /// switch had just closed, so even a switch is being read on its own threshold. RepRapFirmware
+    /// intersects the same latch with the axes the move was homing
     /// </para>
     /// </remarks>
     private async ValueTask FinishSpecialMoveAsync(MoveType moveType, IReadOnlyList<int> armedAxes,
@@ -75,6 +84,7 @@ internal sealed partial class GCodeHandler
             {
                 planner.ResyncFromEngine();
 
+                uint triggered = planner.State.EndstopsTriggered;
                 foreach (int axis in armedAxes)
                 {
                     if (axis >= model.Move.Axes.Count)
@@ -82,10 +92,17 @@ internal sealed partial class GCodeHandler
                         continue;
                     }
 
-                    Endstop? endstop = axis < model.Sensors.Endstops.Count ? model.Sensors.Endstops[axis] : null;
-                    if (endstop is null || !endstop.Triggered)
+                    if (axis >= 32 || (triggered & (1u << axis)) == 0)
                     {
                         continue;               // the move ran its full length, so nothing is known
+                    }
+
+                    // Which end of the axis the switch is at is configuration rather than state, so
+                    // it is the one thing still worth reading from the endstop itself
+                    Endstop? endstop = axis < model.Sensors.Endstops.Count ? model.Sensors.Endstops[axis] : null;
+                    if (endstop is null)
+                    {
+                        continue;               // nothing could have armed it, so nothing stopped it
                     }
 
                     switch (moveType)

@@ -219,6 +219,19 @@ internal sealed class MotionParameters
     public static int ExtruderToDrive(int extruder) => NumDrives - 1 - extruder;
 
     /// <summary>
+    /// The axis occupying a logical drive, or -1
+    /// </summary>
+    /// <param name="drive">Logical drive number</param>
+    /// <returns>Axis number</returns>
+    /// <remarks>
+    /// The axes come first and one apiece, so this is the identity below <see cref="NumAxes"/> - the
+    /// same arrangement RepRapFirmware uses, where an axis' drive number is the axis number. A
+    /// dual-motor axis is still one drive: its motors differ in which driver they are, not in what
+    /// they move
+    /// </remarks>
+    public int DriveToAxis(int drive) => drive >= 0 && drive < NumAxes ? drive : -1;
+
+    /// <summary>
     /// The extruder occupying a logical drive, or -1
     /// </summary>
     /// <param name="drive">Logical drive number</param>

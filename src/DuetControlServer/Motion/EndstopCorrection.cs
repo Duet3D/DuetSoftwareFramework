@@ -117,7 +117,14 @@ internal sealed class EndstopCorrection(
     /// The engine's own position is then set to match, so the next move is planned as a delta from
     /// where the machine really stopped. That replaces the endpoint patching the engine used to do to
     /// the move in flight: the move's planned endpoints are simply not authoritative for a move that
-    /// stopped short, and treating them as such was what made this fragile
+    /// stopped short, and treating them as such was what made this fragile.
+    /// </para>
+    /// <para>
+    /// Which axes were stopped is latched into <see cref="MovementState.EndstopsTriggered"/> as it
+    /// goes, because this is the only moment at which it is known. Nothing else reports it: a stall
+    /// and a Z probe used as an endstop arrive under handles of their own rather than as an endstop
+    /// state, and even a switch has been wound back onto its own threshold by the time the move
+    /// finishes. RepRapFirmware latches the same fact in the same place, from its step interrupt
     /// </para>
     /// </remarks>
     public void Apply(uint whenTriggered, ReadOnlySpan<MotionStoppedDriverEntry> drivers)
@@ -139,15 +146,23 @@ internal sealed class EndstopCorrection(
         }
 
         bool anySent = false;
+        uint stoppedAxes = 0;
         using (planner.Lock())
         {
             foreach ((byte board, List<StoppedDriver> stopped) in byBoard)
             {
-                if (TrySendRevert(board, stopped, whenTriggered))
+                if (TrySendRevert(board, stopped, whenTriggered, ref stoppedAxes))
                 {
                     anySent = true;
                 }
             }
+
+            // Recorded for every axis the stop reached, and narrowed to the axes the move was armed
+            // for where it is read. That is RepRapFirmware's division of the work as well: a coupled
+            // geometry stops every drive on the one switch, so the drives that stopped say which
+            // axes moved rather than which endstop fired, and only the move knows which of them it
+            // was homing
+            planner.State.RecordEndstopTriggered(stoppedAxes);
         }
 
         if (anySent)
@@ -165,9 +180,10 @@ internal sealed class EndstopCorrection(
     /// <param name="board">CAN address</param>
     /// <param name="stopped">Its stopped drivers</param>
     /// <param name="whenTriggered">Master step-clock time the endstop reported</param>
+    /// <param name="stoppedAxes">Bitmap the axes these drivers move are added to</param>
     /// <returns>True if a message was sent</returns>
     /// <remarks>The caller must hold the planner lock</remarks>
-    private bool TrySendRevert(byte board, List<StoppedDriver> stopped, uint whenTriggered)
+    private bool TrySendRevert(byte board, List<StoppedDriver> stopped, uint whenTriggered, ref uint stoppedAxes)
     {
         CanMessageRevertPosition revert = new()
         {
@@ -181,6 +197,12 @@ internal sealed class EndstopCorrection(
             if (drive < 0)
             {
                 continue;                       // a driver this side does not know about
+            }
+
+            int axis = planner.Parameters.DriveToAxis(drive);
+            if (axis >= 0 && axis < 32)
+            {
+                stoppedAxes |= 1u << axis;
             }
 
             if (!nativeLink.GetPositionAt(drive, whenTriggered, out int position,

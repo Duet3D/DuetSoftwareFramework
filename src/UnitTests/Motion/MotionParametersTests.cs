@@ -158,6 +158,23 @@ public class MotionParametersTests
     }
 
     [Test]
+    public void AxesOccupyTheBottomOfTheDriveSpace()
+    {
+        // The endstop path turns the drivers a stop names back into the axes they move, and does it
+        // through this. Answering for an extruder drive would latch an axis that does not exist
+        MotionParameters parameters = Snapshot(MachineWithOneOfEach());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(parameters.DriveToAxis(0), Is.EqualTo(0));
+            Assert.That(parameters.DriveToAxis(parameters.NumAxes - 1), Is.EqualTo(parameters.NumAxes - 1));
+            Assert.That(parameters.DriveToAxis(parameters.NumAxes), Is.EqualTo(-1), "beyond the last axis");
+            Assert.That(parameters.DriveToAxis(NumDrives - 1), Is.EqualTo(-1), "an extruder is not an axis");
+            Assert.That(parameters.DriveToAxis(-1), Is.EqualTo(-1));
+        });
+    }
+
+    [Test]
     public void UnconfiguredDrivesHaveNonZeroStepsPerMm()
     {
         // This divides when converting motor steps back to a position, so a zero would turn an

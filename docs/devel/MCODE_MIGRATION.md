@@ -65,6 +65,15 @@ These rules come from the architecture already established on this branch — se
 6. **Codes that never reach here.** Codes intercepted earlier in the pipeline (`Codes/Pipelines/*`,
    `Codes/Meta/*`) or by the SBC plugins are marked ⛔.
 
+7. **A gap is a `// TODO`, never an invention.** Where a port needs something that is not ported yet,
+   leave a `// TODO` at the point of use naming what it is waiting for, and do the RepRapFirmware
+   thing for everything that *is* available. Do not substitute behaviour of your own — a plausible
+   stand-in that differs from RRF is worse than an absent one, because it looks finished. It passes
+   review, it never gets revisited, and what it produces is wrong in a way nobody is looking for,
+   whereas a missing feature announces itself. §15 is the pass that had to be run over the `TODO`s
+   this rule produces; §15's own finding is that a `TODO` asking whether the code is right is worse
+   than none, so name the missing thing rather than the doubt.
+
 ### Recipe for porting one code
 
 1. Read the RRF implementation at the line given in the tables below.
@@ -1632,9 +1641,9 @@ Same 6HC assumptions as §11 — none of these can be dismissed as not built on 
 | # | Gap | RRF | Cost of not having it |
 |---|---|---|---|
 | 17 | **Bed compensation is baked into the segment interpolation base** | `:2356`, `:3368-3371` vs `Movement/DDA.cpp:319-321` | Z steps up by roughly the full mesh correction at the start of every segmented move and ramps back down across it |
-| 18 | **Only `InputPin` endstops complete a homing move** | `GCodes4.cpp:66-131` | A stall-homed or probe-as-endstop axis is never marked homed and never adopts its position, so G28 reports failure |
-| 19 | **The endstop state is re-read live rather than latched** | `GCodes.cpp:5530`, `ms.endstopsTriggered` | The switch is read after the wind-back has put the axis back on its threshold |
-| 20 | **`HoldAxis` writes an axis position into a raw motor move** | `:2335-2353` | Wrong coordinate space on every `HomesIndividualDrives` geometry when a switch is already closed |
+| 18 | **Only `InputPin` endstops complete a homing move** | `GCodes4.cpp:66-131` | ✅ fixed, see below |
+| 19 | **The endstop state is re-read live rather than latched** | `GCodes.cpp:5530`, `ms.endstopsTriggered` | ✅ fixed, the same change as 18 |
+| 20 | **`HoldAxis` writes an axis position into a raw motor move** | `:2335-2353` | ✅ fixed, see below |
 | 21 | **`runningSystemMacro` still applies workplace offsets** | `GCodeMachineState.h:310`, `:2421-2424` | Reopens phase A4: with a non-zero G54 offset every move in a system macro is shifted by it |
 | 22 | **M556 axis skew is stored but never applied** | `Move3.cpp:34-57` | The object model describes a skew correction the machine does not make |
 | 23 | **`zShift` missing from the height correction** | `Move3.cpp:113`, `:153-169` | A G30 cannot normalise the height map to zero error at the probe point |
@@ -1699,27 +1708,53 @@ it does not consult the endstop's current state: `RecordEndstopTriggered` (`GCod
 `ms.endstopsTriggered` when the stop is *reported*, and `GCodes4.cpp:77` intersects that with
 `axesToHome`.
 
-Two ways to close it, and the second is the one that also closes item 19: either give
-`ApplyInputChangedAsync` the missing branches so `Triggered` means what its name says for all four
-types, or carry the stopped axes back from the motion-stopped event that
-[EndstopCorrection.Apply](src/DuetControlServer/Motion/EndstopCorrection.cs#L122) already receives —
-it knows which drivers stopped and `MotionParameters.DriveForDriver` maps them back to axes.
+**✅ Fixed by latching, which is the second of the two ways it could have gone** — and the one that
+closes item 19 with it. The alternative was to give `ApplyInputChangedAsync` the missing branches so
+`Triggered` means what its name says for all four types; that would have fixed 18 and left 19 open,
+because the flag would still be read after the wind-back.
 
-**19. The endstop is read live, after the wind-back.** `FinishSpecialMoveAsync` waits for standstill,
-then waits out `IsReverting`, and only then reads `endstop.Triggered`. The revert unwinds the drives
-to where they were at the trigger instant, which is the point at which the switch had just closed —
-so the flag is read with the axis sitting on the switch's threshold. RRF latches the fact at the
-moment of the report and never looks again. Fixing this the second way described under item 18 makes
-both a single change.
+[MovementState.EndstopsTriggered](src/DuetControlServer/Motion/MovementState.cs) is RRF's
+`ms.endstopsTriggered`: a bitmap of axes, cleared by `ArmEndstops()` where the move is armed and
+accumulated by `RecordEndstopTriggered()` as each stop is reported.
+[EndstopCorrection.Apply](src/DuetControlServer/Motion/EndstopCorrection.cs) already receives the
+stopped drivers and already maps them to drives through `DriveForDriver`, so it writes the latch on
+the way past — under the planner lock it was taking anyway. `MotionParameters.DriveToAxis` is the
+other half of that mapping, the axis counterpart of the existing `DriveToExtruder`.
 
-**20. `HoldAxis` uses the wrong coordinate space for a raw motor move.**
-[HoldAxis](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L1274) writes
+Two things about the shape are worth knowing:
+
+- **It records drives and narrows at the point of use.** A coupled geometry stops *every* drive on
+  the one switch, so what the drivers say is which axes moved, not which endstop fired.
+  `FinishSpecialMoveAsync` intersects the latch with the move's `ArmedAxes`, which is exactly what
+  `GCodes4.cpp:77` does with `axesToHome`, and a `stopAll` move is already restricted to one armed
+  axis so the intersection is unambiguous.
+- **An endstop that was already closed is latched by the arming code.** Such an axis is commanded to
+  stay where it is, so nothing moves, so no input changes and no stop is ever reported — and yet the
+  axis *is* at its switch, which is the question being asked. RRF gets there by a different route:
+  its step interrupt tests the endstop before the first step, so the move stops on the step it began
+  and the stop is recorded like any other. `LatchAlreadyTriggered` is that case.
+
+Accumulating rather than assigning is load-bearing: a Cartesian homing X, Y and Z in one move reaches
+its three switches at three different times and is reported stopped three times.
+
+**19. The endstop was read live, after the wind-back.** `FinishSpecialMoveAsync` waited for
+standstill, then waited out `IsReverting`, and only then read `endstop.Triggered`. The revert unwinds
+the drives to where they were at the trigger instant, which is the point at which the switch had just
+closed — so the flag was read with the axis sitting on the switch's threshold. ✅ Closed by item 18's
+latch; the endstop is now read only for `HighEnd`, which is configuration rather than state.
+
+**20. `HoldAxis` used the wrong coordinate space for a raw motor move.** It wrote
 `move.Axes[axis].MachinePosition` into `move.Coords[axis]` to keep an axis still when its endstop is
 already closed. For every geometry with `HomesIndividualDrives` — both deltas, both SCARAs, polar,
 hangprinter — `IsRawMotorMove(MoveType.Homing)` is true, so that slot holds a *motor* position in mm,
-not an axis coordinate. It should be a no-op there: `SeedSpecialMoveCoordinates` has already put the
-current motor position in it, which is exactly what "stay where you are" means. Does not affect a
-Cartesian or CoreXY 6HC.
+not an axis coordinate.
+
+✅ Fixed, and not as the "no-op for a raw motor move" the audit proposed. Holding an axis is undoing
+what the code asked for, so the value to put back is whatever the move was *seeded* with — which is
+the same answer in both coordinate spaces, because `SeedSpecialMoveCoordinates` is what put it there.
+That method's body became a loop over a new `SeedSpecialMoveCoordinate(raw, axis)`, and `HoldAxis` is
+now a call to it. The object model read is gone with it: `machinePosition` is a live projection of
+where the machine has got to, and the planner already holds where the move was measured from.
 
 **21. `runningSystemMacro` was ticked but not implemented.** Phase A item 4 claims G53 *and*
 `runningSystemMacro`; only G53 landed.
@@ -1769,11 +1804,12 @@ change each but share the transform.
 
 35. ⬜ Split the interpolation base from the ring's start coordinates, and undo the bed transform in
     `SyncInterpreterToMachine`. *(item 17)*
-36. ⬜ Carry the stopped axes back from the motion-stopped event so a homing move completes for every
+36. ✅ Carry the stopped axes back from the motion-stopped event so a homing move completes for every
     endstop type. *(item 18)*
-37. ⬜ Latch which endstops stopped the move instead of re-reading them after the wind-back — the
-    same change as 36 if the event carries the axes. *(item 19)*
-38. ⬜ Make `HoldAxis` a no-op for a raw motor move. *(item 20)*
+37. ✅ Latch which endstops stopped the move instead of re-reading them after the wind-back — the
+    same change as 36, since the event carries the drivers the axes follow from. *(item 19)*
+38. ✅ Re-seed rather than hold from the object model, which is a no-op for a raw motor move and the
+    right value for every other. *(item 20)*
 39. ⬜ Suppress the workplace offset inside a system macro, reopening phase A item 4. *(item 21)*
 40. ⬜ Apply M556 in `ApplyAxisTransform`, and add `zShift` to the height correction.
     *(items 22, 23)*
