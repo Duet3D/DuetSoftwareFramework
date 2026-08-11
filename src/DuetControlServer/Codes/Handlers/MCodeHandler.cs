@@ -46,6 +46,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="bedCompensation">The height map in effect</param>
 /// <param name="stateStack">Interpreter state saved by M120 and restored by M121</param>
 /// <param name="planner">Where G-codes become queued moves, and what holds the machine description</param>
+/// <param name="toolManager">The tools the machine has, and which one is selected</param>
 /// <param name="settings">Settings</param>
 internal partial class MCodeHandler(
     CodeProcessor codeProcessor,
@@ -66,6 +67,7 @@ internal partial class MCodeHandler(
     Motion.BedCompensation bedCompensation,
     InterpreterStateStack stateStack,
     MovePlanner planner,
+    Tools.ToolManager toolManager,
     IOptions<Settings> settings) : ICodeHandler
 {
     private MessageLoggerProvider? _messageLoggerProvider;
@@ -211,6 +213,8 @@ internal partial class MCodeHandler(
             558 => await HandleProbeConfigAsync(code, cancellationToken),
             // Stop applying bed compensation
             561 => await HandleClearCompensationAsync(code, cancellationToken),
+            // Define or delete a tool
+            563 => await HandleDefineToolAsync(code, cancellationToken),
             // Limit axes and movement before homing
             564 => await HandleMovementLimitsAsync(code, cancellationToken),
             // Configure a stepper driver

@@ -7,6 +7,7 @@ using DuetControlServer.IPC;
 using DuetControlServer.Link;
 using DuetControlServer.Motion;
 using DuetControlServer.Model;
+using DuetControlServer.Tools;
 using DuetControlServer.Utility;
 using DuetSharedLibrary;
 using Microsoft.Extensions.Configuration;
@@ -189,6 +190,7 @@ rootCommand.SetAction(async (parserResult) =>
                     .AddModel()
                     .AddLinkAdapter()
                     .AddMotion()
+                    .AddTools()
                     .AddUtility();
             })
             .Build();
