@@ -3,6 +3,7 @@ using DuetControlServer;
 using DuetControlServer.Codes;
 using DuetControlServer.Commands;
 using DuetControlServer.Files;
+using DuetControlServer.Heat;
 using DuetControlServer.IPC;
 using DuetControlServer.Link;
 using DuetControlServer.Motion;
@@ -190,6 +191,7 @@ rootCommand.SetAction(async (parserResult) =>
                     .AddModel()
                     .AddLinkAdapter()
                     .AddMotion()
+                    .AddHeat()
                     .AddTools()
                     .AddUtility();
             })

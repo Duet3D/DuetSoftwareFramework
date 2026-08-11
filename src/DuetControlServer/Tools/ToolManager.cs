@@ -28,8 +28,10 @@ namespace DuetControlServer.Tools;
 /// </remarks>
 /// <param name="model">Object model</param>
 /// <param name="macroRunner">Runs the tfree/tpre/tpost macros a tool change is made of</param>
+/// <param name="heatManager">Brings a tool's heaters to its active or standby temperatures</param>
 /// <param name="logger">Logger</param>
-public sealed class ToolManager(Model.ObjectModel model, MacroRunner macroRunner, ILogger<ToolManager> logger)
+public sealed class ToolManager(Model.ObjectModel model, MacroRunner macroRunner,
+                                Heat.HeatManager heatManager, ILogger<ToolManager> logger)
 {
     /// <summary>
     /// Highest tool number a machine may have
@@ -137,11 +139,14 @@ public sealed class ToolManager(Model.ObjectModel model, MacroRunner macroRunner
         }
         foreach (int heater in definition.Heaters)
         {
-            // Recorded but not driven: there is no Heat subsystem, so nothing sets a temperature on
-            // these yet. Storing them is still right - §1's first rule - because a machine that
-            // cannot be rebuilt from the object model has lost its configuration
-            // TODO drive these once there is a Heat subsystem: M568 active/standby, M116, tool state
             tool.Heaters.Add(heater);
+
+            // One active and one standby temperature per heater, so that selecting the tool has
+            // something to apply. Both start at zero, which means the tool is defined but cold
+            // TODO M568 is what sets these; until it is ported, M104 and M109 write the heater's
+            // temperatures directly and a tool change overwrites them with these zeros
+            tool.Active.Add(0.0f);
+            tool.Standby.Add(0.0f);
         }
         foreach (int fan in definition.Fans)
         {
@@ -251,15 +256,21 @@ public sealed class ToolManager(Model.ObjectModel model, MacroRunner macroRunner
             await RunToolMacroAsync(channel, "tfree", previous, startCode, cancellationToken);
         }
 
+        Tool? previousTool;
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
-            if (Find(previous) is Tool old)
+            previousTool = Find(previous);
+            if (previousTool is not null)
             {
-                // TODO put the tool into standby rather than off once there is a Heat subsystem -
-                // RepRapFirmware keeps its heaters at the standby temperature so it can be picked up
-                // again without waiting for it to reheat
-                old.State = ToolState.Off;
+                previousTool.State = ToolState.Standby;
             }
+        }
+
+        if (previousTool is not null)
+        {
+            // Standby rather than off, so the tool can be picked up again without waiting for it to
+            // reheat. That is the whole reason a tool has two temperatures
+            await heatManager.ApplyToolStateAsync(previousTool, ToolState.Standby, cancellationToken);
         }
 
         if (toolNumber != NoTool && parameters.HasFlag(ToolChangeParameters.RunPre))
@@ -267,14 +278,20 @@ public sealed class ToolManager(Model.ObjectModel model, MacroRunner macroRunner
             await RunToolMacroAsync(channel, "tpre", toolNumber, startCode, cancellationToken);
         }
 
+        Tool? selected;
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             model.State.CurrentTool = toolNumber;
-            if (Find(toolNumber) is Tool selected)
+            selected = Find(toolNumber);
+            if (selected is not null)
             {
-                // TODO bring the heaters to the active temperature once there is a Heat subsystem
                 selected.State = ToolState.Active;
             }
+        }
+
+        if (selected is not null)
+        {
+            await heatManager.ApplyToolStateAsync(selected, ToolState.Active, cancellationToken);
         }
 
         if (toolNumber != NoTool && parameters.HasFlag(ToolChangeParameters.RunPost))

@@ -46,6 +46,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="bedCompensation">The height map in effect</param>
 /// <param name="stateStack">Interpreter state saved by M120 and restored by M121</param>
 /// <param name="planner">Where G-codes become queued moves, and what holds the machine description</param>
+/// <param name="heatManager">The heaters the machine has, and what they are asked to reach</param>
 /// <param name="toolManager">The tools the machine has, and which one is selected</param>
 /// <param name="settings">Settings</param>
 internal partial class MCodeHandler(
@@ -67,6 +68,7 @@ internal partial class MCodeHandler(
     Motion.BedCompensation bedCompensation,
     InterpreterStateStack stateStack,
     MovePlanner planner,
+    Heat.HeatManager heatManager,
     Tools.ToolManager toolManager,
     IOptions<Settings> settings) : ICodeHandler
 {
@@ -213,6 +215,26 @@ internal partial class MCodeHandler(
             558 => await HandleProbeConfigAsync(code, cancellationToken),
             // Stop applying bed compensation
             561 => await HandleClearCompensationAsync(code, cancellationToken),
+            // Set extruder temperature without waiting
+            104 => await SetTemperaturesAsync(code, await CurrentToolHeatersAsync(code, cancellationToken), wait: false, cancellationToken),
+            // Report temperatures
+            105 => await ReportTemperaturesAsync(cancellationToken),
+            // Set extruder temperature and wait
+            109 => await SetTemperaturesAsync(code, await CurrentToolHeatersAsync(code, cancellationToken), wait: true, cancellationToken),
+            // Wait for temperatures
+            116 => await HandleWaitForTemperaturesAsync(code, cancellationToken),
+            // Set bed temperature without waiting
+            140 => await SetTemperaturesAsync(code, await BedOrChamberHeatersAsync(code, chamber: false, cancellationToken), wait: false, cancellationToken),
+            // Set chamber temperature without waiting
+            141 => await SetTemperaturesAsync(code, await BedOrChamberHeatersAsync(code, chamber: true, cancellationToken), wait: false, cancellationToken),
+            // Set bed temperature and wait
+            190 => await SetTemperaturesAsync(code, await BedOrChamberHeatersAsync(code, chamber: false, cancellationToken), wait: true, cancellationToken),
+            // Set chamber temperature and wait
+            191 => await SetTemperaturesAsync(code, await BedOrChamberHeatersAsync(code, chamber: true, cancellationToken), wait: true, cancellationToken),
+            // Cold extrude and retract limits
+            302 => await HandleColdExtrusionAsync(code, cancellationToken),
+            // Configure a temperature sensor
+            308 => await HandleConfigureSensorAsync(code, cancellationToken),
             // Define or delete a tool
             563 => await HandleDefineToolAsync(code, cancellationToken),
             // Set the mixing ratios of a tool
