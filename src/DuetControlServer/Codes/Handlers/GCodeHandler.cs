@@ -635,7 +635,10 @@ internal sealed partial class GCodeHandler(
             else
             {
                 // TODO support coordinate rotation
-                // TODO apply tool offset, baby stepping, z hop, and axis scaling
+                
+                // Apply tool offset, baby stepping, z hop, and axis scaling
+                ToolOffsetTransform(state, raw.Coords, axesMentioned);
+                
                 // TODO supoort keepout zones, keep if move enters keepout zone
                 // TODO collision checker for multiple motion systems
 
@@ -1482,6 +1485,18 @@ internal sealed partial class GCodeHandler(
     /// <returns>The offset in mm</returns>
     private static float WorkplaceOffset(Axis axis, int workplace)
         => workplace >= 0 && workplace < axis.WorkplaceOffsets.Count ? axis.WorkplaceOffsets[workplace] : 0.0f;
+
+    /// <summary>
+    /// Convert user coordinates to head reference point coordinates
+    /// </summary>
+    /// <param name="state"></param>
+    /// <param name="coords"></param>
+    /// <param name="numAxes"></param>
+    private static void ToolOffsetTransform(MovementState state, Span<float> coords, uint numAxes)
+    {
+        // TODO actually apply tool offset transform
+        state.CurrentUserPosition[..(int)numAxes].CopyTo(coords); // temporary until the transform is implemented
+    }
 
     /// <summary>
     /// The selected workplace, which is a property of the motion system rather than of the machine

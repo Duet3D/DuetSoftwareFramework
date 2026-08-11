@@ -147,7 +147,7 @@ internal sealed class RawMove
     public uint YAxes { get; set; } = 2;
 
     /// <summary>Logical drives this move is allowed to touch, as a bitmap</summary>
-    public uint OwnedDrives { get; set; } = uint.MaxValue;
+    public uint OwnedDrives { get; set; } = uint.MaxValue; // TODO this is never set currently
 
     /// <summary>
     /// How many pieces this move has to be broken into
