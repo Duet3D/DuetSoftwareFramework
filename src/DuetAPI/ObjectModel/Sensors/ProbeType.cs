@@ -66,5 +66,10 @@ public enum ProbeType
     /// <summary>
     /// Analog scanning probe
     /// </summary>
-    ScanningAnalog = 11
+    ScanningAnalog = 11,
+
+    /// <summary>
+    /// Load cell probe measuring the contact force
+    /// </summary>
+    LoadCell = 12
 }

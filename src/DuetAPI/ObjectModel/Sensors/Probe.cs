@@ -56,6 +56,26 @@ public partial class Probe : ModelObject, IStaticModelObject
     public ObservableCollection<float> DiveHeights { get; } = [0F, 0F];
 
     /// <summary>
+    /// Force measured by the probe (in g), or null if it is not a force-sensing probe
+    /// </summary>
+    public float? Force
+    {
+        get => _force;
+        set => SetPropertyValue(ref _force, value);
+    }
+    private float? _force;
+
+    /// <summary>
+    /// Scale of a force-sensing probe (in g per count), or null if it has not been calibrated
+    /// </summary>
+    public float? GramsPerCount
+    {
+        get => _gramsPerCount;
+        set => SetPropertyValue(ref _gramsPerCount, value);
+    }
+    private float? _gramsPerCount;
+
+    /// <summary>
     /// Indicates if the scanning probe is calibrated
     /// </summary>
     public bool? IsCalibrated
