@@ -528,8 +528,21 @@ internal sealed partial class GCodeHandler(
             // Where the move starts from, taken before the axis words below move the interpreter on.
             // It is the same forward transform the target goes through, which is what keeps the two
             // ends of the line in one coordinate space however many terms that transform grows.
-            // RepRapFirmware captures ms.initialCoords at the same instant and for the same reason
-            ToolOffsetTransform(state, raw.InitialCoords, (uint)numAxes);
+            // RepRapFirmware captures ms.initialCoords at the same instant and for the same reason.
+            //
+            // TODO RepRapFirmware copies its initialCoords from ms.raw.coords, which persists from
+            // the previous move, where this evaluates the transform afresh. The two differ only if a
+            // term of the transform changed since - a tool offset, a babystep - in which case RRF
+            // spreads the change across the move and this would apply it at the start. Nothing can
+            // change one yet: there is no tool subsystem and babystepping is not applied forwards
+            ToolOffsetTransform(state, raw.InitialCoords, numAxes);
+
+            // The axes start where the last move left them, which is what an axis the code does not
+            // mention is being commanded to. RepRapFirmware gets this for free - ms.raw.coords is a
+            // member of a long-lived MovementState and simply carries over, which is also how an
+            // extruder-only move leaves the axes alone. A RawMove here is constructed per move, so
+            // "not written" would mean zero rather than unchanged, and zero is a dive to the origin
+            raw.InitialCoords.AsSpan(0, numAxes).CopyTo(raw.Coords);
 
             for (int axis = 0; axis < numAxes; axis++)
             {
@@ -580,12 +593,6 @@ internal sealed partial class GCodeHandler(
             // This might throw a GCodeException
             // TODO use tool axis mapping to get the actual axes to move
             CheckEnoughAxesHomed(axesMentioned, numAxes); // TODO if doingManualBedProbe then skip this check
-
-            // Every axis, not only the ones the code named. A move commands an absolute position for
-            // all of them - an axis the code says nothing about is being commanded to stay where it
-            // is, and it can only say so by carrying its own coordinate. RepRapFirmware's
-            // ToolOffsetTransform runs over the whole vector for the same reason
-            ToolOffsetTransform(state, raw.Coords, (uint)numAxes);
         }
         else
         {
@@ -677,12 +684,18 @@ internal sealed partial class GCodeHandler(
             }
             else if (axesMentioned == 0)
             {
-                // it is an extruder only move
+                // An extruder-only move deliberately does not go through the tool transform, so the
+                // axes keep the coordinates seeded above. RepRapFirmware says why: deferring means a
+                // tool offset that changed since the last move does not move the axes until an axis
+                // move asks them to, rather than the change coming out as motion on a pure extrusion
                 // TODO set the total segments to 1
             }
             else
             {
                 // TODO support coordinate rotation
+
+                // Apply the tool offsets, babystepping, Z hop and axis scaling
+                ToolOffsetTransform(state, raw.Coords, numAxes, axesMentioned);
 
                 // TODO supoort keepout zones, keep if move enters keepout zone
                 // TODO collision checker for multiple motion systems
@@ -1722,17 +1735,30 @@ internal sealed partial class GCodeHandler(
     /// <summary>
     /// Convert user coordinates to head reference point coordinates
     /// </summary>
-    /// <param name="state"></param>
-    /// <param name="coords"></param>
-    /// <param name="numAxes"></param>
-    private static void ToolOffsetTransform(MovementState state, Span<float> coords, uint numAxes)
+    /// <param name="state">The channel's interpreter state, which the coordinates come from</param>
+    /// <param name="coords">Machine coordinates, written for every axis below <paramref name="numAxes"/></param>
+    /// <param name="numAxes">Number of axes to write</param>
+    /// <param name="explicitAxes">Axes the code named, as a bitmap</param>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>ToolOffsetTransform</c>. Note what <paramref name="explicitAxes"/> is and
+    /// is not: it is <em>not</em> a bound on the loop - every axis is written whether the code named
+    /// it or not, because a move commands an absolute position for all of them. It selects the
+    /// <em>input</em> axis under tool axis mapping, where an axis the code named reads its own
+    /// coordinate while an axis that is only in the X map reads X's. So it does nothing until there
+    /// are tools, and it must be carried until then rather than dropped.
+    /// </para>
+    /// </remarks>
+    private static void ToolOffsetTransform(MovementState state, Span<float> coords, int numAxes,
+                                            uint explicitAxes = 0)
     {
         // TODO apply the tool offsets, axis mapping, axis scale factors (M579) and Z hop, once there
-        // is a tool subsystem to read them from. Babystepping belongs here too - it is a term of
-        // RepRapFirmware's ToolOffsetTransform - and nothing adds it in the forward direction yet,
-        // which is why SyncInterpreterToTarget and SyncInterpreterToMachine subtract a term that is
-        // never applied
-        state.CurrentUserPosition[..(int)numAxes].CopyTo(coords);
+        // is a tool subsystem to read them from - explicitAxes is the parameter that mapping needs.
+        // Babystepping belongs here too - it is a term of RepRapFirmware's ToolOffsetTransform - and
+        // nothing adds it in the forward direction yet, which is why SyncInterpreterToTarget and
+        // SyncInterpreterToMachine subtract a term that is never applied
+        _ = explicitAxes;
+        state.CurrentUserPosition[..numAxes].CopyTo(coords);
     }
 
     /// <summary>
