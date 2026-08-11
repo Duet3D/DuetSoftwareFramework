@@ -13,9 +13,9 @@ namespace DuetControlServer.Motion;
 /// </para>
 /// <para>
 /// Imported with <c>using static</c> where they are needed, so that the code reads as
-/// <c>coords[XAxis]</c> as it does in RepRapFirmware. They lived in three places before - the
-/// kinematics engine, the move builder and the G-code handler - which is three chances for one of
-/// them to be given a different value
+/// <c>coords[XAxis]</c> as it does in RepRapFirmware. Declared once: the kinematics, the move
+/// builder and the G-code handler all index the same vector, and separate declarations would be
+/// separate chances to give one of them a different value
 /// </para>
 /// </remarks>
 public static class AxisIndices

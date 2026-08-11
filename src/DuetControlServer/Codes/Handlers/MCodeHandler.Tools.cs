@@ -74,6 +74,67 @@ internal partial class MCodeHandler
     }
 
     /// <summary>
+    /// M567: set the mixing ratios of a tool
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// The ratios say how one E value is divided between a tool's drives, so a slicer commands the
+    /// filament the nozzle consumes and the machine decides where it comes from. RepRapFirmware
+    /// normalises them, so <c>E0.5:0.5</c> and <c>E1:1</c> mean the same thing
+    /// </remarks>
+    private async ValueTask<Message> HandleMixRatiosAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            Tool? tool = code.TryGetInt('P', out int toolNumber) ? toolManager.Find(toolNumber) : toolManager.Current;
+            if (tool is null)
+            {
+                return new Message(MessageType.Error, "No tool selected");
+            }
+
+            if (!code.TryGetFloatArray('E', out float[]? ratios) || ratios.Length == 0)
+            {
+                StringBuilder report = new();
+                report.Append(CultureInfo.InvariantCulture, $"Tool {tool.Number} mix ratios:");
+                foreach (float ratio in tool.Mix)
+                {
+                    report.Append(CultureInfo.InvariantCulture, $" {ratio:F3}");
+                }
+                return new Message(MessageType.Success, report.ToString());
+            }
+
+            if (ratios.Length != tool.Extruders.Count)
+            {
+                return new Message(MessageType.Error,
+                    $"Tool {tool.Number} has {tool.Extruders.Count} drives, so it needs that many mix ratios");
+            }
+
+            float total = 0.0f;
+            foreach (float ratio in ratios)
+            {
+                if (ratio < 0.0f)
+                {
+                    return new Message(MessageType.Error, "Mix ratios cannot be negative");
+                }
+                total += ratio;
+            }
+            if (total <= 0.0f)
+            {
+                return new Message(MessageType.Error, "Mix ratios cannot all be zero");
+            }
+
+            tool.Mix.Clear();
+            foreach (float ratio in ratios)
+            {
+                tool.Mix.Add(ratio / total);
+            }
+        }
+        return new Message();
+    }
+
+    /// <summary>
     /// Report the tools the machine has, as M563 with no parameters does
     /// </summary>
     private async ValueTask<Message> ReportToolsAsync(CancellationToken cancellationToken)

@@ -215,6 +215,8 @@ internal partial class MCodeHandler(
             561 => await HandleClearCompensationAsync(code, cancellationToken),
             // Define or delete a tool
             563 => await HandleDefineToolAsync(code, cancellationToken),
+            // Set the mixing ratios of a tool
+            567 => await HandleMixRatiosAsync(code, cancellationToken),
             // Limit axes and movement before homing
             564 => await HandleMovementLimitsAsync(code, cancellationToken),
             // Configure a stepper driver

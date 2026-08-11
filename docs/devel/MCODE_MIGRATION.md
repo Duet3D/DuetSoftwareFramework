@@ -123,6 +123,17 @@ These rules come from the architecture already established on this branch — se
      neither knew about `*` — so a normally-closed endstop on an expansion board, which is how most
      machines are wired, was rejected outright. They are one function now; see §8.
 
+10. **A comment describes the code that is there, never the code that was.** Do not write "this used
+    to do X", "X was moved here", "the two that existed before disagreed". A reader of the current
+    file has never seen X, cannot tell whether it still exists somewhere, and now has to go and find
+    out — so a comment meant to save them time costs them some. Commit messages and this document are
+    where history belongs; both are addressed to someone who is looking for it.
+
+    The useful half of such a comment is almost always a statement about the present. "One place
+    knows this grammar, because two readers of one grammar diverge silently" says everything "there
+    used to be two" says, and stays true and useful after the next change. Where a rule exists
+    because something went wrong, state the rule and the failure mode, not the incident.
+
 ### Recipe for porting one code
 
 1. Read the RRF implementation at the line given in the tables below.

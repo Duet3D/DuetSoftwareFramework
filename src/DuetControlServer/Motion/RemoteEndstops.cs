@@ -72,10 +72,10 @@ internal static class RemoteEndstops
     /// </para>
     /// <para>
     /// The policy is applied here rather than by the caller because a caller that has to remember a
-    /// second check is a caller that will one day forget it - four of the six call sites had. The
-    /// reason comes back with the refusal for the same reason: a caller composing its own message
-    /// would have to know which refusal it was looking at, and "invalid port" for a port that is
-    /// merely on the wrong board sends the operator looking for a typo that is not there
+    /// second check is a caller that will one day forget it. The reason comes back with the refusal
+    /// for the same reason: a caller composing its own message would have to know which refusal it
+    /// was looking at, and "invalid port" for a port that is merely on the wrong board sends the
+    /// operator looking for a typo that is not there
     /// </para>
     /// </remarks>
     public static bool TrySplitPort(string port, string description, out byte board, out string localPort,

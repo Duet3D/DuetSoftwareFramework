@@ -1278,21 +1278,43 @@ internal sealed partial class GCodeHandler(
             return false;
         }
 
-        // TODO check that we have a tool to extrude with
-        // TODO get tool extruders
+        // A tool is what has extruders, so an E word with none selected has nothing to address.
+        // RepRapFirmware refuses rather than extruding on the first drive it can find, because a
+        // slicer that emits E before T is describing a print for a machine it thinks is set up
+        Tool? tool = toolManager.Current;
+        if (tool is null || tool.Extruders.Count == 0)
+        {
+            throw new GCodeException("Attempting to extrude with no tool selected");
+        }
 
         MotionParameters parameters = planner.Parameters;
-        int numExtruders = parameters.SharedExtruderCount(model.Move); // TODO use the tool extruders not all extruders
+        int numExtruders = parameters.SharedExtruderCount(model.Move);
 
-        // One value per extruder for a mixing tool, or a single value for the first extruder. Tool
-        // mixing ratios are not ported yet, so a lone E does not fan out
-        int count = extrusion.Length == 1 ? Math.Min(1, numExtruders) : Math.Min(extrusion.Length, numExtruders);
-
-        // TODO extend this with mixing extruders
-        for (int extruder = 0; extruder < count; extruder++)
+        // Either one value per drive of the tool, or a single value the mix ratios fan out across
+        // them. Which of the two it is decides what the numbers mean, so a count that matches
+        // neither is a mistake rather than something to interpret
+        bool mixing = extrusion.Length == 1;
+        if (!mixing && extrusion.Length != tool.Extruders.Count)
         {
+            throw new GCodeException(
+                $"Wrong number of extrusion values: tool {tool.Number} has {tool.Extruders.Count} drives");
+        }
+
+        for (int index = 0; index < tool.Extruders.Count; index++)
+        {
+            int extruder = tool.Extruders[index];
+            if (extruder < 0 || extruder >= numExtruders)
+            {
+                continue;                       // the tool names a drive this machine does not have
+            }
+
             Extruder extruderConfig = model.Move.Extruders[extruder];
-            float requestedMm = extrusion[extruder] * unitScale;
+
+            // A mixing tool splits one E value between its drives by the ratios M567 set, so the
+            // slicer commands the filament the nozzle consumes and the machine decides where it
+            // comes from
+            float share = mixing ? MixRatio(tool, index) : 1.0f;
+            float requestedMm = extrusion[mixing ? 0 : index] * unitScale * share;
 
             // Absolute extrusion is a running total, so the movement is the difference from where
             // the extruder was last told it had reached
@@ -1305,19 +1327,36 @@ internal sealed partial class GCodeHandler(
                     raw.HasPositiveExtrusion = true;
                 }
 
-                // TODO handle volumetric extrusion
+                // TODO handle volumetric extrusion (M200), which scales this by the filament's
+                // cross-section - move.extruders[].filamentDiameter is in the object model and
+                // nothing writes or reads it
             }
 
             // M221 is the operator adjusting a print, so it applies to the same moves M220 does
             raw.Coords[MotionParameters.ExtruderToDrive(extruder)] =
                 raw.ApplyM220M221 ? movement * extruderConfig.Factor : movement;
 
-            // TODO store which extruders are moving
+            // TODO track rawExtruderTotal and the virtual extruder position, which is what print
+            // progress and move.motionSystems[].virtualEPos report - §15.2
         }
 
-        // TODO handle endstop moves
+        // TODO extruder endstops (G1 H1 E), which need the per-extruder speed calculation
         return hasExtrusion;
     }
+
+    /// <summary>
+    /// The share of a mixing tool's extrusion that one of its drives takes
+    /// </summary>
+    /// <param name="tool">The tool</param>
+    /// <param name="index">Which of its drives, by position rather than extruder number</param>
+    /// <returns>The ratio</returns>
+    /// <remarks>
+    /// A tool defined before M567 gets an even split, which is what <see cref="Tools.ToolManager"/>
+    /// fills in. A ratio missing entirely means the tool has more drives than ratios, which M567
+    /// refuses, so this is a bound rather than a policy
+    /// </remarks>
+    private static float MixRatio(Tool tool, int index)
+        => index < tool.Mix.Count ? tool.Mix[index] : 0.0f;
 
     /// <summary>
     /// Say which endstop stops which drive of a homing move
@@ -1761,9 +1800,9 @@ internal sealed partial class GCodeHandler(
             return;
         }
 
-        uint xAxes = ToolAxisMap(tool, ToolAxisMapX);
-        uint yAxes = ToolAxisMap(tool, ToolAxisMapY);
-        uint zAxes = ToolAxisMap(tool, ToolAxisMapZ);
+        uint xAxes = ToolAxisMap(tool, XAxis);
+        uint yAxes = ToolAxisMap(tool, YAxis);
+        uint zAxes = ToolAxisMap(tool, ZAxis);
 
         float xSum = 0.0f, ySum = 0.0f, zSum = 0.0f;
         int xCount = 0, yCount = 0, zCount = 0;
@@ -1858,9 +1897,9 @@ internal sealed partial class GCodeHandler(
             return;
         }
 
-        uint xAxes = ToolAxisMap(tool, ToolAxisMapX);
-        uint yAxes = ToolAxisMap(tool, ToolAxisMapY);
-        uint zAxes = ToolAxisMap(tool, ToolAxisMapZ);
+        uint xAxes = ToolAxisMap(tool, XAxis);
+        uint yAxes = ToolAxisMap(tool, YAxis);
+        uint zAxes = ToolAxisMap(tool, ZAxis);
 
         for (int axis = 0; axis < numAxes && axis < 32; axis++)
         {
@@ -1894,19 +1933,17 @@ internal sealed partial class GCodeHandler(
         }
     }
 
-    /// <summary>Positions the tool axis maps are indexed by, as the object model documents them</summary>
-    private const int ToolAxisMapX = 0, ToolAxisMapY = 1, ToolAxisMapZ = 2;
-
     /// <summary>
     /// One of a tool's axis maps, as a bitmap
     /// </summary>
     /// <param name="tool">The tool</param>
-    /// <param name="which">Which map - <see cref="ToolAxisMapX"/> and friends</param>
+    /// <param name="which">The axis whose map is wanted - <see cref="XAxis"/> and friends</param>
     /// <returns>The axes that letter drives</returns>
     /// <remarks>
     /// The object model stores each map as an array of axis numbers rather than a bitmap, so this is
-    /// the conversion. A tool defined before this map existed falls back to the letter driving its
-    /// own axis, which is RepRapFirmware's default mapping
+    /// the conversion. It is indexed by axis because the maps are stored in visible-axis order, so
+    /// X's map is at X's position - there is no second numbering to keep in step. A tool with no map
+    /// recorded falls back to the letter driving its own axis, which is RepRapFirmware's default
     /// </remarks>
     private static uint ToolAxisMap(Tool tool, int which)
     {
@@ -1967,9 +2004,9 @@ internal sealed partial class GCodeHandler(
         {
             int which = letter switch
             {
-                'X' => ToolAxisMapX,
-                'Y' => ToolAxisMapY,
-                'Z' => ToolAxisMapZ,
+                'X' => XAxis,
+                'Y' => YAxis,
+                'Z' => ZAxis,
                 _ => -1
             };
             if (which >= 0)

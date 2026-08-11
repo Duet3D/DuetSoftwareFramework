@@ -7,10 +7,10 @@ namespace DuetControlServer.Link;
 /// The syntax of a port name, and the board address in front of it
 /// </summary>
 /// <remarks>
-/// Ported from RepRapFirmware's <c>IoPort</c>. There is deliberately one of these: a port name is a
-/// grammar, and two functions that read the same grammar diverge silently because each is
-/// individually correct. The two that existed here had - one knew the modifiers and not that board 0
-/// is refused, the other the reverse, and neither knew about <c>*</c>
+/// Ported from RepRapFirmware's <c>IoPort</c>, which likewise has one. A port name is a grammar, and
+/// two readers of one grammar diverge silently: each stays correct on the inputs it happens to see,
+/// so the disagreement only shows up as a port that one part of the system accepts and another
+/// rejects
 /// </remarks>
 public static class IoPorts
 {
