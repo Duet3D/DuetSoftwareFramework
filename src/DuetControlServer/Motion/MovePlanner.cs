@@ -284,9 +284,6 @@ internal sealed class MovePlanner(
             }
 
             // TODO RRF has a bed levelling move check (`Move::MoveLoop()`). It doesn't make sense in this function but the functionality will need to be ported.
-            // TODO nothing writes move.axes[].userPosition, .stepPos, extruders[].position or
-            // motionSystems[].virtualEPos, so M114 and the interfaces report zeros for all of them.
-            // MovementState and the builder's endpoints already hold the answers - §15.2
 
             MoveBuildResult built = Builder.Build(move, _buffer);
             switch (built.Error)
@@ -312,8 +309,60 @@ internal sealed class MovePlanner(
                 return MoveSubmitResult.Busy;
             }
 
+            PublishCommittedPosition();
             return MoveSubmitResult.Queued;
         }
+    }
+
+    /// <summary>
+    /// Say in the object model where the move just queued leaves the machine
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <c>move.axes[].userPosition</c> is the target of the last move fed into the look-ahead, which
+    /// is what the interpreter's own position is - so this is where it becomes visible. It is the
+    /// counterpart of <c>machinePosition</c>, which <c>MotionService</c> publishes from the engine's
+    /// live snapshot: one says where the machine has been told to go and the other where it has got
+    /// to, and the two differ by however many moves are still queued.
+    /// </para>
+    /// <para>
+    /// Published here rather than by the callers because there are three of them and this is the one
+    /// thing they all do. It is also what G92 and a homing or probing move call once they have moved
+    /// the interpreter without queueing anything, so there is one description of the projection
+    /// rather than one per place that changes the position.
+    /// </para>
+    /// <para>
+    /// Both locks have to be held on entry - the object model's for writing and the planner's for
+    /// reading the state this projects. <c>AsyncReaderWriterLock</c> is non-reentrant with no way to
+    /// ask whether it is held (§13.1), so that is a precondition rather than something this can check
+    /// </para>
+    /// </remarks>
+    public void PublishCommittedPosition()
+    {
+        int numAxes = Parameters.SharedAxisCount(model.Move);
+        int workplace = model.Move.MotionSystems.Count > 0 ? model.Move.MotionSystems[0].WorkplaceNumber : 0;
+
+        for (int axis = 0; axis < numAxes; axis++)
+        {
+            DuetAPI.ObjectModel.Axis axisConfig = model.Move.Axes[axis];
+
+            // The workplace offset is included in the interpreter's position and taken back off for
+            // reporting, so the number a client reads is the one the operator typed
+            float offset = workplace >= 0 && workplace < axisConfig.WorkplaceOffsets.Count
+                           ? axisConfig.WorkplaceOffsets[workplace]
+                           : 0.0f;
+            axisConfig.UserPosition = State.CurrentUserPosition[axis] - offset;
+
+            // Where the motors were told to end up, in microsteps. RepRapFirmware reports the live
+            // count; these are the commanded endpoints, which is the same number once the queue has
+            // drained and is the only one this side knows
+            axisConfig.StepPos = Builder.EndPoints[axis];
+        }
+
+        // TODO move.extruders[].position and move.motionSystems[].virtualEPos need the extrusion
+        // totals RepRapFirmware keeps - rawExtruderTotal and latestVirtualExtruderPosition - which
+        // ApplyExtrusion does not track yet. Publishing the endpoints here would report filament
+        // consumed in microsteps of one drive rather than the mm of filament a client expects
     }
 
     /// <summary>

@@ -1686,7 +1686,7 @@ internal sealed partial class GCodeHandler(
                         planner.Builder.SetAxisPosition(axis, coords[axis]);
                     }
 
-                    PublishUserPositions(numAxes);
+                    planner.PublishCommittedPosition();
                 }
 
                 if (code.TryGetFloat('E', out float extruderPosition))
@@ -1719,25 +1719,6 @@ internal sealed partial class GCodeHandler(
         }
     }
 
-    /// <summary>
-    /// Publish the interpreter's position into the object model
-    /// </summary>
-    /// <param name="numAxes">Number of axes to publish</param>
-    /// <remarks>
-    /// RepRapFirmware's <c>GetUserCoordinate</c>: the workplace offset is included in the interpreter's
-    /// position and taken back off for reporting, so the number the user sees is the one they typed.
-    /// The caller must hold the object model write lock and the planner lock
-    /// </remarks>
-    private void PublishUserPositions(int numAxes)
-    {
-        MovementState state = planner.State;
-        for (int axis = 0; axis < numAxes; axis++)
-        {
-            Axis axisConfig = model.Move.Axes[axis];
-            axisConfig.UserPosition = state.CurrentUserPosition[axis]
-                - WorkplaceOffset(axisConfig, WorkplaceNumber);
-        }
-    }
 
     /// <summary>
     /// Redefine where the machine is, from outside the interpreter
@@ -1788,7 +1769,7 @@ internal sealed partial class GCodeHandler(
         RemoveBedCompensation(state.CurrentUserPosition, numAxes);
         RemoveAxisSkewTransform(state.CurrentUserPosition, numAxes);
         ToolOffsetInverseTransform(state.CurrentUserPosition, numAxes);
-        PublishUserPositions(numAxes);
+        planner.PublishCommittedPosition();
     }
 
     /// <summary>
