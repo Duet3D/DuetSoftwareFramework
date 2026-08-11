@@ -240,6 +240,8 @@ internal partial class MCodeHandler(
             471 => await HandleRenameFileAsync(code, cancellationToken),
             // Delete file or directory
             472 => await HandleDeleteFileOrDirectoryAsync(code, cancellationToken),
+            // Save parameters to config-override.g
+            500 => await HandleSaveConfigOverrideAsync(code, cancellationToken),
             // Load parameters from config-override.g
             501 => await HandleLoadConfigOverrideAsync(code, cancellationToken),
             // Print settings

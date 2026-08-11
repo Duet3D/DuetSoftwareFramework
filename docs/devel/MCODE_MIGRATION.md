@@ -436,7 +436,7 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M471 | 3325 | Rename file or directory | ✅ |
 | M472 | 3346 | Delete file or directory | ✅ |
 | M486 | 3365 | Object cancellation | ⬜ |
-| M500 | 3370 | Save to `config-override.g` | ⬜ |
+| M500 | 3370 | Save to `config-override.g` | ✅ |
 | M501 | 3376 | Load `config-override.g` | ⬜ |
 | M502 | 3387 | Reset to factory settings | ⬜ |
 | M503 | 3404 | List configuration | ✅ |
@@ -819,6 +819,41 @@ One thing worth keeping in view: the local board is `CanId.MasterAddress` here w
 answers `CanInterface::GetCanAddress()`. The two are the same number for the only process that runs
 this, and the difference would only matter if DCS were ever not the main board — which §1.4 says it
 always is.
+
+### What M500 saves, and what it does not
+
+Ported from `WriteConfigOverrideFile` and deliberately no wider. config-override.g holds what a
+machine **discovers about itself** — what its heaters turned out to behave like, where its probe
+actually triggers, how far its axes really travel, what an auto-calibration made of its geometry — so
+that a re-flashed machine does not have to be re-tuned. config.g is the configuration, and it is
+written by hand.
+
+| Section | Written | Condition |
+|---|---|---|
+| Kinematics calibration | M665, M666, M669 | Whatever the geometry reports for those codes |
+| Heater models | M307 | Every configured heater |
+| Probed axis limits | M208 | Only axes a `G1 H3` measured — `move.axes[].minProbed`/`.maxProbed` |
+| Z probe values | G31 | `P31` writes them for every probe, otherwise only configured ones |
+| Tool offsets | G10 | `P10` writes them all, otherwise only the probed ones |
+| Workplace offsets | G10 L2 | Any workplace with a non-zero offset |
+
+The condition column is the part that matters and is easy to get wrong. A limit or an offset that
+came from config.g belongs in config.g; writing it into the override as well means the override
+silently wins if the two ever disagree, and an operator editing config.g would find their change had
+no effect. RepRapFirmware's `P` parameter exists to override exactly that rule when someone wants the
+values regardless.
+
+**Writing the whole object model back out is a different feature, and belongs after the migration.**
+Rule 1 makes the object model able to describe the machine, which is what would make such a dump
+possible; it does not make M500 the place to do it. Doing it now would mean settling the emitted form
+of every setting before the code that sets it has been ported — which is the order that produces a
+format nothing quite fits.
+
+One thing RepRapFirmware does that this does not yet: warn when config.g contains no M501, so that a
+machine which saves settings it never loads says so. RRF tracks that with a flag set only while
+config.g is the file being run, and nothing here knows which macro a code came from. Marked with a
+`TODO` rather than approximated, because a flag meaning "M501 ran at some point" would stay quiet in
+exactly the case the warning exists for.
 
 ### Expansion board manager
 
