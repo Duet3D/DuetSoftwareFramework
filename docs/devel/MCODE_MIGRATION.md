@@ -77,6 +77,24 @@ These rules come from the architecture already established on this branch — se
    this rule produces; §15's own finding is that a `TODO` asking whether the code is right is worse
    than none, so name the missing thing rather than the doubt.
 
+8. **Structural departures from RepRapFirmware are the reader's call, not the writer's.** If the
+   faithful port does not fit — because the shape of the code here differs, or because a piece it
+   depends on is missing — **stop and ask** rather than picking a shape that happens to work. Say
+   what RRF does, what does not fit, and what the options are. This is not a style rule: a departure
+   that produces the right answer today is the hardest kind of bug to find later, because the code
+   looks considered and the divergence only shows up when the missing piece lands and nobody
+   remembers that it was traded away.
+
+   The worked example is §11.5 item 17's second defect below. A move was carrying coordinates for
+   only some of its axes. Running the transform over all of them, in a different place from RRF,
+   fixed it — and quietly discarded the parameter tool axis mapping needs and the deferral that keeps
+   a tool offset change from moving the axes during a pure extrusion. Both losses were invisible
+   because neither can be reached until tools are ported. The faithful fix, once asked for, was
+   smaller.
+
+   The tell is worth learning: when a symptom is fixed by *moving* something rather than by supplying
+   what was missing, the thing that was missing is still missing.
+
 ### Recipe for porting one code
 
 1. Read the RRF implementation at the line given in the tables below.
@@ -1707,17 +1725,40 @@ was already written and unused. It has exactly one caller and should keep exactl
 the inverse approximate, so inverting anywhere the interpreter already knows what was asked for would
 be losing precision for nothing.
 
-**A second defect surfaced while fixing it, and is worse.** `ToolOffsetTransform`'s third parameter is
-an axis *count*; the call site passed the `axesMentioned` *bitmap*. So a move carried coordinates only
-for the first `axesMentioned` axes and left the rest at the zero `RawMove` is constructed with — a
-`G1 X10` on an XYZ machine copied one axis and commanded Y0 Z0, a dive to the origin. An extruder-only
-move did not reach the transform at all and commanded every axis to zero, so a retraction dove as
-well. A move commands an absolute position for **every** axis, including the ones it does not name;
-the transform now runs over the whole vector, once, where the interpreter's position has just been
-updated rather than in one branch of three.
+**A second defect surfaced while fixing it, and is worse.** A move carried coordinates only for the
+first few axes and left the rest at the zero a `RawMove` is constructed with — a `G1 X10` on an XYZ
+machine commanded Y0 Z0, a dive to the origin, and an extruder-only move commanded every axis to zero,
+so a retraction dove as well. The proximate cause was `ToolOffsetTransform`'s stub treating its
+`explicitAxes` parameter as an axis count and slicing the copy with it.
 
-Nothing in the audit found this because both audits walked RepRapFirmware and asked what was missing.
-This is present, and wrong — the class of bug that only reading this side finds.
+Nothing in either audit found this because both walked RepRapFirmware asking what was missing. This
+was present, and wrong — the class of bug that only reading this side finds.
+
+**The first fix for it was a shortcut, and was corrected.** Running the transform over every axis,
+early, for every normal move does make the symptom go away, but it relocates the transform rather than
+supplying what was actually absent. What was absent is the *seed*: RRF's `ms.raw` is a member of a
+long-lived `MovementState`, and `DoStraightMove` resets its flags field by field while never touching
+its coords, so the axis coordinates **carry over from the previous move**. That is what an unmentioned
+axis is being commanded to, and it is also how an extruder-only move leaves the axes alone —
+RepRapFirmware says so in as many words at `:2576`. A `RawMove` here is constructed per move, so "not
+written" means zero rather than unchanged.
+
+So the axes are seeded from where the last move left them, and `ToolOffsetTransform` sits where RRF
+has it (`:2600`): in the branch for a normal move that mentions axes, after the extrusion and before
+the position limiting. Two behaviours come back with it.
+
+- **An extruder-only move does not go through the transform.** A tool offset that changed since the
+  last move must not come out as axis motion on a pure extrusion; it waits until an axis move asks
+  for it.
+- **`explicitAxes` is carried rather than replaced by the count.** It is not a bound — RRF writes
+  every visible axis regardless. It selects the *input* axis under tool axis mapping, where an axis
+  the code named reads its own coordinate and an axis that is only in the X map reads X's
+  (`:4945`). Dropping it discarded exactly what the tool port needs.
+
+One divergence remains and is marked with a `TODO` at the point of use: `initialCoords` is evaluated
+afresh here where RRF copies the previous move's coords. The two differ only if a term of the
+transform changed in between — a tool offset, a babystep — in which case RRF spreads the change across
+the move and this would apply it at the start. Nothing can change one yet.
 
 **18. Completing a homing move only works for switch endstops.** Phase C armed all four
 `EndstopType`s; the half that decides what the move *meant* was not updated with it.
