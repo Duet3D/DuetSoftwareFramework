@@ -2209,13 +2209,14 @@ operator and a move planned against a machine that no longer exists.
 
 Seven tests in [MotionParametersTests](src/UnitTests/Motion/MotionParametersTests.cs) cover both.
 
-#### Left open
+#### Left open — closed
 
-Sixteen `await planner.ReconfigureAsync(cancellationToken)` call sites in
-[MCodeHandler.Motion.cs](src/DuetControlServer/Codes/Handlers/MCodeHandler.Motion.cs) discard the
-`bool` return. That is the actual origin of the divergence above: §13.4 makes the consequence
-visible at the next move, but the M-code that caused it still reports success. Worth folding into the
-next pass over that file.
+Every `await planner.ReconfigureAsync(cancellationToken)` call site in
+[MCodeHandler.Motion.cs](src/DuetControlServer/Codes/Handlers/MCodeHandler.Motion.cs) discarded the
+`bool` return, which is the actual origin of the divergence above: §13.4 made the consequence visible
+at the next move, but the M-code that caused it still reported success. They now return
+`MotionConfigRejected` - the same wording `SubmitMoveAsync` uses, so the operator sees the same
+sentence whether they find out from the code or from the move that follows it.
 
 ---
 
@@ -2473,11 +2474,28 @@ references to the same `MotionParameters`, one on each object, kept in step by h
 `ReconfigureAsync`. The builder holds it - it needs it on every move - and `MovePlanner.Parameters`
 reads through to it, so there is one copy and nothing to synchronise.
 
-Steps 1 and 2 are independent of the rest and land first. Step 3 proves the pattern on the part with
-polymorphic structure — the part where the mess actually is — before step 4 applies it to the other
-~2100 lines. Between 3 and 4 the ownership is mixed: kinematics engine-authoritative, axes and
-extruders object-model-authoritative. That is ugly but bounded, and it is what keeps each step
-reviewable.
+All five steps have landed. The ownership is mixed and deliberately so: the kinematics is
+engine-authoritative because there are two objects and one has to be, and the axes and extruders stay
+object-model-authoritative because there is only one.
+
+What the five steps established, and what a later port of this kind should follow:
+
+- **Two representations, one authority.** Where a second representation has to exist - because it holds
+  derived state, or because it is what the planner can read without a lock - decide which one is
+  authoritative and make the other a projection. Where there is only one, adding a second to "invert"
+  it makes things worse, which is what step 4 found.
+- **`Configure` returns a new instance rather than mutating.** Publication is then a reference swap,
+  which the lock-free readers need, and the derived state is computed in one place.
+- **Report from the authoritative side.** Reporting from the projection means every report silently
+  tests it and passes even when it is wrong.
+- **Store values in the units the code gave them** and convert on the way out. A value that goes
+  through a conversion and back does not come back.
+- **One walk, one conversion.** Two methods that each iterate the same collection, or two copies of
+  the same arithmetic, are two things to keep in step by remembering to.
+- **A test that fails on a dropped parameter.** The declarative form (every property classified as read
+  or explicitly unread) and the round-trip form (configure, project, rebuild, compare) are what turn
+  this class of bug into a build failure. They are worth having wherever there are two representations;
+  they are not worth inventing a second representation for.
 
 ### 14.7 What this does to §13
 

@@ -88,6 +88,18 @@ internal partial class MCodeHandler
     private const ushort EndstopMinReportInterval = 0;
 
     /// <summary>
+    /// The reply when the motion engine would not take the new machine description
+    /// </summary>
+    /// <remarks>
+    /// The engine refuses a description it cannot plan for, and a code that changed the configuration
+    /// and reported success anyway leaves the machine running on the description it had before with
+    /// nothing said. §13.4 of <c>docs/devel/MCODE_MIGRATION.md</c> makes that visible at the next
+    /// move; returning this makes it visible at the code that caused it, in the same words
+    /// </remarks>
+    private static Message MotionConfigRejected
+        => new(MessageType.Error, "The motion configuration was not applied; no moves can be planned until it is");
+
+    /// <summary>
     /// M92: set or report the steps per mm of each drive
     /// </summary>
     /// <param name="code">The code</param>
@@ -146,7 +158,10 @@ internal partial class MCodeHandler
             return new Message(MessageType.Success, report!);
         }
 
-        await planner.ReconfigureAsync(cancellationToken);
+        if (!await planner.ReconfigureAsync(cancellationToken))
+        {
+            return MotionConfigRejected;
+        }
         return await UpdateRemoteDriversAsync(toUpdate, cancellationToken);
     }
 
@@ -216,8 +231,7 @@ internal partial class MCodeHandler
             return new Message(MessageType.Success, report!);
         }
 
-        await planner.ReconfigureAsync(cancellationToken);
-        return new Message();
+        return await planner.ReconfigureAsync(cancellationToken) ? new Message() : MotionConfigRejected;
     }
 
     /// <summary>
@@ -281,8 +295,7 @@ internal partial class MCodeHandler
             return new Message(MessageType.Success, report!);
         }
 
-        await planner.ReconfigureAsync(cancellationToken);
-        return new Message();
+        return await planner.ReconfigureAsync(cancellationToken) ? new Message() : MotionConfigRejected;
     }
 
     /// <summary>
@@ -331,8 +344,7 @@ internal partial class MCodeHandler
             return new Message(MessageType.Success, report!);
         }
 
-        await planner.ReconfigureAsync(cancellationToken);
-        return new Message();
+        return await planner.ReconfigureAsync(cancellationToken) ? new Message() : MotionConfigRejected;
     }
 
     /// <summary>
@@ -407,9 +419,9 @@ internal partial class MCodeHandler
             return new Message(MessageType.Success, report);
         }
 
-        if (seenAxis)
+        if (seenAxis && !await planner.ReconfigureAsync(cancellationToken))
         {
-            await planner.ReconfigureAsync(cancellationToken);
+            return MotionConfigRejected;
         }
         return new Message();
     }
@@ -552,7 +564,10 @@ internal partial class MCodeHandler
             return new Message(MessageType.Success, report!);
         }
 
-        await planner.ReconfigureAsync(cancellationToken);
+        if (!await planner.ReconfigureAsync(cancellationToken))
+        {
+            return MotionConfigRejected;
+        }
         return await UpdateRemoteDriversAsync(toUpdate, cancellationToken);
     }
 
@@ -677,7 +692,10 @@ internal partial class MCodeHandler
             return new Message(MessageType.Error, error);
         }
 
-        await planner.ReconfigureAsync(cancellationToken);
+        if (!await planner.ReconfigureAsync(cancellationToken))
+        {
+            return MotionConfigRejected;
+        }
 
         Message result = await UpdateRemoteDriversAsync(toUpdate, cancellationToken);
         foreach (string warning in warnings)
@@ -1259,7 +1277,10 @@ internal partial class MCodeHandler
             }
         }
 
-        await planner.ReconfigureAsync(cancellationToken);
+        if (!await planner.ReconfigureAsync(cancellationToken))
+        {
+            return MotionConfigRejected;
+        }
 
         if (toUpdate.Count == 0)
         {
@@ -1383,8 +1404,7 @@ internal partial class MCodeHandler
             return new Message(MessageType.Success, report!);
         }
 
-        await planner.ReconfigureAsync(cancellationToken);
-        return new Message();
+        return await planner.ReconfigureAsync(cancellationToken) ? new Message() : MotionConfigRejected;
     }
 
     /// <summary>
@@ -1625,8 +1645,7 @@ internal partial class MCodeHandler
             return new Message(MessageType.Success, report!);
         }
 
-        await planner.ReconfigureAsync(cancellationToken);
-        return new Message();
+        return await planner.ReconfigureAsync(cancellationToken) ? new Message() : MotionConfigRejected;
     }
 
     /// <summary>
@@ -1681,8 +1700,7 @@ internal partial class MCodeHandler
             return new Message(MessageType.Success, report!);
         }
 
-        await planner.ReconfigureAsync(cancellationToken);
-        return new Message();
+        return await planner.ReconfigureAsync(cancellationToken) ? new Message() : MotionConfigRejected;
     }
 
     /// <summary>
@@ -1784,8 +1802,7 @@ internal partial class MCodeHandler
             return new Message(MessageType.Success, report!);
         }
 
-        await planner.ReconfigureAsync(cancellationToken);
-        return new Message();
+        return await planner.ReconfigureAsync(cancellationToken) ? new Message() : MotionConfigRejected;
     }
 
     /// <summary>
@@ -1841,8 +1858,7 @@ internal partial class MCodeHandler
             }
         }
 
-        await planner.ReconfigureAsync(cancellationToken);
-        return new Message();
+        return await planner.ReconfigureAsync(cancellationToken) ? new Message() : MotionConfigRejected;
     }
 
     /// <summary>
@@ -1923,8 +1939,7 @@ internal partial class MCodeHandler
             return new Message(MessageType.Success, report!);
         }
 
-        await planner.ReconfigureAsync(cancellationToken);
-        return new Message();
+        return await planner.ReconfigureAsync(cancellationToken) ? new Message() : MotionConfigRejected;
     }
 
     /// <summary>
