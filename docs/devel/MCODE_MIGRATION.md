@@ -17,7 +17,9 @@ side of `DoStraightMove` that those phases made reachable; §11.6 records what t
 no longer does. §13 reviews whether `MotionParameters` is still needed now that the planning path
 holds the object model lock, and records the two bugs that review found. §14 revisits that from the
 other side — which end of the copy is authoritative — and holds the plan for making the object model a
-projection of the motion state rather than the source it is derived from.
+projection of the motion state rather than the source it is derived from. §15 is a pass over every
+`TODO` comment in the motion pipeline, recording which were questions with answers, which are gaps
+already tracked, and which were not tracked anywhere.
 
 ---
 
@@ -2505,3 +2507,54 @@ otherwise materialise per move (§13.3). Inverting ownership does not weaken eit
 strengthens both, because the dense arrays become the authoritative store rather than a copy of one.
 What changes is §13.4: the two problems recorded there are both consequences of the copy being
 derived-and-possibly-stale, and step 4 removes the mechanism rather than the symptoms.
+
+---
+
+## 15. The TODO comments in the motion pipeline
+
+Every `TODO` in `src/DuetControlServer/Motion/` and in the motion parts of `Codes/Handlers/` was read
+and given one of three verdicts: **answered** where the question had an answer and the comment was
+standing in for it, **tracked** where it is a real gap that some other section already covers, or
+**recorded** where it is a real gap that nothing covered until now.
+
+The point of the pass is that a `TODO` asking a question is worse than no comment at all: it makes a
+reader think the code is unsound when it may not be, and it never gets checked because it does not
+look like work. The ones that turned out to be questions are gone, with the answer in their place.
+
+### 15.1 Answered, and removed from the code
+
+| Was | Answer |
+|---|---|
+| `MoveBuilder`: *"is this valid after an endstop move?"* on copying `_endPoints` into `_newEndPoints` | Yes. §12 made the endstop correction write the position the drives actually reached into `_endPoints` before the next move is built, so this copies the corrected position and not the planned one |
+| `MoveBuilder`: *"is this needed since the array was copied above?"* on resetting an unowned drive's endpoint | Yes, and the test says so - removing it fails `ADriveTheMoveDoesNotOwnIsLeftWhereItWas`. `CartesianToMotorSteps` runs over **every** axis from the requested coordinates before the ownership loop, so an unowned axis has already been overwritten and has to be put back rather than left alone |
+| `MoveBuilder` and `KinematicsEngine`: *"convert the magic numbers to constants (or get from kinematics)"* | Constants. `XAxis`/`YAxis`/`ZAxis` are RepRapFirmware's `X_AXIS`/`Y_AXIS`/`Z_AXIS` and are fixed positions in the vector whatever M584 called the axes, so they are not something to ask the geometry for. They moved onto `KinematicsEngine` where four engines had been declaring their own copies, and `0.05f` became `MinXyComponent` |
+
+### 15.2 Recorded here for the first time
+
+| Gap | What it costs | Blocked on |
+|---|---|---|
+| **`M114` reports zeros, and so does the object model** | `move.axes[].userPosition`, `move.axes[].stepPos`, `move.extruders[].position` and `move.motionSystems[].virtualEPos` are **never written by anything**. `MotionService.PublishLivePosition` writes `machinePosition` and nothing else, so every number M114 prints is zero and DuetWebControl's position display has nothing behind it. This is what `MovePlanner`'s *"at some point we need to update the OM user position"* is really saying | Nothing. `MovementState.CurrentUserPosition` already holds the answer for the user position, and the builder's endpoints hold it for the step counts |
+| **`RawMove.OwnedDrives` is never set** | It defaults to every drive, which is right while there is one motion system and wrong the moment there are two: a move would be planned for drives another motion system owns. The builder already honours it, so this is a matter of filling it in | M596 (§5.4) |
+| **RepRapFirmware's `scanningProbeMove` and `controlLaserOrIoBits` flags are not carried** | Neither exists in `MoveFlags`, so there is nothing to set and nothing on the native side to read it. A scanning probe move is planned as an ordinary one, and laser power cannot be varied along a move. Both need the flag adding to the wire format as well as to the builder | Scanning probes; laser support (§5.8) |
+| **M290 babystepping waits for the next move** | RepRapFirmware pushes the new babystep into the ring so it takes effect on moves already queued. Here it is applied as each move is built, so a babystep during a print is not felt until the look-ahead drains | Nothing, but it needs a native call to adjust queued moves |
+| **Volumetric extrusion is not applied** | The object model has `move.extruders[].filamentDiameter` and nothing writes it or reads it. Already noted as M200 in §5.7 and in §11.2 item 5; recorded here because the `TODO` sits on the extrusion path in `GCodeHandler` rather than on M200, and that is where the work is | M200 (§5.7) |
+| **Extruder homing is refused rather than supported** | `ApplyEndstops` does not handle extruders, so the check that would allow `G1 H1 E` is written to exclude them | Nothing, but it needs the endstop path to address extruder drives |
+| **Stall-detect homing speeds are not computed** | RepRapFirmware works out what speed a stall-detect homing move may run at from the driver's stall configuration; here the requested speed is used as given, so a stall-homing move may run too fast or too slow to trigger reliably | M915 is ported, so the configuration is there; the calculation is not |
+| **`G0` in CNC mode is treated as `G1`** | In CNC mode `G0` is a rapid at the machine's maximum rather than at the commanded feed rate | Machine mode (§5.8) |
+| **One laser segment per pixel** | A raster laser job needs the move split per pixel so power can change along it | Laser support (§5.8) |
+
+### 15.3 Already tracked elsewhere
+
+These repeat gaps §11.3 or §4 already record, and are left in the code as markers at the point of use:
+tool axis mapping and tool offsets, axis scale factors (M579), keepout zones (M599), collision
+checking for multiple motion systems (M597), object cancellation and the first move after skipping an
+object (M486), the skew transform (M556), the per-move values RepRapFirmware stores that are not
+carried here (tool, file position, G-code number, mixing extruder position, proportion done, arc
+parameters, original feed rate), and waiting for standstill on the active motion system only.
+
+### 15.4 What is left in the code
+
+Seven `TODO`s remain under `Motion/`, and every one of them now names the thing it is waiting for
+rather than asking whether the code is right. The ones in `Codes/Handlers/` that are not motion - the
+expression evaluator, the keyword handler, and the "used to fall through to RRF" markers left by §2 -
+were not part of this pass.

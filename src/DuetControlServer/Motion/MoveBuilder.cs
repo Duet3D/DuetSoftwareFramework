@@ -39,6 +39,15 @@ internal sealed class MoveBuilder(MotionParameters parameters)
 {
     private const int NumDrives = MotionLimits.MaxAxesPlusExtruders;
 
+    /// <summary>
+    /// Indices of the first three axes, which the bed tilt correction is expressed in terms of
+    /// </summary>
+    /// <remarks>
+    /// The same fixed positions the geometries use. A tilt correction is a rise in Z per unit of X or
+    /// Y movement, so it is about where the axes are in the vector rather than what they are called
+    /// </remarks>
+    private const int XAxis = 0, YAxis = 1, ZAxis = 2;
+
     /// <summary>Where the last move left the machine in axis space, mm</summary>
     private readonly float[] _startCoordinates = new float[NumDrives];
 
@@ -171,8 +180,12 @@ internal sealed class MoveBuilder(MotionParameters parameters)
 
         // --- 1. Compute the new endpoints and the movement vector ---------------------------------
 
+        // Where the machine is, which the new endpoints are built on top of. Valid after a move that
+        // was stopped short as well: the endstop correction writes the position the drives actually
+        // reached into `_endPoints` before the next move is built (§12 of
+        // docs/devel/MCODE_MIGRATION.md), so this is the corrected position rather than the planned one
         Array.Clear(_directionVector);
-        _endPoints.CopyTo(_newEndPoints, 0); // TODO is this valid after an endstop move?
+        _endPoints.CopyTo(_newEndPoints, 0);
 
         bool linearAxesMoving = false;
         bool rotationalAxesMoving = false;
@@ -199,9 +212,12 @@ internal sealed class MoveBuilder(MotionParameters parameters)
             {
                 if ((raw.OwnedDrives & (1u << axis)) == 0)
                 {
-                    // Not ours to move, so it stays where the previous move left it
+                    // Not ours to move, so it goes back to where the previous move left it. The
+                    // transform above ran over every axis from the requested coordinates, including
+                    // this one, so the endpoint copied in before it has to be put back rather than
+                    // simply left alone
                     _directionVector[axis] = 0.0f;
-                    _newEndPoints[axis] = _endPoints[axis]; // TODO is this needed since the array was copied above?
+                    _newEndPoints[axis] = _endPoints[axis];
                     continue;
                 }
 
@@ -359,14 +375,14 @@ internal sealed class MoveBuilder(MotionParameters parameters)
         if (raw.CheckEndstops) { flags |= MoveFlags.CheckEndstops; }
         if (raw.UsingStandardFeedrate) { flags |= MoveFlags.UsingStandardFeedrate; }
         if (raw.UsePressureAdvance) { flags |= MoveFlags.UsePressureAdvance; }
-        // TODO RRF has a scanningProbeMove flag
+        // TODO RRF has a scanningProbeMove flag; MoveFlags has no such bit yet - §15.2
         if (xyMoving) { flags |= MoveFlags.XyMoving; }
         if (isPrintingMove) { flags |= MoveFlags.IsPrintingMove; }
         if (extrudersMoving && !isPrintingMove) { flags |= MoveFlags.IsNonPrintingExtruderMove; }
         if (hasForwardExtrusion) { flags |= MoveFlags.HasForwardExtrusion; }
         if (raw.CheckEndstops || raw.MoveType != MoveType.Normal) { flags |= MoveFlags.IsolatedMove; }
         if (raw.MoveType == MoveType.Normal) { flags |= MoveFlags.ContinuousRotationShortcut; }
-        // TODO RRF has a `controlLaserOrIoBits` flag
+        // TODO RRF has a `controlLaserOrIoBits` flag; MoveFlags has no such bit yet - §15.2
 
         // --- 4. Normalise the direction vector and get the distance ------------------------------------
 
@@ -378,11 +394,11 @@ internal sealed class MoveBuilder(MotionParameters parameters)
             // There is some linear axis movement, so normalise the direction vector so that the total linear movement has unit length and 'totalDistance' is the linear distance moved.
             // This means that the user gets the feed rate that he asked for. It also makes the delta calculations simpler.
             // First do the bed tilt compensation for deltas.
-            float tiltX = Parameters.Geometry.GetTiltCorrection(0); // TODO convert the magic numbers to constants (or get from kinematics)
-            float tiltY = Parameters.Geometry.GetTiltCorrection(1);
-            if ((tiltX != 0.0f || tiltY != 0.0f) && numAxes > 2)
+            float tiltX = Parameters.Geometry.GetTiltCorrection(XAxis);
+            float tiltY = Parameters.Geometry.GetTiltCorrection(YAxis);
+            if ((tiltX != 0.0f || tiltY != 0.0f) && numAxes > ZAxis)
             {
-                _directionVector[2] += (_directionVector[0] * tiltX) + (_directionVector[1] * tiltY);
+                _directionVector[ZAxis] += (_directionVector[XAxis] * tiltX) + (_directionVector[YAxis] * tiltY);
             }
 
             totalDistance = MoveVector.NormaliseLinearMotion(_directionVector, Parameters.LinearAxes, raw.XAxes, raw.YAxes);

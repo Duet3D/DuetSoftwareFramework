@@ -260,7 +260,9 @@ internal sealed class MovePlanner(
             }
 
             // TODO RRF has a bed levelling move check (`Move::MoveLoop()`). It doesn't make sense in this function but the functionality will need to be ported.
-            // TODO at some point we need to update the OM user position
+            // TODO nothing writes move.axes[].userPosition, .stepPos, extruders[].position or
+            // motionSystems[].virtualEPos, so M114 and the interfaces report zeros for all of them.
+            // MovementState and the builder's endpoints already hold the answers - §15.2
 
             MoveBuildResult built = Builder.Build(move, _buffer);
             switch (built.Error)

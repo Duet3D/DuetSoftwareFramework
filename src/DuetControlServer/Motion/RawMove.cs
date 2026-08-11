@@ -147,7 +147,11 @@ internal sealed class RawMove
     public uint YAxes { get; set; } = 2;
 
     /// <summary>Logical drives this move is allowed to touch, as a bitmap</summary>
-    public uint OwnedDrives { get; set; } = uint.MaxValue; // TODO this is never set currently
+    /// <remarks>
+    /// TODO never set: every drive is owned, which is right with one motion system and wrong with two.
+    /// The builder already honours it, so this waits on M596 - §15.2
+    /// </remarks>
+    public uint OwnedDrives { get; set; } = uint.MaxValue;
 
     /// <summary>
     /// How many pieces this move has to be broken into

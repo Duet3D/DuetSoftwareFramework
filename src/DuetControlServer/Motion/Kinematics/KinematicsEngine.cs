@@ -350,17 +350,16 @@ internal abstract class KinematicsEngine
             return;
         }
 
-        // TODO replace magic numbers with constants or get from kinematics
-        float dx = move.NormalisedDirectionVector[0];
-        float dy = move.NormalisedDirectionVector[1];
+        float dx = move.NormalisedDirectionVector[XAxis];
+        float dy = move.NormalisedDirectionVector[YAxis];
         float xySum = dx + dy;
-        if (xySum > 0.05f)
+        if (xySum > MinXyComponent)
         {
             // Interpolate between the X and Y limits by how much of the move each contributes, then
             // scale by the length of the XY part: a move that is mostly Z has little XY in it and so
             // is barely restricted by what X and Y can do
-            float maxSpeedTimesXySum = (maxFeedrates[0] * dx) + (maxFeedrates[1] * dy);
-            float maxAccelerationTimesXySum = (accelerations[0] * dx) + (accelerations[1] * dy);
+            float maxSpeedTimesXySum = (maxFeedrates[XAxis] * dx) + (maxFeedrates[YAxis] * dy);
+            float maxAccelerationTimesXySum = (accelerations[XAxis] * dx) + (accelerations[YAxis] * dy);
             float xyFactor = xySum * MathF.Sqrt((dx * dx) + (dy * dy));
             limits.Limit(maxSpeedTimesXySum / xyFactor, maxAccelerationTimesXySum / xyFactor);
         }
@@ -724,9 +723,24 @@ internal abstract class KinematicsEngine
         => char.IsLower(letter) ? $"home'{letter}.g" : $"home{char.ToLowerInvariant(letter)}.g";
 
     /// <summary>
-    /// Index of the Z axis, which is fixed in the kinematics even where the axis letters are not
+    /// Indices of the first three axes, which are fixed in the kinematics even where the axis letters
+    /// are not
     /// </summary>
-    protected const int ZAxis = 2;
+    /// <remarks>
+    /// RepRapFirmware's <c>X_AXIS</c>, <c>Y_AXIS</c> and <c>Z_AXIS</c>. A geometry reasons about the
+    /// first two as the pair its motors couple and the third as the one that lifts, whatever M584
+    /// called them, which is why these are positions rather than letters
+    /// </remarks>
+    protected const int XAxis = 0, YAxis = 1, ZAxis = 2;
+
+    /// <summary>
+    /// How much XY a move must have before the XY limits are worth applying to it
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's own threshold. Below it the move is essentially along another axis, and
+    /// dividing by the XY component would scale the limits up rather than down
+    /// </remarks>
+    private const float MinXyComponent = 0.05f;
 
     /// <summary>
     /// Whether Z is homed by driving the nozzle at the bed until the probe triggers
