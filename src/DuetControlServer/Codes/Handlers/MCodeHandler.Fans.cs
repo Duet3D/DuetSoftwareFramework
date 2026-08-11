@@ -85,11 +85,11 @@ internal partial class MCodeHandler
             }
 
             Fan fan = fanManager.Create(fanNumber);
+            fan.Port = port;
             if (code.TryGetFloat('Q', out float frequency))
             {
                 fan.Frequency = frequency;
             }
-            fanManager.SetBoard(fanNumber, board);
         }
 
         return await SendGenericAsync<CanMessageM950Fan>(board, code, cancellationToken);

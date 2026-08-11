@@ -103,6 +103,22 @@ public partial class Spindle : ModelObject, IStaticModelObject
     private float? _minPwm;
 
     /// <summary>
+    /// Ports of this spindle as given to M950, or null if it has none
+    /// </summary>
+    /// <remarks>
+    /// Up to three ports separated by <c>+</c>, in the order M950 R takes them: the PWM output that
+    /// sets the speed, the on/off output that starts it, and the direction output that reverses it.
+    /// One string rather than three properties because that is what the operator wrote and what M500
+    /// has to write back out, and because a spindle with no direction port simply has fewer of them
+    /// </remarks>
+    public string? Port
+    {
+        get => _port;
+        set => SetPropertyValue(ref _port, value);
+    }
+    private string? _port;
+
+    /// <summary>
     /// Current state
     /// </summary>
     [Live]

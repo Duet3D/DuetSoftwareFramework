@@ -16,6 +16,21 @@ public partial class GpOutputPort : ModelObject, IStaticModelObject
     private int _freq;
 
     /// <summary>
+    /// Port as given to M950, or null if it has none
+    /// </summary>
+    /// <remarks>
+    /// The expansion board carrying the port is what drives it, but the port is recorded here
+    /// because the object model has to hold enough to recreate the machine: without it M42 has no
+    /// way to know which board to address after a restart
+    /// </remarks>
+    public string? Port
+    {
+        get => _port;
+        set => SetPropertyValue(ref _port, value);
+    }
+    private string? _port;
+
+    /// <summary>
     /// PWM value of this port (0..1)
     /// </summary>
     public float Pwm

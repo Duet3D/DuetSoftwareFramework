@@ -67,31 +67,25 @@ public sealed class FanManager(Model.ObjectModel model, LinkInterface linkInterf
     /// <summary>
     /// The board that carries a fan
     /// </summary>
-    /// <param name="fan">The fan</param>
+    /// <param name="fanNumber">The fan</param>
     /// <param name="board">Receives the CAN address</param>
     /// <returns>True if the fan is on a board that can drive it</returns>
     /// <remarks>
-    /// The port is not in <c>fans[]</c>, so the board is remembered when the fan is created. The
-    /// caller must hold the object model lock
+    /// Read from <c>fans[].port</c>, which is where the machine's description of itself lives, so a
+    /// fan is addressable for as long as the object model says where it is. The caller must hold the
+    /// object model lock
     /// </remarks>
     public bool TryGetBoard(int fanNumber, out byte board)
-        => _boards.TryGetValue(fanNumber, out board) && !CanAddresses.HasNoHardware(board);
+    {
+        board = CanId.MasterAddress;
+        if (Find(fanNumber)?.Port is not string port)
+        {
+            return false;
+        }
 
-    /// <summary>
-    /// Which board carries each fan
-    /// </summary>
-    /// <remarks>
-    /// <c>fans[]</c> has no port property, so there is nowhere in the object model to keep this and
-    /// it has to live beside it. That is a gap in the object model rather than a decision - §1's
-    /// first rule says a machine has to be rebuildable from the model, and a fan whose board is
-    /// forgotten cannot be driven after a restart
-    /// </remarks>
-    private readonly Dictionary<int, byte> _boards = [];
-
-    /// <summary>
-    /// Remember which board a fan was created on
-    /// </summary>
-    public void SetBoard(int fanNumber, byte board) => _boards[fanNumber] = board;
+        board = IoPorts.RemoveBoardAddress(port, out _);
+        return !CanAddresses.HasNoHardware(board);
+    }
 
     /// <summary>
     /// Ask a fan to run at a speed

@@ -40,25 +40,30 @@ public sealed class GpioManager(Model.ObjectModel model, LinkInterface linkInter
     public const int MaxGpInPorts = 32;
 
     /// <summary>
-    /// Where each output lives: which board carries it and which port it is on that board
+    /// The board that carries an output
     /// </summary>
+    /// <param name="portNumber">The output</param>
+    /// <param name="board">Receives the CAN address</param>
+    /// <returns>True if the output is on a board that can drive it</returns>
     /// <remarks>
-    /// <c>state.gpOut[]</c> holds the frequency and the duty cycle but not the port, so the address
-    /// has to live beside it. That is a gap in the object model rather than a decision - §1's first
-    /// rule wants a machine rebuildable from the model, and a port whose board is forgotten cannot be
-    /// driven after a restart
+    /// Read from <c>state.gpOut[].port</c>. The number the board knows the port by is the number this
+    /// side addresses it by, because that is the number M950 gave it. The caller must hold the object
+    /// model lock
     /// </remarks>
-    private readonly Dictionary<int, (byte Board, byte Port)> _outputs = [];
+    public bool TryGetBoard(int portNumber, out byte board)
+    {
+        board = CanId.MasterAddress;
+        GpOutputPort? port = portNumber >= 0 && portNumber < model.State.GpOut.Count
+                             ? model.State.GpOut[portNumber]
+                             : null;
+        if (port?.Port is not string name)
+        {
+            return false;
+        }
 
-    /// <summary>
-    /// Record where an output lives
-    /// </summary>
-    public void SetLocation(int portNumber, byte board, byte localPort) => _outputs[portNumber] = (board, localPort);
-
-    /// <summary>
-    /// Whether an output has been created
-    /// </summary>
-    public bool IsConfigured(int portNumber) => _outputs.ContainsKey(portNumber);
+        board = IoPorts.RemoveBoardAddress(name, out _);
+        return !CanAddresses.HasNoHardware(board);
+    }
 
     /// <summary>
     /// Make room for an output in the object model
@@ -94,30 +99,23 @@ public sealed class GpioManager(Model.ObjectModel model, LinkInterface linkInter
     public async ValueTask<string?> WriteAsync(int portNumber, float pwm, bool isServo,
                                                CancellationToken cancellationToken)
     {
-        if (!_outputs.TryGetValue(portNumber, out (byte Board, byte Port) location))
-        {
-            return $"Output {portNumber} is not configured";
-        }
-        if (CanAddresses.HasNoHardware(location.Board))
-        {
-            return CanAddresses.NoHardwareMessage($"Output {portNumber}");
-        }
-
+        byte board;
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
-            if (portNumber < model.State.GpOut.Count && model.State.GpOut[portNumber] is GpOutputPort port)
+            if (!TryGetBoard(portNumber, out board))
             {
-                port.Pwm = pwm;
+                return $"Output {portNumber} is not configured";
             }
+            model.State.GpOut[portNumber]!.Pwm = pwm;
         }
 
         CanMessageWriteGpio message = new()
         {
-            PortNumber = location.Port,
+            PortNumber = (byte)portNumber,
             Pwm = pwm,
             IsServo = isServo
         };
-        CanResponse response = await linkInterface.SendCanMessageAsync(location.Board, in message,
+        CanResponse response = await linkInterface.SendCanMessageAsync(board, in message,
                                                                        CanMessageType.StandardReply,
                                                                        cancellationToken: cancellationToken);
         Message reply = response.ToMessage();

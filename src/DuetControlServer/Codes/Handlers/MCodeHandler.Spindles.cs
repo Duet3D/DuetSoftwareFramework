@@ -55,7 +55,7 @@ internal partial class MCodeHandler
         {
             // Numbered above the ports a machine addresses directly, so that creating a spindle does
             // not consume output numbers M42 might be using
-            int portNumber = GpioManager.MaxGpOutPorts - 1 - ((spindleNumber * 3) + index);
+            int portNumber = SpindleManager.PortNumberFor(spindleNumber, index);
             if (await CreateSpindlePortAsync(portNumber, names[index], code, cancellationToken) is Message error)
             {
                 return error;
@@ -66,6 +66,7 @@ internal partial class MCodeHandler
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             Spindle spindle = spindleManager.Create(spindleNumber, portNumbers[0], portNumbers[1], portNumbers[2]);
+            spindle.Port = ports;
             spindle.Min = code.TryGetInt('L', out int min) ? min : 0;
             spindle.Max = code.TryGetInt('F', out int max) ? max : 10000;
             spindle.Frequency = code.TryGetInt('Q', out int frequency) ? frequency : 500;
@@ -91,7 +92,7 @@ internal partial class MCodeHandler
             {
                 return new Message(MessageType.Error, error);
             }
-            gpioManager.Create(portNumber);
+            gpioManager.Create(portNumber).Port = port;
         }
 
         // Built from the values rather than from a synthesised code: the port this side addresses is
@@ -113,7 +114,6 @@ internal partial class MCodeHandler
             return reply;
         }
 
-        gpioManager.SetLocation(portNumber, board, (byte)portNumber);
         return null;
     }
 

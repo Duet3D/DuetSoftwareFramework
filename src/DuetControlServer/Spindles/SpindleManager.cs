@@ -42,14 +42,39 @@ public sealed class SpindleManager(Model.ObjectModel model, GpioManager gpioMana
     private readonly record struct SpindlePorts(int Pwm, int OnOff, int Direction);
 
     /// <summary>
-    /// Which outputs each spindle uses
+    /// The outputs a spindle is driven through
+    /// </summary>
+    /// <param name="spindleNumber">The spindle</param>
+    /// <returns>Its outputs, or null if it has none</returns>
+    /// <remarks>
+    /// Derived from the spindle's number rather than stored: the outputs are created for the spindle
+    /// and numbered from the top of the range, so which ones it owns follows from which spindle it
+    /// is. <c>spindles[].port</c> is what says the spindle exists and what M500 writes back out
+    /// </remarks>
+    private static SpindlePorts? PortsFor(Spindle spindle, int spindleNumber)
+    {
+        if (spindle.Port is not string ports)
+        {
+            return null;
+        }
+
+        int count = ports.Split('+', StringSplitOptions.RemoveEmptyEntries).Length;
+        return new SpindlePorts(
+            PortNumberFor(spindleNumber, 0),
+            count > 1 ? PortNumberFor(spindleNumber, 1) : -1,
+            count > 2 ? PortNumberFor(spindleNumber, 2) : -1);
+    }
+
+    /// <summary>
+    /// The general-purpose output one of a spindle's three ports occupies
     /// </summary>
     /// <remarks>
-    /// <c>spindles[]</c> has nowhere to record its ports, so they live beside it - the same gap the
-    /// fans and the general-purpose outputs have, and the same consequence: a spindle whose ports are
-    /// forgotten cannot be driven after a restart
+    /// Numbered down from the top of the range, so that creating a spindle does not consume output
+    /// numbers M42 might be using. The same arithmetic has to be used when the ports are created and
+    /// when they are driven, which is why it is here rather than in the handler
     /// </remarks>
-    private readonly Dictionary<int, SpindlePorts> _ports = [];
+    public static int PortNumberFor(int spindleNumber, int index)
+        => Ports.GpioManager.MaxGpOutPorts - 1 - ((spindleNumber * 3) + index);
 
     /// <summary>
     /// Find a spindle by number
@@ -82,7 +107,6 @@ public sealed class SpindleManager(Model.ObjectModel model, GpioManager gpioMana
             CanReverse = directionPort >= 0
         };
         model.Spindles[spindleNumber] = spindle;
-        _ports[spindleNumber] = new SpindlePorts(pwmPort, onOffPort, directionPort);
         return spindle;
     }
 
@@ -109,10 +133,11 @@ public sealed class SpindleManager(Model.ObjectModel model, GpioManager gpioMana
             {
                 return $"Spindle {spindleNumber} is not configured";
             }
-            if (!_ports.TryGetValue(spindleNumber, out ports))
+            if (PortsFor(spindle, spindleNumber) is not SpindlePorts found)
             {
                 return $"Spindle {spindleNumber} has no ports";
             }
+            ports = found;
             if (reverse && spindle.CanReverse != true)
             {
                 return $"Spindle {spindleNumber} cannot reverse; it has no direction port";

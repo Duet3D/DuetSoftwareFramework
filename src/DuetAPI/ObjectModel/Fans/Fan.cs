@@ -78,6 +78,21 @@ public partial class Fan : ModelObject, IStaticModelObject
     private float _requestedValue;
     
     /// <summary>
+    /// Port of this fan as given to M950, or null if it has none
+    /// </summary>
+    /// <remarks>
+    /// The expansion board carrying the port is what drives the fan, but the port is recorded here
+    /// because the object model has to hold enough to recreate the machine: without it a fan cannot
+    /// be addressed after a restart, because nothing says which board it is on
+    /// </remarks>
+    public string? Port
+    {
+        get => _port;
+        set => SetPropertyValue(ref _port, value);
+    }
+    private string? _port;
+
+    /// <summary>
     /// Current RPM of this fan or -1 if unknown/unset
     /// </summary>
     [Live]

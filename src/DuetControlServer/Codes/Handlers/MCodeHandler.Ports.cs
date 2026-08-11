@@ -42,15 +42,15 @@ internal partial class MCodeHandler
         }
 
         byte board;
-        string localPort;
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
-            if (!RemoteEndstops.TrySplitPort(port, "Output port", out board, out localPort, out string? error))
+            if (!RemoteEndstops.TrySplitPort(port, "Output port", out board, out _, out string? error))
             {
                 return new Message(MessageType.Error, error);
             }
 
             GpOutputPort created = gpioManager.Create(portNumber);
+            created.Port = port;
             if (code.TryGetInt('Q', out int frequency))
             {
                 created.Freq = frequency;
@@ -59,12 +59,7 @@ internal partial class MCodeHandler
 
         // The board numbers its own ports, and the number it will report a write against is the one
         // it is given here. RepRapFirmware sends the same M950 through to the board for that reason
-        Message reply = await SendGenericAsync<CanMessageM950Gpio>(board, code, cancellationToken);
-        if (reply.Type != MessageType.Error)
-        {
-            gpioManager.SetLocation(portNumber, board, (byte)portNumber);
-        }
-        return reply;
+        return await SendGenericAsync<CanMessageM950Gpio>(board, code, cancellationToken);
     }
 
     /// <summary>
