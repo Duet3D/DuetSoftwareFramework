@@ -42,6 +42,26 @@ internal sealed class MovementState
     public float[] CurrentUserPosition { get; } = new float[MotionLimits.MaxAxes];
 
     /// <summary>
+    /// Segments of the move being submitted that have not gone out yet
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>ms.segmentsLeft</c>, and it exists here for the reason RepRapFirmware
+    /// tests it before doing anything else with a movement code: <c>if (GetMovementState(gb)
+    /// .segmentsLeft != 0) return false;</c>. A move too long for the engine's ring is submitted a
+    /// few segments at a time, giving the ring up in between - that is the point of segmenting it,
+    /// because a long move must not block the channel that issued it. But the locks go with the ring,
+    /// so in that window a second channel can build its own move measured from a position that is
+    /// part-way through the first one, and the two end up interleaved.
+    /// </para>
+    /// <para>
+    /// So this is what a second channel waits on. It is deliberately not a lock held across the wait:
+    /// the whole reason the wait exists is that holding it would be the thing that blocks
+    /// </para>
+    /// </remarks>
+    public int SegmentsLeft { get; set; }
+
+    /// <summary>
     /// Axes whose endstop stopped the move that is running, as a bitmap
     /// </summary>
     /// <remarks>
@@ -86,5 +106,6 @@ internal sealed class MovementState
     {
         Array.Clear(CurrentUserPosition);
         EndstopsTriggered = 0;
+        SegmentsLeft = 0;
     }
 }

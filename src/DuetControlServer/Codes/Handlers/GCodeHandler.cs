@@ -236,111 +236,142 @@ internal sealed partial class GCodeHandler(
         List<int> armedAxes = [];
         int submitted = 0;
 
-        // Retrying rather than failing when the ring is full is what applies back-pressure: it is the
-        // normal state when moves are commanded faster than the machine can run them, and it is what
-        // keeps the G-code stream in step with the machine
-        while (!cancellationToken.IsCancellationRequested)
+        try
         {
-            MoveSubmitResult result = MoveSubmitResult.Busy;
-
-            using (await model.AccessReadWriteAsync(cancellationToken))
+            // Retrying rather than failing when the ring is full is what applies back-pressure: it is the
+            // normal state when moves are commanded faster than the machine can run them, and it is what
+            // keeps the G-code stream in step with the machine
+            while (!cancellationToken.IsCancellationRequested)
             {
-                InputChannel? input = model.Inputs[code.Channel];
-                if (input is null)
+                MoveSubmitResult result = MoveSubmitResult.Busy;
+
+                using (await model.AccessReadWriteAsync(cancellationToken))
                 {
-                    return new Message(MessageType.Error, $"Unknown code channel {code.Channel}");
-                }
-                if (model.Move.Axes.Count == 0)
-                {
-                    return new Message(MessageType.Error, "No axes have been configured");
+                    InputChannel? input = model.Inputs[code.Channel];
+                    if (input is null)
+                    {
+                        return new Message(MessageType.Error, $"Unknown code channel {code.Channel}");
+                    }
+                    if (model.Move.Axes.Count == 0)
+                    {
+                        return new Message(MessageType.Error, "No axes have been configured");
+                    }
+
+                    // Refused rather than planned for whichever axes both sides happen to agree on. The
+                    // snapshot is only out of step with the object model when a reconfiguration did not
+                    // happen or did not succeed, and a move planned from a description of a machine that
+                    // no longer exists would address the wrong drives
+                    if (!planner.Parameters.MatchesObjectModel(model.Move))
+                    {
+                        return new Message(MessageType.Error,
+                                           "The motion configuration was not applied; no moves can be planned until it is");
+                    }
+
+                    // Held across building and queueing, because the move is a delta from the state the
+                    // planner holds: another channel building in between would measure from the wrong
+                    // place. Building also advances that state, which is what makes the rollback below
+                    // necessary
+                    using (planner.Lock())
+                    {
+                        MovementState state = planner.State;
+
+                        if (raw is null && state.SegmentsLeft != 0)
+                        {
+                            // Another channel is part-way through a segmented move. Building now would
+                            // measure this move from a position half way along that one and interleave
+                            // the two on the ring, so this waits instead - which is what RepRapFirmware's
+                            // `if (segmentsLeft != 0) return false` amounts to. It cannot be a lock held
+                            // across the wait, because giving the ring up is the point
+                            result = MoveSubmitResult.Busy;
+                        }
+                        else if (raw is null)
+                        {
+                            // Built once, however many segments it turns into and however many times the
+                            // ring is too full to take the next one. Rebuilding would apply a relative
+                            // move a second time, and cannot be done at all once a segment has gone out
+                            float[] positionBeforeMove = ArrayPool<float>.Shared.Rent(MotionLimits.MaxAxes);
+                            try
+                            {
+                                state.CurrentUserPosition.CopyTo(positionBeforeMove, 0);
+
+                                raw = BuildRawMove(code, input, isCoordinated, moveType);
+                            }
+                            catch (Exception ex)
+                            {
+                                logger.LogError(ex, "Could not build move for {Code}", code);
+                                positionBeforeMove.AsSpan(0, MotionLimits.MaxAxes).CopyTo(state.CurrentUserPosition);
+                                throw;
+                            }
+                            finally
+                            {
+                                ArrayPool<float>.Shared.Return(positionBeforeMove);
+                            }
+
+                            armedAxes = raw.ArmedAxes;
+                            segments = SegmentedMove.From(raw, raw.InitialCoords,
+                                                          planner.Parameters.SharedAxisCount(model.Move),
+                                                          planner.Parameters.FirstExtruderDrive);
+
+                            // Claimed here rather than as each segment goes out, so that the claim covers
+                            // the windows in between - which is exactly what the claim is for
+                            state.SegmentsLeft = segments.Count;
+                        }
+
+                        // As many segments as the engine will take. Stopping when it is full and picking
+                        // up from the same place is what keeps a long segmented move from blocking
+                        while (raw is not null && submitted < segments.Count)
+                        {
+                            PrepareSegment(raw, segments, submitted + 1);
+
+                            result = planner.QueueMove(raw);
+                            if (result is MoveSubmitResult.Busy or MoveSubmitResult.Rejected)
+                            {
+                                break;
+                            }
+                            submitted++;
+                            state.SegmentsLeft = segments.Count - submitted;
+                        }
+                    }
                 }
 
-                // Refused rather than planned for whichever axes both sides happen to agree on. The
-                // snapshot is only out of step with the object model when a reconfiguration did not
-                // happen or did not succeed, and a move planned from a description of a machine that
-                // no longer exists would address the wrong drives
-                if (!planner.Parameters.MatchesObjectModel(model.Move))
+                if (result == MoveSubmitResult.Rejected)
                 {
-                    return new Message(MessageType.Error,
-                                       "The motion configuration was not applied; no moves can be planned until it is");
+                    logger.LogError("Rejected {Code}", code);
+                    return new Message(MessageType.Error, "Move could not be planned; see the log for details");
                 }
 
-                // Held across building and queueing, because the move is a delta from the state the
-                // planner holds: another channel building in between would measure from the wrong
-                // place. Building also advances that state, which is what makes the rollback below
-                // necessary
+                // `raw` being null means the move has not been built at all - another channel was
+                // part-way through one - so an empty segment list is "not started", not "finished"
+                if (raw is not null && submitted >= segments.Count)
+                {
+                    if (moveType != MoveType.Normal)
+                    {
+                        // A special move is where the machine finds out where it is, so the code has to
+                        // wait for it rather than queue it and move on. Every ordinary move is committed
+                        // at its planned endpoint and the next code interpreted straight away, which is
+                        // what keeps the queue full
+                        await FinishSpecialMoveAsync(moveType, armedAxes, cancellationToken);
+                    }
+                    return new Message();
+                }
+
+                await Task.Delay(RingFullRetryDelay, cancellationToken);
+            }
+
+            return new Message();
+        }
+        finally
+        {
+            if (raw is not null)
+            {
+                // However this ended - submitted, rejected, thrown or cancelled - the move is no
+                // longer part-way through, and a channel waiting on it must not be left waiting
                 using (planner.Lock())
                 {
-                    MovementState state = planner.State;
-
-                    if (raw is null)
-                    {
-                        // Built once, however many segments it turns into and however many times the
-                        // ring is too full to take the next one. Rebuilding would apply a relative
-                        // move a second time, and cannot be done at all once a segment has gone out
-                        float[] positionBeforeMove = ArrayPool<float>.Shared.Rent(MotionLimits.MaxAxes);
-                        try
-                        {
-                            state.CurrentUserPosition.CopyTo(positionBeforeMove, 0);
-
-                            raw = BuildRawMove(code, input, isCoordinated, moveType);
-                        }
-                        catch (Exception ex)
-                        {
-                            logger.LogError(ex, "Could not build move for {Code}", code);
-                            positionBeforeMove.AsSpan(0, MotionLimits.MaxAxes).CopyTo(state.CurrentUserPosition);
-                            throw;
-                        }
-                        finally
-                        {
-                            ArrayPool<float>.Shared.Return(positionBeforeMove);
-                        }
-
-                        armedAxes = raw.ArmedAxes;
-                        segments = SegmentedMove.From(raw, raw.InitialCoords,
-                                                      planner.Parameters.SharedAxisCount(model.Move),
-                                                      planner.Parameters.FirstExtruderDrive);
-                    }
-
-                    // As many segments as the engine will take. Stopping when it is full and picking
-                    // up from the same place is what keeps a long segmented move from blocking
-                    while (submitted < segments.Count)
-                    {
-                        PrepareSegment(raw, segments, submitted + 1);
-
-                        result = planner.QueueMove(raw);
-                        if (result is MoveSubmitResult.Busy or MoveSubmitResult.Rejected)
-                        {
-                            break;
-                        }
-                        submitted++;
-                    }
+                    planner.State.SegmentsLeft = 0;
                 }
             }
-
-            if (result == MoveSubmitResult.Rejected)
-            {
-                logger.LogError("Rejected {Code}", code);
-                return new Message(MessageType.Error, "Move could not be planned; see the log for details");
-            }
-
-            if (submitted >= segments.Count)
-            {
-                if (moveType != MoveType.Normal)
-                {
-                    // A special move is where the machine finds out where it is, so the code has to
-                    // wait for it rather than queue it and move on. Every ordinary move is committed
-                    // at its planned endpoint and the next code interpreted straight away, which is
-                    // what keeps the queue full
-                    await FinishSpecialMoveAsync(moveType, armedAxes, cancellationToken);
-                }
-                return new Message();
-            }
-
-            await Task.Delay(RingFullRetryDelay, cancellationToken);
         }
-
-        return new Message();
     }
 
     /// <summary>
