@@ -4,7 +4,6 @@ using DuetAPI;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link;
 using DuetControlServer.Link.Protocol.CanMessages;
-using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Motion.Native;
 
 namespace DuetControlServer.Motion;
@@ -66,35 +65,24 @@ internal static class RemoteEndstops
     /// <returns>True if the name is a port this architecture can watch</returns>
     /// <remarks>
     /// <para>
-    /// This answers "can this port be used", not merely "does this parse", and the difference is
-    /// deliberate. A port on board 0 cannot be used - that board runs DuetCANMaster and has no ports
-    /// of its own - and a name with no board prefix means board 0, as in RepRapFirmware. Both are
-    /// refused here rather than by the caller, because a caller that has to remember a second check
-    /// is a caller that will one day forget it. Four of the six call sites had.
+    /// The name is read by <see cref="IoPorts.RemoveBoardAddress"/>, which is the one place that
+    /// knows the grammar. What this adds is the policy: a port on board 0 cannot be used, because
+    /// that board runs DuetCANMaster and has no ports of its own, and a name with no address means
+    /// board 0 as it does in RepRapFirmware.
     /// </para>
     /// <para>
-    /// The reason comes back with the refusal for the same reason. A caller composing its own message
-    /// would have to know which of the two refusals it was looking at, which is the check again in
-    /// another form; and "invalid port" for a port that is merely on the wrong board sends the
-    /// operator looking for a typo that is not there
+    /// The policy is applied here rather than by the caller because a caller that has to remember a
+    /// second check is a caller that will one day forget it - four of the six call sites had. The
+    /// reason comes back with the refusal for the same reason: a caller composing its own message
+    /// would have to know which refusal it was looking at, and "invalid port" for a port that is
+    /// merely on the wrong board sends the operator looking for a typo that is not there
     /// </para>
     /// </remarks>
     public static bool TrySplitPort(string port, string description, out byte board, out string localPort,
                                     [NotNullWhen(false)] out string? error)
     {
-        board = CanId.MasterAddress;
-        localPort = port;
+        board = IoPorts.RemoveBoardAddress(port, out localPort);
         error = null;
-
-        int dot = port.IndexOf('.');
-        if (dot <= 0 || !byte.TryParse(port[..dot], out board))
-        {
-            // No board prefix at all, or a first segment that is part of the port name rather than a
-            // number. Either way RepRapFirmware's grammar makes this the main board's own port
-            board = CanId.MasterAddress;
-            error = CanAddresses.NoHardwareMessage($"{description} '{port}'");
-            return false;
-        }
 
         if (CanAddresses.HasNoHardware(board))
         {
@@ -102,7 +90,6 @@ internal static class RemoteEndstops
             return false;
         }
 
-        localPort = port[(dot + 1)..];
         if (localPort.Length == 0)
         {
             error = $"{description} '{port}' names a board but no pin on it";

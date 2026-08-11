@@ -113,9 +113,14 @@ public static partial class CanGenericWriter
                 break;
 
             case CanParamType.ReducedString:
-                // Expansion boards address their own ports, so the board number has to come off first
-                SetString(ref message, table, letter, RemoveBoardAddress(Text(letter, parameter)));
+            {
+                // Expansion boards address their own ports, so the board number has to come off
+                // first. Which board it named is not needed here - the message is already on its way
+                // to one - but the grammar is shared with everything else that reads a port name
+                IoPorts.RemoveBoardAddress(Text(letter, parameter), out string localPort);
+                SetString(ref message, table, letter, localPort);
                 break;
+            }
 
             case CanParamType.UInt8Array or CanParamType.UInt16Array or CanParamType.UInt32Array:
                 SetUIntArray(ref message, table, letter, UIntArray(letter, parameter, descriptor));
@@ -142,29 +147,6 @@ public static partial class CanGenericWriter
 
     private static string Text(char letter, CodeParameter parameter) =>
         (string?)parameter ?? throw new CanGenericParamException($"parameter '{letter}' expects a string");
-
-    /// <summary>
-    /// Strip a leading board address from a port name, so that "1.out2" becomes "out2". The expansion
-    /// board knows only its own ports, and RepRapFirmware does the same before sending.
-    /// </summary>
-    private static string RemoveBoardAddress(string portName)
-    {
-        // A leading "<digits>." is a board address; anything else, including a '!' or '^' modifier, is not
-        int start = portName.Length > 0 && portName[0] is '!' or '^' ? 1 : 0;
-        int dot = portName.IndexOf('.', start);
-        if (dot <= start)
-        {
-            return portName;
-        }
-        for (int i = start; i < dot; i++)
-        {
-            if (!char.IsAsciiDigit(portName[i]))
-            {
-                return portName;
-            }
-        }
-        return string.Concat(portName.AsSpan(0, start), portName.AsSpan(dot + 1));
-    }
 
     private static uint[] UIntArray(char letter, CodeParameter parameter, CanParamDescriptor descriptor)
     {

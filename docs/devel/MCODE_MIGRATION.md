@@ -118,10 +118,10 @@ These rules come from the architecture already established on this branch — se
      also produces messages like "invalid port" for a port that is perfectly valid and merely on the
      wrong board, which sends the operator hunting a typo that is not there.
    - **One grammar, one parser.** Two functions that read the same syntax will diverge, and they will
-     diverge silently because each is individually correct. `TrySplitPort` and
-     `CanGenericWriter.RemoveBoardAddress` both strip a board address off a port name; only the
-     second knows about the `!` and `^` modifiers, only the first knows board 0 is refused, and
-     neither knows about `*`. See §8.
+     diverge silently, because each stays correct on the inputs it happens to see. Port names had two
+     readers: only one knew the `!` and `^` modifiers, only the other knew board 0 is refused, and
+     neither knew about `*` — so a normally-closed endstop on an expansion board, which is how most
+     machines are wired, was rejected outright. They are one function now; see §8.
 
 ### Recipe for porting one code
 
@@ -750,40 +750,50 @@ Two things follow from that and are worth keeping:
 The driver checks in `MCodeHandler.Motion.cs` stay at their call sites: a driver is given as a
 `DriverId` rather than parsed out of a string, so there is no parse for the policy to attach to.
 
-#### There is a second parser, and the two have diverged
+#### There was a second parser, and the two had diverged
 
-A sweep for other port parsing found exactly one more, and it is the corollary in §1.9 already come
+A sweep for other port parsing found exactly one more, and it was §1.9's third corollary already come
 true. `CanGenericWriter.RemoveBoardAddress` — reached from `FromCode` for any `ReducedString`
-parameter, which is how M950, M308, M955 and friends will carry a port — strips a board address off
-the same syntax, and the two disagree about what that syntax is:
+parameter, which is how M950, M308 and M955 will carry a port — stripped a board address off the same
+syntax, and the two disagreed about what that syntax was:
 
-| | `TrySplitPort` | `RemoveBoardAddress` | RepRapFirmware |
+| | `TrySplitPort` | `CanGenericWriter` | RepRapFirmware |
 |---|---|---|---|
 | `!` and `^` modifiers | ✗ not handled | ✓ | ✓ |
 | `*` modifier | ✗ | ✗ | ✓ |
 | Board 0 refused | ✓ | ✗ — not looked at | n/a, the main board has ports |
 | Address is returned | ✓ | ✗ — discarded | ✓ |
-| Unparseable name | refused | passed through unchanged | treated as the local board |
+| Unrecognised prefix | refused | passed through unchanged | belongs to the local board |
 
-RepRapFirmware has one function, `IoPort::RemoveBoardAddress` (`Hardware/IoPorts.cpp:522`), and its
-grammar is *modifiers, then digits, then a dot*; a name that does not match means the local board.
-Both of the versions here are subsets of it, and different subsets.
+Neither was wrong on the inputs it saw, which is what made it survive: an endstop port rarely reaches
+the generic writer and an M950 port never reaches `TrySplitPort`.
 
-**Two consequences, one of them live.** `TrySplitPort` not knowing the modifiers means
+**One consequence was live.** `TrySplitPort` not knowing the modifiers meant
 `M574 X1 S1 P"!1.io1.in"` — a normally-closed switch on expansion board 1, which is how most machines
-are wired — is refused today, and refused with the message for a port on the main board, which is
-doubly wrong. `M558 P8 C"^1.io2.in"` fails the same way. And `RemoveBoardAddress` discarding the
-address it strips means whoever ports M950 needs the address it just threw away, and will be tempted
-to write a third parser rather than change either of the two.
+are wired — was refused, and refused with the message for a port on the main board. `IndexOf('.')`
+found the dot after `!1`, `byte.TryParse("!1")` failed, and the failure was read as "no address".
+`M558 P8 C"^1.io2.in"` failed identically. The second consequence was latent: the generic writer
+discarded the address it stripped, so whoever ported M950 would have needed an address that had just
+been thrown away, and would have been the third parser.
 
-The fix is one parser with RepRapFirmware's grammar, returning the address and refusing board 0, used
-by both paths. Not yet done — see the ⬜ below.
+✅ **Now one function**, [IoPorts.RemoveBoardAddress](src/DuetControlServer/Link/IoPorts.cs), ported
+from `IoPort::RemoveBoardAddress` (`Hardware/IoPorts.cpp:522`) with its grammar entire: any number of
+`!`, `^` and `*` modifiers, then the digits of an address, then a dot. Anything else is not an address
+and the name belongs to the local board unchanged — which is how `e0heat` stays `e0heat` rather than
+being read as board "e0". It returns the address and leaves the modifiers on the local name, because
+they tell the board the pin is inverted or wants a pull-up; stripping them with the address would
+quietly turn a normally-closed switch into a normally-open one, and the machine would home by driving
+away from the endstop.
 
-| Item | Status |
-|---|---|
-| Refuse board 0 wherever a port is parsed | ✅ |
-| One parser with RRF's full grammar, `!`/`^`/`*` included | ⬜ |
-| M574 and M558 accept a modifier on the port name | ⬜ blocked on the above |
+`TrySplitPort` is now the policy on top of it — refuse board 0, refuse an address with no pin — and
+the generic writer calls the same function and ignores the address it does not need. The grammar is
+covered by [IoPortsTests](src/UnitTests/Link/IoPortsTests.cs) rather than beside either caller,
+because it belongs to neither.
+
+One thing worth keeping in view: the local board is `CanId.MasterAddress` here where RepRapFirmware
+answers `CanInterface::GetCanAddress()`. The two are the same number for the only process that runs
+this, and the difference would only matter if DCS were ever not the main board — which §1.4 says it
+always is.
 
 ### Expansion board manager
 

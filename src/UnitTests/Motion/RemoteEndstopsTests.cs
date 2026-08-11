@@ -51,6 +51,8 @@ public class RemoteEndstopsTests
 
     [TestCase("3.io2.in", (byte)3, "io2.in")]
     [TestCase("1.io1.in", (byte)1, "io1.in")]
+    [TestCase("!1.io1.in", (byte)1, "!io1.in", TestName = "AnInvertedEndstopPortIsAccepted")]
+    [TestCase("^2.io2.in", (byte)2, "^io2.in", TestName = "AnEndstopPortWithAPullUpIsAccepted")]
     public void APortNamesTheBoardThatCarriesIt(string port, byte expectedBoard, string expectedLocal)
     {
         Assert.That(RemoteEndstops.TrySplitPort(port, "Endstop port", out byte board, out string local, out string? error), Is.True);
@@ -64,6 +66,7 @@ public class RemoteEndstopsTests
 
     [TestCase("0.io1.in", TestName = "APortOnTheMainBoardIsRefused(explicit prefix)")]
     [TestCase("io1.in", TestName = "APortOnTheMainBoardIsRefused(no prefix)")]
+    [TestCase("!io1.in", TestName = "APortOnTheMainBoardIsRefused(modified, no prefix)")]
     public void APortOnTheMainBoardIsRefused(string port)
     {
         // Board 0 runs DuetCANMaster and has no ports of its own, and a name with no board prefix
