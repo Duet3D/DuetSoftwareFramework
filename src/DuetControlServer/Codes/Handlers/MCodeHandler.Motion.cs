@@ -1066,9 +1066,14 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>What the board replied</returns>
-    private async ValueTask<CanResponse> SendDriverConfigAsync<TMessage>(DriverId driver, Commands.Code code, CancellationToken cancellationToken)
+    /// <remarks>
+    /// A <see cref="DriverId"/> is a board and a port on it, and only the board half addresses a
+    /// message, so this is where that is said once rather than at each of the M569 sub-codes
+    /// </remarks>
+    private ValueTask<CanResponse> SendDriverConfigAsync<TMessage>(DriverId driver, Commands.Code code,
+                                                                   CancellationToken cancellationToken)
         where TMessage : struct, ICanGenericMessage<TMessage>
-        => await linkInterface.SendCodeAsync<TMessage>((byte)driver.Board, code, cancellationToken: cancellationToken);
+        => new(linkInterface.SendCodeAsync<TMessage>((byte)driver.Board, code, cancellationToken: cancellationToken));
 
     /// <summary>
     /// M915: configure stall detection
