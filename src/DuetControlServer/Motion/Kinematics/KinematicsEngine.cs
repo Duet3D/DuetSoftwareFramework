@@ -602,6 +602,26 @@ internal abstract class KinematicsEngine
     public float[] AxisMaxima { get; } = new float[MotionLimits.MaxAxes];
 
     /// <summary>
+    /// Set one axis' travel limits
+    /// </summary>
+    /// <param name="axis">The axis</param>
+    /// <param name="min">Its lower limit in mm</param>
+    /// <param name="max">Its upper limit in mm</param>
+    /// <remarks>
+    /// M208's box, which every geometry limits positions with and so holds rather than being handed
+    /// per call. An axis outside the range this geometry was built for is ignored, because a limit
+    /// for an axis the machine does not have is not a limit
+    /// </remarks>
+    public void SetAxisLimits(int axis, float min, float max)
+    {
+        if (axis >= 0 && axis < MotionLimits.MaxAxes)
+        {
+            AxisMinima[axis] = min;
+            AxisMaxima[axis] = max;
+        }
+    }
+
+    /// <summary>
     /// Where a drive is when its endstop fires
     /// </summary>
     /// <param name="drive">Logical drive the endstop belongs to</param>

@@ -161,8 +161,12 @@ internal sealed class MovePlanner(
                 Geometry = KinematicsFactory.Create(model.Move.Kinematics);
             }
 
+            // The geometry keeps its own copy of M208's box, and this is where it follows the object
+            // model. Separate from taking the snapshot, because it writes to the geometry
+            MotionParameters.ApplyAxisLimits(model.Move, Geometry);
+
             parameters = MotionParameters.FromObjectModel(model.Move, Geometry);
-            length = parameters.ToMotionConfig(model.Move).Serialize(configBuffer);
+            length = parameters.Config.Serialize(configBuffer);
         }
 
         using (_lock.EnterScope())

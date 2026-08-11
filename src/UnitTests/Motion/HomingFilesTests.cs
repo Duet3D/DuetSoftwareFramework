@@ -27,7 +27,11 @@ public class HomingFilesTests
     /// is what KinematicsFactory.Create is for
     /// </remarks>
     private static MotionParameters Snapshot(Move move)
-        => MotionParameters.FromObjectModel(move, KinematicsFactory.Create(move.Kinematics));
+    {
+        KinematicsEngine geometry = KinematicsFactory.Create(move.Kinematics);
+        MotionParameters.ApplyAxisLimits(move, geometry);
+        return MotionParameters.FromObjectModel(move, geometry);
+    }
     private static readonly char[] Xyz = ['X', 'Y', 'Z'];
 
     /// <summary>

@@ -43,6 +43,12 @@ internal sealed class MotionParameters
     /// </remarks>
     private const float DefaultAcceleration = 10000.0f;
 
+    /// <summary>Moves a ring holds when the object model does not say</summary>
+    private const int DefaultDdasPerRing = 40;
+
+    /// <summary>How far ahead the engine starts a move when the object model does not say, in seconds</summary>
+    private const float DefaultGracePeriodSec = 0.01f;
+
     /// <summary>Axes the user can refer to</summary>
     public int NumAxes { get; private init; }
 
@@ -59,6 +65,16 @@ internal sealed class MotionParameters
     /// <c>docs/devel/MCODE_MIGRATION.md</c>
     /// </remarks>
     public KinematicsEngine Geometry { get; private init; } = CoreKinematicsEngine.TryCreate(KinematicsName.Cartesian)!;
+
+    /// <summary>
+    /// The same machine as the native motion engine takes it
+    /// </summary>
+    /// <remarks>
+    /// The second thing derived from the object model's motion configuration, built in the same walk
+    /// as the rest of this class so that a setting cannot reach one and not the other. It is what
+    /// <see cref="MovePlanner.ReconfigureAsync"/> serialises and pushes down
+    /// </remarks>
+    public MotionConfig Config { get; private init; } = new();
 
     /// <summary>Microsteps per mm, by logical drive</summary>
     public float[] StepsPerMm { get; } = new float[NumDrives];
@@ -103,10 +119,10 @@ internal sealed class MotionParameters
     public float[] InstantDvs { get; } = new float[NumDrives];
 
     /// <summary>Axes that translate rather than rotate, as a bitmap</summary>
-    public uint LinearAxes { get; private init; }
+    public uint LinearAxes { get; private set; }
 
     /// <summary>Axes that rotate, as a bitmap</summary>
-    public uint RotationalAxes { get; private init; }
+    public uint RotationalAxes { get; private set; }
 
     /// <summary>Maximum acceleration for a printing move, mm per step clock squared (M204 P)</summary>
     public float MaxPrintingAcceleration { get; private init; }
@@ -191,8 +207,7 @@ internal sealed class MotionParameters
     {
         if (axis >= 0 && axis < NumAxes)
         {
-            Geometry.AxisMinima[axis] = min;
-            Geometry.AxisMaxima[axis] = max;
+            Geometry.SetAxisLimits(axis, min, max);
         }
     }
 
@@ -232,14 +247,49 @@ internal sealed class MotionParameters
     public static MotionParameters CreateDefault() => new();
 
     /// <summary>
+    /// Give the geometry the travel limits M208 configured
+    /// </summary>
+    /// <param name="move">The move subsystem of the object model</param>
+    /// <param name="geometry">The machine's geometry</param>
+    /// <remarks>
+    /// <para>
+    /// The geometry holds the M208 box because every geometry limits positions with it, so it is a
+    /// copy of <c>move.axes[].min</c> and <c>max</c> and has to follow them.
+    /// </para>
+    /// <para>
+    /// This is the one thing the object model still configures on the geometry rather than the other
+    /// way round (§14.6 step 4c of <c>docs/devel/MCODE_MIGRATION.md</c>), and it is a call of its own
+    /// rather than an assignment buried in <see cref="FromObjectModel"/> because it writes to the
+    /// planner's geometry - taking a snapshot should not change the machine
+    /// </para>
+    /// </remarks>
+    public static void ApplyAxisLimits(Move move, KinematicsEngine geometry)
+    {
+        int numAxes = Math.Min(move.Axes.Count, MotionLimits.MaxAxes);
+        for (int axis = 0; axis < numAxes; axis++)
+        {
+            geometry.SetAxisLimits(axis, move.Axes[axis].Min, move.Axes[axis].Max);
+        }
+    }
+
+    /// <summary>
     /// Take a snapshot of the object model's motion configuration
     /// </summary>
     /// <param name="move">The move subsystem of the object model</param>
     /// <param name="geometry">
     /// The machine's geometry, which the planner owns rather than deriving from the object model
     /// </param>
-    /// <returns>The snapshot</returns>
-    /// <remarks>The caller must hold at least a read lock on the object model</remarks>
+    /// <returns>The snapshot, carrying both the planner's view of the machine and the engine's</returns>
+    /// <remarks>
+    /// <para>
+    /// The caller must hold at least a read lock on the object model.
+    /// </para>
+    /// <para>
+    /// Both derived forms are built here, in one walk of the axes and one of the extruders. They used
+    /// to be built by two methods that each walked both collections, which meant a setting could be
+    /// added to one walk and not the other and nothing would say so
+    /// </para>
+    /// </remarks>
     public static MotionParameters FromObjectModel(Move move, KinematicsEngine geometry)
     {
         int numAxes = Math.Min(move.Axes.Count, MotionLimits.MaxAxes);
@@ -252,22 +302,22 @@ internal sealed class MotionParameters
             numExtruders = Math.Max(0, NumDrives - numAxes);
         }
 
-        uint linearAxes = 0, rotationalAxes = 0;
-        for (int axis = 0; axis < numAxes; axis++)
-        {
-            if (move.Axes[axis].Rotational)
-            {
-                rotationalAxes |= 1u << axis;
-            }
-            else
-            {
-                linearAxes |= 1u << axis;
-            }
-        }
-
         // M204 is per motion system, which is where the object model keeps it. The planner is not
         // per motion system yet, so the first one sets the limits for all of them
         MotionSystem? motionSystem = move.MotionSystems.Count > 0 ? move.MotionSystems[0] : null;
+        MoveQueueItem? queue = move.Queue.Count > 0 ? move.Queue[0] : null;
+
+        MotionConfig config = new()
+        {
+            NumVisibleAxes = (byte)numAxes,
+            NumTotalAxes = (byte)numAxes,
+            NumExtruders = (byte)numExtruders,
+            NumRings = (byte)Math.Max(1, Math.Min(move.MotionSystems.Count, MotionLimits.MaxRings)),
+            NumDdasPerRing = (ushort)(queue is not null && queue.Length > 0 ? queue.Length : DefaultDdasPerRing),
+            GracePeriodMs = (uint)MathF.Round((queue?.GracePeriod ?? DefaultGracePeriodSec) * 1000.0f),
+            JerkPolicy = (uint)move.JerkPolicy,
+            BacklashCorrectionDistanceFactor = (uint)Math.Max(1, move.BacklashFactor)
+        };
 
         MotionParameters parameters = new()
         {
@@ -276,44 +326,82 @@ internal sealed class MotionParameters
             ConfiguredAxes = move.Axes.Count,
             ConfiguredExtruders = move.Extruders.Count,
             Geometry = geometry,
-            LinearAxes = linearAxes,
-            RotationalAxes = rotationalAxes,
+            Config = config,
             MaxPrintingAcceleration = MotionUnits.AccelerationFromMmPerSecSquared(motionSystem?.PrintingAcceleration ?? DefaultAcceleration),
             MaxTravelAcceleration = MotionUnits.AccelerationFromMmPerSecSquared(motionSystem?.TravelAcceleration ?? DefaultAcceleration),
             MinFeedrate = MotionUnits.SpeedFromMmPerSec(move.MinimumMovementSpeed)
         };
 
+        uint linearAxes = 0, rotationalAxes = 0, continuousRotationAxes = 0;
         for (int axis = 0; axis < numAxes; axis++)
         {
             Axis a = move.Axes[axis];
+
+            if (a.Rotational)
+            {
+                rotationalAxes |= 1u << axis;
+                if (a.ContinuousRotation)
+                {
+                    continuousRotationAxes |= 1u << axis;
+                }
+            }
+            else
+            {
+                linearAxes |= 1u << axis;
+            }
+
             parameters.StepsPerMm[axis] = a.StepsPerMm;
             parameters.MaxFeedrates[axis] = MotionUnits.SpeedFromMmPerMin(a.Speed);
             parameters.Accelerations[axis] = MotionUnits.AccelerationFromMmPerSecSquared(a.Acceleration);
             parameters.ReducedAccelerations[axis] =
                 MotionUnits.AccelerationFromMmPerSecSquared(a.ReducedAcceleration > 0.0f ? a.ReducedAcceleration : a.Acceleration);
+
+            // Jerk is an instantaneous speed change, so it converts like a speed. The planner's copy
+            // is the ordinary one only, because what it is for is the acceleration cap that pressure
+            // advance imposes; the engine's lookahead is what needs the printing jerk as well
             parameters.InstantDvs[axis] = MotionUnits.SpeedFromMmPerMin(a.Jerk);
+            config.InstantDvs[axis] = MotionUnits.SpeedFromMmPerMin(a.Jerk);
+            config.PrintingInstantDvs[axis] = MotionUnits.SpeedFromMmPerMin(a.PrintingJerk);
 
-            // The geometry limits positions as well as speeds, and M208's box is the part of that
-            // every geometry shares, so it holds the limits rather than being handed them per call
-            parameters.Geometry.AxisMinima[axis] = a.Min;
-            parameters.Geometry.AxisMaxima[axis] = a.Max;
+            config.DriveStepsPerMm[axis] = a.StepsPerMm;
+            config.BacklashSteps[axis] = (int)MathF.Round(a.Backlash * a.StepsPerMm);
+            config.ControllingDrives[axis] = geometry.GetControllingDrives(axis);
 
-            foreach (DuetAPI.Utility.DriverId driver in a.Drivers)
+            DriverId[] drivers = new DriverId[a.Drivers.Count];
+            for (int i = 0; i < a.Drivers.Count; i++)
             {
-                parameters._driveForDriver[driver] = axis;
+                drivers[i] = ToNativeDriver(a.Drivers[i]);
+                parameters._driveForDriver[a.Drivers[i]] = axis;
             }
+            config.AxisDrivers[axis] = AxisDriversConfig.WithDrivers(drivers);
         }
+
+        parameters.LinearAxes = linearAxes;
+        parameters.RotationalAxes = rotationalAxes;
+
+        // Some geometries have an axis that goes round whether or not M208 said so - a polar bed and
+        // a SCARA joint with more than a full circle of travel both do - so the geometry gets to add
+        // to what the configuration declared, masked to the axes that exist
+        config.ContinuousRotationAxes = (continuousRotationAxes | geometry.ContinuousRotationAxes)
+                                        & (numAxes >= 32 ? uint.MaxValue : (1u << numAxes) - 1);
 
         for (int extruder = 0; extruder < numExtruders; extruder++)
         {
             Extruder e = move.Extruders[extruder];
             int drive = ExtruderToDrive(extruder);
+
             parameters.StepsPerMm[drive] = e.StepsPerMm;
             parameters.MaxFeedrates[drive] = MotionUnits.SpeedFromMmPerMin(e.Speed);
             parameters.Accelerations[drive] = MotionUnits.AccelerationFromMmPerSecSquared(e.Acceleration);
             parameters.ReducedAccelerations[drive] = MotionUnits.AccelerationFromMmPerSecSquared(e.Acceleration);
             parameters.InstantDvs[drive] = MotionUnits.SpeedFromMmPerMin(e.Jerk);
             parameters.PressureAdvanceClocks[drive] = MotionUnits.ClocksFromSeconds(e.PressAdv.K0);
+
+            config.DriveStepsPerMm[drive] = e.StepsPerMm;
+            config.InstantDvs[drive] = MotionUnits.SpeedFromMmPerMin(e.Jerk);
+            config.PrintingInstantDvs[drive] = MotionUnits.SpeedFromMmPerMin(e.PrintingJerk);
+            config.PressureAdvanceClocks[drive] = MotionUnits.ClocksFromSeconds(e.PressAdv.K0);
+            config.ExtruderDrivers[extruder] = e.Driver is not null ? ToNativeDriver(e.Driver) : DriverId.None;
 
             if (e.Driver is not null)
             {
@@ -322,74 +410,6 @@ internal sealed class MotionParameters
         }
 
         return parameters;
-    }
-
-    /// <summary>
-    /// Build the description to push down to the native motion engine
-    /// </summary>
-    /// <param name="move">The move subsystem of the object model</param>
-    /// <returns>The native configuration</returns>
-    /// <remarks>The caller must hold at least a read lock on the object model</remarks>
-    public MotionConfig ToMotionConfig(Move move)
-    {
-        MoveQueueItem? queue = move.Queue.Count > 0 ? move.Queue[0] : null;
-
-        MotionConfig config = new()
-        {
-            NumVisibleAxes = (byte)NumAxes,
-            NumTotalAxes = (byte)NumAxes,
-            NumExtruders = (byte)NumExtruders,
-            NumRings = (byte)Math.Max(1, Math.Min(move.MotionSystems.Count, MotionLimits.MaxRings)),
-            NumDdasPerRing = (ushort)(queue is not null && queue.Length > 0 ? queue.Length : 40),
-            GracePeriodMs = (uint)MathF.Round((queue?.GracePeriod ?? 0.01f) * 1000.0f),
-            JerkPolicy = (uint)move.JerkPolicy,
-            BacklashCorrectionDistanceFactor = (uint)Math.Max(1, move.BacklashFactor)
-        };
-
-        uint continuousRotationAxes = 0;
-        for (int axis = 0; axis < NumAxes; axis++)
-        {
-            Axis a = move.Axes[axis];
-            if (a.Rotational && a.ContinuousRotation)
-            {
-                continuousRotationAxes |= 1u << axis;
-            }
-
-            config.DriveStepsPerMm[axis] = a.StepsPerMm;
-
-            // Jerk is an instantaneous speed change, so it converts like a speed
-            config.InstantDvs[axis] = MotionUnits.SpeedFromMmPerMin(a.Jerk);
-            config.PrintingInstantDvs[axis] = MotionUnits.SpeedFromMmPerMin(a.PrintingJerk);
-
-            config.BacklashSteps[axis] = (int)MathF.Round(a.Backlash * a.StepsPerMm);
-            config.ControllingDrives[axis] = Geometry.GetControllingDrives(axis);
-
-            DriverId[] drivers = new DriverId[a.Drivers.Count];
-            for (int i = 0; i < drivers.Length; i++)
-            {
-                drivers[i] = ToNativeDriver(a.Drivers[i]);
-            }
-            config.AxisDrivers[axis] = AxisDriversConfig.WithDrivers(drivers);
-        }
-        // Some geometries have an axis that goes round whether or not M208 said so - a polar bed and
-        // a SCARA joint with more than a full circle of travel both do - so the geometry gets to add
-        // to what the configuration declared, masked to the axes that exist
-        config.ContinuousRotationAxes = (continuousRotationAxes | Geometry.ContinuousRotationAxes)
-                                        & (NumAxes >= 32 ? uint.MaxValue : (1u << NumAxes) - 1);
-
-        for (int extruder = 0; extruder < NumExtruders; extruder++)
-        {
-            Extruder e = move.Extruders[extruder];
-            int drive = ExtruderToDrive(extruder);
-
-            config.DriveStepsPerMm[drive] = e.StepsPerMm;
-            config.InstantDvs[drive] = MotionUnits.SpeedFromMmPerMin(e.Jerk);
-            config.PrintingInstantDvs[drive] = MotionUnits.SpeedFromMmPerMin(e.PrintingJerk);
-            config.PressureAdvanceClocks[drive] = MotionUnits.ClocksFromSeconds(e.PressAdv.K0);
-            config.ExtruderDrivers[extruder] = e.Driver is not null ? ToNativeDriver(e.Driver) : DriverId.None;
-        }
-
-        return config;
     }
 
     /// <summary>

@@ -2446,17 +2446,20 @@ places between them, with the M-code handlers writing the same arithmetic again.
 turntable limits go through it too - RepRapFirmware converts degrees with the same helpers it uses for
 millimetres, because the arithmetic is identical.
 
-**Step 4b — the two walks should become one.** They still both iterate the axes and extruders, so a
-setting added to one and not the other is still possible. Merging them into a single pass producing
-both outputs is the remaining piece, and it is small now that the arithmetic is shared.
+**Step 4b ✅ the two walks became one.** `ToMotionConfig` is gone; `MotionParameters.Config` is built in
+the same walk of the axes and the same walk of the extruders as the rest of the snapshot, so both
+derived forms of a setting are written next to each other and one cannot be added without the other
+being in view. `MovePlanner.ReconfigureAsync` serialises `parameters.Config` instead of calling a
+second method with the object model again.
 
-**Step 4c — `FromObjectModel` writes into the geometry it is handed.** `Geometry.AxisMinima`/`AxisMaxima`
-are assigned from `move.axes[].min`/`max` on every reconfiguration, so taking a snapshot mutates the
-planner's authoritative geometry as a side effect. It is correct today - the M208 box belongs on the
-geometry, because that is where positions are limited - but it is a write into the geometry from
-outside it, and it is the one place the object model still configures the engine rather than the other
-way round. It wants an explicit `SetAxisLimits`-style call on the way in rather than a hidden
-assignment inside a method named for reading.
+**Step 4c ✅ the write into the geometry is a call of its own.** `FromObjectModel` assigned
+`Geometry.AxisMinima`/`AxisMaxima` from `move.axes[].min`/`max`, so taking a snapshot changed the
+machine. The M208 box does belong on the geometry - that is where positions are limited - so what was
+wrong was that it happened inside a method named for reading. `MotionParameters.ApplyAxisLimits(move,
+geometry)` is now called by `ReconfigureAsync` before the snapshot is taken, and
+`KinematicsEngine.SetAxisLimits` is the one way the box is written, which `G1 H3` already went through.
+This remains the one place the object model configures the geometry rather than the other way round,
+and now it says so.
 
 **Step 5 — merge `MoveBuilder` into `MovePlanner`** per §14.5.
 

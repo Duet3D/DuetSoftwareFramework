@@ -33,7 +33,11 @@ public class MoveBuilderTests
     /// is what KinematicsFactory.Create is for
     /// </remarks>
     private static MotionParameters Snapshot(Move move)
-        => MotionParameters.FromObjectModel(move, KinematicsFactory.Create(move.Kinematics));
+    {
+        KinematicsEngine geometry = KinematicsFactory.Create(move.Kinematics);
+        MotionParameters.ApplyAxisLimits(move, geometry);
+        return MotionParameters.FromObjectModel(move, geometry);
+    }
     private const int NumDrives = MotionLimits.MaxAxesPlusExtruders;
     private const float StepClockRate = MotionLimits.StepClockRate;
 
