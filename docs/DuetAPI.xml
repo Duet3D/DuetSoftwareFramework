@@ -15371,6 +15371,16 @@
             The first element is the dive height for the first tap; the second element is used for subsequent taps when multi-tapping
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.Probe.Force">
+            <summary>
+            Force measured by the probe (in g), or null if it is not a force-sensing probe
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.Probe.GramsPerCount">
+            <summary>
+            Scale of a force-sensing probe (in g per count), or null if it has not been calibrated
+            </summary>
+        </member>
         <member name="P:DuetAPI.ObjectModel.Probe.IsCalibrated">
             <summary>
             Indicates if the scanning probe is calibrated
@@ -15652,6 +15662,11 @@
         <member name="F:DuetAPI.ObjectModel.ProbeType.ScanningAnalog">
             <summary>
             Analog scanning probe
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.ProbeType.LoadCell">
+            <summary>
+            Load cell probe measuring the contact force
             </summary>
         </member>
         <member name="T:DuetAPI.ObjectModel.Sensors">
