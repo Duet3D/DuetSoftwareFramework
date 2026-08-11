@@ -696,6 +696,32 @@ consequence: every ⬜ row in §5 is now a *visible* error at runtime rather tha
 is the point, but it also means a config.g written for RRF will report a lot of errors until the
 remaining phases land.
 
+### A port name has to name an expansion board
+
+Rule §1.4 says only CAN-attached hardware exists here, and port names are where that rule meets what
+an operator types. `CanAddresses.HasNoHardware` is the test - board 0 runs DuetCANMaster and has no
+ports of its own - but *where* it is applied turned out to matter more than the test itself.
+
+It lives inside `RemoteEndstops.TrySplitPort`, so a port that cannot be used is refused by the same
+call that parses it. The alternative, leaving the parse and the policy separate, was tried and does
+not survive contact: of the six call sites, **four had no board check at all**, including
+`CreateEndstopMonitorAsync`, which is what actually asks a board to watch the pin. A rule enforced by
+the caller is a rule enforced in some places and not others.
+
+Two things follow from that and are worth keeping:
+
+- **Both spellings of board 0 are caught in the same place.** `0.io1.in` names it explicitly and
+  `io1.in` names it by omission, exactly as in RepRapFirmware. Catching only the second - which is
+  what happens if the parser merely refuses names it cannot parse - leaves the first to whichever
+  caller remembered, which is the original problem in a narrower form.
+- **The reason travels with the refusal.** A caller composing its own message has to know which
+  refusal it is looking at, and that is the forgotten check again wearing a different hat. It also
+  produced "invalid endstop port" for a port that is perfectly valid and merely on the wrong board,
+  which sends the operator hunting a typo that is not there.
+
+The driver checks in `MCodeHandler.Motion.cs` stay at their call sites: a driver is given as a
+`DriverId` rather than parsed out of a string, so there is no parse for the policy to attach to.
+
 ### Expansion board manager
 
 `Link/Expansion/ExpansionBoardManager.cs` receives what the boards broadcast and writes it to the

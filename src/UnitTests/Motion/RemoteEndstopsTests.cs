@@ -49,14 +49,47 @@ public class RemoteEndstopsTests
         Assert.That(RemoteEndstops.HandleFor(0).All, Is.Not.EqualTo(RemoteEndstops.HandleFor(1).All));
     }
 
-    [TestCase("0.io1.in", (byte)0, "io1.in")]
     [TestCase("3.io2.in", (byte)3, "io2.in")]
-    [TestCase("io1.in", (byte)0, "io1.in")]
+    [TestCase("1.io1.in", (byte)1, "io1.in")]
     public void APortNamesTheBoardThatCarriesIt(string port, byte expectedBoard, string expectedLocal)
     {
-        Assert.That(RemoteEndstops.TrySplitPort(port, out byte board, out string local), Is.True);
-        Assert.That(board, Is.EqualTo(expectedBoard));
-        Assert.That(local, Is.EqualTo(expectedLocal), "the board keeps the name it knows the port by");
+        Assert.That(RemoteEndstops.TrySplitPort(port, "Endstop port", out byte board, out string local, out string? error), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(board, Is.EqualTo(expectedBoard));
+            Assert.That(local, Is.EqualTo(expectedLocal), "the board keeps the name it knows the port by");
+            Assert.That(error, Is.Null);
+        });
+    }
+
+    [TestCase("0.io1.in", TestName = "APortOnTheMainBoardIsRefused(explicit prefix)")]
+    [TestCase("io1.in", TestName = "APortOnTheMainBoardIsRefused(no prefix)")]
+    public void APortOnTheMainBoardIsRefused(string port)
+    {
+        // Board 0 runs DuetCANMaster and has no ports of its own, and a name with no board prefix
+        // means board 0 as it does in RepRapFirmware. Both spellings have to be caught here rather
+        // than by the caller: four of the six call sites did not check the board, so a rule enforced
+        // by the caller is a rule that is enforced in some places and not others
+        Assert.That(RemoteEndstops.TrySplitPort(port, "Endstop port", out _, out _, out string? error), Is.False);
+        Assert.That(error, Does.Contain("expansion board"),
+                    "the reason has to say what to do instead, not just that the port is invalid");
+    }
+
+    [Test]
+    public void BothSpellingsOfTheMainBoardGiveTheSameReason()
+    {
+        // The two used to diverge: one was refused as a bad board, the other as a malformed name, so
+        // the same mistake produced two different messages and only one of them was any help
+        RemoteEndstops.TrySplitPort("0.io1.in", "Endstop port", out _, out _, out string? explicitly);
+        RemoteEndstops.TrySplitPort("io1.in", "Endstop port", out _, out _, out string? implicitly);
+        Assert.That(implicitly, Is.EqualTo(explicitly?.Replace("'0.io1.in'", "'io1.in'")));
+    }
+
+    [Test]
+    public void APortWithNoPinIsRefused()
+    {
+        Assert.That(RemoteEndstops.TrySplitPort("3.", "Endstop port", out _, out _, out string? error), Is.False);
+        Assert.That(error, Does.Contain("no pin"));
     }
 
     [Test]

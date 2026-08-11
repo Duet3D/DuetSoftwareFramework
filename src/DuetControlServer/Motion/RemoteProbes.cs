@@ -63,7 +63,7 @@ internal static class RemoteProbes
     {
         stopInput.Clear();
         if (probe.Type is ProbeType.None or ProbeType.ZMotorStall || string.IsNullOrWhiteSpace(probe.Port) ||
-            !RemoteEndstops.TrySplitPort(probe.Port, out byte board, out _))
+            !RemoteEndstops.TrySplitPort(probe.Port, "Z probe port", out byte board, out _, out _))
         {
             return false;
         }

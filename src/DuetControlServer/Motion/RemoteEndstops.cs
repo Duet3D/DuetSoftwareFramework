@@ -1,7 +1,10 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using DuetAPI;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Link;
 using DuetControlServer.Link.Protocol.CanMessages;
+using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Motion.Native;
 
 namespace DuetControlServer.Motion;
@@ -55,30 +58,57 @@ internal static class RemoteEndstops
     /// <summary>
     /// Split a port name into the board that carries it and the port on that board
     /// </summary>
-    /// <param name="port">Port name, such as "0.io1.in" or "io1.in"</param>
+    /// <param name="port">Port name, such as "1.io1.in"</param>
+    /// <param name="description">What is being addressed, for the message - "Endstop port", say</param>
     /// <param name="board">Receives the CAN address</param>
     /// <param name="localPort">Receives the port name as that board knows it</param>
-    /// <returns>True if the name could be split</returns>
-    /// <remarks>A name with no board prefix belongs to board 0, as in RepRapFirmware</remarks>
-    public static bool TrySplitPort(string port, out byte board, out string localPort)
+    /// <param name="error">Receives why the port cannot be used, or null if it can</param>
+    /// <returns>True if the name is a port this architecture can watch</returns>
+    /// <remarks>
+    /// <para>
+    /// This answers "can this port be used", not merely "does this parse", and the difference is
+    /// deliberate. A port on board 0 cannot be used - that board runs DuetCANMaster and has no ports
+    /// of its own - and a name with no board prefix means board 0, as in RepRapFirmware. Both are
+    /// refused here rather than by the caller, because a caller that has to remember a second check
+    /// is a caller that will one day forget it. Four of the six call sites had.
+    /// </para>
+    /// <para>
+    /// The reason comes back with the refusal for the same reason. A caller composing its own message
+    /// would have to know which of the two refusals it was looking at, which is the check again in
+    /// another form; and "invalid port" for a port that is merely on the wrong board sends the
+    /// operator looking for a typo that is not there
+    /// </para>
+    /// </remarks>
+    public static bool TrySplitPort(string port, string description, out byte board, out string localPort,
+                                    [NotNullWhen(false)] out string? error)
     {
-        board = 0;
+        board = CanId.MasterAddress;
         localPort = port;
+        error = null;
 
         int dot = port.IndexOf('.');
-        if (dot <= 0)
+        if (dot <= 0 || !byte.TryParse(port[..dot], out board))
         {
-            return false;                        // no prefix, endstops must be on an expansion board so we require the
+            // No board prefix at all, or a first segment that is part of the port name rather than a
+            // number. Either way RepRapFirmware's grammar makes this the main board's own port
+            board = CanId.MasterAddress;
+            error = CanAddresses.NoHardwareMessage($"{description} '{port}'");
+            return false;
         }
 
-        if (!byte.TryParse(port[..dot], out board))
+        if (CanAddresses.HasNoHardware(board))
         {
-            board = 0;
-            return false;                        // the first segment is part of the port name
+            error = CanAddresses.NoHardwareMessage($"{description} '{port}'");
+            return false;
         }
 
         localPort = port[(dot + 1)..];
-        return localPort.Length > 0;
+        if (localPort.Length == 0)
+        {
+            error = $"{description} '{port}' names a board but no pin on it";
+            return false;
+        }
+        return true;
     }
 
     /// <summary>
@@ -137,7 +167,7 @@ internal static class RemoteEndstops
         Span<byte> boards = stackalloc byte[ports.Length];
         for (int i = 0; i < ports.Length; i++)
         {
-            if (!TrySplitPort(ports[i], out boards[i], out _))
+            if (!TrySplitPort(ports[i], "Endstop port", out boards[i], out _, out _))
             {
                 return false;
             }

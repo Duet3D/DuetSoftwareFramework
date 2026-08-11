@@ -93,13 +93,9 @@ internal partial class MCodeHandler
         // probe behind
         if (seenPort && !string.IsNullOrWhiteSpace(port))
         {
-            if (!RemoteEndstops.TrySplitPort(port, out byte portBoard, out _))
+            if (!RemoteEndstops.TrySplitPort(port, "Z probe port", out _, out _, out string? portError))
             {
-                return new Message(MessageType.Error, $"Invalid Z probe port '{port}'");
-            }
-            if (CanAddresses.HasNoHardware(portBoard))
-            {
-                return new Message(MessageType.Error, CanAddresses.NoHardwareMessage($"Z probe port '{port}'"));
+                return new Message(MessageType.Error, portError);
             }
         }
 
@@ -291,9 +287,10 @@ internal partial class MCodeHandler
     /// <returns>What the board said about it, empty if it accepted without comment</returns>
     private async ValueTask<Message> CreateProbeMonitorAsync(int probeNumber, string port, CancellationToken cancellationToken)
     {
-        if (!RemoteEndstops.TrySplitPort(port, out byte board, out string localPort))
+        if (!RemoteEndstops.TrySplitPort(port, "Z probe port", out byte board, out string localPort,
+                                         out string? error))
         {
-            return new Message(MessageType.Error, $"Invalid Z probe port '{port}'");
+            return new Message(MessageType.Error, error);
         }
 
         int threshold;
