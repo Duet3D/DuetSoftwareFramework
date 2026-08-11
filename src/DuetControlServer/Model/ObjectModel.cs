@@ -111,21 +111,31 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     internal string Password { get; set; } = DuetAPI.Connection.Defaults.Password;
 
     /// <summary>
-    /// Whether the current machine status is overridden because an update is in progress
+    /// Whether a firmware update is in progress
     /// </summary>
-    internal bool IsUpdating
-    {
-        get => _isUpdating;
-        set
-        {
-            if (value)
-            {
-                State.Status = MachineStatus.Updating;
-            }
-            _isUpdating = value;
-        }
-    }
-    private bool _isUpdating;
+    /// <remarks>
+    /// One of the conditions <c>MachineStatusService</c> derives <c>state.status</c> from. Setting it
+    /// no longer writes the status itself: RepRapFirmware computes its status from conditions like
+    /// this one rather than storing it, and a condition that also wrote the answer would be one of
+    /// several writers racing to describe the same machine
+    /// </remarks>
+    internal bool IsUpdating { get; set; }
+
+    /// <summary>
+    /// Whether an emergency stop has halted the machine (M112)
+    /// </summary>
+    /// <remarks>Cleared by a reset, which is the only thing that ends a halt</remarks>
+    internal bool IsHalted { get; set; }
+
+    /// <summary>
+    /// Whether the link to the machine is down
+    /// </summary>
+    internal bool IsDisconnected { get; set; }
+
+    /// <summary>
+    /// Whether the machine is still starting up, which it is until config.g has run
+    /// </summary>
+    internal bool IsStarting { get; set; } = true;
 
     /// <summary>
     /// Dictionary of the properties vs. sender type + JSON content that failed to be deserialized
@@ -759,10 +769,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
             Boards.Clear();
             Global.Clear();
             Seqs.Clear();
-            if (State.Status != MachineStatus.Halted && State.Status != MachineStatus.Updating)
-            {
-                State.Status = MachineStatus.Disconnected;
-            }
+            IsDisconnected = true;
             State.DisplayMessage = string.Empty;
             State.MessageBox = null;
         }

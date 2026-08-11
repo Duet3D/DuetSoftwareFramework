@@ -1066,7 +1066,7 @@ internal partial class MCodeHandler(
             // RRF halted
             using (await model.AccessReadWriteAsync(cancellationToken))
             {
-                model.State.Status = MachineStatus.Halted;
+                model.IsHalted = true;
             }
             return new Message();
         }

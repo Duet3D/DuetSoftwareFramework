@@ -301,6 +301,9 @@ internal sealed class LinkService(
     {
         try
         {
+            // The link is up, so whatever the status was while it was not, it is not that now
+            model.IsDisconnected = false;
+
             if (!await macroRunner.TryRunAsync(CodeChannel.Trigger, FilePathResolver.ConfigFile,
                                                cancellationToken: lifetime.ApplicationStopping) &&
                 !await macroRunner.TryRunAsync(CodeChannel.Trigger, FilePathResolver.ConfigFileFallback,
@@ -332,6 +335,13 @@ internal sealed class LinkService(
         catch (Exception e)
         {
             logger.LogError(e, "Failed to run the startup files");
+        }
+        finally
+        {
+            // Starting ends when the startup files have been run, whether or not they were found:
+            // the machine is as configured as it is going to get, so reporting it as still starting
+            // would leave a machine with no config.g looking permanently mid-boot
+            model.IsStarting = false;
         }
     }
 
@@ -864,7 +874,7 @@ internal sealed class LinkService(
     {
         using (model.AccessReadWrite(cancellationToken))
         {
-            model.State.Status = MachineStatus.Updating;
+            model.IsUpdating = true;
         }
 
         // Everything in flight is about to become invalid: the controller is going to reboot into IAP

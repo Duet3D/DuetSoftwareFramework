@@ -18,6 +18,7 @@ public static partial class ServiceCollectionExtensions
         return services
             .AddSingleton<Filter>()
             .AddSingleton<ObjectModel>()
+            .AddHostedService<MachineStatusService>()
             .AddSingleton<IDiagnostics, ObjectModel>(services => services.GetRequiredService<ObjectModel>())
             .AddSingleton<Observer>()
             .AddSingleton<PeriodicUpdateService>()

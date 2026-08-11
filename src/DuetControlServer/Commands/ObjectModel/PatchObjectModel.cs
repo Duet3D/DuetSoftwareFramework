@@ -31,7 +31,7 @@ public sealed class PatchObjectModel(Model.ObjectModel model, IOptions<Settings>
             {
                 if (model.IsUpdating && model.State.Status != MachineStatus.Updating)
                 {
-                    model.State.Status = MachineStatus.Updating;
+                    model.IsUpdating = true;
                 }
             }
             else

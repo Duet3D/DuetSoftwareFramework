@@ -247,7 +247,7 @@ public class UpdateService : BackgroundService
                     UpdateModel();
                     if (_model.IsUpdating && _model.State.Status != MachineStatus.Updating)
                     {
-                        _model.State.Status = MachineStatus.Updating;
+                        _model.IsUpdating = true;
                     }
                     UpdateLayers();
                 }
@@ -287,7 +287,7 @@ public class UpdateService : BackgroundService
 
                                 if (_model.IsUpdating && _model.State.Status != MachineStatus.Updating)
                                 {
-                                    _model.State.Status = MachineStatus.Updating;
+                                    _model.IsUpdating = true;
                                 }
                             }
                         }

@@ -211,6 +211,30 @@ internal sealed class MovePlanner(
     /// submitted, not that they have been executed
     /// </para>
     /// </remarks>
+    /// <summary>
+    /// Whether the engine still has moves to run
+    /// </summary>
+    /// <remarks>
+    /// The same comparison <see cref="WaitForStandstillAsync"/> waits on, as a question rather than a
+    /// wait: the rings report what has been scheduled and what has completed, and a difference is
+    /// motion still to happen
+    /// </remarks>
+    public bool IsMoving
+    {
+        get
+        {
+            for (int ring = 0; ring < MotionLimits.MaxRings; ring++)
+            {
+                // An unconfigured ring reads zero for both, so this is safe over all of them
+                if (linkInterface.Native.GetScheduledMoves(ring) != linkInterface.Native.GetCompletedMoves(ring))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
     public async ValueTask<bool> WaitForStandstillAsync(CancellationToken cancellationToken = default)
     {
         while (!cancellationToken.IsCancellationRequested)
