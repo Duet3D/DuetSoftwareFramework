@@ -5,6 +5,7 @@ using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
 
 using Code = DuetAPI.Commands.Code;
+using static DuetControlServer.Motion.AxisIndices;
 
 namespace DuetControlServer.Motion.Kinematics;
 

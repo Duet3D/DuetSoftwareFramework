@@ -6,6 +6,7 @@ using DuetControlServer.Link.Native;
 using DuetControlServer.Motion.Native;
 
 using Code = DuetAPI.Commands.Code;
+using static DuetControlServer.Motion.AxisIndices;
 
 namespace DuetControlServer.Motion.Kinematics;
 
@@ -721,17 +722,6 @@ internal abstract class KinematicsEngine
     /// </remarks>
     protected static string HomingFileFor(char letter)
         => char.IsLower(letter) ? $"home'{letter}.g" : $"home{char.ToLowerInvariant(letter)}.g";
-
-    /// <summary>
-    /// Indices of the first three axes, which are fixed in the kinematics even where the axis letters
-    /// are not
-    /// </summary>
-    /// <remarks>
-    /// RepRapFirmware's <c>X_AXIS</c>, <c>Y_AXIS</c> and <c>Z_AXIS</c>. A geometry reasons about the
-    /// first two as the pair its motors couple and the third as the one that lifts, whatever M584
-    /// called them, which is why these are positions rather than letters
-    /// </remarks>
-    protected const int XAxis = 0, YAxis = 1, ZAxis = 2;
 
     /// <summary>
     /// How much XY a move must have before the XY limits are worth applying to it

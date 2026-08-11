@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
+using static DuetControlServer.Motion.AxisIndices;
 
 namespace DuetControlServer.Motion.Kinematics;
 

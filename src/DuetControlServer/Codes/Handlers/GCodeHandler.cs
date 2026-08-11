@@ -13,6 +13,7 @@ using DuetControlServer.Motion.Native;
 using DuetControlServer.Motion.Kinematics;
 using Microsoft.Extensions.Logging;
 using DuetAPI;
+using static DuetControlServer.Motion.AxisIndices;
 
 namespace DuetControlServer.Codes.Handlers;
 
@@ -1795,17 +1796,17 @@ internal sealed partial class GCodeHandler(
             }
         }
 
-        if (xCount > 0 && XAxisSlot < numAxes)
+        if (xCount > 0 && XAxis < numAxes)
         {
-            coords[XAxisSlot] = xSum / xCount;
+            coords[XAxis] = xSum / xCount;
         }
-        if (yCount > 0 && YAxisSlot < numAxes)
+        if (yCount > 0 && YAxis < numAxes)
         {
-            coords[YAxisSlot] = ySum / yCount;
+            coords[YAxis] = ySum / yCount;
         }
-        if (zCount > 0 && ZAxisSlot < numAxes)
+        if (zCount > 0 && ZAxis < numAxes)
         {
-            coords[ZAxisSlot] = zSum / zCount;
+            coords[ZAxis] = zSum / zCount;
         }
     }
 
@@ -1866,9 +1867,9 @@ internal sealed partial class GCodeHandler(
             // An axis that X is mapped away from keeps whatever it already held. RepRapFirmware says
             // so in as many words above its own version: with X mapped to U and V, the X slot is not
             // a machine position at all, and writing one would move an axis the tool does not drive
-            if ((axis == XAxisSlot && (xAxes & (1u << XAxisSlot)) == 0)
-                || (axis == YAxisSlot && (yAxes & (1u << YAxisSlot)) == 0)
-                || (axis == ZAxisSlot && (zAxes & (1u << ZAxisSlot)) == 0))
+            if ((axis == XAxis && (xAxes & (1u << XAxis)) == 0)
+                || (axis == YAxis && (yAxes & (1u << YAxis)) == 0)
+                || (axis == ZAxis && (zAxes & (1u << ZAxis)) == 0))
             {
                 continue;
             }
@@ -1885,9 +1886,9 @@ internal sealed partial class GCodeHandler(
             // only in a map reads the mapped letter's, which is what makes a single X move two
             // carriages on an IDEX machine
             int inputAxis = (explicitAxes & (1u << axis)) != 0 ? axis
-                            : (xAxes & (1u << axis)) != 0 ? XAxisSlot
-                            : (yAxes & (1u << axis)) != 0 ? YAxisSlot
-                            : (zAxes & (1u << axis)) != 0 ? ZAxisSlot
+                            : (xAxes & (1u << axis)) != 0 ? XAxis
+                            : (yAxes & (1u << axis)) != 0 ? YAxis
+                            : (zAxes & (1u << axis)) != 0 ? ZAxis
                             : axis;
             coords[axis] = state.CurrentUserPosition[inputAxis] + offset;
         }
@@ -1895,9 +1896,6 @@ internal sealed partial class GCodeHandler(
 
     /// <summary>Positions the tool axis maps are indexed by, as the object model documents them</summary>
     private const int ToolAxisMapX = 0, ToolAxisMapY = 1, ToolAxisMapZ = 2;
-
-    /// <summary>The axes X, Y and Z occupy, which are fixed positions as they are in RepRapFirmware</summary>
-    private const int XAxisSlot = 0, YAxisSlot = 1, ZAxisSlot = 2;
 
     /// <summary>
     /// One of a tool's axis maps, as a bitmap

@@ -2,6 +2,7 @@ using System;
 using DuetControlServer.Link.Native;
 using DuetControlServer.Motion.Kinematics;
 using DuetControlServer.Motion.Native;
+using static DuetControlServer.Motion.AxisIndices;
 
 namespace DuetControlServer.Motion;
 
@@ -38,15 +39,6 @@ internal readonly record struct MoveBuildResult(NativeMovementError Error, int L
 internal sealed class MoveBuilder(MotionParameters parameters)
 {
     private const int NumDrives = MotionLimits.MaxAxesPlusExtruders;
-
-    /// <summary>
-    /// Indices of the first three axes, which the bed tilt correction is expressed in terms of
-    /// </summary>
-    /// <remarks>
-    /// The same fixed positions the geometries use. A tilt correction is a rise in Z per unit of X or
-    /// Y movement, so it is about where the axes are in the vector rather than what they are called
-    /// </remarks>
-    private const int XAxis = 0, YAxis = 1, ZAxis = 2;
 
     /// <summary>Where the last move left the machine in axis space, mm</summary>
     private readonly float[] _startCoordinates = new float[NumDrives];
