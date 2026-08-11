@@ -218,10 +218,10 @@ Update these counts as boxes are ticked.
 
 | Blocker | Blocks | Note |
 |---|---|---|
-| **Heat subsystem: partly there** | M143, M303, M307, M309, M562, M570, M568 | [HeatManager](src/DuetControlServer/Heat/HeatManager.cs) holds sensors, heaters, setpoints and waiting. What is left is tuning, the process model, the monitors and the fault codes — every one of them a CAN message that exists and a handler that does not |
-| **Fan subsystem: partly there** | Thermostatic control | [FanManager](src/DuetControlServer/Fans/FanManager.cs) creates fans and sets speeds. `CanMessageFanParameters` carries the monitored sensors and trigger temperatures for `M106 H`/`T`; the mapping onto it is not written |
-| **Tool subsystem: partly there** | M116, M568, M701-M703 | [ToolManager](src/DuetControlServer/Tools/ToolManager.cs) holds definition, selection, offsets, axis mapping and mixing. What is left is what needs Heat: active and standby temperatures, the standby state on deselection, and M116 |
-| **No Spindle subsystem in DCS** | §5.8 | **Blocked on the GPIO port layer, which is itself unported.** A spindle is not a device on the CAN bus: CANlib has no spindle message at all, only a `MaxSpindles` constant. RepRapFirmware's `Spindle` is three `IoPort`s - PWM, on/off and reverse/forward - and a remote one is driven through `CanInterface::WriteGpio`. So spindles need M950 P/S creating remote GPIO and PWM outputs, `state.gpOut[]` holding them, and `CanMessageWriteGpio` writing them, before M3/M4/M5 have anything to address |
+| **Heat subsystem: nearly done** | M303 tuning, M309 feedforward, M144 | [HeatManager](src/DuetControlServer/Heat/HeatManager.cs) holds sensors, heaters, setpoints, waiting, monitors, the process model and the fault codes. M303 is the one with real work left: tuning runs for minutes on the board and reports back through `CanMessageHeaterTuningReport`, so it needs a state machine rather than a handler |
+| **Fan subsystem: done** | — | [FanManager](src/DuetControlServer/Fans/FanManager.cs) creates fans, sets speeds and configures thermostatic control |
+| **Tool subsystem: nearly done** | Firmware retraction, M701-M703 | [ToolManager](src/DuetControlServer/Tools/ToolManager.cs) holds definition, selection, offsets, axis mapping, mixing and — through M568 and the Heat subsystem — the active and standby temperatures. What is left is firmware retraction (M207, `G10` without P, `G11`), which is a synthesised move rather than a message, and the filament codes |
+| **Spindle subsystem: done** | Laser mode | [SpindleManager](src/DuetControlServer/Spindles/SpindleManager.cs) builds a spindle out of three general-purpose outputs, which is what RepRapFirmware's three `IoPort`s are - CANlib has no spindle message at all, only a `MaxSpindles` constant. The GPIO layer it needed is [GpioManager](src/DuetControlServer/Ports/GpioManager.cs). What is left is `M3` in laser mode, which is a different code sharing a number and needs `state.machineMode` |
 | **No endstop/probe abstraction in DCS** | M119, M558, M574, M577, M585, M401, M402, M851 | Needs the input-monitor CAN messages (`CanMessageCreateInputMonitorV1`, `CanMessageChangeInputMonitorV1`, `CanMessageInputChangedV2`) wired to `sensors.endstops[]` / `sensors.probes[]` |
 
 Because of these, **§5.1-§5.4 (motion) is the tractable scope on this branch**; the rest is gated on
@@ -353,24 +353,24 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M116 | 1991 | Wait for temperatures | `heat.heaters[]` | ✅ |
 | M140 | 2265 | Bed temperature | `heat.bedHeaterMapping[]` | ✅ |
 | M141 | 2266 | Chamber temperature | `heat.chamberHeaterMapping[]` | ✅ |
-| M143 | 2407 | Heater protection and limits | `heat.heaters[].monitors[]` → CAN `CanMessageSetHeaterMonitors` | ⬜ blocked |
-| M144 | 2411 | Bed to standby/active | `heat.bedHeaters[]` | ⬜ blocked |
+| M143 | 2407 | Heater protection and limits | `heat.heaters[].monitors[]` → CAN `CanMessageSetHeaterMonitors` | ✅ |
+| M144 | 2411 | Bed to standby/active | `heat.bedHeaterMapping[]` | ⬜ |
 | M190 | 2432 | Set bed temperature and wait | `heat.bedHeaterMapping[]` | ✅ |
 | M191 | 2433 | Set chamber temperature and wait | `heat.chamberHeaterMapping[]` | ✅ |
 | M302 | 2927 | Cold extrude/retract permission and limits | `heat.coldExtrudeTemperature`, `heat.coldRetractTemperature` | ✅ |
 | M303 | 2972 | Run PID tuning | `heat.heaters[].model` → CAN `CanMessageHeaterTuningCommand` | ⬜ blocked |
 | M305 | 2976 | Legacy heater parameters | `heat.heaters[]` | ⬜ blocked |
-| M307 | 2981 | Heater process model | `heat.heaters[].model` → CAN `CanMessageHeaterModelV3` | ⬜ blocked |
+| M307 | 2981 | Heater process model | `heat.heaters[].model` → CAN `CanMessageHeaterModelV3` | ✅ |
 | M308 | 2985 | Configure sensor | `sensors.analog[]` → CAN generic `M308V1Params` | ✅ |
 | M309 | 2989 | Tool feedforward | `tools[].feedForward` → CAN `CanMessageHeaterFeedForwardV1` | ⬜ blocked |
-| M562 | 3738 | Reset temperature fault | `heat.heaters[].state` | ⬜ blocked |
-| M570 | 3882 | Heater fault detection | → CAN `CanMessageSetHeaterFaultDetectionParameters` | ⬜ blocked |
+| M562 | 3738 | Reset temperature fault | `heat.heaters[].state` | ✅ |
+| M570 | 3882 | Heater fault detection | → CAN `CanMessageSetHeaterFaultDetectionParameters` | ✅ |
 
 ### 5.6 Fans — blocked on a Fan subsystem (§4)
 
 | M-code | RRF | Purpose | Object model home | Status |
 |---|---|---|---|---|
-| M106 | 1755 | Set fan speed and parameters | `fans[]` → CAN `CanMessageSetFanSpeed` / `CanMessageFanParameters` | 🟡 speed and limits; `H`/`T` thermostatic control refused |
+| M106 | 1755 | Set fan speed and parameters | `fans[]` → CAN `CanMessageSetFanSpeed` / `CanMessageFanParameters` | ✅ |
 | M107 | 1815 | Fan off (deprecated) | `fans[].requestedValue` | ✅ |
 | M950 (fan) | 4589 | Create fan | `fans[]` → CAN generic `M950FanParams` | ✅ |
 
@@ -388,7 +388,7 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M407 | 3163 | Report filament width | reads the above | ⬜ |
 | M563 | 3754 | Define tool | `tools[]` | ✅ |
 | M567 | 3843 | Tool mix ratios | `tools[].mix` | ✅ |
-| M568 | 3874 | Tool settings (active/standby/spindle RPM) | `tools[]` | ⬜ blocked: every parameter is a temperature or a spindle |
+| M568 | 3874 | Tool settings (active/standby/spindle RPM) | `tools[]` | ✅ |
 | M591 | 3984 | Configure filament sensor | `sensors.filamentMonitors[]` → CAN `CanMessageCreateFilamentMonitor` + generic `ConfigureFilamentMonitorParams` | ⬜ |
 | M701 | 4315 | Load filament | `tools[].filament` | ⬜ blocked |
 | M702 | 4319 | Unload filament | `tools[].filament` | ⬜ blocked |
@@ -398,9 +398,9 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 
 | M-code | RRF | Purpose | Object model home | Status |
 |---|---|---|---|---|
-| M3 | 805 | Spindle clockwise / laser power | `spindles[]` | ⬜ blocked |
-| M4 | 806 | Spindle counter-clockwise | `spindles[]` | ⬜ blocked |
-| M5 | 864 | Spindle off | `spindles[]` | ⬜ blocked |
+| M3 | 805 | Spindle clockwise / laser power | `spindles[]` | 🟡 spindle half; laser needs machine mode |
+| M4 | 806 | Spindle counter-clockwise | `spindles[]` | ✅ |
+| M5 | 864 | Spindle off | `spindles[]` | ✅ |
 | M450 | 3227 | Report printer mode | `state.machineMode` | ⬜ |
 | M451 | 3231 | FFF mode | `state.machineMode` | ⬜ |
 | M452 | 3244 | Laser mode | `state.machineMode`, laser config | ⬜ |
@@ -466,7 +466,7 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 
 | M-code | RRF | Purpose | Object model home | Status |
 |---|---|---|---|---|
-| M42 | 1576 | Set output pin | `state.gpOut[]` → CAN `CanMessageWriteGpio` | ⬜ |
+| M42 | 1576 | Set output pin | `state.gpOut[]` → CAN `CanMessageWriteGpio` | ✅ |
 | M80 | 1588 | ATX power on | `state.atxPower` | ⬜ |
 | M81 | 1592 | ATX power off | `state.atxPower` | ⬜ |
 | M110 | 1933 | Set line number | — | ⬜ |
@@ -478,7 +478,7 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M150 | 2427 | Set LED colours | `ledStrips[]` → CAN generic `M150Params` | ⬜ |
 | M260 | 2778 | I2C send / Modbus write | — | ⬜ only local-variable bookkeeping exists |
 | M261 | 2782 | I2C receive / Modbus read | — | ⬜ only local-variable bookkeeping exists |
-| M280 | 2786 | Servo control | `state.gpOut[]` → CAN `CanMessageWriteGpio` | ⬜ |
+| M280 | 2786 | Servo control | `state.gpOut[]` → CAN `CanMessageWriteGpio` | ✅ |
 | M291 | 2906 | Message box | `state.messageBox` | ⬜ |
 | M292 | 2910 | Acknowledge message box | `state.messageBox` | ⬜ |
 | M300 | 2914 | Beep | `state.beep` | ⬜ |
@@ -494,7 +494,7 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M916 | 4545 | Resume after power fail | — | ⬜ |
 | M918 | 4566 | Configure direct-connect display | `boards[].directDisplay` | ⬜ |
 | M929 | 4581 | Event logging | `state.logFile`, `state.logLevel` | ✅ |
-| M950 | 4589 | Configure I/O pins (heater/fan/gpio/led/servo) | `state.gpOut[]`, `sensors.gpIn[]` → CAN generic `M950*Params` | ⬜ |
+| M950 | 4589 | Configure I/O pins (heater/fan/gpio/led/servo) | `state.gpOut[]`, `sensors.gpIn[]` → CAN generic `M950*Params` | 🟡 H, F, P, S and R; J and D not ported |
 | M951 | 4594 | Height control | — | ⬜ |
 | M952 | 4600 | Change expansion board CAN address | → CAN `CanMessageSetAddressAndNormalTiming` | ✅ |
 | M953 | 4604 | CAN fast data rate | → CAN `CanMessageSetAddressAndNormalTiming` | ✅ |
