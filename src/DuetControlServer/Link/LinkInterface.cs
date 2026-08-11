@@ -181,6 +181,38 @@ public sealed partial class LinkInterface(
     }
 
     /// <summary>
+    /// Repackage a G-code as the generic CAN message its parameter table describes, and send it
+    /// </summary>
+    /// <typeparam name="TReq">Type of the CAN message body</typeparam>
+    /// <param name="dstAddress">CAN address of the board that will act on it</param>
+    /// <param name="code">The code whose parameters the message carries</param>
+    /// <param name="replyType">Expected reply type</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Reassembled reply</returns>
+    /// <remarks>
+    /// <para>
+    /// A generic message <em>is</em> its parameter table: the table says which G-code letters it
+    /// carries and in what form, so turning a code into one is a repackaging rather than a
+    /// translation. That makes it a property of the wire format, which is why it lives here - a
+    /// handler that built its own would be reimplementing the format one code at a time.
+    /// </para>
+    /// <para>
+    /// The reply comes back as a <see cref="CanResponse"/> rather than a message, because what the
+    /// board said and how a code should report it are different questions and only the handler knows
+    /// the second
+    /// </para>
+    /// </remarks>
+    public Task<CanResponse> SendCodeAsync<TReq>(byte dstAddress, Code code,
+                                                 CanMessageType replyType = CanMessageType.StandardReply,
+                                                 CancellationToken cancellationToken = default)
+        where TReq : struct, ICanGenericMessage<TReq>
+    {
+        TReq message = default;
+        message.FromCode(code);
+        return SendCanMessageAsync(dstAddress, in message, replyType, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
     /// Send a raw CAN message to an expansion board and wait for the (optional) reply
     /// </summary>
     /// <param name="messageType">Type of the CAN message</param>

@@ -92,7 +92,7 @@ internal partial class MCodeHandler
             }
         }
 
-        return await SendGenericAsync<CanMessageM950Fan>(board, code, cancellationToken);
+        return (await linkInterface.SendCodeAsync<CanMessageM950Fan>(board, code, cancellationToken: cancellationToken)).ToMessage();
     }
 
     /// <summary>

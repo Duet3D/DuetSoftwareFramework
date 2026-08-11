@@ -124,7 +124,7 @@ internal partial class MCodeHandler
 
         // The board is what reads the sensor, so it is what has to be told how. The parameter table
         // is the message, which is what makes this a repackaging rather than a reimplementation
-        return await SendGenericAsync<CanMessageM308V1>(board, code, cancellationToken);
+        return (await linkInterface.SendCodeAsync<CanMessageM308V1>(board, code, cancellationToken: cancellationToken)).ToMessage();
     }
 
     /// <summary>
@@ -155,26 +155,6 @@ internal partial class MCodeHandler
         return builder.Length == 0
             ? new Message(MessageType.Success, "No temperature sensors are configured")
             : new Message(MessageType.Success, builder.ToString().TrimEnd());
-    }
-
-    /// <summary>
-    /// Send a code to a board as the generic message its parameter table describes
-    /// </summary>
-    /// <typeparam name="TMessage">Type of the CAN message</typeparam>
-    /// <param name="board">CAN address of the board</param>
-    /// <param name="code">The code</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>What the board said</returns>
-    private async ValueTask<Message> SendGenericAsync<TMessage>(byte board, Commands.Code code,
-                                                                CancellationToken cancellationToken)
-        where TMessage : struct, ICanGenericMessage<TMessage>
-    {
-        TMessage message = default;
-        message.FromCode(code);
-        CanResponse response = await linkInterface.SendCanMessageAsync(board, in message,
-                                                                       CanMessageType.StandardReply,
-                                                                       cancellationToken: cancellationToken);
-        return response.ToMessage();
     }
 
     /// <summary>
@@ -242,7 +222,7 @@ internal partial class MCodeHandler
             }
         }
 
-        return await SendGenericAsync<CanMessageM950Heater>(board, code, cancellationToken);
+        return (await linkInterface.SendCodeAsync<CanMessageM950Heater>(board, code, cancellationToken: cancellationToken)).ToMessage();
     }
 
     /// <summary>

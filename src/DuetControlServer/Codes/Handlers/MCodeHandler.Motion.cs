@@ -1068,12 +1068,7 @@ internal partial class MCodeHandler
     /// <returns>What the board replied</returns>
     private async ValueTask<CanResponse> SendDriverConfigAsync<TMessage>(DriverId driver, Commands.Code code, CancellationToken cancellationToken)
         where TMessage : struct, ICanGenericMessage<TMessage>
-    {
-        TMessage message = default;
-        message.FromCode(code);
-        return await linkInterface.SendCanMessageAsync((byte)driver.Board, in message, CanMessageType.StandardReply,
-                                                       cancellationToken: cancellationToken);
-    }
+        => await linkInterface.SendCodeAsync<TMessage>((byte)driver.Board, code, cancellationToken: cancellationToken);
 
     /// <summary>
     /// M915: configure stall detection

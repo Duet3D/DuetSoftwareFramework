@@ -59,7 +59,7 @@ internal partial class MCodeHandler
 
         // The board numbers its own ports, and the number it will report a write against is the one
         // it is given here. RepRapFirmware sends the same M950 through to the board for that reason
-        return await SendGenericAsync<CanMessageM950Gpio>(board, code, cancellationToken);
+        return (await linkInterface.SendCodeAsync<CanMessageM950Gpio>(board, code, cancellationToken: cancellationToken)).ToMessage();
     }
 
     /// <summary>
