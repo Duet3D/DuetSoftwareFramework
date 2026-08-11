@@ -37,6 +37,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="macroRunner">Runs the machine's own macro files</param>
 /// <param name="linkInterface">Link interface, for the endstops a move has to arm over CAN</param>
 /// <param name="endstopCorrection">Undoes the overshoot of a move an endstop cut short</param>
+/// <param name="toolManager">The selected tool, whose offsets and axis mapping the transform needs</param>
 /// <param name="logger">Logger</param>
 internal sealed partial class GCodeHandler(
     Model.ObjectModel model,
@@ -45,6 +46,7 @@ internal sealed partial class GCodeHandler(
     Files.MacroRunner macroRunner,
     Link.LinkInterface linkInterface,
     EndstopCorrection endstopCorrection,
+    Tools.ToolManager toolManager,
     ILogger<GCodeHandler> logger) : ICodeHandler
 {
     /// <summary>
@@ -77,6 +79,11 @@ internal sealed partial class GCodeHandler(
             case 0:
             case 1:
                 rslt = await HandleMoveAsync(code, isCoordinated: code.MajorNumber == 1, cancellationToken);
+                break;
+
+            // Set tool offsets, or retract
+            case 10:
+                rslt = await HandleToolOffsetsAsync(code, cancellationToken);
                 break;
 
             // Set units to inches / millimetres
@@ -1071,15 +1078,14 @@ internal sealed partial class GCodeHandler(
     /// <param name="numAxes">Number of axes to consider</param>
     /// <remarks>
     /// RepRapFirmware's <c>ToolOffsetInverseTransform</c> after a limit was applied, and one of the
-    /// few places the transform is inverted. Bed compensation has not been applied yet, so the only
-    /// term to undo is the one <see cref="ApplyAxisTransform"/> added
+    /// few places the transform is inverted. Neither the bed compensation nor the skew has been
+    /// applied at this point - both happen per segment - so the tool transform is the only one to
+    /// undo, which is why this is not <see cref="SyncInterpreterToMachine"/>
     /// </remarks>
     private void SyncInterpreterToTarget(RawMove raw, MovementState state, int numAxes)
     {
-        for (int axis = 0; axis < numAxes; axis++)
-        {
-            state.CurrentUserPosition[axis] = raw.Coords[axis] - model.Move.Axes[axis].Babystep;
-        }
+        raw.Coords.AsSpan(0, numAxes).CopyTo(state.CurrentUserPosition);
+        ToolOffsetInverseTransform(state.CurrentUserPosition, numAxes);
     }
 
     /// <summary>
@@ -1712,16 +1718,95 @@ internal sealed partial class GCodeHandler(
         int numAxes = planner.Parameters.SharedAxisCount(model.Move);
         ReadOnlySpan<float> machinePosition = planner.Builder.StartCoordinates;
 
-        for (int axis = 0; axis < numAxes; axis++)
-        {
-            state.CurrentUserPosition[axis] = machinePosition[axis] - model.Move.Axes[axis].Babystep;
-        }
+        machinePosition[..numAxes].CopyTo(state.CurrentUserPosition);
+
         // The bed transform first and the axis transform second, which is the order RepRapFirmware's
         // InverseAxisAndBedTransform uses - the mirror of applying the axis transform before the bed
         // one, because the map is indexed by coordinates the skew has already moved
         RemoveBedCompensation(state.CurrentUserPosition, numAxes);
         RemoveAxisSkewTransform(state.CurrentUserPosition, numAxes);
+        ToolOffsetInverseTransform(state.CurrentUserPosition, numAxes);
         PublishUserPositions(numAxes);
+    }
+
+    /// <summary>
+    /// Recover the coordinates that were asked for from the machine position they produced
+    /// </summary>
+    /// <param name="coords">Machine coordinates in, user coordinates out</param>
+    /// <param name="numAxes">Number of axes to consider</param>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>ToolOffsetInverseTransform</c>, and it is deliberately not the exact
+    /// inverse of <see cref="ToolOffsetTransform"/>. Where a letter drives several axes the forward
+    /// transform sends one coordinate to all of them, so there is no single coordinate to come back:
+    /// RepRapFirmware reports the <em>mean</em> of the axes in the map, which is right when they
+    /// agree and is the only defensible answer when they do not.
+    /// </para>
+    /// <para>
+    /// That is exactly why the interpreter keeps its own position rather than reconstructing it. This
+    /// runs only where the machine has ended up somewhere the interpreter did not put it - homing,
+    /// probing, G92 - and losing a little there is the price of knowing where the machine is
+    /// </para>
+    /// </remarks>
+    private void ToolOffsetInverseTransform(Span<float> coords, int numAxes)
+    {
+        Tool? tool = toolManager.Current;
+        if (tool is null)
+        {
+            for (int axis = 0; axis < numAxes; axis++)
+            {
+                coords[axis] -= model.Move.Axes[axis].Babystep;
+            }
+            return;
+        }
+
+        uint xAxes = ToolAxisMap(tool, ToolAxisMapX);
+        uint yAxes = ToolAxisMap(tool, ToolAxisMapY);
+        uint zAxes = ToolAxisMap(tool, ToolAxisMapZ);
+
+        float xSum = 0.0f, ySum = 0.0f, zSum = 0.0f;
+        int xCount = 0, yCount = 0, zCount = 0;
+
+        for (int axis = 0; axis < numAxes && axis < 32; axis++)
+        {
+            float offset = model.Move.Axes[axis].Babystep - ToolOffset(tool, axis);
+            if ((zAxes & (1u << axis)) != 0)
+            {
+                offset += ActualZHop(tool);
+            }
+
+            float coord = coords[axis] - offset;
+            coords[axis] = coord;
+
+            if ((xAxes & (1u << axis)) != 0)
+            {
+                xSum += coord;
+                xCount++;
+            }
+            if ((yAxes & (1u << axis)) != 0)
+            {
+                ySum += coord;
+                yCount++;
+            }
+            if ((zAxes & (1u << axis)) != 0)
+            {
+                zSum += coord;
+                zCount++;
+            }
+        }
+
+        if (xCount > 0 && XAxisSlot < numAxes)
+        {
+            coords[XAxisSlot] = xSum / xCount;
+        }
+        if (yCount > 0 && YAxisSlot < numAxes)
+        {
+            coords[YAxisSlot] = ySum / yCount;
+        }
+        if (zCount > 0 && ZAxisSlot < numAxes)
+        {
+            coords[ZAxisSlot] = zSum / zCount;
+        }
     }
 
     /// <summary>
@@ -1760,15 +1845,101 @@ internal sealed partial class GCodeHandler(
     private void ToolOffsetTransform(MovementState state, Span<float> coords, int numAxes,
                                      uint explicitAxes = 0)
     {
-        // TODO apply the tool offsets, axis mapping, axis scale factors (M579) and Z hop, once there
-        // is a tool subsystem to read them from - explicitAxes is the parameter that mapping needs
-        _ = explicitAxes;
-
-        for (int axis = 0; axis < numAxes; axis++)
+        // TODO apply the axis scale factors (M579) here, which is where RepRapFirmware multiplies
+        // them in - move.axes[].scale does not exist yet, see §6
+        Tool? tool = toolManager.Current;
+        if (tool is null)
         {
-            coords[axis] = state.CurrentUserPosition[axis] + model.Move.Axes[axis].Babystep;
+            for (int axis = 0; axis < numAxes; axis++)
+            {
+                coords[axis] = state.CurrentUserPosition[axis] + model.Move.Axes[axis].Babystep;
+            }
+            return;
+        }
+
+        uint xAxes = ToolAxisMap(tool, ToolAxisMapX);
+        uint yAxes = ToolAxisMap(tool, ToolAxisMapY);
+        uint zAxes = ToolAxisMap(tool, ToolAxisMapZ);
+
+        for (int axis = 0; axis < numAxes && axis < 32; axis++)
+        {
+            // An axis that X is mapped away from keeps whatever it already held. RepRapFirmware says
+            // so in as many words above its own version: with X mapped to U and V, the X slot is not
+            // a machine position at all, and writing one would move an axis the tool does not drive
+            if ((axis == XAxisSlot && (xAxes & (1u << XAxisSlot)) == 0)
+                || (axis == YAxisSlot && (yAxes & (1u << YAxisSlot)) == 0)
+                || (axis == ZAxisSlot && (zAxes & (1u << ZAxisSlot)) == 0))
+            {
+                continue;
+            }
+
+            // The offset is where the nozzle is relative to the head reference point, so reaching a
+            // coordinate means moving the head the other way by it
+            float offset = model.Move.Axes[axis].Babystep - ToolOffset(tool, axis);
+            if ((zAxes & (1u << axis)) != 0)
+            {
+                offset += ActualZHop(tool);
+            }
+
+            // Which coordinate this axis takes. An axis the code named reads its own; one that is
+            // only in a map reads the mapped letter's, which is what makes a single X move two
+            // carriages on an IDEX machine
+            int inputAxis = (explicitAxes & (1u << axis)) != 0 ? axis
+                            : (xAxes & (1u << axis)) != 0 ? XAxisSlot
+                            : (yAxes & (1u << axis)) != 0 ? YAxisSlot
+                            : (zAxes & (1u << axis)) != 0 ? ZAxisSlot
+                            : axis;
+            coords[axis] = state.CurrentUserPosition[inputAxis] + offset;
         }
     }
+
+    /// <summary>Positions the tool axis maps are indexed by, as the object model documents them</summary>
+    private const int ToolAxisMapX = 0, ToolAxisMapY = 1, ToolAxisMapZ = 2;
+
+    /// <summary>The axes X, Y and Z occupy, which are fixed positions as they are in RepRapFirmware</summary>
+    private const int XAxisSlot = 0, YAxisSlot = 1, ZAxisSlot = 2;
+
+    /// <summary>
+    /// One of a tool's axis maps, as a bitmap
+    /// </summary>
+    /// <param name="tool">The tool</param>
+    /// <param name="which">Which map - <see cref="ToolAxisMapX"/> and friends</param>
+    /// <returns>The axes that letter drives</returns>
+    /// <remarks>
+    /// The object model stores each map as an array of axis numbers rather than a bitmap, so this is
+    /// the conversion. A tool defined before this map existed falls back to the letter driving its
+    /// own axis, which is RepRapFirmware's default mapping
+    /// </remarks>
+    private static uint ToolAxisMap(Tool tool, int which)
+    {
+        if (which >= tool.Axes.Count)
+        {
+            return 1u << which;                 // the default: the letter drives its own axis
+        }
+
+        uint bitmap = 0;
+        foreach (int axis in tool.Axes[which])
+        {
+            if (axis is >= 0 and < 32)
+            {
+                bitmap |= 1u << axis;
+            }
+        }
+        return bitmap;
+    }
+
+    /// <summary>A tool's offset for one axis, or zero if it has none recorded</summary>
+    private static float ToolOffset(Tool tool, int axis)
+        => axis >= 0 && axis < tool.Offsets.Count ? tool.Offsets[axis] : 0.0f;
+
+    /// <summary>
+    /// How far the tool is currently lifted by firmware retraction
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>Tool::GetActualZHop</c>: the Z hop only applies while the tool is actually
+    /// retracted, which is what makes it a lift rather than a permanent offset
+    /// </remarks>
+    private static float ActualZHop(Tool tool) => tool.IsRetracted ? tool.Retraction.ZHop : 0.0f;
 
     /// <summary>
     /// The selected workplace, which is a property of the motion system rather than of the machine
@@ -1787,12 +1958,28 @@ internal sealed partial class GCodeHandler(
     /// <param name="letter">Axis letter</param>
     /// <returns>The bitmap</returns>
     /// <remarks>
-    /// The tool axis mapping is not ported yet, so this is the axes literally named X or Y. When it
-    /// is, this becomes the tool's mapping, which is what decides whether a move counts as XY
-    /// movement in user space and therefore whether the printing jerk limits apply
+    /// The selected tool's mapping where there is one, falling back to the axes literally carrying
+    /// the letter where there is not. This is what decides whether a move counts as XY movement in
+    /// user space, and therefore whether the printing jerk limits apply: on an IDEX machine an X move
+    /// drives U, and a move that reached U through the X map is still an XY move
     /// </remarks>
-    private static uint AxisBitmap(Move move, char letter)
+    private uint AxisBitmap(Move move, char letter)
     {
+        if (toolManager.Current is Tool tool)
+        {
+            int which = letter switch
+            {
+                'X' => ToolAxisMapX,
+                'Y' => ToolAxisMapY,
+                'Z' => ToolAxisMapZ,
+                _ => -1
+            };
+            if (which >= 0)
+            {
+                return ToolAxisMap(tool, which);
+            }
+        }
+
         uint bitmap = 0;
         for (int axis = 0; axis < move.Axes.Count && axis < 32; axis++)
         {
