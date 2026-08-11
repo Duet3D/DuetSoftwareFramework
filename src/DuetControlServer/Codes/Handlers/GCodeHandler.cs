@@ -285,6 +285,12 @@ internal sealed partial class GCodeHandler(
 
                             raw = BuildRawMove(code, input, isCoordinated, moveType);
                         }
+                        catch (Exception ex)
+                        {
+                            logger.LogError(ex, "Could not build move for {Code}", code);
+                            positionBeforeMove.AsSpan(0, MotionLimits.MaxAxes).CopyTo(state.CurrentUserPosition);
+                            throw;
+                        }
                         finally
                         {
                             ArrayPool<float>.Shared.Return(positionBeforeMove);

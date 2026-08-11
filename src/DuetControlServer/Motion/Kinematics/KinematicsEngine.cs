@@ -27,14 +27,8 @@ internal struct MoveLimits
     /// <param name="maxAcceleration">Acceleration limit to apply</param>
     public void Limit(float maxSpeed, float maxAcceleration)
     {
-        if (maxSpeed < RequestedSpeed)
-        {
-            RequestedSpeed = maxSpeed;
-        }
-        if (maxAcceleration < MaxAcceleration)
-        {
-            MaxAcceleration = maxAcceleration;
-        }
+        RequestedSpeed = MathF.Min(RequestedSpeed, maxSpeed);
+        MaxAcceleration = MathF.Min(MaxAcceleration, maxAcceleration);
     }
 }
 
@@ -217,7 +211,9 @@ internal abstract class KinematicsEngine
             return;
         }
 
-        float dx = move.NormalisedDirectionVector[0], dy = move.NormalisedDirectionVector[1];
+        // TODO replace magic numbers with constants or get from kinematics
+        float dx = move.NormalisedDirectionVector[0];
+        float dy = move.NormalisedDirectionVector[1];
         float xySum = dx + dy;
         if (xySum > 0.05f)
         {

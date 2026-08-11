@@ -146,7 +146,7 @@ internal sealed class MoveBuilder(MotionParameters parameters)
     /// <summary>
     /// Build a move submission
     /// </summary>
-    /// <param name="move">The move to build</param>
+    /// <param name="raw">The move to build</param>
     /// <param name="destination">Buffer of at least <see cref="MoveParams.Length"/> bytes</param>
     /// <returns>What came of it</returns>
     /// <remarks>
@@ -163,7 +163,7 @@ internal sealed class MoveBuilder(MotionParameters parameters)
     /// be measured from there rather than from where the machine happens to have stopped
     /// </para>
     /// </remarks>
-    public MoveBuildResult Build(RawMove move, Span<byte> destination)
+    public MoveBuildResult Build(RawMove raw, Span<byte> destination)
     {
         float[] stepsPerMm = Parameters.StepsPerMm;
         int numAxes = Parameters.NumAxes;
@@ -172,21 +172,22 @@ internal sealed class MoveBuilder(MotionParameters parameters)
         // --- 1. Compute the new endpoints and the movement vector ---------------------------------
 
         Array.Clear(_directionVector);
-        _endPoints.CopyTo(_newEndPoints, 0);
+        _endPoints.CopyTo(_newEndPoints, 0); // TODO is this valid after an endstop move?
 
-        bool linearAxesMoving = false, rotationalAxesMoving = false;
+        bool linearAxesMoving = false;
+        bool rotationalAxesMoving = false;
         bool xyMoving = false;
 
         // Whether the coordinates are axis positions to be put through the kinematics, or motor
         // positions to be taken as they are. RepRapFirmware's doMotorMapping, and the distinction is
         // the geometry's rather than the move's: G1 H1 on a CoreXY homes an axis through the
         // kinematics, while the same code on a delta addresses one tower's motor
-        bool doMotorMapping = !Parameters.Geometry.IsRawMotorMove(move.MoveType);
+        bool doMotorMapping = !Parameters.Geometry.IsRawMotorMove(raw.MoveType);
 
         if (doMotorMapping)
         {
             NativeMovementError error = Parameters.Geometry.CartesianToMotorSteps(
-                move.Coords, stepsPerMm, numAxes, numAxes, _newEndPoints, move.IsCoordinated);
+                raw.Coords, stepsPerMm, numAxes, numAxes, _newEndPoints, raw.IsCoordinated);
             if (error != NativeMovementError.Ok)
             {
                 // Throw the move away rather than moving somewhere else: the endpoints are what the
@@ -196,16 +197,16 @@ internal sealed class MoveBuilder(MotionParameters parameters)
 
             for (int axis = 0; axis < numAxes; axis++)
             {
-                if ((move.OwnedDrives & (1u << axis)) == 0)
+                if ((raw.OwnedDrives & (1u << axis)) == 0)
                 {
                     // Not ours to move, so it stays where the previous move left it
                     _directionVector[axis] = 0.0f;
-                    _newEndPoints[axis] = _endPoints[axis];
+                    _newEndPoints[axis] = _endPoints[axis]; // TODO is this needed since the array was copied above?
                     continue;
                 }
 
-                float delta = move.Coords[axis] - _startCoordinates[axis];
-                _startCoordinates[axis] = move.Coords[axis];
+                float delta = raw.Coords[axis] - _startCoordinates[axis];
+                _startCoordinates[axis] = raw.Coords[axis];
                 _directionVector[axis] = delta;
 
                 if (delta == 0.0f)
@@ -215,15 +216,16 @@ internal sealed class MoveBuilder(MotionParameters parameters)
 
                 if ((Parameters.RotationalAxes & (1u << axis)) != 0)
                 {
-                    if (move.RotationalAxesMentioned)
+                    if (raw.RotationalAxesMentioned)
                     {
                         rotationalAxesMoving = true;
                     }
                 }
-                else if (move.LinearAxesMentioned)
+                else if (raw.LinearAxesMentioned)
                 {
                     linearAxesMoving = true;
-                    if (((move.XAxes | move.YAxes) & (1u << axis)) != 0)
+                    // TODO RRF applies tool axis mapping here
+                    if (((raw.XAxes | raw.YAxes) & (1u << axis)) != 0)
                     {
                         // XY movement in user space, before the tool mapping was applied. This is
                         // what decides whether the printing jerk limits apply
@@ -237,15 +239,15 @@ internal sealed class MoveBuilder(MotionParameters parameters)
             // A raw motor move: the coordinates are motor positions, not axis positions
             for (int axis = 0; axis < numAxes; axis++)
             {
-                if ((move.OwnedDrives & (1u << axis)) == 0)
+                if ((raw.OwnedDrives & (1u << axis)) == 0)
                 {
                     _directionVector[axis] = 0.0f;
                     _newEndPoints[axis] = _endPoints[axis];
                     continue;
                 }
 
-                float steps = move.Coords[axis] * stepsPerMm[axis];
-                if (steps <= -2147483000.0f || steps >= 2147483000.0f)
+                float steps = raw.Coords[axis] * stepsPerMm[axis];
+                if (MathF.Abs(steps) >= (float)(int.MaxValue - 10)) // (float)(std::numeric_limits<int32_t>::max() - 10)
                 {
                     return new MoveBuildResult(NativeMovementError.MicrostepPositionTooLarge, 0);
                 }
@@ -278,23 +280,25 @@ internal sealed class MoveBuilder(MotionParameters parameters)
         // --- Extruders -----------------------------------------------------------------------------
 
         // Probing and stall-homing moves use the reduced limits, which is what M201.1 configures
-        float[] configuredAccelerations = move.ReduceAcceleration ? Parameters.ReducedAccelerations : Parameters.Accelerations;
+        float[] configuredAccelerations = raw.ReduceAcceleration ? Parameters.ReducedAccelerations : Parameters.Accelerations;
         configuredAccelerations.CopyTo(_accelerations, 0);
 
-        bool extrudersMoving = false, hasForwardExtrusion = false;
+        bool extrudersMoving = false;
+        bool hasForwardExtrusion = false;
         float totalExtrusion = 0.0f;
 
         for (int drive = firstExtruderDrive; drive < NumDrives; drive++)
         {
-            if ((move.OwnedDrives & (1u << drive)) == 0)
+            if ((raw.OwnedDrives & (1u << drive)) == 0)
             {
+                // This is an extruder we don't own, so make sure we don't move it
                 _directionVector[drive] = 0.0f;
                 continue;
             }
 
             // The steps are deliberately not computed here. Extrusion is relative and the native side
             // carries the fraction of a step between moves, so an endpoint would lose it
-            float movement = move.Coords[drive];
+            float movement = raw.Coords[drive];
             _directionVector[drive] = movement;
             if (movement == 0.0f)
             {
@@ -308,7 +312,7 @@ internal sealed class MoveBuilder(MotionParameters parameters)
                 hasForwardExtrusion = true;
             }
 
-            if (xyMoving && move.UsePressureAdvance)
+            if (xyMoving && raw.UsePressureAdvance)
             {
                 float compensationClocks = Parameters.PressureAdvanceClocks[drive];
                 float jerk = Parameters.InstantDvs[drive];
@@ -331,7 +335,7 @@ internal sealed class MoveBuilder(MotionParameters parameters)
             {
                 for (int axis = 0; axis < numAxes; axis++)
                 {
-                    _startCoordinates[axis] = move.Coords[axis];
+                    _startCoordinates[axis] = raw.Coords[axis];
                 }
             }
             return new MoveBuildResult(NativeMovementError.NoMovement, 0);
@@ -339,37 +343,53 @@ internal sealed class MoveBuilder(MotionParameters parameters)
 
         // --- 3. Work out the flags --------------------------------------------------------------------
 
+        // TODO RRF stores the following additional values:
+        // - tool
+        // - file position
+        // - gcode number
+        // - virtual extruder position (mixing extruders)
+        // - proportion of move done
+        // - arc move params
+        // - original feedrate
+
         bool isPrintingMove = xyMoving && hasForwardExtrusion;     // forward, so wipe-while-retracting does not count
 
         uint flags = 0;
-        if (move.CanPauseAfter) { flags |= MoveFlags.CanPauseAfter; }
-        if (move.CheckEndstops) { flags |= MoveFlags.CheckEndstops; }
-        if (move.UsingStandardFeedrate) { flags |= MoveFlags.UsingStandardFeedrate; }
-        if (move.UsePressureAdvance) { flags |= MoveFlags.UsePressureAdvance; }
+        if (raw.CanPauseAfter) { flags |= MoveFlags.CanPauseAfter; }
+        if (raw.CheckEndstops) { flags |= MoveFlags.CheckEndstops; }
+        if (raw.UsingStandardFeedrate) { flags |= MoveFlags.UsingStandardFeedrate; }
+        if (raw.UsePressureAdvance) { flags |= MoveFlags.UsePressureAdvance; }
+        // TODO RRF has a scanningProbeMove flag
         if (xyMoving) { flags |= MoveFlags.XyMoving; }
         if (isPrintingMove) { flags |= MoveFlags.IsPrintingMove; }
         if (extrudersMoving && !isPrintingMove) { flags |= MoveFlags.IsNonPrintingExtruderMove; }
         if (hasForwardExtrusion) { flags |= MoveFlags.HasForwardExtrusion; }
-        if (move.CheckEndstops || move.MoveType != MoveType.Normal) { flags |= MoveFlags.IsolatedMove; }
-        if (move.MoveType == MoveType.Normal) { flags |= MoveFlags.ContinuousRotationShortcut; }
+        if (raw.CheckEndstops || raw.MoveType != MoveType.Normal) { flags |= MoveFlags.IsolatedMove; }
+        if (raw.MoveType == MoveType.Normal) { flags |= MoveFlags.ContinuousRotationShortcut; }
+        // TODO RRF has a `controlLaserOrIoBits` flag
 
         // --- 4. Normalise the direction vector and get the distance ------------------------------------
 
         float totalDistance;
+        // NIST standard section 2.1.2.5 rule A: if any of XYZ is moving then the feed rate specifies the linear XYZ movement
+        // We treat additional linear axes the same as XYZ
         if (linearAxesMoving)
         {
-            // NIST section 2.1.2.5 rule A: if any linear axis moves, the feed rate is the linear speed
-            float tiltX = Parameters.Geometry.GetTiltCorrection(0);
+            // There is some linear axis movement, so normalise the direction vector so that the total linear movement has unit length and 'totalDistance' is the linear distance moved.
+            // This means that the user gets the feed rate that he asked for. It also makes the delta calculations simpler.
+            // First do the bed tilt compensation for deltas.
+            float tiltX = Parameters.Geometry.GetTiltCorrection(0); // TODO convert the magic numbers to constants (or get from kinematics)
             float tiltY = Parameters.Geometry.GetTiltCorrection(1);
             if ((tiltX != 0.0f || tiltY != 0.0f) && numAxes > 2)
             {
                 _directionVector[2] += (_directionVector[0] * tiltX) + (_directionVector[1] * tiltY);
             }
 
-            totalDistance = MoveVector.NormaliseLinearMotion(_directionVector, Parameters.LinearAxes, move.XAxes, move.YAxes);
+            totalDistance = MoveVector.NormaliseLinearMotion(_directionVector, Parameters.LinearAxes, raw.XAxes, raw.YAxes);
         }
         else if (rotationalAxesMoving)
         {
+            // Some axes are moving, but not linear axes. Normalise the movement to the vector sum of the axes that are moving.
             totalDistance = MoveVector.Normalise(_directionVector, Parameters.RotationalAxes);
         }
         else
@@ -405,12 +425,12 @@ internal sealed class MoveBuilder(MotionParameters parameters)
         // --- 6. Requested speed ---------------------------------------------------------------------------
 
         float requestedSpeed;
-        if (move.InverseTimeMode)
+        if (raw.InverseTimeMode)
         {
             // G93 names a time for the whole move, so how fast it has to go is only known now that
             // the distance is. This is RepRapFirmware's totalDistance/feedRate, with the duration in
             // step clocks
-            float durationClocks = move.DurationSec * MotionLimits.StepClockRate;
+            float durationClocks = raw.DurationSec * MotionLimits.StepClockRate;
             if (durationClocks <= 0.0f)
             {
                 return new MoveBuildResult(NativeMovementError.NoMovement, 0);
@@ -419,7 +439,7 @@ internal sealed class MoveBuilder(MotionParameters parameters)
         }
         else
         {
-            requestedSpeed = move.FeedRateMmPerSec / MotionLimits.StepClockRate;
+            requestedSpeed = raw.FeedRateMmPerSec / MotionLimits.StepClockRate;
         }
 
         if (!doMotorMapping && Parameters.Geometry is LinearDeltaKinematicsEngine)
@@ -467,17 +487,17 @@ internal sealed class MoveBuilder(MotionParameters parameters)
 
         MoveParamsHeader header = new()
         {
-            MoveId = move.MoveId,
-            OwnedDrives = move.OwnedDrives,
+            MoveId = raw.MoveId,
+            OwnedDrives = raw.OwnedDrives,
             Flags = flags,
             TotalDistance = totalDistance,
             MaxAcceleration = limits.MaxAcceleration,
             RequestedSpeed = limits.RequestedSpeed,
-            RingNumber = move.RingNumber,
+            RingNumber = raw.RingNumber,
             NumDrives = NumDrives
         };
 
-        int length = MoveParams.Write(destination, header, _newEndPoints, _directionVector, move.StopOnInput);
+        int length = MoveParams.Write(destination, header, _newEndPoints, _directionVector, raw.StopOnInput);
 
         // The machine is now where this move leaves it, so a move that is built must be submitted
         _newEndPoints.CopyTo(_endPoints, 0);
