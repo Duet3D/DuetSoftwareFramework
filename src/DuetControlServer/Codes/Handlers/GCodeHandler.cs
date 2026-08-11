@@ -762,13 +762,26 @@ internal sealed partial class GCodeHandler(
     /// </remarks>
     private void LoadFeedRate(Commands.Code code, InputChannel input, RawMove raw)
     {
-        // TODO handle G0 moves in CNC mode
         // The overrides belong to the print, so they apply to an ordinary move that names an axis and
         // to nothing else
         raw.ApplyM220M221 = raw.MoveType == MoveType.Normal
             && (raw.LinearAxesMentioned || raw.RotationalAxesMentioned)
             && !code.Flags.HasFlag(CodeFlags.IsFromSystemMacro);
-        raw.UsingStandardFeedrate = true;
+        // A G0 on a machine that is not printing is a rapid: it goes as fast as the machine can
+        // rather than at the F the job last set, because on a mill or a laser F describes the cut and
+        // a G0 is the move between cuts. On an FFF machine G0 honours F, which is what makes a travel
+        // move take the speed a slicer chose for it
+        bool isRapid = !raw.IsCoordinated && model.State.MachineMode != MachineMode.FFF;
+        raw.UsingStandardFeedrate = !isRapid;
+
+        if (isRapid)
+        {
+            // RepRapFirmware's MaximumG0FeedRate, and the overrides do not apply to it - M220 scales
+            // the print, and a rapid is not part of the print
+            raw.FeedRateMmPerSec = MaximumG0FeedRate / SecondsPerMinute;
+            raw.ApplyM220M221 = false;
+            return;
+        }
 
         if (input.InverseTimeMode)
         {
@@ -803,6 +816,15 @@ internal sealed partial class GCodeHandler(
         raw.FeedRateMmPerSec = raw.ApplyM220M221 ? converted * model.Move.SpeedFactor : converted;
         return;
     }
+
+    /// <summary>
+    /// How fast a G0 goes when it is a rapid rather than a travel move
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>MaximumG0FeedRate</c> in mm/min. The move is still limited by the axis
+    /// speeds the machine was configured with, so this is an upper bound rather than a promise
+    /// </remarks>
+    private const float MaximumG0FeedRate = 60000.0f;
 
     /// <summary>
     /// Whether the code moves anything other than Z

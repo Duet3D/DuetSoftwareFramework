@@ -146,8 +146,19 @@ internal partial class MCodeHandler
     private async ValueTask<Message> HandleSpindleOnAsync(Commands.Code code, bool reverse,
                                                           CancellationToken cancellationToken)
     {
-        // TODO in laser mode M3 sets the laser power (state.machineMode, M452), which is a different
-        // code sharing a number. M451/M452/M453 are not ported, so there is no mode to branch on
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            if (model.State.MachineMode == MachineMode.Laser)
+            {
+                // M3 in laser mode is a different code sharing a number: S is the beam power for the
+                // moves that follow, not a spindle speed
+                // TODO set the laser power once there is somewhere for it to go - RawMove has no
+                // field for it and the wire format no slot, so accepting S here would record a
+                // number that never reaches a move
+                return new Message(MessageType.Warning,
+                    "Laser power is not supported yet; M3 does nothing in laser mode");
+            }
+        }
 
         int spindleNumber = await SpindleForCodeAsync(code, cancellationToken);
         if (spindleNumber < 0)

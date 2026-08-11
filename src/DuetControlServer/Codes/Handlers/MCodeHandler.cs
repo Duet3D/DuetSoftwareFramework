@@ -234,6 +234,14 @@ internal partial class MCodeHandler(
             409 => await HandleQueryObjectModelAsync(code, cancellationToken),
             // Backlash compensation
             425 => await HandleBacklashAsync(code, cancellationToken),
+            // Report the machine mode
+            450 => await HandleReportMachineModeAsync(cancellationToken),
+            // Select FFF mode
+            451 => await HandleSetMachineModeAsync(code, MachineMode.FFF, cancellationToken),
+            // Select laser mode
+            452 => await HandleSetMachineModeAsync(code, MachineMode.Laser, cancellationToken),
+            // Select CNC mode
+            453 => await HandleSetMachineModeAsync(code, MachineMode.CNC, cancellationToken),
             // Create directory on SD card
             470 => await HandleCreateDirectoryAsync(code, cancellationToken),
             // Rename file or directory on SD card
