@@ -125,6 +125,35 @@ public partial class Heater : ModelObject, IStaticModelObject
     public StaticModelCollection<HeaterMonitor> Monitors { get; } = [];
 
     /// <summary>
+    /// Port of this heater as given to M950, or null if it has none
+    /// </summary>
+    /// <remarks>
+    /// The output that drives the heating element, which is not the same as the port of the sensor
+    /// that reads it - <see cref="Sensor"/> names that one. Both are needed to recreate the machine:
+    /// the sensor says which board the heater is on, and this says what that board should drive
+    /// </remarks>
+    public string? Port
+    {
+        get => _port;
+        set => SetPropertyValue(ref _port, value);
+    }
+    private string? _port;
+
+    /// <summary>
+    /// PWM frequency of this heater in Hz
+    /// </summary>
+    /// <remarks>
+    /// Set by M950 H Q. A mains heater switched by a relay wants a low frequency and a cartridge
+    /// heater on a MOSFET a high one, so it is part of how the machine is wired rather than a default
+    /// </remarks>
+    public float Frequency
+    {
+        get => _frequency;
+        set => SetPropertyValue(ref _frequency, value);
+    }
+    private float _frequency;
+
+    /// <summary>
     /// Sensor number of this heater or -1 if not configured
     /// </summary>
     public int Sensor

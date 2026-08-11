@@ -84,6 +84,42 @@ internal partial class MCodeHandler
             {
                 sensor.Name = name;
             }
+
+            // The board is what turns a resistance into a temperature, but the constants it does
+            // that with are how the machine is built - a thermistor's beta is a property of the part
+            // that was fitted. Storing only the port would leave the model unable to describe it
+            if (code.TryGetFloat('T', out float r25))
+            {
+                sensor.R25 = r25;
+            }
+            if (code.TryGetFloat('B', out float beta))
+            {
+                sensor.Beta = beta;
+            }
+            if (code.TryGetFloat('C', out float shC))
+            {
+                sensor.C = shC;
+            }
+            if (code.TryGetFloat('R', out float seriesResistor))
+            {
+                sensor.RRef = seriesResistor;
+            }
+            if (code.TryGetFloat('L', out float lowReading))
+            {
+                sensor.LowReading = lowReading;
+            }
+            if (code.TryGetFloat('H', out float highReading))
+            {
+                sensor.HighReading = highReading;
+            }
+            if (code.TryGetFloat('U', out float offsetAdj))
+            {
+                sensor.OffsetAdj = offsetAdj;
+            }
+            if (code.TryGetFloat('V', out float slopeAdj))
+            {
+                sensor.SlopeAdj = slopeAdj;
+            }
         }
 
         // The board is what reads the sensor, so it is what has to be told how. The parameter table
@@ -198,7 +234,12 @@ internal partial class MCodeHandler
 
             Heater heater = heatManager.Create(heaterNumber);
             heater.Sensor = sensorNumber;
+            heater.Port = port;
             heater.State = HeaterState.Off;
+            if (code.TryGetFloat('Q', out float frequency))
+            {
+                heater.Frequency = frequency;
+            }
         }
 
         return await SendGenericAsync<CanMessageM950Heater>(board, code, cancellationToken);
@@ -401,14 +442,29 @@ internal partial class MCodeHandler
     }
 
     /// <summary>
-    /// The heaters M140 or M141 addresses
+    /// The heaters M140 or M141 addresses, assigning one first where H says which
     /// </summary>
+    /// <remarks>
+    /// <c>M140 H0</c> is what makes heater 0 the bed, and without it the mapping is empty and M140
+    /// has nothing to address. RepRapFirmware treats the assignment and the temperature as one code
+    /// for that reason: a config.g says which heater the bed is and a job says how hot it should be,
+    /// and both are M140
+    /// </remarks>
     private async ValueTask<List<int>> BedOrChamberHeatersAsync(Commands.Code code, bool chamber,
                                                                 CancellationToken cancellationToken)
     {
+        int index = code.TryGetInt('P', out int given) ? given : -1;
+        if (code.TryGetInt('H', out int heaterNumber))
+        {
+            using (await model.AccessReadWriteAsync(cancellationToken))
+            {
+                heatManager.AssignBedOrChamberHeater(chamber, index < 0 ? 0 : index, heaterNumber);
+            }
+        }
+
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            return heatManager.BedOrChamberHeaters(chamber, code.TryGetInt('P', out int index) ? index : -1);
+            return heatManager.BedOrChamberHeaters(chamber, index);
         }
     }
 

@@ -233,6 +233,27 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
     }
 
     /// <summary>
+    /// Make a heater the bed or chamber heater, or remove it from that role
+    /// </summary>
+    /// <param name="chamber">True for a chamber, false for a bed</param>
+    /// <param name="index">Which bed or chamber</param>
+    /// <param name="heaterNumber">The heater, or negative to leave it with none</param>
+    /// <remarks>
+    /// Each entry of the mapping is the heaters of one bed, so this replaces that bed's set rather
+    /// than adding to it - which is what makes a re-run config.g idempotent. The caller must hold the
+    /// object model write lock
+    /// </remarks>
+    public void AssignBedOrChamberHeater(bool chamber, int index, int heaterNumber)
+    {
+        var mapping = chamber ? model.Heat.ChamberHeaterMapping : model.Heat.BedHeaterMapping;
+        while (mapping.Count <= index)
+        {
+            mapping.Add([]);
+        }
+        mapping[index] = heaterNumber >= 0 ? [heaterNumber] : [];
+    }
+
+    /// <summary>
     /// The first bed heater, which is the one M105 reports as B
     /// </summary>
     /// <remarks>The caller must hold the object model lock</remarks>
