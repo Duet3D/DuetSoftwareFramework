@@ -167,8 +167,9 @@ internal sealed partial class GCodeHandler
 
     private void AxisAndBedTransform(RawMove raw, int numAxes)
     {
-        ApplyAxisSkewTransform(raw.Coords);
-        
+        ApplyAxisSkewTransform(raw.Coords, numAxes);
+
+
         if (IsUsingMeshCompensation(raw, numAxes))
         {
             ApplyBedCompensation(raw, numAxes);

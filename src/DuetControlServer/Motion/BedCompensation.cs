@@ -31,6 +31,10 @@ public sealed class BedCompensation(Model.ObjectModel model)
     /// <summary>Height above the bed at which the correction has faded to nothing, or zero for no taper</summary>
     private float _taperHeight;
 
+    /// <summary>Constant added to every height the map gives, so that one point of it reads zero</summary>
+    /// <remarks>RepRapFirmware's <c>Move::zShift</c> - see <see cref="SetZeroHeightError"/></remarks>
+    private float _zShift;
+
     /// <summary>Whether a height map is loaded and being applied</summary>
     public bool IsActive => _map is not null;
 
@@ -61,6 +65,7 @@ public sealed class BedCompensation(Model.ObjectModel model)
         }
 
         _map = map;
+        _zShift = 0.0f;                         // the shift belonged to the map being replaced
         await PublishAsync(map!, fileName, cancellationToken);
         return null;
     }
@@ -109,6 +114,7 @@ public sealed class BedCompensation(Model.ObjectModel model)
     public async ValueTask AdoptAsync(HeightMap map, CancellationToken cancellationToken)
     {
         _map = map;
+        _zShift = 0.0f;                         // the shift belonged to the map being replaced
         await PublishAsync(map, fileName: null, cancellationToken);
     }
 
@@ -143,6 +149,11 @@ public sealed class BedCompensation(Model.ObjectModel model)
     public async ValueTask ClearAsync(CancellationToken cancellationToken)
     {
         _map = null;
+
+        // As RepRapFirmware's SetIdentityTransform does. The shift normalises a particular map at a
+        // particular point, so it means nothing once that map is gone
+        _zShift = 0.0f;
+
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             MoveCompensation compensation = model.Move.Compensation;
@@ -158,6 +169,45 @@ public sealed class BedCompensation(Model.ObjectModel model)
     /// </summary>
     /// <param name="taperHeight">The height in mm, or zero or less for no taper</param>
     public void SetTaperHeight(float taperHeight) => _taperHeight = taperHeight > 0.0f ? taperHeight : 0.0f;
+
+    /// <summary>
+    /// Normalise the map so that it reads zero error at the point just probed
+    /// </summary>
+    /// <param name="axis0">Coordinate along the first axis of the grid, at the probe</param>
+    /// <param name="axis1">Coordinate along its second</param>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>Move::SetZeroHeightError</c>, called by a G30 that redefines the Z origin.
+    /// The map says how far the bed deviates from flat, but "flat" is wherever Z was zeroed, and a
+    /// G30 has just moved that. Without the shift, a machine that probes at a point where the map
+    /// reads -0.1 mm sets Z to the trigger height and is then immediately corrected by that -0.1 mm
+    /// at the same point - so the map fights the operation that was supposed to define its datum.
+    /// </para>
+    /// <para>
+    /// The coordinates are the <em>probe's</em>, not the nozzle's, which is why the caller adds the
+    /// probe offsets before asking. That is the point the height was actually measured at
+    /// </para>
+    /// </remarks>
+    public void SetZeroHeightError(float axis0, float axis1)
+    {
+        HeightMap? map = _map;
+        _zShift = map is null ? 0.0f : -map.GetInterpolatedHeightError(axis0, axis1);
+    }
+
+    /// <summary>
+    /// How far the bed deviates at a point, before the taper is applied
+    /// </summary>
+    /// <param name="map">The map</param>
+    /// <param name="axis0">Coordinate along the first axis of the grid</param>
+    /// <param name="axis1">Coordinate along its second</param>
+    /// <returns>The deviation in mm</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>ComputeHeightCorrection</c>, less the averaging over mapped axes that
+    /// needs a tool. Both directions of the transform go through it, so the shift cannot be applied
+    /// to one and forgotten in the other
+    /// </remarks>
+    private float ComputeHeightCorrection(HeightMap map, float axis0, float axis1)
+        => map.GetInterpolatedHeightError(axis0, axis1) + _zShift;
 
     /// <summary>The taper height in effect, or zero if the correction is not tapered</summary>
     public float TaperHeight => _taperHeight;
@@ -188,7 +238,7 @@ public sealed class BedCompensation(Model.ObjectModel model)
             return 0.0f;
         }
 
-        float correction = map.GetInterpolatedHeightError(axis0, axis1);
+        float correction = ComputeHeightCorrection(map, axis0, axis1);
         if (tapering && correction < _taperHeight)
         {
             correction *= (_taperHeight - requestedHeight) / _taperHeight;
@@ -216,7 +266,7 @@ public sealed class BedCompensation(Model.ObjectModel model)
             return machineHeight;
         }
 
-        float correction = map.GetInterpolatedHeightError(axis0, axis1);
+        float correction = ComputeHeightCorrection(map, axis0, axis1);
         if (_taperHeight <= 0.0f || correction >= _taperHeight)
         {
             return machineHeight - correction;

@@ -126,6 +126,61 @@ public class BedCompensationTests
     }
 
     [Test]
+    public void ZeroingTheMapMakesTheProbedPointReadZero()
+    {
+        // The whole point of the shift. A G30 has just declared the nozzle to be at the trigger
+        // height here, so the map must not immediately correct the machine at the very point that
+        // defined its datum - it would fight the operation that zeroed it
+        BedCompensation compensation = Loaded();
+        Assert.That(compensation.GetCorrection(20.0f, 20.0f, 0.0f), Is.Not.Zero, "the map deviates here to begin with");
+
+        compensation.SetZeroHeightError(20.0f, 20.0f);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(compensation.GetCorrection(20.0f, 20.0f, 0.0f), Is.Zero.Within(1e-4f),
+                        "the point the machine was zeroed at");
+            Assert.That(compensation.GetCorrection(0.0f, 0.0f, 0.0f), Is.EqualTo(-0.2f).Within(CornerTolerance),
+                        "the rest of the bed keeps its shape, measured from the new datum");
+        });
+    }
+
+    [Test]
+    public void TheZeroShiftInvertsWithTheCorrection()
+    {
+        // Both directions of the transform go through the same height computation, so a shift
+        // applied to one and forgotten in the other would show up as a reported position that drifts
+        // by the shift every time the machine is probed
+        foreach (float taper in new[] { 0.0f, 10.0f })
+        {
+            BedCompensation compensation = Loaded(taper);
+            compensation.SetZeroHeightError(20.0f, 20.0f);
+
+            foreach (float requested in new[] { 0.0f, 1.0f, 5.0f, 9.0f })
+            {
+                float commanded = requested + compensation.GetCorrection(0.0f, 0.0f, requested);
+                Assert.That(compensation.GetRequestedHeight(0.0f, 0.0f, commanded),
+                            Is.EqualTo(requested).Within(1e-3f), $"taper {taper}, requested {requested}");
+            }
+        }
+    }
+
+    [Test]
+    public void ANewMapDoesNotInheritTheOldOnesZeroPoint()
+    {
+        // The shift normalises one particular map at one particular point, so it means nothing once
+        // that map has been replaced. RepRapFirmware clears it in SetIdentityTransform for the same
+        // reason
+        BedCompensation compensation = Loaded();
+        compensation.SetZeroHeightError(20.0f, 20.0f);
+
+        Assert.That(compensation.LoadAsync(new StringReader(SampleMap), "heightmap.csv", CancellationToken.None)
+                                .AsTask().GetAwaiter().GetResult(), Is.Null);
+
+        Assert.That(compensation.GetCorrection(20.0f, 20.0f, 0.0f), Is.EqualTo(0.2f).Within(CornerTolerance));
+    }
+
+    [Test]
     public void ClearingStopsTheCorrectionBeingApplied()
     {
         BedCompensation compensation = Loaded();

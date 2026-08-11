@@ -1,5 +1,6 @@
 using DuetAPI.ObjectModel;
 using DuetControlServer.Motion;
+using DuetControlServer.Motion.Native;
 using System;
 using System.Globalization;
 using System.Threading;
@@ -419,10 +420,50 @@ internal sealed partial class GCodeHandler
                 // position is live and this has to be measured from where the last move left Z
                 float position = planner.Builder.StartCoordinates[settings.ZAxis] - correction;
                 RedefineMachinePosition(settings.ZAxis, position);
+
+                // Z has just been redefined, so "flat" has moved and the map has to be told where to.
+                // Otherwise the height map immediately corrects the machine at the very point the
+                // probe was used to zero it - it would fight the operation that set its own datum
+                ZeroTheHeightMapHere(probe, settings);
             }
             zAxisConfig.Homed = true;
         }
         return new Message();
+    }
+
+    /// <summary>
+    /// Normalise the height map to read zero at the point the probe just measured
+    /// </summary>
+    /// <param name="probe">The probe that was used</param>
+    /// <param name="settings">What the probe is configured to do</param>
+    /// <remarks>
+    /// RepRapFirmware's <c>Move::SetZeroHeightError</c> call after a plain G30. The coordinates it
+    /// wants are the probe's rather than the nozzle's, so the probe's offsets are added first and the
+    /// axis skew applied, exactly as RepRapFirmware does before looking the point up. The caller must
+    /// hold the object model write lock and the planner lock
+    /// </remarks>
+    private void ZeroTheHeightMapHere(Probe probe, ProbeSettings settings)
+    {
+        if (!bedCompensation.IsActive)
+        {
+            return;
+        }
+
+        int numAxes = planner.Parameters.SharedAxisCount(model.Move);
+        float[] probePosition = new float[MotionLimits.MaxAxes];
+        planner.Builder.StartCoordinates[..numAxes].CopyTo(probePosition);
+
+        for (int axis = 0; axis < numAxes && axis < probe.Offsets.Count; axis++)
+        {
+            if (axis != settings.ZAxis)
+            {
+                probePosition[axis] += probe.Offsets[axis];
+            }
+        }
+        ApplyAxisSkewTransform(probePosition, numAxes);
+
+        (float axis0, float axis1) = GridCoordinatesOf(probePosition, numAxes);
+        bedCompensation.SetZeroHeightError(axis0, axis1);
     }
 
     /// <summary>
