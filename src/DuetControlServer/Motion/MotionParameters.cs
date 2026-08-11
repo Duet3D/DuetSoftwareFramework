@@ -34,9 +34,6 @@ internal sealed class MotionParameters
     /// <summary>Number of logical drives</summary>
     private const int NumDrives = MotionLimits.MaxAxesPlusExtruders;
 
-    /// <summary>Seconds per minute, for the object model's mm/min speeds</summary>
-    private const float SecondsPerMinute = 60.0f;
-
     /// <summary>
     /// Acceleration cap to use before a motion system exists to carry one, in mm/s^2
     /// </summary>
@@ -268,8 +265,6 @@ internal sealed class MotionParameters
             }
         }
 
-        float clockSquared = MotionLimits.StepClockRate * MotionLimits.StepClockRate;
-
         // M204 is per motion system, which is where the object model keeps it. The planner is not
         // per motion system yet, so the first one sets the limits for all of them
         MotionSystem? motionSystem = move.MotionSystems.Count > 0 ? move.MotionSystems[0] : null;
@@ -283,19 +278,20 @@ internal sealed class MotionParameters
             Geometry = geometry,
             LinearAxes = linearAxes,
             RotationalAxes = rotationalAxes,
-            MaxPrintingAcceleration = (motionSystem?.PrintingAcceleration ?? DefaultAcceleration) / clockSquared,
-            MaxTravelAcceleration = (motionSystem?.TravelAcceleration ?? DefaultAcceleration) / clockSquared,
-            MinFeedrate = move.MinimumMovementSpeed / MotionLimits.StepClockRate
+            MaxPrintingAcceleration = MotionUnits.AccelerationFromMmPerSecSquared(motionSystem?.PrintingAcceleration ?? DefaultAcceleration),
+            MaxTravelAcceleration = MotionUnits.AccelerationFromMmPerSecSquared(motionSystem?.TravelAcceleration ?? DefaultAcceleration),
+            MinFeedrate = MotionUnits.SpeedFromMmPerSec(move.MinimumMovementSpeed)
         };
 
         for (int axis = 0; axis < numAxes; axis++)
         {
             Axis a = move.Axes[axis];
             parameters.StepsPerMm[axis] = a.StepsPerMm;
-            parameters.MaxFeedrates[axis] = a.Speed / SecondsPerMinute / MotionLimits.StepClockRate;
-            parameters.Accelerations[axis] = a.Acceleration / clockSquared;
-            parameters.ReducedAccelerations[axis] = (a.ReducedAcceleration > 0.0f ? a.ReducedAcceleration : a.Acceleration) / clockSquared;
-            parameters.InstantDvs[axis] = a.Jerk / SecondsPerMinute / MotionLimits.StepClockRate;
+            parameters.MaxFeedrates[axis] = MotionUnits.SpeedFromMmPerMin(a.Speed);
+            parameters.Accelerations[axis] = MotionUnits.AccelerationFromMmPerSecSquared(a.Acceleration);
+            parameters.ReducedAccelerations[axis] =
+                MotionUnits.AccelerationFromMmPerSecSquared(a.ReducedAcceleration > 0.0f ? a.ReducedAcceleration : a.Acceleration);
+            parameters.InstantDvs[axis] = MotionUnits.SpeedFromMmPerMin(a.Jerk);
 
             // The geometry limits positions as well as speeds, and M208's box is the part of that
             // every geometry shares, so it holds the limits rather than being handed them per call
@@ -313,14 +309,11 @@ internal sealed class MotionParameters
             Extruder e = move.Extruders[extruder];
             int drive = ExtruderToDrive(extruder);
             parameters.StepsPerMm[drive] = e.StepsPerMm;
-            parameters.MaxFeedrates[drive] = e.Speed / SecondsPerMinute / MotionLimits.StepClockRate;
-            parameters.Accelerations[drive] = e.Acceleration / clockSquared;
-            parameters.ReducedAccelerations[drive] = e.Acceleration / clockSquared;
-
-            parameters.InstantDvs[drive] = e.Jerk / SecondsPerMinute / MotionLimits.StepClockRate;
-
-            // Pressure advance is a time, so it converts to step clocks rather than dividing by them
-            parameters.PressureAdvanceClocks[drive] = e.PressAdv.K0 * MotionLimits.StepClockRate;
+            parameters.MaxFeedrates[drive] = MotionUnits.SpeedFromMmPerMin(e.Speed);
+            parameters.Accelerations[drive] = MotionUnits.AccelerationFromMmPerSecSquared(e.Acceleration);
+            parameters.ReducedAccelerations[drive] = MotionUnits.AccelerationFromMmPerSecSquared(e.Acceleration);
+            parameters.InstantDvs[drive] = MotionUnits.SpeedFromMmPerMin(e.Jerk);
+            parameters.PressureAdvanceClocks[drive] = MotionUnits.ClocksFromSeconds(e.PressAdv.K0);
 
             if (e.Driver is not null)
             {
@@ -365,8 +358,8 @@ internal sealed class MotionParameters
             config.DriveStepsPerMm[axis] = a.StepsPerMm;
 
             // Jerk is an instantaneous speed change, so it converts like a speed
-            config.InstantDvs[axis] = a.Jerk / SecondsPerMinute / MotionLimits.StepClockRate;
-            config.PrintingInstantDvs[axis] = a.PrintingJerk / SecondsPerMinute / MotionLimits.StepClockRate;
+            config.InstantDvs[axis] = MotionUnits.SpeedFromMmPerMin(a.Jerk);
+            config.PrintingInstantDvs[axis] = MotionUnits.SpeedFromMmPerMin(a.PrintingJerk);
 
             config.BacklashSteps[axis] = (int)MathF.Round(a.Backlash * a.StepsPerMm);
             config.ControllingDrives[axis] = Geometry.GetControllingDrives(axis);
@@ -390,9 +383,9 @@ internal sealed class MotionParameters
             int drive = ExtruderToDrive(extruder);
 
             config.DriveStepsPerMm[drive] = e.StepsPerMm;
-            config.InstantDvs[drive] = e.Jerk / SecondsPerMinute / MotionLimits.StepClockRate;
-            config.PrintingInstantDvs[drive] = e.PrintingJerk / SecondsPerMinute / MotionLimits.StepClockRate;
-            config.PressureAdvanceClocks[drive] = e.PressAdv.K0 * MotionLimits.StepClockRate;
+            config.InstantDvs[drive] = MotionUnits.SpeedFromMmPerMin(e.Jerk);
+            config.PrintingInstantDvs[drive] = MotionUnits.SpeedFromMmPerMin(e.PrintingJerk);
+            config.PressureAdvanceClocks[drive] = MotionUnits.ClocksFromSeconds(e.PressAdv.K0);
             config.ExtruderDrivers[extruder] = e.Driver is not null ? ToNativeDriver(e.Driver) : DriverId.None;
         }
 

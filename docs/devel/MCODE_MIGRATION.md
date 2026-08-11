@@ -2421,12 +2421,42 @@ Three more defects came out of it:
 RepRapFirmware's M669 report for a SCARA - arm lengths, joint ranges, crosstalk and bed origin - was
 not ported before and is now, per §1's rule 5.
 
-**Step 4 — invert axes and extruders.** The same pattern applied to `move.axes[]` and
-`move.extruders[]`, which is the bulk of `MCodeHandler.Motion.cs`. `MatchesObjectModel` and
-`SharedAxisCount`/`SharedExtruderCount` are deleted here, along with §13.4's divergence check, because
-divergence stops being representable. §1's rule 2 and the header comment on
-[MCodeHandler.Motion.cs:26](src/DuetControlServer/Codes/Handlers/MCodeHandler.Motion.cs#L26) are
-rewritten to say the opposite of what they say now.
+**Step 4 — axes and extruders: not the same problem, and not the same fix.** The plan said to apply
+step 3's pattern to `move.axes[]` and `move.extruders[]`. Looking at what that would mean, it should
+not be:
+
+- Kinematics had *two* objects. `KinematicsEngine` has to exist on this side whatever the object model
+  says, because it holds precomputed transform state - a delta's tower positions, a SCARA's arm-length
+  squares, a core geometry's inverted matrix - that the object model does not and should not carry.
+  Two objects means one of them has to be authoritative, and the wrong one was.
+- Axes have *one*. `move.axes[]` is a flat list of scalars with no behaviour and no derived state, and
+  nothing on this side holds a second copy of it. `MotionParameters` is derived, and §13 established
+  why it must stay derived. Inverting here would mean writing a DCS-side class mirroring `Axis`
+  property for property and a projection between them - **adding** a copy that can drift, to solve a
+  problem that does not exist for axes.
+
+So the object model stays authoritative for `move.axes[]` and `move.extruders[]`, and §1's rule 2 stands
+as written for them. What is left of step 4 is the part of the original complaint that *is* real:
+
+**Step 4a ✅ one place per conversion.** `FromObjectModel` and `ToMotionConfig` both walked the axes and
+extruders and both wrote out `/ SecondsPerMinute / StepClockRate` and `/ clockSquared` by hand, in eight
+places between them, with the M-code handlers writing the same arithmetic again. Now in
+[MotionUnits](src/DuetControlServer/Motion/MotionUnits.cs), ported from RepRapFirmware's
+`ConvertSpeedFromMmPerSec` family: a conversion that exists once cannot disagree with itself. The polar
+turntable limits go through it too - RepRapFirmware converts degrees with the same helpers it uses for
+millimetres, because the arithmetic is identical.
+
+**Step 4b — the two walks should become one.** They still both iterate the axes and extruders, so a
+setting added to one and not the other is still possible. Merging them into a single pass producing
+both outputs is the remaining piece, and it is small now that the arithmetic is shared.
+
+**Step 4c — `FromObjectModel` writes into the geometry it is handed.** `Geometry.AxisMinima`/`AxisMaxima`
+are assigned from `move.axes[].min`/`max` on every reconfiguration, so taking a snapshot mutates the
+planner's authoritative geometry as a side effect. It is correct today - the M208 box belongs on the
+geometry, because that is where positions are limited - but it is a write into the geometry from
+outside it, and it is the one place the object model still configures the engine rather than the other
+way round. It wants an explicit `SetAxisLimits`-style call on the way in rather than a hidden
+assignment inside a method named for reading.
 
 **Step 5 — merge `MoveBuilder` into `MovePlanner`** per §14.5.
 

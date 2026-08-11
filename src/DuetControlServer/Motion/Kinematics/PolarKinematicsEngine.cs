@@ -54,11 +54,14 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
     public float MaxTurntableAccelerationPerSec { get; }
 
     /// <summary>How fast the turntable may turn, degrees per step clock</summary>
-    public float MaxTurntableSpeed => MaxTurntableSpeedPerSec / MotionLimits.StepClockRate;
+    /// <remarks>
+    /// Degrees convert to step clocks exactly as millimetres do, which is why RepRapFirmware puts its
+    /// turntable limits through the same <c>ConvertSpeedFromMmPerSec</c> the axes use
+    /// </remarks>
+    public float MaxTurntableSpeed => MotionUnits.SpeedFromMmPerSec(MaxTurntableSpeedPerSec);
 
     /// <summary>How hard the turntable may be accelerated, degrees per step clock squared</summary>
-    public float MaxTurntableAcceleration
-        => MaxTurntableAccelerationPerSec / (MotionLimits.StepClockRate * MotionLimits.StepClockRate);
+    public float MaxTurntableAcceleration => MotionUnits.AccelerationFromMmPerSecSquared(MaxTurntableAccelerationPerSec);
 
     /// <inheritdoc />
     public override KinematicsName Kind => KinematicsName.Polar;
