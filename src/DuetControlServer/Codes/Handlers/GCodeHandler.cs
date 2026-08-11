@@ -531,10 +531,11 @@ internal sealed partial class GCodeHandler(
             // RepRapFirmware captures ms.initialCoords at the same instant and for the same reason.
             //
             // TODO RepRapFirmware copies its initialCoords from ms.raw.coords, which persists from
-            // the previous move, where this evaluates the transform afresh. The two differ only if a
-            // term of the transform changed since - a tool offset, a babystep - in which case RRF
-            // spreads the change across the move and this would apply it at the start. Nothing can
-            // change one yet: there is no tool subsystem and babystepping is not applied forwards
+            // the previous move, where this evaluates the transform afresh. The two differ whenever a
+            // term of the transform changed since - and M290 during a print is exactly that, so this
+            // is reachable now rather than theoretical. RRF interpolates from the old babystep to the
+            // new one across the move; here the whole change lands on the first segment. Closing it
+            // means carrying the previous move's coords rather than re-deriving them
             ToolOffsetTransform(state, raw.InitialCoords, numAxes);
 
             // The axes start where the last move left them, which is what an axis the code does not
@@ -1748,17 +1749,25 @@ internal sealed partial class GCodeHandler(
     /// coordinate while an axis that is only in the X map reads X's. So it does nothing until there
     /// are tools, and it must be carried until then rather than dropped.
     /// </para>
+    /// <para>
+    /// Babystepping is a term of it, and the one term that exists so far. It is what makes the offset
+    /// adjustable during a print without the reported coordinates moving: it is added on the way down
+    /// and taken back off by <see cref="SyncInterpreterToTarget"/> and
+    /// <see cref="SyncInterpreterToMachine"/> on the way up, so the operator reads back the
+    /// coordinate they asked for
+    /// </para>
     /// </remarks>
-    private static void ToolOffsetTransform(MovementState state, Span<float> coords, int numAxes,
-                                            uint explicitAxes = 0)
+    private void ToolOffsetTransform(MovementState state, Span<float> coords, int numAxes,
+                                     uint explicitAxes = 0)
     {
         // TODO apply the tool offsets, axis mapping, axis scale factors (M579) and Z hop, once there
-        // is a tool subsystem to read them from - explicitAxes is the parameter that mapping needs.
-        // Babystepping belongs here too - it is a term of RepRapFirmware's ToolOffsetTransform - and
-        // nothing adds it in the forward direction yet, which is why SyncInterpreterToTarget and
-        // SyncInterpreterToMachine subtract a term that is never applied
+        // is a tool subsystem to read them from - explicitAxes is the parameter that mapping needs
         _ = explicitAxes;
-        state.CurrentUserPosition[..numAxes].CopyTo(coords);
+
+        for (int axis = 0; axis < numAxes; axis++)
+        {
+            coords[axis] = state.CurrentUserPosition[axis] + model.Move.Axes[axis].Babystep;
+        }
     }
 
     /// <summary>
