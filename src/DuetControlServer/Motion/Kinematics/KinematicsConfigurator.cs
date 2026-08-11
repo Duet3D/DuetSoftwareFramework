@@ -81,9 +81,20 @@ internal static class KinematicsConfigurator
         // TryConfigureSegmentation, so they are handled once here rather than seven times
         if (code.MajorNumber == 669 && (code.HasParameter('S') || code.HasParameter('T')))
         {
+            // Each parameter keeps its existing value when the code does not give it, which is what
+            // RepRapFirmware's TryGetNonNegativeFValue does. Reading them straight into the variables
+            // cannot express that: an out parameter is assigned whether or not the value was found,
+            // so an absent T would zero the minimum segment length and turn segmentation off - on a
+            // code that had just asked for it
             float segmentsPerSecond = engine.SegmentsPerSecond, minSegmentLength = engine.MinSegmentLength;
-            code.TryGetFloat('S', out segmentsPerSecond);
-            code.TryGetFloat('T', out minSegmentLength);
+            if (code.TryGetFloat('S', out float givenSegmentsPerSecond))
+            {
+                segmentsPerSecond = givenSegmentsPerSecond;
+            }
+            if (code.TryGetFloat('T', out float givenMinSegmentLength))
+            {
+                minSegmentLength = givenMinSegmentLength;
+            }
             engine.ConfigureSegmentation(segmentsPerSecond, minSegmentLength);
             seen = true;
         }
