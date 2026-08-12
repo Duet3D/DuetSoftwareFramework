@@ -58,6 +58,12 @@ namespace Duet::Sbc
 		// works out where the drives were when it fired and tells the boards to wind back, which is
 		// why this carries the raw report rather than a conclusion
 		MotionStopped = 13,
+		// OutboundSeqEvent, no tail. Every command up to and including this sequence number reached
+		// the controller in a transfer that completed
+		OutboundDelivered = 14,
+		// OutboundSeqEvent, no tail. Every command up to and including this sequence number was
+		// abandoned instead, because the controller went away before it could be sent
+		OutboundDropped = 15,
 	};
 
 	// Severity for InboundEventType::Log, mirroring the subset of MessageType DCS logs at.
@@ -124,6 +130,15 @@ namespace Duet::Sbc
 		// doing. The SBC cannot tell the two apart afterwards: the sequence numbers that said so have
 		// been reset with everything else
 		uint16_t hadReset;
+	};
+
+	// How far the outbound queue has got. The queue is FIFO end to end - commands leave the ring in
+	// order and are written into a transfer in order - so one number says what happened to any number
+	// of them, which is what keeps this off the per-command hot path.
+	struct OutboundSeqEvent
+	{
+		InboundEventHeader header;
+		uint32_t sequenceNumber;
 	};
 
 	struct RequestCompletedEvent

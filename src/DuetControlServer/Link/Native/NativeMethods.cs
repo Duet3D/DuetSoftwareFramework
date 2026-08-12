@@ -143,7 +143,7 @@ internal static partial class NativeMethods
     /// <param name="length">Length of <paramref name="message"/> in bytes</param>
     /// <returns>Zero on success, non-zero if the outbound ring is full</returns>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_QueueMessage(IntPtr handle, uint flags, ReadOnlySpan<byte> message, int length);
+    internal static partial long DuetSbc_QueueMessage(IntPtr handle, uint flags, ReadOnlySpan<byte> message, int length);
 
     /// <summary>
     /// Queue a CAN message for transmission
@@ -158,7 +158,7 @@ internal static partial class NativeMethods
     /// <param name="length">Length of <paramref name="payload"/></param>
     /// <returns>Zero on success, non-zero if the outbound ring is full</returns>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_QueueCanMessage(IntPtr handle, ushort txToken, ushort msgType,
+    internal static partial long DuetSbc_QueueCanMessage(IntPtr handle, ushort txToken, ushort msgType,
         ushort replyType, byte dstAddress, int isResponse, ReadOnlySpan<byte> payload, int length);
 
     /// <summary>
@@ -169,7 +169,7 @@ internal static partial class NativeMethods
     /// <param name="requestId">Request id to report completion against, or 0 for fire-and-forget</param>
     /// <returns>Zero on success, non-zero if the outbound ring is full</returns>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_QueueEnableCan(IntPtr handle, int enable, uint requestId);
+    internal static partial long DuetSbc_QueueEnableCan(IntPtr handle, int enable, uint requestId);
 
     /// <summary>
     /// Request an immediate emergency stop

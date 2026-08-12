@@ -252,19 +252,26 @@ public sealed partial class LinkInterface(
         {
             // Hand the message to the native loop, which stages it into the next transfer. The reply
             // (if any) arrives as a CanResponse event and is matched back to this request by its token
-            nativeLink.QueueCanMessage(request.TxToken, (ushort)request.MessageType, (ushort)request.ReplyType,
+            uint sequenceNumber = nativeLink.QueueCanMessage(request.TxToken, (ushort)request.MessageType, (ushort)request.ReplyType,
                 request.DstAddress, request.IsResponse, request.RequestPayload);
             request.Sent = true;
 
-            // A request expecting no reply is complete as soon as the native loop has taken it: there
-            // is nothing further to wait for, and no CanResponse event will ever arrive to resolve it.
-            // It must also be dropped from the list here, because only a matching response would
-            // otherwise remove it -- leaving it to accumulate for every fire-and-forget message.
+            // A request expecting no reply has no CanResponse event to resolve it, so what completes it
+            // is the transfer that carried it reaching the controller. Taking the message out of the
+            // ring is a memcpy, and a request resolved on that is one the caller believes was sent when
+            // the link may drop before it ever is
             if (!request.ExpectsReply)
             {
-                lock (CanRequests)
+                try
                 {
-                    CanRequests.Remove(request);
+                    await nativeLink.WaitForDeliveryAsync(sequenceNumber, cancellationToken);
+                }
+                finally
+                {
+                    lock (CanRequests)
+                    {
+                        CanRequests.Remove(request);
+                    }
                 }
                 request.SetResult();
             }

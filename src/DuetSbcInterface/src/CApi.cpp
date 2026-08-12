@@ -156,17 +156,16 @@ extern "C"
 
 	// --- Outbound ---
 
-	int32_t DuetSbc_QueueMessage(DuetSbcHandle* h, uint32_t flags, const char* message, int32_t length)
+	int64_t DuetSbc_QueueMessage(DuetSbcHandle* h, uint32_t flags, const char* message, int32_t length)
 	{
 		if (h == nullptr)
 			return -1;
-		return h->interface.QueueMessage(
-				   flags, message, (message != nullptr && length > 0) ? static_cast<size_t>(length) : 0)
-				   ? 0
-				   : -1;
+		const uint32_t seq = h->interface.QueueMessage(
+			flags, message, (message != nullptr && length > 0) ? static_cast<size_t>(length) : 0);
+		return (seq != 0) ? static_cast<int64_t>(seq) : -1;
 	}
 
-	int32_t DuetSbc_QueueCanMessage(DuetSbcHandle* h,
+	int64_t DuetSbc_QueueCanMessage(DuetSbcHandle* h,
 									uint16_t txToken,
 									uint16_t msgType,
 									uint16_t replyType,
@@ -177,22 +176,23 @@ extern "C"
 	{
 		if (h == nullptr)
 			return -1;
-		return h->interface.QueueCanMessage(txToken,
-											msgType,
-											replyType,
-											dstAddress,
-											isResponse != 0,
-											payload,
-											(payload != nullptr && length > 0) ? static_cast<size_t>(length) : 0)
-				   ? 0
-				   : -1;
+		const uint32_t seq =
+			h->interface.QueueCanMessage(txToken,
+										 msgType,
+										 replyType,
+										 dstAddress,
+										 isResponse != 0,
+										 payload,
+										 (payload != nullptr && length > 0) ? static_cast<size_t>(length) : 0);
+		return (seq != 0) ? static_cast<int64_t>(seq) : -1;
 	}
 
-	int32_t DuetSbc_QueueEnableCan(DuetSbcHandle* h, int32_t enable, uint32_t requestId)
+	int64_t DuetSbc_QueueEnableCan(DuetSbcHandle* h, int32_t enable, uint32_t requestId)
 	{
 		if (h == nullptr)
 			return -1;
-		return h->interface.QueueEnableCan(enable != 0, requestId) ? 0 : -1;
+		const uint32_t seq = h->interface.QueueEnableCan(enable != 0, requestId);
+		return (seq != 0) ? static_cast<int64_t>(seq) : -1;
 	}
 
 	void DuetSbc_RequestEmergencyStop(DuetSbcHandle* h, uint32_t requestId)

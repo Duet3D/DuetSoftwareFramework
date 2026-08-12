@@ -72,19 +72,22 @@ namespace Duet::Sbc
 		//
 		// These return false if the outbound ring is full, i.e. the loop is not draining it. The caller
 		// must treat that as an error rather than silently losing the message.
-		bool QueueMessage(uint32_t messageFlags, const char* message, size_t length);
-		bool QueueCanMessage(uint16_t txToken,
+		// The Queue* calls return the sequence number the command was given, or 0 if the ring was full.
+		// Every command gets one, and OutboundDelivered/OutboundDropped say what became of everything up
+		// to a given number - which works because the queue is FIFO end to end
+		uint32_t QueueMessage(uint32_t messageFlags, const char* message, size_t length);
+		uint32_t QueueCanMessage(uint16_t txToken,
 							 uint16_t msgType,
 							 uint16_t replyType,
 							 uint8_t dstAddress,
 							 bool isResponse,
 							 const uint8_t* payload,
 							 size_t payloadLength);
-		bool QueueEnableCan(bool enable, uint32_t requestId = kNoRequestId);
+		uint32_t QueueEnableCan(bool enable, uint32_t requestId = kNoRequestId);
 
 		// Queue a prepared move. Called from the motion thread, which must never block, so this
 		// returns false rather than waiting when the ring is full - the caller stops preparing.
-		bool QueueScheduleMove(std::span<const uint8_t> packet);
+		uint32_t QueueScheduleMove(std::span<const uint8_t> packet);
 
 		// Post an inbound event from a thread other than the interface thread. The ring serialises
 		// its producers with a mutex held only for the copy, so this does not wait on a transfer -
@@ -160,8 +163,17 @@ namespace Duet::Sbc
 		RingBuffer m_inbound;
 		RingBuffer m_outbound;
 
+		// Sequence numbers for the outbound queue. Queued is written by whoever queues a command and
+		// read by the interface thread; the other two belong to the interface thread alone
+		std::atomic<uint32_t> m_queuedSeq{0};
+		uint32_t m_stagedSeq = 0;
+		uint32_t m_reportedSeq = 0;
+
 		// Abandon the commands queued for a controller that is not there
 		void DropOutgoing();
+
+		// Report how far the outbound queue has got
+		void PostOutboundSeq(InboundEventType type, uint32_t sequenceNumber);
 
 		// When the most recent transfer completed, in the step-time model's local timebase. Written
 		// and read only by the interface thread.

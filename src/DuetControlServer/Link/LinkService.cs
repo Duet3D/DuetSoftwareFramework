@@ -260,6 +260,11 @@ internal sealed class LinkService(
             case InboundEventType.MotionStopped:
                 HandleMotionStopped(record);
                 break;
+            case InboundEventType.OutboundDelivered:
+            case InboundEventType.OutboundDropped:
+                nativeLink.CompleteOutbound(MemoryMarshal.Read<OutboundSeqEvent>(record).SequenceNumber,
+                                            (InboundEventType)header.Type == InboundEventType.OutboundDelivered);
+                break;
             case InboundEventType.FatalError:
                 HandleFatalError(record);
                 break;

@@ -70,7 +70,13 @@ internal enum InboundEventType : ushort
     /// The controller's report, unchanged. Where the drives should end up is not in it, because the
     /// controller never generated the steps; that is worked out here from the trigger timestamp
     /// </remarks>
-    MotionStopped = 13
+    MotionStopped = 13,
+
+    /// <summary>Outbound commands reached the controller: <see cref="OutboundSeqEvent"/></summary>
+    OutboundDelivered = 14,
+
+    /// <summary>Outbound commands were abandoned instead: <see cref="OutboundSeqEvent"/></summary>
+    OutboundDropped = 15
 }
 
 /// <summary>
@@ -237,9 +243,27 @@ internal struct CodeBufferEvent
 }
 
 /// <summary>
+/// How far the outbound queue has got
+/// </summary>
+/// <remarks>
+/// The queue is FIFO end to end, so one number says what became of every command up to it. That is
+/// what keeps the report off the per-command path, where the move stream lives
+/// </remarks>
+[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 8)]
+internal struct OutboundSeqEvent
+{
+    /// <summary>Record header</summary>
+    public InboundEventHeader Header;
+
+    /// <summary>Last command this applies to</summary>
+    public uint SequenceNumber;
+}
+
+/// <summary>
 /// The link came up
 /// </summary>
 [StructLayout(LayoutKind.Sequential, Pack = 1, Size = 8)]
+
 internal struct ConnectionEstablishedEvent
 {
     /// <summary>Record header</summary>

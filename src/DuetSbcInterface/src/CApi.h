@@ -71,8 +71,9 @@ extern "C"
 
 	// These return 0 on success and non-zero if the outbound ring is full (i.e. the message was NOT
 	// queued and the caller must surface that rather than lose it).
-	int32_t DuetSbc_QueueMessage(DuetSbcHandle* h, uint32_t flags, const char* message, int32_t length);
-	int32_t DuetSbc_QueueCanMessage(DuetSbcHandle* h,
+	// The Queue* calls return the sequence number the command was given, or -1 if it was refused
+	int64_t DuetSbc_QueueMessage(DuetSbcHandle* h, uint32_t flags, const char* message, int32_t length);
+	int64_t DuetSbc_QueueCanMessage(DuetSbcHandle* h,
 									uint16_t txToken,
 									uint16_t msgType,
 									uint16_t replyType,
@@ -81,7 +82,7 @@ extern "C"
 									const uint8_t* payload,
 									int32_t length);
 	// requestId may be 0 for fire-and-forget; otherwise the outcome arrives as a RequestCompleted event.
-	int32_t DuetSbc_QueueEnableCan(DuetSbcHandle* h, int32_t enable, uint32_t requestId);
+	int64_t DuetSbc_QueueEnableCan(DuetSbcHandle* h, int32_t enable, uint32_t requestId);
 	void DuetSbc_RequestEmergencyStop(DuetSbcHandle* h, uint32_t requestId);
 	void DuetSbc_RequestReset(DuetSbcHandle* h, uint32_t requestId);
 

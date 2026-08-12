@@ -558,11 +558,13 @@ A per-command completion event would be one event per message on the hot path, w
 cannot afford. It is not needed: **the outbound path is FIFO end to end.** Commands leave the ring in
 order and are written into the transfer in order, so one number describes any number of them:
 
-- Every command gets a monotonic `outboundSeq` when it enters `m_outbound`.
-- The transfer engine records the highest seq staged into the transfer it is about to perform.
+- Every command gets a monotonic sequence number when it enters `m_outbound`.
+- The transfer engine counts how far `StageOutgoing` has consumed into the transfer it is about to
+  perform.
 - On success, post `OutboundDelivered(seq)` — *everything up to and including* `seq` reached the
   controller.
-- On a drop (§4.1.1) or a failed transfer, post `OutboundDropped(from, to)`.
+- On a drop (§4.1.1), post `OutboundDropped(seq)` for everything queued, which covers both what was
+  staged into a transfer that never completed and what never left the ring.
 
 That is O(1) per transfer rather than O(1) per command, and the managed side resolves it against an
 ordered map of `seq` → completion. Commands that already carry a request id keep it: the id says
@@ -767,11 +769,12 @@ Each phase is independently useful and independently testable.
 - [x] Native: drop the staged TX buffer and the `m_outbound` ring in `PrepareReconnect`, and on a
       reset the link never timed out over; complete request-bearing commands as `Cancelled`, count and
       log the rest (§4.1.1)
-- [ ] Native: `outboundSeq` on every command, `OutboundDelivered(seq)` after a successful transfer and
-      `OutboundDropped(from, to)` on a drop; move `EnableCan`'s completion off the staging path
-      (§4.1.2 hop 1)
-- [ ] Protocol: `FirmwareRequest::CanMessageSent = 7`, batched `{txToken, status}` entries;
-      `ProtocolVersion` → 9 on both sides, and correct the stale C# `Consts.ProtocolVersion` (hop 2)
+- [x] Native: a sequence number on every command, `OutboundDelivered(seq)` after a successful transfer
+      and `OutboundDropped(seq)` on a drop (§4.1.2 hop 1)
+- [x] DCS: a CAN message expecting no reply resolves on delivery rather than at queue time
+- [x] Correct the stale C# `Consts.ProtocolVersion`, which disagreed with the transfer engine's copy
+- [ ] Protocol: `FirmwareRequest::CanMessageSent`, batched `{txToken, status}` entries (hop 2). No
+      version bump: nothing has been released against this protocol yet
 - [ ] Controller: acknowledge every SBC-originated CAN message from `SendCanRequest`, including the
       four paths that currently fail silently; map a cancelled CAN id back to its token
 - [ ] DCS: resolve fire-and-forget CAN requests on the ack rather than at queue time, bound by

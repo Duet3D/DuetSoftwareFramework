@@ -140,7 +140,7 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	// Outbound queueing (caller threads)
 	// ---------------------------------------------------------------------------
-	bool SbcInterface::QueueMessage(uint32_t messageFlags, const char* message, size_t length)
+	uint32_t SbcInterface::QueueMessage(uint32_t messageFlags, const char* message, size_t length)
 	{
 		MessageCommand cmd{};
 		cmd.header.type = static_cast<uint16_t>(OutboundCommandType::Message);
@@ -149,13 +149,14 @@ namespace Duet::Sbc
 		const ByteSpan fragments[2] = {AsBytes(cmd), AsBytes(message, length)};
 		if (!m_outbound.WriteScattered(fragments))
 		{
-			return false;
+			return 0;
 		}
+		const uint32_t seq = ++m_queuedSeq;
 		RequestTransfer();
-		return true;
+		return seq;
 	}
 
-	bool SbcInterface::QueueCanMessage(uint16_t txToken,
+	uint32_t SbcInterface::QueueCanMessage(uint16_t txToken,
 									   uint16_t msgType,
 									   uint16_t replyType,
 									   uint8_t dstAddress,
@@ -174,10 +175,11 @@ namespace Duet::Sbc
 		const ByteSpan fragments[2] = {AsBytes(cmd), AsBytes(payload, payloadLength)};
 		if (!m_outbound.WriteScattered(fragments))
 		{
-			return false;
+			return 0;
 		}
+		const uint32_t seq = ++m_queuedSeq;
 		RequestTransfer();
-		return true;
+		return seq;
 	}
 
 	bool SbcInterface::OutboundHasHeadroom() const
@@ -197,7 +199,7 @@ namespace Duet::Sbc
 		PostEvent(type, header, headerLength, tail, tailLength);
 	}
 
-	bool SbcInterface::QueueScheduleMove(std::span<const uint8_t> packet)
+	uint32_t SbcInterface::QueueScheduleMove(std::span<const uint8_t> packet)
 	{
 		OutboundCommandHeader header{};
 		header.type = static_cast<uint16_t>(OutboundCommandType::ScheduleMove);
@@ -205,13 +207,14 @@ namespace Duet::Sbc
 		const ByteSpan fragments[2] = {AsBytes(header), packet};
 		if (!m_outbound.WriteScattered(fragments))
 		{
-			return false;
+			return 0;
 		}
+		const uint32_t seq = ++m_queuedSeq;
 		RequestTransfer();
-		return true;
+		return seq;
 	}
 
-	bool SbcInterface::QueueEnableCan(bool enable, uint32_t requestId)
+	uint32_t SbcInterface::QueueEnableCan(bool enable, uint32_t requestId)
 	{
 		EnableCanCommand cmd{};
 		cmd.header.type = static_cast<uint16_t>(OutboundCommandType::EnableCan);
@@ -219,10 +222,11 @@ namespace Duet::Sbc
 		cmd.enable = enable ? 1 : 0;
 		if (!m_outbound.Write(AsBytes(cmd)))
 		{
-			return false;
+			return 0;
 		}
+		const uint32_t seq = ++m_queuedSeq;
 		RequestTransfer();
-		return true;
+		return seq;
 	}
 
 	void SbcInterface::RequestEmergencyStop(uint32_t requestId)
@@ -411,6 +415,9 @@ namespace Duet::Sbc
 				// rather than while walking the packets is what makes the pairing constant: a packet
 				// is reached after however long the ones before it took to process, and that
 				// variation is exactly what the fit cannot remove.
+				// Everything staged into the transfer that has just completed is now the controller's
+				PostOutboundSeq(InboundEventType::OutboundDelivered, m_stagedSeq);
+
 				m_lastTransferNs = StepTimer::GetLocalTimeNs();
 				if (m_transfer.IsConnected())
 				{
@@ -580,6 +587,7 @@ namespace Duet::Sbc
 				break;
 			}
 			m_outbound.Consume();
+			++m_stagedSeq;
 		}
 	}
 
@@ -617,6 +625,26 @@ namespace Duet::Sbc
 			// the outside exactly like one that delivered everything
 			PostLog(LogLevel::Warning, "Dropped " + std::to_string(dropped) + " queued command(s) for the controller");
 		}
+
+		// Everything queued is now accounted for: what was staged into a transfer that never completed
+		// is as lost as what never left the ring, and the caller waiting on either needs telling
+		m_stagedSeq = m_queuedSeq.load(std::memory_order_relaxed);
+		PostOutboundSeq(InboundEventType::OutboundDropped, m_stagedSeq);
+	}
+
+	// Report how far the outbound queue has got, skipping a report that says nothing new
+	void SbcInterface::PostOutboundSeq(InboundEventType type, uint32_t sequenceNumber)
+	{
+		if (sequenceNumber == m_reportedSeq)
+		{
+			return;
+		}
+		m_reportedSeq = sequenceNumber;
+
+		OutboundSeqEvent event{};
+		event.header.type = static_cast<uint16_t>(type);
+		event.sequenceNumber = sequenceNumber;
+		PostEvent(type, &event, sizeof(event));
 	}
 
 	// ---------------------------------------------------------------------------

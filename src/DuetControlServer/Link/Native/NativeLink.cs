@@ -98,6 +98,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
         Check<CanResponseEvent>(16);
         Check<CodeBufferEvent>(8);
         Check<ConnectionEstablishedEvent>(8);
+        Check<OutboundSeqEvent>(8);
         Check<RequestCompletedEvent>(12);
         Check<LogEvent>(8);
         Check<MalformedPacketEvent>(12);
@@ -239,7 +240,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     {
         ThrowIfDisposed();
         byte[] encoded = Encoding.UTF8.GetBytes(message);
-        if (NativeMethods.DuetSbc_QueueMessage(_handle, (uint)flags, encoded, encoded.Length) != 0)
+        if (NativeMethods.DuetSbc_QueueMessage(_handle, (uint)flags, encoded, encoded.Length) < 0)
         {
             // The transfer loop is not draining the ring, so the message would be silently lost
             throw new InvalidOperationException("Failed to queue message: native outbound buffer is full");
@@ -255,14 +256,17 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     /// <param name="dstAddress">CAN destination: 0..126, or 127 for broadcast</param>
     /// <param name="isResponse">Whether this message is a response</param>
     /// <param name="payload">CAN payload (0..64 bytes)</param>
+    /// <returns>Sequence number to wait on with <see cref="WaitForDeliveryAsync"/></returns>
     /// <exception cref="InvalidOperationException">The outbound ring is full</exception>
-    public void QueueCanMessage(ushort txToken, ushort msgType, ushort replyType, byte dstAddress, bool isResponse, ReadOnlySpan<byte> payload)
+    public uint QueueCanMessage(ushort txToken, ushort msgType, ushort replyType, byte dstAddress, bool isResponse, ReadOnlySpan<byte> payload)
     {
         ThrowIfDisposed();
-        if (NativeMethods.DuetSbc_QueueCanMessage(_handle, txToken, msgType, replyType, dstAddress, isResponse ? 1 : 0, payload, payload.Length) != 0)
+        long sequenceNumber = NativeMethods.DuetSbc_QueueCanMessage(_handle, txToken, msgType, replyType, dstAddress, isResponse ? 1 : 0, payload, payload.Length);
+        if (sequenceNumber < 0)
         {
             throw new InvalidOperationException("Failed to queue CAN message: native outbound buffer is full");
         }
+        return (uint)sequenceNumber;
     }
 
     /// <summary>
@@ -333,7 +337,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
         ThrowIfDisposed();
         TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         uint requestId = RegisterRequest(tcs);
-        if (NativeMethods.DuetSbc_QueueEnableCan(_handle, enable ? 1 : 0, requestId) != 0)
+        if (NativeMethods.DuetSbc_QueueEnableCan(_handle, enable ? 1 : 0, requestId) < 0)
         {
             _pendingRequests.TryRemove(requestId, out _);
             throw new InvalidOperationException("Failed to queue CAN enable request: native outbound buffer is full");
@@ -451,6 +455,79 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
             default:
                 tcs.TrySetException(new InvalidOperationException(string.IsNullOrEmpty(error) ? "Request failed" : error));
                 break;
+        }
+    }
+
+    /// <summary>
+    /// Commands waiting to hear that they reached the controller, by sequence number
+    /// </summary>
+    private readonly SortedDictionary<uint, TaskCompletionSource> _outboundWaiters = [];
+
+    /// <summary>
+    /// Wait until a queued command has reached the controller
+    /// </summary>
+    /// <param name="sequenceNumber">Sequence number the command was given when it was queued</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    /// <exception cref="OperationCanceledException">The command was dropped instead</exception>
+    internal Task WaitForDeliveryAsync(uint sequenceNumber, CancellationToken cancellationToken)
+    {
+        TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_outboundWaiters)
+        {
+            if (sequenceNumber <= _deliveredSequenceNumber)
+            {
+                return Task.CompletedTask;
+            }
+            _outboundWaiters[sequenceNumber] = tcs;
+        }
+        return tcs.Task.WaitAsync(cancellationToken);
+    }
+
+    private uint _deliveredSequenceNumber;
+
+    /// <summary>
+    /// Resolve everything the controller has taken, or everything that was abandoned
+    /// </summary>
+    /// <param name="sequenceNumber">Last command this applies to</param>
+    /// <param name="delivered">Whether the commands reached the controller</param>
+    internal void CompleteOutbound(uint sequenceNumber, bool delivered)
+    {
+        List<TaskCompletionSource> completed = [];
+        lock (_outboundWaiters)
+        {
+            if (delivered)
+            {
+                _deliveredSequenceNumber = sequenceNumber;
+            }
+
+            // Sorted by sequence number, so everything this covers is at the front
+            List<uint> keys = [];
+            foreach (var kv in _outboundWaiters)
+            {
+                if (kv.Key > sequenceNumber)
+                {
+                    break;
+                }
+                keys.Add(kv.Key);
+                completed.Add(kv.Value);
+            }
+            foreach (uint key in keys)
+            {
+                _outboundWaiters.Remove(key);
+            }
+        }
+
+        foreach (TaskCompletionSource tcs in completed)
+        {
+            if (delivered)
+            {
+                tcs.TrySetResult();
+            }
+            else
+            {
+                tcs.TrySetCanceled();
+            }
         }
     }
 
