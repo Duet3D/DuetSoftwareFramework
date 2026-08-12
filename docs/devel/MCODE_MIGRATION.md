@@ -625,6 +625,23 @@ motors rather than failing.
 takes `MovePlanner`, which is internal; partial so the motion codes live in their own file rather
 than extending an already long switch. Nothing outside the assembly referenced it.
 
+**M584 rejects a driver claimed by two drives, which RRF does not.** `DoDriveMapping` checks only
+that each driver exists; assigning one already mapped to another axis or extruder silently gives it
+two owners, and the two then fight over its steps. The handler works the whole mapping out before
+writing any of it, and a driver that would end up on two drives makes the code an error that changes
+nothing. A drive the code names releases its old drivers first, so `M584 X0.1 Y0.0` still swaps a
+pair and the E list, which replaces every extruder, frees all their drivers.
+
+**`M584 X` releases the drivers of X.** A drive that is refused a driver needs a way to give one up,
+and there was none: RRF never shrinks `numTotalAxes`, and here a letter given without a value was
+worse than an error. `Parser.ConvertDriverIds` split the empty string into one empty item and handed
+it to `DriverId`, whose string constructor keeps its defaults for an empty value, so `M584 X` quietly
+assigned driver 0.0 to X. It now leaves the parameter null, and the handler reads a null parameter as
+an empty driver list: the axis stays in `move.axes[]` — positions and axis indices do not move — but
+owns nothing and cannot be moved until it is mapped again. A bare `E` leaves no extruders at all. An
+axis with no drivers was already reachable, since a driver that does not exist is dropped from the
+list it was named in.
+
 **Not carried over from RRF's versions of these codes:** M201's `T` acceleration-time parameter and
 the S-curve flag (`SUPPORT_3RD_ORDER`), M584's `MinVisibleAxes` lower bound, and M350/M92's
 recalculation of backlash steps (`UpdateBacklashSteps`) — backlash arrives with M425 in phase 3.

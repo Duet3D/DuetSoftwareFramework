@@ -974,6 +974,14 @@ public partial class Code
     {
         if (!parameter.IsExpression)
         {
+            // A parameter given without a value names no driver at all. Splitting an empty string
+            // yields one empty item, which DriverId reads as its default of 0.0
+            if (string.IsNullOrEmpty(parameter.StringValue))
+            {
+                parameter.IsDriverId = true;
+                return;
+            }
+
             List<DriverId> drivers = [];
 
             string[] parameters = parameter.StringValue.Split(':') ?? [];

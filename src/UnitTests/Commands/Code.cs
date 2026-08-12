@@ -474,6 +474,23 @@ public class Code
     }
 
     [Test]
+    public void ParseM584WithoutDrivers()
+    {
+        // A letter given without a value names no driver. It must not read as driver 0.0, which is
+        // what a driver ID parsed from an empty string defaults to
+        foreach (DuetAPI.Commands.Code code in Parse("M584 X E2.0"))
+        {
+            Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
+            Assert.That(code.MajorNumber, Is.EqualTo(584));
+            Assert.That(code.Parameters.Count, Is.EqualTo(2));
+            Assert.That(code.Parameters[0].Letter, Is.EqualTo('X'));
+            Assert.That(code.Parameters[0].IsNull, Is.True);
+            Assert.That(code.Parameters[1].Letter, Is.EqualTo('E'));
+            Assert.That((DriverId)code.Parameters[1], Is.EqualTo(new DriverId(2, 0)));
+        }
+    }
+
+    [Test]
     public void ParseM586WithComment()
     {
         foreach (DuetAPI.Commands.Code code in Parse(" \t M586 P2 S0                               ; Disable Telnet"))

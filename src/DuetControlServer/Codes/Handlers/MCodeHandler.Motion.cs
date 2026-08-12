@@ -595,7 +595,10 @@ internal partial class MCodeHandler
     /// <remarks>
     /// This is what brings an axis into existence: <c>move.axes[]</c> starts empty, and an axis
     /// letter named here for the first time adds an entry for it. Nothing can be moved or configured
-    /// until that has happened, which is why config.g runs M584 before the rest of the motion setup
+    /// until that has happened, which is why config.g runs M584 before the rest of the motion setup.
+    /// A driver can only drive one axis or extruder, so a mapping that gives one to two drives is
+    /// rejected whole and leaves the previous mapping in place. A letter given without drivers gives
+    /// up the ones it had, which is the only way to free a driver for another drive to use
     /// </remarks>
     private async ValueTask<Message> HandleDriveMappingAsync(Commands.Code code, CancellationToken cancellationToken)
     {
@@ -618,16 +621,32 @@ internal partial class MCodeHandler
         {
             Move move = model.Move;
 
+            // Read the whole mapping before writing any of it, because a driver claimed by two
+            // drives makes the code an error and the mapping it would have replaced has to survive
+            List<(char Letter, DriverId[] Drivers)> axisMapping = [];
             foreach (char letter in Axis.Letters)
             {
-                if (!code.TryGetDriverIdArray(letter, out DriverId[]? drivers))
+                if (TryGetDrivers(code, letter, out DriverId[] drivers))
                 {
-                    continue;
+                    axisMapping.Add((letter, [.. drivers.Where(driver => IsValidDriver(driver, warnings))]));
                 }
-                seen = true;
+            }
 
-                DriverId[] valid = [.. drivers.Where(driver => IsValidDriver(driver, warnings))];
+            DriverId?[]? extruderMapping = null;
+            if (TryGetDrivers(code, 'E', out DriverId[] extruderDrivers))
+            {
+                extruderMapping = [.. extruderDrivers.Select(driver => IsValidDriver(driver, warnings) ? driver : null)];
+            }
+            seen = axisMapping.Count > 0 || extruderMapping is not null;
 
+            string? conflict = FindDriverConflict(move, axisMapping, extruderMapping);
+            if (conflict is not null)
+            {
+                return new Message(MessageType.Error, conflict);
+            }
+
+            foreach ((char letter, DriverId[] drivers) in axisMapping)
+            {
                 Axis? axis = move.Axes.FirstOrDefault(a => a.Letter == letter);
                 if (axis is null)
                 {
@@ -636,31 +655,29 @@ internal partial class MCodeHandler
                 }
 
                 axis.Drivers.Clear();
-                foreach (DriverId driver in valid)
+                foreach (DriverId driver in drivers)
                 {
                     axis.Drivers.Add(driver);
                 }
                 AddDrivers(toUpdate, axis.Drivers, axis.StepsPerMm, axis.Microstepping);
             }
 
-            if (code.TryGetDriverIdArray('E', out DriverId[]? extruderDrivers))
+            if (extruderMapping is not null)
             {
-                seen = true;
-
                 // The E list is the whole set of extruders, so one that is no longer named goes away
-                while (move.Extruders.Count > extruderDrivers.Length)
+                while (move.Extruders.Count > extruderMapping.Length)
                 {
                     move.Extruders.RemoveAt(move.Extruders.Count - 1);
                 }
-                while (move.Extruders.Count < extruderDrivers.Length)
+                while (move.Extruders.Count < extruderMapping.Length)
                 {
                     move.Extruders.Add(new Extruder());
                 }
 
-                for (int i = 0; i < extruderDrivers.Length; i++)
+                for (int i = 0; i < extruderMapping.Length; i++)
                 {
                     Extruder extruder = move.Extruders[i];
-                    extruder.Driver = IsValidDriver(extruderDrivers[i], warnings) ? extruderDrivers[i] : null;
+                    extruder.Driver = extruderMapping[i];
                     AddDriver(toUpdate, extruder.Driver, extruder.StepsPerMm, extruder.Microstepping);
                 }
             }
@@ -2442,6 +2459,103 @@ internal partial class MCodeHandler
             return false;
         }
         return true;
+    }
+
+    /// <summary>
+    /// Read the drivers M584 assigns to one drive letter
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="letter">The axis letter, or E for the extruders</param>
+    /// <param name="drivers">The drivers named for it, empty if the letter was given without any</param>
+    /// <returns>True if the code names the letter at all</returns>
+    /// <remarks>
+    /// A letter given without a value means no drivers, which is how a drive gives up the ones it
+    /// has: an axis stays in place but can no longer move, and a bare E leaves no extruders at all
+    /// </remarks>
+    private static bool TryGetDrivers(Commands.Code code, char letter, out DriverId[] drivers)
+    {
+        DuetAPI.Commands.CodeParameter? parameter = code.GetParameter(letter);
+        if (parameter is not null && parameter.IsNull)
+        {
+            drivers = [];
+            return true;
+        }
+
+        if (code.TryGetDriverIdArray(letter, out DriverId[]? given))
+        {
+            drivers = given;
+            return true;
+        }
+
+        drivers = [];
+        return false;
+    }
+
+    /// <summary>
+    /// Find a driver that the mapping M584 asks for would give to two drives at once
+    /// </summary>
+    /// <param name="move">The move model as it stands</param>
+    /// <param name="axisMapping">The drivers the code assigns to each axis letter it names</param>
+    /// <param name="extruderMapping">The drivers it assigns to the extruders, or null if it names none</param>
+    /// <returns>Why the mapping cannot be applied, or null if every driver is claimed once</returns>
+    /// <remarks>
+    /// A drive the code says nothing about keeps the drivers it has, so those are taken. One it does
+    /// name gives up its old drivers, which is what lets a single code swap the drivers of two axes
+    /// </remarks>
+    private static string? FindDriverConflict(Move move, List<(char Letter, DriverId[] Drivers)> axisMapping, DriverId?[]? extruderMapping)
+    {
+        Dictionary<DriverId, string> owners = [];
+
+        foreach (Axis axis in move.Axes)
+        {
+            if (!axisMapping.Any(mapping => mapping.Letter == axis.Letter))
+            {
+                foreach (DriverId driver in axis.Drivers)
+                {
+                    owners[driver] = $"axis {axis.Letter}";
+                }
+            }
+        }
+
+        // The E parameter is the whole set of extruders, so naming it frees every extruder driver
+        if (extruderMapping is null)
+        {
+            for (int i = 0; i < move.Extruders.Count; i++)
+            {
+                if (move.Extruders[i].Driver is DriverId driver)
+                {
+                    owners[driver] = $"extruder {i}";
+                }
+            }
+        }
+
+        foreach ((char letter, DriverId[] drivers) in axisMapping)
+        {
+            foreach (DriverId driver in drivers)
+            {
+                if (owners.TryGetValue(driver, out string? owner))
+                {
+                    return $"Driver {driver} is already used by {owner}";
+                }
+                owners[driver] = $"axis {letter}";
+            }
+        }
+
+        if (extruderMapping is not null)
+        {
+            for (int i = 0; i < extruderMapping.Length; i++)
+            {
+                if (extruderMapping[i] is DriverId driver)
+                {
+                    if (owners.TryGetValue(driver, out string? owner))
+                    {
+                        return $"Driver {driver} is already used by {owner}";
+                    }
+                    owners[driver] = $"extruder {i}";
+                }
+            }
+        }
+        return null;
     }
 
     /// <summary>
