@@ -315,7 +315,16 @@ internal partial class MCodeHandler
 
         CanResponse response = await linkInterface.SendCanMessageAsync(board, in message, CanMessageType.StandardReply,
                                                                       cancellationToken: cancellationToken);
-        return response.ToMessage();
+        Message reply = response.ToMessage();
+        if (reply.Type != MessageType.Error)
+        {
+            // As for an endstop: the board reports changes from here on, so a probe already reading
+            // above its threshold when it was configured would read as clear until it moved. A
+            // probing move checks the probe before it starts, and would not have noticed
+            await expansionBoardManager.NoteMonitorCreatedAsync(message.Handle, response.Extra != 0,
+                                                                cancellationToken);
+        }
+        return reply;
     }
 
     /// <summary>

@@ -37,6 +37,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="jobProcessor">Job processor</param>
 /// <param name="linkInterface">Link interface</param>
 /// <param name="model">Object model</param>
+/// <param name="expansionBoardManager">What the expansion boards have reported about themselves</param>
 /// <param name="mqtt">MQTT provider</param>
 /// <param name="sbcTriggerService">SBC trigger service</param>
 /// <param name="logger">Logger</param>
@@ -60,6 +61,7 @@ internal partial class MCodeHandler(
     FileInfoParser fileInfoParser,
     FilePathResolver filePathResolver,
     LinkInterface linkInterface,
+    Link.Expansion.ExpansionBoardManager expansionBoardManager,
     Model.ObjectModel model,
     MQTT mqtt,
     SbcTriggerService sbcTriggerService,

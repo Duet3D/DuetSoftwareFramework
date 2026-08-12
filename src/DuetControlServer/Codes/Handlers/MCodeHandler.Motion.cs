@@ -2291,6 +2291,13 @@ internal partial class MCodeHandler
                 return reply;                   // the switch is not being watched, so stop here
             }
 
+            // The board answers with the switch's current state, and this is the only chance to learn
+            // it: from here it reports only changes, so a switch already closed - a machine powered
+            // up resting on its endstop - would read as open until somebody moved the axis by hand.
+            // A homing move would then not hold the axis, because nothing knew it needed holding
+            await expansionBoardManager.NoteMonitorCreatedAsync(message.Handle, response.Extra != 0,
+                                                                cancellationToken);
+
             // The board took the port but may still have had something to say about it, which the
             // code carries back rather than dropping for not being an error
             replies.Add(reply);

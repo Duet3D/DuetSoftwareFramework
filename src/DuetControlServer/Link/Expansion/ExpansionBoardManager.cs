@@ -504,50 +504,89 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, ILogger<Exp
             int handles = Math.Min((int)numHandles, 16);
             for (int i = 0; i < handles; i++)
             {
-                RemoteInputHandle handle = getHandle((uint)i);
-
                 // Bit i of States is the digital level of the i'th handle in this message
-                bool active = (states & (1 << i)) != 0;
+                ApplyInputState(getHandle((uint)i), (states & (1 << i)) != 0);
+            }
+        }
+    }
 
-                if (handle.Type == RemoteInputHandle.TypeGpIn)
+    /// <summary>
+    /// Adopt the state a board reported when an input monitor was created
+    /// </summary>
+    /// <param name="handle">Handle the monitor was created under</param>
+    /// <param name="active">The state the board answered with</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>An awaitable task</returns>
+    /// <remarks>
+    /// <para>
+    /// A board reports an input when it <em>changes</em>, so a switch that was already closed when
+    /// the monitor was created never reports anything and would read as open here for as long as
+    /// nobody touched it. That is the state a machine powered up resting on its endstop is in, and
+    /// the consequence is a homing move that drives into a switch it is already sitting on - the
+    /// axis is not held, because nothing knows it needs holding.
+    /// </para>
+    /// <para>
+    /// The board answers the create request with the current state for exactly this reason
+    /// (<c>InputMonitor::Create</c> sets <c>extra</c>), so the only thing needed is to believe it.
+    /// This goes through the same bookkeeping a change does, rather than writing the object model
+    /// directly, so that the seeded state and the reported state cannot disagree about an axis with
+    /// more than one switch
+    /// </para>
+    /// </remarks>
+    public async ValueTask NoteMonitorCreatedAsync(RemoteInputHandle handle, bool active,
+                                                   CancellationToken cancellationToken = default)
+    {
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            ApplyInputState(handle, active);
+        }
+    }
+
+    /// <summary>
+    /// Record the state of one monitored input
+    /// </summary>
+    /// <param name="handle">The handle it is monitored under</param>
+    /// <param name="active">Its digital level</param>
+    /// <remarks>The caller must hold the object model write lock</remarks>
+    private void ApplyInputState(RemoteInputHandle handle, bool active)
+    {
+        if (handle.Type == RemoteInputHandle.TypeGpIn)
+        {
+            GpInputPort? port = GetOrCreate(model.Sensors.GpIn, handle.Major, () => new GpInputPort());
+            if (port is not null)
+            {
+                port.Value = active ? 1.0f : 0.0f;
+            }
+        }
+        else if (handle.Type == RemoteInputHandle.TypeEndstop)
+        {
+            // Major is the axis the endstop belongs to, which is how M574 registered it. An axis with
+            // a switch per driver reports each switch under its own minor, and any of them being
+            // closed is the axis being stopped, which is how RepRapFirmware's SwitchEndstop::Stopped
+            // reads it too
+            Endstop? endstop = handle.Major < model.Sensors.Endstops.Count
+                ? model.Sensors.Endstops[handle.Major]
+                : null;
+            if (endstop is not null)
+            {
+                endstop.Triggered = NoteEndstopSwitch(handle.Major, handle.Minor, active);
+            }
+        }
+        else if (handle.Type == RemoteInputHandle.TypeZprobe)
+        {
+            // Major is the probe number, which is how M558 registered it. The board sends the level
+            // of a digital probe and the reading of an analog one; both arrive here as one bit, so a
+            // digital probe reads as the extremes of the analog range
+            Probe? probe = handle.Major < model.Sensors.Probes.Count
+                ? model.Sensors.Probes[handle.Major]
+                : null;
+            if (probe is not null)
+            {
+                while (probe.Value.Count < 1)
                 {
-                    GpInputPort? port = GetOrCreate(model.Sensors.GpIn, handle.Major, () => new GpInputPort());
-                    if (port is not null)
-                    {
-                        port.Value = active ? 1.0f : 0.0f;
-                    }
+                    probe.Value.Add(0);
                 }
-                else if (handle.Type == RemoteInputHandle.TypeEndstop)
-                {
-                    // Major is the axis the endstop belongs to, which is how M574 registered it. An
-                    // axis with a switch per driver reports each switch under its own minor, and any
-                    // of them being closed is the axis being stopped, which is how RepRapFirmware's
-                    // SwitchEndstop::Stopped reads it too
-                    Endstop? endstop = handle.Major < model.Sensors.Endstops.Count
-                        ? model.Sensors.Endstops[handle.Major]
-                        : null;
-                    if (endstop is not null)
-                    {
-                        endstop.Triggered = NoteEndstopSwitch(handle.Major, handle.Minor, active);
-                    }
-                }
-                else if (handle.Type == RemoteInputHandle.TypeZprobe)
-                {
-                    // Major is the probe number, which is how M558 registered it. The board sends the
-                    // level of a digital probe and the reading of an analog one; both arrive here as
-                    // one bit, so a digital probe reads as the extremes of the analog range
-                    Probe? probe = handle.Major < model.Sensors.Probes.Count
-                        ? model.Sensors.Probes[handle.Major]
-                        : null;
-                    if (probe is not null)
-                    {
-                        while (probe.Value.Count < 1)
-                        {
-                            probe.Value.Add(0);
-                        }
-                        probe.Value[0] = active ? Motion.RemoteProbes.MaxReading : 0;
-                    }
-                }
+                probe.Value[0] = active ? Motion.RemoteProbes.MaxReading : 0;
             }
         }
     }

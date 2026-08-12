@@ -95,6 +95,22 @@ dead switch, so `M574` refuses rather than accepting a port it could not registe
 **Duet3Expansion** creates an `InputMonitor` bound to the pin and starts watching it. From here the
 board owns the pin; nothing upstream reads it again.
 
+### The reply carries the state, and it has to be believed
+
+`InputMonitor::Create` answers with the pin's **current** state in the reply's `extra` byte, and DCS
+adopts it through the same bookkeeping a change goes through.
+
+This is not a nicety. From the moment the monitor exists the board reports only *changes*, so a
+switch that was already closed when it was created never reports anything at all. Without seeding,
+`sensors.endstops[].triggered` would read false until somebody moved the axis by hand - which is the
+state a machine that was powered off resting on its endstop comes up in. The already-closed handling
+in §4 would then not fire, the axis would not be held, and the homing move would drive into a switch
+it was already sitting on. It is the same fault §4 exists to prevent, arriving through the one door
+§4 cannot watch.
+
+Z probes are seeded the same way and for the same reason: a probing move refuses to start if the
+probe is already triggered, and that test is only as good as the state behind it.
+
 `M119` reports endstop states from the same change messages the controller acts on, so what a user
 sees and what stops a move come from one source.
 
@@ -164,9 +180,10 @@ The controller stops a move when an input **changes**. A switch already closed w
 never changes, so nothing would arrive and the axis would drive into it until the user opened and
 closed the switch by hand - a silent fault rather than a visible one.
 
-So the state is tested where it is known. DCS holds `sensors.endstops[].triggered`, updated from the
-same change messages, and commands an axis that is already at its switch to stay where it is, latching
-it as triggered so the move still concludes correctly. RepRapFirmware reaches the same place from the
+So the state is tested where it is known. DCS holds `sensors.endstops[].triggered`, seeded from the
+reply that created the monitor (§3) and updated from the change messages thereafter, and commands an
+axis that is already at its switch to stay where it is, latching it as triggered so the move still
+concludes correctly. RepRapFirmware reaches the same place from the
 other direction: its step interrupt tests the endstop before the first step, so the move ends on the
 step it began. On coupled kinematics one closed switch holds every drive.
 
@@ -507,7 +524,10 @@ thing. They are listed as invariants rather than as bugs because that is how the
 6. **A CAN message that expects no reply says `NoReply`.** The controller reads any other value as a
    reply being expected and then requires an all-ones request id placeholder to allocate over - which
    a revert has no field for, so it is dropped rather than sent, and the machine keeps its overshoot.
-7. **A position redefined without moving is published.** `move.axes[].userPosition` is written by
+7. **The state a board reports when a monitor is created is adopted.** From then on it reports only
+   changes, so a switch already closed at that moment is never reported at all, and every check that
+   asks "is it triggered" answers no for as long as nobody touches it by hand.
+8. **A position redefined without moving is published.** `move.axes[].userPosition` is written by
    `PublishCommittedPosition`, which ordinary moves call as they queue; a special move queues nothing
    after it concludes.
 
@@ -540,6 +560,11 @@ that was never tripped and looks exactly like a stop that was thrown away.
 
 - **`CanMessageInputChangedV1` carries no timestamp.** Only V2 has `GetWhen`. A board on the older
   message is stopped where the message found it and keeps its overshoot. Inherent to the format.
+- **A board that resets after startup loses its monitors, and nothing re-creates them.** An
+  announcement refreshes the board's description in the object model and no more, so the endstops on
+  a board that rebooted stop being watched and stop being reported - silently, because an endstop
+  that is never reported looks exactly like one that never triggers. Closing it means replaying the
+  `M574` and `M558` configuration for that board when it announces.
 - **A stop report carries no move id.** A report arriving after the *next* move has armed would be
   attributed to it. The grace window in §9 makes that unlikely rather than impossible; closing it
   properly means carrying the move id through `MotionStopped`, which is a protocol change across
