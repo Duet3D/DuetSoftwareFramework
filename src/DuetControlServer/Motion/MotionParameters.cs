@@ -396,7 +396,7 @@ internal sealed class MotionParameters
         // a SCARA joint with more than a full circle of travel both do - so the geometry gets to add
         // to what the configuration declared, masked to the axes that exist
         config.ContinuousRotationAxes = (continuousRotationAxes | geometry.ContinuousRotationAxes)
-                                        & (numAxes >= 32 ? uint.MaxValue : (1u << numAxes) - 1);
+                                        & ((1u << Math.Min(numAxes, MotionLimits.MaxAxes)) - 1);
 
         for (int extruder = 0; extruder < numExtruders; extruder++)
         {

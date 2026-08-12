@@ -2,6 +2,7 @@ using DuetAPI.ObjectModel;
 using System;
 using DuetControlServer.Motion;
 using DuetControlServer.Motion.Kinematics;
+using DuetControlServer.Motion.Native;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
@@ -264,7 +265,7 @@ internal sealed partial class GCodeHandler
             if (toBeHomed == 0)
             {
                 // G28 with no axes homes everything, so everything stops being homed first
-                toBeHomed = axisLetters.Length >= 32 ? uint.MaxValue : (1u << axisLetters.Length) - 1;
+                toBeHomed = (1u << Math.Min(axisLetters.Length, MotionLimits.MaxAxes)) - 1;
             }
 
             // Marked not homed before rather than after: if homing is interrupted half way, the
@@ -341,7 +342,7 @@ internal sealed partial class GCodeHandler
         uint homed = 0;
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            for (int axis = 0; axis < model.Move.Axes.Count && axis < 32; axis++)
+            for (int axis = 0; axis < model.Move.Axes.Count && axis < MotionLimits.MaxAxes; axis++)
             {
                 if (model.Move.Axes[axis].Homed)
                 {

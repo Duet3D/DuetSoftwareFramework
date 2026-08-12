@@ -946,7 +946,7 @@ internal sealed partial class GCodeHandler(
     private uint AxesMentioned(Commands.Code code, int numAxes)
     {
         uint mentioned = 0;
-        for (int axis = 0; axis < numAxes && axis < 32; axis++)
+        for (int axis = 0; axis < numAxes && axis < MotionLimits.MaxAxes; axis++)
         {
             if (code.HasParameter(model.Move.Axes[axis].Letter))
             {
@@ -979,7 +979,7 @@ internal sealed partial class GCodeHandler(
         uint mustBeHomed = planner.Parameters.Geometry.MustBeHomedAxes(axesMentioned, model.Move.NoMovesBeforeHoming);
 
         uint unhomed = 0;
-        for (int axis = 0; axis < numAxes && axis < 32; axis++)
+        for (int axis = 0; axis < numAxes && axis < MotionLimits.MaxAxes; axis++)
         {
             if ((mustBeHomed & (1u << axis)) != 0 && !model.Move.Axes[axis].Homed)
             {
@@ -993,7 +993,7 @@ internal sealed partial class GCodeHandler(
         }
 
         StringBuilder letters = new();
-        for (int axis = 0; axis < numAxes && axis < 32; axis++)
+        for (int axis = 0; axis < numAxes && axis < MotionLimits.MaxAxes; axis++)
         {
             if ((unhomed & (1u << axis)) != 0)
             {
@@ -1038,7 +1038,7 @@ internal sealed partial class GCodeHandler(
     {
         // CHECK this logic is comparable to RRF in `GCodes::DoStraightMove()`
         uint axesToLimit = 0;
-        for (int axis = 0; axis < numAxes && axis < 32; axis++)
+        for (int axis = 0; axis < numAxes && axis < MotionLimits.MaxAxes; axis++)
         {
             if ((axesMentioned & (1u << axis)) != 0 && model.Move.Axes[axis].Homed)
             {
@@ -1200,7 +1200,7 @@ internal sealed partial class GCodeHandler(
         int zAxis = ZAxisIndex(model.Move);
         float z = zAxis >= 0 && zAxis < numAxes ? coords[zAxis] : 0.0f;
 
-        for (int axis = 0; axis < numAxes && axis < 32; axis++)
+        for (int axis = 0; axis < numAxes && axis < MotionLimits.MaxAxes; axis++)
         {
             if ((xAxes & (1u << axis)) != 0)
             {
@@ -1248,7 +1248,7 @@ internal sealed partial class GCodeHandler(
         int zAxis = ZAxisIndex(model.Move);
         float z = zAxis >= 0 && zAxis < numAxes ? coords[zAxis] : 0.0f;
 
-        for (int axis = 0; axis < numAxes && axis < 32; axis++)
+        for (int axis = 0; axis < numAxes && axis < MotionLimits.MaxAxes; axis++)
         {
             if ((yAxes & (1u << axis)) != 0)
             {
@@ -1271,7 +1271,7 @@ internal sealed partial class GCodeHandler(
     /// <returns>The axis, or -1 if the bitmap names none that exists</returns>
     private static int LowestSetAxis(uint axes, int numAxes)
     {
-        for (int axis = 0; axis < numAxes && axis < 32; axis++)
+        for (int axis = 0; axis < numAxes && axis < MotionLimits.MaxAxes; axis++)
         {
             if ((axes & (1u << axis)) != 0)
             {
@@ -1575,7 +1575,7 @@ internal sealed partial class GCodeHandler(
                     // CoreXY's X stall means watching both motors, because moving X turns both
                     uint drives = planner.Parameters.Geometry.GetControllingDrives(axis);
                     List<DuetAPI.Utility.DriverId> drivers = [];
-                    for (int drive = 0; drive < model.Move.Axes.Count && drive < 32; drive++)
+                    for (int drive = 0; drive < model.Move.Axes.Count && drive < MotionLimits.MaxAxes; drive++)
                     {
                         if ((drives & (1u << drive)) != 0)
                         {
@@ -1810,7 +1810,7 @@ internal sealed partial class GCodeHandler(
         float xSum = 0.0f, ySum = 0.0f, zSum = 0.0f;
         int xCount = 0, yCount = 0, zCount = 0;
 
-        for (int axis = 0; axis < numAxes && axis < 32; axis++)
+        for (int axis = 0; axis < numAxes && axis < MotionLimits.MaxAxes; axis++)
         {
             float offset = model.Move.Axes[axis].Babystep - ToolOffset(tool, axis);
             if ((zAxes & (1u << axis)) != 0)
@@ -1904,7 +1904,7 @@ internal sealed partial class GCodeHandler(
         uint yAxes = ToolAxisMap(tool, YAxis);
         uint zAxes = ToolAxisMap(tool, ZAxis);
 
-        for (int axis = 0; axis < numAxes && axis < 32; axis++)
+        for (int axis = 0; axis < numAxes && axis < MotionLimits.MaxAxes; axis++)
         {
             // An axis that X is mapped away from keeps whatever it already held. RepRapFirmware says
             // so in as many words above its own version: with X mapped to U and V, the X slot is not
@@ -1958,7 +1958,7 @@ internal sealed partial class GCodeHandler(
         uint bitmap = 0;
         foreach (int axis in tool.Axes[which])
         {
-            if (axis is >= 0 and < 32)
+            if (axis is >= 0 and < MotionLimits.MaxAxes)
             {
                 bitmap |= 1u << axis;
             }
@@ -2019,7 +2019,7 @@ internal sealed partial class GCodeHandler(
         }
 
         uint bitmap = 0;
-        for (int axis = 0; axis < move.Axes.Count && axis < 32; axis++)
+        for (int axis = 0; axis < move.Axes.Count && axis < MotionLimits.MaxAxes; axis++)
         {
             if (char.ToUpperInvariant(move.Axes[axis].Letter) == letter)
             {

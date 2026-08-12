@@ -20,9 +20,18 @@ internal static class MotionLimits
     public const int MaxExtruders = 20;
 
     /// <summary>Logical drives the native side indexes by; may be less than MaxAxes + MaxExtruders</summary>
+    /// <remarks>
+    /// Also the width of every drive bitmap: the engine takes drive sets as a <c>uint</c>, so this
+    /// being 32 is what lets one name every drive. Anything bounding a shift into such a bitmap
+    /// should say this rather than 32, so that the two cannot drift apart silently
+    /// </remarks>
     public const int MaxAxesPlusExtruders = 32;
 
     /// <summary>Maximum number of drivers that can move a single axis</summary>
+    /// <remarks>
+    /// Also the width of a per-driver bitmap within one drive, which is how the endstop correction
+    /// tracks which motors of a dual-motor axis have reached their own switch
+    /// </remarks>
     public const int MaxDriversPerAxis = 8;
 
     /// <summary>Movement systems, i.e. DDA rings, the native side builds</summary>
