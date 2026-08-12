@@ -134,6 +134,25 @@ These rules come from the architecture already established on this branch — se
     used to be two" says, and stays true and useful after the next change. Where a rule exists
     because something went wrong, state the rule and the failure mode, not the incident.
 
+11. **A green `dotnet build` is not a green build.** Build the whole project with
+    `./scripts/build.sh --all` from the repo root. It builds every dotnet project *and*
+    cross-compiles the native `libduet_sbc.so` for aarch64 through CMake, which is the half a
+    per-project `dotnet build` cannot see at all.
+
+    Building the native side the obvious way is worse than not building it, because it looks like it
+    worked: `make` inside `src/DuetSbcInterface/build/native` compiles for the **host**, so a change
+    that breaks the aarch64 cross-build passes cleanly and the failure surfaces on the machine. The
+    motion engine, the DDA ring and the drive trackers all live on that side, so anything touching
+    §10 to §12's subject matter is exactly what this catches.
+
+    Do not pass `--local` or `--target` to verify. Those deploy - stopping systemd services and
+    rsyncing into `/opt/dsf/bin` - which fails in a devcontainer *after* a successful build, so the
+    run reads as broken when the code is fine. Without them it ends "Build complete. No deployment
+    target specified."
+
+    Tests stay separate and are both worth running: `dotnet test src/UnitTests/UnitTests.csproj` for
+    the managed side and `ctest` in the native build directory for the other.
+
 ### Recipe for porting one code
 
 1. Read the RRF implementation at the line given in the tables below.
@@ -147,7 +166,8 @@ These rules come from the architecture already established on this branch — se
    `CanGenericTables.g.cs` already carries parameter tables for M111, M150, M308, M569
    (+ `.1`/`.2`/`.4`/`.6`/`.7`), M655, M915, M950 (heater/fan/gpio/led), M955 and M959.
 7. Report in RRF's format when no parameters are given.
-8. Tick the box here.
+8. Build with `./scripts/build.sh --all` and run both test suites (§1.11).
+9. Tick the box here.
 
 ### Status legend
 
