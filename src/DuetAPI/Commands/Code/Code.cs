@@ -169,7 +169,6 @@ namespace DuetAPI.Commands
             Flags = CodeFlags.None;
             Comment = null;
             FilePosition = Length = null;
-            Length = null;
             Parameters.Clear();
         }
 

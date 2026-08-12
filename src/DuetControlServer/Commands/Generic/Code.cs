@@ -347,7 +347,7 @@ namespace DuetControlServer.Commands
         /// <summary>
         /// Internal TCS representing the lifecycle of a code
         /// </summary>
-        private TaskCompletionSource<Message?> _tcs = new();
+        private TaskCompletionSource<Message?> _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         /// <summary>
         /// Resets more <see cref="Code"/> fields
@@ -356,6 +356,7 @@ namespace DuetControlServer.Commands
         {
             base.Reset();
             Connection = null;
+            ReplyLogLevel = null;
             Stage = Codes.PipelineStage.Start;
             File = null;
             _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
