@@ -1406,194 +1406,63 @@ internal sealed partial class GCodeHandler(
     /// </remarks>
     private void ApplyEndstops(Commands.Code code, RawMove raw, int numAxes)
     {
-        KinematicsEngine geometry = planner.Parameters.Geometry;
-
         // What stopped the last endstop move says nothing about this one. Cleared here rather than
         // where the move finishes, so that a move which is never reported as stopped - because it
         // ran its full length - leaves an empty latch rather than the previous move's
         planner.State.ArmEndstops();
 
-        int stopAllAxis = -1;
-        MoveStopInput stopAllInput = new();
-        int perAxisCount = 0;
-        List<int> alreadyTriggered = [];
-
+        List<int> axesMentioned = [];
         for (int axis = 0; axis < numAxes; axis++)
         {
-            if (!code.HasParameter(model.Move.Axes[axis].Letter))
+            if (code.HasParameter(model.Move.Axes[axis].Letter))
             {
-                continue;
-            }
-
-            Endstop? endstop = axis < model.Sensors.Endstops.Count ? model.Sensors.Endstops[axis] : null;
-            if (endstop is null)
-            {
-                throw new GCodeException($"No endstop configured for axis {model.Move.Axes[axis].Letter}");
-            }
-
-            // TODO if simulating continue to next axis
-
-            if (!TryArmAxis(endstop, axis, raw))
-            {
-                // Refusing is the point. Leaving the axis unarmed and carrying on would run the move
-                // to its full commanded length with nothing to stop it, which for a homing move means
-                // driving into the end of the axis. RepRapFirmware's EnableAxisEndstops throws here
-                // for the same reason
-                throw new GCodeException($"Cannot home {model.Move.Axes[axis].Letter}: {DescribeUnusableEndstop(endstop)}");
-            }
-
-            if (endstop.Type is EndstopType.MotorStallAny or EndstopType.MotorStallIndividual)
-            {
-                // The driver has to be turning slowly enough to tell a stall from normal load, which
-                // is what M201.1 configures
-                raw.ReduceAcceleration = true;
-            }
-
-            if (endstop.Triggered)
-            {
-                // Already at the switch. The controller only stops a move when an input *changes*,
-                // so a switch that is closed before the move starts would never report anything and
-                // the axis would drive into it until the user opened and closed the switch by hand.
-                // RepRapFirmware ends up in the same place from the other direction: its step
-                // interrupt tests the endstop before the first step, so the move ends on the step it
-                // began. Recorded here and applied below, once it is known whether this axis can be
-                // held on its own
-                if (!HoldClosedDrivers(raw, axis))
-                {
-                    alreadyTriggered.Add(axis);
-                }
-            }
-
-            // The axis needs a drive that is not its own, so it cannot be stopped by itself
-            if ((geometry.GetControllingDrives(axis) & ~(1u << axis)) != 0)
-            {
-                if (stopAllAxis >= 0)
-                {
-                    throw new GCodeException(
-                        $"Cannot home {model.Move.Axes[stopAllAxis].Letter} and {model.Move.Axes[axis].Letter} together: "
-                        + "on this kinematics either endstop has to stop every drive");
-                }
-                stopAllAxis = axis;
-                stopAllInput.CopyFrom(raw.StopOnInput[axis]);
-                raw.ArmedAxes.Add(axis);
-            }
-            else
-            {
-                perAxisCount++;
-                raw.ArmedAxes.Add(axis);
+                axesMentioned.Add(axis);
             }
         }
 
-        if (stopAllAxis >= 0)
+        // Every rule about what stops what is in EndstopArming; this applies what it decided. The
+        // holding is here because it writes the move's coordinates from the machine position, which
+        // is the interpreter's business rather than the endstops'
+        ArmedMove armed = EndstopArming.Arm(model.Move, model.Sensors, planner.Parameters.Geometry,
+                                            numAxes, axesMentioned,
+                                            expansionBoardManager.GetClosedEndstopSwitches,
+                                            raw.StopOnInput);
+
+        raw.ArmedAxes.AddRange(armed.ArmedAxes);
+        raw.ReduceAcceleration |= armed.ReduceAcceleration;
+        foreach (int axis in armed.AxesToHold)
         {
-            if (perAxisCount > 0)
-            {
-                throw new GCodeException(
-                    $"Cannot home {model.Move.Axes[stopAllAxis].Letter} with another axis: "
-                    + "its endstop has to stop every drive, which would disarm the others");
-            }
-
-            // Every drive watches the one switch, so whichever driver sees the change first, they all
-            // stop. That is what makes this stopAll rather than stopAxis. A per-driver endstop is
-            // demoted to its first switch here for the same reason RepRapFirmware demotes it: the
-            // drives are coupled, so letting each motor wait for its own switch would keep the
-            // others running
-            for (int drive = 0; drive < raw.StopOnInput.Length; drive++)
-            {
-                raw.StopOnInput[drive].SetShared(stopAllInput.Handle, stopAllInput.Boards[0]);
-            }
-
-            // On coupled kinematics the whole move stops on the one endstop, so an endstop that is
-            // already closed holds every drive rather than only its own axis
-            if (alreadyTriggered.Contains(stopAllAxis))
-            {
-                HoldAxes(raw, numAxes);
-                LatchAlreadyTriggered(alreadyTriggered);
-                ArmCorrection(raw);
-                return;
-            }
+            SeedSpecialMoveCoordinate(raw, axis);
         }
 
-        foreach (int axis in alreadyTriggered)
-        {
-            HoldAxis(raw, axis);
-        }
-        LatchAlreadyTriggered(alreadyTriggered);
+        // An axis commanded to stay where it is never moves, so no input changes and no stop is ever
+        // reported - and yet the axis is at its switch, which is the whole question a homing move
+        // asks. RepRapFirmware arrives at the same answer by a different route: its step interrupt
+        // tests the endstop before the first step, so the move stops on the step it began and the
+        // stop is recorded like any other
+        planner.State.RecordEndstopTriggered(armed.TriggeredAxes);
         ArmCorrection(raw);
     }
 
     /// <summary>
-    /// Tell the endstop correction which drives this move watches something on
+    /// Tell the endstop correction what this move watches, and which motors are already down
     /// </summary>
     /// <param name="raw">The move, with its stop inputs settled</param>
     /// <remarks>
-    /// Read from the move rather than from the axes the code named, because the two differ: coupled
-    /// kinematics arm every drive on the one switch, and an axis whose endstop was already closed is
-    /// held rather than armed. What the correction has to recognise is what the controller was
-    /// actually told to watch. Called once the stop inputs are final, which is why it is here rather
-    /// than where the latch is cleared
-    /// </remarks>
-    /// <summary>
-    /// Hold only the motors of an axis that are already on their own switch
-    /// </summary>
-    /// <param name="raw">The move being built, with this axis' stop input already filled in</param>
-    /// <param name="axis">The axis</param>
-    /// <returns>True if the axis still has a motor to move, so it must not be held as a whole</returns>
-    /// <remarks>
     /// <para>
-    /// Only an axis with a switch per driver can answer yes. That arrangement exists to square a
-    /// gantry - each motor runs on to its own switch, so a skewed gantry ends up straight - and the
-    /// move that corrects a skew is precisely the one that starts with one side already down.
-    /// Holding the whole axis because one switch is closed would make it do nothing, leaving the
-    /// gantry skewed and the axis reporting itself homed.
+    /// Read back from the move rather than taken from what the arming decided, because the move is
+    /// what the controller and the boards will act on: coupled kinematics rewrite every drive's stop
+    /// input to the one switch, and an axis whose endstop was already closed is held rather than
+    /// armed. Reading the move is what makes it impossible for the correction's idea of the move to
+    /// drift from the one that was actually sent.
     /// </para>
     /// <para>
-    /// RepRapFirmware reaches the same place from <c>DDA::Prepare</c>: <c>CheckEndstops(false)</c>
-    /// runs after the per-driver movements have been accumulated and before they are sent, and
-    /// <c>StopDriverWhenProvisional</c> zeroes the steps of, in its own words, "the motors
-    /// concerned". Its <c>SwitchEndstop::CheckTriggered</c> only escalates to stopping the axis once
-    /// one switch is left, which is the same rule as returning false here when every switch is
-    /// closed.
-    /// </para>
-    /// <para>
-    /// The axis is deliberately not latched as triggered by this. RepRapFirmware records an endstop
-    /// as having triggered for <c>stopAll</c> and <c>stopAxis</c> only, never for
-    /// <c>stopDriver</c> - the axis has not finished homing until its last switch is reached
+    /// A motor held because it was already on its switch is given no steps, so it never moves and no
+    /// stop is ever reported for it. It counts as stopped from the start, or the drive would wait
+    /// for a report that cannot arrive and the move would run its full length instead of ending when
+    /// the last moving motor reaches its own switch
     /// </para>
     /// </remarks>
-    private bool HoldClosedDrivers(RawMove raw, int axis)
-    {
-        MoveStopInput stopInput = raw.StopOnInput[axis];
-        if (stopInput.NumSwitches < 2)
-        {
-            return false;                       // one switch stops every driver, so none can run on
-        }
-
-        // stopAll outranks stopDriver, and the demotion to it happens below this. Moving one motor
-        // of a coupled axis is not a thing the kinematics can express: the drives that would have to
-        // move to hold the others still are the ones being held
-        if ((planner.Parameters.Geometry.GetControllingDrives(axis) & ~(1u << axis)) != 0)
-        {
-            return false;
-        }
-
-        uint closed = expansionBoardManager.GetClosedEndstopSwitches(axis);
-        uint all = (1u << stopInput.NumSwitches) - 1;
-        if ((closed & all) == all)
-        {
-            return false;                       // every motor is down; there is nothing left to move
-        }
-
-        for (int switchIndex = 0; switchIndex < stopInput.NumSwitches; switchIndex++)
-        {
-            if ((closed & (1u << switchIndex)) != 0)
-            {
-                stopInput.HoldDriver(switchIndex);
-            }
-        }
-        return true;
-    }
-
     private void ArmCorrection(RawMove raw)
     {
         uint armedDrives = 0;
@@ -1623,129 +1492,10 @@ internal sealed partial class GCodeHandler(
         }
     }
 
-    /// <summary>
-    /// Count an endstop that was already closed as having stopped the move
-    /// </summary>
-    /// <param name="axes">Axes whose endstop was closed before the move started</param>
-    /// <remarks>
-    /// The axis is commanded to stay where it is, so nothing moves, so no input changes and no stop
-    /// is ever reported - and yet the axis is at its switch, which is the whole question a homing
-    /// move asks. RepRapFirmware arrives at the same answer by a different route: its step interrupt
-    /// tests the endstop before the first step, so the move stops on the step it began and the stop
-    /// is recorded like any other
-    /// </remarks>
-    private void LatchAlreadyTriggered(List<int> axes)
-    {
-        uint bitmap = 0;
-        foreach (int axis in axes)
-        {
-            if (axis < MotionLimits.MaxAxes)
-            {
-                bitmap |= 1u << axis;
-            }
-        }
-        planner.State.RecordEndstopTriggered(bitmap);
-    }
 
-    /// <summary>
-    /// Fill in what stops one axis of an endstop move, whatever kind of endstop it has
-    /// </summary>
-    /// <param name="endstop">The axis' endstop</param>
-    /// <param name="axis">Axis number</param>
-    /// <param name="raw">The move being built</param>
-    /// <returns>True if the axis can be stopped, false if its endstop cannot arm a move</returns>
-    /// <remarks>
-    /// The four kinds are RepRapFirmware's four endstop classes. A switch and a Z probe are inputs a
-    /// board watches, so they name a handle the board already knows; a stall is detected by the driver
-    /// itself, so what the move watches is the board's stall report and the drivers were armed before
-    /// the move was built - see <see cref="ArmStallEndstopsAsync"/>
-    /// </remarks>
-    private bool TryArmAxis(Endstop endstop, int axis, RawMove raw)
-    {
-        switch (endstop.Type)
-        {
-            case EndstopType.InputPin:
-                // CHECK should we send a CanMessageChangeInputMonitorV1 message to actually enable the endstops like in `SwitchEndstop::PrimeAxis()`?
-                return RemoteEndstops.TryGetStopInput(endstop, axis, model.Move.Axes[axis].Drivers.Count,
-                                                      raw.StopOnInput[axis]);
 
-            case EndstopType.ZProbeAsEndstop:
-                {
-                    int probeNumber = endstop.Probe ?? 0;
-                    Probe? probe = probeNumber < model.Sensors.Probes.Count ? model.Sensors.Probes[probeNumber] : null;
-                    return probe is not null && RemoteProbes.TryGetStopInput(probe, probeNumber, raw.StopOnInput[axis]);
-                }
 
-            case EndstopType.MotorStallAny:
-            case EndstopType.MotorStallIndividual:
-                {
-                    // Which drivers to watch is the geometry's answer, not the axis': stopping on a
-                    // CoreXY's X stall means watching both motors, because moving X turns both
-                    uint drives = planner.Parameters.Geometry.GetControllingDrives(axis);
-                    List<DuetAPI.Utility.DriverId> drivers = [];
-                    for (int drive = 0; drive < model.Move.Axes.Count && drive < MotionLimits.MaxAxes; drive++)
-                    {
-                        if ((drives & (1u << drive)) != 0)
-                        {
-                            drivers.AddRange(model.Move.Axes[drive].Drivers);
-                        }
-                    }
-                    return RemoteEndstops.TryGetStallStopInput(CollectionsMarshal.AsSpan(drivers), raw.StopOnInput[axis]);
-                }
 
-            default:
-                return false;
-        }
-    }
-
-    /// <summary>
-    /// Why an endstop cannot stop a move, for the error the user sees
-    /// </summary>
-    /// <param name="endstop">The endstop</param>
-    /// <returns>The reason</returns>
-    private static string DescribeUnusableEndstop(Endstop endstop) => endstop.Type switch
-    {
-        EndstopType.InputPin => "its endstop has no port assigned",
-        EndstopType.ZProbeAsEndstop => "its endstop is a Z probe that cannot stop a move; check M558",
-        EndstopType.MotorStallAny or EndstopType.MotorStallIndividual => "no driver is assigned to it",
-        _ => "its endstop type is not one a move can be stopped by"
-    };
-
-    /// <summary>
-    /// Command an axis to stay where it is
-    /// </summary>
-    /// <param name="raw">The move being built</param>
-    /// <param name="axis">Axis to hold</param>
-    /// <remarks>
-    /// <para>
-    /// Undoing what the code asked for, so the value to put back is the one the move was seeded with -
-    /// which is the same slot's own meaning, whatever coordinate space that is. On a geometry that
-    /// homes individual drives the slot holds a motor position in mm rather than an axis coordinate,
-    /// so seeding it again is the only way to write something the rest of the move agrees with.
-    /// </para>
-    /// <para>
-    /// It is deliberately not read from <c>move.axes[].machinePosition</c>. That is a live projection
-    /// of where the machine is, published from the engine, and it is an axis coordinate on every
-    /// geometry - so on a delta or a SCARA it would put a carriage height's worth of arm angle into a
-    /// motor slot, and even on a Cartesian it is the object model answering a question the planner
-    /// already holds the answer to
-    /// </para>
-    /// </remarks>
-    private void HoldAxis(RawMove raw, int axis) => SeedSpecialMoveCoordinate(raw, axis);
-
-    /// <summary>
-    /// Command every axis to stay where it is
-    /// </summary>
-    /// <param name="raw">The move being built</param>
-    /// <param name="numAxes">Number of axes to consider</param>
-    /// <remarks>The caller must hold the object model lock</remarks>
-    private void HoldAxes(RawMove raw, int numAxes)
-    {
-        for (int axis = 0; axis < numAxes; axis++)
-        {
-            HoldAxis(raw, axis);
-        }
-    }
 
     /// <summary>
     /// G92: redefine the current position without moving
