@@ -15406,6 +15406,11 @@
             X+Y offsets (in mm)
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.Probe.Preload">
+            <summary>
+            Preload of a force-sensing probe at the last tare (in g), or null if it is not a force-sensing probe
+            </summary>
+        </member>
         <member name="P:DuetAPI.ObjectModel.Probe.RecoveryTime">
             <summary>
             Recovery time (in s)
