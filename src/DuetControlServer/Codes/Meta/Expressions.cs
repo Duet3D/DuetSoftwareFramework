@@ -23,7 +23,8 @@ namespace DuetControlServer.Codes.Meta;
 /// <param name="filter">Object model filter</param>
 /// <param name="model">Object model</param>
 /// <param name="variableStore">Variables in scope, by the code being evaluated</param>
-public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, VariableStore variableStore)
+/// <param name="lastCodeResult">How the last code on each channel ended</param>
+public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, VariableStore variableStore, LastCodeResult lastCodeResult)
 {
     /// <summary>
     /// Delegate for asynchronously resolving custom meta G-code fuctions
@@ -630,7 +631,8 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Va
 
         // What the running code can see: the object model, its own variables, and where it is in its file
         Parsing.IExpressionEvaluationContext context = new ExpressionContext(() => code.File?.GetIterations(code),
-                                                                            (int)(code.LineNumber ?? 0), filter,
+                                                                            (int)(code.LineNumber ?? 0),
+                                                                            lastCodeResult.Get(code.Channel), filter,
                                                                             variableStore.For(code), model);
 
         // Eat a single-quoted char and append its content to the given builder instance
@@ -1069,16 +1071,20 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Va
     /// </summary>
     /// <param name="iterationsProvider">Provides the current loop iteration count lazily (it errors outside a loop)</param>
     /// <param name="lineNumber">Current G-code line number</param>
+    /// <param name="lastResult">How the last code on this channel ended</param>
     /// <param name="filter">Object model filter</param>
     /// <param name="variables">Variables the running code can see</param>
     /// <param name="objectModel">Object model, which is where the global variables live</param>
-    internal sealed class ExpressionContext(Func<int?> iterationsProvider, int lineNumber, Model.Filter filter, VariableSet variables, Model.ObjectModel objectModel) : Parsing.IExpressionEvaluationContext
+    internal sealed class ExpressionContext(Func<int?> iterationsProvider, int lineNumber, int lastResult, Model.Filter filter, VariableSet variables, Model.ObjectModel objectModel) : Parsing.IExpressionEvaluationContext
     {
         /// <inheritdoc/>
         public int? Iterations => iterationsProvider();
 
         /// <inheritdoc/>
         public int LineNumber => lineNumber;
+
+        /// <inheritdoc/>
+        public int? Result => lastResult;
 
         /// <inheritdoc/>
         public bool TryResolveIdentifier(string path, bool wantExists, bool wantArrayLength, out object? value)

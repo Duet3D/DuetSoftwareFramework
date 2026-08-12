@@ -1,5 +1,6 @@
 ﻿using DuetAPI.ObjectModel;
 using DuetControlServer;
+using DuetControlServer.Codes;
 using DuetControlServer.Codes.Meta;
 using DuetControlServer.Codes.Meta.Parsing;
 using Microsoft.Extensions.Hosting;
@@ -38,6 +39,7 @@ namespace UnitTests.Machine
         private Expressions _expressions;
         private VariableStore _variableStore;
         private VariableSet _variables;
+        private LastCodeResult _lastCodeResult;
 
         [SetUp]
         public void SetUp()
@@ -47,7 +49,8 @@ namespace UnitTests.Machine
             _filter = new DcsFilter(_model);
             _variableStore = new VariableStore(_model);
             _variables = new VariableSet();
-            _expressions = new Expressions(_filter, _model, _variableStore);
+            _lastCodeResult = new LastCodeResult();
+            _expressions = new Expressions(_filter, _model, _variableStore, _lastCodeResult);
 
             // volumes carries the SBC-property flag, move does not; both resolve
             _model.Volumes.Add(new Volume { FreeSpace = 12345 });
@@ -56,7 +59,7 @@ namespace UnitTests.Machine
 
         private bool TryEval(string expression, out object value)
         {
-            IExpressionEvaluationContext context = new Expressions.ExpressionContext(() => null, 0, _filter, _variables, _model);
+            IExpressionEvaluationContext context = new Expressions.ExpressionContext(() => null, 0, _lastCodeResult.Get(CodeChannel.Trigger), _filter, _variables, _model);
             using (_model.AccessReadOnly())
             {
                 return MetaExpressionParser.TryEvaluate(expression, context, out value);
@@ -496,6 +499,31 @@ namespace UnitTests.Machine
 
             Assert.That(TryEval("state.status == \"processing\"", out object equal), Is.True);
             Assert.That(equal, Is.EqualTo(true));
+        }
+
+        [Test]
+        public void ResultFollowsTheChannelItIsReadOn()
+        {
+            // What a macro checks after running a code: M98 P"probe.g" then if result != 0
+            Assert.That(_lastCodeResult.Get(CodeChannel.Trigger), Is.EqualTo(LastCodeResult.Ok));
+
+            _lastCodeResult.Set(CodeChannel.Trigger, new Message(MessageType.Error, "it failed"));
+            Assert.That(_lastCodeResult.Get(CodeChannel.Trigger), Is.EqualTo(LastCodeResult.Error));
+            Assert.That(TryEval("result", out object failed), Is.True);
+            Assert.That(failed, Is.EqualTo(LastCodeResult.Error));
+
+            _lastCodeResult.Set(CodeChannel.Trigger, new Message(MessageType.Warning, "careful"));
+            Assert.That(TryEval("result == 1", out object warned), Is.True);
+            Assert.That(warned, Is.EqualTo(true));
+
+            // Another channel's codes do not change what this one sees
+            _lastCodeResult.Set(CodeChannel.HTTP, new Message(MessageType.Error, "elsewhere"));
+            Assert.That(TryEval("result", out object unchanged), Is.True);
+            Assert.That(unchanged, Is.EqualTo(LastCodeResult.Warning));
+
+            _lastCodeResult.Set(CodeChannel.Trigger, new Message(MessageType.Success, "done"));
+            Assert.That(TryEval("result", out object succeeded), Is.True);
+            Assert.That(succeeded, Is.EqualTo(LastCodeResult.Ok));
         }
 
         [Test]

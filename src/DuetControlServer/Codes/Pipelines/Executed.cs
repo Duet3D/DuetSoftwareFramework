@@ -34,6 +34,7 @@ public sealed class Executed : PipelineBase
     private readonly IHostApplicationLifetime _lifetime;
     private readonly IOptions<Settings> _settings;
     private readonly PipelineStackItem _stackItem;
+    private readonly LastCodeResult _lastCodeResult;
 
     /// <summary>
     /// Constructor of this class
@@ -46,6 +47,7 @@ public sealed class Executed : PipelineBase
     /// <param name="gCodes">G-code handler</param>
     /// <param name="mCodes">M-code handler</param>
     /// <param name="tCodes">T-code handler</param>
+    /// <param name="lastCodeResult">How the last code on each channel ended</param>
     /// <param name="lifetime">Application lifetime</param>
     /// <param name="settings">Application settings</param>
     public Executed(ChannelProcessor channelProcessor,
@@ -56,6 +58,7 @@ public sealed class Executed : PipelineBase
         [FromKeyedServices(Keys.GCodes)] ICodeHandler gCodes,
         [FromKeyedServices(Keys.MCodes)] ICodeHandler mCodes,
         [FromKeyedServices(Keys.TCodes)] ICodeHandler tCodes,
+        LastCodeResult lastCodeResult,
         IHostApplicationLifetime lifetime,
         IOptions<Settings> settings) : base(PipelineStage.Executed, channelProcessor, codeProcessor, lifetime, settings)
     {
@@ -69,6 +72,7 @@ public sealed class Executed : PipelineBase
         _lifetime = lifetime;
         _settings = settings;
 
+        _lastCodeResult = lastCodeResult;
         _stackItem = _stack.Peek();
     }
 
@@ -77,6 +81,10 @@ public sealed class Executed : PipelineBase
     {
         if (code.Result is not null)
         {
+            // Record how it ended, which is what meta G-code reads as "result". RepRapFirmware does the
+            // same where it handles a reply, which is what this stage is
+            _lastCodeResult.Set(code.Channel, code.Result);
+
             // Update the file position
             await code.UpdateNextFilePositionAsync(code.CancellationToken);
 

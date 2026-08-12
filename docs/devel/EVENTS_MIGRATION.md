@@ -857,3 +857,45 @@ trigger channels — the same reason `config.g` runs on `Trigger`.
   outbound command with an existing completion path, so `OutboundDelivered` may be redundant for them
   — or may be the cheaper signal, since it costs nothing per move. Worth measuring rather than
   assuming, because it decides whether the seq sweep can replace anything or only adds to it.
+
+---
+
+## 9. After the migration
+
+Not part of this work, recorded here because the migration is what found them.
+
+### 9.1 A variable that refers to the object model
+
+`var a = move.axes` is refused, and so is `global a = move`, because an object in an expression is a
+stand-in that holds nothing (§3.4.1). RepRapFirmware stores an object model array as pointers into
+its own model, which makes this work there:
+
+```
+var a = move.axes
+echo var.a[0].letter
+```
+
+Doing the same here means holding a reference to a model object that the update task mutates and that
+a reconfiguration - `M584`, or the invalidation a lost link performs - can detach from the model. The
+variable would then read stale values rather than failing, which is the worst of the available
+behaviours. A `global` could not hold one at all: it is serialised for the clients.
+
+**What fits instead is a symbolic reference**: store the path, `move.axes[0]`, and resolve it on each
+read. It serialises, so locals and globals behave alike; it holds no lock across time; and it cannot
+go stale, because a path that stops resolving is an error rather than a wrong number. It diverges from
+RepRapFirmware only where RRF is arguably wrong - after the machine is reconfigured under a stored
+reference.
+
+The work is mostly in one place. `VariableStore.TrySplitIndexedName` accepts a name and indices;
+a symbolic reference needs it to accept a field suffix too, so that `var.a[0].letter` parses, and
+`#` and `exists()` have to route through the same resolution. That grammar has two readers today and
+this would be the third, which is the argument for doing it once rather than growing another.
+
+### 9.2 `input`
+
+RepRapFirmware's `input` constant is the value entered in an `M291` message box
+([ExpressionParser.cpp:1836](lib/RepRapFirmware/src/GCodes/GCodeBuffer/ExpressionParser.cpp#L1836)).
+`M291` is not ported - it is what §3.5's message-box default action waits for - so `input` is left to
+forward. `result`, the other constant RRF has and this did not, is implemented: `LastCodeResult`
+records how the last code on each channel ended, set where the Executed stage handles the reply,
+which is where RepRapFirmware sets its own.

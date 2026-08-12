@@ -804,9 +804,11 @@ public sealed class MetaExpressionParser
             case "line":
                 result = _context.LineNumber;
                 break;
+            case "result":
+                result = _context.Result;
+                break;
             default:
-                // 'result' and 'input' are firmware execution state that the SBC does not hold, so they are left to
-                // the identifier path, which forwards them to the firmware
+                // 'input' is the value entered in an M291 message box, which is not implemented yet
                 return false;
         }
 

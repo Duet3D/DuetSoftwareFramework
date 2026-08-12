@@ -458,9 +458,20 @@ namespace UnitTests.Machine
         }
 
         [Test]
-        public void FirmwareStateConstantsAreForwarded()
+        public void ResultIsTheLastCodeResult()
         {
-            AssertForwards("result");
+            TestContext context = new() { Result = 2 };
+            Assert.That(MetaExpressionParser.TryEvaluate("result", context, out object value), Is.True);
+            Assert.That(value, Is.EqualTo(2));
+
+            Assert.That(MetaExpressionParser.TryEvaluate("result != 0", context, out object comparison), Is.True);
+            Assert.That(comparison, Is.EqualTo(true));
+        }
+
+        [Test]
+        public void InputIsForwarded()
+        {
+            // The value entered in an M291 message box, which is not implemented yet
             AssertForwards("input");
         }
         #endregion
@@ -563,6 +574,7 @@ namespace UnitTests.Machine
         {
             public int? Iterations { get; set; }
             public int LineNumber { get; set; }
+            public int? Result { get; set; }
 
             public Dictionary<string, object> Identifiers { get; } = new();
             public Dictionary<string, Func<object[], object>> Functions { get; } = new();
