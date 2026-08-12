@@ -509,11 +509,14 @@ the reset check. Track the outage with a flag or generation counter the interfac
 commands not yet written into a transfer — is never cleared by anything. Both are replayed at a
 controller that may have rebooted since, with no state to receive them.
 
-They must be dropped instead:
+They are dropped instead:
 
-- `PrepareReconnect()` clears `m_txPointer`, `m_packetId` and `m_packetsBeingResent`, i.e. what
-  `ResetConnection()` already does ([SbcTransfer.cpp:327](src/DuetSbcInterface/src/SBC/SbcTransfer.cpp#L327)).
-- The `m_outbound` ring is drained and discarded in the same place, which nothing currently does.
+- `PrepareReconnect()` clears `m_txPointer`, `m_packetId` and `m_packetsBeingResent`.
+- The `m_outbound` ring is drained where the outage is reported, which is the same moment.
+- **And where the controller reset without the link timing out.** A reboot inside one connection
+  timeout never reaches `PrepareReconnect`, so nothing there would drop what was queued for the board
+  that went away - and that queue is what the replay hazard is about. `DropOutgoing` runs on the
+  `HadReset` branch too.
 
 Reporting the drops is mostly existing machinery, and it is worth being precise about what it does and
 does not reach:
@@ -761,8 +764,9 @@ Each phase is independently useful and independently testable.
 - [x] Native: post `ConnectionLost` from `PrepareReconnect`, `ConnectionEstablished` on recovery
       **after** the `HadReset` check, carry `HadReset` (§4.1)
 - [x] Delete the unreachable transition check in `SbcInterface::Execute`
-- [ ] Native: drop the staged TX buffer and the `m_outbound` ring in `PrepareReconnect`; complete
-      request-bearing commands as `Cancelled`, count and log the rest (§4.1.1)
+- [x] Native: drop the staged TX buffer and the `m_outbound` ring in `PrepareReconnect`, and on a
+      reset the link never timed out over; complete request-bearing commands as `Cancelled`, count and
+      log the rest (§4.1.1)
 - [ ] Native: `outboundSeq` on every command, `OutboundDelivered(seq)` after a successful transfer and
       `OutboundDropped(from, to)` on a drop; move `EnableCan`'s completion off the staging path
       (§4.1.2 hop 1)

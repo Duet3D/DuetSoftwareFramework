@@ -276,8 +276,8 @@ namespace Duet::Sbc
 		throw TransferTimeout("Transfer cancelled");
 	}
 
-	// Put the link back into the "reconnecting" state so the next transfer re-runs the handshake. The
-	// pending TX data is preserved and retransmitted; only the connection/first-transfer flags are reset.
+	// Put the link back into the "reconnecting" state so the next transfer re-runs the handshake, and
+	// abandon whatever was staged for the transfer that did not happen.
 	void SbcTransfer::PrepareReconnect(const char* reason)
 	{
 		m_txHeader.protocolVersion = proto::ProtocolVersion;
@@ -288,6 +288,13 @@ namespace Duet::Sbc
 			m_hadTimeout = true;
 		}
 		m_connected = false;
+
+		// Whatever was staged for the transfer that did not happen is abandoned. A controller that
+		// rebooted has no state to receive it, and one that merely stalled is about to be configured
+		// again by the reconnect, so replaying it means sending yesterday's machine to today's board
+		m_txPointer = 0;
+		m_packetId = 0;
+		m_packetsBeingResent.clear();
 
 		// Report it from here, where it is observed. PerformFullTransfer does not return until the link
 		// is back, so a caller watching its result cannot learn that the link went away at all

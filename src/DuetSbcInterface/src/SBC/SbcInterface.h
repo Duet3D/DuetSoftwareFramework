@@ -160,6 +160,9 @@ namespace Duet::Sbc
 		RingBuffer m_inbound;
 		RingBuffer m_outbound;
 
+		// Abandon the commands queued for a controller that is not there
+		void DropOutgoing();
+
 		// When the most recent transfer completed, in the step-time model's local timebase. Written
 		// and read only by the interface thread.
 		int64_t m_lastTransferNs = 0;

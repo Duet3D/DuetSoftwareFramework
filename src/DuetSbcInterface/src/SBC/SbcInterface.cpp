@@ -44,6 +44,7 @@ namespace Duet::Sbc
 			[this](const std::string& reason)
 			{
 				m_wasConnected = false;
+				DropOutgoing();
 				InboundEventHeader header{};
 				header.type = static_cast<uint16_t>(InboundEventType::ConnectionLost);
 				PostEvent(InboundEventType::ConnectionLost, &header, sizeof(header), reason.c_str(), reason.size());
@@ -355,6 +356,10 @@ namespace Duet::Sbc
 				const bool hadReset = m_transfer.HadReset();
 				if (hadReset)
 				{
+					// A reboot the link never timed out over: nothing dropped what was queued for the
+					// board that went away, and it was composed for a machine that no longer exists
+					DropOutgoing();
+
 					InboundEventHeader header{};
 					header.type = static_cast<uint16_t>(InboundEventType::ControllerReset);
 					PostEvent(InboundEventType::ControllerReset, &header, sizeof(header));
@@ -575,6 +580,42 @@ namespace Duet::Sbc
 				break;
 			}
 			m_outbound.Consume();
+		}
+	}
+
+	// Abandon the commands queued for a controller that is not there. Called when the link drops, from
+	// the interface thread, so this does not race with StageOutgoing.
+	void SbcInterface::DropOutgoing()
+	{
+		unsigned int dropped = 0;
+		while (const std::optional<ByteSpan> peeked = m_outbound.Peek())
+		{
+			const ByteSpan bytes = *peeked;
+			if (bytes.size() >= sizeof(OutboundCommandHeader))
+			{
+				OutboundCommandHeader header{};
+				std::memcpy(&header, bytes.data(), sizeof(header));
+
+				// A command that someone is waiting on is failed rather than merely forgotten. The rest
+				// carry no way to say so, which is what the acknowledgement work in section 4.1.2 of
+				// docs/devel/EVENTS_MIGRATION.md is for
+				if (static_cast<OutboundCommandType>(header.type) == OutboundCommandType::EnableCan &&
+					bytes.size() >= sizeof(EnableCanCommand))
+				{
+					EnableCanCommand cmd{};
+					std::memcpy(&cmd, bytes.data(), sizeof(cmd));
+					CompleteRequest(cmd.requestId, RequestResult::Cancelled);
+				}
+			}
+			m_outbound.Consume();
+			++dropped;
+		}
+
+		if (dropped != 0)
+		{
+			// Said rather than counted silently: a queue that empties itself on an outage looks from
+			// the outside exactly like one that delivered everything
+			PostLog(LogLevel::Warning, "Dropped " + std::to_string(dropped) + " queued command(s) for the controller");
 		}
 	}
 
