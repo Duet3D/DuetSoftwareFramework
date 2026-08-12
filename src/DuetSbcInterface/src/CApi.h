@@ -150,6 +150,10 @@ extern "C"
 	// thread and never tears.
 	int32_t DuetSbc_MotionGetMotorPositions(DuetSbcHandle* h, int32_t* stepsOut, int32_t count, uint32_t* whenTicks);
 
+	// Where the drives are now, interpolated within the segment each is running. GetMotorPositions
+	// reports the commanded position instead, which is what the planner resynchronises against.
+	int32_t DuetSbc_MotionGetLivePositions(DuetSbcHandle* h, int32_t* stepsOut, int32_t count, uint32_t* whenTicks);
+
 	// Where one drive was at a given step-clock time, and where it was when its current move began.
 	// This is what undoing an endstop overshoot needs: the position at the instant the switch fired
 	// rather than the one the stop message caught. Only this side can answer it, because only this

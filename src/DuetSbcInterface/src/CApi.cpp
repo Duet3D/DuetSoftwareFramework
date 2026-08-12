@@ -356,6 +356,15 @@ extern "C"
 		return (int32_t)h->motion.GetMotorPositions({stepsOut, (size_t)count}, whenTicks);
 	}
 
+	int32_t DuetSbc_MotionGetLivePositions(DuetSbcHandle* h, int32_t* stepsOut, int32_t count, uint32_t* whenTicks)
+	{
+		if (h == nullptr || stepsOut == nullptr || count <= 0)
+		{
+			return 0;
+		}
+		return (int32_t)h->motion.GetLivePositions({stepsOut, (size_t)count}, whenTicks);
+	}
+
 	int32_t DuetSbc_MotionGetPositionAt(DuetSbcHandle* h, int32_t drive, uint32_t whenTicks,
 										int32_t* positionOut, int32_t* positionAtMoveStartOut,
 										int32_t* usedTimestampOut)

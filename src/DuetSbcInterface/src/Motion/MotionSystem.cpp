@@ -2,6 +2,7 @@
  * MotionSystem.cpp - see MotionSystem.h.
  */
 
+#include <cmath>
 #include "MotionSystem.h"
 
 #include <Movement/MoveTiming.h>
@@ -154,6 +155,21 @@ void MotionSystem::GetMotorPositions(std::span<int32_t> positions) const noexcep
 		// Subtract the backlash correction already injected: it moved the motor, but it did not
 		// move the axis, so reporting it would put the machine position out by the backlash.
 		positions[drive] = m_trackers[drive].GetMotorPosition() - m_currentBacklashSteps[drive];
+	}
+}
+
+void MotionSystem::GetLivePositions(std::span<int32_t> positions, uint32_t now) const noexcept
+{
+	const size_t count = std::min(positions.size(), maxAxesPlusExtruders);
+	for (size_t drive = 0; drive < count; ++drive)
+	{
+		// Where the drive is *now*, not where the last retired segment left it. DriveTracker::Advance
+		// deliberately leaves the stored position alone while a segment is still running, so reading
+		// it would report a move as three jumps - one per phase of the trapezoid - instead of motion.
+		// Rounded rather than truncated: the tracker carries a fraction of a step, and truncating it
+		// would make a slow drive appear to lag by up to a whole step.
+		const float live = m_trackers[drive].GetCurrentPosition(now);
+		positions[drive] = (int32_t)lrintf(live) - m_currentBacklashSteps[drive];
 	}
 }
 

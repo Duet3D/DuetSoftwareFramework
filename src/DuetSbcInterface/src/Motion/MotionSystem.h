@@ -176,6 +176,11 @@ namespace Duet::Sbc::Motion
 		// `positions` as there are drives to report.
 		void GetMotorPositions(std::span<int32_t> positions) const noexcept;
 
+		// Where the drives are at the given instant, interpolating within the segment each is running.
+		// GetMotorPositions reports the commanded position instead, which is what the planner has to
+		// resynchronise against; this is what a live position display wants.
+		void GetLivePositions(std::span<int32_t> positions, uint32_t now) const noexcept;
+
 		// Force motor positions, for homing and for resynchronising after a move that was cut short.
 		// Only the drives named in `drives` are taken, and only as far as `positions` reaches.
 		void SetMotorPositions(LogicalDrivesBitmap drives, std::span<const int32_t> positions) noexcept;

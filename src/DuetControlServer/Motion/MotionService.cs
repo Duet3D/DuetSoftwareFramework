@@ -225,7 +225,7 @@ internal sealed class MotionService(
         int numAxes;
         using (planner.Lock())
         {
-            if (linkInterface.Native.GetMotorPositions(_liveEndPoints, out _) <= 0)
+            if (linkInterface.Native.GetLivePositions(_liveEndPoints, out _) <= 0)
             {
                 return;
             }

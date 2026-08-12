@@ -630,6 +630,28 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     }
 
     /// <summary>
+    /// Where the drives are now, interpolated within the segment each is running
+    /// </summary>
+    /// <param name="steps">Receives the positions in microsteps</param>
+    /// <param name="whenTicks">Receives the step-clock time the snapshot was taken at</param>
+    /// <returns>Number of positions written</returns>
+    /// <remarks>
+    /// <see cref="GetMotorPositions"/> reports what the drives were <em>commanded</em> to, which only
+    /// advances as each segment of a move retires - so a trapezoidal move moves it three times, once
+    /// per phase. That is the right answer for resynchronising the planner and the wrong one for a
+    /// position display, which is what this is for
+    /// </remarks>
+    public int GetLivePositions(Span<int> steps, out uint whenTicks)
+    {
+        if (_handle == IntPtr.Zero)
+        {
+            whenTicks = 0;
+            return 0;
+        }
+        return NativeMethods.DuetSbc_MotionGetLivePositions(_handle, steps, steps.Length, out whenTicks);
+    }
+
+    /// <summary>
     /// Where one drive was at a given step-clock time
     /// </summary>
     /// <param name="drive">Logical drive</param>

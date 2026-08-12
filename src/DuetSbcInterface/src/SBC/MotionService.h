@@ -78,6 +78,7 @@ namespace Duet::Sbc
 		// they were taken at. Lock-free, so a garbage collection in the caller cannot stall motion.
 		// Returns the number of drives written.
 		size_t GetMotorPositions(std::span<int32_t> positions, uint32_t *whenTicks) const;
+		size_t GetLivePositions(std::span<int32_t> positions, uint32_t *whenTicks) const;
 
 		// Force motor positions, after homing or a move that was cut short.
 		static void SetMotorPositions(uint32_t driveMask, std::span<const int32_t> positions);
@@ -170,10 +171,21 @@ namespace Duet::Sbc
 		struct PositionSnapshot
 		{
 			uint32_t whenTicks = 0;
+
+			// What the drives were commanded to, which is where the last retired segment left them.
+			// The planner resynchronises against this after a move is cut short, so it has to be the
+			// commanded position and not an interpolated one.
 			int32_t positions[maxAxesPlusExtruders]{};
+
+			// Where the drives actually are, interpolated within the segment each is running. Only
+			// for reporting - two meanings, kept apart, rather than one that has to serve both.
+			int32_t livePositions[maxAxesPlusExtruders]{};
 		};
 		mutable std::atomic<uint32_t> m_snapshotSequence{0};
 		PositionSnapshot m_snapshot;
+
+		size_t ReadSnapshot(std::span<int32_t> positions, uint32_t *whenTicks,
+							const int32_t (&source)[maxAxesPlusExtruders]) const;
 
 		std::thread m_thread;
 		std::atomic<bool> m_stop{false};

@@ -376,6 +376,8 @@ internal static partial class NativeMethods
     /// </remarks>
     [LibraryImport(LibraryName)]
     internal static partial int DuetSbc_MotionGetMotorPositions(IntPtr handle, Span<int> steps, int count, out uint whenTicks);
+    [LibraryImport(LibraryName)]
+    internal static partial int DuetSbc_MotionGetLivePositions(IntPtr handle, Span<int> steps, int count, out uint whenTicks);
 
     /// <summary>
     /// Where one drive was at a given step-clock time, and where it was when its move began

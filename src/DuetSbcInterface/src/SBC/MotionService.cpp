@@ -207,15 +207,31 @@ namespace Duet::Sbc
 		m_snapshotSequence.store(sequence + 1, std::memory_order_release);
 		std::atomic_thread_fence(std::memory_order_release);
 
-		m_snapshot.whenTicks = StepTimer::GetMovementTimerTicks();
-		// The span is deduced from the array, so the length cannot drift from the thing it describes
+		const uint32_t now = StepTimer::GetMovementTimerTicks();
+		m_snapshot.whenTicks = now;
+		// The spans are deduced from the arrays, so the lengths cannot drift from the things they
+		// describe
 		reprap.GetMove().GetMotorPositions(m_snapshot.positions);
+		reprap.GetMove().GetLivePositions(m_snapshot.livePositions, now);
 
 		std::atomic_thread_fence(std::memory_order_release);
 		m_snapshotSequence.store(sequence + 2, std::memory_order_release);
 	}
 
 	size_t MotionService::GetMotorPositions(std::span<int32_t> positions, uint32_t *whenTicks) const
+	{
+		return ReadSnapshot(positions, whenTicks, m_snapshot.positions);
+	}
+
+	size_t MotionService::GetLivePositions(std::span<int32_t> positions, uint32_t *whenTicks) const
+	{
+		return ReadSnapshot(positions, whenTicks, m_snapshot.livePositions);
+	}
+
+	// Both readers share the retry loop: the seqlock protects the whole snapshot, so which array is
+	// being read makes no difference to how it has to be read.
+	size_t MotionService::ReadSnapshot(std::span<int32_t> positions, uint32_t *whenTicks,
+									   const int32_t (&source)[maxAxesPlusExtruders]) const
 	{
 		if (positions.empty())
 		{
@@ -233,7 +249,7 @@ namespace Duet::Sbc
 			std::atomic_thread_fence(std::memory_order_acquire);
 
 			const uint32_t when = m_snapshot.whenTicks;
-			std::memcpy(positions.data(), m_snapshot.positions, toCopy * sizeof(int32_t));
+			std::memcpy(positions.data(), source, toCopy * sizeof(int32_t));
 
 			std::atomic_thread_fence(std::memory_order_acquire);
 			if (m_snapshotSequence.load(std::memory_order_relaxed) == before)
