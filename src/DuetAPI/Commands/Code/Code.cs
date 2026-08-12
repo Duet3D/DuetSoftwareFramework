@@ -170,7 +170,6 @@ public partial class Code : Command<Message?>
         Flags = CodeFlags.None;
         Comment = null;
         FilePosition = Length = null;
-        Length = null;
         Parameters.Clear();
     }
 
