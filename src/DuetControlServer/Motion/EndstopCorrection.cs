@@ -69,11 +69,6 @@ internal sealed class EndstopCorrection(
     private const float StepClockRate = MotionLimits.StepClockRate;
 
     /// <summary>
-    /// Reply type meaning "expect nothing back", as the native side used for this message
-    /// </summary>
-    private const ushort UnusedMessageType = 0;
-
-    /// <summary>
     /// One driver the controller stopped
     /// </summary>
     /// <param name="Board">CAN address of the board carrying it</param>
@@ -243,12 +238,18 @@ internal sealed class EndstopCorrection(
 
         // No request id and no reply: the board acts on it or it does not, and there is nothing this
         // side could usefully do about a failure it only heard about milliseconds later. RRF sends it
-        // the same way, with SetupRequestMessageNoRid
+        // the same way, with SetupRequestMessageNoRid.
+        //
+        // The reply type has to be NoReply rather than any other "nothing" value. The controller
+        // reads anything else as a reply being expected, and a request that expects a reply must
+        // carry an all-ones request id placeholder for it to allocate over - which this message has
+        // no field for. It drops the message rather than sending it, so the boards are never told to
+        // wind back and the machine silently keeps the overshoot
         revert.ClearReservedFields();
         ReadOnlySpan<byte> payload = MemoryMarshal.AsBytes(
             new ReadOnlySpan<CanMessageRevertPosition>(in revert))[..(int)CanMessageRevertPosition.GetActualDataLength((uint)numReverting)];
 
-        nativeLink.QueueCanMessage(0, (ushort)CanMessageType.RevertPosition, UnusedMessageType,
+        nativeLink.QueueCanMessage(0, (ushort)CanMessageType.RevertPosition, (ushort)CanMessageType.NoReply,
                                    board, isResponse: false, payload);
         return true;
     }
