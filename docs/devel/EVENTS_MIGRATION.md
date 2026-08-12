@@ -145,8 +145,9 @@ paused or pausing, no second pause is added.
 | `EventType` enum, CANlib numbering | [EventType.g.cs](src/DuetControlServer/Link/Protocol/Shared/EventType.g.cs), generated from [can-messages.json](src/DuetCanMessage.SourceGenerators/Schema/can-messages.json) | ✅ 0-10, matches `RRF3Common.h` |
 | `CanMessageEvent` decode | [CanMessageFormats.g.cs:4454](src/DuetControlServer/Link/Protocol/CanMessages/Generated/CanMessageFormats.g.cs#L4454) | ✅ |
 | Board events arriving from CAN | [ExpansionBoardManager.cs:189](src/DuetControlServer/Link/Expansion/ExpansionBoardManager.cs#L189) | 🟡 `logger.LogWarning(...)` and nothing else |
-| Event queue, priority, suppression | — | ⬜ does not exist |
-| Event macros | — | ⬜ nothing runs them |
+| Event queue, priority, suppression | `Events/EventQueue.cs` | ✅ phase B |
+| Event text and macro names | `Events/EventText.cs`, `Events/DriverStatusText.cs` | ✅ phase B (§3.5.1) |
+| Event macros | — | ⬜ nothing runs them yet: the processor is what does |
 | `M957` | — | ⬜ |
 | `Autopause` code channel | [CodeChannel.cs:71](src/DuetAPI/CodeChannel.cs#L71) = 11 | ✅ has a `ChannelProcessor` like every other channel; nothing puts codes on it |
 | Macro runner | [MacroRunner.cs:72](src/DuetControlServer/Files/MacroRunner.cs#L72) | ✅ runs a macro on a channel, with parameters (§3.4) |
@@ -377,6 +378,37 @@ Until those land, the pausing branch is a `// TODO` naming what it waits for, an
 runs for every event. That is a *known* missing default, not an invented one (MCODE_MIGRATION §1.7):
 the macro path — which is what machines actually configure — is complete from phase B.
 
+### 3.5.1 Where the text of an event lives
+
+Three of the messages in §1.5 are not one string but a format with a decoded value in the middle: a
+heater fault's type, a driver's status word, a filament monitor's status. CANlib carries all three
+tables, and the question each one asks is the same: does anything other than DuetControlServer render
+this? If a board renders it too, two copies drift and the same fault reads differently depending on
+which of them reported it.
+
+The answers differ, so the three are handled differently:
+
+| Table | Rendered by a board? | Where it lives |
+|---|---|---|
+| `StandardDriverStatus::BitMeanings` and the severity masks | **Yes** — Duet3Expansion answers a status request with this text ([CommandProcessor.cpp:559](src/Duet3Expansion/src/CommandProcessing/CommandProcessor.cpp#L559)) | The schema, emitted to C# and compared against CANlib |
+| `HeaterFaultText` | No — a board sends the fault type; only RRF and the controller `Event.cpp` §7 deletes render it | DuetControlServer, in `EventText` |
+| `FilamentSensorStatus` | The value is an enum DuetAPI already declares | Nowhere new; it is already in the schema as `checkOnly` |
+
+`HeaterFaultType` itself is in the schema either way, because Duet3Expansion decides the value and
+sends it: the ordinals are a wire contract even though the words are not. CANlib is left alone in both
+cases, so RepRapFirmware still compiles against it.
+
+Checking the shared table needed one thing the generator did not have. `verify-cpp-layout.sh` proves
+the schema matches CANlib by compiling both and comparing layouts, and a string array has no layout;
+`compare-constants.py` compares numbers. So a constant group may now declare **string tables**, and
+that comparison reads CANlib's `constexpr` string arrays and reports the entry that differs rather
+than the array. C# cannot assert an array's length at compile time as CANlib does, so both of the
+`static_assert`s CANlib makes - one string per fault type, and the three severity masks disjoint and
+together covering exactly the bits with meanings - are asserted in the tests instead.
+
+That check earned itself immediately: the first transcription of the three masks into hex was wrong,
+and comparing them against CANlib is what said so.
+
 ### 3.6 Numbering, and priority as its own property
 
 `EventType` mirrors CANlib and travels on the wire as 8 bits. **Values 0-10 are fixed**: Duet3Expansion
@@ -433,6 +465,11 @@ declaration, checked by the same validator, with no second list to drift. The or
 Declaration order would express the same thing without a new field, but only while the two orders
 happen to coincide: the values are grouped by CANlib's numbering and a priority change would mean
 moving a line for reasons unrelated to what it declares. An explicit number says what it is.
+
+Two mechanics turned out differently from what this section first assumed. `compare-enums.py` needed
+no teaching at all - it already skips what the schema emits for C# alone, which is what the local
+block is. `can-messages.schema.json` did: it validates the schema file itself and rejects a property
+it has not been told about, so `priority` had to be declared there as well.
 
 ---
 
@@ -698,13 +735,15 @@ Each phase is independently useful and independently testable.
 - [x] Arrays: `var.x[2]` as a value and as an assignment target, computed indices, and object model
       collections of scalars
 
-### Phase B — the event system ⬜
+### Phase B — the event system 🟡
 
-- [ ] Schema: a `priority` per `EventType` value; generator emits `EventTypeExtensions.Priority`;
-      validator covers it (§3.6)
-- [ ] `Events/EventQueue.cs`: priority order from the schema, head pinning, similarity suppression,
+- [x] Schema: a `priority` per `EventType` value, and the local block at 128; the generator emits
+      `EventTypePriority` beside the enum (§3.6)
+- [x] `Events/EventQueue.cs`: priority order from the schema, head pinning, similarity suppression,
       counters, cap
-- [ ] `Events/EventText.cs`: port of `GetTextDescription`, strings preserved verbatim
+- [x] `Events/EventText.cs`: port of `GetTextDescription` and `GetMacroFileName`, strings verbatim
+- [x] `HeaterFaultType` in the schema, its text in DCS; `StandardDriverStatus` and its bit meanings in
+      the schema, rendered by `Events/DriverStatusText.cs` (§3.5.1)
 - [ ] `Events/EventProcessor.cs`: hosted service on `CodeChannel.Autopause`
 - [ ] `Events/Extensions.cs` + registration alongside `AddLinkAdapter`
 - [ ] Route board CAN events into the queue (replacing the `LogWarning`)
@@ -712,7 +751,8 @@ Each phase is independently useful and independently testable.
       `expansion_timeout` and setting `BoardState.TimedOut`, rebased after a reconnect (§3.3.1)
 - [ ] Raise `expansion_reconnect` when a board announces while already `Running`
 - [ ] `M122` line: `Events: %u queued, %u completed`
-- [ ] Unit tests: ordering, suppression, head pinning, macro-name mapping for all 13 types
+- [x] Unit tests: ordering, suppression, head pinning, macro-name mapping for all 13 types, and the
+      two invariants CANlib asserts of the driver status masks
 
 ### Phase C — the link events ⬜
 
@@ -781,6 +821,11 @@ Gated on MCODE_MIGRATION's `M291`/`M292` and `M25`:
 
 Legend as [MCODE_MIGRATION.md](MCODE_MIGRATION.md) §1: ✅ done, 🟡 partial, ⬜ not started, ⛔ out of
 scope.
+
+Every row's **text and macro name exist** as of phase B, including the decoded driver status and
+heater fault type (§3.5.1) — a test walks all thirteen. What the ⬜ columns are waiting for is one
+thing each: *Queued* wants the routing that replaces the `LogWarning`, and *Macro runs* wants the
+processor. Neither is per-event work.
 
 ---
 
