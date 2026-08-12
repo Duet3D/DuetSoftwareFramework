@@ -395,6 +395,34 @@ namespace UnitTests.Machine
         }
 
         [Test]
+        public void CharComparesAgainstAString()
+        {
+            // move.axes[].letter is a char, and a char compared against a string is converted to one
+            Assert.That(TryEval("move.axes[0].letter == \"X\"", out object equal), Is.True);
+            Assert.That(equal, Is.EqualTo(true));
+
+            Assert.That(TryEval("move.axes[0].letter == \"Y\"", out object notEqual), Is.True);
+            Assert.That(notEqual, Is.EqualTo(false));
+
+            Assert.That(TryEval("move.axes[0].letter != \"Y\"", out object inverted), Is.True);
+            Assert.That(inverted, Is.EqualTo(true));
+
+            // A char converts to a string wherever one is wanted
+            Assert.That(TryEval("move.axes[0].letter ^ \"1\"", out object concatenated), Is.True);
+            Assert.That(concatenated, Is.EqualTo("X1"));
+        }
+
+        [Test]
+        public void CharAgainstACharIsRefusedAsInTheFirmware()
+        {
+            // Two chars are left alone by the type balancing and the equality operator has no case for
+            // them, so RepRapFirmware refuses this and so does this parser. The message names the types,
+            // which is what tells the reader to write == "X" instead
+            Assert.That(() => TryEval("move.axes[0].letter == 'X'", out _),
+                        Throws.TypeOf<CodeParserException>().With.Message.Contains("got char"));
+        }
+
+        [Test]
         public void UnknownPathsAreNotSbcExpressions()
         {
             Assert.That(_expressions.IsSbcExpression("foo", false), Is.False);
