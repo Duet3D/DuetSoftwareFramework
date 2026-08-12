@@ -443,18 +443,23 @@ namespace UnitTests.Machine
         }
 
         [Test]
-        public async Task ArrayOfObjectsCanBeStored()
+        public void ObjectsCannotBeAssignedToAVariable()
         {
-            // RepRapFirmware stores an object model array in a variable, so an array of stand-ins is
-            // stored here. A global keeps only how they print, which is all a stand-in holds anyway
+            // A stand-in holds nothing, so storing one - or an array of them - would give a macro
+            // "{object}" where it expected the machine. Both are refused where the assignment is made
+            Assert.That(TryEval("move", out object model), Is.True);
+            Assert.That(ObjectModelValue.OccursIn(model), Is.True);
+
             Assert.That(TryEval("move.axes", out object axes), Is.True);
-            await _variableStore.TryCreateGlobalAsync("axes", axes, default);
+            Assert.That(ObjectModelValue.OccursIn(axes), Is.True);
 
-            Assert.That(TryEval("#global.axes", out object length), Is.True);
-            Assert.That(length, Is.EqualTo(1));
+            // Nested, because an array of arrays of them is no more useful
+            Assert.That(ObjectModelValue.OccursIn(new object?[] { new object?[] { model } }), Is.True);
 
-            Assert.That(TryEval("global.axes[0]", out object element), Is.True);
-            Assert.That(element, Is.EqualTo("{object}"));
+            // What can be stored is unaffected
+            Assert.That(TryEval("move.axes[0].machinePosition", out object position), Is.True);
+            Assert.That(ObjectModelValue.OccursIn(position), Is.False);
+            Assert.That(ObjectModelValue.OccursIn(new object?[] { 1, "two", null }), Is.False);
         }
 
         [Test]

@@ -305,11 +305,15 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
 
                 // Evaluate what it is being assigned to
                 object? value = await expressions.EvaluateExpressionToValueAsync(code, expression, false, cancellationToken);
-                if (value is Meta.Parsing.ObjectModelValue)
+                if (Meta.Parsing.ObjectModelValue.OccursIn(value))
                 {
-                    // An object is not a value. RepRapFirmware refuses this too, and stores an array of
-                    // them - which is why the refusal is of the value itself and not of what contains it
-                    throw new CodeParserException("Cannot assign a value of type 'object' to a variable", code);
+                    // An object is not a value, and an array of them is not one either: what would be
+                    // stored holds nothing, so a macro reading it back gets "{object}" where it expected
+                    // the machine. RepRapFirmware refuses the first for the same reason and stores the
+                    // second as references, which a variable here cannot hold
+                    throw new CodeParserException((value is Meta.Parsing.ObjectModelValue)
+                        ? "Cannot assign a value of type 'object' to a variable"
+                        : "Cannot assign an array of objects to a variable", code);
                 }
 
                 // Assign it. A "var" or "global" statement creates, "set" assigns to what already exists;

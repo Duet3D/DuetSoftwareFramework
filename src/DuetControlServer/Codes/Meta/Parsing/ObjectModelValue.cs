@@ -30,4 +30,34 @@ public sealed class ObjectModelValue
     /// </summary>
     /// <returns>Always <c>{object}</c></returns>
     public override string ToString() => "{object}";
+
+    /// <summary>
+    /// Check whether a value is an object, or an array holding one at any depth
+    /// </summary>
+    /// <param name="value">Value to check</param>
+    /// <returns>True if an object occurs anywhere in it</returns>
+    /// <remarks>
+    /// Assigning one to a variable is refused, and so is assigning an array of them: what would be
+    /// stored holds nothing, so a macro reading it back gets eight characters where it expected the
+    /// machine. RepRapFirmware refuses the first and stores the second, but what it stores are
+    /// references into its object model - something a variable here cannot hold in any case
+    /// </remarks>
+    public static bool OccursIn(object? value)
+    {
+        if (value is ObjectModelValue)
+        {
+            return true;
+        }
+        if (value is object?[] array)
+        {
+            foreach (object? element in array)
+            {
+                if (OccursIn(element))
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 }

@@ -313,13 +313,9 @@ public sealed class VariableStore(Model.ObjectModel model)
                 }
                 writer.WriteEndArray();
                 break;
-            case Parsing.ObjectModelValue objectValue:
-                // An array of objects can be assigned to a variable, as it can in RepRapFirmware, and
-                // this is what one of them prints as. Storing anything more would mean storing a
-                // reference into the object model, which is what a global must not hold
-                writer.WriteStringValue(objectValue.ToString());
-                break;
             default:
+                // The statement that assigns a variable refuses what cannot be stored, in the words a
+                // macro author needs, so anything reaching here is a caller that skipped that check
                 throw new ArgumentException($"Cannot store a value of type {value.GetType().Name} in a variable", nameof(value));
         }
     }
