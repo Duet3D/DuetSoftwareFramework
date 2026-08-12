@@ -188,8 +188,8 @@ namespace UnitTests.Machine
             {
                 if (type != HeaterFaultType.HeaterFaultTypeLimit)
                 {
-                    (string text, _) = EventText.Describe(Event(EventType.HeaterFault, param: (ushort)type));
-                    Assert.That(text, Does.Not.Contain("unknown error"), $"{type} has no text of its own");
+                    Assert.That(EventText.Describe(Event(EventType.HeaterFault, param: (ushort)type)).Content,
+                                Does.Not.Contain("unknown error"), $"{type} has no text of its own");
                 }
             }
         }
@@ -197,32 +197,32 @@ namespace UnitTests.Machine
         [Test]
         public void EventsAreDescribedAsTheFirmwareDescribesThem()
         {
-            (string text, MessageType type) = EventText.Describe(Event(EventType.HeaterFault, device: 2, param: 1, text: "expected 200 measured 150"));
-            Assert.That(text, Is.EqualTo("Heater 2 fault: temperature rising too slowly: expected 200 measured 150"));
-            Assert.That(type, Is.EqualTo(MessageType.Error));
+            Message described = EventText.Describe(Event(EventType.HeaterFault, device: 2, param: 1, text: "expected 200 measured 150"));
+            Assert.That(described.Content, Is.EqualTo("Heater 2 fault: temperature rising too slowly: expected 200 measured 150"));
+            Assert.That(described.Type, Is.EqualTo(MessageType.Error));
 
             // A fault type CANlib does not have falls back to the last entry, as it does in RRF
-            (text, _) = EventText.Describe(Event(EventType.HeaterFault, device: 0, param: 99));
-            Assert.That(text, Is.EqualTo("Heater 0 fault: unknown error: "));
+            Assert.That(EventText.Describe(Event(EventType.HeaterFault, device: 0, param: 99)).Content,
+                        Is.EqualTo("Heater 0 fault: unknown error: "));
 
-            (text, type) = EventText.Describe(Event(EventType.DriverStall, board: 2, device: 3));
-            Assert.That(text, Is.EqualTo("Driver 2.3 stall"));
-            Assert.That(type, Is.EqualTo(MessageType.Warning));
+            described = EventText.Describe(Event(EventType.DriverStall, board: 2, device: 3));
+            Assert.That(described.Content, Is.EqualTo("Driver 2.3 stall"));
+            Assert.That(described.Type, Is.EqualTo(MessageType.Warning));
 
-            (text, type) = EventText.Describe(Event(EventType.Undervoltage, board: 4, param: 118));
-            Assert.That(text, Is.EqualTo("undervoltage on board 4: voltage 11.8V"));
-            Assert.That(type, Is.EqualTo(MessageType.Warning));
+            described = EventText.Describe(Event(EventType.Undervoltage, board: 4, param: 118));
+            Assert.That(described.Content, Is.EqualTo("undervoltage on board 4: voltage 11.8V"));
+            Assert.That(described.Type, Is.EqualTo(MessageType.Warning));
 
-            (text, type) = EventText.Describe(Event(EventType.ExpansionTimeout, board: 5));
-            Assert.That(text, Is.EqualTo("Expansion board 5 stopped sending status"));
-            Assert.That(type, Is.EqualTo(MessageType.Error));
+            described = EventText.Describe(Event(EventType.ExpansionTimeout, board: 5));
+            Assert.That(described.Content, Is.EqualTo("Expansion board 5 stopped sending status"));
+            Assert.That(described.Type, Is.EqualTo(MessageType.Error));
 
-            (text, type) = EventText.Describe(Event(EventType.ControllerDisconnect, board: 0, text: "Transfer timeout"));
-            Assert.That(text, Is.EqualTo("Lost connection to the controller: Transfer timeout"));
-            Assert.That(type, Is.EqualTo(MessageType.Error));
+            described = EventText.Describe(Event(EventType.ControllerDisconnect, board: 0, text: "Transfer timeout"));
+            Assert.That(described.Content, Is.EqualTo("Lost connection to the controller: Transfer timeout"));
+            Assert.That(described.Type, Is.EqualTo(MessageType.Error));
 
-            (text, _) = EventText.Describe(Event(EventType.ControllerReconnect, board: 0, param: 1));
-            Assert.That(text, Is.EqualTo("Connection to the controller re-established, it had reset"));
+            Assert.That(EventText.Describe(Event(EventType.ControllerReconnect, board: 0, param: 1)).Content,
+                        Is.EqualTo("Connection to the controller re-established, it had reset"));
         }
 
         [Test]
@@ -247,13 +247,13 @@ namespace UnitTests.Machine
                         Is.EqualTo("over temperature warning, over temperature shutdown"));
 
             // And that is what a driver event says
-            (string text, MessageType type) = EventText.Describe(Event(EventType.DriverError, board: 1, device: 2, param: (ushort)overTemperatureShutdown));
-            Assert.That(text, Is.EqualTo("Driver 1.2 error: over temperature shutdown"));
-            Assert.That(type, Is.EqualTo(MessageType.Error));
+            Message described = EventText.Describe(Event(EventType.DriverError, board: 1, device: 2, param: (ushort)overTemperatureShutdown));
+            Assert.That(described.Content, Is.EqualTo("Driver 1.2 error: over temperature shutdown"));
+            Assert.That(described.Type, Is.EqualTo(MessageType.Error));
 
-            (text, type) = EventText.Describe(Event(EventType.DriverWarning, board: 1, device: 2, param: (ushort)overTemperatureWarning));
-            Assert.That(text, Is.EqualTo("Driver 1.2 warning: over temperature warning"));
-            Assert.That(type, Is.EqualTo(MessageType.Warning));
+            described = EventText.Describe(Event(EventType.DriverWarning, board: 1, device: 2, param: (ushort)overTemperatureWarning));
+            Assert.That(described.Content, Is.EqualTo("Driver 1.2 warning: over temperature warning"));
+            Assert.That(described.Type, Is.EqualTo(MessageType.Warning));
         }
 
         [Test]

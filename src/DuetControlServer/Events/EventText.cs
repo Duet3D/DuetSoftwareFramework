@@ -79,61 +79,66 @@ public static class EventText
     /// Describe an event to the operator
     /// </summary>
     /// <param name="machineEvent">Event to describe</param>
-    /// <returns>What to say and how loudly to say it</returns>
-    public static (string Text, MessageType Type) Describe(MachineEvent machineEvent)
+    /// <returns>What to say, and how loudly to say it</returns>
+    /// <remarks>
+    /// RepRapFirmware returns the severity and fills in a string reference, because that is what its
+    /// string handling allows. Here the two belong to one another and there is already a type that
+    /// says so, which is also what the logger takes
+    /// </remarks>
+    public static Message Describe(MachineEvent machineEvent)
     {
         switch (machineEvent.Type)
         {
             case EventType.HeaterFault:
                 {
                     int index = (machineEvent.Param < HeaterFaultText.Length) ? machineEvent.Param : HeaterFaultText.Length - 1;
-                    return ($"Heater {machineEvent.DeviceNumber} fault: {HeaterFaultText[index]}{machineEvent.Text}", MessageType.Error);
+                    return new Message(MessageType.Error, $"Heater {machineEvent.DeviceNumber} fault: {HeaterFaultText[index]}{machineEvent.Text}");
                 }
 
             case EventType.FilamentError:
-                return ($"Filament error on extruder {machineEvent.DeviceNumber}: {(FilamentMonitorStatus)machineEvent.Param}", MessageType.Error);
+                return new Message(MessageType.Error, $"Filament error on extruder {machineEvent.DeviceNumber}: {(FilamentMonitorStatus)machineEvent.Param}");
 
             case EventType.DriverError:
-                return ($"Driver {machineEvent.BoardAddress}.{machineEvent.DeviceNumber} error: " +
-                        $"{DriverStatusText.Describe(machineEvent.Param, DriverStatusText.Severity.ErrorsOnly)}{machineEvent.Text}",
-                        MessageType.Error);
+                return new Message(MessageType.Error,
+                                   $"Driver {machineEvent.BoardAddress}.{machineEvent.DeviceNumber} error: " +
+                                   $"{DriverStatusText.Describe(machineEvent.Param, DriverStatusText.Severity.ErrorsOnly)}{machineEvent.Text}");
 
             case EventType.DriverWarning:
-                return ($"Driver {machineEvent.BoardAddress}.{machineEvent.DeviceNumber} warning: " +
-                        $"{DriverStatusText.Describe(machineEvent.Param, DriverStatusText.Severity.WarningsAndErrors)}{machineEvent.Text}",
-                        MessageType.Warning);
+                return new Message(MessageType.Warning,
+                                   $"Driver {machineEvent.BoardAddress}.{machineEvent.DeviceNumber} warning: " +
+                                   $"{DriverStatusText.Describe(machineEvent.Param, DriverStatusText.Severity.WarningsAndErrors)}{machineEvent.Text}");
 
             case EventType.DriverStall:
-                return ($"Driver {machineEvent.BoardAddress}.{machineEvent.DeviceNumber} stall", MessageType.Warning);
+                return new Message(MessageType.Warning, $"Driver {machineEvent.BoardAddress}.{machineEvent.DeviceNumber} stall");
 
             case EventType.McuTemperatureWarning:
-                return ($"MCU temperature warning from board {machineEvent.BoardAddress}: temperature {machineEvent.Param / 10.0:F1}C", MessageType.Warning);
+                return new Message(MessageType.Warning, $"MCU temperature warning from board {machineEvent.BoardAddress}: temperature {machineEvent.Param / 10.0:F1}C");
 
             case EventType.Overvoltage:
-                return ($"overvoltage on board {machineEvent.BoardAddress}: voltage {machineEvent.Param / 10.0:F1}V", MessageType.Warning);
+                return new Message(MessageType.Warning, $"overvoltage on board {machineEvent.BoardAddress}: voltage {machineEvent.Param / 10.0:F1}V");
 
             case EventType.Undervoltage:
-                return ($"undervoltage on board {machineEvent.BoardAddress}: voltage {machineEvent.Param / 10.0:F1}V", MessageType.Warning);
+                return new Message(MessageType.Warning, $"undervoltage on board {machineEvent.BoardAddress}: voltage {machineEvent.Param / 10.0:F1}V");
 
             case EventType.ExpansionTimeout:
-                return ($"Expansion board {machineEvent.BoardAddress} stopped sending status", MessageType.Error);
+                return new Message(MessageType.Error, $"Expansion board {machineEvent.BoardAddress} stopped sending status");
 
             case EventType.ExpansionReconnect:
-                return ($"Expansion board {machineEvent.BoardAddress} reconnected", MessageType.Error);
+                return new Message(MessageType.Error, $"Expansion board {machineEvent.BoardAddress} reconnected");
 
             case EventType.ControllerDisconnect:
-                return ($"Lost connection to the controller: {machineEvent.Text}", MessageType.Error);
+                return new Message(MessageType.Error, $"Lost connection to the controller: {machineEvent.Text}");
 
             case EventType.ControllerReconnect:
-                return ("Connection to the controller re-established" + (machineEvent.Param != 0 ? ", it had reset" : string.Empty),
-                        MessageType.Warning);
+                return new Message(MessageType.Warning,
+                                   "Connection to the controller re-established" + (machineEvent.Param != 0 ? ", it had reset" : string.Empty));
 
             case EventType.MainBoardPowerFail:
                 // Never raised, here and in RepRapFirmware alike, which is why it has no text there either
-                return (string.Empty, MessageType.Error);
+                return new Message(MessageType.Error, string.Empty);
 
             default:
-                return ($"Unknown event type {(byte)machineEvent.Type}", MessageType.Error);
+                return new Message(MessageType.Error, $"Unknown event type {(byte)machineEvent.Type}");
         }
     }
 }

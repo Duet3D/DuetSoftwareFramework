@@ -79,9 +79,9 @@ public sealed class EventProcessor(EventQueue queue, MacroRunner macroRunner, Ev
     /// <returns>Asynchronous task</returns>
     private async Task ProcessAsync(MachineEvent machineEvent, CancellationToken cancellationToken)
     {
-        (string text, MessageType severity) = EventText.Describe(machineEvent);
+        Message description = EventText.Describe(machineEvent);
         string macroName = EventText.GetMacroFileName(machineEvent.Type);
-        logger.LogDebug("Processing event {Type} from board {Board}: {Text}", machineEvent.Type, machineEvent.BoardAddress, text);
+        logger.LogDebug("Processing event {Type} from board {Board}: {Text}", machineEvent.Type, machineEvent.BoardAddress, description.Content);
 
         // What the macro can read about the event it was started for. B is passed even though every
         // board here is a CAN board, so that one macro works on a Duet without expansion boards too
@@ -90,7 +90,7 @@ public sealed class EventProcessor(EventQueue queue, MacroRunner macroRunner, Ev
             ["D"] = (int)machineEvent.DeviceNumber,
             ["B"] = (int)machineEvent.BoardAddress,
             ["P"] = (int)machineEvent.Param,
-            ["S"] = text
+            ["S"] = description.Content
         };
 
         if (await macroRunner.TryRunAsync(CodeChannel.Autopause, macroName, parameters: parameters, cancellationToken: cancellationToken))
@@ -102,9 +102,6 @@ public sealed class EventProcessor(EventQueue queue, MacroRunner macroRunner, Ev
         // print for a heater fault, a filament error or a driver error
         // TODO: raise the message box and pause once M291 and M25 are implemented; see §3.5 of
         // docs/devel/EVENTS_MIGRATION.md for which events pause and which of them run pause.g
-        if (!string.IsNullOrEmpty(text))
-        {
-            eventLogger.LogOutput(severity, text);
-        }
+        eventLogger.LogOutput(description);
     }
 }
