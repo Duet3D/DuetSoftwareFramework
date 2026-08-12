@@ -309,6 +309,11 @@
               "description": "An id that is no longer used. It is emitted as a comment rather than dropped, because the comment is the record that the number is spent: reusing one would have an expansion board on older firmware act on a message that now means something else.",
               "default": false
             },
+            "priority": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Order this value is dealt with in, lowest first, for an enum where that has a meaning. Declared separately from the value because the value is fixed by what firmware in the field already sends, while the order is a design choice."
+            },
             "doc": { "$ref": "#/$defs/docText" },
             "emit": { "$ref": "#/$defs/emit" }
           }

@@ -2550,22 +2550,30 @@
     "output": "src/DuetControlServer/Link/Protocol/Shared/EventType.g.cs",
     "doc": [
       "What happened, in an event message sent by an expansion board.",
-      "Mirrors EventType in CANlib's RRF3Common.h. The value travels on the wire as the 8-bit eventType",
-      "of an event message, so it has to keep CANlib's numbering. Earlier values have higher priority,",
-      "and the names are also the names of the macro files run in response to the event."
+      "Values 0-10 mirror EventType in CANlib's RRF3Common.h. They travel on the wire as the 8-bit",
+      "eventType of an event message, so expansion board firmware already in the field decides them and",
+      "they cannot move. Values from 128 up are raised by DuetControlServer about itself and never reach",
+      "the wire, which is why they start clear of anything CANlib may add.",
+      "The name is also the name of the macro file run in response, with underscores becoming hyphens.",
+      "'priority' is the order events are dealt with in, lowest first: RepRapFirmware uses the value",
+      "itself for that, which is not open to an enum whose numbering is a compatibility constraint."
     ],
     "values": [
-      { "name": "main_board_power_fail", "value": 0, "doc": "a placeholder: main board power failure is not currently handled by the event system" },
-      { "name": "expansion_reconnect", "value": 1, "doc": "an expansion board re-announced itself after losing and regaining time sync, without having reset" },
-      { "name": "expansion_timeout", "value": 2, "doc": "an expansion board stopped responding" },
-      { "name": "heater_fault", "value": 3, "doc": "a heater was shut down because its temperature did not follow the model" },
-      { "name": "driver_error", "value": 4, "doc": "a driver reported an error serious enough to stop the print, such as a short circuit or over temperature" },
-      { "name": "filament_error", "value": 5, "doc": "a filament monitor reported that the filament is missing or not moving as expected" },
-      { "name": "driver_stall", "value": 6, "doc": "a driver reported a stall" },
-      { "name": "driver_warning", "value": 7, "doc": "a driver reported a condition that is not yet an error, such as approaching its temperature limit" },
-      { "name": "mcu_temperature_warning", "value": 8, "doc": "not currently used" },
-      { "name": "overvoltage", "value": 9, "doc": "the VIN supply rose above the safe limit" },
-      { "name": "undervoltage", "value": 10, "doc": "the VIN supply fell below the safe limit" }
+      { "name": "main_board_power_fail", "value": 0, "priority": 2, "doc": "a placeholder: main board power failure is not currently handled by the event system" },
+      { "name": "expansion_reconnect", "value": 1, "priority": 3, "doc": "an expansion board re-announced itself after losing and regaining time sync, without having reset" },
+      { "name": "expansion_timeout", "value": 2, "priority": 4, "doc": "an expansion board stopped responding" },
+      { "name": "heater_fault", "value": 3, "priority": 5, "doc": "a heater was shut down because its temperature did not follow the model" },
+      { "name": "driver_error", "value": 4, "priority": 6, "doc": "a driver reported an error serious enough to stop the print, such as a short circuit or over temperature" },
+      { "name": "filament_error", "value": 5, "priority": 7, "doc": "a filament monitor reported that the filament is missing or not moving as expected" },
+      { "name": "driver_stall", "value": 6, "priority": 8, "doc": "a driver reported a stall" },
+      { "name": "driver_warning", "value": 7, "priority": 9, "doc": "a driver reported a condition that is not yet an error, such as approaching its temperature limit" },
+      { "name": "mcu_temperature_warning", "value": 8, "priority": 10, "doc": "not currently used" },
+      { "name": "overvoltage", "value": 9, "priority": 11, "doc": "the VIN supply rose above the safe limit" },
+      { "name": "undervoltage", "value": 10, "priority": 12, "doc": "the VIN supply fell below the safe limit" },
+
+      { "section": "Raised by DuetControlServer about its own link, never sent over CAN" },
+      { "name": "controller_disconnect", "value": 128, "priority": 0, "emit": ["csharp"], "doc": "the SPI link to the controller stopped responding, or the controller reset" },
+      { "name": "controller_reconnect", "value": 129, "priority": 1, "emit": ["csharp"], "doc": "the SPI link to the controller came back" }
     ]
    }
   ],

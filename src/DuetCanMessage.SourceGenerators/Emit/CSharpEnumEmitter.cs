@@ -73,7 +73,50 @@ public sealed class CSharpEnumEmitter(CanSchema schema)
                 needsBlank = entry.Doc is not null;
             }
         }
+        EmitPriorities(writer, definition);
         return writer.ToString();
+    }
+
+    /// <summary>
+    /// Emit the order the values are dealt with in, for an enum that declares one
+    /// </summary>
+    /// <remarks>
+    /// The priority is emitted beside the enum rather than being read from the value, because the values
+    /// are a compatibility constraint and the order is a design choice. Keeping the two in one declaration
+    /// is what stops them drifting: a value added to the schema without a priority fails here rather than
+    /// silently sorting last
+    /// </remarks>
+    private static void EmitPriorities(CodeWriter writer, MessageTypeEnumDef definition)
+    {
+        List<MessageTypeDef> ordered = [.. definition.Values
+            .Where(entry => entry.Section is null && !entry.Retired && !entry.IsAlias && entry.IsGenerated(Language.CSharp))
+            .Where(entry => entry.Priority is not null)
+            .OrderBy(entry => entry.Priority!.Value)];
+        if (ordered.Count == 0)
+        {
+            return;
+        }
+
+        writer.Line();
+        writer.XmlDoc($"The order {definition.CSharpName} values are dealt with in, lowest first");
+        using (writer.Block($"public static class {definition.CSharpName}Priority", "}"))
+        {
+            writer.Outdent();
+            writer.Line("{");
+            writer.Indent();
+
+            writer.XmlDoc("Get the priority of an event type, lowest first");
+            writer.Line($"public static int Of({definition.CSharpName} value) => value switch");
+            writer.Line("{");
+            writer.Indent();
+            foreach (MessageTypeDef entry in ordered)
+            {
+                writer.Line($"{definition.CSharpName}.{Naming.MessageTypeMember(entry.Name)} => {entry.Priority},");
+            }
+            writer.Line("_ => int.MaxValue");
+            writer.Outdent();
+            writer.Line("};");
+        }
     }
 
     private static string Trailing(string? doc) => doc is null ? "" : $" // {doc}";

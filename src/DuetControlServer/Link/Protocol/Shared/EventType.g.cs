@@ -8,9 +8,13 @@ namespace DuetControlServer.Link.Protocol.Shared;
 
 /// <summary>
 /// What happened, in an event message sent by an expansion board.
-/// Mirrors EventType in CANlib's RRF3Common.h. The value travels on the wire as the 8-bit eventType
-/// of an event message, so it has to keep CANlib's numbering. Earlier values have higher priority,
-/// and the names are also the names of the macro files run in response to the event.
+/// Values 0-10 mirror EventType in CANlib's RRF3Common.h. They travel on the wire as the 8-bit
+/// eventType of an event message, so expansion board firmware already in the field decides them and
+/// they cannot move. Values from 128 up are raised by DuetControlServer about itself and never reach
+/// the wire, which is why they start clear of anything CANlib may add.
+/// The name is also the name of the macro file run in response, with underscores becoming hyphens.
+/// 'priority' is the order events are dealt with in, lowest first: RepRapFirmware uses the value
+/// itself for that, which is not open to an enum whose numbering is a compatibility constraint.
 /// </summary>
 public enum EventType : byte
 {
@@ -46,4 +50,34 @@ public enum EventType : byte
 
     /// <summary>the VIN supply fell below the safe limit</summary>
     Undervoltage = 10,
+
+    // Raised by DuetControlServer about its own link, never sent over CAN
+    /// <summary>the SPI link to the controller stopped responding, or the controller reset</summary>
+    ControllerDisconnect = 128,
+
+    /// <summary>the SPI link to the controller came back</summary>
+    ControllerReconnect = 129,
+}
+
+/// <summary>The order EventType values are dealt with in, lowest first</summary>
+public static class EventTypePriority
+{
+    /// <summary>Get the priority of an event type, lowest first</summary>
+    public static int Of(EventType value) => value switch
+    {
+        EventType.ControllerDisconnect => 0,
+        EventType.ControllerReconnect => 1,
+        EventType.MainBoardPowerFail => 2,
+        EventType.ExpansionReconnect => 3,
+        EventType.ExpansionTimeout => 4,
+        EventType.HeaterFault => 5,
+        EventType.DriverError => 6,
+        EventType.FilamentError => 7,
+        EventType.DriverStall => 8,
+        EventType.DriverWarning => 9,
+        EventType.McuTemperatureWarning => 10,
+        EventType.Overvoltage => 11,
+        EventType.Undervoltage => 12,
+        _ => int.MaxValue
+    };
 }

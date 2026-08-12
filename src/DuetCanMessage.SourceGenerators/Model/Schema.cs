@@ -440,6 +440,17 @@ public sealed class MessageTypeDef : IEmittable
     /// </summary>
     public bool Retired;
 
+    /// <summary>
+    /// Order this value is dealt with in, where its meaning has one. Lower runs first.
+    /// </summary>
+    /// <remarks>
+    /// An event is queued by priority, and RepRapFirmware uses the value itself for that. The values here
+    /// are fixed by what expansion board firmware already sends, so the two cannot be the same number: the
+    /// events that matter most are the ones this repository added, which have to be numbered out of
+    /// CANlib's way. Declaring the priority separately is what keeps both true at once
+    /// </remarks>
+    public int? Priority;
+
     public HashSet<Language> Emit { get; set; } = [Language.Cpp, Language.CSharp];
 
     /// <summary>True if <see cref="Value"/> names another enumerator rather than giving a number.</summary>
@@ -882,7 +893,8 @@ public sealed class CanSchema
                     _ => throw new InvalidDataException($"message type {Str(v, "name")} has no value")
                 },
                 Doc = Doc(v),
-                Retired = Bool(v, "retired") ?? false
+                Retired = Bool(v, "retired") ?? false,
+                Priority = v["priority"] is JsonValue priority && priority.TryGetValue(out int priorityValue) ? priorityValue : null
             };
             if (v["emit"] is JsonArray emit)
             {
