@@ -13,7 +13,6 @@
 #  include "CanMotion.h"
 #  include "ExpansionManager.h"
 #  include <CanMessageBuffer.h>
-#  include <Platform/Event.h>
 #  include <Platform/OutputMemory.h>
 #  include <Platform/Platform.h>
 #  include <Platform/RepRap.h>

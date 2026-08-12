@@ -20,12 +20,16 @@ namespace UnitTests.Link;
 [TestFixture]
 public class ExpansionBoardManagerTests
 {
-    private static ExpansionBoardManager NewManager()
+    private static ExpansionBoardManager NewManager() => NewManager(out _);
+
+    private static ExpansionBoardManager NewManager(out DuetControlServer.Events.EventQueue events)
     {
         DuetControlServer.Model.ObjectModel model = new(new StoppedLifetime(),
                                                         NullLogger<DuetControlServer.Model.ObjectModel>.Instance,
                                                         Options.Create(new Settings()));
-        return new ExpansionBoardManager(model, NullLogger<ExpansionBoardManager>.Instance);
+        events = new DuetControlServer.Events.EventQueue(NullLogger<DuetControlServer.Events.EventQueue>.Instance);
+        return new ExpansionBoardManager(model, events, Options.Create(new Settings()),
+                                         NullLogger<ExpansionBoardManager>.Instance);
     }
 
     /// <summary>
@@ -84,6 +88,37 @@ public class ExpansionBoardManagerTests
             Assert.That(manager.TryEnqueue(CanMessageType.StandardReply, 1, new byte[64]), Is.False);
             Assert.That(manager.TryEnqueue(CanMessageType.TimeSync, 1, new byte[64]), Is.False);
         });
+    }
+
+    [Test]
+    public async System.Threading.Tasks.Task ABoardEventReachesTheEventQueue()
+    {
+        ExpansionBoardManager manager = NewManager(out DuetControlServer.Events.EventQueue events);
+        await manager.StartAsync(System.Threading.CancellationToken.None);
+        try
+        {
+            // The message carries the event type in its first byte, then the device number and the
+            // parameter; the manager decodes it and the queue is where it ends up
+            byte[] payload = new byte[64];
+            payload[0] = (byte)EventType.DriverStall;
+            payload[1] = 7;
+            Assert.That(manager.TryEnqueue(CanMessageType.Event, 3, payload), Is.True);
+
+            using System.Threading.CancellationTokenSource cts = new(System.TimeSpan.FromSeconds(5));
+            while (events.Count == 0 && !cts.IsCancellationRequested)
+            {
+                await System.Threading.Tasks.Task.Delay(10, cts.Token);
+            }
+
+            Assert.That(events.TryStartProcessing(out DuetControlServer.Events.MachineEvent raised), Is.True,
+                        "a board event used to be logged and dropped; it is queued now");
+            Assert.That(raised!.Type, Is.EqualTo(EventType.DriverStall));
+            Assert.That(raised.BoardAddress, Is.EqualTo(3), "the board it came from, which the message does not carry");
+        }
+        finally
+        {
+            await manager.StopAsync(System.Threading.CancellationToken.None);
+        }
     }
 
     [Test]

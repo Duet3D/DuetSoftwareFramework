@@ -51,12 +51,12 @@ Every `AddEvent` call site in RepRapFirmware, with the DSF verdict:
 
 | Event | Raised by | RRF source | In DSF |
 |---|---|---|---|
-| `expansion_reconnect` | A board re-announces while already `Running` | ExpansionManager.cpp:180 | ⬜ DCS sees the announcement ([ExpansionBoardManager.cs:84](src/DuetControlServer/Link/Expansion/ExpansionBoardManager.cs#L84)) but does not compare states |
-| `expansion_timeout` | No status report for `StatusMessageTimeoutMillis` | ExpansionManager.cpp:578 | ⬜ DCS has no board watchdog at all |
+| `expansion_reconnect` | A board re-announces while already `Running` | ExpansionManager.cpp:180 | ✅ raised where the announcement is applied |
+| `expansion_timeout` | No status report for `StatusMessageTimeoutMillis` | ExpansionManager.cpp:578 | ✅ the sweep moved here from the controller (§3.3.1) |
 | `heater_fault` | `LocalHeater` gave up on a heater | LocalHeater.cpp:1044 | ⛔ local hardware; arrives from the board as a CAN event instead |
 | `driver_error`, `driver_warning`, `driver_stall` | Local driver status | Move.cpp:3613/3627/3648 | ⛔ local hardware; arrives as a CAN event |
 | `filament_error` | `FilamentMonitor` | FilamentMonitor.cpp:412 | ⛔ local hardware; arrives as a CAN event |
-| any | `CanMessageEvent` from an expansion board | CommandProcessor.cpp:727 | 🟡 arrives and is logged, nothing more — [ExpansionBoardManager.cs:189](src/DuetControlServer/Link/Expansion/ExpansionBoardManager.cs#L189) |
+| any | `CanMessageEvent` from an expansion board | CommandProcessor.cpp:727 | ✅ decoded and queued |
 | any | `M957` | GCodes3.cpp:1306 | ⬜ not implemented — [MCODE_MIGRATION.md](MCODE_MIGRATION.md) §5.11 |
 
 So in this architecture there are **three** producers, not seven: CAN event messages from expansion
@@ -735,7 +735,7 @@ Each phase is independently useful and independently testable.
 - [x] Arrays: `var.x[2]` as a value and as an assignment target, computed indices, and object model
       collections of scalars
 
-### Phase B — the event system 🟡
+### Phase B — the event system ✅
 
 - [x] Schema: a `priority` per `EventType` value, and the local block at 128; the generator emits
       `EventTypePriority` beside the enum (§3.6)
@@ -744,13 +744,14 @@ Each phase is independently useful and independently testable.
 - [x] `Events/EventText.cs`: port of `GetTextDescription` and `GetMacroFileName`, strings verbatim
 - [x] `HeaterFaultType` in the schema, its text in DCS; `StandardDriverStatus` and its bit meanings in
       the schema, rendered by `Events/DriverStatusText.cs` (§3.5.1)
-- [ ] `Events/EventProcessor.cs`: hosted service on `CodeChannel.Autopause`
-- [ ] `Events/Extensions.cs` + registration alongside `AddLinkAdapter`
-- [ ] Route board CAN events into the queue (replacing the `LogWarning`)
-- [ ] Move the board watchdog from the controller: last-seen timestamp per board, sweep raising
-      `expansion_timeout` and setting `BoardState.TimedOut`, rebased after a reconnect (§3.3.1)
-- [ ] Raise `expansion_reconnect` when a board announces while already `Running`
-- [ ] `M122` line: `Events: %u queued, %u completed`
+- [x] `Events/EventProcessor.cs`: hosted service on `CodeChannel.Autopause`
+- [x] `Events/Extensions.cs` + registration in `Program.cs`
+- [x] Route board CAN events into the queue (replacing the `LogWarning`)
+- [x] Move the board watchdog from the controller: last-seen timestamp per board, sweep raising
+      `expansion_timeout` and setting `BoardState.TimedOut`, forgotten on invalidation (§3.3.1)
+- [x] Raise `expansion_reconnect` when a board announces while already `Running`
+- [x] Delete the controller's `Event.cpp`, its sweep and its diagnostics line (§7)
+- [x] `M122` line: `Events: %u queued, %u completed`
 - [x] Unit tests: ordering, suppression, head pinning, macro-name mapping for all 13 types, and the
       two invariants CANlib asserts of the driver status masks
 
@@ -822,10 +823,11 @@ Gated on MCODE_MIGRATION's `M291`/`M292` and `M25`:
 Legend as [MCODE_MIGRATION.md](MCODE_MIGRATION.md) §1: ✅ done, 🟡 partial, ⬜ not started, ⛔ out of
 scope.
 
-Every row's **text and macro name exist** as of phase B, including the decoded driver status and
-heater fault type (§3.5.1) — a test walks all thirteen. What the ⬜ columns are waiting for is one
-thing each: *Queued* wants the routing that replaces the `LogWarning`, and *Macro runs* wants the
-processor. Neither is per-event work.
+Phase B finished all three middle columns for every event a board can send: the text and macro name
+exist (§3.5.1, a test walks all thirteen), the CAN event message is decoded and queued, and the
+processor runs the macro named after it with `param.D/B/P/S`. What is left per event is the **default
+action** where a macro is absent, and only for the three that pause — they wait on `M291` and `M25`
+(§3.5). The two `controller_*` rows wait on phase C, which is what raises them.
 
 ---
 

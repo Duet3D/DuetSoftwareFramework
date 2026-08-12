@@ -26,7 +26,6 @@
 
 #include "RepRap.h"
 
-#include "Event.h"
 #include <Version.h>
 
 #include "Tasks.h"
@@ -754,7 +753,7 @@ void Platform::Diagnostics(unsigned int part, const StringRef& reply) noexcept
 		break;
 
 	case 5:
-		Event::Diagnostics(reply, *this);
+		// Events are queued and dealt with by the SBC, which reports its own counters
 		break;
 
 	case 6:

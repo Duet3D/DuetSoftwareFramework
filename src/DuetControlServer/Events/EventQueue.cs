@@ -1,7 +1,9 @@
 using DuetControlServer.Link.Protocol.Shared;
+using DuetControlServer.Utility;
 using Microsoft.Extensions.Logging;
 using Nito.AsyncEx;
 using System.Collections.Generic;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -24,7 +26,8 @@ namespace DuetControlServer.Events;
 /// </para>
 /// </remarks>
 /// <param name="logger">Logger</param>
-public sealed class EventQueue(ILogger<EventQueue> logger)
+[DiagnosticsPriority(-4)]
+public sealed class EventQueue(ILogger<EventQueue> logger) : IDiagnostics
 {
     /// <summary>
     /// How many events may wait before the least urgent is dropped
@@ -178,6 +181,15 @@ public sealed class EventQueue(ILogger<EventQueue> logger)
             }
         }
         await _eventQueued.WaitAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Report what the queue has done, as RepRapFirmware reports it
+    /// </summary>
+    /// <param name="builder">String builder</param>
+    public void PrintDiagnostics(StringBuilder builder)
+    {
+        builder.AppendLine($"Events: {Queued} queued, {Processed} completed");
     }
 
     /// <summary>

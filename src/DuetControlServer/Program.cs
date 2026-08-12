@@ -2,6 +2,7 @@
 using DuetControlServer;
 using DuetControlServer.Codes;
 using DuetControlServer.Commands;
+using DuetControlServer.Events;
 using DuetControlServer.Fans;
 using DuetControlServer.Files;
 using DuetControlServer.Heat;
@@ -188,6 +189,7 @@ rootCommand.SetAction(async (parserResult) =>
                     .AddSettings(context.Configuration, updateOnlyValue, logLevelValue, configFileValue, socketDirectoryValue, socketFileValue, baseDirectoryValue, out startErrorFile)
                     .AddCodes()
                     .AddCommands()
+                    .AddEvents()
                     .AddFiles()
                     .AddIPC()
                     .AddLink()

@@ -14,7 +14,6 @@
 
 #  include <Platform/Platform.h>
 
-#  include <Platform/Event.h>
 
 #  include <Movement/StepTimer.h>
 
@@ -83,10 +82,6 @@ void ExpansionManager::ProcessAnnouncement(CanMessageBuffer& buf, bool isNewForm
 			const WriteLocker lock(boardsLock);
 
 			board.whenLastStatusReportReceived = millis();
-			if (board.state == BoardState::Running)
-			{
-				Event::AddEvent(EventType::expansion_reconnect, 0, src, 0, "");
-			}
 			String<StringLength100> boardTypeAndFirmwareVersion;
 			if (isNewFormat)
 			{
@@ -254,28 +249,11 @@ const ExpansionBoardData& ExpansionManager::FindIndexedBoard(unsigned int index)
 	return m_boards[address];
 }
 
-// Check whether we have lost contact with any expansion boards
+// Nothing to do here. A board that stops reporting is noticed by the SBC, which receives the same
+// status reports this forwards and owns both the board state it would set and the event it would
+// raise; see ExpansionBoardManager and docs/devel/EVENTS_MIGRATION.md section 3.3.1.
 void ExpansionManager::Spin() noexcept
 {
-	for (CanAddress addr = 1; addr <= CanId::MaxCanAddress; ++addr)
-	{
-		const ExpansionBoardData& board = m_boards[addr];
-		if (board.state == BoardState::Running)
-		{
-			// We can get interrupted here by the CanReceive task, which may update
-			// 'board.whenLastStatusReportReceived'. So read and save that value before we call millis().
-			const uint32_t lastTimeReceived =
-				board.whenLastStatusReportReceived; // capture volatile variable before we call millis()
-			if (millis() - lastTimeReceived > StatusMessageTimeoutMillis)
-			{
-				{
-					const WriteLocker lock(boardsLock);
-					UpdateBoardState(addr, BoardState::TimedOut);
-				}
-				Event::AddEvent(EventType::expansion_timeout, 0, addr, 0, "");
-			}
-		}
-	}
 }
 
 void ExpansionManager::EmergencyStop() noexcept

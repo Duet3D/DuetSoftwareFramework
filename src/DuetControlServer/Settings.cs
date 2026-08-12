@@ -254,6 +254,17 @@ public sealed class Settings
     public int CanRequestTimeout { get; set; } = 2000;
 
     /// <summary>
+    /// How long a board may go without reporting before it is presumed gone (in ms).
+    /// </summary>
+    /// <remarks>
+    /// The controller used the same 5 s for the sweep it used to run. Reports reach here one SPI
+    /// transfer later and jittered by the transfer cadence, which is well inside that: a board reports
+    /// far more often than once every five seconds, so what this measures is silence rather than
+    /// lateness
+    /// </remarks>
+    public int ExpansionBoardTimeout { get; set; } = 5000;
+
+    /// <summary>
     /// Path to the GPIO chip device node
     /// </summary>
     public string GpioChipDevice { get; set; } = "/dev/gpiochip0";

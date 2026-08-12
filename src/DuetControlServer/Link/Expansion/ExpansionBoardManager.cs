@@ -1,8 +1,10 @@
 using DuetAPI.ObjectModel;
+using DuetControlServer.Events;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -33,8 +35,14 @@ namespace DuetControlServer.Link.Expansion;
 /// </remarks>
 /// <param name="model">Object model</param>
 /// <param name="logger">Logger</param>
-internal sealed class ExpansionBoardManager(Model.ObjectModel model, ILogger<ExpansionBoardManager> logger) : BackgroundService
+internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.EventQueue events,
+                                           IOptions<Settings> settings, ILogger<ExpansionBoardManager> logger) : BackgroundService
 {
+    /// <summary>
+    /// When each board was last heard from, for the watchdog below
+    /// </summary>
+    private readonly DateTime?[] _lastSeen = new DateTime?[CanId.MaxCanAddress + 1];
+
     /// <summary>
     /// How many reports may be waiting before the oldest is dropped
     /// </summary>
@@ -99,6 +107,8 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, ILogger<Exp
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        _ = WatchForSilentBoardsAsync(stoppingToken);
+
         await foreach (Report report in _reports.Reader.ReadAllAsync(stoppingToken))
         {
             try
@@ -124,6 +134,11 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, ILogger<Exp
     /// <param name="cancellationToken">Cancellation token</param>
     private async ValueTask ApplyAsync(Report report, CancellationToken cancellationToken)
     {
+        if (report.Source <= CanId.MaxCanAddress)
+        {
+            _lastSeen[report.Source] = DateTime.UtcNow;
+        }
+
         switch (report.Type)
         {
             case CanMessageType.AnnounceV0:
@@ -189,8 +204,8 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, ILogger<Exp
             case CanMessageType.Event:
                 {
                     CanMessageEvent canEvent = CanMessageSerializer.Deserialize<CanMessageEvent>(report.Payload);
-                    logger.LogWarning("Event from board {Source}: type {EventType}, device {Device}, parameter {Param}: {Text}",
-                                      report.Source, canEvent.EventType, canEvent.DeviceNumber, canEvent.EventParam, canEvent.TextString);
+                    events.Raise(new MachineEvent(canEvent.EventType, canEvent.EventParam, report.Source,
+                                                  canEvent.DeviceNumber, canEvent.TextString));
                 }
                 break;
 
@@ -215,9 +230,11 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, ILogger<Exp
         // Duet3Expansion sends "<board type>|<firmware version>|<firmware date>"
         string[] parts = description.Split('|');
 
+        bool wasRunning;
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             Board board = GetOrCreateBoard(source);
+            wasRunning = board.State == BoardState.Running;
             board.ShortName = parts.Length > 0 ? parts[0] : string.Empty;
             board.Name = board.ShortName;
             board.FirmwareVersion = parts.Length > 1 ? parts[1] : string.Empty;
@@ -245,6 +262,14 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, ILogger<Exp
         }
 
         logger.LogInformation("Expansion board {Source} announced itself as {Description}", source, description);
+        _lastSeen[source] = DateTime.UtcNow;
+
+        // A board announces itself when it starts and when it regains time sync. The second is a board
+        // the machine thought it still had, which is a different thing worth telling a macro about
+        if (wasRunning)
+        {
+            events.Raise(new MachineEvent(EventType.ExpansionReconnect, 0, source, 0, string.Empty));
+        }
     }
 
     /// <summary>
@@ -597,6 +622,79 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, ILogger<Exp
     /// <param name="address">CAN address</param>
     /// <returns>The board</returns>
     /// <remarks>The caller must hold the object model write lock</remarks>
+    /// <summary>
+    /// Notice a board that has stopped reporting
+    /// </summary>
+    /// <param name="stoppingToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    /// <remarks>
+    /// <para>
+    /// The controller used to do this and no longer does: nothing there acted on the result, the event
+    /// it raised had no consumer, and the object model this belongs in is here. See §3.3.1 of
+    /// docs/devel/EVENTS_MIGRATION.md.
+    /// </para>
+    /// <para>
+    /// The one thing the controller's timer had that this does not is independence from the SPI link.
+    /// Reports only arrive while the link is up, so what a board was last heard from is meaningless
+    /// across an outage - which is why an invalidation forgets the timestamps rather than letting the
+    /// first sweep after a reconnect time out every board at once
+    /// </para>
+    /// </remarks>
+    private async Task WatchForSilentBoardsAsync(CancellationToken stoppingToken)
+    {
+        TimeSpan timeout = TimeSpan.FromMilliseconds(settings.Value.ExpansionBoardTimeout);
+        PeriodicTimer timer = new(TimeSpan.FromMilliseconds(settings.Value.ExpansionBoardTimeout / 4));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(stoppingToken))
+            {
+                DateTime now = DateTime.UtcNow;
+                for (byte address = 0; address <= CanId.MaxCanAddress; address++)
+                {
+                    if (_lastSeen[address] is not DateTime lastSeen || now - lastSeen < timeout)
+                    {
+                        continue;
+                    }
+
+                    bool wasRunning = false;
+                    using (await model.AccessReadWriteAsync(stoppingToken))
+                    {
+                        if (address < model.Boards.Count && model.Boards[address] is Board board && board.State == BoardState.Running)
+                        {
+                            board.State = BoardState.TimedOut;
+                            wasRunning = true;
+                        }
+                    }
+
+                    // Only once per silence: the timestamp stays until the board is heard from again,
+                    // so without this every sweep would raise the same event afresh
+                    _lastSeen[address] = null;
+                    if (wasRunning)
+                    {
+                        events.Raise(new MachineEvent(EventType.ExpansionTimeout, 0, address, 0, string.Empty));
+                    }
+                }
+            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // Shutting down
+        }
+        finally
+        {
+            timer.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Forget when each board was last heard from
+    /// </summary>
+    /// <remarks>
+    /// Called when the link goes down, because a timestamp taken before an outage says nothing about a
+    /// board that has had no way to report since
+    /// </remarks>
+    public void Invalidate() => Array.Clear(_lastSeen);
+
     private Board GetOrCreateBoard(byte address)
     {
         foreach (Board existing in model.Boards)

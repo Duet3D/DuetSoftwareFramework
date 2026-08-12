@@ -941,6 +941,10 @@ internal sealed class LinkService(
         // a stale endpoint reading applied to a move planned after the reconnect would be a jump
         motionTracker.Invalidate();
 
+        // Forget when each board was last heard from, so that the first sweep after the link returns
+        // does not time out every board for a silence they had no way to break
+        expansionBoardManager.Invalidate();
+
         // Close all the files
         foreach (var kv in _openFiles)
         {
