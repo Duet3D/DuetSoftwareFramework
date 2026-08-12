@@ -226,6 +226,50 @@ namespace UnitTests.Machine
         }
 
         [Test]
+        public void DriverStatusIsDescribedAsTheBoardDescribesIt()
+        {
+            // Bit 1 is an error, bit 0 a warning, bit 16 information; a driver error reports errors alone
+            const uint overTemperatureShutdown = 1u << 1, overTemperatureWarning = 1u << 0, standstill = 1u << 16;
+
+            Assert.That(DriverStatusText.Describe(0, DriverStatusText.Severity.All), Is.EqualTo("ok"));
+            Assert.That(DriverStatusText.Describe(overTemperatureShutdown, DriverStatusText.Severity.ErrorsOnly),
+                        Is.EqualTo("over temperature shutdown"));
+            Assert.That(DriverStatusText.Describe(overTemperatureWarning, DriverStatusText.Severity.ErrorsOnly),
+                        Is.EqualTo("ok"), "a warning is not an error");
+            Assert.That(DriverStatusText.Describe(overTemperatureWarning, DriverStatusText.Severity.WarningsAndErrors),
+                        Is.EqualTo("over temperature warning"));
+            Assert.That(DriverStatusText.Describe(standstill, DriverStatusText.Severity.WarningsAndErrors),
+                        Is.EqualTo("ok"), "information is neither");
+            Assert.That(DriverStatusText.Describe(standstill, DriverStatusText.Severity.All), Is.EqualTo("standstill"));
+
+            // More than one, in bit order whatever order they are set in
+            Assert.That(DriverStatusText.Describe(overTemperatureWarning | overTemperatureShutdown, DriverStatusText.Severity.All),
+                        Is.EqualTo("over temperature warning, over temperature shutdown"));
+
+            // And that is what a driver event says
+            (string text, MessageType type) = EventText.Describe(Event(EventType.DriverError, board: 1, device: 2, param: (ushort)overTemperatureShutdown));
+            Assert.That(text, Is.EqualTo("Driver 1.2 error: over temperature shutdown"));
+            Assert.That(type, Is.EqualTo(MessageType.Error));
+
+            (text, type) = EventText.Describe(Event(EventType.DriverWarning, board: 1, device: 2, param: (ushort)overTemperatureWarning));
+            Assert.That(text, Is.EqualTo("Driver 1.2 warning: over temperature warning"));
+            Assert.That(type, Is.EqualTo(MessageType.Warning));
+        }
+
+        [Test]
+        public void TheSeverityMasksPartitionTheMeanings()
+        {
+            // CANlib asserts both of these of its own copy at compile time
+            Assert.That(StandardDriverStatus.ErrorMask & StandardDriverStatus.WarningMask, Is.Zero);
+            Assert.That(StandardDriverStatus.ErrorMask & StandardDriverStatus.InfoMask, Is.Zero);
+            Assert.That(StandardDriverStatus.InfoMask & StandardDriverStatus.WarningMask, Is.Zero);
+
+            uint covered = StandardDriverStatus.ErrorMask | StandardDriverStatus.WarningMask | StandardDriverStatus.InfoMask;
+            Assert.That(covered, Is.EqualTo((1u << StandardDriverStatus.BitMeanings.Length) - 1),
+                        "every bit with a meaning has a severity, and every severity bit has a meaning");
+        }
+
+        [Test]
         public async Task WaitingReturnsWhenAnEventArrives()
         {
             using CancellationTokenSource cts = new(TimeSpan.FromSeconds(5));

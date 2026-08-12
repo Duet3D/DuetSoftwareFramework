@@ -154,9 +154,30 @@ public sealed class CSharpEnumEmitter(CanSchema schema)
                 writer.XmlDoc(constant.Doc);
                 writer.Line($"public const {Types.CSharp(schema, constant.Type)} {constant.Name} = {Value(constant.Value)};");
             }
+
+            foreach (StringTableDef table in group.StringTables)
+            {
+                if (needsBlank)
+                {
+                    writer.Line();
+                }
+                needsBlank = true;
+                writer.XmlDoc(table.Doc);
+                writer.Line($"public static readonly string[] {table.Name} =");
+                writer.Line("[");
+                writer.Indent();
+                foreach (string value in table.Values)
+                {
+                    writer.Line($"{Quote(value)},");
+                }
+                writer.Outdent();
+                writer.Line("];");
+            }
         }
         return writer.ToString();
     }
+
+    private static string Quote(string value) => '"' + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + '"';
 
     /// <summary>Render a constant's value, which the schema keeps in CANlib's own spelling.</summary>
     private static string Value(string value) =>

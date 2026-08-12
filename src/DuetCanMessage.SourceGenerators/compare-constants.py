@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""Compare the schema's constants against CANlib's.
+"""Compare the schema's constants and string tables against CANlib's.
 
 The layout probe proves where every field sits and is blind to what any of them is worth. A constant is
 exactly that blind spot: several of these are protocol magic numbers — CanMessageSetAddressAndNormalTiming's
 DoSetTimingYes is 0xB6, CanMessageEnterTestMode's Passwd is a specific word — where a wrong value produces a
 message of the right shape that the board rejects or, worse, silently misreads.
 
-Compares two things:
+Compares three things:
 
   * the struct constants, i.e. every "static constexpr" CANlib declares inside a struct;
-  * the schema-level constants that bound the array members.
+  * the schema-level constants that bound the array members;
+  * the string tables, such as what each bit of a driver status word means. The layout probe cannot
+    see those either — a string array has no layout — and they are rendered by a board as well as by
+    DuetControlServer, so a difference means one machine describes a fault two ways.
 
 Values are compared after normalising the spellings the two sides use for the same number: integer suffixes,
 digit separators, casts, and CANlib's habit of writing a length as sizeof(field).
@@ -87,6 +90,16 @@ def normalise(value, canlib, arrays):
         return value.lower()
 
 
+def parse_canlib_string_tables(directory):
+    """Every constexpr array of string literals CANlib declares, by name."""
+    tables = {}
+    for path in glob.glob(os.path.join(directory, "**", "*.h"), recursive=True):
+        text = strip_comments(open(path, encoding="utf-8", errors="replace").read())
+        for match in re.finditer(r"constexpr\s+const\s+char\s*\*[\w\s_]*\s+(\w+)\s*\[\s*\]\s*=\s*\{(.*?)\}\s*;", text, re.S):
+            tables[match.group(1)] = [literal for literal in re.findall(r'"((?:[^"\\]|\\.)*)"', match.group(2))]
+    return tables
+
+
 def main():
     if len(sys.argv) != 3:
         print(__doc__)
@@ -119,7 +132,21 @@ def main():
         elif normalise(want, canlib, arrays) != normalise(canlib[name], canlib, arrays):
             problems.append(f"FAIL {name}: schema says {want}, CANlib says {canlib[name]}")
 
+    string_tables = parse_canlib_string_tables(sys.argv[2])
     for group in schema.get("constantGroups", []):
+        for table in group.get("stringTables", []):
+            checks += 1
+            name, want = table["name"], table["values"]
+            if name not in string_tables:
+                problems.append(f"FAIL {group['name']}.{name} is not declared by CANlib")
+            elif string_tables[name] != want:
+                got = string_tables[name]
+                if len(got) != len(want):
+                    problems.append(f"FAIL {group['name']}.{name}: CANlib has {len(got)} entries, the schema has {len(want)}")
+                for index, (theirs, ours) in enumerate(zip(got, want)):
+                    if theirs != ours:
+                        problems.append(f"FAIL {group['name']}.{name}[{index}]: CANlib says \"{theirs}\", the schema says \"{ours}\"")
+
         for constant in group["values"]:
             checks += 1
             name, want = constant["name"], constant["value"]

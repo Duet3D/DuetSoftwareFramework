@@ -94,13 +94,14 @@ public static class EventText
                 return ($"Filament error on extruder {machineEvent.DeviceNumber}: {(FilamentMonitorStatus)machineEvent.Param}", MessageType.Error);
 
             case EventType.DriverError:
-                // TODO: append the decoded driver status, which needs StandardDriverStatus in the schema:
-                // the board renders the same bits for its own replies, so the two must not drift
-                return ($"Driver {machineEvent.BoardAddress}.{machineEvent.DeviceNumber} error: {machineEvent.Text}", MessageType.Error);
+                return ($"Driver {machineEvent.BoardAddress}.{machineEvent.DeviceNumber} error: " +
+                        $"{DriverStatusText.Describe(machineEvent.Param, DriverStatusText.Severity.ErrorsOnly)}{machineEvent.Text}",
+                        MessageType.Error);
 
             case EventType.DriverWarning:
-                // TODO: append the decoded driver status, as above
-                return ($"Driver {machineEvent.BoardAddress}.{machineEvent.DeviceNumber} warning: {machineEvent.Text}", MessageType.Warning);
+                return ($"Driver {machineEvent.BoardAddress}.{machineEvent.DeviceNumber} warning: " +
+                        $"{DriverStatusText.Describe(machineEvent.Param, DriverStatusText.Severity.WarningsAndErrors)}{machineEvent.Text}",
+                        MessageType.Warning);
 
             case EventType.DriverStall:
                 return ($"Driver {machineEvent.BoardAddress}.{machineEvent.DeviceNumber} stall", MessageType.Warning);

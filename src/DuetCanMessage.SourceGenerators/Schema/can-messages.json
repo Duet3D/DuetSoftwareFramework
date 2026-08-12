@@ -2601,6 +2601,63 @@
 
   "constantGroups": [
    {
+    "name": "StandardDriverStatus",
+    "cppHeader": "RRF3Common.h",
+    "cppScope": "StandardDriverStatus",
+    "output": "src/DuetControlServer/Link/Protocol/Shared/StandardDriverStatus.g.cs",
+    "doc": [
+      "The driver status word a board reports, mirroring StandardDriverStatus in CANlib's RRF3Common.h.",
+      "The lowest 8 bits match the TMC2209 DRV_STATUS register; other drivers are translated to them.",
+      "Only the lowest 16 bits travel in a driver event message.",
+      "The bit meanings are here rather than in DuetControlServer because a board renders them too:",
+      "Duet3Expansion answers a status request with this same text, so one declaration has to serve",
+      "both or a driver fault reads differently depending on which of them reported it.",
+      "Each mask says which bits are of that severity; AppendText in CANlib picks by severity and joins",
+      "the meanings of what is set, or says \"ok\"."
+    ],
+    "values": [
+      { "name": "OtpwBitPos", "type": "u32", "value": "0", "doc": "over temperature warning" },
+      { "name": "OtBitPos", "type": "u32", "value": "1", "doc": "over temperature shutdown" },
+      { "name": "S2gBitsPos", "type": "u32", "value": "2", "doc": "first of the two short-to-ground bits" },
+      { "name": "S2vsBitsPos", "type": "u32", "value": "4", "doc": "first of the two short-to-Vin bits" },
+      { "name": "OpenLoadBitsPos", "type": "u32", "value": "6", "doc": "first of the two open load bits" },
+      { "name": "StallBitPos", "type": "u32", "value": "8", "doc": "stall" },
+      { "name": "ExternDriverErrorBitPos", "type": "u32", "value": "9", "doc": "external driver signalled an error" },
+      { "name": "StandstillBitPos", "type": "u32", "value": "16", "doc": "standstill indicator" },
+      { "name": "SgresultBitPos", "type": "u32", "value": "22", "doc": "first bit of the minimum stallguard result" },
+      { "name": "ErrorMask", "type": "u32", "value": "0x4A3E", "doc": "bits that usually correspond to errors" },
+      { "name": "WarningMask", "type": "u32", "value": "0x24C1", "doc": "bits that correspond to warnings" },
+      { "name": "InfoMask", "type": "u32", "value": "0x39100", "doc": "bits that correspond to information" },
+      { "name": "OpenLoadMask", "type": "u32", "value": "0xC0", "doc": "bits that correspond to open load" }
+    ],
+    "stringTables": [
+      {
+        "name": "BitMeanings",
+        "doc": "What each bit means, in bit order. Rendered by DuetControlServer and by Duet3Expansion alike.",
+        "values": [
+          "over temperature warning",
+          "over temperature shutdown",
+          "phase A short to ground",
+          "phase B short to ground",
+          "phase A short to Vin",
+          "phase B short to Vin",
+          "phase A may be disconnected",
+          "phase B may be disconnected",
+          "stalled",
+          "external driver error",
+          "position tolerance exceeded",
+          "failed to maintain position",
+          "not tuned/calibrated",
+          "tuning/calibration failed",
+          "move attempted when not tuned/calibrated",
+          "unused bit",
+          "standstill",
+          "not present"
+        ]
+      }
+    ]
+   },
+   {
     "name": "CanId",
     "cppHeader": "CanId.h",
     "cppScope": "CanId",

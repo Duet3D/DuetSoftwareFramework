@@ -210,7 +210,26 @@
           "description": "Where the generated file is written, relative to the repository root."
         },
         "doc": { "$ref": "#/$defs/docText" },
-        "values": { "type": "array", "items": { "$ref": "#/$defs/constant" } }
+        "values": { "type": "array", "items": { "$ref": "#/$defs/constant" } },
+        "stringTables": {
+          "type": "array",
+          "description": "Arrays of strings the same CANlib scope declares, such as the meaning of each bit of a status word. Text that a board renders as well as DuetControlServer has to come from one declaration, or the two drift.",
+          "items": {
+            "type": "object",
+            "required": ["name", "values"],
+            "additionalProperties": false,
+            "properties": {
+              "$comment": { "$ref": "#/$defs/docText" },
+              "name": { "type": "string", "description": "CANlib's name for the array." },
+              "doc": { "$ref": "#/$defs/docText" },
+              "values": {
+                "type": "array",
+                "description": "The strings, in the order CANlib declares them.",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        }
       }
     },
 

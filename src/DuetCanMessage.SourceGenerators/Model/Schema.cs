@@ -497,6 +497,25 @@ public sealed class ConstantGroupDef
 
     public string? Doc;
     public List<ConstantDef> Values = [];
+
+    /// <summary>String tables the same scope declares, such as the meaning of each bit of a status word.</summary>
+    /// <remarks>
+    /// Text a board renders as well as DuetControlServer has to come from one declaration, or the two
+    /// drift and a driver fault reads differently depending on which of them reported it
+    /// </remarks>
+    public List<StringTableDef> StringTables = [];
+}
+
+/// <summary>
+/// An array of strings that CANlib declares and the C# side has to agree with.
+/// </summary>
+public sealed class StringTableDef
+{
+    public string Name = "";
+    public string? Doc;
+
+    /// <summary>The strings, in the order CANlib declares them.</summary>
+    public List<string> Values = [];
 }
 
 /// <summary>
@@ -699,6 +718,17 @@ public sealed class CanSchema
                     Type = Str(v, "type") ?? "u32",
                     Value = Str(v, "value") ?? "0",
                     Doc = Doc(v)
+                });
+            }
+            foreach (JsonNode? table in g["stringTables"]?.AsArray() ?? [])
+            {
+                JsonObject t = table!.AsObject();
+                group.StringTables.Add(new StringTableDef
+                {
+                    Name = Str(t, "name") ?? throw new InvalidDataException($"string table in {group.Name} has no name"),
+                    Doc = Doc(t),
+                    Values = [.. (t["values"]?.AsArray() ?? throw new InvalidDataException($"string table {Str(t, "name")} has no values"))
+                                 .Select(n => n!.GetValue<string>())]
                 });
             }
             schema.ConstantGroups.Add(group);
