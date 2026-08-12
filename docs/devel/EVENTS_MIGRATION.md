@@ -332,6 +332,29 @@ A variable holds a scalar. Arrays, and therefore `var.x[2]` and `set var.x[2] = 
 thing left: both refuse with a message naming the limitation rather than pretending the name is
 unknown.
 
+### 3.4.1 Expressions no longer resolve half the machine
+
+Variables were the second thing an event macro needs. The first is the machine itself, and asking for
+it did not work either: the expression evaluator resolved only object model branches carrying the
+SBC-property flag - `volumes`, `messages`, `directories`, `plugins`, `job` - because everything else
+was the firmware's to answer. `move`, `heat`, `state`, `sensors`, `boards` and `tools` fell through to
+a fallback that used to be the RepRapFirmware round trip and had become `return null`.
+
+That is not a small gap for this work. `heater-fault.g` reads `heat.heaters[param.D]`; a conditional
+evaluating to `null` throws `invalid conditional result 'null'`, so `if move.axes[0].homed` - the
+shape most machine macros are built from - failed outright, and outside a conditional it silently
+produced `null`.
+
+So the gate is gone: the evaluator resolves the whole object model, which DuetControlServer now owns
+in full. The two-pass shape that remains is not about ownership but about what a *synchronous*
+evaluation can do — `fileexists()`, `fileread()` and `exists()` need asynchronous lookups, so the
+first pass evaluates everything else, the second substitutes those as literals and re-evaluates what
+comes back.
+
+**An expression that still cannot be produced is now an error**, `cannot evaluate '<expression>'`,
+rather than a null. A null reads as a valid answer, which is how the two gaps above stayed invisible;
+what is left unresolvable - arrays and live collections as values - announces itself instead.
+
 ### 3.5 Default actions in DSF terms
 
 | RRF | DSF |
@@ -662,7 +685,9 @@ Each phase is independently useful and independently testable.
 - [x] Reuse it for MCODE_MIGRATION §9's code-named-after-itself macros (`M1234 X5` → `param.X`)
 - [x] Unit tests: scoping, parameters beside a local of the same name, unknown-variable errors,
       global round-tripping
-- [ ] Arrays: `var.x[2]` as a value and as an assignment target
+- [x] Resolve the whole object model in expressions, not just the SBC-flagged branches (§3.4.1)
+- [x] Fail loudly on an expression that cannot be produced, instead of evaluating it to null
+- [ ] Arrays: `var.x[2]` as a value and as an assignment target, and array-valued object model paths
 
 ### Phase B — the event system ⬜
 

@@ -628,6 +628,11 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Va
     {
         int i = 0;
 
+        // What the running code can see: the object model, its own variables, and where it is in its file
+        Parsing.IExpressionEvaluationContext context = new ExpressionContext(() => code.File?.GetIterations(code),
+                                                                            (int)(code.LineNumber ?? 0), filter,
+                                                                            variableStore.For(code), model);
+
         // Eat a single-quoted char and append its content to the given builder instance
         void eatChar(StringBuilder builder)
         {
@@ -847,19 +852,16 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Va
 
             // Don't return exceptions from cancelled codes
             cancellationToken.ThrowIfCancellationRequested();
-            try
+
+            // Not a literal, so it is an expression of its own - a function argument or an array index
+            using (await model.AccessReadOnlyAsync(cancellationToken))
             {
-                // TODO: evaluate the expression locally
-#if false
-                return await linkInterface.EvaluateExpressionAsync(code.Channel, subExpression, cancellationToken);
-#else
-                return null;
-#endif
+                if (Parsing.MetaExpressionParser.TryEvaluate(subExpression, context, out object? parsedResult))
+                {
+                    return parsedResult;
+                }
             }
-            catch (CodeParserException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw new OperationCanceledException();
-            }
+            throw new CodeParserException(string.Format(Parsing.ExpressionErrors.CannotEvaluate, subExpression.Trim()), code);
         }
 
         // Eat a sub-expression and evaluate SBC-only properties + custom functions where applicable
@@ -1006,12 +1008,9 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Va
             return result.ToString();
         }
 
-        // Fast path: evaluate the whole expression on the SBC when possible, avoiding the firmware round-trip.
-        // If anything in it cannot be resolved here, fall back to substituting SBC fields and forwarding the rest
+        // First pass: evaluate the whole expression in one go, which is what nearly everything takes
         if (!onlySbcFields)
         {
-            // Whole-mirror evaluation will be selected by the connection method (it is needed when sending G-codes directly over CAN-FD); off for now
-            Parsing.IExpressionEvaluationContext context = new ExpressionContext(this, () => code.File?.GetIterations(code), (int)(code.LineNumber ?? 0), filter, variableStore.For(code), model, false);
             bool resolvedLocally;
             object? localResult;
             using (await model.AccessReadOnlyAsync(cancellationToken))
@@ -1024,6 +1023,8 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Va
             }
         }
 
+        // Second pass: substitute what only an asynchronous lookup can produce - the custom functions
+        // fileexists(), fileread() and exists() - which the synchronous evaluator above cannot call
         string expressionContent = await eatExpression('\0');
         if (onlySbcFields)
         {
@@ -1032,19 +1033,18 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Va
 
         // Don't return exceptions from cancelled codes
         cancellationToken.ThrowIfCancellationRequested();
-        try
+
+        // Those substitutions are encoded as literals, so what came back is an expression the
+        // evaluator can finish. Anything that still will not resolve is an error: there is no
+        // firmware behind this to forward it to, and a silent null reads as a valid answer
+        using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            // TODO: evaluate the expression locally
-#if false
-            return await linkInterface.EvaluateExpressionAsync(code.Channel, expressionContent, cancellationToken);
-#else
-            return null;
-#endif
+            if (Parsing.MetaExpressionParser.TryEvaluate(expressionContent, context, out object? substitutedResult))
+            {
+                return substitutedResult;
+            }
         }
-        catch (CodeParserException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw new OperationCanceledException();
-        }
+        throw new CodeParserException(string.Format(Parsing.ExpressionErrors.CannotEvaluate, expression.Trim()), code);
     }
 
     /// <summary>
@@ -1067,14 +1067,12 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Va
     /// <summary>
     /// Evaluation context backing the SBC-side expression evaluator with the running code and the object model mirror
     /// </summary>
-    /// <param name="owner">Owning expression evaluator (for SBC field detection)</param>
     /// <param name="iterationsProvider">Provides the current loop iteration count lazily (it errors outside a loop)</param>
     /// <param name="lineNumber">Current G-code line number</param>
     /// <param name="filter">Object model filter</param>
     /// <param name="variables">Variables the running code can see</param>
     /// <param name="objectModel">Object model, which is where the global variables live</param>
-    /// <param name="evaluateAllObjectModelFields">Whether to resolve all object model fields and not just SBC-specific ones</param>
-    internal sealed class ExpressionContext(Expressions owner, Func<int?> iterationsProvider, int lineNumber, Model.Filter filter, VariableSet variables, Model.ObjectModel objectModel, bool evaluateAllObjectModelFields) : Parsing.IExpressionEvaluationContext
+    internal sealed class ExpressionContext(Func<int?> iterationsProvider, int lineNumber, Model.Filter filter, VariableSet variables, Model.ObjectModel objectModel) : Parsing.IExpressionEvaluationContext
     {
         /// <inheritdoc/>
         public int? Iterations => iterationsProvider();
@@ -1098,20 +1096,16 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Va
             {
                 if (wantArrayLength)
                 {
-                    return false;       // exists(#...) is forwarded for now
+                    return false;       // exists(#...) is not answered here yet
                 }
 
-                // Default mode can only answer for SBC-rooted paths; the flag opts into the whole (non-live) mirror
-                if (!evaluateAllObjectModelFields && !owner.IsSbcExpression(path, false))
-                {
-                    return false;
-                }
                 value = filter.GetSpecific(path, false, out _);
                 return true;
             }
 
-            // findSbcProperty restricts resolution to SBC-only fields unless the operator opts into the whole mirror
-            if (!filter.GetSpecific(path, !evaluateAllObjectModelFields, out object? field))
+            // The whole object model is resolved here. It used to be only the SBC-owned branches, because
+            // everything else was the firmware's to answer; DuetControlServer owns all of it now
+            if (!filter.GetSpecific(path, false, out object? field))
             {
                 return false;
             }
