@@ -982,6 +982,12 @@ regression in macro handling.
 Phase 5's architecture, written down here because it spans four components and no one of them shows
 the whole shape.
 
+> **See [ENDSTOPS.md](docs/devel/ENDSTOPS.md)** for the implementation as it now stands, described in
+> the order it runs rather than in the order it was arrived at. This section and §12 are the record of
+> *why* it is shaped the way it is - what was tried, what was moved and what that cost - and are kept
+> because the reasoning does not survive in the code. Where the two disagree about what the code does
+> today, ENDSTOPS.md is the one being maintained.
+
 RepRapFirmware does all of this on one board: it generates the steps, so it knows when an endstop
 fired and where every drive was at that instant. Here the drives are on CAN-connected expansion
 boards, DuetSbcInterface plans the motion, DuetCANMaster bridges SPI to CAN, and no single component
