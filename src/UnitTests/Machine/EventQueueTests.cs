@@ -1,3 +1,4 @@
+using DuetAPI.ObjectModel;
 using DuetControlServer.Events;
 using System;
 using DuetControlServer.Link.Protocol.Shared;
@@ -151,6 +152,54 @@ namespace UnitTests.Machine
             Assert.That(_queue.Count, Is.EqualTo(EventQueue.MaxEvents));
             Assert.That(_queue.TryStartProcessing(out MachineEvent first), Is.True);
             Assert.That(first!.Type, Is.EqualTo(EventType.ControllerDisconnect));
+        }
+
+        [Test]
+        public void EveryEventTypeNamesItsMacro()
+        {
+            // A type added without a macro name would otherwise get a plausible file name nobody wrote
+            foreach (EventType type in System.Enum.GetValues<EventType>())
+            {
+                string macro = EventText.GetMacroFileName(type);
+                Assert.That(macro, Does.EndWith(".g"));
+                Assert.That(macro, Does.Not.StartWith("event-"), $"{type} has no macro name");
+                Assert.That(macro, Does.Not.Contain("_"), $"{type} keeps an underscore in its macro name");
+            }
+
+            Assert.That(EventText.GetMacroFileName(EventType.HeaterFault), Is.EqualTo("heater-fault.g"));
+            Assert.That(EventText.GetMacroFileName(EventType.ControllerDisconnect), Is.EqualTo("controller-disconnect.g"));
+            Assert.That(EventText.GetMacroFileName(EventType.Overvoltage), Is.EqualTo("overvoltage.g"));
+        }
+
+        [Test]
+        public void EventsAreDescribedAsTheFirmwareDescribesThem()
+        {
+            (string text, MessageType type) = EventText.Describe(Event(EventType.HeaterFault, device: 2, param: 1, text: "expected 200 measured 150"));
+            Assert.That(text, Is.EqualTo("Heater 2 fault: temperature rising too slowly: expected 200 measured 150"));
+            Assert.That(type, Is.EqualTo(MessageType.Error));
+
+            // A fault type CANlib does not have falls back to the last entry, as it does in RRF
+            (text, _) = EventText.Describe(Event(EventType.HeaterFault, device: 0, param: 99));
+            Assert.That(text, Is.EqualTo("Heater 0 fault: unknown error: "));
+
+            (text, type) = EventText.Describe(Event(EventType.DriverStall, board: 2, device: 3));
+            Assert.That(text, Is.EqualTo("Driver 2.3 stall"));
+            Assert.That(type, Is.EqualTo(MessageType.Warning));
+
+            (text, type) = EventText.Describe(Event(EventType.Undervoltage, board: 4, param: 118));
+            Assert.That(text, Is.EqualTo("undervoltage on board 4: voltage 11.8V"));
+            Assert.That(type, Is.EqualTo(MessageType.Warning));
+
+            (text, type) = EventText.Describe(Event(EventType.ExpansionTimeout, board: 5));
+            Assert.That(text, Is.EqualTo("Expansion board 5 stopped sending status"));
+            Assert.That(type, Is.EqualTo(MessageType.Error));
+
+            (text, type) = EventText.Describe(Event(EventType.ControllerDisconnect, board: 0, text: "Transfer timeout"));
+            Assert.That(text, Is.EqualTo("Lost connection to the controller: Transfer timeout"));
+            Assert.That(type, Is.EqualTo(MessageType.Error));
+
+            (text, _) = EventText.Describe(Event(EventType.ControllerReconnect, board: 0, param: 1));
+            Assert.That(text, Is.EqualTo("Connection to the controller re-established, it had reset"));
         }
 
         [Test]

@@ -2544,6 +2544,27 @@
     ]
    },
    {
+    "name": "HeaterFaultType",
+    "cppHeader": "RRF3Common.h",
+    "underlyingType": "byte",
+    "output": "src/DuetControlServer/Link/Protocol/Shared/HeaterFaultType.g.cs",
+    "doc": [
+      "Why a heater was shut down, in the parameter of a heater_fault event.",
+      "Mirrors HeaterFaultType in CANlib's RRF3Common.h. The board that owns the heater decides the",
+      "value - see Duet3Expansion's LocalHeater - and sends it, so the ordinals have to match.",
+      "CANlib also carries the text for each of these, but nothing on a board renders it: the text",
+      "belongs with whoever reports the fault to the operator, which is DuetControlServer."
+    ],
+    "values": [
+      { "name": "failedToReadSensor", "value": 0, "doc": "the sensor could not be read; the sensor error follows" },
+      { "name": "temperatureRisingTooSlowly", "value": 1, "doc": "the heater did not heat up as the model said it would" },
+      { "name": "exceededAllowedExcursion", "value": 2, "doc": "the temperature strayed further from the target than allowed" },
+      { "name": "monitorTriggered", "value": 3, "doc": "a heater monitor fired" },
+      { "name": "pwmTooHigh", "value": 4, "doc": "the heater needed more power than the model said it should" },
+      { "name": "heaterFaultTypeLimit", "value": 5, "doc": "not a fault type, but how many there are" }
+    ]
+   },
+   {
     "name": "EventType",
     "cppHeader": "RRF3Common.h",
     "underlyingType": "byte",
