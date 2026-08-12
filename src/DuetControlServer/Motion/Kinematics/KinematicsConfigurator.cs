@@ -86,7 +86,8 @@ internal static class KinematicsConfigurator
             // cannot express that: an out parameter is assigned whether or not the value was found,
             // so an absent T would zero the minimum segment length and turn segmentation off - on a
             // code that had just asked for it
-            float segmentsPerSecond = engine.SegmentsPerSecond, minSegmentLength = engine.MinSegmentLength;
+            float segmentsPerSecond = engine.SegmentsPerSecond;
+            float minSegmentLength = engine.MinSegmentLength;
             if (code.TryGetFloat('S', out float givenSegmentsPerSecond))
             {
                 segmentsPerSecond = givenSegmentsPerSecond;
