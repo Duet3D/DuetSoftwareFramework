@@ -22,6 +22,8 @@ Start with [ARCHITECTURE.md](ARCHITECTURE.md). From there, follow the link that 
 | [PLUGINS.md](PLUGINS.md) | Plugin manifest, lifecycle (DuetPluginService), security profile, package layout. |
 | [FILES.md](FILES.md) | Path resolution, virtual SD card, file parser, M28/M29 streamed-write, job processor. |
 | [BUILD_VARIANTS.md](BUILD_VARIANTS.md) | Project layout, packages produced (`pkg/`), how DocFX docs are generated. |
+| [MCODE_MIGRATION.md](MCODE_MIGRATION.md) | Porting `GCodes::HandleMcode` into DCS: inventory of ~190 M-codes, the porting contract, macro inventory, decisions. |
+| [EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) | Porting RepRapFirmware's event system into DCS, plus the new `controller_disconnect` / `controller_reconnect` link events. |
 
 ## Project READMEs
 

@@ -521,7 +521,7 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M954 | 4610 | Configure as expansion board | — | ⛔ DSF is always the main board |
 | M955 | 4619 | Configure accelerometer | `boards[].accelerometer` → CAN generic `M955Params` | ⬜ |
 | M956 | 4623 | Start accelerometer collection | → CAN `CanMessageStartAccelerometer` | ⬜ |
-| M957 | 4628 | Raise event | → CAN `CanMessageEvent` | ⬜ |
+| M957 | 4628 | Raise event | Event queue — [EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) | ⬜ |
 | M959 | 4633 | Expansion board connection timeout | → CAN generic `M959Params` | ⬜ |
 | M997 | 4645 | Firmware update | → CAN `CanMessageUpdateYourFirmware` | 🔵 |
 | M998 | 4650 | Request resend | — | ⬜ currently throws `NotSupportedException` |
@@ -960,6 +960,8 @@ Every macro RRF invokes, taken from its `DoFileMacro` call sites and the filenam
 | `resurrect.g`, `resurrect-prologue.g` | M916 after a power fail | ⬜ |
 | `daemon.g` | Repeatedly on the daemon channel | ⬜ |
 | `trigger<n>.g` | An external trigger firing (M581) | ⬜ |
+| `heater-fault.g`, `driver-error.g`, `driver-warning.g`, `driver-stall.g`, `filament-error.g`, `expansion-reconnect.g`, `expansion-timeout.g`, `mcu-temperature-warning.g`, `overvoltage.g`, `undervoltage.g` | An event of that type — see [EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) | ⬜ blocked: no event queue, and macros cannot take parameters |
+| `controller-disconnect.g`, `controller-reconnect.g` | The SPI link to the controller dropping and returning — [EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) §4 | ⬜ new events, no RepRapFirmware equivalent |
 | `network-override.g` | Network configuration | ⬜ |
 | `homeall.g`, `home<axis>.g` | G28 | ⬜ blocked: no endstops |
 | `homedelta.g`, `homebed.g`, `homeradius.g`, `homeproximal.g`, `homedistal.g`, `home5barscara.g` | G28 on those kinematics | ⬜ blocked: kinematics and endstops |
