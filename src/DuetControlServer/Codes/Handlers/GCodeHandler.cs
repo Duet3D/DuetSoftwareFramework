@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -1604,6 +1605,22 @@ internal sealed partial class GCodeHandler(
             }
         }
         endstopCorrection.ArmMove(armedDrives);
+
+        // A motor held because it was already on its switch is given no steps, so it never moves and
+        // no stop is ever reported for it. It counts as stopped from the start, or the drive would
+        // wait for a report that cannot arrive and the move would run its full length instead of
+        // ending when the last moving motor reaches its own switch. Seeded after ArmMove, which is
+        // what clears the record of the previous move
+        for (int drive = 0; drive < raw.StopOnInput.Length && drive < MotionLimits.MaxAxesPlusExtruders; drive++)
+        {
+            byte held = raw.StopOnInput[drive].HeldDrivers;
+            while (held != 0)
+            {
+                int driverIndex = BitOperations.TrailingZeroCount(held);
+                endstopCorrection.NoteDriverAlreadyStopped(drive, driverIndex);
+                held &= (byte)(held - 1);
+            }
+        }
     }
 
     /// <summary>

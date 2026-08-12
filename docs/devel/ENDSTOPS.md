@@ -193,6 +193,12 @@ that corrects a skew is exactly the one that starts with one side already down -
 axis because one switch is closed would make it do nothing, leaving the gantry skewed and the axis
 calling itself homed. Only the motors that are already on their switches are held; the rest move.
 
+A held motor counts as stopped from the start. It is given no steps, so it never moves, so no input
+changes and no stop is ever reported for it - and the drive is only finished, its position adopted
+and the move ended, once every one of its motors is down. Waiting for a report that cannot arrive
+would leave the move running its full planned length after the last moving motor had already
+stopped.
+
 They are held by being given no steps, which is a per-driver quantity the movement message already
 has, rather than by changing what the drive is doing. `MoveStopInput.heldDrivers` carries one bit per
 driver from `ApplyEndstops` to `DDA::Prepare`, which emits zero for those and the move's delta for
@@ -207,9 +213,11 @@ concerned". `SwitchEndstop::CheckTriggered` only escalates to stopping the whole
 switch is left untriggered, which is the same rule as holding the axis here only when every switch
 is closed.
 
-The axis is deliberately **not** latched as triggered by this. RepRapFirmware records an endstop as
-having triggered for `stopAll` and `stopAxis` and never for `stopDriver`: an axis with switches left
-to reach has not finished homing.
+The axis is deliberately **not** latched as triggered by this, nor by the first motor to reach its
+switch. RepRapFirmware records an endstop as having triggered for `stopAll` and `stopAxis` and never
+for `stopDriver`: an axis with switches left to reach has not finished homing. That is also where a
+partly homed axis becomes visible - it stays unhomed, and `G28` reports "Failed to home axes" from
+the same latch.
 
 ---
 
@@ -382,8 +390,12 @@ decision, and it runs under the planner lock:
    of `NoReply` and no request id.
 4. **Adopt the position**, once the last driver of that drive has stopped (see below), by pushing it
    down through `SetMotorPositions` and writing it into the planner's own endpoints.
-5. **Latch which axes were stopped** into `MovementState.EndstopsTriggered`, because this is the only
-   moment at which it is known.
+5. **Latch the axis** into `MovementState.EndstopsTriggered`, once every motor of the drive is down
+   and not before. This is the only moment at which it is known, and waiting is what makes a partly
+   homed axis visible: RepRapFirmware records an endstop as triggered on `stopAll` and `stopAxis`
+   and never on `stopDriver`, so an axis with switches left to reach stays unhomed and `G28` then
+   reports "Failed to home axes". Latching on the first motor would set the axis to the coordinate
+   of a switch its other motors never arrived at, and call the move a success.
 
 **Duet3Expansion** handles `revertPosition` statelessly
 ([CanInterface.cpp](src/Duet3Expansion/src/CAN/CanInterface.cpp)): it reads
