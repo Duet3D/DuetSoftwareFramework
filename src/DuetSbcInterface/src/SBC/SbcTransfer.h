@@ -62,6 +62,15 @@ namespace Duet::Sbc
 		using LogCallback = std::function<void(const std::string& message)>;
 		void SetLogCallback(LogCallback cb) { m_logCallback = std::move(cb); }
 
+		// Called when a live connection is first seen to have dropped, from the thread that saw it.
+		// Reporting it here rather than after PerformFullTransfer returns is the whole point: that
+		// call does not return until the link is back, so anything waiting on it learns too late
+		using ConnectionLostCallback = std::function<void(const std::string& reason)>;
+		void SetConnectionLostCallback(ConnectionLostCallback cb) { m_connectionLostCallback = std::move(cb); }
+
+		// Whether the last transfer completed after an outage, i.e. this is a reconnection
+		[[nodiscard]] bool HadTimeout() const noexcept { return m_hadTimeout; }
+
 		// Establish the initial connection (performs the first full transfer). Throws on failure.
 		void Connect();
 
@@ -200,7 +209,7 @@ namespace Duet::Sbc
 		void ThrowIfStopped();
 
 		// Recovery: put the link back into the "reconnecting" state so the next transfer re-handshakes.
-		void PrepareReconnect();
+		void PrepareReconnect(const char* reason);
 		// Sleep up to `ms`, returning early if Stop() is called (used to pace error retries).
 		void InterruptibleSleep(int ms);
 
@@ -261,6 +270,7 @@ namespace Duet::Sbc
 
 		// Error recovery
 		LogCallback m_logCallback;
+		ConnectionLostCallback m_connectionLostCallback;
 		int m_consecutiveErrors = 0;
 		int m_numResyncs = 0;
 

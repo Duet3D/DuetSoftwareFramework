@@ -17,6 +17,7 @@ public static class ServiceCollectionExtensions
         return services
             .AddSingleton<EventQueue>()
             .AddSingleton<Utility.IDiagnostics, EventQueue>(services => services.GetRequiredService<EventQueue>())
-            .AddHostedService<EventProcessor>();
+            .AddSingleton<EventProcessor>()
+            .AddHostedService(services => services.GetRequiredService<EventProcessor>());
     }
 }

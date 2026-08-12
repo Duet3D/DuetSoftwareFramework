@@ -120,7 +120,10 @@ namespace Duet::Sbc
 	{
 		InboundEventHeader header;
 		uint16_t protocolVersion;
-		uint16_t padding;
+		// Non-zero when the controller had reset while it was away, rather than resuming what it was
+		// doing. The SBC cannot tell the two apart afterwards: the sequence numbers that said so have
+		// been reset with everything else
+		uint16_t hadReset;
 	};
 
 	struct RequestCompletedEvent

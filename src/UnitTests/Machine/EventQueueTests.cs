@@ -270,6 +270,43 @@ namespace UnitTests.Machine
         }
 
         [Test]
+        public void TheLinkEventsAreDescribedByWhatNoticedThem()
+        {
+            // param.P says which signal noticed the outage, because a reboot fast enough to fit inside
+            // one connection timeout is one the timeout never sees
+            Message timedOut = EventText.Describe(Event(EventType.ControllerDisconnect, board: 0, param: 0, text: "Transfer timeout"));
+            Assert.That(timedOut.Content, Is.EqualTo("Lost connection to the controller: Transfer timeout"));
+
+            Message reset = EventText.Describe(Event(EventType.ControllerDisconnect, board: 0, param: 1, text: "the controller reset"));
+            Assert.That(reset.Content, Is.EqualTo("Lost connection to the controller: the controller reset"));
+
+            // And on the way back, whether it is the same controller carrying on
+            Assert.That(EventText.Describe(Event(EventType.ControllerReconnect, board: 0, param: 0)).Content,
+                        Is.EqualTo("Connection to the controller re-established"));
+            Assert.That(EventText.Describe(Event(EventType.ControllerReconnect, board: 0, param: 1)).Content,
+                        Is.EqualTo("Connection to the controller re-established, it had reset"));
+        }
+
+        [Test]
+        public void ADisconnectOutranksEverythingElseWaiting()
+        {
+            // Nothing else in the queue can be acted on: the link every other macro would use is down
+            _queue.Raise(Event(EventType.HeaterFault, device: 1));
+            _queue.Raise(Event(EventType.DriverError, device: 2));
+            _queue.Raise(Event(EventType.ControllerDisconnect, board: 0));
+
+            Assert.That(_queue.TryStartProcessing(out MachineEvent first), Is.True);
+            Assert.That(first!.Type, Is.EqualTo(EventType.ControllerDisconnect));
+            _queue.FinishedProcessing();
+
+            // And the reconnect comes next, so what queued during the outage runs against a machine
+            // that has been put back
+            _queue.Raise(Event(EventType.ControllerReconnect, board: 0));
+            Assert.That(_queue.TryStartProcessing(out MachineEvent second), Is.True);
+            Assert.That(second!.Type, Is.EqualTo(EventType.ControllerReconnect));
+        }
+
+        [Test]
         public async Task WaitingReturnsWhenAnEventArrives()
         {
             using CancellationTokenSource cts = new(TimeSpan.FromSeconds(5));

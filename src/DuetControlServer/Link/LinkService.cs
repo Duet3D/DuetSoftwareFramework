@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Events;
 using DuetControlServer.Files;
 using DuetControlServer.Link.Native;
 using DuetControlServer.Link.Protocol.CanMessages;
@@ -41,6 +42,8 @@ namespace DuetControlServer.Link;
 /// <param name="expansionBoardManager">Receiver for expansion board status reports</param>
 /// <param name="macroRunner">Runs macro files</param>
 /// <param name="jobProcessor">Job processor</param>
+/// <param name="events">Events waiting to be dealt with</param>
+/// <param name="eventProcessor">Event processor, for the reconnect default action</param>
 /// <param name="nativeLink">Native SPI transfer loop</param>
 /// <param name="linkInterface">Link interface</param>
 /// <param name="model">Object model</param>
@@ -55,6 +58,8 @@ internal sealed class LinkService(
     Expansion.ExpansionBoardManager expansionBoardManager,
     MacroRunner macroRunner,
     JobProcessor jobProcessor,
+    Events.EventQueue events,
+    Events.EventProcessor eventProcessor,
     NativeLink nativeLink,
     LinkInterface linkInterface,
     Model.ObjectModel model,
@@ -87,6 +92,10 @@ internal sealed class LinkService(
         // service owns (job processor, channel processors, open files), so hand it the entry points
         linkInterface.InvalidateCodesCallback = InvalidateCodes;
         linkInterface.InvalidateCallback = Invalidate;
+
+        // A controller that comes back has to be configured again. controller-reconnect.g replaces
+        // this when a machine has one, which is what lets it home or resume instead
+        eventProcessor.ReconnectDefaultAction = _ => RunStartupFilesAsync();
 
         // Create the native interface and complete the initial handshake. This throws if the
         // controller is absent or fundamentally incompatible, which is worth failing startup over
@@ -222,6 +231,10 @@ internal sealed class LinkService(
             case InboundEventType.ControllerReset:
                 Invalidate();
                 eventLogger.LogOutput(MessageType.Warning, "Connection to controller has been reset");
+
+                // A reboot quick enough to fit inside one connection timeout is an outage the timeout
+                // never saw, so this is the only signal there is for it
+                RaiseControllerDisconnect(ControllerResetCause, "the controller reset");
                 break;
             case InboundEventType.ConnectionLost:
                 HandleConnectionLost(record);
@@ -282,6 +295,17 @@ internal sealed class LinkService(
             eventLogger.LogOutput(MessageType.Warning, "Incompatible firmware, please upgrade as soon as possible");
         }
         eventLogger.LogOutput(MessageType.Success, "Connection to Duet established");
+
+        if (_controllerDown)
+        {
+            // Coming back rather than starting up. The macro decides what that means for this machine,
+            // and running config.g is what happens when it has nothing to say - see §4.3 of
+            // docs/devel/EVENTS_MIGRATION.md for why the recovery does not live in the macro alone
+            _controllerDown = false;
+            events.Raise(new MachineEvent(EventType.ControllerReconnect, connectionEvent.HadReset,
+                                          CanId.MasterAddress, 0, string.Empty));
+            return;
+        }
 
         // The machine is only configured once config.g has run, and nothing else runs it
         _ = RunStartupFilesAsync();
@@ -355,7 +379,42 @@ internal sealed class LinkService(
         logger.LogDebug("Lost connection to Duet: {Reason}", reason);
 
         Invalidate();
-        eventLogger.LogOutput(MessageType.Warning, $"Lost connection to Duet ({reason})");
+        RaiseControllerDisconnect(TimeoutCause, reason);
+    }
+
+    /// <summary>
+    /// Cause of a disconnect that the link timed out
+    /// </summary>
+    private const ushort TimeoutCause = 0;
+
+    /// <summary>
+    /// Cause of a disconnect noticed only because the controller had reset
+    /// </summary>
+    private const ushort ControllerResetCause = 1;
+
+    /// <summary>
+    /// Whether the controller is currently away
+    /// </summary>
+    /// <remarks>
+    /// Both signals that say so can arrive for one outage, and a slow one will have finished running
+    /// the disconnect macro long before the second does - so the queue's own suppression, which only
+    /// covers an event still waiting, is not enough to keep it to one
+    /// </remarks>
+    private bool _controllerDown;
+
+    /// <summary>
+    /// Raise the disconnect event, at most once for an outage
+    /// </summary>
+    /// <param name="cause">What noticed the outage</param>
+    /// <param name="reason">What to tell the operator</param>
+    private void RaiseControllerDisconnect(ushort cause, string reason)
+    {
+        if (_controllerDown)
+        {
+            return;
+        }
+        _controllerDown = true;
+        events.Raise(new MachineEvent(EventType.ControllerDisconnect, cause, CanId.MasterAddress, 0, reason));
     }
 
     /// <summary>

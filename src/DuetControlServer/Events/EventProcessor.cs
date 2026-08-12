@@ -34,6 +34,15 @@ namespace DuetControlServer.Events;
 /// <param name="logger">Logger</param>
 public sealed class EventProcessor(EventQueue queue, MacroRunner macroRunner, EventLogger eventLogger, ILogger<EventProcessor> logger) : BackgroundService
 {
+    /// <summary>
+    /// What to do for an event whose macro is absent and whose default action is not just to say so
+    /// </summary>
+    /// <remarks>
+    /// Only <c>controller_reconnect</c> has one: a controller that has come back has to be configured
+    /// again, and that recovery cannot live in a macro a machine may not have. Set by the link, which
+    /// is what knows how to run the startup files
+    /// </remarks>
+    public Func<CancellationToken, Task>? ReconnectDefaultAction { get; set; }
     /// <inheritdoc/>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -103,5 +112,11 @@ public sealed class EventProcessor(EventQueue queue, MacroRunner macroRunner, Ev
         // TODO: raise the message box and pause once M291 and M25 are implemented; see §3.5 of
         // docs/devel/EVENTS_MIGRATION.md for which events pause and which of them run pause.g
         eventLogger.LogOutput(description);
+
+        if (machineEvent.Type == EventType.ControllerReconnect && ReconnectDefaultAction is not null)
+        {
+            // The machine came back and nothing said what that should mean, so put it back as it was
+            await ReconnectDefaultAction(cancellationToken);
+        }
     }
 }

@@ -248,8 +248,8 @@ internal struct ConnectionEstablishedEvent
     /// <summary>Negotiated protocol version</summary>
     public ushort ProtocolVersion;
 
-    /// <summary>Padding</summary>
-    public ushort Padding;
+    /// <summary>Non-zero when the controller had reset while it was away, rather than resuming</summary>
+    public ushort HadReset;
 }
 
 /// <summary>

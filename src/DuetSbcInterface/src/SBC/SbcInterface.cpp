@@ -40,6 +40,14 @@ namespace Duet::Sbc
 	{
 		// Route the transfer engine's internal recovery reporting into the inbound ring
 		m_transfer.SetLogCallback([this](const std::string& message) { PostLog(LogLevel::Warning, message); });
+		m_transfer.SetConnectionLostCallback(
+			[this](const std::string& reason)
+			{
+				m_wasConnected = false;
+				InboundEventHeader header{};
+				header.type = static_cast<uint16_t>(InboundEventType::ConnectionLost);
+				PostEvent(InboundEventType::ConnectionLost, &header, sizeof(header), reason.c_str(), reason.size());
+			});
 	}
 
 	SbcInterface::~SbcInterface()
@@ -344,11 +352,24 @@ namespace Duet::Sbc
 				}
 
 				// Report a controller reset so the caller can invalidate its pending resources
-				if (m_transfer.HadReset())
+				const bool hadReset = m_transfer.HadReset();
+				if (hadReset)
 				{
 					InboundEventHeader header{};
 					header.type = static_cast<uint16_t>(InboundEventType::ControllerReset);
 					PostEvent(InboundEventType::ControllerReset, &header, sizeof(header));
+				}
+
+				// Then that the link is up, in that order: a reset belongs to the outage that is ending,
+				// and a reader told the link is back first would apply it to the connection that follows
+				if (m_transfer.IsConnected() && !m_wasConnected)
+				{
+					m_wasConnected = true;
+					ConnectionEstablishedEvent event{};
+					event.header.type = static_cast<uint16_t>(InboundEventType::ConnectionEstablished);
+					event.protocolVersion = static_cast<uint16_t>(m_transfer.ProtocolVersion());
+					event.hadReset = hadReset ? 1 : 0;
+					PostEvent(InboundEventType::ConnectionEstablished, &event, sizeof(event));
 				}
 
 				// Process incoming packets from the previous transfer
@@ -392,28 +413,6 @@ namespace Duet::Sbc
 
 					// The controller reports its movement delay as a total, not a change
 					StepTimer::RaiseMovementDelayTo(m_transfer.RxHiccupTime());
-				}
-
-				// Report connection state transitions
-				const bool connected = m_transfer.IsConnected();
-				if (connected != m_wasConnected)
-				{
-					m_wasConnected = connected;
-					if (connected)
-					{
-						ConnectionEstablishedEvent event{};
-						event.header.type = static_cast<uint16_t>(InboundEventType::ConnectionEstablished);
-						event.protocolVersion = static_cast<uint16_t>(m_transfer.ProtocolVersion());
-						PostEvent(InboundEventType::ConnectionEstablished, &event, sizeof(event));
-					}
-					else
-					{
-						InboundEventHeader header{};
-						header.type = static_cast<uint16_t>(InboundEventType::ConnectionLost);
-						static constexpr char kReason[] = "Transfer timeout";
-						PostEvent(
-							InboundEventType::ConnectionLost, &header, sizeof(header), kReason, sizeof(kReason) - 1);
-					}
 				}
 
 				// Report jitter for a served request, if any

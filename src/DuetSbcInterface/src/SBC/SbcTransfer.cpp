@@ -246,7 +246,7 @@ namespace Duet::Sbc
 					m_logCallback("Lost connection to controller (timeout); reconnecting");
 				}
 				// The pin wait already paced this, so just resync and keep retrying
-				PrepareReconnect();
+				PrepareReconnect("Transfer timeout");
 				retry = 0;
 			}
 			catch (const std::exception& e)
@@ -264,7 +264,7 @@ namespace Duet::Sbc
 					m_logCallback("Transfer error, recovering (resync #" + std::to_string(m_numResyncs) +
 								  "): " + e.what());
 				}
-				PrepareReconnect();
+				PrepareReconnect(e.what());
 				retry = 0;
 				// Pace fast-failing errors (e.g. a persistent protocol mismatch) so recovery does not spin
 				// the CPU; the backoff grows with consecutive failures up to a 1 s cap
@@ -278,15 +278,23 @@ namespace Duet::Sbc
 
 	// Put the link back into the "reconnecting" state so the next transfer re-runs the handshake. The
 	// pending TX data is preserved and retransmitted; only the connection/first-transfer flags are reset.
-	void SbcTransfer::PrepareReconnect()
+	void SbcTransfer::PrepareReconnect(const char* reason)
 	{
 		m_txHeader.protocolVersion = proto::ProtocolVersion;
 		m_waitingForFirstTransfer = true;
-		if (!m_hadTimeout && m_connected)
+		const bool justDropped = !m_hadTimeout && m_connected;
+		if (justDropped)
 		{
 			m_hadTimeout = true;
 		}
 		m_connected = false;
+
+		// Report it from here, where it is observed. PerformFullTransfer does not return until the link
+		// is back, so a caller watching its result cannot learn that the link went away at all
+		if (justDropped && m_connectionLostCallback)
+		{
+			m_connectionLostCallback(reason != nullptr ? reason : "Transfer timeout");
+		}
 		m_resetting = false;
 
 		// The header CRC may be stale after a partial/failed exchange or a protocol-version change
@@ -332,7 +340,7 @@ namespace Duet::Sbc
 		m_packetId = 0;
 		m_packetsBeingResent.clear();
 		m_numResyncs++;
-		PrepareReconnect();
+		PrepareReconnect("Connection reset");
 	}
 
 	void SbcTransfer::InterruptibleSleep(int ms)

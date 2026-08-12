@@ -174,9 +174,10 @@ bound, and `expansion_timeout` for a board that flaps produces one entry per fla
 raw CAN messages instead. **The event system belongs on the DCS side of the link**, and the
 controller's copy should be deleted once §5's phase C lands — see §7.
 
-### 2.2 The link never tells the managed side it went down
+### 2.2 The link never told the managed side it went down
 
-This blocks the two new events, so it is scoped here rather than left as background.
+**Fixed in phase C.** What follows is what was wrong, because it explains the shape of the fix and
+why the ordering in §4.1 matters.
 
 `SbcInterface::Execute` checks for a connection-state change *after* `PerformFullTransfer()`
 returns ([SbcInterface.cpp:398](src/DuetSbcInterface/src/SBC/SbcInterface.cpp#L398)), but
@@ -755,11 +756,11 @@ Each phase is independently useful and independently testable.
 - [x] Unit tests: ordering, suppression, head pinning, macro-name mapping for all 13 types, and the
       two invariants CANlib asserts of the driver status masks
 
-### Phase C — the link events ⬜
+### Phase C — the link events 🟡
 
-- [ ] Native: post `ConnectionLost` from `PrepareReconnect`, `ConnectionEstablished` on recovery
+- [x] Native: post `ConnectionLost` from `PrepareReconnect`, `ConnectionEstablished` on recovery
       **after** the `HadReset` check, carry `HadReset` (§4.1)
-- [ ] Delete the unreachable transition check in `SbcInterface::Execute`
+- [x] Delete the unreachable transition check in `SbcInterface::Execute`
 - [ ] Native: drop the staged TX buffer and the `m_outbound` ring in `PrepareReconnect`; complete
       request-bearing commands as `Cancelled`, count and log the rest (§4.1.1)
 - [ ] Native: `outboundSeq` on every command, `OutboundDelivered(seq)` after a successful transfer and
@@ -775,9 +776,9 @@ Each phase is independently useful and independently testable.
       or to hang for 2 s. Pull the link mid-transfer; expect the staged commands to report dropped
 - [ ] Schema: `controller_disconnect` = 128, `controller_reconnect` = 129, `"emit": ["csharp"]`,
       priorities 0 and 1; teach `compare-enums.py` to skip C++-excluded values; regenerate
-- [ ] Raise `controller_disconnect` from both `HandleConnectionLost` and `HandleControllerReset`,
+- [x] Raise `controller_disconnect` from both `HandleConnectionLost` and `HandleControllerReset`,
       once per outage via `_controllerDown`, with `param.P` = 0/1 (§4.2, §4.5)
-- [ ] Raise `controller_reconnect` from `HandleConnectionEstablished`; default action = today's
+- [x] Raise `controller_reconnect` from `HandleConnectionEstablished`; default action = today's
       `RunStartupFilesAsync`
 - [ ] Delete `Event.cpp`/`Event.h` and their two call sites from DuetCANMaster (§2.1, §7)
 - [ ] Ship example macros and document the link-down restriction (§4.4)
@@ -817,8 +818,8 @@ Gated on MCODE_MIGRATION's `M291`/`M292` and `M25`:
 | `mcu_temperature_warning` | `mcu-temperature-warning.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ log |
 | `overvoltage` | `overvoltage.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ log |
 | `undervoltage` | `undervoltage.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ log |
-| `controller_disconnect` | `controller-disconnect.g` | ⬜ blocked: §2.2 | ⬜ | ⬜ | ⬜ log |
-| `controller_reconnect` | `controller-reconnect.g` | ⬜ blocked: §2.2 | ⬜ | ⬜ | ⬜ `config.g` |
+| `controller_disconnect` | `controller-disconnect.g` | ✅ §2.2 fixed | ✅ | ✅ | ✅ log |
+| `controller_reconnect` | `controller-reconnect.g` | ✅ §2.2 fixed | ✅ | ✅ | ✅ `config.g` |
 
 Legend as [MCODE_MIGRATION.md](MCODE_MIGRATION.md) §1: ✅ done, 🟡 partial, ⬜ not started, ⛔ out of
 scope.
