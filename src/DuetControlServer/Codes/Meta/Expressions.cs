@@ -1122,16 +1122,33 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Va
                         value = collection.Count;
                         return true;
                     default:
-                        return false;   // not an array or string -> let the firmware handle it
+                        return false;   // the length operator only applies to an array or a string
                 }
             }
 
-            // The value is used after the object model read lock is released, so only hand back immutable scalars.
-            // Live collections and model objects are mutated in place by the SPI update task, so they are left to the
-            // locked fallback path to substitute and format
+            // The value is used after the object model read lock is released, so only hand back immutable scalars
             if (field is null or bool or char or int or uint or long or ulong or float or double or string or DateTime)
             {
                 value = field;
+                return true;
+            }
+
+            // A collection of scalars is copied while the lock is held, so what escapes is a snapshot rather
+            // than the live list the update task mutates. A collection of anything else is refused: copying
+            // it would hand out the live elements it holds
+            if (field is ICollection fieldCollection)
+            {
+                object?[] snapshot = new object?[fieldCollection.Count];
+                int index = 0;
+                foreach (object? element in fieldCollection)
+                {
+                    if (element is not (null or bool or char or int or uint or long or ulong or float or double or string or DateTime))
+                    {
+                        return false;
+                    }
+                    snapshot[index++] = element;
+                }
+                value = snapshot;
                 return true;
             }
             return false;
@@ -1175,17 +1192,10 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Va
                 return false;
             }
 
-            // A variable holds a scalar, so anything past the name - an index or a field of its own -
-            // is not something this can answer yet
-            // TODO: resolve indices and nested fields once a variable can hold an array
-            foreach (char c in name)
-            {
-                if (!char.IsLetterOrDigit(c) && c != '_')
-                {
-                    return false;
-                }
-            }
-            if (name.Length == 0)
+            // The parser folds evaluated indices into the path it asks about, so var.x[2] arrives here
+            // as one string. A field of a variable is not a thing: a variable holds a value, not an object
+            if (!VariableStore.TrySplitIndexedName(name, out name, out IReadOnlyList<string> indexExpressions) ||
+                !VariableStore.TryParseIndices(indexExpressions, out IReadOnlyList<int> indices))
             {
                 return false;
             }
@@ -1201,28 +1211,71 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Va
                 found = isParameter ? variables.TryGetParameter(name, out value) : variables.TryGetVariable(name, out value);
             }
 
-            if (wantExists)
-            {
-                value = found;
-                return true;
-            }
-
             if (!found)
             {
                 value = null;
+                if (wantExists)
+                {
+                    value = false;
+                    return true;
+                }
                 throw new CodeParserException(string.Format(isParameter ? Parsing.ExpressionErrors.UnknownParameter
                                                                        : Parsing.ExpressionErrors.UnknownVariable, name));
             }
 
+            // Apply the indices, if any. An index past the end is an error when the value is being read
+            // and merely a "no" when its existence is the question
+            foreach (int index in indices)
+            {
+                int length = value switch
+                {
+                    object?[] array => array.Length,
+                    string text => text.Length,
+                    _ => -1
+                };
+                if (length < 0)
+                {
+                    value = null;
+                    if (wantExists)
+                    {
+                        value = false;
+                        return true;
+                    }
+                    return false;       // an index applied to something that is not indexable
+                }
+                if (index < 0 || index >= length)
+                {
+                    value = null;
+                    if (wantExists)
+                    {
+                        value = false;
+                        return true;
+                    }
+                    throw new CodeParserException(Parsing.ExpressionErrors.ArrayIndexOutOfRange);
+                }
+                value = (value is object?[] indexedArray) ? indexedArray[index] : ((string)value!)[index];
+            }
+
+            if (wantExists)
+            {
+                value = true;
+                return true;
+            }
+
             if (wantArrayLength)
             {
-                if (value is string stringValue)
+                switch (value)
                 {
-                    value = stringValue.Length;
-                    return true;
+                    case object?[] array:
+                        value = array.Length;
+                        return true;
+                    case string text:
+                        value = text.Length;
+                        return true;
+                    default:
+                        value = null;
+                        return false;   // the length operator only applies to an array or a string
                 }
-                value = null;
-                return false;       // not a string, and a variable cannot hold an array yet
             }
             return true;
         }

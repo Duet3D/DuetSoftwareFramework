@@ -1,6 +1,8 @@
 using DuetAPI;
 using System;
 using System.Buffers;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
@@ -44,6 +46,120 @@ public sealed class VariableStore(Model.ObjectModel model)
     public VariableSet For(Code code) => code.File?.Variables ?? _channelVariables[(int)code.Channel];
 
     /// <summary>
+    /// Split a variable name from the element indices applied to it
+    /// </summary>
+    /// <param name="path">Name as written, e.g. <c>speeds[1][2]</c></param>
+    /// <param name="name">Name on its own</param>
+    /// <param name="indices">What stood in each pair of brackets, empty when the name stands alone</param>
+    /// <returns>True if the name is a variable name, optionally indexed</returns>
+    /// <remarks>
+    /// One reader for this grammar, because two readers of one grammar diverge silently: the
+    /// expression evaluator and the <c>set</c> statement have to agree on what <c>var.x[2]</c> names.
+    /// What is inside the brackets is handed back as written, because the two do not agree on that:
+    /// the expression parser has already evaluated its indices to integers by the time it asks, while
+    /// <c>set</c> arrives with whatever the operator typed
+    /// </remarks>
+    public static bool TrySplitIndexedName(string path, out string name, out IReadOnlyList<string> indices)
+    {
+        name = path;
+        indices = [];
+
+        int bracket = path.IndexOf('[');
+        if (bracket < 0)
+        {
+            return IsVariableName(path);
+        }
+
+        name = path[..bracket];
+        if (!IsVariableName(name))
+        {
+            return false;
+        }
+
+        List<string> parsedIndices = [];
+        int i = bracket, depth = 0, start = 0;
+        for (; i < path.Length; i++)
+        {
+            if (path[i] == '[')
+            {
+                if (depth++ == 0)
+                {
+                    start = i + 1;
+                }
+            }
+            else if (path[i] == ']')
+            {
+                if (--depth < 0)
+                {
+                    return false;
+                }
+                if (depth == 0)
+                {
+                    parsedIndices.Add(path[start..i]);
+                }
+            }
+            else if (depth == 0)
+            {
+                return false;       // something between one pair of brackets and the next
+            }
+        }
+        if (depth != 0)
+        {
+            return false;
+        }
+
+        indices = parsedIndices;
+        return true;
+    }
+
+    /// <summary>
+    /// Read an index that has already been evaluated to a number
+    /// </summary>
+    /// <param name="indices">Index expressions as written</param>
+    /// <param name="values">The same indices as integers</param>
+    /// <returns>True if every one of them is an integer literal</returns>
+    /// <remarks>
+    /// The expression parser evaluates an index before folding it into the path it asks about, so by
+    /// the time an expression reaches the evaluator its indices are literals. Anything else is not
+    /// something this can resolve
+    /// </remarks>
+    public static bool TryParseIndices(IReadOnlyList<string> indices, out IReadOnlyList<int> values)
+    {
+        int[] parsed = new int[indices.Count];
+        for (int i = 0; i < indices.Count; i++)
+        {
+            if (!int.TryParse(indices[i], NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed[i]))
+            {
+                values = [];
+                return false;
+            }
+        }
+        values = parsed;
+        return true;
+    }
+
+    /// <summary>
+    /// Check whether a string is a name a variable may have
+    /// </summary>
+    /// <param name="name">Name to check</param>
+    /// <returns>True if it is a valid name</returns>
+    private static bool IsVariableName(string name)
+    {
+        if (name.Length == 0)
+        {
+            return false;
+        }
+        foreach (char c in name)
+        {
+            if (!char.IsLetterOrDigit(c) && c != '_')
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>
     /// Create a global variable
     /// </summary>
     /// <param name="name">Variable name without the <c>global.</c> prefix</param>
@@ -84,6 +200,41 @@ public sealed class VariableStore(Model.ObjectModel model)
     }
 
     /// <summary>
+    /// Assign to an element of an existing global variable
+    /// </summary>
+    /// <param name="name">Variable name without the <c>global.</c> prefix</param>
+    /// <param name="indices">Index of the element, one per dimension</param>
+    /// <param name="value">Value to give it</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>What happened</returns>
+    /// <remarks>
+    /// A global is stored as JSON, so the element cannot be written in place: the array is read out,
+    /// changed and written back, all under the same write lock
+    /// </remarks>
+    public async ValueTask<VariableAssignment> TryAssignGlobalElementAsync(string name, IReadOnlyList<int> indices, object? value,
+                                                                          CancellationToken cancellationToken)
+    {
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (!model.Global.TryGetValue(name, out JsonElement? existing))
+            {
+                return VariableAssignment.UnknownVariable;
+            }
+            if (!TryFromJson(existing, out object? current))
+            {
+                return VariableAssignment.NotAnArray;
+            }
+
+            VariableAssignment result = VariableSet.AssignElement(current, indices, value);
+            if (result == VariableAssignment.Assigned)
+            {
+                model.Global[name] = ToJson(current);
+            }
+            return result;
+        }
+    }
+
+    /// <summary>
     /// Convert an evaluated value into what the object model stores
     /// </summary>
     /// <param name="value">Value produced by the expression evaluator</param>
@@ -105,48 +256,66 @@ public sealed class VariableStore(Model.ObjectModel model)
         ArrayBufferWriter<byte> buffer = new();
         using (Utf8JsonWriter writer = new(buffer))
         {
-            switch (value)
-            {
-                case null:
-                    writer.WriteNullValue();
-                    break;
-                case bool boolValue:
-                    writer.WriteBooleanValue(boolValue);
-                    break;
-                case char charValue:
-                    writer.WriteStringValue(charValue.ToString());
-                    break;
-                case string stringValue:
-                    writer.WriteStringValue(stringValue);
-                    break;
-                case int intValue:
-                    writer.WriteNumberValue(intValue);
-                    break;
-                case uint uintValue:
-                    writer.WriteNumberValue(uintValue);
-                    break;
-                case long longValue:
-                    writer.WriteNumberValue(longValue);
-                    break;
-                case ulong ulongValue:
-                    writer.WriteNumberValue(ulongValue);
-                    break;
-                case float floatValue:
-                    writer.WriteNumberValue(floatValue);
-                    break;
-                case double doubleValue:
-                    writer.WriteNumberValue(doubleValue);
-                    break;
-                case DateTime dateTimeValue:
-                    writer.WriteStringValue(dateTimeValue);
-                    break;
-                default:
-                    throw new ArgumentException($"Cannot store a value of type {value.GetType().Name} in a variable", nameof(value));
-            }
+            WriteValue(writer, value);
         }
 
         using JsonDocument document = JsonDocument.Parse(buffer.WrittenMemory);
         return document.RootElement.Clone();
+    }
+
+    /// <summary>
+    /// Write one value, which may be an array of them
+    /// </summary>
+    /// <param name="writer">Writer to write to</param>
+    /// <param name="value">Value to write</param>
+    private static void WriteValue(Utf8JsonWriter writer, object? value)
+    {
+        switch (value)
+        {
+            case null:
+                writer.WriteNullValue();
+                break;
+            case bool boolValue:
+                writer.WriteBooleanValue(boolValue);
+                break;
+            case char charValue:
+                writer.WriteStringValue(charValue.ToString());
+                break;
+            case string stringValue:
+                writer.WriteStringValue(stringValue);
+                break;
+            case int intValue:
+                writer.WriteNumberValue(intValue);
+                break;
+            case uint uintValue:
+                writer.WriteNumberValue(uintValue);
+                break;
+            case long longValue:
+                writer.WriteNumberValue(longValue);
+                break;
+            case ulong ulongValue:
+                writer.WriteNumberValue(ulongValue);
+                break;
+            case float floatValue:
+                writer.WriteNumberValue(floatValue);
+                break;
+            case double doubleValue:
+                writer.WriteNumberValue(doubleValue);
+                break;
+            case DateTime dateTimeValue:
+                writer.WriteStringValue(dateTimeValue);
+                break;
+            case object?[] array:
+                writer.WriteStartArray();
+                foreach (object? element in array)
+                {
+                    WriteValue(writer, element);
+                }
+                writer.WriteEndArray();
+                break;
+            default:
+                throw new ArgumentException($"Cannot store a value of type {value.GetType().Name} in a variable", nameof(value));
+        }
     }
 
     /// <summary>
@@ -156,9 +325,8 @@ public sealed class VariableStore(Model.ObjectModel model)
     /// <param name="value">The same value as a scalar</param>
     /// <returns>True if it is a scalar this can represent</returns>
     /// <remarks>
-    /// Arrays and objects are refused rather than converted. The expression evaluator hands back only
-    /// immutable scalars, because everything else is read under the object model lock and used after
-    /// it has been released
+    /// An array is copied element by element, so what comes back is the caller's own and cannot be
+    /// changed underneath it. Objects are refused: a variable has no way to hold one
     /// </remarks>
     public static bool TryFromJson(JsonElement? element, out object? value)
     {
@@ -194,6 +362,20 @@ public sealed class VariableStore(Model.ObjectModel model)
                     value = json.GetDouble();
                 }
                 return true;
+            case JsonValueKind.Array:
+                {
+                    object?[] array = new object?[json.GetArrayLength()];
+                    int index = 0;
+                    foreach (JsonElement item in json.EnumerateArray())
+                    {
+                        if (!TryFromJson(item, out array[index++]))
+                        {
+                            return false;
+                        }
+                    }
+                    value = array;
+                    return true;
+                }
             default:
                 return false;
         }

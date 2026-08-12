@@ -3,6 +3,37 @@ using System.Collections.Generic;
 namespace DuetControlServer.Codes.Meta;
 
 /// <summary>
+/// What happened to an attempt to assign to a variable
+/// </summary>
+/// <remarks>
+/// Reported rather than thrown, because the wording of the refusal belongs to the statement that
+/// asked for it - a G-code keyword answers in RepRapFirmware's words, and nothing else here should
+/// have to know them
+/// </remarks>
+public enum VariableAssignment
+{
+    /// <summary>
+    /// The value was stored
+    /// </summary>
+    Assigned,
+
+    /// <summary>
+    /// There is no variable of that name
+    /// </summary>
+    UnknownVariable,
+
+    /// <summary>
+    /// An index was applied to something that is not an array
+    /// </summary>
+    NotAnArray,
+
+    /// <summary>
+    /// An index was past the end of the array it was applied to
+    /// </summary>
+    IndexOutOfRange
+}
+
+/// <summary>
 /// The variables one execution context can see
 /// </summary>
 /// <remarks>
@@ -104,6 +135,63 @@ public sealed class VariableSet
             _variables[name] = value;
             return true;
         }
+    }
+
+    /// <summary>
+    /// Assign to an element of an existing local variable
+    /// </summary>
+    /// <param name="name">Variable name without the <c>var.</c> prefix</param>
+    /// <param name="indices">Index of the element, one per dimension</param>
+    /// <param name="value">Value to give it</param>
+    /// <returns>What happened</returns>
+    /// <remarks>
+    /// Done under the lock rather than by handing the array out, so that an assignment cannot race
+    /// with a read of the same variable
+    /// </remarks>
+    public VariableAssignment TryAssignVariableElement(string name, IReadOnlyList<int> indices, object? value)
+    {
+        lock (_lock)
+        {
+            if (!_variables.TryGetValue(name, out object? existing))
+            {
+                return VariableAssignment.UnknownVariable;
+            }
+            return AssignElement(existing, indices, value);
+        }
+    }
+
+    /// <summary>
+    /// Walk an index chain and assign to the element it names
+    /// </summary>
+    /// <param name="target">Value the indices are applied to</param>
+    /// <param name="indices">Index of the element, one per dimension</param>
+    /// <param name="value">Value to give it</param>
+    /// <returns>What happened</returns>
+    /// <remarks>
+    /// The array is mutated in place, so a caller holding the same array sees the change. That is
+    /// what makes this work for a global as well, whose array is rewritten by its owner afterwards
+    /// </remarks>
+    internal static VariableAssignment AssignElement(object? target, IReadOnlyList<int> indices, object? value)
+    {
+        for (int i = 0; i < indices.Count; i++)
+        {
+            if (target is not object?[] array)
+            {
+                return VariableAssignment.NotAnArray;
+            }
+            if (indices[i] < 0 || indices[i] >= array.Length)
+            {
+                return VariableAssignment.IndexOutOfRange;
+            }
+
+            if (i == indices.Count - 1)
+            {
+                array[indices[i]] = value;
+                return VariableAssignment.Assigned;
+            }
+            target = array[indices[i]];
+        }
+        return VariableAssignment.NotAnArray;
     }
 
     /// <summary>

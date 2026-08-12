@@ -328,9 +328,13 @@ refuse to overwrite, `set` assigns and refuses to create, parameters are read-on
 accepts only the `var.` and `global.` prefixes, and reading one that does not exist is an error rather
 than a null - `unknown variable 'x'` / `unknown parameter 'x'`.
 
-A variable holds a scalar. Arrays, and therefore `var.x[2]` and `set var.x[2] = ...`, are the one
-thing left: both refuse with a message naming the limitation rather than pretending the name is
-unknown.
+A variable holds a scalar or an array of them, indexed to any depth: `var.grid[1][0]` reads,
+`set var.speeds[var.i] = 0` assigns, `#var.speeds` measures, and `exists(var.speeds[5])` answers
+`false` where reading the same element is an error. Where the brackets are is decided in one place -
+`VariableStore.TrySplitIndexedName` - but what is *inside* them is handed back as written, because the
+two callers do not agree on that: the expression parser has already evaluated its indices to integers
+by the time it asks, while `set` arrives with whatever the operator typed and evaluates it itself.
+That is what makes an index a computed expression rather than a literal.
 
 ### 3.4.1 Expressions no longer resolve half the machine
 
@@ -352,8 +356,12 @@ first pass evaluates everything else, the second substitutes those as literals a
 comes back.
 
 **An expression that still cannot be produced is now an error**, `cannot evaluate '<expression>'`,
-rather than a null. A null reads as a valid answer, which is how the two gaps above stayed invisible;
-what is left unresolvable - arrays and live collections as values - announces itself instead.
+rather than a null. A null reads as a valid answer, which is how the two gaps above stayed invisible.
+
+A collection of scalars is copied while the read lock is held, so `move.axes[0].workplaceOffsets`
+resolves as an array rather than being refused. A collection of model objects still is: copying it
+would hand out the live elements it holds, which the update task mutates, and `move.axes` says so
+rather than producing something that looks like an answer.
 
 ### 3.5 Default actions in DSF terms
 
@@ -687,7 +695,8 @@ Each phase is independently useful and independently testable.
       global round-tripping
 - [x] Resolve the whole object model in expressions, not just the SBC-flagged branches (§3.4.1)
 - [x] Fail loudly on an expression that cannot be produced, instead of evaluating it to null
-- [ ] Arrays: `var.x[2]` as a value and as an assignment target, and array-valued object model paths
+- [x] Arrays: `var.x[2]` as a value and as an assignment target, computed indices, and object model
+      collections of scalars
 
 ### Phase B — the event system ⬜
 

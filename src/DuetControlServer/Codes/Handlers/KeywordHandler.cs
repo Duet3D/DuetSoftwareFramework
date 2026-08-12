@@ -7,6 +7,7 @@ using DuetControlServer.Link;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -274,13 +275,31 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
                 }
                 string fullVarName = (isGlobal ? "global." : "var.") + varName;
 
-                // A variable holds a scalar, so a name is all that can be assigned to
-                // TODO: assign to an element once a variable can hold an array
-                foreach (char c in varName)
+                // "set" may name an element of an array; "var" and "global" name the variable they create
+                if (!VariableStore.TrySplitIndexedName(varName, out varName, out IReadOnlyList<string> indexExpressions))
                 {
-                    if (!char.IsLetterOrDigit(c) && c != '_')
+                    throw new CodeParserException($"expected a variable name, got '{fullVarName}'", code);
+                }
+                if (indexExpressions.Count > 0 && code.Keyword != KeywordType.Set)
+                {
+                    throw new CodeParserException($"expected a new variable name, got '{fullVarName}'", code);
+                }
+
+                // An index is an expression of its own, which is what makes "set var.a[var.i] = ..." work
+                int[] indices = new int[indexExpressions.Count];
+                for (int index = 0; index < indexExpressions.Count; index++)
+                {
+                    object? indexValue = await expressions.EvaluateExpressionToValueAsync(code, indexExpressions[index], false, cancellationToken);
+                    indices[index] = indexValue switch
                     {
-                        throw new CodeParserException($"cannot assign to '{fullVarName}': a variable can only hold a single value", code);
+                        int intIndex => intIndex,
+                        long longIndex when longIndex is >= 0 and <= int.MaxValue => (int)longIndex,
+                        uint uintIndex when uintIndex <= int.MaxValue => (int)uintIndex,
+                        _ => throw new CodeParserException(Meta.Parsing.ExpressionErrors.ExpectedNonNegativeInt, code)
+                    };
+                    if (indices[index] < 0)
+                    {
+                        throw new CodeParserException(Meta.Parsing.ExpressionErrors.ExpectedNonNegativeInt, code);
                     }
                 }
 
@@ -289,42 +308,55 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
 
                 // Assign it. A "var" or "global" statement creates, "set" assigns to what already exists;
                 // neither does the other's job, so that a name cannot quietly change meaning halfway through a file
-                if (isGlobal)
+                if (code.Keyword == KeywordType.Set)
                 {
-                    bool assigned = (code.Keyword == KeywordType.Set)
-                        ? await variableStore.TryAssignGlobalAsync(varName, value, cancellationToken)
-                        : await variableStore.TryCreateGlobalAsync(varName, value, cancellationToken);
-                    if (!assigned)
+                    VariableAssignment assignment;
+                    if (indices.Length > 0)
                     {
-                        throw new CodeParserException((code.Keyword == KeywordType.Set)
-                            ? $"unknown variable '{varName}'"
-                            : $"variable '{varName}' already exists", code);
+                        assignment = isGlobal
+                            ? await variableStore.TryAssignGlobalElementAsync(varName, indices, value, cancellationToken)
+                            : variableStore.For(code).TryAssignVariableElement(varName, indices, value);
+                    }
+                    else
+                    {
+                        bool assigned = isGlobal
+                            ? await variableStore.TryAssignGlobalAsync(varName, value, cancellationToken)
+                            : variableStore.For(code).TryAssignVariable(varName, value);
+                        assignment = assigned ? VariableAssignment.Assigned : VariableAssignment.UnknownVariable;
+                    }
+
+                    switch (assignment)
+                    {
+                        case VariableAssignment.Assigned:
+                            break;
+                        case VariableAssignment.NotAnArray:
+                            throw new CodeParserException("Expected an array expression", code);
+                        case VariableAssignment.IndexOutOfRange:
+                            throw new CodeParserException(Meta.Parsing.ExpressionErrors.ArrayIndexOutOfRange, code);
+                        default:
+                            throw new CodeParserException($"unknown variable '{varName}'", code);
+                    }
+                }
+                else if (isGlobal)
+                {
+                    if (!await variableStore.TryCreateGlobalAsync(varName, value, cancellationToken))
+                    {
+                        throw new CodeParserException($"variable '{varName}' already exists", code);
                     }
                 }
                 else
                 {
-                    VariableSet variables = variableStore.For(code);
-                    if (code.Keyword == KeywordType.Set)
+                    if (!variableStore.For(code).TryCreateVariable(varName, value))
                     {
-                        if (!variables.TryAssignVariable(varName, value))
-                        {
-                            throw new CodeParserException($"unknown variable '{varName}'", code);
-                        }
+                        throw new CodeParserException($"variable '{varName}' already exists", code);
                     }
-                    else
-                    {
-                        if (!variables.TryCreateVariable(varName, value))
-                        {
-                            throw new CodeParserException($"variable '{varName}' already exists", code);
-                        }
 
-                        // The block that created it is the block that deletes it again
-                        if (code.File is not null)
+                    // The block that created it is the block that deletes it again
+                    if (code.File is not null)
+                    {
+                        using (await code.File.LockAsync(cancellationToken))
                         {
-                            using (await code.File.LockAsync(cancellationToken))
-                            {
-                                code.File.AddLocalVariable(varName);
-                            }
+                            code.File.AddLocalVariable(varName);
                         }
                     }
                 }

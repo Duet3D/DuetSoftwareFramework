@@ -254,6 +254,147 @@ namespace UnitTests.Machine
         }
 
         [Test]
+        public void ArrayVariableIsIndexedAndMeasured()
+        {
+            _variables.TryCreateVariable("speeds", new object?[] { 10, 20, 30 });
+
+            Assert.That(TryEval("var.speeds[1]", out object element), Is.True);
+            Assert.That(element, Is.EqualTo(20));
+
+            Assert.That(TryEval("#var.speeds", out object length), Is.True);
+            Assert.That(length, Is.EqualTo(3));
+
+            Assert.That(TryEval("var.speeds[1] + var.speeds[2]", out object sum), Is.True);
+            Assert.That(sum, Is.EqualTo(50));
+        }
+
+        [Test]
+        public void NestedArrayVariableIsIndexed()
+        {
+            _variables.TryCreateVariable("grid", new object?[] { new object?[] { 1, 2 }, new object?[] { 3, 4 } });
+
+            Assert.That(TryEval("var.grid[1][0]", out object element), Is.True);
+            Assert.That(element, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void IndexPastTheEndOfAVariableIsAnError()
+        {
+            _variables.TryCreateVariable("speeds", new object?[] { 10, 20 });
+            Assert.That(() => TryEval("var.speeds[5]", out _), Throws.TypeOf<CodeParserException>());
+
+            // exists() answers rather than throwing, as it does for a name that is not there
+            Assert.That(TryEval("exists(var.speeds[5])", out object missing), Is.True);
+            Assert.That(missing, Is.EqualTo(false));
+
+            Assert.That(TryEval("exists(var.speeds[1])", out object present), Is.True);
+            Assert.That(present, Is.EqualTo(true));
+        }
+
+        [Test]
+        public void StringVariableIsIndexed()
+        {
+            _variables.TryCreateVariable("text", "hello");
+            Assert.That(TryEval("var.text[1]", out object element), Is.True);
+            Assert.That(element, Is.EqualTo('e'));
+        }
+
+        [Test]
+        public async Task GlobalArrayRoundTripsAndIsIndexed()
+        {
+            await _variableStore.TryCreateGlobalAsync("speeds", new object?[] { 1, "two", 3.5f, null }, default);
+
+            Assert.That(TryEval("global.speeds[1]", out object element), Is.True);
+            Assert.That(element, Is.EqualTo("two"));
+
+            Assert.That(TryEval("#global.speeds", out object length), Is.True);
+            Assert.That(length, Is.EqualTo(4));
+
+            Assert.That(TryEval("global.speeds[3]", out object nothing), Is.True);
+            Assert.That(nothing, Is.Null);
+        }
+
+        [Test]
+        public void AssignToAnArrayElement()
+        {
+            _variables.TryCreateVariable("speeds", new object?[] { 10, 20, 30 });
+
+            Assert.That(_variables.TryAssignVariableElement("speeds", [1], 99), Is.EqualTo(VariableAssignment.Assigned));
+            Assert.That(TryEval("var.speeds[1]", out object element), Is.True);
+            Assert.That(element, Is.EqualTo(99));
+
+            Assert.That(_variables.TryAssignVariableElement("speeds", [5], 0), Is.EqualTo(VariableAssignment.IndexOutOfRange));
+            Assert.That(_variables.TryAssignVariableElement("nope", [0], 0), Is.EqualTo(VariableAssignment.UnknownVariable));
+
+            _variables.TryCreateVariable("scalar", 1);
+            Assert.That(_variables.TryAssignVariableElement("scalar", [0], 0), Is.EqualTo(VariableAssignment.NotAnArray));
+        }
+
+        [Test]
+        public async Task AssignToAGlobalArrayElement()
+        {
+            await _variableStore.TryCreateGlobalAsync("speeds", new object?[] { 10, 20 }, default);
+
+            Assert.That(await _variableStore.TryAssignGlobalElementAsync("speeds", [0], 99, default), Is.EqualTo(VariableAssignment.Assigned));
+            Assert.That(TryEval("global.speeds[0]", out object element), Is.True);
+            Assert.That(element, Is.EqualTo(99));
+
+            Assert.That(await _variableStore.TryAssignGlobalElementAsync("speeds", [7], 0, default), Is.EqualTo(VariableAssignment.IndexOutOfRange));
+            Assert.That(await _variableStore.TryAssignGlobalElementAsync("nope", [0], 0, default), Is.EqualTo(VariableAssignment.UnknownVariable));
+        }
+
+        [Test]
+        public void IndexedNamesAreSplitOnce()
+        {
+            Assert.That(VariableStore.TrySplitIndexedName("speeds", out string name, out IReadOnlyList<string> indices), Is.True);
+            Assert.That(name, Is.EqualTo("speeds"));
+            Assert.That(indices, Is.Empty);
+
+            Assert.That(VariableStore.TrySplitIndexedName("grid[1][20]", out name, out indices), Is.True);
+            Assert.That(name, Is.EqualTo("grid"));
+            Assert.That(indices, Is.EqualTo(new[] { "1", "20" }));
+
+            // What is inside the brackets is handed back as written, for the caller to evaluate
+            Assert.That(VariableStore.TrySplitIndexedName("speeds[var.i + 1]", out name, out indices), Is.True);
+            Assert.That(name, Is.EqualTo("speeds"));
+            Assert.That(indices, Is.EqualTo(new[] { "var.i + 1" }));
+            Assert.That(VariableStore.TryParseIndices(indices, out _), Is.False);
+
+            Assert.That(VariableStore.TryParseIndices(["4"], out IReadOnlyList<int> parsed), Is.True);
+            Assert.That(parsed, Is.EqualTo(new[] { 4 }));
+
+            // A field of a variable is not a thing, and neither is a name that does not close its brackets
+            Assert.That(VariableStore.TrySplitIndexedName("speeds.first", out _, out _), Is.False);
+            Assert.That(VariableStore.TrySplitIndexedName("speeds[0", out _, out _), Is.False);
+            Assert.That(VariableStore.TrySplitIndexedName("speeds[0]x", out _, out _), Is.False);
+            Assert.That(VariableStore.TrySplitIndexedName(string.Empty, out _, out _), Is.False);
+        }
+
+        [Test]
+        public void ScalarCollectionIsSnapshotted()
+        {
+            // A collection of scalars is copied under the lock, so the whole of it can be handed out
+            _model.Move.Axes[0].WorkplaceOffsets.Add(1.5f);
+            _model.Move.Axes[0].WorkplaceOffsets.Add(2.5f);
+
+            Assert.That(TryEval("#move.axes[0].workplaceOffsets", out object length), Is.True);
+            Assert.That(length, Is.EqualTo(2));
+
+            Assert.That(TryEval("move.axes[0].workplaceOffsets[1]", out object element), Is.True);
+            Assert.That(element, Is.EqualTo(2.5f));
+
+            Assert.That(TryEval("move.axes[0].workplaceOffsets", out object whole), Is.True);
+            Assert.That(whole, Is.EqualTo(new object[] { 1.5f, 2.5f }));
+        }
+
+        [Test]
+        public void CollectionOfModelObjectsIsRefused()
+        {
+            // Copying it would hand out the live elements it holds, which the update task mutates
+            Assert.That(TryEval("move.axes", out _), Is.False);
+        }
+
+        [Test]
         public void UnknownPathsAreNotSbcExpressions()
         {
             Assert.That(_expressions.IsSbcExpression("foo", false), Is.False);
