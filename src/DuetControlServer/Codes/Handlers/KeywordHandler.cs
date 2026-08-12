@@ -305,6 +305,12 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
 
                 // Evaluate what it is being assigned to
                 object? value = await expressions.EvaluateExpressionToValueAsync(code, expression, false, cancellationToken);
+                if (value is Meta.Parsing.ObjectModelValue)
+                {
+                    // An object is not a value. RepRapFirmware refuses this too, and stores an array of
+                    // them - which is why the refusal is of the value itself and not of what contains it
+                    throw new CodeParserException("Cannot assign a value of type 'object' to a variable", code);
+                }
 
                 // Assign it. A "var" or "global" statement creates, "set" assigns to what already exists;
                 // neither does the other's job, so that a name cannot quietly change meaning halfway through a file

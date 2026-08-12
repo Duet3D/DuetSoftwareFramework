@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using DuetAPI;
+using DuetAPI.Utility;
 using NUnit.Framework;
 using System.Collections.Generic;
 using System.Threading;
@@ -86,10 +87,14 @@ namespace UnitTests.Machine
         }
 
         [Test]
-        public void LiveCollectionIsRefusedToAvoidRace()
+        public void LiveCollectionIsCopiedRatherThanHandedOut()
         {
-            // The whole collection is a live reference mutated by the SPI task, so it must not be handed out
-            Assert.That(TryEval("volumes", out _), Is.False);
+            // The collection is a live reference the update task mutates, so what escapes is a copy of it
+            // holding stand-ins for the objects inside
+            Assert.That(TryEval("volumes", out object volumes), Is.True);
+            Assert.That(volumes, Is.InstanceOf<object[]>());
+            Assert.That(((object[])volumes), Has.Length.EqualTo(1));
+            Assert.That(((object[])volumes)[0]?.ToString(), Is.EqualTo("{object}"));
         }
 
         [Test]
@@ -388,13 +393,6 @@ namespace UnitTests.Machine
         }
 
         [Test]
-        public void CollectionOfModelObjectsIsRefused()
-        {
-            // Copying it would hand out the live elements it holds, which the update task mutates
-            Assert.That(TryEval("move.axes", out _), Is.False);
-        }
-
-        [Test]
         public void CharComparesAgainstAString()
         {
             // move.axes[].letter is a char, and a char compared against a string is converted to one
@@ -420,6 +418,79 @@ namespace UnitTests.Machine
             // which is what tells the reader to write == "X" instead
             Assert.That(() => TryEval("move.axes[0].letter == 'X'", out _),
                         Throws.TypeOf<CodeParserException>().With.Message.Contains("got char"));
+        }
+
+        [Test]
+        public void ObjectResolvesAsAStandIn()
+        {
+            // RepRapFirmware prints an object as "{object}" and does nothing else with one, so that is
+            // what an expression naming an object holds. The object itself must not escape: the update
+            // task mutates it after the model lock is released
+            Assert.That(TryEval("move", out object model), Is.True);
+            Assert.That(model?.ToString(), Is.EqualTo("{object}"));
+
+            Assert.That(TryEval("move.axes[0]", out object axis), Is.True);
+            Assert.That(axis?.ToString(), Is.EqualTo("{object}"));
+
+            // A collection of them is an array of stand-ins
+            Assert.That(TryEval("move.axes", out object axes), Is.True);
+            Assert.That(axes, Is.InstanceOf<object[]>());
+            Assert.That(((object[])axes)[0]?.ToString(), Is.EqualTo("{object}"));
+
+            // Comparing them is refused in RepRapFirmware's words
+            Assert.That(() => TryEval("move == move", out _),
+                        Throws.TypeOf<CodeParserException>().With.Message.Contains("cannot compare objects"));
+        }
+
+        [Test]
+        public async Task ArrayOfObjectsCanBeStored()
+        {
+            // RepRapFirmware stores an object model array in a variable, so an array of stand-ins is
+            // stored here. A global keeps only how they print, which is all a stand-in holds anyway
+            Assert.That(TryEval("move.axes", out object axes), Is.True);
+            await _variableStore.TryCreateGlobalAsync("axes", axes, default);
+
+            Assert.That(TryEval("#global.axes", out object length), Is.True);
+            Assert.That(length, Is.EqualTo(1));
+
+            Assert.That(TryEval("global.axes[0]", out object element), Is.True);
+            Assert.That(element, Is.EqualTo("{object}"));
+        }
+
+        [Test]
+        public void ArrayRendersInSquareBrackets()
+        {
+            // RepRapFirmware writes an array literal as {1,2,3} and prints one as [1,2,3]
+            Assert.That(TryEval("\"\" ^ {1,2,3}", out object rendered), Is.True);
+            Assert.That(rendered, Is.EqualTo("[1,2,3]"));
+
+            Assert.That(TryEval("\"\" ^ {1,}", out object single), Is.True);
+            Assert.That(single, Is.EqualTo("[1]"));
+        }
+
+        [Test]
+        public void DriverIdCollectionResolves()
+        {
+            _model.Move.Axes[0].Drivers.Add(new DriverId(1, 2));
+
+            Assert.That(TryEval("move.axes[0].drivers[0]", out object driver), Is.True);
+            Assert.That(driver, Is.EqualTo(new DriverId(1, 2)));
+
+            Assert.That(TryEval("#move.axes[0].drivers", out object count), Is.True);
+            Assert.That(count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void EnumResolvesAsItsObjectModelName()
+        {
+            // state.status is "processing" in the object model, and that is what a macro compares against
+            _model.State.Status = MachineStatus.Processing;
+
+            Assert.That(TryEval("state.status", out object status), Is.True);
+            Assert.That(status, Is.EqualTo("processing"));
+
+            Assert.That(TryEval("state.status == \"processing\"", out object equal), Is.True);
+            Assert.That(equal, Is.EqualTo(true));
         }
 
         [Test]

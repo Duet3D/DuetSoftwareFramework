@@ -519,6 +519,10 @@ public sealed class MetaExpressionParser
                         BalanceTypes(ref val, ref val2, evaluate);
                         switch (val)
                         {
+                            case ObjectModelValue:
+                                ThrowParseException("cannot compare objects");
+                                result = false;
+                                break;
                             case int i:
                                 result = i == (int)val2!;
                                 break;
@@ -1233,6 +1237,7 @@ public sealed class MetaExpressionParser
         float or double => "float",
         DateTime => "datetime",
         DriverId => "driver id",
+        ObjectModelValue => "object",
         object?[] => "array",
         _ => val.GetType().Name
     };
@@ -1330,9 +1335,11 @@ public sealed class MetaExpressionParser
                 return Convert.ToString(val, CultureInfo.InvariantCulture)!;
             case DateTime dt:
                 return dt.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
+            case ObjectModelValue om:
+                return om.ToString();
             case object?[] array:
                 {
-                    StringBuilder sb = new("{");
+                    StringBuilder sb = new("[");
                     for (int i = 0; i < array.Length; i++)
                     {
                         if (i > 0)
@@ -1341,7 +1348,7 @@ public sealed class MetaExpressionParser
                         }
                         sb.Append(AppendAsString(array[i]));
                     }
-                    sb.Append('}');
+                    sb.Append(']');
                     return sb.ToString();
                 }
             default:

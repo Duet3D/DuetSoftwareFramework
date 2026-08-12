@@ -569,39 +569,39 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Va
         }
         if (obj is bool[] boolArray)
         {
-            return '{' + string.Join(',', boolArray.Select(boolValue => boolValue ? "true" : "false")) + (encodeValues && boolArray.Length == 1 ? ",}" : "}");
+            return '[' + string.Join(',', boolArray.Select(boolValue => boolValue ? "true" : "false")) + ']';
         }
         if (obj is char[] charArray)
         {
-            return '{' + string.Join(',', charArray.Select(charValue => $"'{charValue}'")) + (encodeValues && charArray.Length == 1 ? ",}" : "}");
+            return '[' + string.Join(',', charArray.Select(charValue => $"'{charValue}'")) + ']';
         }
         if (obj is string[] stringArray)
         {
-            return '{' + string.Join(',', stringArray.Select(stringValue => encodeString(stringValue))) + (encodeValues && stringArray.Length == 1 ? ",}" : "}");
+            return '[' + string.Join(',', stringArray.Select(stringValue => encodeString(stringValue))) + ']';
         }
         if (obj is DriverId[] driverIdArray)
         {
-            return '{' + string.Join(',', driverIdArray.Select(driverIdValue => encodeString(driverIdValue.ToString()))) + (encodeValues && driverIdArray.Length == 1 ? ",}" : "}");
+            return '[' + string.Join(',', driverIdArray.Select(driverIdValue => encodeString(driverIdValue.ToString()))) + ']';
         }
         if (obj is int[] intArray)
         {
-            return '{' + string.Join(',', intArray.Select(intValue => intValue.ToString("G", CultureInfo.InvariantCulture))) + (encodeValues && intArray.Length == 1 ? ",}" : "}");
+            return '[' + string.Join(',', intArray.Select(intValue => intValue.ToString("G", CultureInfo.InvariantCulture))) + ']';
         }
         if (obj is uint[] uintArray)
         {
-            return '{' + string.Join(',', uintArray.Select(uintValue => uintValue.ToString("G", CultureInfo.InvariantCulture))) + (encodeValues && uintArray.Length == 1 ? ",}" : "}");
+            return '[' + string.Join(',', uintArray.Select(uintValue => uintValue.ToString("G", CultureInfo.InvariantCulture))) + ']';
         }
         if (obj is float[] floatArray)
         {
-            return '{' + string.Join(',', floatArray.Select(floatValue => floatValue.ToString("G", CultureInfo.InvariantCulture))) + (encodeValues && floatArray.Length == 1 ? ",}" : "}");
+            return '[' + string.Join(',', floatArray.Select(floatValue => floatValue.ToString("G", CultureInfo.InvariantCulture))) + ']';
         }
         if (obj is long[] longArray)
         {
-            return '{' + string.Join(',', longArray.Select(longValue => longValue.ToString("G", CultureInfo.InvariantCulture))) + (encodeValues && longArray.Length == 1 ? ",}" : "}");
+            return '[' + string.Join(',', longArray.Select(longValue => longValue.ToString("G", CultureInfo.InvariantCulture))) + ']';
         }
         if (obj is object[] objectArray)
         {
-            return '{' + string.Join(',', objectArray.Select(objectValue => ObjectToString(objectValue, false, encodeValues, code))) + (encodeValues && objectArray.Length == 1 ? ",}" : "}");
+            return '[' + string.Join(',', objectArray.Select(objectValue => ObjectToString(objectValue, false, encodeValues, code))) + ']';
         }
         if (!wantsCount && obj is IList)
         {
@@ -1126,32 +1126,71 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Va
                 }
             }
 
-            // The value is used after the object model read lock is released, so only hand back immutable scalars
-            if (field is null or bool or char or int or uint or long or ulong or float or double or string or DateTime)
-            {
-                value = field;
-                return true;
-            }
+            return TryConvertField(field, out value);
+        }
 
-            // A collection of scalars is copied while the lock is held, so what escapes is a snapshot rather
-            // than the live list the update task mutates. A collection of anything else is refused: copying
-            // it would hand out the live elements it holds
-            if (field is ICollection fieldCollection)
+        /// <summary>
+        /// Convert an object model field into a value an expression can hold
+        /// </summary>
+        /// <param name="field">Field as the object model stores it</param>
+        /// <param name="value">The same thing as an expression value</param>
+        /// <returns>True if it could be converted</returns>
+        /// <remarks>
+        /// <para>
+        /// Everything handed back has to be immutable, because it is read under the object model lock and
+        /// used after that lock has been released, while the update task goes on mutating what it was read
+        /// from. So a collection is copied rather than passed on, and an object becomes a stand-in that
+        /// holds nothing - which is all RepRapFirmware does with one either.
+        /// </para>
+        /// <para>
+        /// One function decides this for a field and for the elements inside a collection, so that an array
+        /// cannot end up holding something a scalar of the same type would have been refused
+        /// </para>
+        /// </remarks>
+        private static bool TryConvertField(object? field, out object? value)
+        {
+            switch (field)
             {
-                object?[] snapshot = new object?[fieldCollection.Count];
-                int index = 0;
-                foreach (object? element in fieldCollection)
-                {
-                    if (element is not (null or bool or char or int or uint or long or ulong or float or double or string or DateTime))
+                // Values the language has, handed on as they are
+                case null or bool or char or string or int or uint or long or ulong or float or double or DateTime or DriverId:
+                    value = field;
+                    return true;
+
+                // An enum is a string in the object model - "processing", "inactive" - and that is what a
+                // macro compares it against, so it is one here too rather than a CLR enumerator name
+                case Enum enumValue:
+                    value = JsonSerializer.Serialize(enumValue, JsonHelper.DefaultJsonOptions.GetTypeInfo(enumValue.GetType())).Trim('"');
+                    return true;
+
+                // A dictionary is an object, not an array: its elements are keys and values, not values
+                case IModelDictionary:
+                    value = Parsing.ObjectModelValue.Instance;
+                    return true;
+
+                case ICollection collection:
                     {
-                        return false;
+                        value = null;
+                        object?[] snapshot = new object?[collection.Count];
+                        int index = 0;
+                        foreach (object? element in collection)
+                        {
+                            if (!TryConvertField(element, out snapshot[index++]))
+                            {
+                                return false;
+                            }
+                        }
+                        value = snapshot;
+                        return true;
                     }
-                    snapshot[index++] = element;
-                }
-                value = snapshot;
-                return true;
+
+                case IModelObject:
+                    value = Parsing.ObjectModelValue.Instance;
+                    return true;
+
+                default:
+                    value = null;
+                    return false;
             }
-            return false;
         }
 
         /// <summary>
