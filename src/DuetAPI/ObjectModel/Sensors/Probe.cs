@@ -122,6 +122,16 @@ public partial class Probe : ModelObject, IStaticModelObject
     public ObservableCollection<float> Offsets { get; } = [0F, 0F];
 
     /// <summary>
+    /// Preload of a force-sensing probe at the last tare (in g), or null if it is not a force-sensing probe
+    /// </summary>
+    public float? Preload
+    {
+        get => _preload;
+        set => SetPropertyValue(ref _preload, value);
+    }
+    private float? _preload;
+
+    /// <summary>
     /// Recovery time (in s)
     /// </summary>
     public float RecoveryTime
