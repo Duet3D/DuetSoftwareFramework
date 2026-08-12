@@ -37,10 +37,19 @@ public sealed class ObjectModelValue
     /// <param name="value">Value to check</param>
     /// <returns>True if an object occurs anywhere in it</returns>
     /// <remarks>
+    /// <para>
     /// Assigning one to a variable is refused, and so is assigning an array of them: what would be
     /// stored holds nothing, so a macro reading it back gets eight characters where it expected the
-    /// machine. RepRapFirmware refuses the first and stores the second, but what it stores are
-    /// references into its object model - something a variable here cannot hold in any case
+    /// machine.
+    /// </para>
+    /// <para>
+    /// RepRapFirmware refuses the first and stores the second as pointers into its object model, which
+    /// makes <c>var a = move.axes</c> followed by <c>var.a[0].letter</c> work there. Doing the same
+    /// here would mean holding a reference to a model object that the update task mutates and that a
+    /// reconfiguration can detach from the model - a variable that then reads stale values rather than
+    /// failing - and a global could not hold one at all, because it is serialised for the clients.
+    /// A path re-resolved on each read is what would fit; nothing here does that yet
+    /// </para>
     /// </remarks>
     public static bool OccursIn(object? value)
     {
