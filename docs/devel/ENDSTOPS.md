@@ -25,22 +25,25 @@ on hardware, which is the best guide to what breaks when one of the invariants b
 
 ## 1. The shape of it
 
-```
-   configuration        M574                     the move                     the trigger
-   ------------         ----                     --------                     -----------
+```mermaid
+flowchart TB
+    subgraph Pi["Raspberry Pi"]
+        DCS["DuetControlServer<br/>what a move means, and what became of it"]
+        SBCI["DuetSbcInterface<br/>plans the motion, holds the segment chain"]
+    end
+    subgraph Main["Duet 3 main board"]
+        CM["DuetCANMaster<br/>bridges SPI to CAN, decides the stop"]
+    end
+    subgraph Boards["Expansion boards"]
+        EXP["Duet3Expansion<br/>owns the pins and the drivers"]
+    end
 
-   DuetControlServer    endstop -> handle        G1 H1 -> StopOnInput[drive]  <- MotionStopped
-        |                    |                        |                            |
-        |  CreateInputMonitor|                        | MoveParams                 | GetPositionAt
-        v                    v                        v                            v
-   DuetSbcInterface     (passes through)         DDA::m_stopOnInput           evaluates the chain
-        |                    |                        |                            |
-        |                    |                        | ScheduleMove               | RevertPosition
-        v                    v                        v                            ^
-   DuetCANMaster        CreateInputMonitorV1     endstopWatches + stopList    matches, stops, reports
-        |                    |                        |                            ^
-        v                    v                        v                            | InputChangedV2
-   Duet3Expansion       watches the pin          moves the driver             sees the switch
+    DCS -- "handles, stop inputs, moves, reverts" --> SBCI
+    SBCI -- "ScheduleMove and CAN messages, over SPI" --> CM
+    CM -- "CreateInputMonitor, Movement, StopMovement, RevertPosition" --> EXP
+    EXP -- "InputChangedV2: which handle, what state, when" --> CM
+    CM -- "MotionStopped: when, and which drivers" --> SBCI
+    SBCI -- "MotionStopped event, position queries answered" --> DCS
 ```
 
 Configuration flows down, the move flows down, the trigger flows up, and the correction flows down
@@ -120,6 +123,20 @@ RepRapFirmware picks one of four actions when an endstop fires, and which one de
 | `stopAll` | Moving the axis needs drives other than its own | **Every** drive in the move carries that one input, so whichever driver sees the change first, they all stop |
 | `stopDriver` | The axis has as many switches as drivers | Each drive entry carries the same board but a handle whose minor field is the driver's index |
 
+```mermaid
+flowchart TD
+    A["G1 H1 names an axis"] --> B{"Does moving it need<br/>drives other than its own?"}
+    B -- yes --> C["stopAll<br/>every drive in the move carries this one input"]
+    B -- no --> D{"Does it have as many<br/>switches as drivers?"}
+    D -- yes --> E["stopDriver<br/>driver i watches switch i"]
+    D -- no --> F["stopAxis<br/>this axis' drivers carry the input"]
+    C --> G{"Is another axis armed<br/>in the same move?"}
+    G -- yes --> H["Refused: a drive carries one stop input,<br/>so the second endstop has nowhere to live"]
+    G -- no --> I["Armed"]
+    E --> I
+    F --> I
+```
+
 `stopAll` is the one that matters for correctness rather than tidiness. On a CoreXY, holding X still
 needs both motors, so stopping only "X's drivers" would leave the other running and drag the head
 diagonally into the switch. The test is RepRapFirmware's, from `SwitchEndstop::PrimeAxis`: the axis
@@ -187,9 +204,57 @@ Then it sends `CanMessageMovementLinearShaped` to each board.
 
 **Duet3Expansion** queues the move by its absolute start time and executes it, generating the steps.
 
+The stop identity is rebuilt once per driver on the way through, and never looked up:
+
+```mermaid
+flowchart LR
+    A["RawMove.StopOnInput[drive]<br/>handle, numSwitches, boards[]"] --> B["MoveParams<br/>third trailing array"]
+    B --> C["DDA::m_stopOnInput[drive]"]
+    C --> D["StopInputForDriver, in DDA::Prepare<br/>boards[i] plus handle with minor = i"]
+    D --> E["ScheduleMoveDriver<br/>stopOnBoard, stopOnHandle"]
+    E --> F["endstopWatches<br/>driver to board and handle"]
+    E --> G["stopList<br/>per board, which drivers are Active"]
+    F --> H["matched when a change arrives"]
+    G --> I["marked StopRequested, then stopped"]
+```
+
 ---
 
 ## 6. The trigger
+
+The whole of it, from the switch closing to the machine believing it is somewhere:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant EXP as Duet3Expansion
+    participant CM as DuetCANMaster
+    participant SBCI as DuetSbcInterface
+    participant DCS as DuetControlServer
+
+    EXP->>EXP: pin interrupt, stamp whenStateChanged from its own step clock
+    EXP->>CM: InputChangedV2, time converted to master, 16 bits of it
+    CM->>CM: widen to 32 bits against its own clock, discard if over 10 ms old
+    CM->>CM: match the handle against endstopWatches
+    CM->>EXP: StopMovement
+    EXP->>EXP: release the drivers' segments, the motors stop where they are
+    Note over CM,SBCI: the stop is on the bus before anything is reported upwards
+    CM->>SBCI: MotionStopped, over SPI
+    SBCI->>DCS: MotionStopped event, forwarded unchanged
+    DCS->>SBCI: where was drive D at whenTriggered?
+    SBCI-->>DCS: position, positionAtMoveStart, whether the timestamp was usable
+    DCS->>CM: RevertPosition, as steps since the move began
+    CM->>EXP: RevertPosition
+    EXP->>EXP: difference against the steps actually taken, synthesise a corrective move
+    DCS->>SBCI: SetMotorPositions, once the drive's last driver has stopped
+    SBCI->>SBCI: tracker frozen, so the move has no motion left and retires
+    Note over EXP,DCS: separately, the same InputChangedV2 reaches DCS as an object model update
+```
+
+The ordering that matters is guaranteed by construction rather than by care: the controller stops the
+drivers *before* it reports anything upwards, so the stop is already on the CAN bus by the time DCS
+has something to react to. RepRapFirmware has to prioritise stops explicitly in `GetUrgentMessage`
+for the same reason.
 
 ### Duet3Expansion sees the switch
 
@@ -338,6 +403,25 @@ Every code that redefines a position without moving anything has the same obliga
 RepRapFirmware's `waitingForSpecialMoveToComplete`. Every `G1 H` move waits for it, not only one that
 watches an endstop: it may stop short, and even an `H2` is planned in motor coordinates the
 interpreter's own position knows nothing about.
+
+```mermaid
+flowchart TD
+    A["G1 H move submitted"] --> B["Wait: rings drained, and nothing<br/>still queued for the motion thread"]
+    B --> C["Wait: a stop reported for this move, or 50 ms<br/>only if the move armed something"]
+    C --> D["Wait: the wind-back finished, 50 ms since the revert"]
+    D --> E["ConcludeMove, under the planner lock<br/>a stop arriving later is refused"]
+    E --> F["Resync the planner from the engine"]
+    F --> G{"Was this axis armed<br/>and did it trigger?"}
+    G -- no --> H["Left where it is, and unhomed"]
+    G -- yes --> I{"Move type"}
+    I -- H1 --> J["The coordinate of its switch, homed set"]
+    I -- H3 --> K["Axis limit set to where it stopped, homed untouched"]
+    I -- H4 --> L["Nothing: the probing sequence owns the outcome"]
+    H --> M["Push the result down to the engine, publish it"]
+    J --> M
+    K --> M
+    L --> M
+```
 
 Waiting means three things, and each exists because the one before it is insufficient:
 
