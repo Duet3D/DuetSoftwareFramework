@@ -114,6 +114,10 @@ class SbcInterface
 	MotionStoppedBuffer m_motionStoppedRing[NumMotionStoppedBuffers]{};
 	volatile size_t m_motionStoppedHead, m_motionStoppedTail;
 
+	// Reported in M122. A stop the SBC never hears about is one it cannot correct, and the failure
+	// looks the same from the SBC whether this board never sent it or the SBC never acted on it
+	uint32_t m_motionStoppedReports = 0, m_motionStoppedDropped = 0;
+
 	bool ProcessMotionStopped() noexcept; // Write queued motion-stopped reports into the current transfer
 
 #  ifdef TRACK_FILE_CODES

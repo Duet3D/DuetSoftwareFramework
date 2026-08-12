@@ -115,9 +115,6 @@ public:
 	[[nodiscard]] const int32_t *_ecv_array DriveCoordinates() const noexcept { return m_endPoint; }				// Get endpoints of a move in machine coordinates
 	void SetDriveCoordinate(size_t drive, int32_t ep) noexcept;										// Force an end point
 
-	// Note that one driver of a drive has stopped on its own endstop switch, and say whether that
-	// was the last of them. See m_driversStopped for why the caller has to wait for the last.
-	[[nodiscard]] bool NoteDriverStopped(size_t drive, size_t driverIndex, size_t numDrivers) noexcept;
 	void SetFeedRate(float rate) noexcept { m_requestedSpeed = rate; }
 
 	// DuetControlServer's correlation id for this move, quoted back when the move completes or fails
@@ -227,13 +224,6 @@ private:
 	// stopping on its own endstop
 	Duet::Sbc::Motion::MoveStopInput m_stopOnInput[maxAxesPlusExtruders]{};
 
-	// Which drivers of each drive have already stopped on an endstop, one bit per driver of the
-	// axis. An axis with a switch per driver stops them one at a time - that is the point of it,
-	// since a gantry squares itself by letting each motor run on to its own switch - and the drive's
-	// tracker is what tells each driver where it was when its own switch fired. Adopting a stopped
-	// driver's position would freeze the tracker there, so it is only adopted once every driver of
-	// the drive has stopped
-	uint8_t m_driversStopped[maxAxesPlusExtruders]{};
     float m_totalDistance{};							// How long is the move in hypercuboid space
     float m_maxAcceleration{};							// The maximum acceleration and deceleration to use, always positive
 #if SUPPORT_S_CURVE

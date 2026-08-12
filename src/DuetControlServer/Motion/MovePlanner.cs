@@ -176,6 +176,14 @@ internal sealed class MovePlanner(
             length = parameters.Config.Serialize(configBuffer);
         }
 
+        // A driver claimed by two drives is a configuration fault with no visible symptom until an
+        // endstop fires, at which point the stop is attributed to whichever drive the lookup
+        // happens to answer with. Said here because this is where the description was read
+        foreach (string conflict in parameters.DriverConflicts)
+        {
+            logger.LogWarning("Motion configuration: {Conflict}", conflict);
+        }
+
         using (_lock.EnterScope())
         {
             if (!linkInterface.Native.ConfigureMotion(configBuffer.AsSpan(0, length)))
@@ -190,8 +198,7 @@ internal sealed class MovePlanner(
             // different position in mm. Both sides have to be brought back to the position the
             // machine is actually at, or the next move is planned as a delta from somewhere else
             Builder.RecalculateEndPoints();
-            uint driveMask = parameters.NumAxes >= 32 ? uint.MaxValue : (1u << parameters.NumAxes) - 1;
-            linkInterface.Native.SetMotorPositions(driveMask, Builder.EndPoints);
+            PushPositionsToEngine();
             return true;
         }
     }
@@ -215,14 +222,29 @@ internal sealed class MovePlanner(
     /// Whether the engine still has moves to run
     /// </summary>
     /// <remarks>
-    /// The same comparison <see cref="WaitForStandstillAsync"/> waits on, as a question rather than a
-    /// wait: the rings report what has been scheduled and what has completed, and a difference is
-    /// motion still to happen
+    /// <para>
+    /// What <see cref="WaitForStandstillAsync"/> waits on, as a question rather than a wait. The
+    /// rings report what has been scheduled and what has completed, and a difference is motion still
+    /// to happen.
+    /// </para>
+    /// <para>
+    /// A move that has been submitted but not yet taken up counts as motion, and has to. Submitting
+    /// hands the move to a lock-free queue and returns; the ring only counts it as scheduled once
+    /// the motion thread has taken it out, which is up to a tick later. Asking the rings alone in
+    /// that window is answered "the machine is idle" about a move that has not started - and a
+    /// homing move which believed that would decide its endstop never triggered before the axis had
+    /// begun to move towards it
+    /// </para>
     /// </remarks>
     public bool IsMoving
     {
         get
         {
+            if (linkInterface.Native.HasPendingSubmissions)
+            {
+                return true;
+            }
+
             for (int ring = 0; ring < MotionLimits.MaxRings; ring++)
             {
                 // An unconfigured ring reads zero for both, so this is safe over all of them
@@ -239,18 +261,7 @@ internal sealed class MovePlanner(
     {
         while (!cancellationToken.IsCancellationRequested)
         {
-            bool moving = false;
-            for (int ring = 0; ring < MotionLimits.MaxRings; ring++)
-            {
-                // An unconfigured ring reads zero for both, so this is safe over all of them
-                if (linkInterface.Native.GetScheduledMoves(ring) != linkInterface.Native.GetCompletedMoves(ring))
-                {
-                    moving = true;
-                    break;
-                }
-            }
-
-            if (!moving)
+            if (!IsMoving)
             {
                 return true;
             }
@@ -363,6 +374,37 @@ internal sealed class MovePlanner(
         // totals RepRapFirmware keeps - rawExtruderTotal and latestVirtualExtruderPosition - which
         // ApplyExtrusion does not track yet. Publishing the endpoints here would report filament
         // consumed in microsteps of one drive rather than the mm of filament a client expects
+    }
+
+    /// <summary>
+    /// Tell the engine where the machine is, from the endpoints the builder holds
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The other direction from <see cref="ResyncFromEngine"/>, and the one every code that redefines
+    /// the position without moving anything has to take: G92, the coordinate a homing move adopts
+    /// from its switch, the height a probing move measures. Until the engine is told, it still holds
+    /// the position the last move was planned to end at, and it plans the next move as the difference
+    /// between that and what it is given - so the machine would travel the gap between where it has
+    /// been told it is and where it was last commanded to be.
+    /// </para>
+    /// <para>
+    /// RepRapFirmware's <c>Move::ChangeEndpointsAfterHoming</c>, which is the same pair of updates
+    /// for the same reason. Axes only: an extruder's motion is relative and the engine carries the
+    /// fraction of a step between moves, so an endpoint would lose it. The caller must hold
+    /// <see cref="Lock"/>
+    /// </para>
+    /// </remarks>
+    public void PushPositionsToEngine()
+    {
+        int numAxes = Parameters.NumAxes;
+        uint driveMask = (1u << Math.Min(numAxes, MotionLimits.MaxAxesPlusExtruders)) - 1;
+        if (!linkInterface.Native.SetMotorPositions(driveMask, Builder.EndPoints))
+        {
+            // The two sides now disagree about where the machine is, and the engine's copy is what
+            // the drives will be given. Nothing here can put that right, so it is said out loud
+            logger.LogError("The motion engine would not take the machine position; it and the planner have diverged");
+        }
     }
 
     /// <summary>

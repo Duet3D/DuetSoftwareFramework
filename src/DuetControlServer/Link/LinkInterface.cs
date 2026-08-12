@@ -104,6 +104,16 @@ public sealed partial class LinkInterface(
               + $"peak residual {clock.PeakResidualNs / 1000}us, {clock.NumBackwardClamps} clamps, "
               + $"{clock.NumRejectedSamples} rejected"
             : $"Step clock: NOT synchronised, {clock.NumSamples} samples, {clock.NumRejectedSamples} rejected");
+
+        // Reported next to the clock because it is part of reading it: moves are timed in the
+        // movement timebase and an endstop reports its trigger in the raw one, so this is the gap
+        // between the two. It only ever grows, and it grows silently - every board slips by the same
+        // amount, so nothing about the motion looks wrong while it does
+        if (Native.GetMovementDelay() is uint movementDelay)
+        {
+            builder.AppendLine($"Movement delay: {movementDelay} ticks "
+                               + $"({movementDelay * 1000.0 / Motion.Native.MotionLimits.StepClockRate:F1}ms)");
+        }
     }
 
     /// <summary>

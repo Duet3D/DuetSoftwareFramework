@@ -4,6 +4,7 @@ using DuetControlServer.Motion;
 using DuetControlServer.Motion.Kinematics;
 using DuetControlServer.Motion.Native;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,6 +25,64 @@ internal sealed partial class GCodeHandler
     /// How often to re-check whether the boards have finished winding back
     /// </summary>
     private static readonly TimeSpan RevertPollInterval = TimeSpan.FromMilliseconds(5);
+
+    /// <summary>
+    /// How long a move that stopped nothing waits for a stop report before believing itself
+    /// </summary>
+    /// <remarks>
+    /// A stop crosses the CAN bus, a whole SPI transfer and an event ring before it reaches here, and
+    /// nothing on the way back says one is coming. RepRapFirmware needs no equivalent: it stops the
+    /// drives and records the stop in the same interrupt, so the question cannot arise. Sized as two
+    /// or three transfers - long enough that a report in flight arrives, short enough to be invisible
+    /// on a move that really did run its full length
+    /// </remarks>
+    private static readonly TimeSpan StopReportGrace = TimeSpan.FromMilliseconds(50);
+
+    /// <summary>
+    /// Wait until a move that may have stopped short has really finished
+    /// </summary>
+    /// <param name="watchesSomething">
+    /// Whether this move armed an endstop or a probe, and so may have a stop report in flight
+    /// </param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>An awaitable task</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>WaitForEndstopOrProbingMoveToFinish</c>, which is standstill and the
+    /// wind-back both. Draining the rings is not enough on its own: a move that stopped short leaves
+    /// the boards winding back the overshoot, and that corrective move is synthesised on the board
+    /// from the revert message - the engine never scheduled it, so its ring counters never see it.
+    /// Letting the next move go out now would have the two overlap on the same driver
+    /// </remarks>
+    private async ValueTask WaitForSpecialMoveToFinishAsync(bool watchesSomething, CancellationToken cancellationToken)
+    {
+        await planner.WaitForStandstillAsync(cancellationToken);
+
+        // The rings draining is a weaker statement than it looks. The controller stops the drives and
+        // reports it afterwards, over a link the engine knows nothing about, so a stop can still be
+        // in flight while the move already looks finished from here - and a move concluded without it
+        // decides the axis never triggered, which is the one answer that cannot be corrected
+        // afterwards. So if nothing has been reported yet, give the report the time it needs to
+        // arrive.
+        //
+        // Only for a move that armed something. A `G1 H2` moves the motors and watches nothing, so
+        // there is no report to wait for and waiting would put this on every back-off move in every
+        // homing macro
+        if (watchesSomething)
+        {
+            DateTime deadline = DateTime.UtcNow + StopReportGrace;
+            while (!endstopCorrection.StopReportedForCurrentMove
+                   && DateTime.UtcNow < deadline
+                   && !cancellationToken.IsCancellationRequested)
+            {
+                await Task.Delay(RevertPollInterval, cancellationToken);
+            }
+        }
+
+        while (endstopCorrection.IsReverting && !cancellationToken.IsCancellationRequested)
+        {
+            await Task.Delay(RevertPollInterval, cancellationToken);
+        }
+    }
 
     /// <summary>
     /// Wait for a special move to finish and find out where it left the machine
@@ -64,17 +123,7 @@ internal sealed partial class GCodeHandler
     private async ValueTask FinishSpecialMoveAsync(MoveType moveType, IReadOnlyList<int> armedAxes,
                                                    CancellationToken cancellationToken)
     {
-        await planner.WaitForStandstillAsync(cancellationToken);
-
-        // Draining the rings is not enough on its own. A move that stopped short leaves the boards
-        // winding back the overshoot, and that corrective move is synthesised on the board from the
-        // revert message - the engine never scheduled it, so its ring counters never see it. Letting
-        // the next move go out now would have the two overlap on the same driver. RepRapFirmware
-        // waits the same time for the same reason, in CanMotion::RevertStoppedDrivers
-        while (endstopCorrection.IsReverting && !cancellationToken.IsCancellationRequested)
-        {
-            await Task.Delay(RevertPollInterval, cancellationToken);
-        }
+        await WaitForSpecialMoveToFinishAsync(armedAxes.Count > 0, cancellationToken);
 
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
@@ -85,17 +134,29 @@ internal sealed partial class GCodeHandler
             {
                 planner.ResyncFromEngine();
 
+                // What this concluded and why, so that "the position was not set" can be told apart
+                // from "no axis was armed", "the endstop never reported" and "the axis has no
+                // endstop" - which are four different faults with one symptom
+                // Concluded under the planner lock, which is the lock a stop report takes before it
+                // records anything: a report that has not got here by now cannot get in behind this
+                // decision, and one that arrives later is refused rather than applied to a move that
+                // has already been decided without it
+                StringBuilder outcome = new($"move #{endstopCorrection.ConcludeMove()}, H{(int)moveType}:");
                 uint triggered = planner.State.EndstopsTriggered;
                 foreach (int axis in armedAxes)
                 {
                     if (axis >= model.Move.Axes.Count)
                     {
+                        outcome.Append($" axis {axis} no longer exists;");
                         continue;
                     }
 
-                    if (axis >= 32 || (triggered & (1u << axis)) == 0)
+                    char letter = model.Move.Axes[axis].Letter;
+                    if (axis >= MotionLimits.MaxAxes || (triggered & (1u << axis)) == 0)
                     {
-                        continue;               // the move ran its full length, so nothing is known
+                        // The move ran its full length, so nothing is known
+                        outcome.Append($" {letter} armed but never triggered;");
+                        continue;
                     }
 
                     // Which end of the axis the switch is at is configuration rather than state, so
@@ -103,7 +164,9 @@ internal sealed partial class GCodeHandler
                     Endstop? endstop = axis < model.Sensors.Endstops.Count ? model.Sensors.Endstops[axis] : null;
                     if (endstop is null)
                     {
-                        continue;               // nothing could have armed it, so nothing stopped it
+                        // Nothing could have armed it, so nothing stopped it
+                        outcome.Append($" {letter} has no endstop;");
+                        continue;
                     }
 
                     switch (moveType)
@@ -111,26 +174,52 @@ internal sealed partial class GCodeHandler
                         case MoveType.Homing:
                             AdoptEndstopPosition(axis, endstop.HighEnd);
                             model.Move.Axes[axis].Homed = true;
+                            outcome.Append(CultureInfo.InvariantCulture,
+                                $" {letter} homed to {planner.Builder.StartCoordinates[axis]:F3};");
                             break;
 
                         case MoveType.SenseLength:
                             // H3 asks how long the axis turned out to be rather than where it is, so
                             // the answer goes into the limit and the axis is left unhomed
                             RecordAxisLength(axis, endstop.HighEnd);
+                            outcome.Append(CultureInfo.InvariantCulture,
+                                $" {letter} {(endstop.HighEnd ? "max" : "min")} measured as "
+                                + $"{(endstop.HighEnd ? model.Move.Axes[axis].Max : model.Move.Axes[axis].Min):F3};");
                             break;
 
                         default:
                             // H4 is a probing move; the probe path owns what comes of it. H0 and H2
                             // never arm an axis, so they never reach here
+                            outcome.Append($" {letter} triggered, nothing to record;");
                             break;
                     }
                 }
+
+                if (armedAxes.Count == 0)
+                {
+                    outcome.Append(" no axis was armed");
+                }
+                planner.State.LastSpecialMove = outcome.ToString();
+
+                // An axis that was homed has been given the coordinate of its switch, which is not
+                // where any of this was measured from. The engine has to be told, or it would plan
+                // the next move as the distance from where this one was commanded to end. This is
+                // RepRapFirmware's ChangeEndpointsAfterHoming, in the same place and for the same
+                // reason; for an axis that was not homed it says again what the resync just read
+                planner.PushPositionsToEngine();
 
                 // The interpreter's position was left alone while the special move ran, because a
                 // motor position is not an axis position. Now that the machine has settled somewhere
                 // definite, it has to be brought back into step with it - which is the one direction
                 // the inverse transform is for
                 SyncInterpreterToMachine();
+
+                // And said out loud. A move that queues something publishes where it will leave the
+                // machine as it goes; this one moved the interpreter without queueing anything, so
+                // nothing else will. Until it does, `move.axes[].userPosition` - which is what M114
+                // reports and what a client displays - still holds the coordinate the homing move was
+                // sent to, so an axis that homed perfectly reads as being at the far end of its travel
+                planner.PublishCommittedPosition();
             }
         }
     }

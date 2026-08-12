@@ -1503,6 +1503,7 @@ internal sealed partial class GCodeHandler(
             {
                 HoldAxes(raw, numAxes);
                 LatchAlreadyTriggered(alreadyTriggered);
+                ArmCorrection(raw);
                 return;
             }
         }
@@ -1512,7 +1513,31 @@ internal sealed partial class GCodeHandler(
             HoldAxis(raw, axis);
         }
         LatchAlreadyTriggered(alreadyTriggered);
-        return;
+        ArmCorrection(raw);
+    }
+
+    /// <summary>
+    /// Tell the endstop correction which drives this move watches something on
+    /// </summary>
+    /// <param name="raw">The move, with its stop inputs settled</param>
+    /// <remarks>
+    /// Read from the move rather than from the axes the code named, because the two differ: coupled
+    /// kinematics arm every drive on the one switch, and an axis whose endstop was already closed is
+    /// held rather than armed. What the correction has to recognise is what the controller was
+    /// actually told to watch. Called once the stop inputs are final, which is why it is here rather
+    /// than where the latch is cleared
+    /// </remarks>
+    private void ArmCorrection(RawMove raw)
+    {
+        uint armedDrives = 0;
+        for (int drive = 0; drive < raw.StopOnInput.Length && drive < MotionLimits.MaxAxesPlusExtruders; drive++)
+        {
+            if (raw.StopOnInput[drive].NumSwitches > 0)
+            {
+                armedDrives |= 1u << drive;
+            }
+        }
+        endstopCorrection.ArmMove(armedDrives);
     }
 
     /// <summary>
@@ -1531,7 +1556,7 @@ internal sealed partial class GCodeHandler(
         uint bitmap = 0;
         foreach (int axis in axes)
         {
-            if (axis < 32)
+            if (axis < MotionLimits.MaxAxes)
             {
                 bitmap |= 1u << axis;
             }
@@ -1679,13 +1704,17 @@ internal sealed partial class GCodeHandler(
                 {
                     // The planner keeps its own machine position, and this changes what that
                     // position is called without moving anything
-                    float[] coords = new float[MotionLimits.MaxAxes];
                     // TODO apply tool offsets?
                     foreach (int axis in axesIncluded)
                     {
-                        planner.Builder.SetAxisPosition(axis, coords[axis]);
+                        planner.Builder.SetAxisPosition(axis, state.CurrentUserPosition[axis]);
                     }
 
+                    // The engine holds its own idea of where the motors are and plans the next move
+                    // as the difference from it, so a position redefined only here would be undone by
+                    // the next move. RepRapFirmware pushes both together in
+                    // MovementState::SetNewPositionOfOwnedAxes
+                    planner.PushPositionsToEngine();
                     planner.PublishCommittedPosition();
                 }
 
@@ -1734,7 +1763,15 @@ internal sealed partial class GCodeHandler(
     private void RedefineMachinePosition(int axis, float machinePosition)
     {
         planner.Builder.SetAxisPosition(axis, machinePosition);
+
+        // The engine measures the next move from the position it holds, so redefining one here and
+        // not there would have the machine travel the difference
+        planner.PushPositionsToEngine();
         SyncInterpreterToMachine();
+
+        // Nothing was queued, so nothing else will say where the machine ended up: what a client
+        // reads would still be the coordinate the probing move was sent to
+        planner.PublishCommittedPosition();
     }
 
     /// <summary>

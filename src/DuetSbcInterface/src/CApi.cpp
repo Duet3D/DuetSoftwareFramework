@@ -384,12 +384,13 @@ extern "C"
 		return 1;
 	}
 
-	void DuetSbc_MotionSetMotorPositions(DuetSbcHandle* h, uint32_t driveMask, const int32_t* positions, int32_t count)
+	int32_t DuetSbc_MotionSetMotorPositions(DuetSbcHandle* h, uint32_t driveMask, const int32_t* positions, int32_t count)
 	{
-		if (h != nullptr && positions != nullptr && count > 0)
+		if (h == nullptr || positions == nullptr || count <= 0)
 		{
-			Duet::Sbc::MotionService::SetMotorPositions(driveMask, {positions, (size_t)count});
+			return 0;
 		}
+		return h->motion.SetMotorPositions(driveMask, {positions, (size_t)count}) ? 1 : 0;
 	}
 
 	void DuetSbc_MotionSetRingState(DuetSbcHandle* h, int32_t ring, int32_t shouldStartMove, int32_t waitingForEmpty)
@@ -415,10 +416,26 @@ extern "C"
 		return (h != nullptr) ? h->motion.GetSubmissionsDropped() : 0;
 	}
 
+	uint32_t DuetSbc_MotionGetForcedPositionsApplied(DuetSbcHandle* h)
+	{
+		return (h != nullptr) ? h->motion.GetForcedPositionsApplied() : 0;
+	}
+
+	int32_t DuetSbc_MotionHasPendingSubmissions(DuetSbcHandle* h)
+	{
+		return (h != nullptr && h->motion.HasPendingSubmissions()) ? 1 : 0;
+	}
+
 	uint32_t DuetSbc_GetStepClockTicks(DuetSbcHandle* h)
 	{
 		(void)h;					// the model is process-wide, like the clock it tracks
 		return StepTimer::GetTimerTicks();
+	}
+
+	uint32_t DuetSbc_GetMovementDelay(DuetSbcHandle* h)
+	{
+		(void)h;					// as above
+		return StepTimer::GetMovementDelay();
 	}
 
 	void DuetSbc_GetClockStats(DuetSbcHandle* h, DuetSbcClockStats* stats)

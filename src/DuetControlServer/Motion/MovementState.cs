@@ -84,6 +84,17 @@ internal sealed class MovementState
     public uint EndstopsTriggered { get; private set; }
 
     /// <summary>
+    /// What the last <c>G1 H</c> move concluded, for M122
+    /// </summary>
+    /// <remarks>
+    /// A special move is where the machine finds out where it is, and it can decline to conclude
+    /// anything for several unrelated reasons: the move armed no axis, the endstop never reported,
+    /// the axis has no endstop configured. All of them look identical from outside - the position is
+    /// simply not what was expected - so the conclusion is recorded rather than inferred
+    /// </remarks>
+    public string? LastSpecialMove { get; set; }
+
+    /// <summary>
     /// Start a move that watches endstops, forgetting what stopped the last one
     /// </summary>
     public void ArmEndstops() => EndstopsTriggered = 0;

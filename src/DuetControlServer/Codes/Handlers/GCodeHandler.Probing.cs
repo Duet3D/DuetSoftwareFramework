@@ -298,6 +298,9 @@ internal sealed partial class GCodeHandler
                     {
                         move.StopOnInput[drive].CopyFrom(move.StopOnInput[0]);
                     }
+
+                    // What stopped the last move that watched something says nothing about this one
+                    ArmCorrection(move);
                 }
 
                 result = planner.QueueMove(move);
@@ -307,7 +310,10 @@ internal sealed partial class GCodeHandler
             {
                 case MoveSubmitResult.Queued:
                 case MoveSubmitResult.NoMovement:
-                    await planner.WaitForStandstillAsync(cancellationToken);
+                    // A probing move is an endstop move armed on a probe handle, so it is waited for
+                    // the same way: standstill, and then the wind-back the boards are doing on their
+                    // own. RepRapFirmware uses the same WaitForEndstopOrProbingMoveToFinish for both
+                    await WaitForSpecialMoveToFinishAsync(checkProbe, cancellationToken);
                     if (checkProbe)
                     {
                         // The move stopped short, so this side's idea of where Z is comes from the
@@ -316,6 +322,12 @@ internal sealed partial class GCodeHandler
                         {
                             using (planner.Lock())
                             {
+                                // Under the planner lock, which is what a stop report takes before it
+                                // records anything: what arrives after this belongs to a move whose
+                                // height has already been read off, and applying it would move Z
+                                // under the tap that has just been measured
+                                endstopCorrection.ConcludeMove();
+
                                 planner.ResyncFromEngine();
                                 RedefineMachinePosition(zAxis, planner.Builder.StartCoordinates[zAxis]);
                             }

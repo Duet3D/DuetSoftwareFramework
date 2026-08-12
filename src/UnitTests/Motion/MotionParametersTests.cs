@@ -175,6 +175,52 @@ public class MotionParametersTests
     }
 
     [Test]
+    public void ADriverIsMappedToItsDriveAndToItsPlaceInIt()
+    {
+        // Both halves matter to the endstop path. The drive says which axis a stop reached; the
+        // index says which of the axis' switches fired, which is what lets a dual-motor axis square
+        // itself by waiting for the last of them rather than adopting the first
+        Move move = MachineWithOneOfEach();
+        move.Axes[0].Drivers.Add(new OmDriverId(1, 4));
+
+        MotionParameters parameters = Snapshot(move);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(parameters.DriveForDriver(new OmDriverId(1, 2)), Is.EqualTo(0));
+            Assert.That(parameters.DriverIndexForDriver(new OmDriverId(1, 2)), Is.EqualTo(0));
+            Assert.That(parameters.DriveForDriver(new OmDriverId(1, 4)), Is.EqualTo(0));
+            Assert.That(parameters.DriverIndexForDriver(new OmDriverId(1, 4)), Is.EqualTo(1));
+            Assert.That(parameters.DriversPerDrive[0], Is.EqualTo(2), "X is driven by two motors");
+            Assert.That(parameters.DriversPerDrive[1], Is.EqualTo(0), "C has no driver configured");
+            Assert.That(parameters.DriversPerDrive[NumDrives - 1], Is.EqualTo(1), "the extruder has one");
+
+            Assert.That(parameters.DriveForDriver(new OmDriverId(2, 0)), Is.EqualTo(-1), "no drive claims it");
+            Assert.That(parameters.DriverIndexForDriver(new OmDriverId(2, 0)), Is.EqualTo(-1));
+        });
+    }
+
+    [Test]
+    public void ADriverClaimedTwiceStaysWithTheAxisThatClaimedItFirst()
+    {
+        // The reverse lookup is how an endstop stop becomes a drive. Letting a later claim win means
+        // a homing move corrects the position of whatever claimed the driver last - an extruder that
+        // was not moving - and winds the axis that actually stopped back to wherever that arithmetic
+        // lands, which is nothing like where the switch is
+        Move move = MachineWithOneOfEach();
+        move.Extruders[0].Driver = new OmDriverId(1, 2);        // the same driver X is on
+
+        MotionParameters parameters = Snapshot(move);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(parameters.DriveForDriver(new OmDriverId(1, 2)), Is.EqualTo(0), "X keeps its driver");
+            Assert.That(parameters.DriverConflicts, Has.Count.EqualTo(1), "and the conflict is reported");
+            Assert.That(parameters.DriverConflicts[0], Does.Contain("1.2"));
+        });
+    }
+
+    [Test]
     public void UnconfiguredDrivesHaveNonZeroStepsPerMm()
     {
         // This divides when converting motor steps back to a position, so a zero would turn an

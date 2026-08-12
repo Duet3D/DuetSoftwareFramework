@@ -87,7 +87,52 @@ internal sealed class MotionParameters
     /// is all it knows; everything on this side is indexed by logical drive. RepRapFirmware keeps the
     /// same lookup as <c>Move::GetLogicalDriveForDriver</c>
     /// </remarks>
-    private readonly Dictionary<DuetAPI.Utility.DriverId, int> _driveForDriver = [];
+    private readonly Dictionary<DuetAPI.Utility.DriverId, DriverPlace> _driveForDriver = [];
+
+    /// <summary>
+    /// Where a physical driver sits: which logical drive it moves, and which of that drive's drivers
+    /// it is
+    /// </summary>
+    /// <param name="Drive">Logical drive</param>
+    /// <param name="Index">Position in the drive's driver list</param>
+    /// <remarks>
+    /// The index matters because an axis' endstop switches are paired with its drivers by position -
+    /// switch <em>i</em> stops driver <em>i</em> - so a stop report has to be attributable to one of
+    /// them rather than only to the axis
+    /// </remarks>
+    private readonly record struct DriverPlace(int Drive, int Index);
+
+    /// <summary>
+    /// Configurations in which two drives claim the same physical driver
+    /// </summary>
+    /// <remarks>
+    /// A driver belongs to one drive. Where a configuration says otherwise the first claim is kept -
+    /// axes are walked before extruders, so an axis outranks an extruder - and the rest are recorded
+    /// here for whoever rebuilt the snapshot to report. Silently letting the last claim win is what
+    /// makes this worth keeping: the reverse lookup is how a stop report becomes a drive, so a
+    /// homing move would then correct the position of something that was not moving and leave the
+    /// axis that was to be wound back to wherever the arithmetic landed
+    /// </remarks>
+    public IReadOnlyList<string> DriverConflicts => _driverConflicts;
+    private readonly List<string> _driverConflicts = [];
+
+    /// <summary>
+    /// Claim a physical driver for a logical drive, keeping the first claim
+    /// </summary>
+    /// <param name="driver">The driver</param>
+    /// <param name="drive">The drive claiming it</param>
+    /// <param name="index">Its position in that drive's driver list</param>
+    /// <param name="description">How to name the drive in a conflict message</param>
+    private void ClaimDriver(DuetAPI.Utility.DriverId driver, int drive, int index, string description)
+    {
+        if (_driveForDriver.TryGetValue(driver, out DriverPlace existing))
+        {
+            _driverConflicts.Add($"driver {driver.Board}.{driver.Port} is assigned to {description} "
+                                 + $"as well as to drive {existing.Drive}; the first assignment is used");
+            return;
+        }
+        _driveForDriver[driver] = new DriverPlace(drive, index);
+    }
 
     /// <summary>
     /// The logical drive a physical driver belongs to
@@ -95,7 +140,26 @@ internal sealed class MotionParameters
     /// <param name="driver">The driver</param>
     /// <returns>The drive, or -1 if no drive claims it</returns>
     public int DriveForDriver(DuetAPI.Utility.DriverId driver)
-        => _driveForDriver.TryGetValue(driver, out int drive) ? drive : -1;
+        => _driveForDriver.TryGetValue(driver, out DriverPlace place) ? place.Drive : -1;
+
+    /// <summary>
+    /// Which of its drive's drivers a physical driver is
+    /// </summary>
+    /// <param name="driver">The driver</param>
+    /// <returns>The index, or -1 if no drive claims it</returns>
+    public int DriverIndexForDriver(DuetAPI.Utility.DriverId driver)
+        => _driveForDriver.TryGetValue(driver, out DriverPlace place) ? place.Index : -1;
+
+    /// <summary>
+    /// How many physical drivers each logical drive has
+    /// </summary>
+    /// <remarks>
+    /// An axis with a switch per driver stops its motors one at a time - that is what squares a
+    /// gantry - so the endstop correction has to know when the last of them has stopped before it
+    /// adopts the drive's position. RepRapFirmware reads the same count from
+    /// <c>AxisDriversConfig::numDrivers</c>
+    /// </remarks>
+    public int[] DriversPerDrive { get; } = new int[NumDrives];
 
     /// <summary>Maximum speed in mm per step clock, by logical drive</summary>
     public float[] MaxFeedrates { get; } = new float[NumDrives];
@@ -381,10 +445,11 @@ internal sealed class MotionParameters
             config.ControllingDrives[axis] = geometry.GetControllingDrives(axis);
 
             DriverId[] drivers = new DriverId[a.Drivers.Count];
+            parameters.DriversPerDrive[axis] = a.Drivers.Count;
             for (int i = 0; i < a.Drivers.Count; i++)
             {
                 drivers[i] = ToNativeDriver(a.Drivers[i]);
-                parameters._driveForDriver[a.Drivers[i]] = axis;
+                parameters.ClaimDriver(a.Drivers[i], axis, i, $"axis {a.Letter}");
             }
             config.AxisDrivers[axis] = AxisDriversConfig.WithDrivers(drivers);
         }
@@ -418,7 +483,8 @@ internal sealed class MotionParameters
 
             if (e.Driver is not null)
             {
-                parameters._driveForDriver[e.Driver] = drive;
+                parameters.ClaimDriver(e.Driver, drive, 0, $"extruder {extruder}");
+                parameters.DriversPerDrive[drive] = 1;
             }
         }
 

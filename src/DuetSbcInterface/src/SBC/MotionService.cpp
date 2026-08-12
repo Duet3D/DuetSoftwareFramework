@@ -24,6 +24,10 @@ namespace Duet::Sbc
 		// over in bursts and the motion thread taking them up.
 		constexpr size_t kSubmissionCapacity = 256 * 1024;
 
+		// Forced positions are rare - homing, probing, G92, a reconfiguration - and the motion thread
+		// takes every one of them within a millisecond. Room for a burst, not for a backlog.
+		constexpr size_t kForcedPositionCapacity = 8 * 1024;
+
 		// The longest the motion thread sleeps when the rings say there is nothing to do. Short
 		// enough that a move submitted while it sleeps is still prepared well inside its lead time.
 	}
@@ -32,9 +36,8 @@ namespace Duet::Sbc
 		: m_link(&link)
 		, m_sink(link)
 		, m_submissions(kSubmissionCapacity)
+		, m_forcedPositions(kForcedPositionCapacity)
 	{
-		// The controller stops an endstop move itself; correcting where the drives ended up is this
-		// side's job, because the trackers that know are here
 		// The controller stops an endstop move itself. Where the drives should end up is decided in
 		// DuetControlServer, from the positions this side can evaluate - see GetPositionAt - so all
 		// that happens here is handing the report on
@@ -123,6 +126,9 @@ namespace Duet::Sbc
 
 	void MotionService::SpinOnce()
 	{
+		// Before the submissions, so that a move queued after a position was forced is planned from
+		// that position rather than from the one it replaced
+		DrainForcedPositions();
 		DrainSubmissions();
 
 		for (unsigned int i = 0; i < numRings; ++i)
@@ -263,9 +269,45 @@ namespace Duet::Sbc
 		}
 	}
 
-	void MotionService::SetMotorPositions(uint32_t driveMask, std::span<const int32_t> positions)
+	bool MotionService::SetMotorPositions(uint32_t driveMask, std::span<const int32_t> positions)
 	{
-		reprap.GetMove().SetMotorPositions(LogicalDrivesBitmap(driveMask), positions);
+		// A drive the caller did not supply a position for cannot be set, whatever the mask says.
+		// maxAxesPlusExtruders is also the width of the mask, so a full array names every drive
+		const size_t count = std::min(positions.size(), maxAxesPlusExtruders);
+		static_assert(maxAxesPlusExtruders <= 32, "a drive mask is 32 bits wide");
+		const uint32_t suppliedDrives =
+			(count >= maxAxesPlusExtruders) ? 0xFFFFFFFFu : ((1u << count) - 1u);
+
+		ForcedPositions forced;
+		forced.driveMask = driveMask & suppliedDrives;
+		std::memcpy(forced.positions, positions.data(), count * sizeof(int32_t));
+		return m_forcedPositions.Write(AsBytes(forced));
+	}
+
+	void MotionService::DrainForcedPositions()
+	{
+		while (const std::optional<ByteSpan> record = m_forcedPositions.Peek())
+		{
+			if (record->size() >= sizeof(ForcedPositions))
+			{
+				ForcedPositions forced{};
+				std::memcpy(&forced, record->data(), sizeof(forced));
+
+				const LogicalDrivesBitmap drives{forced.driveMask};
+				reprap.GetMove().SetMotorPositions(drives, forced.positions);
+
+				// The rings hold the endpoint each drive was last planned to, and DDA::Prepare turns
+				// a move into steps by differencing against it. Leaving that behind would make the
+				// next move travel the gap between where the machine was told it is and where the
+				// last move meant to leave it - the whole of the homing move, after homing.
+				for (auto& ring : m_rings)
+				{
+					ring.SetLastEndpoints(drives, forced.positions);
+				}
+				m_forcedPositionsApplied.fetch_add(1, std::memory_order_relaxed);
+			}
+			m_forcedPositions.Consume();
+		}
 	}
 
 	bool MotionService::GetPositionAt(size_t drive, uint32_t whenTicks, int32_t& position,

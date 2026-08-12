@@ -26,6 +26,7 @@ using Duet::Sbc::Motion::MoveParamsHeader;
 using Duet::Sbc::Motion::MoveParamsLength;
 using Duet::Sbc::Motion::ScheduleMoveSink;
 namespace MoveFlags = Duet::Sbc::Motion::MoveFlags;
+using duet::spi::protocol::ScheduleMoveDriver;
 using duet::spi::protocol::ScheduleMoveHeader;
 namespace ScheduleMoveFlags = duet::spi::protocol::ScheduleMoveFlags;
 
@@ -53,12 +54,25 @@ namespace
 		bool Send(std::span<const uint8_t> packet) noexcept override
 		{
 			headers.push_back(*reinterpret_cast<const ScheduleMoveHeader *>(packet.data()));
+
+			// The steps a driver is told to take, which is the quantity a forced position has to
+			// change: the ring differences the move's endpoint against the previous move's
+			const auto *const drivers =
+				reinterpret_cast<const ScheduleMoveDriver *>(packet.data() + sizeof(ScheduleMoveHeader));
+			firstDriverSteps.push_back(headers.back().numDrivers > 0 ? drivers[0].steps : 0);
 			return true;
 		}
 
 		[[nodiscard]] bool CanAccept() const noexcept override { return true; }
 
+		void Clear() noexcept
+		{
+			headers.clear();
+			firstDriverSteps.clear();
+		}
+
 		std::vector<ScheduleMoveHeader> headers;
+		std::vector<int32_t> firstDriverSteps;
 	};
 
 	// --- The machine -------------------------------------------------------------------------
@@ -154,7 +168,7 @@ namespace
 	// rest, and the three phases account for exactly the time the move was planned to take.
 	void TestSingleMove(DDARing& ring, RecordingSink& sink) noexcept
 	{
-		sink.headers.clear();
+		sink.Clear();
 		MoveRecord move = MakeXMove(1, 0.0F, 50.0F);
 		CHECK(ring.CanAddMove(), "an empty ring accepts a move");
 		CHECK(ring.AddMove(move.Header()) == MovementError::Ok, "the move is accepted");
@@ -205,7 +219,7 @@ namespace
 	// made it.
 	void TestGracePeriodCommitsTheMove(DDARing& ring, RecordingSink& sink) noexcept
 	{
-		sink.headers.clear();
+		sink.Clear();
 		CHECK(Drain(ring), "the ring starts empty");
 
 		MoveRecord move = MakeXMove(500, 0.0F, 30.0F);
@@ -242,7 +256,7 @@ namespace
 	// boundary, and each move must start where the last one ended, in speed and in time.
 	void TestColinearRunMelds(DDARing& ring, RecordingSink& sink) noexcept
 	{
-		sink.headers.clear();
+		sink.Clear();
 		constexpr int numMoves = 5;
 		for (int i = 0; i < numMoves; ++i)
 		{
@@ -281,7 +295,7 @@ namespace
 	// Moves retire in the order they were queued, and only once their time has passed.
 	void TestRetirementInOrder(DDARing& ring, RecordingSink& sink) noexcept
 	{
-		sink.headers.clear();
+		sink.Clear();
 		const uint32_t completedBefore = ring.GetCompletedMoves();
 		for (int i = 0; i < 3; ++i)
 		{
@@ -303,7 +317,7 @@ namespace
 	// The ring is finite, and refusing a move is how back pressure reaches DCS.
 	void TestRingSaturates(DDARing& ring, RecordingSink& sink) noexcept
 	{
-		sink.headers.clear();
+		sink.Clear();
 		// Do not Spin: nothing is prepared or retired, so the ring can only fill up.
 		int added = 0;
 		while (ring.CanAddMove() && added < 1000)
@@ -329,7 +343,7 @@ namespace
 	// physically fills.
 	void TestRingThrottlesOnTime(DDARing& ring, RecordingSink& sink) noexcept
 	{
-		sink.headers.clear();
+		sink.Clear();
 		int added = 0;
 		while (ring.CanAddMove() && added < 1000)
 		{
@@ -355,7 +369,7 @@ namespace
 	void TestRejectedMoveLeavesTheRingUsable(DDARing& ring, RecordingSink& sink) noexcept
 	{
 		CHECK(Drain(ring), "the ring is idle before the check");
-		sink.headers.clear();
+		sink.Clear();
 
 		// Far enough at a low enough speed to need more than the 2^31 step clocks a move may take.
 		MoveRecord bad = MakeXMove(500, 0.0F, 1000.0F);
@@ -373,10 +387,44 @@ namespace
 		CHECK(sink.headers.size() == 1, "only the accepted move reached the sink");
 	}
 
+	// A move is turned into steps by differencing its endpoint against the previous move's, so the
+	// endpoint the ring remembers is what every following move is measured from. Forcing it is how a
+	// position established outside the ring - a homing switch, a probe, G92, or a move an endstop cut
+	// short - reaches the drivers. Without it the next move travels the gap between where the machine
+	// really is and where the last move meant to leave it, which is the whole of it after homing.
+	void TestForcedEndpointIsWhatTheNextMoveIsMeasuredFrom(DDARing& ring, RecordingSink& sink) noexcept
+	{
+		sink.Clear();
+		CHECK(Drain(ring), "the ring starts empty");
+
+		// A move to 50mm that the machine only got 10mm into, as a homing move stopped short does
+		MoveRecord cutShort = MakeXMove(700, 0.0F, 50.0F);
+		CHECK(ring.AddMove(cutShort.Header()) == MovementError::Ok, "the move is accepted");
+		CHECK(Drain(ring), "the move finishes");
+
+		const int32_t stoppedAt = lrintf(10.0F * stepsPerMm);
+		ring.SetLastEndpoint(xAxis, stoppedAt);
+		CHECK(ring.GetLastEndpoint(xAxis) == stoppedAt, "the ring reports the position it was given");
+
+		sink.Clear();
+		MoveRecord next = MakeXMove(701, 10.0F, 20.0F);
+		CHECK(ring.AddMove(next.Header()) == MovementError::Ok, "the following move is accepted");
+		CHECK(Drain(ring), "the following move finishes");
+
+		CHECK(sink.headers.size() == 1, "the following move reaches the sink");
+		if (sink.headers.empty())
+		{
+			return;
+		}
+		CHECK(sink.firstDriverSteps[0] == lrintf(10.0F * stepsPerMm),
+			  "the driver is told the distance from where the machine really is, not from where the "
+			  "cut-short move was planned to end");
+	}
+
 	// Simulation works out how long a print would take without moving anything.
 	void TestSimulationSendsNothing(DDARing& ring, RecordingSink& sink) noexcept
 	{
-		sink.headers.clear();
+		sink.Clear();
 		for (int i = 0; i < 3; ++i)
 		{
 			MoveRecord move = MakeXMove((uint32_t)i + 300, (float)i * 10.0F, (float)(i + 1) * 10.0F);
@@ -421,6 +469,7 @@ int main()
 	TestRingSaturates(ring, sink);
 	TestRingThrottlesOnTime(ring, sink);
 	TestRejectedMoveLeavesTheRingUsable(ring, sink);
+	TestForcedEndpointIsWhatTheNextMoveIsMeasuredFrom(ring, sink);
 	TestSimulationSendsNothing(ring, sink);
 
 	StepTimer::SetLocalClockSource(nullptr);

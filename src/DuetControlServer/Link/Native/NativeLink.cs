@@ -556,6 +556,33 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     public uint StepClockTicks => _handle != IntPtr.Zero ? NativeMethods.DuetSbc_GetStepClockTicks(_handle) : 0;
 
     /// <summary>
+    /// How far the movement timebase lags the raw step clock, in ticks
+    /// </summary>
+    /// <returns>The delay, or null if the loaded library does not report it</returns>
+    /// <remarks>
+    /// Moves are scheduled in the movement timebase and an endstop reports its trigger in the raw
+    /// one. Anything other than zero here is the gap the endstop correction has to reconcile, and it
+    /// is the one part of the clock that grows silently: every board slips by the same amount so
+    /// nothing about the motion looks wrong
+    /// </remarks>
+    public uint? GetMovementDelay()
+    {
+        if (_handle == IntPtr.Zero)
+        {
+            return null;
+        }
+
+        try
+        {
+            return NativeMethods.DuetSbc_GetMovementDelay(_handle);
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// How well the step-clock model is tracking the controller
     /// </summary>
     /// <returns>The statistics, or a zeroed struct if the link is not up</returns>
@@ -690,13 +717,16 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     /// </summary>
     /// <param name="driveMask">Logical drives to set</param>
     /// <param name="positions">Positions in microsteps</param>
-    public void SetMotorPositions(uint driveMask, ReadOnlySpan<int> positions)
-    {
-        if (_handle != IntPtr.Zero)
-        {
-            NativeMethods.DuetSbc_MotionSetMotorPositions(_handle, driveMask, positions, positions.Length);
-        }
-    }
+    /// <returns>True if the engine took the position</returns>
+    /// <remarks>
+    /// The engine adopts it on its own thread, because adopting a position discards the pending
+    /// motion of the drives it names and that is not something another thread may do to it. It
+    /// happens before any move submitted afterwards, so a caller that forces a position and then
+    /// queues a move gets the move it meant
+    /// </remarks>
+    public bool SetMotorPositions(uint driveMask, ReadOnlySpan<int> positions)
+        => _handle != IntPtr.Zero
+           && NativeMethods.DuetSbc_MotionSetMotorPositions(_handle, driveMask, positions, positions.Length) != 0;
 
     /// <summary>
     /// Store the ring state decided here for the motion thread to read
@@ -730,6 +760,52 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     /// Submissions refused because the queue was full. Non-zero means a move was lost
     /// </summary>
     public uint SubmissionsDropped => _handle != IntPtr.Zero ? NativeMethods.DuetSbc_MotionGetSubmissionsDropped(_handle) : 0;
+
+    /// <summary>
+    /// Whether a submitted move has not yet been taken up by the engine's motion thread
+    /// </summary>
+    /// <remarks>
+    /// <see cref="SubmitMove"/> hands the move to a lock-free queue and returns; the ring that
+    /// executes it only counts it as scheduled once the motion thread has taken it out. Between
+    /// those two the ring counters describe a machine with nothing to do while a move is already on
+    /// its way to it, so anything waiting for the machine to stop has to ask this as well
+    /// </remarks>
+    public bool HasPendingSubmissions
+        => _handle != IntPtr.Zero && NativeMethods.DuetSbc_MotionHasPendingSubmissions(_handle) != 0;
+
+    /// <summary>
+    /// Forced positions the engine has adopted
+    /// </summary>
+    /// <returns>The count since startup, or null if the loaded library does not report it</returns>
+    /// <remarks>
+    /// <para>
+    /// <see cref="SetMotorPositions"/> queues a position for the motion thread; this says how many it
+    /// has taken up. The two are the difference between a position that was sent and one that took
+    /// effect, which nothing else distinguishes.
+    /// </para>
+    /// <para>
+    /// Null rather than a throw when the symbol is absent. This is a diagnostic, and a diagnostic
+    /// that takes the whole of <c>M122</c> down with it when the native library is older than this
+    /// program is worse than no diagnostic - not least because "the library was not updated" is
+    /// exactly what it would have been reporting
+    /// </para>
+    /// </remarks>
+    public uint? GetForcedPositionsApplied()
+    {
+        if (_handle == IntPtr.Zero)
+        {
+            return null;
+        }
+
+        try
+        {
+            return NativeMethods.DuetSbc_MotionGetForcedPositionsApplied(_handle);
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return null;
+        }
+    }
     #endregion
 
     /// <summary>

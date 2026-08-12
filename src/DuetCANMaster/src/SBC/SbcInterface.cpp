@@ -355,9 +355,11 @@ bool SbcInterface::ReportMotionStopped(uint32_t whenTriggered,
 	}
 
 	const TaskCriticalSectionLocker lock;
+	++m_motionStoppedReports;
 	const size_t next = (m_motionStoppedHead + 1) % NumMotionStoppedBuffers;
 	if (next == m_motionStoppedTail)
 	{
+		++m_motionStoppedDropped;
 		return false;						// queue full; the move will stop but keep its overshoot
 	}
 
@@ -788,6 +790,11 @@ void SbcInterface::Diagnostics(const StringRef& reply) noexcept
 				m_numSbcTimeouts,
 				m_iapRamAvailable);
 	reply.lcatf("Buffer RX/TX: %d/%d-%d", (int)m_rxPointer, (int)m_txPointer, (int)m_txEnd);
+
+	// Where an endstop stop leaves this board. The SBC works out where the drives should end up, so
+	// a stop that is never reported here is one it can never correct - and nothing else says whether
+	// the report was made
+	reply.lcatf("Motion stops reported: %" PRIu32 ", dropped: %" PRIu32, m_motionStoppedReports, m_motionStoppedDropped);
 #  ifdef TRACK_FILE_CODES
 	reply.lcatf("File codes read/handled: %d/%d, file macros open/closing: %d %d",
 				(int)fileCodesRead,

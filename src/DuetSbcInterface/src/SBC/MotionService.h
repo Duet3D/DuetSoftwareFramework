@@ -81,7 +81,22 @@ namespace Duet::Sbc
 		size_t GetLivePositions(std::span<int32_t> positions, uint32_t *whenTicks) const;
 
 		// Force motor positions, after homing or a move that was cut short.
-		static void SetMotorPositions(uint32_t driveMask, std::span<const int32_t> positions);
+		//
+		// The rings are told as well as the trackers. A move is scheduled as the difference between
+		// its own endpoint and the previous move's, so a position forced here that the ring never
+		// heard about would be undone by the next move: it would travel the difference between where
+		// the machine really is and where the last move meant to leave it. This is RepRapFirmware's
+		// Move::ChangeEndpointsAfterHoming, which sets both for the same reason.
+		//
+		// Queued for the motion thread rather than applied here, like a move and for the same reason.
+		// Adopting a position discards the drive's remaining segments, and the segment freelist is not
+		// thread-safe; doing that from the caller's thread while the motion thread is retiring
+		// segments of its own would corrupt it. The endstop correction forces a position in the middle
+		// of a move, so this is the ordinary case rather than a corner of it. Applied within one pass
+		// of the motion thread, before any move submitted after it.
+		//
+		// False means the queue is full and the position was not taken - never a silent drop.
+		bool SetMotorPositions(uint32_t driveMask, std::span<const int32_t> positions);
 
 		// Where a drive was at a given step-clock time, and where it was when the current move began.
 		//
@@ -107,6 +122,25 @@ namespace Duet::Sbc
 
 		[[nodiscard]] uint32_t GetScheduledMoves(unsigned int ring) const;
 		[[nodiscard]] uint32_t GetCompletedMoves(unsigned int ring) const;
+
+		// True while a submitted move has not yet been taken up by the motion thread.
+		//
+		// A ring's scheduled count only rises when the motion thread takes the move out of the
+		// submission queue, so between SubmitMove returning and the next pass of that thread the
+		// rings say the machine is idle while a move is already on its way to it. Anything asking
+		// whether the machine has stopped has to ask this as well, or it is answered "yes" about a
+		// move that has not started. DrainSubmissions consumes each record only after the ring has
+		// counted it, so the two together never both say idle while a move exists.
+		[[nodiscard]] bool HasPendingSubmissions() const { return !m_submissions.IsEmpty(); }
+
+		// Positions the motion thread has adopted. The counterpart of what DCS believes it has sent:
+		// the two diverging is the difference between a position that was queued and one that took
+		// effect, which nothing else distinguishes.
+		[[nodiscard]] uint32_t GetForcedPositionsApplied() const
+		{
+			return m_forcedPositionsApplied.load(std::memory_order_relaxed);
+		}
+
 		[[nodiscard]] uint32_t GetSubmissionsDropped() const
 		{
 			return m_submissionsDropped.load(std::memory_order_relaxed);
@@ -120,6 +154,7 @@ namespace Duet::Sbc
 		void Run();
 		void SpinOnce();
 		void DrainSubmissions();
+		void DrainForcedPositions();
 		void PublishPositions();
 
 		// True if `record` is long enough for the header and for the two trailing arrays that the
@@ -156,6 +191,19 @@ namespace Duet::Sbc
 		// SubmitMove never blocks the caller and never blocks the motion thread either.
 		RingBuffer m_submissions;
 		std::atomic<uint32_t> m_submissionsDropped{0};
+
+		// One position DCS has forced, waiting to be adopted by the motion thread
+		struct ForcedPositions
+		{
+			uint32_t driveMask = 0;
+			int32_t positions[maxAxesPlusExtruders]{};
+		};
+
+		// Forced positions waiting to be adopted. Drained before the submissions, so that a move
+		// queued after a position was forced is planned from that position and not from the one it
+		// replaced.
+		RingBuffer m_forcedPositions;
+		std::atomic<uint32_t> m_forcedPositionsApplied{0};
 
 		// Per-ring state that DCS sets and the motion thread reads. Plain atomics: the answer is
 		// allowed to be one cycle stale, and waiting for a fresh one would be far worse.

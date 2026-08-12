@@ -27,7 +27,10 @@ public static partial class ServiceCollectionExtensions
             // Where G-codes become queued moves. Shared with the code handlers, which is the whole
             // point of it: every move has to be built in the order it was commanded
             .AddSingleton<MovePlanner>()
+            // Reported in M122: when a homing move ends somewhere unexpected, this is the only place
+            // that says how far along the chain from the switch to the machine position it got
             .AddSingleton<EndstopCorrection>()
+            .AddSingleton<IDiagnostics, EndstopCorrection>(services => services.GetRequiredService<EndstopCorrection>())
             // The height map in effect. Shared between the codes that load it and the move builder
             // that applies it, which is why it is not simply a field of either
             .AddSingleton<BedCompensation>()

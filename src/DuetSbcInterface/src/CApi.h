@@ -169,8 +169,14 @@ extern "C"
 										int32_t* positionOut, int32_t* positionAtMoveStartOut,
 										int32_t* usedTimestampOut);
 
-	// Force motor positions, after homing or a move that stopped early.
-	void DuetSbc_MotionSetMotorPositions(DuetSbcHandle* h, uint32_t driveMask, const int32_t* positions, int32_t count);
+	// Force motor positions, after homing or a move that stopped early. The endpoint each ring
+	// measures its next move from follows, because a move is scheduled as the difference between two
+	// endpoints - so a position the rings never heard about would be undone by the next move.
+	//
+	// Queued for the motion thread, which takes it up before any move submitted after this call.
+	// Returns 1 if it was taken, 0 if the queue was full and the caller must retry - a dropped
+	// position is a machine that thinks it is somewhere it is not.
+	int32_t DuetSbc_MotionSetMotorPositions(DuetSbcHandle* h, uint32_t driveMask, const int32_t* positions, int32_t count);
 
 	// State DCS decides from its own bookkeeping each cycle, stored for the motion thread to read.
 	void DuetSbc_MotionSetRingState(DuetSbcHandle* h, int32_t ring, int32_t shouldStartMove, int32_t waitingForEmpty);
@@ -179,6 +185,16 @@ extern "C"
 	uint32_t DuetSbc_MotionGetCompletedMoves(DuetSbcHandle* h, int32_t ring);
 	// Submissions refused because the queue was full. Non-zero means DCS ignored a retry.
 	uint32_t DuetSbc_MotionGetSubmissionsDropped(DuetSbcHandle* h);
+
+	// 1 while a submitted move has not yet been taken up by the motion thread. A ring's scheduled
+	// count only rises once it has, so asking the rings alone whether the machine has stopped is
+	// answered "yes" about a move that has not started. Anything waiting for standstill must check
+	// both.
+	int32_t DuetSbc_MotionHasPendingSubmissions(DuetSbcHandle* h);
+
+	// Forced positions the motion thread has adopted. Compared against what the caller believes it
+	// has sent, this is the difference between a position that was queued and one that took effect.
+	uint32_t DuetSbc_MotionGetForcedPositionsApplied(DuetSbcHandle* h);
 
 	// --- Step clock ---
 	//
@@ -189,6 +205,12 @@ extern "C"
 
 	// The current step-clock reading, in the controller's ticks.
 	uint32_t DuetSbc_GetStepClockTicks(DuetSbcHandle* h);
+
+	// How far the movement timebase lags the raw step clock, in ticks. Moves are scheduled in the
+	// movement timebase and an endstop's trigger timestamp is a reading of the raw one, so this is
+	// the difference between the two clocks the endstop correction has to reconcile. It only grows,
+	// and it grows whenever any board reports that it could not keep up.
+	uint32_t DuetSbc_GetMovementDelay(DuetSbcHandle* h);
 
 	// How the model is tracking. Mirrors StepTimer::ClockStats; see LinkEvents.cs's counterpart for
 	// the managed shape. `synced` is 0 until the fit has enough samples to be trusted, during which

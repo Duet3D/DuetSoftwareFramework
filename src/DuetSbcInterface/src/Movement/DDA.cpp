@@ -315,8 +315,6 @@ MovementError DDA::InitFromParams(DDARing& ring, const Duet::Sbc::Motion::MovePa
 		}
 	}
 
-	std::fill(std::begin(m_driversStopped), std::end(m_driversStopped), uint8_t{0});
-
 	m_totalDistance = params.totalDistance;
 	m_maxAcceleration = params.maxAcceleration;
 	m_requestedSpeed = params.requestedSpeed;
@@ -666,18 +664,6 @@ void DDA::MatchSpeeds() noexcept
 void DDA::SetDriveCoordinate(size_t drive, int32_t ep) noexcept
 {
 	m_endPoint[drive] = ep;
-}
-
-bool DDA::NoteDriverStopped(size_t drive, size_t driverIndex, size_t numDrivers) noexcept
-{
-	if (drive >= maxAxesPlusExtruders || numDrivers == 0 || driverIndex >= 8)
-	{
-		return true;					// nothing to wait for: an extruder, or a driver off the end
-	}
-
-	m_driversStopped[drive] |= static_cast<uint8_t>(1u << driverIndex);
-	const uint8_t all = static_cast<uint8_t>((numDrivers >= 8) ? 0xFF : ((1u << numDrivers) - 1));
-	return (m_driversStopped[drive] & all) == all;
 }
 
 // Dispatch this DDA to the move segment queue for execution.

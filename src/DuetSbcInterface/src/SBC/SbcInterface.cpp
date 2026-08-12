@@ -647,8 +647,12 @@ namespace Duet::Sbc
 		}
 		case proto::FirmwareRequest::MotionStopped:
 		{
+			// Every way of not acting on this is reported. A stop that is dropped here leaves the
+			// machine believing a move that was cut short ran to its end, which shows up much later
+			// as a homing offset and points at everything except the packet that went missing
 			if (dataLength < sizeof(proto::MotionStoppedHeader))
 			{
+				PostLog(LogLevel::Error, "Discarded a truncated motion-stopped report");
 				break;
 			}
 			proto::MotionStoppedHeader header{};
@@ -658,15 +662,18 @@ namespace Duet::Sbc
 			if (dataLength < sizeof(header) + driversBytes ||
 				header.numDrivers > proto::MaxMotionStoppedDrivers)
 			{
+				PostLog(LogLevel::Error, "Discarded a motion-stopped report that does not carry the drivers it claims");
 				break;
 			}
 
 			proto::MotionStoppedDriver drivers[proto::MaxMotionStoppedDrivers];
 			std::memcpy(drivers, data + sizeof(header), driversBytes);
-			if (m_onMotionStopped)
+			if (!m_onMotionStopped)
 			{
-				m_onMotionStopped(header.whenTriggered, std::span{drivers, header.numDrivers});
+				PostLog(LogLevel::Error, "A move was stopped by an endstop with nothing listening for it");
+				break;
 			}
+			m_onMotionStopped(header.whenTriggered, std::span{drivers, header.numDrivers});
 			break;
 		}
 		default:

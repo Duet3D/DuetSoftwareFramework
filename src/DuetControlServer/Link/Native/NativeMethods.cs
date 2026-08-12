@@ -304,6 +304,19 @@ internal static partial class NativeMethods
     internal static partial uint DuetSbc_GetStepClockTicks(IntPtr handle);
 
     /// <summary>
+    /// How far the movement timebase lags the raw step clock, in ticks
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <returns>The delay in step clock ticks</returns>
+    /// <remarks>
+    /// Moves are scheduled in the movement timebase and an endstop reports its trigger in the raw
+    /// one, so this is the difference the endstop correction has to reconcile. It only ever grows,
+    /// and it grows whenever a board reports that it could not keep up
+    /// </remarks>
+    [LibraryImport(LibraryName)]
+    internal static partial uint DuetSbc_GetMovementDelay(IntPtr handle);
+
+    /// <summary>
     /// How well the step-clock model is tracking the controller
     /// </summary>
     /// <param name="handle">Interface handle</param>
@@ -406,8 +419,9 @@ internal static partial class NativeMethods
     /// <param name="driveMask">Logical drives to set</param>
     /// <param name="positions">Positions in microsteps</param>
     /// <param name="count">Number of entries in <paramref name="positions"/></param>
+    /// <returns>Non-zero if the engine took it, zero if its queue was full</returns>
     [LibraryImport(LibraryName)]
-    internal static partial void DuetSbc_MotionSetMotorPositions(IntPtr handle, uint driveMask, ReadOnlySpan<int> positions, int count);
+    internal static partial int DuetSbc_MotionSetMotorPositions(IntPtr handle, uint driveMask, ReadOnlySpan<int> positions, int count);
 
     /// <summary>
     /// Store the ring state this side decides from its own bookkeeping
@@ -445,6 +459,29 @@ internal static partial class NativeMethods
     /// <remarks>Non-zero means a retry was skipped: a move was lost</remarks>
     [LibraryImport(LibraryName)]
     internal static partial uint DuetSbc_MotionGetSubmissionsDropped(IntPtr handle);
+
+    /// <summary>
+    /// Forced positions the motion thread has adopted
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <returns>Applied position count</returns>
+    /// <remarks>
+    /// Lagging behind what this side has sent means a position was queued but has not taken effect
+    /// </remarks>
+    [LibraryImport(LibraryName)]
+    internal static partial uint DuetSbc_MotionGetForcedPositionsApplied(IntPtr handle);
+
+    /// <summary>
+    /// Whether a submitted move has not yet been taken up by the motion thread
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <returns>Non-zero while a submission is still queued</returns>
+    /// <remarks>
+    /// A ring counts a move as scheduled only once the motion thread has taken it out of the
+    /// submission queue, so the rings alone report a machine as idle while a move is on its way to it
+    /// </remarks>
+    [LibraryImport(LibraryName)]
+    internal static partial int DuetSbc_MotionHasPendingSubmissions(IntPtr handle);
 
     /// <summary>
     /// Stop the loop and destroy the instance
