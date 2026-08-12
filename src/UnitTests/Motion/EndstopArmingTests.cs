@@ -32,7 +32,8 @@ public class EndstopArmingTests
     /// The geometry is passed to the arming separately, so it is not described here: what the object
     /// model carries is the axes, their drivers and their endstop ports
     /// </remarks>
-    private static (Move Move, Sensors Sensors) Machine(int yDrivers = 1, int ySwitches = 1)
+    private static (Move Move, Sensors Sensors) Machine(int yDrivers = 1, int ySwitches = 1,
+                                                        int xDrivers = 1, int xSwitches = 1)
     {
         Move move = new();
         Sensors sensors = new();
@@ -41,7 +42,7 @@ public class EndstopArmingTests
         for (int axis = 0; axis < NumAxes; axis++)
         {
             Axis a = new() { Letter = letters[axis] };
-            int drivers = axis == 1 ? yDrivers : 1;
+            int drivers = axis switch { 0 => xDrivers, 1 => yDrivers, _ => 1 };
             for (int i = 0; i < drivers; i++)
             {
                 a.Drivers.Add(new OmDriverId(1, (axis * 4) + i));
@@ -50,7 +51,7 @@ public class EndstopArmingTests
 
             // Switch i of an axis is a port of its own, which is how M574 registers them
             List<string> ports = [];
-            int switches = axis == 1 ? ySwitches : 1;
+            int switches = axis switch { 0 => xSwitches, 1 => ySwitches, _ => 1 };
             for (int i = 0; i < switches; i++)
             {
                 ports.Add($"1.io{(axis * 4) + i}.in");
@@ -119,6 +120,39 @@ public class EndstopArmingTests
             Assert.That(stopInputs[1].Handle, Is.EqualTo(stopInputs[0].Handle), "Y's drive watches X's switch");
             Assert.That(stopInputs[2].Handle, Is.EqualTo(stopInputs[0].Handle), "and so does every other drive");
         });
+    }
+
+    [Test]
+    public void ACoupledAxisKeepsEveryOneOfItsSwitches()
+    {
+        // The bug this replaced: demoting to stopAll collapsed the axis to its first switch, so the
+        // second was armed on nothing - it did nothing, and M119 still showed it because the state
+        // comes from the board. RepRapFirmware watches every port of an endstop whatever the action
+        // M584 X1.0:2.0, M669 K1, M574 X1 P"2.io1.in+1.io0.in"
+        (Move move, Sensors sensors) = Machine(xDrivers: 2, xSwitches: 2);
+        sensors.Endstops[0]!.Port = "2.io1.in+1.io0.in";
+        MoveStopInput[] stopInputs = NewStopInputs();
+
+        ArmedMove armed = Arm((move, sensors), stopInputs, [0], kinematics: KinematicsName.CoreXY);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(armed.StopsEveryDrive, Is.True, "any of them has to stop the whole move");
+            Assert.That(stopInputs[0].NumSwitches, Is.EqualTo(2), "both switches are kept");
+            Assert.That(stopInputs[0].Boards[0], Is.EqualTo(2), "the first on its own board");
+            Assert.That(stopInputs[0].Boards[1], Is.EqualTo(1), "and the second on its own");
+            Assert.That(stopInputs[1].NumSwitches, Is.EqualTo(2), "every drive carries them");
+            Assert.That(stopInputs[1].Boards[1], Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void AnIndependentAxisDoesNotStopEveryDrive()
+    {
+        (Move move, Sensors sensors) = Machine();
+        MoveStopInput[] stopInputs = NewStopInputs();
+
+        Assert.That(Arm((move, sensors), stopInputs, [0]).StopsEveryDrive, Is.False);
     }
 
     [Test]

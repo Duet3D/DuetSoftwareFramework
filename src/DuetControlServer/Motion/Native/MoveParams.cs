@@ -104,6 +104,18 @@ internal static class MoveFlags
 
     /// <summary>Some extruder moves forwards during this move</summary>
     public const uint HasForwardExtrusion = 1u << 9;
+
+    /// <summary>
+    /// Any watched input stops every driver of this move, not just the drivers watching that input
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>EndstopHitAction::stopAll</c>. Set when moving the axis being homed needs
+    /// drives other than its own - a CoreXY axis needs both motors - so stopping only the drivers
+    /// that watch the switch would leave the others running and drag the head into it. The axis'
+    /// switches are spread over the move's drivers so that all of them are watched, and whichever
+    /// fires first stops everything
+    /// </remarks>
+    public const uint StopAllDrivers = 1u << 10;
 }
 
 /// <summary>

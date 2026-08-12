@@ -25,11 +25,17 @@ namespace DuetControlServer.Motion;
 /// Whether any armed endstop is a stall, which has to be approached slowly enough to tell a stall
 /// from normal load. M201.1 configures the limit
 /// </param>
+/// <param name="StopsEveryDrive">
+/// Whether any watched input must stop every driver of this move rather than only the drivers
+/// watching it. RepRapFirmware's <c>stopAll</c>: moving the axis being homed needs drives other than
+/// its own, so stopping only its own would leave the rest running
+/// </param>
 internal sealed record ArmedMove(
     IReadOnlyList<int> ArmedAxes,
     IReadOnlyList<int> AxesToHold,
     uint TriggeredAxes,
-    bool ReduceAcceleration);
+    bool ReduceAcceleration,
+    bool StopsEveryDrive);
 
 /// <summary>
 /// Deciding what a <c>G1 H</c> move watches, and what it must not move
@@ -127,7 +133,7 @@ internal static class EndstopArming
 
         if (stopAllAxis < 0)
         {
-            return new ArmedMove(armedAxes, alreadyClosed, AsBitmap(alreadyClosed), reduceAcceleration);
+            return new ArmedMove(armedAxes, alreadyClosed, AsBitmap(alreadyClosed), reduceAcceleration, false);
         }
 
         if (independentlyArmed > 0)
@@ -137,18 +143,23 @@ internal static class EndstopArming
                 + "its endstop has to stop every drive, which would disarm the others");
         }
 
-        // Every drive watches the one switch, so whichever driver sees the change first, they all
-        // stop. That is what makes this stopAll rather than stopAxis. A per-driver endstop is
-        // demoted to its first switch here for the same reason RepRapFirmware demotes it: the drives
-        // are coupled, so letting each motor wait for its own switch would keep the others running
+        // Every drive carries this axis' switches, and the move is marked so that whichever of them
+        // fires stops every driver rather than only the ones watching it. That is what makes this
+        // stopAll rather than stopAxis: the drives are coupled, so letting the others run on would
+        // drag the head into the switch.
+        //
+        // All of the switches are kept, not just the first. RepRapFirmware watches every port of the
+        // endstop whatever the action - PrimeAxis primes portsLeftToTrigger with all of them and
+        // CheckTriggered scans them all - and collapsing them here left an axis' second switch armed
+        // on nothing, doing nothing, and looking configured
         for (int drive = 0; drive < stopOnInput.Length; drive++)
         {
-            stopOnInput[drive].SetShared(stopAllInput.Handle, stopAllInput.Boards[0]);
+            stopOnInput[drive].CopyFrom(stopAllInput);
         }
 
         if (!alreadyClosed.Contains(stopAllAxis))
         {
-            return new ArmedMove(armedAxes, alreadyClosed, AsBitmap(alreadyClosed), reduceAcceleration);
+            return new ArmedMove(armedAxes, alreadyClosed, AsBitmap(alreadyClosed), reduceAcceleration, true);
         }
 
         // On coupled kinematics the whole move stops on the one endstop, so an endstop that is
@@ -158,7 +169,7 @@ internal static class EndstopArming
         {
             everyAxis.Add(axis);
         }
-        return new ArmedMove(armedAxes, everyAxis, AsBitmap(alreadyClosed), reduceAcceleration);
+        return new ArmedMove(armedAxes, everyAxis, AsBitmap(alreadyClosed), reduceAcceleration, true);
     }
 
     /// <summary>

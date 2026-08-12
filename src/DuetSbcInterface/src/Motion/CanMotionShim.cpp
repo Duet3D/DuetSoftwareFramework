@@ -37,7 +37,7 @@ void CanMotion::AddExtruderMovement(const PrepParams& params, DriverId canDriver
 uint32_t CanMotion::FinishMovement(const DDA& dda, uint32_t moveStartTime, bool simulating) noexcept
 {
 	return Builder().FinishMovement(dda.GetMoveId(), moveStartTime, simulating, dda.IsCheckingEndstops(),
-									dda.UsesInputShaping());
+									dda.StopsAllDrivers(), dda.UsesInputShaping());
 }
 
 bool CanMotion::CanPrepareMove() noexcept

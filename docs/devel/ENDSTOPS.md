@@ -153,6 +153,15 @@ flowchart TD
     F --> I
 ```
 
+`stopAll` keeps **every** switch of the axis. RepRapFirmware watches all of an endstop's ports
+whatever the action - `PrimeAxis` primes `portsLeftToTrigger` with all of them and `CheckTriggered`
+scans them all - and only the action changes. Here the switches are spread across the move's drivers
+so that each one is watched by somebody, and the move carries `ScheduleMoveFlags::StopAllDrivers` so
+that whichever fires stops every driver rather than only the ones watching it. Collapsing the axis to
+its first switch instead, which is what this did until it was tested on a CoreXY with two X switches,
+leaves the others armed on nothing: they do nothing, and `M119` still shows them because the state
+comes from the board rather than from the move.
+
 `stopAll` is the one that matters for correctness rather than tidiness. On a CoreXY, holding X still
 needs both motors, so stopping only "X's drivers" would leave the other running and drag the head
 diagonally into the switch. The test is RepRapFirmware's, from `SwitchEndstop::PrimeAxis`: the axis
@@ -604,6 +613,11 @@ that was never tripped and looks exactly like a stop that was thrown away.
   a board that rebooted stop being watched and stop being reported - silently, because an endstop
   that is never reported looks exactly like one that never triggers. Closing it means replaying the
   `M574` and `M558` configuration for that board when it announces.
+- **An axis whose switch count differs from its driver count keeps only its first switch.**
+  RepRapFirmware watches every port and lets the first trigger stop the whole axis; here
+  `RemoteEndstops.TryGetStopInput` falls back to `SetShared`, which takes `boards[0]` alone. The
+  same class of fault as the `stopAll` collapse above, in the one case the wire format cannot yet
+  express: stopping every driver *of one drive* has no flag, only stopping every driver of the move.
 - **A stop report carries no move id.** A report arriving after the *next* move has armed would be
   attributed to it. The grace window in §9 makes that unlikely rather than impossible; closing it
   properly means carrying the move id through `MotionStopped`, which is a protocol change across

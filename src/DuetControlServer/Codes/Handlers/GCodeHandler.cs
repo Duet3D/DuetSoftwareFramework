@@ -1430,6 +1430,7 @@ internal sealed partial class GCodeHandler(
 
         raw.ArmedAxes.AddRange(armed.ArmedAxes);
         raw.ReduceAcceleration |= armed.ReduceAcceleration;
+        raw.StopsEveryDrive = armed.StopsEveryDrive;
         foreach (int axis in armed.AxesToHold)
         {
             SeedSpecialMoveCoordinate(raw, axis);
