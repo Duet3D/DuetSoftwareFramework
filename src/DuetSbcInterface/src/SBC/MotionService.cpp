@@ -281,10 +281,23 @@ namespace Duet::Sbc
 		// at that timestamp would extrapolate far outside the move
 		const bool canUseTimestamp = whenTicks != 0 && StepTimer::GetClockStats().synced;
 
-		Motion::DriveTracker& tracker = reprap.GetMove().GetDriveTracker(drive);
-		tracker.Advance(StepTimer::GetTimerTicks());
+		// The timestamp is a reading of the raw step clock - the board stamps it from its own and the
+		// controller converts it to master time - but a segment is timed in the movement timebase,
+		// which is the raw clock less the movement delay. Evaluating one against the other reads the
+		// trigger as having happened `movementDelay` later than it did, and since only the segment at
+		// the head of the chain is evaluated and the answer is clamped to its end, a delay of any size
+		// puts the drive at the end of whatever phase it was in rather than where the switch fired.
+		const uint32_t whenInMovementTime = StepTimer::ConvertLocalToMovementTime(whenTicks);
 
-		position = canUseTimestamp ? lrintf(tracker.GetCurrentPosition(whenTicks)) : tracker.GetMotorPosition();
+		// Read as the motion thread last left it rather than advanced here. Advancing retires
+		// segments and releases them, and the segment freelist is not thread-safe; the motion thread
+		// advances every tracker once a millisecond, which is closer to the trigger than the report
+		// that asks this question. Advancing would also be the wrong answer as often as the right
+		// one: it moves the chain past the segment `whenTicks` falls in, and only the segment at the
+		// head is evaluated
+		const Motion::DriveTracker& tracker = reprap.GetMove().GetDriveTracker(drive);
+		position = canUseTimestamp ? lrintf(tracker.GetCurrentPosition(whenInMovementTime))
+								   : tracker.GetMotorPosition();
 		positionAtMoveStart = tracker.GetPositionAtMoveStart();
 		usedTimestamp = canUseTimestamp;
 		return true;
