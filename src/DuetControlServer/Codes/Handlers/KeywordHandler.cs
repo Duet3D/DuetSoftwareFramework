@@ -20,9 +20,10 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="codeProcessor">Code processor</param>
 /// <param name="expressions">Meta G-code expression parser</param>
 /// <param name="filePathResolver">File path resolver</param>
+/// <param name="variableStore">Variables in scope</param>
 /// <param name="logger">Logger</param>
 /// <param name="settings">Settings</param>
-public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expressions, FilePathResolver filePathResolver, ILogger<KeywordHandler> logger, IOptions<Settings> settings) : ICodeHandler
+public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expressions, FilePathResolver filePathResolver, VariableStore variableStore, ILogger<KeywordHandler> logger, IOptions<Settings> settings) : ICodeHandler
 {
     // Private fields
     private readonly ILogger<KeywordHandler> _logger = logger;
@@ -251,35 +252,83 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
                     throw new CodeParserException("expected '='", code);
                 }
 
-                // Replace SBC fields and prepare the variable name
-                expression = await expressions.EvaluateAsync(code, false, cancellationToken) ?? string.Empty;
-                string fullVarName = varName;
+                // Work out what is being assigned to. "set" names the scope itself, the other two imply it
+                bool isGlobal = code.Keyword == KeywordType.Global;
                 if (code.Keyword == KeywordType.Set)
                 {
-                    fullVarName = await expressions.EvaluateExpressionToStringAsync(code, fullVarName, true, false, cancellationToken);
+                    varName = await expressions.EvaluateExpressionToStringAsync(code, varName, true, false, cancellationToken);
+                    if (varName.StartsWith("global.", StringComparison.Ordinal))
+                    {
+                        isGlobal = true;
+                        varName = varName["global.".Length..];
+                    }
+                    else if (varName.StartsWith("var.", StringComparison.Ordinal))
+                    {
+                        varName = varName["var.".Length..];
+                    }
+                    else
+                    {
+                        // Parameters are read-only, so "param." lands here too, as it does in RepRapFirmware
+                        throw new CodeParserException("expected a global or local variable", code);
+                    }
+                }
+                string fullVarName = (isGlobal ? "global." : "var.") + varName;
+
+                // A variable holds a scalar, so a name is all that can be assigned to
+                // TODO: assign to an element once a variable can hold an array
+                foreach (char c in varName)
+                {
+                    if (!char.IsLetterOrDigit(c) && c != '_')
+                    {
+                        throw new CodeParserException($"cannot assign to '{fullVarName}': a variable can only hold a single value", code);
+                    }
+                }
+
+                // Evaluate what it is being assigned to
+                object? value = await expressions.EvaluateExpressionToValueAsync(code, expression, false, cancellationToken);
+
+                // Assign it. A "var" or "global" statement creates, "set" assigns to what already exists;
+                // neither does the other's job, so that a name cannot quietly change meaning halfway through a file
+                if (isGlobal)
+                {
+                    bool assigned = (code.Keyword == KeywordType.Set)
+                        ? await variableStore.TryAssignGlobalAsync(varName, value, cancellationToken)
+                        : await variableStore.TryCreateGlobalAsync(varName, value, cancellationToken);
+                    if (!assigned)
+                    {
+                        throw new CodeParserException((code.Keyword == KeywordType.Set)
+                            ? $"unknown variable '{varName}'"
+                            : $"variable '{varName}' already exists", code);
+                    }
                 }
                 else
                 {
-                    fullVarName = (code.Keyword == KeywordType.Global ? "global." : "var.") + varName;
-                }
-
-                // Assign the variable
-                // TODO save the variable
-#if false
-                object? value = await linkInterface.SetVariableAsync(code.Channel, code.Keyword != KeywordType.Set, fullVarName, expression, cancellationToken);
-#else
-                object? value = null;
-#endif
-                _logger.LogDebug("Set variable {Variable} to {Value}", fullVarName, value);
-
-                // Keep track of it
-                if (code.Keyword == KeywordType.Var && code.File is not null)
-                {
-                    using (await code.File.LockAsync(cancellationToken))
+                    VariableSet variables = variableStore.For(code);
+                    if (code.Keyword == KeywordType.Set)
                     {
-                        code.File.AddLocalVariable(varName);
+                        if (!variables.TryAssignVariable(varName, value))
+                        {
+                            throw new CodeParserException($"unknown variable '{varName}'", code);
+                        }
+                    }
+                    else
+                    {
+                        if (!variables.TryCreateVariable(varName, value))
+                        {
+                            throw new CodeParserException($"variable '{varName}' already exists", code);
+                        }
+
+                        // The block that created it is the block that deletes it again
+                        if (code.File is not null)
+                        {
+                            using (await code.File.LockAsync(cancellationToken))
+                            {
+                                code.File.AddLocalVariable(varName);
+                            }
+                        }
                     }
                 }
+                _logger.LogDebug("Set variable {Variable} to {Value}", fullVarName, value);
                 return new Message();
         }
 

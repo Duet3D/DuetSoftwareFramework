@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -362,8 +363,8 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <remarks>
     /// RepRapFirmware looks for <c>&lt;letter&gt;&lt;number&gt;.g</c>, or
     /// <c>&lt;letter&gt;&lt;number&gt;.&lt;fraction&gt;.g</c> for a code with a fraction, in the
-    /// system directory. It also exposes the code's own parameters to the macro as variables, which
-    /// is not done here yet
+    /// system directory, and gives the macro the code's own parameters, so that <c>M1234 X5</c> can
+    /// read <c>param.X</c>
     /// </remarks>
     private async ValueTask<bool> TryRunCodeMacroAsync()
     {
@@ -374,10 +375,31 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
 
         char letter = Type == CodeType.GCode ? 'G' : 'M';
         string macroName = MinorNumber > 0 ? $"{letter}{MajorNumber}.{MinorNumber}.g" : $"{letter}{MajorNumber}.g";
+
+        // The code's own parameters, by letter, keeping the type the parser gave each one so that
+        // param.S is a string and param.X is a number
+        // TODO: pass array parameters too, once a variable can hold an array
+        Dictionary<string, object?> parameters = [];
+        foreach (CodeParameter parameter in Parameters)
+        {
+            object? value =
+                parameter.IsNull ? null :
+                parameter.Type == typeof(string) ? (string?)parameter :
+                parameter.Type == typeof(int) ? (int)parameter :
+                parameter.Type == typeof(uint) ? (uint)parameter :
+                parameter.Type == typeof(long) ? (long)parameter :
+                parameter.Type == typeof(float) ? (float)parameter :
+                null;
+            if (value is not null || parameter.IsNull)
+            {
+                parameters[parameter.Letter.ToString()] = value;
+            }
+        }
+
         // A macro standing in for a code the user typed, so it is not a system macro unless the
         // code that reached here came from one
         return await _macroRunner.TryRunAsync(Channel, macroName, this, isSystemMacro: false,
-                                              cancellationToken: CancellationToken);
+                                              parameters: parameters, cancellationToken: CancellationToken);
     }
 
     /// <summary>

@@ -149,14 +149,15 @@ paused or pausing, no second pause is added.
 | Event macros | — | ⬜ nothing runs them |
 | `M957` | — | ⬜ |
 | `Autopause` code channel | [CodeChannel.cs:71](src/DuetAPI/CodeChannel.cs#L71) = 11 | ✅ has a `ChannelProcessor` like every other channel; nothing puts codes on it |
-| Macro runner | [MacroRunner.cs:72](src/DuetControlServer/Files/MacroRunner.cs#L72) | 🟡 runs a macro on a channel; **cannot pass parameters** |
+| Macro runner | [MacroRunner.cs:72](src/DuetControlServer/Files/MacroRunner.cs#L72) | ✅ runs a macro on a channel, with parameters (§3.4) |
+| Variables (`var`, `set`, `global`, `param`) | `Codes/Meta/VariableSet.cs`, `VariableStore.cs` | ✅ phase A — they did not exist at all before it |
 | Message box | `state.messageBox` exists in the model | ⬜ `M291`/`M292` not ported |
 | Pause | `JobProcessor.Pause(...)` exists | ⬜ nothing calls it; `M25` and `pause.g` not ported |
 | `M122` events line | — | ⬜ |
 
 Three of those are hard prerequisites and are tracked as phases in §5: **macro parameters**
-(without `param.S`/`D`/`B`/`P` an event macro cannot see the event), **message box** and **pause**
-(without them two default actions cannot be written faithfully).
+(without `param.S`/`D`/`B`/`P` an event macro cannot see the event — done, §3.4), **message box** and
+**pause** (without them two default actions cannot be written faithfully).
 
 ### 2.1 DuetCANMaster still has an event queue, and it leaks
 
@@ -296,16 +297,40 @@ The alternative — leaving the timer on the controller and having it tell DCS �
 to carry a fact DCS can already compute from messages it already receives, and leaves the board state
 split across two owners. It is the wrong side of "the object model must recreate the machine".
 
-### 3.4 Macro parameters (the prerequisite)
+### 3.4 Macro parameters, and the variables underneath them
 
-`MacroRunner.TryRunAsync` has no parameter channel, and MCODE_MIGRATION §9 already records the same
-gap for `M98`-style code macros: *"RRF passes the code's own parameters into the macro as variables
-(`DoFileMacroWithParameters`), so `M1234 X5` can read `param.X`. That needs variable plumbing through
-`MacroFile` and is not done."*
+Phase A was scoped as "give `MacroRunner` a parameter channel". It was larger than that: **DCS had no
+variables at all.** `var`, `set` and `global` parsed and validated their arguments and then threw the
+value away behind a `// TODO save the variable`, and the expression evaluator documented `var`/`param`
+as "owned by the firmware" and refused them. Every one of those paths was a leftover from the split
+architecture, where RepRapFirmware held the variables and DCS forwarded to it.
 
-One mechanism serves both. Whatever shape it takes, event macros need `param.D`, `param.B`, `param.P`
-as integers and `param.S` as a string, visible to expressions inside the macro and destroyed with the
-macro's stack level. This is phase A and it is on the critical path for everything else here.
+So `param` could not be added on its own, and what phase A built is the whole mechanism:
+
+| Piece | Where |
+|---|---|
+| A named set of values, locals and parameters side by side | `Codes/Meta/VariableSet.cs` |
+| Which set a code sees - its file, or its channel when it has no file | `Codes/Meta/VariableStore.cs` |
+| `global`, stored in the object model where it is visible over IPC | `VariableStore.TryCreateGlobalAsync` / `TryAssignGlobalAsync` |
+| `var` / `set` / `global` statements | `Codes/Handlers/KeywordHandler.cs` |
+| `var.x`, `param.x`, `global.x` and `exists()` in expressions | `Expressions.ExpressionContext.TryResolveVariable` |
+| Parameters at macro start, and a code's own parameters to the macro named after it | `MacroRunner.TryRunAsync`, `Code.TryRunCodeMacroAsync` |
+
+Storage is per file and lifetime is per block, which is RepRapFirmware's split: it keeps one
+`VariableSet` per machine state and tags each variable with the block nesting it was created at.
+DCS already recorded the block half - `CodeBlock.LocalVariables` names what a block created, and the
+block ending or a `while` restarting deletes exactly those. Per-block *sets* would have made an inner
+`var x` shadow an outer one, which RRF refuses outright (`variable 'x' already exists`, from a flat
+lookup), and would put a parent-chain walk in the expression path.
+
+RRF's semantics are kept as they are what macros are written against: `var` and `global` create and
+refuse to overwrite, `set` assigns and refuses to create, parameters are read-only because `set`
+accepts only the `var.` and `global.` prefixes, and reading one that does not exist is an error rather
+than a null - `unknown variable 'x'` / `unknown parameter 'x'`.
+
+A variable holds a scalar. Arrays, and therefore `var.x[2]` and `set var.x[2] = ...`, are the one
+thing left: both refuse with a message naming the limitation rather than pretending the name is
+unknown.
 
 ### 3.5 Default actions in DSF terms
 
@@ -627,12 +652,17 @@ after the machine has been restored rather than into a dead link.
 
 Each phase is independently useful and independently testable.
 
-### Phase A — macro parameters ⬜
+### Phase A — variables and macro parameters ✅
 
-- [ ] Carry a parameter set through `MacroRunner.TryRunAsync` → `MacroFile` → the macro's stack level
-- [ ] Expose them to expressions as `param.X`, destroyed with the level
-- [ ] Reuse it for MCODE_MIGRATION §9's code-named-after-itself macros (`M1234 X5` → `param.X`)
-- [ ] Unit test: a macro reading `param.S` and `param.D`
+- [x] A variable set per file, and per channel for codes without one (§3.4)
+- [x] `var`, `set` and `global` statements store what they evaluate
+- [x] `var.x`, `param.x`, `global.x`, `exists()` and `#` resolve in expressions
+- [x] Block-scoped deletion, which no longer takes an SPI round trip
+- [x] Carry a parameter set through `MacroRunner.TryRunAsync` into the macro's own set
+- [x] Reuse it for MCODE_MIGRATION §9's code-named-after-itself macros (`M1234 X5` → `param.X`)
+- [x] Unit tests: scoping, parameters beside a local of the same name, unknown-variable errors,
+      global round-tripping
+- [ ] Arrays: `var.x[2]` as a value and as an assignment target
 
 ### Phase B — the event system ⬜
 

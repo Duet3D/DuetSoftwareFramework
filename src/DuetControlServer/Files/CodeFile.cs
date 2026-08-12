@@ -318,7 +318,6 @@ public class CodeFile(
                                     await codeProcessor.FlushAsync(this, cancellationToken);
                                 }
 
-                                Task varDeletionTask;
                                 using (await LockAsync(cancellationToken))
                                 {
                                     Position = state.FilePosition ?? 0;
@@ -326,14 +325,13 @@ public class CodeFile(
                                     state.ProcessBlock = true;
                                     state.ContinueLoop = false;
                                     state.Iterations++;
-                                    varDeletionTask = DeleteLocalVariablesAsync(state);
+                                    DeleteLocalVariables(state);
                                     readAgain = true;
                                     if (!IsClosed)
                                     {
                                         logger.LogRestartingBlock(state.Keyword, state.Iterations);
                                     }
                                 }
-                                await varDeletionTask;  // wait outside the code lock to avoid deadlocks
                                 break;
                             }
                             await EndCodeBlockAsync(cancellationToken);
@@ -513,6 +511,15 @@ public class CodeFile(
     }
 
     /// <summary>
+    /// Variables this file has created and the parameters it was called with
+    /// </summary>
+    /// <remarks>
+    /// A file gets its own set, so a macro cannot see the variables of whatever started it. The block
+    /// a variable was created in decides how long it lives; the file decides who can see it
+    /// </remarks>
+    public VariableSet Variables { get; } = new();
+
+    /// <summary>
     /// Add a new local variable to the current code block
     /// </summary>
     /// <param name="varName">Name of the variable</param>
@@ -535,21 +542,15 @@ public class CodeFile(
     }
 
     /// <summary>
-    /// Delete local variables from a given code block asynchronously
+    /// Delete the local variables a code block created
     /// </summary>
-    /// <param name="codeBlock">Code block</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    private async Task DeleteLocalVariablesAsync(CodeBlock codeBlock, CancellationToken cancellationToken = default)
+    /// <param name="codeBlock">Code block that is ending or restarting</param>
+    private void DeleteLocalVariables(CodeBlock codeBlock)
     {
-        Task[] deletionTasks = new Task[codeBlock.LocalVariables.Count];
-        for (int i = 0; i < codeBlock.LocalVariables.Count; i++)
+        foreach (string varName in codeBlock.LocalVariables)
         {
-#if false // TODO: delete local variables once they are stored in DCS
-            deletionTasks[i] = linkInterface.SetVariableAsync(Channel, false, codeBlock.LocalVariables[i], null, cancellationToken);
-#endif
+            Variables.DeleteVariable(varName);
         }
-        await Task.WhenAll(deletionTasks);
         codeBlock.LocalVariables.Clear();
         codeBlock.HasLocalVariables = false;
     }
@@ -561,8 +562,6 @@ public class CodeFile(
     /// <returns>Asynchronous task</returns>
     private async Task EndCodeBlockAsync(CancellationToken cancellationToken)
     {
-        Task? varDeletionTask = null;
-
         using (await LockAsync(cancellationToken))
         {
             CodeBlock? codeBlock;
@@ -587,16 +586,11 @@ public class CodeFile(
                 }
 
                 // Delete previously created local variables
-                varDeletionTask = DeleteLocalVariablesAsync(codeBlock, cancellationToken);
+                DeleteLocalVariables(codeBlock);
 
                 // End
                 _lastCodeBlock = codeBlock;
             }
-        }
-
-        if (varDeletionTask is not null)
-        {
-            await varDeletionTask;
         }
     }
 }

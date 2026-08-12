@@ -22,7 +22,8 @@ namespace DuetControlServer.Codes.Meta;
 /// </summary>
 /// <param name="filter">Object model filter</param>
 /// <param name="model">Object model</param>
-public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
+/// <param name="variableStore">Variables in scope, by the code being evaluated</param>
+public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, VariableStore variableStore)
 {
     /// <summary>
     /// Delegate for asynchronously resolving custom meta G-code fuctions
@@ -1010,7 +1011,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
         if (!onlySbcFields)
         {
             // Whole-mirror evaluation will be selected by the connection method (it is needed when sending G-codes directly over CAN-FD); off for now
-            Parsing.IExpressionEvaluationContext context = new ExpressionContext(this, () => code.File?.GetIterations(code), (int)(code.LineNumber ?? 0), filter, false);
+            Parsing.IExpressionEvaluationContext context = new ExpressionContext(this, () => code.File?.GetIterations(code), (int)(code.LineNumber ?? 0), filter, variableStore.For(code), model, false);
             bool resolvedLocally;
             object? localResult;
             using (await model.AccessReadOnlyAsync(cancellationToken))
@@ -1070,8 +1071,10 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
     /// <param name="iterationsProvider">Provides the current loop iteration count lazily (it errors outside a loop)</param>
     /// <param name="lineNumber">Current G-code line number</param>
     /// <param name="filter">Object model filter</param>
+    /// <param name="variables">Variables the running code can see</param>
+    /// <param name="objectModel">Object model, which is where the global variables live</param>
     /// <param name="evaluateAllObjectModelFields">Whether to resolve all object model fields and not just SBC-specific ones</param>
-    internal sealed class ExpressionContext(Expressions owner, Func<int?> iterationsProvider, int lineNumber, Model.Filter filter, bool evaluateAllObjectModelFields) : Parsing.IExpressionEvaluationContext
+    internal sealed class ExpressionContext(Expressions owner, Func<int?> iterationsProvider, int lineNumber, Model.Filter filter, VariableSet variables, Model.ObjectModel objectModel, bool evaluateAllObjectModelFields) : Parsing.IExpressionEvaluationContext
     {
         /// <inheritdoc/>
         public int? Iterations => iterationsProvider();
@@ -1083,17 +1086,19 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
         public bool TryResolveIdentifier(string path, bool wantExists, bool wantArrayLength, out object? value)
         {
             value = null;
+
+            // Variables are not object model fields: which ones a code can see depends on the file it
+            // came from, so they are resolved from the set it was given rather than through the filter
+            if (TryResolveVariable(path, wantExists, wantArrayLength, out value))
+            {
+                return true;
+            }
+
             if (wantExists)
             {
                 if (wantArrayLength)
                 {
                     return false;       // exists(#...) is forwarded for now
-                }
-
-                // var/param are owned by the firmware, so their existence cannot be determined here
-                if (path is "var" or "param" || path.StartsWith("var.", StringComparison.Ordinal) || path.StartsWith("param.", StringComparison.Ordinal))
-                {
-                    return false;
                 }
 
                 // Default mode can only answer for SBC-rooted paths; the flag opts into the whole (non-live) mirror
@@ -1136,6 +1141,96 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
                 return true;
             }
             return false;
+        }
+
+        /// <summary>
+        /// Resolve a path that names a variable rather than an object model field
+        /// </summary>
+        /// <param name="path">Fully-qualified identifier path</param>
+        /// <param name="wantExists">Caller only wants to know whether the variable exists</param>
+        /// <param name="wantArrayLength">The length operator '#' was applied</param>
+        /// <param name="value">Value the variable holds, or whether it exists</param>
+        /// <returns>True if the path named a variable and could be resolved</returns>
+        /// <exception cref="CodeParserException">The variable does not exist</exception>
+        /// <remarks>
+        /// <c>global</c> is read from the object model, where it lives, but through this path rather
+        /// than the filter: it is not an SBC property, so the filter refuses it in the default mode
+        /// </remarks>
+        private bool TryResolveVariable(string path, bool wantExists, bool wantArrayLength, out object? value)
+        {
+            value = null;
+
+            string name;
+            bool isParameter = false, isGlobal = false;
+            if (path.StartsWith("var.", StringComparison.Ordinal))
+            {
+                name = path["var.".Length..];
+            }
+            else if (path.StartsWith("param.", StringComparison.Ordinal))
+            {
+                name = path["param.".Length..];
+                isParameter = true;
+            }
+            else if (path.StartsWith("global.", StringComparison.Ordinal))
+            {
+                name = path["global.".Length..];
+                isGlobal = true;
+            }
+            else
+            {
+                return false;
+            }
+
+            // A variable holds a scalar, so anything past the name - an index or a field of its own -
+            // is not something this can answer yet
+            // TODO: resolve indices and nested fields once a variable can hold an array
+            foreach (char c in name)
+            {
+                if (!char.IsLetterOrDigit(c) && c != '_')
+                {
+                    return false;
+                }
+            }
+            if (name.Length == 0)
+            {
+                return false;
+            }
+
+            bool found;
+            if (isGlobal)
+            {
+                found = objectModel.Global.TryGetValue(name, out JsonElement? globalValue) &&
+                        VariableStore.TryFromJson(globalValue, out value);
+            }
+            else
+            {
+                found = isParameter ? variables.TryGetParameter(name, out value) : variables.TryGetVariable(name, out value);
+            }
+
+            if (wantExists)
+            {
+                value = found;
+                return true;
+            }
+
+            if (!found)
+            {
+                value = null;
+                throw new CodeParserException(string.Format(isParameter ? Parsing.ExpressionErrors.UnknownParameter
+                                                                       : Parsing.ExpressionErrors.UnknownVariable, name));
+            }
+
+            if (wantArrayLength)
+            {
+                if (value is string stringValue)
+                {
+                    value = stringValue.Length;
+                    return true;
+                }
+                value = null;
+                return false;       // not a string, and a variable cannot hold an array yet
+            }
+            return true;
         }
 
         /// <inheritdoc/>

@@ -2,6 +2,7 @@ using DuetAPI;
 using DuetAPI.Commands;
 using DuetControlServer.Codes;
 using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -52,6 +53,7 @@ public sealed class MacroRunner(
     /// <param name="startCode">Code that asked for the macro, if any</param>
     /// <param name="directory">Directory the macro is looked up in</param>
     /// <param name="isSystemMacro">Whether the firmware asked for this macro rather than the user</param>
+    /// <param name="parameters">Parameters the macro can read as <c>param.name</c>, if any</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True if the macro was found and run, false if there is no such file</returns>
     /// <remarks>
@@ -72,6 +74,7 @@ public sealed class MacroRunner(
     public async ValueTask<bool> TryRunAsync(CodeChannel channel, string fileName, Code? startCode = null,
                                              FileDirectory directory = FileDirectory.System,
                                              bool isSystemMacro = true,
+                                             IReadOnlyDictionary<string, object?>? parameters = null,
                                              CancellationToken cancellationToken = default)
     {
         if (codeProcessor.GetStackDepth(channel) >= MaxNesting)
@@ -93,6 +96,11 @@ public sealed class MacroRunner(
             return false;
         }
         macro.IsSystemMacro = isSystemMacro || startCode?.Flags.HasFlag(CodeFlags.IsFromSystemMacro) == true;
+        if (parameters is not null)
+        {
+            // Before the first code runs, which is what makes them read-only to the macro itself
+            macro.Variables.SetParameters(parameters);
+        }
 
         // The stack level has to exist before the macro starts reading, because its codes are routed
         // to the level whose file they belong to

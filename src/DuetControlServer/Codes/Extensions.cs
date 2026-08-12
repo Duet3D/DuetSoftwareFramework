@@ -17,6 +17,7 @@ public static partial class ServiceCollectionExtensions
     {
         return services
             .AddSingleton<Meta.Expressions>()
+            .AddSingleton<Meta.VariableStore>()
             .AddHostedService<Meta.Functions>()
             .AddSingleton<CodeFactory>()
             .AddSingleton<CodeProcessor>()
