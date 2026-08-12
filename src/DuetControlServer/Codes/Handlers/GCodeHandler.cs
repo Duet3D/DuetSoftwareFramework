@@ -37,6 +37,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="bedCompensation">Height map correction</param>
 /// <param name="macroRunner">Runs the machine's own macro files</param>
 /// <param name="linkInterface">Link interface, for the endstops a move has to arm over CAN</param>
+/// <param name="expansionBoardManager">Which switches of an endstop are closed, switch by switch</param>
 /// <param name="endstopCorrection">Undoes the overshoot of a move an endstop cut short</param>
 /// <param name="toolManager">The selected tool, whose offsets and axis mapping the transform needs</param>
 /// <param name="logger">Logger</param>
@@ -46,6 +47,7 @@ internal sealed partial class GCodeHandler(
     BedCompensation bedCompensation,
     Files.MacroRunner macroRunner,
     Link.LinkInterface linkInterface,
+    Link.Expansion.ExpansionBoardManager expansionBoardManager,
     EndstopCorrection endstopCorrection,
     Tools.ToolManager toolManager,
     ILogger<GCodeHandler> logger) : ICodeHandler
@@ -1455,7 +1457,10 @@ internal sealed partial class GCodeHandler(
                 // interrupt tests the endstop before the first step, so the move ends on the step it
                 // began. Recorded here and applied below, once it is known whether this axis can be
                 // held on its own
-                alreadyTriggered.Add(axis);
+                if (!HoldClosedDrivers(raw, axis))
+                {
+                    alreadyTriggered.Add(axis);
+                }
             }
 
             // The axis needs a drive that is not its own, so it cannot be stopped by itself
@@ -1527,6 +1532,67 @@ internal sealed partial class GCodeHandler(
     /// actually told to watch. Called once the stop inputs are final, which is why it is here rather
     /// than where the latch is cleared
     /// </remarks>
+    /// <summary>
+    /// Hold only the motors of an axis that are already on their own switch
+    /// </summary>
+    /// <param name="raw">The move being built, with this axis' stop input already filled in</param>
+    /// <param name="axis">The axis</param>
+    /// <returns>True if the axis still has a motor to move, so it must not be held as a whole</returns>
+    /// <remarks>
+    /// <para>
+    /// Only an axis with a switch per driver can answer yes. That arrangement exists to square a
+    /// gantry - each motor runs on to its own switch, so a skewed gantry ends up straight - and the
+    /// move that corrects a skew is precisely the one that starts with one side already down.
+    /// Holding the whole axis because one switch is closed would make it do nothing, leaving the
+    /// gantry skewed and the axis reporting itself homed.
+    /// </para>
+    /// <para>
+    /// RepRapFirmware reaches the same place from <c>DDA::Prepare</c>: <c>CheckEndstops(false)</c>
+    /// runs after the per-driver movements have been accumulated and before they are sent, and
+    /// <c>StopDriverWhenProvisional</c> zeroes the steps of, in its own words, "the motors
+    /// concerned". Its <c>SwitchEndstop::CheckTriggered</c> only escalates to stopping the axis once
+    /// one switch is left, which is the same rule as returning false here when every switch is
+    /// closed.
+    /// </para>
+    /// <para>
+    /// The axis is deliberately not latched as triggered by this. RepRapFirmware records an endstop
+    /// as having triggered for <c>stopAll</c> and <c>stopAxis</c> only, never for
+    /// <c>stopDriver</c> - the axis has not finished homing until its last switch is reached
+    /// </para>
+    /// </remarks>
+    private bool HoldClosedDrivers(RawMove raw, int axis)
+    {
+        MoveStopInput stopInput = raw.StopOnInput[axis];
+        if (stopInput.NumSwitches < 2)
+        {
+            return false;                       // one switch stops every driver, so none can run on
+        }
+
+        // stopAll outranks stopDriver, and the demotion to it happens below this. Moving one motor
+        // of a coupled axis is not a thing the kinematics can express: the drives that would have to
+        // move to hold the others still are the ones being held
+        if ((planner.Parameters.Geometry.GetControllingDrives(axis) & ~(1u << axis)) != 0)
+        {
+            return false;
+        }
+
+        uint closed = expansionBoardManager.GetClosedEndstopSwitches(axis);
+        uint all = (1u << stopInput.NumSwitches) - 1;
+        if ((closed & all) == all)
+        {
+            return false;                       // every motor is down; there is nothing left to move
+        }
+
+        for (int switchIndex = 0; switchIndex < stopInput.NumSwitches; switchIndex++)
+        {
+            if ((closed & (1u << switchIndex)) != 0)
+            {
+                stopInput.HoldDriver(switchIndex);
+            }
+        }
+        return true;
+    }
+
     private void ArmCorrection(RawMove raw)
     {
         uint armedDrives = 0;

@@ -194,6 +194,26 @@ void TestStopInputPerDriver() noexcept
 	// A drive with no endstop has to stay without one, or it would start watching switch 0
 	CHECK(StopInputForDriver(kNoStopSwitches, 1) == kNoStopInput, "a drive watching nothing keeps the sentinel");
 
+	// A motor already sitting on its own switch is given no steps while the rest of the axis moves,
+	// which is what lets a gantry that starts with one side down square itself. Holding the whole
+	// axis because one switch is closed would make exactly that move do nothing
+	MoveStopInput held = perDriver;
+	held.heldDrivers = 0b010;
+	CHECK(!IsDriverHeld(held, 0), "a motor that is not on its switch still moves");
+	CHECK(IsDriverHeld(held, 1), "a motor already on its switch is held");
+	CHECK(!IsDriverHeld(held, 2), "and the third is unaffected");
+	CHECK(!IsDriverHeld(kNoStopSwitches, 0), "a drive watching nothing holds nothing");
+	CHECK(!IsDriverHeld(held, maxDriversPerAxis), "a driver past the end of the axis is not held");
+
+	// Holding a driver must not change what it watches. The drive is still armed and the motors that
+	// are moving still have to be stopped by their own switches, so the held bit and the switch a
+	// driver is given are independent
+	for (size_t driver = 0; driver < held.numSwitches; ++driver)
+	{
+		CHECK(StopInputForDriver(held, driver) == StopInputForDriver(perDriver, driver),
+			  "holding a driver leaves every driver watching the switch it was given");
+	}
+
 	// A stall endstop is n boards but one handle: a board reports every driver that stalled under
 	// RemoteInputHandle(typeStallEndstop, 0, 0), so the board tells one driver's stall from
 	// another's. Deriving a minor per driver here would name a handle no board ever reports, and the

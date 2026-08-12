@@ -135,7 +135,16 @@ namespace Duet::Sbc::Motion
 		uint16_t handle;
 		uint8_t numSwitches;
 		uint8_t boards[maxDriversPerAxis];		// CAN address of each switch, in driver order
-		uint8_t padding;						// declared so the C# mirror can match it
+
+		// Drivers already sitting on their own switch when the move was built, one bit per driver.
+		//
+		// Such a driver is given no steps rather than the drive being held still. An axis with a
+		// switch per driver is squared by letting each motor run on to its own switch, so a gantry
+		// that starts with one side already down has exactly one side left to move - holding the
+		// whole axis because one switch is closed would make the move that corrects a skew do
+		// nothing. RepRapFirmware does the same from DDA::Prepare, where CheckEndstops(false) zeroes
+		// the steps of "the motors concerned" before the movement messages go out
+		uint8_t heldDrivers;
 	};
 
 	// The handle type field, which decides whether the minor field is per-driver. See
@@ -145,6 +154,14 @@ namespace Duet::Sbc::Motion
 
 	static_assert(sizeof(MoveStopInput) == 4 + maxDriversPerAxis, "MoveStopInput layout");
 	static_assert(offsetof(MoveStopInput, boards) == 3);
+	static_assert(maxDriversPerAxis <= 8, "heldDrivers is one byte, so one bit per driver of an axis");
+
+	// Whether this driver was already on its switch when the move was built, so it must not be given
+	// any steps. See MoveStopInput::heldDrivers.
+	[[nodiscard]] constexpr bool IsDriverHeld(const MoveStopInput& stop, size_t driverIndex) noexcept
+	{
+		return driverIndex < maxDriversPerAxis && (stop.heldDrivers & (1u << driverIndex)) != 0;
+	}
 
 	// A drive that watches nothing, which is what every drive of an ordinary move carries.
 	inline constexpr MoveStopInput kNoStopSwitches{};

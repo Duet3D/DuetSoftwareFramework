@@ -841,9 +841,18 @@ void DDA::Prepare(DDARing& ring,
 							const DriverId driver = config.driverNumbers[i];
 							if (driver.IsRemote())
 							{
+								// A driver already sitting on its own switch is given no steps, while
+								// the rest of the axis moves. That is what squares a gantry which
+								// starts with one side already down: holding the whole axis because
+								// one switch is closed would make the move that corrects the skew do
+								// nothing. The driver is still named in the message, so it is still
+								// enabled and the controller still marks it as not to be stopped
+								const int32_t driverSteps =
+									Duet::Sbc::Motion::IsDriverHeld(m_stopOnInput[drive], i) ? 0 : delta;
+
 								// Port i of an endstop belongs to driver i of the axis, so the
 								// switch this driver watches follows from its index
-								CanMotion::AddAxisMovement(params, driver, delta,
+								CanMotion::AddAxisMovement(params, driver, driverSteps,
 														   Duet::Sbc::Motion::StopInputForDriver(m_stopOnInput[drive], i));
 							}
 						}

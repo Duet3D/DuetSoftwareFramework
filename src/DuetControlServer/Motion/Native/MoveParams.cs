@@ -143,11 +143,25 @@ internal sealed class MoveStopInput
     /// <summary>CAN address of each switch, in driver order</summary>
     public byte[] Boards { get; } = new byte[MotionLimits.MaxDriversPerAxis];
 
+    /// <summary>
+    /// Drivers already sitting on their own switch when the move was built, one bit per driver
+    /// </summary>
+    /// <remarks>
+    /// Such a driver is given no steps, while the rest of the axis moves. An axis with a switch per
+    /// driver is squared by letting each motor run on to its own switch, so a gantry that starts
+    /// with one side already down has exactly one side left to move - holding the whole axis because
+    /// one switch is closed would make the move that corrects the skew do nothing. RepRapFirmware
+    /// does the same from <c>DDA::Prepare</c>, where <c>CheckEndstops(false)</c> zeroes the steps of
+    /// the motors concerned before the movement messages go out
+    /// </remarks>
+    public byte HeldDrivers { get; set; }
+
     /// <summary>Stop watching anything, which is what every drive of an ordinary move carries</summary>
     public void Clear()
     {
         Handle = 0;
         NumSwitches = 0;
+        HeldDrivers = 0;
         Array.Clear(Boards);
     }
 
@@ -189,7 +203,20 @@ internal sealed class MoveStopInput
     {
         Handle = other.Handle;
         NumSwitches = other.NumSwitches;
+        HeldDrivers = other.HeldDrivers;
         other.Boards.CopyTo(Boards, 0);
+    }
+
+    /// <summary>
+    /// Give one driver no steps, because it is already on its own switch
+    /// </summary>
+    /// <param name="driverIndex">Which driver of the drive</param>
+    public void HoldDriver(int driverIndex)
+    {
+        if (driverIndex >= 0 && driverIndex < MotionLimits.MaxDriversPerAxis)
+        {
+            HeldDrivers |= (byte)(1 << driverIndex);
+        }
     }
 }
 
@@ -252,7 +279,7 @@ internal static class MoveParams
             BinaryPrimitives.WriteUInt16LittleEndian(entry, stop.Handle);
             entry[2] = stop.NumSwitches;
             stop.Boards.CopyTo(entry[3..]);
-            entry[^1] = 0;              // padding, declared natively so this can match it
+            entry[^1] = stop.HeldDrivers;
         }
         return total;
     }

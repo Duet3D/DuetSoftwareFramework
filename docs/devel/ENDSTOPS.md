@@ -124,7 +124,7 @@ to use for backing off a switch that is already closed.
 **DuetControlServer** does all of this, in
 [ApplyEndstops](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs). Per axis the code actually
 mentions - a move naming X and Y must not be stopped by Z's switch happening to be closed - it fills
-in `RawMove.StopOnInput[drive]`, a `MoveStopInput` of `{ handle, numSwitches, boards[] }`. That is
+in `RawMove.StopOnInput[drive]`, a `MoveStopInput` of `{ handle, numSwitches, boards[], heldDrivers }`. That is
 RepRapFirmware's `SwitchEndstop` reduced to what a move needs.
 
 ### The four stop actions
@@ -186,6 +186,30 @@ axis that is already at its switch to stay where it is, latching it as triggered
 concludes correctly. RepRapFirmware reaches the same place from the
 other direction: its step interrupt tests the endstop before the first step, so the move ends on the
 step it began. On coupled kinematics one closed switch holds every drive.
+
+**Except on an axis with a switch per driver**, where holding the whole axis would defeat the point
+of it. That arrangement squares a gantry by letting each motor run on to its own switch, so the move
+that corrects a skew is exactly the one that starts with one side already down - and stopping the
+axis because one switch is closed would make it do nothing, leaving the gantry skewed and the axis
+calling itself homed. Only the motors that are already on their switches are held; the rest move.
+
+They are held by being given no steps, which is a per-driver quantity the movement message already
+has, rather than by changing what the drive is doing. `MoveStopInput.heldDrivers` carries one bit per
+driver from `ApplyEndstops` to `DDA::Prepare`, which emits zero for those and the move's delta for
+the others. The drive still watches all of its switches: the motors that are moving still have to be
+stopped by their own, and a driver given no steps is marked inactive in the controller's stop list,
+so it cannot be stopped twice.
+
+RepRapFirmware does the same thing in the same place. `DDA::Prepare` calls `CheckEndstops(false)`
+after the per-driver movements have been accumulated and before they are sent, and
+`StopDriverWhenProvisional` zeroes the steps of - in the firmware's own words - "the motors
+concerned". `SwitchEndstop::CheckTriggered` only escalates to stopping the whole axis once one
+switch is left untriggered, which is the same rule as holding the axis here only when every switch
+is closed.
+
+The axis is deliberately **not** latched as triggered by this. RepRapFirmware records an endstop as
+having triggered for `stopAll` and `stopAxis` and never for `stopDriver`: an axis with switches left
+to reach has not finished homing.
 
 ---
 
@@ -524,10 +548,13 @@ thing. They are listed as invariants rather than as bugs because that is how the
 6. **A CAN message that expects no reply says `NoReply`.** The controller reads any other value as a
    reply being expected and then requires an all-ones request id placeholder to allocate over - which
    a revert has no field for, so it is dropped rather than sent, and the machine keeps its overshoot.
-7. **The state a board reports when a monitor is created is adopted.** From then on it reports only
+7. **A switch already closed holds its own motor, not the whole axis** - unless the axis has one
+   switch for every driver, or is coupled. Holding an axis that has motors left to reach their own
+   switches turns the move that squares a gantry into one that does nothing.
+8. **The state a board reports when a monitor is created is adopted.** From then on it reports only
    changes, so a switch already closed at that moment is never reported at all, and every check that
    asks "is it triggered" answers no for as long as nobody touches it by hand.
-8. **A position redefined without moving is published.** `move.axes[].userPosition` is written by
+9. **A position redefined without moving is published.** `move.axes[].userPosition` is written by
    `PublishCommittedPosition`, which ordinary moves call as they queue; a special move queues nothing
    after it concludes.
 
