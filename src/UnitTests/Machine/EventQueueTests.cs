@@ -172,6 +172,29 @@ namespace UnitTests.Machine
         }
 
         [Test]
+        public void HeaterFaultTextCoversEveryFaultType()
+        {
+            // CANlib asserts this of its own copy at compile time. C# cannot assert an array's length
+            // there, so it is asserted here: a fault type added to the schema without a string would
+            // otherwise be reported as "unknown error" by a machine that knows exactly what happened
+            Assert.That(EventText.HeaterFaultText, Has.Length.EqualTo((int)HeaterFaultType.HeaterFaultTypeLimit + 1),
+                        "one string per HeaterFaultType, plus one for a value that is none of them");
+
+            // The last entry is the one a value outside the enum falls back to, so it cannot be a real
+            // fault type's text
+            Assert.That(EventText.HeaterFaultText[^1], Is.EqualTo("unknown error: "));
+
+            foreach (HeaterFaultType type in System.Enum.GetValues<HeaterFaultType>())
+            {
+                if (type != HeaterFaultType.HeaterFaultTypeLimit)
+                {
+                    (string text, _) = EventText.Describe(Event(EventType.HeaterFault, param: (ushort)type));
+                    Assert.That(text, Does.Not.Contain("unknown error"), $"{type} has no text of its own");
+                }
+            }
+        }
+
+        [Test]
         public void EventsAreDescribedAsTheFirmwareDescribesThem()
         {
             (string text, MessageType type) = EventText.Describe(Event(EventType.HeaterFault, device: 2, param: 1, text: "expected 200 measured 150"));

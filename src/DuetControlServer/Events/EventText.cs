@@ -44,12 +44,20 @@ public static class EventText
     /// Why a heater was shut down, by fault type
     /// </summary>
     /// <remarks>
+    /// <para>
     /// CANlib carries these strings as well, but nothing on a board renders them: a board sends the
     /// fault type and whoever reports the fault to the operator turns it into words. The wording is
     /// RepRapFirmware's, and the trailing spaces are load-bearing - the detail the board sent is
-    /// appended straight after
+    /// appended straight after.
+    /// </para>
+    /// <para>
+    /// One entry per <see cref="HeaterFaultType"/> plus one for a value that is none of them, which is
+    /// what CANlib asserts of its own copy. C# cannot assert an array's length at compile time, so
+    /// <c>HeaterFaultTextCoversEveryFaultType</c> asserts it where this repository keeps its other
+    /// cross-file invariants
+    /// </para>
     /// </remarks>
-    private static readonly string[] HeaterFaultText =
+    internal static readonly string[] HeaterFaultText =
     [
         "failed to read sensor: ",                      // the sensor error follows
         "temperature rising too slowly: ",              // "expected ... measured ..." follows
