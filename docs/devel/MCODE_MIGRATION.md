@@ -1208,10 +1208,11 @@ own switch would leave the coupled drives running.
 The drive tracker complicates matters slightly. Adopting a stopped driver's position freezes the
 tracker, and the tracker is exactly what tells the *remaining* drivers where they were when their own
 switch fired - freezing it on the first trigger would revert the second motor to the first motor's
-position and undo the squaring. So `DDA::NoteDriverStopped` records which drivers of a drive have
-stopped, and the position is only adopted once the last of them has. Each driver's
-`CanMessageRevertPosition` is still computed as it is reported, from the live tracker at that driver's
-own trigger time.
+position and undo the squaring. So which drivers of a drive have stopped is recorded, and the position
+is only adopted once the last of them has. Each driver's `CanMessageRevertPosition` is still computed
+as it is reported, from the live tracker at that driver's own trigger time. (That record was
+`DDA::NoteDriverStopped` when this was written; it moved to `EndstopCorrection` with the decision -
+see §12.9.)
 
 Not carried over: RepRapFirmware sets the axis to its low or high limit when the *last* switch of a
 `stopDriver` axis fires (`setAxisLow` / `setAxisHigh`). Nothing sets an axis position from an endstop
@@ -2117,7 +2118,9 @@ steps 1-6. What is gone is gone by build switch or by deletion, not by divergenc
 ## 12. Moving the endstop correction into DuetControlServer
 
 **Done.** §10 describes the arrangement it replaced; this is the change and why. Section 12.6's
-steps are all landed, including the wind-back wait from §12.7 and both homing gaps in §12.8.
+steps are all landed, including the wind-back wait from §12.7 and both homing gaps in §12.8. Step 4's
+second half - pushing the corrected position down into the engine - was written down but not written,
+which hardware found; §12.9 is what was missing and what it cost.
 
 ### 12.1 What it looks like today
 
@@ -2419,6 +2422,271 @@ Steps 1 and 2 are additive. Step 3 is the behaviour change for non-Cartesian mac
 to be careful with: nothing in the test suite exercises homing on a delta, so it wants a test written
 against `LinearDeltaKinematicsEngine` before the change rather than after.
 
+### 12.9 Half of step 4 was never there
+
+Found on hardware: an endstop stops the motor, but the position DCS reports afterwards is wrong and
+the move after it does not turn the motor at all. §12.4 said the corrected position would be "pushed
+down through the existing `SetMotorPositions`", and §12.6 step 4 said DCS "applies the corrected
+positions through `SetMotorPositions`". Neither happened. `EndstopCorrection.Apply` sent the revert
+and wrote `MoveBuilder.SetDriveEndpoint`, and stopped there. Nothing below DCS was told anything.
+
+Three consequences, and between them they are the whole of what was seen:
+
+- **The move ran its full length.** `DDA::HasExpired` for an endstop move is
+  `AreDrivesStopped(drivesMoving)` - no pending motion in the trackers - which is the port's
+  equivalent of RepRapFirmware's move finishing once its last `DriveMovement` has left `activeDMs`.
+  Nothing stopped the trackers, so they evaluated the profile to its planned end and the move ended
+  when it would have ended anyway. A homing move that triggers after 5mm of a 200mm sweep held the
+  channel for the remaining 195mm of nothing.
+- **The reported position was the planned one.** `FinishSpecialMoveAsync` resyncs from the engine,
+  and the engine had the endpoint the move was planned to reach. That resync overwrote the one
+  correct number in the system, the `SetDriveEndpoint` the correction had just written.
+- **The next move was scheduled from that planned endpoint.** `DDA::Prepare` turns a move into
+  steps as `m_endPoint[drive] - m_prev->m_endPoint[drive]`, and nothing had corrected `m_prev`.
+  After homing, the difference between the axis limit DCS adopts and the far end of the homing sweep
+  is most of the axis, delivered in the time computed for the small move that was actually asked
+  for. A stepper given a few hundred mm/s it cannot follow does not move.
+
+`DDARing::SetLastEndpoints` existed for this and had no callers. In RepRapFirmware the two halves are
+one operation - `Move::ChangeEndpointsAfterHoming` is `rings[].SetLastEndpoints` followed by
+`SetMotorPositions`, and `MovementState::SetNewPositionOfOwnedAxes` reaches it for G92 - so
+`MotionService::SetMotorPositions` now does both, and there is no way to set one without the other.
+
+#### Every code that redefines the position has to say so
+
+The same gap was in three other places, because forcing a position in DCS and forcing it in the
+engine were separate acts and only the first was ever performed. `MovePlanner.PushPositionsToEngine`
+is the pair, and the codes that redefine a position without moving anything now call it:
+
+| Code | What it redefines | Was |
+|---|---|---|
+| `G1 H1` | the axis takes the coordinate of its switch | pushed nowhere, so the next move ran off by the length of the homing sweep |
+| `G30` | Z takes the trigger height | same, off by the dive height |
+| `G92` | the axis is renamed | same - and it set every named axis to zero, reading an array it had just allocated instead of the value the code carried |
+| M92, M208, M584, M669… | microsteps mean something else now | already pushed, through `ReconfigureAsync` |
+
+#### `stopDriver` moved to DCS with it
+
+§12.4 said `NoteDriverStopped` "has to go somewhere" and §12.6 step 5 said the native one was
+deleted. It was left behind instead - `DDA::NoteDriverStopped` and `m_driversStopped` were still
+there with no callers, and no counterpart was written. Adopting a drive's position freezes its
+tracker, and the tracker is what tells the motors that have not yet reached their own switch where
+they were when theirs fired, so a gantry with two switches would have been squared by the first
+trigger and unsquared by the revert built from it. `EndstopCorrection` now keeps the per-driver
+bitmap, using `MotionParameters.DriversPerDrive` and the driver's index within its drive; each
+driver's revert still goes out as it is reported, and only the last of them adopts. The dead native
+version is gone.
+
+#### The revert never reached the CAN bus
+
+Found with a logic analyser on both buses: the `SendCanMessage` packet carrying
+`CanMessageRevertPosition` goes out over SPI on every stop, and nothing corresponding appears on CAN.
+
+`EndstopCorrection` sent it with a reply type of **0**, from a constant whose comment said "as the
+native side used for this message". The number was copied; the meaning was not. The value that means
+"expect nothing back" is `CanMessageType::unusedMessageType`, which is `0xFFFF`, and DuetCANMaster
+reads anything else as a reply being expected:
+[CanInterface::SendCanRequest](src/DuetCANMaster/src/CAN/CanInterface.cpp#L669) then requires the
+message to carry an all-ones request id for it to allocate a real one over. A revert has no request
+id field at all - RRF builds it with `SetupRequestMessageNoRid`, which is what the suffix means - so
+the check could never pass, and the controller dropped the message instead of sending it.
+
+The consequence is invisible from either end on its own. DCS has sent the message and has no reply to
+wait for; the controller warns once into the general message stream and carries on; the boards are
+simply never told to wind back, so the machine keeps exactly the overshoot the whole mechanism exists
+to remove. `CanMessageType.NoReply` is now used, which is the alias that exists to be named rather
+than have its value written out.
+
+#### The stop was attributed to the wrong drive
+
+`Last endstop stop: drive 31 stopped 0 steps into a move of 0` is the fault the rest of this section
+was chasing. Drive 31 is the top of the drive space, which is extruder 0 - not the axis that was
+homing. Every count above it read as healthy because every step of the chain did happen; it happened
+to the wrong drive.
+
+`MotionParameters` builds the reverse map from driver to drive by walking the axes and then the
+extruders, assigning into a dictionary. A driver claimed by an axis **and** by an extruder was
+therefore resolved to the extruder, because it was written second. From there:
+
+| | |
+|---|---|
+| The revert | computed from the extruder's tracker, which had not moved: `finalStepCounts` of 0 for a driver the message names by its number on the board. The board wound the *axis* motor back to where the move began - the "massive jump", and the wind-back landing before the trigger |
+| The position | `SetDriveEndpoint` and `SetMotorPositions` applied to drive 31, so the axis kept the endpoint it never reached and its tracker kept running |
+| The move | `AreDrivesStopped` still saw the axis moving, so it ran its full planned length |
+| The homing | `DriveToAxis(31)` is -1, so no axis was latched as triggered and none was set to its switch |
+
+All four symptoms, from one lookup. Two changes, because either alone would have left it silent:
+
+- **A driver belongs to one drive.** The first claim wins - axes are walked before extruders, so an
+  axis outranks an extruder - and any further claim is recorded and logged when the description is
+  read. Last-writer-wins was the bug; refusing the second claim without saying so would only have
+  moved it.
+- **A stop may only correct a drive the move armed.** The controller watches an input on a driver
+  because the move in flight told it to, so a report resolving to any other drive means the two sides
+  disagree about that driver, and correcting the drive the lookup answered with is worse than doing
+  nothing. `EndstopCorrection` now holds the armed drives and refuses anything else, counted as
+  `unarmed` in `M122`. That is the guard that turns this class of fault from a motor winding
+  somewhere arbitrary into a warning.
+
+#### The trigger timestamp was read against the wrong clock
+
+With the revert flowing, the counters showed the whole chain working - every stop reported, mapped,
+located, reverted and adopted - and the machine still reported the position the move was planned to
+reach. The mechanism was right and the number was wrong.
+
+A trigger timestamp is a reading of the **raw** step clock: the board stamps it from its own counter
+and the controller converts it to master time. A segment is timed in the **movement** timebase, which
+is the raw clock less `movementDelay`. `GetPositionAt` handed one to the other, so the switch was read
+as having fired `movementDelay` later than it did.
+
+That would be a small error if it degraded gracefully, and it does not. Only the segment at the head
+of the chain is evaluated, and `GetCurrentPosition` clamps anything past its end *to* its end - so
+once the offset exceeds what is left of the current segment, every trigger returns the end of
+whichever phase the drive was in. On a homing move that is one long steady phase, which is why the
+answer came back as most of the move rather than as a few millimetres of overshoot.
+
+`StepTimer::ConvertLocalToMovementTime` is the conversion, and it existed already. The movement delay
+is reported by `M122` next to the clock, because it grows silently: every board slips by the same
+amount, so nothing about the motion looks wrong while it does.
+
+#### Forcing a position is the motion thread's job
+
+`DriveTracker::SetMotorPosition` discards the drive's pending segments, and `MoveSegment`'s freelist
+is documented as not thread-safe. Before §12 that call was made from the SPI thread; §12 moved it to
+whichever managed thread handles the stop report. Either way it races the motion thread's own
+retirement of segments, and the failure is a corrupted freelist rather than a wrong number.
+
+Until now it did not bite, because the only caller was `ReconfigureAsync`, which runs at standstill
+where there are no segments to free. The endstop correction forces a position in the middle of a
+move, which is the case the header's own threading contract was written for. `SetMotorPositions`
+therefore queues the position on a `RingBuffer` and the motion thread adopts it, exactly as a move is
+queued - drained at the top of `SpinOnce`, ahead of the submissions, so a move queued after a
+position was forced is planned from that position. A full queue is reported rather than dropped: a
+lost position is a machine that believes it is somewhere it is not.
+
+`MotionService::GetPositionAt` had the same problem in miniature - it called `DriveTracker::Advance`,
+which retires and releases segments - and it is now a pure read. That is also the better answer:
+advancing to now moves the chain past the segment the trigger falls in, and only the head segment is
+evaluated. It advanced against `StepTimer::GetTimerTicks()` as well, where segments are timed in the
+movement timebase.
+
+#### Standstill was reported before the move started
+
+The move was not finishing before its stop arrived; it was finishing before it *began*. The log line
+`An endstop stop for move #2 arrived after the move had been concluded` was emitted seconds after the
+move was concluded, on a move whose endstop triggered part way along it.
+
+`DuetSbc_MotionSubmitMove` writes the move into a lock-free queue and returns. The ring's
+`m_scheduledMoves` is incremented by `DDARing::AddMove`, which runs on the **motion thread** in
+`DrainSubmissions` - up to a tick later. `WaitForStandstillAsync` compared scheduled against completed
+and did so *before* its first delay, so a caller that submitted a move and immediately waited for it
+was told the machine was idle, about a move that had not started.
+
+Whether it went wrong depended on where the motion thread's tick fell, which is why two identical
+homing moves behaved differently. A homing move that believes it has finished decides its endstop
+never triggered - before the axis has begun to move towards it - and the stop then arrives against a
+move that has already been concluded.
+
+`MotionService::HasPendingSubmissions` reports the queue, and `IsMoving` asks it first.
+`DrainSubmissions` consumes each record only after the ring has counted it, so the queue and the
+counters can never both say idle while a move exists. `WaitForStandstillAsync` is now that one
+question in a loop rather than a second copy of it.
+
+**This was never specific to homing.** Every caller of `WaitForStandstillAsync` - M92, M208, M584,
+M669, anything that must not change what a microstep means mid-move - could be told the machine had
+stopped while a move was on its way to it. It showed up here because a homing move is the one that
+draws a conclusion from having finished.
+
+#### The move could finish before its own stop was heard
+
+Two identical `G1 H1` moves, one homing correctly and one not, with the failing one reporting both a
+stop *and* `X armed but never triggered`. Those two cannot both describe one move unless the move was
+concluded before its stop report was processed - which is what `from 0 towards 0` confirms, the
+planned endpoint having already been overwritten by the conclusion that ran first.
+
+Draining the rings does not mean no stop is coming. The controller stops the drives and reports it
+afterwards, over a link the engine knows nothing about, so the report is in flight while the move
+already looks finished from here. RepRapFirmware needs no equivalent: it stops the drives and records
+the stop in the same interrupt, so the question cannot arise.
+
+Both ends of the window are now closed:
+
+- **A move that has seen no stop waits for one.** After standstill, `WaitForSpecialMoveToFinishAsync`
+  gives a report 50ms - two or three transfers - to arrive. It costs that only on a move that stopped
+  nothing, which is a homing move that has already failed.
+- **A move that has concluded refuses one.** `EndstopCorrection.ConcludeMove` is called under the
+  planner lock, which is the lock a stop report takes before it records anything, so a report that
+  has not arrived by then cannot get in behind the decision. One that arrives later is counted as
+  `too late` in `M122` and dropped rather than applied to a position the next move has already been
+  planned from.
+
+What remains is that a stop carries no move id, so one arriving after the *next* move has armed would
+be attributed to it. The grace window makes that unlikely rather than impossible; closing it properly
+means carrying the move id through `MotionStopped`, which is a protocol change across three
+components.
+
+#### A homed axis never said so
+
+`G1 H1` did set the axis to its switch, and `M114` went on reporting the coordinate the homing move
+had been sent to. `move.axes[].userPosition` is written by `MovePlanner.PublishCommittedPosition`,
+which every move calls as it queues - and a special move queues nothing after it concludes, so
+nothing published the position it concluded. The class doc had said all along that "G92 and a homing
+or probing move" call it; G92 did, the other two did not.
+
+`FinishSpecialMoveAsync` and `RedefineMachinePosition` now do, which covers homing and probing. The
+axis position, the endpoints, the engine and the reported position are then all set from the one
+place, in that order.
+
+#### Saying where the chain broke
+
+Four components have to agree before a homing move ends where it should, and when the machine ends up
+somewhere else none of them says which one did not play its part - the two faults above were found
+with a logic analyser on the SPI and CAN buses, which is not a reasonable thing to need. `M122` now
+reports the chain in the order it runs, on both boards:
+
+| Where | What it says |
+|---|---|
+| DuetCANMaster | `Motion stops reported` / `dropped` - whether the controller told the SBC at all |
+| DuetControlServer | `Endstop stops:` - reports received, drivers named, drivers belonging to no drive, drivers belonging to a drive the move did not arm, positions the engine could not locate, reverts sent, positions adopted and applied |
+| DuetControlServer | `Last endstop stop:` - how far into the move the switch was found, against how far the move was going to go |
+| DuetControlServer | `Last special move:` - what the `G1 H` move concluded, per axis, and why it concluded nothing where it did not |
+| DuetControlServer | `Movement delay:` - the gap between the two clocks the correction has to reconcile |
+
+The counters say the mechanism ran; they cannot say the number it produced is any good, which is
+exactly the state the timestamp fault left it in. `Last endstop stop` is that number: a wind-back of a
+few steps out of thousands is a trigger that was located, and one that is nearly the whole move is a
+trigger that was not.
+
+Both "last" lines quote the move they describe, counted from startup by `EndstopCorrection.ArmMove`.
+Without it the two read as one account of one move and cannot be: a stop reported for move 6 beside a
+move 7 that concluded nothing is the ordinary result of arming a move that was never tripped, and it
+looks exactly like a move whose stop was thrown away.
+
+Read as a chain, each count explains the next one being zero. No reports means the stop never left the
+controller. Drivers that map to no drive mean the two sides disagree about driver numbering - which
+can only happen for a driver a move named itself, so it is always a fault. Positions adopted but not
+applied mean the engine's queue is backed up. The line is printed whether or not anything has
+happened, because "none reported since startup" is the answer to a question worth asking, and it is
+also how to tell that a build reached the machine at all.
+
+Three silent drops became loud with it: a truncated or over-claiming `MotionStopped` packet, a stop
+arriving with no callback registered, and a stopped driver belonging to no configured drive.
+
+#### What is still not covered by tests
+
+`EndstopCorrection` and `MotionService::SetMotorPositions` both need a link and a running motion
+thread, which the harness does not stand up - the same limit §10 records for `HandleMotionStopped`.
+What is covered is the invariant underneath: `DdaRingTests` checks that a forced endpoint is what the
+next move's steps are measured from, and `MotionParametersTests` checks the driver-to-drive-and-index
+mapping the per-driver rule reads. The rest is verified on hardware.
+
+One race is inherent rather than fixed. The stop report crosses SPI, so if an endstop fires within a
+transfer or two of the move's natural end, standstill can be reached before the correction arrives
+and `FinishSpecialMoveAsync` will resync from an uncorrected position. An axis that triggered is
+still put right, because its coordinate comes from its switch rather than from the resync; an axis in
+the same move that did not trigger would keep its planned endpoint. RepRapFirmware has no equivalent
+window because its stop and its position update are the same interrupt.
+
 ---
 
 ## 13. `MotionParameters`: whether the snapshot is still needed
@@ -2438,7 +2706,7 @@ model could simply be read where it is used.
 
 | Consumer | What it reads | Why it cannot take the lock |
 |---|---|---|
-| [EndstopCorrection.Apply](src/DuetControlServer/Motion/EndstopCorrection.cs#L123) → `TrySendRevert` | `DriveForDriver`, then `Geometry`/`StepsPerMm`/`NumAxes` via `SetDriveEndpoint` | Reached synchronously from [LinkService.HandleMotionStopped](src/DuetControlServer/Link/LinkService.cs#L443), a native event dispatch. `AccessReadOnlyAsync` is async-only, and the path is latency-critical — the CAN revert has to go out before the boards wind further (§12) |
+| [EndstopCorrection.Apply](src/DuetControlServer/Motion/EndstopCorrection.cs#L161) → `TrySendRevert` | `DriveForDriver` and `DriverIndexForDriver`, `DriversPerDrive`, then `Geometry`/`StepsPerMm`/`NumAxes` via `SetDriveEndpoint` | Reached synchronously from [LinkService.HandleMotionStopped](src/DuetControlServer/Link/LinkService.cs#L443), a native event dispatch. `AccessReadOnlyAsync` is async-only, and the path is latency-critical — the CAN revert has to go out before the boards wind further (§12) |
 | [MotionService.PublishLivePosition](src/DuetControlServer/Motion/MotionService.cs#L222) | `Geometry`, `StepsPerMm`, `NumAxes` | Reads them inside `planner.Lock()` and takes the object model lock only afterwards. Reading the model inside the planner lock would invert the order every handler uses, which §11's header states as planner-inside-model |
 
 There is also a structural blocker for the move path itself.
@@ -2457,7 +2725,7 @@ Only four things:
 | `Geometry` | **Not in the object model at all.** `KinematicsEngine` is an SBC-side object with precomputed state — `LinearDeltaKinematicsEngine` alone caches `_towerX`/`_towerY`, `_diagonalsSquared` and the forward-transform differences, rebuilt by `Recalculate()`. The object model holds M665/M669's *inputs*, not this |
 | `StepsPerMm` | Dense drive-indexed array; used by both lock-free consumers |
 | `NumAxes` / `NumExtruders` | Used by both lock-free consumers |
-| `_driveForDriver` | Reverse map from board+driver to logical drive, the equivalent of RRF's `Move::GetLogicalDriveForDriver`. Its only consumer is the lock-free endstop path |
+| `_driveForDriver` | Reverse map from board+driver to the logical drive **and the driver's place in it**, the equivalent of RRF's `Move::GetLogicalDriveForDriver` and `AxisDriversConfig`. With `DriversPerDrive` it is what the per-driver stop rule reads (§12.9), and its only consumer is the lock-free endstop path |
 
 ### 13.3 Why the rest stays in the snapshot as well
 
