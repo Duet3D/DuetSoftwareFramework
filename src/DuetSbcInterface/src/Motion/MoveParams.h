@@ -130,9 +130,10 @@ namespace Duet::Sbc::Motion
 	//   1  every driver of the drive watches boards[0], so the first to trigger stops the axis
 	//   n  driver i watches boards[i], so each motor runs on to its own switch
 	//
-	// A stall endstop is the case where n switches are not n handles. A board reports every driver
-	// that stalled under one board-wide handle, RemoteInputHandle(typeStallEndstop, 0, 0), so what
-	// tells one driver's stall from another's is the board rather than the handle. See below.
+	// A stall endstop uses none of this. A board reports every driver that stalled under one
+	// board-wide handle, RemoteInputHandle(typeStallEndstop, 0, 0), and a driver can only ever be
+	// stopped by its own stall - so the board is the driver's own and boards[] selects nothing. See
+	// StopInputForSwitch below.
 	struct MoveStopInput
 	{
 		// RemoteInputHandle the switches are registered under, with a minor field of zero. For an
@@ -156,6 +157,7 @@ namespace Duet::Sbc::Motion
 	// RemoteInputHandle in CANlib: minor is bits 0-5, major 6-11, type 12-15.
 	inline constexpr uint16_t kHandleTypeShift = 12;
 	inline constexpr uint16_t kHandleTypeEndstop = 1;		// RemoteInputHandle::typeEndstop
+	inline constexpr uint16_t kHandleTypeStallEndstop = 5;	// RemoteInputHandle::typeStallEndstop
 
 	static_assert(sizeof(MoveStopInput) == 4 + maxDriversPerAxis, "MoveStopInput layout");
 	static_assert(offsetof(MoveStopInput, boards) == 3);
@@ -182,16 +184,32 @@ namespace Duet::Sbc::Motion
 	// way. A stall endstop in particular is reported under one handle per board whatever the driver,
 	// so deriving a minor for it would name a handle the board never reports and the move would run
 	// on as if it had no endstop at all.
+	//
 	// `switchIndex` selects which of the drive's switches this driver watches. It is the driver's own
 	// index for an axis being squared, where each motor has to reach the switch beside it, and is
 	// assigned round-robin for a stopAll move, where every switch has to be watched by somebody and
 	// which motor watches which does not matter - any of them stops the whole move.
-	[[nodiscard]] constexpr uint32_t StopInputForSwitch(const MoveStopInput& stop, size_t switchIndex) noexcept
+	//
+	// `driverBoard` is the CAN address of the driver being emitted. It is what a stall watch uses,
+	// because a driver can only be stopped by its own stall, and the board that reports it is the one
+	// carrying it. Which drive an entry ends up on is decided after the arming - a stopAll move
+	// rewrites every drive's entry to the one axis' - so the board of the emitting driver is the only
+	// place this can be read from correctly.
+	[[nodiscard]] constexpr uint32_t StopInputForSwitch(const MoveStopInput& stop, size_t switchIndex,
+														uint8_t driverBoard) noexcept
 	{
 		if (stop.numSwitches == 0)
 		{
 			return kNoStopInput;
 		}
+
+		// Checked before anything reads boards[] or switchIndex, because neither means anything for a
+		// stall: every driver of the drive watches its own board under the one board-wide handle
+		if ((stop.handle >> kHandleTypeShift) == kHandleTypeStallEndstop)
+		{
+			return MakeStopInput(driverBoard, stop.handle);
+		}
+
 		if (stop.numSwitches == 1)
 		{
 			return MakeStopInput(stop.boards[0], stop.handle);
@@ -213,9 +231,10 @@ namespace Duet::Sbc::Motion
 	}
 
 	// The switch a driver watches when each motor has to reach the one beside it.
-	[[nodiscard]] constexpr uint32_t StopInputForDriver(const MoveStopInput& stop, size_t driverIndex) noexcept
+	[[nodiscard]] constexpr uint32_t StopInputForDriver(const MoveStopInput& stop, size_t driverIndex,
+														uint8_t driverBoard) noexcept
 	{
-		return StopInputForSwitch(stop, driverIndex);
+		return StopInputForSwitch(stop, driverIndex, driverBoard);
 	}
 
 	// Total size of a submission carrying `numDrives` drives.

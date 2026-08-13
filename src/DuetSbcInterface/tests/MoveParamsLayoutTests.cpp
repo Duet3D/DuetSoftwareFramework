@@ -142,7 +142,9 @@ namespace
 
 			// The board and handle have to survive the round trip separately: they are matched
 			// against an incoming input change one field at a time
-			const uint32_t forDriver = Duet::Sbc::Motion::StopInputForDriver(readStopInputs[i], 0);
+			// 0xFF as the emitting driver's board, which a switch must ignore: only a stall watch
+			// reads it
+			const uint32_t forDriver = Duet::Sbc::Motion::StopInputForDriver(readStopInputs[i], 0, 0xFF);
 			CHECK(Duet::Sbc::Motion::StopInputBoard(forDriver) == i + 1, "the stop input board reads back as written");
 			CHECK(Duet::Sbc::Motion::StopInputHandle(forDriver) == 0x100 + i, "the stop input handle reads back as written");
 		}
@@ -167,7 +169,7 @@ void TestStopInputPerDriver() noexcept
 	shared.boards[0] = 3;
 	for (size_t driver = 0; driver < 3; ++driver)
 	{
-		const uint32_t forDriver = StopInputForDriver(shared, driver);
+		const uint32_t forDriver = StopInputForDriver(shared, driver, 0xFF);
 		CHECK(StopInputBoard(forDriver) == 3, "every driver watches the axis' board");
 		CHECK(StopInputHandle(forDriver) == handle, "and the axis' switch");
 	}
@@ -182,17 +184,17 @@ void TestStopInputPerDriver() noexcept
 	perDriver.boards[2] = 0;
 	for (size_t driver = 0; driver < perDriver.numSwitches; ++driver)
 	{
-		const uint32_t forDriver = StopInputForDriver(perDriver, driver);
+		const uint32_t forDriver = StopInputForDriver(perDriver, driver, 0xFF);
 		CHECK(StopInputBoard(forDriver) == perDriver.boards[driver], "each switch keeps its own board");
 		CHECK(StopInputHandle(forDriver) == handle + driver, "the minor field selects the driver's switch");
 	}
 
 	// A driver with no switch of its own must not fall back to another motor's, which would stop it
 	// at the wrong place and defeat the point of giving each motor one
-	CHECK(StopInputForDriver(perDriver, 3) == kNoStopInput, "a driver past the last switch watches nothing");
+	CHECK(StopInputForDriver(perDriver, 3, 0xFF) == kNoStopInput, "a driver past the last switch watches nothing");
 
 	// A drive with no endstop has to stay without one, or it would start watching switch 0
-	CHECK(StopInputForDriver(kNoStopSwitches, 1) == kNoStopInput, "a drive watching nothing keeps the sentinel");
+	CHECK(StopInputForDriver(kNoStopSwitches, 1, 0xFF) == kNoStopInput, "a drive watching nothing keeps the sentinel");
 
 	// A motor already sitting on its own switch is given no steps while the rest of the axis moves,
 	// which is what lets a gantry that starts with one side down square itself. Holding the whole
@@ -210,27 +212,62 @@ void TestStopInputPerDriver() noexcept
 	// driver is given are independent
 	for (size_t driver = 0; driver < held.numSwitches; ++driver)
 	{
-		CHECK(StopInputForDriver(held, driver) == StopInputForDriver(perDriver, driver),
+		CHECK(StopInputForDriver(held, driver, 0xFF) == StopInputForDriver(perDriver, driver, 0xFF),
 			  "holding a driver leaves every driver watching the switch it was given");
 	}
 
-	// A stall endstop is n boards but one handle: a board reports every driver that stalled under
-	// RemoteInputHandle(typeStallEndstop, 0, 0), so the board tells one driver's stall from
-	// another's. Deriving a minor per driver here would name a handle no board ever reports, and the
-	// move would run on as though it had no endstop
+}
+
+// A driver can only ever be stopped by its own stall, and the board that reports it is the one
+// carrying it. So a stall watch reads the emitting driver's board and nothing else - not boards[],
+// which selects a switch, and not the switch index, which selects a port. Getting this wrong is
+// invisible until the controller starts matching the stalled-driver bitmap against the watch, at
+// which point a driver given another driver's board never matches and its motor runs on.
+void TestStallWatchesTheDriversOwnBoard() noexcept
+{
+	using namespace Duet::Sbc::Motion;
+
+	// A board reports every driver that stalled under RemoteInputHandle(typeStallEndstop, 0, 0)
 	constexpr uint16_t stallHandle = 5u << 12;			// type 5 (stall endstop), major 0, minor 0
 	MoveStopInput stall{};
 	stall.handle = stallHandle;
-	stall.numSwitches = 3;
-	stall.boards[0] = 1;
-	stall.boards[1] = 4;
-	stall.boards[2] = 0;
-	for (size_t driver = 0; driver < stall.numSwitches; ++driver)
+	stall.numSwitches = 1;
+
+	for (uint8_t board = 1; board <= 4; ++board)
 	{
-		const uint32_t forDriver = StopInputForDriver(stall, driver);
-		CHECK(StopInputBoard(forDriver) == stall.boards[driver], "each driver watches its own board");
+		const uint32_t forDriver = StopInputForDriver(stall, 0, board);
+		CHECK(StopInputBoard(forDriver) == board, "each driver watches the board carrying it");
 		CHECK(StopInputHandle(forDriver) == stallHandle, "under the one board-wide stall handle");
 	}
+
+	// Deriving a minor per driver would name a handle no board ever reports, and the move would run
+	// on as though it had no endstop
+	CHECK(StopInputHandle(StopInputForDriver(stall, 2, 7)) == stallHandle,
+		  "the minor field is not derived for a stall handle");
+
+	// On a coupled move every drive carries the one axis' entry and the switch index is handed out
+	// round-robin across the move's drivers. That is right for switches, where any port stops
+	// everything, and meaningless for a stall - so it must not select anything
+	MoveStopInput coupled{};
+	coupled.handle = stallHandle;
+	coupled.numSwitches = 3;
+	coupled.boards[0] = 1;
+	coupled.boards[1] = 4;
+	coupled.boards[2] = 0;
+	for (size_t switchIndex = 0; switchIndex < 5; ++switchIndex)
+	{
+		CHECK(StopInputForSwitch(coupled, switchIndex, 2) == MakeStopInput(2, stallHandle),
+			  "whichever switch it was handed, the driver watches its own board");
+	}
+
+	// Including past the end of the list, where a switch-per-driver axis gives a driver nothing
+	// rather than another motor's switch. A stall has no such thing to run out of
+	CHECK(StopInputForSwitch(coupled, maxDriversPerAxis, 2) == MakeStopInput(2, stallHandle),
+		  "a stall watch has no per-driver list to run past the end of");
+
+	// A drive watching nothing still watches nothing, whatever board is emitting
+	CHECK(StopInputForSwitch(kNoStopSwitches, 0, 2) == kNoStopInput,
+		  "a drive with no endstop keeps the sentinel");
 }
 
 int main()
@@ -240,5 +277,6 @@ int main()
 	TestScheduleMoveLayout();
 	TestMoveParamsTails();
 	TestStopInputPerDriver();
+	TestStallWatchesTheDriversOwnBoard();
 	return TestSupport::Summarise("MoveParams layout");
 }

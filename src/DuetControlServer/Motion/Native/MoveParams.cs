@@ -192,6 +192,24 @@ internal sealed class MoveStopInput
     }
 
     /// <summary>
+    /// Watch for a stall, which every driver of the drive does on its own board
+    /// </summary>
+    /// <param name="handle">The board-wide stall handle</param>
+    /// <remarks>
+    /// No board is written. A driver can only be stopped by its own stall and the board that reports
+    /// it is the one carrying it, so the native side takes the board from the driver it is emitting
+    /// and <see cref="Boards"/> selects nothing. <see cref="NumSwitches"/> is one because there is
+    /// nothing per-switch to count here - it says the drive watches something, which is what
+    /// everything reading it wants to know
+    /// </remarks>
+    public void SetStall(RemoteInputHandle handle)
+    {
+        Clear();
+        Handle = handle;
+        NumSwitches = 1;
+    }
+
+    /// <summary>
     /// Give each driver of the drive its own switch, in driver order
     /// </summary>
     /// <param name="handle">Handle the first switch is registered under; driver i uses minor i</param>

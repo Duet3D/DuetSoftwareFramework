@@ -345,10 +345,13 @@ Kept current as the work lands, not afterwards: a phase moves to ✅ in the same
 and anything it turned out to need that this document did not predict is written into that phase
 rather than left for a reader to find in the diff.
 
+Phases are named by their commit subject rather than by a hash, so that a phase can be ticked in the
+same commit that does it; `git log --grep` finds them.
+
 | Phase | What | Status |
 |---|---|---|
-| 1 | One seam for both kinds | ✅ `133dbca8` |
-| 2 | A driver watches its own board | ⬜ |
+| 1 | One seam for both kinds | ✅ `refactor: arm both kinds of endstop through one seam` |
+| 2 | A driver watches its own board | ✅ `fix: make a stall watch name the driver's own board` |
 | 3 | The controller reads the stalled-driver bitmap | ⬜ |
 | 4 | Stop groups | ⬜ |
 | 5 | `S3` and `S4` told apart | ⬜ |
@@ -383,18 +386,26 @@ Two things the phase needed that this document had not predicted, both kept:
   `numAxes`, which is `min(configured axes, object model axes)` and so is the tighter of the two;
   it can only exclude a drive the planner holds no parameters for.
 
-### Phase 2 — a driver watches its own board (§5.1) ⬜
+### Phase 2 — a driver watches its own board (§5.1) ✅
 
 | | |
 |---|---|
-| Touches | [MoveParams.h](src/DuetSbcInterface/src/Motion/MoveParams.h) `StopInputForSwitch`, [DDA.cpp](src/DuetSbcInterface/src/Movement/DDA.cpp#L864), [RemoteEndstops.cs](src/DuetControlServer/Motion/RemoteEndstops.cs#L193) |
+| Touches | [MoveParams.h](src/DuetSbcInterface/src/Motion/MoveParams.h) `StopInputForSwitch`, [DDA.cpp](src/DuetSbcInterface/src/Movement/DDA.cpp), [RemoteEndstops.cs](src/DuetControlServer/Motion/RemoteEndstops.cs), [MoveParams.cs](src/DuetControlServer/Motion/Native/MoveParams.cs) |
 | Wire format | unchanged |
-| Tests | `ScheduleMoveBuilderTests` gains a stall case: two drivers on different boards, each emitted watching its own; and a `stopAll` case proving the round-robin does not apply to stall handles |
+| Behaviour | a stall watch now always names the board carrying the driver. It was already right whenever the plan's driver order happened to match the drive's; it is now right unconditionally |
+| Tests | `MoveParamsLayoutTests` gains `TestStallWatchesTheDriversOwnBoard`; `RemoteEndstopsTests` says a stall entry names no board. 9 ctest suites and 897 NUnit tests passing |
 
-Simplify `TryGetStallStopInput` at the same time: once the board comes from the driver, all it has to
-say is how many drivers the drive has, so the `boards[]` fill goes away. Phase 1 has already removed
-the reason the fill could disagree with the arming - both now read the one plan - so what is left
-here is deleting a field nobody reads.
+`StopInputForSwitch` takes the emitting driver's CAN address and returns it for a stall handle before
+it reads `boards[]` or the switch index, because neither means anything for a stall. `boards[]` and
+the round-robin still decide a switch, unchanged.
+
+`TryGetStallStopInput` therefore writes no board at all - `MoveStopInput.SetStall` sets the handle and
+a `numSwitches` of one, which is what everything downstream reads it for. It cannot be a board list:
+which drive an entry ends up on is settled *after* the arming, since a coupled move rewrites every
+drive's entry to the one axis', and the boards were then handed out round-robin across the move's
+drivers. A driver could be given another driver's board to watch its own stall on. That is invisible
+today because the controller ignores the bitmap and `stopAll` stops everything anyway, and would
+become a motor that never stops the moment Phase 3 lands - which is why this goes first.
 
 ### Phase 3 — the controller reads the stalled-driver bitmap (§5.3) ⬜
 

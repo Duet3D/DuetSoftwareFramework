@@ -864,8 +864,10 @@ void DDA::Prepare(DDARing& ring,
 								const size_t switchIndex =
 									m_flags.stopAllDrivers ? (stopAllSwitch++ % m_stopOnInput[drive].numSwitches) : i;
 
-								CanMotion::AddAxisMovement(params, driver, driverSteps,
-														   Duet::Sbc::Motion::StopInputForSwitch(m_stopOnInput[drive], switchIndex));
+								CanMotion::AddAxisMovement(
+									params, driver, driverSteps,
+									Duet::Sbc::Motion::StopInputForSwitch(m_stopOnInput[drive], switchIndex,
+																		  driver.boardAddress));
 							}
 						}
 #endif

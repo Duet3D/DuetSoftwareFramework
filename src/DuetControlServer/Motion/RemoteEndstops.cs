@@ -175,20 +175,22 @@ internal static class RemoteEndstops
     /// <summary>
     /// Fill in the stall reports a homing move should stop an axis on
     /// </summary>
-    /// <param name="drivers">Drivers to watch, in driver order</param>
+    /// <param name="drivers">Drivers the axis watches, which is only read to know whether there are any</param>
     /// <param name="stopInput">Entry to fill in; left watching nothing if there is nothing to watch</param>
     /// <returns>True if there is at least one driver to watch</returns>
     /// <remarks>
     /// <para>
     /// A stall is detected by the driver, so what stops the move is a report from the board carrying
-    /// it rather than an input on a pin. Every board reports under the one <see cref="StallHandle"/>,
-    /// so unlike a switch per driver this is one handle and a board per driver - which is why the
-    /// native side only derives a per-driver minor field for an endstop handle.
+    /// it rather than an input on a pin, and every board reports under the one
+    /// <see cref="StallHandle"/>. So there is no board list to write: a driver can only be stopped by
+    /// its own stall, and the board that reports it is the one carrying it, which the native side
+    /// takes from the driver it is emitting.
     /// </para>
     /// <para>
-    /// A single driver is written as shared rather than per-driver so that every driver of the drive
-    /// watches it. That is what makes <c>MotorStallAny</c> stop a dual-motor axis on either motor
-    /// stalling, and it is also the right thing for the coupled case
+    /// Writing a board list here was wrong in a way nothing could catch. Which drive an entry ends up
+    /// on is decided after this runs - a coupled move rewrites every drive's entry to the one axis' -
+    /// and the boards were then handed out round-robin across the move's drivers, so a driver could
+    /// be given another driver's board to watch its own stall on
     /// </para>
     /// </remarks>
     public static bool TryGetStallStopInput(IReadOnlyList<WatchedDriver> drivers, MoveStopInput stopInput)
@@ -199,18 +201,7 @@ internal static class RemoteEndstops
             return false;
         }
 
-        if (drivers.Count == 1)
-        {
-            stopInput.SetShared(StallHandle(), (byte)drivers[0].Driver.Board);
-            return true;
-        }
-
-        Span<byte> boards = stackalloc byte[drivers.Count];
-        for (int i = 0; i < drivers.Count; i++)
-        {
-            boards[i] = (byte)drivers[i].Driver.Board;
-        }
-        stopInput.SetPerDriver(StallHandle(), boards);
+        stopInput.SetStall(StallHandle());
         return true;
     }
 }

@@ -212,11 +212,13 @@ public class RemoteEndstopsTests
     }
 
     [Test]
-    public void AStallEndstopIsOneHandleAndABoardPerDriver()
+    public void AStallEndstopNamesNoBoard()
     {
-        // A board reports every driver that stalled under one board-wide handle, so what tells one
-        // driver's stall from another's is the board. That is the opposite way round from a switch
-        // per driver, where the handle's minor field selects the switch and the boards may repeat
+        // A driver can only be stopped by its own stall and the board that reports it is the one
+        // carrying it, so there is no board to choose here - the native side takes it from the driver
+        // it is emitting. Writing one was wrong in a way nothing could catch: which drive this entry
+        // ends up on is settled afterwards, and a coupled move hands the boards out round-robin, so a
+        // driver could be given another driver's board to watch its own stall on
         MoveStopInput stopInput = new();
         WatchedDriver[] drivers = [new WatchedDriver(new OmDriverId(1, 0), 2400.0f),
                                    new WatchedDriver(new OmDriverId(4, 2), 2400.0f)];
@@ -225,24 +227,19 @@ public class RemoteEndstopsTests
         Assert.Multiple(() =>
         {
             Assert.That(stopInput.Handle, Is.EqualTo(RemoteEndstops.StallHandle()));
-            Assert.That(stopInput.NumSwitches, Is.EqualTo(2));
-            Assert.That(stopInput.Boards[0], Is.EqualTo(1), "the first driver's board");
-            Assert.That(stopInput.Boards[1], Is.EqualTo(4), "the second driver's board");
+            Assert.That(stopInput.NumSwitches, Is.EqualTo(1), "the drive watches something");
+            Assert.That(stopInput.Boards, Is.All.Zero, "and no board is named");
         });
     }
 
     [Test]
-    public void AStallEndstopOnOneDriverStopsEveryDriverOfTheDrive()
+    public void AStallEndstopWithNoDriverWatchesNothing()
     {
-        // Written as shared rather than as a one-entry per-driver list, so that a dual-motor axis
-        // with one stall-detecting driver still stops both motors
+        // The axis has a stall endstop configured and no driver assigned to it, which the move has to
+        // refuse rather than run with nothing to stop it
         MoveStopInput stopInput = new();
         Assert.That(RemoteEndstops.TryGetStallStopInput([new WatchedDriver(new OmDriverId(2, 1), 2400.0f)], stopInput), Is.True);
-        Assert.Multiple(() =>
-        {
-            Assert.That(stopInput.NumSwitches, Is.EqualTo(1), "shared, so every driver watches it");
-            Assert.That(stopInput.Boards[0], Is.EqualTo(2));
-        });
+        Assert.That(stopInput.NumSwitches, Is.EqualTo(1));
 
         Assert.That(RemoteEndstops.TryGetStallStopInput([], stopInput), Is.False, "nothing to watch");
         Assert.That(stopInput.NumSwitches, Is.Zero);
