@@ -64,6 +64,9 @@ namespace Duet::Sbc
 		// OutboundSeqEvent, no tail. Every command up to and including this sequence number was
 		// abandoned instead, because the controller went away before it could be sent
 		OutboundDropped = 15,
+		// CanMessagesSentEvent + CanMessageSentEntry[] tail. What became of the CAN messages the SBC
+		// asked the controller to send
+		CanMessagesSent = 16,
 	};
 
 	// Severity for InboundEventType::Log, mirroring the subset of MessageType DCS logs at.
@@ -135,6 +138,13 @@ namespace Duet::Sbc
 	// How far the outbound queue has got. The queue is FIFO end to end - commands leave the ring in
 	// order and are written into a transfer in order - so one number says what happened to any number
 	// of them, which is what keeps this off the per-command hot path.
+	struct CanMessagesSentEvent
+	{
+		InboundEventHeader header;
+		uint16_t count;
+		uint16_t padding;
+	};
+
 	struct OutboundSeqEvent
 	{
 		InboundEventHeader header;

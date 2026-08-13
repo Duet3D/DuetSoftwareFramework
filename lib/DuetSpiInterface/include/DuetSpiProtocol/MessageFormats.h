@@ -95,6 +95,7 @@ enum class FirmwareRequest : uint16_t {
                            // that a mismatched pair fails on the protocol version rather than here
     CANResponse = 5,       // Forwarded CAN message from expansion boards
     MotionStopped = 6,     // Drive(s) that have stopped
+    CanMessageSent = 7,    // What became of the CAN messages the SBC asked to be sent
 };
 
 // Status of a forwarded CAN message (FirmwareRequests/CanStatus.cs)
@@ -298,6 +299,24 @@ struct MotionStoppedHeader {
 // drivers, so this matches the schedule packet's own limit.
 inline constexpr size_t MaxMotionStoppedDrivers = MaxScheduleMoveDrivers;
 
+// What became of the CAN messages the SBC asked to be sent, batched: the controller answers for
+// everything it dealt with since the last transfer rather than a packet per message. A message the
+// SBC expects no reply to has nothing else that could tell it, and one that does expects a reply
+// that a failure here means will never come.
+struct CanMessageSentHeader {
+    uint16_t count;   // CanMessageSentEntry records that follow this header
+    uint16_t padding;
+};
+
+struct CanMessageSentEntry {
+    uint16_t txToken; // Token the SBC gave the message it asked to be sent
+    uint8_t status;   // CanStatus: Ok means the CAN controller accepted it, not that it is on the wire
+    uint8_t padding;
+};
+
+// Most entries one packet may carry, which is what bounds the ring the controller batches them in
+inline constexpr size_t MaxCanMessagesSentPerTransfer = 64;
+
 struct CanResponseHeader {
     uint16_t txToken;    // Token mapping the response back to its request (0 if unsolicited)
     uint16_t msgType;    // CanMessageType of the received message
@@ -351,6 +370,8 @@ static_assert(sizeof(SendCanMessageHeader) == 12, "SendCanMessageHeader must be 
 static_assert(sizeof(FlashVerify) == 8, "FlashVerify must be 8 bytes");
 static_assert(sizeof(CodeBufferUpdateHeader) == 4, "CodeBufferUpdateHeader must be 4 bytes");
 static_assert(sizeof(CanResponseHeader) == 12, "CanResponseHeader must be 12 bytes");
+static_assert(sizeof(CanMessageSentHeader) == 4, "CanMessageSentHeader must be 4 bytes");
+static_assert(sizeof(CanMessageSentEntry) == 4, "CanMessageSentEntry must be 4 bytes");
 
 // Round a length up to the next 4-byte boundary, matching the padding rules used by both sides.
 inline constexpr size_t AddPadding(size_t length) noexcept {

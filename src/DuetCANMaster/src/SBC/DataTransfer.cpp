@@ -1252,6 +1252,25 @@ bool DataTransfer::WriteCANResponse(const CANResponseHeader& header, const char*
 	return true;
 }
 
+// Tell the SBC what became of the CAN messages it asked to be sent, several at a time.
+// Returns false if there isn't enough room in this transfer, in which case the caller should try again next time.
+bool DataTransfer::WriteCanMessagesSent(const CanMessageSentEntry* entries, size_t count) noexcept
+{
+	const size_t dataLength = sizeof(CanMessageSentHeader) + (count * sizeof(CanMessageSentEntry));
+	if (count == 0 || !CanWritePacket(dataLength))
+	{
+		return false;
+	}
+
+	(void)WritePacketHeader(FirmwareRequest::CanMessageSent, dataLength);
+
+	auto* hdr = WriteDataHeader<CanMessageSentHeader>();
+	hdr->count = (uint16_t)count;
+	hdr->padding = 0;
+	WriteData(reinterpret_cast<const char*>(entries), count * sizeof(CanMessageSentEntry));
+	return true;
+}
+
 // Tell the SBC which drives an endstop stopped and when it fired, so it can work out where they
 // should end up and send the revert.
 // Returns false if there isn't enough room in this transfer, in which case the caller should try again next time.

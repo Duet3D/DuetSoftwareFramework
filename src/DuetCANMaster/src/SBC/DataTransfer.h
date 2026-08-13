@@ -71,6 +71,7 @@ class DataTransfer
 	bool WriteCodeReply(MessageType type, OutputBuffer*& response) noexcept;
 	bool WritePrintPaused(FilePosition position, FilePosition position2, PrintPausedReason reason) noexcept;
 	bool WriteMotionStopped(const MotionStoppedHeader& header, const MotionStoppedDriver* drivers) noexcept;
+	bool WriteCanMessagesSent(const CanMessageSentEntry* entries, size_t count) noexcept;
 	bool WriteCANResponse(const CANResponseHeader& header,
 						  const char* _ecv_null payload) noexcept; // Forward a received CAN message to the SBC
 

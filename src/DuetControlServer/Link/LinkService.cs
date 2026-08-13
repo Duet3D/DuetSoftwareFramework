@@ -260,6 +260,9 @@ internal sealed class LinkService(
             case InboundEventType.MotionStopped:
                 HandleMotionStopped(record);
                 break;
+            case InboundEventType.CanMessagesSent:
+                HandleCanMessagesSent(record);
+                break;
             case InboundEventType.OutboundDelivered:
             case InboundEventType.OutboundDropped:
                 nativeLink.CompleteOutbound(MemoryMarshal.Read<OutboundSeqEvent>(record).SequenceNumber,
@@ -420,6 +423,21 @@ internal sealed class LinkService(
         }
         _controllerDown = true;
         events.Raise(new MachineEvent(EventType.ControllerDisconnect, cause, CanId.MasterAddress, 0, reason));
+    }
+
+    /// <summary>
+    /// Resolve the CAN messages the controller has dealt with
+    /// </summary>
+    /// <param name="record">Raw event record</param>
+    private void HandleCanMessagesSent(ReadOnlySpan<byte> record)
+    {
+        CanMessagesSentEvent sent = MemoryMarshal.Read<CanMessagesSentEvent>(record);
+        ReadOnlySpan<byte> entries = record[Marshal.SizeOf<CanMessagesSentEvent>()..];
+        for (int i = 0; i < sent.Count; i++)
+        {
+            CanMessageSentEntry entry = MemoryMarshal.Read<CanMessageSentEntry>(entries[(i * Marshal.SizeOf<CanMessageSentEntry>())..]);
+            linkInterface.CompleteCanMessageSent(entry.TxToken, (CanStatus)entry.Status);
+        }
     }
 
     /// <summary>

@@ -76,7 +76,10 @@ internal enum InboundEventType : ushort
     OutboundDelivered = 14,
 
     /// <summary>Outbound commands were abandoned instead: <see cref="OutboundSeqEvent"/></summary>
-    OutboundDropped = 15
+    OutboundDropped = 15,
+
+    /// <summary>What became of CAN messages sent for us: <see cref="CanMessagesSentEvent"/> plus entries</summary>
+    CanMessagesSent = 16
 }
 
 /// <summary>
@@ -240,6 +243,38 @@ internal struct CodeBufferEvent
 
     /// <summary>Padding</summary>
     public ushort Padding;
+}
+
+/// <summary>
+/// What became of the CAN messages the controller was asked to send
+/// </summary>
+[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 8)]
+internal struct CanMessagesSentEvent
+{
+    /// <summary>Record header</summary>
+    public InboundEventHeader Header;
+
+    /// <summary>How many entries follow</summary>
+    public ushort Count;
+
+    /// <summary>Padding</summary>
+    public ushort Padding;
+}
+
+/// <summary>
+/// One CAN message the controller was asked to send, and what became of it
+/// </summary>
+[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 4)]
+internal struct CanMessageSentEntry
+{
+    /// <summary>Token the message was queued with</summary>
+    public ushort TxToken;
+
+    /// <summary>Outcome, as a <see cref="Protocol.FirmwareRequests.CanStatus"/></summary>
+    public byte Status;
+
+    /// <summary>Padding</summary>
+    public byte Padding;
 }
 
 /// <summary>

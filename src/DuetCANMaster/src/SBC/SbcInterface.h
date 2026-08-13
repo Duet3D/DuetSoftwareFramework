@@ -60,6 +60,10 @@ class SbcInterface
 
 	bool EnqueueCanResponse(const CANResponseHeader& header, const char* _ecv_null data) noexcept;
 
+	// Record what became of a CAN message the SBC asked to be sent. Called from whichever task dealt
+	// with it, so that every outcome is reported by the code that produced it rather than inferred
+	void ReportCanMessageSent(uint16_t txToken, CanStatus status) noexcept;
+
 	// Tell the SBC that an endstop cut a move short. The controller stops the drives itself, but only
 	// the SBC can say where they should have ended up, so it takes the trigger timestamp from here
 	// and sends the revert. Called from the CAN receiver task
@@ -98,10 +102,17 @@ class SbcInterface
 		uint8_t payload[64];
 	};
 	CanResponseBuffer m_canResponseRing[NumCanResponseBuffers]{};
+
+	// Outcomes waiting to be reported, batched into one packet per transfer
+	static constexpr size_t NumCanMessageSentEntries = SbcProtocol::MaxCanMessagesSentPerTransfer;
+	CanMessageSentEntry m_canMessageSentRing[NumCanMessageSentEntries]{};
+	volatile size_t m_canMessageSentHead = 0;
+	volatile size_t m_canMessageSentTail = 0;
 	volatile size_t m_canResponseHead,
 		m_canResponseTail; // head = next slot to write, tail = next slot to read; empty when equal
 
-	bool ProcessCanResponses() noexcept; // Write queued CAN responses into the current transfer
+	bool ProcessCanResponses() noexcept;
+	bool ProcessCanMessagesSent() noexcept; // Write queued CAN responses into the current transfer
 
 	// Ring of motion-stopped reports waiting to go to the SBC. Endstop stops are rare, so this is
 	// much smaller than the CAN response ring

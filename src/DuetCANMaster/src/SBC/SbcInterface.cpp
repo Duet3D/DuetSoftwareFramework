@@ -198,7 +198,7 @@ static void SendUsbInitMessage(SerialCDC* dev) noexcept
 					// the SBC pulls it on the next clock.
 					// Motion-stopped reports first: a move is already stopped and waiting for the
 					// SBC to say where it should end up, so it should not queue behind status traffic
-					const bool wroteEverything = ProcessMotionStopped() & ProcessCanResponses();
+					const bool wroteEverything = ProcessMotionStopped() & ProcessCanResponses() & ProcessCanMessagesSent();
 					if (wroteEverything)
 					{
 						m_transfer.StartNextTransfer(true);
@@ -457,6 +457,58 @@ bool SbcInterface::ProcessCanResponses() noexcept
 	return ret;
 }
 
+// Record what became of a CAN message the SBC asked to be sent
+void SbcInterface::ReportCanMessageSent(uint16_t txToken, CanStatus status) noexcept
+{
+	const TaskCriticalSectionLocker lock;
+	const size_t next = (m_canMessageSentHead + 1) % NumCanMessageSentEntries;
+	if (next == m_canMessageSentTail)
+	{
+		// The SBC bounds its own wait, so a lost outcome costs a timeout rather than a hang
+		return;
+	}
+
+	CanMessageSentEntry& entry = m_canMessageSentRing[m_canMessageSentHead];
+	entry.txToken = txToken;
+	entry.status = (uint8_t)status;
+	entry.padding = 0;
+	m_canMessageSentHead = next;
+	EventOccurred(true);
+}
+
+// Send what became of the CAN messages the SBC asked to be sent, as many as fit in one packet
+bool SbcInterface::ProcessCanMessagesSent() noexcept
+{
+	CanMessageSentEntry batch[NumCanMessageSentEntries];
+	size_t count = 0;
+	{
+		const TaskCriticalSectionLocker lock;
+		while (m_canMessageSentTail != m_canMessageSentHead && count < NumCanMessageSentEntries)
+		{
+			batch[count++] = m_canMessageSentRing[m_canMessageSentTail];
+			m_canMessageSentTail = (m_canMessageSentTail + 1) % NumCanMessageSentEntries;
+		}
+	}
+
+	if (count == 0)
+	{
+		return true;
+	}
+
+	if (!m_transfer.WriteCanMessagesSent(batch, count))
+	{
+		// No room this time: put them back at the front, in the order they were taken
+		const TaskCriticalSectionLocker lock;
+		for (size_t i = count; i > 0; i--)
+		{
+			m_canMessageSentTail = (m_canMessageSentTail + NumCanMessageSentEntries - 1) % NumCanMessageSentEntries;
+			m_canMessageSentRing[m_canMessageSentTail] = batch[i - 1];
+		}
+		return false;
+	}
+	return true;
+}
+
 void SbcInterface::ExchangeData() noexcept
 {
 
@@ -682,6 +734,7 @@ void SbcInterface::ExchangeData() noexcept
 	// Forward any CAN responses queued by the CAN receiver tasks
 	ProcessMotionStopped();
 	ProcessCanResponses();
+	ProcessCanMessagesSent();
 }
 
 [[noreturn]] void SbcInterface::ReceiveAndStartIap(const char* iapChunk, size_t length) noexcept

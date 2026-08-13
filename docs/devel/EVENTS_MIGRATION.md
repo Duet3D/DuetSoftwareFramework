@@ -526,7 +526,7 @@ does not reach:
 | Commands carrying a request id (enable CAN, e-stop, reset, firmware update) | ✅ `CompleteRequest(id, RequestResult::Cancelled)` → `TrySetCanceled()` ([NativeLink.cs:448](src/DuetControlServer/Link/Native/NativeLink.cs#L448)); `Cancelled` is documented as exactly this case ([LinkEvents.h:76](src/DuetSbcInterface/src/SBC/LinkEvents.h#L76)) |
 | CAN requests expecting a reply | ✅ cancelled by `LinkInterface.Invalidate()`, and by the 2 s `CanRequestTimeout` |
 | Scheduled moves | ✅ no `MoveCompleted` arrives; `motionTracker.Invalidate()` discards the moves they refer to |
-| **Fire-and-forget CAN messages** | ❌ today: resolved as *sent* the moment the native loop takes them ([LinkInterface.cs:263-270](src/DuetControlServer/Link/LinkInterface.cs#L263-L270)), so a dropped one cannot be reported — DCS already believes it succeeded. Fixed by §4.1.2 |
+| **Fire-and-forget CAN messages** | ✅ resolved when the controller says the CAN peripheral took the message, and failed when it says why it could not |
 
 So the drop needs a `Cancelled` completion for anything holding a request id, and — once §4.1.2 lands —
 for every unsent CAN message too.
@@ -761,7 +761,7 @@ Each phase is independently useful and independently testable.
 - [x] Unit tests: ordering, suppression, head pinning, macro-name mapping for all 13 types, and the
       two invariants CANlib asserts of the driver status masks
 
-### Phase C — the link events 🟡
+### Phase C — the link events ✅
 
 - [x] Native: post `ConnectionLost` from `PrepareReconnect`, `ConnectionEstablished` on recovery
       **after** the `HadReset` check, carry `HadReset` (§4.1)
@@ -773,11 +773,14 @@ Each phase is independently useful and independently testable.
       and `OutboundDropped(seq)` on a drop (§4.1.2 hop 1)
 - [x] DCS: a CAN message expecting no reply resolves on delivery rather than at queue time
 - [x] Correct the stale C# `Consts.ProtocolVersion`, which disagreed with the transfer engine's copy
-- [ ] Protocol: `FirmwareRequest::CanMessageSent`, batched `{txToken, status}` entries (hop 2). No
+- [x] Protocol: `FirmwareRequest::CanMessageSent`, batched `{txToken, status}` entries (hop 2). No
       version bump: nothing has been released against this protocol yet
-- [ ] Controller: acknowledge every SBC-originated CAN message from `SendCanRequest`, including the
-      four paths that currently fail silently; map a cancelled CAN id back to its token
-- [ ] DCS: resolve fire-and-forget CAN requests on the ack rather than at queue time, bound by
+- [x] Controller: acknowledge every SBC-originated CAN message from `SendCanRequest`, including three
+      of the four paths that failed silently
+- [ ] Controller: map a CAN id cancelled to make room back to the token that sent it, which is the
+      fourth. `SendMessage` names the message it dropped by id, and only an in-flight id-to-token
+      table can turn that into an outcome for a particular request
+- [x] DCS: resolve fire-and-forget CAN requests on the ack rather than at queue time, bound by
       `CanRequestTimeout`; fail reply-expecting requests early on a non-`Ok` ack or a hop-1 drop
 - [ ] Test: send with CAN disabled and with a full tx buffer; expect the code to fail, not to succeed
       or to hang for 2 s. Pull the link mid-transfer; expect the staged commands to report dropped

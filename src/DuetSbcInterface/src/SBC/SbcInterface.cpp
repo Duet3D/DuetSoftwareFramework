@@ -713,6 +713,27 @@ namespace Duet::Sbc
 			PostEvent(InboundEventType::CanResponse, &event, sizeof(event), data + sizeof(header), header.dataLength);
 			break;
 		}
+		case proto::FirmwareRequest::CanMessageSent:
+		{
+			if (dataLength < sizeof(proto::CanMessageSentHeader))
+			{
+				break;
+			}
+			proto::CanMessageSentHeader header{};
+			std::memcpy(&header, data, sizeof(header));
+
+			const size_t entriesLength = header.count * sizeof(proto::CanMessageSentEntry);
+			if (dataLength < sizeof(header) + entriesLength)
+			{
+				break;
+			}
+
+			CanMessagesSentEvent event{};
+			event.header.type = static_cast<uint16_t>(InboundEventType::CanMessagesSent);
+			event.count = header.count;
+			PostEvent(InboundEventType::CanMessagesSent, &event, sizeof(event), data + sizeof(header), entriesLength);
+			break;
+		}
 		case proto::FirmwareRequest::MotionStopped:
 		{
 			// Every way of not acting on this is reported. A stop that is dropped here leaves the

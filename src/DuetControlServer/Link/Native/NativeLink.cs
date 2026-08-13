@@ -99,6 +99,8 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
         Check<CodeBufferEvent>(8);
         Check<ConnectionEstablishedEvent>(8);
         Check<OutboundSeqEvent>(8);
+        Check<CanMessagesSentEvent>(8);
+        Check<CanMessageSentEntry>(4);
         Check<RequestCompletedEvent>(12);
         Check<LogEvent>(8);
         Check<MalformedPacketEvent>(12);

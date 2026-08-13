@@ -668,8 +668,11 @@ unsigned int CanInterface::GetNumPendingMotionMessages() noexcept
 // send is non-blocking.
 void CanInterface::SendCanRequest(CanMessageBuffer& buf, uint16_t txToken, CanMessageType replyType) noexcept
 {
+	bool noReplyPossible = false;
 	if (can0dev == nullptr)
 	{
+		// CAN was never enabled. Nothing reaches the bus and the SBC has no other way to find out
+		reprap.GetSbcInterface().ReportCanMessageSent(txToken, CanStatus::BusError);
 		return;
 	}
 
@@ -682,6 +685,7 @@ void CanInterface::SendCanRequest(CanMessageBuffer& buf, uint16_t txToken, CanMe
 			reprap.GetPlatform().MessageF(WarningMessage,
 										  "Dropped SBC CAN request type %u: request ID placeholder not 0xFFF\n",
 										  (unsigned int)buf.id.MsgType());
+			reprap.GetSbcInterface().ReportCanMessageSent(txToken, CanStatus::BusError);
 			return;
 		}
 
@@ -719,9 +723,9 @@ void CanInterface::SendCanRequest(CanMessageBuffer& buf, uint16_t txToken, CanMe
 			}
 			else
 			{
-				// TODO: send a message to the SBC to say that we have no free slots for pending requests, so it should
-				// not expect a reply If there is no free slot we still send the request, but we won't be able to
-				// forward the reply
+				// The request is still sent, but nothing can match its reply back to the SBC. Saying so
+				// is what lets the caller fail now rather than wait out a reply that cannot arrive
+				noReplyPossible = true;
 			}
 		}
 	}
@@ -747,6 +751,10 @@ void CanInterface::SendCanRequest(CanMessageBuffer& buf, uint16_t txToken, CanMe
 	} // TODO: choose a different buffer for urgent requests
 	const auto timeout = maxRequestSendWait; // TODO make this configurable per request type
 	SendCanMessage(txBuffer, timeout, buf);
+
+	// Accepted by the CAN controller, which is as much as this can say: SendMessage returns once the
+	// peripheral has taken the message, not once it is on the wire
+	reprap.GetSbcInterface().ReportCanMessageSent(txToken, noReplyPossible ? CanStatus::NoBuffer : CanStatus::Ok);
 	reprap.GetPlatform().OnProcessingCanMessage();
 }
 

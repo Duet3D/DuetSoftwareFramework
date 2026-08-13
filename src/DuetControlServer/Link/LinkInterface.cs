@@ -476,6 +476,47 @@ public sealed partial class LinkInterface(
     /// Abort all files in RRF on the given channel asynchronously
     /// </summary>
     /// <summary>
+    /// Record what became of a CAN message the controller was asked to send
+    /// </summary>
+    /// <param name="txToken">Token the message was queued with</param>
+    /// <param name="status">Outcome the controller reported</param>
+    /// <remarks>
+    /// A message expecting no reply is complete here: this is the furthest anything can say it got.
+    /// One expecting a reply is only failed here - a reply it can no longer receive is one it would
+    /// otherwise wait out the whole timeout for
+    /// </remarks>
+    internal void CompleteCanMessageSent(ushort txToken, Protocol.FirmwareRequests.CanStatus status)
+    {
+        CanRequest? request = null;
+        lock (CanRequests)
+        {
+            foreach (CanRequest candidate in CanRequests)
+            {
+                if (candidate.TxToken == txToken)
+                {
+                    request = candidate;
+                    break;
+                }
+            }
+
+            if (request is null || (request.ExpectsReply && status == Protocol.FirmwareRequests.CanStatus.Ok))
+            {
+                return;
+            }
+            CanRequests.Remove(request);
+        }
+
+        if (status == Protocol.FirmwareRequests.CanStatus.Ok)
+        {
+            request.SetResult();
+        }
+        else
+        {
+            request.SetException(new IOException($"Controller could not send CAN message: {status}"));
+        }
+    }
+
+    /// <summary>
     /// Invalidate pending codes and code-relevant requests due to an emergency stop
     /// </summary>
     internal void InvalidateCodes()
