@@ -179,13 +179,23 @@ jobs:
       - name: Verify the CAN message layouts against CANlib
         run: make can-messages-verify
 
-      # Tests in the RequiresMachine category talk to a real Duet/SBC over HTTP. They skip themselves
-      # unless DSF_TEST_MACHINE_URL is set, but exclude them explicitly so they cannot stall the runner.
-      - name: Run C# unit tests
+      # Runs the tests with coverage and writes both UnitTests.trx and coverage.cobertura.xml into
+      # test-results, which is uploaded below. The RequiresMachine category, which needs a real
+      # Duet/SBC over HTTP, is excluded by the script.
+      - name: Run C# unit tests with coverage
+        run: ./scripts/coverage.sh --results-dir test-results | tee coverage.log
+
+      # Surfaces the per-assembly table on the run's summary page so a coverage change is visible
+      # without opening the log or downloading the artifact.
+      - name: Publish coverage summary
+        if: always()
         run: |
-          dotnet test src/UnitTests/UnitTests.csproj -c Debug \
-            --filter "TestCategory!=RequiresMachine" \
-            --logger "trx;LogFileName=UnitTests.trx" --results-directory test-results
+          {
+            echo '### Code coverage'
+            echo '```'
+            sed -n '/^=== Coverage ===$/,$p' coverage.log || echo 'No coverage summary produced'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # The DuetSbcInterface tests are host-side and only get built when not cross-compiling, so
       # they run through the native preset rather than the arm64 one the deployable .so uses.

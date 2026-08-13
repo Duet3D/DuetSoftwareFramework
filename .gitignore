@@ -33,6 +33,11 @@ bld/
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*
 
+# scripts/coverage.sh output
+test-results/
+coverage.log
+coverage-report/
+
 # NUNIT
 *.VisualState.xml
 TestResult.xml
