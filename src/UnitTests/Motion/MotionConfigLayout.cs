@@ -1,7 +1,9 @@
 using System;
 using System.Buffers.Binary;
+using System.Runtime.InteropServices;
 using DuetControlServer.Motion.Native;
 using NUnit.Framework;
+using UnitTests.Utility;
 
 namespace UnitTests.Motion;
 
@@ -43,6 +45,24 @@ public class MotionConfigLayout
         Assert.That(MotionLimits.MaxExtruders, Is.EqualTo(20));
         Assert.That(MotionLimits.MaxAxesPlusExtruders, Is.EqualTo(32));
         Assert.That(MotionLimits.MaxDriversPerAxis, Is.EqualTo(8));
+    }
+
+    [Test]
+    public void AxisDriversConfigDeclaresTheStrideItIsWrittenAt()
+    {
+        // The struct is never marshalled - it holds a managed array, so nothing checks its declared
+        // Size against anything, and Serialize writes each axis by hand. What that declaration has
+        // to agree with is the distance between one axis and the next in the record, which is what
+        // puts extruderDrivers at the offset the native side reads it from rather than 30 axes'
+        // worth of some other number further along
+        int stride = (ExtruderDriversOffset - AxisDriversOffset) / MotionLimits.MaxAxes;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(stride, Is.EqualTo(typeof(AxisDriversConfig).StructLayoutAttribute!.Size), "sizeof(AxisDriversConfig)");
+            Assert.That(stride, Is.EqualTo(1 + (MotionLimits.MaxDriversPerAxis * Marshal.SizeOf<DriverId>())), "numDrivers and a DriverId per driver");
+            Assert.That(PackedStructSize.OfFields(typeof(DriverId)), Is.EqualTo(Marshal.SizeOf<DriverId>()), "the fields fill DriverId, leaving no padding");
+        });
     }
 
     [Test]
