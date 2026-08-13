@@ -294,3 +294,6 @@ aot/out
 build/
 # Claude Code worktrees are local scratch, not part of the repository
 .claude/worktrees/
+
+# Reference checkout of RepRapFirmware; not a submodule of this repo.
+lib/RepRapFirmware/

@@ -94,7 +94,16 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Mark workspace as a safe git directory
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        run: git config --global --add safe.directory '*'
+
+      # libduet_sbc.so compiles RRFLibraries for its host, so DuetSbcInterface needs that submodule
+      # and DuetControlServer needs it too because it builds libduet_sbc.so in turn. Nothing else in
+      # the matrix touches lib/, so the clone is skipped for the other projects.
+      - name: Check out RRFLibraries
+        if: matrix.project == 'DuetSbcInterface' || matrix.project == 'DuetControlServer'
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git submodule update --init --depth 1 lib/RRFLibraries
 
       - name: Build ${{ matrix.project }} (${{ matrix.arch }}, ${{ matrix.mode }})
         run: ./scripts/build.sh ${{ matrix.mode == 'aot' && '--aot' || '' }} --arch ${{ matrix.arch }} ${{ matrix.project }}
@@ -196,11 +205,13 @@ jobs:
 
       # The DuetSbcInterface tests are host-side and only get built when not cross-compiling, so
       # they run through the native preset rather than the arm64 one the deployable .so uses.
+      # The whole preset is built rather than named targets, so a test added later is run here
+      # without this step having to be edited.
       - name: Build and run DuetSbcInterface tests
         working-directory: src/DuetSbcInterface
         run: |
           cmake --preset native
-          cmake --build --preset native --target ring_buffer_tests -j"$(nproc)"
+          cmake --build --preset native -j"$(nproc)"
           ctest --test-dir build/native --output-on-failure
 
       - name: Upload test results
