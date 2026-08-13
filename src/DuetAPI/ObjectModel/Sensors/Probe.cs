@@ -56,26 +56,6 @@ public partial class Probe : ModelObject, IStaticModelObject
     public ObservableCollection<float> DiveHeights { get; } = [0F, 0F];
 
     /// <summary>
-    /// Force measured by the probe (in g), or null if it is not a force-sensing probe
-    /// </summary>
-    public float? Force
-    {
-        get => _force;
-        set => SetPropertyValue(ref _force, value);
-    }
-    private float? _force;
-
-    /// <summary>
-    /// Scale of a force-sensing probe (in g per count), or null if it has not been calibrated
-    /// </summary>
-    public float? GramsPerCount
-    {
-        get => _gramsPerCount;
-        set => SetPropertyValue(ref _gramsPerCount, value);
-    }
-    private float? _gramsPerCount;
-
-    /// <summary>
     /// Indicates if the scanning probe is calibrated
     /// </summary>
     public bool? IsCalibrated
@@ -94,6 +74,16 @@ public partial class Probe : ModelObject, IStaticModelObject
         set => SetPropertyValue(ref _lastStopHeight, value);
     }
     private float _lastStopHeight;
+
+    /// <summary>
+    /// Load cell parameters (only applicable for load cell probes, otherwise null)
+    /// </summary>
+    public ProbeLoadCell? LoadCell
+    {
+        get => _loadCell;
+        set => SetPropertyValue(ref _loadCell, value);
+    }
+    private ProbeLoadCell? _loadCell;
 
     /// <summary>
     /// Maximum number of times to probe after a bad reading was determined
@@ -120,16 +110,6 @@ public partial class Probe : ModelObject, IStaticModelObject
     /// X+Y offsets (in mm)
     /// </summary>
     public ObservableCollection<float> Offsets { get; } = [0F, 0F];
-
-    /// <summary>
-    /// Preload of a force-sensing probe at the last tare (in g), or null if it is not a force-sensing probe
-    /// </summary>
-    public float? Preload
-    {
-        get => _preload;
-        set => SetPropertyValue(ref _preload, value);
-    }
-    private float? _preload;
 
     /// <summary>
     /// Recovery time (in s)
