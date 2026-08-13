@@ -51,6 +51,11 @@ namespace Duet::Sbc::Motion
 		inline constexpr uint32_t isolatedMove = 1u << 8;
 		// Some extruder moves forwards during this move (M571)
 		inline constexpr uint32_t hasForwardExtrusion = 1u << 9;
+		// Any watched input stops every driver of this move - RepRapFirmware's stopAll. Set when
+		// moving the axis being homed needs drives other than its own, so stopping only the drivers
+		// that watch the switch would leave the others running. The axis' switches are spread over
+		// the move's drivers, so all of them are watched and whichever fires first stops everything
+		inline constexpr uint32_t stopAllDrivers = 1u << 10;
 	}
 
 #pragma pack(push, 1)
@@ -135,7 +140,16 @@ namespace Duet::Sbc::Motion
 		uint16_t handle;
 		uint8_t numSwitches;
 		uint8_t boards[maxDriversPerAxis];		// CAN address of each switch, in driver order
-		uint8_t padding;						// declared so the C# mirror can match it
+
+		// Drivers already sitting on their own switch when the move was built, one bit per driver.
+		//
+		// Such a driver is given no steps rather than the drive being held still. An axis with a
+		// switch per driver is squared by letting each motor run on to its own switch, so a gantry
+		// that starts with one side already down has exactly one side left to move - holding the
+		// whole axis because one switch is closed would make the move that corrects a skew do
+		// nothing. RepRapFirmware does the same from DDA::Prepare, where CheckEndstops(false) zeroes
+		// the steps of "the motors concerned" before the movement messages go out
+		uint8_t heldDrivers;
 	};
 
 	// The handle type field, which decides whether the minor field is per-driver. See
@@ -145,6 +159,14 @@ namespace Duet::Sbc::Motion
 
 	static_assert(sizeof(MoveStopInput) == 4 + maxDriversPerAxis, "MoveStopInput layout");
 	static_assert(offsetof(MoveStopInput, boards) == 3);
+	static_assert(maxDriversPerAxis <= 8, "heldDrivers is one byte, so one bit per driver of an axis");
+
+	// Whether this driver was already on its switch when the move was built, so it must not be given
+	// any steps. See MoveStopInput::heldDrivers.
+	[[nodiscard]] constexpr bool IsDriverHeld(const MoveStopInput& stop, size_t driverIndex) noexcept
+	{
+		return driverIndex < maxDriversPerAxis && (stop.heldDrivers & (1u << driverIndex)) != 0;
+	}
 
 	// A drive that watches nothing, which is what every drive of an ordinary move carries.
 	inline constexpr MoveStopInput kNoStopSwitches{};
@@ -160,7 +182,11 @@ namespace Duet::Sbc::Motion
 	// way. A stall endstop in particular is reported under one handle per board whatever the driver,
 	// so deriving a minor for it would name a handle the board never reports and the move would run
 	// on as if it had no endstop at all.
-	[[nodiscard]] constexpr uint32_t StopInputForDriver(const MoveStopInput& stop, size_t driverIndex) noexcept
+	// `switchIndex` selects which of the drive's switches this driver watches. It is the driver's own
+	// index for an axis being squared, where each motor has to reach the switch beside it, and is
+	// assigned round-robin for a stopAll move, where every switch has to be watched by somebody and
+	// which motor watches which does not matter - any of them stops the whole move.
+	[[nodiscard]] constexpr uint32_t StopInputForSwitch(const MoveStopInput& stop, size_t switchIndex) noexcept
 	{
 		if (stop.numSwitches == 0)
 		{
@@ -170,10 +196,11 @@ namespace Duet::Sbc::Motion
 		{
 			return MakeStopInput(stop.boards[0], stop.handle);
 		}
-		if (driverIndex >= stop.numSwitches || driverIndex >= maxDriversPerAxis)
+		if (switchIndex >= stop.numSwitches || switchIndex >= maxDriversPerAxis)
 		{
 			return kNoStopInput;
 		}
+		const size_t driverIndex = switchIndex;
 
 		if ((stop.handle >> kHandleTypeShift) != kHandleTypeEndstop)
 		{
@@ -183,6 +210,12 @@ namespace Duet::Sbc::Motion
 		constexpr uint16_t minorMask = 0x3F;			// RemoteInputHandle::minor is 6 bits wide
 		const auto handle = static_cast<uint16_t>((stop.handle & ~minorMask) | (driverIndex & minorMask));
 		return MakeStopInput(stop.boards[driverIndex], handle);
+	}
+
+	// The switch a driver watches when each motor has to reach the one beside it.
+	[[nodiscard]] constexpr uint32_t StopInputForDriver(const MoveStopInput& stop, size_t driverIndex) noexcept
+	{
+		return StopInputForSwitch(stop, driverIndex);
 	}
 
 	// Total size of a submission carrying `numDrives` drives.

@@ -489,6 +489,23 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
     private readonly Dictionary<int, uint> _endstopSwitches = [];
 
     /// <summary>
+    /// Which switches of one endstop are currently closed, one bit per switch
+    /// </summary>
+    /// <param name="axis">Axis the endstop belongs to</param>
+    /// <returns>The switches, as a bitmap</returns>
+    /// <remarks>
+    /// <c>sensors.endstops[].triggered</c> answers whether <em>any</em> switch is closed, which is
+    /// the question a single-switch axis has. An axis with a switch per driver has a different one:
+    /// which motors are already down, because those are the ones that must not be moved while the
+    /// others run on to their own switches. Only the arming path asks this
+    /// </remarks>
+    public uint GetClosedEndstopSwitches(int axis)
+    {
+        _endstopSwitches.TryGetValue(axis, out uint switches);
+        return switches;
+    }
+
+    /// <summary>
     /// Record the state of one switch of an endstop
     /// </summary>
     /// <param name="axis">Axis the endstop belongs to</param>

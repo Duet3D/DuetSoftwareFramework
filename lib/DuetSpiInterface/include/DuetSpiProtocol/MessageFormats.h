@@ -171,6 +171,14 @@ inline constexpr uint8_t UsePressureAdvance = 1u << 1;
 inline constexpr uint8_t CheckEndstops = 1u << 2;
 // The last packet of this move: the controller sends the accumulated CAN messages when it sees this
 inline constexpr uint8_t LastPacket = 1u << 3;
+// Any watched input stops every driver of this move, not just the drivers watching that input.
+//
+// This is RepRapFirmware's EndstopHitAction::stopAll. It is set when moving the axis being homed
+// needs drives other than its own - a CoreXY axis needs both motors - so stopping only the drivers
+// that watch the switch would leave the others running and drag the head into it. The axis may have
+// several switches, spread over the move's drivers so that all of them are watched; whichever fires
+// first stops everything.
+inline constexpr uint8_t StopAllDrivers = 1u << 4;
 } // namespace ScheduleMoveFlags
 
 // Schedule a move on the controller (SbcRequest::ScheduleMove).

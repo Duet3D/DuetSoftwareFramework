@@ -124,7 +124,7 @@ to use for backing off a switch that is already closed.
 **DuetControlServer** does all of this, in
 [ApplyEndstops](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs). Per axis the code actually
 mentions - a move naming X and Y must not be stopped by Z's switch happening to be closed - it fills
-in `RawMove.StopOnInput[drive]`, a `MoveStopInput` of `{ handle, numSwitches, boards[] }`. That is
+in `RawMove.StopOnInput[drive]`, a `MoveStopInput` of `{ handle, numSwitches, boards[], heldDrivers }`. That is
 RepRapFirmware's `SwitchEndstop` reduced to what a move needs.
 
 ### The four stop actions
@@ -152,6 +152,15 @@ flowchart TD
     E --> I
     F --> I
 ```
+
+`stopAll` keeps **every** switch of the axis. RepRapFirmware watches all of an endstop's ports
+whatever the action - `PrimeAxis` primes `portsLeftToTrigger` with all of them and `CheckTriggered`
+scans them all - and only the action changes. Here the switches are spread across the move's drivers
+so that each one is watched by somebody, and the move carries `ScheduleMoveFlags::StopAllDrivers` so
+that whichever fires stops every driver rather than only the ones watching it. Collapsing the axis to
+its first switch instead, which is what this did until it was tested on a CoreXY with two X switches,
+leaves the others armed on nothing: they do nothing, and `M119` still shows them because the state
+comes from the board rather than from the move.
 
 `stopAll` is the one that matters for correctness rather than tidiness. On a CoreXY, holding X still
 needs both motors, so stopping only "X's drivers" would leave the other running and drag the head
@@ -186,6 +195,38 @@ axis that is already at its switch to stay where it is, latching it as triggered
 concludes correctly. RepRapFirmware reaches the same place from the
 other direction: its step interrupt tests the endstop before the first step, so the move ends on the
 step it began. On coupled kinematics one closed switch holds every drive.
+
+**Except on an axis with a switch per driver**, where holding the whole axis would defeat the point
+of it. That arrangement squares a gantry by letting each motor run on to its own switch, so the move
+that corrects a skew is exactly the one that starts with one side already down - and stopping the
+axis because one switch is closed would make it do nothing, leaving the gantry skewed and the axis
+calling itself homed. Only the motors that are already on their switches are held; the rest move.
+
+A held motor counts as stopped from the start. It is given no steps, so it never moves, so no input
+changes and no stop is ever reported for it - and the drive is only finished, its position adopted
+and the move ended, once every one of its motors is down. Waiting for a report that cannot arrive
+would leave the move running its full planned length after the last moving motor had already
+stopped.
+
+They are held by being given no steps, which is a per-driver quantity the movement message already
+has, rather than by changing what the drive is doing. `MoveStopInput.heldDrivers` carries one bit per
+driver from `ApplyEndstops` to `DDA::Prepare`, which emits zero for those and the move's delta for
+the others. The drive still watches all of its switches: the motors that are moving still have to be
+stopped by their own, and a driver given no steps is marked inactive in the controller's stop list,
+so it cannot be stopped twice.
+
+RepRapFirmware does the same thing in the same place. `DDA::Prepare` calls `CheckEndstops(false)`
+after the per-driver movements have been accumulated and before they are sent, and
+`StopDriverWhenProvisional` zeroes the steps of - in the firmware's own words - "the motors
+concerned". `SwitchEndstop::CheckTriggered` only escalates to stopping the whole axis once one
+switch is left untriggered, which is the same rule as holding the axis here only when every switch
+is closed.
+
+The axis is deliberately **not** latched as triggered by this, nor by the first motor to reach its
+switch. RepRapFirmware records an endstop as having triggered for `stopAll` and `stopAxis` and never
+for `stopDriver`: an axis with switches left to reach has not finished homing. That is also where a
+partly homed axis becomes visible - it stays unhomed, and `G28` reports "Failed to home axes" from
+the same latch.
 
 ---
 
@@ -358,8 +399,12 @@ decision, and it runs under the planner lock:
    of `NoReply` and no request id.
 4. **Adopt the position**, once the last driver of that drive has stopped (see below), by pushing it
    down through `SetMotorPositions` and writing it into the planner's own endpoints.
-5. **Latch which axes were stopped** into `MovementState.EndstopsTriggered`, because this is the only
-   moment at which it is known.
+5. **Latch the axis** into `MovementState.EndstopsTriggered`, once every motor of the drive is down
+   and not before. This is the only moment at which it is known, and waiting is what makes a partly
+   homed axis visible: RepRapFirmware records an endstop as triggered on `stopAll` and `stopAxis`
+   and never on `stopDriver`, so an axis with switches left to reach stays unhomed and `G28` then
+   reports "Failed to home axes". Latching on the first motor would set the axis to the coordinate
+   of a switch its other motors never arrived at, and call the move a success.
 
 **Duet3Expansion** handles `revertPosition` statelessly
 ([CanInterface.cpp](src/Duet3Expansion/src/CAN/CanInterface.cpp)): it reads
@@ -524,10 +569,13 @@ thing. They are listed as invariants rather than as bugs because that is how the
 6. **A CAN message that expects no reply says `NoReply`.** The controller reads any other value as a
    reply being expected and then requires an all-ones request id placeholder to allocate over - which
    a revert has no field for, so it is dropped rather than sent, and the machine keeps its overshoot.
-7. **The state a board reports when a monitor is created is adopted.** From then on it reports only
+7. **A switch already closed holds its own motor, not the whole axis** - unless the axis has one
+   switch for every driver, or is coupled. Holding an axis that has motors left to reach their own
+   switches turns the move that squares a gantry into one that does nothing.
+8. **The state a board reports when a monitor is created is adopted.** From then on it reports only
    changes, so a switch already closed at that moment is never reported at all, and every check that
    asks "is it triggered" answers no for as long as nobody touches it by hand.
-8. **A position redefined without moving is published.** `move.axes[].userPosition` is written by
+9. **A position redefined without moving is published.** `move.axes[].userPosition` is written by
    `PublishCommittedPosition`, which ordinary moves call as they queue; a special move queues nothing
    after it concludes.
 
@@ -565,6 +613,11 @@ that was never tripped and looks exactly like a stop that was thrown away.
   a board that rebooted stop being watched and stop being reported - silently, because an endstop
   that is never reported looks exactly like one that never triggers. Closing it means replaying the
   `M574` and `M558` configuration for that board when it announces.
+- **An axis whose switch count differs from its driver count keeps only its first switch.**
+  RepRapFirmware watches every port and lets the first trigger stop the whole axis; here
+  `RemoteEndstops.TryGetStopInput` falls back to `SetShared`, which takes `boards[0]` alone. The
+  same class of fault as the `stopAll` collapse above, in the one case the wire format cannot yet
+  express: stopping every driver *of one drive* has no flag, only stopping every driver of the move.
 - **A stop report carries no move id.** A report arriving after the *next* move has armed would be
   attributed to it. The grace window in §9 makes that unlikely rather than impossible; closing it
   properly means carrying the move id through `MotionStopped`, which is a protocol change across

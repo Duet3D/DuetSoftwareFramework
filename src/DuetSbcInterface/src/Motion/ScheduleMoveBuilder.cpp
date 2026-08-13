@@ -107,7 +107,7 @@ bool ScheduleMoveBuilder::SendPacket(uint32_t moveId, uint32_t moveStartTime, ui
 }
 
 uint32_t ScheduleMoveBuilder::FinishMovement(uint32_t moveId, uint32_t moveStartTime, bool simulating,
-											 bool checkEndstops, bool useInputShaping) noexcept
+											 bool checkEndstops, bool stopAllDrivers, bool useInputShaping) noexcept
 {
 	const size_t total = m_numDrivers;
 	m_numDrivers = 0;
@@ -122,6 +122,7 @@ uint32_t ScheduleMoveBuilder::FinishMovement(uint32_t moveId, uint32_t moveStart
 	if (useInputShaping) { commonFlags |= ScheduleMoveFlags::UseInputShaping; }
 	if (m_usePressureAdvance) { commonFlags |= ScheduleMoveFlags::UsePressureAdvance; }
 	if (checkEndstops) { commonFlags |= ScheduleMoveFlags::CheckEndstops; }
+	if (stopAllDrivers) { commonFlags |= ScheduleMoveFlags::StopAllDrivers; }
 
 	for (size_t first = 0; first < total; first += MaxScheduleMoveDrivers)
 	{

@@ -71,7 +71,7 @@ namespace Duet::Sbc::Motion
 		// nothing was sent. The caller compares that against its own figure and extends its move if
 		// the boards' is longer, so that they never have to catch up.
 		uint32_t FinishMovement(uint32_t moveId, uint32_t moveStartTime, bool simulating,
-								bool checkEndstops, bool useInputShaping) noexcept;
+								bool checkEndstops, bool stopAllDrivers, bool useInputShaping) noexcept;
 
 		// False when the sink is backed up, so that PrepareMoves throttles instead of dropping.
 		[[nodiscard]] bool CanPrepareMove() const noexcept;

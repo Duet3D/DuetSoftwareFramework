@@ -94,7 +94,7 @@ namespace
 		const MoveProfile profile = SampleProfile();
 		builder.StartMovement();
 		builder.AddAxisMovement(profile, DriverId(board1, 0), 1234, Duet::Sbc::Motion::kNoStopInput);
-		const uint32_t clocks = builder.FinishMovement(7, 0xDEADBEEF, false, false, true);
+		const uint32_t clocks = builder.FinishMovement(7, 0xDEADBEEF, false, false, false, true);
 
 		CHECK(clocks == 3500, "FinishMovement returns the total clocks of the profile");
 		CHECK(sink.packets.size() == 1, "one driver produces one packet");
@@ -143,7 +143,7 @@ namespace
 		builder.StartMovement();
 		builder.AddAxisMovement(profile, DriverId(board1, 0), 100, Duet::Sbc::Motion::kNoStopInput);
 		builder.AddExtruderMovement(profile, DriverId(board2, 3), 12.5F, true);
-		(void)builder.FinishMovement(1, 0, false, true, false);
+		(void)builder.FinishMovement(1, 0, false, true, false, false);
 
 		CHECK(sink.packets.size() == 1, "two drivers still fit in one packet");
 		if (sink.packets.empty())
@@ -172,21 +172,21 @@ namespace
 		builder.SetSink(&sink);
 
 		builder.StartMovement();
-		CHECK(builder.FinishMovement(1, 0, false, false, false) == 0, "a move with no drivers reports no clocks");
+		CHECK(builder.FinishMovement(1, 0, false, false, false, false) == 0, "a move with no drivers reports no clocks");
 		CHECK(sink.packets.empty(), "a move with no drivers sends nothing");
 
 		// Simulating: the move is planned so that the time it takes is known, but no board runs it.
 		const MoveProfile profile = SampleProfile();
 		builder.StartMovement();
 		builder.AddAxisMovement(profile, DriverId(board1, 0), 500, Duet::Sbc::Motion::kNoStopInput);
-		CHECK(builder.FinishMovement(2, 0, true, false, false) == 0, "a simulated move reports no clocks");
+		CHECK(builder.FinishMovement(2, 0, true, false, false, false) == 0, "a simulated move reports no clocks");
 		CHECK(sink.packets.empty(), "a simulated move sends nothing");
 
 		// ...and having discarded it, the builder is clean for the next move rather than carrying
 		// the simulated move's drivers into it.
 		builder.StartMovement();
 		builder.AddAxisMovement(profile, DriverId(board1, 1), 600, Duet::Sbc::Motion::kNoStopInput);
-		(void)builder.FinishMovement(3, 0, false, false, false);
+		(void)builder.FinishMovement(3, 0, false, false, false, false);
 		CHECK(sink.packets.size() == 1, "the move after a simulated one is sent");
 		if (!sink.packets.empty())
 		{
@@ -206,7 +206,7 @@ namespace
 		// No FinishMovement: Prepare bailed out. The next move must not inherit that driver.
 		builder.StartMovement();
 		builder.AddAxisMovement(profile, DriverId(board1, 1), 222, Duet::Sbc::Motion::kNoStopInput);
-		(void)builder.FinishMovement(4, 0, false, false, false);
+		(void)builder.FinishMovement(4, 0, false, false, false, false);
 
 		CHECK(sink.packets.size() == 1, "the second move is sent");
 		if (sink.packets.empty())
@@ -232,7 +232,7 @@ namespace
 		{
 			builder.AddAxisMovement(profile, DriverId((uint8_t)(i / 4), (uint8_t)(i % 4)), (int32_t)i + 1, Duet::Sbc::Motion::kNoStopInput);
 		}
-		const uint32_t clocks = builder.FinishMovement(9, 12345, false, false, false);
+		const uint32_t clocks = builder.FinishMovement(9, 12345, false, false, false, false);
 
 		CHECK(clocks == 3500, "a split move still reports the profile's clocks");
 		CHECK(sink.packets.size() == 2, "a move of one and a half packets takes two packets");
@@ -280,7 +280,7 @@ namespace
 		{
 			builder.AddAxisMovement(profile, DriverId(1, (uint8_t)(i % 4)), (int32_t)i + 1, Duet::Sbc::Motion::kNoStopInput);
 		}
-		const uint32_t clocks = builder.FinishMovement(11, 0, false, false, false);
+		const uint32_t clocks = builder.FinishMovement(11, 0, false, false, false, false);
 
 		CHECK(clocks == 0, "a move that could not be sent reports no clocks");
 		CHECK(builder.GetDroppedPackets() == 1, "the drop is counted");
@@ -312,7 +312,7 @@ void TestEndstopReachesTheWire() noexcept
 	builder.StartMovement();
 	builder.AddAxisMovement(profile, DriverId(board1, 0), 1234, Duet::Sbc::Motion::MakeStopInput(3, 0x0142));
 	builder.AddAxisMovement(profile, DriverId(board1, 1), 500, Duet::Sbc::Motion::kNoStopInput);
-	(void)builder.FinishMovement(1, 100, false, true, true);
+	(void)builder.FinishMovement(1, 100, false, true, false, true);
 
 	CHECK(sink.packets.size() == 1, "one packet");
 	if (sink.packets.empty())

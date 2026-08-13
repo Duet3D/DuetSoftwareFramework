@@ -321,6 +321,7 @@ MovementError DDA::InitFromParams(DDARing& ring, const Duet::Sbc::Motion::MovePa
 
 	m_flags.canPauseAfter = (params.flags & MoveFlags::canPauseAfter) != 0;
 	m_flags.checkEndstops = (params.flags & MoveFlags::checkEndstops) != 0;
+	m_flags.stopAllDrivers = (params.flags & MoveFlags::stopAllDrivers) != 0;
 	m_flags.usingStandardFeedrate = (params.flags & MoveFlags::usingStandardFeedrate) != 0;
 	m_flags.usePressureAdvance = (params.flags & MoveFlags::usePressureAdvance) != 0;
 	m_flags.isPrintingMove = (params.flags & MoveFlags::isPrintingMove) != 0;
@@ -796,6 +797,10 @@ void DDA::Prepare(DDARing& ring,
 		float extrusionFraction = 0.0;
 		AxesBitmap additionalAxisMotorsToEnable, axisMotorsEnabled;
 		afterPrepare.drivesMoving.Clear();
+
+		// Runs across every driver of the move, not per drive: on a stopAll move the axis' switches
+		// are handed out round-robin so that all of them are watched by somebody
+		size_t stopAllSwitch = 0;
 		MovementFlags segFlags{};
 		segFlags.Clear();
 		segFlags.checkEndstops = m_flags.checkEndstops;
@@ -841,10 +846,26 @@ void DDA::Prepare(DDARing& ring,
 							const DriverId driver = config.driverNumbers[i];
 							if (driver.IsRemote())
 							{
-								// Port i of an endstop belongs to driver i of the axis, so the
-								// switch this driver watches follows from its index
-								CanMotion::AddAxisMovement(params, driver, delta,
-														   Duet::Sbc::Motion::StopInputForDriver(m_stopOnInput[drive], i));
+								// A driver already sitting on its own switch is given no steps, while
+								// the rest of the axis moves. That is what squares a gantry which
+								// starts with one side already down: holding the whole axis because
+								// one switch is closed would make the move that corrects the skew do
+								// nothing. The driver is still named in the message, so it is still
+								// enabled and the controller still marks it as not to be stopped
+								const int32_t driverSteps =
+									Duet::Sbc::Motion::IsDriverHeld(m_stopOnInput[drive], i) ? 0 : delta;
+
+								// Which switch this driver watches. Normally port i of an endstop
+								// belongs to driver i of the axis, so it follows from the index. On a
+								// stopAll move it does not: every drive carries the one axis' switches
+								// and any of them stops everything, so they are handed out round-robin
+								// across the move's drivers purely so that all of them end up watched.
+								// RepRapFirmware watches every port of an endstop whatever the action
+								const size_t switchIndex =
+									m_flags.stopAllDrivers ? (stopAllSwitch++ % m_stopOnInput[drive].numSwitches) : i;
+
+								CanMotion::AddAxisMovement(params, driver, driverSteps,
+														   Duet::Sbc::Motion::StopInputForSwitch(m_stopOnInput[drive], switchIndex));
 							}
 						}
 #endif

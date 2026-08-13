@@ -535,6 +535,52 @@ public class MoveBuilderTests
     }
 
     [Test]
+    public void AMotorAlreadyOnItsSwitchIsMarkedHeldRatherThanTheAxisBeingStopped()
+    {
+        // The last byte of the entry says which motors of the axis were already down when the move
+        // was built. The engine gives those no steps while the rest of the axis moves, which is what
+        // squares a gantry that starts skewed with one side already on its switch
+        MoveBuilder builder = NewBuilder(CartesianMachine());
+        RawMove move = LinearMove(1, 0.0f, 10.0f, 0.0f);
+        move.CheckEndstops = true;
+        move.StopOnInput[1].SetPerDriver(0x1080, [1, 4]);
+        move.StopOnInput[1].HoldDriver(1);
+
+        byte[] buffer = new byte[MoveParams.Length(NumDrives)];
+        Assert.That(builder.Build(move, buffer).HasMove, Is.True);
+
+        int stopsAt = Marshal.SizeOf<MoveParamsHeader>() + (NumDrives * (sizeof(int) + sizeof(float)));
+        byte[] y = buffer[(stopsAt + MoveStopInput.Length)..(stopsAt + (2 * MoveStopInput.Length))];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(y[^1], Is.EqualTo(0b10), "the second motor is held, the first is not");
+            Assert.That(y[2], Is.EqualTo(2), "and the drive still watches a switch per driver");
+            Assert.That(y[3], Is.EqualTo(1), "each keeping the board it was given");
+            Assert.That(y[4], Is.EqualTo(4));
+        });
+    }
+
+    [Test]
+    public void ClearingAStopInputForgetsWhichMotorsWereHeld()
+    {
+        // An entry is reused between moves, and a motor that was down for the last one says nothing
+        // about this one. Leaving the bit set would give that motor no steps for a move that never
+        // armed anything
+        MoveStopInput stopInput = new();
+        stopInput.SetPerDriver(0x1080, [1, 4]);
+        stopInput.HoldDriver(0);
+        Assert.That(stopInput.HeldDrivers, Is.EqualTo(1));
+
+        stopInput.SetShared(0x1042, 3);
+        Assert.That(stopInput.HeldDrivers, Is.Zero, "re-arming the drive forgets it");
+
+        stopInput.HoldDriver(0);
+        stopInput.Clear();
+        Assert.That(stopInput.HeldDrivers, Is.Zero, "and so does clearing it");
+    }
+
+    [Test]
     public void AnH1MoveOnACoreXyGoesThroughTheKinematics()
     {
         // RepRapFirmware's Move::IsRawMotorMove: a homing move is a raw motor move only where the

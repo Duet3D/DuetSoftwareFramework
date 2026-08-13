@@ -171,6 +171,32 @@ internal sealed class EndstopCorrection(
     }
 
     /// <summary>
+    /// Record that a driver is already at its own switch, so this move will not be told it stopped
+    /// </summary>
+    /// <param name="drive">The logical drive it moves</param>
+    /// <param name="driverIndex">Which of that drive's drivers it is</param>
+    /// <remarks>
+    /// A motor held because it was already down is given no steps, so it never moves, so no input
+    /// changes and no stop is ever reported for it. Counting it as stopped from the start is what
+    /// lets the drive be finished by the motors that <em>are</em> moving: without it the drive waits
+    /// for a report that cannot arrive, its position is never adopted, and the move runs its full
+    /// planned length rather than ending when the last motor reaches its switch.
+    /// </remarks>
+    public void NoteDriverAlreadyStopped(int drive, int driverIndex)
+    {
+        if (drive < 0 || drive >= _driversStopped.Length ||
+            driverIndex < 0 || driverIndex >= MotionLimits.MaxDriversPerAxis)
+        {
+            return;
+        }
+
+        using (_lock.EnterScope())
+        {
+            _driversStopped[drive] |= 1u << driverIndex;
+        }
+    }
+
+    /// <summary>
     /// Whether a stop has been reported for the move in flight
     /// </summary>
     /// <remarks>
@@ -436,12 +462,6 @@ internal sealed class EndstopCorrection(
                 continue;
             }
 
-            int axis = planner.Parameters.DriveToAxis(drive);
-            if (axis >= 0 && axis < MotionLimits.MaxAxes)
-            {
-                stoppedAxes |= 1u << axis;
-            }
-
             if (!nativeLink.GetPositionAt(drive, whenTriggered, out int position,
                                           out int positionAtMoveStart, out bool usedTimestamp))
             {
@@ -487,8 +507,22 @@ internal sealed class EndstopCorrection(
             if (!NoteDriverStopped(drive, planner.Parameters.DriverIndexForDriver(driverId)))
             {
                 // This drive has motors still running on switches of their own. Its tracker is what
-                // will tell them where they were when those fired, so it has to keep running
+                // will tell them where they were when those fired, so it has to keep running, and
+                // the axis has not finished homing until they arrive
                 continue;
+            }
+
+            // Every motor of this drive is now down, so the axis has reached its endstop. Recorded
+            // here rather than on the first motor's stop, which is where RepRapFirmware records it:
+            // it acts on stopAll and stopAxis and never on stopDriver, and a switch-per-driver axis
+            // only becomes stopAxis once one switch is left. Latching earlier would let a move that
+            // reached one switch and then ran out set the axis to the coordinate of a switch its
+            // other motors never got to - and would hide the failure, because G28 decides an axis
+            // was not homed from exactly this latch
+            int axis = planner.Parameters.DriveToAxis(drive);
+            if (axis >= 0 && axis < MotionLimits.MaxAxes)
+            {
+                stoppedAxes |= 1u << axis;
             }
 
             // The engine's own idea of where the drive is has to match what the board is being told,
