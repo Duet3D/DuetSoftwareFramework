@@ -1,3 +1,4 @@
+using DuetAPI.ObjectModel;
 using DuetControlServer;
 using DuetControlServer.Motion;
 using Microsoft.Extensions.Hosting;
@@ -189,6 +190,137 @@ public class BedCompensationTests
         {
             Assert.That(compensation.IsActive, Is.False);
             Assert.That(compensation.GetCorrection(20.0f, 20.0f, 0.0f), Is.Zero);
+        });
+    }
+
+    /// <summary>A machine whose axes are named in the given order, with a map loaded over X and Y</summary>
+    private static (DcsModel Model, BedCompensation Compensation) LoadedMachine(string letters = "XYZ",
+                                                                                float taperHeight = 0.0f)
+    {
+        DcsModel model = NewModel();
+        foreach (char letter in letters)
+        {
+            model.Move.Axes.Add(new Axis { Letter = letter, Visible = true });
+        }
+
+        BedCompensation compensation = new(model);
+        Assert.That(compensation.LoadAsync(new StringReader(SampleMap), "heightmap.csv", CancellationToken.None)
+                                .AsTask().GetAwaiter().GetResult(), Is.Null);
+        compensation.SetTaperHeight(taperHeight);
+        return (model, compensation);
+    }
+
+    private static RawMove MoveTo(float x, float y, float z)
+    {
+        RawMove raw = new();
+        raw.Coords[0] = x;
+        raw.Coords[1] = y;
+        raw.Coords[2] = z;
+        return raw;
+    }
+
+    [Test]
+    public void AMoveIsCorrectedOnlyWhileTheMapStillHasAnEffect()
+    {
+        // Above the taper the correction has faded to nothing, so there is nothing to follow and
+        // nothing to segment for
+        (_, BedCompensation compensation) = LoadedMachine(taperHeight: 10.0f);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(compensation.AppliesTo(MoveTo(20.0f, 20.0f, 1.0f), 3), Is.True);
+            Assert.That(compensation.AppliesTo(MoveTo(20.0f, 20.0f, 50.0f), 3), Is.False);
+        });
+    }
+
+    [Test]
+    public void AnUnmappedMachineNeverCorrectsAMove()
+    {
+        DcsModel model = NewModel();
+        model.Move.Axes.Add(new Axis { Letter = 'X', Visible = true });
+        BedCompensation compensation = new(model);
+
+        RawMove raw = MoveTo(20.0f, 20.0f, 0.0f);
+        compensation.Apply(raw, 1);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(compensation.AppliesTo(raw, 1), Is.False);
+            Assert.That(raw.Coords[2], Is.Zero, "and applying it anyway changes nothing");
+        });
+    }
+
+    [Test]
+    public void TheCorrectionLiftsTheAxisTheOperatorCalledZ()
+    {
+        (_, BedCompensation compensation) = LoadedMachine();
+
+        RawMove raw = MoveTo(20.0f, 20.0f, 0.0f);
+        compensation.Apply(raw, 3);
+
+        Assert.That(raw.Coords[2], Is.EqualTo(0.2f).Within(CornerTolerance));
+    }
+
+    [Test]
+    public void TheMapIsIndexedByTheAxesItWasMeasuredOverRatherThanTheFirstTwo()
+    {
+        // The grid names its own axes, which is what lets a machine probe over something other than
+        // the first two axes it happens to have
+        (_, BedCompensation compensation) = LoadedMachine("UXY");
+
+        (float axis0, float axis1) = compensation.GridCoordinates([7.0f, 20.0f, 20.0f], 3);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(axis0, Is.EqualTo(20.0f), "X, which is the second axis on this machine");
+            Assert.That(axis1, Is.EqualTo(20.0f), "and Y the third");
+        });
+    }
+
+    [Test]
+    public void AMoveIsSplitIntoTwoSegmentsPerGridCellItCrosses()
+    {
+        // A correction applied at the ends alone is a chord across the bed's actual shape
+        (_, BedCompensation compensation) = LoadedMachine();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(compensation.MinimumSegments(0.0f, 0.0f), Is.EqualTo(1), "a move that stays in one cell");
+            Assert.That(compensation.MinimumSegments(20.0f, 0.0f), Is.EqualTo(5), "two cells across the 10mm spacing");
+            Assert.That(compensation.MinimumSegments(0.0f, -20.0f), Is.EqualTo(5), "and the same going backwards");
+        });
+    }
+
+    [Test]
+    public void CorrectingAMoveAndUncorrectingThePositionGivesBackWhatWasAskedFor()
+    {
+        (_, BedCompensation compensation) = LoadedMachine();
+
+        RawMove raw = MoveTo(20.0f, 20.0f, 1.0f);
+        compensation.Apply(raw, 3);
+        Assert.That(raw.Coords[2], Is.Not.EqualTo(1.0f), "the correction was applied at all");
+
+        float[] position = [20.0f, 20.0f, raw.Coords[2]];
+        compensation.Remove(position, 3);
+
+        Assert.That(position[2], Is.EqualTo(1.0f).Within(CornerTolerance));
+    }
+
+    [Test]
+    public void AMachineWithNoZAxisHasNothingToCorrect()
+    {
+        (_, BedCompensation compensation) = LoadedMachine("XY");
+
+        RawMove raw = MoveTo(20.0f, 20.0f, 0.0f);
+        compensation.Apply(raw, 2);
+        float[] position = [20.0f, 20.0f];
+        compensation.Remove(position, 2);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(raw.Coords[2], Is.Zero);
+            Assert.That(position, Is.EqualTo(new[] { 20.0f, 20.0f }));
+            Assert.That(compensation.AppliesTo(raw, 2), Is.True, "the move is still segmented to follow the map");
         });
     }
 }

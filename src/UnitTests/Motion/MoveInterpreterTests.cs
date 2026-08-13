@@ -635,4 +635,160 @@ public class MoveInterpreterTests
 
         Assert.That(raw.Coords[0], Is.EqualTo(12.0f).Within(1e-3f));
     }
+
+    [Test]
+    public void ARawMotorMoveIsMeasuredInMotorPositionsAndAnythingElseInAxisPositions()
+    {
+        // A raw motor move starts from the motor endpoints converted back to mm per drive; H3 and H4
+        // are still axis moves, so they start from the axis coordinates
+        Machine machine = NewMachine();
+        machine.Builder.SetAxisPosition(0, 12.0f);
+
+        RawMove motors = new() { MoveType = MoveType.RawMotor };
+        RawMove axes = new() { MoveType = MoveType.SenseLength };
+        machine.Interpreter.SeedSpecialMoveCoordinate(motors, 0);
+        machine.Interpreter.SeedSpecialMoveCoordinate(axes, 0);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(motors.Coords[0], Is.EqualTo(12.0f).Within(1e-3f), "960 microsteps at 80 steps/mm");
+            Assert.That(axes.Coords[0], Is.EqualTo(12.0f).Within(1e-4f));
+        });
+    }
+
+    [Test]
+    public void AHomingMoveArmsTheAxesItNamesAndNoOthers()
+    {
+        // A homing move naming X must not be stopped by Z's switch happening to be closed already
+        Machine machine = NewMachine(withEndstops: true);
+        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 H1 X-250"), NewInput(), isCoordinated: true, MoveType.Homing);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(raw.ArmedAxes, Is.EqualTo(new[] { 0 }));
+            Assert.That(raw.StopOnInput[0].NumSwitches, Is.EqualTo(1), "X watches its switch");
+            Assert.That(raw.StopOnInput[1].NumSwitches, Is.Zero, "Y watches nothing");
+            Assert.That(raw.StopOnInput[2].NumSwitches, Is.Zero, "and neither does Z");
+        });
+    }
+
+    [Test]
+    public void AnEndstopMoveOnAnAxisWithNoEndstopIsRefused()
+    {
+        // Carrying on would run the move to its full commanded length with nothing to stop it, which
+        // for a homing move means driving into the end of the axis
+        Machine machine = NewMachine();
+
+        Assert.Throws<GCodeException>(
+            () => machine.Interpreter.BuildRawMove(G("G1 H1 X-250"), NewInput(), isCoordinated: true, MoveType.Homing));
+    }
+
+    [Test]
+    public void ArmingAMoveForgetsWhatStoppedTheLastOne()
+    {
+        // A move that ran its full length is never reported as stopped, so the latch has to be
+        // cleared where the next one is armed rather than where the last one finished
+        Machine machine = NewMachine(withEndstops: true);
+        machine.State.RecordEndstopTriggered(0b111);
+
+        machine.Interpreter.BuildRawMove(G("G1 H1 X-250"), NewInput(), isCoordinated: true, MoveType.Homing);
+
+        Assert.That(machine.State.EndstopsTriggered, Is.Zero);
+    }
+
+    [Test]
+    public void AnAxisAlreadyOnItsSwitchIsRecordedAsTriggeredAndHeldWhereItIs()
+    {
+        // Such an axis never moves, so no input changes and no stop is ever reported - and yet it is
+        // at its switch, which is the whole question a homing move asks
+        Machine machine = NewMachine(withEndstops: true, closedSwitches: _ => 0b1);
+        machine.Model.Sensors.Endstops[0]!.Triggered = true;
+        machine.Builder.SetAxisPosition(0, 3.0f);
+
+        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 H1 X-250"), NewInput(), isCoordinated: true, MoveType.Homing);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(machine.State.EndstopsTriggered & 0b1, Is.EqualTo(0b1u));
+            Assert.That(raw.Coords[0], Is.EqualTo(3.0f).Within(1e-3f), "commanded to stay where it is");
+        });
+    }
+
+    [Test]
+    public void EachSegmentEndsAFractionOfTheWayAlongAndTheLastOneExactlyAtTheTarget()
+    {
+        // Otherwise a long move would accumulate rounding and stop short of where it was asked to go
+        Machine machine = NewMachine();
+        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 X30 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
+        raw.SegmentCount = 3;
+        SegmentedMove segments = SegmentedMove.From(raw, [0.0f, 0.0f, 0.0f], 3, MotionLimits.MaxAxesPlusExtruders - 1);
+
+        machine.Interpreter.PrepareSegment(raw, segments, 1);
+        float first = raw.Coords[0];
+        machine.Interpreter.PrepareSegment(raw, segments, 3);
+        float last = raw.Coords[0];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(first, Is.EqualTo(10.0f).Within(1e-4f), "a third of the way, of three segments");
+            Assert.That(last, Is.EqualTo(30.0f), "and the last lands exactly on the target");
+        });
+    }
+
+    [Test]
+    public void EverySegmentIsItsOwnMoveToTheEngine()
+    {
+        Machine machine = NewMachine();
+        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 X30 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
+        raw.MoveId = 42;
+
+        machine.Interpreter.PrepareSegment(raw, SegmentedMove.From(raw, [0.0f, 0.0f, 0.0f], 3, MotionLimits.MaxAxesPlusExtruders - 1), 1);
+
+        Assert.That(raw.MoveId, Is.Zero, "so it is given a correlation id of its own when it is queued");
+    }
+
+    [Test]
+    public void ASegmentCarriesItsShareOfTheExtrusionRatherThanTheWholeMoves()
+    {
+        Machine machine = NewMachine(NewTool());
+        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 X30 E6 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
+        raw.SegmentCount = 3;
+
+        SegmentedMove segments = SegmentedMove.From(raw, [0.0f, 0.0f, 0.0f], 3, MotionLimits.MaxAxesPlusExtruders - 1);
+        machine.Interpreter.PrepareSegment(raw, segments, 1);
+
+        Assert.That(raw.Coords[MotionParameters.ExtruderToDrive(0)], Is.EqualTo(2.0f).Within(1e-4f));
+    }
+
+    [Test]
+    public void ASpecialMoveIsNotPutThroughTheAxisAndBedTransform()
+    {
+        // It bypasses the user coordinate system entirely, so a skew correction would be applied to a
+        // motor position that was never in that space
+        Machine machine = NewMachine();
+        machine.Model.Move.Compensation.Skew.TanXY = 0.01f;
+
+        RawMove special = new() { MoveType = MoveType.RawMotor };
+        special.Coords[1] = 10.0f;
+        SegmentedMove segments = SegmentedMove.From(special, [0.0f, 0.0f, 0.0f], 3, MotionLimits.MaxAxesPlusExtruders - 1);
+
+        machine.Interpreter.PrepareSegment(special, segments, 1);
+
+        Assert.That(special.Coords[0], Is.Zero, "X picked up no cross term from Y");
+    }
+
+    [Test]
+    public void AnOrdinarySegmentCarriesTheSkewCorrection()
+    {
+        Machine machine = NewMachine();
+        machine.Model.Move.Compensation.Skew.TanXY = 0.01f;
+
+        RawMove raw = new() { MoveType = MoveType.Normal };
+        raw.Coords[1] = 10.0f;
+        SegmentedMove segments = SegmentedMove.From(raw, [0.0f, 0.0f, 0.0f], 3, MotionLimits.MaxAxesPlusExtruders - 1);
+
+        machine.Interpreter.PrepareSegment(raw, segments, 1);
+
+        Assert.That(raw.Coords[0], Is.EqualTo(0.1f).Within(1e-4f), "X is corrected when Y moves, which is what CompensateXY defaults to");
+    }
 }
