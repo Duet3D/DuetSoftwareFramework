@@ -162,11 +162,11 @@ internal static class RemoteEndstops
 
         if (numDrivers > 1 && ports.Length == numDrivers)
         {
-            stopInput.SetPerDriver(HandleFor(axis).All, boards);
+            stopInput.SetPerDriver(HandleFor(axis), boards);
         }
         else
         {
-            stopInput.SetShared(HandleFor(axis).All, boards[0]);
+            stopInput.SetShared(HandleFor(axis), boards[0]);
         }
         return true;
     }
@@ -200,7 +200,7 @@ internal static class RemoteEndstops
 
         if (drivers.Length == 1)
         {
-            stopInput.SetShared(StallHandle().All, (byte)drivers[0].Board);
+            stopInput.SetShared(StallHandle(), (byte)drivers[0].Board);
             return true;
         }
 
@@ -209,7 +209,7 @@ internal static class RemoteEndstops
         {
             boards[i] = (byte)drivers[i].Board;
         }
-        stopInput.SetPerDriver(StallHandle().All, boards);
+        stopInput.SetPerDriver(StallHandle(), boards);
         return true;
     }
 }

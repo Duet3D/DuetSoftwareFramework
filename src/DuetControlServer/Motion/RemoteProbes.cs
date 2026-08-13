@@ -68,7 +68,7 @@ internal static class RemoteProbes
             return false;
         }
 
-        stopInput.SetShared(HandleFor(probeNumber).All, board);
+        stopInput.SetShared(HandleFor(probeNumber), board);
         return true;
     }
 }

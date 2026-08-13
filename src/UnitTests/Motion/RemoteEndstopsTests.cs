@@ -104,7 +104,7 @@ public class RemoteEndstopsTests
         Assert.That(RemoteEndstops.TryGetStopInput(endstop, 1, 1, stopInput), Is.True);
         Assert.That(stopInput.NumSwitches, Is.EqualTo(1), "the whole axis stops on the one switch");
         Assert.That(stopInput.Boards[0], Is.EqualTo(3), "the board survives");
-        Assert.That(stopInput.Handle, Is.EqualTo(RemoteEndstops.HandleFor(1).All), "the handle survives");
+        Assert.That(stopInput.Handle, Is.EqualTo(RemoteEndstops.HandleFor(1)), "the handle survives");
     }
 
     [Test]
@@ -206,7 +206,7 @@ public class RemoteEndstopsTests
         // The caller writes the result into the move either way, so a refusal has to be the value
         // that means "watch nothing" rather than a stale one
         MoveStopInput stopInput = new();
-        stopInput.SetShared(0x1234, 5);
+        stopInput.SetShared(new RemoteInputHandle { All = 0x1234 }, 5);
         RemoteEndstops.TryGetStopInput(new Endstop { Type = EndstopType.MotorStallAny }, 0, 1, stopInput);
         Assert.That(stopInput.NumSwitches, Is.Zero, "a refused endstop leaves the drive watching nothing");
     }
@@ -223,7 +223,7 @@ public class RemoteEndstopsTests
         Assert.That(RemoteEndstops.TryGetStallStopInput(drivers, stopInput), Is.True);
         Assert.Multiple(() =>
         {
-            Assert.That(stopInput.Handle, Is.EqualTo(RemoteEndstops.StallHandle().All));
+            Assert.That(stopInput.Handle, Is.EqualTo(RemoteEndstops.StallHandle()));
             Assert.That(stopInput.NumSwitches, Is.EqualTo(2));
             Assert.That(stopInput.Boards[0], Is.EqualTo(1), "the first driver's board");
             Assert.That(stopInput.Boards[1], Is.EqualTo(4), "the second driver's board");

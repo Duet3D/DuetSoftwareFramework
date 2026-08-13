@@ -1979,7 +1979,7 @@ internal partial class MCodeHandler
             return new Message(MessageType.Error, "Invalid endstop input type");
         }
 
-        List<(int Axis, int Position)> configured = [];
+        List<(int Axis, EndstopPosition Position)> configured = [];
         string? report = null;
 
         if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
@@ -1995,11 +1995,11 @@ internal partial class MCodeHandler
             {
                 if (code.TryGetInt(move.Axes[axis].Letter, out int position))
                 {
-                    if (position is < 0 or > (int)EndstopPosition.HighEnd)
+                    if (!Enum.IsDefined((EndstopPosition)position))
                     {
                         return new Message(MessageType.Error, "Invalid endstop position");
                     }
-                    configured.Add((axis, position));
+                    configured.Add((axis, (EndstopPosition)position));
                 }
             }
 
@@ -2030,9 +2030,9 @@ internal partial class MCodeHandler
                     return new Message(MessageType.Error, portError);
                 }
 
-                foreach ((int axis, int position) in configured)
+                foreach ((int axis, EndstopPosition position) in configured)
                 {
-                    if (position == (int)EndstopPosition.None)
+                    if (position == EndstopPosition.None)
                     {
                         // Removing an endstop leaves the slot empty rather than absent, so the
                         // collection stays indexed by axis
@@ -2044,7 +2044,7 @@ internal partial class MCodeHandler
                     }
 
                     Endstop endstop = GetOrCreateEndstop(axis);
-                    endstop.HighEnd = position == (int)EndstopPosition.HighEnd;
+                    endstop.HighEnd = position == EndstopPosition.HighEnd;
                     endstop.Type = ToEndstopType((RrfEndstopType)inputType);
                     if (hasPort)
                     {
@@ -2061,9 +2061,9 @@ internal partial class MCodeHandler
 
         // Tell the boards to watch the ports. Done outside the model lock because it goes over CAN
         List<Message> replies = [];
-        foreach ((int axis, int position) in configured)
+        foreach ((int axis, EndstopPosition position) in configured)
         {
-            if (position == (int)EndstopPosition.None)
+            if (position == EndstopPosition.None)
             {
                 continue;
             }

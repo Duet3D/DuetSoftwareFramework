@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Runtime.InteropServices;
+using DuetControlServer.Link.Protocol.CanMessages;
 
 namespace DuetControlServer.Motion.Native;
 
@@ -147,7 +148,7 @@ internal sealed class MoveStopInput
     /// Remote input handle the switches are registered under, with a minor field of zero
     /// </summary>
     /// <remarks>Driver i watches minor i, which is why only one handle has to be carried</remarks>
-    public ushort Handle { get; set; } // CHECK can this be changed to RemoteInputHandle?
+    public RemoteInputHandle Handle { get; set; }
 
     /// <summary>How many switches the drive watches</summary>
     public byte NumSwitches { get; set; }
@@ -171,7 +172,7 @@ internal sealed class MoveStopInput
     /// <summary>Stop watching anything, which is what every drive of an ordinary move carries</summary>
     public void Clear()
     {
-        Handle = 0;
+        Handle = new RemoteInputHandle();
         NumSwitches = 0;
         HeldDrivers = 0;
         Array.Clear(Boards);
@@ -182,7 +183,7 @@ internal sealed class MoveStopInput
     /// </summary>
     /// <param name="handle">Handle the switch is registered under</param>
     /// <param name="board">CAN address of the board carrying it</param>
-    public void SetShared(ushort handle, byte board)
+    public void SetShared(RemoteInputHandle handle, byte board)
     {
         Clear();
         Handle = handle;
@@ -196,7 +197,7 @@ internal sealed class MoveStopInput
     /// <param name="handle">Handle the first switch is registered under; driver i uses minor i</param>
     /// <param name="boards">CAN address of each switch</param>
     /// <exception cref="ArgumentException">More switches than an axis can have drivers</exception>
-    public void SetPerDriver(ushort handle, ReadOnlySpan<byte> boards)
+    public void SetPerDriver(RemoteInputHandle handle, ReadOnlySpan<byte> boards)
     {
         if (boards.Length > MotionLimits.MaxDriversPerAxis)
         {
@@ -288,7 +289,7 @@ internal static class MoveParams
         {
             Span<byte> entry = stops.Slice(drive * MoveStopInput.Length, MoveStopInput.Length);
             MoveStopInput stop = stopOnInput[drive];
-            BinaryPrimitives.WriteUInt16LittleEndian(entry, stop.Handle);
+            BinaryPrimitives.WriteUInt16LittleEndian(entry, stop.Handle.All);
             entry[2] = stop.NumSwitches;
             stop.Boards.CopyTo(entry[3..]);
             entry[^1] = stop.HeldDrivers;

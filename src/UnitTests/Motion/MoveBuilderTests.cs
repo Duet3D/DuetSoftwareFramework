@@ -2,6 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
+using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Motion;
 using DuetControlServer.Motion.Kinematics;
 using DuetControlServer.Motion.Native;
@@ -118,6 +119,11 @@ public class MoveBuilderTests
     }
 
     private static MoveBuilder NewBuilder(Move move) => new(Snapshot(move));
+
+    /// <summary>A handle with the given raw value, which is the form the record carries it in</summary>
+    /// <param name="all">Type, major and minor packed as the boards read them</param>
+    /// <returns>The handle</returns>
+    private static RemoteInputHandle Handle(ushort all) => new() { All = all };
 
     /// <summary>The submission decoded back into the pieces the native side reads</summary>
     private sealed record Submission(MoveParamsHeader Header, int[] EndPoints, float[] DirectionVector);
@@ -507,8 +513,8 @@ public class MoveBuilderTests
         MoveBuilder builder = NewBuilder(CartesianMachine());
         RawMove move = LinearMove(1, 10.0f, 0.0f, 0.0f);
         move.CheckEndstops = true;
-        move.StopOnInput[0].SetShared(0x1042, 3);
-        move.StopOnInput[1].SetPerDriver(0x1080, [1, 4]);
+        move.StopOnInput[0].SetShared(Handle(0x1042), 3);
+        move.StopOnInput[1].SetPerDriver(Handle(0x1080), [1, 4]);
 
         byte[] buffer = new byte[MoveParams.Length(NumDrives)];
         MoveBuildResult result = builder.Build(move, buffer);
@@ -543,7 +549,7 @@ public class MoveBuilderTests
         MoveBuilder builder = NewBuilder(CartesianMachine());
         RawMove move = LinearMove(1, 0.0f, 10.0f, 0.0f);
         move.CheckEndstops = true;
-        move.StopOnInput[1].SetPerDriver(0x1080, [1, 4]);
+        move.StopOnInput[1].SetPerDriver(Handle(0x1080), [1, 4]);
         move.StopOnInput[1].HoldDriver(1);
 
         byte[] buffer = new byte[MoveParams.Length(NumDrives)];
@@ -568,11 +574,11 @@ public class MoveBuilderTests
         // about this one. Leaving the bit set would give that motor no steps for a move that never
         // armed anything
         MoveStopInput stopInput = new();
-        stopInput.SetPerDriver(0x1080, [1, 4]);
+        stopInput.SetPerDriver(Handle(0x1080), [1, 4]);
         stopInput.HoldDriver(0);
         Assert.That(stopInput.HeldDrivers, Is.EqualTo(1));
 
-        stopInput.SetShared(0x1042, 3);
+        stopInput.SetShared(Handle(0x1042), 3);
         Assert.That(stopInput.HeldDrivers, Is.Zero, "re-arming the drive forgets it");
 
         stopInput.HoldDriver(0);

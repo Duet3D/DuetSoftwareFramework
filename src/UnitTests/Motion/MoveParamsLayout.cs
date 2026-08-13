@@ -30,13 +30,9 @@ public class MoveParamsLayout
         int size = 0;
         foreach (PropertyInfo property in typeof(MoveStopInput).GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
-            size += property.GetValue(stop) switch
-            {
-                byte[] boards => boards.Length,
-                byte => sizeof(byte),
-                ushort => sizeof(ushort),
-                _ => throw new AssertionException($"{property.Name} has no counterpart in the native MoveStopInput")
-            };
+            // Boards is the one field whose width is a count rather than a type, so it is measured
+            // from the instance; every other field is as wide as it marshals
+            size += property.GetValue(stop) is byte[] boards ? boards.Length : Marshal.SizeOf(property.PropertyType);
         }
 
         Assert.Multiple(() =>
