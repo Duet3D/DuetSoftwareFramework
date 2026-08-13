@@ -97,7 +97,7 @@ So the pieces are in place and wired together. What is wrong is what happens bet
 
 The first four are behavioural. The fifth is structural, and is why §4.4 happened.
 
-### 4.1 The stalled-driver bitmap is discarded
+### 4.1 The stalled-driver bitmap is discarded ✅ Phase 3
 
 [`HandleInputStateChanged`](src/DuetCANMaster/src/CAN/CommandProcessor.cpp#L162) reads `msg.states`
 and `results[i].handle`, and never `GetEntryReading(i)`. For a switch that is right - the handle
@@ -107,7 +107,8 @@ discarding the reading discards the only thing that says *which motor stalled*.
 What it costs:
 
 - Every armed driver on the reporting board stops, whichever one stalled.
-- `S4` cannot be told from `S3` for motors sharing a board.
+- `S4` cannot be told from `S3` for motors sharing a board. Phase 3 makes that expressible; §4.3 is
+  what still has to act on it.
 - **Homing two stall-homed axes together silently mis-homes one of them.** `G1 H1 X-300 Y-300` with
   `S3` on both and the motors on one board: a stall on X stops Y as well, both are reported in
   `MotionStopped`, and [`TrySendRevert`](src/DuetControlServer/Motion/EndstopCorrection.cs#L522) marks
@@ -172,9 +173,9 @@ thought to add.
 
 ## 5. Design decisions
 
-§5.1 to §5.3 change the SPI wire format between DuetSbcInterface and DuetCANMaster, so they want
-agreeing before the phases that implement them are written. §5.4 changed where DuetControlServer arms
-an endstop and is done; it is kept here because every phase after it reads the seam it describes.
+§5.2 changes the SPI wire format between DuetSbcInterface and DuetCANMaster, so it wants agreeing
+before Phase 4 is written. §5.1, §5.3 and §5.4 are done and are kept here because every phase after
+them reads the shapes they describe.
 
 ### 5.1 A driver watching a stall watches its own board
 
@@ -352,7 +353,7 @@ same commit that does it; `git log --grep` finds them.
 |---|---|---|
 | 1 | One seam for both kinds | ✅ `refactor: arm both kinds of endstop through one seam` |
 | 2 | A driver watches its own board | ✅ `fix: make a stall watch name the driver's own board` |
-| 3 | The controller reads the stalled-driver bitmap | ⬜ |
+| 3 | The controller reads the stalled-driver bitmap | ✅ `fix: stop only the driver that stalled` |
 | 4 | Stop groups | ⬜ |
 | 5 | `S3` and `S4` told apart | ⬜ |
 | 6 | The motor-stall Z probe | ⬜ |
@@ -407,17 +408,29 @@ drivers. A driver could be given another driver's board to watch its own stall o
 today because the controller ignores the bitmap and `stopAll` stops everything anyway, and would
 become a motor that never stops the moment Phase 3 lands - which is why this goes first.
 
-### Phase 3 — the controller reads the stalled-driver bitmap (§5.3) ⬜
+### Phase 3 — the controller reads the stalled-driver bitmap (§5.3) ✅
 
 | | |
 |---|---|
-| Touches | [CommandProcessor.cpp](src/DuetCANMaster/src/CAN/CommandProcessor.cpp#L162), [CanMotion.cpp](src/DuetCANMaster/src/CAN/CanMotion.cpp#L577) (`StopDriversWatchingInput` takes the reading) |
+| Touches | new [StopRules.h](lib/DuetSpiInterface/include/DuetSpiProtocol/StopRules.h), [CommandProcessor.cpp](src/DuetCANMaster/src/CAN/CommandProcessor.cpp), [CanMotion.cpp](src/DuetCANMaster/src/CAN/CanMotion.cpp) and [CanMotion.h](src/DuetCANMaster/src/CAN/CanMotion.h), [SbcMessageFormats.h](src/DuetCANMaster/src/SBC/SbcMessageFormats.h), [MoveParams.h](src/DuetSbcInterface/src/Motion/MoveParams.h) |
 | Wire format | unchanged - the reading is already on the CAN bus and already in the buffer |
-| Fixes | the false "Y homed" of §4.1, and makes `S4` expressible |
-| Tests | `stop_rules_tests`, new; `WatchMatches` against a switch handle, a stall handle whose bit is set, and a stall handle whose bit is clear. See §7 |
+| Fixes | the false "Y homed" of §4.1 |
+| Tests | new `stop_rules_tests`, 10 native suites and 897 NUnit tests passing; both firmware variants link |
 
-Do this before Phase 4 even though it is the smaller half: it is the one that turns a silent wrong
-answer into a correct one, and it is independent of the wire-format change.
+`StopDriversWatchingInput` takes the entry's reading and matches through `WatchMatches`, and
+`CanMotion`'s watch array is now an array of `DriverStopWatch` rather than a struct of its own - so
+the controller's state is the tested type and there is no copy to drift. `DriverId` is built from the
+two bytes at the one place that stops a driver, which is what keeps the header free of CANlib.
+
+The handle-type constants moved into `StopRules.h` too, and `MoveParams.h` now uses them rather than
+its own copies. They are what Phase 2 added on the SBC side and what this phase needs on the
+controller side, and two definitions of "what a stall handle looks like" is the same class of drift
+this document is about.
+
+This does not make `S4` work: telling it from `S3` still needs the stop groups of Phase 4, because a
+`stopDriver` that leaves the axis' other motors running is only correct if the last of them can still
+stop the axis. What it does fix is `S3` on one board no longer stopping - and recording as homed - an
+axis that never stalled.
 
 ### Phase 4 — stop groups (§5.2) ⬜
 
@@ -492,14 +505,16 @@ beside the one the two sides already share:
 lib/DuetSpiInterface/include/DuetSpiProtocol/StopRules.h
 ```
 
-That directory is already on the include path of both builds - DuetCANMaster reaches it through
-[CanMotion.h:19](src/DuetCANMaster/src/CAN/CanMotion.h#L19) and the host tests reach it through
-`duet_motion`, which is how [MoveParamsLayoutTests.cpp:20](src/DuetSbcInterface/tests/MoveParamsLayoutTests.cpp#L20)
-already names `duet::spi::protocol::ScheduleMoveDriver`. A sibling header rather than more of
-`MessageFormats.h` because that file is wire layout and this is behaviour; nothing else about it
-differs.
+That directory is already on the include path of both builds - both add the same
+`duet_spi_protocol` INTERFACE target - so a new header there is visible to each without any build
+change. A sibling header rather than more of `MessageFormats.h` because that file is wire layout and
+this is behaviour; nothing else about it differs. The firmware picks it up through
+[SbcMessageFormats.h](src/DuetCANMaster/src/SBC/SbcMessageFormats.h), which is its single point for
+shared protocol definitions, and the test links `duet_spi_protocol` alone.
 
-The header holds one struct and two functions, and they are the **only** definitions of either:
+The header holds one struct and the rules that read it, and they are the **only** definitions of
+either. Phase 3 landed the struct and `WatchMatches`; `stopGroup`, `stopFlags`, `stillRunning` and
+`ResolveStop` arrive with Phase 4, which is what needs them:
 
 ```c
 // A watched driver, reduced to what the rules need. No DriverId: that is CANlib, which is
@@ -509,20 +524,20 @@ struct DriverStopWatch {
     uint8_t driverNumber;   // its number on that board
     uint8_t inputBoard;     // board carrying the input it watches
     uint16_t inputHandle;
-    uint8_t stopGroup;      // NoStopGroup if this driver stops alone
-    uint8_t stopFlags;      // StopDriverFlags
-    bool stillRunning;      // false once this move has already stopped it
+    uint8_t stopGroup;      // PHASE 4: NoStopGroup if this driver stops alone
+    uint8_t stopFlags;      // PHASE 4: StopDriverFlags
+    bool stillRunning;      // PHASE 4: false once this move has already stopped it
 };
 
 // §5.3. A switch compares (board, handle); a stall also requires its own bit in the reading.
 constexpr bool WatchMatches(const DriverStopWatch&, uint8_t inputBoard, uint16_t inputHandle,
                             uint32_t reading) noexcept;
 
-enum class StopScope : uint8_t { none, driver, group, all };
+enum class StopScope : uint8_t { none, driver, group, all };            // PHASE 4
 
 // §5.2. stopAll, else Individual with more than one of the group still running, else the group.
 constexpr StopScope ResolveStop(std::span<const DriverStopWatch> watches, size_t matched,
-                                bool moveStopsAllDrivers) noexcept;
+                                bool moveStopsAllDrivers) noexcept;    // PHASE 4
 ```
 
 **Nothing is duplicated, because nothing is mirrored.** `CanMotion`'s `endstopWatches[]` is declared
@@ -543,14 +558,13 @@ Everything that is not a decision: holding the watch array across `ScheduleFromS
 the `MotionStopped` report and waking the async sender. These are untested rather than duplicated -
 they exist once, in `CanMotion.cpp`, and hardware commissioning is what covers them.
 
-### 7.3 Where the test lives
+### 7.3 Where the test lives ✅ Phase 3
 
-`src/DuetSbcInterface/tests` with a `stop_rules_tests` target, because it is the only host-side C++
-suite in the tree and standing up a second one under DuetCANMaster would mean a host build of a
-project that is otherwise cross-compiled only. The suite tests a controller rule from an SBC-side
-directory, which is slightly odd; say so in the file header, as `MoveParamsLayoutTests` says why it
-prints layouts. If you would rather have a `src/DuetCANMaster/tests` instead, that is the alternative
-and it costs a CMake target and a CI entry.
+`src/DuetSbcInterface/tests`, target `stop_rules_tests`, because it is the only host-side C++ suite
+in the tree and standing up a second one under DuetCANMaster would mean a host build of a project
+that is otherwise cross-compiled only. The suite tests a controller rule from an SBC-side directory,
+which is odd enough that its file header says so. If a `src/DuetCANMaster/tests` is wanted later that
+is the alternative, and it costs a CMake target and a CI entry.
 
 **Hardware commissioning** is what proves the whole path, and needs at minimum:
 

@@ -403,15 +403,12 @@ namespace CanMotion
 	//
 	// Only the stop is decided here. Where the drive should end up is worked out on the SBC, which
 	// already evaluates the same motion to report live positions (Motion::DriveTracker), so the
-	// velocity profile is not duplicated on this side
-	struct EndstopWatch
-	{
-		DriverId driver;
-		uint8_t inputBoard{};
-		uint16_t inputHandle{};
-	};
-
-	static EndstopWatch endstopWatches[SbcProtocol::MaxScheduleMoveDrivers];
+	// velocity profile is not duplicated on this side.
+	//
+	// SbcProtocol::DriverStopWatch rather than a struct of our own, because the rule that matches a
+	// trigger against these is shared with the host-side tests. Holding the tested type as our own
+	// state is what stops the two drifting; see DuetSpiProtocol/StopRules.h
+	static SbcProtocol::DriverStopWatch endstopWatches[SbcProtocol::MaxScheduleMoveDrivers];
 	static size_t numEndstopWatches = 0;
 
 	// Whether any watched input stops every driver of this move rather than only the drivers
@@ -497,9 +494,7 @@ void CanMotion::ScheduleFromSbc(const SbcProtocol::ScheduleMoveHeader& header,
 		// Record what stops this driver, if anything. Only an endstop move carries these
 		if (d.stopOnBoard != SbcProtocol::NoEndstopBoard && numEndstopWatches < ARRAY_SIZE(endstopWatches))
 		{
-			endstopWatches[numEndstopWatches].driver = driver;
-			endstopWatches[numEndstopWatches].inputBoard = d.stopOnBoard;
-			endstopWatches[numEndstopWatches].inputHandle = d.stopOnHandle;
+			endstopWatches[numEndstopWatches] = { d.boardAddress, d.driverNumber, d.stopOnBoard, d.stopOnHandle };
 			++numEndstopWatches;
 		}
 	}
@@ -574,15 +569,15 @@ void CanMotion::StopDriverWhenProvisional(DriverId driver) noexcept
 
 #  if HAS_SBC_INTERFACE
 
-size_t CanMotion::StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHandle,
+size_t CanMotion::StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHandle, uint32_t reading,
 										   std::span<SbcProtocol::MotionStoppedDriver> stopped) noexcept
 {
-	// Does this input stop anything at all? On a stopAll move it stops everything, so the answer
+	// Does this trigger stop anything at all? On a stopAll move it stops everything, so the answer
 	// decides what to iterate rather than which drivers to skip
 	bool matched = false;
 	for (size_t i = 0; i < numEndstopWatches && !matched; ++i)
 	{
-		matched = endstopWatches[i].inputBoard == inputBoard && endstopWatches[i].inputHandle == inputHandle;
+		matched = SbcProtocol::WatchMatches(endstopWatches[i], inputBoard, inputHandle, reading);
 	}
 	if (!matched)
 	{
@@ -592,35 +587,35 @@ size_t CanMotion::StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHan
 	size_t numStopped = 0;
 	for (size_t i = 0; i < numEndstopWatches; ++i)
 	{
-		const EndstopWatch& watch = endstopWatches[i];
+		const SbcProtocol::DriverStopWatch& watch = endstopWatches[i];
 
 		// On a stopAll move every driver goes, whichever of the axis' switches fired. Stopping only
 		// the drivers watching that one switch would leave the coupled drives running
-		if (!sbcMoveStopsAllDrivers &&
-			(watch.inputBoard != inputBoard || watch.inputHandle != inputHandle))
+		if (!sbcMoveStopsAllDrivers && !SbcProtocol::WatchMatches(watch, inputBoard, inputHandle, reading))
 		{
 			continue;
 		}
 
+		const DriverId driver(watch.driverBoard, watch.driverNumber);
 		bool didStop = false;
 		if (sbcMoveInProgress)
 		{
 			// The move has not gone out yet, so the driver can simply be given no steps. This is the
 			// case RepRapFirmware calls an endstop already triggered at the start of the move, and
 			// it needs no correction afterwards because the drive never moved
-			StopDriverWhenProvisional(watch.driver);
+			StopDriverWhenProvisional(driver);
 		}
 		else
 		{
 			// The move is running on the boards. Stopping it is this side's whole job; where the
 			// drive should end up is the SBC's, which is why it is reported below
-			didStop = StopDriverWhenExecuting(watch.driver);
+			didStop = StopDriverWhenExecuting(driver);
 		}
 
 		if (didStop && numStopped < stopped.size())
 		{
-			stopped[numStopped].boardAddress = watch.driver.boardAddress;
-			stopped[numStopped].driverNumber = watch.driver.localDriver;
+			stopped[numStopped].boardAddress = watch.driverBoard;
+			stopped[numStopped].driverNumber = watch.driverNumber;
 			stopped[numStopped].padding = 0;
 			++numStopped;
 		}

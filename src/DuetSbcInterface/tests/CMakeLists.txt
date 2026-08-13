@@ -35,3 +35,10 @@ target_link_libraries(move_params_layout_tests PRIVATE duet_motion)
 
 duet_sbc_add_test(motion_config_layout_tests MotionConfigLayoutTests.cpp)
 target_link_libraries(motion_config_layout_tests PRIVATE duet_motion)
+
+# The rule DuetCANMaster matches an input change against. It lives in the shared protocol headers
+# rather than in the controller so that it can be tested at all: the controller is built for an ARM
+# target and reaches the rule through a firmware task. Links the protocol headers alone - the rule
+# depends on nothing else, which is what makes it testable here.
+duet_sbc_add_test(stop_rules_tests StopRulesTests.cpp)
+target_link_libraries(stop_rules_tests PRIVATE duet_spi_protocol)

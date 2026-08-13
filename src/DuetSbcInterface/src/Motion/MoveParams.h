@@ -22,6 +22,8 @@
 
 #include <RepRapFirmware.h>
 
+#include <DuetSpiProtocol/StopRules.h>
+
 #include <span>
 
 namespace Duet::Sbc::Motion
@@ -153,11 +155,12 @@ namespace Duet::Sbc::Motion
 		uint8_t heldDrivers;
 	};
 
-	// The handle type field, which decides whether the minor field is per-driver. See
-	// RemoteInputHandle in CANlib: minor is bits 0-5, major 6-11, type 12-15.
-	inline constexpr uint16_t kHandleTypeShift = 12;
-	inline constexpr uint16_t kHandleTypeEndstop = 1;		// RemoteInputHandle::typeEndstop
-	inline constexpr uint16_t kHandleTypeStallEndstop = 5;	// RemoteInputHandle::typeStallEndstop
+	// The handle type field, which decides whether the minor field is per-driver. Defined in
+	// DuetSpiProtocol/StopRules.h, beside the rule the controller matches a trigger with, so that
+	// the two sides cannot come to disagree about what a stall handle looks like.
+	using duet::spi::protocol::kHandleTypeEndstop;
+	using duet::spi::protocol::kHandleTypeShift;
+	using duet::spi::protocol::kHandleTypeStallEndstop;
 
 	static_assert(sizeof(MoveStopInput) == 4 + maxDriversPerAxis, "MoveStopInput layout");
 	static_assert(offsetof(MoveStopInput, boards) == 3);

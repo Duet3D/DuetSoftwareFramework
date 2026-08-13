@@ -53,18 +53,22 @@ namespace CanMotion
 	CanMessageBuffer* _ecv_null GetUrgentMessage() noexcept;
 
 #  if HAS_SBC_INTERFACE
-	// Stop every driver of the move in progress that was told to watch this input.
+	// Stop every driver of the move in progress that this trigger stops.
 	//
 	// This is why the controller and not the SBC watches endstops: an input change that had to reach
 	// the SBC and come back as a stop would take long enough for the axis to overrun. The move says
 	// which input stops which driver (ScheduleMoveDriver::stopOnBoard and stopOnHandle), so matching
 	// an incoming change against it needs no lookup and no knowledge of what an endstop means.
 	//
-	// Returns true if anything was stopped, in which case the caller should wake the async sender.
-	// Called from the CAN receiver task
+	// `reading` is the entry's reading from the input change message. A switch does not need it - the
+	// handle identifies the switch - but a stall does: every board reports every driver that stalled
+	// under one board-wide handle, and the bitmap in the reading is the only thing that says which.
+	// The rule is duet::spi::protocol::WatchMatches, shared with the host-side tests.
+	//
+	// Called from the CAN receiver task.
 	// `stopped` receives the drivers that were stopped, so the caller can report them to the SBC.
 	// Returns how many were written, which is at most `stopped.size()`
-	size_t StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHandle,
+	size_t StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHandle, uint32_t reading,
 									std::span<duet::spi::protocol::MotionStoppedDriver> stopped) noexcept;
 #  endif
 

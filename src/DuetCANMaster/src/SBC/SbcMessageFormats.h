@@ -10,7 +10,10 @@
  * are local to RepRapFirmware and never cross the SPI link.
  *
  * Do not redeclare wire structs here: add them to
- * lib/DuetSpiInterface/include/DuetSpiProtocol/MessageFormats.h so both sides move together.
+ * lib/DuetSpiInterface/include/DuetSpiProtocol/MessageFormats.h so both sides move together. The
+ * same goes for any rule both sides have to agree on rather than merely any struct - StopRules.h
+ * holds those, and is where the controller's endstop matching lives so that it can be tested off
+ * the target.
  */
 
 #ifndef SRC_SBC_MESSAGEFORMATS_H_
@@ -27,6 +30,7 @@
 #  include <Platform/PrintPausedReason.h>
 
 #  include <DuetSpiProtocol/MessageFormats.h>
+#  include <DuetSpiProtocol/StopRules.h>
 
 namespace SbcProtocol = duet::spi::protocol;
 

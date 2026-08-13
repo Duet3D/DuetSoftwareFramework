@@ -154,11 +154,13 @@ static void HandleFirmwareBlockRequest(CanMessageBuffer& buf) noexcept
 
 // Forward a received CAN message to the SBC. If it is a response to a request we sent on behalf of the SBC, map the
 // request ID back to the SBC's txToken and collate multi-fragment standard replies into a single response.
-// Stop whatever the move said this input stops, and tell the SBC what was stopped.
+// Stop whatever the move said this trigger stops, and tell the SBC what was stopped.
 //
 // The two message versions differ in the size of their per-handle entries, so each is read as
-// itself; reading one as the other shifts every handle. Only V2 carries the trigger timestamp, which
-// is what lets the SBC undo the overshoot; a V1 board can only be stopped where the message found it
+// itself; reading one as the other shifts every handle. Both carry a reading, which for a stall is
+// the bitmap of the reporting board's stalled drivers and is the only thing that says which motor
+// stalled. Only V2 carries the trigger timestamp, which is what lets the SBC undo the overshoot; a
+// V1 board can only be stopped where the message found it
 static void HandleInputStateChanged(CanMessageBuffer& buf, CanMessageType id) noexcept
 {
 #if HAS_SBC_INTERFACE
@@ -183,7 +185,7 @@ static void HandleInputStateChanged(CanMessageBuffer& buf, CanMessageType id) no
 			}
 
 			const size_t added = CanMotion::StopDriversWatchingInput(
-				src, msg.results[i].handle.asU16(),
+				src, msg.results[i].handle.asU16(), (uint32_t)msg.GetEntryReading(i),
 				std::span{stopped + numStopped, ARRAY_SIZE(stopped) - numStopped});
 			if (added != 0)
 			{
@@ -206,7 +208,7 @@ static void HandleInputStateChanged(CanMessageBuffer& buf, CanMessageType id) no
 			}
 
 			numStopped += CanMotion::StopDriversWatchingInput(
-				src, msg.results[i].handle.asU16(),
+				src, msg.results[i].handle.asU16(), (uint32_t)msg.GetEntryReading(i),
 				std::span{stopped + numStopped, ARRAY_SIZE(stopped) - numStopped});
 		}
 	}
