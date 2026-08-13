@@ -473,9 +473,6 @@ public sealed partial class LinkInterface(
     }
 
     /// <summary>
-    /// Abort all files in RRF on the given channel asynchronously
-    /// </summary>
-    /// <summary>
     /// Record what became of a CAN message the controller was asked to send
     /// </summary>
     /// <param name="txToken">Token the message was queued with</param>
