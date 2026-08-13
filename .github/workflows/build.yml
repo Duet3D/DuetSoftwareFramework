@@ -49,6 +49,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   build:
+    name: Build DSF (${{ matrix.arch }} ${{ matrix.mode }})
     needs: image
     runs-on: ubuntu-24.04
     permissions:
@@ -92,6 +93,7 @@ jobs:
   # Bare-metal DuetCANMaster firmware (arm-none-eabi), built through its CMake presets.
   # The per-board presets are built here so a break in any single board is visible on its own.
   firmware:
+    name: Build DuetCANMaster firmware (${{ matrix.preset }})
     needs: image
     runs-on: ubuntu-24.04
     permissions:
@@ -143,6 +145,7 @@ jobs:
         run: cmake --build --preset ${{ matrix.preset }} -j"$(nproc)"
 
   test:
+    name: Run unit tests
     needs: image
     runs-on: ubuntu-24.04
     permissions:
@@ -178,7 +181,7 @@ jobs:
 
       # Tests in the RequiresMachine category talk to a real Duet/SBC over HTTP. They skip themselves
       # unless DSF_TEST_MACHINE_URL is set, but exclude them explicitly so they cannot stall the runner.
-      - name: Run unit tests
+      - name: Run C# unit tests
         run: |
           dotnet test src/UnitTests/UnitTests.csproj -c Debug \
             --filter "TestCategory!=RequiresMachine" \
