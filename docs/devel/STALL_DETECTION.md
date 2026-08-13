@@ -78,11 +78,10 @@ More than it looks. The configuration and arming halves are ported and correct:
 - `M915` reaches every addressed board and is recorded under `boards[].drivers[].config.stallDetection`
   ([MCodeHandler.Motion.cs:1105](src/DuetControlServer/Codes/Handlers/MCodeHandler.Motion.cs#L1105)),
   including `R`, which is what makes the board raise `driver_stall`.
-- [`ArmStallEndstopsAsync`](src/DuetControlServer/Codes/Handlers/GCodeHandler.Endstops.cs#L56) sends
-  what `PrimeAxis` sends, run before the move and undone in a `finally`
-  ([GCodeHandler.cs:213](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L213)). Because
-  `G1 H1` awaits `FinishSpecialMoveAsync`, the arming really does span the move. Where it lives is
-  §4.5.
+- [`StallEndstopKind.PrepareAsync`](src/DuetControlServer/Motion/EndstopKinds.cs) sends what
+  `PrimeAxis` sends, run before the move and released in a `finally`
+  ([GCodeHandler.cs](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs)). Because `G1 H1` awaits
+  `FinishSpecialMoveAsync`, the arming really does span the move.
 - The `driver_stall` event already runs `driver_stall.g` through
   [EventProcessor](src/DuetControlServer/Events/EventProcessor.cs).
 - The move carries the stall handle per driver, and DuetCANMaster's
@@ -134,9 +133,9 @@ makes it routine rather than rare, because a stall-homed axis is usually the mul
 
 ### 4.3 `MotorStallAny` and `MotorStallIndividual` are not distinguished
 
-[`TryArmAxis`](src/DuetControlServer/Motion/EndstopArming.cs#L226) and `ArmStallEndstopsAsync` treat
-the two types identically. Nothing ports `individualMotors`, `numDriversLeft`, or the escalation to
-`stopAxis` on the last remaining motor. `S4` therefore cannot square a gantry by stall homing, which
+One [`StallEndstopKind`](src/DuetControlServer/Motion/EndstopKinds.cs) answers `Handles` for both
+types and treats them identically. Nothing ports `individualMotors`, `numDriversLeft`, or the
+escalation to `stopAxis` on the last remaining motor. `S4` therefore cannot square a gantry by stall homing, which
 is the reason `S4` exists.
 
 ### 4.4 The board a driver watches is not always its own
@@ -151,31 +150,31 @@ point, and wrong for stalls, where a driver can only ever be stopped by *its own
 It does no harm today, because `stopAll` stops everything anyway and the bitmap is ignored. It
 becomes a correctness bug the moment §4.1 is fixed, so it has to be fixed first.
 
-### 4.5 The two kinds of endstop are armed in different places
+### 4.5 The two kinds of endstop are armed in different places ✅ Phase 1
 
-A stall endstop is armed from
-[`HandleMoveAsync`](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L213), before the move is
-built. A switch is armed from
-[`EndstopArming.TryArmAxis`](src/DuetControlServer/Motion/EndstopArming.cs#L206), while it is being
-built. Two files, two call sites, and nothing that says the pair exists.
+A stall endstop was armed from `HandleMoveAsync`, before the move was built. A switch was armed from
+`EndstopArming.TryArmAxis`, while it was being built. Two files, two call sites, and nothing that
+said the pair existed.
 
 RepRapFirmware has one seam - `Endstop::PrimeAxis`, virtual, and both subclasses do their CAN work in
-it. So this is a divergence from the reference rather than a port of it, and it is not free: §4.4 is
-precisely what that split produced. "Which drivers does this axis' stall endstop watch" is worked out
-twice, in [ArmStallEndstopsAsync](src/DuetControlServer/Codes/Handlers/GCodeHandler.Endstops.cs#L83)
-and in [TryArmAxis](src/DuetControlServer/Motion/EndstopArming.cs#L231), from the object model at two
-different moments, and the two answers are not compared. The same shape is what leaves the switch
-half of `PrimeAxis` - re-enabling a remote handle and re-reading its state per move - simply absent,
-with nothing to notice it is missing.
+it. So that was a divergence from the reference rather than a port of it, and it was not free: §4.4 is
+precisely what the split produced. "Which drivers does this axis' stall endstop watch" was worked out
+twice, once for the boards and once for the move, from the object model at two different moments,
+with nothing comparing the answers. The same shape is what leaves the switch half of `PrimeAxis` -
+re-enabling a remote handle and re-reading its state per move - simply absent, with nothing to notice
+it is missing; that is now an unimplemented `PrepareAsync` on
+[SwitchEndstopKind](src/DuetControlServer/Motion/EndstopKinds.cs) rather than a code path nobody
+thought to add.
 
-§5.4 is the fix, and Phase 1 does it before anything else touches either site.
+§5.4 was the fix and Phase 1 did it, before anything else touched either site.
 
 ---
 
 ## 5. Design decisions
 
-§5.1 to §5.3 change the SPI wire format between DuetSbcInterface and DuetCANMaster and §5.4 changes
-where DuetControlServer arms an endstop, so all four want agreeing before any of §6 is written.
+§5.1 to §5.3 change the SPI wire format between DuetSbcInterface and DuetCANMaster, so they want
+agreeing before the phases that implement them are written. §5.4 changed where DuetControlServer arms
+an endstop and is done; it is kept here because every phase after it reads the seam it describes.
 
 ### 5.1 A driver watching a stall watches its own board
 
@@ -261,10 +260,8 @@ This is `WatchMatches` in §7.1 - written once, in the header both sides compile
 
 ### 5.4 One seam for both kinds of endstop
 
-A stall endstop is armed in
-[`GCodeHandler.HandleMoveAsync`](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L213) and a
-switch is armed in [`EndstopArming.TryArmAxis`](src/DuetControlServer/Motion/EndstopArming.cs#L206),
-two files and two call sites apart. That is not RepRapFirmware's shape.
+A stall endstop was armed in `GCodeHandler.HandleMoveAsync` and a switch in
+`EndstopArming.TryArmAxis`, two files and two call sites apart. That is not RepRapFirmware's shape.
 
 **RepRapFirmware has one seam.** `PrimeAxis` is pure virtual on
 [`Endstop`](lib/RepRapFirmware/src/Endstops/Endstop.h#L107) and *both* subclasses do CAN work in it:
@@ -287,35 +284,38 @@ what notices if they do not:
 ```csharp
 internal interface IEndstopKind
 {
-    EndstopType Type { get; }
+    // A predicate rather than a property, because one kind covers both S3 and S4 until §4.3 is fixed
+    bool Handles(EndstopType type);
     bool ReducesAcceleration { get; }
 
-    // The CAN half. Runs where ArmStallEndstopsAsync runs now: before the move, no locks held.
+    // The CAN half. Runs before the move is built, with no locks held.
     // A no-op for a switch and a Z probe today - see below for why that is worth keeping.
-    ValueTask<Message> PrepareAsync(EndstopPlan plan, CancellationToken cancellationToken);
+    ValueTask<Message> PrepareAsync(EndstopPlan plan, EndstopArmingState state, LinkInterface link,
+                                    CancellationToken cancellationToken);
 
-    // The decision half. Runs inside EndstopArming.Arm, where nothing may await.
+    // Undo PrepareAsync, however the move ended. Per move rather than per axis: one message
+    // disables every stall endstop on a board, so two axes must not release twice
+    ValueTask ReleaseAsync(EndstopArmingState state, LinkInterface link, ILogger logger,
+                           CancellationToken cancellationToken);
+
+    // The decision half. Runs inside EndstopArming.Arm, where nothing may await
     string? TryArm(EndstopPlan plan, MoveStopInput stopInput);
-
-    // Undo PrepareAsync, however the move ended.
-    ValueTask ReleaseAsync(EndstopPlan plan);
 }
 ```
 
+The live definition is [EndstopKinds.cs](src/DuetControlServer/Motion/EndstopKinds.cs); this is here
+for the argument, not as a second copy to keep in step.
+
 The two phases read one `EndstopPlan` per named axis - the axis, its kind, the drivers to watch and
 the steps per second they should expect - computed **once**, under one read lock, before either
-phase runs. That is what removes the duplication behind §4.4: today
-[`ArmStallEndstopsAsync`](src/DuetControlServer/Codes/Handlers/GCodeHandler.Endstops.cs#L83) and
-[`TryArmAxis`](src/DuetControlServer/Motion/EndstopArming.cs#L231) each work out "which drivers does
-this axis' stall endstop watch" from the object model independently, at different moments, and
-nothing makes them agree.
+phase runs. That is what removes the duplication behind §4.4: the arming that went over the bus and
+the arming written into the move each worked out "which drivers does this axis' stall endstop watch"
+from the object model independently, at different moments, with nothing making them agree.
 
-The speeds move with it. `LoadFeedRate` is already called before `ApplyEndstops` and
-[MoveInterpreter.cs:253](src/DuetControlServer/Motion/MoveInterpreter.cs#L253) already carries
-`TODO calculate speeds for stall detect homing` at exactly the point the plan would be built, so
-`StallHomingSpeed` stops being a second, cruder estimate living in the code handler and becomes the
-one the interpreter already computes. RepRapFirmware works the speeds out at the same point, in
-[GCodes.cpp:2498](lib/RepRapFirmware/src/GCodes/GCodes.cpp#L2498).
+The speeds go into the plan with the drivers, so there is one estimate rather than one per phase.
+It is still taken from the code rather than from the built move, because the arming has to reach the
+boards before the move exists - RepRapFirmware does the same and calls its own calculation an
+approximation, in [GCodes.cpp:2498](lib/RepRapFirmware/src/GCodes/GCodes.cpp#L2498).
 
 *Why a strategy type rather than methods on `Endstop`:* `DuetAPI.ObjectModel.Endstop` is a
 serialised, observed object-model class. Behaviour on it would cross the API boundary and be visible
@@ -341,19 +341,49 @@ Each phase is meant to be committable on its own and to leave the tree no worse 
 The order is forced: §4.1 cannot be fixed before §4.4, and §4.3 cannot be fixed before §4.2. Phase 1
 comes first because every later phase edits one or both of the two places it merges.
 
-### Phase 1 — one seam for both kinds (§5.4)
+Kept current as the work lands, not afterwards: a phase moves to ✅ in the same commit that does it,
+and anything it turned out to need that this document did not predict is written into that phase
+rather than left for a reader to find in the diff.
+
+| Phase | What | Status |
+|---|---|---|
+| 1 | One seam for both kinds | ✅ `133dbca8` |
+| 2 | A driver watches its own board | ⬜ |
+| 3 | The controller reads the stalled-driver bitmap | ⬜ |
+| 4 | Stop groups | ⬜ |
+| 5 | `S3` and `S4` told apart | ⬜ |
+| 6 | The motor-stall Z probe | ⬜ |
+| 7 | Diagnostics | ⬜ |
+
+**Nothing is fixed on a machine until Phase 3.** Phase 1 changed no behaviour, and Phase 2 only makes
+the bitmap safe to act on. `M574 S3`/`S4` behave exactly as §4 describes until then.
+
+### Phase 1 — one seam for both kinds (§5.4) ✅
 
 | | |
 |---|---|
-| Touches | new `EndstopKinds`/`EndstopPlan` beside [EndstopArming.cs](src/DuetControlServer/Motion/EndstopArming.cs), [GCodeHandler.Endstops.cs](src/DuetControlServer/Codes/Handlers/GCodeHandler.Endstops.cs) (shrinks to running the prepare phase), [GCodeHandler.cs](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L213), [MoveInterpreter.cs](src/DuetControlServer/Motion/MoveInterpreter.cs#L253) (builds the plan, owns the speeds) |
+| Touches | new [EndstopKinds.cs](src/DuetControlServer/Motion/EndstopKinds.cs) and [EndstopPlan.cs](src/DuetControlServer/Motion/EndstopPlan.cs) beside [EndstopArming.cs](src/DuetControlServer/Motion/EndstopArming.cs), [GCodeHandler.Endstops.cs](src/DuetControlServer/Codes/Handlers/GCodeHandler.Endstops.cs), [GCodeHandler.cs](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs), [MoveInterpreter.cs](src/DuetControlServer/Motion/MoveInterpreter.cs), [RemoteEndstops.cs](src/DuetControlServer/Motion/RemoteEndstops.cs) |
 | Wire format | unchanged |
-| Behaviour | none intended. This is the refactor that makes Phases 2 and 6 edits to one place rather than two |
-| Tests | `EndstopArmingTests` moves to the new seam unchanged - it already takes the machine description as an argument, so the plan is what it now builds. A new test that a kind with no `TryArm` implementation cannot be constructed is not possible in C#; the compiler covers it instead |
+| Behaviour | none intended, and none observed - the suite passed unchanged |
+| Tests | `EndstopArmingTests` and `MoveInterpreterTests` go through the planner rather than hand-built inputs, so they exercise both phases; new `EndstopPlannerTests` covers what the seam guarantees. 897 passing, from 887 |
 
-Do it first and do it without behaviour changes, so that the diff of every later phase is about
-stall detection rather than about plumbing.
+`IEndstopKind` dispatches on `Handles(EndstopType)` rather than exposing a `Type`, because one kind
+covers both `S3` and `S4` today: telling them apart in Phase 5 is splitting one class rather than
+changing the table. `EndstopArming.TryArmAxis` and its `switch` are gone.
 
-### Phase 2 — a driver watches its own board (§5.1)
+Two things the phase needed that this document had not predicted, both kept:
+
+- **Planning is separate from arming.** `PlanEndstopsAsync` runs before `PrepareEndstopsAsync` sends
+  anything. The old shape took the boards it had armed from the *return* of the arming call, so a
+  board refusing part way through threw with the boards already armed unrecorded and the `finally`
+  released nothing - a driver left armed reports a stall during the next ordinary move. Deriving the
+  plans first is what lets the release always know what to undo.
+- **The two derivations disagreed about how far to iterate**, one bounded by
+  `move.Axes.Count && MaxAxes` and the other by `numAxes && MaxAxesPlusExtruders`. The plan uses
+  `numAxes`, which is `min(configured axes, object model axes)` and so is the tighter of the two;
+  it can only exclude a drive the planner holds no parameters for.
+
+### Phase 2 — a driver watches its own board (§5.1) ⬜
 
 | | |
 |---|---|
@@ -366,7 +396,7 @@ say is how many drivers the drive has, so the `boards[]` fill goes away. Phase 1
 the reason the fill could disagree with the arming - both now read the one plan - so what is left
 here is deleting a field nobody reads.
 
-### Phase 3 — the controller reads the stalled-driver bitmap (§5.3)
+### Phase 3 — the controller reads the stalled-driver bitmap (§5.3) ⬜
 
 | | |
 |---|---|
@@ -378,7 +408,7 @@ here is deleting a field nobody reads.
 Do this before Phase 4 even though it is the smaller half: it is the one that turns a silent wrong
 answer into a correct one, and it is independent of the wire-format change.
 
-### Phase 4 — stop groups (§5.2)
+### Phase 4 — stop groups (§5.2) ⬜
 
 | | |
 |---|---|
@@ -390,7 +420,7 @@ Both halves of the SPI link ship together, so no version negotiation is needed -
 `static_assert` blocks are what makes a half-updated build fail to compile rather than mis-parse, and
 they must be updated in the same commit.
 
-### Phase 5 — `S3` and `S4` in DuetControlServer (§4.3)
+### Phase 5 — `S3` and `S4` in DuetControlServer (§4.3) ⬜
 
 | | |
 |---|---|
@@ -402,16 +432,17 @@ No new escalation state is needed on the DCS side. The last-motor escalation liv
 where the count of drivers still running is known; DCS only says which drivers form a group and
 whether the group is individual.
 
-### Phase 6 — the motor-stall Z probe
+### Phase 6 — the motor-stall Z probe ⬜
 
 [`RemoteProbes.TryGetStopInput`](src/DuetControlServer/Motion/RemoteProbes.cs#L62) returns false for
 `ProbeType.ZMotorStall`, so a `G30` against one silently watches nothing and runs its full length.
-RRF has a `MotorStallZProbe` class for this. With Phases 1-5 done it is a small addition: arm the Z
-drivers exactly as `ArmStallEndstopsAsync` does and give the probe's drive a stall stop input.
+RRF has a `MotorStallZProbe` class for this. With Phases 1-5 done it is a small addition: a kind
+whose `PrepareAsync` arms the Z drivers as `StallEndstopKind` does and whose `TryArm` gives the
+probe's drive a stall stop input.
 
 Deferred behind the rest because it fails loudly enough to notice, where §4.1 and §4.2 do not.
 
-### Phase 7 — diagnostics
+### Phase 7 — diagnostics ⬜
 
 [`ApplyInputState`](src/DuetControlServer/Link/Expansion/ExpansionBoardManager.cs#L595) drops
 `typeStallEndstop` silently. RepRapFirmware does not set `sensors.endstops[].triggered` for a stall
