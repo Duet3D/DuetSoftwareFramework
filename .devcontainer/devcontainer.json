@@ -5,7 +5,8 @@
     "context": ".."
   },
   "features": {
-    "ghcr.io/devcontainers-extra/features/ripgrep": "latest"
+    "ghcr.io/devcontainers-extra/features/ripgrep": "latest",
+    "ghcr.io/devcontainers/features/github-cli": "latest"
   },
   "customizations": {
     "vscode": {
