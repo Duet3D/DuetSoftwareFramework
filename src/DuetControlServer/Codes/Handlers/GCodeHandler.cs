@@ -202,32 +202,32 @@ internal sealed partial class GCodeHandler(
             await planner.WaitForStandstillAsync(cancellationToken);
         }
 
-        // A stall-homed axis has to have its drivers told what speed to expect before the move runs,
-        // which is a CAN round trip and so cannot happen with the object model lock held. Nothing is
-        // sent for a move whose axes all home on switches
-        HashSet<byte> armedBoards = [];
+        // What each named axis watches, worked out once. A stall-homed axis also has to have its
+        // drivers told what speed to expect before the move runs, which is a CAN round trip and so
+        // cannot happen with the object model lock held; nothing is sent for a move whose axes all
+        // home on switches
+        List<EndstopPlan> plans = [];
+        EndstopArmingState armingState = new();
         Message? armReply = null;
 
         try
         {
             if (moveType.ChecksEndstops())
             {
-                (armedBoards, armReply) = await ArmStallEndstopsAsync(code, cancellationToken);
+                // Planned before anything is sent, so that a board refusing to arm still leaves the
+                // release below knowing what to undo
+                plans = await PlanEndstopsAsync(code, cancellationToken);
+                armReply = await PrepareEndstopsAsync(plans, armingState, cancellationToken);
             }
             // A board that armed the driver but had something to say about it is reported alongside
             // whatever the move itself came back with, rather than being dropped for not being an
             // error. A move that never completed still returns null, which is what says so
-            Message result = await SubmitMoveAsync(code, isCoordinated, moveType, cancellationToken);
+            Message result = await SubmitMoveAsync(code, isCoordinated, moveType, plans, cancellationToken);
             return new[] { armReply, result }.ToMessage();
         }
         finally
         {
-            // However the move ended. A driver left armed would report a stall during an ordinary
-            // move, and the next move naming the stall handle would stop on it
-            if (armedBoards.Count > 0)
-            {
-                await DisarmStallEndstopsAsync(armedBoards, CancellationToken.None);
-            }
+            await ReleaseEndstopsAsync(plans, armingState, CancellationToken.None);
         }
     }
 
@@ -237,9 +237,11 @@ internal sealed partial class GCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="isCoordinated">Whether the axes move together (G1) or independently (G0)</param>
     /// <param name="moveType">What kind of move the H parameter asked for</param>
+    /// <param name="plans">What each named axis watches, empty for a move that watches nothing</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
     private async ValueTask<Message> SubmitMoveAsync(Commands.Code code, bool isCoordinated, MoveType moveType,
+                                                     IReadOnlyList<EndstopPlan> plans,
                                                      CancellationToken cancellationToken)
     {
         RawMove? raw = null;
@@ -305,7 +307,7 @@ internal sealed partial class GCodeHandler(
                             {
                                 state.CurrentUserPosition.CopyTo(positionBeforeMove, 0);
 
-                                raw = moveInterpreter.BuildRawMove(code, input, isCoordinated, moveType);
+                                raw = moveInterpreter.BuildRawMove(code, input, isCoordinated, moveType, plans);
                             }
                             catch (Exception ex)
                             {

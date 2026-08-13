@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using DuetAPI;
 using DuetAPI.Commands;
@@ -104,6 +105,29 @@ public class MoveInterpreterTests
         return new Machine(model, builder, state, interpreter);
     }
 
+    /// <summary>How fast a homing move runs here, in mm/sec, which only a stall endstop's arming reads</summary>
+    private const float HomingSpeedMmPerSec = 30.0f;
+
+    /// <summary>
+    /// Plan what the move watches and then build it, which is the order a move really happens in
+    /// </summary>
+    /// <remarks>
+    /// The two are separate calls because the planning may go over the CAN bus and the building runs
+    /// inside a lock that may not await. Going through both here rather than handing the builder an
+    /// empty plan is what keeps these tests exercising the pair
+    /// </remarks>
+    private static RawMove Build(Machine machine, Code code, InputChannel input, bool isCoordinated,
+                                 MoveType moveType)
+    {
+        MotionParameters parameters = machine.Builder.Parameters;
+        List<EndstopPlan> plans = moveType.ChecksEndstops()
+            ? EndstopPlanner.Plan(code, machine.Model.Move, machine.Model.Sensors, parameters.Geometry,
+                                  parameters.SharedAxisCount(machine.Model.Move), parameters.StepsPerMm,
+                                  HomingSpeedMmPerSec)
+            : [];
+        return machine.Interpreter.BuildRawMove(code, input, isCoordinated, moveType, plans);
+    }
+
     private static void AddAxis(Move move, char letter, float stepsPerMm, float speedMmPerMin,
                                 float acceleration, int driver, bool homed = true)
     {
@@ -176,7 +200,7 @@ public class MoveInterpreterTests
     public void AnAbsoluteMoveTargetsTheCoordinateItNames()
     {
         Machine machine = NewMachine();
-        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 X10 Y20 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
+        RawMove raw = Build(machine, G("G1 X10 Y20 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
 
         Assert.Multiple(() =>
         {
@@ -194,9 +218,9 @@ public class MoveInterpreterTests
         // A RawMove is built fresh for every move, so an axis that is not written would be commanded
         // to zero - which is a dive to the origin rather than the axis being left alone
         Machine machine = NewMachine();
-        machine.Interpreter.BuildRawMove(G("G1 X10 Y20 Z5"), NewInput(), isCoordinated: true, MoveType.Normal);
+        Build(machine, G("G1 X10 Y20 Z5"), NewInput(), isCoordinated: true, MoveType.Normal);
 
-        RawMove second = machine.Interpreter.BuildRawMove(G("G1 X30"), NewInput(), isCoordinated: true, MoveType.Normal);
+        RawMove second = Build(machine, G("G1 X30"), NewInput(), isCoordinated: true, MoveType.Normal);
 
         Assert.Multiple(() =>
         {
@@ -210,9 +234,9 @@ public class MoveInterpreterTests
     public void ARelativeMoveIsMeasuredFromWhereTheLastOneEnded()
     {
         Machine machine = NewMachine();
-        machine.Interpreter.BuildRawMove(G("G1 X10"), NewInput(), isCoordinated: true, MoveType.Normal);
+        Build(machine, G("G1 X10"), NewInput(), isCoordinated: true, MoveType.Normal);
 
-        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 X15"), NewInput(axesRelative: true), isCoordinated: true, MoveType.Normal);
+        RawMove raw = Build(machine, G("G1 X15"), NewInput(axesRelative: true), isCoordinated: true, MoveType.Normal);
 
         Assert.That(raw.Coords[0], Is.EqualTo(25.0f));
     }
@@ -223,7 +247,7 @@ public class MoveInterpreterTests
         Machine machine = NewMachine();
         SetWorkplaceOffset(machine, axis: 0, workplace: 1, offset: 7.0f);
 
-        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 X10"), NewInput(), isCoordinated: true, MoveType.Normal);
+        RawMove raw = Build(machine, G("G1 X10"), NewInput(), isCoordinated: true, MoveType.Normal);
 
         Assert.That(raw.Coords[0], Is.EqualTo(17.0f));
     }
@@ -243,8 +267,8 @@ public class MoveInterpreterTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(machine.Interpreter.BuildRawMove(g53, NewInput(), true, MoveType.Normal).Coords[0], Is.EqualTo(10.0f));
-            Assert.That(machine.Interpreter.BuildRawMove(macro, NewInput(), true, MoveType.Normal).Coords[0], Is.EqualTo(10.0f));
+            Assert.That(Build(machine, g53, NewInput(), true, MoveType.Normal).Coords[0], Is.EqualTo(10.0f));
+            Assert.That(Build(machine, macro, NewInput(), true, MoveType.Normal).Coords[0], Is.EqualTo(10.0f));
         });
     }
 
@@ -254,7 +278,7 @@ public class MoveInterpreterTests
         Machine machine = NewMachine();
         machine.Model.Move.Axes[1].Rotational = true;
 
-        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 X1 Y90"), NewInput(unit: DistanceUnit.Inch),
+        RawMove raw = Build(machine, G("G1 X1 Y90"), NewInput(unit: DistanceUnit.Inch),
                                                        isCoordinated: true, MoveType.Normal);
 
         Assert.Multiple(() =>
@@ -271,8 +295,8 @@ public class MoveInterpreterTests
     {
         // It may stop short, so where it would resume from is not known until it has finished
         Machine machine = NewMachine(withEndstops: true);
-        RawMove homing = machine.Interpreter.BuildRawMove(G("G1 H1 X-250"), NewInput(), isCoordinated: true, MoveType.Homing);
-        RawMove ordinary = machine.Interpreter.BuildRawMove(G("G1 X10"), NewInput(), isCoordinated: true, MoveType.Normal);
+        RawMove homing = Build(machine, G("G1 H1 X-250"), NewInput(), isCoordinated: true, MoveType.Homing);
+        RawMove ordinary = Build(machine, G("G1 X10"), NewInput(), isCoordinated: true, MoveType.Normal);
 
         Assert.Multiple(() =>
         {
@@ -291,7 +315,7 @@ public class MoveInterpreterTests
         Machine machine = NewMachine(NewTool(), withEndstops: true);
 
         Assert.Throws<GCodeException>(
-            () => machine.Interpreter.BuildRawMove(G("G1 H1 X-250 E5"), NewInput(), isCoordinated: true, MoveType.Homing));
+            () => Build(machine, G("G1 H1 X-250 E5"), NewInput(), isCoordinated: true, MoveType.Homing));
     }
 
     [Test]
@@ -300,9 +324,9 @@ public class MoveInterpreterTests
         // A motor position is not an axis position, so writing one back would tell the interpreter the
         // machine is somewhere it is not
         Machine machine = NewMachine();
-        machine.Interpreter.BuildRawMove(G("G1 X10"), NewInput(), isCoordinated: true, MoveType.Normal);
+        Build(machine, G("G1 X10"), NewInput(), isCoordinated: true, MoveType.Normal);
 
-        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 H2 X5"), NewInput(axesRelative: true),
+        RawMove raw = Build(machine, G("G1 H2 X5"), NewInput(axesRelative: true),
                                                        isCoordinated: true, MoveType.RawMotor);
 
         Assert.Multiple(() =>
@@ -320,7 +344,7 @@ public class MoveInterpreterTests
         machine.Model.Move.NoMovesBeforeHoming = true;
 
         GCodeException error = Assert.Throws<GCodeException>(
-            () => machine.Interpreter.BuildRawMove(G("G1 X10"), NewInput(), isCoordinated: true, MoveType.Normal))!;
+            () => Build(machine, G("G1 X10"), NewInput(), isCoordinated: true, MoveType.Normal))!;
 
         Assert.That(error.Message, Does.Contain("X"));
     }
@@ -333,16 +357,16 @@ public class MoveInterpreterTests
         machine.Model.Move.Axes[0].Homed = false;
         machine.Model.Move.NoMovesBeforeHoming = false;
 
-        Assert.DoesNotThrow(() => machine.Interpreter.BuildRawMove(G("G1 X10"), NewInput(), isCoordinated: true, MoveType.Normal));
+        Assert.DoesNotThrow(() => Build(machine, G("G1 X10"), NewInput(), isCoordinated: true, MoveType.Normal));
     }
 
     [Test]
     public void AnExtruderOnlyMoveLeavesTheAxesAlone()
     {
         Machine machine = NewMachine(NewTool());
-        machine.Interpreter.BuildRawMove(G("G1 X10"), NewInput(), isCoordinated: true, MoveType.Normal);
+        Build(machine, G("G1 X10"), NewInput(), isCoordinated: true, MoveType.Normal);
 
-        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 E2"), NewInput(), isCoordinated: true, MoveType.Normal);
+        RawMove raw = Build(machine, G("G1 E2"), NewInput(), isCoordinated: true, MoveType.Normal);
 
         Assert.Multiple(() =>
         {
@@ -359,7 +383,7 @@ public class MoveInterpreterTests
         Machine machine = NewMachine();
 
         Assert.Throws<GCodeException>(
-            () => machine.Interpreter.BuildRawMove(G("G1 X10 E2"), NewInput(), isCoordinated: true, MoveType.Normal));
+            () => Build(machine, G("G1 X10 E2"), NewInput(), isCoordinated: true, MoveType.Normal));
     }
 
     [Test]
@@ -368,7 +392,7 @@ public class MoveInterpreterTests
         Machine machine = NewMachine(NewTool());
         machine.Model.Move.Extruders[0].RawPosition = 8.0f;
 
-        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 X10 E10"), NewInput(drivesRelative: false),
+        RawMove raw = Build(machine, G("G1 X10 E10"), NewInput(drivesRelative: false),
                                                        isCoordinated: true, MoveType.Normal);
 
         Assert.That(raw.Coords[MotionParameters.ExtruderToDrive(0)], Is.EqualTo(2.0f));
@@ -384,7 +408,7 @@ public class MoveInterpreterTests
 
         Machine machine = NewMachine(tool, numExtruders: 2);
 
-        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 X10 E4"), NewInput(), isCoordinated: true, MoveType.Normal);
+        RawMove raw = Build(machine, G("G1 X10 E4"), NewInput(), isCoordinated: true, MoveType.Normal);
 
         Assert.Multiple(() =>
         {
@@ -402,7 +426,7 @@ public class MoveInterpreterTests
         Machine machine = NewMachine(tool, numExtruders: 2);
 
         Assert.Throws<GCodeException>(
-            () => machine.Interpreter.BuildRawMove(G("G1 X10 E1:2:3"), NewInput(), isCoordinated: true, MoveType.Normal));
+            () => Build(machine, G("G1 X10 E1:2:3"), NewInput(), isCoordinated: true, MoveType.Normal));
     }
 
     [Test]
@@ -411,7 +435,7 @@ public class MoveInterpreterTests
         Machine machine = NewMachine(NewTool());
         machine.Model.Move.Extruders[0].Factor = 0.5f;
 
-        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 X10 E4"), NewInput(), isCoordinated: true, MoveType.Normal);
+        RawMove raw = Build(machine, G("G1 X10 E4"), NewInput(), isCoordinated: true, MoveType.Normal);
 
         Assert.That(raw.Coords[MotionParameters.ExtruderToDrive(0)], Is.EqualTo(2.0f));
     }
@@ -422,8 +446,8 @@ public class MoveInterpreterTests
         Machine machine = NewMachine();
         InputChannel input = NewInput();
 
-        RawMove first = machine.Interpreter.BuildRawMove(G("G1 X10 F3000"), input, isCoordinated: true, MoveType.Normal);
-        RawMove second = machine.Interpreter.BuildRawMove(G("G1 X20"), input, isCoordinated: true, MoveType.Normal);
+        RawMove first = Build(machine, G("G1 X10 F3000"), input, isCoordinated: true, MoveType.Normal);
+        RawMove second = Build(machine, G("G1 X20"), input, isCoordinated: true, MoveType.Normal);
 
         Assert.Multiple(() =>
         {
@@ -439,11 +463,11 @@ public class MoveInterpreterTests
         Machine machine = NewMachine();
         machine.Model.Move.SpeedFactor = 2.0f;
 
-        RawMove job = machine.Interpreter.BuildRawMove(G("G1 X10 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
+        RawMove job = Build(machine, G("G1 X10 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
 
         Code macro = G("G1 X10 F3000");
         macro.Flags |= CodeFlags.IsFromSystemMacro;
-        RawMove fromMacro = machine.Interpreter.BuildRawMove(macro, NewInput(), isCoordinated: true, MoveType.Normal);
+        RawMove fromMacro = Build(machine, macro, NewInput(), isCoordinated: true, MoveType.Normal);
 
         Assert.Multiple(() =>
         {
@@ -461,10 +485,10 @@ public class MoveInterpreterTests
         // machine G0 honours the speed the slicer chose for the travel move
         Machine machine = NewMachine();
         machine.Model.State.MachineMode = MachineMode.CNC;
-        RawMove rapid = machine.Interpreter.BuildRawMove(G("G0 X10 F3000"), NewInput(), isCoordinated: false, MoveType.Normal);
+        RawMove rapid = Build(machine, G("G0 X10 F3000"), NewInput(), isCoordinated: false, MoveType.Normal);
 
         machine.Model.State.MachineMode = MachineMode.FFF;
-        RawMove travel = machine.Interpreter.BuildRawMove(G("G0 X20 F3000"), NewInput(), isCoordinated: false, MoveType.Normal);
+        RawMove travel = Build(machine, G("G0 X20 F3000"), NewInput(), isCoordinated: false, MoveType.Normal);
 
         Assert.Multiple(() =>
         {
@@ -485,9 +509,9 @@ public class MoveInterpreterTests
         Assert.Multiple(() =>
         {
             Assert.Throws<GCodeException>(
-                () => machine.Interpreter.BuildRawMove(G("G1 X10"), NewInput(inverseTime: true), isCoordinated: true, MoveType.Normal));
+                () => Build(machine, G("G1 X10"), NewInput(inverseTime: true), isCoordinated: true, MoveType.Normal));
 
-            RawMove raw = machine.Interpreter.BuildRawMove(G("G1 X10 F2"), NewInput(inverseTime: true),
+            RawMove raw = Build(machine, G("G1 X10 F2"), NewInput(inverseTime: true),
                                                            isCoordinated: true, MoveType.Normal);
             Assert.That(raw.DurationSec, Is.EqualTo(30.0f).Within(1e-4f), "one over two minutes");
             Assert.That(raw.InverseTimeMode, Is.True);
@@ -501,7 +525,7 @@ public class MoveInterpreterTests
         Machine machine = NewMachine();
         machine.Model.Move.SpeedFactor = 2.0f;
 
-        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 X10 F2"), NewInput(inverseTime: true),
+        RawMove raw = Build(machine, G("G1 X10 F2"), NewInput(inverseTime: true),
                                                        isCoordinated: true, MoveType.Normal);
 
         Assert.That(raw.DurationSec, Is.EqualTo(15.0f).Within(1e-4f));
@@ -513,7 +537,7 @@ public class MoveInterpreterTests
         Machine machine = NewMachine();
         machine.Model.Move.Axes[1].Rotational = true;
 
-        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 Y90 F600"), NewInput(unit: DistanceUnit.Inch),
+        RawMove raw = Build(machine, G("G1 Y90 F600"), NewInput(unit: DistanceUnit.Inch),
                                                        isCoordinated: true, MoveType.Normal);
 
         Assert.That(raw.FeedRateMmPerSec, Is.EqualTo(10.0f).Within(1e-4f), "degrees per minute, unconverted");
@@ -524,8 +548,8 @@ public class MoveInterpreterTests
     {
         Machine machine = NewMachine(NewTool());
 
-        RawMove printing = machine.Interpreter.BuildRawMove(G("G1 X10 E1"), NewInput(), isCoordinated: true, MoveType.Normal);
-        RawMove zOnly = machine.Interpreter.BuildRawMove(G("G1 Z1 E1"), NewInput(), isCoordinated: true, MoveType.Normal);
+        RawMove printing = Build(machine, G("G1 X10 E1"), NewInput(), isCoordinated: true, MoveType.Normal);
+        RawMove zOnly = Build(machine, G("G1 Z1 E1"), NewInput(), isCoordinated: true, MoveType.Normal);
 
         Assert.Multiple(() =>
         {
@@ -542,9 +566,9 @@ public class MoveInterpreterTests
         Machine machine = NewMachine();
 
         Assert.Throws<GCodeException>(
-            () => machine.Interpreter.BuildRawMove(G("G1 X5000"), NewInput(), isCoordinated: true, MoveType.Normal));
+            () => Build(machine, G("G1 X5000"), NewInput(), isCoordinated: true, MoveType.Normal));
 
-        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 X5000"), NewInput(axesRelative: true),
+        RawMove raw = Build(machine, G("G1 X5000"), NewInput(axesRelative: true),
                                                        isCoordinated: true, MoveType.Normal);
 
         Assert.Multiple(() =>
@@ -559,7 +583,7 @@ public class MoveInterpreterTests
     public void ACartesianMoveIsNotSegmented()
     {
         Machine machine = NewMachine();
-        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 X100 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
+        RawMove raw = Build(machine, G("G1 X100 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
 
         Assert.That(raw.SegmentCount, Is.EqualTo(1));
     }
@@ -570,7 +594,7 @@ public class MoveInterpreterTests
         // The step clock is 32 bits at 750kHz, so a move occupying a large part of it cannot be timed
         // against it whatever the geometry says
         Machine machine = NewMachine();
-        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 X200 F0.1"), NewInput(), isCoordinated: true, MoveType.Normal);
+        RawMove raw = Build(machine, G("G1 X200 F0.1"), NewInput(), isCoordinated: true, MoveType.Normal);
 
         Assert.That(raw.SegmentCount, Is.GreaterThan(1));
     }
@@ -579,7 +603,7 @@ public class MoveInterpreterTests
     public void TheAxisLetterBitmapsFollowTheConfiguration()
     {
         Machine machine = NewMachine();
-        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 X10"), NewInput(), isCoordinated: true, MoveType.Normal);
+        RawMove raw = Build(machine, G("G1 X10"), NewInput(), isCoordinated: true, MoveType.Normal);
 
         Assert.Multiple(() =>
         {
@@ -661,7 +685,7 @@ public class MoveInterpreterTests
     {
         // A homing move naming X must not be stopped by Z's switch happening to be closed already
         Machine machine = NewMachine(withEndstops: true);
-        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 H1 X-250"), NewInput(), isCoordinated: true, MoveType.Homing);
+        RawMove raw = Build(machine, G("G1 H1 X-250"), NewInput(), isCoordinated: true, MoveType.Homing);
 
         Assert.Multiple(() =>
         {
@@ -680,7 +704,7 @@ public class MoveInterpreterTests
         Machine machine = NewMachine();
 
         Assert.Throws<GCodeException>(
-            () => machine.Interpreter.BuildRawMove(G("G1 H1 X-250"), NewInput(), isCoordinated: true, MoveType.Homing));
+            () => Build(machine, G("G1 H1 X-250"), NewInput(), isCoordinated: true, MoveType.Homing));
     }
 
     [Test]
@@ -691,7 +715,7 @@ public class MoveInterpreterTests
         Machine machine = NewMachine(withEndstops: true);
         machine.State.RecordEndstopTriggered(0b111);
 
-        machine.Interpreter.BuildRawMove(G("G1 H1 X-250"), NewInput(), isCoordinated: true, MoveType.Homing);
+        Build(machine, G("G1 H1 X-250"), NewInput(), isCoordinated: true, MoveType.Homing);
 
         Assert.That(machine.State.EndstopsTriggered, Is.Zero);
     }
@@ -705,7 +729,7 @@ public class MoveInterpreterTests
         machine.Model.Sensors.Endstops[0]!.Triggered = true;
         machine.Builder.SetAxisPosition(0, 3.0f);
 
-        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 H1 X-250"), NewInput(), isCoordinated: true, MoveType.Homing);
+        RawMove raw = Build(machine, G("G1 H1 X-250"), NewInput(), isCoordinated: true, MoveType.Homing);
 
         Assert.Multiple(() =>
         {
@@ -719,7 +743,7 @@ public class MoveInterpreterTests
     {
         // Otherwise a long move would accumulate rounding and stop short of where it was asked to go
         Machine machine = NewMachine();
-        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 X30 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
+        RawMove raw = Build(machine, G("G1 X30 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
         raw.SegmentCount = 3;
         SegmentedMove segments = SegmentedMove.From(raw, [0.0f, 0.0f, 0.0f], 3, MotionLimits.MaxAxesPlusExtruders - 1);
 
@@ -739,7 +763,7 @@ public class MoveInterpreterTests
     public void EverySegmentIsItsOwnMoveToTheEngine()
     {
         Machine machine = NewMachine();
-        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 X30 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
+        RawMove raw = Build(machine, G("G1 X30 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
         raw.MoveId = 42;
 
         machine.Interpreter.PrepareSegment(raw, SegmentedMove.From(raw, [0.0f, 0.0f, 0.0f], 3, MotionLimits.MaxAxesPlusExtruders - 1), 1);
@@ -751,7 +775,7 @@ public class MoveInterpreterTests
     public void ASegmentCarriesItsShareOfTheExtrusionRatherThanTheWholeMoves()
     {
         Machine machine = NewMachine(NewTool());
-        RawMove raw = machine.Interpreter.BuildRawMove(G("G1 X30 E6 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
+        RawMove raw = Build(machine, G("G1 X30 E6 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
         raw.SegmentCount = 3;
 
         SegmentedMove segments = SegmentedMove.From(raw, [0.0f, 0.0f, 0.0f], 3, MotionLimits.MaxAxesPlusExtruders - 1);

@@ -96,7 +96,8 @@ internal sealed class MoveInterpreter(
     /// <returns>The move</returns>
     /// <exception cref="GCodeException">The move cannot be built</exception>
     /// <remarks>The caller must hold the object model write lock</remarks>
-    public RawMove BuildRawMove(DuetAPI.Commands.Code code, InputChannel input, bool isCoordinated, MoveType moveType)
+    public RawMove BuildRawMove(DuetAPI.Commands.Code code, InputChannel input, bool isCoordinated, MoveType moveType,
+                                IReadOnlyList<EndstopPlan> endstopPlans)
     {
         MotionParameters parameters = Parameters;
         int numAxes = parameters.SharedAxisCount(model.Move);
@@ -263,9 +264,7 @@ internal sealed class MoveInterpreter(
                 throw new GCodeException("Cannot enable both axis and extruder endstops in the same move");
             }
 
-            // TODO calculate speeds for stall detect homing
-
-            ApplyEndstops(code, raw, numAxes); // can throw GCodeException
+            ApplyEndstops(endstopPlans, raw, numAxes); // can throw GCodeException
         }
 
         bool hasExtrusion = ApplyExtrusion(code, input, raw, unitScale);
@@ -897,7 +896,7 @@ internal sealed class MoveInterpreter(
     /// <summary>
     /// Say which endstop stops which drive of a homing move
     /// </summary>
-    /// <param name="code">The code</param>
+    /// <param name="plans">What each axis the code named watches</param>
     /// <param name="raw">The move being built</param>
     /// <param name="numAxes">Number of axes to consider</param>
     /// <remarks>
@@ -910,32 +909,24 @@ internal sealed class MoveInterpreter(
     /// independent and stopping its own drivers is enough, which is <c>stopAxis</c>.
     /// </para>
     /// <para>
-    /// Only the axes the code actually moves are armed. A homing move naming X and Y must not be
-    /// stopped by Z's switch happening to be closed already
+    /// The plans cover only the axes the code named, so only those are armed: a homing move naming X
+    /// and Y must not be stopped by Z's switch happening to be closed already. They were worked out
+    /// before the boards were told what to watch for, which is what makes the drivers armed over the
+    /// bus and the drivers named in the move the same drivers
     /// </para>
     /// </remarks>
-    public void ApplyEndstops(DuetAPI.Commands.Code code, RawMove raw, int numAxes)
+    public void ApplyEndstops(IReadOnlyList<EndstopPlan> plans, RawMove raw, int numAxes)
     {
         // What stopped the last endstop move says nothing about this one. Cleared here rather than
         // where the move finishes, so that a move which is never reported as stopped - because it
         // ran its full length - leaves an empty latch rather than the previous move's
         state.ArmEndstops();
 
-        List<int> axesMentioned = [];
-        for (int axis = 0; axis < numAxes; axis++)
-        {
-            if (code.HasParameter(model.Move.Axes[axis].Letter))
-            {
-                axesMentioned.Add(axis);
-            }
-        }
-
         // Every rule about what stops what is in EndstopArming; this applies what it decided. The
         // holding is here because it writes the move's coordinates from the machine position, which
         // is the interpreter's business rather than the endstops'
-        ArmedMove armed = EndstopArming.Arm(model.Move, model.Sensors, Parameters.Geometry,
-                                            numAxes, axesMentioned, closedEndstopSwitches,
-                                            raw.StopOnInput);
+        ArmedMove armed = EndstopArming.Arm(model.Move, Parameters.Geometry, numAxes, plans,
+                                            closedEndstopSwitches, raw.StopOnInput);
 
         raw.ArmedAxes.AddRange(armed.ArmedAxes);
         raw.ReduceAcceleration |= armed.ReduceAcceleration;

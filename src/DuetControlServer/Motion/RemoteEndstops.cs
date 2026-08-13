@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using DuetAPI;
 using DuetAPI.ObjectModel;
@@ -190,24 +191,24 @@ internal static class RemoteEndstops
     /// stalling, and it is also the right thing for the coupled case
     /// </para>
     /// </remarks>
-    public static bool TryGetStallStopInput(ReadOnlySpan<DuetAPI.Utility.DriverId> drivers, MoveStopInput stopInput)
+    public static bool TryGetStallStopInput(IReadOnlyList<WatchedDriver> drivers, MoveStopInput stopInput)
     {
         stopInput.Clear();
-        if (drivers.Length == 0)
+        if (drivers.Count == 0)
         {
             return false;
         }
 
-        if (drivers.Length == 1)
+        if (drivers.Count == 1)
         {
-            stopInput.SetShared(StallHandle(), (byte)drivers[0].Board);
+            stopInput.SetShared(StallHandle(), (byte)drivers[0].Driver.Board);
             return true;
         }
 
-        Span<byte> boards = stackalloc byte[drivers.Length];
-        for (int i = 0; i < drivers.Length; i++)
+        Span<byte> boards = stackalloc byte[drivers.Count];
+        for (int i = 0; i < drivers.Count; i++)
         {
-            boards[i] = (byte)drivers[i].Board;
+            boards[i] = (byte)drivers[i].Driver.Board;
         }
         stopInput.SetPerDriver(StallHandle(), boards);
         return true;

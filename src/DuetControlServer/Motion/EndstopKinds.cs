@@ -1,0 +1,316 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using DuetAPI;
+using DuetAPI.ObjectModel;
+using DuetControlServer.Link;
+using DuetControlServer.Link.Protocol.CanMessages;
+using DuetControlServer.Link.Protocol.Shared;
+using DuetControlServer.Motion.Native;
+using Microsoft.Extensions.Logging;
+
+namespace DuetControlServer.Motion;
+
+/// <summary>
+/// What one move has already sent to the boards, so that it can be undone
+/// </summary>
+/// <remarks>
+/// Held by the move rather than by the endstop, because the endstops of the object model are
+/// replicated data with no lifetime of their own: an <c>M574</c> between two moves replaces the
+/// object that would have had to remember what the first one armed
+/// </remarks>
+internal sealed class EndstopArmingState
+{
+    /// <summary>Boards this move sent an arming message to, and must therefore release</summary>
+    public HashSet<byte> ArmedBoards { get; } = [];
+}
+
+/// <summary>
+/// One kind of endstop, and everything a move does about it
+/// </summary>
+/// <remarks>
+/// <para>
+/// RepRapFirmware's <c>Endstop</c> vtable: <c>PrimeAxis</c> is virtual and each subclass does its own
+/// CAN work in it, so <c>EnableAxisEndstops</c> is one loop over one call whatever kind the axis has.
+/// The same shape here, split in two because <see cref="TryArm"/> runs inside the planner lock and
+/// nothing there may await - see <see cref="EndstopPlanner"/>.
+/// </para>
+/// <para>
+/// Both halves live on the one type so that adding a kind is implementing an interface rather than
+/// remembering two call sites, which is what the split cost before
+/// </para>
+/// </remarks>
+internal interface IEndstopKind
+{
+    /// <summary>
+    /// Whether this handles the given endstop type
+    /// </summary>
+    /// <param name="type">The endstop type</param>
+    /// <returns>True if it does</returns>
+    /// <remarks>
+    /// A predicate rather than a property because one kind may cover more than one type. Motor stall
+    /// is currently one kind for both <c>S3</c> and <c>S4</c>, which is the defect §4.3 of the plan
+    /// describes; splitting them is splitting this
+    /// </remarks>
+    bool Handles(EndstopType type);
+
+    /// <summary>
+    /// Whether a move watching this has to be run at the reduced acceleration <c>M201.1</c> configures
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>Endstop::ShouldReduceAcceleration</c></remarks>
+    bool ReducesAcceleration { get; }
+
+    /// <summary>
+    /// Tell the boards what to watch for, before the move is built
+    /// </summary>
+    /// <param name="plan">What this axis watches</param>
+    /// <param name="state">What this move has armed so far, to be added to</param>
+    /// <param name="link">Link interface</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Anything the boards had to say that is worth passing on</returns>
+    /// <exception cref="GCodeException">A board refused, so the move must not run</exception>
+    ValueTask<Message> PrepareAsync(EndstopPlan plan, EndstopArmingState state, LinkInterface link,
+                                    CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Undo <see cref="PrepareAsync"/>, however the move ended
+    /// </summary>
+    /// <param name="state">What this move armed</param>
+    /// <param name="link">Link interface</param>
+    /// <param name="logger">Logger, because there is nobody left to report a failure to</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>An awaitable task</returns>
+    ValueTask ReleaseAsync(EndstopArmingState state, LinkInterface link, ILogger logger,
+                           CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Write what stops this axis into the move
+    /// </summary>
+    /// <param name="plan">What this axis watches</param>
+    /// <param name="stopInput">The stop input to fill in</param>
+    /// <returns>Null if the axis is armed, else why its endstop cannot stop a move</returns>
+    /// <remarks>Runs inside the planner lock, so it must not await and must not touch the bus</remarks>
+    string? TryArm(EndstopPlan plan, MoveStopInput stopInput);
+}
+
+/// <summary>
+/// The kind of endstop an axis has
+/// </summary>
+/// <remarks>
+/// The dispatch RepRapFirmware gets from a vtable. It cannot hang off
+/// <see cref="DuetAPI.ObjectModel.Endstop"/> itself: that is a replicated object-model class, so
+/// behaviour on it would cross the API boundary and be visible to every client
+/// </remarks>
+internal static class EndstopKinds
+{
+    private static readonly IEndstopKind[] All =
+    [
+        new SwitchEndstopKind(),
+        new ZProbeEndstopKind(),
+        new StallEndstopKind()
+    ];
+
+    /// <summary>
+    /// The kind that handles an endstop type
+    /// </summary>
+    /// <param name="type">The endstop type</param>
+    /// <returns>The kind, or null if a move cannot be stopped by that type</returns>
+    public static IEndstopKind? For(EndstopType type)
+    {
+        foreach (IEndstopKind kind in All)
+        {
+            if (kind.Handles(type))
+            {
+                return kind;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Every kind the move's plans need, without repeats
+    /// </summary>
+    /// <param name="plans">The move's plans</param>
+    /// <returns>The distinct kinds</returns>
+    /// <remarks>
+    /// What <see cref="IEndstopKind.ReleaseAsync"/> is called on. Releasing is per move rather than
+    /// per axis - one message disables every stall endstop on a board - so two axes of the same kind
+    /// must not release twice
+    /// </remarks>
+    public static IEnumerable<IEndstopKind> Used(IReadOnlyList<EndstopPlan> plans)
+    {
+        List<IEndstopKind> used = [];
+        foreach (EndstopPlan plan in plans)
+        {
+            if (For(plan.Kind) is IEndstopKind kind && !used.Contains(kind))
+            {
+                used.Add(kind);
+            }
+        }
+        return used;
+    }
+}
+
+/// <summary>
+/// A switch on an input pin, which is almost every endstop
+/// </summary>
+/// <remarks>
+/// Nothing is sent per move. The board was asked to watch the pin by <c>M574</c> and has reported
+/// every change since, so the move only has to name the handle.
+///
+/// RepRapFirmware's <c>SwitchEndstop::PrimeAxis</c> does more than this: it re-enables each remote
+/// handle and re-reads its state every move, which is what makes a board that reset mid-job fail
+/// loudly instead of silently never reporting again. Porting that is §13 of the endstops document and
+/// belongs here when it happens
+/// </remarks>
+internal sealed class SwitchEndstopKind : IEndstopKind
+{
+    /// <inheritdoc/>
+    public bool Handles(EndstopType type) => type == EndstopType.InputPin;
+
+    /// <inheritdoc/>
+    public bool ReducesAcceleration => false;
+
+    /// <inheritdoc/>
+    public ValueTask<Message> PrepareAsync(EndstopPlan plan, EndstopArmingState state, LinkInterface link,
+                                           CancellationToken cancellationToken)
+        => new(new Message());
+
+    /// <inheritdoc/>
+    public ValueTask ReleaseAsync(EndstopArmingState state, LinkInterface link, ILogger logger,
+                                  CancellationToken cancellationToken)
+        => ValueTask.CompletedTask;
+
+    /// <inheritdoc/>
+    public string? TryArm(EndstopPlan plan, MoveStopInput stopInput)
+        => RemoteEndstops.TryGetStopInput(plan.Endstop, plan.Axis, plan.NumAxisDrivers, stopInput)
+            ? null
+            : "its endstop has no port assigned";
+}
+
+/// <summary>
+/// The Z probe standing in for the axis' endstop
+/// </summary>
+/// <remarks>
+/// Registered under a probe handle by <c>M558</c>, so like a switch there is nothing to send per move
+/// </remarks>
+internal sealed class ZProbeEndstopKind : IEndstopKind
+{
+    /// <inheritdoc/>
+    public bool Handles(EndstopType type) => type == EndstopType.ZProbeAsEndstop;
+
+    /// <inheritdoc/>
+    public bool ReducesAcceleration => false;
+
+    /// <inheritdoc/>
+    public ValueTask<Message> PrepareAsync(EndstopPlan plan, EndstopArmingState state, LinkInterface link,
+                                           CancellationToken cancellationToken)
+        => new(new Message());
+
+    /// <inheritdoc/>
+    public ValueTask ReleaseAsync(EndstopArmingState state, LinkInterface link, ILogger logger,
+                                  CancellationToken cancellationToken)
+        => ValueTask.CompletedTask;
+
+    /// <inheritdoc/>
+    public string? TryArm(EndstopPlan plan, MoveStopInput stopInput)
+        => plan.Probe is not null && RemoteProbes.TryGetStopInput(plan.Probe, plan.Endstop.Probe ?? 0, stopInput)
+            ? null
+            : "its endstop is a Z probe that cannot stop a move; check M558";
+}
+
+/// <summary>
+/// The drivers of the axis stalling
+/// </summary>
+/// <remarks>
+/// The one kind with something to send per move. A driver decides it has stalled by comparing the
+/// back-EMF against what the commanded speed implies, so it cannot detect one until it has been told
+/// what speed this move will run at - and must be untold afterwards, or it reports a stall during an
+/// ordinary move. RepRapFirmware's <c>StallDetectionEndstop::PrimeAxis</c> by way of
+/// <c>CanInterface::EnableRemoteStallEndstop</c>
+/// </remarks>
+internal sealed class StallEndstopKind : IEndstopKind
+{
+    /// <inheritdoc/>
+    public bool Handles(EndstopType type)
+        => type is EndstopType.MotorStallAny or EndstopType.MotorStallIndividual;
+
+    /// <inheritdoc/>
+    public bool ReducesAcceleration => true;
+
+    /// <inheritdoc/>
+    public async ValueTask<Message> PrepareAsync(EndstopPlan plan, EndstopArmingState state, LinkInterface link,
+                                                 CancellationToken cancellationToken)
+    {
+        List<Message> replies = [];
+        foreach (WatchedDriver watched in plan.DriversWatched)
+        {
+            CanMessageEnableStallEndstop message = new()
+            {
+                DriverNumber = (ushort)watched.Driver.Port,
+                Speed = watched.StepsPerSecond
+            };
+
+            byte board = (byte)watched.Driver.Board;
+            CanResponse response = await link.SendCanMessageAsync(
+                board, in message, CanMessageType.StandardReply, cancellationToken: cancellationToken);
+
+            // Recorded before the reply is judged: a board that refused one driver may already have
+            // armed another, and the release has to reach it either way
+            state.ArmedBoards.Add(board);
+
+            Message reply = response.ToMessage();
+            if (reply.Type == MessageType.Error)
+            {
+                throw new GCodeException(reply.Content);
+            }
+
+            // The driver was armed but the board may still have had something to say about it, which
+            // the move carries back rather than dropping: a warning here is the only sign the user
+            // gets that the stall threshold may not be what they asked for
+            replies.Add(reply);
+        }
+        return replies.ToMessage();
+    }
+
+    /// <inheritdoc/>
+    public async ValueTask ReleaseAsync(EndstopArmingState state, LinkInterface link, ILogger logger,
+                                        CancellationToken cancellationToken)
+    {
+        foreach (byte board in state.ArmedBoards)
+        {
+            CanMessageEnableStallEndstop message = new()
+            {
+                DriverNumber = CanMessageEnableStallEndstop.DisableAll,
+                Speed = 0.0f
+            };
+
+            try
+            {
+                CanResponse response = await link.SendCanMessageAsync(board, in message, CanMessageType.StandardReply,
+                                                                      cancellationToken: cancellationToken);
+
+                // The move this cleans up after has already run, so there is nobody left to answer;
+                // a board that would not disarm is still worth a line in the log, because the next
+                // move naming the stall handle is what will notice
+                if (response.Severity != MessageType.Success)
+                {
+                    logger.LogWarning("Board {Board} did not disable its stall endstops: {Reply}", board,
+                                      response.ToMessage().Content);
+                }
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                // Worth knowing about but not worth failing the move that has already run for
+                logger.LogWarning(e, "Could not disable the stall endstops on board {Board}", board);
+            }
+        }
+    }
+
+    /// <inheritdoc/>
+    public string? TryArm(EndstopPlan plan, MoveStopInput stopInput)
+        => RemoteEndstops.TryGetStallStopInput(plan.DriversWatched, stopInput)
+            ? null
+            : "no driver is assigned to it";
+}

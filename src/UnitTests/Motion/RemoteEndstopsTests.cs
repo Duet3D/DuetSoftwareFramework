@@ -218,7 +218,8 @@ public class RemoteEndstopsTests
         // driver's stall from another's is the board. That is the opposite way round from a switch
         // per driver, where the handle's minor field selects the switch and the boards may repeat
         MoveStopInput stopInput = new();
-        OmDriverId[] drivers = [new OmDriverId(1, 0), new OmDriverId(4, 2)];
+        WatchedDriver[] drivers = [new WatchedDriver(new OmDriverId(1, 0), 2400.0f),
+                                   new WatchedDriver(new OmDriverId(4, 2), 2400.0f)];
 
         Assert.That(RemoteEndstops.TryGetStallStopInput(drivers, stopInput), Is.True);
         Assert.Multiple(() =>
@@ -236,7 +237,7 @@ public class RemoteEndstopsTests
         // Written as shared rather than as a one-entry per-driver list, so that a dual-motor axis
         // with one stall-detecting driver still stops both motors
         MoveStopInput stopInput = new();
-        Assert.That(RemoteEndstops.TryGetStallStopInput([new OmDriverId(2, 1)], stopInput), Is.True);
+        Assert.That(RemoteEndstops.TryGetStallStopInput([new WatchedDriver(new OmDriverId(2, 1), 2400.0f)], stopInput), Is.True);
         Assert.Multiple(() =>
         {
             Assert.That(stopInput.NumSwitches, Is.EqualTo(1), "shared, so every driver watches it");

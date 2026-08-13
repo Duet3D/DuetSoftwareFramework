@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using DuetAPI;
+using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Motion;
 using DuetControlServer.Motion.Kinematics;
@@ -76,11 +78,48 @@ public class EndstopArmingTests
         return stopInputs;
     }
 
+    /// <summary>
+    /// Plan and arm the axes, as a move does
+    /// </summary>
+    /// <remarks>
+    /// The two run in that order and against the same plans on a machine as well: what an axis
+    /// watches is settled once, before the boards are told about it, and the arming below reads the
+    /// same answer. Going through the planner here rather than hand-building plans is what keeps this
+    /// suite testing the pair rather than half of it
+    /// </remarks>
     private static ArmedMove Arm((Move Move, Sensors Sensors) machine, MoveStopInput[] stopInputs,
                                  IReadOnlyList<int> axes, Func<int, uint>? closed = null,
                                  KinematicsName kinematics = KinematicsName.Cartesian)
-        => EndstopArming.Arm(machine.Move, machine.Sensors, KinematicsFactory.Create(kinematics),
-                             NumAxes, axes, closed ?? (_ => 0), stopInputs);
+    {
+        KinematicsEngine geometry = KinematicsFactory.Create(kinematics);
+        List<EndstopPlan> plans = EndstopPlanner.Plan(CodeNaming(machine.Move, axes), machine.Move,
+                                                      machine.Sensors, geometry, NumAxes, StepsPerMm,
+                                                      FeedRateMmPerSec);
+        return EndstopArming.Arm(machine.Move, geometry, NumAxes, plans, closed ?? (_ => 0), stopInputs);
+    }
+
+    /// <summary>Steps per mm of every drive, which only a stall endstop's speeds are worked out from</summary>
+    private static readonly float[] StepsPerMm = Enumerable.Repeat(80.0f, MotionLimits.MaxAxesPlusExtruders).ToArray();
+
+    /// <summary>How fast the move runs, in mm/sec</summary>
+    private const float FeedRateMmPerSec = 30.0f;
+
+    /// <summary>
+    /// A <c>G1 H1</c> naming these axes, since that is what the planner reads the axes from
+    /// </summary>
+    /// <param name="move">The machine's axes, for their letters</param>
+    /// <param name="axes">Axes to name</param>
+    /// <returns>The code</returns>
+    private static Code CodeNaming(Move move, IReadOnlyList<int> axes)
+    {
+        Code code = new() { Type = CodeType.GCode, MajorNumber = 1 };
+        code.Parameters.Add(new CodeParameter('H', 1));
+        foreach (int axis in axes)
+        {
+            code.Parameters.Add(new CodeParameter(move.Axes[axis].Letter, -300.0f));
+        }
+        return code;
+    }
 
     [Test]
     public void AnIndependentAxisIsStoppedByItsOwnSwitch()

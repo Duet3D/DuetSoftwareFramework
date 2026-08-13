@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using DuetAPI;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Motion.Kinematics;
@@ -61,23 +60,24 @@ internal static class EndstopArming
     /// Work out what this move watches, and fill in the stop input of every drive
     /// </summary>
     /// <param name="move">The move subsystem of the object model, for the axes and their drivers</param>
-    /// <param name="sensors">The sensors subsystem, for the endstops and probes</param>
     /// <param name="geometry">The machine's geometry, which decides which action an endstop takes</param>
     /// <param name="numAxes">Number of axes that can be planned for</param>
-    /// <param name="axesMentioned">Axes the code named, in order</param>
+    /// <param name="plans">What each axis the code named watches, in the order it named them</param>
     /// <param name="closedSwitches">Which switches of an axis' endstop are closed, as a bitmap</param>
     /// <param name="stopOnInput">Per-drive stop inputs to fill in, indexed by drive</param>
     /// <returns>What was decided</returns>
     /// <exception cref="GCodeException">
-    /// An axis has no endstop, has one a move cannot be stopped by, or was named alongside an axis
-    /// whose endstop has to stop every drive
+    /// An axis has an endstop a move cannot be stopped by, or was named alongside an axis whose
+    /// endstop has to stop every drive
     /// </exception>
     /// <remarks>
-    /// Only the axes the code names are armed. A homing move naming X and Y must not be stopped by
-    /// Z's switch happening to be closed
+    /// Only the axes the plans cover are armed, which is only the axes the code named. A homing move
+    /// naming X and Y must not be stopped by Z's switch happening to be closed. What each of them
+    /// watches was settled by <see cref="EndstopPlanner"/> before the boards were told about it, so
+    /// this and the arming that went over the bus cannot disagree
     /// </remarks>
-    public static ArmedMove Arm(Move move, Sensors sensors, KinematicsEngine geometry, int numAxes,
-                                IReadOnlyList<int> axesMentioned, Func<int, uint> closedSwitches,
+    public static ArmedMove Arm(Move move, KinematicsEngine geometry, int numAxes,
+                                IReadOnlyList<EndstopPlan> plans, Func<int, uint> closedSwitches,
                                 MoveStopInput[] stopOnInput)
     {
         List<int> armedAxes = [], alreadyClosed = [];
@@ -88,25 +88,28 @@ internal static class EndstopArming
         MoveStopInput stopAllInput = new();
         int independentlyArmed = 0;
 
-        foreach (int axis in axesMentioned)
+        foreach (EndstopPlan plan in plans)
         {
-            Endstop? endstop = axis < sensors.Endstops.Count ? sensors.Endstops[axis] : null;
-            if (endstop is null)
-            {
-                throw new GCodeException($"No endstop configured for axis {move.Axes[axis].Letter}");
-            }
+            int axis = plan.Axis;
+            Endstop endstop = plan.Endstop;
+            IEndstopKind? kind = EndstopKinds.For(plan.Kind);
 
+            // Refusing is the point. Leaving the axis unarmed and carrying on would run the move to
+            // its full commanded length with nothing to stop it, which for a homing move means
+            // driving into the end of the axis. RepRapFirmware's EnableAxisEndstops throws here for
+            // the same reason
             // TODO if simulating continue to next axis
-            if (TryArmAxis(move, sensors, geometry, endstop, axis, stopOnInput[axis]) is string reason)
+            if (kind is null)
             {
-                // Refusing is the point. Leaving the axis unarmed and carrying on would run the move
-                // to its full commanded length with nothing to stop it, which for a homing move means
-                // driving into the end of the axis. RepRapFirmware's EnableAxisEndstops throws here
-                // for the same reason
+                throw new GCodeException(
+                    $"Cannot home {move.Axes[axis].Letter}: its endstop type is not one a move can be stopped by");
+            }
+            if (kind.TryArm(plan, stopOnInput[axis]) is string reason)
+            {
                 throw new GCodeException($"Cannot home {move.Axes[axis].Letter}: {reason}");
             }
 
-            reduceAcceleration |= endstop.Type is EndstopType.MotorStallAny or EndstopType.MotorStallIndividual;
+            reduceAcceleration |= kind.ReducesAcceleration;
 
             if (endstop.Triggered && !HoldClosedDrivers(geometry, closedSwitches, axis, stopOnInput[axis]))
             {
@@ -185,67 +188,6 @@ internal static class EndstopArming
     /// </remarks>
     private static bool NeedsEveryDrive(KinematicsEngine geometry, int axis)
         => (geometry.GetControllingDrives(axis) & ~(1u << axis)) != 0;
-
-    /// <summary>
-    /// Fill in what stops one axis, whatever kind of endstop it has
-    /// </summary>
-    /// <param name="move">The move subsystem of the object model</param>
-    /// <param name="sensors">The sensors subsystem</param>
-    /// <param name="geometry">The machine's geometry</param>
-    /// <param name="endstop">The axis' endstop</param>
-    /// <param name="axis">Axis number</param>
-    /// <param name="stopInput">The stop input to fill in</param>
-    /// <returns>Null if the axis is armed, else why its endstop cannot stop a move</returns>
-    /// <remarks>
-    /// The four kinds are RepRapFirmware's four endstop classes. A switch and a Z probe are inputs a
-    /// board watches, so they name a handle the board already knows; a stall is detected by the
-    /// driver itself, so what the move watches is the board's stall report. The reason travels back
-    /// with the refusal rather than being derived again from the type, because the two would then
-    /// have to be kept in step and only one of them is exercised
-    /// </remarks>
-    private static string? TryArmAxis(Move move, Sensors sensors, KinematicsEngine geometry,
-                                      Endstop endstop, int axis, MoveStopInput stopInput)
-    {
-        switch (endstop.Type)
-        {
-            case EndstopType.InputPin:
-                // CHECK should we send a CanMessageChangeInputMonitorV1 message to actually enable the endstops like in `SwitchEndstop::PrimeAxis()`?
-                return RemoteEndstops.TryGetStopInput(endstop, axis, move.Axes[axis].Drivers.Count, stopInput)
-                       ? null
-                       : "its endstop has no port assigned";
-
-            case EndstopType.ZProbeAsEndstop:
-                {
-                    int probeNumber = endstop.Probe ?? 0;
-                    Probe? probe = probeNumber < sensors.Probes.Count ? sensors.Probes[probeNumber] : null;
-                    return probe is not null && RemoteProbes.TryGetStopInput(probe, probeNumber, stopInput)
-                           ? null
-                           : "its endstop is a Z probe that cannot stop a move; check M558";
-                }
-
-            case EndstopType.MotorStallAny:
-            case EndstopType.MotorStallIndividual:
-                {
-                    // Which drivers to watch is the geometry's answer, not the axis': stopping on a
-                    // CoreXY's X stall means watching both motors, because moving X turns both
-                    uint drives = geometry.GetControllingDrives(axis);
-                    List<DuetAPI.Utility.DriverId> drivers = [];
-                    for (int drive = 0; drive < move.Axes.Count && drive < MotionLimits.MaxAxes; drive++)
-                    {
-                        if ((drives & (1u << drive)) != 0)
-                        {
-                            drivers.AddRange(move.Axes[drive].Drivers);
-                        }
-                    }
-                    return RemoteEndstops.TryGetStallStopInput(CollectionsMarshal.AsSpan(drivers), stopInput)
-                           ? null
-                           : "no driver is assigned to it";
-                }
-
-            default:
-                return "its endstop type is not one a move can be stopped by";
-        }
-    }
 
     /// <summary>
     /// Hold only the motors of an axis that are already on their own switch
