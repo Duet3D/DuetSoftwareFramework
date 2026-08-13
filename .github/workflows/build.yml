@@ -72,24 +72,6 @@ jobs:
         mode:
           - aot
           - runtime
-        # Built one project per job rather than with --all so they run in parallel.
-        # DuetControlServer implicitly pulls in DuetSbcInterface (libduet_sbc.so) for the same arch.
-        project:
-          - DuetControlServer
-          - DuetSbcInterface
-          - DuetPiManagementPlugin
-          - DuetPluginService
-          - DuetWebServer
-          - CodeConsole
-          - CodeLogger
-          - CodeStream
-          - CustomHttpEndpoint
-          - ModelObserver
-          - PluginManager
-        exclude:
-          # DuetSbcInterface is native C++ and is built the same way either way, so once per arch
-          - project: DuetSbcInterface
-            mode: aot
     steps:
       - uses: actions/checkout@v6
 
@@ -100,13 +82,12 @@ jobs:
       # and DuetControlServer needs it too because it builds libduet_sbc.so in turn. Nothing else in
       # the matrix touches lib/, so the clone is skipped for the other projects.
       - name: Check out RRFLibraries
-        if: matrix.project == 'DuetSbcInterface' || matrix.project == 'DuetControlServer'
         run: |
           git config --global url."https://github.com/".insteadOf "git@github.com:"
           git submodule update --init --depth 1 lib/RRFLibraries
 
-      - name: Build ${{ matrix.project }} (${{ matrix.arch }}, ${{ matrix.mode }})
-        run: ./scripts/build.sh ${{ matrix.mode == 'aot' && '--aot' || '' }} --arch ${{ matrix.arch }} ${{ matrix.project }}
+      - name: Build DSF (${{ matrix.arch }}, ${{ matrix.mode }})
+        run: ./scripts/build.sh ${{ matrix.mode == 'aot' && '--aot' || '' }} --arch ${{ matrix.arch }} --all
 
   # Bare-metal DuetCANMaster firmware (arm-none-eabi), built through its CMake presets.
   # The per-board presets are built here so a break in any single board is visible on its own.
