@@ -58,6 +58,7 @@ internal partial class MCodeHandler(
     CommandFactory commandFactory,
     DiagnosticsProvider diagnosticsProvider,
     EventLogger eventLogger,
+    Events.EventQueue events,
     FileInfoParser fileInfoParser,
     FilePathResolver filePathResolver,
     LinkInterface linkInterface,
@@ -328,6 +329,8 @@ internal partial class MCodeHandler(
             953 => await HandleEnableCanAsync(code, cancellationToken),
             // Configure phase stepping
             970 => await HandlePhaseSteppingAsync(code, cancellationToken),
+            // Raise an event
+            957 => HandleRaiseEvent(code),
             // Update the firmware
             997 => await HandleFirmwareUpdateAsync(code, cancellationToken),
             // Request resend of line
@@ -1764,6 +1767,42 @@ internal partial class MCodeHandler(
         await linkInterface.EnableCanAsync(true, cancellationToken);
 
         return new Message();
+    }
+
+    /// <summary>
+    /// M957: raise an event
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// How an event macro is exercised without the machine having to produce the fault it is for, and
+    /// the only way to reach <c>controller-disconnect.g</c> short of pulling a cable. The event is
+    /// raised and nothing else happens: this does not touch the link or invalidate anything, so a
+    /// simulated disconnect runs its macro against a machine that is still there
+    /// </remarks>
+    private Message HandleRaiseEvent(Commands.Code code)
+    {
+        if (!code.TryGetString('E', out string? typeName))
+        {
+            return new Message(MessageType.Error, "Missing event type");
+        }
+        if (!Events.EventText.TryParse(typeName, out EventType eventType))
+        {
+            return new Message(MessageType.Error, "Invalid event type");
+        }
+
+        if (!code.TryGetUIntLimited('D', 0, 255, out uint deviceNumber))
+        {
+            return new Message(MessageType.Error, "Missing device number");
+        }
+        uint param = code.GetUInt('P', 0);
+        uint boardAddress = code.GetUInt('B', CanId.MasterAddress);
+        code.TryGetString('S', out string? text);
+
+        Events.MachineEvent machineEvent = new(eventType, (ushort)param, (byte)boardAddress, (byte)deviceNumber, text ?? string.Empty);
+        return events.Raise(machineEvent)
+            ? new Message()
+            : new Message(MessageType.Warning, "a similar event is already queued");
     }
 
     /// <summary>

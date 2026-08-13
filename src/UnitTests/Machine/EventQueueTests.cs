@@ -307,6 +307,32 @@ namespace UnitTests.Machine
         }
 
         [Test]
+        public void AnEventTypeIsNamedTheWayItsMacroIs()
+        {
+            // What M957 takes: RepRapFirmware turns hyphens into underscores before looking it up, so
+            // the name a macro file has works as well as the name the schema declares
+            Assert.That(EventText.TryParse("heater_fault", out EventType underscored), Is.True);
+            Assert.That(underscored, Is.EqualTo(EventType.HeaterFault));
+
+            Assert.That(EventText.TryParse("heater-fault", out EventType hyphenated), Is.True);
+            Assert.That(hyphenated, Is.EqualTo(EventType.HeaterFault));
+
+            Assert.That(EventText.TryParse("  Controller-Disconnect  ", out EventType link), Is.True);
+            Assert.That(link, Is.EqualTo(EventType.ControllerDisconnect));
+
+            Assert.That(EventText.TryParse("not_an_event", out _), Is.False);
+            Assert.That(EventText.TryParse(string.Empty, out _), Is.False);
+
+            // Every type that can be raised has a macro to raise it into, because it is one table
+            foreach (EventType type in System.Enum.GetValues<EventType>())
+            {
+                Assert.That(EventText.TryParse(EventText.GetMacroFileName(type)[..^2], out EventType roundTripped), Is.True,
+                            $"{type} cannot be named");
+                Assert.That(roundTripped, Is.EqualTo(type));
+            }
+        }
+
+        [Test]
         public async Task WaitingReturnsWhenAnEventArrives()
         {
             using CancellationTokenSource cts = new(TimeSpan.FromSeconds(5));

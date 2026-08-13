@@ -521,7 +521,7 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M954 | 4610 | Configure as expansion board | — | ⛔ DSF is always the main board |
 | M955 | 4619 | Configure accelerometer | `boards[].accelerometer` → CAN generic `M955Params` | ⬜ |
 | M956 | 4623 | Start accelerometer collection | → CAN `CanMessageStartAccelerometer` | ⬜ |
-| M957 | 4628 | Raise event | Event queue — [EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) | ⬜ |
+| M957 | 4628 | Raise event | Event queue — [EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) | ✅ |
 | M959 | 4633 | Expansion board connection timeout | → CAN generic `M959Params` | ⬜ |
 | M997 | 4645 | Firmware update | → CAN `CanMessageUpdateYourFirmware` | 🔵 |
 | M998 | 4650 | Request resend | — | ⬜ currently throws `NotSupportedException` |

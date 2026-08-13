@@ -1,4 +1,5 @@
 using DuetAPI.ObjectModel;
+using System;
 using DuetControlServer.Link.Protocol.Shared;
 using System.Collections.Generic;
 
@@ -66,6 +67,31 @@ public static class EventText
         "high PWM: ",                                   // "expected ... actual ..." follows
         "unknown error: "                               // the fault type was not one of the above
     ];
+
+    /// <summary>
+    /// Find the event type a name refers to
+    /// </summary>
+    /// <param name="name">Name as the schema spells it, underscores or hyphens alike</param>
+    /// <param name="type">Event type it names</param>
+    /// <returns>True if it names one</returns>
+    /// <remarks>
+    /// The same table the macro name comes from, so a type that can be raised is a type that has a
+    /// macro to raise it into
+    /// </remarks>
+    public static bool TryParse(string name, out EventType type)
+    {
+        string wanted = name.Trim().Replace('-', '_');
+        foreach (var kv in Names)
+        {
+            if (string.Equals(kv.Value, wanted, StringComparison.OrdinalIgnoreCase))
+            {
+                type = kv.Key;
+                return true;
+            }
+        }
+        type = default;
+        return false;
+    }
 
     /// <summary>
     /// Get the name of the macro file run in response to an event

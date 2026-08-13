@@ -57,7 +57,7 @@ Every `AddEvent` call site in RepRapFirmware, with the DSF verdict:
 | `driver_error`, `driver_warning`, `driver_stall` | Local driver status | Move.cpp:3613/3627/3648 | ⛔ local hardware; arrives as a CAN event |
 | `filament_error` | `FilamentMonitor` | FilamentMonitor.cpp:412 | ⛔ local hardware; arrives as a CAN event |
 | any | `CanMessageEvent` from an expansion board | CommandProcessor.cpp:727 | ✅ decoded and queued |
-| any | `M957` | GCodes3.cpp:1306 | ⬜ not implemented — [MCODE_MIGRATION.md](MCODE_MIGRATION.md) §5.11 |
+| any | `M957` | GCodes3.cpp:1306 | ✅ |
 
 So in this architecture there are **three** producers, not seven: CAN event messages from expansion
 boards, board-connectivity events DCS derives itself, and `M957`. Plus the two new link events.
@@ -148,7 +148,7 @@ paused or pausing, no second pause is added.
 | Event queue, priority, suppression | `Events/EventQueue.cs` | ✅ phase B |
 | Event text and macro names | `Events/EventText.cs`, `Events/DriverStatusText.cs` | ✅ phase B (§3.5.1) |
 | Event macros | — | ⬜ nothing runs them yet: the processor is what does |
-| `M957` | — | ⬜ |
+| `M957` | `MCodeHandler.HandleRaiseEvent` | ✅ |
 | `Autopause` code channel | [CodeChannel.cs:71](src/DuetAPI/CodeChannel.cs#L71) = 11 | ✅ has a `ChannelProcessor` like every other channel; nothing puts codes on it |
 | Macro runner | [MacroRunner.cs:72](src/DuetControlServer/Files/MacroRunner.cs#L72) | ✅ runs a macro on a channel, with parameters (§3.4) |
 | Variables (`var`, `set`, `global`, `param`) | `Codes/Meta/VariableSet.cs`, `VariableStore.cs` | ✅ phase A — they did not exist at all before it |
@@ -794,11 +794,11 @@ Each phase is independently useful and independently testable.
 - [ ] Test: reboot the controller inside one `SbcConnectionTimeout` window; expect the same two
       events in the same order, with `param.P` = 1 on the disconnect
 
-### Phase D — `M957` ⬜
+### Phase D — `M957` ✅
 
-- [ ] Port GCodes3.cpp:1306, including `-` → `_` on the `E` parameter and the
+- [x] Port GCodes3.cpp:1306, including `-` → `_` on the `E` parameter and the
       `a similar event is already queued` warning
-- [ ] Validate the event type (`Invalid event type` when the name is not one), but allow **any** valid
+- [x] Validate the event type (`Invalid event type` when the name is not one), but allow **any** valid
       type including the 128+ block — that is how the link macros get tested (§7)
 
 ### Phase E — the blocked default actions ⬜
