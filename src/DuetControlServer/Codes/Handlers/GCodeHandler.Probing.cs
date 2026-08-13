@@ -5,6 +5,7 @@ using System;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
+using static DuetControlServer.Motion.AxisIndices;
 
 namespace DuetControlServer.Codes.Handlers;
 
@@ -300,7 +301,7 @@ internal sealed partial class GCodeHandler
                     }
 
                     // What stopped the last move that watched something says nothing about this one
-                    ArmCorrection(move);
+                    moveInterpreter.ArmCorrection(move);
                 }
 
                 result = planner.QueueMove(move);
@@ -472,9 +473,9 @@ internal sealed partial class GCodeHandler
                 probePosition[axis] += probe.Offsets[axis];
             }
         }
-        ApplyAxisSkewTransform(probePosition, numAxes);
+        AxisSkew.Apply(toolManager.Current, model.Move, probePosition, numAxes);
 
-        (float axis0, float axis1) = GridCoordinatesOf(probePosition, numAxes);
+        (float axis0, float axis1) = bedCompensation.GridCoordinates(probePosition, numAxes);
         bedCompensation.SetZeroHeightError(axis0, axis1);
     }
 

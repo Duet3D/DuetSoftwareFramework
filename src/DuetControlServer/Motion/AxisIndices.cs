@@ -1,3 +1,5 @@
+using DuetAPI.ObjectModel;
+
 namespace DuetControlServer.Motion;
 
 /// <summary>
@@ -28,4 +30,27 @@ public static class AxisIndices
 
     /// <summary>Position of the Z axis</summary>
     public const int ZAxis = 2;
+
+    /// <summary>
+    /// Which axis is Z, or -1 if the machine has none
+    /// </summary>
+    /// <param name="move">The move model</param>
+    /// <returns>The axis index</returns>
+    /// <remarks>
+    /// The axis <em>called</em> Z rather than <see cref="ZAxis"/>, which is the third position in the
+    /// vector. The two are the same on an ordinary machine and need not be: the bed correction lifts
+    /// whichever axis the operator named Z, wherever M584 put it. The caller must hold the object
+    /// model lock
+    /// </remarks>
+    public static int ZAxisIndex(Move move)
+    {
+        for (int axis = 0; axis < move.Axes.Count; axis++)
+        {
+            if (move.Axes[axis].Letter == 'Z')
+            {
+                return axis;
+            }
+        }
+        return -1;
+    }
 }
