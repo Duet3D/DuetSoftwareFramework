@@ -26,7 +26,7 @@ inline constexpr uint8_t FormatCodeStandalone = 0x60;
 inline constexpr uint8_t InvalidFormatCode = 0xC9;
 
 // Protocol version. Incremented whenever the protocol details change. CRC32 is used for version >= 4.
-inline constexpr uint16_t ProtocolVersion = 7;
+inline constexpr uint16_t ProtocolVersion = 8;
 
 // Default size of a data transfer buffer. Must be a multiple of 4 and kept in sync with both sides.
 inline constexpr size_t BufferSize = 8192;
