@@ -97,18 +97,22 @@ public class AxisSkewTests
         Assert.That(coords[0], Is.EqualTo(10.0f));
     }
 
-    [TestCase(0.0f, 0.002f, 0.004f, TestName = "ApplyingAndRemovingTheSkewGivesBackTheRequestedPosition(height terms)")]
-    [TestCase(0.01f, 0.0f, 0.0f, TestName = "ApplyingAndRemovingTheSkewGivesBackTheRequestedPosition(XY term)")]
-    public void ApplyingAndRemovingTheSkewGivesBackTheRequestedPosition(float tanXY, float tanXZ, float tanYZ)
+    [TestCase(0.0f, 0.002f, 0.004f, true, TestName = "ApplyingAndRemovingTheSkewGivesBackTheRequestedPosition(height terms)")]
+    [TestCase(0.01f, 0.0f, 0.0f, true, TestName = "ApplyingAndRemovingTheSkewGivesBackTheRequestedPosition(XY term)")]
+    [TestCase(0.01f, 0.002f, 0.004f, true, TestName = "ApplyingAndRemovingTheSkewGivesBackTheRequestedPosition(every term, compensating X)")]
+    [TestCase(0.01f, 0.002f, 0.004f, false, TestName = "ApplyingAndRemovingTheSkewGivesBackTheRequestedPosition(every term, compensating Y)")]
+    public void ApplyingAndRemovingTheSkewGivesBackTheRequestedPosition(float tanXY, float tanXZ, float tanYZ,
+                                                                        bool compensateXY)
     {
-        // What the operator reads back has to be what they asked for, or a probed position would
-        // drift by the correction every time the machine is homed. Compensating Y, which is the
-        // direction the inverse undoes correctly - see below for the one that does not
-        Move move = NewMove(tanXY, tanXZ, tanYZ, compensateXY: false);
+        // What the operator reads back has to be what they asked for. The inverse is written back
+        // into the commanded position after homing and probing, so a round trip that does not cancel
+        // is not a reporting error - it is movement, repeated every time the machine is probed
+        Move move = NewMove(tanXY, tanXZ, tanYZ, compensateXY);
 
         float[] coords = [10.0f, 20.0f, 50.0f];
         AxisSkew.Apply(null, move, coords, 3);
-        Assert.That(coords[1], Is.Not.EqualTo(20.0f), "the correction was applied at all");
+        Assert.That(coords[compensateXY ? 0 : 1], Is.Not.EqualTo(compensateXY ? 10.0f : 20.0f),
+                    "the correction was applied at all");
 
         AxisSkew.Remove(null, move, coords, 3);
 
@@ -121,26 +125,28 @@ public class AxisSkewTests
     }
 
     [Test]
-    public void TheXyTermAndAHeightTermTogetherDoNotQuiteRoundTrip()
+    public void TheXyTermAndAHeightTermTogetherCancelWhereTheFirmwareLeavesAResidual()
     {
-        // Inherited from RepRapFirmware rather than introduced here, and pinned so that it is
-        // recorded rather than discovered again. Apply corrects X and then reads the corrected X for
-        // Y's cross term; Remove walks the axes once with the Y branch ahead of the X branch, which
-        // only undoes the pair in the opposite order when Y is the lower-numbered axis. On an
-        // ordinary machine X comes first, so Y's term is taken back off using an X that has already
-        // been restored and the position drifts by tanXY times the correction X was given.
-        //
-        // Move::AxisTransform and Move::InverseAxisTransform in RRF's Movement/Move3.cpp are the
-        // same single loop with the same branch order, so the firmware drifts by the same amount.
-        // Fixing it here alone would put the two out of step, which is worse than the drift
-        Move move = NewMove(tanXY: 0.01f, tanXZ: 0.002f, compensateXY: false);
+        // The case DSF leads RepRapFirmware on. Its Move::InverseAxisTransform walks the axes once
+        // with the Y branch ahead of the X branch, which only undoes the pair in the opposite order
+        // when Y is the lower-numbered axis; on an ordinary machine X comes first, so X's correction
+        // comes off before the Y it was computed from has been restored. Two passes each way avoid
+        // that, and the residual it leaves in the firmware - tanXY times a height correction - is
+        // what this asserts is gone
+        foreach (bool compensateXY in new[] { true, false })
+        {
+            Move move = NewMove(tanXY: 0.01f, tanXZ: 0.002f, tanYZ: 0.004f, compensateXY);
 
-        float[] coords = [10.0f, 20.0f, 50.0f];
-        AxisSkew.Apply(null, move, coords, 3);
-        AxisSkew.Remove(null, move, coords, 3);
+            float[] coords = [10.0f, 20.0f, 50.0f];
+            AxisSkew.Apply(null, move, coords, 3);
+            AxisSkew.Remove(null, move, coords, 3);
 
-        Assert.That(coords[1] - 20.0f, Is.EqualTo(0.01f * 0.002f * 50.0f).Within(1e-6f),
-                    "tanXY times the correction X was given");
+            Assert.Multiple(() =>
+            {
+                Assert.That(coords[0] - 10.0f, Is.Zero.Within(1e-6f), $"X, compensateXY {compensateXY}");
+                Assert.That(coords[1] - 20.0f, Is.Zero.Within(1e-6f), $"Y, compensateXY {compensateXY}");
+            });
+        }
     }
 
     [Test]

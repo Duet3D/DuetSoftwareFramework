@@ -9,9 +9,21 @@ namespace DuetControlServer.Motion;
 /// M556 axis skew compensation
 /// </summary>
 /// <remarks>
+/// <para>
 /// RepRapFirmware's <c>Move::AxisTransform</c> and <c>Move::InverseAxisTransform</c>. The machine's
 /// axes are not quite at right angles to each other, so a move along one drags the head slightly
-/// along another; M556 measures that as a deviation over a distance and stores the tangent
+/// along another; M556 measures that as a deviation over a distance and stores the tangent.
+/// </para>
+/// <para>
+/// Each direction is two passes over the axes rather than one, and that is a deliberate difference
+/// from the firmware. RepRapFirmware walks the axes once and swaps the order of the two branches in
+/// the inverse, which only undoes the pair in the opposite order when the Y axis has the lower axis
+/// number; on an ordinary machine X comes first, so its correction is taken back off before the Y
+/// value it was computed from has been restored. The round trip is then out by <c>tanXY</c> times
+/// one of the height corrections, which lands on the commanded position rather than only on what is
+/// reported - see <c>MovementState.UpdateCoordinatesFromLastKnownEndpoints</c> on that side. Two
+/// passes make both directions read the same values, so the round trip cancels exactly
+/// </para>
 /// </remarks>
 internal static class AxisSkew
 {
@@ -32,10 +44,10 @@ internal static class AxisSkew
     /// both would double it. Which one is a matter of which axis the machine is squared against.
     /// </para>
     /// <para>
-    /// One pass in axis order, reading the reference coordinates as it goes, because that is what
-    /// RepRapFirmware does: with the correction on Y the term reads X, and X may already have been
-    /// corrected for its own Z skew by the time Y is reached. The difference is second order but it
-    /// is a difference, and the point of a port is that it does not have one
+    /// Every X axis first and then every Y axis, reading the reference coordinates as it goes: with
+    /// the correction on Y the term reads X, and X has already been corrected for its own Z skew by
+    /// the time the Y pass runs. <see cref="Remove"/> undoes the two passes in the opposite order,
+    /// which is what makes the round trip exact
     /// </para>
     /// </remarks>
     public static void Apply(Tool? tool, Move move, Span<float> coords, int numAxes)
@@ -66,6 +78,10 @@ internal static class AxisSkew
                 float fromY = skew.CompensateXY && lowestX >= 0 ? skew.TanXY * coords[lowestY] : 0.0f;
                 coords[axis] += fromY + (skew.TanXZ * z);
             }
+        }
+
+        for (int axis = 0; axis < numAxes && axis < MotionLimits.MaxAxes; axis++)
+        {
             if ((yAxes & (1u << axis)) != 0)
             {
                 float fromX = !skew.CompensateXY && lowestX >= 0 ? skew.TanXY * coords[lowestX] : 0.0f;
@@ -82,9 +98,11 @@ internal static class AxisSkew
     /// <param name="coords">Machine coordinates, corrected on the way in and requested on the way out</param>
     /// <param name="numAxes">Number of axes to consider</param>
     /// <remarks>
-    /// Note that this undoes the pair in the opposite order to <see cref="Apply"/> - Y before X,
-    /// where the forward transform does X before Y. Same reason the forward one reads its references
-    /// live: whichever of the two carries the cross term has to see the other in the state it was in
+    /// The passes run in the opposite order to <see cref="Apply"/> - every Y axis and then every X
+    /// axis, where the forward transform does X and then Y. That is what makes the cross terms
+    /// cancel: whichever of the two carries one has to see the other in the state the forward pass
+    /// saw it in, so Y is undone while X still carries its own correction, and X is undone once Y is
+    /// back to the coordinate the move was commanded in
     /// </remarks>
     public static void Remove(Tool? tool, Move move, Span<float> coords, int numAxes)
     {
@@ -114,6 +132,10 @@ internal static class AxisSkew
                 float fromX = !skew.CompensateXY && lowestX >= 0 ? skew.TanXY * coords[lowestX] : 0.0f;
                 coords[axis] -= fromX + (skew.TanYZ * z);
             }
+        }
+
+        for (int axis = 0; axis < numAxes && axis < MotionLimits.MaxAxes; axis++)
+        {
             if ((xAxes & (1u << axis)) != 0)
             {
                 float fromY = skew.CompensateXY && lowestX >= 0 ? skew.TanXY * coords[lowestY] : 0.0f;
