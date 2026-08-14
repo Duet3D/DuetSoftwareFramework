@@ -19,10 +19,12 @@ holds the object model lock, and records the two bugs that review found. §14 re
 other side — which end of the copy is authoritative — and holds the plan for making the object model a
 projection of the motion state rather than the source it is derived from. §15 is a pass over every
 `TODO` comment in the motion pipeline, recording which were questions with answers, which are gaps
-already tracked, and which were not tracked anywhere.
+already tracked, and which were not tracked anywhere. §16 is the tool subsystem, and §17 is a pass
+that read this document back against the tree.
 
-§11.5's phase G is complete. What is left of §11 is phase F, every item of which is gated on a
-subsystem that does not exist yet.
+§11.5's phase G is complete. What is left of §11 is phase F: items 30 and 32 are part-done and the
+rest are gated on an object model field, a subsystem, or — in the case of arc moves — on nothing but
+the work.
 
 ---
 
@@ -174,7 +176,6 @@ These rules come from the architecture already established on this branch — se
 | | Meaning |
 |---|---|
 | ✅ | Fully handled inside DSF |
-| 🔵 | ~~SBC half only~~ — resolved, see §2 |
 | 🟡 | Partially ported — see the note |
 | ⬜ | Not started |
 | ⛔ | Out of scope: handled elsewhere in the pipeline, local-hardware only, or withdrawn in RRF |
@@ -208,29 +209,33 @@ and M606 re-sync the object model after RRF changed `inputs[].active`.
 never about RRF replies — resuming the job after M0/M1/M2/M24/M32/M37, and starting the second job
 after M606 S1.
 
-The remaining 🔵 marks below are historical; treat them as ✅ for the SBC half and read the note for
-what the machine half now does (or does not yet) do.
+The 🔵 mark that stood for "SBC half only" is retired: a code that used to carry it is now ✅ if it
+does the whole job here, and 🟡 with a note naming what is missing if it does not. Keeping a mark for
+"the other half belongs to a program that no longer exists" made every one of those rows say less
+than an ordinary status would.
 
 ---
 
 ## 3. Progress summary
 
-| Group | ✅ Done | 🔵 SBC half | Rows (excl. ⛔) |
-|---|---|---|---|
-| §5.1 Motion — drives and axes | 26 | 0 | 26 |
-| §5.2 Motion — kinematics and geometry | 8 | 0 | 12 |
-| §5.3 Motion — compensation and probing | 12 | 0 | 14 |
-| §5.4 Motion — queue, sync and shaping | 3 | 1 | 9 |
-| §5.5 Heat | 0 | 0 | 19 |
-| §5.6 Fans | 0 | 0 | 3 |
-| §5.7 Tools and filament | 0 | 0 | 14 |
-| §5.8 Spindles, laser and machine mode | 0 | 0 | 9 |
-| §5.9 Job, files and SD | 17 | 4 | 29 |
-| §5.10 Network | 4 | 1 | 13 |
-| §5.11 I/O, expansion and miscellaneous | 6 | 5 | 38 |
-| **Total** | **77** | **11** | **186** |
+| Group | ✅ Done | 🟡 Partial | ⬜ Left | Rows (excl. ⛔) |
+|---|---|---|---|---|
+| §5.1 Motion — drives and axes | 26 | 0 | 0 | 26 |
+| §5.2 Motion — kinematics and geometry | 8 | 0 | 4 | 12 |
+| §5.3 Motion — compensation and probing | 12 | 0 | 2 | 14 |
+| §5.4 Motion — queue, sync and shaping | 3 | 1 | 5 | 9 |
+| §5.5 Heat | 14 | 0 | 5 | 19 |
+| §5.6 Fans | 3 | 0 | 0 | 3 |
+| §5.7 Tools and filament | 3 | 0 | 11 | 14 |
+| §5.8 Spindles, laser and machine mode | 5 | 2 | 2 | 9 |
+| §5.9 Job, files and SD | 19 | 3 | 7 | 29 |
+| §5.10 Network | 5 | 0 | 8 | 13 |
+| §5.11 I/O, expansion and miscellaneous | 11 | 5 | 23 | 39 |
+| **Total** | **109** | **11** | **67** | **187** |
 
-Update these counts as boxes are ticked.
+Recount these from §5 when a box is ticked rather than adjusting them from memory of what changed:
+that is how they came to say a group was untouched after most of it had been ported (§17). The last
+three columns sum to the row count, which is the arithmetic that catches a miscount.
 
 ---
 
@@ -238,14 +243,16 @@ Update these counts as boxes are ticked.
 
 | Blocker | Blocks | Note |
 |---|---|---|
-| **Heat subsystem: nearly done** | M303 tuning, M309 feedforward, M144 | [HeatManager](src/DuetControlServer/Heat/HeatManager.cs) holds sensors, heaters, setpoints, waiting, monitors, the process model and the fault codes. M303 is the one with real work left: tuning runs for minutes on the board and reports back through `CanMessageHeaterTuningReport`, so it needs a state machine rather than a handler |
+| **Heat subsystem: nearly done** | M108, M144, M303 tuning, M305, M309 feedforward | [HeatManager](src/DuetControlServer/Heat/HeatManager.cs) holds sensors, heaters, setpoints, waiting, monitors, the process model and the fault codes. M303 is the one with real work left: tuning runs for minutes on the board and reports back through `CanMessageHeaterTuningReport`, so it needs a state machine rather than a handler |
 | **Fan subsystem: done** | — | [FanManager](src/DuetControlServer/Fans/FanManager.cs) creates fans, sets speeds and configures thermostatic control |
 | **Tool subsystem: nearly done** | Firmware retraction, M701-M703 | [ToolManager](src/DuetControlServer/Tools/ToolManager.cs) holds definition, selection, offsets, axis mapping, mixing and — through M568 and the Heat subsystem — the active and standby temperatures. What is left is firmware retraction (M207, `G10` without P, `G11`), which is a synthesised move rather than a message, and the filament codes |
-| **Spindle subsystem: done** | Laser mode | [SpindleManager](src/DuetControlServer/Spindles/SpindleManager.cs) builds a spindle out of three general-purpose outputs, which is what RepRapFirmware's three `IoPort`s are - CANlib has no spindle message at all, only a `MaxSpindles` constant. The GPIO layer it needed is [GpioManager](src/DuetControlServer/Ports/GpioManager.cs). What is left is `M3` in laser mode, which is a different code sharing a number and needs `state.machineMode` |
-| **No endstop/probe abstraction in DCS** | M119, M558, M574, M577, M585, M401, M402, M851 | Needs the input-monitor CAN messages (`CanMessageCreateInputMonitorV1`, `CanMessageChangeInputMonitorV1`, `CanMessageInputChangedV2`) wired to `sensors.endstops[]` / `sensors.probes[]` |
+| **Spindle subsystem: done** | Laser | [SpindleManager](src/DuetControlServer/Spindles/SpindleManager.cs) builds a spindle out of three general-purpose outputs, which is what RepRapFirmware's three `IoPort`s are - CANlib has no spindle message at all, only a `MaxSpindles` constant. The GPIO layer it needed is [GpioManager](src/DuetControlServer/Ports/GpioManager.cs). `state.machineMode` exists now, so what is left is the laser itself: M452's port and power parameters, `M3` in laser mode, and a power field on the move |
+| **Endstops and probes: done** | M585, M672, M558.1/.2 | The input-monitor CAN messages (`CanMessageCreateInputMonitorV1`, `CanMessageChangeInputMonitorV1`, `CanMessageInputChangedV2`) are wired to `sensors.endstops[]` / `sensors.probes[]`, and §10 covers the whole path. What is left needs `G30 P` — see §10's "What is left in phase 5" |
+| **No job lifecycle hooks** | M25, M226/M600/M601, `start.g`, `stop.g`, `cancel.g`, `pause.g`, `resume.g` | Macros run (§9), so what is missing is the pause/resume state itself: restore points, the file position to resume from, and the calls that run those macros. §11.4's phase F item 29 is the same gap seen from the move path |
 
-Because of these, **§5.1-§5.4 (motion) is the tractable scope on this branch**; the rest is gated on
-subsystems that do not exist yet.
+Motion (§5.1-§5.4) is essentially complete and heat, fans, tools, spindles and probing have landed
+since this table was first written. What gates the remaining rows is now mostly the job lifecycle and
+the laser, not a missing subsystem.
 
 ### Kinematics engines
 
@@ -318,7 +325,7 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 |---|---|---|---|---|---|
 | M290 | 2812 | Babystepping | `move.axes[].babystep` | no | ✅ |
 | M425 | 3223 | Backlash compensation | `move.axes[].backlash`, `move.backlashFactor` | yes | ✅ |
-| M556 | 3653 | Axis skew compensation | `move.compensation.skew` | no | 🟡 stored, never applied — §11.5 item 22 |
+| M556 | 3653 | Axis skew compensation | `move.compensation.skew` | no | ✅ applied by `AxisSkew` — §11.5 item 22 |
 | M579 | 3925 | Scale Cartesian axes | needs new field — §6 | no | ⬜ |
 | M665 | 4052 | Delta configuration | `move.kinematics` (`DeltaKinematics`) | yes | ✅ |
 | M666 | 4082 | Delta endstop adjustments | `move.kinematics` (`DeltaKinematics`) | yes | ✅ |
@@ -340,7 +347,7 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M401 | 3131 | Deploy Z probe | `sensors.probes[]` | no | ✅ |
 | M402 | 3144 | Retract Z probe | `sensors.probes[]` | no | ✅ |
 | M557 | 3686 | Probe grid definition | `move.compensation.probeGrid` | no | ✅ |
-| M558 | 3690 | Z probe type/configuration; `.1`/`.2` scanning probe calibration | `sensors.probes[]` | no | ✅ |
+| M558 | 3690 | Z probe type/configuration | `sensors.probes[]` | no | ✅ `.1` and `.2` are refused — see §10 |
 | M561 | 3730 | Identity transform, disable height map | `move.compensation.type` | no | ✅ |
 | M574 | 3897 | Endstop configuration | `sensors.endstops[]` | no | ✅ |
 | M577 | 3919 | Wait for endstop trigger | `sensors.endstops[]` | no | ✅ |
@@ -356,13 +363,13 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M592 | 3992 | Nonlinear extrusion | `move.extruders[].nonlinear` | yes | ✅ |
 | M593 | 3997 | Input shaping | `move.shaping` → CAN `CanMessageSetInputShapingV1` | yes | ✅ |
 | M595 | 4007 | Movement queue size | `move.queue[]` | yes | ⬜ |
-| M596 | 4016 | Select movement queue | `inputs[].motionSystem`, `move.motionSystems[]` | no | ⬜ only a post-execution OM re-sync exists |
+| M596 | 4016 | Select movement queue | `inputs[].motionSystem`, `move.motionSystems[]` | no | ⬜ nothing handles it |
 | M597 | 4020 | Collision avoidance | needs new field — §6 | no | ⬜ |
 | M598 | 4024 | Sync movement systems | — | n/a | ⬜ |
 | M599 | 4030 | Define keepout zone | `move.keepout[]` | no | ⬜ |
-| M606 | 4038 | Fork input reader | `inputs[]` | no | 🔵 forks the job on the SBC, then defers |
+| M606 | 4038 | Fork input reader | `inputs[]` | no | 🟡 forks the job; reports not implemented when there is no `File2` input |
 
-### 5.5 Heat — blocked on a Heat subsystem (§4)
+### 5.5 Heat — the subsystem exists (§4); what is left needs tuning or tools
 
 | M-code | RRF | Purpose | Object model home | Status |
 |---|---|---|---|---|
@@ -386,7 +393,7 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M562 | 3738 | Reset temperature fault | `heat.heaters[].state` | ✅ |
 | M570 | 3882 | Heater fault detection | → CAN `CanMessageSetHeaterFaultDetectionParameters` | ✅ |
 
-### 5.6 Fans — blocked on a Fan subsystem (§4)
+### 5.6 Fans — done (§4)
 
 | M-code | RRF | Purpose | Object model home | Status |
 |---|---|---|---|---|
@@ -394,7 +401,7 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M107 | 1815 | Fan off (deprecated) | `fans[].requestedValue` | ✅ |
 | M950 (fan) | 4589 | Create fan | `fans[]` → CAN generic `M950FanParams` | ✅ |
 
-### 5.7 Tools and filament — mostly blocked on a Tool subsystem (§4)
+### 5.7 Tools and filament — the tool subsystem exists (§16); the filament codes do not
 
 | M-code | RRF | Purpose | Object model home | Status |
 |---|---|---|---|---|
@@ -414,17 +421,17 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M702 | 4319 | Unload filament | `tools[].filament` | ⬜ blocked |
 | M703 | 4323 | Configure filament | `tools[].filament` | ⬜ blocked |
 
-### 5.8 Spindles, laser and machine mode — blocked on a Spindle subsystem (§4)
+### 5.8 Spindles, laser and machine mode — spindles and the mode are done; the laser is not
 
 | M-code | RRF | Purpose | Object model home | Status |
 |---|---|---|---|---|
-| M3 | 805 | Spindle clockwise / laser power | `spindles[]` | 🟡 spindle half; laser needs machine mode |
+| M3 | 805 | Spindle clockwise / laser power | `spindles[]` | 🟡 spindle half; in laser mode it reports that laser power is not supported |
 | M4 | 806 | Spindle counter-clockwise | `spindles[]` | ✅ |
 | M5 | 864 | Spindle off | `spindles[]` | ✅ |
-| M450 | 3227 | Report printer mode | `state.machineMode` | ⬜ |
-| M451 | 3231 | FFF mode | `state.machineMode` | ⬜ |
-| M452 | 3244 | Laser mode | `state.machineMode`, laser config | ⬜ |
-| M453 | 3284 | CNC mode | `state.machineMode` | ⬜ |
+| M450 | 3227 | Report printer mode | `state.machineMode` | ✅ |
+| M451 | 3231 | FFF mode | `state.machineMode` | ✅ |
+| M452 | 3244 | Laser mode | `state.machineMode`, laser config | 🟡 selects the mode; C, F/Q, R and S have nowhere to go |
+| M453 | 3284 | CNC mode | `state.machineMode` | ✅ |
 | M571 | 3887 | Set output on extrude | `state.gpOut[]` | ⬜ |
 | M670 | 4146 | IO port allocation / laser task | `state.gpOut[]` | ⬜ |
 
@@ -432,12 +439,12 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 
 | M-code | RRF | Purpose | Status |
 |---|---|---|---|
-| M0 / M1 / M2 | 755 | Stop / sleep / program end | 🔵 cancels the job, then relies on RRF to stop the machine |
+| M0 / M1 / M2 | 755 | Stop / sleep / program end | 🟡 cancels the job; heaters, spindles and motors are not stopped and `stop.g` is not run |
 | M20 | 990 | List files | ✅ |
-| M21 | 1068 | Initialise SD card | ✅ |
-| M22 | 1079 | Release SD card | ✅ |
-| M23 / M32 | 1092 | Select file / select and start | 🔵 |
-| M24 | 1160 | Start or resume print | 🔵 relies on RRF to invoke `resume.g` |
+| M21 | 1068 | Initialise SD card | ✅ P0 succeeds because the volume is always mounted |
+| M22 | 1079 | Release SD card | ⬜ throws `NotSupportedException`, so it answers "Command is not supported" |
+| M23 / M32 | 1092 | Select file / select and start | ✅ |
+| M24 | 1160 | Start or resume print | 🟡 resumes the job; `resume.g` is not run |
 | M25 | 1281 | Pause print | ⬜ |
 | M26 | 1319 | Set SD position | ✅ |
 | M27 | 1339 | Report print status | ✅ |
@@ -445,7 +452,7 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M29 | 1373 | End write to file | ✅ |
 | M30 | 1377 | Delete file | ✅ |
 | M36 | 1397 | File information and thumbnails | ✅ |
-| M37 | 1451 | Simulation mode | 🔵 |
+| M37 | 1451 | Simulation mode | 🟡 selects the file to simulate; nothing starts the simulation |
 | M38 | 1487 | File CRC32 | ✅ |
 | M39 | 1517 | SD card info | ✅ |
 | M73 | 1584 | Slicer print-time hints | ⬜ |
@@ -457,7 +464,7 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M472 | 3346 | Delete file or directory | ✅ |
 | M486 | 3365 | Object cancellation | ⬜ |
 | M500 | 3370 | Save to `config-override.g` | ✅ |
-| M501 | 3376 | Load `config-override.g` | ⬜ |
+| M501 | 3376 | Load `config-override.g` | ✅ |
 | M502 | 3387 | Reset to factory settings | ⬜ |
 | M503 | 3404 | List configuration | ✅ |
 | M505 | 3451 | Set sys/web folder | ✅ |
@@ -469,7 +476,7 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 |---|---|---|---|
 | M118 | 2092 | Echo message to a channel (incl. MQTT) | ✅ |
 | M540 | 3485 | Set/report MAC address | ⬜ |
-| M550 | 3504 | Machine name | 🔵 sets the hostname, then passes the code on |
+| M550 | 3504 | Machine name | ✅ writes `network.name`, refusing a name the Linux hostname does not match |
 | M551 | 3527 | Set password | ✅ |
 | M552 | 3539 | Enable network / IP address | ✅ |
 | M553 | 3601 | Netmask | ⬜ |
@@ -490,11 +497,11 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M80 | 1588 | ATX power on | `state.atxPower` | ⬜ |
 | M81 | 1592 | ATX power off | `state.atxPower` | ⬜ |
 | M110 | 1933 | Set line number | — | ⬜ |
-| M111 | 1937 | Debug level | → CAN generic `M111Params` | 🔵 sets DSF log levels only |
+| M111 | 1937 | Debug level | → CAN generic `M111Params` | 🟡 sets DSF log levels; nothing is sent to a board |
 | M112 | 1941 | Emergency stop | → CAN `CanMessageEmergencyStop` | ✅ |
 | M115 | 1949 | Firmware version / board type | `boards[]` → CAN `CanMessageReturnInfo` | 🟡 `B>0` works; `B0` is a TODO stub |
 | M117 | 2084 | Display message | `state.displayMessage` | ⬜ |
-| M122 | 2227 | Diagnostics | `boards[]` → CAN generic `M122P1Params` | 🔵 appends to RRF's output |
+| M122 | 2227 | Diagnostics | `boards[]` → CAN generic `M122P1Params` | 🟡 DSF diagnostics for board 0; `B>0` reports that it is not supported |
 | M150 | 2427 | Set LED colours | `ledStrips[]` → CAN generic `M150Params` | ⬜ |
 | M260 | 2778 | I2C send / Modbus write | — | ⬜ only local-variable bookkeeping exists |
 | M261 | 2782 | I2C receive / Modbus read | — | ⬜ only local-variable bookkeeping exists |
@@ -502,9 +509,9 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M291 | 2906 | Message box | `state.messageBox` | ⬜ |
 | M292 | 2910 | Acknowledge message box | `state.messageBox` | ⬜ |
 | M300 | 2914 | Beep | `state.beep` | ⬜ |
-| M409 | 3169 | Object model query | — | 🔵 patches RRF's JSON |
+| M409 | 3169 | Object model query | — | ✅ answers for every key |
 | M564 | 3758 | Limit axes / allow movement before homing | `move.limitAxes`, `move.noMovesBeforeHoming` | ✅ |
-| M581 | 3948 | Configure external trigger | `sensors.gpIn[]` | 🔵 SBC-side expressions only |
+| M581 | 3948 | Configure external trigger | `sensors.gpIn[]` | 🟡 the `M581.1` expression form only; the plain form can drop a trigger and nothing runs `trigger<n>.g` |
 | M582 | 3952 | Check external trigger | `sensors.gpIn[]` | ⬜ |
 | M594 | 4002 | Height following mode | — | ⬜ |
 | M655 | 4046 | CAN configuration | → CAN generic `M655Params` | ⬜ |
@@ -523,8 +530,8 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M956 | 4623 | Start accelerometer collection | → CAN `CanMessageStartAccelerometer` | ⬜ |
 | M957 | 4628 | Raise event | Event queue — [EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) | ✅ |
 | M959 | 4633 | Expansion board connection timeout | → CAN generic `M959Params` | ⬜ |
-| M997 | 4645 | Firmware update | → CAN `CanMessageUpdateYourFirmware` | 🔵 |
-| M998 | 4650 | Request resend | — | ⬜ currently throws `NotSupportedException` |
+| M997 | 4645 | Firmware update | → CAN `CanMessageUpdateYourFirmware` | ✅ |
+| M998 | 4650 | Request resend | — | ⬜ throws `NotSupportedException`, so it answers "Command is not supported" |
 | M999 | 4663 | Reset | → CAN `CanMessageReset` | ✅ |
 | M750-M756 | 4345 | 3D scanner extension | — | ⛔ withdrawn in RRF |
 | M408 | — | Legacy status report | — | ⛔ withdrawn in RRF 3.7 |
@@ -562,7 +569,9 @@ that exists and is never written looks identical, from the class, to one that is
 
 ## 7. Suggested order of work
 
-Each phase leaves the tree in a state where the machine is more usable than before.
+Each phase leaves the tree in a state where the machine is more usable than before. The numbering is
+the order to do them in; the "Phase N" names are the original labels, which §8's headings and §10 and
+§11 refer to, so they stay attached to their work rather than to their position in this list.
 
 1. ~~**Phase 1 — make an axis movable.** M92, M201, M203, M204, M205/M566, M208, M350, M400, M584,
    M906.~~ **Done** — see §8. Lives in
@@ -573,13 +582,25 @@ Each phase leaves the tree in a state where the machine is more usable than befo
    M425, M556, M564.~~ **Done** — see §8.
 4. ~~**Phase 4 — geometry.** M665, M666, M667, M669, M671.~~ **Done** — see §8. M673-M675 move
    to phase 5: they need homed axes and probe points.
-5. **Phase 5 — endstops and probing.** Needs the input-monitor plumbing first: M119, M574, M558, M401,
-   M402, M577, M585, M851, then the height map codes M374-M376, M557, M561.
-6. **Phase 6 — queue and multi-system.** M595, M596, M597, M598, M599.
-7. **Phase 7 — close out the 🔵 rows.** Absorb the RRF half of M0/M1/M2, M23/M32, M24, M37, M111,
-   M122, M409, M550, M581, M606, M997, and delete the `CodeExecutedAsync` hooks that only patched up
-   RRF replies.
-8. **Later, gated on new subsystems.** Heat (§5.5), fans (§5.6), tools (§5.7), spindles (§5.8).
+5. ~~**Phase 5 — endstops and probing.** M119, M574, M558, M401, M402, M577, M851, then the height map
+   codes M374-M376, M557, M561.~~ **Done** — see §10. M585 and M675 stayed behind with M674: all
+   three need `G30 P`, which is §10's "What is left in phase 5".
+6. ~~**Phase 7 — close out the SBC-half rows.**~~ **Done** — see §2 and §8's "Removing the DSF/RRF
+   split". M409, M550 and M997 do the whole job now; M0/M1/M2, M24, M37, M111, M122, M581 and M606
+   are 🟡 with the remaining half named in their row, and what each of them is waiting for is a
+   subsystem rather than the absorbed firmware.
+7. ~~**Later, gated on new subsystems.**~~ Heat (§5.5), fans (§5.6), tools (§5.7, §16) and spindles
+   (§5.8) all landed. What is left in those groups is listed per row.
+8. **Firmware retraction.** M207, `G10` with no P, `G11`. Nothing is in front of it: `tools[]
+   .retraction` is stored, `ToolTransform.ActualZHop` already reads `isRetracted`, and it is a
+   synthesised move rather than a message — see §16.4.
+9. **The job lifecycle.** M25, M226/M600/M601, restore points, and the macros that hang off them —
+   `start.g`, `stop.g`, `cancel.g`, `pause.g`, `resume.g`. This is the same gap as §11.4's phase F
+   item 29 and the ⬜ half of §9's table, and it is what M0/M1/M2, M24 and M37 are each missing.
+10. **Phase 6 — queue and multi-system.** M595, M596, M597, M598, M599. M596 is what
+    `RawMove.OwnedDrives` waits for (§15.2).
+11. **The laser.** M452's parameters, `M3` in laser mode, a power field on the move and on the wire,
+    and the per-segment hook phase E left for pixel data.
 
 ---
 
@@ -949,7 +970,7 @@ Every macro RRF invokes, taken from its `DoFileMacro` call sites and the filenam
 | `runonce.g` | After config.g, then deleted | ✅ |
 | `config-override.g` | M501 | ✅ M501 implemented |
 | `dsf-config.g` | After the plugins start | ✅ already issued as `M98 P"dsf-config.g"`, which now works |
-| `<letter><number>[.<fraction>].g` | Any code no handler recognises | ✅ see below |
+| `<letter><number>[.<fraction>].g` | Any code no handler recognises | 🟡 written, and unreachable — see below |
 | Any file | `M98 P"..."` | ✅ |
 | `start.g` | Start of a job | ⬜ needs a job lifecycle hook |
 | `stop.g` | M0, M2 | ⬜ |
@@ -959,17 +980,17 @@ Every macro RRF invokes, taken from its `DoFileMacro` call sites and the filenam
 | `filament-change.g` | M600 | ⬜ |
 | `resurrect.g`, `resurrect-prologue.g` | M916 after a power fail | ⬜ |
 | `daemon.g` | Repeatedly on the daemon channel | ⬜ |
-| `trigger<n>.g` | An external trigger firing (M581) | ⬜ |
-| `heater-fault.g`, `driver-error.g`, `driver-warning.g`, `driver-stall.g`, `filament-error.g`, `expansion-reconnect.g`, `expansion-timeout.g`, `mcu-temperature-warning.g`, `overvoltage.g`, `undervoltage.g` | An event of that type — see [EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) | ⬜ blocked: no event queue, and macros cannot take parameters |
+| `trigger<n>.g` | An external trigger firing (M581) | ⬜ M581 can configure a trigger but nothing runs the macro |
+| `heater-fault.g`, `driver-error.g`, `driver-warning.g`, `driver-stall.g`, `filament-error.g`, `expansion-reconnect.g`, `expansion-timeout.g`, `mcu-temperature-warning.g`, `overvoltage.g`, `undervoltage.g` | An event of that type — see [EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) | ✅ `EventProcessor` runs the macro named after the event type on the autopause channel, with the event's parameters |
 | `controller-disconnect.g`, `controller-reconnect.g` | The SPI link to the controller dropping and returning — [EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) §4 | ⬜ new events, no RepRapFirmware equivalent |
 | `network-override.g` | Network configuration | ⬜ |
-| `homeall.g`, `home<axis>.g` | G28 | ⬜ blocked: no endstops |
-| `homedelta.g`, `homebed.g`, `homeradius.g`, `homeproximal.g`, `homedistal.g`, `home5barscara.g` | G28 on those kinematics | ⬜ blocked: kinematics and endstops |
-| `bed.g` | G32 | ⬜ blocked: no probes |
-| `mesh.g` | G29 | ⬜ blocked: no probes |
-| `deployprobe<n>.g`, `retractprobe<n>.g` | M401, M402 and probing moves | ⬜ blocked: no probes |
-| `tfree<n>.g`, `tpre<n>.g`, `tpost<n>.g` | T-codes | ⬜ blocked: no tool subsystem |
-| `filaments/<name>/load.g`, `unload.g`, `config.g` | M701, M702, M703 | ⬜ blocked: no tool subsystem |
+| `homeall.g`, `home<axis>.g` | G28 | ✅ chosen by the kinematics through `GetHomingFileName` |
+| `homedelta.g`, `homebed.g`, `homeradius.g`, `homeproximal.g`, `homedistal.g`, `home5barscara.g` | G28 on those kinematics | ✅ same call, so a geometry naming its own file gets it |
+| `bed.g` | G32 | ⬜ G32 is not implemented |
+| `mesh.g` | G29 | ✅ |
+| `deployprobe<n>.g`, `retractprobe<n>.g` | M401, M402 and probing moves | ✅ including the redeploy a BLTouch needs between taps |
+| `tfree<n>.g`, `tpre<n>.g`, `tpost<n>.g` | T-codes | ✅ see §16.1 |
+| `filaments/<name>/load.g`, `unload.g`, `config.g` | M701, M702, M703 | ⬜ blocked: the filament codes are not ported |
 
 ### A code no handler recognises runs a macro named after it
 
@@ -982,9 +1003,22 @@ The reply when there is no such macro now matches RRF exactly: `<code>: Command 
 a **warning** rather than an error. The earlier `Unsupported command: <code>` error was mine and was
 wrong on both counts.
 
-One difference remains: RRF passes the code's own parameters into the macro as variables
-(`DoFileMacroWithParameters`), so `M1234 X5` can read `param.X`. That needs variable plumbing through
-`MacroFile` and is not done, so a macro implementing a code cannot see its parameters yet.
+**The lookup does not currently happen.** `MCodeHandler.ProcessAsync` and `GCodeHandler.ProcessAsync`
+throw `NotSupportedException` from the default arm of their switch, and `Code.ProcessInternally`
+catches it and calls `ResolveAsUnsupported`, then returns — from above the fallback it was supposed to
+try first. So the reply is right and the lookup that should have come before it never runs.
+§17 has the detail; it is recorded here because this is the section that would otherwise tell a
+reader the feature works.
+
+The parameters travel with it, as they do in RepRapFirmware's `DoFileMacroWithParameters`: `M1234 X5`
+running `sys/M1234.g` can read `param.X`, each parameter keeping the type the parser gave it. An
+array parameter is the exception and is dropped, because a variable cannot hold an array yet.
+
+**M98 does not pass its parameters, and RepRapFirmware's does.** RRF's M98 is
+`DoFileMacroWithParameters` too (`GCodes2.cpp:1706`), so `M98 P"probe.g" S3` gives the macro
+`param.S`; here the same call is made without the parameters, and the macro sees none. The two paths
+that run a user's macro should agree on this, and the one that already threads the dictionary through
+is the code-named fallback above.
 
 ### Consequences worth knowing
 
@@ -1841,13 +1875,15 @@ within **15 microns** of the line when cut into 32 segments.
     transform. *(item 13)*
 29. **Restore points** — `R`, `moveFractionToSkip`, `filePos`, and pause/resume generally.
     *(items 1, 2)*
-30. **Tools** — mixing, tool drive mapping, tool offsets, axis mapping, axis scale factors, no-tool
-    refusal, `rawExtruderTotal`. Offsets, mapping and scale factors are terms in the phase A
-    transform. *(items 14, 15)*
+30. 🟡 **Tools** — mixing, tool drive mapping, tool offsets, axis mapping and the no-tool refusal
+    landed with §16, and the offsets and mapping are terms in the phase A transform as planned. Axis
+    scale factors still need `move.axes[].scale` (§6) and `rawExtruderTotal` is still unwritten
+    (§15.2). *(items 14, 15)*
 31. **Extruder endstops** — the extruder speed calculation and `EnableExtruderEndstops`, on top of
     phase C. *(item 16)*
-32. **Machine mode** — G0 maximum feed rate, then laser (which also needs a per-segment hook from
-    phase E for pixel data). *(items 3, 11)*
+32. 🟡 **Machine mode** — G0 is a rapid at `MaximumG0FeedRate` outside FFF mode, and the overrides do
+    not apply to it. The laser half is untouched and also needs a per-segment hook from phase E for
+    pixel data. *(items 3, 11)*
 33. **Arc moves (G2/G3)**, and with them `initialUserC0` / `initialUserC1`. The arc generator is the
     other half of the phase E segment loop. *(item 2)*
 34. **M486 object cancellation** — dropping the move, the object coordinate bounds, and
@@ -3163,10 +3199,21 @@ parameters, original feed rate), and waiting for standstill on the active motion
 
 ### 15.4 What is left in the code
 
-Seven `TODO`s remain under `Motion/`, and every one of them now names the thing it is waiting for
-rather than asking whether the code is right. The ones in `Codes/Handlers/` that are not motion - the
-expression evaluator, the keyword handler, and the "used to fall through to RRF" markers left by §2 -
-were not part of this pass.
+Thirty `TODO`s are under `Motion/` and nineteen under `Codes/Handlers/`. The count is not the seven
+this section first recorded because the move path moved: `MoveInterpreter` was lifted out of
+`GCodeHandler` so that it could be tested, and it carried twenty-one markers across the boundary this
+pass drew. They are the same markers, on the other side of it.
+
+The pass's rule has not held everywhere. Three ask whether the code is right rather than naming what
+is missing — `MovePlanner.cs:297` on RepRapFirmware's bed levelling move check, and
+`MoveInterpreter.cs:315` and `:321`, which ask for a comment to be rewritten later and for print tests
+to settle whether excluding Z is harmful. Those are the shape §15 exists to remove.
+
+Eight of the nineteen in `Codes/Handlers/` are the "used to fall through to RRF" markers left by §2.
+Each sits on the branch a code takes when its ported path does not apply and returns "Not
+implemented", so what they mark is real; what they say is not. A comment describing a program that is
+gone is what §1.10 rules out, and the useful half of each is a statement about the present — which
+parameter or which case is unported. Those are the 🟡 notes in §5.
 
 ---
 
@@ -3230,14 +3277,91 @@ slicer that emits E before T is describing a print for a machine it thinks is se
 
 | Gap | Waiting on |
 |---|---|
-| Active and standby temperatures; a deselected tool goes to `Off` where RRF sets `Standby` | Heat (§4) |
-| **M116** wait for temperatures | Heat |
-| **M568** — every parameter it has is a temperature or a spindle RPM | Heat, Spindles |
-| Tool heaters and fans are recorded but not driven | Heat, Fans |
 | **M701-M703** filament load/unload/configure | The filaments directory and its macros |
 | Firmware retraction — **M207**, `G10` with no P, `G11` | Nothing; `tools[].retraction` is stored and `ActualZHop` already reads `isRetracted` |
 | Axis scale factors (M579) in the transform | `move.axes[].scale`, which does not exist (§6) |
 | `rawExtruderTotal`, the virtual extruder position, volumetric extrusion | §15.2 and M200 |
 | Extruder endstops (`G1 H1 E`) | The per-extruder speed calculation (§11.4 item 31) |
 
+The four rows this table used to open with have landed: selecting a tool applies its active
+temperatures and puts the one it replaced into `Standby` rather than `Off`, `M116` waits on a tool's
+heaters or on every heater that is on, `M568` writes both temperature sets and the spindle RPM, and a
+tool's fans follow `M106` through its fan list.
+
 Firmware retraction is the one with nothing in front of it, and is the obvious next piece here.
+`G10` without P says so at the point of use rather than doing nothing: it reports that firmware
+retraction is not supported yet, which is §1.7's rule applied to a code a slicer emits by the
+hundred.
+
+---
+
+## 17. Reading this document back against the tree
+
+Every status in §5, every macro in §9 and the summary counts in §3 were checked against the code
+rather than against the last thing written about them. This section records what the pass found and
+how, because a document this size is only worth reading if a reader can tell how far to trust it —
+and because the same three or four kinds of drift produced nearly every error in it.
+
+**Statuses drift in both directions, and the harmless-looking direction is the worse one.** A row
+that says ⬜ for something that landed costs a reader a duplicate implementation attempt, and they
+find out within minutes. A row that says ✅ for something that does not work costs a reader their
+trust in every other ✅, and they find out at the machine. M22 was the second kind.
+
+**The method: dispatch first, body second.** `MCodeHandler.ProcessAsync` is one switch, so the set of
+codes that reach a handler at all is a single list; anything not on it is ⬜ whatever the table says.
+That catches the ⬜-that-landed rows in one pass. It does not catch a code that dispatches to a
+handler which reports it cannot do the job, so every row that changed was read at its handler as
+well. A `case` label is evidence a code was thought about, not evidence it works — and a label found
+by searching for one is not even that: G2 and G3 have no label in the dispatch at all, and the
+`case 2:` and `case 3:` that a search does turn up are the values of G29's `S` parameter.
+
+### What changed
+
+| Row | Was | Is | Why |
+|---|---|---|---|
+| M450, M451, M453 | ⬜ | ✅ | `MCodeHandler.MachineMode.cs` |
+| M452 | ⬜ | 🟡 | selects the mode; its laser parameters are refused with a warning |
+| M501 | ⬜ | ✅ | runs `config-override.g` through `MacroRunner` |
+| M556 | 🟡 | ✅ | `AxisSkew.Apply`/`.Remove`, per §11.5 item 22 |
+| M22 | ✅ | ⬜ | throws `NotSupportedException` |
+| §9: `<letter><number>.g` for an unrecognised code | ✅ | 🟡 written but unreachable | see finding 1 below |
+| M558 `.1`/`.2` | inside a ✅ | refused | the row claimed the scanning-probe calibration that §10 lists as outstanding |
+| M596 | "a post-execution OM re-sync exists" | nothing handles it | `CodeExecutedAsync` keeps only the M0/M1/M2/M24/M32/M37 and M606 hooks |
+| M0/M1/M2, M24, M37, M111, M122, M581, M606 | 🔵 | 🟡 with the missing half named | §2's mark outlived the split it described |
+| M409, M550, M997, M23/M32 | 🔵 | ✅ | they do the whole job here |
+| §9: homing, `mesh.g`, probe deploy/retract, tool macros, event macros | ⬜ blocked | ✅ | every one of those callers exists |
+| §9: macro parameters | "cannot take parameters" | they can | `MacroRunner` calls `Variables.SetParameters`; an array parameter is still dropped |
+| §15.4 | seven `TODO`s under `Motion/` | thirty | `MoveInterpreter` carried twenty-one across from `GCodeHandler` |
+| §3 | 77 ✅ of 186 | 109 ✅, 11 🟡, 67 ⬜ of 187 | the group totals had not been touched since heat, fans, tools and spindles landed |
+
+### Findings that are code, not documentation
+
+1. **The code-named macro fallback cannot be reached.** §9 says a code no handler recognises runs
+   `sys/<code>.g`, and `Code.TryRunCodeMacroAsync` implements exactly that — but nothing calls it in
+   practice. Both switches end with `throw new NotSupportedException` on their default arm
+   (`MCodeHandler.cs:340`, `GCodeHandler.cs:140`), and `Code.ProcessInternally` catches that at
+   `Code.cs:313` with `ResolveAsUnsupported(); return true;`. The fallback is at `Code.cs:349`, below
+   that `return`. So every unrecognised G- and M-code answers "Command is not supported" without the
+   macro being looked for, and a machine that adds a code of its own — which is the whole point of
+   the mechanism — is silently not served.
+
+   The two codes that throw deliberately, **M22** and **M998**, reach the same place by the same
+   route, so nothing distinguishes "we decided against this" from "nobody has written it". Whichever
+   way the fallback is fixed, that distinction has to survive it: a handler that means to refuse
+   should return a message saying so, and throwing should mean only "not mine".
+
+   Nothing covers this. `UnitTests/File/MacroRunnerTests.cs` tests the macro *name* against a copy of
+   the rule written inside the test, which is a test of the convention and not of the path.
+2. **`M98` does not pass its parameters** where RepRapFirmware's `DoFileMacroWithParameters` does, and
+   where the code-named fallback in the same program already does. See §9.
+3. **`M453 S` is ignored** where RepRapFirmware answers "Spindle management has been moved to M950"
+   and makes it an error, so an old config that still carries it is told nothing.
+4. **M21 answers `P0` with success because the volume is always mounted, and M22 refuses.** The
+   symmetric answer would be a no-op success, but that is a decision about what releasing an SD card
+   should mean on a machine whose files are the operating system's, and this document should not make
+   it on its own.
+
+A fourth is a comment rather than behaviour: `MCodeHandler.HandleResumePrintAsync` says `resume.g` is
+not run *because macro execution is not wired up yet*. It is wired up; what M24 is missing is the
+restore-point state and the call. A reason that has been overtaken is worse than no reason, because
+it answers the question a reader came with.
