@@ -12,6 +12,12 @@
   href: firmware-link.md
 - name: SPI Transfer State Machine
   href: spi-state-machine.md
+- name: CAN Messages
+  href: can-messages.md
+- name: Endstops
+  href: endstops.md
+- name: Differences from RepRapFirmware
+  href: rrf-differences.md
 - name: File Management
   href: file-management.md
 - name: REST API
