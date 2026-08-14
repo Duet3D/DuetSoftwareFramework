@@ -436,6 +436,8 @@ namespace CanMotion
 	static size_t StopDriversWatchingActiveInputs(std::span<SbcProtocol::MotionStoppedDriver> stopped,
 												 uint32_t& moveId) noexcept
 	{
+		// Read on the SBC task while the CAN receiver task may be adding to it; see NoteInputState
+		const TaskCriticalSectionLocker lock;
 		size_t numStopped = 0;
 		for (size_t i = 0; i < numActiveInputs && numStopped < stopped.size(); ++i)
 		{
@@ -450,6 +452,11 @@ namespace CanMotion
 
 void CanMotion::NoteInputState(uint8_t inputBoard, uint16_t inputHandle, bool active) noexcept
 {
+	// Two tasks reach this: the CAN receiver task, for a level a board reported, and the SBC task,
+	// for a handle whose monitor is being replaced or dropped. The update is read-modify-write on
+	// both the array and the count, and losing the SBC task's half is the dangerous direction - it
+	// would leave a level held for a monitor that no longer exists
+	const TaskCriticalSectionLocker lock;
 	numActiveInputs = SbcProtocol::NoteInputState(std::span{activeInputs}, numActiveInputs, inputBoard, inputHandle,
 												  active);
 }

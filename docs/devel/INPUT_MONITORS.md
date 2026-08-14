@@ -375,14 +375,34 @@ is the case `Create`'s replace-first already covers.
 Tested by [InputMonitorsTests](src/UnitTests/Motion/InputMonitorsTests.cs): all five abandonment cases,
 the two board-move cases, that only a switch on a pin is monitored at all, and the probe equivalents.
 
-### Phase 4 - clear a held input when its monitor goes ⬜
+### Phase 4 - clear a held input when its monitor goes ✅
 
-`CommandProcessor` clears the held level for a handle when a create or a delete for it passes
-through, so the replay in `ScheduleFromSbc` cannot act on a level from a monitor that no longer
-exists.
+Every CAN message DCS sends passes through `SbcInterface`'s request handler on its way to the bus, so
+that is where a `createInputMonitorV1`, or a `changeInputMonitorV1` carrying `actionDelete`, clears
+the level held for its handle. `setAddressAndNormalTiming` was already inspected there, so this is an
+existing shape rather than a new one.
 
-Tested by: a host-side case in `StopRulesTests`, the clearing being expressed as a rule in
-`StopRules.h` for the same reason `NoteInputState` is - it is the tested copy.
+Clearing rather than re-reading is the right default: the replacement monitor reports only when it
+*changes*, so nothing is known about its level until it does, and the window §4.6 of
+`STALL_DETECTION.md` describes reopens for that handle until then - which is where DSF was before any
+of this. Acting on the level a deleted monitor left behind is the outcome worth ruling out.
+
+Only create and delete clear. A threshold or interval change leaves the monitor in place, and the
+board re-evaluates and reports if that moved the input across the threshold, so the held level stays
+answerable.
+
+**A concurrency point the plan did not anticipate.** This gave `activeInputs` a second writing task -
+the SBC task, alongside the CAN receiver task - and the update is read-modify-write on both the array
+and its count. Losing the SBC task's half is the dangerous direction, because it leaves a level held
+for a monitor that no longer exists, so `NoteInputState` and the replay now take a
+`TaskCriticalSectionLocker`.
+
+**Not host-tested, and it cannot be.** The rule that a create or a delete clears a handle is a
+statement about CAN message types, and `StopRules.h` deliberately includes no CANlib, which is what
+lets the host suite build it at all. What *is* tested there is the clearing itself, in
+`TestAnInputIsHeldFromWhenItGoesActiveUntilItGoesInactive` and
+`TestAnInputThatDoesNotFitIsSimplyNotHeld` - the call site is the untested part, and forcing it into
+the shared header to change that would put a CANlib dependency somewhere it must not go.
 
 ---
 
