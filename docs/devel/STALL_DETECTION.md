@@ -218,9 +218,8 @@ struct ScheduleMoveDriver {
 
 **`stopAction` absorbs `ScheduleMoveFlags::StopAllDrivers`, which is deleted.** The action belongs to
 the endstop that fired, not to the move: that is what RRF models, and a per-move flag only works
-because `EndstopArming` refuses to home a coupled axis alongside an independent one - a DSF policy,
-not a wire limitation, which the format should not bake in. It also removes a field rather than
-adding one. The SBC keeps `MoveFlags::StopAllDrivers` for the DDA's round-robin switch assignment,
+because `EndstopArming` refuses to home a coupled axis alongside another axis - a DSF limitation
+rather than a wire one, and Phase 6 lifts it. It also removes a field rather than adding one. The SBC keeps `MoveFlags::StopAllDrivers` for the DDA's round-robin switch assignment,
 which never crossed the wire.
 
 `NoStopGroup` and `StopAction` are declared in `StopRules.h` beside the rules that read them, not in
@@ -364,8 +363,9 @@ same commit that does it; `git log --grep` finds them.
 | 4 | Stop groups and the three stop actions | ✅ `feat: give a move's endstops the three stop actions` |
 | 5 | `S3` and `S4` told apart | ✅ folded into Phase 4 |
 | 5a | The move id in `MotionStopped` | ✅ same commit as Phase 4 - see below |
-| 6 | The motor-stall Z probe | ⬜ |
-| 7 | Diagnostics | ⬜ |
+| 6 | A group is the coupling set, not the drive | ⬜ |
+| 7 | The motor-stall Z probe | ⬜ |
+| 8 | Diagnostics | ⬜ |
 
 **Nothing is fixed on a machine until Phase 3.** Phase 1 changed no behaviour, and Phase 2 only makes
 the bitmap safe to act on. `M574 S3`/`S4` behave exactly as §4 describes until then.
@@ -511,17 +511,65 @@ controller that sent none, or a move armed and not yet queued. Those are applied
 them would throw away stops that are almost certainly the armed move's. `M122` counts the mismatches
 separately from the too-late ones.
 
-### Phase 6 — the motor-stall Z probe ⬜
+### Phase 6 — a group is the coupling set, not the drive ⬜
+
+`stopGroup` is filled with the logical drive, derived in
+[DDA.cpp](src/DuetSbcInterface/src/Movement/DDA.cpp) from the drive being emitted, and a coupled axis
+is given `StopAction::all` instead. That makes two axes with disjoint couplings impossible to home
+together, and [EndstopArming](src/DuetControlServer/Motion/EndstopArming.cs) refuses the move:
+
+```
+M584 X1.0 Y1.1 U1.2 V1.3
+M669 K1 X1:1:0:0 Y1:-1:0:0 U0:0:1:1 V0:0:1:-1   ; CoreXYUV: X/Y coupled, U/V coupled, pairs independent
+G1 H1 X100 U100                                  ; Cannot home X and U together
+```
+
+RepRapFirmware accepts that move and half-homes it. `EnableAxisEndstops` primes both endstops without
+complaint and both get `stopAll`, so whichever switch closes first runs
+[`Move::StopAllDrivers`](lib/RepRapFirmware/src/Movement/Move.cpp#L2973), which iterates *every*
+logical drive. X reaches its switch and is set from it; U and V stop wherever they are, unhomed, and
+U's endstop never fires. No error is reported.
+
+Both behaviours are wrong, and the group can express the right one: X's endstop stops `{X, Y}`, U's
+stops `{U, V}`, both axes home in the one move and neither disturbs the other. `GetControllingDrives`
+already returns exactly those sets - `{X,Y}` for X and `{U,V}` for U on the configuration above.
+
+What has to change:
+
+| | |
+|---|---|
+| Touches | [EndstopArming.cs](src/DuetControlServer/Motion/EndstopArming.cs), [MoveParams.h](src/DuetSbcInterface/src/Motion/MoveParams.h) and [MoveParams.cs](src/DuetControlServer/Motion/Native/MoveParams.cs), [DDA.cpp](src/DuetSbcInterface/src/Movement/DDA.cpp) |
+| Wire format | unchanged. `MoveStopInput` carries the group in the padding byte Phase 4 added, so it stays 14 |
+| Tests | `EndstopArmingTests` for the configuration above: two plans, two groups, no refusal; and that a coupled axis alone still groups every controlling drive together |
+
+- `MoveStopInput` carries a group id, and `EndstopArming` assigns it: every drive of
+  `GetControllingDrives(axis)` shares one id, and an independent axis keeps its own drive number.
+  This is the part that has to move to DuetControlServer, because the kinematics is what says which
+  drives belong together and the controller holds no axis-to-driver map.
+- `DDA.cpp` passes `m_stopOnInput[drive].stopGroup` rather than `(uint8_t)drive`.
+- A coupled axis asks for `group` rather than `all`, and the two refusals in `Arm` - two coupled axes
+  together, and a coupled axis alongside an independent one - are lifted.
+
+`StopAction::all` then has no user. It stays, because RepRapFirmware makes an extruder endstop
+`stopAll` and that is the one case where the answer really is "the whole move" rather than a set of
+drives; §8 records why extruder endstops are out of scope for now.
+
+*Why this was not Phase 4:* the group being the drive is what let Phase 4 derive it natively, with no
+new field and nothing for the two sides to disagree about. Moving the assignment to DCS is a
+behaviour change with its own failure mode - a coupling set computed wrongly under-stops, where `all`
+over-stops and fails safe - so it wants its own commit and its own commissioning case.
+
+### Phase 7 — the motor-stall Z probe ⬜
 
 [`RemoteProbes.TryGetStopInput`](src/DuetControlServer/Motion/RemoteProbes.cs#L62) returns false for
 `ProbeType.ZMotorStall`, so a `G30` against one silently watches nothing and runs its full length.
-RRF has a `MotorStallZProbe` class for this. With Phases 1-5 done it is a small addition: a kind
+RRF has a `MotorStallZProbe` class for this. With the earlier phases done it is a small addition: a kind
 whose `PrepareAsync` arms the Z drivers as `StallEndstopKind` does and whose `TryArm` gives the
 probe's drive a stall stop input.
 
 Deferred behind the rest because it fails loudly enough to notice, where §4.1 and §4.2 do not.
 
-### Phase 7 — diagnostics ⬜
+### Phase 8 — diagnostics ⬜
 
 [`ApplyInputState`](src/DuetControlServer/Link/Expansion/ExpansionBoardManager.cs#L595) drops
 `typeStallEndstop` silently. RepRapFirmware does not set `sensors.endstops[].triggered` for a stall
@@ -632,6 +680,7 @@ is the alternative, and it costs a CMake target and a CI entry.
 | Dual-motor axis, `S4` | Each motor stops at its own stall; the gantry squares; the last one stops the axis |
 | Two stall-homed axes homed together on one board | Only the stalled axis is recorded as homed |
 | CoreXY, `S3` | Whole move stops |
+| CoreXYUV, `G1 H1 X100 U100` (Phase 6) | Both axes home in the one move; X's endstop stops X and Y only, U's stops U and V only |
 | Ordinary move after a stall-homed one | No spurious stall - the disarm ran |
 
 The last one is the regression that catches a `finally` that stopped running.
