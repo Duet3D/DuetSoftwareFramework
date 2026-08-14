@@ -8,6 +8,16 @@ namespace DuetAPI.ObjectModel;
 /// </summary>
 public partial class Probe : ModelObject, IStaticModelObject
 {
+    // What a probe does before M558 and G31 have configured it, as RepRapFirmware's ZProbe
+    // constructor sets it.
+
+    /// <summary>Height the probe rises to between taps until M558 says otherwise (in mm)</summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>DefaultZDive</c>. Zero would leave the nozzle on the bed between the taps
+    /// of a multi-tap probe, so each tap after the first would measure nothing
+    /// </remarks>
+    public const float DefaultDiveHeight = 5F;
+
     /// <summary>
     /// Calibration temperature (in C)
     /// </summary>
@@ -47,13 +57,13 @@ public partial class Probe : ModelObject, IStaticModelObject
         get => _diveHeight;
         set => SetPropertyValue(ref _diveHeight, value);
     }
-    private float _diveHeight;
+    private float _diveHeight = DefaultDiveHeight;
 
     /// <summary>
     /// Dive heights of the probe (in mm).
     /// The first element is the dive height for the first tap; the second element is used for subsequent taps when multi-tapping
     /// </summary>
-    public ObservableCollection<float> DiveHeights { get; } = [0F, 0F];
+    public ObservableCollection<float> DiveHeights { get; } = [DefaultDiveHeight, DefaultDiveHeight];
 
     /// <summary>
     /// Indicates if the scanning probe is calibrated

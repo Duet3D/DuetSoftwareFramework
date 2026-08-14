@@ -51,14 +51,6 @@ namespace DuetControlServer.Codes.Handlers;
 /// </remarks>
 internal partial class MCodeHandler
 {
-    /// <summary>Steps per mm may not be zero or negative (RepRapFirmware's MinimumStepsPerMm)</summary>
-    private const float MinStepsPerMm = 0.01f;
-
-    /// <summary>Minimum acceleration in mm/s^2 (RepRapFirmware's MinimumAcceleration)</summary>
-    private const float MinAcceleration = 0.1f;
-
-    /// <summary>Minimum jerk in mm/s (RepRapFirmware's MinimumJerk)</summary>
-    private const float MinJerkMmPerSec = 0.1f;
 
     /// <summary>Absolute floor for the minimum movement speed, in mm/s (RepRapFirmware's AbsoluteMinFeedrate)</summary>
     private const float AbsoluteMinFeedrateMmPerSec = 0.001f;
@@ -191,7 +183,7 @@ internal partial class MCodeHandler
             {
                 if (code.TryGetFloat(axis.Letter, out float value))
                 {
-                    float acceleration = MathF.Max(value, MinAcceleration);
+                    float acceleration = MathF.Max(value, Move.MinimumAcceleration);
                     if (reduced)
                     {
                         axis.ReducedAcceleration = acceleration;
@@ -212,7 +204,7 @@ internal partial class MCodeHandler
                 {
                     for (int i = 0; i < extruderValues.Length; i++)
                     {
-                        move.Extruders[i].Acceleration = MathF.Max(extruderValues[i], MinAcceleration);
+                        move.Extruders[i].Acceleration = MathF.Max(extruderValues[i], Move.MinimumAcceleration);
                     }
                 }
                 seen = true;
@@ -317,17 +309,17 @@ internal partial class MCodeHandler
             // override what S just set
             if (code.TryGetFloat('S', out float both))
             {
-                motionSystem.PrintingAcceleration = motionSystem.TravelAcceleration = MathF.Max(both, MinAcceleration);
+                motionSystem.PrintingAcceleration = motionSystem.TravelAcceleration = MathF.Max(both, Move.MinimumAcceleration);
                 seen = true;
             }
             if (code.TryGetFloat('P', out float printing))
             {
-                motionSystem.PrintingAcceleration = MathF.Max(printing, MinAcceleration);
+                motionSystem.PrintingAcceleration = MathF.Max(printing, Move.MinimumAcceleration);
                 seen = true;
             }
             if (code.TryGetFloat('T', out float travel))
             {
-                motionSystem.TravelAcceleration = MathF.Max(travel, MinAcceleration);
+                motionSystem.TravelAcceleration = MathF.Max(travel, Move.MinimumAcceleration);
                 seen = true;
             }
 
@@ -363,7 +355,7 @@ internal partial class MCodeHandler
         bool mmPerSec = code.MajorNumber == 205;
         bool setMax = code.MajorNumber == 566;
         float toMmPerMin = mmPerSec ? SecondsPerMinute : 1.0f;
-        float minJerkMmPerMin = MinJerkMmPerSec * SecondsPerMinute;
+        float minJerkMmPerMin = Move.MinimumJerk;
 
         bool seenAxis = false, seenExtruder = false;
         string? report = null;
@@ -2346,7 +2338,7 @@ internal partial class MCodeHandler
         {
             value = value * inUse / quotedAt;
         }
-        return MathF.Max(value, MinStepsPerMm);
+        return MathF.Max(value, Move.MinimumStepsPerMm);
     }
 
     /// <summary>
@@ -2448,6 +2440,7 @@ internal partial class MCodeHandler
             axis.Speed = Axis.DefaultZSpeed;
             axis.Acceleration = axis.ReducedAcceleration = Axis.DefaultZAcceleration;
             axis.Jerk = axis.PrintingJerk = Axis.DefaultZJerk;
+            axis.StepsPerMm = Axis.DefaultZStepsPerMm;
         }
         return axis;
     }

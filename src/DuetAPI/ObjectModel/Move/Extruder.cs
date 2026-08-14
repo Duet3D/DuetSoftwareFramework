@@ -21,6 +21,9 @@ public partial class Extruder : ModelObject, IStaticModelObject
     /// <summary>Jerk of an extruder until M566 says otherwise (in mm/min)</summary>
     public const float DefaultJerk = 5F * 60F;
 
+    /// <summary>Microsteps per mm of an extruder until M92 says otherwise</summary>
+    public const float DefaultStepsPerMm = 420F;
+
     /// <summary>
     /// Acceleration of this extruder (in mm/s^2)
     /// </summary>
@@ -195,5 +198,5 @@ public partial class Extruder : ModelObject, IStaticModelObject
         get => _stepsPerMm;
         set => SetPropertyValue(ref _stepsPerMm, value);
     }
-    private float _stepsPerMm = 420F;
+    private float _stepsPerMm = DefaultStepsPerMm;
 }

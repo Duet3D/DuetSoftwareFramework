@@ -1,3 +1,4 @@
+using System.Linq;
 using DuetAPI.ObjectModel;
 using NUnit.Framework;
 
@@ -34,7 +35,18 @@ public class AxisDefaultsTests
             Assert.That(axis.Speed, Is.GreaterThan(0.0f));
             Assert.That(axis.Jerk, Is.GreaterThan(0.0f));
             Assert.That(axis.PrintingJerk, Is.GreaterThan(0.0f));
+            Assert.That(axis.StepsPerMm, Is.GreaterThan(0.0f), "and a move on it would round to no steps");
         });
+    }
+
+    [Test]
+    public void ANewProbeRisesBetweenTaps()
+    {
+        // A dive height of zero leaves the nozzle on the bed between taps, so every tap after the
+        // first measures nothing
+        Probe probe = new();
+
+        Assert.That(probe.DiveHeights, Is.All.GreaterThan(0.0f));
     }
 
     [Test]
@@ -52,27 +64,78 @@ public class AxisDefaultsTests
     }
 
     /// <summary>
-    /// Speeds and jerks are per minute here and per second in RepRapFirmware, so a default copied
-    /// across without converting is out by sixty - which is invisible in a machine that configures
-    /// its axes and cripplingly slow in one that does not
+    /// Every default has to be a value the machine could also have been configured with
     /// </summary>
+    /// <remarks>
+    /// A configuration code clamps what it is given to a floor, so a default below that floor would
+    /// be a machine that starts life outside the range it is allowed to be configured into: the
+    /// first <c>M201</c>, <c>M566</c> or <c>M92</c> to name the drive would raise the value rather
+    /// than lower it, and a bare <c>M203</c> would speed the axis up. Nothing would report that,
+    /// because each half is reasonable on its own
+    /// </remarks>
     [Test]
-    public void SpeedsAndJerksAreConvertedFromRepRapFirmwaresPerSecondConstants()
+    public void EveryDefaultIsAboveTheFloorItsCodeClampsTo()
     {
+        Move move = new();
+        float minSpeed = move.MinimumMovementSpeed * 60.0f;      // the floor M203 applies, in mm/min
+
         Assert.Multiple(() =>
         {
-            Assert.That(Axis.DefaultSpeed, Is.EqualTo(6000.0f), "DefaultAxisMaxFeedrate, 100 mm/s");
-            Assert.That(Axis.DefaultZSpeed, Is.EqualTo(1200.0f), "DefaultZMaxFeedrate, 20 mm/s");
-            Assert.That(Axis.DefaultJerk, Is.EqualTo(900.0f), "DefaultAxisInstantDv, 15 mm/s");
-            Assert.That(Axis.DefaultZJerk, Is.EqualTo(600.0f), "DefaultZInstantDv, 10 mm/s");
-            Assert.That(Extruder.DefaultSpeed, Is.EqualTo(6000.0f), "DefaultEMaxFeedrate, 100 mm/s");
-            Assert.That(Extruder.DefaultJerk, Is.EqualTo(300.0f), "DefaultEInstantDv, 5 mm/s");
+            foreach ((string name, float accel) in new[]
+                     {
+                         ("Axis.DefaultAcceleration", Axis.DefaultAcceleration),
+                         ("Axis.DefaultZAcceleration", Axis.DefaultZAcceleration),
+                         ("Extruder.DefaultAcceleration", Extruder.DefaultAcceleration)
+                     })
+            {
+                Assert.That(accel, Is.GreaterThanOrEqualTo(Move.MinimumAcceleration), name);
+            }
 
-            // Accelerations are mm/s^2 on both sides, so these are RepRapFirmware's numbers as they
-            // stand - which is why acceleration was the field whose default was noticed missing
-            Assert.That(Axis.DefaultAcceleration, Is.EqualTo(1000.0f), "DefaultAxisAcceleration");
-            Assert.That(Axis.DefaultZAcceleration, Is.EqualTo(200.0f), "DefaultZAcceleration");
-            Assert.That(Extruder.DefaultAcceleration, Is.EqualTo(500.0f), "DefaultEAcceleration");
+            foreach ((string name, float jerk) in new[]
+                     {
+                         ("Axis.DefaultJerk", Axis.DefaultJerk),
+                         ("Axis.DefaultZJerk", Axis.DefaultZJerk),
+                         ("Extruder.DefaultJerk", Extruder.DefaultJerk)
+                     })
+            {
+                Assert.That(jerk, Is.GreaterThanOrEqualTo(Move.MinimumJerk), name);
+            }
+
+            foreach ((string name, float steps) in new[]
+                     {
+                         ("Axis.DefaultStepsPerMm", Axis.DefaultStepsPerMm),
+                         ("Axis.DefaultZStepsPerMm", Axis.DefaultZStepsPerMm),
+                         ("Extruder.DefaultStepsPerMm", Extruder.DefaultStepsPerMm)
+                     })
+            {
+                Assert.That(steps, Is.GreaterThanOrEqualTo(Move.MinimumStepsPerMm), name);
+            }
+
+            foreach ((string name, float speed) in new[]
+                     {
+                         ("Axis.DefaultSpeed", Axis.DefaultSpeed),
+                         ("Axis.DefaultZSpeed", Axis.DefaultZSpeed),
+                         ("Extruder.DefaultSpeed", Extruder.DefaultSpeed)
+                     })
+            {
+                Assert.That(speed, Is.GreaterThanOrEqualTo(minSpeed), name);
+            }
         });
+    }
+
+    /// <summary>
+    /// A default axis has somewhere to move between
+    /// </summary>
+    /// <remarks>
+    /// The only pair of defaults that bound each other rather than being bounded by a constant.
+    /// Equal limits would be an axis of no length, which <c>M208</c> would have to be used to undo
+    /// before the axis could move at all
+    /// </remarks>
+    [Test]
+    public void ANewAxisHasTravelBetweenItsLimits()
+    {
+        Axis axis = new();
+
+        Assert.That(axis.Max, Is.GreaterThan(axis.Min));
     }
 }

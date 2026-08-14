@@ -52,6 +52,16 @@ public partial class Axis : ModelObject, IStaticModelObject
     /// <summary>Jerk of a Z axis until M566 says otherwise (in mm/min)</summary>
     public const float DefaultZJerk = 10F * 60F;
 
+    /// <summary>Microsteps per mm of an axis until M92 says otherwise</summary>
+    public const float DefaultStepsPerMm = 80F;
+
+    /// <summary>Microsteps per mm of a Z axis until M92 says otherwise</summary>
+    /// <remarks>
+    /// Ten times the other axes', because a Z is usually a leadscrew and a belt's figure would move
+    /// it ten times too far
+    /// </remarks>
+    public const float DefaultZStepsPerMm = 800F;
+
     /// <summary>
     /// Acceleration of this axis (in mm/s^2)
     /// </summary>
@@ -279,7 +289,7 @@ public partial class Axis : ModelObject, IStaticModelObject
         get => _stepsPerMm;
         set => SetPropertyValue(ref _stepsPerMm, value);
     }
-    private float _stepsPerMm = 80F;
+    private float _stepsPerMm = DefaultStepsPerMm;
 
     /// <summary>
     /// Current step position of the axis (in steps)
