@@ -12474,6 +12474,11 @@
             Defines the source generated JSON serialization contract metadata for a given type.
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.ObjectModelContext.ProbeLoadCell">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
         <member name="P:DuetAPI.ObjectModel.ObjectModelContext.ProbeTouchMode">
             <summary>
             Defines the source generated JSON serialization contract metadata for a given type.
@@ -15371,16 +15376,6 @@
             The first element is the dive height for the first tap; the second element is used for subsequent taps when multi-tapping
             </summary>
         </member>
-        <member name="P:DuetAPI.ObjectModel.Probe.Force">
-            <summary>
-            Force measured by the probe (in g), or null if it is not a force-sensing probe
-            </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.Probe.GramsPerCount">
-            <summary>
-            Scale of a force-sensing probe (in g per count), or null if it has not been calibrated
-            </summary>
-        </member>
         <member name="P:DuetAPI.ObjectModel.Probe.IsCalibrated">
             <summary>
             Indicates if the scanning probe is calibrated
@@ -15389,6 +15384,11 @@
         <member name="P:DuetAPI.ObjectModel.Probe.LastStopHeight">
             <summary>
             Height of the probe where it stopped last time (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.Probe.LoadCell">
+            <summary>
+            Load cell parameters (only applicable for load cell probes, otherwise null)
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.Probe.MaxProbeCount">
@@ -15404,11 +15404,6 @@
         <member name="P:DuetAPI.ObjectModel.Probe.Offsets">
             <summary>
             X+Y offsets (in mm)
-            </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.Probe.Preload">
-            <summary>
-            Preload of a force-sensing probe at the last tare (in g), or null if it is not a force-sensing probe
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.Probe.RecoveryTime">
@@ -15514,6 +15509,85 @@
             <remarks>This property is auto-generated</remarks>
         </member>
         <member name="M:DuetAPI.ObjectModel.Probe.GetPropertyValue(System.Int32)">
+            <summary>
+            Read the value of the property with the given index
+            </summary>
+            <param name="index">Index of the property</param>
+            <returns>Property value</returns>
+            <exception cref="T:System.ArgumentOutOfRangeException">Property index is invalid</exception>
+            <remarks>This method is auto-generated</remarks>
+        </member>
+        <member name="T:DuetAPI.ObjectModel.ProbeLoadCell">
+            <summary>
+            Information about a load cell probe
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ProbeLoadCell.Force">
+            <summary>
+            Force measured by the load cell relative to the last tare (in g)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ProbeLoadCell.GramsPerCount">
+            <summary>
+            Scale of the load cell (in g per count)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ProbeLoadCell.Preload">
+            <summary>
+            Preload of the load cell at the last tare (in g)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ProbeLoadCell.PreloadWindow">
+            <summary>
+            Safe window for the preload (in g, low and high limit). Two equal values disable the check
+            </summary>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.ProbeLoadCell.Assign(DuetAPI.ObjectModel.IStaticModelObject)">
+            <summary>
+            Assign the properties from another instance.
+            This is required to update model properties which do not have a setter
+            </summary>
+            <param name="from">Other instance</param>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.ProbeLoadCell.Clone">
+            <summary>
+            Clone this instance
+            </summary>
+            <remarks>This method is auto-generated</remarks>
+            <returns>Cloned instance</returns>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.ProbeLoadCell.UpdateFromJson(System.Text.Json.JsonElement,System.Boolean)">
+            <summary>
+            Update this instance from a given JSON element
+            </summary>
+            <remarks>This method is auto-generated</remarks>
+            <param name="jsonElement">Element to update this intance from</param>
+            <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.ProbeLoadCell.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
+            <summary>
+            Update this instance from a given JSON element
+            </summary>
+            <remarks>This method is auto-generated</remarks>
+            <param name="reader">Reader to update this intance from</param>
+            <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
+            <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ProbeLoadCell.TypeDescriptor">
+            <summary>
+            Static description of this type
+            </summary>
+            <remarks>This property is auto-generated</remarks>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ProbeLoadCell.Descriptor">
+            <summary>
+            Static description of this instance's type
+            </summary>
+            <remarks>This property is auto-generated</remarks>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.ProbeLoadCell.GetPropertyValue(System.Int32)">
             <summary>
             Read the value of the property with the given index
             </summary>
