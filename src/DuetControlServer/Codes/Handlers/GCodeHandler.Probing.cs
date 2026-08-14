@@ -291,7 +291,10 @@ internal sealed partial class GCodeHandler
 
                     // Every drive watches the probe rather than only Z's. On a delta the effector
                     // only comes down because all three towers do, so stopping one would tip it
-                    if (!RemoteProbes.TryGetStopInput(probe, probeNumber, move.StopOnInput[0]))
+                    // Every driver of the move goes, which is what RepRapFirmware's ZProbe answers
+                    // whatever the geometry: on a delta the effector only comes down because all
+                    // three towers do, so stopping one would tip it
+                    if (!RemoteProbes.TryGetStopInput(probe, probeNumber, StopAction.All, move.StopOnInput[0]))
                     {
                         return false;
                     }

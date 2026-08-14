@@ -211,6 +211,48 @@ public class RemoteEndstopsTests
         Assert.That(stopInput.NumSwitches, Is.Zero, "a refused endstop leaves the drive watching nothing");
     }
 
+    /// <summary>
+    /// A drive that watches something has to say what a trigger on it stops
+    /// </summary>
+    /// <remarks>
+    /// An action of <c>None</c> means the controller stops nothing, so an entry armed without one is
+    /// a move that watches a probe and then drives straight through it. Nothing downstream can tell
+    /// that from a drive that was deliberately left unarmed, which is why the action is an argument
+    /// rather than something a caller may forget
+    /// </remarks>
+    [Test]
+    public void AProbeStopInputCarriesTheActionItWasGiven()
+    {
+        Probe probe = new() { Type = ProbeType.Analog, Port = "1.io0.in" };
+        MoveStopInput stopInput = new();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(RemoteProbes.TryGetStopInput(probe, 0, StopAction.All, stopInput), Is.True);
+            Assert.That(stopInput.NumSwitches, Is.EqualTo(1), "the drive watches the probe");
+            Assert.That(stopInput.Action, Is.EqualTo(StopAction.All),
+                        "a probing move stops every driver, as RepRapFirmware's ZProbe does");
+
+            Assert.That(RemoteProbes.TryGetStopInput(probe, 0, StopAction.Group, stopInput), Is.True);
+            Assert.That(stopInput.Action, Is.EqualTo(StopAction.Group),
+                        "and a probe standing in for an axis endstop stops the axis");
+        });
+    }
+
+    [Test]
+    public void AProbeThatCannotStopAMoveLeavesTheDriveWatchingNothing()
+    {
+        MoveStopInput stopInput = new();
+        Probe stall = new() { Type = ProbeType.ZMotorStall };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(RemoteProbes.TryGetStopInput(stall, 0, StopAction.All, stopInput), Is.False);
+            Assert.That(stopInput.NumSwitches, Is.Zero);
+            Assert.That(stopInput.Action, Is.EqualTo(StopAction.None), "so nothing is armed on it either");
+        });
+    }
+
     [Test]
     public void AStallEndstopNamesNoBoard()
     {

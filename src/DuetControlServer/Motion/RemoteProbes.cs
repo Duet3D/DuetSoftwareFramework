@@ -53,13 +53,19 @@ internal static class RemoteProbes
     /// </summary>
     /// <param name="probe">The probe</param>
     /// <param name="probeNumber">Probe number</param>
+    /// <param name="action">
+    /// What a trigger stops. RepRapFirmware has a class per use and they answer differently: a
+    /// probing move is <c>ZProbe</c>, which stops every driver of the move, while the
+    /// <c>ZProbeEndstop</c> standing in for an axis endstop stops the axis. Passed in rather than
+    /// decided here, so that no caller can arm a drive without saying what a trigger on it stops
+    /// </param>
     /// <param name="stopInput">Entry to fill in; left watching nothing if the probe cannot stop a move</param>
     /// <returns>True if the probe has an input a move can stop on</returns>
     /// <remarks>
     /// A probe of type none is a placeholder for manual probing and a motor stall probe is detected
     /// by the driver, so neither has an input a move can be armed on
     /// </remarks>
-    public static bool TryGetStopInput(Probe probe, int probeNumber, MoveStopInput stopInput)
+    public static bool TryGetStopInput(Probe probe, int probeNumber, StopAction action, MoveStopInput stopInput)
     {
         stopInput.Clear();
         if (probe.Type is ProbeType.None or ProbeType.ZMotorStall || string.IsNullOrWhiteSpace(probe.Port) ||
@@ -69,6 +75,7 @@ internal static class RemoteProbes
         }
 
         stopInput.SetShared(HandleFor(probeNumber), board);
+        stopInput.Action = action;
         return true;
     }
 }

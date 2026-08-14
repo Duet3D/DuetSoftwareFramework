@@ -227,13 +227,14 @@ internal sealed class ZProbeEndstopKind : IEndstopKind
     /// <inheritdoc/>
     public string? TryArm(EndstopPlan plan, MoveStopInput stopInput)
     {
-        if (plan.Probe is null || !RemoteProbes.TryGetStopInput(plan.Probe, plan.Endstop.Probe ?? 0, stopInput))
+        // One probe for the drive, so there is nothing for a motor to run on to alone. That is
+        // RepRapFirmware's ZProbeEndstop, which stops the axis; EndstopArming raises it to the whole
+        // move where the kinematics couples the drives
+        if (plan.Probe is null ||
+            !RemoteProbes.TryGetStopInput(plan.Probe, plan.Endstop.Probe ?? 0, StopAction.Group, stopInput))
         {
             return "its endstop is a Z probe that cannot stop a move; check M558";
         }
-
-        // One probe for the drive, so there is nothing for a motor to run on to alone
-        stopInput.Action = StopAction.Group;
         return null;
     }
 }
