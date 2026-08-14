@@ -2,6 +2,7 @@ using DuetAPI.ObjectModel;
 using DuetControlServer.Motion;
 using DuetControlServer.Motion.Native;
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -119,9 +120,14 @@ internal sealed partial class GCodeHandler
     /// <param name="TriggerHeight">Where the probe triggers relative to the nozzle, mm</param>
     /// <param name="RecoveryTime">How long to wait before each tap, seconds</param>
     /// <param name="ZMin">Lowest the Z axis may be driven to</param>
+    /// <param name="IsStallProbe">
+    /// Whether the probe is the drivers of Z stalling rather than an input on a pin, which is what
+    /// decides whether the drivers have to be armed before each tap
+    /// </param>
     private readonly record struct ProbeSettings(
         string? Refusal, int ZAxis, float[] DiveHeights, float[] Speeds, float TravelSpeed,
-        int MaxTaps, float Tolerance, float TriggerHeight, float RecoveryTime, float ZMin);
+        int MaxTaps, float Tolerance, float TriggerHeight, float RecoveryTime, float ZMin,
+        bool IsStallProbe = false);
 
     /// <summary>
     /// Read what a probing move needs to know
@@ -138,7 +144,7 @@ internal sealed partial class GCodeHandler
             {
                 return new ProbeSettings($"Z probe {probeNumber} not found", 0, [], [], 0, 0, 0, 0, 0, 0);
             }
-            if (probe.Type is ProbeType.None or ProbeType.ZMotorStall)
+            if (probe.Type == ProbeType.None)
             {
                 return new ProbeSettings($"Z probe {probeNumber} cannot stop a move", 0, [], [], 0, 0, 0, 0, 0, 0);
             }
@@ -158,7 +164,8 @@ internal sealed partial class GCodeHandler
                 probe.Tolerance,
                 probe.TriggerHeight,
                 probe.RecoveryTime,
-                model.Move.Axes[zAxis].Min);
+                model.Move.Axes[zAxis].Min,
+                probe.Type == ProbeType.ZMotorStall);
         }
     }
 
@@ -197,7 +204,11 @@ internal sealed partial class GCodeHandler
                 await Task.Delay(TimeSpan.FromSeconds(settings.RecoveryTime), cancellationToken);
             }
 
-            if (await IsProbeTriggeredAsync(probeNumber, cancellationToken))
+            // Only an input can be closed before the move starts. A stall is a driver's judgement
+            // about a move that is running, so there is nothing for it to be already triggered by -
+            // and the latch that answers for it describes the previous tap until this one clears it
+            if (!settings.IsStallProbe &&
+                await IsProbeTriggeredAsync(probeNumber, settings.ZAxis, cancellationToken))
             {
                 return (null, new Message(MessageType.Error, "Probe already triggered before probing move started"));
             }
@@ -206,16 +217,37 @@ internal sealed partial class GCodeHandler
             // is what lets a machine take one long approach and then several short ones
             int tapIndex = Math.Min(taps, 1);
             await MoveToZAsync(settings.ZAxis, ProbeStartHeight(settings, tapIndex), settings.TravelSpeed,
-                               checkProbe: false, probeNumber, cancellationToken);
+                               checkProbe: false, probeNumber, [], cancellationToken);
+
+            // A stall probe has to have the drivers that move Z told what speed to expect, which is a
+            // CAN round trip and so cannot happen while the move is being built. The speed is this
+            // tap's, because that is what the driver compares against
+            IReadOnlyList<WatchedDriver> stallDrivers = settings.IsStallProbe
+                ? await StallProbeDriversAsync(settings.ZAxis, settings.Speeds[tapIndex], cancellationToken)
+                : [];
+            EndstopArmingState arming = new();
 
             float target = settings.ZMin - settings.DiveHeights[0] + settings.TriggerHeight;
-            if (!await MoveToZAsync(settings.ZAxis, target, settings.Speeds[tapIndex],
-                                    checkProbe: true, probeNumber, cancellationToken))
+            try
             {
-                return (null, new Message(MessageType.Error, "Failed to arm the Z probe"));
+                if (stallDrivers.Count > 0)
+                {
+                    await StallArming.ArmAsync(stallDrivers, arming, linkInterface, cancellationToken);
+                }
+
+                if (!await MoveToZAsync(settings.ZAxis, target, settings.Speeds[tapIndex],
+                                        checkProbe: true, probeNumber, stallDrivers, cancellationToken))
+                {
+                    return (null, new Message(MessageType.Error, "Failed to arm the Z probe"));
+                }
+            }
+            finally
+            {
+                // However the tap ended. A driver left armed reports a stall during an ordinary move
+                await StallArming.ReleaseAsync(arming, linkInterface, logger, CancellationToken.None);
             }
 
-            if (!await IsProbeTriggeredAsync(probeNumber, cancellationToken))
+            if (!await IsProbeTriggeredAsync(probeNumber, settings.ZAxis, cancellationToken))
             {
                 return (null, new Message(MessageType.Error, "Probe was not triggered during probing move"));
             }
@@ -236,7 +268,7 @@ internal sealed partial class GCodeHandler
 
             // Back up to the dive height before tapping again, or before whatever comes next
             await MoveToZAsync(settings.ZAxis, stopped + settings.DiveHeights[1], settings.TravelSpeed,
-                               checkProbe: false, probeNumber, cancellationToken);
+                               checkProbe: false, probeNumber, [], cancellationToken);
         }
 
         return (sum / taps, null);
@@ -261,8 +293,31 @@ internal sealed partial class GCodeHandler
     /// <param name="probeNumber">Probe number</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>False if the move could not be armed on the probe</returns>
+    /// <summary>
+    /// The drivers a motor stall probe watches, and how fast each will turn
+    /// </summary>
+    /// <param name="zAxis">Index of the Z axis</param>
+    /// <param name="speed">Probing speed of this tap, mm/s</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The drivers</returns>
+    /// <remarks>
+    /// The same list a stall-homed Z would watch, from the same place, because it is the same
+    /// question: which drivers have to turn for Z to move. On a delta that is all three towers
+    /// </remarks>
+    private async ValueTask<IReadOnlyList<WatchedDriver>> StallProbeDriversAsync(
+        int zAxis, float speed, CancellationToken cancellationToken)
+    {
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            return EndstopPlanner.DriversMoving(model.Move, planner.Parameters.Geometry,
+                                                planner.Parameters.SharedAxisCount(model.Move), zAxis,
+                                                planner.Parameters.StepsPerMm, speed);
+        }
+    }
+
     private async ValueTask<bool> MoveToZAsync(int zAxis, float target, float speed, bool checkProbe,
-                                               int probeNumber, CancellationToken cancellationToken)
+                                               int probeNumber, IReadOnlyList<WatchedDriver> stallDrivers,
+                                               CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -289,14 +344,28 @@ internal sealed partial class GCodeHandler
                 {
                     Probe probe = model.Sensors.Probes[probeNumber]!;
 
-                    // Every drive watches the probe rather than only Z's. On a delta the effector
-                    // only comes down because all three towers do, so stopping one would tip it
                     // Every driver of the move goes, which is what RepRapFirmware's ZProbe answers
                     // whatever the geometry: on a delta the effector only comes down because all
-                    // three towers do, so stopping one would tip it
-                    if (!RemoteProbes.TryGetStopInput(probe, probeNumber, StopAction.All, move.StopOnInput[0]))
+                    // three towers do, so stopping one would tip it.
+                    //
+                    // A motor stall probe has no input to watch, so what stops the move is the stall
+                    // report from the boards carrying the drivers that move Z - the same handle a
+                    // stall-homed axis stops on, armed by the caller before the move
+                    bool armed = probe.Type == ProbeType.ZMotorStall
+                        ? RemoteEndstops.TryGetStallStopInput(stallDrivers, move.StopOnInput[0])
+                        : RemoteProbes.TryGetStopInput(probe, probeNumber, StopAction.All, move.StopOnInput[0]);
+                    if (!armed)
                     {
                         return false;
+                    }
+                    move.StopOnInput[0].Action = StopAction.All;
+
+                    // What stopped the last probing move says nothing about this one. A switch probe
+                    // is read from its own input so it does not need this; a stall probe has no
+                    // input, and the latch is the only record that the move was stopped at all
+                    using (planner.Lock())
+                    {
+                        planner.State.ArmEndstops();
                     }
                     for (int drive = 1; drive < move.StopOnInput.Length; drive++)
                     {
@@ -354,12 +423,30 @@ internal sealed partial class GCodeHandler
     /// <param name="probeNumber">Probe number</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True if it is triggered</returns>
-    private async ValueTask<bool> IsProbeTriggeredAsync(int probeNumber, CancellationToken cancellationToken)
+    private async ValueTask<bool> IsProbeTriggeredAsync(int probeNumber, int zAxis,
+                                                        CancellationToken cancellationToken)
     {
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
             Probe probe = model.Sensors.Probes[probeNumber]!;
-            return probe.Value.Count > 0 && probe.Value[0] >= probe.Threshold;
+            if (probe.Type != ProbeType.ZMotorStall)
+            {
+                return probe.Value.Count > 0 && probe.Value[0] >= probe.Threshold;
+            }
+
+            // A stall has no reading to compare: nothing writes sensors.probes[].value for it,
+            // because a driver reporting a stall is not an input on a pin. What says it triggered is
+            // that the move was stopped, which is what the latch records - and it is cleared before
+            // each tap, so it can only mean this one.
+            //
+            // RepRapFirmware answers the same question from the live stalled-driver bitmap of its
+            // local drivers. There are none here, which is why its own motor stall probe cannot work
+            // on this architecture at all
+            using (planner.Lock())
+            {
+                return zAxis >= 0 && zAxis < MotionLimits.MaxAxes &&
+                       (planner.State.EndstopsTriggered & (1u << zAxis)) != 0;
+            }
         }
     }
 

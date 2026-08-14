@@ -160,6 +160,49 @@ public class EndstopPlannerTests
         Assert.That(individual[0].DriversWatched, Is.EqualTo(any[0].DriversWatched));
     }
 
+    /// <summary>
+    /// A motor-stall Z probe watches the drivers that move Z, which is the same question a
+    /// stall-homed axis asks
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's motor stall probe reads the stalled-driver bitmap of its *local* drivers, so
+    /// on this architecture - where every driver is on a CAN board - it can never trigger. The
+    /// probing path arms the drivers instead, through the list this returns
+    /// </remarks>
+    [Test]
+    public void AStallProbeWatchesEveryDriverThatMovesZ()
+    {
+        // On a CoreXZ, Z only comes down because both motors turn, so a stall probe has to watch both
+        (Move move, Sensors sensors) = Machine();
+        _ = sensors;
+
+        IReadOnlyList<WatchedDriver> drivers =
+            EndstopPlanner.DriversMoving(move, KinematicsFactory.Create(KinematicsName.CoreXZ), NumAxes, 2,
+                                         StepsPerMm, FeedRateMmPerSec);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(drivers.Select(d => d.Driver.Board), Is.EqualTo(new[] { 1, 3 }),
+                        "X's motor and Z's, each on its own board");
+            Assert.That(drivers.Select(d => d.StepsPerSecond),
+                        Is.EqualTo(new[] { FeedRateMmPerSec * 80.0f, FeedRateMmPerSec * 400.0f }),
+                        "each told the speed its own drive will turn at");
+        });
+    }
+
+    [Test]
+    public void AnIndependentAxisWatchesOnlyItsOwnDriversWhenProbing()
+    {
+        (Move move, Sensors sensors) = Machine();
+        _ = sensors;
+
+        IReadOnlyList<WatchedDriver> drivers =
+            EndstopPlanner.DriversMoving(move, KinematicsFactory.Create(KinematicsName.Cartesian), NumAxes, 2,
+                                         StepsPerMm, FeedRateMmPerSec);
+
+        Assert.That(drivers.Select(d => d.Driver.Board), Is.EqualTo(new[] { 3 }));
+    }
+
     [Test]
     public void EveryKindAMoveCanBeStoppedByHasAKind()
     {

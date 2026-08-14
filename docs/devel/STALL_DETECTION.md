@@ -364,7 +364,7 @@ same commit that does it; `git log --grep` finds them.
 | 5 | `S3` and `S4` told apart | ✅ folded into Phase 4 |
 | 5a | The move id in `MotionStopped` | ✅ same commit as Phase 4 - see below |
 | 6 | A group is the coupling set, not the drive | ✅ `feat: home any number of axes whose drives do not overlap` |
-| 7 | The motor-stall Z probe | ⬜ |
+| 7 | The motor-stall Z probe | ✅ `feat: probe on a motor stall over CAN` |
 | 8 | Diagnostics | ⬜ |
 
 **Nothing is fixed on a machine until Phase 3.** Phase 1 changed no behaviour, and Phase 2 only makes
@@ -577,15 +577,36 @@ alone on a CoreXY puts Y in `stoppedAxes`. That is harmless because `FinishSpeci
 inspects the axes the code named, but `stoppedAxes` is "axes whose drives stopped", not "axes that
 reached an endstop".
 
-### Phase 7 — the motor-stall Z probe ⬜
+### Phase 7 — the motor-stall Z probe ✅
 
-[`RemoteProbes.TryGetStopInput`](src/DuetControlServer/Motion/RemoteProbes.cs#L62) returns false for
-`ProbeType.ZMotorStall`, so a `G30` against one silently watches nothing and runs its full length.
-RRF has a `MotorStallZProbe` class for this. With the earlier phases done it is a small addition: a kind
-whose `PrepareAsync` arms the Z drivers as `StallEndstopKind` does and whose `TryArm` gives the
-probe's drive a stall stop input.
+| | |
+|---|---|
+| Touches | new [StallArming.cs](src/DuetControlServer/Motion/StallArming.cs), [EndstopPlan.cs](src/DuetControlServer/Motion/EndstopPlan.cs), [EndstopKinds.cs](src/DuetControlServer/Motion/EndstopKinds.cs), [GCodeHandler.Probing.cs](src/DuetControlServer/Codes/Handlers/GCodeHandler.Probing.cs) |
+| Wire format | unchanged |
+| Tests | `EndstopPlannerTests` for the drivers a coupled Z probe watches |
 
-Deferred behind the rest because it fails loudly enough to notice, where §4.1 and §4.2 do not.
+**This one is not a port.** RepRapFirmware's `MotorStallZProbe` is a stub and the detection is in
+`ZProbe::GetReading`, which for `zMotorStall` reads the stalled-driver bitmap of its **local**
+drivers - `GetLocalDriversBitmap` filters to `IsLocal()`. Nothing arms a remote stall endstop for a
+probe anywhere in RRF. Every driver here is remote, so a faithful port would be a feature that can
+never trigger.
+
+So the probing move arms the drivers itself, the way a stall-homed axis does. `StallArming` is the
+arming lifted out of `StallEndstopKind` so that both use it, and `EndstopPlanner.DriversMoving` is
+the driver list lifted out of the planner for the same reason - the probe asks the same question a
+stall-homed axis does, and a second answer to it could differ.
+
+Two things the probe needs that an endstop does not:
+
+- The arming speed is **per tap**, because `M558 F` may give the taps different speeds and the speed
+  is what the driver compares the back-EMF against.
+- "Was it triggered?" comes from `MovementState.EndstopsTriggered`, not `sensors.probes[].value`:
+  nothing writes a reading for a stall. The latch is cleared before each tap so it can only describe
+  that one, and the already-triggered check before the move is skipped, since a stall is a judgement
+  about a move that is running.
+
+Recorded in §2.2 of [rrf-differences.md](src/Documentation/articles/rrf-differences.md), because it
+is a deliberate departure rather than a gap.
 
 ### Phase 8 — diagnostics ⬜
 

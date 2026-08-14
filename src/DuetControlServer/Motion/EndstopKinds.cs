@@ -259,73 +259,14 @@ internal sealed class StallEndstopKind : IEndstopKind
     public bool ReducesAcceleration => true;
 
     /// <inheritdoc/>
-    public async ValueTask<Message> PrepareAsync(EndstopPlan plan, EndstopArmingState state, LinkInterface link,
-                                                 CancellationToken cancellationToken)
-    {
-        List<Message> replies = [];
-        foreach (WatchedDriver watched in plan.DriversWatched)
-        {
-            CanMessageEnableStallEndstop message = new()
-            {
-                DriverNumber = (ushort)watched.Driver.Port,
-                Speed = watched.StepsPerSecond
-            };
-
-            byte board = (byte)watched.Driver.Board;
-            CanResponse response = await link.SendCanMessageAsync(
-                board, in message, CanMessageType.StandardReply, cancellationToken: cancellationToken);
-
-            // Recorded before the reply is judged: a board that refused one driver may already have
-            // armed another, and the release has to reach it either way
-            state.ArmedBoards.Add(board);
-
-            Message reply = response.ToMessage();
-            if (reply.Type == MessageType.Error)
-            {
-                throw new GCodeException(reply.Content);
-            }
-
-            // The driver was armed but the board may still have had something to say about it, which
-            // the move carries back rather than dropping: a warning here is the only sign the user
-            // gets that the stall threshold may not be what they asked for
-            replies.Add(reply);
-        }
-        return replies.ToMessage();
-    }
+    public ValueTask<Message> PrepareAsync(EndstopPlan plan, EndstopArmingState state, LinkInterface link,
+                                          CancellationToken cancellationToken)
+        => StallArming.ArmAsync(plan.DriversWatched, state, link, cancellationToken);
 
     /// <inheritdoc/>
-    public async ValueTask ReleaseAsync(EndstopArmingState state, LinkInterface link, ILogger logger,
-                                        CancellationToken cancellationToken)
-    {
-        foreach (byte board in state.ArmedBoards)
-        {
-            CanMessageEnableStallEndstop message = new()
-            {
-                DriverNumber = CanMessageEnableStallEndstop.DisableAll,
-                Speed = 0.0f
-            };
-
-            try
-            {
-                CanResponse response = await link.SendCanMessageAsync(board, in message, CanMessageType.StandardReply,
-                                                                      cancellationToken: cancellationToken);
-
-                // The move this cleans up after has already run, so there is nobody left to answer;
-                // a board that would not disarm is still worth a line in the log, because the next
-                // move naming the stall handle is what will notice
-                if (response.Severity != MessageType.Success)
-                {
-                    logger.LogWarning("Board {Board} did not disable its stall endstops: {Reply}", board,
-                                      response.ToMessage().Content);
-                }
-            }
-            catch (Exception e) when (e is not OperationCanceledException)
-            {
-                // Worth knowing about but not worth failing the move that has already run for
-                logger.LogWarning(e, "Could not disable the stall endstops on board {Board}", board);
-            }
-        }
-    }
+    public ValueTask ReleaseAsync(EndstopArmingState state, LinkInterface link, ILogger logger,
+                                  CancellationToken cancellationToken)
+        => StallArming.ReleaseAsync(state, link, logger, cancellationToken);
 
     /// <inheritdoc/>
     /// <remarks>

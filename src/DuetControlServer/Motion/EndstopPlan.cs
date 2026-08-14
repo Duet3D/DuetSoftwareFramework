@@ -134,12 +134,32 @@ internal static class EndstopPlanner
     private static IReadOnlyList<WatchedDriver> WatchedDrivers(Move move, KinematicsEngine geometry, int numAxes,
                                                                int axis, EndstopType kind,
                                                                IReadOnlyList<float> stepsPerMm, float feedRateMmPerSec)
-    {
-        if (kind is not (EndstopType.MotorStallAny or EndstopType.MotorStallIndividual))
-        {
-            return [];
-        }
+        => kind is EndstopType.MotorStallAny or EndstopType.MotorStallIndividual
+            ? DriversMoving(move, geometry, numAxes, axis, stepsPerMm, feedRateMmPerSec)
+            : [];
 
+    /// <summary>
+    /// Every driver that has to turn for one axis to move, and how fast each of them will
+    /// </summary>
+    /// <param name="move">The move subsystem of the object model</param>
+    /// <param name="geometry">The machine's geometry</param>
+    /// <param name="numAxes">Number of axes that can be planned for</param>
+    /// <param name="axis">The axis</param>
+    /// <param name="stepsPerMm">Microsteps per mm, by logical drive</param>
+    /// <param name="feedRateMmPerSec">How fast the move will run</param>
+    /// <returns>The drivers</returns>
+    /// <remarks>
+    /// Which drivers to watch is the geometry's answer, not the axis': stopping on a CoreXY's X stall
+    /// means watching both motors, because moving X turns both. The speed is per drive rather than
+    /// per axis because a coupled machine need not have the same steps per mm on each of them.
+    ///
+    /// A probing move needs the same list for the same reason, so this is shared rather than being a
+    /// step of building a plan
+    /// </remarks>
+    public static IReadOnlyList<WatchedDriver> DriversMoving(Move move, KinematicsEngine geometry, int numAxes,
+                                                             int axis, IReadOnlyList<float> stepsPerMm,
+                                                             float feedRateMmPerSec)
+    {
         List<WatchedDriver> drivers = [];
         uint drives = geometry.GetControllingDrives(axis);
         for (int drive = 0; drive < numAxes && drive < move.Axes.Count && drive < stepsPerMm.Count; drive++)

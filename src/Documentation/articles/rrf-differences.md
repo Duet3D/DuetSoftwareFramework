@@ -136,6 +136,31 @@ Two differences fall out of having named the group:
   are refused here, naming the drive they collide on, because a drive carries one watch and the
   second axis could never reach its endstop in that move.
 
+### 2.2 A motor-stall Z probe works, which RepRapFirmware's does not
+
+`M558 P10` probes by driving Z into the bed until its motors stall. In RepRapFirmware the probe
+object is a stub — no port, `SetProbing` returns `true` — and the detection lives in
+`ZProbe::GetReading`, which for `zMotorStall` reads
+`GetAxisDriversConfig(Z_AXIS).GetLocalDriversBitmap()`. That bitmap is filtered to `IsLocal()`
+drivers, and nothing anywhere arms a *remote* stall endstop for a probe. So on a machine whose
+drivers are all on CAN boards — which is every machine here — RepRapFirmware's motor stall probe
+reads an empty bitmap and can never trigger.
+
+Rather than port a feature that cannot fire, the probing move arms the drivers, exactly as a
+stall-homed axis does: `StallArming` tells each driver that moves Z what speed to expect before the
+tap and releases it afterwards, the move watches the board-wide stall handle with an action of
+`all`, and the drivers to arm come from the same `EndstopPlanner.DriversMoving` a stall-homed axis
+uses — so on a CoreXZ or a delta the probe watches every motor that brings Z down, not only the one
+called Z.
+
+Two consequences are worth knowing. The speed is per tap, because it is what the driver compares the
+back-EMF against and `M558 F` may give the taps different speeds. And "was the probe triggered?" is
+answered from `MovementState.EndstopsTriggered` rather than from `sensors.probes[].value`: nothing
+writes a reading for a stall, because it is not an input on a pin. The latch is cleared before each
+tap so it can only describe that one, and the "already triggered before the move started" check is
+skipped, since a stall is a judgement about a move that is running and there is nothing for it to be
+already triggered by.
+
 ---
 
 ## 3. The object model has to be able to recreate the machine
