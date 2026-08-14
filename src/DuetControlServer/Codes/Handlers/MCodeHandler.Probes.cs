@@ -31,16 +31,6 @@ namespace DuetControlServer.Codes.Handlers;
 internal partial class MCodeHandler
 {
     /// <summary>
-    /// Shortest interval in ms between a probe reporting twice while it is being used
-    /// </summary>
-    /// <remarks>
-    /// RepRapFirmware's <c>RemoteZProbe::ActiveProbeReportInterval</c>. A probe is left at the active
-    /// interval here rather than being slowed down between probes: the interval is only lowered while
-    /// probing to save bus traffic, and nothing in the object model depends on the difference
-    /// </remarks>
-    private const ushort ProbeReportInterval = 2;
-
-    /// <summary>
     /// Most times M558 A may ask for a point to be probed, as in RepRapFirmware's <c>MaxTapsLimit</c>
     /// </summary>
     private const int MaxProbeTaps = 31;
@@ -309,7 +299,12 @@ internal partial class MCodeHandler
         {
             Handle = RemoteProbes.HandleFor(probeNumber),
             Threshold = threshold,
-            MinInterval = ProbeReportInterval
+
+            // Created idle, and raised to the probing rate by ProbeArming for the duration of a tap.
+            // RepRapFirmware creates at the probing rate and only slows the probe down once it has
+            // finished probing for the first time, which leaves a configured but unused probe
+            // reporting every change it sees
+            MinInterval = (ushort)Motion.ProbeArming.InactiveReportInterval
         };
         CanText.SetString(message.PinName, localPort);
 

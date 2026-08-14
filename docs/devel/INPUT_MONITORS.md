@@ -328,19 +328,33 @@ does not claim more than is true.
 
 No behaviour changes.
 
-### Phase 2 - tell a probe when it is probing ⬜
+### Phase 2 - tell a probe when it is probing ✅
 
-A start/stop seam on the probing path that sends `actionChangeThreshold` (analog types only) and
-`actionChangeMinInterval`, with an active and an inactive interval matching RRF's 2 ms and 25 ms.
+[ProbeArming](src/DuetControlServer/Motion/ProbeArming.cs) sends `actionChangeThreshold` (analog
+types only) and `actionChangeMinInterval`, from the same `try`/`finally` around a tap that the stall
+arming already used - so a probe is put back however the tap ended, for the same reason a driver is.
 
-Tested by: the message is built from the object model, so this is testable without a board. That an
-analog probe with a port produces both messages; that a digital probe produces only the interval;
-that a motor-stall probe, a probe of type none, and a probe with no port produce neither; and that
-the inactive interval is restored when the probing move ends however it ended.
+What it sends is captured under the object model lock as a `ProbeMonitor` and sent outside it. A live
+`Probe` read outside the lock could be reconfigured half way through, and sending is a CAN round trip.
+`RemoteProbes.TryGetMonitoredBoard` is now the single answer to "does this probe have a monitor at
+all", shared with `TryGetStopInput`, so nothing can be sent to a handle that was never created.
 
-`ProbeReportInterval` becomes two constants, and the article's note about probe report latency needs
-re-checking against the inactive value - a probe that is not probing will now report more slowly,
-which is what RRF does, but the article currently describes the 2 ms figure without qualification.
+Failing to arm throws and fails the tap; failing to disarm is logged. A probe left fast costs bus
+traffic, which is where DSF already was, so it is not worth failing a probe that has already run.
+
+**One deliberate departure from the reference.** RRF creates the monitor at
+`ActiveProbeReportInterval` and only slows it down when its first probing operation *ends*, so a
+configured but unused probe reports every change it sees. DSF creates at the inactive interval
+instead. It is the state RRF reaches anyway, reached immediately, and creating fast would leave §2.2
+half unfixed for exactly the machines that configure a probe and do not use it.
+
+Tested by [ProbeArmingTests](src/UnitTests/Motion/ProbeArmingTests.cs): an analog and a scanning probe
+carry the threshold the object model holds now, a digital probe carries none, the board is the one
+named by the port, a negative threshold does not become a huge unsigned one, and none of a stall
+probe, a probe of type none, a probe with no port, or one with a blank port is armed at all.
+
+The endstops article gained the probe half of its `minInterval` note, which previously described only
+the endstop case.
 
 ### Phase 3 - delete abandoned monitors ⬜
 

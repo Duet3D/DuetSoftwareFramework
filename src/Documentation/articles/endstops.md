@@ -95,6 +95,13 @@ here is a missed stop.
 the move would run its full length with nothing to stop it. The failure is silent and looks like a
 dead switch, so `M574` refuses rather than accepting a port it could not register.
 
+A **Z probe** is registered the same way by `M558`, but with an interval that is not zero and does
+not stay the same. An analog probe sitting near its threshold changes reading constantly, and a
+report per change costs bus a move is sharing, so the monitor is created at 25 ms and raised to 2 ms
+by [ProbeArming](src/DuetControlServer/Motion/ProbeArming.cs) for the duration of a tap. The same
+message carries the trigger threshold, which is why `G31 P` needs no CAN message of its own: the
+board is given whatever the object model holds when probing starts.
+
 **Duet3Expansion** creates an `InputMonitor` bound to the pin and starts watching it. From here the
 board owns the pin; nothing upstream reads it again.
 
