@@ -14,12 +14,15 @@
 
 #  include "CanInterface.h"
 #  include <Platform/Platform.h>
+#  include <Platform/RepRap.h>
 
 #  if HAS_SBC_INTERFACE
 #    include <SBC/SbcMessageFormats.h>
 #  endif
 
 #  include <General/FreelistManager.h>
+
+#  include <array>
 
 struct PrepParams
 {
@@ -408,7 +411,7 @@ namespace CanMotion
 	// SbcProtocol::DriverStopWatch rather than a struct of our own, because the rule that matches a
 	// trigger against these is shared with the host-side tests. Holding the tested type as our own
 	// state is what stops the two drifting; see DuetSpiProtocol/StopRules.h
-	static SbcProtocol::DriverStopWatch endstopWatches[SbcProtocol::MaxScheduleMoveDrivers];
+	static std::array<SbcProtocol::DriverStopWatch, SbcProtocol::MaxMoveDrivers> endstopWatches;
 	static size_t numEndstopWatches = 0;
 
 } // namespace CanMotion
@@ -481,12 +484,28 @@ void CanMotion::ScheduleFromSbc(const SbcProtocol::ScheduleMoveHeader& header,
 			AddAxisMovement(params, driver, d.steps);
 		}
 
-		// Record what stops this driver, if anything. Only an endstop move carries these
-		if (d.stopOnBoard != SbcProtocol::NoEndstopBoard && numEndstopWatches < ARRAY_SIZE(endstopWatches))
+		// Record what stops this driver, if anything. Only an endstop move carries these.
+		//
+		// The array is sized for a whole move rather than a packet, because the count is only reset
+		// when a new move starts. Dropping a watch is not a small loss: that driver is then stopped
+		// by nothing and runs to the end of its commanded travel, so it is reported rather than
+		// quietly skipped
+		if (d.stopOnBoard != SbcProtocol::NoEndstopBoard)
 		{
-			endstopWatches[numEndstopWatches] = { d.boardAddress, d.driverNumber, d.stopOnBoard, d.stopOnHandle,
-												  d.stopGroup,   d.stopAction,   true };
-			++numEndstopWatches;
+			if (numEndstopWatches < endstopWatches.size())
+			{
+				endstopWatches[numEndstopWatches] = { d.boardAddress, d.driverNumber, d.stopOnBoard, d.stopOnHandle,
+													  d.stopGroup,   d.stopAction,   true };
+				++numEndstopWatches;
+			}
+			else
+			{
+				reprap.GetPlatform().MessageF(ErrorMessage,
+											  "move %" PRIu32 ": driver %u.%u will not be stopped by its endstop, "
+											  "because this move watches more than %u drivers\n",
+											  header.moveId, d.boardAddress, d.driverNumber,
+											  (unsigned int)endstopWatches.size());
+			}
 		}
 	}
 
@@ -571,7 +590,7 @@ size_t CanMotion::StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHan
 	// Which watch this trigger matched and what that watch stops - itself, its whole drive, or the
 	// whole move. Both are decided by DuetSpiProtocol/StopRules.h, which is where this rule can be
 	// tested; everything below is the acting on it
-	const std::span<const SbcProtocol::DriverStopWatch> watches{ endstopWatches, numEndstopWatches };
+	const std::span<const SbcProtocol::DriverStopWatch> watches{ endstopWatches.data(), numEndstopWatches };
 	const SbcProtocol::StopDecision decision =
 		SbcProtocol::DecideStop(watches, inputBoard, inputHandle, reading);
 	if (decision.action == SbcProtocol::StopAction::none)

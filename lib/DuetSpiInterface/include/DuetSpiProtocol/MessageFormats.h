@@ -250,6 +250,12 @@ struct ScheduleMoveDriver {
 // simply take another packet.
 inline constexpr size_t MaxScheduleMoveDrivers = 32;
 
+// Most drivers one whole move may carry, across all of its packets: every logical drive of the
+// machine moving, each with a full complement of drivers. This is what anything accumulating per
+// move has to be sized by - MaxScheduleMoveDrivers bounds a packet, and a move split across several
+// of them can carry many times that.
+inline constexpr size_t MaxMoveDrivers = 32 * 8;
+
 // Bits of SendCanMessageHeader::flags
 namespace SendCanMessageFlags {
 inline constexpr uint8_t IsResponse = 1u << 0;
