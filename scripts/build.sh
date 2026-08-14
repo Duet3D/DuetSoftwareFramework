@@ -68,7 +68,8 @@ Options:
       --fetch-sysroot  Fetch a sysroot from the deploy target and build against it
       --aot            Build ahead of time binaries. Defaults to "false"
       --arch           Architecture to build for. Defaults to "$ARCH"
-      --build-type     Defaults to "Debug"
+      --build-type     Defaults to "Debug". Also selects the CMake preset libduet_sbc.so
+                       is built with, so Debug builds it unoptimised and steppable
   -p, --publish-args   msbuild properties
   -o, --dest-dir       Defaults to "$DEFAULT_BUILD_DIR unless --aot then "$DEFAULT_AOT_BUILD_DIR/<arch>/" 
   -h, --help           Show this help
@@ -112,6 +113,7 @@ while [[ $# -gt 0 ]]; do
         --fetch-sysroot) FETCH_SYSROOT=true; shift ;;
         --aot)        AOT=true;       shift ;;
         --arch)       ARCH="$2";      shift 2 ;;
+        --build-type) BUILD_TYPE="$2"; shift 2 ;;
         -o|--dest-dir) BUILD_DIR="$2"; shift 2 ;;
         -p|--publish-args)    PUBLISH_ARGS="$2"; shift 2 ;;
         -h|--help)    usage; exit 0           ;;
@@ -229,6 +231,14 @@ build_sbc_interface() {
             preset="$cross_preset"
             echo "    Cross-compiling against the container's $cross_preset libraries (glibc 2.36)"
         fi
+    fi
+
+    # An optimised .so is not steppable: the debugger loses locals and reorders lines. Every preset
+    # has a -debug twin that differs only in CMAKE_BUILD_TYPE, so --build-type picks the same
+    # configuration for the native library as it already does for the managed assemblies.
+    if [[ "${BUILD_TYPE,,}" == "debug" ]]; then
+        preset="$preset-debug"
+        echo "    Build type is $BUILD_TYPE; using the unoptimised preset"
     fi
 
     local build_dir="$SBC_SRC_DIR/build/$preset"

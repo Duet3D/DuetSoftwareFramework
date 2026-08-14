@@ -86,6 +86,18 @@
       "displayName": "Cross-compile for aarch64 against a Pi sysroot, unoptimised with full debug info",
       "description": "As arm64-sysroot, for targeting an older glibc than the container's. Requires pi-sysroot/ as arm64-sysroot does.",
       "inherits": ["debug", "arm64-sysroot"]
+    },
+    {
+      "name": "armhf-debug",
+      "displayName": "Cross-compile for 32-bit armhf, unoptimised with full debug info",
+      "description": "As armhf. Every deployable preset has a -debug twin so that scripts/build.sh --build-type Debug can pick one whatever the architecture.",
+      "inherits": ["debug", "armhf"]
+    },
+    {
+      "name": "armhf-sysroot-debug",
+      "displayName": "Cross-compile for 32-bit armhf against a Pi sysroot, unoptimised with full debug info",
+      "description": "As armhf-sysroot, for targeting an older glibc than the container's. Requires pi-sysroot/ as armhf-sysroot does.",
+      "inherits": ["debug", "armhf-sysroot"]
     }
   ],
   "buildPresets": [
@@ -96,6 +108,8 @@
     { "name": "armhf-sysroot", "configurePreset": "armhf-sysroot" },
     { "name": "native-debug", "configurePreset": "native-debug" },
     { "name": "arm64-debug", "configurePreset": "arm64-debug" },
-    { "name": "arm64-sysroot-debug", "configurePreset": "arm64-sysroot-debug" }
+    { "name": "arm64-sysroot-debug", "configurePreset": "arm64-sysroot-debug" },
+    { "name": "armhf-debug", "configurePreset": "armhf-debug" },
+    { "name": "armhf-sysroot-debug", "configurePreset": "armhf-sysroot-debug" }
   ]
 }
