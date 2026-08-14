@@ -215,6 +215,18 @@ every homing move to learn something DSF already knows.
 This is the piece most likely to be mistaken for an unfinished port, because
 `SwitchEndstopKind.PrepareAsync` is empty and reads like a to-do.
 
+**One thing the round trip gives RepRapFirmware that DSF does not get, and it is not deliberate.** A
+board that reset mid-job has forgotten its monitors. RRF finds out at the start of the next homing
+move, because priming the axis fails and throws; DSF finds out never - the endstop simply stops
+reporting, and the first anyone knows is a move that runs its full length. DSF raises
+`expansion_reconnect` when a board re-announces while already `Running`
+([ExpansionBoardManager.cs#L268](src/DuetControlServer/Link/Expansion/ExpansionBoardManager.cs#L268)),
+so `expansion-reconnect.g` is where a machine recovers, but nothing re-creates the monitors on its own
+and nothing fails if the macro does not. RRF has that same event *and* the safety net.
+
+That is a gap, and a worse one than §2 or §3, because it is silent. It is §7's open question rather
+than a phase, because the two candidate shapes differ in more than effort - see below.
+
 **Action: document it in [rrf-differences.md](src/Documentation/articles/rrf-differences.md)** as a
 deliberate departure, in the same form as §2.2's motor-stall Z probe, and give
 `SwitchEndstopKind.PrepareAsync` a line saying there is nothing to prepare and why - so the empty
@@ -224,6 +236,28 @@ method reads as finished rather than pending.
 `PrimeAxis` as "simply absent, with nothing to notice it is missing". That was the right reading of
 the code at the time and is the wrong conclusion; it should say the switch half is deliberately not
 ported, and point at the article.
+
+---
+
+### 4.1 Open question: what should notice a board that lost its monitors
+
+Two shapes, and the choice is not obvious enough to make silently.
+
+**Port `PrimeAxis`'s round trip.** `SwitchEndstopKind.PrepareAsync` sends `actionDoMonitor` per
+remote switch and throws if a board does not know the handle, exactly as RRF does. Faithful, and it
+fails at the moment it matters - the start of a homing move. Costs a CAN round trip per switch per
+homing move, and covers endstops only: a probe whose board reset is still silent, because probing does
+not prime.
+
+**Re-create monitors when a board announces itself.** `ApplyAnnouncementAsync` already knows a board
+re-announced while it thought it was running. Re-sending the `CreateInputMonitor` for every endstop
+and probe on that board would restore them without a per-move cost and would cover probes as well as
+endstops. Not what RRF does, and it recovers rather than reports: a board silently losing and
+regaining its monitors mid-job is arguably something the user should be told about, not something
+papered over.
+
+They are not exclusive - the announcement path is the recovery and the prime is the check - and the
+honest answer may be both. Deferred rather than guessed.
 
 ---
 
@@ -273,6 +307,7 @@ same commit that does it; `git log --grep` finds them.
 | 2 | Tell a probe when it is probing (§2) | ⬜ |
 | 3 | Delete abandoned monitors (§3) | ⬜ |
 | 4 | Clear a held input when its monitor goes (§3) | ⬜ |
+| - | A board that lost its monitors (§4.1) | ❓ open question, not planned |
 
 Phase 1 first because it changes no behaviour and settles what the empty `PrepareAsync` means, which
 is the question that produced this plan.
@@ -280,10 +315,16 @@ is the question that produced this plan.
 Phases 3 and 4 are separate commits but must land together: Phase 3 introduces the case Phase 4
 handles, and Phase 3 alone would make a re-created endstop stop its first move.
 
-### Phase 1 - document the divergences ⬜
+### Phase 1 - document the divergences ✅
 
-`rrf-differences.md` gains a section on continuously monitored inputs covering §4 and §5, §4.5 of
-`STALL_DETECTION.md` is corrected, and `SwitchEndstopKind.PrepareAsync` says why it is empty.
+`rrf-differences.md` gained §2.3, on endstop state being kept current rather than fetched per move,
+covering §4 and §5 here. §4.5 of `STALL_DETECTION.md` said the switch half of `PrimeAxis` was "simply
+absent, with nothing to notice it is missing"; it now says the empty `PrepareAsync` is deliberate and
+points at both. The `SwitchEndstopKind` comment says the same in the place someone reading the empty
+method will be.
+
+§2.3 also records the one thing the round trip buys that DSF does not get, per §4.1, so the article
+does not claim more than is true.
 
 No behaviour changes.
 

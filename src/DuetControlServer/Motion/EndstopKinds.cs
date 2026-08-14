@@ -156,12 +156,14 @@ internal static class EndstopKinds
 /// A switch on an input pin, which is almost every endstop
 /// </summary>
 /// <remarks>
-/// Nothing is sent per move. The board was asked to watch the pin by <c>M574</c> and has reported
-/// every change since, so the move only has to name the handle.
+/// Nothing is sent per move, and nothing should be. The board was asked to watch the pin by
+/// <c>M574</c> and has reported every change since, so the move only has to name the handle.
 ///
-/// RepRapFirmware's <c>SwitchEndstop::PrimeAxis</c> does more than this: it re-enables each remote
-/// handle and re-reads its state every move, which is what makes a board that reset mid-job fail
-/// loudly instead of silently never reporting again. That belongs in <see cref="PrepareAsync"/>
+/// RepRapFirmware's <c>SwitchEndstop::PrimeAxis</c> opens every homing move with a CAN round trip
+/// per switch, to refresh a cached level. There is no such cache here: the reports maintain
+/// <c>sensors.endstops[].triggered</c> continuously, because <c>M119</c> and the already-closed
+/// check read it at moments no move chose. Fetching it per move would add latency to learn something
+/// already known - see §2.3 of the design differences article
 /// </remarks>
 internal sealed class SwitchEndstopKind : IEndstopKind
 {

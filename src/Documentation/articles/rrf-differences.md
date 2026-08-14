@@ -161,6 +161,36 @@ tap so it can only describe that one, and the "already triggered before the move
 skipped, since a stall is a judgement about a move that is running and there is nothing for it to be
 already triggered by.
 
+### 2.3 An endstop's state is kept current, not fetched per move
+
+`SwitchEndstop::PrimeAxis` begins every homing move with a CAN round trip per remote switch. The
+message is `CanMessageChangeInputMonitorV1` with `actionDoMonitor`, but re-enabling is incidental —
+nothing in RepRapFirmware ever disables a handle. What the call is for is its out parameter, which
+refreshes `states[i]`, the endstop's cached level, before the move consults it.
+
+DSF has no such cache to refresh. Every board reports an input when it changes, DCS applies those
+reports to `sensors.endstops[].triggered` as they arrive, and three things read that value at moments
+no move chose: `M119`, the check that refuses to drive an axis into a switch that is already closed,
+and the levels DuetCANMaster holds so that a move armed on an input that closed while the move was in
+flight is stopped before it starts.
+
+The same difference explains the other direction. `SwitchEndstop::AppendDetails` asks each board what
+its pin is called — `actionReturnPinName` — every time `M119` is rendered, and two of RepRapFirmware's
+three callers of that action actually want the current level it also returns. DSF answers both from
+memory: the pin name is the string that was given to `M574`, and the level is already live.
+
+RepRapFirmware can afford to fetch on demand because its endstops are evaluated in the step interrupt
+on the board that owns them. Here the answer crosses CAN and then SPI before anything reads it, so it
+is kept current instead, and a per-move round trip per switch would add latency to the start of every
+homing move to learn something DSF already knows.
+
+One thing RepRapFirmware gets from that round trip which DSF does not: a board that reset mid-job has
+forgotten its monitors, and priming the axis fails loudly instead of the endstop silently never
+reporting again. DSF raises `expansion_reconnect` when a board re-announces, so `expansion-reconnect.g`
+is where a machine recovers, but nothing re-creates the monitors on its own and nothing fails if the
+macro does not. That is a gap rather than a difference — see
+[INPUT_MONITORS.md](https://github.com/Duet3D/DuetSoftwareFramework/blob/master/docs/devel/INPUT_MONITORS.md).
+
 ---
 
 ## 3. The object model has to be able to recreate the machine

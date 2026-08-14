@@ -162,11 +162,11 @@ RepRapFirmware has one seam - `Endstop::PrimeAxis`, virtual, and both subclasses
 it. So that was a divergence from the reference rather than a port of it, and it was not free: §4.4 is
 precisely what the split produced. "Which drivers does this axis' stall endstop watch" was worked out
 twice, once for the boards and once for the move, from the object model at two different moments,
-with nothing comparing the answers. The same shape is what leaves the switch half of `PrimeAxis` -
-re-enabling a remote handle and re-reading its state per move - simply absent, with nothing to notice
-it is missing; that is now an unimplemented `PrepareAsync` on
-[SwitchEndstopKind](src/DuetControlServer/Motion/EndstopKinds.cs) rather than a code path nobody
-thought to add.
+with nothing comparing the answers. The seam also gives the switch half of `PrimeAxis` somewhere to be
+judged rather than merely be absent: `PrepareAsync` on
+[SwitchEndstopKind](src/DuetControlServer/Motion/EndstopKinds.cs) is empty *deliberately*, because
+what RepRapFirmware primes is a cached level that DSF maintains continuously - see §2.3 of the design
+differences article and [INPUT_MONITORS.md §4](INPUT_MONITORS.md).
 
 §5.4 was the fix and Phase 1 did it, before anything else touched either site.
 
