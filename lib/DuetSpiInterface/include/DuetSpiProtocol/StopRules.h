@@ -31,6 +31,7 @@ namespace duet::spi::protocol {
 // A RemoteInputHandle as CANlib packs it: minor in bits 0-5, major in bits 6-11, type in bits 12-15.
 inline constexpr uint16_t kHandleTypeShift = 12;
 inline constexpr uint16_t kHandleTypeEndstop = 1;       // RemoteInputHandle::typeEndstop
+inline constexpr uint16_t kHandleTypeZProbe = 3;        // RemoteInputHandle::typeZprobe
 inline constexpr uint16_t kHandleTypeStallEndstop = 5;  // RemoteInputHandle::typeStallEndstop
 
 [[nodiscard]] constexpr uint16_t HandleType(uint16_t handle) noexcept
@@ -175,6 +176,68 @@ struct StopDecision
     default:
         return false;
     }
+}
+
+// An input a board has reported active and has not since reported inactive.
+struct ActiveInput
+{
+    uint8_t board;
+    uint16_t handle;
+};
+
+// Record the level an input was last reported at, returning the new number of active inputs.
+//
+// A board reports an input when it *changes*, so an input that goes active while a move is on its
+// way to the controller is reported to nobody who can act on it: no watch for that move exists yet,
+// and the input will not change again. Holding the level is what lets that move still be stopped.
+// RepRapFirmware has no such window because its step interrupt reads endstop state before every step.
+//
+// Only the two kinds a move can be stopped by are held, rather than everything that is not a stall.
+// A general purpose input or an ATE input can go active for reasons that have nothing to do with
+// motion, and holding those would let them crowd out the endstop the next move needs.
+//
+// A stall is one of the excluded kinds for a reason of its own: it says a driver failed to keep up
+// with the move that was running, which describes that move rather than a level the input can be
+// found at, so holding one would stop the next move armed on the same handle before it had turned a
+// step.
+//
+// An input that does not fit is not recorded. That leaves the window open for it but cannot invent a
+// stop, because clearing an input that was never recorded does nothing.
+[[nodiscard]] constexpr bool CanStopAMove(uint16_t handle) noexcept
+{
+    const uint16_t type = HandleType(handle);
+    return type == kHandleTypeEndstop || type == kHandleTypeZProbe;
+}
+
+[[nodiscard]] constexpr size_t NoteInputState(std::span<ActiveInput> inputs, size_t count, uint8_t board,
+                                              uint16_t handle, bool active) noexcept
+{
+    if (!CanStopAMove(handle))
+    {
+        return count;
+    }
+
+    for (size_t i = 0; i < count; ++i)
+    {
+        if (inputs[i].board == board && inputs[i].handle == handle)
+        {
+            if (active)
+            {
+                return count;
+            }
+
+            // Order is not meaningful, so the last entry fills the hole
+            inputs[i] = inputs[count - 1];
+            return count - 1;
+        }
+    }
+
+    if (active && count < inputs.size())
+    {
+        inputs[count] = { board, handle };
+        return count + 1;
+    }
+    return count;
 }
 
 }  // namespace duet::spi::protocol

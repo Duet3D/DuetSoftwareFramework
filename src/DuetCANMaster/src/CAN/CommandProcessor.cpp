@@ -177,10 +177,14 @@ static void HandleInputStateChanged(CanMessageBuffer& buf, CanMessageType id) no
 		const CanMessageInputChangedV2& msg = buf.msg.inputChangedV2;
 		for (unsigned int i = 0; i < msg.numHandles && i < ARRAY_SIZE(msg.results); ++i)
 		{
-			// Bit i of states is the level of the i'th handle. Only a handle that went active stops
-			// anything; a release is just as much a change, and stopping on one would end the move
-			// the moment the axis backed off the endstop
-			if ((msg.states & (1u << i)) == 0)
+			// Bit i of states is the level of the i'th handle. Remembered whichever way it went, so
+			// that a move armed on an input that is already active is stopped before it starts
+			const bool active = (msg.states & (1u << i)) != 0;
+			CanMotion::NoteInputState(src, msg.results[i].handle.asU16(), active);
+
+			// Only a handle that went active stops anything; a release is just as much a change, and
+			// stopping on one would end the move the moment the axis backed off the endstop
+			if (!active)
 			{
 				continue;
 			}
@@ -203,7 +207,9 @@ static void HandleInputStateChanged(CanMessageBuffer& buf, CanMessageType id) no
 		const CanMessageInputChangedV1& msg = buf.msg.inputChangedV1;
 		for (unsigned int i = 0; i < msg.numHandles && i < ARRAY_SIZE(msg.results); ++i)
 		{
-			if ((msg.states & (1u << i)) == 0)
+			const bool active = (msg.states & (1u << i)) != 0;
+			CanMotion::NoteInputState(src, msg.results[i].handle.asU16(), active);
+			if (!active)
 			{
 				continue;
 			}

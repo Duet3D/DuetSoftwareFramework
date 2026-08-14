@@ -16,12 +16,15 @@
 
 #include <span>
 
+using duet::spi::protocol::ActiveInput;
 using duet::spi::protocol::DriverStopWatch;
 using duet::spi::protocol::HandleType;
 using duet::spi::protocol::IsStallHandle;
 using duet::spi::protocol::kHandleTypeEndstop;
 using duet::spi::protocol::kHandleTypeStallEndstop;
+using duet::spi::protocol::kHandleTypeZProbe;
 using duet::spi::protocol::kMaxDriversPerBoard;
+using duet::spi::protocol::NoteInputState;
 using duet::spi::protocol::StopAction;
 using duet::spi::protocol::StopDecision;
 using duet::spi::protocol::StopsDriver;
@@ -36,7 +39,23 @@ namespace
 	// The one handle every board reports every stalled driver under
 	constexpr uint16_t stallHandle = kHandleTypeStallEndstop << 12;
 
+	// A probe, which a move can be stopped by, and a general purpose input, which it cannot
+	constexpr uint16_t probeHandle = kHandleTypeZProbe << 12;
+	constexpr uint16_t gpInHandle = 2u << 12;
+
 	constexpr uint32_t Stalled(uint8_t driver) noexcept { return static_cast<uint32_t>(1) << driver; }
+
+	bool Held(std::span<const ActiveInput> inputs, size_t count, uint8_t board, uint16_t handle) noexcept
+	{
+		for (size_t i = 0; i < count; ++i)
+		{
+			if (inputs[i].board == board && inputs[i].handle == handle)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
 }
 
 void TestHandleTypes() noexcept
@@ -241,6 +260,71 @@ void TestAnUnwatchedTriggerStopsNothing() noexcept
 	CHECK(DecideStop({}, 3, stallHandle, Stalled(0)).action == StopAction::none, "or no move at all");
 }
 
+// A board reports an input when it changes, so an input that goes active while a move is on its way
+// to the controller is reported before there is any watch to match it against. Holding the level is
+// what lets that move still be stopped rather than driving into a closed switch
+void TestAnInputIsHeldFromWhenItGoesActiveUntilItGoesInactive() noexcept
+{
+	ActiveInput inputs[4];
+	const std::span all{ inputs };
+
+	size_t count = NoteInputState(all, 0, 3, switchHandle, true);
+	CHECK(count == 1, "an input that went active is held");
+
+	count = NoteInputState(all, count, 3, switchHandle, true);
+	CHECK(count == 1, "and reporting it again does not hold it twice");
+
+	count = NoteInputState(all, count, 3, switchHandle, false);
+	CHECK(count == 0, "until it goes inactive");
+}
+
+void TestInputsAreToldApartByBoardAndHandle() noexcept
+{
+	ActiveInput inputs[4];
+	const std::span all{ inputs };
+
+	size_t count = NoteInputState(all, 0, 3, switchHandle, true);
+	count = NoteInputState(all, count, 4, switchHandle, true);
+	count = NoteInputState(all, count, 3, switchHandle + 1, true);
+	CHECK(count == 3, "the same handle on another board is another input");
+
+	// Clearing takes the last entry to fill the hole, so the one cleared has to be the one that goes
+	count = NoteInputState(all, count, 4, switchHandle, false);
+	CHECK(count == 2, "and clearing one clears only it");
+	CHECK(Held(all, count, 3, switchHandle) && Held(all, count, 3, switchHandle + 1), "leaving the others");
+}
+
+// Only what a move can be stopped by is held. A stall is excluded for a reason of its own: it says a
+// driver failed to keep up with the move that was running, not a level the input can be found at,
+// and held it would stop the next move armed on the same handle before it turned a step
+void TestOnlyWhatCanStopAMoveIsHeld() noexcept
+{
+	ActiveInput inputs[4];
+	const std::span all{ inputs };
+
+	CHECK(NoteInputState(all, 0, 3, switchHandle, true) == 1, "a switch is held");
+	CHECK(NoteInputState(all, 0, 3, probeHandle, true) == 1, "so is a probe");
+	CHECK(NoteInputState(all, 0, 3, stallHandle, true) == 0, "a stall is not a level");
+	CHECK(NoteInputState(all, 0, 3, gpInHandle, true) == 0,
+		  "and an input no move watches would only crowd out one it does");
+}
+
+// Losing an input leaves the window open for it, which is what there was before any of this. What
+// must not happen is the reverse: an input held that nothing can clear would stop every later move
+void TestAnInputThatDoesNotFitIsSimplyNotHeld() noexcept
+{
+	ActiveInput inputs[2];
+	const std::span all{ inputs };
+
+	size_t count = NoteInputState(all, 0, 3, switchHandle, true);
+	count = NoteInputState(all, count, 3, switchHandle + 1, true);
+	count = NoteInputState(all, count, 3, switchHandle + 2, true);
+	CHECK(count == 2, "the third does not fit");
+
+	count = NoteInputState(all, count, 3, switchHandle + 2, false);
+	CHECK(count == 2, "and clearing one that was never held changes nothing");
+}
+
 int main()
 {
 	std::printf("Stop rules:\n");
@@ -256,5 +340,9 @@ int main()
 	TestAStoppedDriverIsNotStoppedAgain();
 	TestNoGroupDoesNotStopEveryOtherUngroupedDriver();
 	TestAnUnwatchedTriggerStopsNothing();
+	TestAnInputIsHeldFromWhenItGoesActiveUntilItGoesInactive();
+	TestInputsAreToldApartByBoardAndHandle();
+	TestOnlyWhatCanStopAMoveIsHeld();
+	TestAnInputThatDoesNotFitIsSimplyNotHeld();
 	return TestSupport::Summarise("Stop rules");
 }

@@ -73,6 +73,11 @@ namespace CanMotion
 	size_t StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHandle, uint32_t reading,
 									std::span<duet::spi::protocol::MotionStoppedDriver> stopped,
 									uint32_t& moveId) noexcept;
+
+	// Record the level an input was last reported at, so that a move armed on one that is already
+	// active is stopped before it starts. What is held and what is not is decided by
+	// DuetSpiProtocol/StopRules.h. Called from the CAN receiver task
+	void NoteInputState(uint8_t inputBoard, uint16_t inputHandle, bool active) noexcept;
 #  endif
 
 	// These may be called from the CAN receiver task, so they can't send CAN messages directly.
@@ -81,7 +86,8 @@ namespace CanMotion
 	// endstop firing and the stop taking effect needs the position at the trigger instant, and that
 	// is worked out on the SBC, which evaluates the same motion anyway to report live positions.
 	// The SBC sends the revert itself; see FirmwareRequest::MotionStopped
-	void StopDriverWhenProvisional(DriverId driver) noexcept pre(driver.IsRemote());
+	// Returns true if the driver was found in the move being accumulated and given no steps.
+	bool StopDriverWhenProvisional(DriverId driver) noexcept pre(driver.IsRemote());
 	bool StopDriverWhenExecuting(DriverId driver) noexcept pre(driver.IsRemote());
 } // namespace CanMotion
 

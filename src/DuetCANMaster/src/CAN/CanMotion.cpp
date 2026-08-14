@@ -17,6 +17,7 @@
 #  include <Platform/RepRap.h>
 
 #  if HAS_SBC_INTERFACE
+#    include <SBC/SbcInterface.h>
 #    include <SBC/SbcMessageFormats.h>
 #  endif
 
@@ -414,7 +415,44 @@ namespace CanMotion
 	static std::array<SbcProtocol::DriverStopWatch, SbcProtocol::MaxMoveDrivers> endstopWatches;
 	static size_t numEndstopWatches = 0;
 
+	// The inputs known to be active, so that a move armed on one that is already active can be
+	// stopped before it starts.
+	//
+	// Sized like the watches above, because that is the same bound: a move names at most one input
+	// per driver it carries, so a store this size can never be short of the input a driver needs.
+	// Only the kinds a move can be stopped by are held, so nothing else can take up the room.
+	//
+	// SbcProtocol::NoteInputState decides what is held and what is not, for the same reason the
+	// watches above use SbcProtocol::DriverStopWatch: it is the shared, host-tested rule.
+	//
+	// This holds only what the boards have reported since startup. An input that was already active
+	// before the first change arrived is unknown here, which is the SBC's to answer: the reply to
+	// CanMessageCreateInputMonitor carries the level, and that is what seeds sensors.endstops[].
+	static std::array<SbcProtocol::ActiveInput, SbcProtocol::MaxMoveDrivers> activeInputs;
+	static size_t numActiveInputs = 0;
+
+	// Stop the drivers of the move being accumulated whose input is already active, filling in the
+	// move they belong to. Returns how many were stopped
+	static size_t StopDriversWatchingActiveInputs(std::span<SbcProtocol::MotionStoppedDriver> stopped,
+												 uint32_t& moveId) noexcept
+	{
+		size_t numStopped = 0;
+		for (size_t i = 0; i < numActiveInputs && numStopped < stopped.size(); ++i)
+		{
+			// Zero for the reading: only a stall names drivers in one, and a stall is never held here
+			numStopped += StopDriversWatchingInput(activeInputs[i].board, activeInputs[i].handle, 0,
+												   stopped.subspan(numStopped), moveId);
+		}
+		return numStopped;
+	}
+
 } // namespace CanMotion
+
+void CanMotion::NoteInputState(uint8_t inputBoard, uint16_t inputHandle, bool active) noexcept
+{
+	numActiveInputs = SbcProtocol::NoteInputState(std::span{activeInputs}, numActiveInputs, inputBoard, inputHandle,
+												  active);
+}
 
 void CanMotion::ScheduleFromSbc(const SbcProtocol::ScheduleMoveHeader& header,
 								std::span<const SbcProtocol::ScheduleMoveDriver> drivers) noexcept
@@ -511,10 +549,27 @@ void CanMotion::ScheduleFromSbc(const SbcProtocol::ScheduleMoveHeader& header,
 
 	if ((header.flags & ScheduleMoveFlags::LastPacket) != 0)
 	{
+		// Every driver of the move is recorded now, so an input that is already active can be applied
+		// to it. This is the only chance to: a board reports an input when it changes, so one that
+		// closed while this move was on its way here will not be reported again, and one closed
+		// before the SBC decided what to watch is already in the level it read
+		SbcProtocol::MotionStoppedDriver stopped[SbcProtocol::MaxMotionStoppedDrivers];
+		uint32_t moveId = 0;
+		const size_t numStopped = StopDriversWatchingActiveInputs(std::span{stopped}, moveId);
+
 		sbcMoveInProgress = false;
 		(void)FinishMovement(header.whenToExecute,
 							 false, // the SBC does not send a move it is only simulating
 							 (header.flags & ScheduleMoveFlags::CheckEndstops) != 0);
+
+		if (numStopped != 0)
+		{
+			// Zero for the trigger time: the input was active before the move started, so there is
+			// no overshoot to wind back and the drives are where the SBC will find them. What the
+			// report is for is the SBC learning the endstop was reached, without which the move ends
+			// as one that watched something and saw nothing
+			reprap.GetSbcInterface().ReportMotionStopped(0, moveId, std::span{stopped, numStopped});
+		}
 	}
 }
 
@@ -561,7 +616,7 @@ CanMessageBuffer* _ecv_null CanMotion::GetUrgentMessage() noexcept
 // The next 4 functions may be called from the step ISR, so they can't send CAN messages directly
 
 // Flag a CAN-connected driver as not moving when we haven't sent the movement message yet
-void CanMotion::StopDriverWhenProvisional(DriverId driver) noexcept
+bool CanMotion::StopDriverWhenProvisional(DriverId driver) noexcept
 {
 	// Search for the correct movement buffer
 	CanMessageBuffer* _ecv_null buf = movementBufferList;
@@ -571,10 +626,11 @@ void CanMotion::StopDriverWhenProvisional(DriverId driver) noexcept
 		{
 			// The move was found so set the steps to zero. We still send the message so that the drivers get enabled.
 			buf->msg.moveLinearShaped.perDrive[driver.localDriver].steps = 0;
-			break;
+			return true;
 		}
 		buf = buf->next;
 	}
+	return false;
 }
 
 #  if HAS_SBC_INTERFACE
@@ -617,9 +673,10 @@ size_t CanMotion::StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHan
 		if (sbcMoveInProgress)
 		{
 			// The move has not gone out yet, so the driver can simply be given no steps. This is the
-			// case RepRapFirmware calls an endstop already triggered at the start of the move, and
-			// it needs no correction afterwards because the drive never moved
-			StopDriverWhenProvisional(driver);
+			// case RepRapFirmware calls an endstop already triggered at the start of the move. It is
+			// still reported: the drive needs no correction because it never moved, but the SBC has
+			// no other way to learn that the axis reached its endstop
+			didStop = StopDriverWhenProvisional(driver);
 		}
 		else
 		{

@@ -93,9 +93,10 @@ So the pieces are in place and wired together. What is wrong is what happens bet
 
 ---
 
-## 4. The five defects
+## 4. The defects
 
-The first four are behavioural. The fifth is structural, and is why §4.4 happened.
+The first four are behavioural. The fifth is structural, and is why §4.4 happened. The sixth came out
+of a question asked once the rest was working, and is not specific to stalls.
 
 ### 4.1 The stalled-driver bitmap is discarded ✅ Phase 3
 
@@ -168,6 +169,23 @@ it is missing; that is now an unimplemented `PrepareAsync` on
 thought to add.
 
 §5.4 was the fix and Phase 1 did it, before anything else touched either site.
+
+### 4.6 An input that goes active while the move is in flight stops nothing ✅ Phase 9
+
+A board reports an input when it **changes**. Between the SBC reading `endstop.Triggered` to decide
+what the move watches, and the move's `ScheduleMove` packets reaching the controller, sit the queue,
+the ring's grace period and an SPI transfer - tens of milliseconds. An input that goes active in that
+window is reported to nobody who can act on it: no watch exists yet, so `StopDriversWatchingInput`
+matches nothing, and the input never changes again, so the move that follows runs to its full
+commanded length into a closed switch and is then recorded as having watched something and seen
+nothing.
+
+RepRapFirmware has no such window, because its step interrupt reads endstop **state** before every
+step rather than acting on changes.
+
+Reachable rather than likely: every `G1 H` and probing move waits for standstill before it is built,
+so it takes a hand on the axis, a sagging Z settling onto its switch, a marginal switch, or a knock
+on a probe. Phase 9 closes it.
 
 ---
 
@@ -366,6 +384,7 @@ same commit that does it; `git log --grep` finds them.
 | 6 | A group is the coupling set, not the drive | ✅ `feat: home any number of axes whose drives do not overlap` |
 | 7 | The motor-stall Z probe | ✅ `feat: probe on a motor stall over CAN` |
 | 8 | Diagnostics | ⬜ |
+| 9 | Hold the level of every input (§4.6) | ✅ `fix: stop a move armed on an input that is already active` |
 
 **Nothing is fixed on a machine until Phase 3.** Phase 1 changed no behaviour, and Phase 2 only makes
 the bitmap safe to act on. `M574 S3`/`S4` behave exactly as §4 describes until then.
@@ -620,6 +639,50 @@ drivers named, drivers not armed.
 
 `M119` reporting a stall endstop as "not stopped" unconditionally is RRF's `Stopped()` for
 `StallDetectionEndstop` unported. Worth doing here or leaving; it is a report, not a mechanism.
+
+### Phase 9 — hold the level of every input (§4.6) ✅
+
+The controller now remembers which inputs are active, and applies them to a move as it is scheduled.
+
+`SbcProtocol::NoteInputState` in
+[StopRules.h](lib/DuetSpiInterface/include/DuetSpiProtocol/StopRules.h) holds the rule, for the same
+reason `DecideStop` does: it is what the host suite can test, and holding the tested function as the
+controller's only copy is what stops the two drifting.
+[`CanMotion::NoteInputState`](src/DuetCANMaster/src/CAN/CanMotion.cpp) is a call into it from the
+one place every input change is already parsed.
+
+Only the two kinds a move can be stopped by are held - `typeEndstop` and `typeZprobe`. A general
+purpose or ATE input can go active for reasons that have nothing to do with motion, and holding those
+would let them crowd out the endstop the next move needs. A stall is excluded for a reason of its
+own: it says a driver failed to keep up with the move that was running, which describes that move
+rather than a level the input can be found at; held, it would stop the next move armed on the same
+handle before it had turned a step.
+
+That filter is what makes the store's size an argument rather than a guess. It is
+`MaxMoveDrivers`, the same bound as the watches, because a move names at most one input per driver it
+carries - so a store that size can never be short of the input a driver needs, and nothing a move
+does not watch can take up the room.
+
+On the last `ScheduleMove` packet, once every driver of the move is recorded, each held input is
+replayed through `StopDriversWatchingInput`. The move has not gone out, so this takes the branch that
+gives a driver no steps - RepRapFirmware's endstop already triggered at the start of the move.
+
+That branch now reports the driver to the SBC, which it did not before. It needs no *correction*,
+because the drive never moved, but without a report DCS never learns the axis reached its endstop:
+`RecordEndstopTriggered` is never called, the drive is never adopted, and the move ends as one that
+watched something and saw nothing. `whenTriggered` is sent as zero, which already means "correct from
+where this finds the drives" - and they are where they started.
+
+Two limits worth stating:
+
+- The controller only knows what the boards have reported **since startup**. An input already active
+  before the first change arrived is unknown to it. That case is the SBC's and is already answered:
+  the reply to `CanMessageCreateInputMonitor` carries the level, and it is what seeds
+  `sensors.endstops[]` for `EndstopArming` to read.
+- An input that does not fit the array is not held. That leaves the window open for it, which is
+  where it was before this existed, and cannot invent a stop, because clearing an input that was
+  never held does nothing. The failure is one-sided by construction, so overflow degrades rather
+  than misbehaves.
 
 ---
 
