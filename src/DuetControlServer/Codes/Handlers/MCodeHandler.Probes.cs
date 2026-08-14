@@ -112,6 +112,7 @@ internal partial class MCodeHandler
 
         string? monitorPort = null;
         string? report = null;
+        List<InputMonitors.Monitored> monitorsBefore = [], monitorsAfter = [];
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             Probe? probe = probeNumber < model.Sensors.Probes.Count ? model.Sensors.Probes[probeNumber] : null;
@@ -119,6 +120,11 @@ internal partial class MCodeHandler
             {
                 return new Message(MessageType.Error, $"Z probe {probeNumber} not found");
             }
+
+            // What a board is watching for this probe now, taken before the model is overwritten:
+            // the old port is what names the board holding it, and M558 P0 leaves no new port to
+            // work it out from afterwards
+            monitorsBefore = InputMonitors.Of(probe, probeNumber);
 
             if (seenType)
             {
@@ -139,10 +145,12 @@ internal partial class MCodeHandler
                 // Only ask the board for a monitor once the object model agrees with what is being
                 // asked for, so a rejected port leaves a probe that says what it is watching
                 monitorPort = WatchableProbePort(probe!);
+                monitorsAfter = InputMonitors.Of(probe, probeNumber);
             }
             else
             {
                 report = DescribeProbe(probeNumber, probe!);
+                monitorsAfter = monitorsBefore;         // nothing was changed, so nothing is given up
             }
         }
 
@@ -153,6 +161,10 @@ internal partial class MCodeHandler
         {
             return monitorReply;
         }
+
+        // Whatever the probe had watched for it and no longer wants. Last, so that a board that
+        // refuses to give a pin back cannot stop the probe being set up
+        await InputMonitors.ReleaseAsync(monitorsBefore, monitorsAfter, linkInterface, logger, cancellationToken);
 
         // A board that took the port but had something to say about it is reported too, since M558
         // otherwise looks like it configured exactly what was asked for

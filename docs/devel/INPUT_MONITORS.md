@@ -356,14 +356,24 @@ probe, a probe of type none, a probe with no port, or one with a blank port is a
 The endstops article gained the probe half of its `minInterval` note, which previously described only
 the endstop case.
 
-### Phase 3 - delete abandoned monitors ⬜
+### Phase 3 - delete abandoned monitors ✅
 
-Old ports captured under the model lock in both handlers, deletes sent for handles the new
-configuration will not re-create, per §3.
+[InputMonitors](src/DuetControlServer/Motion/InputMonitors.cs) answers "what is this endstop or probe
+having watched for it" from the object model, and `ReleaseAsync` sends `actionDelete` for everything
+in the before list that is not in the after list. Both handlers capture the before list under the
+model lock, before overwriting it, and release after creating - so a board that will not give a pin
+back cannot stop the endstop or probe being set up.
 
-Tested by: the five abandonment cases in §3, each asserting which handles are deleted and which are
-not; and that reconfiguring an axis to a different pin under the same handle deletes nothing, because
-`Create` already replaces it.
+A monitor is compared on `Handle.All` rather than on the handle struct: `RemoteInputHandle` is a union
+of the whole and its bitfields, and only the whole is meaningful to compare.
+
+One case the plan did not list turned out to matter, and has a test of its own: **moving an endstop to
+a different board**. The handle is unchanged, so the new create replaces nothing on the *old* board,
+which is left holding a pin for a switch that has moved. Same-board moves still delete nothing, which
+is the case `Create`'s replace-first already covers.
+
+Tested by [InputMonitorsTests](src/UnitTests/Motion/InputMonitorsTests.cs): all five abandonment cases,
+the two board-move cases, that only a switch on a pin is monitored at all, and the probe equivalents.
 
 ### Phase 4 - clear a held input when its monitor goes ⬜
 

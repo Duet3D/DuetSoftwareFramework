@@ -1972,6 +1972,7 @@ internal partial class MCodeHandler
         }
 
         List<(int Axis, EndstopPosition Position)> configured = [];
+        List<InputMonitors.Monitored> monitorsBefore = [], monitorsAfter = [];
         string? report = null;
 
         if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
@@ -2024,6 +2025,12 @@ internal partial class MCodeHandler
 
                 foreach ((int axis, EndstopPosition position) in configured)
                 {
+                    // What this axis has boards watching for it now, so that whatever the new
+                    // configuration does not want can be given back. Taken before the model is
+                    // overwritten, because the old ports are what name the boards holding them
+                    monitorsBefore.AddRange(InputMonitors.Of(
+                        axis < model.Sensors.Endstops.Count ? model.Sensors.Endstops[axis] : null, axis));
+
                     if (position == EndstopPosition.None)
                     {
                         // Removing an endstop leaves the slot empty rather than absent, so the
@@ -2042,6 +2049,12 @@ internal partial class MCodeHandler
                     {
                         endstop.Port = port;
                     }
+                }
+
+                foreach ((int axis, _) in configured)
+                {
+                    monitorsAfter.AddRange(InputMonitors.Of(
+                        axis < model.Sensors.Endstops.Count ? model.Sensors.Endstops[axis] : null, axis));
                 }
             }
         }
@@ -2062,6 +2075,10 @@ internal partial class MCodeHandler
 
             replies.Add(await CreateEndstopMonitorAsync(axis, cancellationToken));
         }
+
+        // Whatever the axis had watched for it and no longer wants. Last, so that a board that
+        // refuses to give a pin back cannot stop the endstop being set up
+        await InputMonitors.ReleaseAsync(monitorsBefore, monitorsAfter, linkInterface, logger, cancellationToken);
 
         return replies.ToMessage();
     }
