@@ -5,7 +5,10 @@
             "id": "canmaster_board",
             "type": "pickString",
             "description": "DuetCANMaster board target to build the compile database for",
-            "options": [ "Duet3_MB6HC", "Duet3_MB6XD" ],
+            "options": [
+                "Duet3_MB6HC",
+                "Duet3_MB6XD"
+            ],
             "default": "Duet3_MB6HC"
         },
         {
@@ -73,12 +76,30 @@
             "type": "pickString",
             "description": "DuetCANMaster CMake build preset",
             "options": [
-                { "label": "Duet3 MB6HC (Release)", "value": "Duet3_MB6HC" },
-                { "label": "Duet3 MB6HC (Debug)", "value": "Duet3_MB6HC-debug" },
-                { "label": "Duet3 MB6XD (Release)", "value": "Duet3_MB6XD" },
-                { "label": "Duet3 MB6XD (Debug)", "value": "Duet3_MB6XD-debug" },
-                { "label": "All boards (Release)", "value": "release" },
-                { "label": "All boards (Debug)", "value": "debug" }
+                {
+                    "label": "Duet3 MB6HC (Release)",
+                    "value": "Duet3_MB6HC"
+                },
+                {
+                    "label": "Duet3 MB6HC (Debug)",
+                    "value": "Duet3_MB6HC-debug"
+                },
+                {
+                    "label": "Duet3 MB6XD (Release)",
+                    "value": "Duet3_MB6XD"
+                },
+                {
+                    "label": "Duet3 MB6XD (Debug)",
+                    "value": "Duet3_MB6XD-debug"
+                },
+                {
+                    "label": "All boards (Release)",
+                    "value": "release"
+                },
+                {
+                    "label": "All boards (Debug)",
+                    "value": "debug"
+                }
             ],
             "default": "Duet3_MB6HC"
         },
@@ -87,17 +108,50 @@
             "type": "pickString",
             "description": "Duet3Expansion board to build for",
             "options": [
-                { "label": "EXP3HC", "value": "EXP3HC" },
-                { "label": "EXP1XD", "value": "EXP1XD" },
-                { "label": "EXP1HCL", "value": "EXP1HCL" },
-                { "label": "TOOL1LC", "value": "TOOL1LC" },
-                { "label": "SAMMYC21", "value": "SAMMYC21" },
-                { "label": "SZP", "value": "SZP" },
-                { "label": "M23CL", "value": "M23CL" },
-                { "label": "F3PTB", "value": "F3PTB" },
-                { "label": "TOOL1RR", "value": "TOOL1RR" },
-                { "label": "TOOLINDX", "value": "TOOLINDX" },
-                { "label": "All", "value": "all" }
+                {
+                    "label": "EXP3HC",
+                    "value": "EXP3HC"
+                },
+                {
+                    "label": "EXP1XD",
+                    "value": "EXP1XD"
+                },
+                {
+                    "label": "EXP1HCL",
+                    "value": "EXP1HCL"
+                },
+                {
+                    "label": "TOOL1LC",
+                    "value": "TOOL1LC"
+                },
+                {
+                    "label": "SAMMYC21",
+                    "value": "SAMMYC21"
+                },
+                {
+                    "label": "SZP",
+                    "value": "SZP"
+                },
+                {
+                    "label": "M23CL",
+                    "value": "M23CL"
+                },
+                {
+                    "label": "F3PTB",
+                    "value": "F3PTB"
+                },
+                {
+                    "label": "TOOL1RR",
+                    "value": "TOOL1RR"
+                },
+                {
+                    "label": "TOOLINDX",
+                    "value": "TOOLINDX"
+                },
+                {
+                    "label": "All",
+                    "value": "all"
+                }
             ]
         },
         {
@@ -377,12 +431,19 @@
         {
             "label": "[DSF] Build and Deploy To",
             "type": "shell",
-            "command": "./scripts/build.sh $([ '${input:dotnet_aot}' = 'Yes' ] && echo --aot) --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services ${input:project_name}",
+            "command": "./scripts/build.sh $([ '${input:dotnet_aot}' = 'Yes' ] && echo --aot) --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services ${input:project_name} && ${workspaceFolder}/.vscode/scripts/get-remote-dsf-pid.sh",
             "problemMatcher": [
                 "$msCompile"
             ],
             "runOptions": {
                 "instanceLimit": 1
+            },
+            "options": {
+                "env": {
+                    "DSF_SSH_USER": "${config:dsf.debug.sshUser}",
+                    "DSF_TARGET_IP": "${config:dsf.debug.targetIp}",
+                    "WORKSPACE_FOLDER": "${workspaceFolder}"
+                }
             }
         },
         {
@@ -399,12 +460,19 @@
         {
             "label": "[DSF] Build and Deploy DCS to",
             "type": "shell",
-            "command": "./scripts/build.sh $([ '${input:dotnet_aot}' = 'Yes' ] && echo --aot) --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services DuetControlServer",
+            "command": "./scripts/build.sh $([ '${input:dotnet_aot}' = 'Yes' ] && echo --aot) --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services DuetControlServer && ${workspaceFolder}/.vscode/scripts/get-remote-dsf-pid.sh",
             "problemMatcher": [
                 "$msCompile"
             ],
             "runOptions": {
                 "instanceLimit": 1
+            },
+            "options": {
+                "env": {
+                    "DSF_SSH_USER": "${config:dsf.debug.sshUser}",
+                    "DSF_TARGET_IP": "${config:dsf.debug.targetIp}",
+                    "WORKSPACE_FOLDER": "${workspaceFolder}"
+                }
             }
         },
         {
@@ -520,10 +588,17 @@
         {
             "label": "[DSF] Restart DSF Services",
             "type": "shell",
-            "command": "ssh root@${config:dsf.debug.targetIp} 'systemctl restart duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root'",
+            "command": "ssh root@${config:dsf.debug.targetIp} 'systemctl restart duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root' && ${workspaceFolder}/.vscode/scripts/get-remote-dsf-pid.sh",
             "problemMatcher": [],
             "runOptions": {
                 "instanceLimit": 1
+            },
+            "options": {
+                "env": {
+                    "DSF_SSH_USER": "${config:dsf.debug.sshUser}",
+                    "DSF_TARGET_IP": "${config:dsf.debug.targetIp}",
+                    "WORKSPACE_FOLDER": "${workspaceFolder}"
+                }
             }
         },
         {
@@ -563,7 +638,6 @@
                 "panel": "shared"
             }
         },
-
         // ---------------------------------------------------------------
         // DuetCANMaster firmware (src/DuetCANMaster). CMake presets live in
         // src/DuetCANMaster/CMakePresets.json; the "release"/"debug" configure
@@ -577,19 +651,31 @@
             "label": "[CANMaster] Configure - Release",
             "type": "shell",
             "command": "cmake --preset release",
-            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "options": {
+                "cwd": "${workspaceFolder}/src/DuetCANMaster"
+            },
             "problemMatcher": [],
-            "presentation": { "reveal": "silent" },
-            "runOptions": { "instanceLimit": 1 }
+            "presentation": {
+                "reveal": "silent"
+            },
+            "runOptions": {
+                "instanceLimit": 1
+            }
         },
         {
             "label": "[CANMaster] Configure - Debug",
             "type": "shell",
             "command": "cmake --preset debug",
-            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "options": {
+                "cwd": "${workspaceFolder}/src/DuetCANMaster"
+            },
             "problemMatcher": [],
-            "presentation": { "reveal": "silent" },
-            "runOptions": { "instanceLimit": 1 }
+            "presentation": {
+                "reveal": "silent"
+            },
+            "runOptions": {
+                "instanceLimit": 1
+            }
         },
         {
             // The build preset carries the board and the build type; the matching configure
@@ -597,62 +683,90 @@
             "label": "[CANMaster] Build Selected Target",
             "type": "shell",
             "command": "case '${input:canmaster_preset}' in *debug) cfg=debug;; *) cfg=release;; esac; cmake --preset $cfg && cmake --build --preset ${input:canmaster_preset} -j $(nproc)",
-            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
-            "problemMatcher": [ "$gcc" ],
+            "options": {
+                "cwd": "${workspaceFolder}/src/DuetCANMaster"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
             "group": "build"
         },
         {
             "label": "[CANMaster] Build Duet3_MB6HC - Debug",
             "type": "shell",
             "command": "cmake --build --preset Duet3_MB6HC-debug -j $(nproc)",
-            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "options": {
+                "cwd": "${workspaceFolder}/src/DuetCANMaster"
+            },
             "dependsOn": "[CANMaster] Configure - Debug",
-            "problemMatcher": [ "$gcc" ],
+            "problemMatcher": [
+                "$gcc"
+            ],
             "group": "build"
         },
         {
             "label": "[CANMaster] Build Duet3_MB6HC - Release",
             "type": "shell",
             "command": "cmake --build --preset Duet3_MB6HC -j $(nproc)",
-            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "options": {
+                "cwd": "${workspaceFolder}/src/DuetCANMaster"
+            },
             "dependsOn": "[CANMaster] Configure - Release",
-            "problemMatcher": [ "$gcc" ],
+            "problemMatcher": [
+                "$gcc"
+            ],
             "group": "build"
         },
         {
             "label": "[CANMaster] Build Duet3_MB6XD - Debug",
             "type": "shell",
             "command": "cmake --build --preset Duet3_MB6XD-debug -j $(nproc)",
-            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "options": {
+                "cwd": "${workspaceFolder}/src/DuetCANMaster"
+            },
             "dependsOn": "[CANMaster] Configure - Debug",
-            "problemMatcher": [ "$gcc" ],
+            "problemMatcher": [
+                "$gcc"
+            ],
             "group": "build"
         },
         {
             "label": "[CANMaster] Build Duet3_MB6XD - Release",
             "type": "shell",
             "command": "cmake --build --preset Duet3_MB6XD -j $(nproc)",
-            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "options": {
+                "cwd": "${workspaceFolder}/src/DuetCANMaster"
+            },
             "dependsOn": "[CANMaster] Configure - Release",
-            "problemMatcher": [ "$gcc" ],
+            "problemMatcher": [
+                "$gcc"
+            ],
             "group": "build"
         },
         {
             "label": "[CANMaster] Build All Boards - Debug",
             "type": "shell",
             "command": "cmake --build --preset debug -j $(nproc)",
-            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "options": {
+                "cwd": "${workspaceFolder}/src/DuetCANMaster"
+            },
             "dependsOn": "[CANMaster] Configure - Debug",
-            "problemMatcher": [ "$gcc" ],
+            "problemMatcher": [
+                "$gcc"
+            ],
             "group": "build"
         },
         {
             "label": "[CANMaster] Build All Boards - Release",
             "type": "shell",
             "command": "cmake --build --preset release -j $(nproc)",
-            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "options": {
+                "cwd": "${workspaceFolder}/src/DuetCANMaster"
+            },
             "dependsOn": "[CANMaster] Configure - Release",
-            "problemMatcher": [ "$gcc" ],
+            "problemMatcher": [
+                "$gcc"
+            ],
             "group": "build"
         },
         {
@@ -660,7 +774,9 @@
             "label": "[CANMaster] Clean All",
             "type": "shell",
             "command": "rm -rf build",
-            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "options": {
+                "cwd": "${workspaceFolder}/src/DuetCANMaster"
+            },
             "problemMatcher": [],
             "group": "build"
         },
@@ -668,7 +784,9 @@
             "label": "[CANMaster] Clean - Release",
             "type": "shell",
             "command": "cmake --build --preset release --target clean",
-            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "options": {
+                "cwd": "${workspaceFolder}/src/DuetCANMaster"
+            },
             "problemMatcher": [],
             "group": "build"
         },
@@ -676,11 +794,12 @@
             "label": "[CANMaster] Clean - Debug",
             "type": "shell",
             "command": "cmake --build --preset debug --target clean",
-            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "options": {
+                "cwd": "${workspaceFolder}/src/DuetCANMaster"
+            },
             "problemMatcher": [],
             "group": "build"
         },
-
         // ---------------------------------------------------------------
         // Duet3Expansion firmware (src/Duet3Expansion). These run in the
         // submodule directory and build against the shared ./lib libraries.
@@ -689,28 +808,36 @@
             "label": "[Expansion] Build Selected Target",
             "type": "shell",
             "command": "make ${input:fw_buildType} ${input:expansion_target} LIBRARIES_DIR=${workspaceFolder}/lib -j",
-            "problemMatcher": [ "$gcc" ],
+            "problemMatcher": [
+                "$gcc"
+            ],
             "group": "build"
         },
         {
             "label": "[Expansion] Build EXP1HCL - Debug",
             "type": "shell",
             "command": "make DEBUG=1 EXP1HCL LIBRARIES_DIR=${workspaceFolder}/lib -j",
-            "problemMatcher": [ "$gcc" ],
+            "problemMatcher": [
+                "$gcc"
+            ],
             "group": "build"
         },
         {
             "label": "[Expansion] Clean All",
             "type": "shell",
             "command": "make Duet3Expansion.clean-all LIBRARIES_DIR=${workspaceFolder}/lib",
-            "problemMatcher": [ "$gcc" ],
+            "problemMatcher": [
+                "$gcc"
+            ],
             "group": "build"
         },
         {
             "label": "[Style] Format DuetCANMaster",
             "type": "shell",
             "command": "clang-format -i --style=file $(find src -name '*.cpp' -o -name '*.h' | grep -vE '^src/(libc|libcpp)/')",
-            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "options": {
+                "cwd": "${workspaceFolder}/src/DuetCANMaster"
+            },
             "problemMatcher": [],
             "group": "build",
             "detail": "Reformat first-party sources. Skips src/libc and src/libcpp (vendored newlib/GCC runtime)."
@@ -719,7 +846,9 @@
             "label": "[Style] Format DuetSbcInterface",
             "type": "shell",
             "command": "clang-format -i --style=file $(find src harness tests -name '*.cpp' -o -name '*.h')",
-            "options": { "cwd": "${workspaceFolder}/src/DuetSbcInterface" },
+            "options": {
+                "cwd": "${workspaceFolder}/src/DuetSbcInterface"
+            },
             "problemMatcher": [],
             "group": "build",
             "detail": "Reformat sbc/, harness/ and tests/."
@@ -728,7 +857,9 @@
             "label": "[Style] Check Formatting (both projects)",
             "type": "shell",
             "command": "cd ${workspaceFolder}/src/DuetCANMaster && clang-format --dry-run --Werror --style=file $(find src -name '*.cpp' -o -name '*.h' | grep -vE '^src/(libc|libcpp)/') && cd ${workspaceFolder}/src/DuetSbcInterface && clang-format --dry-run --Werror --style=file $(find src harness tests -name '*.cpp' -o -name '*.h') && echo 'Formatting OK'",
-            "problemMatcher": [ "$gcc" ],
+            "problemMatcher": [
+                "$gcc"
+            ],
             "group": "test",
             "detail": "Non-mutating check; exits non-zero if anything would be reformatted. Suitable for CI."
         },
@@ -739,10 +870,16 @@
             "label": "[Style] Generate Compile DB - DuetCANMaster",
             "type": "shell",
             "command": "scripts/gen-compile-commands.sh ${input:canmaster_board}",
-            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
+            "options": {
+                "cwd": "${workspaceFolder}/src/DuetCANMaster"
+            },
             "problemMatcher": [],
-            "presentation": { "reveal": "silent" },
-            "runOptions": { "instanceLimit": 1 },
+            "presentation": {
+                "reveal": "silent"
+            },
+            "runOptions": {
+                "instanceLimit": 1
+            },
             "group": "build",
             "detail": "Configure CMake into build/compile-commands, keep the chosen board's firmware TUs, and rewrite them so clang can parse the bare-metal ARM flags. Writes src/DuetCANMaster/compile_commands.json."
         },
@@ -750,8 +887,12 @@
             "label": "[Style] Generate Compile DB - DuetSbcInterface",
             "type": "shell",
             "command": "cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
-            "options": { "cwd": "${workspaceFolder}/src/DuetSbcInterface" },
-            "problemMatcher": [ "$gcc" ],
+            "options": {
+                "cwd": "${workspaceFolder}/src/DuetSbcInterface"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
             "group": "build",
             "detail": "CMake exports compile_commands.json into build/."
         },
@@ -762,8 +903,12 @@
             "type": "shell",
             "dependsOn": "[Style] Generate Compile DB - DuetCANMaster",
             "command": "run-clang-tidy -p . -j $(nproc) -quiet '^.*/src/DuetCANMaster/src/(?!libc/|libcpp/|Hardware/ExceptionHandlers).*\\.cpp$' 2>&1 | awk -f ${workspaceFolder}/scripts/tidy-report.awk",
-            "options": { "cwd": "${workspaceFolder}/src/DuetCANMaster" },
-            "problemMatcher": [ "$gcc" ],
+            "options": {
+                "cwd": "${workspaceFolder}/src/DuetCANMaster"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
             "group": "test",
             "detail": "Regenerates the compile DB for the chosen board, then lints src/ (minus libc, libcpp and ExceptionHandlers). Report only. Do not add -fix: see STYLE.md, per-file fixing corrupts shared headers."
         },
@@ -771,11 +916,14 @@
             "label": "[Style] Tidy DuetSbcInterface",
             "type": "shell",
             "command": "test -f build/compile_commands.json || { echo 'No build/compile_commands.json - run [Style] Generate Compile DB - DuetSbcInterface first' >&2; exit 1; }; run-clang-tidy -p build -j $(nproc) -quiet '^.*/src/DuetSbcInterface/(src|harness|tests)/.*\\.cpp$' 2>&1 | awk -f ${workspaceFolder}/scripts/tidy-report.awk",
-            "options": { "cwd": "${workspaceFolder}/src/DuetSbcInterface" },
-            "problemMatcher": [ "$gcc" ],
+            "options": {
+                "cwd": "${workspaceFolder}/src/DuetSbcInterface"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
             "group": "test",
             "detail": "Report only. Do not add -fix: see STYLE.md, per-file fixing corrupts shared headers."
         }
-
     ]
 }
