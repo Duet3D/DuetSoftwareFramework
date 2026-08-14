@@ -107,21 +107,15 @@ internal static class MoveFlags
     public const uint HasForwardExtrusion = 1u << 9;
 
     /// <summary>
-    /// Any watched input stops every driver of this move, not just the drivers watching that input
+    /// Some armed axis' switches are watched by drives other than its own
     /// </summary>
     /// <remarks>
-    /// RepRapFirmware's <c>EndstopHitAction::stopAll</c>. Set when moving the axis being homed needs
-    /// drives other than its own - a CoreXY axis needs both motors - so stopping only the drivers
-    /// that watch the switch would leave the others running and drag the head into it. The axis'
-    /// switches are spread over the move's drivers so that all of them are watched, and whichever
-    /// fires first stops everything.
-    ///
-    /// What reaches the controller is <see cref="MoveStopInput.Action"/> of
-    /// <see cref="StopAction.All"/> per driver, not this flag: the action belongs to the endstop
-    /// that fired rather than to the move. This stays because the native side needs it to spread the
-    /// axis' switches over the move's drivers, which never crossed the wire
+    /// Set when moving the axis needs drives other than its own - a CoreXY axis needs both motors -
+    /// so every drive of the set carries that axis' switches. The native side spreads them over the
+    /// set's drivers, so that all of them end up watched however many drivers and switches there
+    /// are. It never crosses the SPI link: what the controller receives is one input per driver
     /// </remarks>
-    public const uint StopAllDrivers = 1u << 10;
+    public const uint SharedSwitches = 1u << 10;
 }
 
 /// <summary>
@@ -214,6 +208,19 @@ internal sealed class MoveStopInput
     /// </remarks>
     public StopAction Action { get; set; }
 
+    /// <summary>
+    /// Drivers stopped together by <see cref="StopAction.Group"/>, or <see cref="NoGroup"/>
+    /// </summary>
+    /// <remarks>
+    /// The set of drives that have to turn for one axis to move, which the kinematics decides and so
+    /// this side assigns: the controller holds no axis-to-driver map. Every drive of a coupling set
+    /// carries the same id, which is what lets two axes with disjoint sets be homed in one move
+    /// </remarks>
+    public byte Group { get; set; } = NoGroup;
+
+    /// <summary>Value of <see cref="Group"/> meaning the drive belongs to no group</summary>
+    public const byte NoGroup = 0xFF;
+
     /// <summary>Stop watching anything, which is what every drive of an ordinary move carries</summary>
     public void Clear()
     {
@@ -221,6 +228,7 @@ internal sealed class MoveStopInput
         NumSwitches = 0;
         HeldDrivers = 0;
         Action = StopAction.None;
+        Group = NoGroup;
         Array.Clear(Boards);
     }
 
@@ -282,6 +290,7 @@ internal sealed class MoveStopInput
         NumSwitches = other.NumSwitches;
         HeldDrivers = other.HeldDrivers;
         Action = other.Action;
+        Group = other.Group;
         other.Boards.CopyTo(Boards, 0);
     }
 
@@ -359,7 +368,7 @@ internal static class MoveParams
             stop.Boards.CopyTo(entry[3..]);
             entry[3 + MotionLimits.MaxDriversPerAxis] = stop.HeldDrivers;
             entry[4 + MotionLimits.MaxDriversPerAxis] = (byte)stop.Action;
-            entry[5 + MotionLimits.MaxDriversPerAxis] = 0;           // the native record's padding byte
+            entry[5 + MotionLimits.MaxDriversPerAxis] = stop.Group;
         }
         return total;
     }

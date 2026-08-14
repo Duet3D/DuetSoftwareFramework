@@ -363,7 +363,7 @@ same commit that does it; `git log --grep` finds them.
 | 4 | Stop groups and the three stop actions | ✅ `feat: give a move's endstops the three stop actions` |
 | 5 | `S3` and `S4` told apart | ✅ folded into Phase 4 |
 | 5a | The move id in `MotionStopped` | ✅ same commit as Phase 4 - see below |
-| 6 | A group is the coupling set, not the drive | ⬜ |
+| 6 | A group is the coupling set, not the drive | ✅ `feat: home any number of axes whose drives do not overlap` |
 | 7 | The motor-stall Z probe | ⬜ |
 | 8 | Diagnostics | ⬜ |
 
@@ -511,7 +511,7 @@ controller that sent none, or a move armed and not yet queued. Those are applied
 them would throw away stops that are almost certainly the armed move's. `M122` counts the mismatches
 separately from the too-late ones.
 
-### Phase 6 — a group is the coupling set, not the drive ⬜
+### Phase 6 — a group is the coupling set, not the drive ✅
 
 `stopGroup` is filled with the logical drive, derived in
 [DDA.cpp](src/DuetSbcInterface/src/Movement/DDA.cpp) from the drive being emitted, and a coupled axis
@@ -534,30 +534,48 @@ Both behaviours are wrong, and the group can express the right one: X's endstop 
 stops `{U, V}`, both axes home in the one move and neither disturbs the other. `GetControllingDrives`
 already returns exactly those sets - `{X,Y}` for X and `{U,V}` for U on the configuration above.
 
-What has to change:
-
 | | |
 |---|---|
-| Touches | [EndstopArming.cs](src/DuetControlServer/Motion/EndstopArming.cs), [MoveParams.h](src/DuetSbcInterface/src/Motion/MoveParams.h) and [MoveParams.cs](src/DuetControlServer/Motion/Native/MoveParams.cs), [DDA.cpp](src/DuetSbcInterface/src/Movement/DDA.cpp) |
-| Wire format | unchanged. `MoveStopInput` carries the group in the padding byte Phase 4 added, so it stays 14 |
-| Tests | `EndstopArmingTests` for the configuration above: two plans, two groups, no refusal; and that a coupled axis alone still groups every controlling drive together |
+| Touches | [EndstopArming.cs](src/DuetControlServer/Motion/EndstopArming.cs), [MoveParams.h](src/DuetSbcInterface/src/Motion/MoveParams.h) and [MoveParams.cs](src/DuetControlServer/Motion/Native/MoveParams.cs), [DDA.cpp](src/DuetSbcInterface/src/Movement/DDA.cpp) and [DDA.h](src/DuetSbcInterface/src/Movement/DDA.h), [MoveBuilder.cs](src/DuetControlServer/Motion/MoveBuilder.cs), [RawMove.cs](src/DuetControlServer/Motion/RawMove.cs) |
+| Wire format | unchanged. `MoveStopInput` carries the group in the byte Phase 4 left as padding, so it stays 14 |
+| Tests | `EndstopArmingTests` gains the CoreXYUV pair - `X + U` armed as two groups, `X + Y` refused - and the CoreXY cases move to the new rule |
 
-- `MoveStopInput` carries a group id, and `EndstopArming` assigns it: every drive of
-  `GetControllingDrives(axis)` shares one id, and an independent axis keeps its own drive number.
-  This is the part that has to move to DuetControlServer, because the kinematics is what says which
-  drives belong together and the controller holds no axis-to-driver map.
-- `DDA.cpp` passes `m_stopOnInput[drive].stopGroup` rather than `(uint8_t)drive`.
-- A coupled axis asks for `group` rather than `all`, and the two refusals in `Arm` - two coupled axes
-  together, and a coupled axis alongside an independent one - are lifted.
+**The rule is that the armed axes' controlling-drive sets must not overlap.** Any number of disjoint
+sets may be homed in one move; two axes that share a drive are refused, naming the drive they collide
+on. That replaces both of the old refusals, and it is the honest statement of the constraint: a drive
+carries one watch, so two axes needing the same drive would have the second overwrite the first and
+leave one endstop watched by nobody.
 
-`StopAction::all` then has no user. It stays, because RepRapFirmware makes an extruder endstop
-`stopAll` and that is the one case where the answer really is "the whole move" rather than a set of
-drives; §8 records why extruder endstops are out of scope for now.
+Refusing rather than stopping everything is not only a data-structure limit. Two axes of one coupling
+share their motors, so the first trigger has to stop them and the second axis can never reach its
+endstop in that move. Whatever the move then reported would be wrong: `stoppedAxes` is derived from
+the drives that stopped, so the axis that never triggered would be recorded as homed.
 
-*Why this was not Phase 4:* the group being the drive is what let Phase 4 derive it natively, with no
-new field and nothing for the two sides to disagree about. Moving the assignment to DCS is a
-behaviour change with its own failure mode - a coupling set computed wrongly under-stops, where `all`
-over-stops and fails safe - so it wants its own commit and its own commissioning case.
+What each of the three parts does:
+
+- `EndstopArming` assigns the group and copies the axis' entry to **every drive of its controlling
+  set**, not just the axis' own. The copy is what the old `stopAll` path did by copying to every
+  drive; without it a CoreXY homing X leaves Y's drive with no watch at all, so it never becomes a
+  `DriverStopWatch` and its motor runs on.
+- A coupled axis asks for `group` rather than `all`, overriding whatever its kind chose - RRF's
+  `GetResult` tests the coupling before `individualMotors`, because moving one motor of a coupled
+  axis is not something the kinematics can express.
+- `DDA.cpp` passes `m_stopOnInput[drive].stopGroup`, and its round-robin switch counter becomes one
+  counter **per group**. A single counter across the move would hand one set's switches to another
+  set's drivers now that a move can carry several sets.
+
+`MoveFlags::StopAllDrivers` is renamed `SharedSwitches`, and `ArmedMove.StopsEveryDrive` to
+`SharesSwitchesAcrossDrives`. It never crossed the SPI link; all it ever told the native side was to
+spread an axis' switches over more drivers than the axis has, which is what it still says.
+
+`StopAction::all` now has no user. It stays because RepRapFirmware makes an extruder endstop
+`stopAll`, which is the one case where the answer really is "the whole move" rather than a set of
+drives; §8 records why extruder endstops are out of scope.
+
+One consequence to read carefully: a group stop marks every drive of the set as stopped, so homing X
+alone on a CoreXY puts Y in `stoppedAxes`. That is harmless because `FinishSpecialMoveAsync` only
+inspects the axes the code named, but `stoppedAxes` is "axes whose drives stopped", not "axes that
+reached an endstop".
 
 ### Phase 7 — the motor-stall Z probe ⬜
 

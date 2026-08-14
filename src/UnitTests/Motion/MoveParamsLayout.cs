@@ -43,19 +43,13 @@ public class MoveParamsLayout
             };
         }
 
-        // The native record ends in a padding byte that no property stands for, because the compiler
-        // would insert it whether or not it were written out - see MoveParams.h
-        const int nativePadding = 1;
-
         Assert.Multiple(() =>
         {
-            Assert.That(MoveStopInput.Length, Is.EqualTo(size + nativePadding),
-                        "Length covers every field of the entry, plus the native record's padding");
+            Assert.That(MoveStopInput.Length, Is.EqualTo(size), "Length covers every field of the entry");
 
             // 6 + maxDriversPerAxis is what MoveParams.h static_asserts sizeof(MoveStopInput) to be,
             // and MotionConfigLayout pins maxDriversPerAxis itself to the native 8
-            Assert.That(size + nativePadding, Is.EqualTo(6 + MotionLimits.MaxDriversPerAxis),
-                        "sizeof(MoveStopInput)");
+            Assert.That(size, Is.EqualTo(6 + MotionLimits.MaxDriversPerAxis), "sizeof(MoveStopInput)");
         });
     }
 

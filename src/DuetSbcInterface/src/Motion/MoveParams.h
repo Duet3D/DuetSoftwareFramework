@@ -57,7 +57,7 @@ namespace Duet::Sbc::Motion
 		// moving the axis being homed needs drives other than its own, so stopping only the drivers
 		// that watch the switch would leave the others running. The axis' switches are spread over
 		// the move's drivers, so all of them are watched and whichever fires first stops everything
-		inline constexpr uint32_t stopAllDrivers = 1u << 10;
+		inline constexpr uint32_t sharedSwitches = 1u << 10;
 	}
 
 #pragma pack(push, 1)
@@ -159,9 +159,13 @@ namespace Duet::Sbc::Motion
 		// EndstopHitActions, decided by DCS from the endstop type and the kinematics
 		duet::spi::protocol::StopAction stopAction;
 
-		// Written out rather than left to the compiler: the C# mirror has to lay this record out by
-		// hand, and a byte the two sides disagree about shifts every drive after the first
-		uint8_t padding;
+		// Drivers stopped together by StopAction::group, or kNoStopGroup.
+		//
+		// The set of drives that have to turn for one axis to move, which the kinematics decides and
+		// DCS therefore assigns: the controller holds no axis-to-driver map. Every drive of a
+		// coupling set carries the same id, so a trigger on any of the axis' switches stops the set
+		// and nothing outside it - which is what lets two axes with disjoint sets home in one move
+		uint8_t stopGroup;
 	};
 
 	// The handle type field, which decides whether the minor field is per-driver. Defined in
@@ -175,6 +179,7 @@ namespace Duet::Sbc::Motion
 	static_assert(offsetof(MoveStopInput, boards) == 3);
 	static_assert(offsetof(MoveStopInput, heldDrivers) == 3 + maxDriversPerAxis);
 	static_assert(offsetof(MoveStopInput, stopAction) == 4 + maxDriversPerAxis);
+	static_assert(offsetof(MoveStopInput, stopGroup) == 5 + maxDriversPerAxis);
 	static_assert(maxDriversPerAxis <= 8, "heldDrivers is one byte, so one bit per driver of an axis");
 
 	// Whether this driver was already on its switch when the move was built, so it must not be given

@@ -321,7 +321,7 @@ MovementError DDA::InitFromParams(DDARing& ring, const Duet::Sbc::Motion::MovePa
 
 	m_flags.canPauseAfter = (params.flags & MoveFlags::canPauseAfter) != 0;
 	m_flags.checkEndstops = (params.flags & MoveFlags::checkEndstops) != 0;
-	m_flags.stopAllDrivers = (params.flags & MoveFlags::stopAllDrivers) != 0;
+	m_flags.sharedSwitches = (params.flags & MoveFlags::sharedSwitches) != 0;
 	m_flags.usingStandardFeedrate = (params.flags & MoveFlags::usingStandardFeedrate) != 0;
 	m_flags.usePressureAdvance = (params.flags & MoveFlags::usePressureAdvance) != 0;
 	m_flags.isPrintingMove = (params.flags & MoveFlags::isPrintingMove) != 0;
@@ -798,9 +798,11 @@ void DDA::Prepare(DDARing& ring,
 		AxesBitmap additionalAxisMotorsToEnable, axisMotorsEnabled;
 		afterPrepare.drivesMoving.Clear();
 
-		// Runs across every driver of the move, not per drive: on a stopAll move the axis' switches
-		// are handed out round-robin so that all of them are watched by somebody
-		size_t stopAllSwitch = 0;
+		// One counter per stop group rather than one for the move. An axis whose switches are shared
+		// across a set hands them out round-robin over the set's drivers so that all of them are
+		// watched by somebody; a move may carry several such sets, and one counter across all of
+		// them would interleave one set's switches into another's drivers
+		uint8_t nextSwitchInGroup[maxAxesPlusExtruders] = { };
 		MovementFlags segFlags{};
 		segFlags.Clear();
 		segFlags.checkEndstops = m_flags.checkEndstops;
@@ -856,22 +858,25 @@ void DDA::Prepare(DDARing& ring,
 									Duet::Sbc::Motion::IsDriverHeld(m_stopOnInput[drive], i) ? 0 : delta;
 
 								// Which switch this driver watches. Normally port i of an endstop
-								// belongs to driver i of the axis, so it follows from the index. On a
-								// stopAll move it does not: every drive carries the one axis' switches
-								// and any of them stops everything, so they are handed out round-robin
-								// across the move's drivers purely so that all of them end up watched.
+								// belongs to driver i of the axis, so it follows from the index. Where
+								// an axis' switches are shared across a set of drives it does not:
+								// every drive of the set carries the one axis' switches and any of
+								// them stops the set, so they are handed out round-robin across the
+								// set's drivers purely so that all of them end up watched.
 								// RepRapFirmware watches every port of an endstop whatever the action
+								const uint8_t group = m_stopOnInput[drive].stopGroup;
 								const size_t switchIndex =
-									m_flags.stopAllDrivers ? (stopAllSwitch++ % m_stopOnInput[drive].numSwitches) : i;
+									(m_flags.sharedSwitches && group < maxAxesPlusExtruders)
+										? (nextSwitchInGroup[group]++ % m_stopOnInput[drive].numSwitches)
+										: i;
 
-								// The group is the logical drive: "stop this axis" is what it means
-								// once the move has been flattened into drivers, and the controller
-								// holds no axis-to-driver map to work it out for itself
+								// The group is DCS's, because the kinematics is what says which drives
+								// have to stop together and the controller holds no axis-to-driver map
 								CanMotion::AddAxisMovement(
 									params, driver, driverSteps,
 									Duet::Sbc::Motion::StopInputForSwitch(m_stopOnInput[drive], switchIndex,
 																		  driver.boardAddress),
-									(uint8_t)drive, m_stopOnInput[drive].stopAction);
+									m_stopOnInput[drive].stopGroup, m_stopOnInput[drive].stopAction);
 							}
 						}
 #endif

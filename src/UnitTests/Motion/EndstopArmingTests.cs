@@ -157,7 +157,8 @@ public class EndstopArmingTests
         {
             Assert.That(stopInputs[0].NumSwitches, Is.EqualTo(1));
             Assert.That(stopInputs[1].Handle, Is.EqualTo(stopInputs[0].Handle), "Y's drive watches X's switch");
-            Assert.That(stopInputs[2].Handle, Is.EqualTo(stopInputs[0].Handle), "and so does every other drive");
+            Assert.That(stopInputs[1].Group, Is.EqualTo(stopInputs[0].Group), "under the one group");
+            Assert.That(stopInputs[2].NumSwitches, Is.Zero, "and Z, which X does not need, watches nothing");
         });
     }
 
@@ -176,7 +177,7 @@ public class EndstopArmingTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(armed.StopsEveryDrive, Is.True, "any of them has to stop the whole move");
+            Assert.That(armed.SharesSwitchesAcrossDrives, Is.True, "the set's drivers share them");
             Assert.That(stopInputs[0].NumSwitches, Is.EqualTo(2), "both switches are kept");
             Assert.That(stopInputs[0].Boards[0], Is.EqualTo(2), "the first on its own board");
             Assert.That(stopInputs[0].Boards[1], Is.EqualTo(1), "and the second on its own");
@@ -191,29 +192,41 @@ public class EndstopArmingTests
         (Move move, Sensors sensors) = Machine();
         MoveStopInput[] stopInputs = NewStopInputs();
 
-        Assert.That(Arm((move, sensors), stopInputs, [0]).StopsEveryDrive, Is.False);
+        Assert.That(Arm((move, sensors), stopInputs, [0]).SharesSwitchesAcrossDrives, Is.False);
     }
 
     [Test]
-    public void TwoCoupledAxesCannotBeHomedTogether()
+    public void TwoAxesSharingADriveCannotBeHomedTogether()
     {
-        // A drive carries one stop input, so the second endstop would have nowhere to live. Refusing
-        // is what stops one of the two being silently disarmed
+        // X and Y of a CoreXY both need both motors, so each drive would have to watch both
+        // endstops. A drive carries one watch, so the second would overwrite the first and leave one
+        // endstop watched by nobody - which is a move that runs to its full length
         (Move move, Sensors sensors) = Machine();
         MoveStopInput[] stopInputs = NewStopInputs();
 
-        Assert.Throws<GCodeException>(() => Arm((move, sensors), stopInputs, [0, 1],
-                                                kinematics: KinematicsName.CoreXY));
+        GCodeException? thrown = Assert.Throws<GCodeException>(
+            () => Arm((move, sensors), stopInputs, [0, 1], kinematics: KinematicsName.CoreXY));
+        Assert.That(thrown!.Message, Does.Contain("both need drive"), "and says which drive they collide on");
     }
 
     [Test]
-    public void ACoupledAxisCannotBeHomedAlongsideAnIndependentOne()
+    public void ACoupledAxisCanBeHomedAlongsideAnAxisItDoesNotShareADriveWith()
     {
+        // Z is nothing to do with a CoreXY's X, so X's endstop stopping X and Y leaves Z homing
         (Move move, Sensors sensors) = Machine();
         MoveStopInput[] stopInputs = NewStopInputs();
 
-        Assert.Throws<GCodeException>(() => Arm((move, sensors), stopInputs, [0, 2],
-                                                kinematics: KinematicsName.CoreXY));
+        ArmedMove armed = Arm((move, sensors), stopInputs, [0, 2], kinematics: KinematicsName.CoreXY);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(armed.ArmedAxes, Is.EqualTo(new[] { 0, 2 }));
+            Assert.That(stopInputs[0].Group, Is.EqualTo(0), "X and Y are one group");
+            Assert.That(stopInputs[1].Group, Is.EqualTo(0));
+            Assert.That(stopInputs[2].Group, Is.EqualTo(2), "and Z is its own");
+            Assert.That(stopInputs[1].Handle, Is.EqualTo(stopInputs[0].Handle), "Y's drive watches X's switch");
+            Assert.That(stopInputs[2].Handle, Is.Not.EqualTo(stopInputs[0].Handle), "Z watches its own");
+        });
     }
 
     [Test]
@@ -299,7 +312,89 @@ public class EndstopArmingTests
         ArmedMove armed = Arm((move, sensors), stopInputs, [0], closed: axis => axis == 0 ? 0b1u : 0u,
                               kinematics: KinematicsName.CoreXY);
 
-        Assert.That(armed.AxesToHold, Is.EqualTo(new[] { 0, 1, 2 }));
+        Assert.That(armed.AxesToHold, Is.EqualTo(new[] { 0 }),
+                    "the axis is held; the drives that move it follow from the kinematics");
+    }
+
+    /// <summary>
+    /// A CoreXYUV: X and Y share one pair of motors, U and V share another, and the pairs are
+    /// independent
+    /// </summary>
+    /// <remarks>
+    /// <c>M584 X1.0 Y1.1 U1.2 V1.3</c> with
+    /// <c>M669 K1 X1:1:0:0 Y1:-1:0:0 U0:0:1:1 V0:0:1:-1</c>
+    /// </remarks>
+    private static ((Move Move, Sensors Sensors) Machine, KinematicsEngine Geometry) CoreXYUV()
+    {
+        Move move = new();
+        Sensors sensors = new();
+        char[] letters = ['X', 'Y', 'U', 'V'];
+        for (int axis = 0; axis < letters.Length; axis++)
+        {
+            Axis a = new() { Letter = letters[axis] };
+            a.Drivers.Add(new OmDriverId(1, axis));
+            move.Axes.Add(a);
+            sensors.Endstops.Add(new Endstop { Type = EndstopType.InputPin, Port = $"1.io{axis}.in" });
+        }
+
+        CoreKinematics core = new();
+        core.InverseMatrix.Clear();
+        foreach (float[] row in new[] { new float[] { 1, 1, 0, 0 }, new float[] { 1, -1, 0, 0 },
+                                        new float[] { 0, 0, 1, 1 }, new float[] { 0, 0, 1, -1 } })
+        {
+            core.InverseMatrix.Add(row);
+        }
+        move.Kinematics = core;
+        return ((move, sensors), KinematicsFactory.Create(move.Kinematics));
+    }
+
+    private static ArmedMove ArmCoreXYUV((Move Move, Sensors Sensors) machine, KinematicsEngine geometry,
+                                         MoveStopInput[] stopInputs, IReadOnlyList<int> axes)
+    {
+        List<EndstopPlan> plans = EndstopPlanner.Plan(CodeNaming(machine.Move, axes), machine.Move,
+                                                      machine.Sensors, geometry, 4, StepsPerMm,
+                                                      FeedRateMmPerSec);
+        return EndstopArming.Arm(machine.Move, geometry, 4, plans, _ => 0, stopInputs);
+    }
+
+    [Test]
+    public void TwoIndependentlyCoupledAxesAreHomedTogether()
+    {
+        // G1 H1 X100 U100. X needs motors 0 and 1, U needs 2 and 3, and the two sets share nothing -
+        // so X's endstop stops X and Y, U's stops U and V, and both axes home in the one move.
+        // RepRapFirmware accepts this move and stops every drive on the first trigger, leaving the
+        // other axis unhomed wherever it happened to be
+        ((Move move, Sensors sensors), KinematicsEngine geometry) = CoreXYUV();
+        MoveStopInput[] stopInputs = NewStopInputs();
+
+        ArmedMove armed = ArmCoreXYUV((move, sensors), geometry, stopInputs, [0, 2]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(armed.ArmedAxes, Is.EqualTo(new[] { 0, 2 }));
+            Assert.That(stopInputs[0].Group, Is.EqualTo(stopInputs[1].Group), "X and Y are one group");
+            Assert.That(stopInputs[2].Group, Is.EqualTo(stopInputs[3].Group), "U and V are another");
+            Assert.That(stopInputs[0].Group, Is.Not.EqualTo(stopInputs[2].Group), "and the two are distinct");
+
+            Assert.That(stopInputs[1].Handle, Is.EqualTo(stopInputs[0].Handle), "Y's drive watches X's endstop");
+            Assert.That(stopInputs[3].Handle, Is.EqualTo(stopInputs[2].Handle), "V's watches U's");
+            Assert.That(stopInputs[2].Handle, Is.Not.EqualTo(stopInputs[0].Handle), "which is not X's");
+
+            Assert.That(stopInputs[0].Action, Is.EqualTo(StopAction.Group), "each stops its own set");
+            Assert.That(stopInputs[2].Action, Is.EqualTo(StopAction.Group), "and not the whole move");
+        });
+    }
+
+    [Test]
+    public void TwoAxesOfTheSameCouplingCannotBeHomedTogether()
+    {
+        // G1 H1 X100 Y100 on the same machine. Both need motors 0 and 1, so each drive would have to
+        // watch both endstops and one of them would be left watching nothing. The move can never home
+        // both in any case: the motors are shared, so the first trigger has to stop them
+        ((Move move, Sensors sensors), KinematicsEngine geometry) = CoreXYUV();
+        MoveStopInput[] stopInputs = NewStopInputs();
+
+        Assert.Throws<GCodeException>(() => ArmCoreXYUV((move, sensors), geometry, stopInputs, [0, 1]));
     }
 
     [Test]
@@ -381,9 +476,9 @@ public class EndstopArmingTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(armed.StopsEveryDrive, Is.True);
-            Assert.That(stopInputs[0].Action, Is.EqualTo(StopAction.All), "and not the S4 the endstop asked for");
-            Assert.That(stopInputs[1].Action, Is.EqualTo(StopAction.All), "on every drive of the move");
+            Assert.That(armed.SharesSwitchesAcrossDrives, Is.True);
+            Assert.That(stopInputs[0].Action, Is.EqualTo(StopAction.Group), "and not the S4 the endstop asked for");
+            Assert.That(stopInputs[1].Action, Is.EqualTo(StopAction.Group), "on every drive of the set");
         });
     }
 

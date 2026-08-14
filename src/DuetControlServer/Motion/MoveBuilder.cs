@@ -365,7 +365,7 @@ internal sealed class MoveBuilder(MotionParameters parameters)
         uint flags = 0;
         if (raw.CanPauseAfter) { flags |= MoveFlags.CanPauseAfter; }
         if (raw.CheckEndstops) { flags |= MoveFlags.CheckEndstops; }
-        if (raw.StopsEveryDrive) { flags |= MoveFlags.StopAllDrivers; }
+        if (raw.SharesSwitchesAcrossDrives) { flags |= MoveFlags.SharedSwitches; }
         if (raw.UsingStandardFeedrate) { flags |= MoveFlags.UsingStandardFeedrate; }
         if (raw.UsePressureAdvance) { flags |= MoveFlags.UsePressureAdvance; }
         // TODO RRF has a scanningProbeMove flag; MoveFlags has no such bit yet - §15.2

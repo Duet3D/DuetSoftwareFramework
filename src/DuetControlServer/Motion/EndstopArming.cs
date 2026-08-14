@@ -24,17 +24,17 @@ namespace DuetControlServer.Motion;
 /// Whether any armed endstop is a stall, which has to be approached slowly enough to tell a stall
 /// from normal load. M201.1 configures the limit
 /// </param>
-/// <param name="StopsEveryDrive">
-/// Whether any watched input must stop every driver of this move rather than only the drivers
-/// watching it. RepRapFirmware's <c>stopAll</c>: moving the axis being homed needs drives other than
-/// its own, so stopping only its own would leave the rest running
+/// <param name="SharesSwitchesAcrossDrives">
+/// Whether any armed axis' switches are watched by drives other than its own, because moving it
+/// needs them. The move has to spread those switches over the drivers of the set so that all of them
+/// end up watched, which is the one thing the native side needs telling
 /// </param>
 internal sealed record ArmedMove(
     IReadOnlyList<int> ArmedAxes,
     IReadOnlyList<int> AxesToHold,
     uint TriggeredAxes,
     bool ReduceAcceleration,
-    bool StopsEveryDrive);
+    bool SharesSwitchesAcrossDrives);
 
 /// <summary>
 /// Deciding what a <c>G1 H</c> move watches, and what it must not move
@@ -82,11 +82,12 @@ internal static class EndstopArming
     {
         List<int> armedAxes = [], alreadyClosed = [];
         bool reduceAcceleration = false;
+        bool copiedAcrossASet = false;
 
-        // The axis whose endstop has to stop every drive, if the geometry has one in this move
-        int stopAllAxis = -1;
-        MoveStopInput stopAllInput = new();
-        int independentlyArmed = 0;
+        // Which axis has claimed each drive, so that a drive two axes would both have to stop is
+        // caught rather than silently given to whichever was armed last
+        int[] claimedBy = new int[MotionLimits.MaxAxesPlusExtruders];
+        Array.Fill(claimedBy, -1);
 
         foreach (EndstopPlan plan in plans)
         {
@@ -116,65 +117,55 @@ internal static class EndstopArming
                 alreadyClosed.Add(axis);
             }
 
-            if (NeedsEveryDrive(geometry, axis))
+            // Every drive that has to turn for this axis to move. Two axes whose sets overlap cannot
+            // both be homed by one move: a drive carries one watch, so the second would overwrite
+            // the first and leave one of the two endstops watched by nobody. Sets that do not
+            // overlap are independent and may be homed together, however many of them there are
+            uint controlling = geometry.GetControllingDrives(axis);
+            for (int drive = 0; drive < claimedBy.Length; drive++)
             {
-                if (stopAllAxis >= 0)
+                if ((controlling & (1u << drive)) != 0 && claimedBy[drive] >= 0)
                 {
                     throw new GCodeException(
-                        $"Cannot home {move.Axes[stopAllAxis].Letter} and {move.Axes[axis].Letter} together: "
-                        + "on this kinematics either endstop has to stop every drive");
+                        $"Cannot home {move.Axes[claimedBy[drive]].Letter} and {move.Axes[axis].Letter} together: "
+                        + $"both need drive logical axis {drive} to move, but a drive can only watch one endstop at a time");
                 }
-                stopAllAxis = axis;
-                stopAllInput.CopyFrom(stopOnInput[axis]);
             }
-            else
+
+            // Every drive of the set watches this axis' endstop under the one group, so whichever of
+            // the axis' switches fires stops the set and nothing outside it. The action outranks
+            // whatever the kind chose, as RepRapFirmware's GetResult tests the coupling before it
+            // tests individualMotors: moving one motor of a coupled axis is not something the
+            // kinematics can express.
+            //
+            // All of the switches are kept, not just the first. RepRapFirmware watches every port of
+            // an endstop whatever the action - PrimeAxis primes portsLeftToTrigger with all of them
+            // and CheckTriggered scans them all
+            if (NeedsEveryDrive(geometry, axis))
             {
-                independentlyArmed++;
+                stopOnInput[axis].Action = StopAction.Group;
+                copiedAcrossASet = true;
             }
+            stopOnInput[axis].Group = (byte)axis;
+
+            for (int drive = 0; drive < claimedBy.Length; drive++)
+            {
+                if ((controlling & (1u << drive)) == 0)
+                {
+                    continue;
+                }
+                claimedBy[drive] = axis;
+                if (drive != axis && drive < stopOnInput.Length)
+                {
+                    stopOnInput[drive].CopyFrom(stopOnInput[axis]);
+                }
+            }
+
             armedAxes.Add(axis);
         }
 
-        if (stopAllAxis < 0)
-        {
-            return new ArmedMove(armedAxes, alreadyClosed, AsBitmap(alreadyClosed), reduceAcceleration, false);
-        }
-
-        if (independentlyArmed > 0)
-        {
-            throw new GCodeException(
-                $"Cannot home {move.Axes[stopAllAxis].Letter} with another axis: "
-                + "its endstop has to stop every drive, which would disarm the others");
-        }
-
-        // Every drive carries this axis' switches, and whichever of them fires stops every driver
-        // rather than only the ones watching it. That is what makes this stopAll rather than
-        // stopAxis: the drives are coupled, so letting the others run on would drag the head into
-        // the switch. The action outranks whatever the kind chose, exactly as RepRapFirmware's
-        // GetResult tests stopAll before it tests individualMotors.
-        //
-        // All of the switches are kept, not just the first. RepRapFirmware watches every port of the
-        // endstop whatever the action - PrimeAxis primes portsLeftToTrigger with all of them and
-        // CheckTriggered scans them all - and collapsing them here left an axis' second switch armed
-        // on nothing, doing nothing, and looking configured
-        stopAllInput.Action = StopAction.All;
-        for (int drive = 0; drive < stopOnInput.Length; drive++)
-        {
-            stopOnInput[drive].CopyFrom(stopAllInput);
-        }
-
-        if (!alreadyClosed.Contains(stopAllAxis))
-        {
-            return new ArmedMove(armedAxes, alreadyClosed, AsBitmap(alreadyClosed), reduceAcceleration, true);
-        }
-
-        // On coupled kinematics the whole move stops on the one endstop, so an endstop that is
-        // already closed holds every drive rather than only its own axis
-        List<int> everyAxis = [];
-        for (int axis = 0; axis < numAxes; axis++)
-        {
-            everyAxis.Add(axis);
-        }
-        return new ArmedMove(armedAxes, everyAxis, AsBitmap(alreadyClosed), reduceAcceleration, true);
+        return new ArmedMove(armedAxes, alreadyClosed, AsBitmap(alreadyClosed), reduceAcceleration,
+                             copiedAcrossASet);
     }
 
     /// <summary>

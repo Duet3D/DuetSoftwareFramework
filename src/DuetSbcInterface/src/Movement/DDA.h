@@ -101,7 +101,6 @@ public:
 	[[nodiscard]] bool UsingStandardFeedrate() const noexcept { return m_flags.usingStandardFeedrate; }
 	[[nodiscard]] bool IsCheckingEndstops() const noexcept { return m_flags.checkEndstops; }
 	// True if any watched input stops every driver of this move - RepRapFirmware's stopAll
-	[[nodiscard]] bool StopsAllDrivers() const noexcept { return m_flags.stopAllDrivers; }
 	[[nodiscard]] bool IsIsolatedMove() const noexcept { return m_flags.isolatedMove; }
 	[[nodiscard]] bool NoShaping() const noexcept { return m_flags.isolatedMove; }
 	[[nodiscard]] bool UsesInputShaping() const noexcept;									// return true if this move should use input shaping
@@ -206,7 +205,7 @@ private:
 					 continuousRotationShortcut : 1, // True if continuous rotation axes take shortcuts
 					 isolatedMove : 1,				// set if we disable input shaping for this move and wait for it to finish e.g. for a G1 H2 move
 					 hasForwardExtrusion : 1,		// set if any extruder has forward movement (used by M571)
-				 stopAllDrivers : 1				// set if any watched input stops every driver of this move, not just the ones watching it
+				 sharedSwitches : 1				// set if an armed axis' switches are watched by drives other than its own, so they must be spread over the set's drivers
 #if SUPPORT_S_CURVE
 					 , useScurve : 1,				// set if this move uses S-curve acceleration
 					 fullyPlanned : 1				// set if this move can't be made to go any faster even if we add more moves to the ring

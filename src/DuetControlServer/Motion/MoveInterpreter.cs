@@ -930,7 +930,7 @@ internal sealed class MoveInterpreter(
 
         raw.ArmedAxes.AddRange(armed.ArmedAxes);
         raw.ReduceAcceleration |= armed.ReduceAcceleration;
-        raw.StopsEveryDrive = armed.StopsEveryDrive;
+        raw.SharesSwitchesAcrossDrives = armed.SharesSwitchesAcrossDrives;
         foreach (int axis in armed.AxesToHold)
         {
             SeedSpecialMoveCoordinate(raw, axis);

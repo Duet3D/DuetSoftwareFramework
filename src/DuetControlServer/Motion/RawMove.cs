@@ -166,7 +166,7 @@ internal sealed class RawMove
     /// its own, so stopping only its own would leave the rest running and drag the head into the
     /// switch. The axis' switches are spread over the move's drivers so that all of them are watched
     /// </remarks>
-    public bool StopsEveryDrive { get; set; }
+    public bool SharesSwitchesAcrossDrives { get; set; }
 
     /// <summary>
     /// What kind of move this is, as chosen by the H parameter
@@ -217,7 +217,7 @@ internal sealed class RawMove
         CheckEndstops = false;
         UsePressureAdvance = false;
         ReduceAcceleration = false;
-        StopsEveryDrive = false;
+        SharesSwitchesAcrossDrives = false;
         MoveType = MoveType.Normal;
     }
 }
