@@ -2428,7 +2428,8 @@ internal partial class MCodeHandler
         // A through D default to rotating, because that is what they conventionally are; every other
         // letter defaults to translating
         bool continuous = wrapType.HasValue ? wrapType.Value == 1 : letter is >= 'A' and <= 'D';
-        return new Axis
+
+        Axis axis = new()
         {
             Letter = letter,
             Visible = true,
@@ -2437,6 +2438,18 @@ internal partial class MCodeHandler
             MachinePosition = 0.0f,
             UserPosition = 0.0f
         };
+
+        // Everything else an axis starts life with is the object model's, so that a bare Axis is a
+        // movable one wherever it is constructed. Only the Z rule lives here, because it is selected
+        // by the axis letter and this is where the letter is known. RepRapFirmware picks Z out by
+        // index instead, index 2 being Z by convention
+        if (letter == 'Z')
+        {
+            axis.Speed = Axis.DefaultZSpeed;
+            axis.Acceleration = axis.ReducedAcceleration = Axis.DefaultZAcceleration;
+            axis.Jerk = axis.PrintingJerk = Axis.DefaultZJerk;
+        }
+        return axis;
     }
 
     /// <summary>

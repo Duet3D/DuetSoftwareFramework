@@ -18,6 +18,40 @@ public partial class Axis : ModelObject, IStaticModelObject
         'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'
     ];
 
+    // What an axis may do before anything has configured it. RepRapFirmware's Move::Init writes the
+    // same values into every axis slot before config.g runs, so an axis that no M201, M203 or M566
+    // mentions is still movable.
+    //
+    // Its constants are in mm/sec and mm/sec^2. Speed and jerk are carried here in mm/min, so those
+    // are converted once, here, rather than a per-minute field being given a per-second number.
+    //
+    // The acceleration is the one that must never be left at zero: the planner works a move's
+    // duration out by dividing by it, so an axis without one has every move on it rejected as
+    // infinitely long and simply never moves.
+
+    /// <summary>Speed an axis may move at until M203 says otherwise (in mm/min)</summary>
+    public const float DefaultSpeed = 100F * 60F;
+
+    /// <summary>Speed a Z axis may move at until M203 says otherwise (in mm/min)</summary>
+    /// <remarks>
+    /// Z gets its own, slower, defaults throughout, as it does in RepRapFirmware: it is usually a
+    /// leadscrew carrying the bed or the gantry, and the speeds the other axes tolerate would damage
+    /// it. The axis letter is what selects these, so they are applied where an axis is created
+    /// </remarks>
+    public const float DefaultZSpeed = 20F * 60F;
+
+    /// <summary>Acceleration of an axis until M201 says otherwise (in mm/s^2)</summary>
+    public const float DefaultAcceleration = 1000F;
+
+    /// <summary>Acceleration of a Z axis until M201 says otherwise (in mm/s^2)</summary>
+    public const float DefaultZAcceleration = 200F;
+
+    /// <summary>Jerk of an axis until M566 says otherwise (in mm/min)</summary>
+    public const float DefaultJerk = 15F * 60F;
+
+    /// <summary>Jerk of a Z axis until M566 says otherwise (in mm/min)</summary>
+    public const float DefaultZJerk = 10F * 60F;
+
     /// <summary>
     /// Acceleration of this axis (in mm/s^2)
     /// </summary>
@@ -26,7 +60,7 @@ public partial class Axis : ModelObject, IStaticModelObject
         get => _acceleration;
         set => SetPropertyValue(ref _acceleration, value);
     }
-    private float _acceleration;
+    private float _acceleration = DefaultAcceleration;
 
     /// <summary>
     /// Babystep amount (in mm)
@@ -81,7 +115,7 @@ public partial class Axis : ModelObject, IStaticModelObject
         get => _jerk;
         set => SetPropertyValue(ref _jerk, value);
     }
-    private float _jerk = 15F;
+    private float _jerk = DefaultJerk;
 
     /// <summary>
     /// Letter of this axis
@@ -190,7 +224,7 @@ public partial class Axis : ModelObject, IStaticModelObject
         get => _printingJerk;
         set => SetPropertyValue(ref _printingJerk, value);
     }
-    private float _printingJerk = 15;
+    private float _printingJerk = DefaultJerk;
 
     /// <summary>
     /// Whether this axis rotates rather than translates, so its units are degrees
@@ -225,7 +259,7 @@ public partial class Axis : ModelObject, IStaticModelObject
         get => _reducedAcceleration;
         set => SetPropertyValue(ref _reducedAcceleration, value);
     }
-    private float _reducedAcceleration;
+    private float _reducedAcceleration = DefaultAcceleration;
 
     /// <summary>
     /// Maximum speed (in mm/min)
@@ -235,7 +269,7 @@ public partial class Axis : ModelObject, IStaticModelObject
         get => _speed;
         set => SetPropertyValue(ref _speed, value);
     }
-    private float _speed = 100F;
+    private float _speed = DefaultSpeed;
 
     /// <summary>
     /// Number of microsteps per mm

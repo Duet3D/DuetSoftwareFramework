@@ -8,6 +8,19 @@ namespace DuetAPI.ObjectModel;
 /// </summary>
 public partial class Extruder : ModelObject, IStaticModelObject
 {
+    // What an extruder may do before anything has configured it, as RepRapFirmware's Move::Init sets
+    // it. Its constants are in mm/sec; speed and jerk are carried here in mm/min, so those are
+    // converted once, here.
+
+    /// <summary>Speed an extruder may run at until M203 says otherwise (in mm/min)</summary>
+    public const float DefaultSpeed = 100F * 60F;
+
+    /// <summary>Acceleration of an extruder until M201 says otherwise (in mm/s^2)</summary>
+    public const float DefaultAcceleration = 500F;
+
+    /// <summary>Jerk of an extruder until M566 says otherwise (in mm/min)</summary>
+    public const float DefaultJerk = 5F * 60F;
+
     /// <summary>
     /// Acceleration of this extruder (in mm/s^2)
     /// </summary>
@@ -16,7 +29,7 @@ public partial class Extruder : ModelObject, IStaticModelObject
         get => _acceleration;
         set => SetPropertyValue(ref _acceleration, value);
     }
-    private float _acceleration = 500F;
+    private float _acceleration = DefaultAcceleration;
 
     /// <summary>
     /// Motor current (in mA)
@@ -46,7 +59,7 @@ public partial class Extruder : ModelObject, IStaticModelObject
         get => _printingJerk;
         set => SetPropertyValue(ref _printingJerk, value);
     }
-    private float _printingJerk = 15;
+    private float _printingJerk = DefaultJerk;
 
     /// <summary>
     /// Name of the currently loaded filament
@@ -86,7 +99,7 @@ public partial class Extruder : ModelObject, IStaticModelObject
         get => _jerk;
         set => SetPropertyValue(ref _jerk, value);
     }
-    private float _jerk = 15F;
+    private float _jerk = DefaultJerk;
 
     /// <summary>
     /// Microstepping configuration
@@ -172,7 +185,7 @@ public partial class Extruder : ModelObject, IStaticModelObject
         get => _speed;
         set => SetPropertyValue(ref _speed, value);
     }
-    private float _speed = 100F;
+    private float _speed = DefaultSpeed;
 
     /// <summary>
     /// Number of microsteps per mm

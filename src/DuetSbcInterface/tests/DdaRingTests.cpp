@@ -162,10 +162,40 @@ namespace
 		return false;
 	}
 
+	// One move along a single axis with a chosen acceleration, for the rejection check below.
+	MoveRecord MakeMoveWithAcceleration(uint32_t moveId, float accel) noexcept
+	{
+		MoveRecord move = MakeXMove(moveId, 0.0F, 50.0F);
+		move.Header().maxAcceleration = accel;
+		return move;
+	}
+
 	// --- Checks ------------------------------------------------------------------------------
 
 	// A single move from and to a standstill: it accelerates, may hold, and decelerates back to
 	// rest, and the three phases account for exactly the time the move was planned to take.
+	// A move whose acceleration is zero has no finite duration: the time it takes is worked out by
+	// dividing by the acceleration. The ring rejects it rather than queueing something it can never
+	// prepare, which is right - but the rejection is far from the cause, so the axis simply stops
+	// moving and the log says only "move duration too long". Everything that writes an axis
+	// acceleration therefore has to keep it above zero, and everything that creates an axis has to
+	// give it one; this is the check that says why.
+	void TestZeroAccelerationIsRejected(DDARing& ring, RecordingSink& sink) noexcept
+	{
+		sink.Clear();
+		CHECK(Drain(ring), "the ring starts empty");
+
+		MoveRecord bad = MakeMoveWithAcceleration(900, 0.0F);
+		CHECK(ring.AddMove(bad.Header()) == MovementError::MoveDurationTooLong,
+			  "a move with no acceleration is refused rather than queued");
+		CHECK(sink.headers.empty(), "and nothing reaches the boards");
+
+		// The ring is still usable: the rejected move must not have taken the add slot
+		MoveRecord good = MakeMoveWithAcceleration(901, acceleration);
+		CHECK(ring.AddMove(good.Header()) == MovementError::Ok, "a move with acceleration is accepted");
+		CHECK(Drain(ring), "and runs");
+	}
+
 	void TestSingleMove(DDARing& ring, RecordingSink& sink) noexcept
 	{
 		sink.Clear();
@@ -471,6 +501,7 @@ int main()
 	TestRejectedMoveLeavesTheRingUsable(ring, sink);
 	TestForcedEndpointIsWhatTheNextMoveIsMeasuredFrom(ring, sink);
 	TestSimulationSendsNothing(ring, sink);
+	TestZeroAccelerationIsRejected(ring, sink);
 
 	StepTimer::SetLocalClockSource(nullptr);
 	return TestSupport::Summarise("DDARing");
