@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 /// <summary>
@@ -97,6 +98,12 @@ async Task WriteDocumentation(StreamWriter writer)
 /// <returns>Asynchronous task</returns>
 async Task WritePropertyDocumentation(StreamWriter writer, PropertyInfo property, string? path, string? classDescription, int depth)
 {
+    // Properties that are not serialized are not part of the object model, like the auto-generated Descriptor
+    if (Attribute.IsDefined(property, typeof(JsonIgnoreAttribute)))
+    {
+        return;
+    }
+
     if (depth > MaxDepth)
     {
         depth = MaxDepth;
