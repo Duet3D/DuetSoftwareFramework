@@ -192,4 +192,4 @@ to write *another* plugin's data); a DWC-only plugin uses `PATCH /machine/plugin
 - [IPC](ipc.md) - how plugins connect and which commands need which permissions
 - [Components](components.md#command-line-tools-and-example-plugins) - `CodeLogger`, `CustomHttpEndpoint`,
   and `PluginManager` as references
-- [G-code flow](gcode-flow.md#the-six-stage-code-pipeline) - where interception plugins hook in
+- [G-code flow](gcode-flow.md#the-five-stage-code-pipeline) - where interception plugins hook in

@@ -1,9 +1,10 @@
 # G-code flow
 
 This article follows a single G/M/T-code through DuetControlServer (DCS): how its source text becomes
-a [`Code`](#the-code-object), how the six-stage pipeline processes it, what DCS handles itself versus
-forwards to RepRapFirmware (RRF), and how its reply gets back to the client. The final hop to the
-firmware is covered separately in [Firmware link](firmware-link.md); files and macros in
+a [`Code`](#the-code-object), how the five-stage pipeline processes it, and how its reply gets back to
+the client. **Every code is executed here** - there is no other program to hand one to. What a code
+does to the machine leaves DCS as a move or a CAN message, covered in
+[Firmware link](firmware-link.md) and [CAN messages](can-messages.md); files and macros are in
 [File management](file-management.md).
 
 Paths are relative to the repository root; line numbers are indicative - the file and method names are
@@ -25,7 +26,7 @@ Key fields:
 | `MajorNumber` / `MinorNumber` | e.g. `28` / `null` for `G28`, `54` / `3` for `G54.3` |
 | `Parameters` (`List<CodeParameter>`) | Parsed parameters, each with a typed value and an `IsExpression` flag |
 | `Keyword` / `KeywordArgument` | For meta codes: `if`, `elif`, `else`, `while`, `break`, `continue`, `abort`, `echo`, `var`, `set`, `global` |
-| `Flags` (`CodeFlags`) | `Asynchronous`, `IsFromFirmware`, `IsFromMacro`, `IsPrioritized`, `Unbuffered`, and the progress flags `IsPreProcessed` / `IsInternallyProcessed` / `IsPostProcessed` |
+| `Flags` (`CodeFlags`) | `Asynchronous`, `IsFromMacro`, `IsFromSystemMacro`, `IsPrioritized`, `Unbuffered`, and the progress flags `IsPreProcessed` / `IsInternallyProcessed` / `IsPostProcessed` |
 | `FilePosition` / `Length` | Byte offset and length in the source file |
 | `LineNumber` / `Indent` | Source line and indentation level (indentation drives block nesting) |
 | `SourceConnection` | IPC connection id that submitted the code (0 if internal) |
@@ -42,14 +43,14 @@ independently and in parallel:
 | `Telnet` | Telnet session |
 | `File` | Primary file print job |
 | `USB` | USB serial |
-| `Aux` | Serial device, e.g. PanelDue |
+| `Aux` | Serial device, e.g. PanelDue - no serial reader is wired up today |
 | `Trigger` | Trigger macros and `config.g` |
 | `Queue` | Code queue synced with primary motion |
 | `LCD` | Auxiliary LCD device |
-| `SBC` | Default channel for SPI requests from the firmware |
+| `SBC` | Historically the channel for firmware-initiated codes; nothing feeds it now |
 | `Daemon` | `daemon.g` background process |
 | `Aux2` | Second UART |
-| `Autopause` | Power-fail / heater-fault / filament-out macros |
+| `Autopause` | Event macros - heater fault, driver error, link loss ([events](rrf-differences.md#4-events)) |
 | `File2` | Secondary (forked) file print job |
 | `Queue2` | Code queue synced with secondary motion |
 | `USB2` | Secondary USB channel |
@@ -68,15 +69,15 @@ flowchart TD
     IPC --> INTERCEPT["CodeInterception<br/>(plugin rewrites)"]
 
     FILEJOB["Print job<br/>JobProcessor"] --> CODEFILE["CodeFile.ReadCodeAsync()"]
-    MACRO["Macro file<br/>MacroFile"] --> CODEFILE
+    MACRO["Macro file<br/>MacroRunner + MacroFile"] --> CODEFILE
 
-    FWREQ["RRF over firmware link<br/>(see firmware-link.md)"] --> SIMPLE["DoFirmwareCode<br/>SimpleCode, IsFromFirmware"]
+    EVENT["Event macro<br/>EventProcessor, Autopause channel"] --> MACRO
+    STARTUP["config.g / runonce.g<br/>at link-up, Trigger channel"] --> MACRO
 
     CSTREAM --> START
     CMD --> START
     INTERCEPT --> START
     CODEFILE --> START
-    SIMPLE --> START
 
     START["CodeProcessor.StartCodeAsync()"]
 ```
@@ -85,21 +86,27 @@ flowchart TD
   feeds streamed lines on a channel; `Intercept` lets plugins rewrite codes in flight.
 - **Print jobs and macros** ([file-management.md](file-management.md)): the job loop and macros read
   codes lazily from files on the `File`/`File2` and macro-owning channels.
-- **Firmware `DoCode`** ([firmware-link.md](firmware-link.md#requests-initiated-by-the-firmware)): RRF can ask
-  the SBC to run a code; a `SimpleCode` flagged `IsFromFirmware` is built and executed.
+- **Machine-initiated macros**: `config.g` and `runonce.g` when the link comes up, a macro named after
+  an [event](rrf-differences.md#4-events) on the `Autopause` channel, and the homing, probing and
+  tool-change files a code runs for itself. These all go through `MacroRunner`, which pushes a stack
+  level on the owning channel so a flush inside a macro waits for the macro's own codes.
 
 `SimpleCode` (`src/DuetControlServer/Commands/Generic/SimpleCode.cs`) parses an arbitrary text string
 (possibly several codes) and runs each resulting `Code`.
 
-## The six-stage code pipeline
+## The five-stage code pipeline
 
 Once a `Code` is handed to `CodeProcessor.StartCodeAsync()`
-(`src/DuetControlServer/Codes/CodeProcessor.cs`), it flows through six ordered stages defined by the
+(`src/DuetControlServer/Codes/CodeProcessor.cs`), it flows through five ordered stages defined by the
 `PipelineStage` enum (`src/DuetControlServer/Codes/Pipelines/PipelineStage.cs`):
 
 ```
-Start -> Pre -> ProcessInternally -> Post -> Firmware -> Executed
+Start -> Pre -> ProcessInternally -> Post -> Executed
 ```
+
+There used to be a sixth, `Firmware`, where a code DCS did not handle was parked for transmission to
+RepRapFirmware. It is gone along with the per-channel buffering behind it: a code is either executed
+here or it is not executed at all.
 
 Each stage is a `PipelineBase` subclass under `src/DuetControlServer/Codes/Pipelines/`. The hand-off
 between stages is a bounded `System.Threading.Channel<Code>` (the `Executed` stage uses an unbounded
@@ -120,15 +127,12 @@ flowchart TD
     PRE -- "not resolved" --> PROC
 
     PROC{"ProcessInternally<br/>code.ProcessInternally()"}
-    PROC -- "handled on SBC" --> EXEC
-    PROC -- "needs firmware" --> POST
+    PROC -- "a handler answered" --> EXEC
+    PROC -- "no handler claimed it" --> POSTI["Post-mode interception,<br/>then sys/&lt;code&gt;.g if it exists,<br/>else 'Command is not supported'"]
+    POSTI --> EXEC
 
-    POST{"Post<br/>InterceptionMode.Post"}
-    POST -- "interceptor resolved" --> EXEC
-    POST -- "not resolved" --> FW
-
-    FW["Firmware<br/>buffer for firmware link"]
-    FW --> EXEC
+    POST["Post<br/>re-entry only: a code an interceptor<br/>resubmitted after internal processing"]
+    POST --> EXEC
 
     EXEC["Executed<br/>InterceptionMode.Executed<br/>SetFinished() / SetCancelled()"]
     EXEC --> DONE[Reply returned to client]
@@ -143,82 +147,83 @@ Stage by stage:
    [`Intercept` connection](ipc.md#intercept) in `Pre` mode. If a plugin *resolves* it, the code jumps
    straight to **Executed**; otherwise it proceeds to **ProcessInternally**. The `IsPreProcessed` flag
    prevents re-interception on re-entry.
-3. **ProcessInternally** (`Pipelines/ProcessInternally.cs`): calls `code.ProcessInternally()`. If DCS
-   fully handles the code (non-null result) it goes to **Executed**; otherwise it continues to
-   **Post**. Sets `IsInternallyProcessed`. This is where the per-type handlers run (see
-   [Internal processing](#internal-processing-vs-forwarding-to-firmware)).
-4. **Post** (`Pipelines/Post.cs`): a second interception hook, `Post` mode. Resolve -> **Executed**;
-   otherwise -> **Firmware**. Sets `IsPostProcessed`.
-5. **Firmware** (`Pipelines/Firmware.cs`): not a processing stage - it has no processor task. Codes
-   parked here are picked up by the [firmware link layer](firmware-link.md), serialised, and transmitted to RRF.
-   Its `FlushAsync` delegates to the link interface so callers can wait for the firmware to drain.
-6. **Executed** (`Pipelines/Executed.cs`): the terminal stage. Runs `Executed`-mode interception
+3. **ProcessInternally** (`Pipelines/ProcessInternally.cs`): calls `code.ProcessInternally()`, which
+   is where the per-type handlers run (see [Internal processing](#internal-processing)). If no handler
+   claims the code, the same method runs `Post`-mode interception, then tries the macro named after
+   the code, and only then resolves it as unsupported - so an unclaimed code leaves this stage with an
+   answer either way. Sets `IsInternallyProcessed`.
+4. **Post** (`Pipelines/Post.cs`): reached only on re-entry, when an interceptor resubmits a code that
+   has already been processed internally. Sets `IsPostProcessed`.
+5. **Executed** (`Pipelines/Executed.cs`): the terminal stage. Runs `Executed`-mode interception
    (notification only - it cannot resolve), then finalises the code with `SetFinished()` or, on
    failure/cancellation, `SetCancelled()`. The result travels back to the originating client.
 
 ### ChannelProcessor and the per-channel stack
 
 `CodeProcessor` holds one `ChannelProcessor` per [code channel](#code-channels)
-(`src/DuetControlServer/Codes/ChannelProcessor.cs`). Each `ChannelProcessor` owns the full six-stage
+(`src/DuetControlServer/Codes/ChannelProcessor.cs`). Each `ChannelProcessor` owns the full five-stage
 pipeline for that channel. To support nested files and macros, every stage keeps a
 `Stack<PipelineStackItem>`: starting a macro pushes a new stack item onto all non-Executed stages at
 once; ending it pops them. Each stack item has its own processor task, so a macro nested on top of a
 print runs concurrently with - but logically above - the codes beneath it.
 
-## Internal processing vs. forwarding to firmware
+## Internal processing
 
 `code.ProcessInternally()` (`src/DuetControlServer/Commands/Generic/Code.cs`) dispatches by code type
 to one of four handlers registered through keyed DI (`Codes/Handlers/`):
 
 - `GCodeHandler`, `MCodeHandler`, `TCodeHandler`, `KeywordHandler`, all implementing `ICodeHandler`.
 
-The contract: a handler's `ProcessAsync` returns a `Message?`. **Non-null means the code was fully
-handled on the SBC and is never sent to the firmware**; **null means "forward to the firmware"** (the
-code continues to Post -> Firmware).
+A handler's `ProcessAsync` returns a `Message?`. **Non-null means the handler answered the code.**
+Null used to mean "forward to RepRapFirmware"; now it means no handler recognised the code, and what
+happens next is the fallback described above - `Post` interception, then `sys/<code>.g`, then
+`<code>: Command is not supported` as a warning, which is RepRapFirmware's own wording for the same
+situation.
 
 ```mermaid
 flowchart TD
     PI["code.ProcessInternally()"] --> TYPE{Code type}
-    TYPE -- "G" --> GH["GCodeHandler<br/>always returns null"]
-    TYPE -- "T" --> TH["TCodeHandler<br/>always returns null"]
-    TYPE -- "M" --> MH["MCodeHandler<br/>selected M-codes handled,<br/>rest return null"]
+    TYPE -- "G" --> GH["GCodeHandler<br/>moves, homing, probing,<br/>compensation, tool transforms"]
+    TYPE -- "T" --> TH["TCodeHandler<br/>tool selection and its macros"]
+    TYPE -- "M" --> MH["MCodeHandler<br/>configuration, heat, fans, tools,<br/>files, network, plugins"]
     TYPE -- "Keyword<br/>(echo/abort/var/set/global)" --> KH["KeywordHandler"]
 
-    GH --> FWD["null -> forward to firmware"]
-    TH --> FWD
-    MH --> DECIDE{handled?}
-    DECIDE -- "yes" --> RESOLVED["non-null -> resolved on SBC"]
-    DECIDE -- "no" --> FWD
-    KH --> RESOLVED
+    GH --> ANS{"recognised?"}
+    TH --> ANS
+    MH --> ANS
+    KH --> ANS
+    ANS -- "yes" --> RESOLVED["non-null -> answered here"]
+    ANS -- "no" --> FALLBACK["Post interception,<br/>sys/&lt;code&gt;.g,<br/>then unsupported"]
 ```
 
-- **G-codes and T-codes** are always forwarded - DCS does not interpret motion or tool-change
-  semantics; RRF does.
-- **M-codes**: `MCodeHandler` handles the M-codes that need SBC-side resources - filesystem,
-  networking, the [object model](object-model.md), plugins, firmware update - and forwards the rest.
-  Notable SBC-handled M-codes:
+- **G-codes** are interpreted here in full: `G0`/`G1` become planned moves through
+  [MoveInterpreter and MovePlanner](rrf-differences.md#5-interpreter-and-move-path), `G28` runs the
+  machine's homing macros, `G29`/`G30`/`G31` probe and build the height map, `G10`/`G53`/`G92` move
+  the coordinate systems around.
+- **T-codes**: `TCodeHandler` selects a tool and runs `tfree`/`tpre`/`tpost` around the change.
+- **M-codes**: `MCodeHandler` is the largest of the four, split across a file per subsystem
+  (`MCodeHandler.Motion.cs`, `.Heat.cs`, `.Fans.cs`, `.Tools.cs`, `.Probes.cs`, `.Spindles.cs`,
+  `.Ports.cs`, `.Compensation.cs`, `.ConfigOverride.cs`). A configuration code writes the
+  [object model](object-model.md) and, where a board needs telling, sends the matching
+  [CAN message](can-messages.md).
 
-  | M-code | SBC-side action |
+  A sample of the range, rather than a full list -
+  [MCODE_MIGRATION.md](docs/devel/MCODE_MIGRATION.md) has the complete inventory with status:
+
+  | M-code | What it does here |
   | --- | --- |
-  | M0/M1/M2 | Cancel the active job (if any), then forward |
-  | M20 | List an SD directory from the Linux filesystem |
-  | M21/M22 | Mount/release (the virtual SD is always mounted) |
-  | M23/M32/M37 | Select / start / simulate a print file |
-  | M24/M26/M27 | Resume / set / report file position |
-  | M28/M29/M30 | Begin / end SD write, delete file |
-  | M36/M38/M39 | File info (incl. thumbnails), CRC32, SD volume info |
-  | M98 | Mark a macro as pausable |
-  | M111 P-1 | Set the DCS log level |
-  | M112 | Emergency stop via the link interface |
-  | M118 P6 | Publish over MQTT |
-  | M122 "DSF" | DSF diagnostics |
-  | M409 (network/plugins/sbc/volumes) | Object-model query handled on the SBC |
-  | M470/M471/M472 | Create / rename / delete directory or file |
-  | M503/M505/M550/M551 | Config dump, config folder, machine name, password |
-  | M581.1/M586(.4) | SBC trigger config, protocol/MQTT/CORS config |
+  | M20-M39 | The virtual SD: list, select, write, delete, file info, CRC32, volume info |
+  | M92/M201/M203/M350/M584/M906 | Motion configuration, then a reconfiguration of the planner at standstill |
+  | M104/M109/M140/M307/M308 | Heaters and sensors, configured here and driven over CAN |
+  | M106/M950 | Fans and the I/O ports everything else is built from |
+  | M563/M567/M568 | Tool definition, mixing and settings |
+  | M558/M574/M119 | Probes and endstops ([Endstops](endstops.md)) |
+  | M500/M501/M503 | `config-override.g` - what the machine discovered about itself |
+  | M111 P-1 / M122 / M929 | DCS log level, diagnostics, event logging |
+  | M118 P6 / M586 | MQTT publication, network protocol and CORS configuration |
   | M606 S1 | Fork the input reader (start a second job on File2) |
-  | M929 | Start/stop event logging |
-  | M997/M999 | Firmware update / controller reset (stops the app) |
+  | M957 | Raise an [event](rrf-differences.md#4-events) |
+  | M997/M999 | Firmware update / controller reset |
 
 - **Keywords**: `KeywordHandler` handles only `echo`, `abort`, `var`, `set`, and `global`.
   Flow-control keywords (`if`, `elif`, `else`, `while`, `break`, `continue`) never reach a handler -
@@ -232,19 +237,27 @@ understand code structure rather than pass it through.
 ### Expression evaluation
 
 `src/DuetControlServer/Codes/Meta/Expressions.cs` evaluates `{ ... }` expressions and expression
-parameters, distinguishing two kinds of operand:
+parameters, **entirely locally**. There is no second evaluator to defer to: `M104 S{heat.heaters[0].target + 5}`
+and `{sbc.ethernet.ipAddress}` are both resolved here, against the one
+[object model](object-model.md) DCS owns.
 
-- **SBC fields**: [object-model](object-model.md) properties marked `[SbcProperty]` (parts of
-  `network`, `sbc`, `volumes`, `plugins`), the special variables `iterations` and `line`, and the
-  custom functions `exists`, `fileexists`, `fileread`. These are resolved locally.
-- **Firmware fields**: everything else. DCS substitutes any SBC sub-expressions in place, then sends
-  the remaining expression to RRF (`linkInterface.EvaluateExpressionAsync()`) for the actual
-  arithmetic/boolean evaluation.
+That was not always so. The evaluator used to resolve only the branches marked `[SbcProperty]` -
+`network`, `sbc`, `volumes`, `plugins`, `job` - and hand everything else to RepRapFirmware. When the
+firmware went, the fallback became `return null`, so `if move.axes[0].homed` silently produced
+nothing. The gate is gone, and an expression that genuinely cannot be produced is now an error
+(`cannot evaluate '<expression>'`) rather than a null, because a null reads as a valid answer.
 
-So `M104 S{heat.heaters[0].target + 5}` has `heat.heaters[0].target` resolved by RRF (a firmware
-field), whereas `{sbc.ethernet.ipAddress}` is resolved entirely on the SBC. Expression parameters are
-rewritten to their evaluated value before the code proceeds (`IsExpression` is cleared). The custom
-functions are registered at startup by `Functions` / `FunctionsInitializer` (`Codes/Meta/`).
+The two-pass shape that remains is about *synchrony*, not ownership: `fileexists()`, `fileread()` and
+`exists()` need asynchronous lookups, so the first pass evaluates everything else and the second
+substitutes those as literals and re-evaluates. Expression parameters are rewritten to their evaluated
+value before the code proceeds (`IsExpression` is cleared). The custom functions are registered at
+startup by `Functions` / `FunctionsInitializer` (`Codes/Meta/`).
+
+Variables (`var`, `set`, `global`, `param`) are also DCS's own, in `Codes/Meta/VariableSet.cs` and
+`VariableStore.cs`: one set per file, per channel for codes without one, with RepRapFirmware's
+semantics - `var` and `global` create and refuse to overwrite, `set` assigns and refuses to create,
+parameters are read-only. One thing they deliberately cannot do is hold an object model reference; see
+[Differences from RepRapFirmware](rrf-differences.md#6-meta-g-code-and-expressions).
 
 ### Flow control
 
@@ -272,21 +285,26 @@ A `M104 S200` typed in DWC during a print:
    `HTTP` channel, then handed to `CodeProcessor.StartCodeAsync()`.
 2. **Start** accounts for it and forwards to **Pre**.
 3. **Pre**: no interceptor resolves it -> **ProcessInternally**.
-4. **ProcessInternally**: `MCodeHandler` does not special-case M104, returns null -> **Post**.
-5. **Post**: no interceptor resolves it -> **Firmware**.
-6. **Firmware**: the [Firmware link](firmware-link.md) buffers it for the `HTTP` channel and, on the next
-   transfer, serialises and sends it to RRF.
-7. RRF sets the tool temperature and returns a reply; DCS matches it to the buffered code and sets its
-   `Result`.
-8. **Executed**: the `Executed` interception fires, the code is finalised with `SetFinished()`, and
+4. **ProcessInternally**: `MCodeHandler` claims M104. It resolves which tool's heaters the code
+   addresses, takes the object model's write lock, sets `heat.heaters[n].active`, and sends the
+   [CAN message](can-messages.md) that tells the board carrying that heater its new setpoint.
+5. The handler returns a `Message`, so the code goes straight to **Executed**.
+6. **Executed**: the `Executed` interception fires, the code is finalised with `SetFinished()`, and
    the reply is returned to DWC.
 
-Meanwhile the print continues on the `File` channel completely independently, with its own pipeline,
-macro stack, and SPI buffer - the two channels never block each other.
+The board reports the temperature it actually reaches in its periodic status report, which
+`ExpansionBoardManager` writes into `heat.heaters[n].current` - a separate path, arriving whether or
+not anybody asked.
+
+Meanwhile the print continues on the `File` channel completely independently, with its own pipeline
+and macro stack - the two channels never block each other, unless a code on one of them asks for
+standstill.
 
 ## See also
 
-- [Firmware link](firmware-link.md) - the Firmware stage and what happens once a code leaves DCS
+- [Firmware link](firmware-link.md) - the link a move or a CAN message leaves over
+- [CAN messages](can-messages.md) - how a handler addresses a board
 - [File management](file-management.md) - jobs, macros, and the flow-control details
 - [IPC](ipc.md) - the connections codes arrive on
 - [Object model](object-model.md) - the state expressions read
+- [Differences from RepRapFirmware](rrf-differences.md) - where the interpretation deliberately differs

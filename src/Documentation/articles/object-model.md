@@ -5,6 +5,15 @@ positions, the current job, network configuration, loaded plugins, and so on. Cl
 subscribe to changes to it, and reference it inside [expressions](gcode-flow.md#expression-evaluation).
 It is defined once in [DuetAPI](components.md#duetapi) and maintained at runtime by DCS.
 
+**DCS owns it outright.** There is no second copy on a firmware board to merge with, and no poll that
+fetches one. A configuration code writes the model directly; the boards report readings that are
+written into it; everything else derives from it. That makes the model more than a mirror of the
+machine - it is the *only* description of the machine that survives a restart, so a code that
+configures something is required to store it here and not merely send it over CAN. That rule, and what
+it added to the model, are in [Differences from RepRapFirmware][om-rule].
+
+[om-rule]: rrf-differences.md#3-the-object-model-has-to-be-able-to-recreate-the-machine
+
 - Definition: `src/DuetAPI/ObjectModel/ObjectModel.cs` and the `ObjectModel/` subtree
 - DCS provider and locking: `src/DuetControlServer/Model/ObjectModel.cs`, `Model/LockWrapper.cs`
 
@@ -50,10 +59,12 @@ Every node in the model derives from one of a small set of base types in
 
 Two attributes annotate properties and drive query/merge behaviour:
 
-- **`[SbcProperty]`** marks a property maintained by DSF rather than by the firmware. A constructor
-  argument records whether it is also available in standalone mode. When firmware updates are merged
-  these properties are skipped, and [expressions](gcode-flow.md#expression-evaluation) that reference
-  them are evaluated on the SBC instead of being forwarded to RRF.
+- **`[SbcProperty]`** marks a property that exists only when DSF is present - `network`, `sbc`,
+  `volumes`, `plugins`, `job` and parts of `directories` - as opposed to one a standalone Duet would
+  also have. A constructor argument records whether it is available in standalone mode too. It used to
+  carry a second meaning, "skip this when merging a firmware update, and evaluate it locally rather
+  than forwarding the expression"; with no firmware model to merge and no expression forwarded, only
+  the descriptive meaning is left.
 - **`[Live]`** marks frequently-changing properties (temperatures, positions) that are only included
   when the live query flag is set.
 
@@ -63,9 +74,8 @@ The model is serialized to JSON with a camelCase naming policy
 (`src/DuetAPI/ObjectModel/ObjectModelContext.cs`): `State.Status` becomes `state.status`. Dictionary
 keys (`Plugins`, `Global`) keep their original case. The companion source generator
 (`src/DuetAPI.SourceGenerators/`) emits, for every model type, fast `UpdateFromJson` /
-`UpdateFromJsonReader` and `Assign` methods used when merging firmware updates and cloning - this
-avoids reflection on the hot path. The generated update code honours `[SbcProperty]` so a firmware
-merge never clobbers SBC-owned state.
+`UpdateFromJsonReader` and `Assign` methods - this avoids reflection on the hot path when a client
+patch is applied or the model is cloned for a subscriber.
 
 ## Maintaining the model in DCS
 
@@ -78,30 +88,34 @@ DCS holds one global `ObjectModel` instance, guarded by an async reader/writer l
 - `AccessReadWrite()` / `AccessReadWriteAsync()` - one exclusive writer.
 
 The lock wrapper is disposable; releasing a write lock signals observers that the model changed.
-Condition variables let callers wait for the next update (`WaitForUpdate`) or for a full firmware
-update. A watchdog (`MaxMachineModelLockTime`) logs and shuts the app down if a lock is held too long,
-to surface deadlocks rather than hang silently.
+`WaitForUpdate` lets a caller wait for the next change. A watchdog (`MaxMachineModelLockTime`) logs
+and shuts the app down if a lock is held too long, to surface deadlocks rather than hang silently.
 
 > Lock contention on this single model is a real failure mode: any long-running work must gather data
 > outside the lock and apply it inside a short write-lock window. The periodic update service below is
 > written this way.
 
-### Updates from the firmware
+### Who writes what
 
-`Model/UpdateService.cs` requests object-model JSON from RRF over the [Firmware link](firmware-link.md) and
-merges each section with the generated `UpdateFromFirmwareJson` methods, skipping `[SbcProperty]`
-fields. Per-section sequence numbers (`Seqs`) tell DCS which sections actually changed since the last
-poll, so it only re-requests what moved.
+There are four writers, and no polling of another program's model among them:
 
-`Model/PeriodicUpdateService.cs` fills in the host-side facts the firmware cannot know - network
-interfaces, storage volumes, SBC CPU/memory/distribution info. It gathers these asynchronously
-outside the lock, then applies them under a brief write lock.
+| Writer | Writes |
+| --- | --- |
+| **Code handlers** (`Codes/Handlers/`) | Everything a code configures: `move.*`, `heat.*`, `fans[]`, `tools[]`, `sensors.*`, `boards[].drivers[]`, `state.*`. Under the write lock, as part of executing the code |
+| **`Link/Expansion/ExpansionBoardManager.cs`** | What the boards report: announcements into `boards[]`, temperatures into `sensors.analog[]`, heater state, fan RPM, driver status, input changes into `sensors.endstops[]` / `sensors.gpIn[]`. A bounded queue with the oldest entry dropped when full, because these are periodic reports where the newest is worth more than a backlog |
+| **`Motion/MotionService.cs`** | The live position - `move.axes[].machinePosition` from the engine's snapshot, so the field means where the machine *is* rather than where the last move was planned to end |
+| **`Model/PeriodicUpdateService.cs`** | Host-side facts nothing else can know: network interfaces, storage volumes, SBC CPU/memory/distribution info. Gathered asynchronously outside the lock, applied under a brief write lock |
+
+`Model/UpdateService.cs` still exists but is compiled out: it was the service that fetched object-model
+JSON from RepRapFirmware section by section, guided by per-section sequence numbers, and nothing
+produces that JSON any more.
 
 ### Observing changes and patches
 
 ```mermaid
 flowchart LR
-    FW["Firmware update<br/>(SPI)"] --> MODEL
+    BOARDS["ExpansionBoardManager<br/>(what the boards report)"] --> MODEL
+    MOTION["MotionService<br/>(live position)"] --> MODEL
     PERIODIC["PeriodicUpdateService"] --> MODEL
     CODE["Code execution"] --> MODEL
 
@@ -119,8 +133,7 @@ value. The [`ModelSubscription` IPC processor](ipc.md#connection-modes) turns th
 what drives the live DWC interface through the [DuetWebServer WebSocket](components.md#duetwebserver).
 
 `Model/SbcTriggerService.cs` is a second observer: it re-evaluates `M581.1` external-trigger
-expressions that reference SBC fields (which RRF cannot evaluate) whenever a relevant path changes,
-and queues codes when a trigger fires.
+expressions whenever a relevant path changes, and queues codes when a trigger fires.
 
 ## Querying by path
 
@@ -133,4 +146,6 @@ resolution backs SBC-side [expression evaluation](gcode-flow.md#expression-evalu
 
 - [IPC](ipc.md) - the `Subscribe` connection mode and the object-model commands
 - [G-code flow](gcode-flow.md#meta-codes-expressions-and-flow-control) - how expressions read the model
-- [Firmware link](firmware-link.md) - where firmware updates come from
+- [CAN messages](can-messages.md) - where the readings the boards report arrive from
+- [Differences from RepRapFirmware](rrf-differences.md#3-the-object-model-has-to-be-able-to-recreate-the-machine) -
+  why the model has to be able to rebuild the machine

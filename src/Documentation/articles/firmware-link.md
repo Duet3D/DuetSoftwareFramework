@@ -1,165 +1,130 @@
 # Firmware link
 
-DCS and RepRapFirmware (RRF) exchange data over a binary link. Every code DCS does not handle itself
-crosses this link, and RRF uses the same link to ask DCS for macros, file I/O, and SBC-side code
-execution. The link supports **two transports** behind a common interface:
+The link is what connects DuetControlServer to the hardware. It has two halves that are easy to
+confuse, because "the link" is used for both:
 
-- **SPI** - the SBC is the SPI master and a GPIO line (`TfrRdy`) signals readiness. The default.
-- **USB** - a serial connection over `/dev/ttyACM*`.
+- **DCS to the native side.** [DuetSbcInterface](components.md#duetsbcinterface) is a shared library
+  loaded into the DCS process. DCS calls exported functions to submit moves and queue messages, and
+  reads a ring buffer of events coming back. No serialisation, no sockets - a P/Invoke and a memcpy.
+- **The native side to the controller.** DuetSbcInterface's own thread runs an SPI transfer loop
+  against DuetCANMaster on the Duet 3 mainboard. That is the wire, and it is SPI only: the USB
+  transport is gone.
 
-The choice is made by the `CommunicationMethod` setting (`"spi"` or `"usb"`) and wired up in
-`Link/Extensions.cs`. Everything above the transport - the transfer loop, per-channel buffering, the
-packet protocol, and the firmware-request handlers - is shared.
+This replaced an arrangement where DCS itself drove the SPI link and RepRapFirmware sat on the other
+end of it. Both the transport code and the traffic changed. What crosses the link now is moves, CAN
+messages and their outcomes; what used to cross it - G-codes for another interpreter to run, macro
+requests coming back, file I/O on the firmware's behalf, object model polls - has no counterpart,
+because there is no second interpreter.
 
-- Transport interface: `src/DuetControlServer/Link/Adapter/ILinkAdapter.cs`
-- Transports: `Link/Adapter/SPI.cs`, `Link/Adapter/USB.cs`
-- Transfer loop and request handlers: `Link/LinkService.cs`
-- Higher-level link API: `Link/LinkInterface.cs`
-- Per-channel buffering: `Link/Channel/Processor.cs`, `Channel/Manager.cs`
-- Wire format: `Link/Protocol/`
-
-This article continues from the [Firmware stage of the code pipeline](gcode-flow.md#the-six-stage-code-pipeline):
-once a code reaches that stage, the link layer described here transmits it.
+- Managed side of the boundary: `src/DuetControlServer/Link/Native/NativeLink.cs`,
+  `Link/Native/LinkEvents.cs`
+- Event dispatch and request handlers: `src/DuetControlServer/Link/LinkService.cs`
+- Higher-level API (CAN requests, messages, emergency stop):
+  `src/DuetControlServer/Link/LinkInterface.cs`
+- Native transfer engine: `src/DuetSbcInterface/src/SBC/SbcInterface.cpp`, `SBC/SbcTransfer.cpp`
+- Wire format, shared by both builds: `lib/DuetSpiInterface/include/DuetSpiProtocol/MessageFormats.h`
 
 ## Layering
 
 ```mermaid
 flowchart TD
-    FW["Firmware stage<br/>(gcode-flow.md)"] --> CHAN["Channel processors<br/>per-channel code buffering"]
-    CHAN --> LI["LinkInterface<br/>buffer-space accounting, high-level API"]
-    LS["LinkService<br/>transfer loop + request routing"] --> LI
-    LI --> ADAPTER{"ILinkAdapter"}
-    ADAPTER -- "CommunicationMethod = spi" --> SPI["SPI adapter<br/>/dev/spidev0.0 + GPIO TfrRdy"]
-    ADAPTER -- "CommunicationMethod = usb" --> USB["USB adapter<br/>/dev/ttyACM*"]
-    SPI <--> RRF["RepRapFirmware"]
-    USB <--> RRF
+    HANDLERS["Code handlers, MovePlanner<br/>(gcode-flow.md)"] --> LI["LinkInterface<br/>CAN requests, messages, e-stop"]
+    LI --> NL["NativeLink<br/>P/Invoke into libduet_sbc.so"]
+    MP["MovePlanner"] --> NL
+    NL --> RING["outbound ring<br/>sequence-numbered commands"]
+    RING --> XFER["SbcTransfer<br/>SPI master, TfrRdy-gated"]
+    XFER <-->|"SPI"| CM["DuetCANMaster"]
+    CM <-->|"CAN"| EXP["Duet3Expansion"]
+    XFER --> EVENTS["inbound event ring"]
+    EVENTS --> LS["LinkService<br/>dispatch on the managed side"]
 ```
 
-`ILinkAdapter` is the transport abstraction. It exposes `Connect`, `PerformFullTransfer`,
-`ReadNextPacket`, and a set of typed readers for firmware requests (`ReadMacroRequest`,
-`ReadMessage`, `ReadObjectModel`, `ReadCodeBufferUpdate`, ...). `LinkService`, `LinkInterface`, and the
-channel processors are written entirely against this interface, so they do not care which transport is
-in use.
+Two rules shape this picture and are worth stating outright:
 
-## The transfer loop
+- **Every CAN message originates in DCS.** The native side builds no messages of its own; it stages
+  what it is handed. That invariant held with one exception - the endstop wind-back - until that was
+  moved up to DCS as well, taking the CANlib dependency out of DuetSbcInterface with it.
+- **The transfer loop must never block on managed work.** Everything inbound is posted to a ring and
+  dispatched on a managed thread, so a slow object-model write cannot stall an SPI transfer.
 
-One high-priority thread runs `LinkService.Execute()`:
+## What goes down
 
-```mermaid
-flowchart TD
-    subgraph loop["LinkService.Execute() - highest priority"]
-        RECV["Read received packets<br/>ProcessPacket() routes each"] --> SPIN["channels.Spin()<br/>round-robin over channels"]
-        SPIN --> BUF["Processor.Spin() per channel:<br/>replies, locks, aborts,<br/>macros, BufferCode()"]
-        BUF --> XFER["adapter.PerformFullTransfer()"]
-        XFER --> RECV
-    end
+`SbcRequest` (`MessageFormats.h`) is the whole outbound vocabulary:
 
-    FW["Firmware stage<br/>(gcode-flow.md)"] --> BUF
-    XFER <-->|"chosen transport"| RRF["RepRapFirmware"]
-```
+| Request | Sent by | Meaning |
+| --- | --- | --- |
+| `ScheduleMove` | `MovePlanner` via the motion engine | One planned move, per-drive: steps, extrusion, and what stops each driver |
+| `SendCANMessage` | `LinkInterface.SendCanMessageAsync` | A CAN message body for the controller to put on the bus ([CAN messages](can-messages.md)) |
+| `ConfigCAN` / `EnableCAN` | Startup and `M952`/`M953` | Bus timing, and turning the bus on |
+| `EmergencyStop` | `M112` | Stop everything, now |
+| `Reset` | `M999` | Reset the controller |
+| `WriteIap` / `StartIap` | `M997` | Stream the in-application programmer and launch it |
+| `Message` | `M118` and diagnostics | Text for the controller to print on its own console |
 
-Each iteration: read and route the packets RRF sent, let every [code channel](gcode-flow.md#code-channels)
-buffer outgoing codes, then perform one full transfer over the active transport.
+Every command entering the outbound ring is given a **monotonic sequence number**. The path is FIFO
+end to end, so one number describes every command up to it: after a successful transfer the native
+side posts `OutboundDelivered(seq)`, and on a drop `OutboundDropped(seq)`. That is what lets a
+fire-and-forget CAN message be resolved on delivery rather than on the memcpy that queued it, at a
+cost of one event per transfer rather than one per message.
 
-## Sending codes to the firmware
+## What comes back
 
-`Link/Channel/Manager.cs` visits each channel round-robin and calls `Processor.Spin()`
-(`Link/Channel/Processor.cs`), which handles, in priority order: pending replies, lock/unlock
-requests, abort requests, macro management, resumption of suspended codes, then buffering of new codes
-via `BufferCode()`.
+Inbound traffic is a ring of `InboundEventType` records, dispatched by `LinkService`:
 
-Each channel tracks a `BufferedCodes` list and a `BytesBuffered` counter. A code is only buffered when
-it fits within `MaxBufferSpacePerChannel` **and** RRF has reported enough free space (RRF sends
-`CodeBufferUpdate` packets; `LinkInterface` keeps a running `BufferSpace` figure). The code is
-serialized by `Link/Protocol/Writer.cs` into a `CodeHeader` plus its parameters, wrapped in an 8-byte
-`PacketHeader` of type `Code`, and copied into the transmit buffer.
+| Event | What DCS does with it |
+| --- | --- |
+| `Message` | Route firmware text to the message log and any listening clients |
+| `CanResponse` | Match the token to a pending CAN request and reassemble it, or route it as unsolicited traffic - board announcements, status reports, input changes, events |
+| `MoveCompleted` / `MoveFailed` | Retire the move in `MotionTracker`, or report why it could not run |
+| `MotionStopped` | An endstop cut a move short: the trigger time, the move id and the drivers that stopped ([Endstops](endstops.md)) |
+| `CanMessagesSent` | What the controller made of the CAN messages it was asked to send |
+| `OutboundDelivered` / `OutboundDropped` | Resolve or fail everything up to that sequence number |
+| `ConnectionLost` / `ConnectionEstablished` / `ControllerReset` | Invalidate what the link was carrying, then raise the matching event |
+| `RequestCompleted` | Complete an awaited request that carried a request id |
+| `Log` / `MalformedPacket` / `FatalError` | Diagnostics from the transfer loop; the last one ends the link service |
+| `CodeBufferUpdate` | Reported buffer space, kept for `M122` |
+
+Note what is *not* in that list: no `ExecuteMacro`, no `DoCode`, no `AbortFile`, no file I/O. The
+controller asks DCS for nothing except to be told what to do; macros are started by DCS itself
+through `MacroRunner`, and the filesystem was always the SBC's.
+
+## When the link drops
+
+The transfer engine reports the outage where it observes it, rather than after the fact, and DCS
+reacts in a fixed order:
+
+1. `Invalidate()` - cancel pending CAN requests, discard queued moves, drop what was staged for a
+   controller that may since have rebooted. Staged data is **not** replayed: a rebooted controller has
+   no state to receive it, and one that merely stalled is about to be reconfigured anyway.
+2. Raise `controller_disconnect`, which runs `sys/controller-disconnect.g` if the machine has one.
+   Once per outage, whether the outage was seen as a timeout or as a reset.
+3. On recovery, raise `controller_reconnect`. Its default action is to run `config.g`, because a
+   controller that reset has lost every setting and something has to put them back. A machine that
+   provides `sys/controller-reconnect.g` takes that responsibility on instead.
+
+Both events are DSF's own - RepRapFirmware has no equivalent because it *is* the controller. See
+[Differences from RepRapFirmware](rrf-differences.md#4-events).
 
 ## The wire format
 
-A single transfer carries one **transfer header** followed by a sequence of packets. Each packet
-begins with an 8-byte `PacketHeader` (request type, id, length, resend id) followed by a
-4-byte-aligned payload. The packet layer is identical on both transports; only the transfer header and
-the integrity guarantees differ:
+A transfer carries one `SpiTransferHeader` followed by a sequence of packets, each an 8-byte
+`PacketHeader` (request type, id, length, resend id) plus a 4-byte-aligned payload. The header carries
+a format code, a protocol version, a sequence number (which is how a reset is detected), and CRC32s
+over the header and the data.
 
-| | SPI (`TransferHeader`) | USB (`UsbTransferHeader`) |
-| --- | --- | --- |
-| Header size | 16 bytes | 8 bytes |
-| Format code | yes | no |
-| Sequence number | yes (detects resets) | no |
-| CRC | CRC32 (v4+) / CRC16 | none - USB guarantees integrity and ordering |
-| Readiness signalling | GPIO `TfrRdy` line | serial flow, no GPIO |
-| Direction | full-duplex (TX and RX swapped together) | serial read/write |
+Two fields ride in the header rather than in a packet of their own, and for the same reason: the
+**master clock** sample and the **hiccup time**. The SBC has no step clock, so it fits one to those
+samples and schedules every move by absolute start time in the result. What the fit rests on is the
+pairing between a tick count and the local time it was stamped with, and a packet is read after an
+unknown number of others - the header arrives at a fixed point in every transfer.
 
-Both transports keep three transmit buffers so a firmware resend request can be honoured.
-
-### SPI transport
-
-`Link/Adapter/SPI.cs` drives `/dev/spidev0.0`. `PerformFullTransfer()`:
-
-1. finalises the transmit header (packet count, incremented sequence number, data length, CRC),
-2. `ExchangeHeader()` - waits for `TfrRdy`, swaps the 16-byte headers full-duplex, validates the CRC
-   and protocol version, and acknowledges,
-3. `ExchangeData()` - if either side has data, swaps the payloads full-duplex and validates the CRC,
-4. rotates to the next transmit buffer and resets the pointers.
-
-Each of those steps is a separate `TfrRdy`-gated sub-exchange, and either side can reject one at any
-point. [SPI transfer state machine](spi-state-machine.md) documents both sides of that handshake in
-full, including how each side recovers when the other desynchronises.
-
-### USB transport
-
-`Link/Adapter/USB.cs` drives a `SerialPort` on `/dev/ttyACM*` (default `/dev/ttyACM1`). Because USB
-already provides reliable, ordered delivery, the `UsbTransferHeader` drops the CRC, format code, and
-sequence number, and there is no GPIO handshake - the adapter simply writes the header and data and
-reads the firmware's response from the serial stream. The packet protocol above it is unchanged, so
-the same `LinkService` request handlers and channel buffering apply.
-
-## Replies
-
-When RRF returns a `Message` carrying the binary-code-reply flag, DCS routes it to the originating
-channel (`Manager.HandleReply` -> `Processor.HandleReply`), pops the matching code off that channel's
-`BufferedCodes` (FIFO), and attaches the text as the code's
-[`Result`](gcode-flow.md#the-code-object). The code then finalises in the
-[Executed stage](gcode-flow.md#the-six-stage-code-pipeline) and the reply travels back to whichever
-client submitted it.
-
-## Requests initiated by the firmware
-
-RRF is not only a sink for codes - it drives work back into DCS. These arrive as packets and are
-routed by `LinkService.ProcessPacket()`, independent of transport:
-
-```mermaid
-flowchart LR
-    RRF["RepRapFirmware"] -->|ExecuteMacro| MAC["DoMacroFile()<br/>push macro on channel stack"]
-    RRF -->|DoCode| DC["DoFirmwareCode()<br/>SimpleCode, IsFromFirmware"]
-    RRF -->|Message / code reply| RPL["HandleReply()<br/>complete buffered code"]
-    RRF -->|AbortFile| AB["FilesAborted()<br/>unwind macro stack"]
-    RRF -->|PrintPaused| PP["pause the job<br/>invalidate file codes"]
-    RRF -->|Locked| LK["resolve movement-lock request"]
-    RRF -->|MacroFileClosed| MFC["pop SBC macro stack"]
-    RRF -->|OpenFile/Read/Write/Seek/Close| FIO["filesystem I/O on the SBC"]
-
-    MAC --> PIPE["into the code pipeline"]
-    DC --> PIPE
-```
-
-- **ExecuteMacro** - RRF asks DCS to run a macro (homing files, `config.g`, tool-change macros, ...).
-  DCS resolves the [virtual path](file-management.md#path-mapping), pushes a
-  [`MacroFile`](file-management.md#macros) onto the channel stack, and its codes flow through the
-  normal pipeline.
-- **DoCode** - RRF asks DCS to execute a code string; a `SimpleCode` flagged `IsFromFirmware` is run.
-- **AbortFile / PrintPaused / MacroFileClosed** - keep DCS's per-channel macro stack and
-  [job state](file-management.md#print-jobs) consistent with the firmware's.
-- **Locked** - completes a pending movement-lock request so a code waiting on motion synchronisation
-  can proceed.
-- **File I/O** - RRF delegates file open/read/write/seek/close to the SBC, which performs the actual
-  Linux filesystem access and streams data back.
-
-The [object model](object-model.md#updates-from-the-firmware) is also kept current over this link via
-`GetObjectModel` requests and `CodeBufferUpdate` packets.
+Each sub-exchange is gated by the `TfrRdy` line and either side can reject one, which is a protocol in
+its own right: [SPI transfer state machine](spi-state-machine.md) documents both sides of it,
+including how each recovers when the other desynchronises.
 
 ## See also
 
-- [G-code flow](gcode-flow.md) - how a code reaches the Firmware stage in the first place
-- [File management](file-management.md) - macros, jobs, and the virtual paths RRF requests
-- [Object model](object-model.md#updates-from-the-firmware) - the model updates carried over this link
+- [G-code flow](gcode-flow.md) - what happens before a move or a message reaches this layer
+- [CAN messages](can-messages.md) - the message bodies this link tunnels
+- [Endstops](endstops.md) - the one path where the link's latency is a design constraint
+- [SPI transfer state machine](spi-state-machine.md) - one transfer, in full detail

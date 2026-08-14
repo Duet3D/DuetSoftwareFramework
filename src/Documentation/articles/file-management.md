@@ -1,11 +1,13 @@
 # File management
 
-RepRapFirmware addresses files with FatFs-style virtual paths (`0:/sys/config.g`). DSF has no real SD
-card - it maps those paths onto a directory on the Linux filesystem, parses G-code metadata for the
-web interface, and runs print jobs and macros out of that tree.
+G-code addresses files with FatFs-style virtual paths (`0:/sys/config.g`), which is what a Duet's own
+SD card looks like and what a decade of macros and slicer output expect. DSF has no real SD card - it
+maps those paths onto a directory on the Linux filesystem, parses G-code metadata for the web
+interface, and runs print jobs and macros out of that tree.
 
 - Path mapping: `src/DuetControlServer/Files/FilePathResolver.cs`
-- Jobs and macros: `src/DuetControlServer/Files/JobProcessor.cs`, `Files/CodeFile.cs`, `Files/MacroFile.cs`
+- Jobs and macros: `src/DuetControlServer/Files/JobProcessor.cs`, `Files/CodeFile.cs`,
+  `Files/MacroFile.cs`, `Files/MacroRunner.cs`
 - File info: `src/DuetControlServer/Files/Parser/`
 - Directory keys: `src/DuetAPI/ObjectModel/Directories/`
 
@@ -58,7 +60,7 @@ flowchart TD
     PAUSE -- "resume" --> SEEK["seek to saved position"]
     SEEK --> LOOP
 
-    READ -- "M98 / firmware macro request" --> MAC["MacroFile + ChannelProcessor.Push()"]
+    READ -- "M98, or a code that runs a macro" --> MAC["MacroRunner + ChannelProcessor.Push()"]
     MAC --> MACLOOP["MacroFile.RunAsync()<br/>buffered async execution"]
     MACLOOP -- "macro ends" --> POP["ChannelProcessor.Pop()<br/>restore parent codes"]
     POP --> LOOP
@@ -66,7 +68,7 @@ flowchart TD
 
 `JobProcessor` (`Files/JobProcessor.cs`) owns the print lifecycle. `SelectFileAsync` opens the file on
 the [`File` channel](gcode-flow.md#code-channels); `DoFilePrint()` then reads codes and pushes them
-into the [pipeline](gcode-flow.md#the-six-stage-code-pipeline). File position advances by
+into the [pipeline](gcode-flow.md#the-five-stage-code-pipeline). File position advances by
 `FilePosition + Length` per code.
 
 On **pause**, the current position is saved and the loop waits on a resume signal; on **resume** it
@@ -80,15 +82,32 @@ print in parallel.
 ## Macros
 
 A macro is a `MacroFile` (`Files/MacroFile.cs`), a `CodeFile` that runs its codes asynchronously on
-the channel that owns it. Each channel keeps a stack of macro levels; starting a macro pushes a level
-and exhausting it pops one, restoring any suspended parent codes (the stack lives in the
-[firmware channel processor](firmware-link.md#sending-codes-to-the-firmware)).
+the channel that owns it. `Files/MacroRunner.cs` is what starts one: it pushes a level onto that
+channel's [pipeline stack](gcode-flow.md#channelprocessor-and-the-per-channel-stack), runs the macro,
+waits for it, and pops the level again. Running on its own level is what makes a flush inside a macro
+wait for the macro's codes rather than for whatever started it, and what lets macros nest without
+interleaving. Nesting is capped at 10 levels, as RepRapFirmware caps its own stack.
 
-- A **nested macro** is started by a code - `M98`, or implicitly `config.g`, `M501`, a homing file,
-  ... - and carries its start code and source connection. Its codes are flagged `IsFromMacro` (plus
-  `IsNestedMacro`, `IsFromConfig`, etc. as applicable).
-- A **system macro** is requested by the firmware over the [Firmware link](firmware-link.md#requests-initiated-by-the-firmware)
-  with no start code.
+Macros are started by DCS itself - nothing asks it to run one from outside any more:
+
+| Macro | Started by |
+| --- | --- |
+| `config.g`, then `runonce.g` | The link coming up, on the `Trigger` channel |
+| `config-override.g` | `M501` |
+| Any file | `M98 P"..."` |
+| `homeall.g`, `home<axis>.g` | `G28`, one macro at a time until every named axis is homed |
+| `deployprobe<n>.g` / `retractprobe<n>.g`, `mesh.g`, `bed.g` | The probing codes |
+| `tfree<n>.g`, `tpre<n>.g`, `tpost<n>.g` | A tool change |
+| `<letter><number>.g` | A code no handler recognised - how a machine adds a code of its own |
+| `heater-fault.g`, `driver-stall.g`, `controller-disconnect.g`, ... | An [event](rrf-differences.md#4-events), on the `Autopause` channel |
+
+Codes from a macro are flagged `IsFromMacro`, plus `IsNestedMacro`, `IsFromConfig` or
+`IsFromSystemMacro` as applicable. `IsFromSystemMacro` is load-bearing rather than informational: a
+system macro's moves are not given the workplace offset, because `homeall.g` and friends work in
+machine coordinates.
+
+A macro can take parameters - `MacroRunner.TryRunAsync` seeds the macro's variable set, which is how
+an event macro reads `param.D`/`B`/`P`/`S` and how `M1234 X5` reaches `param.X` in `sys/M1234.g`.
 
 For `config.g`, DCS injects synthetic codes (machine name, date/time) so the configuration reflects
 the host environment.
@@ -108,5 +127,5 @@ thumbnail data and file fragments on demand.
 ## See also
 
 - [G-code flow](gcode-flow.md) - the pipeline these files feed, and the flow-control details
-- [Firmware link](firmware-link.md#requests-initiated-by-the-firmware) - firmware macro and file-I/O requests
 - [Object model](object-model.md) - the `Job`, `Directories`, and `Volumes` keys
+- [Differences from RepRapFirmware](rrf-differences.md) - including what `M500` writes and what it does not
