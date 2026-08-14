@@ -297,8 +297,8 @@ src/DuetAPI/Generated
 aot/out
 
 build/
-# Claude Code worktrees are local scratch, not part of the repository
-.claude/worktrees/
+# Claude Code
+.claude/
 
 # Reference checkout of RepRapFirmware; not a submodule of this repo.
 lib/RepRapFirmware/
