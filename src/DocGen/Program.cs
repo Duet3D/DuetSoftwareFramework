@@ -137,11 +137,11 @@ async Task WritePropertyDocumentation(StreamWriter writer, PropertyInfo property
             ObsoleteAttribute attribute = (ObsoleteAttribute)Attribute.GetCustomAttribute(property, typeof(ObsoleteAttribute))!;
             if (string.IsNullOrWhiteSpace(attribute.Message))
             {
-                await writer.WriteLineAsync("*This field is obsolete and will be removed from the object model in the future*");
+                await writer.WriteLineAsync("*This field is obsolete, can be queried using the 'o' flag, and will be removed from the object model in the future*");
             }
             else
             {
-                await writer.WriteLineAsync($"*This field is obsolete and will be removed in the future: {attribute.Message}*");
+                await writer.WriteLineAsync($"*This field is obsolete, can be queried using the 'o' flag, and will be removed in the future: {attribute.Message}*");
             }
             writeNL = true;
         }
@@ -181,7 +181,7 @@ async Task WritePropertyDocumentation(StreamWriter writer, PropertyInfo property
         await writer.WriteLineAsync(documentation);
         await writer.WriteLineAsync();
 
-        Type baseType = property.PropertyType.IsGenericType ? property.PropertyType.GetGenericArguments()[0] : property.PropertyType;
+        Type baseType = GetItemType(property.PropertyType);
         if (baseType.IsEnum)
         {
             // Write enum values
@@ -210,12 +210,7 @@ async Task WritePropertyDocumentation(StreamWriter writer, PropertyInfo property
         {
             // Write documentation for (inherited) types
             Type[] relatedTypes;
-            if (baseType == typeof(Inputs))
-            {
-                // Inputs is a pseudo-list so it requires special treatment
-                relatedTypes = [typeof(InputChannel)];
-            }
-            else if (baseType == typeof(Message))
+            if (baseType == typeof(Message))
             {
                 // Message is not inherited from ModelObject
                 relatedTypes = [typeof(Message)];
@@ -252,6 +247,29 @@ async Task WritePropertyDocumentation(StreamWriter writer, PropertyInfo property
             }
         }
     }
+}
+
+/// <summary>
+/// Get the item type of a collection or the given type if it is not a collection
+/// </summary>
+/// <param name="type">Type to resolve</param>
+/// <returns>Item type</returns>
+Type GetItemType(Type type)
+{
+    if (type.IsGenericType)
+    {
+        return type.GetGenericArguments()[0];
+    }
+
+    // Collections like Boards and Inputs are not generic themselves, they derive from a generic collection
+    for (Type? candidate = type.BaseType; candidate is not null; candidate = candidate.BaseType)
+    {
+        if (candidate.IsGenericType && typeof(IEnumerable).IsAssignableFrom(candidate))
+        {
+            return candidate.GetGenericArguments()[0];
+        }
+    }
+    return type;
 }
 
 /// <summary>

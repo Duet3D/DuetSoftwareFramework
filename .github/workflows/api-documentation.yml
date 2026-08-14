@@ -1,4 +1,4 @@
-name: Update DuetAPI documentation
+name: Update API documentation
 
 # The object model TypeScript library generates its documentation sidecar from DuetAPI.xml and cannot
 # build DSF itself, so the file is kept in docs/ where that library's release workflow fetches it from
@@ -11,6 +11,7 @@ on:
       - v*-dev
     paths:
       - src/DuetAPI/**
+      - src/DocGen/**
   workflow_dispatch:
 
 permissions:
@@ -23,6 +24,8 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-24.04
+    env:
+      RRF_WIKI_TOKEN: ${{ secrets.RRF_WIKI_TOKEN }}
     steps:
       - uses: actions/checkout@v7
 
@@ -47,5 +50,33 @@ jobs:
             echo "DuetAPI.xml is already up to date"
           else
             git commit -m "Updated DuetAPI documentation"
+            git push
+          fi
+
+      # DocGen reads ../DuetAPI/DuetAPI.xml and writes documentation.md, both relative to its own directory
+      - name: Generate object model documentation
+        working-directory: src/DocGen
+        run: dotnet run -c Release
+
+      # The wiki lives in another repository, so the default GITHUB_TOKEN cannot push to it. Without the
+      # secret the object model documentation stays as it is and the rest of the workflow still runs
+      - name: Publish object model documentation
+        if: env.RRF_WIKI_TOKEN != ''
+        run: |
+          version=$(grep -oPm1 '(?<=<Version>)[^<]+' src/Directory.Build.props)
+          case "$version" in
+            *-*) page="Object-Model-Documentation-Beta-&-RC.md" ;;
+            *)   page="Object-Model-Documentation.md" ;;
+          esac
+          git clone -q "https://x-access-token:$RRF_WIKI_TOKEN@github.com/Duet3D/RepRapFirmware.wiki.git" rrfwiki
+          cp src/DocGen/documentation.md "rrfwiki/$page"
+          cd rrfwiki
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$page"
+          if git diff --staged --quiet; then
+            echo "$page is already up to date"
+          else
+            git commit -m "Updated object model documentation for $version"
             git push
           fi
