@@ -321,6 +321,84 @@ public class EndstopArmingTests
     }
 
     [Test]
+    public void AnAxisWithOneSwitchStopsTheWholeDrive()
+    {
+        // Every motor watches the same switch and none of them has one to run on to, so there is
+        // nothing individual about it
+        (Move move, Sensors sensors) = Machine(yDrivers: 2, ySwitches: 1);
+        MoveStopInput[] stopInputs = NewStopInputs();
+
+        Arm((move, sensors), stopInputs, [1]);
+
+        Assert.That(stopInputs[1].Action, Is.EqualTo(StopAction.Group));
+    }
+
+    [Test]
+    public void AnAxisWithASwitchPerDriverStopsEachMotorOnItsOwn()
+    {
+        // What squares a gantry: each motor runs on to the switch beside it. The controller
+        // escalates the last of them to stopping the drive, which is where the count lives
+        (Move move, Sensors sensors) = Machine(yDrivers: 2, ySwitches: 2);
+        MoveStopInput[] stopInputs = NewStopInputs();
+
+        Arm((move, sensors), stopInputs, [1]);
+
+        Assert.That(stopInputs[1].Action, Is.EqualTo(StopAction.Driver));
+    }
+
+    [Test]
+    public void MotorStallAnyStopsTheDriveAndMotorStallIndividualStopsOneMotor()
+    {
+        // The whole difference between M574 S3 and S4, and the reason S4 exists: a stall-homed
+        // gantry squares itself only if each motor stops where it stalled
+        (Move any, Sensors anySensors) = Machine(yDrivers: 2);
+        anySensors.Endstops[1]!.Type = EndstopType.MotorStallAny;
+        MoveStopInput[] anyInputs = NewStopInputs();
+        Arm((any, anySensors), anyInputs, [1]);
+
+        (Move individual, Sensors individualSensors) = Machine(yDrivers: 2);
+        individualSensors.Endstops[1]!.Type = EndstopType.MotorStallIndividual;
+        MoveStopInput[] individualInputs = NewStopInputs();
+        Arm((individual, individualSensors), individualInputs, [1]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(anyInputs[1].Action, Is.EqualTo(StopAction.Group), "S3 stops every motor of the axis");
+            Assert.That(individualInputs[1].Action, Is.EqualTo(StopAction.Driver), "S4 stops the one that stalled");
+        });
+    }
+
+    [Test]
+    public void CoupledKinematicsOutranksWhateverTheEndstopWouldHaveDone()
+    {
+        // RepRapFirmware's GetResult tests stopAll before it tests individualMotors, because the
+        // drives are coupled: letting the others run on would drag the head into the switch
+        (Move move, Sensors sensors) = Machine(xDrivers: 2);
+        sensors.Endstops[0]!.Type = EndstopType.MotorStallIndividual;
+        MoveStopInput[] stopInputs = NewStopInputs();
+
+        ArmedMove armed = Arm((move, sensors), stopInputs, [0], kinematics: KinematicsName.CoreXY);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(armed.StopsEveryDrive, Is.True);
+            Assert.That(stopInputs[0].Action, Is.EqualTo(StopAction.All), "and not the S4 the endstop asked for");
+            Assert.That(stopInputs[1].Action, Is.EqualTo(StopAction.All), "on every drive of the move");
+        });
+    }
+
+    [Test]
+    public void ADriveThatWatchesNothingHasNoAction()
+    {
+        (Move move, Sensors sensors) = Machine();
+        MoveStopInput[] stopInputs = NewStopInputs();
+
+        Arm((move, sensors), stopInputs, [0]);
+
+        Assert.That(stopInputs[1].Action, Is.EqualTo(StopAction.None), "an axis the code did not name");
+    }
+
+    [Test]
     public void ASwitchEndstopDoesNotAskForReducedAcceleration()
     {
         (Move move, Sensors sensors) = Machine();

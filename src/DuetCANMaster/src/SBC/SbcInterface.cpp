@@ -346,7 +346,7 @@ bool SbcInterface::EnqueueCanResponse(const CANResponseHeader& header, const cha
 	return true;
 }
 
-bool SbcInterface::ReportMotionStopped(uint32_t whenTriggered,
+bool SbcInterface::ReportMotionStopped(uint32_t whenTriggered, uint32_t moveId,
 									   std::span<const duet::spi::protocol::MotionStoppedDriver> stopped) noexcept
 {
 	if (stopped.empty())
@@ -366,6 +366,7 @@ bool SbcInterface::ReportMotionStopped(uint32_t whenTriggered,
 	MotionStoppedBuffer& item = m_motionStoppedRing[m_motionStoppedHead];
 	const auto count = min<size_t>(stopped.size(), ARRAY_SIZE(item.drivers));
 	item.header.whenTriggered = whenTriggered;
+	item.header.moveId = moveId;
 	item.header.numDrivers = (uint8_t)count;
 	memset(item.header.padding, 0, sizeof(item.header.padding));
 	memcpy(item.drivers, stopped.data(), count * sizeof(item.drivers[0]));

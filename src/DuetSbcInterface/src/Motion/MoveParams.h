@@ -153,6 +153,15 @@ namespace Duet::Sbc::Motion
 		// nothing. RepRapFirmware does the same from DDA::Prepare, where CheckEndstops(false) zeroes
 		// the steps of "the motors concerned" before the movement messages go out
 		uint8_t heldDrivers;
+
+		// What a trigger on this drive's input stops: this motor alone until it is the last of the
+		// drive still running, the whole drive, or the whole move. RepRapFirmware's three
+		// EndstopHitActions, decided by DCS from the endstop type and the kinematics
+		duet::spi::protocol::StopAction stopAction;
+
+		// Written out rather than left to the compiler: the C# mirror has to lay this record out by
+		// hand, and a byte the two sides disagree about shifts every drive after the first
+		uint8_t padding;
 	};
 
 	// The handle type field, which decides whether the minor field is per-driver. Defined in
@@ -162,8 +171,10 @@ namespace Duet::Sbc::Motion
 	using duet::spi::protocol::kHandleTypeShift;
 	using duet::spi::protocol::kHandleTypeStallEndstop;
 
-	static_assert(sizeof(MoveStopInput) == 4 + maxDriversPerAxis, "MoveStopInput layout");
+	static_assert(sizeof(MoveStopInput) == 6 + maxDriversPerAxis, "MoveStopInput layout");
 	static_assert(offsetof(MoveStopInput, boards) == 3);
+	static_assert(offsetof(MoveStopInput, heldDrivers) == 3 + maxDriversPerAxis);
+	static_assert(offsetof(MoveStopInput, stopAction) == 4 + maxDriversPerAxis);
 	static_assert(maxDriversPerAxis <= 8, "heldDrivers is one byte, so one bit per driver of an axis");
 
 	// Whether this driver was already on its switch when the move was built, so it must not be given

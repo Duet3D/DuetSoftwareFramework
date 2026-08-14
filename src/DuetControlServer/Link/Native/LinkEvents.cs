@@ -453,7 +453,7 @@ internal struct MotionStoppedDriverEntry
 /// reported it is too old to send one
 /// </para>
 /// </remarks>
-[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 12)]
+[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 16)]
 internal struct MotionStoppedEvent
 {
     /// <summary>Record header</summary>
@@ -461,6 +461,18 @@ internal struct MotionStoppedEvent
 
     /// <summary>Master step-clock time the endstop reported, zero if it sent none</summary>
     public uint WhenTriggered;
+
+    /// <summary>
+    /// The move that was stopped, as this side numbered it in <see cref="MoveParamsHeader.MoveId"/>
+    /// </summary>
+    /// <remarks>
+    /// Without it a report that arrives after the next move has armed is applied to that move: the
+    /// drives it names belong to the move that really stopped, so the wrong axis is corrected and the
+    /// one that stopped keeps an endpoint it never reached. Nothing else can tell the two apart - the
+    /// drives are usually the same ones, and the timestamp only becomes comparable once the report
+    /// has been attributed to a move
+    /// </remarks>
+    public uint MoveId;
 
     /// <summary>Entries in the trailing array</summary>
     public byte NumDrivers;

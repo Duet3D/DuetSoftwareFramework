@@ -42,7 +42,7 @@ public class LinkEventsLayout
         new object[] { typeof(MoveCompletedEvent), 16 },
         new object[] { typeof(MoveFailedEvent), 12 },
         new object[] { typeof(MotionStoppedDriverEntry), 4 },
-        new object[] { typeof(MotionStoppedEvent), 12 },
+        new object[] { typeof(MotionStoppedEvent), 16 },
 
         // The controller writes these two, so the size to match is the one the wire format declares
         // in lib/DuetSpiInterface MessageFormats.h rather than anything the native side asserts

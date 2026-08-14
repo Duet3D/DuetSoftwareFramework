@@ -341,6 +341,15 @@ internal sealed partial class GCodeHandler(
                             {
                                 break;
                             }
+
+                            // The id the move went out under, which a stop report quotes back. It is
+                            // assigned as the move is queued, so it cannot be known when the move was
+                            // armed - and this is inside the planner lock, which is the lock a report
+                            // takes, so no report can find the move armed but unnamed
+                            if (submitted == 0 && plans.Count > 0)
+                            {
+                                endstopCorrection.NoteMoveId(raw.MoveId);
+                            }
                             submitted++;
                             state.SegmentsLeft = segments.Count - submitted;
                         }

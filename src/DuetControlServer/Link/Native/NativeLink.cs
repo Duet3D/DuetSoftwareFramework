@@ -106,7 +106,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
         Check<MalformedPacketEvent>(12);
         Check<MoveCompletedEvent>(16);
         Check<MoveFailedEvent>(12);
-        Check<MotionStoppedEvent>(12);
+        Check<MotionStoppedEvent>(16);
         Check<MotionStoppedDriverEntry>(4);
         Check<MoveParamsHeader>(28);
     }

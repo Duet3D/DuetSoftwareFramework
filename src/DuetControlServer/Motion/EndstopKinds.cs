@@ -38,7 +38,7 @@ internal sealed class EndstopArmingState
 /// </para>
 /// <para>
 /// Both halves live on the one type so that adding a kind is implementing an interface rather than
-/// remembering two call sites, which is what the split cost before
+/// remembering two call sites
 /// </para>
 /// </remarks>
 internal interface IEndstopKind
@@ -161,8 +161,7 @@ internal static class EndstopKinds
 ///
 /// RepRapFirmware's <c>SwitchEndstop::PrimeAxis</c> does more than this: it re-enables each remote
 /// handle and re-reads its state every move, which is what makes a board that reset mid-job fail
-/// loudly instead of silently never reporting again. Porting that is §13 of the endstops document and
-/// belongs here when it happens
+/// loudly instead of silently never reporting again. That belongs in <see cref="PrepareAsync"/>
 /// </remarks>
 internal sealed class SwitchEndstopKind : IEndstopKind
 {
@@ -183,10 +182,22 @@ internal sealed class SwitchEndstopKind : IEndstopKind
         => ValueTask.CompletedTask;
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// An axis with one switch stops the whole drive on it, because every motor watches the same
+    /// switch and none of them has one to run on to. An axis with a switch per driver stops each
+    /// motor on its own, which is what squares a gantry, and the controller escalates the last of
+    /// them to stopping the drive - RepRapFirmware's <c>numPortsLeftToTrigger == 1</c>
+    /// </remarks>
     public string? TryArm(EndstopPlan plan, MoveStopInput stopInput)
-        => RemoteEndstops.TryGetStopInput(plan.Endstop, plan.Axis, plan.NumAxisDrivers, stopInput)
-            ? null
-            : "its endstop has no port assigned";
+    {
+        if (!RemoteEndstops.TryGetStopInput(plan.Endstop, plan.Axis, plan.NumAxisDrivers, stopInput))
+        {
+            return "its endstop has no port assigned";
+        }
+
+        stopInput.Action = stopInput.NumSwitches > 1 ? StopAction.Driver : StopAction.Group;
+        return null;
+    }
 }
 
 /// <summary>
@@ -215,9 +226,16 @@ internal sealed class ZProbeEndstopKind : IEndstopKind
 
     /// <inheritdoc/>
     public string? TryArm(EndstopPlan plan, MoveStopInput stopInput)
-        => plan.Probe is not null && RemoteProbes.TryGetStopInput(plan.Probe, plan.Endstop.Probe ?? 0, stopInput)
-            ? null
-            : "its endstop is a Z probe that cannot stop a move; check M558";
+    {
+        if (plan.Probe is null || !RemoteProbes.TryGetStopInput(plan.Probe, plan.Endstop.Probe ?? 0, stopInput))
+        {
+            return "its endstop is a Z probe that cannot stop a move; check M558";
+        }
+
+        // One probe for the drive, so there is nothing for a motor to run on to alone
+        stopInput.Action = StopAction.Group;
+        return null;
+    }
 }
 
 /// <summary>
@@ -309,8 +327,20 @@ internal sealed class StallEndstopKind : IEndstopKind
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// This is the whole difference between <c>M574 S3</c> and <c>S4</c>. <c>MotorStallAny</c> stops
+    /// every motor of the drive on any of them stalling; <c>MotorStallIndividual</c> stops each motor
+    /// where it stalled, which is what squares a gantry, and the controller escalates the last of
+    /// them to stopping the drive - RepRapFirmware's <c>individualMotors &amp;&amp; numDriversLeft > 1</c>
+    /// </remarks>
     public string? TryArm(EndstopPlan plan, MoveStopInput stopInput)
-        => RemoteEndstops.TryGetStallStopInput(plan.DriversWatched, stopInput)
-            ? null
-            : "no driver is assigned to it";
+    {
+        if (!RemoteEndstops.TryGetStallStopInput(plan.DriversWatched, stopInput))
+        {
+            return "no driver is assigned to it";
+        }
+
+        stopInput.Action = plan.Kind == EndstopType.MotorStallIndividual ? StopAction.Driver : StopAction.Group;
+        return null;
+    }
 }

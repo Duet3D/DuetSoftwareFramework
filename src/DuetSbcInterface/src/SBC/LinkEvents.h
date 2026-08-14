@@ -212,6 +212,7 @@ namespace Duet::Sbc
 	{
 		InboundEventHeader header;
 		uint32_t whenTriggered; // master step-clock time the endstop reported, 0 if it sent none
+		uint32_t moveId;		// the move that was stopped, as DCS numbered it in MoveParamsHeader
 		uint8_t numDrivers;
 		uint8_t padding[3];
 		// MotionStoppedDriverEntry driver[numDrivers] follows
@@ -301,7 +302,7 @@ namespace Duet::Sbc
 	static_assert(sizeof(MoveCompletedEvent) == 16, "MoveCompletedEvent must be 16 bytes");
 	static_assert(sizeof(MoveFailedEvent) == 12, "MoveFailedEvent must be 12 bytes");
 	static_assert(sizeof(MotionStoppedDriverEntry) == 4, "MotionStoppedDriverEntry must be 4 bytes");
-	static_assert(sizeof(MotionStoppedEvent) == 12, "MotionStoppedEvent must be 12 bytes");
+	static_assert(sizeof(MotionStoppedEvent) == 16, "MotionStoppedEvent must be 16 bytes");
 
 	static_assert(sizeof(OutboundCommandHeader) == 4, "OutboundCommandHeader must be 4 bytes");
 	static_assert(sizeof(MessageCommand) == 8, "MessageCommand must be 8 bytes");

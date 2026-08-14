@@ -49,7 +49,8 @@ namespace Duet::Sbc
 		// registers this, because it owns the drive trackers that have to be corrected; this class
 		// only knows how to take the report off the link
 		using MotionStoppedCallback =
-			std::function<void(uint32_t whenTriggered, std::span<const duet::spi::protocol::MotionStoppedDriver>)>;
+			std::function<void(uint32_t whenTriggered, uint32_t moveId,
+							   std::span<const duet::spi::protocol::MotionStoppedDriver>)>;
 
 		explicit SbcInterface(const Config& config);
 		~SbcInterface();

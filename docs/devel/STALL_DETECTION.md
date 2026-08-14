@@ -114,7 +114,7 @@ What it costs:
   `MotionStopped`, and [`TrySendRevert`](src/DuetControlServer/Motion/EndstopCorrection.cs#L522) marks
   **both** axes triggered. Y is recorded as homed wherever it happened to be. No error is produced.
 
-### 4.2 There is no `stopAxis` on the wire
+### 4.2 There is no `stopAxis` on the wire ✅ Phase 4
 
 The only escalation the protocol has is `ScheduleMoveFlags::StopAllDrivers`, which stops every driver
 of the whole move and is set only for coupled kinematics
@@ -132,7 +132,7 @@ This is the same gap §13 of [endstops.md](src/Documentation/articles/endstops.m
 every driver *of one drive* has no flag, only stopping every driver of the move"). Stall detection
 makes it routine rather than rare, because a stall-homed axis is usually the multi-motor one.
 
-### 4.3 `MotorStallAny` and `MotorStallIndividual` are not distinguished
+### 4.3 `MotorStallAny` and `MotorStallIndividual` are not distinguished ✅ Phase 4
 
 One [`StallEndstopKind`](src/DuetControlServer/Motion/EndstopKinds.cs) answers `Handles` for both
 types and treats them identically. Nothing ports `individualMotors`, `numDriversLeft`, or the
@@ -207,32 +207,39 @@ struct ScheduleMoveDriver {
     float extrusion;
     uint16_t stopOnHandle;
     uint8_t stopGroup;      // NEW: drivers stopped together, or NoStopGroup
-    uint8_t stopFlags;      // NEW: StopDriverFlags
+    StopAction stopAction;  // NEW: none | driver | group | all
 };
 ```
 
 - `stopGroup` is the logical drive the driver belongs to, or `NoStopGroup = 0xFF`.
-- `stopFlags` bit 0, `Individual`: while more than one driver of this group is still running, a
-  trigger stops only the matched driver; when one is left, it stops the group. This is RRF's
-  `individualMotors && numDriversLeft > 1`, and it is per driver rather than per move because one
-  move may home an `S3` axis and an `S4` axis together.
+- `stopAction` is RRF's `EndstopHitAction`, one byte: `driver` stops only the matched motor while its
+  group has others still running, `group` stops every driver of the group, `all` stops every driver
+  of the move.
 
-`NoStopGroup` and the `StopDriverFlags` bits are declared in `StopRules.h` beside the rules that read
-them, not in `MessageFormats.h` - see §7.1.
+**`stopAction` absorbs `ScheduleMoveFlags::StopAllDrivers`, which is deleted.** The action belongs to
+the endstop that fired, not to the move: that is what RRF models, and a per-move flag only works
+because `EndstopArming` refuses to home a coupled axis alongside an independent one - a DSF policy,
+not a wire limitation, which the format should not bake in. It also removes a field rather than
+adding one. The SBC keeps `MoveFlags::StopAllDrivers` for the DDA's round-robin switch assignment,
+which never crossed the wire.
+
+`NoStopGroup` and `StopAction` are declared in `StopRules.h` beside the rules that read them, not in
+`MessageFormats.h` - see §7.1.
 
 DuetCANMaster's `StopDriversWatchingInput` then resolves a trigger in three steps, which is exactly
 RRF's `GetResult`:
 
-1. `sbcMoveStopsAllDrivers` → stop every driver of the move (`stopAll`).
-2. else the matched driver is `Individual` and its group has more than one driver still running →
-   stop only that driver (`stopDriver`).
-3. else → stop every driver sharing its `stopGroup` (`stopAxis`).
+1. The matched watch's action is `all` → stop every driver of the move (`stopAll`).
+2. It is `driver` and its group has more than one driver still running → stop only that driver
+   (`stopDriver`).
+3. Otherwise → stop every driver sharing its `stopGroup` (`stopAxis`).
 
-That decision is `ResolveStop` in §7.1, so it is one function that the firmware calls and the tests
-call, rather than a rule written out here and again in `CanMotion.cpp`.
+That decision is `DecideStop` in §7.1, so it is one function that the firmware calls and the tests
+call, rather than a rule written out here and again in `CanMotion.cpp`. The escalation reads
+`stillRunning`, which the controller clears as it stops each driver.
 
-`Individual` needs a per-drive bit on the SBC side too, so `MoveStopInput` gains one byte
-(`stopScope`), taking it from 12 to 13. Both the C# mirror in
+The action needs a per-drive field on the SBC side too, so `MoveStopInput` gains `stopAction` and the
+padding byte the compiler would insert after it, taking it from 12 to 14. Both the C# mirror in
 [MoveParams.cs](src/DuetControlServer/Motion/Native/MoveParams.cs) and the layout tests move with it.
 
 *Why a group id rather than a second "stop this drive" flag:* the group is what the switch case needs
@@ -354,8 +361,9 @@ same commit that does it; `git log --grep` finds them.
 | 1 | One seam for both kinds | ✅ `refactor: arm both kinds of endstop through one seam` |
 | 2 | A driver watches its own board | ✅ `fix: make a stall watch name the driver's own board` |
 | 3 | The controller reads the stalled-driver bitmap | ✅ `fix: stop only the driver that stalled` |
-| 4 | Stop groups | ⬜ |
-| 5 | `S3` and `S4` told apart | ⬜ |
+| 4 | Stop groups and the three stop actions | ✅ `feat: give a move's endstops the three stop actions` |
+| 5 | `S3` and `S4` told apart | ✅ folded into Phase 4 |
+| 5a | The move id in `MotionStopped` | ✅ same commit as Phase 4 - see below |
 | 6 | The motor-stall Z probe | ⬜ |
 | 7 | Diagnostics | ⬜ |
 
@@ -432,29 +440,76 @@ This does not make `S4` work: telling it from `S3` still needs the stop groups o
 stop the axis. What it does fix is `S3` on one board no longer stopping - and recording as homed - an
 axis that never stalled.
 
-### Phase 4 — stop groups (§5.2) ⬜
+### Phase 4 — stop groups and the three stop actions (§5.2) ✅
 
 | | |
 |---|---|
-| Touches | [MessageFormats.h](lib/DuetSpiInterface/include/DuetSpiProtocol/MessageFormats.h#L233), [MoveParams.h](src/DuetSbcInterface/src/Motion/MoveParams.h), [ScheduleMoveBuilder.cpp](src/DuetSbcInterface/src/Motion/ScheduleMoveBuilder.cpp#L47), [DDA.cpp](src/DuetSbcInterface/src/Movement/DDA.cpp#L864), [CanMotion.cpp](src/DuetCANMaster/src/CAN/CanMotion.cpp#L577), [MoveParams.cs](src/DuetControlServer/Motion/Native/MoveParams.cs) |
-| Wire format | `ScheduleMoveDriver` gains `stopGroup`/`stopFlags` in existing padding; `MoveStopInput` gains `stopScope` |
-| Tests | `MoveParamsLayoutTests` and `ScheduleMoveBuilderTests` for the layout; `stop_rules_tests` for `ResolveStop` - the three-step rule, and the `Individual` escalation as drivers of a group are used up |
+| Touches | [StopRules.h](lib/DuetSpiInterface/include/DuetSpiProtocol/StopRules.h), [MessageFormats.h](lib/DuetSpiInterface/include/DuetSpiProtocol/MessageFormats.h), [MoveParams.h](src/DuetSbcInterface/src/Motion/MoveParams.h), [ScheduleMoveBuilder](src/DuetSbcInterface/src/Motion/ScheduleMoveBuilder.cpp), [DDA.cpp](src/DuetSbcInterface/src/Movement/DDA.cpp), [CanMotion.cpp](src/DuetCANMaster/src/CAN/CanMotion.cpp), [EndstopKinds.cs](src/DuetControlServer/Motion/EndstopKinds.cs), [EndstopArming.cs](src/DuetControlServer/Motion/EndstopArming.cs), [MoveParams.cs](src/DuetControlServer/Motion/Native/MoveParams.cs) |
+| Wire format | `ScheduleMoveDriver` gains `stopGroup` and `stopAction` in its padding and stays 16 bytes; `ScheduleMoveFlags::StopAllDrivers` is deleted; `MoveStopInput` goes from 12 to 14 |
+| Tests | `stop_rules_tests` for the three actions and the escalation; `MoveParamsLayoutTests` and `MoveParamsLayout` for the layouts; `EndstopArmingTests` for the action each kind asks for |
 
-Both halves of the SPI link ship together, so no version negotiation is needed - but the two
-`static_assert` blocks are what makes a half-updated build fail to compile rather than mis-parse, and
-they must be updated in the same commit.
+Which action each endstop asks for is `IEndstopKind.TryArm`'s answer, and `EndstopArming` overrides
+it to `all` on coupled kinematics - RRF's `GetResult` tests `stopAll` before `individualMotors`:
 
-### Phase 5 — `S3` and `S4` in DuetControlServer (§4.3) ⬜
+| Endstop | Action |
+|---|---|
+| Coupled kinematics, whatever the endstop | `all` |
+| Switch, one for the axis | `group` |
+| Switch, one per driver | `driver`, escalating |
+| Z probe | `group` |
+| `M574 S3` MotorStallAny | `group` |
+| `M574 S4` MotorStallIndividual | `driver`, escalating |
+
+The escalation belongs to the controller, because it is the side that knows how many motors of a
+drive are still running: `DriverStopWatch::stillRunning` is cleared as each is stopped, and
+`DecideStop` resolves `driver` to `group` once the matched driver is the last of its group. That is
+RRF's `Acknowledge` decrementing `numDriversLeft`; without it the last motor of a gantry squaring
+itself stops alone and the move runs on with nothing to end it.
+
+Both halves of the SPI link ship together, so no version negotiation is needed - the `static_assert`
+blocks are what make a half-updated build fail to compile rather than mis-parse.
+
+### Phase 5 — `S3` and `S4` in DuetControlServer (§4.3) ✅ folded into Phase 4
 
 | | |
 |---|---|
-| Touches | [EndstopArming.cs](src/DuetControlServer/Motion/EndstopArming.cs#L226), [RemoteEndstops.cs](src/DuetControlServer/Motion/RemoteEndstops.cs), [MoveInterpreter.cs](src/DuetControlServer/Motion/MoveInterpreter.cs#L917) |
-| Behaviour | `MotorStallIndividual` sets `stopScope = Individual`; `MotorStallAny` does not. `NeedsEveryDrive` still outranks both, as `stopAll` outranks `individualMotors` in `GetResult` |
-| Tests | `EndstopArmingTests`: `S3` and `S4` on an independent dual-motor axis produce different scopes; both produce `StopsEveryDrive` on a coupled one |
+Its own defect, but nothing was left to do once Phase 4 landed: telling `S3` from `S4` **is**
+choosing between `StopAction::group` and `StopAction::driver`, and `StallEndstopKind` is the one
+place that choice can be made. Splitting it into two kinds was considered and rejected - the two
+differ in one expression, and a second class would duplicate the arming, the release and the speed
+handling to express it.
 
-No new escalation state is needed on the DCS side. The last-motor escalation lives in the controller,
-where the count of drivers still running is known; DCS only says which drivers form a group and
-whether the group is individual.
+### Phase 5a — the move id in `MotionStopped` ✅
+
+Not a stall defect, and not on the schedule path: it is the second Known Limit of §13 of
+endstops.md, taken while the wire was open.
+
+Committed with Phase 4 rather than on its own. The two are separable in purpose but not in the
+source: `ScheduleMoveBuilder::FinishMovement` already takes the move id, and in `CanMotion.cpp` the
+id is read at the top of the function Phase 4 rewrites, so either half alone does not compile.
+
+| | |
+|---|---|
+| Touches | [MessageFormats.h](lib/DuetSpiInterface/include/DuetSpiProtocol/MessageFormats.h), [LinkEvents.h](src/DuetSbcInterface/src/SBC/LinkEvents.h) and its C# mirror, [SbcInterface](src/DuetCANMaster/src/SBC/SbcInterface.cpp), [MotionService](src/DuetSbcInterface/src/SBC/MotionService.cpp), [LinkService.cs](src/DuetControlServer/Link/LinkService.cs), [EndstopCorrection.cs](src/DuetControlServer/Motion/EndstopCorrection.cs) |
+| Wire format | `MotionStoppedHeader` gains `moveId`, 8 bytes to 12; `MotionStoppedEvent` follows, 12 to 16 |
+| Tests | `LinkEventsLayout` for the record size. The guard itself is not covered - see §7 on why `EndstopCorrection` is not |
+
+A stop report carried no move id, so one arriving after the next move had armed was applied to that
+move: the drives it names belong to the move that really stopped, so the wrong axis is corrected and
+the one that stopped keeps an endpoint it never reached. `_currentMoveConcluded` catches the report
+that arrives after its move finished; it cannot catch the one that arrives after the *next* move has
+armed, and nothing else can tell the two apart, because the drives are usually the same ones and the
+timestamp only becomes comparable once the report has been attributed.
+
+DCS already numbers the move - `MoveParamsHeader::moveId`, assigned by `MovePlanner` and shared by
+every segment of one code - so the controller only has to quote it back. `EndstopCorrection` learns
+the id through `NoteMoveId` as the move is queued, which is under the planner lock, so no report can
+find the move armed but unnamed.
+
+A zero on either side means the id could not be checked rather than that it did not match: a
+controller that sent none, or a move armed and not yet queued. Those are applied, because refusing
+them would throw away stops that are almost certainly the armed move's. `M122` counts the mismatches
+separately from the too-late ones.
 
 ### Phase 6 — the motor-stall Z probe ⬜
 
@@ -513,8 +568,7 @@ this is behaviour; nothing else about it differs. The firmware picks it up throu
 shared protocol definitions, and the test links `duet_spi_protocol` alone.
 
 The header holds one struct and the rules that read it, and they are the **only** definitions of
-either. Phase 3 landed the struct and `WatchMatches`; `stopGroup`, `stopFlags`, `stillRunning` and
-`ResolveStop` arrive with Phase 4, which is what needs them:
+either:
 
 ```c
 // A watched driver, reduced to what the rules need. No DriverId: that is CANlib, which is
@@ -524,20 +578,22 @@ struct DriverStopWatch {
     uint8_t driverNumber;   // its number on that board
     uint8_t inputBoard;     // board carrying the input it watches
     uint16_t inputHandle;
-    uint8_t stopGroup;      // PHASE 4: NoStopGroup if this driver stops alone
-    uint8_t stopFlags;      // PHASE 4: StopDriverFlags
-    bool stillRunning;      // PHASE 4: false once this move has already stopped it
+    uint8_t stopGroup;      // the logical drive, or kNoStopGroup
+    StopAction stopAction;  // what a trigger matching this watch stops
+    bool stillRunning;      // false once this move has already stopped this driver
 };
 
 // §5.3. A switch compares (board, handle); a stall also requires its own bit in the reading.
 constexpr bool WatchMatches(const DriverStopWatch&, uint8_t inputBoard, uint16_t inputHandle,
                             uint32_t reading) noexcept;
 
-enum class StopScope : uint8_t { none, driver, group, all };            // PHASE 4
+enum class StopAction : uint8_t { none, driver, group, all };
 
-// §5.2. stopAll, else Individual with more than one of the group still running, else the group.
-constexpr StopScope ResolveStop(std::span<const DriverStopWatch> watches, size_t matched,
-                                bool moveStopsAllDrivers) noexcept;    // PHASE 4
+// §5.2. The matched watch's action, with `driver` escalated to `group` once it is the last motor of
+// its group still running, and then which drivers that comes to.
+constexpr StopDecision DecideStop(std::span<const DriverStopWatch> watches, uint8_t inputBoard,
+                                  uint16_t inputHandle, uint32_t reading) noexcept;
+constexpr bool StopsDriver(std::span<const DriverStopWatch>, const StopDecision&, size_t index) noexcept;
 ```
 
 **Nothing is duplicated, because nothing is mirrored.** `CanMotion`'s `endstopWatches[]` is declared

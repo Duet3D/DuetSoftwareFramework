@@ -83,13 +83,16 @@ namespace
 		CHECK_OFFSET(ScheduleMoveDriver, steps, 4);
 		CHECK_OFFSET(ScheduleMoveDriver, extrusion, 8);
 		CHECK_OFFSET(ScheduleMoveDriver, stopOnHandle, 12);
+		CHECK_OFFSET(ScheduleMoveDriver, stopGroup, 14);
+		CHECK_OFFSET(ScheduleMoveDriver, stopAction, 15);
 
-		// The controller matches an incoming input change against these two, so they are the only
-		// thing standing between an endstop firing and the right drive being stopped
+		// The controller matches an incoming input change against these, so they are the only thing
+		// standing between an endstop firing and the right drive being stopped
 		Report("MotionStoppedHeader", sizeof(duet::spi::protocol::MotionStoppedHeader));
-		CHECK(sizeof(duet::spi::protocol::MotionStoppedHeader) == 8, "MotionStoppedHeader is 8 bytes");
+		CHECK(sizeof(duet::spi::protocol::MotionStoppedHeader) == 12, "MotionStoppedHeader is 12 bytes");
 		CHECK_OFFSET(duet::spi::protocol::MotionStoppedHeader, whenTriggered, 0);
-		CHECK_OFFSET(duet::spi::protocol::MotionStoppedHeader, numDrivers, 4);
+		CHECK_OFFSET(duet::spi::protocol::MotionStoppedHeader, moveId, 4);
+		CHECK_OFFSET(duet::spi::protocol::MotionStoppedHeader, numDrivers, 8);
 		CHECK(sizeof(duet::spi::protocol::MotionStoppedDriver) == 4, "MotionStoppedDriver is 4 bytes");
 
 		// numDrivers is a byte, so a packet can never ask for more drivers than the SBC can put in
@@ -104,7 +107,7 @@ namespace
 		constexpr uint8_t numDrives = 4;
 		constexpr size_t length = MoveParamsLength(numDrives);
 		Report("MoveParams(4 drives)", length);
-		CHECK(length == 28 + (4 * (4 + 4 + 12)), "a four-drive submission is the header plus three four-entry arrays");
+		CHECK(length == 28 + (4 * (4 + 4 + 14)), "a four-drive submission is the header plus three four-entry arrays");
 
 		alignas(uint32_t) char record[MoveParamsLength(numDrives)]{};
 		auto *const header = reinterpret_cast<MoveParamsHeader *>(record);

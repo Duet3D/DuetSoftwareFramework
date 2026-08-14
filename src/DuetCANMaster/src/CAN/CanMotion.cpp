@@ -411,13 +411,6 @@ namespace CanMotion
 	static SbcProtocol::DriverStopWatch endstopWatches[SbcProtocol::MaxScheduleMoveDrivers];
 	static size_t numEndstopWatches = 0;
 
-	// Whether any watched input stops every driver of this move rather than only the drivers
-	// watching it. RepRapFirmware's EndstopHitAction::stopAll, decided by the SBC from the
-	// kinematics: moving the axis being homed needs drives other than its own, so stopping only its
-	// own would leave the rest running and drag the head into the switch. The axis' switches are
-	// spread over the move's drivers, so all of them are watched and whichever fires first stops
-	// everything
-	static bool sbcMoveStopsAllDrivers = false;
 } // namespace CanMotion
 
 void CanMotion::ScheduleFromSbc(const SbcProtocol::ScheduleMoveHeader& header,
@@ -432,7 +425,6 @@ void CanMotion::ScheduleFromSbc(const SbcProtocol::ScheduleMoveHeader& header,
 		sbcMoveId = header.moveId;
 		sbcMoveInProgress = true;
 		numEndstopWatches = 0;			// the watches belong to the move being abandoned, not the new one
-		sbcMoveStopsAllDrivers = false;
 	}
 
 	// Rebuild PrepParams from the packet. The SBC plans second-order moves - it has no S-curve
@@ -476,8 +468,6 @@ void CanMotion::ScheduleFromSbc(const SbcProtocol::ScheduleMoveHeader& header,
 	// Iterating the span rather than header.numDrivers: the count and the records arrive in the same
 	// packet, so trusting the count to describe the records is trusting the packet to be consistent
 	// with itself. The caller sized the span from what the payload actually carries.
-	sbcMoveStopsAllDrivers = sbcMoveStopsAllDrivers || (header.flags & ScheduleMoveFlags::StopAllDrivers) != 0;
-
 	const bool usePressureAdvance = (header.flags & ScheduleMoveFlags::UsePressureAdvance) != 0;
 	for (const SbcProtocol::ScheduleMoveDriver& d : drivers)
 	{
@@ -494,7 +484,8 @@ void CanMotion::ScheduleFromSbc(const SbcProtocol::ScheduleMoveHeader& header,
 		// Record what stops this driver, if anything. Only an endstop move carries these
 		if (d.stopOnBoard != SbcProtocol::NoEndstopBoard && numEndstopWatches < ARRAY_SIZE(endstopWatches))
 		{
-			endstopWatches[numEndstopWatches] = { d.boardAddress, d.driverNumber, d.stopOnBoard, d.stopOnHandle };
+			endstopWatches[numEndstopWatches] = { d.boardAddress, d.driverNumber, d.stopOnBoard, d.stopOnHandle,
+												  d.stopGroup,   d.stopAction,   true };
 			++numEndstopWatches;
 		}
 	}
@@ -570,16 +561,20 @@ void CanMotion::StopDriverWhenProvisional(DriverId driver) noexcept
 #  if HAS_SBC_INTERFACE
 
 size_t CanMotion::StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHandle, uint32_t reading,
-										   std::span<SbcProtocol::MotionStoppedDriver> stopped) noexcept
+										   std::span<SbcProtocol::MotionStoppedDriver> stopped,
+										   uint32_t& moveId) noexcept
 {
-	// Does this trigger stop anything at all? On a stopAll move it stops everything, so the answer
-	// decides what to iterate rather than which drivers to skip
-	bool matched = false;
-	for (size_t i = 0; i < numEndstopWatches && !matched; ++i)
-	{
-		matched = SbcProtocol::WatchMatches(endstopWatches[i], inputBoard, inputHandle, reading);
-	}
-	if (!matched)
+	// Read here rather than by a second call from the caller: the drivers stopped and the move they
+	// belong to are one answer, and a move scheduled in between would make two calls disagree
+	moveId = sbcMoveId;
+
+	// Which watch this trigger matched and what that watch stops - itself, its whole drive, or the
+	// whole move. Both are decided by DuetSpiProtocol/StopRules.h, which is where this rule can be
+	// tested; everything below is the acting on it
+	const std::span<const SbcProtocol::DriverStopWatch> watches{ endstopWatches, numEndstopWatches };
+	const SbcProtocol::StopDecision decision =
+		SbcProtocol::DecideStop(watches, inputBoard, inputHandle, reading);
+	if (decision.action == SbcProtocol::StopAction::none)
 	{
 		return 0;
 	}
@@ -587,14 +582,16 @@ size_t CanMotion::StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHan
 	size_t numStopped = 0;
 	for (size_t i = 0; i < numEndstopWatches; ++i)
 	{
-		const SbcProtocol::DriverStopWatch& watch = endstopWatches[i];
-
-		// On a stopAll move every driver goes, whichever of the axis' switches fired. Stopping only
-		// the drivers watching that one switch would leave the coupled drives running
-		if (!sbcMoveStopsAllDrivers && !SbcProtocol::WatchMatches(watch, inputBoard, inputHandle, reading))
+		SbcProtocol::DriverStopWatch& watch = endstopWatches[i];
+		if (!watch.stillRunning || !SbcProtocol::StopsDriver(watches, decision, i))
 		{
 			continue;
 		}
+
+		// Recorded before the stop is attempted, because what it feeds is the escalation: a driver
+		// stopped individually has to stop counting towards its group, or the last motor of a
+		// gantry squaring itself would never escalate to stopping the axis
+		watch.stillRunning = false;
 
 		const DriverId driver(watch.driverBoard, watch.driverNumber);
 		bool didStop = false;

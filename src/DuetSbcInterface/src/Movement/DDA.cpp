@@ -864,10 +864,14 @@ void DDA::Prepare(DDARing& ring,
 								const size_t switchIndex =
 									m_flags.stopAllDrivers ? (stopAllSwitch++ % m_stopOnInput[drive].numSwitches) : i;
 
+								// The group is the logical drive: "stop this axis" is what it means
+								// once the move has been flattened into drivers, and the controller
+								// holds no axis-to-driver map to work it out for itself
 								CanMotion::AddAxisMovement(
 									params, driver, driverSteps,
 									Duet::Sbc::Motion::StopInputForSwitch(m_stopOnInput[drive], switchIndex,
-																		  driver.boardAddress));
+																		  driver.boardAddress),
+									(uint8_t)drive, m_stopOnInput[drive].stopAction);
 							}
 						}
 #endif

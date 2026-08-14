@@ -66,8 +66,10 @@ class SbcInterface
 
 	// Tell the SBC that an endstop cut a move short. The controller stops the drives itself, but only
 	// the SBC can say where they should have ended up, so it takes the trigger timestamp from here
-	// and sends the revert. Called from the CAN receiver task
-	bool ReportMotionStopped(uint32_t whenTriggered,
+	// and sends the revert. `moveId` is the move that was stopped, as the SBC numbered it, so that a
+	// report arriving after the next move has armed is not applied to that move.
+	// Called from the CAN receiver task
+	bool ReportMotionStopped(uint32_t whenTriggered, uint32_t moveId,
 							 std::span<const duet::spi::protocol::MotionStoppedDriver> stopped) noexcept;
 	void EnqueueCanTextReply(
 		uint16_t txToken,

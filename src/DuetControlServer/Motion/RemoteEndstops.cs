@@ -187,10 +187,9 @@ internal static class RemoteEndstops
     /// takes from the driver it is emitting.
     /// </para>
     /// <para>
-    /// Writing a board list here was wrong in a way nothing could catch. Which drive an entry ends up
-    /// on is decided after this runs - a coupled move rewrites every drive's entry to the one axis' -
-    /// and the boards were then handed out round-robin across the move's drivers, so a driver could
-    /// be given another driver's board to watch its own stall on
+    /// There is no board list to write because a board list could not be read correctly here: which
+    /// drive this entry ends up on is settled after this runs, since a coupled move rewrites every
+    /// drive's entry to the one axis'
     /// </para>
     /// </remarks>
     public static bool TryGetStallStopInput(IReadOnlyList<WatchedDriver> drivers, MoveStopInput stopInput)

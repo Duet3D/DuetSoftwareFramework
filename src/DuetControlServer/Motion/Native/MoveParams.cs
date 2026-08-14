@@ -114,9 +114,43 @@ internal static class MoveFlags
     /// drives other than its own - a CoreXY axis needs both motors - so stopping only the drivers
     /// that watch the switch would leave the others running and drag the head into it. The axis'
     /// switches are spread over the move's drivers so that all of them are watched, and whichever
-    /// fires first stops everything
+    /// fires first stops everything.
+    ///
+    /// What reaches the controller is <see cref="MoveStopInput.Action"/> of
+    /// <see cref="StopAction.All"/> per driver, not this flag: the action belongs to the endstop
+    /// that fired rather than to the move. This stays because the native side needs it to spread the
+    /// axis' switches over the move's drivers, which never crossed the wire
     /// </remarks>
     public const uint StopAllDrivers = 1u << 10;
+}
+
+/// <summary>
+/// What a trigger on a drive's input stops
+/// </summary>
+/// <remarks>
+/// The mirror of <c>duet::spi::protocol::StopAction</c> in
+/// <c>lib/DuetSpiInterface/include/DuetSpiProtocol/StopRules.h</c>, which is RepRapFirmware's
+/// <c>EndstopHitAction</c>. The values are on the wire, so they must not be renumbered on one side
+/// </remarks>
+internal enum StopAction : byte
+{
+    /// <summary>This drive watches nothing, so nothing it could match stops anything</summary>
+    None = 0,
+
+    /// <summary>
+    /// Stop only the motor that triggered, while its drive has others still running
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>stopDriver</c>. The last motor of the drive escalates to
+    /// <see cref="Group"/>, which the controller decides because it is what knows how many are left
+    /// </remarks>
+    Driver = 1,
+
+    /// <summary>Stop every driver of the drive - RepRapFirmware's <c>stopAxis</c></summary>
+    Group = 2,
+
+    /// <summary>Stop every driver of the move - RepRapFirmware's <c>stopAll</c></summary>
+    All = 3
 }
 
 /// <summary>
@@ -142,7 +176,7 @@ internal sealed class MoveStopInput
     /// <summary>
     /// Serialised size of one entry, which must match the native <c>MoveStopInput</c>
     /// </summary>
-    public const int Length = 2 + 1 + MotionLimits.MaxDriversPerAxis + 1;
+    public const int Length = 2 + 1 + MotionLimits.MaxDriversPerAxis + 1 + 1 + 1;
 
     /// <summary>
     /// Remote input handle the switches are registered under, with a minor field of zero
@@ -169,12 +203,24 @@ internal sealed class MoveStopInput
     /// </remarks>
     public byte HeldDrivers { get; set; }
 
+    /// <summary>
+    /// What a trigger on this drive's input stops
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's three <c>EndstopHitAction</c>s, decided from the endstop type and the
+    /// kinematics. Carried per drive rather than per move because it belongs to the endstop that
+    /// fired: one move may home an axis whose endstop has to stop every drive alongside one whose
+    /// endstop stops only its own
+    /// </remarks>
+    public StopAction Action { get; set; }
+
     /// <summary>Stop watching anything, which is what every drive of an ordinary move carries</summary>
     public void Clear()
     {
         Handle = new RemoteInputHandle();
         NumSwitches = 0;
         HeldDrivers = 0;
+        Action = StopAction.None;
         Array.Clear(Boards);
     }
 
@@ -235,6 +281,7 @@ internal sealed class MoveStopInput
         Handle = other.Handle;
         NumSwitches = other.NumSwitches;
         HeldDrivers = other.HeldDrivers;
+        Action = other.Action;
         other.Boards.CopyTo(Boards, 0);
     }
 
@@ -310,7 +357,9 @@ internal static class MoveParams
             BinaryPrimitives.WriteUInt16LittleEndian(entry, stop.Handle.All);
             entry[2] = stop.NumSwitches;
             stop.Boards.CopyTo(entry[3..]);
-            entry[^1] = stop.HeldDrivers;
+            entry[3 + MotionLimits.MaxDriversPerAxis] = stop.HeldDrivers;
+            entry[4 + MotionLimits.MaxDriversPerAxis] = (byte)stop.Action;
+            entry[5 + MotionLimits.MaxDriversPerAxis] = 0;           // the native record's padding byte
         }
         return total;
     }

@@ -146,15 +146,17 @@ internal static class EndstopArming
                 + "its endstop has to stop every drive, which would disarm the others");
         }
 
-        // Every drive carries this axis' switches, and the move is marked so that whichever of them
-        // fires stops every driver rather than only the ones watching it. That is what makes this
-        // stopAll rather than stopAxis: the drives are coupled, so letting the others run on would
-        // drag the head into the switch.
+        // Every drive carries this axis' switches, and whichever of them fires stops every driver
+        // rather than only the ones watching it. That is what makes this stopAll rather than
+        // stopAxis: the drives are coupled, so letting the others run on would drag the head into
+        // the switch. The action outranks whatever the kind chose, exactly as RepRapFirmware's
+        // GetResult tests stopAll before it tests individualMotors.
         //
         // All of the switches are kept, not just the first. RepRapFirmware watches every port of the
         // endstop whatever the action - PrimeAxis primes portsLeftToTrigger with all of them and
         // CheckTriggered scans them all - and collapsing them here left an axis' second switch armed
         // on nothing, doing nothing, and looking configured
+        stopAllInput.Action = StopAction.All;
         for (int drive = 0; drive < stopOnInput.Length; drive++)
         {
             stopOnInput[drive].CopyFrom(stopAllInput);

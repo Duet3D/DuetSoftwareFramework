@@ -762,7 +762,7 @@ namespace Duet::Sbc
 				PostLog(LogLevel::Error, "A move was stopped by an endstop with nothing listening for it");
 				break;
 			}
-			m_onMotionStopped(header.whenTriggered, std::span{drivers, header.numDrivers});
+			m_onMotionStopped(header.whenTriggered, header.moveId, std::span{drivers, header.numDrivers});
 			break;
 		}
 		default:

@@ -14,12 +14,18 @@
 
 #include <TestSupport.h>
 
+#include <span>
+
 using duet::spi::protocol::DriverStopWatch;
 using duet::spi::protocol::HandleType;
 using duet::spi::protocol::IsStallHandle;
 using duet::spi::protocol::kHandleTypeEndstop;
 using duet::spi::protocol::kHandleTypeStallEndstop;
 using duet::spi::protocol::kMaxDriversPerBoard;
+using duet::spi::protocol::StopAction;
+using duet::spi::protocol::StopDecision;
+using duet::spi::protocol::StopsDriver;
+using duet::spi::protocol::DecideStop;
 using duet::spi::protocol::WatchMatches;
 
 namespace
@@ -45,7 +51,7 @@ void TestHandleTypes() noexcept
 // whole test - and the reading is the pin's value, which says nothing about who is watching it.
 void TestASwitchMatchesOnBoardAndHandle() noexcept
 {
-	constexpr DriverStopWatch watch{ 1, 0, 3, switchHandle };
+	constexpr DriverStopWatch watch{ 1, 0, 3, switchHandle, 0, StopAction::group, true };
 
 	CHECK(WatchMatches(watch, 3, switchHandle, 0), "the switch it watches stops it");
 	CHECK(WatchMatches(watch, 3, switchHandle, 0xFFFFFFFF),
@@ -62,8 +68,8 @@ void TestAStallMatchesOnlyTheDriverThatStalled() noexcept
 {
 	// Two drivers of a move, both on board 3, both watching for their own stall. Phase 2 guarantees
 	// the input board of a stall watch is the board carrying the driver
-	constexpr DriverStopWatch x{ 3, 0, 3, stallHandle };
-	constexpr DriverStopWatch y{ 3, 2, 3, stallHandle };
+	constexpr DriverStopWatch x{ 3, 0, 3, stallHandle, 2, StopAction::group, true };
+	constexpr DriverStopWatch y{ 3, 2, 3, stallHandle, 2, StopAction::group, true };
 
 	CHECK(WatchMatches(x, 3, stallHandle, Stalled(0)), "the driver that stalled is stopped");
 	CHECK(!WatchMatches(y, 3, stallHandle, Stalled(0)),
@@ -86,7 +92,7 @@ void TestAStallMatchesOnlyTheDriverThatStalled() noexcept
 // number their drivers independently, so board 4 reporting driver 0 must not stop board 3's driver 0
 void TestAStallDoesNotCrossBoards() noexcept
 {
-	constexpr DriverStopWatch onBoard3{ 3, 0, 3, stallHandle };
+	constexpr DriverStopWatch onBoard3{ 3, 0, 3, stallHandle, 2, StopAction::group, true };
 
 	CHECK(!WatchMatches(onBoard3, 4, stallHandle, Stalled(0)),
 		  "another board's driver 0 stalling is not this driver stalling");
@@ -97,7 +103,7 @@ void TestAStallDoesNotCrossBoards() noexcept
 // shifting by it would be undefined rather than false
 void TestADriverPastTheBitmapIsNotStalled() noexcept
 {
-	constexpr DriverStopWatch beyond{ 3, kMaxDriversPerBoard, 3, stallHandle };
+	constexpr DriverStopWatch beyond{ 3, kMaxDriversPerBoard, 3, stallHandle, 2, StopAction::group, true };
 
 	CHECK(!WatchMatches(beyond, 3, stallHandle, 0xFFFFFFFF),
 		  "a driver past the width of the bitmap is never reported stalled");
@@ -113,6 +119,128 @@ void TestAZeroedWatchIsNotMatchedByAnythingReal() noexcept
 	CHECK(!WatchMatches(zeroed, 1, switchHandle, 0), "nor anybody's switch");
 }
 
+// stopAll: every driver of the move goes, whichever endstop fired. The drives are coupled, so
+// letting the others run on would drag the head into the switch.
+void TestStopAllStopsEveryDriverOfTheMove() noexcept
+{
+	const DriverStopWatch watches[] = {
+		{ 1, 0, 3, switchHandle, 0, StopAction::all, true },
+		{ 1, 1, 3, switchHandle, 1, StopAction::all, true },
+		{ 2, 0, 9, switchHandle, 2, StopAction::all, true },   // another drive, another board entirely
+	};
+	const std::span all{ watches };
+
+	const StopDecision decision = DecideStop(all, 3, switchHandle, 0);
+	CHECK(decision.action == StopAction::all, "the endstop that fired says stop everything");
+	for (size_t i = 0; i < all.size(); ++i)
+	{
+		CHECK(StopsDriver(all, decision, i), "so every driver of the move stops");
+	}
+}
+
+// stopAxis: every motor of the drive goes, and nothing else does. The drive is the only thing that
+// ties them together - a dual-motor axis may have its motors on two boards, under two driver
+// numbers, so nothing about the trigger itself names the motor that did not stall.
+void TestGroupStopsTheDriveAndNothingElse() noexcept
+{
+	const DriverStopWatch watches[] = {
+		{ 3, 0, 3, stallHandle, 2, StopAction::group, true },  // Z motor 1, its own board
+		{ 4, 0, 4, stallHandle, 2, StopAction::group, true },  // Z motor 2, a different board
+		{ 5, 0, 5, stallHandle, 0, StopAction::group, true },  // X, a different drive
+	};
+	const std::span all{ watches };
+
+	// Board 3's motor stalls. Board 4's is a different board and a different driver number, so
+	// nothing about the trigger names it - only the group does
+	const StopDecision decision = DecideStop(all, 3, stallHandle, Stalled(0));
+	CHECK(decision.action == StopAction::group, "an S3 stall stops the drive");
+	CHECK(StopsDriver(all, decision, 0), "the motor that stalled");
+	CHECK(StopsDriver(all, decision, 1), "and the one on the other board, which is the whole point");
+	CHECK(!StopsDriver(all, decision, 2), "but not a drive that was not stopped");
+}
+
+// stopDriver, and the escalation that makes it usable: each motor stops where it stalled, which is
+// what squares a gantry, and the last one left stops the drive. Without the escalation the last
+// motor would stop alone and the move would run on with nothing to end it.
+void TestIndividualStopsOneMotorUntilItIsTheLast() noexcept
+{
+	DriverStopWatch watches[] = {
+		{ 3, 0, 3, stallHandle, 2, StopAction::driver, true },
+		{ 3, 1, 3, stallHandle, 2, StopAction::driver, true },
+		{ 3, 2, 3, stallHandle, 2, StopAction::driver, true },
+	};
+	const std::span all{ watches };
+
+	// Three motors running: the first to stall stops alone
+	StopDecision decision = DecideStop(all, 3, stallHandle, Stalled(0));
+	CHECK(decision.action == StopAction::driver, "with others still running, only this motor stops");
+	CHECK(StopsDriver(all, decision, 0), "the motor that stalled stops");
+	CHECK(!StopsDriver(all, decision, 1), "the others keep running on to their own stalls");
+	CHECK(!StopsDriver(all, decision, 2), "however many of them there are");
+	watches[0].stillRunning = false;
+
+	// Two left: still individual
+	decision = DecideStop(all, 3, stallHandle, Stalled(1));
+	CHECK(decision.action == StopAction::driver, "and again with one still running behind it");
+	watches[1].stillRunning = false;
+
+	// One left: it has nothing to square against, so it stops the drive
+	decision = DecideStop(all, 3, stallHandle, Stalled(2));
+	CHECK(decision.action == StopAction::group, "the last motor of the drive stops the drive");
+	CHECK(StopsDriver(all, decision, 2), "including itself");
+}
+
+// A driver already stopped by this move is not stopped again, and stops counting towards its group.
+// Both matter: a second stop would be reported twice, and a stopped motor still counted would keep
+// the escalation from ever firing.
+void TestAStoppedDriverIsNotStoppedAgain() noexcept
+{
+	const DriverStopWatch watches[] = {
+		{ 3, 0, 3, stallHandle, 2, StopAction::driver, false },  // already stopped
+		{ 3, 1, 3, stallHandle, 2, StopAction::driver, true },
+	};
+	const std::span all{ watches };
+
+	CHECK(DecideStop(all, 3, stallHandle, Stalled(0)).action == StopAction::none,
+		  "a driver this move already stopped matches nothing");
+
+	const StopDecision decision = DecideStop(all, 3, stallHandle, Stalled(1));
+	CHECK(decision.action == StopAction::group,
+		  "and does not count towards its group, so the one left escalates");
+}
+
+// A driver in no group stops alone under `group`, rather than sweeping up every other driver that
+// also has no group. Nothing builds such a move today; the rule matters because kNoStopGroup is what
+// a driver watching nothing carries, and those share the value.
+void TestNoGroupDoesNotStopEveryOtherUngroupedDriver() noexcept
+{
+	const DriverStopWatch watches[] = {
+		{ 3, 0, 3, stallHandle, duet::spi::protocol::kNoStopGroup, StopAction::group, true },
+		{ 3, 1, 0, 0, duet::spi::protocol::kNoStopGroup, StopAction::none, true },
+	};
+	const std::span all{ watches };
+
+	const StopDecision decision = DecideStop(all, 3, stallHandle, Stalled(0));
+	CHECK(decision.action == StopAction::group, "the action is what the move asked for");
+	CHECK(!StopsDriver(all, decision, 0), "a driver in no group is not stopped by a group action");
+	CHECK(!StopsDriver(all, decision, 1), "and neither is anything else that has no group");
+}
+
+// A trigger nothing watches stops nothing at all, which is the ordinary case: a board reports every
+// input change, and most of them belong to no move in flight.
+void TestAnUnwatchedTriggerStopsNothing() noexcept
+{
+	const DriverStopWatch watches[] = {
+		{ 3, 0, 3, stallHandle, 2, StopAction::group, true },
+	};
+	const std::span all{ watches };
+
+	CHECK(DecideStop(all, 9, stallHandle, Stalled(0)).action == StopAction::none, "another board");
+	CHECK(DecideStop(all, 3, switchHandle, 0).action == StopAction::none, "another kind of input");
+	CHECK(DecideStop(all, 3, stallHandle, Stalled(1)).action == StopAction::none, "another driver");
+	CHECK(DecideStop({}, 3, stallHandle, Stalled(0)).action == StopAction::none, "or no move at all");
+}
+
 int main()
 {
 	std::printf("Stop rules:\n");
@@ -122,5 +250,11 @@ int main()
 	TestAStallDoesNotCrossBoards();
 	TestADriverPastTheBitmapIsNotStalled();
 	TestAZeroedWatchIsNotMatchedByAnythingReal();
+	TestStopAllStopsEveryDriverOfTheMove();
+	TestGroupStopsTheDriveAndNothingElse();
+	TestIndividualStopsOneMotorUntilItIsTheLast();
+	TestAStoppedDriverIsNotStoppedAgain();
+	TestNoGroupDoesNotStopEveryOtherUngroupedDriver();
+	TestAnUnwatchedTriggerStopsNothing();
 	return TestSupport::Summarise("Stop rules");
 }

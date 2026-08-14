@@ -120,6 +120,7 @@ internal sealed class EndstopCorrection(
     private long _driversUnmapped;
     private long _driversUnarmed;
     private long _stopsAfterConclusion;
+    private long _stopsForAnotherMove;
     private long _positionQueriesFailed;
     private long _revertsSent;
     private long _positionsAdopted;
@@ -165,10 +166,29 @@ internal sealed class EndstopCorrection(
             Array.Clear(_driversStopped);
             _armedDrives = armedDrives;
             _currentMove++;
+            _armedMoveId = 0;
             _stopsForCurrentMove = 0;
             _currentMoveConcluded = false;
         }
     }
+
+    /// <summary>
+    /// Say which move id the armed move went out under
+    /// </summary>
+    /// <param name="moveId">The id, as the controller will quote it back</param>
+    /// <remarks>
+    /// The id is assigned when the move is queued, which is after it is armed, so it arrives in a
+    /// second call. Both happen under the planner lock, which is the lock a report takes before it
+    /// records anything, so no report can land in between and find the move armed but unnamed
+    /// </remarks>
+    public void NoteMoveId(uint moveId)
+    {
+        using (_lock.EnterScope())
+        {
+            _armedMoveId = moveId;
+        }
+    }
+    private uint _armedMoveId;
 
     /// <summary>
     /// Record that a driver is already at its own switch, so this move will not be told it stopped
@@ -259,6 +279,7 @@ internal sealed class EndstopCorrection(
     /// Correct the drives an endstop cut short
     /// </summary>
     /// <param name="whenTriggered">Master step-clock time the endstop reported, zero if it sent none</param>
+    /// <param name="moveId">The move the controller stopped, as this side numbered it</param>
     /// <param name="drivers">The drivers the controller stopped</param>
     /// <remarks>
     /// <para>
@@ -282,7 +303,7 @@ internal sealed class EndstopCorrection(
     /// finishes. RepRapFirmware latches the same fact in the same place, from its step interrupt
     /// </para>
     /// </remarks>
-    public void Apply(uint whenTriggered, ReadOnlySpan<MotionStoppedDriverEntry> drivers)
+    public void Apply(uint whenTriggered, uint moveId, ReadOnlySpan<MotionStoppedDriverEntry> drivers)
     {
         Interlocked.Increment(ref _reportsReceived);
         Interlocked.Add(ref _driversReported, drivers.Length);
@@ -314,11 +335,33 @@ internal sealed class EndstopCorrection(
             // decided without it
             long move;
             bool tooLate;
+            bool wrongMove;
+            uint armedMoveId;
             using (_lock.EnterScope())
             {
                 _stopsForCurrentMove++;
                 move = _currentMove;
                 tooLate = _currentMoveConcluded;
+                armedMoveId = _armedMoveId;
+
+                // Zero on either side means the id could not be checked rather than that it did not
+                // match: a report the controller sent without one, or a move this side armed and has
+                // not yet queued. Refusing those would throw away stops that are almost certainly
+                // this move's
+                wrongMove = moveId != 0 && armedMoveId != 0 && moveId != armedMoveId;
+            }
+
+            if (wrongMove)
+            {
+                // A report for a move that has already been concluded and replaced. The drives it
+                // names belong to the earlier move, so correcting them would wind a motor to a
+                // position from a move the machine has since been told it finished - and leave the
+                // move actually in flight with an endpoint it never reached
+                Interlocked.Increment(ref _stopsForAnotherMove);
+                logger.LogWarning(
+                    "An endstop stop naming move id {ReportedId} arrived while move id {ArmedId} was armed; ignoring it",
+                    moveId, armedMoveId);
+                return;
             }
 
             if (tooLate)
@@ -596,6 +639,7 @@ internal sealed class EndstopCorrection(
             + $"({Interlocked.Read(ref _driversUnmapped)} unmapped, "
             + $"{Interlocked.Read(ref _driversUnarmed)} unarmed, "
             + $"{Interlocked.Read(ref _stopsAfterConclusion)} too late, "
+            + $"{Interlocked.Read(ref _stopsForAnotherMove)} for another move, "
             + $"{Interlocked.Read(ref _positionQueriesFailed)} unlocatable), "
             + $"{Interlocked.Read(ref _revertsSent)} reverts sent, "
             + $"{Interlocked.Read(ref _positionsAdopted)} positions adopted "

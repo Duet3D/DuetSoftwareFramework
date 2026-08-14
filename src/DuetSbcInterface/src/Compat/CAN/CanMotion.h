@@ -19,6 +19,8 @@
 
 #include <RepRapFirmware.h>
 
+#include <DuetSpiProtocol/StopRules.h>
+
 class DDA;
 struct PrepParams;
 
@@ -29,8 +31,10 @@ namespace CanMotion
 
 	// Add one axis driver's share of the move, in net microsteps.
 	// stopOnInput is the endstop that stops this driver, packed by Motion::MakeStopInput, or
-	// Motion::kNoStopInput. The controller does the watching; see Motion/MoveParams.h
-	void AddAxisMovement(const PrepParams& params, DriverId canDriver, int32_t steps, uint32_t stopOnInput) noexcept;
+	// Motion::kNoStopInput. stopGroup and stopAction say what else that endstop stops. The
+	// controller does the watching; see Motion/MoveParams.h
+	void AddAxisMovement(const PrepParams& params, DriverId canDriver, int32_t steps, uint32_t stopOnInput,
+						 uint8_t stopGroup, duet::spi::protocol::StopAction stopAction) noexcept;
 
 	// Add one extruder driver's share, in microsteps including fractional parts.
 	void AddExtruderMovement(const PrepParams& params, DriverId canDriver, float extrusion,

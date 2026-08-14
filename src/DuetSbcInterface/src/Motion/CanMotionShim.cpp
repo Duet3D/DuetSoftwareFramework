@@ -23,9 +23,10 @@ void CanMotion::StartMovement() noexcept
 	Builder().StartMovement();
 }
 
-void CanMotion::AddAxisMovement(const PrepParams& params, DriverId canDriver, int32_t steps, uint32_t stopOnInput) noexcept
+void CanMotion::AddAxisMovement(const PrepParams& params, DriverId canDriver, int32_t steps, uint32_t stopOnInput,
+								uint8_t stopGroup, duet::spi::protocol::StopAction stopAction) noexcept
 {
-	Builder().AddAxisMovement(params, canDriver, steps, stopOnInput);
+	Builder().AddAxisMovement(params, canDriver, steps, stopOnInput, stopGroup, stopAction);
 }
 
 void CanMotion::AddExtruderMovement(const PrepParams& params, DriverId canDriver, float extrusion,
@@ -37,7 +38,7 @@ void CanMotion::AddExtruderMovement(const PrepParams& params, DriverId canDriver
 uint32_t CanMotion::FinishMovement(const DDA& dda, uint32_t moveStartTime, bool simulating) noexcept
 {
 	return Builder().FinishMovement(dda.GetMoveId(), moveStartTime, simulating, dda.IsCheckingEndstops(),
-									dda.StopsAllDrivers(), dda.UsesInputShaping());
+									dda.UsesInputShaping());
 }
 
 bool CanMotion::CanPrepareMove() noexcept

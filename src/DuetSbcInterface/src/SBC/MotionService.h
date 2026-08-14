@@ -167,7 +167,7 @@ namespace Duet::Sbc
 		// Hand the controller's stop report to DCS unchanged, so it can decide what the drives should
 		// have ended up at. Raw rather than a conclusion: this side knows where the drives were, but
 		// only DCS knows what the move was for and what should be done about it.
-		void PostMotionStopped(uint32_t whenTriggered,
+		void PostMotionStopped(uint32_t whenTriggered, uint32_t moveId,
 							   std::span<const duet::spi::protocol::MotionStoppedDriver> drivers);
 
 		void PostMoveCompleted(unsigned int ring, uint32_t moveId);

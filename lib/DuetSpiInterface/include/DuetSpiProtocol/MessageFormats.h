@@ -12,6 +12,10 @@
 #include <cstddef>
 #include <cstdint>
 
+// For StopAction, which ScheduleMoveDriver carries. The rules that read it are declared beside it so
+// that the wire field and the meaning of its values cannot come apart.
+#include <DuetSpiProtocol/StopRules.h>
+
 namespace duet::spi::protocol {
 
 // ---------------------------------------------------------------------------
@@ -171,14 +175,7 @@ inline constexpr uint8_t UsePressureAdvance = 1u << 1;
 inline constexpr uint8_t CheckEndstops = 1u << 2;
 // The last packet of this move: the controller sends the accumulated CAN messages when it sees this
 inline constexpr uint8_t LastPacket = 1u << 3;
-// Any watched input stops every driver of this move, not just the drivers watching that input.
-//
-// This is RepRapFirmware's EndstopHitAction::stopAll. It is set when moving the axis being homed
-// needs drives other than its own - a CoreXY axis needs both motors - so stopping only the drivers
-// that watch the switch would leave the others running and drag the head into it. The axis may have
-// several switches, spread over the move's drivers so that all of them are watched; whichever fires
-// first stops everything.
-inline constexpr uint8_t StopAllDrivers = 1u << 4;
+// Bit 4 is unused.
 } // namespace ScheduleMoveFlags
 
 // Schedule a move on the controller (SbcRequest::ScheduleMove).
@@ -227,18 +224,25 @@ inline constexpr uint8_t NoEndstopBoard = 0xFF;
 // rather than looking anything up. Carrying it per driver rather than per move is what lets one
 // move home several axes at once, each stopping on its own endstop.
 //
+// stopGroup and stopAction say what else goes when this driver's input fires. They are per driver
+// for the same reason: RepRapFirmware picks one of three actions per endstop, not per move, so a
+// move may home an axis whose endstop stops every drive alongside one whose endstop stops only its
+// own. The group is the logical drive, which is what "stop this axis" means once the move has been
+// flattened into drivers - the controller holds no axis-to-driver map and should not acquire one.
+//
 // The controller does the stopping because it is the only place close enough to the bus for the
 // latency to be acceptable: by the time an input change reached the SBC and a stop came back, the
 // axis would have travelled past the endstop.
 struct ScheduleMoveDriver {
-    uint8_t boardAddress;  // CAN address of the board carrying this driver
-    uint8_t driverNumber;  // driver number on that board
-    uint8_t isExtruder;    // non-zero if this driver is an extruder
-    uint8_t stopOnBoard;   // CAN address of the board carrying the endstop, or NoEndstopBoard
-    int32_t steps;         // net microsteps, for an axis driver
-    float extrusion;       // microsteps including fractional parts, for an extruder
-    uint16_t stopOnHandle; // RemoteInputHandle of the endstop to stop on, if stopOnBoard is set
-    uint16_t padding;
+    uint8_t boardAddress;   // CAN address of the board carrying this driver
+    uint8_t driverNumber;   // driver number on that board
+    uint8_t isExtruder;     // non-zero if this driver is an extruder
+    uint8_t stopOnBoard;    // CAN address of the board carrying the endstop, or NoEndstopBoard
+    int32_t steps;          // net microsteps, for an axis driver
+    float extrusion;        // microsteps including fractional parts, for an extruder
+    uint16_t stopOnHandle;  // RemoteInputHandle of the endstop to stop on, if stopOnBoard is set
+    uint8_t stopGroup;      // drivers stopped together by StopAction::group, or NoStopGroup
+    StopAction stopAction;  // what a trigger on this driver's input stops
 };
 
 // Most drivers one ScheduleMove packet may carry. Chosen so that a full packet is a few hundred
@@ -299,7 +303,13 @@ struct MotionStoppedDriver {
 // MotionStoppedDriver records follow this header, numDrivers of them.
 struct MotionStoppedHeader {
     uint32_t whenTriggered;  // master step-clock time the endstop reported
-    uint8_t numDrivers;      // MotionStoppedDriver records that follow this header
+    // The move this stopped, as the SBC numbered it in MoveParamsHeader::moveId. Without it a report
+    // that arrives after the next move has armed is applied to that move instead: the drives it
+    // names belong to the move that really stopped, so the wrong axis is corrected and the one that
+    // stopped keeps an endpoint it never reached. Nothing else can tell the two apart - the drives
+    // are usually the same ones, and the timestamp is only comparable once it has been attributed
+    uint32_t moveId;
+    uint8_t numDrivers;  // MotionStoppedDriver records that follow this header
     uint8_t padding[3];
 };
 
@@ -366,14 +376,17 @@ static_assert(sizeof(ScheduleMoveHeader) == 56, "ScheduleMoveHeader must be 56 b
 static_assert(offsetof(ScheduleMoveHeader, acceleration) == 16, "");
 static_assert(offsetof(ScheduleMoveHeader, moveId) == 48, "");
 static_assert(offsetof(ScheduleMoveHeader, numDrivers) == 52, "");
-static_assert(sizeof(MotionStoppedHeader) == 8, "MotionStoppedHeader must be 8 bytes");
-static_assert(offsetof(MotionStoppedHeader, numDrivers) == 4, "");
+static_assert(sizeof(MotionStoppedHeader) == 12, "MotionStoppedHeader must be 12 bytes");
+static_assert(offsetof(MotionStoppedHeader, moveId) == 4, "");
+static_assert(offsetof(MotionStoppedHeader, numDrivers) == 8, "");
 static_assert(sizeof(MotionStoppedDriver) == 4, "MotionStoppedDriver must be 4 bytes");
 static_assert(sizeof(ScheduleMoveDriver) == 16, "ScheduleMoveDriver must be 16 bytes");
 static_assert(offsetof(ScheduleMoveDriver, stopOnBoard) == 3, "");
 static_assert(offsetof(ScheduleMoveDriver, steps) == 4, "");
 static_assert(offsetof(ScheduleMoveDriver, extrusion) == 8, "");
 static_assert(offsetof(ScheduleMoveDriver, stopOnHandle) == 12, "");
+static_assert(offsetof(ScheduleMoveDriver, stopGroup) == 14, "");
+static_assert(offsetof(ScheduleMoveDriver, stopAction) == 15, "");
 static_assert(sizeof(SendCanMessageHeader) == 12, "SendCanMessageHeader must be 12 bytes");
 static_assert(sizeof(FlashVerify) == 8, "FlashVerify must be 8 bytes");
 static_assert(sizeof(CodeBufferUpdateHeader) == 4, "CodeBufferUpdateHeader must be 4 bytes");

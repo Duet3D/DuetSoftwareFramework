@@ -1,3 +1,4 @@
+using System;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using DuetControlServer.Motion.Native;
@@ -31,17 +32,30 @@ public class MoveParamsLayout
         foreach (PropertyInfo property in typeof(MoveStopInput).GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
             // Boards is the one field whose width is a count rather than a type, so it is measured
-            // from the instance; every other field is as wide as it marshals
-            size += property.GetValue(stop) is byte[] boards ? boards.Length : Marshal.SizeOf(property.PropertyType);
+            // from the instance. An enum is as wide as what it is declared over, which is not what
+            // Marshal.SizeOf will say about it; everything else is as wide as it marshals
+            size += property.GetValue(stop) switch
+            {
+                byte[] boards => boards.Length,
+                _ => Marshal.SizeOf(property.PropertyType.IsEnum
+                                    ? Enum.GetUnderlyingType(property.PropertyType)
+                                    : property.PropertyType)
+            };
         }
+
+        // The native record ends in a padding byte that no property stands for, because the compiler
+        // would insert it whether or not it were written out - see MoveParams.h
+        const int nativePadding = 1;
 
         Assert.Multiple(() =>
         {
-            Assert.That(MoveStopInput.Length, Is.EqualTo(size), "Length covers every field of the entry");
+            Assert.That(MoveStopInput.Length, Is.EqualTo(size + nativePadding),
+                        "Length covers every field of the entry, plus the native record's padding");
 
-            // 4 + maxDriversPerAxis is what MoveParams.h static_asserts sizeof(MoveStopInput) to be,
+            // 6 + maxDriversPerAxis is what MoveParams.h static_asserts sizeof(MoveStopInput) to be,
             // and MotionConfigLayout pins maxDriversPerAxis itself to the native 8
-            Assert.That(size, Is.EqualTo(4 + MotionLimits.MaxDriversPerAxis), "sizeof(MoveStopInput)");
+            Assert.That(size + nativePadding, Is.EqualTo(6 + MotionLimits.MaxDriversPerAxis),
+                        "sizeof(MoveStopInput)");
         });
     }
 

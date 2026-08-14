@@ -560,7 +560,8 @@ public class MoveBuilderTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(y[^1], Is.EqualTo(0b10), "the second motor is held, the first is not");
+            Assert.That(y[3 + MotionLimits.MaxDriversPerAxis], Is.EqualTo(0b10),
+                        "the second motor is held, the first is not");
             Assert.That(y[2], Is.EqualTo(2), "and the drive still watches a switch per driver");
             Assert.That(y[3], Is.EqualTo(1), "each keeping the board it was given");
             Assert.That(y[4], Is.EqualTo(4));

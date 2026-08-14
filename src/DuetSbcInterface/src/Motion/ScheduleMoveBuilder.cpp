@@ -40,12 +40,14 @@ ScheduleMoveDriver& ScheduleMoveBuilder::NewDriver(const MoveProfile& profileToU
 	d.driverNumber = driver.localDriver;
 	d.stopOnBoard = duet::spi::protocol::NoEndstopBoard;
 	d.stopOnHandle = 0;
-	d.padding = 0;
+	d.stopGroup = duet::spi::protocol::kNoStopGroup;
+	d.stopAction = duet::spi::protocol::StopAction::none;
 	return d;
 }
 
 void ScheduleMoveBuilder::AddAxisMovement(const MoveProfile& profileToUse, DriverId driver, int32_t steps,
-										  uint32_t stopOnInput) noexcept
+										  uint32_t stopOnInput, uint8_t stopGroup,
+										  duet::spi::protocol::StopAction stopAction) noexcept
 {
 	ScheduleMoveDriver& d = NewDriver(profileToUse, driver);
 	d.isExtruder = 0;
@@ -58,6 +60,8 @@ void ScheduleMoveBuilder::AddAxisMovement(const MoveProfile& profileToUse, Drive
 	{
 		d.stopOnBoard = Duet::Sbc::Motion::StopInputBoard(stopOnInput);
 		d.stopOnHandle = Duet::Sbc::Motion::StopInputHandle(stopOnInput);
+		d.stopGroup = stopGroup;
+		d.stopAction = stopAction;
 	}
 }
 
@@ -107,7 +111,7 @@ bool ScheduleMoveBuilder::SendPacket(uint32_t moveId, uint32_t moveStartTime, ui
 }
 
 uint32_t ScheduleMoveBuilder::FinishMovement(uint32_t moveId, uint32_t moveStartTime, bool simulating,
-											 bool checkEndstops, bool stopAllDrivers, bool useInputShaping) noexcept
+											 bool checkEndstops, bool useInputShaping) noexcept
 {
 	const size_t total = m_numDrivers;
 	m_numDrivers = 0;
@@ -122,7 +126,6 @@ uint32_t ScheduleMoveBuilder::FinishMovement(uint32_t moveId, uint32_t moveStart
 	if (useInputShaping) { commonFlags |= ScheduleMoveFlags::UseInputShaping; }
 	if (m_usePressureAdvance) { commonFlags |= ScheduleMoveFlags::UsePressureAdvance; }
 	if (checkEndstops) { commonFlags |= ScheduleMoveFlags::CheckEndstops; }
-	if (stopAllDrivers) { commonFlags |= ScheduleMoveFlags::StopAllDrivers; }
 
 	for (size_t first = 0; first < total; first += MaxScheduleMoveDrivers)
 	{

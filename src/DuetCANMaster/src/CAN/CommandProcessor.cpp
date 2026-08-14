@@ -170,6 +170,7 @@ static void HandleInputStateChanged(CanMessageBuffer& buf, CanMessageType id) no
 	// V1 carries no trigger timestamp; zero tells the SBC to correct from where the message
 	// found the drives instead, which keeps the overshoot V2 exists to remove
 	uint32_t whenTriggered = 0;
+	uint32_t moveId = 0;
 
 	if (id == CanMessageType::inputStateChangedV2)
 	{
@@ -186,7 +187,7 @@ static void HandleInputStateChanged(CanMessageBuffer& buf, CanMessageType id) no
 
 			const size_t added = CanMotion::StopDriversWatchingInput(
 				src, msg.results[i].handle.asU16(), (uint32_t)msg.GetEntryReading(i),
-				std::span{stopped + numStopped, ARRAY_SIZE(stopped) - numStopped});
+				std::span{stopped + numStopped, ARRAY_SIZE(stopped) - numStopped}, moveId);
 			if (added != 0)
 			{
 				// The board reports its own low 16 bits. Widened here rather than on the SBC,
@@ -209,7 +210,7 @@ static void HandleInputStateChanged(CanMessageBuffer& buf, CanMessageType id) no
 
 			numStopped += CanMotion::StopDriversWatchingInput(
 				src, msg.results[i].handle.asU16(), (uint32_t)msg.GetEntryReading(i),
-				std::span{stopped + numStopped, ARRAY_SIZE(stopped) - numStopped});
+				std::span{stopped + numStopped, ARRAY_SIZE(stopped) - numStopped}, moveId);
 		}
 	}
 
@@ -219,7 +220,7 @@ static void HandleInputStateChanged(CanMessageBuffer& buf, CanMessageType id) no
 		CanInterface::WakeAsyncSender();
 
 		// The SBC works out where the drives should have ended up and sends the revert itself
-		reprap.GetSbcInterface().ReportMotionStopped(whenTriggered, std::span{stopped, numStopped});
+		reprap.GetSbcInterface().ReportMotionStopped(whenTriggered, moveId, std::span{stopped, numStopped});
 	}
 #else
 	(void)buf;

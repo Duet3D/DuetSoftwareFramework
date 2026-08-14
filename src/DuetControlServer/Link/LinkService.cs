@@ -554,7 +554,7 @@ internal sealed class LinkService(
 
         ReadOnlySpan<MotionStoppedDriverEntry> drivers =
             MemoryMarshal.Cast<byte, MotionStoppedDriverEntry>(tail[..(stoppedEvent.NumDrivers * entrySize)]);
-        endstopCorrection.Apply(stoppedEvent.WhenTriggered, drivers);
+        endstopCorrection.Apply(stoppedEvent.WhenTriggered, stoppedEvent.MoveId, drivers);
     }
 
     /// <summary>

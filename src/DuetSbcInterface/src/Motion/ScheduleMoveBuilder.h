@@ -60,7 +60,12 @@ namespace Duet::Sbc::Motion
 		void StartMovement() noexcept;
 
 		// Add one axis driver's share of the move, in net microsteps.
-		void AddAxisMovement(const MoveProfile& profile, DriverId driver, int32_t steps, uint32_t stopOnInput) noexcept;
+		//
+		// `stopGroup` and `stopAction` say what a trigger on this driver's input stops: itself, every
+		// driver of the group, or every driver of the move. The group is the logical drive. A driver
+		// that watches nothing passes StopAction::none, which is what NewDriver writes anyway.
+		void AddAxisMovement(const MoveProfile& profile, DriverId driver, int32_t steps, uint32_t stopOnInput,
+							 uint8_t stopGroup, duet::spi::protocol::StopAction stopAction) noexcept;
 
 		// Add one extruder driver's share, in microsteps including fractional parts. The board adds
 		// pressure advance and carries the fraction forward, which is why this is not rounded here.
@@ -71,7 +76,7 @@ namespace Duet::Sbc::Motion
 		// nothing was sent. The caller compares that against its own figure and extends its move if
 		// the boards' is longer, so that they never have to catch up.
 		uint32_t FinishMovement(uint32_t moveId, uint32_t moveStartTime, bool simulating,
-								bool checkEndstops, bool stopAllDrivers, bool useInputShaping) noexcept;
+								bool checkEndstops, bool useInputShaping) noexcept;
 
 		// False when the sink is backed up, so that PrepareMoves throttles instead of dropping.
 		[[nodiscard]] bool CanPrepareMove() const noexcept;

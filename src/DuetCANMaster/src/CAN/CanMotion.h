@@ -68,8 +68,11 @@ namespace CanMotion
 	// Called from the CAN receiver task.
 	// `stopped` receives the drivers that were stopped, so the caller can report them to the SBC.
 	// Returns how many were written, which is at most `stopped.size()`
+	// `moveId` receives the move the stopped drivers belong to, for the SBC to check the report
+	// against the move it armed.
 	size_t StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHandle, uint32_t reading,
-									std::span<duet::spi::protocol::MotionStoppedDriver> stopped) noexcept;
+									std::span<duet::spi::protocol::MotionStoppedDriver> stopped,
+									uint32_t& moveId) noexcept;
 #  endif
 
 	// These may be called from the CAN receiver task, so they can't send CAN messages directly.

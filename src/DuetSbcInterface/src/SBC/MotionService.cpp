@@ -42,9 +42,10 @@ namespace Duet::Sbc
 		// DuetControlServer, from the positions this side can evaluate - see GetPositionAt - so all
 		// that happens here is handing the report on
 		link.SetMotionStoppedCallback(
-			[this](uint32_t whenTriggered, std::span<const duet::spi::protocol::MotionStoppedDriver> drivers)
+			[this](uint32_t whenTriggered, uint32_t moveId,
+				   std::span<const duet::spi::protocol::MotionStoppedDriver> drivers)
 			{
-				PostMotionStopped(whenTriggered, drivers);
+				PostMotionStopped(whenTriggered, moveId, drivers);
 			});
 	}
 
@@ -398,7 +399,7 @@ namespace Duet::Sbc
 		// reached, which is the failure this arrangement exists to remove
 	}
 
-	void MotionService::PostMotionStopped(uint32_t whenTriggered,
+	void MotionService::PostMotionStopped(uint32_t whenTriggered, uint32_t moveId,
 										  std::span<const duet::spi::protocol::MotionStoppedDriver> drivers)
 	{
 		if (drivers.empty() || m_link == nullptr)
@@ -411,6 +412,7 @@ namespace Duet::Sbc
 		MotionStoppedEvent event{};
 		event.header.type = static_cast<uint16_t>(InboundEventType::MotionStopped);
 		event.whenTriggered = whenTriggered;
+		event.moveId = moveId;
 		event.numDrivers = static_cast<uint8_t>(numDrivers);
 
 		MotionStoppedDriverEntry entries[duet::spi::protocol::MaxMotionStoppedDrivers]{};

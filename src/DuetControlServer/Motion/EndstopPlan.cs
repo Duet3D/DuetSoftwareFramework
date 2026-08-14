@@ -49,9 +49,9 @@ internal sealed record EndstopPlan(
 /// RepRapFirmware does both in one <c>PrimeAxis</c> because it has neither lock.
 /// </para>
 /// <para>
-/// So the two phases stay separate and this is what keeps them agreeing: which drivers an axis
-/// watches is derived here, once, and both phases are handed the answer. Deriving it twice is what
-/// let the drivers a board was armed for drift from the drivers the move told the controller to watch
+/// So the two phases stay separate, and this is what keeps them agreeing: which drivers an axis
+/// watches is derived here, once, and both phases are handed the answer. A second derivation could
+/// disagree with this one, which would arm one set of drivers and watch another
 /// </para>
 /// </remarks>
 internal static class EndstopPlanner
