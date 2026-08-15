@@ -9,23 +9,23 @@
 
 // Static members
 
-MoveSegment *_ecv_null MoveSegment::freeList = nullptr;
-unsigned int MoveSegment::numCreated = 0;
+MoveSegment *_ecv_null MoveSegment::s_freeList = nullptr;
+unsigned int MoveSegment::s_numCreated = 0;
 
 // Allocate a MoveSegment, from the freelist if possible, else create a new one
 MoveSegment *MoveSegment::Allocate(MoveSegment *_ecv_null pNext) noexcept
 {
 	const auto iflags = IrqSave();
-	MoveSegment *_ecv_null ms = freeList;
+	MoveSegment *_ecv_null ms = s_freeList;
 	if (ms != nullptr)
 	{
-		freeList = ms->next;
+		s_freeList = ms->m_next;
 		IrqRestore(iflags);
-		ms->next = pNext;
+		ms->m_next = pNext;
 	}
 	else
 	{
-		++numCreated;
+		++s_numCreated;
 		IrqRestore(iflags);
 		ms = new MoveSegment(pNext);
 	}
@@ -38,7 +38,7 @@ void MoveSegment::ReleaseAll(MoveSegment *_ecv_null item) noexcept
 	while (item != nullptr)
 	{
 		MoveSegment *itemToRelease = item;
-		item = item->next;
+		item = item->m_next;
 		Release(itemToRelease);
 	}
 }
@@ -50,11 +50,11 @@ void MoveSegment::DebugPrint() const noexcept
 				" j=%.4e"
 #endif
 				" f=%02" PRIx32 "\n",
-				startTime, duration, (double)distance, (double)CalcU(), (double)a,
+				m_startTime, m_duration, (double)m_distance, (double)CalcU(), (double)m_a,
 #if SUPPORT_S_CURVE
-				(double)j,
+				(double)m_j,
 #endif
-				flags.all);
+				m_flags.all);
 }
 
 // Append details of this segment to a string buffer
@@ -65,11 +65,11 @@ void MoveSegment::AppendDetails(const StringRef& str) const noexcept
 				" j=%.4e"
 #endif
 				" f=%02" PRIx32 "\n",
-				startTime, duration, (double)distance, (double)CalcU(), (double)a,
+				m_startTime, m_duration, (double)m_distance, (double)CalcU(), (double)m_a,
 #if SUPPORT_S_CURVE
-				(double)j,
+				(double)m_j,
 #endif
-				flags.all);
+				m_flags.all);
 }
 
 /*static*/ void MoveSegment::DebugPrintList(const MoveSegment *_ecv_null segs) noexcept

@@ -133,16 +133,16 @@ void PrepParams::SetFromDDA(DDA& dda) noexcept
 	phaseClocks[1] = std::lrint((motioncalc_t)(dda.topSpeed - dda.startSpeed)/peakAcceleration);
 	phaseClocks[5] = std::lrint((motioncalc_t)(dda.endSpeed - dda.topSpeed)/peakDeceleration);
 	distances[0] = distances[2] = distances[4] = distances[6] = 0.0;
-	distances[5] = dda.beforePrepare.decelDistance;
-	const motioncalc_t decelStartDistance = dda.totalDistance - dda.beforePrepare.decelDistance;
-	distances[1] = min<motioncalc_t>(dda.beforePrepare.accelDistance, decelStartDistance);
+	distances[5] = dda.m_beforePrepare.decelDistance;
+	const motioncalc_t decelStartDistance = dda.totalDistance - dda.m_beforePrepare.decelDistance;
+	distances[1] = min<motioncalc_t>(dda.m_beforePrepare.accelDistance, decelStartDistance);
 	distances[3] = decelStartDistance - distances[1];
 	phaseClocks[3] = (distances[3] <= (motioncalc_t)0.0) ? 0 : std::lrint(distances[3]/(motioncalc_t)dda.topSpeed);
 	dda.clocksNeeded = phaseClocks[1] + phaseClocks[3] + phaseClocks[5];
 	speedsCalculated = false;
 #else
-	decelStartDistance = dda.m_totalDistance - dda.beforePrepare.decelDistance;
-	accelDistance = min<motioncalc_t>(dda.beforePrepare.accelDistance, decelStartDistance);
+	decelStartDistance = dda.m_totalDistance - dda.m_beforePrepare.decelDistance;
+	accelDistance = min<motioncalc_t>(dda.m_beforePrepare.accelDistance, decelStartDistance);
 	acceleration = dda.m_maxAcceleration;
 	deceleration = -dda.m_maxAcceleration;
 	accelClocks = std::lrint((motioncalc_t)(dda.m_topSpeed - dda.m_startSpeed)/acceleration);
@@ -220,7 +220,7 @@ uint32_t DDA::GetTimeLeft() const noexcept
 		return m_clocksNeeded;
 	case Committed:
 		{
-			const int32_t timeExecuting = (int32_t)(StepTimer::GetMovementTimerTicks() - afterPrepare.moveStartTime);
+			const int32_t timeExecuting = (int32_t)(StepTimer::GetMovementTimerTicks() - m_afterPrepare.moveStartTime);
 			return (timeExecuting <= 0) ? m_clocksNeeded							// move has not started yet
 					: ((uint32_t)timeExecuting > m_clocksNeeded) ? 0				// move has completed
 						: m_clocksNeeded - (uint32_t)timeExecuting;				// move is part way through
@@ -251,7 +251,7 @@ void DDA::DebugPrintVector(const char *_ecv_array name, const float *_ecv_array 
 // Print the text followed by the DDA only
 void DDA::DebugPrint(const char *_ecv_array tag) const noexcept
 {
-	DebugPrintf("%s %u ts=%" PRIu32 " DDA: s=%.4g", tag, (unsigned int)GetState(), afterPrepare.moveStartTime, (double)m_totalDistance);
+	DebugPrintf("%s %u ts=%" PRIu32 " DDA: s=%.4g", tag, (unsigned int)GetState(), m_afterPrepare.moveStartTime, (double)m_totalDistance);
 	DebugPrintVector(" vec", m_directionVector, maxAxesPlusExtruders);
 	DebugPrintf("\n"
 #if SUPPORT_S_CURVE
@@ -261,7 +261,7 @@ void DDA::DebugPrint(const char *_ecv_array tag) const noexcept
 #endif
 				" reqv=%.4e startv=%.4e topv=%.4e endv=%.4e cks=%" PRIu32 " id=%" PRIu32 " fl=0x%06" PRIx32 "\n",
 #if SUPPORT_S_CURVE
-				(double)startAcceleration, (double)maxAcceleration, (double)jerk,
+				(double)m_startAcceleration, (double)m_maxAcceleration, (double)m_jerk,
 #else
 				(double)m_maxAcceleration,
 #endif
@@ -347,7 +347,7 @@ MovementError DDA::InitFromParams(DDARing& ring, const Duet::Sbc::Motion::MovePa
 	{
 		// Try to meld this move to the previous move to avoid stop/start
 		// Assuming that this move ends with zero speed, calculate the maximum possible starting speed: u^2 = -2as limited to the requested speed
-		m_prev->beforePrepare.targetNextSpeed = min<float>(fastSqrtf(m_maxAcceleration * m_totalDistance * 2.0), m_requestedSpeed);
+		m_prev->m_beforePrepare.targetNextSpeed = min<float>(fastSqrtf(m_maxAcceleration * m_totalDistance * 2.0), m_requestedSpeed);
 		DoLookahead(ring, m_prev);
 		m_startSpeed = m_prev->m_endSpeed;
 	}
@@ -366,7 +366,7 @@ MovementError DDA::InitFromParams(DDARing& ring, const Duet::Sbc::Motion::MovePa
 			// The lookahead above raised the previous move's end speed so this one could carry on
 			// from it. Nothing is going to, so re-plan the chain to come to rest instead - otherwise
 			// the last move in the ring ends at speed with nothing following it.
-			m_prev->beforePrepare.targetNextSpeed = 0.0;
+			m_prev->m_beforePrepare.targetNextSpeed = 0.0;
 			DoLookahead(ring, m_prev);
 		}
 		return rslt;
@@ -380,9 +380,9 @@ MovementError DDA::InitFromParams(DDARing& ring, const Duet::Sbc::Motion::MovePa
 // A move planned as a deceleration-only move may have a short acceleration segment at the start because of rounding error
 bool DDA::IsDecelerationMove() const noexcept
 {
-	return beforePrepare.decelDistance == m_totalDistance					// the simple case - is a deceleration-only move
+	return m_beforePrepare.decelDistance == m_totalDistance					// the simple case - is a deceleration-only move
 			|| (m_topSpeed < m_requestedSpeed								// can't have been intended as deceleration-only if it reaches the requested speed
-				&& beforePrepare.decelDistance > 0.98 * m_totalDistance	// rounding error can only go so far
+				&& m_beforePrepare.decelDistance > 0.98 * m_totalDistance	// rounding error can only go so far
 			   );
 }
 
@@ -390,9 +390,9 @@ bool DDA::IsDecelerationMove() const noexcept
 // A move planned as a deceleration-only move may have a short acceleration segment at the start because of rounding error
 bool DDA::IsAccelerationMove() const noexcept
 {
-	return beforePrepare.accelDistance == m_totalDistance					// the simple case - is an acceleration-only move
+	return m_beforePrepare.accelDistance == m_totalDistance					// the simple case - is an acceleration-only move
 			|| (m_topSpeed < m_requestedSpeed								// can't have been intended as deceleration-only if it reaches the requested speed
-				&& beforePrepare.accelDistance > 0.98 * m_totalDistance	// rounding error can only go so far
+				&& m_beforePrepare.accelDistance > 0.98 * m_totalDistance	// rounding error can only go so far
 			   );
 }
 
@@ -419,9 +419,9 @@ bool DDA::IsAccelerationMove() const noexcept
 	for (;;)
 	{
 		// We have been asked to adjust the end speed of this move to match the next move starting at targetNextSpeed
-		if (laDDA->beforePrepare.targetNextSpeed > laDDA->m_requestedSpeed)
+		if (laDDA->m_beforePrepare.targetNextSpeed > laDDA->m_requestedSpeed)
 		{
-			laDDA->beforePrepare.targetNextSpeed = laDDA->m_requestedSpeed;			// don't try for an end speed higher than our requested speed
+			laDDA->m_beforePrepare.targetNextSpeed = laDDA->m_requestedSpeed;			// don't try for an end speed higher than our requested speed
 		}
 		if (laDDA->m_topSpeed >= laDDA->m_requestedSpeed)
 		{
@@ -429,7 +429,7 @@ bool DDA::IsAccelerationMove() const noexcept
 			break;																	// stop going back to previous moves
 		}
 		if (   laDDA->IsDecelerationMove()
-			 && laDDA->m_prev->beforePrepare.decelDistance > 0.0						// if the previous move has no deceleration phase then no point in adjusting it
+			 && laDDA->m_prev->m_beforePrepare.decelDistance > 0.0						// if the previous move has no deceleration phase then no point in adjusting it
 			)
 		{
 			// This is a deceleration-only move, and the previous one has a deceleration phase. We may have to adjust the previous move as well to get optimum behaviour.
@@ -444,8 +444,8 @@ bool DDA::IsAccelerationMove() const noexcept
 			   )
 			{
 				laDDA->MatchSpeeds();
-				const float maxStartSpeed = fastSqrtf(fsquare(laDDA->beforePrepare.targetNextSpeed) + (2 * laDDA->m_maxAcceleration * laDDA->m_totalDistance));
-				laDDA->m_prev->beforePrepare.targetNextSpeed = min<float>(maxStartSpeed, laDDA->m_requestedSpeed);
+				const float maxStartSpeed = fastSqrtf(fsquare(laDDA->m_beforePrepare.targetNextSpeed) + (2 * laDDA->m_maxAcceleration * laDDA->m_totalDistance));
+				laDDA->m_prev->m_beforePrepare.targetNextSpeed = min<float>(maxStartSpeed, laDDA->m_requestedSpeed);
 
 				// Still going up
 				laDDA = _ecv_not_null(laDDA->m_prev);
@@ -463,9 +463,9 @@ bool DDA::IsAccelerationMove() const noexcept
 		// This move doesn't reach its requested speed, but either it isn't a deceleration-only move or we can't adjust the previous one
 		// Set its target end speed to the minimum of the requested speed and the highest we can reach
 		const float maxReachableSpeed = fastSqrtf(fsquare(laDDA->m_startSpeed) + (2 * laDDA->m_maxAcceleration * laDDA->m_totalDistance));
-		if (laDDA->beforePrepare.targetNextSpeed > maxReachableSpeed)
+		if (laDDA->m_beforePrepare.targetNextSpeed > maxReachableSpeed)
 		{
-			laDDA->beforePrepare.targetNextSpeed = maxReachableSpeed;
+			laDDA->m_beforePrepare.targetNextSpeed = maxReachableSpeed;
 		}
 		break;
 	}
@@ -475,24 +475,24 @@ bool DDA::IsAccelerationMove() const noexcept
 	// Iterate back through the list towards later moves
 	for (;;)
 	{
-		if (laDDA->beforePrepare.targetNextSpeed < laDDA->m_endSpeed)
+		if (laDDA->m_beforePrepare.targetNextSpeed < laDDA->m_endSpeed)
 		{
 			// This situation should not normally happen except by a small amount because of rounding error.
 			// Don't reduce the end speed of the current move, because that may make the move infeasible.
 			// Report a lookahead error if the change is too large to be accounted for by rounding error.
-			if (laDDA->beforePrepare.targetNextSpeed < laDDA->m_endSpeed * 0.99)
+			if (laDDA->m_beforePrepare.targetNextSpeed < laDDA->m_endSpeed * 0.99)
 			{
 				ring.RecordLookaheadError();
 				if (reprap.GetDebugFlags(Module::Move).IsBitSet(MoveDebugFlags::lookahead))
 				{
-					DebugPrintf("DDA.cpp(%d) tn=%f ", __LINE__, (double)laDDA->beforePrepare.targetNextSpeed);
+					DebugPrintf("DDA.cpp(%d) tn=%f ", __LINE__, (double)laDDA->m_beforePrepare.targetNextSpeed);
 					laDDA->DebugPrint("la");
 				}
 			}
 		}
 		else
 		{
-			laDDA->m_endSpeed = laDDA->beforePrepare.targetNextSpeed;
+			laDDA->m_endSpeed = laDDA->m_beforePrepare.targetNextSpeed;
 		}
 
 LA_DEBUG;
@@ -516,9 +516,9 @@ LA_DEBUG;
 		// We have adjusted the end speed of the previous move as much as is possible. Adjust this move to match it.
 		laDDA->m_startSpeed = laDDA->m_prev->m_endSpeed;
 		const float maxEndSpeed = fastSqrtf(fsquare(laDDA->m_startSpeed) + (2 * laDDA->m_maxAcceleration * laDDA->m_totalDistance));
-		if (maxEndSpeed < laDDA->beforePrepare.targetNextSpeed)
+		if (maxEndSpeed < laDDA->m_beforePrepare.targetNextSpeed)
 		{
-			laDDA->beforePrepare.targetNextSpeed = maxEndSpeed;
+			laDDA->m_beforePrepare.targetNextSpeed = maxEndSpeed;
 		}
 	}
 }
@@ -529,9 +529,9 @@ LA_DEBUG;
 MovementError DDA::RecalculateMove(DDARing& ring) noexcept
 {
 	const float twoA = 2 * m_maxAcceleration;
-	beforePrepare.accelDistance = (fsquare(m_requestedSpeed) - fsquare(m_startSpeed))/twoA;
-	beforePrepare.decelDistance = (fsquare(m_requestedSpeed) - fsquare(m_endSpeed))/twoA;
-	if (beforePrepare.accelDistance + beforePrepare.decelDistance < m_totalDistance)
+	m_beforePrepare.accelDistance = (fsquare(m_requestedSpeed) - fsquare(m_startSpeed))/twoA;
+	m_beforePrepare.decelDistance = (fsquare(m_requestedSpeed) - fsquare(m_endSpeed))/twoA;
+	if (m_beforePrepare.accelDistance + m_beforePrepare.decelDistance < m_totalDistance)
 	{
 		// This move reaches its top speed
 		// It sometimes happens that we get a very short acceleration or deceleration segment. Remove any such segments by reducing the top speed to the start or end speed.
@@ -541,7 +541,7 @@ MovementError DDA::RecalculateMove(DDARing& ring) noexcept
 			if (m_startSpeed + m_maxAcceleration * minimumAccelOrDecelClocks > m_requestedSpeed && m_startSpeed >= m_requestedSpeed * 0.9)
 			{
 				m_topSpeed = m_startSpeed;
-				beforePrepare.accelDistance = 0.0;
+				m_beforePrepare.accelDistance = 0.0;
 			}
 			else
 			{
@@ -553,7 +553,7 @@ MovementError DDA::RecalculateMove(DDARing& ring) noexcept
 			if (m_endSpeed + m_maxAcceleration * minimumAccelOrDecelClocks > m_requestedSpeed && m_endSpeed >= m_requestedSpeed * 0.9)
 			{
 				m_topSpeed = m_endSpeed;
-				beforePrepare.decelDistance = 0.0;
+				m_beforePrepare.decelDistance = 0.0;
 			}
 			else
 			{
@@ -572,8 +572,8 @@ MovementError DDA::RecalculateMove(DDARing& ring) noexcept
 		if (vsquared > fsquare(m_startSpeed) && vsquared > fsquare(m_endSpeed))
 		{
 			// It's an accelerate-decelerate move. Calculate accelerate distance from: V^2 = u^2 + 2as.
-			beforePrepare.accelDistance = (vsquared - fsquare(m_startSpeed))/twoA;
-			beforePrepare.decelDistance = (vsquared - fsquare(m_endSpeed))/twoA;
+			m_beforePrepare.accelDistance = (vsquared - fsquare(m_startSpeed))/twoA;
+			m_beforePrepare.decelDistance = (vsquared - fsquare(m_endSpeed))/twoA;
 			m_topSpeed = fastSqrtf(vsquared);
 		}
 		else
@@ -583,8 +583,8 @@ MovementError DDA::RecalculateMove(DDARing& ring) noexcept
 			// It's OK to adjust maxAcceleration because if we get here then we have either an acceleration or a deceleration segment, not both
 			if (m_startSpeed < m_endSpeed)
 			{
-				beforePrepare.accelDistance = m_totalDistance;
-				beforePrepare.decelDistance = 0.0;
+				m_beforePrepare.accelDistance = m_totalDistance;
+				m_beforePrepare.decelDistance = 0.0;
 				m_topSpeed = m_endSpeed;
 				const float newAcceleration = (fsquare(m_endSpeed) - fsquare(m_startSpeed))/(2 * m_totalDistance);
 				if (newAcceleration > 1.02 * m_maxAcceleration)
@@ -601,8 +601,8 @@ MovementError DDA::RecalculateMove(DDARing& ring) noexcept
 			}
 			else
 			{
-				beforePrepare.accelDistance = 0.0;
-				beforePrepare.decelDistance = m_totalDistance;
+				m_beforePrepare.accelDistance = 0.0;
+				m_beforePrepare.decelDistance = m_totalDistance;
 				m_topSpeed = m_startSpeed;
 				const float newDeceleration = (fsquare(m_startSpeed) - fsquare(m_endSpeed))/(2 * m_totalDistance);
 				if (newDeceleration > 1.02 * m_maxAcceleration)
@@ -636,7 +636,7 @@ MovementError DDA::RecalculateMove(DDARing& ring) noexcept
 
 	// We need to set the number of clocks needed here because we use it before the move has been frozen
 	const float totalTime = (2 * m_topSpeed - m_startSpeed - m_endSpeed)/m_maxAcceleration
-							+ (m_totalDistance - beforePrepare.accelDistance - beforePrepare.decelDistance)/m_topSpeed;
+							+ (m_totalDistance - m_beforePrepare.accelDistance - m_beforePrepare.decelDistance)/m_topSpeed;
 	m_clocksNeeded = (uint32_t)totalTime;
 	return (totalTime < (float)(std::numeric_limits<int32_t>::max() - 100)) ? MovementError::Ok : MovementError::MoveDurationTooLong;
 }
@@ -651,11 +651,11 @@ void DDA::MatchSpeeds() noexcept
 		if (m_directionVector[drive] != 0.0 || m_next->m_directionVector[drive] != 0.0)
 		{
 			const float totalFraction = fabsf(m_directionVector[drive] - m_next->m_directionVector[drive]);
-			const float instantDv = totalFraction * beforePrepare.targetNextSpeed;
+			const float instantDv = totalFraction * m_beforePrepare.targetNextSpeed;
 			const float allowedInstantDv = reprap.GetMove().GetPrintingInstantDv(drive);
 			if (instantDv > allowedInstantDv)
 			{
-				beforePrepare.targetNextSpeed = allowedInstantDv/totalFraction;
+				m_beforePrepare.targetNextSpeed = allowedInstantDv/totalFraction;
 			}
 		}
 	}
@@ -764,7 +764,7 @@ void DDA::Prepare(DDARing& ring,
 
 	if (m_prev->GetState() == Committed)
 	{
-		uint32_t prevEndTime = m_prev->afterPrepare.moveStartTime + m_prev->m_clocksNeeded;
+		uint32_t prevEndTime = m_prev->m_afterPrepare.moveStartTime + m_prev->m_clocksNeeded;
 		// Don't allow the start of a move without input shaping (e.g. retraction/repriming) to overlap a move with input shaping
 		if (!params.useInputShaping && m_prev->UsesInputShaping())
 		{
@@ -772,21 +772,21 @@ void DDA::Prepare(DDARing& ring,
 		}
 		if ((int32_t)(prevEndTime - now) >= (int32_t)MoveTiming::absoluteMinimumPreparedTime)
 		{
-			afterPrepare.moveStartTime = prevEndTime;		// start this move directly after the previous one
+			m_afterPrepare.moveStartTime = prevEndTime;		// start this move directly after the previous one
 		}
 		else if (m_startSpeed == 0.0)
 		{
-			afterPrepare.moveStartTime = now + localPrepareAdvanceTime;
+			m_afterPrepare.moveStartTime = now + localPrepareAdvanceTime;
 		}
 		else
 		{
-			afterPrepare.moveStartTime = now + MoveTiming::absoluteMinimumPreparedTime;
+			m_afterPrepare.moveStartTime = now + MoveTiming::absoluteMinimumPreparedTime;
 			move.AddPrepareHiccup();		// move was supposed to follow the previous one directly, so record a hiccup
 		}
 	}
 	else
 	{
-		afterPrepare.moveStartTime = now + localPrepareAdvanceTime;
+		m_afterPrepare.moveStartTime = now + localPrepareAdvanceTime;
 	}
 
 	if (simMode < SimulationMode::Normal)
@@ -796,7 +796,7 @@ void DDA::Prepare(DDARing& ring,
 #endif
 		float extrusionFraction = 0.0;
 		AxesBitmap additionalAxisMotorsToEnable, axisMotorsEnabled;
-		afterPrepare.drivesMoving.Clear();
+		m_afterPrepare.drivesMoving.Clear();
 
 		// One counter per stop group rather than one for the move. An axis whose switches are shared
 		// across a set hands them out round-robin over the set's drivers so that all of them are
@@ -838,8 +838,8 @@ void DDA::Prepare(DDARing& ring,
 						delta = move.ApplyBacklashCompensation(drive, delta);
 
 						// We generate segments even for nonlocal drivers so that the final position is correct and to track the position in near real time
-						move.AddLinearSegments(drive, afterPrepare.moveStartTime, params, (motioncalc_t)delta, segFlags);
-						afterPrepare.drivesMoving.SetBit(drive);
+						move.AddLinearSegments(drive, m_afterPrepare.moveStartTime, params, (motioncalc_t)delta, segFlags);
+						m_afterPrepare.drivesMoving.SetBit(drive);
 
 #if SUPPORT_CAN_EXPANSION
 						const AxisDriversConfig& config = move.GetAxisDriversConfig(drive);
@@ -918,7 +918,7 @@ void DDA::Prepare(DDARing& ring,
 							const motioncalc_t delta = m_totalDistance * m_directionVector[drive] * move.DriveStepsPerMm(drive);
 
 							// We generate segments even for nonlocal extruders in order to track extruder position
-							move.AddLinearSegments(drive, afterPrepare.moveStartTime, params, delta, segFlags.AddIsExtruder());
+							move.AddLinearSegments(drive, m_afterPrepare.moveStartTime, params, delta, segFlags.AddIsExtruder());
 
 #if SUPPORT_CAN_EXPANSION
 							const DriverId driver = move.GetExtruderDriver(extruder);
@@ -928,7 +928,7 @@ void DDA::Prepare(DDARing& ring,
 								CanMotion::AddExtruderMovement(params, driver, (float)delta, m_flags.usePressureAdvance);
 							}
 #endif
-							afterPrepare.drivesMoving.SetBit(drive);
+							m_afterPrepare.drivesMoving.SetBit(drive);
 						}
 					}
 				}
@@ -944,7 +944,7 @@ void DDA::Prepare(DDARing& ring,
 			move.EnableDrivers(drive, false);
 		}
 
-		afterPrepare.averageExtrusionSpeed = (extrusionFraction * m_totalDistance * (float)stepClockRate)/(float)m_clocksNeeded;
+		m_afterPrepare.averageExtrusionSpeed = (extrusionFraction * m_totalDistance * (float)stepClockRate)/(float)m_clocksNeeded;
 
 		SetState(Committed);
 
@@ -954,7 +954,7 @@ void DDA::Prepare(DDARing& ring,
 		// the ScheduleMove packet's CheckEndstops flag is what tells the controller to arm that.
 
 #if SUPPORT_CAN_EXPANSION
-		const uint32_t canClocksNeeded = CanMotion::FinishMovement(*this, afterPrepare.moveStartTime, simMode != SimulationMode::Off);
+		const uint32_t canClocksNeeded = CanMotion::FinishMovement(*this, m_afterPrepare.moveStartTime, simMode != SimulationMode::Off);
 		if (canClocksNeeded > m_clocksNeeded)
 		{
 			// Due to rounding error in the calculations, we quite often calculate the CAN move as being longer than our previously-calculated value, normally by just one clock.
@@ -994,7 +994,7 @@ bool DDA::HasExpired() const noexcept
 {
 	// Note, for Z leadscrew adjustment moves (and any other individual motor moves that we may support in future), we must not use drivesMoving, because it doesn't describe the drivers that are moving.
 	return (m_flags.checkEndstops)
-			? reprap.GetMove().AreDrivesStopped(afterPrepare.drivesMoving)
+			? reprap.GetMove().AreDrivesStopped(m_afterPrepare.drivesMoving)
 				: (int32_t)(StepTimer::GetMovementTimerTicks() - GetMoveFinishTime()) >= 0;
 }
 

@@ -119,53 +119,53 @@ public:
 	void operator delete(void* ptr, std::align_val_t align) noexcept {}
 
 	// Read the values of the flag bits
-	[[nodiscard]] bool IsLinear() const noexcept { return a == (motioncalc_t)0.0; }
-	[[nodiscard]] MovementFlags GetFlags() const noexcept { return flags; }
+	[[nodiscard]] bool IsLinear() const noexcept { return m_a == (motioncalc_t)0.0; }
+	[[nodiscard]] MovementFlags GetFlags() const noexcept { return m_flags; }
 
 #if 0 //SUPPORT_REMOTE_COMMANDS
 	bool IsRemote() const noexcept { return isRemote; }
 #endif
 
 	// Given that this is not a constant-speed segment, test whether it is accelerating or decelerating
-	[[nodiscard]] bool IsAccelerating() const noexcept { return a > (motioncalc_t)0.0; }
+	[[nodiscard]] bool IsAccelerating() const noexcept { return m_a > (motioncalc_t)0.0; }
 
 	// Get the segment start time in step clocks
-	[[nodiscard]] uint32_t GetStartTime() const noexcept { return startTime; }
+	[[nodiscard]] uint32_t GetStartTime() const noexcept { return m_startTime; }
 
 	// Get the segment duration in step clocks
-	[[nodiscard]] uint32_t GetDuration() const noexcept { return duration; }
+	[[nodiscard]] uint32_t GetDuration() const noexcept { return m_duration; }
 
 	// Get the initial speed
 	[[nodiscard]] motioncalc_t CalcU() const noexcept;
 
 	// Get the reciprocal of the initial speed assuming this move has no acceleration, and no jerk if we are supporting 3rd order motion control
-	[[nodiscard]] motioncalc_t CalcLinearRecipU() const noexcept pre(a == (motioncalc_t)0.0) { return (motioncalc_t)duration/distance; }
+	[[nodiscard]] motioncalc_t CalcLinearRecipU() const noexcept pre(m_a == (motioncalc_t)0.0) { return (motioncalc_t)m_duration/m_distance; }
 
 	// Get the acceleration (the initial acceleration f we are supporting 3rd order motion control)
-	[[nodiscard]] motioncalc_t GetA() const noexcept { return a; }
+	[[nodiscard]] motioncalc_t GetA() const noexcept { return m_a; }
 
 #if SUPPORT_S_CURVE
 	// Get the rate of change of acceleration
-	motioncalc_t GetJ() const noexcept { return j; }
+	motioncalc_t GetJ() const noexcept { return m_j; }
 
 	// Get the speed change
-	motioncalc_t GetSpeedChange() const noexcept { return (a + j * (motioncalc_t)duration * OneHalf) * (motioncalc_t)duration; }
+	motioncalc_t GetSpeedChange() const noexcept { return (m_a + m_j * (motioncalc_t)m_duration * OneHalf) * (motioncalc_t)m_duration; }
 
 	// Get the acceleration change
-	motioncalc_t GetAccChange() const noexcept { return j * (motioncalc_t)duration; }
+	motioncalc_t GetAccChange() const noexcept { return m_j * (motioncalc_t)m_duration; }
 #endif
 
 	// Get the length
-	[[nodiscard]] motioncalc_t GetLength() const noexcept { return distance; }
+	[[nodiscard]] motioncalc_t GetLength() const noexcept { return m_distance; }
 
 	// Make a small correction to the length. Only ever called on the last segment in a list.
-	void AdjustLength(motioncalc_t adjustment) noexcept { distance += adjustment; }
+	void AdjustLength(motioncalc_t adjustment) noexcept { m_distance += adjustment; }
 
 	// Set the parameters of this segment
 	void SetParameters(uint32_t pStartTime, uint32_t pDuration, motioncalc_t pDistance, motioncalc_t pA J_FORMAL_PARAMETER(p_j), MovementFlags pFlags) noexcept;
 
 	// Split this segment in two, returning a pointer to the second part
-	MoveSegment *Split(uint32_t firstDuration) noexcept pre(firstDuration < duration);
+	MoveSegment *Split(uint32_t firstDuration) noexcept pre(firstDuration < m_duration);
 
 	// Merge the parameters for another segment with the same start time and duration into this one
 	void Merge(motioncalc_t pDistance, motioncalc_t pA J_FORMAL_PARAMETER(p_j), MovementFlags pFlags) noexcept;
@@ -174,7 +174,7 @@ public:
 	bool NormaliseAndCheckLinear(motioncalc_t distanceCarriedForwards, motioncalc_t& t0) noexcept;
 
 	// Set the 'executing' bit in the flags
-	void SetExecuting() noexcept { flags.executing = true; }
+	void SetExecuting() noexcept { m_flags.executing = true; }
 
 	// Get the next segment in this list
 	[[nodiscard]] MoveSegment *_ecv_null GetNext() const noexcept;
@@ -184,7 +184,7 @@ public:
 
 	// Combine the data from a previous short segment with this one. The previous segment must end at the same time that this one begins.
 	void CombinePrevious(const MoveSegment *prev) noexcept
-		pre(prev->startTime + prev->duration == startTime; prev->flags == flags);
+		pre(prev->m_startTime + prev->m_duration == m_startTime; prev->m_flags == m_flags);
 
 	// Print this segment to the debug channel
 	void DebugPrint() const noexcept;
@@ -205,23 +205,23 @@ public:
 	static void ReleaseAll(MoveSegment *_ecv_null item) noexcept;
 
 	// Return the number of MoveSegment objects that have been created
-	static unsigned int NumCreated() noexcept { return numCreated; }
+	static unsigned int NumCreated() noexcept { return s_numCreated; }
 
 	static constexpr int32_t minDuration = 10;				// the minimum duration in movement clock ticks that we consider sensible
 
 protected:
-	static MoveSegment *_ecv_null freeList;					// list of recycled segment objects
-	static unsigned int numCreated;							// total number of segment objects created
+	static MoveSegment *_ecv_null s_freeList;				// list of recycled segment objects
+	static unsigned int s_numCreated;						// total number of segment objects created
 
-	MoveSegment *_ecv_null next;							// pointer to the next segment
-	MovementFlags flags{};
-	uint32_t startTime{};										// when this segment should start, in movement clock ticks
-	uint32_t duration{};										// the duration of this segment in movement ticks
-	motioncalc_t distance{};									// the number of steps moved
-	motioncalc_t a{};											// the acceleration (initial if SUPPORT_S_CURVE) during this segment in steps per movement tick squared
+	MoveSegment *_ecv_null m_next;							// pointer to the next segment
+	MovementFlags m_flags{};
+	uint32_t m_startTime{};									// when this segment should start, in movement clock ticks
+	uint32_t m_duration{};									// the duration of this segment in movement ticks
+	motioncalc_t m_distance{};								// the number of steps moved
+	motioncalc_t m_a{};										// the acceleration (initial if SUPPORT_S_CURVE) during this segment in steps per movement tick squared
 
 #if SUPPORT_S_CURVE
-	motioncalc_t j;											// the jerk i.e. rate of change of acceleration
+	motioncalc_t m_j;										// the jerk i.e. rate of change of acceleration
 #endif
 
 private:
@@ -230,7 +230,7 @@ private:
 
 // Create a new one, leaving the flags clear
 inline MoveSegment::MoveSegment(MoveSegment *pNext) noexcept
-	: next(pNext)
+	: m_next(pNext)
 {
 	// remaining fields are not initialised
 }
@@ -239,9 +239,9 @@ inline MoveSegment::MoveSegment(MoveSegment *pNext) noexcept
 inline motioncalc_t MoveSegment::CalcU() const noexcept
 {
 #if SUPPORT_S_CURVE
-	return distance/(motioncalc_t)duration - (OneHalf * a + OneSixth * j * (motioncalc_t)duration) * (motioncalc_t)duration;
+	return m_distance/(motioncalc_t)m_duration - (OneHalf * m_a + OneSixth * m_j * (motioncalc_t)m_duration) * (motioncalc_t)m_duration;
 #else
-	return distance/(motioncalc_t)duration - oneHalf * a * (motioncalc_t)duration;
+	return m_distance/(motioncalc_t)m_duration - oneHalf * m_a * (motioncalc_t)m_duration;
 #endif
 }
 
@@ -253,7 +253,7 @@ inline motioncalc_t MoveSegment::CalcU() const noexcept
 //  false if the segment has acceleration or deceleration, with t0 = time from start of segment at which the speed would have been/will be/would be zero
 inline bool MoveSegment::NormaliseAndCheckLinear(motioncalc_t distanceCarriedForwards, motioncalc_t& t0) noexcept
 {
-	if (a != (motioncalc_t)0.0)
+	if (m_a != (motioncalc_t)0.0)
 	{
 		// The move has acceleration or deceleration, but it may be small enough to cause problems with the calculations.
 		// The reason is that the step time is calculated as:
@@ -269,21 +269,21 @@ inline bool MoveSegment::NormaliseAndCheckLinear(motioncalc_t distanceCarriedFor
 		// so approximately when (p*N)^4 < 8*q^3, or very roughly when p*N << q
 		// However, using the Maclaurin expansion requires an extra division in each step calculation, which we would prefer to avoid.
 		// 2. We can convert the segment to a constant-speed segment, on the assumption that the speed won't change much during it. This is what we currently do.
-		const motioncalc_t provisionalT0 = oneHalf * (motioncalc_t)duration - distance/(a * (motioncalc_t)duration);
+		const motioncalc_t provisionalT0 = oneHalf * (motioncalc_t)m_duration - m_distance/(m_a * (motioncalc_t)m_duration);
 		if (likely(std::fabs(provisionalT0) <= 4 * (motioncalc_t)16777216.0))
 		{
 			t0 = provisionalT0;
 			return false;
 		}
 		// The acceleration/deceleration is small enough to cause calculation problems, so change it to a linear move
-		a = (motioncalc_t)0.0;
+		m_a = (motioncalc_t)0.0;
 #if SUPPORT_S_CURVE
-		j = (motioncalc_t)0.0;
+		m_j = (motioncalc_t)0.0;
 #endif
 	}
 
 	// The move is constant speed
-	t0 = -distanceCarriedForwards * (motioncalc_t)duration/distance;
+	t0 = -distanceCarriedForwards * (motioncalc_t)m_duration/m_distance;
 	return true;
 }
 
@@ -291,51 +291,51 @@ inline bool MoveSegment::NormaliseAndCheckLinear(motioncalc_t distanceCarriedFor
 inline void MoveSegment::Release(MoveSegment *item) noexcept
 {
 	const auto iflags = IrqSave();
-	item->next = freeList;
-	freeList = item;
+	item->m_next = s_freeList;
+	s_freeList = item;
 	IrqRestore(iflags);
 }
 
 inline MoveSegment *_ecv_null MoveSegment::GetNext() const noexcept
 {
-	return next;
+	return m_next;
 }
 
 inline void MoveSegment::SetNext(MoveSegment *_ecv_null pNext) noexcept
 {
-	next = pNext;
+	m_next = pNext;
 }
 
 // Set the parameters of this segment
 inline void MoveSegment::SetParameters(uint32_t pStartTime, uint32_t pDuration, motioncalc_t pDistance, motioncalc_t pA J_FORMAL_PARAMETER(p_j), MovementFlags pFlags) noexcept
 {
-	startTime = pStartTime;
-	duration = pDuration;
-	distance = pDistance;
-	a = pA;
+	m_startTime = pStartTime;
+	m_duration = pDuration;
+	m_distance = pDistance;
+	m_a = pA;
 #if SUPPORT_S_CURVE
-	j = p_j;
+	m_j = p_j;
 #endif
-	flags = pFlags;
+	m_flags = pFlags;
 }
 
 // Split this segment in two, returning a pointer to the new second part
 inline MoveSegment *MoveSegment::Split(uint32_t firstDuration) noexcept
 {
-	MoveSegment *const secondSeg = Allocate(next);
+	MoveSegment *const secondSeg = Allocate(m_next);
 #if SUPPORT_S_CURVE
-	const motioncalc_t firstDistance = (CalcU() + (OneHalf * a + j * (motioncalc_t)firstDuration * OneSixth) * (motioncalc_t)firstDuration) * (motioncalc_t)firstDuration;
-	secondSeg->SetParameters(startTime + firstDuration, duration - firstDuration, distance - firstDistance, a + j * (motioncalc_t)firstDuration, j, flags);
+	const motioncalc_t firstDistance = (CalcU() + (OneHalf * m_a + m_j * (motioncalc_t)firstDuration * OneSixth) * (motioncalc_t)firstDuration) * (motioncalc_t)firstDuration;
+	secondSeg->SetParameters(m_startTime + firstDuration, m_duration - firstDuration, m_distance - firstDistance, m_a + m_j * (motioncalc_t)firstDuration, m_j, m_flags);
 #else
-	const motioncalc_t firstDistance = (CalcU() + oneHalf * a * (motioncalc_t)firstDuration) * (motioncalc_t)firstDuration;
-	secondSeg->SetParameters(startTime + firstDuration, duration - firstDuration, distance - firstDistance, a, flags);
+	const motioncalc_t firstDistance = (CalcU() + oneHalf * m_a * (motioncalc_t)firstDuration) * (motioncalc_t)firstDuration;
+	secondSeg->SetParameters(m_startTime + firstDuration, m_duration - firstDuration, m_distance - firstDistance, m_a, m_flags);
 #endif
 #if SEGMENT_DEBUG
-	debugPrintf("split at %" PRIu32 ", fd=%.2f, sd=%.2f\n", firstDuration, (double)firstDistance, (double)(distance - firstDistance));
+	debugPrintf("split at %" PRIu32 ", fd=%.2f, sd=%.2f\n", firstDuration, (double)firstDistance, (double)(m_distance - firstDistance));
 #endif
-	duration = firstDuration;
-	distance = firstDistance;
-	next = secondSeg;
+	m_duration = firstDuration;
+	m_distance = firstDistance;
+	m_next = secondSeg;
 	return secondSeg;
 }
 
@@ -347,30 +347,30 @@ inline void MoveSegment::Merge(motioncalc_t pDistance, motioncalc_t pA J_FORMAL_
 	debugPrintf("merge d=%.2f a=%.4e into ", (double)p_distance, (double)p_a);
 	DebugPrint();
 #endif
-	distance += pDistance;
-	a += pA;
+	m_distance += pDistance;
+	m_a += pA;
 #if SUPPORT_S_CURVE
-	j += p_j;
+	m_j += p_j;
 #endif
-	flags |= pFlags;
+	m_flags |= pFlags;
 }
 
 // Combine the data from a previous short segment with this one. The previous segment ends at the same time that this one begins.
 inline void MoveSegment::CombinePrevious(const MoveSegment *prev) noexcept
 {
 #if 0 //SUPPORT_S_CURVE
-	const motioncalc_t finalAcc = a + j * (motioncalc_t)duration;
+	const motioncalc_t finalAcc = m_a + m_j * (motioncalc_t)m_duration;
 #endif
-	duration += prev->duration;
-	startTime = prev->startTime;
-	distance += prev->distance;
+	m_duration += prev->m_duration;
+	m_startTime = prev->m_startTime;
+	m_distance += prev->m_distance;
 #if 0// SUPPORT_S_CURVE
 	// Preserve the final acceleration of the segment. The segment that follows it may be temporarily detached, so don't use its starting acceleration.
 	// However, this causes speed changes, so  it's disabled.
-	a = prev->a;
-	j = (finalAcc - a)/(motioncalc_t)duration;
+	m_a = prev->m_a;
+	m_j = (finalAcc - m_a)/(motioncalc_t)m_duration;
 #endif
-	flags.combined = true;
+	m_flags.combined = true;
 }
 
 #endif /* SRC_MOVEMENT_MOVESEGMENT_H_ */

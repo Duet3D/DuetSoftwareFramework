@@ -126,23 +126,23 @@ public:
 	[[nodiscard]] float GetTopSpeedMmPerSec() const noexcept { return InverseConvertSpeedToMmPerSec(m_topSpeed); }
 	[[nodiscard]] float GetAccelerationMmPerSecSquared() const noexcept							// Get the (peak) acceleration for reporting in the object model
 #if SUPPORT_S_CURVE
-		{ return InverseConvertAcceleration(afterPrepare.peakAcceleration); }
+		{ return InverseConvertAcceleration(m_afterPrepare.peakAcceleration); }
 #else
 		{ return InverseConvertAcceleration(m_maxAcceleration); }
 #endif
 	[[nodiscard]] float GetDecelerationMmPerSecSquared() const noexcept							// Get the (peak) acceleration for reporting in the object model
 #if SUPPORT_S_CURVE
-		{ return InverseConvertAcceleration(afterPrepare.peakDeceleration); }
+		{ return InverseConvertAcceleration(m_afterPrepare.peakDeceleration); }
 #else
 		{ return InverseConvertAcceleration(m_maxAcceleration); }
 #endif
 #if SUPPORT_S_CURVE
 	bool IsSCurveMove() const noexcept { return flags.useScurve; }
 	bool IsFullyPlanned() const noexcept { return flags.fullyPlanned; }
-	float GetMovementRatio() const noexcept { return movementRatio; }
+	float GetMovementRatio() const noexcept { return m_movementRatio; }
 	void SetSpeedRatioAndMaxJunctionSpeedForPrintingMoves(const Move& move) noexcept;
 	void SetSpeedRatioAndMaxJunctionSpeedForNonPrintingMoves(const Move& move) noexcept;
-	void SetStartSpeedAndAcceleration(float speed, float acceleration) noexcept { startSpeed = speed; startAcceleration = acceleration; }
+	void SetStartSpeedAndAcceleration(float speed, float acceleration) noexcept { startSpeed = speed; m_startAcceleration = acceleration; }
 
 	static void PlanMoves(DDA *firstUnpreparedMove, MovementProfile& plannedProfile, bool stopping) noexcept;
 #endif
@@ -152,10 +152,10 @@ public:
 	[[nodiscard]] uint32_t GetClocksNeeded() const noexcept { return m_clocksNeeded; }
 	[[nodiscard]] bool HasExpired() const noexcept pre(IsCommitted());
 	[[nodiscard]] bool IsNonPrintingExtruderMove() const noexcept { return m_flags.isNonPrintingExtruderMove; }
-	[[nodiscard]] uint32_t GetMoveStartTime() const noexcept { return afterPrepare.moveStartTime; }
-	[[nodiscard]] uint32_t GetMoveFinishTime() const noexcept { return afterPrepare.moveStartTime + m_clocksNeeded; }
+	[[nodiscard]] uint32_t GetMoveStartTime() const noexcept { return m_afterPrepare.moveStartTime; }
+	[[nodiscard]] uint32_t GetMoveFinishTime() const noexcept { return m_afterPrepare.moveStartTime + m_clocksNeeded; }
 
-	[[nodiscard]] float GetAverageExtrusionSpeed() const noexcept pre(IsCommitted()) { return afterPrepare.averageExtrusionSpeed; }
+	[[nodiscard]] float GetAverageExtrusionSpeed() const noexcept pre(IsCommitted()) { return m_afterPrepare.averageExtrusionSpeed; }
 	[[nodiscard]] bool HasForwardExtrusion() const noexcept { return m_flags.hasForwardExtrusion; }
 
 	void DebugPrint(const char *_ecv_array tag) const noexcept;				// print the DDA only
@@ -229,15 +229,15 @@ private:
     float m_totalDistance{};							// How long is the move in hypercuboid space
     float m_maxAcceleration{};							// The maximum acceleration and deceleration to use, always positive
 #if SUPPORT_S_CURVE
-	float jerk;										// The magnitude of the rate of change of acceleration or deceleration, always positive
+	float m_jerk;									// The magnitude of the rate of change of acceleration or deceleration, always positive
 #endif
     float m_requestedSpeed{};							// The speed that the user asked for
 
     // These vary depending on how we connect the move with its predecessor and successor, but remain constant while the move is being executed
     float m_startSpeed{}, m_topSpeed{}, m_endSpeed{};
 #if SUPPORT_S_CURVE
-    float startAcceleration;
-    float movementRatio;							// for moves with extrusion and axis movement this is the ratio of total extrusion to total distance. For non extruding moves it is 1.0.
+    float m_startAcceleration;
+    float m_movementRatio;							// for moves with extrusion and axis movement this is the ratio of total extrusion to total distance. For non extruding moves it is 1.0.
 #endif
 
 	uint32_t m_clocksNeeded{};
@@ -255,10 +255,10 @@ private:
 			float decelDistance;
 			float targetNextSpeed;					// The speed that the next move would like to start at, used to keep track of the lookahead without making recursive calls
 #if SUPPORT_S_CURVE
-			float startSpeedRatio;					// the ratio of start speed of this move to the end speed of the previous move needed to maintain the same extrusion speed across the boundary
-			float maxPrevEndSpeed;					// the maximum end speed we can have for the previous move to remain within the instantaneous speed change limits
+			float m_startSpeedRatio;					// the ratio of start speed of this move to the end speed of the previous move needed to maintain the same extrusion speed across the boundary
+			float m_maxPrevEndSpeed;					// the maximum end speed we can have for the previous move to remain within the instantaneous speed change limits
 #endif
-		} beforePrepare{};
+		} m_beforePrepare{};
 
 		// Values that are not set or accessed before Prepare is called
 		struct
@@ -266,7 +266,7 @@ private:
 			uint32_t moveStartTime;					// clock count at which the move is due to start (before execution) or was started (during execution)
 			float averageExtrusionSpeed;			// the average extrusion speed in mm/sec, for applying heater feedforward
 			LogicalDrivesBitmap drivesMoving;		// bitmap of logical drives moving - needed to keep track of whether remote drives are moving and to determine when a move that checks endstops has terminated
-		} afterPrepare;
+		} m_afterPrepare;
 	};
 
 #if DDA_LOG_PROBE_CHANGES
