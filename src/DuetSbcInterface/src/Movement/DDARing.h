@@ -94,7 +94,31 @@ public:
 	}
 
 	void RecordLookaheadError() noexcept { ++m_numLookaheadErrors; }						// Record a lookahead error
-	void Diagnostics(const StringRef& reply, unsigned int ringNumber) noexcept;
+
+	// What this ring has done since the counters were last reset. Reported rather than formatted
+	// here: DuetControlServer owns the wording of M122, as it does for every other reply.
+	struct Stats
+	{
+		uint32_t scheduledMoves;
+		uint32_t completedMoves;
+		unsigned int numLookaheadErrors;			// how many times the lookahead algorithm failed
+		unsigned int numLookaheadUnderruns;		// how many times it ran out of moves to adjust
+		unsigned int numNoMoveUnderruns;			// how many times a move was wanted and there was none
+	};
+
+	[[nodiscard]] Stats GetStats() const noexcept
+	{
+		return Stats{ m_scheduledMoves, m_completedMoves,
+					  m_numLookaheadErrors, m_numLookaheadUnderruns, m_numNoMoveUnderruns };
+	}
+
+	// Zero the error and underrun counters. Separate from GetStats on purpose: reporting used to
+	// zero them as a side effect, so a second report showed zeros however bad the first had been.
+	// The move counts are not reset - they are running totals DCS matches move ids against.
+	void ResetStats() noexcept
+	{
+		m_numLookaheadErrors = m_numLookaheadUnderruns = m_numNoMoveUnderruns = 0;
+	}
 
 	bool SetWaitingToEmpty() noexcept;
 

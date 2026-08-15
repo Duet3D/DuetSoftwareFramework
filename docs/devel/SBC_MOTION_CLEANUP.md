@@ -334,9 +334,13 @@ would otherwise have gone in §4 as unreachable.
 
 **Debug flags are a separate mechanism and M122 does not subsume them** (D3). The `reprap.Debug(Module::Move)`
 branches do not feed M122 — they call `DebugPrintf`, which reaches DCS as a log event through the sink
-that already exists. What is missing is only a way to turn them on. So keep the flag word, add a
-`DuetSbc_SetDebugFlags`, and let M111 drive it later; §2.4 is about to repair several such branches, and
-repairing branches that can never be switched on is how they rotted the first time.
+that already exists. What is missing is only a way to turn them on.
+
+The flag word moves onto `MotionSystem` with a `SetDebugFlags`, so there is one place to enable a topic
+from. **No CApi export goes with it yet.** DCS's M111 handles `P-1` (its own log level) and does not
+implement RRF's `P<module> S<0|1>`, so an export would have no caller — and an unreachable ABI entry
+point is the same defect as the unreachable branches this pass is removing, just newer. It lands with
+M111's module support; §7 records that.
 
 ---
 
@@ -517,7 +521,7 @@ already carries the S-curve entry; extend it rather than starting a second list.
 | Input shaping on this side | Deliberate — the boards shape. The consequence (tracked position leads real position during acceleration by `shapingTimeClocks`) is documented in `MotionConfig.h`; cross-reference it. |
 | IOBits, scanning probes, coordinate rotation | Not ported; each needs a field on the move that DCS does not send. Switches deleted by §2.1. |
 | Leadscrew adjustment moves, `InitAsyncMove`, babystepping into a queued move | The three named in `DDA.h`'s "Gone for Phase 1" |
-| M111 driving the motion debug flags | §3.9 keeps the flag word and adds `DuetSbc_SetDebugFlags`; nothing calls it until M111 is wired in DCS, so the `reprap.Debug(Module::Move)` branches stay switched off in the meantime |
+| M111 driving the motion debug flags | DCS's M111 implements `P-1` only. `MotionSystem::SetDebugFlags` exists and nothing calls it; the CApi export and the `P<module> S<0\|1>` parsing land together, and until they do the `Module::Move` and `Module::DDA` branches stay compiled but switched off |
 
 ---
 

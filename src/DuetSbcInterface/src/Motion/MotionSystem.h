@@ -139,6 +139,7 @@ namespace Duet::Sbc::Motion
 		// Where prepared moves go out to the controller. Owned here because it is per-machine state
 		// with the same lifetime as the drive trackers.
 		[[nodiscard]] ScheduleMoveBuilder& GetScheduleMoveBuilder() noexcept { return m_scheduleMoveBuilder; }
+		[[nodiscard]] const ScheduleMoveBuilder& GetScheduleMoveBuilder() const noexcept { return m_scheduleMoveBuilder; }
 
 		// --- Per-drive motion -----------------------------------------------------------------
 

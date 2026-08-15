@@ -97,7 +97,6 @@ public:
 	};
 
 	static ClockStats GetClockStats() noexcept;
-	static void Diagnostics(const StringRef& reply) noexcept;
 
 	// --- Test seam ---------------------------------------------------------------------------
 

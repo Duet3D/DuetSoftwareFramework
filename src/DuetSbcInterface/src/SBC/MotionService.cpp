@@ -385,6 +385,29 @@ namespace Duet::Sbc
 		return (ring < numRings) ? m_rings[ring].GetCompletedMoves() : 0;
 	}
 
+	MotionService::Stats MotionService::GetStats() const
+	{
+		Stats stats{};
+		stats.segmentsCreated = MoveSegment::NumCreated();
+		stats.movementDelayTicks = StepTimer::GetMovementDelay();
+		stats.submissionsDropped = m_submissionsDropped.load(std::memory_order_relaxed);
+		stats.forcedPositionsApplied = m_forcedPositionsApplied.load(std::memory_order_relaxed);
+		stats.droppedSchedulePackets = m_move.GetScheduleMoveBuilder().GetDroppedPackets();
+		for (unsigned int i = 0; i < numRings; ++i)
+		{
+			stats.rings[i] = m_rings[i].GetStats();
+		}
+		return stats;
+	}
+
+	void MotionService::ResetStats()
+	{
+		for (auto& ring : m_rings)
+		{
+			ring.ResetStats();
+		}
+	}
+
 	void MotionService::OnMoveRetired(const DDA& dda, void *context) noexcept
 	{
 		const auto& ctx = *static_cast<const RetirementContext *>(context);

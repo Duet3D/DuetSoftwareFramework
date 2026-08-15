@@ -328,16 +328,3 @@ StepTimer::ClockStats StepTimer::GetClockStats() noexcept
 	};
 }
 
-void StepTimer::Diagnostics(const StringRef& reply) noexcept
-{
-	const ClockStats stats = GetClockStats();
-	reply.catf("Step clock: %s, %" PRIu32 " samples, drift %.1fppm, peak residual %" PRIu32
-			   "us, %" PRIu32 " clamps, %" PRIu32 " rejected, movement delay %" PRIu32 "us",
-			   (stats.synced) ? "synced" : "free-running",
-			   stats.numSamples,
-			   stats.driftPpm,
-			   stats.peakResidualNs / 1000,
-			   stats.numBackwardClamps,
-			   stats.numRejectedSamples,
-			   TicksToIntegerMicroseconds(GetMovementDelay()));
-}

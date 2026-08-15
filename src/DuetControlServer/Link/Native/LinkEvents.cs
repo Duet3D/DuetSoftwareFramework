@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace DuetControlServer.Link.Native;
@@ -109,6 +110,75 @@ public struct NativeClockStats
 
     /// <summary>Non-zero once the fit rests on enough samples to be trusted</summary>
     public int Synced;
+}
+
+/// <summary>
+/// What one DDA ring has done. Mirrors <c>DuetSbcRingStats</c>
+/// </summary>
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+public struct NativeRingStats
+{
+    /// <summary>Moves this ring has taken, as a running total</summary>
+    public uint ScheduledMoves;
+
+    /// <summary>Moves this ring has retired, as a running total</summary>
+    public uint CompletedMoves;
+
+    /// <summary>Times the lookahead algorithm produced a speed it could not honour</summary>
+    public uint NumLookaheadErrors;
+
+    /// <summary>Times lookahead ran out of queued moves to adjust</summary>
+    public uint NumLookaheadUnderruns;
+
+    /// <summary>Times a move was wanted and the ring was empty</summary>
+    public uint NumNoMoveUnderruns;
+}
+
+/// <summary>
+/// The per-ring counters of <see cref="NativeMotionStats"/>
+/// </summary>
+/// <remarks>
+/// An inline array rather than a marshalled one: the struct crosses the ABI through a
+/// source-generated P/Invoke, which requires it to be blittable, and <c>[MarshalAs(ByValArray)]</c>
+/// is not
+/// </remarks>
+[InlineArray(NativeMotionStats.MaxRings)]
+public struct NativeRingStatsArray
+{
+    private NativeRingStats _element0;
+}
+
+/// <summary>
+/// What the native motion engine has done. Mirrors <c>DuetSbcMotionStats</c>
+/// </summary>
+/// <remarks>
+/// Counters rather than formatted text: this side owns the wording of M122, as it does for every
+/// other reply, so the native side reports numbers and <see cref="Motion.MotionDiagnostics"/> renders
+/// them
+/// </remarks>
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+public struct NativeMotionStats
+{
+    /// <summary>Movement systems the engine builds. Must match the native <c>DUET_SBC_MAX_RINGS</c></summary>
+    public const int MaxRings = 2;
+
+    /// <summary>MoveSegments allocated since startup</summary>
+    public uint SegmentsCreated;
+
+    /// <summary>How far the movement timebase lags the raw step clock, in ticks</summary>
+    public uint MovementDelayTicks;
+
+    /// <summary>Moves refused because the submission queue was full</summary>
+    public uint SubmissionsDropped;
+
+    /// <summary>Forced positions the motion thread has adopted</summary>
+    public uint ForcedPositionsApplied;
+
+    /// <summary>ScheduleMove packets the link refused. Non-zero means motion was lost</summary>
+    public uint DroppedSchedulePackets;
+
+    /// <summary>Per-ring counters</summary>
+    public NativeRingStatsArray Rings;
 }
 
 /// <summary>

@@ -197,6 +197,36 @@ extern "C"
 	// has sent, this is the difference between a position that was queued and one that took effect.
 	uint32_t DuetSbc_MotionGetForcedPositionsApplied(DuetSbcHandle* h);
 
+	// Everything M122 reports about the motion engine. Counters rather than text: the caller owns
+	// the wording of the report, as it does for the step clock stats below.
+	using DuetSbcRingStats = struct
+	{
+		uint32_t scheduledMoves;
+		uint32_t completedMoves;
+		uint32_t numLookaheadErrors;
+		uint32_t numLookaheadUnderruns;
+		uint32_t numNoMoveUnderruns;
+	};
+
+	// Movement systems the engine builds. Must match Motion::maxRings.
+	#define DUET_SBC_MAX_RINGS 2
+
+	using DuetSbcMotionStats = struct
+	{
+		uint32_t segmentsCreated;		 // MoveSegments allocated since startup
+		uint32_t movementDelayTicks;	 // how far the movement timebase lags the raw step clock
+		uint32_t submissionsDropped;	 // moves refused because the submission queue was full
+		uint32_t forcedPositionsApplied; // positions the motion thread has adopted
+		uint32_t droppedSchedulePackets; // ScheduleMove packets the link refused: motion was lost
+		DuetSbcRingStats rings[DUET_SBC_MAX_RINGS];
+	};
+
+	void DuetSbc_MotionGetStats(DuetSbcHandle* h, DuetSbcMotionStats* stats);
+
+	// Zero the error and underrun counters. Separate from reading them, so that reporting twice does
+	// not show zeros the second time.
+	void DuetSbc_MotionResetStats(DuetSbcHandle* h);
+
 	// --- Step clock ---
 	//
 	// The SBC has no step clock of its own: it models the controller's, from the MasterClock packet

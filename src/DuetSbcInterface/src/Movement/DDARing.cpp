@@ -459,12 +459,4 @@ float DDARing::GetCurrentMoveDuration() const noexcept
 	return (cdda != nullptr) ? (float)cdda->GetClocksNeeded() * stepClocksToSeconds : 0.0;;
 }
 
-void DDARing::Diagnostics(const StringRef& reply, unsigned int ringNumber) noexcept
-{
-	reply.lcatf("=== DDARing %u ===\nScheduled moves %" PRIu32 ", completed %" PRIu32 ", LaErrors %u, Underruns [%u, %u]\n",
-				ringNumber, m_scheduledMoves, m_completedMoves, m_numLookaheadErrors, m_numLookaheadUnderruns, m_numNoMoveUnderruns
-			   );
-	m_numLookaheadUnderruns = m_numNoMoveUnderruns = m_numLookaheadErrors = 0;
-}
-
 // End

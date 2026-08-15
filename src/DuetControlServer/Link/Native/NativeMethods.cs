@@ -325,6 +325,25 @@ internal static partial class NativeMethods
     internal static partial void DuetSbc_GetClockStats(IntPtr handle, out NativeClockStats stats);
 
     /// <summary>
+    /// What the motion engine has done since the counters were last reset
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <param name="stats">Receives the statistics</param>
+    [LibraryImport(LibraryName)]
+    internal static partial void DuetSbc_MotionGetStats(IntPtr handle, out NativeMotionStats stats);
+
+    /// <summary>
+    /// Zero the motion engine's error and underrun counters
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <remarks>
+    /// Separate from reading them so that reporting twice does not show zeros the second time, which
+    /// is what the native side used to do by reporting and zeroing in one call
+    /// </remarks>
+    [LibraryImport(LibraryName)]
+    internal static partial void DuetSbc_MotionResetStats(IntPtr handle);
+
+    /// <summary>
     /// Push the machine description down to the motion engine
     /// </summary>
     /// <param name="handle">Interface handle</param>
