@@ -137,7 +137,7 @@ class DDARing final
 		}
 	}
 
-	[[nodiscard]] bool IsTimeToPrepareMove(uint32_t prepareAdvanceTime, uint32_t moveTimeLeft) const noexcept;
+	[[nodiscard]] static bool IsTimeToPrepareMove(uint32_t prepareAdvanceTime, uint32_t moveTimeLeft) noexcept;
 	uint32_t PrepareMoves(DDA* firstUnpreparedMove,
 						  uint32_t prepareAdvanceTime,
 						  uint32_t moveTimeLeft,

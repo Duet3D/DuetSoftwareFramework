@@ -21,11 +21,10 @@ endforeach()
 # RepRapFirmware's and keeps its algorithms, and the Motion/ code written here for the parts of the
 # firmware that have no counterpart on an SBC.
 #
-# It is a separate library from duet_sbc for two reasons. Imported upstream source is linted by its
-# own project rather than by this one, so clang-tidy is off for the whole target - which would be
-# the wrong default for the hand-written code in duet_sbc. And the source list is explicit: a
-# recursive glob is what pulled the unported tree into duet_sbc and broke the build, so a file
-# compiles here only once someone has ported it and said so.
+# It is a separate library from duet_sbc so that the engine's independence from the link is
+# structural rather than a convention: nothing under Motion/ or Movement/ may refer back to the SPI
+# transfer loop, and the offline tests rely on that. The source list is explicit for the same reason
+# a glob would not be - a file compiles here only once someone has put it here deliberately.
 set(DUET_MOTION_SOURCES
     Motion/DriveTracker.cpp
     Motion/Log.cpp
@@ -49,17 +48,11 @@ target_compile_options(duet_motion PRIVATE
     # float16_t is __fp16 in RRFLibraries' Portability.h, which does not exist on x86-64. See the
     # header for why this is forced in rather than #included.
     -include "${CMAKE_CURRENT_SOURCE_DIR}/Config/Float16Compat.h"
-    -Wno-unused-parameter
 )
-# PUBLIC, not PRIVATE: the imported code names parameters it deliberately ignores, most visibly in
-# the no-op operator delete pairs that go with allocation from the permanent arena, and those are in
-# headers - so anything including them sees the same warnings. Renaming them would be churn in files
-# that get re-synced against upstream.
-target_compile_options(duet_motion INTERFACE -Wno-unused-parameter)
-set_target_properties(duet_motion PROPERTIES
-    CXX_CLANG_TIDY ""
-    POSITION_INDEPENDENT_CODE ON
-)
+# The engine is linted by the same .clang-tidy as the rest of this project. It used to be exempt on
+# the grounds that upstream lints its own sources; the tree has diverged too far for that to be
+# true, and the exemption is what let the unreachable code in it accumulate.
+set_target_properties(duet_motion PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # Static library used by the standalone harness.
 add_library(duet_sbc STATIC ${DUET_SBC_SOURCES})

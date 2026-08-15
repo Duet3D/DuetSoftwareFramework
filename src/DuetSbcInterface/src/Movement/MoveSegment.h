@@ -43,7 +43,9 @@
 #include <Motion/MotionArena.h>
 #include <new> // for align_val_t
 
-#define SEGMENT_DEBUG (0)
+#ifndef SEGMENT_DEBUG
+#  define SEGMENT_DEBUG (0)
+#endif
 
 constexpr motioncalc_t oneHalf = (motioncalc_t)0.5;
 
@@ -127,8 +129,8 @@ class MoveSegment final
 	{
 		return Duet::Sbc::Motion::MotionArena::Allocate(count, align);
 	}
-	void operator delete(void* ptr) noexcept {}
-	void operator delete(void* ptr, std::align_val_t align) noexcept {}
+	void operator delete(void * /*ptr*/) noexcept {}
+	void operator delete(void * /*ptr*/, std::align_val_t /*align*/) noexcept {}
 
 	// Read the values of the flag bits
 	[[nodiscard]] bool IsLinear() const noexcept { return m_a == (motioncalc_t)0.0; }

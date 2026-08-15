@@ -208,6 +208,28 @@ jobs:
           cmake --build --preset native -j"$(nproc)"
           ctest --test-dir build/native --output-on-failure
 
+      # A build switch whose other path nobody compiles rots the first time a field is renamed,
+      # which is exactly how the motion engine's disabled branches ended up not compiling at all.
+      # Compile-only: this is about the branches still building, not about running them.
+      #
+      # SUPPORT_S_CURVE and SUPPORT_LASER are absent on purpose. Their disabled paths cannot be
+      # built - MovementProfile, DDA_3rdOrder and the laser PWM field were never ported - so they
+      # are tracked in src/Documentation/articles/rrf-differences.md instead of here.
+      - name: Compile the motion engine's other build paths
+        working-directory: src/DuetSbcInterface
+        run: |
+          for flag in \
+              "SUPPORT_ASYNC_MOVES=0" \
+              "SUPPORT_NONLINEAR_EXTRUSION=0" \
+              "SEGMENT_DEBUG=1" \
+              "DDA_MOVE_DEBUG=1"; do
+            echo "::group::duet_motion with $flag"
+            cmake --preset native -B build/flagcheck \
+                  -DCMAKE_CXX_FLAGS="-D${flag%%=*}=${flag##*=}" -DDUET_SBC_CLANG_TIDY=OFF
+            cmake --build build/flagcheck --target duet_motion -j"$(nproc)"
+            echo "::endgroup::"
+          done
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4

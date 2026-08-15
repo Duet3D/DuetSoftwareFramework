@@ -107,3 +107,9 @@ CheckOptions:
     value: 'm_'
   - key: readability-identifier-naming.StaticVariablePrefix
     value: 's_'
+  # Static data members of a class take the same s_ prefix as a file-scope static, so that a
+  # reader can tell at the point of use which of the two kinds of member they are looking at.
+  - key: readability-identifier-naming.ClassMemberCase
+    value: camelBack
+  - key: readability-identifier-naming.ClassMemberPrefix
+    value: 's_'

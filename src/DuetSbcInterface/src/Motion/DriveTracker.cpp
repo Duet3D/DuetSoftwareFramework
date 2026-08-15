@@ -115,7 +115,7 @@ void DriveTracker::Advance(uint32_t now) noexcept
 			seg = m_segments; // EnterCurrentSegment may have merged it away
 		}
 
-		if ((uint32_t)(now - seg->GetStartTime()) < seg->GetDuration())
+		if ((now - seg->GetStartTime()) < seg->GetDuration())
 		{
 			return; // still running; GetCurrentPosition interpolates it
 		}

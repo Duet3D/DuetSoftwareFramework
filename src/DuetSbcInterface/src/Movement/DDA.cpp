@@ -18,7 +18,9 @@
 #include <algorithm>
 #include <limits>
 
-#define DDA_MOVE_DEBUG (0)
+#ifndef DDA_MOVE_DEBUG
+#  define DDA_MOVE_DEBUG (0)
+#endif
 
 #if DDA_MOVE_DEBUG
 
@@ -202,7 +204,7 @@ void PrepParams::DebugPrint() const noexcept
 
 DDA::DDA(DDA* n) noexcept
 	: m_next(n)
-	, m_prev(nullptr)
+	, m_moveId(0)
 {
 	// Zero the endpoints. They describe no real position until DuetControlServer sends the first
 	// move or forces a position, and both replace them outright.
@@ -214,7 +216,6 @@ DDA::DDA(DDA* n) noexcept
 	m_flags.all = 0; // in particular we need to set endCoordinatesValid, usePressureAdvance to false, stateBits to
 					 // empty, also checkEndstops false for the ATE build
 	SetState(Empty); // should alrrady be covered by the above
-	m_moveId = 0;
 }
 
 // Return the number of clocks this DDA still needs to execute.
@@ -226,18 +227,23 @@ uint32_t DDA::GetTimeLeft() const noexcept
 		return m_clocksNeeded;
 	case Committed:
 	{
-		const int32_t timeExecuting = (int32_t)(StepTimer::GetMovementTimerTicks() - m_afterPrepare.moveStartTime);
-		return (timeExecuting <= 0) ? m_clocksNeeded // move has not started yet
-			   : ((uint32_t)timeExecuting > m_clocksNeeded)
-				   ? 0										   // move has completed
-				   : m_clocksNeeded - (uint32_t)timeExecuting; // move is part way through
+		const auto timeExecuting = (int32_t)(StepTimer::GetMovementTimerTicks() - m_afterPrepare.moveStartTime);
+		if (timeExecuting <= 0)
+		{
+			return m_clocksNeeded; // move has not started yet
+		}
+		if ((uint32_t)timeExecuting >= m_clocksNeeded)
+		{
+			return 0; // move has completed
+		}
+		return m_clocksNeeded - (uint32_t)timeExecuting; // move is part way through
 	}
 	default:
 		return 0;
 	}
 }
 
-void DDA::DebugPrintVector(const char* name, const float* vec, size_t len) const noexcept
+/*static*/ void DDA::DebugPrintVector(const char* name, const float* vec, size_t len) noexcept
 {
 	DebugPrintf("%s=", name);
 	for (size_t i = 0; i < len; ++i)
@@ -450,11 +456,8 @@ bool DDA::IsAccelerationMove() const noexcept
 	for (;;)
 	{
 		// We have been asked to adjust the end speed of this move to match the next move starting at targetNextSpeed
-		if (laDDA->m_beforePrepare.targetNextSpeed > laDDA->m_requestedSpeed)
-		{
-			laDDA->m_beforePrepare.targetNextSpeed =
-				laDDA->m_requestedSpeed; // don't try for an end speed higher than our requested speed
-		}
+		laDDA->m_beforePrepare.targetNextSpeed =
+			std::min(laDDA->m_beforePrepare.targetNextSpeed, laDDA->m_requestedSpeed);
 		if (laDDA->m_topSpeed >= laDDA->m_requestedSpeed)
 		{
 			// This move already reaches its top speed, so we just need to adjust the deceleration part
@@ -497,10 +500,7 @@ bool DDA::IsAccelerationMove() const noexcept
 		// the previous one Set its target end speed to the minimum of the requested speed and the highest we can reach
 		const float maxReachableSpeed =
 			fastSqrtf(fsquare(laDDA->m_startSpeed) + (2 * laDDA->m_maxAcceleration * laDDA->m_totalDistance));
-		if (laDDA->m_beforePrepare.targetNextSpeed > maxReachableSpeed)
-		{
-			laDDA->m_beforePrepare.targetNextSpeed = maxReachableSpeed;
-		}
+		laDDA->m_beforePrepare.targetNextSpeed = std::min(laDDA->m_beforePrepare.targetNextSpeed, maxReachableSpeed);
 		break;
 	}
 
@@ -551,10 +551,7 @@ bool DDA::IsAccelerationMove() const noexcept
 		laDDA->m_startSpeed = laDDA->m_prev->m_endSpeed;
 		const float maxEndSpeed =
 			fastSqrtf(fsquare(laDDA->m_startSpeed) + (2 * laDDA->m_maxAcceleration * laDDA->m_totalDistance));
-		if (maxEndSpeed < laDDA->m_beforePrepare.targetNextSpeed)
-		{
-			laDDA->m_beforePrepare.targetNextSpeed = maxEndSpeed;
-		}
+		laDDA->m_beforePrepare.targetNextSpeed = std::min(maxEndSpeed, laDDA->m_beforePrepare.targetNextSpeed);
 	}
 }
 
@@ -1005,13 +1002,7 @@ void DDA::Prepare(DDARing& ring,
 																  simMode != SimulationMode::Off,
 																  IsCheckingEndstops(),
 																  UsesInputShaping());
-		if (canClocksNeeded > m_clocksNeeded)
-		{
-			// Due to rounding error in the calculations, we quite often calculate the CAN move as being longer than our
-			// previously-calculated value, normally by just one clock. Extend our move time in this case so that the
-			// expansion boards don't need to catch up.
-			m_clocksNeeded = canClocksNeeded;
-		}
+		m_clocksNeeded = std::max(canClocksNeeded, m_clocksNeeded);
 
 		if (move.GetDebugFlags(Module::Move)
 				.IsBitSet(MoveDebugFlags::printAllMoves)) // show the prepared DDA if debug enabled

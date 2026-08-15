@@ -189,7 +189,7 @@ uint32_t DDARing::Spin(uint32_t prepareAdvanceTime,
 			cdda = cdda->GetNext();
 		}
 
-		uint32_t ret;
+		uint32_t ret = 0;
 		if (cdda->IsProvisional())
 		{
 			ret = PrepareMoves(cdda, prepareAdvanceTime, preparedTime, simulationMode);
@@ -311,7 +311,7 @@ inline bool DDARing::NeedNewPlan(DDA* moveToPrepare) const noexcept
 #endif
 
 // Return true if it is time to prepare some moves
-inline bool DDARing::IsTimeToPrepareMove(uint32_t prepareAdvanceTime, uint32_t moveTimeLeft) const noexcept
+/*static*/ inline bool DDARing::IsTimeToPrepareMove(uint32_t prepareAdvanceTime, uint32_t moveTimeLeft) noexcept
 {
 	return moveTimeLeft <
 		   prepareAdvanceTime; // the caller decides how far ahead; see MoveTiming::usualMinimumPreparedTime
@@ -367,7 +367,7 @@ uint32_t DDARing::PrepareMoves(DDA* firstUnpreparedMove,
 			return 1;
 		}
 
-		const int32_t clocksTillWakeup =
+		const auto clocksTillWakeup =
 			(int32_t)(moveTimeLeft - prepareAdvanceTime); // calculate how long before we run out of prepared moves,
 														  // less the usual advance prepare time
 		return (clocksTillWakeup <= 0) ? 2
@@ -411,7 +411,7 @@ int32_t DDARing::GetLastEndpoint(size_t drive) const noexcept
 void DDARing::SetLastEndpoints(LogicalDrivesBitmap logicalDrives, const int32_t* ep) noexcept
 {
 	DDA* prev = m_addPointer->GetPrevious();
-	logicalDrives.Iterate([prev, ep](unsigned int drive, unsigned int count) noexcept
+	logicalDrives.Iterate([prev, ep](unsigned int drive, unsigned int /*count*/) noexcept
 						  { prev->SetDriveCoordinate(drive, ep[drive]); });
 }
 

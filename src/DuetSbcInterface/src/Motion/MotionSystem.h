@@ -209,7 +209,7 @@ namespace Duet::Sbc::Motion
 
 		// Record that preparation could not keep up and everything must slip. Reported to the
 		// controller so it can pass the delay on to the expansion boards.
-		void AddPrepareHiccup() noexcept;
+		static void AddPrepareHiccup() noexcept;
 
 	  private:
 		MotionConfig m_config;

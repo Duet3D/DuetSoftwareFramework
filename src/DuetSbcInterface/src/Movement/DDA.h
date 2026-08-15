@@ -81,8 +81,8 @@ class DDA final
 	{
 		return Duet::Sbc::Motion::MotionArena::Allocate(count, align);
 	}
-	void operator delete(void* ptr) noexcept {}
-	void operator delete(void* ptr, std::align_val_t align) noexcept {}
+	void operator delete(void * /*ptr*/) noexcept {}
+	void operator delete(void * /*ptr*/, std::align_val_t /*align*/) noexcept {}
 
 	// Take up a move DuetControlServer has already worked out the shape of, and plan it against the
 	// moves already in the ring. This is where InitStandardMove's step 7 used to begin.
@@ -201,12 +201,12 @@ class DDA final
 		noexcept; // return true if this move is or have been might have been intended to be a deceleration-only move
 	[[nodiscard]] bool IsAccelerationMove() const
 		noexcept; // return true if this move is or have been might have been intended to be an acceleration-only move
-	void DebugPrintVector(const char* name, const float* vec, size_t len) const noexcept;
+	static void DebugPrintVector(const char* name, const float* vec, size_t len) noexcept;
 
 	// The ring is circular and complete once DDARing::Init has run, so neither of these is ever null
 	// after that; every traversal here relies on it. Init asserts it.
 	DDA* m_next; // The next one in the ring
-	DDA* m_prev; // The previous one in the ring
+	DDA* m_prev{nullptr}; // The previous one in the ring
 
 	union
 	{

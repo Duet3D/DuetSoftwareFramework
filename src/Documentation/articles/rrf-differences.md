@@ -330,8 +330,10 @@ real gaps.
 | `DDARing::PauseMoves`, `LowPowerOrStallPause` | Pending — follows restore points and pause/resume |
 | `DDARing::AddSpecialMove` | Pending — bed levelling and leadscrew adjustment moves |
 
-`SUPPORT_S_CURVE` and `SUPPORT_LASER` cannot be built with the switch flipped; everything else that
-has one is compiled both ways by CI, so a disabled path cannot rot unnoticed.
+`SUPPORT_S_CURVE` and `SUPPORT_LASER` cannot be built with the switch flipped. Everything else that
+has one is a `#ifndef`-guarded default, and CI compiles the motion engine with each of them flipped,
+so a path nobody builds cannot quietly stop building — which is how these two got into the state they
+are in.
 
 **M592 nonlinear extrusion is implemented.** The coefficients travel down in `MotionConfig` and
 `DDA::Prepare` applies them exactly as RepRapFirmware does, scaling the commanded extrusion by

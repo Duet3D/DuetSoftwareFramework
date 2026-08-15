@@ -143,7 +143,7 @@ uint32_t ScheduleMoveBuilder::FinishMovement(
 
 	for (size_t first = 0; first < total; first += MaxScheduleMoveDrivers)
 	{
-		const size_t count = min<size_t>(total - first, MaxScheduleMoveDrivers);
+		const auto count = min<size_t>(total - first, MaxScheduleMoveDrivers);
 		const bool isLast = (first + count == total);
 		const uint8_t flags = (isLast) ? (uint8_t)(commonFlags | ScheduleMoveFlags::LastPacket) : commonFlags;
 		if (!SendPacket(moveId, moveStartTime, flags, first, count))

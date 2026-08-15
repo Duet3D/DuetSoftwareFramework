@@ -8,6 +8,8 @@
 
 #include "SegmentBuilder.h"
 
+#include <math.h>
+
 #include <cstdlib>
 
 namespace
@@ -48,7 +50,7 @@ MoveSegment* Duet::Sbc::Motion::SegmentBuilder::AddSegment(MoveSegment* list,
 	// Find the earliest existing segment that the new one starts before, or overlaps.
 	while (seg != nullptr)
 	{
-		int32_t offset = (int32_t)(startTime - seg->GetStartTime()); // how much later the new one starts
+		auto offset = (int32_t)(startTime - seg->GetStartTime());	 // how much later the new one starts
 		if (offset < 0)												 // new segment starts first
 		{
 			if (offset + (int32_t)duration <= 0)
@@ -58,7 +60,7 @@ MoveSegment* Duet::Sbc::Motion::SegmentBuilder::AddSegment(MoveSegment* list,
 
 			// Insert the part that precedes the existing segment, then go round again with the rest.
 			seg = MoveSegment::Allocate(seg);
-			const uint32_t firstDuration = (uint32_t)-offset;
+			const auto firstDuration = (uint32_t)-offset;
 			const auto mFirstDuration = (motioncalc_t)firstDuration;
 			const motioncalc_t firstDistance =
 				(CalcInitialSpeed(duration, distance, a) + oneHalf * a * mFirstDuration) * mFirstDuration;
@@ -97,7 +99,7 @@ MoveSegment* Duet::Sbc::Motion::SegmentBuilder::AddSegment(MoveSegment* list,
 			}
 
 			// Same start time now, but they may end at different times.
-			const int32_t timeDifference = (int32_t)(duration - seg->GetDuration());
+			const auto timeDifference = (int32_t)(duration - seg->GetDuration());
 			if (timeDifference > 0)
 			{
 				// The new segment outlasts the existing one: merge as much as overlaps, then loop.
@@ -160,8 +162,8 @@ MoveSegment* Duet::Sbc::Motion::SegmentBuilder::AddLinearSegments(MoveSegment* l
 
 	// A phase of zero duration is not executed, and dividing by its duration would produce
 	// infinities. Skip those, but keep the distances adding up to the whole move.
-	motioncalc_t accelDistance;
-	motioncalc_t accelPressureAdvance;
+	motioncalc_t accelDistance = NAN;
+	motioncalc_t accelPressureAdvance = NAN;
 	if (profile.accelClocks == 0)
 	{
 		accelDistance = 0;
@@ -174,8 +176,8 @@ MoveSegment* Duet::Sbc::Motion::SegmentBuilder::AddLinearSegments(MoveSegment* l
 		accelPressureAdvance = (motioncalc_t)profile.accelClocks * pressureAdvanceClocks;
 	}
 
-	motioncalc_t decelDistance;
-	motioncalc_t decelPressureAdvance;
+	motioncalc_t decelDistance = NAN;
+	motioncalc_t decelPressureAdvance = NAN;
 	if (profile.decelClocks == 0)
 	{
 		decelDistance = 0;

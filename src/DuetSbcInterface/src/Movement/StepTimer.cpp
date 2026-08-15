@@ -218,7 +218,7 @@ void StepTimer::RecordMasterClockSample(uint32_t masterTicks, int64_t localNs) n
 	}
 	else
 	{
-		unwrappedMaster += (int64_t)(uint32_t)(masterTicks - lastRawMaster);
+		unwrappedMaster += (int64_t)(masterTicks - lastRawMaster);
 	}
 	lastRawMaster = masterTicks;
 
@@ -261,19 +261,22 @@ void StepTimer::RecordMasterClockSample(uint32_t masterTicks, int64_t localNs) n
 	const int64_t refNs = samples[oldest].localNs;
 	const int64_t refTicks = samples[oldest].masterTicks;
 
-	double sumX = 0.0, sumY = 0.0, sumXX = 0.0, sumXY = 0.0;
+	double sumX = 0.0;
+	double sumY = 0.0;
+	double sumXX = 0.0;
+	double sumXY = 0.0;
 	for (unsigned int i = 0; i < numSamples; ++i)
 	{
 		const Sample& s = samples[(oldest + i) % maxSamples];
-		const double x = (double)(s.localNs - refNs);
-		const double y = (double)(s.masterTicks - refTicks);
+		const auto x = (double)(s.localNs - refNs);
+		const auto y = (double)(s.masterTicks - refTicks);
 		sumX += x;
 		sumY += y;
 		sumXX += x * x;
 		sumXY += x * y;
 	}
 
-	const double n = (double)numSamples;
+	const auto n = (double)numSamples;
 	const double denom = (n * sumXX) - (sumX * sumX);
 	if (denom <= 0.0)
 	{

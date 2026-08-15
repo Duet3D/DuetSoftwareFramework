@@ -206,7 +206,7 @@ void MotionSystem::CancelStepping() noexcept
 	}
 }
 
-void MotionSystem::AddPrepareHiccup() noexcept
+/*static*/ void MotionSystem::AddPrepareHiccup() noexcept
 {
 	// Preparation did not finish before the move was due to start. Slip the whole movement timebase
 	// rather than starting the move late: every board shares this delay, so their moves stay in

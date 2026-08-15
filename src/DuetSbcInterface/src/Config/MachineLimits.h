@@ -44,11 +44,20 @@
 // by CI with the switch flipped, so that it stays that way.
 // ---------------------------------------------------------------------------------------------
 
-#define SUPPORT_ASYNC_MOVES 1		  // two DDA rings, drives owned per movement system
-#define SUPPORT_NONLINEAR_EXTRUSION 1 // M592 extrusion correction
-
-#define SUPPORT_S_CURVE 0 // 3rd-order planning: needs DDA_3rdOrder and MovementProfile
-#define SUPPORT_LASER 0	  // laser power scaling: needs a PWM field on the move
+// Defaults, not fixed values: CI compiles the engine with each one flipped, so that a path nobody
+// builds cannot quietly stop building.
+#ifndef SUPPORT_ASYNC_MOVES
+#  define SUPPORT_ASYNC_MOVES 1 // two DDA rings, drives owned per movement system
+#endif
+#ifndef SUPPORT_NONLINEAR_EXTRUSION
+#  define SUPPORT_NONLINEAR_EXTRUSION 1 // M592 extrusion correction
+#endif
+#ifndef SUPPORT_S_CURVE
+#  define SUPPORT_S_CURVE 0 // 3rd-order planning: needs DDA_3rdOrder and MovementProfile
+#endif
+#ifndef SUPPORT_LASER
+#  define SUPPORT_LASER 0 // laser power scaling: needs a PWM field on the move
+#endif
 
 // In the firmware this is __attribute__((optimize("O2"))), to force optimisation of the step ISR in
 // a debug build. There is no step ISR here, and mixing per-function optimize attributes with the
