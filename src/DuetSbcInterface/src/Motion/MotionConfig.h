@@ -3,10 +3,9 @@
  *
  * The machine description the motion engine needs, as pushed down from DuetControlServer.
  *
- * DCS owns configuration: it parses M92, M201, M203, M566, M425, M569, M584 and it owns the
+ * DCS owns configuration: it parses M92, M201, M203, M566, M425, M569, M584, M592 and it owns the
  * kinematics. This is the subset of the result that the code on this side actually reads while
- * planning and preparing moves, which the imported RepRapFirmware sources reach for through
- * reprap.GetMove() and reprap.GetGCodes().
+ * planning and preparing moves, reached through the MotionSystem each DDARing is built against.
  *
  * Two entries are worth explaining because they are not configuration in the firmware's sense, but
  * kinematics results: continuousRotationAxes and controllingDrives. DDA::Prepare needs to know
@@ -23,7 +22,7 @@
 #ifndef SRC_MOTION_MOTIONCONFIG_H_
 #define SRC_MOTION_MOTIONCONFIG_H_
 
-#include <RepRapFirmware.h>
+#include <Config/MachineLimits.h>
 
 namespace Duet::Sbc::Motion
 {
@@ -44,7 +43,7 @@ namespace Duet::Sbc::Motion
 	{
 		float a = 0.0;
 		float b = 0.0;
-		float limit = 0.2;			// RepRapFirmware's DefaultNonlinearExtrusionLimit
+		float limit = 0.2; // RepRapFirmware's DefaultNonlinearExtrusionLimit
 	};
 
 	// The drivers that move one axis. An axis with several drivers - a Z axis with three
@@ -59,15 +58,15 @@ namespace Duet::Sbc::Motion
 	{
 		// --- Machine shape -------------------------------------------------------------------
 
-		uint8_t numVisibleAxes = 0;			// axes the user can refer to
-		uint8_t numTotalAxes = 0;			// including axes that exist only in the kinematics
+		uint8_t numVisibleAxes = 0; // axes the user can refer to
+		uint8_t numTotalAxes = 0;	// including axes that exist only in the kinematics
 		uint8_t numExtruders = 0;
 
-		uint8_t numRings = 1;				// 1, or 2 for a second asynchronous movement system
-		uint16_t numDdasPerRing = 40;		// lookahead depth
-		uint16_t padding = 0;				// explicit, so the layout is the same on both sides
+		uint8_t numRings = 1;		  // 1, or 2 for a second asynchronous movement system
+		uint16_t numDdasPerRing = 40; // lookahead depth
+		uint16_t padding = 0;		  // explicit, so the layout is the same on both sides
 
-		uint32_t gracePeriodMs = 10;		// how long to let moves accumulate before starting one
+		uint32_t gracePeriodMs = 10; // how long to let moves accumulate before starting one
 
 		// --- Per-drive limits ----------------------------------------------------------------
 
@@ -98,16 +97,16 @@ namespace Duet::Sbc::Motion
 
 		AxisDriversConfig axisDrivers[maxAxes];
 		DriverId extruderDrivers[maxExtruders];
-		uint16_t padding2 = 0;							// explicit, to realign what follows
+		uint16_t padding2 = 0; // explicit, to realign what follows
 
 		// --- Kinematics results, evaluated by DCS ---------------------------------------------
 
 		// Axes that wrap at 360 degrees, so a move may take the short way round.
-		uint32_t continuousRotationAxes = 0;			// AxesBitmap raw
+		uint32_t continuousRotationAxes = 0; // AxesBitmap raw
 
 		// For each axis, the other drives that must be energised to hold it. On a Cartesian machine
 		// this is empty; on CoreXY moving X requires both motors to be enabled.
-		uint32_t controllingDrives[maxAxes]{};			// AxesBitmap raw
+		uint32_t controllingDrives[maxAxes]{}; // AxesBitmap raw
 
 		// --- Input shaping --------------------------------------------------------------------
 
@@ -135,10 +134,7 @@ namespace Duet::Sbc::Motion
 			return maxAxesPlusExtruders - numExtruders;
 		}
 
-		[[nodiscard]] constexpr bool IsExtruder(size_t drive) const noexcept
-		{
-			return drive >= FirstExtruderDrive();
-		}
+		[[nodiscard]] constexpr bool IsExtruder(size_t drive) const noexcept { return drive >= FirstExtruderDrive(); }
 	};
 
 	// ---------------------------------------------------------------------------------------------
@@ -166,6 +162,6 @@ namespace Duet::Sbc::Motion
 	static_assert(sizeof(NonlinearExtrusion) == 12, "NonlinearExtrusion is three floats with no padding");
 	static_assert(offsetof(MotionConfig, nonlinearExtrusion) % 4 == 0, "the coefficients must stay 4-aligned");
 	static_assert(sizeof(MotionConfig) % 4 == 0, "no tail padding beyond what is declared");
-}
+} // namespace Duet::Sbc::Motion
 
 #endif /* SRC_MOTION_MOTIONCONFIG_H_ */

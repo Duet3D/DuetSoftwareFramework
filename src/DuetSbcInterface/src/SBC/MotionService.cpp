@@ -26,9 +26,6 @@ namespace Duet::Sbc
 		// Forced positions are rare - homing, probing, G92, a reconfiguration - and the motion thread
 		// takes every one of them within a millisecond. Room for a burst, not for a backlog.
 		constexpr size_t kForcedPositionCapacity = 8 * 1024;
-
-		// The longest the motion thread sleeps when the rings say there is nothing to do. Short
-		// enough that a move submitted while it sleeps is still prepared well inside its lead time.
 	}
 
 	MotionService::MotionService(SbcInterface& link)

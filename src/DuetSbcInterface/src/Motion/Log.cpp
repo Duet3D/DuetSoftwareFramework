@@ -16,7 +16,7 @@ namespace
 	// Long enough for the widest DDA::DebugPrint line; anything longer is truncated rather than
 	// allocated for, because this runs on the motion thread.
 	constexpr size_t maxMessageLength = 256;
-}
+} // namespace
 
 void Duet::Sbc::Motion::SetLogSink(LogSink sink) noexcept
 {
@@ -25,7 +25,7 @@ void Duet::Sbc::Motion::SetLogSink(LogSink sink) noexcept
 
 namespace
 {
-	void Emit(const char *fmt, va_list args) noexcept
+	void Emit(const char* fmt, va_list args) noexcept
 	{
 		char buffer[maxMessageLength];
 		if (vsnprintf(buffer, sizeof(buffer), fmt, args) < 0)
@@ -43,9 +43,9 @@ namespace
 			std::fputs(buffer, stderr);
 		}
 	}
-}
+} // namespace
 
-void Duet::Sbc::Motion::LogMessage(const char *fmt, ...) noexcept
+void Duet::Sbc::Motion::LogMessage(const char* fmt, ...) noexcept
 {
 	va_list args;
 	va_start(args, fmt);
@@ -53,11 +53,10 @@ void Duet::Sbc::Motion::LogMessage(const char *fmt, ...) noexcept
 	va_end(args);
 }
 
-void DebugPrintf(const char *fmt, ...) noexcept
+void DebugPrintf(const char* fmt, ...) noexcept
 {
 	va_list args;
 	va_start(args, fmt);
 	Emit(fmt, args);
 	va_end(args);
 }
-

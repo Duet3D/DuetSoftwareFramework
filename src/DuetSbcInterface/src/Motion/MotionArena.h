@@ -17,9 +17,9 @@
 #ifndef SRC_MOTION_MOTIONARENA_H_
 #define SRC_MOTION_MOTIONARENA_H_
 
-#include <RepRapFirmware.h>
+#include <Config/MachineLimits.h>
 
-#include <new>		// for std::align_val_t
+#include <new> // for std::align_val_t
 
 namespace Duet::Sbc::Motion::MotionArena
 {
@@ -33,11 +33,11 @@ namespace Duet::Sbc::Motion::MotionArena
 	void Release() noexcept;
 
 	// Allocate. Never returns null: exhaustion aborts, for the reason in the header comment.
-	void *Allocate(size_t count) noexcept;
-	void *Allocate(size_t count, std::align_val_t align) noexcept;
+	void* Allocate(size_t count) noexcept;
+	void* Allocate(size_t count, std::align_val_t align) noexcept;
 
 	// Bytes still unallocated.
 	[[nodiscard]] ptrdiff_t BytesFree() noexcept;
-}
+} // namespace Duet::Sbc::Motion::MotionArena
 
 #endif /* SRC_MOTION_MOTIONARENA_H_ */

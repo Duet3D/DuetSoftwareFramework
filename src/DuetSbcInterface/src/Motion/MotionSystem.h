@@ -8,10 +8,10 @@
  * belongs here. Kinematics, compensation and homing moved to DuetControlServer, which is where the
  * moves are now built; there is no step interrupt because there are no local drivers.
  *
- * What is left is the part the imported DDA and DDARing sources still need: somewhere to ask how
- * many steps per mm a drive has, which board drives it, how much backlash to take up, and somewhere
- * to put the segments that Prepare produces. So this class is mostly the machine description
- * (MotionConfig, pushed down by DCS) plus the array of DriveTrackers.
+ * What is left is the part DDA and DDARing still need: somewhere to ask how many steps per mm a
+ * drive has, which board drives it, how much backlash to take up, and somewhere to put the segments
+ * that Prepare produces. So this class is mostly the machine description (MotionConfig, pushed down
+ * by DCS) plus the array of DriveTrackers.
  *
  * A DDARing is given one of these when it is built, and the DDAs in it reach it through the ring.
  */
@@ -30,7 +30,7 @@ namespace Duet::Sbc::Motion
 {
 	class MotionSystem
 	{
-	public:
+	  public:
 		MotionSystem() noexcept;
 
 		// Reserve the permanent arena and reset every drive. Call once before use.
@@ -65,10 +65,7 @@ namespace Duet::Sbc::Motion
 			return AxesBitmap((module < Module::Num) ? m_debugFlags[(unsigned int)module] : 0);
 		}
 
-		[[nodiscard]] bool IsDebugEnabled(Module module) const noexcept
-		{
-			return GetDebugFlags(module).IsNonEmpty();
-		}
+		[[nodiscard]] bool IsDebugEnabled(Module module) const noexcept { return GetDebugFlags(module).IsNonEmpty(); }
 
 		// Set one topic's flags. There is no caller yet: M111 is not ported, and until it is, the
 		// diagnostics behind these branches cannot be switched on. Kept so that a topic can be
@@ -81,14 +78,17 @@ namespace Duet::Sbc::Motion
 			}
 		}
 
-		// --- Accessors used by the imported DDA / DDARing sources ------------------------------
+		// --- Per-drive configuration -----------------------------------------------------------
 		//
-		// Names match the firmware's Move members, so those call sites read as they do upstream.
+		// Names match the firmware's Move members, so the planning code reads as it does upstream.
 
 		[[nodiscard]] float DriveStepsPerMm(size_t drive) const noexcept { return m_config.driveStepsPerMm[drive]; }
 		[[nodiscard]] uint32_t GetJerkPolicy() const noexcept { return m_config.jerkPolicy; }
 		[[nodiscard]] float GetMaxInstantDv(size_t drive) const noexcept { return m_config.instantDvs[drive]; }
-		[[nodiscard]] float GetPrintingInstantDv(size_t drive) const noexcept { return m_config.printingInstantDvs[drive]; }
+		[[nodiscard]] float GetPrintingInstantDv(size_t drive) const noexcept
+		{
+			return m_config.printingInstantDvs[drive];
+		}
 		[[nodiscard]] float GetPressureAdvanceK0ClocksForLogicalDrive(size_t drive) const noexcept
 		{
 			return m_config.pressureAdvanceClocks[drive];
@@ -139,7 +139,10 @@ namespace Duet::Sbc::Motion
 		// Where prepared moves go out to the controller. Owned here because it is per-machine state
 		// with the same lifetime as the drive trackers.
 		[[nodiscard]] ScheduleMoveBuilder& GetScheduleMoveBuilder() noexcept { return m_scheduleMoveBuilder; }
-		[[nodiscard]] const ScheduleMoveBuilder& GetScheduleMoveBuilder() const noexcept { return m_scheduleMoveBuilder; }
+		[[nodiscard]] const ScheduleMoveBuilder& GetScheduleMoveBuilder() const noexcept
+		{
+			return m_scheduleMoveBuilder;
+		}
 
 		// --- Per-drive motion -----------------------------------------------------------------
 
@@ -174,8 +177,11 @@ namespace Duet::Sbc::Motion
 
 		// Hand one drive's share of a prepared move to its tracker. This is what DDA::Prepare calls
 		// in place of the firmware's Move::AddLinearSegments.
-		void AddLinearSegments(size_t drive, uint32_t startTime, const MoveProfile& profile,
-							   motioncalc_t steps, MovementFlags moveFlags) noexcept;
+		void AddLinearSegments(size_t drive,
+							   uint32_t startTime,
+							   const MoveProfile& profile,
+							   motioncalc_t steps,
+							   MovementFlags moveFlags) noexcept;
 
 		// Bring every drive's position up to `now`. Called once per pass of the motion loop.
 		void AdvanceTrackers(uint32_t now) noexcept;
@@ -205,7 +211,7 @@ namespace Duet::Sbc::Motion
 		// controller so it can pass the delay on to the expansion boards.
 		void AddPrepareHiccup() noexcept;
 
-	private:
+	  private:
 		MotionConfig m_config;
 		uint32_t m_debugFlags[(unsigned int)Module::Num]{};
 		DriveTracker m_trackers[maxAxesPlusExtruders];
@@ -225,6 +231,6 @@ namespace Duet::Sbc::Motion
 		int32_t m_targetBacklashSteps[maxAxesPlusExtruders]{};
 		int32_t m_currentBacklashSteps[maxAxesPlusExtruders]{};
 	};
-}
+} // namespace Duet::Sbc::Motion
 
 #endif /* SRC_MOTION_MOTIONSYSTEM_H_ */

@@ -7,10 +7,9 @@
 # CApi.cpp is the one exception: it is the C ABI the shared library exports, and is deliberately kept
 # out of the static library the harness and the tests link.
 #
-# Movement/, Compat/ and Motion/ are the second: they make up the duet_motion library below, which
-# has its own lint policy and its own explicit source list. Anything added under them is picked up
-# there, not here.
-set(DUET_MOTION_DIRS "/Movement/" "/Compat/" "/Motion/")
+# Movement/ and Motion/ are the second: they make up the duet_motion library below, which has its own
+# explicit source list. Anything added under them is picked up there, not here.
+set(DUET_MOTION_DIRS "/Movement/" "/Motion/")
 
 file(GLOB_RECURSE DUET_SBC_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
 list(REMOVE_ITEM DUET_SBC_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/CApi.cpp")
@@ -18,9 +17,9 @@ foreach(_dir IN LISTS DUET_MOTION_DIRS)
     list(FILTER DUET_SBC_SOURCES EXCLUDE REGEX "${_dir}")
 endforeach()
 
-# The motion engine: RepRapFirmware's Movement/ sources, the Compat/ headers that let them compile
-# against this host, and the Motion/ code written here to replace the parts of the firmware that
-# have no counterpart on an SBC.
+# The motion engine: the DDA ring and segment machinery under Movement/, which began as
+# RepRapFirmware's and keeps its algorithms, and the Motion/ code written here for the parts of the
+# firmware that have no counterpart on an SBC.
 #
 # It is a separate library from duet_sbc for two reasons. Imported upstream source is linted by its
 # own project rather than by this one, so clang-tidy is off for the whole target - which would be
@@ -41,10 +40,7 @@ set(DUET_MOTION_SOURCES
 )
 
 add_library(duet_motion STATIC ${DUET_MOTION_SOURCES})
-target_include_directories(duet_motion PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/Compat
-)
+target_include_directories(duet_motion PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 # duet_spi_protocol for the ScheduleMove wire structs the builder fills. It is header-only and has
 # no dependency of its own, so this does not tie the motion engine to the SPI transfer loop: the
 # packets go wherever the sink the caller installs takes them.
@@ -52,7 +48,7 @@ target_link_libraries(duet_motion PUBLIC ${RRFLIBRARIES_TARGET} duet_spi_protoco
 target_compile_options(duet_motion PRIVATE
     # float16_t is __fp16 in RRFLibraries' Portability.h, which does not exist on x86-64. See the
     # header for why this is forced in rather than #included.
-    -include "${CMAKE_CURRENT_SOURCE_DIR}/Compat/Float16Compat.h"
+    -include "${CMAKE_CURRENT_SOURCE_DIR}/Config/Float16Compat.h"
     -Wno-unused-parameter
 )
 # PUBLIC, not PRIVATE: the imported code names parameters it deliberately ignores, most visibly in

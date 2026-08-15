@@ -149,7 +149,7 @@ rrflibraries_add_interface(RRFLIBRARIES_INTERFACE MCU HOST)
 rrflibraries_add_library(RRFLIBRARIES_TARGET
     MCU HOST
     ARCH ${DUET_ARCH_HOST}
-    EXTRA_COMPILE_OPTIONS -include "${CMAKE_CURRENT_SOURCE_DIR}/src/Compat/Float16Compat.h")
+    EXTRA_COMPILE_OPTIONS -include "${CMAKE_CURRENT_SOURCE_DIR}/src/Config/Float16Compat.h")
 # Imported upstream source: linted by its own project, not by this one.
 set_target_properties(${RRFLIBRARIES_TARGET} PROPERTIES CXX_CLANG_TIDY "")
 

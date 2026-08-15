@@ -20,7 +20,7 @@
 #ifndef SRC_MOTION_MOVEPARAMS_H_
 #define SRC_MOTION_MOVEPARAMS_H_
 
-#include <RepRapFirmware.h>
+#include <Config/MachineLimits.h>
 
 #include <DuetSpiProtocol/StopRules.h>
 
@@ -58,14 +58,15 @@ namespace Duet::Sbc::Motion
 		// that watch the switch would leave the others running. The axis' switches are spread over
 		// the move's drivers, so all of them are watched and whichever fires first stops everything
 		inline constexpr uint32_t sharedSwitches = 1u << 10;
-	}
+	} // namespace MoveFlags
 
 #pragma pack(push, 1)
 
-	// Fixed part of a move submission. Two arrays follow it in the same record:
+	// Fixed part of a move submission. Three arrays follow it in the same record:
 	//
-	//     int32_t endPoint[numDrives];        machine position each drive ends at, microsteps
-	//     float   directionVector[numDrives]; normalised direction, first three entries Cartesian
+	//     int32_t       endPoint[numDrives];        machine position each drive ends at, microsteps
+	//     float         directionVector[numDrives]; normalised direction, first three Cartesian
+	//     MoveStopInput stopInputs[numDrives];      which switches stop each drive, if any
 	//
 	// numDrives is the configured maxAxesPlusExtruders rather than the number of drives that
 	// actually move, because MatchSpeeds, RecalculateMove and Prepare all index densely by logical
@@ -97,8 +98,8 @@ namespace Duet::Sbc::Motion
 #pragma pack(pop)
 
 	static_assert(sizeof(MoveParamsHeader) == 28, "MoveParamsHeader must be 28 bytes");
-	static_assert(offsetof(MoveParamsHeader, totalDistance) == 12 );
-	static_assert(offsetof(MoveParamsHeader, ringNumber) == 24 );
+	static_assert(offsetof(MoveParamsHeader, totalDistance) == 12);
+	static_assert(offsetof(MoveParamsHeader, ringNumber) == 24);
 
 	// Value of a stopOnInput entry meaning "this driver watches no endstop during this move".
 	inline constexpr uint32_t kNoStopInput = 0xFFFFFFFF;
@@ -142,7 +143,7 @@ namespace Duet::Sbc::Motion
 		// endstop handle driver i watches minor i, which is why only one handle has to be carried
 		uint16_t handle;
 		uint8_t numSwitches;
-		uint8_t boards[maxDriversPerAxis];		// CAN address of each switch, in driver order
+		uint8_t boards[maxDriversPerAxis]; // CAN address of each switch, in driver order
 
 		// Drivers already sitting on their own switch when the move was built, one bit per driver.
 		//
@@ -214,7 +215,8 @@ namespace Duet::Sbc::Motion
 	// carrying it. Which drive an entry ends up on is decided after the arming - a stopAll move
 	// rewrites every drive's entry to the one axis' - so the board of the emitting driver is the only
 	// place this can be read from correctly.
-	[[nodiscard]] constexpr uint32_t StopInputForSwitch(const MoveStopInput& stop, size_t switchIndex,
+	[[nodiscard]] constexpr uint32_t StopInputForSwitch(const MoveStopInput& stop,
+														size_t switchIndex,
 														uint8_t driverBoard) noexcept
 	{
 		if (stop.numSwitches == 0)
@@ -244,7 +246,7 @@ namespace Duet::Sbc::Motion
 			return MakeStopInput(stop.boards[driverIndex], stop.handle);
 		}
 
-		constexpr uint16_t minorMask = 0x3F;			// RemoteInputHandle::minor is 6 bits wide
+		constexpr uint16_t minorMask = 0x3F; // RemoteInputHandle::minor is 6 bits wide
 		const auto handle = static_cast<uint16_t>((stop.handle & ~minorMask) | (driverIndex & minorMask));
 		return MakeStopInput(stop.boards[driverIndex], handle);
 	}
@@ -266,7 +268,8 @@ namespace Duet::Sbc::Motion
 	[[nodiscard]] inline std::span<const int32_t> MoveParamsEndPoints(const MoveParamsHeader& header) noexcept
 	{
 		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
-		const auto *const first = reinterpret_cast<const int32_t *>(reinterpret_cast<const char *>(&header) + sizeof(header));
+		const auto* const first =
+			reinterpret_cast<const int32_t*>(reinterpret_cast<const char*>(&header) + sizeof(header));
 		return {first, header.numDrives};
 	}
 
@@ -274,7 +277,7 @@ namespace Duet::Sbc::Motion
 	{
 		const std::span<const int32_t> endPoints = MoveParamsEndPoints(header);
 		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
-		const auto *const first = reinterpret_cast<const float *>(endPoints.data() + endPoints.size());
+		const auto* const first = reinterpret_cast<const float*>(endPoints.data() + endPoints.size());
 		return {first, header.numDrives};
 	}
 
@@ -289,7 +292,8 @@ namespace Duet::Sbc::Motion
 	{
 		const std::span<const float> directionVector = MoveParamsDirectionVector(header);
 		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
-		const auto *const first = reinterpret_cast<const MoveStopInput *>(directionVector.data() + directionVector.size());
+		const auto* const first =
+			reinterpret_cast<const MoveStopInput*>(directionVector.data() + directionVector.size());
 		return {first, header.numDrives};
 	}
 
@@ -298,7 +302,7 @@ namespace Duet::Sbc::Motion
 	[[nodiscard]] inline std::span<int32_t> MoveParamsEndPoints(MoveParamsHeader& header) noexcept
 	{
 		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
-		auto *const first = reinterpret_cast<int32_t *>(reinterpret_cast<char *>(&header) + sizeof(header));
+		auto* const first = reinterpret_cast<int32_t*>(reinterpret_cast<char*>(&header) + sizeof(header));
 		return {first, header.numDrives};
 	}
 
@@ -306,7 +310,7 @@ namespace Duet::Sbc::Motion
 	{
 		const std::span<int32_t> endPoints = MoveParamsEndPoints(header);
 		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
-		auto *const first = reinterpret_cast<float *>(endPoints.data() + endPoints.size());
+		auto* const first = reinterpret_cast<float*>(endPoints.data() + endPoints.size());
 		return {first, header.numDrives};
 	}
 
@@ -314,9 +318,9 @@ namespace Duet::Sbc::Motion
 	{
 		const std::span<float> directionVector = MoveParamsDirectionVector(header);
 		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
-		auto *const first = reinterpret_cast<MoveStopInput *>(directionVector.data() + directionVector.size());
+		auto* const first = reinterpret_cast<MoveStopInput*>(directionVector.data() + directionVector.size());
 		return {first, header.numDrives};
 	}
-}
+} // namespace Duet::Sbc::Motion
 
 #endif /* SRC_MOTION_MOVEPARAMS_H_ */

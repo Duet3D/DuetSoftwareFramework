@@ -2,12 +2,12 @@
  * MotionSystem.cpp - see MotionSystem.h.
  */
 
-#include <cmath>
 #include "MotionSystem.h"
+#include <cmath>
 
+#include <Motion/MotionArena.h>
 #include <Movement/MoveTiming.h>
 #include <Movement/StepTimer.h>
-#include <Motion/MotionArena.h>
 
 #include <algorithm>
 #include <cstdlib>
@@ -21,7 +21,7 @@ namespace
 	// equivalent from whatever RAM is left over; here memory is not the constraint, so this is
 	// generous enough that exhaustion means a bug rather than a busy machine.
 	constexpr size_t permanentArenaBytes = 4 * 1024 * 1024;
-}
+} // namespace
 
 MotionSystem::MotionSystem() noexcept
 {
@@ -45,7 +45,10 @@ bool MotionSystem::Init() noexcept
 		m_targetBacklashSteps[drive] = 0;
 		m_currentBacklashSteps[drive] = 0;
 	}
-	for (auto& d : m_lastMoveWasBackwards) { d = false; }
+	for (auto& d : m_lastMoveWasBackwards)
+	{
+		d = false;
+	}
 	return true;
 }
 
@@ -57,15 +60,15 @@ void MotionSystem::SanitiseConfig(MotionConfig& config) noexcept
 	// end of extruderDrivers. Extruders are what give way, because the axes are already placed.
 	config.numTotalAxes = static_cast<uint8_t>(std::min<size_t>(config.numTotalAxes, maxAxes));
 	config.numExtruders = static_cast<uint8_t>(std::min<size_t>(config.numExtruders, maxExtruders));
-	config.numExtruders = static_cast<uint8_t>(
-		std::min<size_t>(config.numExtruders, maxAxesPlusExtruders - config.numTotalAxes));
+	config.numExtruders =
+		static_cast<uint8_t>(std::min<size_t>(config.numExtruders, maxAxesPlusExtruders - config.numTotalAxes));
 	config.numVisibleAxes = static_cast<uint8_t>(std::min(config.numVisibleAxes, config.numTotalAxes));
 
 	// Rings. DDARing::Init clamps the depth as well, but doing it here keeps GetConfig() honest
 	// about what was actually built.
 	config.numRings = static_cast<uint8_t>(std::clamp<unsigned int>(config.numRings, 1, maxRings));
-	config.numDdasPerRing = static_cast<uint16_t>(
-		std::clamp<unsigned int>(config.numDdasPerRing, minDdasPerRing, maxDdasPerRing));
+	config.numDdasPerRing =
+		static_cast<uint16_t>(std::clamp<unsigned int>(config.numDdasPerRing, minDdasPerRing, maxDdasPerRing));
 
 	// Driver mapping. numDrivers indexes driverNumbers[maxDriversPerAxis] in DDA::Prepare.
 	for (AxisDriversConfig& axis : config.axisDrivers)
@@ -84,7 +87,7 @@ int32_t MotionSystem::ApplyBacklashCompensation(size_t drive, int32_t delta) noe
 {
 	if (drive >= maxAxes)
 	{
-		return delta;						// extruders have no backlash to take up
+		return delta; // extruders have no backlash to take up
 	}
 
 	// A change of direction means the whole backlash has to be taken up again, in the new direction.
@@ -113,8 +116,8 @@ int32_t MotionSystem::ApplyBacklashCompensation(size_t drive, int32_t delta) noe
 		{
 			const auto maxAllowedSteps =
 				(int32_t)max<uint32_t>((uint32_t)labs(delta) / m_config.backlashCorrectionDistanceFactor, 1u);
-			const int32_t stepsToDo = (stepsDue < 0) ? max<int32_t>(stepsDue, -maxAllowedSteps)
-													 : min<int32_t>(stepsDue, maxAllowedSteps);
+			const int32_t stepsToDo =
+				(stepsDue < 0) ? max<int32_t>(stepsDue, -maxAllowedSteps) : min<int32_t>(stepsDue, maxAllowedSteps);
 			currentSteps += stepsToDo;
 			delta += stepsToDo;
 		}
@@ -122,8 +125,8 @@ int32_t MotionSystem::ApplyBacklashCompensation(size_t drive, int32_t delta) noe
 	return delta;
 }
 
-void MotionSystem::AddLinearSegments(size_t drive, uint32_t startTime, const MoveProfile& profile,
-									 motioncalc_t steps, MovementFlags moveFlags) noexcept
+void MotionSystem::AddLinearSegments(
+	size_t drive, uint32_t startTime, const MoveProfile& profile, motioncalc_t steps, MovementFlags moveFlags) noexcept
 {
 	const motioncalc_t pressureAdvance =
 		(moveFlags.isExtruder && !moveFlags.nonPrintingMove) ? GetPressureAdvanceK0ClocksForLogicalDrive(drive) : 0;
@@ -184,13 +187,14 @@ void MotionSystem::SetMotorPositions(LogicalDrivesBitmap drives, std::span<const
 bool MotionSystem::AreDrivesStopped(LogicalDrivesBitmap drives) const noexcept
 {
 	bool stopped = true;
-	drives.Iterate([this, &stopped](unsigned int drive, unsigned int) noexcept
-				   {
-					   if (drive < maxAxesPlusExtruders && m_trackers[drive].MotionPending())
-					   {
-						   stopped = false;
-					   }
-				   });
+	drives.Iterate(
+		[this, &stopped](unsigned int drive, unsigned int) noexcept
+		{
+			if (drive < maxAxesPlusExtruders && m_trackers[drive].MotionPending())
+			{
+				stopped = false;
+			}
+		});
 	return stopped;
 }
 

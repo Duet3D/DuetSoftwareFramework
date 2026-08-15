@@ -33,8 +33,12 @@ namespace Duet::Sbc::Motion::SegmentBuilder
 	// Units are steps for distance and step clocks for time. `pressureAdvanceClocksTimesDuration` is
 	// the pressure-advance time constant multiplied by this segment's duration; the extra distance
 	// it implies is a * that, since pressure advance adds distance proportional to the speed change.
-	MoveSegment *AddSegment(MoveSegment *list, uint32_t startTime, uint32_t duration,
-							motioncalc_t distance, motioncalc_t a, MovementFlags moveFlags,
+	MoveSegment* AddSegment(MoveSegment* list,
+							uint32_t startTime,
+							uint32_t duration,
+							motioncalc_t distance,
+							motioncalc_t a,
+							MovementFlags moveFlags,
 							motioncalc_t pressureAdvanceClocksTimesDuration) noexcept;
 
 	// Add the accelerate/steady/decelerate segments for one drive's share of a move.
@@ -43,9 +47,12 @@ namespace Duet::Sbc::Motion::SegmentBuilder
 	// in mm and step clocks; the ratio between them is what scales the profile onto this drive.
 	// `pressureAdvanceClocks` is the drive's pressure-advance time constant, zero for anything that
 	// is not an extruder doing a printing move. Returns the new head of the list.
-	MoveSegment *AddLinearSegments(MoveSegment *list, uint32_t startTime, const MoveProfile& profile,
-								   motioncalc_t steps, MovementFlags moveFlags,
+	MoveSegment* AddLinearSegments(MoveSegment* list,
+								   uint32_t startTime,
+								   const MoveProfile& profile,
+								   motioncalc_t steps,
+								   MovementFlags moveFlags,
 								   motioncalc_t pressureAdvanceClocks = 0) noexcept;
-}
+} // namespace Duet::Sbc::Motion::SegmentBuilder
 
 #endif /* SRC_MOTION_SEGMENTBUILDER_H_ */

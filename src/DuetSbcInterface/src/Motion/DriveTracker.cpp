@@ -25,15 +25,18 @@ void DriveTracker::Init(size_t logicalDrive) noexcept
 	m_enteredCurrentSegment = false;
 }
 
-void DriveTracker::AddMove(uint32_t startTime, const MoveProfile& profile, motioncalc_t steps,
-						   MovementFlags moveFlags, motioncalc_t pressureAdvanceClocks) noexcept
+void DriveTracker::AddMove(uint32_t startTime,
+						   const MoveProfile& profile,
+						   motioncalc_t steps,
+						   MovementFlags moveFlags,
+						   motioncalc_t pressureAdvanceClocks) noexcept
 {
 	// Where this move starts from, so that a revert can express its progress as net steps. Taken
 	// before the segments are added, while the position still describes only what came before
 	m_positionAtMoveStart = m_currentMotorPosition;
 
-	m_segments = SegmentBuilder::AddLinearSegments(m_segments, startTime, profile, steps, moveFlags,
-												 pressureAdvanceClocks);
+	m_segments =
+		SegmentBuilder::AddLinearSegments(m_segments, startTime, profile, steps, moveFlags, pressureAdvanceClocks);
 
 	// AddLinearSegments may have split or merged the segment that was current, so its cached
 	// parameters no longer describe the segment at the head of the chain. Re-enter it on the next
@@ -41,13 +44,14 @@ void DriveTracker::AddMove(uint32_t startTime, const MoveProfile& profile, motio
 	//
 	// This is safe here in a way it would not be in the firmware, which has to detach the tail of
 	// the chain first so that the step ISR cannot be executing a segment while it is being amended.
-	// Nothing else touches the chain on this side; see Compat/RTOSIface/RTOSIface.h.
+	// Nothing else touches the chain on this side: every allocation, release and traversal of a
+	// segment happens on the motion thread.
 	m_enteredCurrentSegment = false;
 }
 
 void DriveTracker::EnterCurrentSegment() noexcept
 {
-	MoveSegment *seg = m_segments;
+	MoveSegment* seg = m_segments;
 
 	// Fold away segments too short to be worth evaluating separately. Rounding error in the profile
 	// makes sub-microsecond segments unreliable, and they show up in the reported position as speed
@@ -55,17 +59,16 @@ void DriveTracker::EnterCurrentSegment() noexcept
 	// one ends and describes the same kind of motion.
 	for (;;)
 	{
-		MoveSegment *const nextSeg = seg->GetNext();
-		if (   seg->GetDuration() >= MoveTiming::minimumExecutingSegmentDuration
-			|| nextSeg == nullptr
-			|| !nextSeg->GetFlags().SameStaticFlags(seg->GetFlags())
-			|| nextSeg->GetStartTime() != seg->GetStartTime() + seg->GetDuration())
+		MoveSegment* const nextSeg = seg->GetNext();
+		if (seg->GetDuration() >= MoveTiming::minimumExecutingSegmentDuration || nextSeg == nullptr ||
+			!nextSeg->GetFlags().SameStaticFlags(seg->GetFlags()) ||
+			nextSeg->GetStartTime() != seg->GetStartTime() + seg->GetDuration())
 		{
 			break;
 		}
 		nextSeg->CombinePrevious(seg);
 		m_segments = nextSeg;
-		MoveSegment::Release(seg);			// released rather than retired: it never really existed
+		MoveSegment::Release(seg); // released rather than retired: it never really existed
 		seg = nextSeg;
 	}
 
@@ -81,7 +84,7 @@ void DriveTracker::EnterCurrentSegment() noexcept
 	m_enteredCurrentSegment = true;
 }
 
-void DriveTracker::RetireSegment(MoveSegment *segment) noexcept
+void DriveTracker::RetireSegment(MoveSegment* segment) noexcept
 {
 	if (m_retiredSegment != nullptr)
 	{
@@ -94,7 +97,7 @@ void DriveTracker::Advance(uint32_t now) noexcept
 {
 	for (;;)
 	{
-		MoveSegment *seg = m_segments;
+		MoveSegment* seg = m_segments;
 		if (seg == nullptr)
 		{
 			m_enteredCurrentSegment = false;
@@ -103,18 +106,18 @@ void DriveTracker::Advance(uint32_t now) noexcept
 
 		if ((int32_t)(now - seg->GetStartTime()) < 0)
 		{
-			return;								// due to start later; nothing to account for yet
+			return; // due to start later; nothing to account for yet
 		}
 
 		if (!m_enteredCurrentSegment)
 		{
 			EnterCurrentSegment();
-			seg = m_segments;						// EnterCurrentSegment may have merged it away
+			seg = m_segments; // EnterCurrentSegment may have merged it away
 		}
 
 		if ((uint32_t)(now - seg->GetStartTime()) < seg->GetDuration())
 		{
-			return;								// still running; GetCurrentPosition interpolates it
+			return; // still running; GetCurrentPosition interpolates it
 		}
 
 		// Finished. Take its whole travel, and carry the fraction of a step it could not deliver.
@@ -130,7 +133,7 @@ void DriveTracker::Advance(uint32_t now) noexcept
 
 float DriveTracker::GetCurrentPosition(uint32_t now) const noexcept
 {
-	const MoveSegment *const seg = m_segments;
+	const MoveSegment* const seg = m_segments;
 	if (seg == nullptr || !m_enteredCurrentSegment)
 	{
 		// Stationary, or the next segment has not started. Either way the drive is wherever the
@@ -153,8 +156,8 @@ float DriveTracker::GetCurrentPosition(uint32_t now) const noexcept
 
 	// s = u*t + a*t^2/2, from the position the segment started at.
 	const auto t = (motioncalc_t)timeSinceStart;
-	return (float)((m_u + oneHalf * seg->GetA() * t) * t
-				   + (motioncalc_t)m_positionAtSegmentStart + m_distanceCarriedForwards);
+	return (float)((m_u + oneHalf * seg->GetA() * t) * t + (motioncalc_t)m_positionAtSegmentStart +
+				   m_distanceCarriedForwards);
 }
 
 void DriveTracker::SetMotorPosition(int32_t position) noexcept

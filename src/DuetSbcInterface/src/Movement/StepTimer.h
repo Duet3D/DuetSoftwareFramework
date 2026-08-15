@@ -29,11 +29,13 @@
 #ifndef SRC_MOVEMENT_STEPTIMER_H_
 #define SRC_MOVEMENT_STEPTIMER_H_
 
-#include <RepRapFirmware.h>
+#include <Movement/StepClock.h>
+
+#include <General/StringRef.h>
 
 class StepTimer
 {
-public:
+  public:
 	using Ticks = uint32_t;
 
 	// Reset the model to the nominal rate, anchored at the current local time. Call before use;
@@ -88,12 +90,12 @@ public:
 
 	struct ClockStats
 	{
-		double driftPpm;				// fitted rate minus nominal, in parts per million
-		uint32_t numSamples;			// samples in the current fit
-		uint32_t peakResidualNs;		// largest |sample - fit| since Init
-		uint32_t numBackwardClamps;		// times a new fit would have made the reading go backwards
-		uint32_t numRejectedSamples;	// samples discarded as implausible
-		bool synced;					// true once the fit is based on enough samples to trust
+		double driftPpm;			 // fitted rate minus nominal, in parts per million
+		uint32_t numSamples;		 // samples in the current fit
+		uint32_t peakResidualNs;	 // largest |sample - fit| since Init
+		uint32_t numBackwardClamps;	 // times a new fit would have made the reading go backwards
+		uint32_t numRejectedSamples; // samples discarded as implausible
+		bool synced;				 // true once the fit is based on enough samples to trust
 	};
 
 	static ClockStats GetClockStats() noexcept;
@@ -124,7 +126,7 @@ public:
 	//
 	// The offset does not need this and does not wait for it: until the window has filled to
 	// minSamplesToSync, every sample re-anchors the model at the nominal rate.
-	static constexpr int64_t minSampleSpacingNs = 50000000;		// 50ms
+	static constexpr int64_t minSampleSpacingNs = 50000000; // 50ms
 
 	// A fitted rate further than this from nominal is a bad fit, not a bad crystal. Duet 3 and Pi
 	// oscillators are specified well inside 100ppm; 2000 leaves room for a hot board.

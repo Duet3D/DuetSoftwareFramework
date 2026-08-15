@@ -10,17 +10,16 @@
  * for translation units that reach Portability.h through a header we control, and the whole point
  * of the Compat layer is that the imported RepRapFirmware sources keep their original #includes.
  *
- * float is the right substitute rather than a 16-bit emulation: the only float16_t in the code kept
- * here was DDA::originalFeedRate, which exists for pause/resume reporting and is not sent to this
- * side of the split at all.
+ * float is the right substitute rather than a 16-bit emulation: nothing in this project declares a
+ * float16_t. The type is needed only because RRFLibraries' own header names it.
  */
 
-#ifndef SRC_COMPAT_FLOAT16COMPAT_H_
-#define SRC_COMPAT_FLOAT16COMPAT_H_
+#ifndef SRC_CONFIG_FLOAT16COMPAT_H_
+#define SRC_CONFIG_FLOAT16COMPAT_H_
 
 #ifndef FLOAT16_T_DEFINED
-# define FLOAT16_T_DEFINED
+#  define FLOAT16_T_DEFINED
 using float16_t = float;
 #endif
 
-#endif /* SRC_COMPAT_FLOAT16COMPAT_H_ */
+#endif /* SRC_CONFIG_FLOAT16COMPAT_H_ */

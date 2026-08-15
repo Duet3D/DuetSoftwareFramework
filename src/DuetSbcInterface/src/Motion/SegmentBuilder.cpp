@@ -20,11 +20,14 @@ namespace
 	{
 		return distance / (motioncalc_t)duration - oneHalf * a * (motioncalc_t)duration;
 	}
-}
+} // namespace
 
-MoveSegment *Duet::Sbc::Motion::SegmentBuilder::AddSegment(MoveSegment *list, uint32_t startTime,
-														   uint32_t duration, motioncalc_t distance,
-														   motioncalc_t a, MovementFlags moveFlags,
+MoveSegment* Duet::Sbc::Motion::SegmentBuilder::AddSegment(MoveSegment* list,
+														   uint32_t startTime,
+														   uint32_t duration,
+														   motioncalc_t distance,
+														   motioncalc_t a,
+														   MovementFlags moveFlags,
 														   motioncalc_t pressureAdvanceClocksTimesDuration) noexcept
 {
 	if ((int32_t)duration <= 0)
@@ -39,18 +42,18 @@ MoveSegment *Duet::Sbc::Motion::SegmentBuilder::AddSegment(MoveSegment *list, ui
 	// Pressure advance adds distance proportional to the speed change, i.e. to a * t.
 	distance += a * pressureAdvanceClocksTimesDuration;
 
-	MoveSegment *prev = nullptr;
-	MoveSegment *seg = list;
+	MoveSegment* prev = nullptr;
+	MoveSegment* seg = list;
 
 	// Find the earliest existing segment that the new one starts before, or overlaps.
 	while (seg != nullptr)
 	{
-		int32_t offset = (int32_t)(startTime - seg->GetStartTime());		// how much later the new one starts
-		if (offset < 0)														// new segment starts first
+		int32_t offset = (int32_t)(startTime - seg->GetStartTime()); // how much later the new one starts
+		if (offset < 0)												 // new segment starts first
 		{
 			if (offset + (int32_t)duration <= 0)
 			{
-				break;														// and ends before this one starts
+				break; // and ends before this one starts
 			}
 
 			// Insert the part that precedes the existing segment, then go round again with the rest.
@@ -59,7 +62,8 @@ MoveSegment *Duet::Sbc::Motion::SegmentBuilder::AddSegment(MoveSegment *list, ui
 			const auto mFirstDuration = (motioncalc_t)firstDuration;
 			const motioncalc_t firstDistance =
 				(CalcInitialSpeed(duration, distance, a) + oneHalf * a * mFirstDuration) * mFirstDuration;
-			seg->SetParameters(startTime, firstDuration, firstDistance, a J_ACTUAL_PARAMETER((motioncalc_t)0.0), moveFlags);
+			seg->SetParameters(
+				startTime, firstDuration, firstDistance, a J_ACTUAL_PARAMETER((motioncalc_t)0.0), moveFlags);
 			if (prev == nullptr)
 			{
 				list = seg;
@@ -82,7 +86,7 @@ MoveSegment *Duet::Sbc::Motion::SegmentBuilder::AddSegment(MoveSegment *list, ui
 		}
 
 		// The new segment now starts at or after the existing one starts.
-		if (offset < (int32_t)seg->GetDuration())							// it starts before this one ends
+		if (offset < (int32_t)seg->GetDuration()) // it starts before this one ends
 		{
 			// If it starts strictly later, split the existing segment so the two line up.
 			if (offset != 0)
@@ -123,7 +127,7 @@ MoveSegment *Duet::Sbc::Motion::SegmentBuilder::AddSegment(MoveSegment *list, ui
 	}
 
 	// Whatever is left of the new segment goes before 'seg', which may be null.
-	MoveSegment *const newSeg = MoveSegment::Allocate(seg);
+	MoveSegment* const newSeg = MoveSegment::Allocate(seg);
 	newSeg->SetParameters(startTime, duration, distance, a J_ACTUAL_PARAMETER((motioncalc_t)0.0), moveFlags);
 	if (prev == nullptr)
 	{
@@ -136,14 +140,16 @@ MoveSegment *Duet::Sbc::Motion::SegmentBuilder::AddSegment(MoveSegment *list, ui
 	return list;
 }
 
-MoveSegment *Duet::Sbc::Motion::SegmentBuilder::AddLinearSegments(MoveSegment *list, uint32_t startTime,
-																  const MoveProfile& profile, motioncalc_t steps,
+MoveSegment* Duet::Sbc::Motion::SegmentBuilder::AddLinearSegments(MoveSegment* list,
+																  uint32_t startTime,
+																  const MoveProfile& profile,
+																  motioncalc_t steps,
 																  MovementFlags moveFlags,
 																  motioncalc_t pressureAdvanceClocks) noexcept
 {
 	if (profile.totalDistance == (motioncalc_t)0.0)
 	{
-		return list;								// nothing to scale onto this drive
+		return list; // nothing to scale onto this drive
 	}
 
 	const uint32_t steadyStartTime = startTime + profile.accelClocks;
@@ -163,7 +169,8 @@ MoveSegment *Duet::Sbc::Motion::SegmentBuilder::AddLinearSegments(MoveSegment *l
 	}
 	else
 	{
-		accelDistance = (profile.decelClocks + profile.steadyClocks == 0) ? profile.totalDistance : profile.accelDistance;
+		accelDistance =
+			(profile.decelClocks + profile.steadyClocks == 0) ? profile.totalDistance : profile.accelDistance;
 		accelPressureAdvance = (motioncalc_t)profile.accelClocks * pressureAdvanceClocks;
 	}
 
@@ -176,8 +183,8 @@ MoveSegment *Duet::Sbc::Motion::SegmentBuilder::AddLinearSegments(MoveSegment *l
 	}
 	else
 	{
-		decelDistance = profile.totalDistance
-						- ((profile.steadyClocks == 0) ? accelDistance : profile.decelStartDistance);
+		decelDistance =
+			profile.totalDistance - ((profile.steadyClocks == 0) ? accelDistance : profile.decelStartDistance);
 		decelPressureAdvance = (motioncalc_t)profile.decelClocks * pressureAdvanceClocks;
 	}
 
@@ -186,18 +193,33 @@ MoveSegment *Duet::Sbc::Motion::SegmentBuilder::AddLinearSegments(MoveSegment *l
 
 	if (profile.accelClocks != 0)
 	{
-		list = AddSegment(list, startTime, profile.accelClocks, accelDistance * stepsPerMm,
-						  profile.acceleration * stepsPerMm, moveFlags, accelPressureAdvance);
+		list = AddSegment(list,
+						  startTime,
+						  profile.accelClocks,
+						  accelDistance * stepsPerMm,
+						  profile.acceleration * stepsPerMm,
+						  moveFlags,
+						  accelPressureAdvance);
 	}
 	if (profile.steadyClocks != 0)
 	{
-		list = AddSegment(list, steadyStartTime, profile.steadyClocks, steadyDistance * stepsPerMm,
-						  (motioncalc_t)0.0, moveFlags, (motioncalc_t)0.0);
+		list = AddSegment(list,
+						  steadyStartTime,
+						  profile.steadyClocks,
+						  steadyDistance * stepsPerMm,
+						  (motioncalc_t)0.0,
+						  moveFlags,
+						  (motioncalc_t)0.0);
 	}
 	if (profile.decelClocks != 0)
 	{
-		list = AddSegment(list, decelStartTime, profile.decelClocks, decelDistance * stepsPerMm,
-						  profile.deceleration * stepsPerMm, moveFlags, decelPressureAdvance);
+		list = AddSegment(list,
+						  decelStartTime,
+						  profile.decelClocks,
+						  decelDistance * stepsPerMm,
+						  profile.deceleration * stepsPerMm,
+						  moveFlags,
+						  decelPressureAdvance);
 	}
 	return list;
 }

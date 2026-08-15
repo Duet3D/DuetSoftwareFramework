@@ -14,7 +14,7 @@
 
 namespace
 {
-	char *arenaBase = nullptr;
+	char* arenaBase = nullptr;
 	size_t arenaSize = 0;
 	size_t arenaUsed = 0;
 
@@ -25,7 +25,7 @@ namespace
 		return (value + alignment - 1) & ~(alignment - 1);
 	}
 
-	void *AllocateAligned(size_t count, size_t alignment) noexcept
+	void* AllocateAligned(size_t count, size_t alignment) noexcept
 	{
 		if (arenaBase == nullptr)
 		{
@@ -38,26 +38,24 @@ namespace
 		const size_t offset = AlignUp(arenaUsed, alignment);
 		if (offset + count > arenaSize)
 		{
-			std::fprintf(stderr,
-						 "duet_sbc: permanent arena exhausted (%zu bytes, wanted %zu more)\n",
-						 arenaSize, count);
+			std::fprintf(
+				stderr, "duet_sbc: permanent arena exhausted (%zu bytes, wanted %zu more)\n", arenaSize, count);
 			std::abort();
 		}
 
 		arenaUsed = offset + count;
 		return arenaBase + offset;
 	}
-}
+} // namespace
 
 bool Duet::Sbc::Motion::MotionArena::Reserve(size_t bytes) noexcept
 {
 	if (arenaBase != nullptr)
 	{
-		return true;						// already reserved
+		return true; // already reserved
 	}
 
-	void * const mem = mmap(nullptr, bytes, PROT_READ | PROT_WRITE,
-							MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	void* const mem = mmap(nullptr, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	if (mem == MAP_FAILED)
 	{
 		return false;
@@ -74,7 +72,7 @@ bool Duet::Sbc::Motion::MotionArena::Reserve(size_t bytes) noexcept
 		DebugPrintf("could not mlock the motion arena (%zu bytes): timing may be affected\n", bytes);
 	}
 
-	arenaBase = static_cast<char *>(mem);
+	arenaBase = static_cast<char*>(mem);
 	arenaSize = bytes;
 	arenaUsed = 0;
 	return true;
@@ -91,12 +89,12 @@ void Duet::Sbc::Motion::MotionArena::Release() noexcept
 	}
 }
 
-void *Duet::Sbc::Motion::MotionArena::Allocate(size_t count) noexcept
+void* Duet::Sbc::Motion::MotionArena::Allocate(size_t count) noexcept
 {
 	return AllocateAligned(count, defaultAlignment);
 }
 
-void *Duet::Sbc::Motion::MotionArena::Allocate(size_t count, std::align_val_t align) noexcept
+void* Duet::Sbc::Motion::MotionArena::Allocate(size_t count, std::align_val_t align) noexcept
 {
 	return AllocateAligned(count, static_cast<size_t>(align));
 }

@@ -28,7 +28,7 @@ namespace
 	// transfer; a mutex between them would put the writer in a position to block the reader, which
 	// is the one thing this component must not do. Readers retry instead.
 	std::atomic<uint32_t> modelSeq{0};
-	ClockModel publishedModel{};		// only written between odd/even seq transitions
+	ClockModel publishedModel{}; // only written between odd/even seq transitions
 
 	std::atomic<StepTimer::LocalClockSource> localClockSource{nullptr};
 
@@ -41,14 +41,14 @@ namespace
 	struct Sample
 	{
 		int64_t localNs;
-		int64_t masterTicks;		// unwrapped
+		int64_t masterTicks; // unwrapped
 	};
 
 	Sample samples[StepTimer::maxSamples];
 	unsigned int numSamples = 0;
-	unsigned int nextSample = 0;			// ring index; the buffer is a sliding window
+	unsigned int nextSample = 0; // ring index; the buffer is a sliding window
 	int64_t unwrappedMaster = 0;
-	int64_t lastAcceptedNs = 0;			// local time of the newest sample in the window
+	int64_t lastAcceptedNs = 0; // local time of the newest sample in the window
 	uint32_t lastRawMaster = 0;
 	bool haveFirstSample = false;
 
@@ -80,11 +80,11 @@ namespace
 	void PublishModel(const ClockModel& model) noexcept
 	{
 		const uint32_t seq = modelSeq.load(std::memory_order_relaxed);
-		modelSeq.store(seq + 1, std::memory_order_relaxed);		// odd: write in progress
+		modelSeq.store(seq + 1, std::memory_order_relaxed); // odd: write in progress
 		std::atomic_thread_fence(std::memory_order_release);
 		publishedModel = model;
 		std::atomic_thread_fence(std::memory_order_release);
-		modelSeq.store(seq + 2, std::memory_order_release);		// even: readable again
+		modelSeq.store(seq + 2, std::memory_order_release); // even: readable again
 	}
 
 	int64_t TicksAt(const ClockModel& model, int64_t localNs) noexcept
@@ -118,7 +118,7 @@ namespace
 		clock_gettime(CLOCK_MONOTONIC, &ts);
 		return (int64_t)ts.tv_sec * 1000000000 + ts.tv_nsec;
 	}
-}
+} // namespace
 
 int64_t StepTimer::GetLocalTimeNs() noexcept
 {
@@ -150,7 +150,7 @@ void StepTimer::Init() noexcept
 	movementDelay.store(0, std::memory_order_relaxed);
 	movementDelayIncreased.store(false, std::memory_order_relaxed);
 
-	PublishModel(ClockModel{ GetLocalTimeNs(), 0, nominalTicksPerNs });
+	PublishModel(ClockModel{GetLocalTimeNs(), 0, nominalTicksPerNs});
 }
 
 StepTimer::Ticks StepTimer::GetTimerTicks() noexcept
@@ -227,7 +227,7 @@ void StepTimer::RecordMasterClockSample(uint32_t masterTicks, int64_t localNs) n
 	const bool accepted = (numSamples == 0) || (localNs - lastAcceptedNs >= minSampleSpacingNs);
 	if (accepted)
 	{
-		samples[nextSample] = Sample{ localNs, unwrappedMaster };
+		samples[nextSample] = Sample{localNs, unwrappedMaster};
 		nextSample = (nextSample + 1) % maxSamples;
 		lastAcceptedNs = localNs;
 		if (numSamples < maxSamples)
@@ -241,7 +241,7 @@ void StepTimer::RecordMasterClockSample(uint32_t masterTicks, int64_t localNs) n
 		// Not enough to fit a rate yet. Track the offset at the nominal rate, on every sample rather
 		// than only the accepted ones, so the reading is usable immediately - the first move is
 		// scheduled long before the window fills.
-		PublishClamped(ClockModel{ localNs, unwrappedMaster, nominalTicksPerNs }, localNs);
+		PublishClamped(ClockModel{localNs, unwrappedMaster, nominalTicksPerNs}, localNs);
 		publishedSampleCount.store(numSamples, std::memory_order_relaxed);
 		return;
 	}
@@ -308,7 +308,7 @@ void StepTimer::RecordMasterClockSample(uint32_t masterTicks, int64_t localNs) n
 		peakResidualNs.store(residualNs, std::memory_order_relaxed);
 	}
 
-	const ClockModel model{ refNs, refTicks + (int64_t)llrint(intercept), slope };
+	const ClockModel model{refNs, refTicks + (int64_t)llrint(intercept), slope};
 
 	fittedTicksPerNs.store(slope, std::memory_order_relaxed);
 	publishedSampleCount.store(numSamples, std::memory_order_relaxed);
@@ -318,13 +318,10 @@ void StepTimer::RecordMasterClockSample(uint32_t masterTicks, int64_t localNs) n
 StepTimer::ClockStats StepTimer::GetClockStats() noexcept
 {
 	const uint32_t count = publishedSampleCount.load(std::memory_order_relaxed);
-	return ClockStats{
-		((fittedTicksPerNs.load(std::memory_order_relaxed) / nominalTicksPerNs) - 1.0) * 1.0e6,
-		count,
-		peakResidualNs.load(std::memory_order_relaxed),
-		numBackwardClamps.load(std::memory_order_relaxed),
-		numRejectedSamples.load(std::memory_order_relaxed),
-		count >= minSamplesToSync
-	};
+	return ClockStats{((fittedTicksPerNs.load(std::memory_order_relaxed) / nominalTicksPerNs) - 1.0) * 1.0e6,
+					  count,
+					  peakResidualNs.load(std::memory_order_relaxed),
+					  numBackwardClamps.load(std::memory_order_relaxed),
+					  numRejectedSamples.load(std::memory_order_relaxed),
+					  count >= minSamplesToSync};
 }
-
