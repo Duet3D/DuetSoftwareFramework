@@ -36,7 +36,7 @@
 #define SRC_MOVEMENT_MOVESEGMENT_H_
 
 #include <RepRapFirmware.h>
-#include <Platform/Tasks.h>
+#include <Motion/MotionArena.h>
 #include <new>		// for align_val_t
 
 #define SEGMENT_DEBUG	(0)
@@ -112,8 +112,8 @@ union MovementFlags final
 class MoveSegment final
 {
 public:
-	void* operator new(size_t count) noexcept { return Tasks::AllocPermanent(count); }
-	void* operator new(size_t count, std::align_val_t align) noexcept { return Tasks::AllocPermanent(count, align); }
+	void* operator new(size_t count) noexcept { return Duet::Sbc::Motion::MotionArena::Allocate(count); }
+	void* operator new(size_t count, std::align_val_t align) noexcept { return Duet::Sbc::Motion::MotionArena::Allocate(count, align); }
 	void operator delete(void* ptr) noexcept {}
 	void operator delete(void* ptr, std::align_val_t align) noexcept {}
 
@@ -204,7 +204,7 @@ public:
 
 	static constexpr int32_t minDuration = 10;				// the minimum duration in movement clock ticks that we consider sensible
 
-protected:
+private:
 	static MoveSegment *_ecv_null s_freeList;				// list of recycled segment objects
 	static unsigned int s_numCreated;						// total number of segment objects created
 
@@ -219,7 +219,6 @@ protected:
 	motioncalc_t m_j;										// the jerk i.e. rate of change of acceleration
 #endif
 
-private:
 	explicit MoveSegment(MoveSegment *pNext) noexcept;
 };
 
@@ -282,13 +281,15 @@ inline bool MoveSegment::NormaliseAndCheckLinear(motioncalc_t distanceCarriedFor
 	return true;
 }
 
-// Release a MoveSegment.  Not thread-safe.
+// Release a MoveSegment.
+//
+// The free list is not guarded, because it does not need to be: every allocation, release and
+// traversal happens on the motion thread. Nothing may call into the segment machinery from another
+// thread - the C API reads a position snapshot that thread publishes instead.
 inline void MoveSegment::Release(MoveSegment *item) noexcept
 {
-	const auto iflags = IrqSave();
 	item->m_next = s_freeList;
 	s_freeList = item;
-	IrqRestore(iflags);
 }
 
 inline MoveSegment *_ecv_null MoveSegment::GetNext() const noexcept

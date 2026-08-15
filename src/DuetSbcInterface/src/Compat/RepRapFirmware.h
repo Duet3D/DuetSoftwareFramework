@@ -237,16 +237,6 @@ inline void Memcpyu32(uint32_t *dst, const uint32_t *src, size_t numWords) noexc
 # define unlikely(x)	__builtin_expect(!!(x), 0)
 #endif
 
-// Interrupt masking, as used by the MoveSegment freelist and by RRFLibraries' Isqrt.
-//
-// No-ops, for the same reason as the RTOSIface types: there is no interrupt to mask. What they
-// guarded is a plain data race here, and it is avoided by ownership rather than by locking - every
-// MoveSegment allocation, release and traversal happens on the motion thread. Nothing may call into
-// the segment machinery from another thread; the C API reads a snapshot the motion thread publishes.
-using irqflags_t = uint32_t;
-inline irqflags_t IrqSave() noexcept { return 0; }
-inline void IrqRestore(irqflags_t /*unused*/) noexcept { }
-
 // Milliseconds since start, for the ring's grace-period bookkeeping.
 uint32_t Millis() noexcept;
 

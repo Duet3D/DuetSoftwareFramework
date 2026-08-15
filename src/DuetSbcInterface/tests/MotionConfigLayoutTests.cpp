@@ -12,7 +12,6 @@
 #include <Motion/MotionConfig.h>
 #include <Motion/MotionSystem.h>
 #include <Movement/DDARing.h>
-#include <Platform/RepRap.h>
 
 #include <cstddef>
 
@@ -128,6 +127,8 @@ namespace
 		CHECK(huge.numDdasPerRing <= Duet::Sbc::Motion::maxDdasPerRing, "the lookahead depth is bounded");
 	}
 
+	MotionSystem theMove;
+
 	// A ring of 0 or 1 is not a ring: every move would take its start endpoints from the DDA it is
 	// about to overwrite, so the drives would be commanded the whole distance a second time.
 	void TestRingDepthIsClamped() noexcept
@@ -135,13 +136,13 @@ namespace
 		for (const unsigned int requested : {0u, 1u, 2u})
 		{
 			DDARing ring;
-			ring.Init(requested);
+			ring.Init(theMove, requested);
 			CHECK(ring.GetNumDdas() >= Duet::Sbc::Motion::minDdasPerRing, "a degenerate ring depth is refused");
 			CHECK(ring.CanAddMove(), "the clamped ring has room for a move");
 		}
 
 		DDARing sane;
-		sane.Init(40);
+		sane.Init(theMove, 40);
 		CHECK(sane.GetNumDdas() == 40, "a sensible depth is used as given");
 	}
 }
@@ -155,7 +156,7 @@ int main()
 	TestSanitiseRings();
 
 	// The ring allocates its DDAs from the permanent arena, which Init reserves
-	if (!reprap.GetMove().Init())
+	if (!theMove.Init())
 	{
 		std::printf("FAIL: could not initialise the motion system\n");
 		return 1;

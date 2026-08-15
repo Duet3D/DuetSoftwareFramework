@@ -296,7 +296,7 @@ int main(int argc, char** argv)
 				motionConfig.axisDrivers[axis].driverNumbers[0] = DriverId((uint8_t)dstAddress, (uint8_t)axis);
 			}
 			motionConfig.extruderDrivers[0] = DriverId((uint8_t)dstAddress, 3);
-			MotionService::Configure(motionConfig);
+			motion.Configure(motionConfig);
 
 			if (!motion.Init())
 			{

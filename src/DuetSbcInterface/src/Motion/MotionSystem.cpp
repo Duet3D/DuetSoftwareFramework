@@ -7,7 +7,7 @@
 
 #include <Movement/MoveTiming.h>
 #include <Movement/StepTimer.h>
-#include <Platform/Tasks.h>
+#include <Motion/MotionArena.h>
 
 #include <algorithm>
 #include <cstdlib>
@@ -33,7 +33,7 @@ MotionSystem::MotionSystem() noexcept
 
 bool MotionSystem::Init() noexcept
 {
-	if (!Tasks::InitPermanentArena(permanentArenaBytes))
+	if (!MotionArena::Reserve(permanentArenaBytes))
 	{
 		return false;
 	}
@@ -120,15 +120,6 @@ int32_t MotionSystem::ApplyBacklashCompensation(size_t drive, int32_t delta) noe
 		}
 	}
 	return delta;
-}
-
-void MotionSystem::EnableDrivers(size_t drive, bool unconditional) noexcept
-{
-	// Nothing to do. Every driver is on a CAN-connected board and is enabled by the move messages
-	// the controller sends it; the SBC has no driver enable line of its own. Kept so that
-	// DDA::Prepare needs no edits.
-	(void)drive;
-	(void)unconditional;
 }
 
 void MotionSystem::AddLinearSegments(size_t drive, uint32_t startTime, const MoveProfile& profile,

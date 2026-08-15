@@ -27,9 +27,14 @@ public:
 
 	DDARing() noexcept;
 
-	// Build the ring. `numDdas` is clamped to Motion::minDdasPerRing..Motion::maxDdasPerRing; the
-	// value actually used is what GetNumDdas reports.
-	void Init(unsigned int numDdas) noexcept;
+	// Build the ring against the machine it will plan for. `numDdas` is clamped to
+	// Motion::minDdasPerRing..Motion::maxDdasPerRing; the value actually used is what GetNumDdas
+	// reports. The motion system must outlive the ring.
+	void Init(Duet::Sbc::Motion::MotionSystem& move, unsigned int numDdas) noexcept;
+
+	// The machine this ring plans for. The DDAs in it reach the configuration and the drive
+	// trackers through here rather than through a global.
+	[[nodiscard]] Duet::Sbc::Motion::MotionSystem& GetMove() const noexcept { return *m_move; }
 	void Exit() noexcept;
 
 	[[nodiscard]] unsigned int GetNumDdas() const noexcept { return m_numDdasInRing; }
@@ -108,6 +113,8 @@ private:
 	void PlanMoves(DDA *firstUnpreparedMove, bool stopping) noexcept;
 	bool NeedNewPlan(DDA *moveToPrepare) const noexcept;
 #endif
+
+	Duet::Sbc::Motion::MotionSystem* m_move = nullptr;
 
 	DDA* m_addPointer{};															// Pointer to the next DDA that we can use to add a new move, if this DDA is free
 	DDA* volatile m_getPointer{};													// Pointer to the oldest committed or provisional move, if not equal to addPointer

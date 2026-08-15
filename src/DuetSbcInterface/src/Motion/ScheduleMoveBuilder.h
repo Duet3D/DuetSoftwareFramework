@@ -9,9 +9,8 @@
  * information, puts it on the SPI link as one ScheduleMove packet, and the controller's CanMotion
  * does the grouping by board and the CAN send, which is code that already exists and works.
  *
- * The interface deliberately mirrors CanMotion's: StartMovement, AddAxisMovement, AddExtruderMovement,
- * FinishMovement, CanPrepareMove. In step 9 a thin `namespace CanMotion` shim forwards to it, so the
- * imported DDA::Prepare needs no edits at its call sites.
+ * The call sequence is the firmware's - StartMovement, AddAxisMovement, AddExtruderMovement,
+ * FinishMovement - because DDA::Prepare drives it in that order and for the same reasons.
  *
  * Where the packets go is a sink the caller supplies. The real one queues onto the outbound ring
  * that the SPI transfer loop drains; the tests supply one that records, which is how the whole

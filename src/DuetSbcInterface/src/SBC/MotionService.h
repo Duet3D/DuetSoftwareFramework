@@ -29,6 +29,7 @@
 
 #include <DuetSpiProtocol/MessageFormats.h>
 #include <Motion/MotionConfig.h>
+#include <Motion/MotionSystem.h>
 #include <Motion/MoveParams.h>
 #include <Movement/DDARing.h>
 #include <Platform/RingBuffer.h>
@@ -62,7 +63,7 @@ namespace Duet::Sbc
 		// Replace the machine description. Safe only while no move is in flight, which is DCS's
 		// responsibility - it holds movement locked while it reconfigures, exactly as M92 requires
 		// in the firmware.
-		static void Configure(const Motion::MotionConfig& config);
+		void Configure(const Motion::MotionConfig& config);
 
 		// --- Called from the managed side -------------------------------------------------------
 
@@ -113,8 +114,8 @@ namespace Duet::Sbc
 		// wild one. The caller has to know which it got, because it decides what to do about it.
 		//
 		// Returns false if `drive` is out of range.
-		static bool GetPositionAt(size_t drive, uint32_t whenTicks, int32_t& position,
-								  int32_t& positionAtMoveStart, bool& usedTimestamp);
+		bool GetPositionAt(size_t drive, uint32_t whenTicks, int32_t& position,
+						   int32_t& positionAtMoveStart, bool& usedTimestamp) const;
 
 		// What DCS decides from its own state each cycle, stored rather than called: the motion
 		// thread must never wait on the managed side to answer a question.
@@ -176,6 +177,10 @@ namespace Duet::Sbc
 		SbcInterface *m_link;
 		LinkScheduleMoveSink m_sink;
 
+		// The machine, and the rings that plan for it. Owned here rather than reached through a
+		// global, so that the engine has no static state and a second instance is a second machine
+		// rather than the same one twice.
+		Motion::MotionSystem m_move;
 		DDARing m_rings[numRings];
 
 		// What a ring's retirement callback is given. The DDA does not know which ring holds it, so

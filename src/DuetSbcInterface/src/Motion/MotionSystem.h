@@ -13,8 +13,7 @@
  * to put the segments that Prepare produces. So this class is mostly the machine description
  * (MotionConfig, pushed down by DCS) plus the array of DriveTrackers.
  *
- * It is reached through the `reprap` facade in Compat/Platform/RepRap.h, so that the imported code
- * keeps its reprap.GetMove() call sites as they are written upstream.
+ * A DDARing is given one of these when it is built, and the DDAs in it reach it through the ring.
  */
 
 #ifndef SRC_MOTION_MOTIONSYSTEM_H_
@@ -50,6 +49,37 @@ namespace Duet::Sbc::Motion
 		static void SanitiseConfig(MotionConfig& config) noexcept;
 
 		[[nodiscard]] const MotionConfig& GetConfig() const noexcept { return m_config; }
+
+		// --- Machine shape ---------------------------------------------------------------------
+
+		[[nodiscard]] size_t GetTotalAxes() const noexcept { return m_config.numTotalAxes; }
+		[[nodiscard]] size_t GetNumExtruders() const noexcept { return m_config.numExtruders; }
+
+		// --- Debug topics ----------------------------------------------------------------------
+		//
+		// One bitmap per topic, as M111 sets them in the firmware. Nothing sets them yet, so the
+		// branches that read them are compiled but not taken; see the note on SetDebugFlags.
+
+		[[nodiscard]] AxesBitmap GetDebugFlags(Module module) const noexcept
+		{
+			return AxesBitmap((module < Module::Num) ? m_debugFlags[(unsigned int)module] : 0);
+		}
+
+		[[nodiscard]] bool IsDebugEnabled(Module module) const noexcept
+		{
+			return GetDebugFlags(module).IsNonEmpty();
+		}
+
+		// Set one topic's flags. There is no caller yet: M111 is not ported, and until it is, the
+		// diagnostics behind these branches cannot be switched on. Kept so that a topic can be
+		// enabled from one place once it is, rather than the branches being deleted and rewritten.
+		void SetDebugFlags(Module module, uint32_t flags) noexcept
+		{
+			if (module < Module::Num)
+			{
+				m_debugFlags[(unsigned int)module] = flags;
+			}
+		}
 
 		// --- Accessors used by the imported DDA / DDARing sources ------------------------------
 		//
@@ -102,21 +132,18 @@ namespace Duet::Sbc::Motion
 		// injecting it all at once would show up as a visible jolt.
 		[[nodiscard]] int32_t ApplyBacklashCompensation(size_t drive, int32_t delta) noexcept;
 
-		// No-op: the drivers are on other boards and are enabled over CAN, not from here.
-		void EnableDrivers(size_t drive, bool unconditional) noexcept;
-
 		// How long the boards' input shaper spreads a move over. Zero while shaping is off; see
 		// MotionConfig::shapingTimeClocks for why this is not simply absent.
 		[[nodiscard]] uint32_t GetShapingTimeClocks() const noexcept { return m_config.shapingTimeClocks; }
 
 		// Where prepared moves go out to the controller. Owned here because it is per-machine state
-		// with the same lifetime as the drive trackers, and because the CanMotion shim in front of
-		// it has to find it from somewhere without a second global.
+		// with the same lifetime as the drive trackers.
 		[[nodiscard]] ScheduleMoveBuilder& GetScheduleMoveBuilder() noexcept { return m_scheduleMoveBuilder; }
 
 		// --- Per-drive motion -----------------------------------------------------------------
 
 		[[nodiscard]] DriveTracker& GetDriveTracker(size_t drive) noexcept { return m_trackers[drive]; }
+		[[nodiscard]] const DriveTracker& GetDriveTracker(size_t drive) const noexcept { return m_trackers[drive]; }
 
 		// The logical drive a CAN-connected driver belongs to, or maxAxesPlusExtruders if none does.
 		//
@@ -207,6 +234,7 @@ namespace Duet::Sbc::Motion
 
 	private:
 		MotionConfig m_config;
+		uint32_t m_debugFlags[(unsigned int)Module::Num]{};
 		DriveTracker m_trackers[maxAxesPlusExtruders];
 		ScheduleMoveBuilder m_scheduleMoveBuilder;
 

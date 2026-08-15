@@ -307,7 +307,7 @@ extern "C"
 		}
 		Duet::Sbc::Motion::MotionConfig copy{};
 		std::memcpy(&copy, config, sizeof(copy));
-		Duet::Sbc::MotionService::Configure(copy);
+		h->motion.Configure(copy);
 		return 1;
 	}
 
@@ -376,7 +376,7 @@ extern "C"
 		}
 
 		bool usedTimestamp = false;
-		if (!Duet::Sbc::MotionService::GetPositionAt((size_t)drive, whenTicks, *positionOut, *positionAtMoveStartOut, usedTimestamp))
+		if (!h->motion.GetPositionAt((size_t)drive, whenTicks, *positionOut, *positionAtMoveStartOut, usedTimestamp))
 		{
 			return 0;
 		}

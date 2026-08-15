@@ -13,13 +13,14 @@
 #include <Movement/DDARing.h>
 #include <Movement/MoveTiming.h>
 #include <Movement/StepTimer.h>
-#include <Platform/RepRap.h>
+#include <Motion/MotionSystem.h>
 
 #include <TestSupport.h>
 
 #include <vector>
 
 using Duet::Sbc::Motion::MotionConfig;
+using Duet::Sbc::Motion::MotionSystem;
 using Duet::Sbc::Motion::MoveParamsDirectionVector;
 using Duet::Sbc::Motion::MoveParamsEndPoints;
 using Duet::Sbc::Motion::MoveParamsHeader;
@@ -87,6 +88,8 @@ namespace
 	constexpr float acceleration = 1000.0F / ((float)stepClockRate * stepClockRate);
 	constexpr float instantDv = 10.0F / stepClockRate;
 
+	MotionSystem theMove;
+
 	void ConfigureMachine() noexcept
 	{
 		MotionConfig config;
@@ -107,7 +110,7 @@ namespace
 			config.axisDrivers[axis].driverNumbers[0] = DriverId(1, (uint8_t)axis);
 		}
 		config.extruderDrivers[0] = DriverId(1, 3);
-		reprap.GetMove().Configure(config);
+		theMove.Configure(config);
 	}
 
 	// --- Building a move ---------------------------------------------------------------------
@@ -479,7 +482,7 @@ int main()
 {
 	StepTimer::Init();
 	StepTimer::SetLocalClockSource(FakeClock);
-	if (!reprap.GetMove().Init())
+	if (!theMove.Init())
 	{
 		std::printf("FAIL: could not initialise the motion system\n");
 		return 1;
@@ -487,10 +490,10 @@ int main()
 	ConfigureMachine();
 
 	RecordingSink sink;
-	reprap.GetMove().GetScheduleMoveBuilder().SetSink(&sink);
+	theMove.GetScheduleMoveBuilder().SetSink(&sink);
 
 	DDARing ring;
-	ring.Init(20);
+	ring.Init(theMove, 20);
 
 	TestSingleMove(ring, sink);
 	TestGracePeriodCommitsTheMove(ring, sink);

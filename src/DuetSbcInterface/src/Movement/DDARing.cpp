@@ -9,15 +9,11 @@
 #include "DDA.h"
 #include "MoveDebugFlags.h"
 #include "MoveTiming.h"
-#include <Platform/Platform.h>
-#include <Platform/RepRap.h>
-#include <Platform/Tasks.h>
-#include <GCodes/GCodes.h>
 #include <Motion/MotionConfig.h>
 
 #include <algorithm>
 
-#include "CAN/CanMotion.h"
+#include <Motion/MotionSystem.h>
 
 /* Note on how the DDA ring works, using the new step-generation code that implements late input shaping:
  * A DDA represents a straight-line move with at least one of an acceleration segment, a steady speed segment, and a deceleration segment.
@@ -47,8 +43,10 @@ DDARing::DDARing() noexcept : m_gracePeriod(defaultGracePeriod)
 }
 
 // This can be called in the constructor for class Move
-void DDARing::Init(unsigned int numDdas) noexcept
+void DDARing::Init(Duet::Sbc::Motion::MotionSystem& move, unsigned int numDdas) noexcept
 {
+	m_move = &move;
+
 	// The configuration comes down from DuetControlServer, so it is not trusted to be sane. A ring
 	// of 0 or 1 is not a ring at all: every move would take its start endpoints from the DDA it is
 	// about to overwrite, and the drives would be commanded the whole distance again.
@@ -159,7 +157,7 @@ uint32_t DDARing::Spin(uint32_t prepareAdvanceTime, SimulationMode simulationMod
 	else
 	{
 		// See if we can retire any completed moves
-		while (cdda->IsCommitted() && cdda->HasExpired())
+		while (cdda->IsCommitted() && cdda->HasExpired(*m_move))
 		{
 			++m_completedMoves;
 			ReportRetirement(*cdda);
@@ -309,7 +307,7 @@ uint32_t DDARing::PrepareMoves(DDA *firstUnpreparedMove, uint32_t prepareAdvance
 	// Try to avoid preparing deceleration-only moves too early
 	while (	  firstUnpreparedMove->IsProvisional()
 		   && IsTimeToPrepareMove(prepareAdvanceTime, moveTimeLeft)
-		   && CanMotion::CanPrepareMove()
+		   && m_move->GetScheduleMoveBuilder().CanPrepareMove()
 		  )
 	{
 #if SUPPORT_S_CURVE
@@ -325,7 +323,7 @@ uint32_t DDARing::PrepareMoves(DDA *firstUnpreparedMove, uint32_t prepareAdvance
 			else
 			{
 #if 0
-				if (reprap.GetDebugFlags(Module::Move).IsBitSet(MoveDebugFlags::lookahead))
+				if (m_move->GetDebugFlags(Module::Move).IsBitSet(MoveDebugFlags::lookahead))
 				{
 					DebugPrintf("Skipping planning\n");
 				}

@@ -9,7 +9,6 @@
 #include <Movement/MoveTiming.h>
 #include <Movement/StepTimer.h>
 #include <Platform/ProcessHelpers.h>
-#include <Platform/RepRap.h>
 
 #include <chrono>
 #include <cstring>
@@ -60,16 +59,16 @@ namespace Duet::Sbc
 		{
 			return true;
 		}
-		if (!reprap.GetMove().Init())
+		if (!m_move.Init())
 		{
 			return false;
 		}
-		reprap.GetMove().GetScheduleMoveBuilder().SetSink(&m_sink);
+		m_move.GetScheduleMoveBuilder().SetSink(&m_sink);
 
-		const Motion::MotionConfig& config = reprap.GetMove().GetConfig();
+		const Motion::MotionConfig& config = m_move.GetConfig();
 		for (unsigned int i = 0; i < numRings; ++i)
 		{
-			m_rings[i].Init(config.numDdasPerRing);
+			m_rings[i].Init(m_move, config.numDdasPerRing);
 			m_rings[i].SetGracePeriod(MillisToStepClocks(config.gracePeriodMs));
 
 			// The callback context carries the ring index as well as `this`. The DDA does not know
@@ -83,7 +82,7 @@ namespace Duet::Sbc
 
 	void MotionService::Configure(const Motion::MotionConfig& config)
 	{
-		reprap.GetMove().Configure(config);
+		m_move.Configure(config);
 	}
 
 	void MotionService::Start(int rtPriority)
@@ -151,7 +150,7 @@ namespace Duet::Sbc
 				MoveTiming::usualMinimumPreparedTime, SimulationMode::Off, signalMoveCompletion, shouldStartMove);
 		}
 
-		reprap.GetMove().AdvanceTrackers(StepTimer::GetMovementTimerTicks());
+		m_move.AdvanceTrackers(StepTimer::GetMovementTimerTicks());
 		PublishPositions();
 	}
 
@@ -218,8 +217,8 @@ namespace Duet::Sbc
 		m_snapshot.whenTicks = now;
 		// The spans are deduced from the arrays, so the lengths cannot drift from the things they
 		// describe
-		reprap.GetMove().GetMotorPositions(m_snapshot.positions);
-		reprap.GetMove().GetLivePositions(m_snapshot.livePositions, now);
+		m_move.GetMotorPositions(m_snapshot.positions);
+		m_move.GetLivePositions(m_snapshot.livePositions, now);
 
 		std::atomic_thread_fence(std::memory_order_release);
 		m_snapshotSequence.store(sequence + 2, std::memory_order_release);
@@ -295,7 +294,7 @@ namespace Duet::Sbc
 				std::memcpy(&forced, record->data(), sizeof(forced));
 
 				const LogicalDrivesBitmap drives{forced.driveMask};
-				reprap.GetMove().SetMotorPositions(drives, forced.positions);
+				m_move.SetMotorPositions(drives, forced.positions);
 
 				// The rings hold the endpoint each drive was last planned to, and DDA::Prepare turns
 				// a move into steps by differencing against it. Leaving that behind would make the
@@ -312,7 +311,7 @@ namespace Duet::Sbc
 	}
 
 	bool MotionService::GetPositionAt(size_t drive, uint32_t whenTicks, int32_t& position,
-									  int32_t& positionAtMoveStart, bool& usedTimestamp)
+									  int32_t& positionAtMoveStart, bool& usedTimestamp) const
 	{
 		if (drive >= maxAxesPlusExtruders)
 		{
@@ -338,7 +337,7 @@ namespace Duet::Sbc
 		// that asks this question. Advancing would also be the wrong answer as often as the right
 		// one: it moves the chain past the segment `whenTicks` falls in, and only the segment at the
 		// head is evaluated
-		const Motion::DriveTracker& tracker = reprap.GetMove().GetDriveTracker(drive);
+		const Motion::DriveTracker& tracker = m_move.GetDriveTracker(drive);
 		position = canUseTimestamp ? lrintf(tracker.GetCurrentPosition(whenInMovementTime))
 								   : tracker.GetMotorPosition();
 		positionAtMoveStart = tracker.GetPositionAtMoveStart();

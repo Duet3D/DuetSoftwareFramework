@@ -15,18 +15,15 @@ unsigned int MoveSegment::s_numCreated = 0;
 // Allocate a MoveSegment, from the freelist if possible, else create a new one
 MoveSegment *MoveSegment::Allocate(MoveSegment *_ecv_null pNext) noexcept
 {
-	const auto iflags = IrqSave();
 	MoveSegment *_ecv_null ms = s_freeList;
 	if (ms != nullptr)
 	{
 		s_freeList = ms->m_next;
-		IrqRestore(iflags);
 		ms->m_next = pNext;
 	}
 	else
 	{
 		++s_numCreated;
-		IrqRestore(iflags);
 		ms = new MoveSegment(pNext);
 	}
 	return ms;

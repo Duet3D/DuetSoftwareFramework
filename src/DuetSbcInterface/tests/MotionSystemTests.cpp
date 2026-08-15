@@ -10,7 +10,7 @@
 #include "TestSupport.h"
 
 #include <Motion/MotionSystem.h>
-#include <Platform/RepRap.h>
+#include <Motion/MotionSystem.h>
 
 #include <cstdint>
 
@@ -46,9 +46,11 @@ namespace
 		return c;
 	}
 
+	MotionSystem theMove;
+
 	MotionSystem& FreshSystem(const MotionConfig& config) noexcept
 	{
-		MotionSystem& move = reprap.GetMove();
+		MotionSystem& move = theMove;
 		(void)move.Init();
 		move.Configure(config);
 		return move;
@@ -252,8 +254,8 @@ static void TestConfigureIsVisibleThroughAccessors()
 	CHECK_NEAR(move.GetPressureAdvanceK0ClocksForLogicalDrive(maxAxesPlusExtruders - 1), 30.0, 1e-6,
 			   "pressure advance");
 	CHECK(move.GetShapingTimeClocks() == 750, "shaping time");
-	CHECK(reprap.GetGCodes().GetTotalAxes() == 3, "the GCodes view sees the same config");
-	CHECK(reprap.GetGCodes().GetNumExtruders() == 1, "including the extruder count");
+	CHECK(move.GetTotalAxes() == 3, "the axis count comes from the same config");
+	CHECK(move.GetNumExtruders() == 1, "as does the extruder count");
 }
 
 // An axis with a switch per driver needs each driver's index within its axis, because the index is

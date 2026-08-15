@@ -8,13 +8,12 @@
 #include "DDA.h"
 #include "DDARing.h"
 #include "MoveDebugFlags.h"
-#include <Platform/RepRap.h>
-#include <Platform/Platform.h>
+#include <Motion/Log.h>
 #include "MoveTiming.h"
 #include "StepTimer.h"
-#include <GCodes/GCodes.h>
 
-#include <CAN/CanMotion.h>
+#include <Motion/MotionSystem.h>
+#include <Motion/ScheduleMoveBuilder.h>
 
 #include <algorithm>
 #include <limits>
@@ -46,16 +45,15 @@ struct MoveParameters
 
 	void DebugPrint() const noexcept
 	{
-		reprap.GetPlatform().MessageF(DebugMessage, "%f,%f,%f,%f,%f,%f,%f,%f,%08" PRIX32 ",%08" PRIx32 "\n",
+		Duet::Sbc::Motion::LogMessage("%f,%f,%f,%f,%f,%f,%f,%f,%08" PRIX32 ",%08" PRIx32 "\n",
 								(double)accelDistance, (double)steadyDistance, (double)decelDistance, (double)requestedSpeed, (double)startSpeed, (double)topSpeed, (double)endSpeed,
 								(double)targetNextSpeed, endstopChecks, flags);
 	}
 
 	static void PrintHeading() noexcept
 	{
-		reprap.GetPlatform().Message(DebugMessage,
-									"accelDistance,steadyDistance,decelDistance,requestedSpeed,startSpeed,topSpeed,endSpeed,"
-									"targetNextSpeed,endstopChecks,flags\n");
+		Duet::Sbc::Motion::LogMessage("accelDistance,steadyDistance,decelDistance,requestedSpeed,startSpeed,"
+									  "topSpeed,endSpeed,targetNextSpeed,endstopChecks,flags\n");
 	}
 };
 
@@ -82,42 +80,44 @@ static size_t savedMovePointer = 0;
 
 #endif
 
-// Set up the parameters from the DDA. Only called for non-Scurve moves.
-// As a side effect it sets up clocksNeeded. If 3rd order motion control is used it also sets the start speed and acceleration in the following DDA.
-void PrepParams::SetFromDDA(DDA& dda) noexcept
+// Work out the velocity profile this move will be executed with. Only called for non-Scurve moves.
+// As a side effect it sets clocksNeeded. If 3rd order motion control is used it also sets the start speed and acceleration in the following DDA.
+PrepParams DDA::BuildProfile() noexcept
 {
-	totalDistance = dda.m_totalDistance;
+	PrepParams params;
+	params.totalDistance = m_totalDistance;
 	// Due to rounding error, for an accelerate-decelerate move we may have accelDistance+decelDistance slightly greater than totalDistance.
 	// We need to make sure that accelDistance <= decelStartDistance for subsequent calculations to work.
 #if SUPPORT_S_CURVE
-	jerk = 0.0;							// this signals that we are not using S-curve acceleration
-	peakAcceleration = initialAcceleration = dda.m_maxAcceleration;
-	peakDeceleration = initialDeceleration = -dda.m_maxAcceleration;
-	phaseClocks[0] = phaseClocks[2] = phaseClocks[4] = phaseClocks[6] = 0;
-	phaseClocks[1] = std::lrint((motioncalc_t)(dda.m_topSpeed - dda.m_startSpeed)/peakAcceleration);
-	phaseClocks[5] = std::lrint((motioncalc_t)(dda.m_endSpeed - dda.m_topSpeed)/peakDeceleration);
-	distances[0] = distances[2] = distances[4] = distances[6] = 0.0;
-	distances[5] = dda.m_beforePrepare.decelDistance;
-	const motioncalc_t decelStartDistance = dda.m_totalDistance - dda.m_beforePrepare.decelDistance;
-	distances[1] = min<motioncalc_t>(dda.m_beforePrepare.accelDistance, decelStartDistance);
-	distances[3] = decelStartDistance - distances[1];
-	phaseClocks[3] = (distances[3] <= (motioncalc_t)0.0) ? 0 : std::lrint(distances[3]/(motioncalc_t)dda.m_topSpeed);
-	dda.m_clocksNeeded = phaseClocks[1] + phaseClocks[3] + phaseClocks[5];
-	speedsCalculated = false;
+	params.jerk = 0.0;							// this signals that we are not using S-curve acceleration
+	params.peakAcceleration = params.initialAcceleration = m_maxAcceleration;
+	params.peakDeceleration = params.initialDeceleration = -m_maxAcceleration;
+	params.phaseClocks[0] = params.phaseClocks[2] = params.phaseClocks[4] = params.phaseClocks[6] = 0;
+	params.phaseClocks[1] = std::lrint((motioncalc_t)(m_topSpeed - m_startSpeed)/params.peakAcceleration);
+	params.phaseClocks[5] = std::lrint((motioncalc_t)(m_endSpeed - m_topSpeed)/params.peakDeceleration);
+	params.distances[0] = params.distances[2] = params.distances[4] = params.distances[6] = 0.0;
+	params.distances[5] = m_beforePrepare.decelDistance;
+	const motioncalc_t decelStartDistance = m_totalDistance - m_beforePrepare.decelDistance;
+	params.distances[1] = min<motioncalc_t>(m_beforePrepare.accelDistance, decelStartDistance);
+	params.distances[3] = decelStartDistance - params.distances[1];
+	params.phaseClocks[3] = (params.distances[3] <= (motioncalc_t)0.0) ? 0 : std::lrint(params.distances[3]/(motioncalc_t)m_topSpeed);
+	m_clocksNeeded = params.phaseClocks[1] + params.phaseClocks[3] + params.phaseClocks[5];
+	params.speedsCalculated = false;
 #else
-	decelStartDistance = dda.m_totalDistance - dda.m_beforePrepare.decelDistance;
-	accelDistance = min<motioncalc_t>(dda.m_beforePrepare.accelDistance, decelStartDistance);
-	acceleration = dda.m_maxAcceleration;
-	deceleration = -dda.m_maxAcceleration;
-	accelClocks = std::lrint((motioncalc_t)(dda.m_topSpeed - dda.m_startSpeed)/acceleration);
-	decelClocks = std::lrint((motioncalc_t)(dda.m_endSpeed - dda.m_topSpeed)/deceleration);
-	const motioncalc_t steadyDistance = decelStartDistance - accelDistance;
-	steadyClocks = (steadyDistance <= (motioncalc_t)0.0) ? 0 : std::lrint(steadyDistance/(motioncalc_t)dda.m_topSpeed);
-	dda.m_clocksNeeded = accelClocks + steadyClocks + decelClocks;
+	params.decelStartDistance = m_totalDistance - m_beforePrepare.decelDistance;
+	params.accelDistance = min<motioncalc_t>(m_beforePrepare.accelDistance, params.decelStartDistance);
+	params.acceleration = m_maxAcceleration;
+	params.deceleration = -m_maxAcceleration;
+	params.accelClocks = std::lrint((motioncalc_t)(m_topSpeed - m_startSpeed)/params.acceleration);
+	params.decelClocks = std::lrint((motioncalc_t)(m_endSpeed - m_topSpeed)/params.deceleration);
+	const motioncalc_t steadyDistance = params.decelStartDistance - params.accelDistance;
+	params.steadyClocks = (steadyDistance <= (motioncalc_t)0.0) ? 0 : std::lrint(steadyDistance/(motioncalc_t)m_topSpeed);
+	m_clocksNeeded = params.accelClocks + params.steadyClocks + params.decelClocks;
 #endif
-	startSpeed = dda.m_startSpeed;
-	topSpeed = dda.m_topSpeed;
-	endSpeed = dda.m_endSpeed;
+	params.startSpeed = m_startSpeed;
+	params.topSpeed = m_topSpeed;
+	params.endSpeed = m_endSpeed;
+	return params;
 }
 
 #if SUPPORT_S_CURVE
@@ -294,7 +294,7 @@ MovementError DDA::InitFromParams(DDARing& ring, const Duet::Sbc::Motion::MovePa
 	// 7. Calculate the provisional accelerate and decelerate distances and the top speed
 	m_endSpeed = 0.0;																	// until we have a following move
 
-	const Move& move = reprap.GetMove();
+	const Duet::Sbc::Motion::MotionSystem& move = ring.GetMove();
 	const bool melded =
 		   m_prev->IsProvisional()													// if previous move has not started yet
 		&& (   move.GetJerkPolicy() != 0											// and melding is allowed
@@ -372,7 +372,7 @@ bool DDA::IsAccelerationMove() const noexcept
 /*static*/ void DDA::DoLookahead(DDARing& ring, DDA *laDDA) noexcept
 //pre(state == provisional)
 {
-//	if (reprap.Debug(Module::DDA)) DebugPrintf("Adjusting, %f\n", laDDA->m_beforePrepare.targetNextSpeed);
+//	if (ring.GetMove().IsDebugEnabled(Module::DDA)) DebugPrintf("Adjusting, %f\n", laDDA->m_beforePrepare.targetNextSpeed);
 	unsigned int laDepth = 0;
 
 	// Iterate through the list towards earlier moves
@@ -394,7 +394,7 @@ bool DDA::IsAccelerationMove() const noexcept
 		{
 			// This is a deceleration-only move, and the previous one has a deceleration phase. We may have to adjust the previous move as well to get optimum behaviour.
 			if (   laDDA->m_prev->IsProvisional()
-				&& (   reprap.GetMove().GetJerkPolicy() != 0
+				&& (   ring.GetMove().GetJerkPolicy() != 0
 					|| (   laDDA->m_prev->m_flags.xyMoving == laDDA->m_flags.xyMoving
 						&& (   laDDA->m_prev->m_flags.isPrintingMove == laDDA->m_flags.isPrintingMove
 							|| (laDDA->m_prev->m_flags.isPrintingMove && laDDA->m_prev->m_requestedSpeed == laDDA->m_requestedSpeed)	// special case to support coast-to-end
@@ -403,7 +403,7 @@ bool DDA::IsAccelerationMove() const noexcept
 				   )
 			   )
 			{
-				laDDA->MatchSpeeds();
+				laDDA->MatchSpeeds(ring.GetMove());
 				const float maxStartSpeed = fastSqrtf(fsquare(laDDA->m_beforePrepare.targetNextSpeed) + (2 * laDDA->m_maxAcceleration * laDDA->m_totalDistance));
 				laDDA->m_prev->m_beforePrepare.targetNextSpeed = min<float>(maxStartSpeed, laDDA->m_requestedSpeed);
 
@@ -430,7 +430,7 @@ bool DDA::IsAccelerationMove() const noexcept
 		break;
 	}
 
-	laDDA->MatchSpeeds();													// adjust the target end speed if necessary
+	laDDA->MatchSpeeds(ring.GetMove());										// adjust the target end speed if necessary
 
 	// Iterate back through the list towards later moves
 	for (;;)
@@ -443,7 +443,7 @@ bool DDA::IsAccelerationMove() const noexcept
 			if (laDDA->m_beforePrepare.targetNextSpeed < laDDA->m_endSpeed * 0.99)
 			{
 				ring.RecordLookaheadError();
-				if (reprap.GetDebugFlags(Module::Move).IsBitSet(MoveDebugFlags::lookahead))
+				if (ring.GetMove().GetDebugFlags(Module::Move).IsBitSet(MoveDebugFlags::lookahead))
 				{
 					DebugPrintf("DDA.cpp(%d) tn=%f ", __LINE__, (double)laDDA->m_beforePrepare.targetNextSpeed);
 					laDDA->DebugPrint("la");
@@ -461,7 +461,7 @@ LA_DEBUG;
 		if (laDepth == 0)
 		{
 #if 0
-			if (reprap.Debug(Module::DDA))
+			if (ring.GetMove().IsDebugEnabled(Module::DDA))
 			{
 				DebugPrintf("Complete, %f\n", laDDA->m_beforePrepare.targetNextSpeed);
 			}
@@ -551,7 +551,7 @@ MovementError DDA::RecalculateMove(DDARing& ring) noexcept
 				{
 					// The acceleration increase is greater than we expect from rounding error, so record an error
 					ring.RecordLookaheadError();
-					if (reprap.GetDebugFlags(Module::Move).IsBitSet(MoveDebugFlags::lookahead))
+					if (ring.GetMove().GetDebugFlags(Module::Move).IsBitSet(MoveDebugFlags::lookahead))
 					{
 						DebugPrintf("DDA.cpp(%d) na=%f", __LINE__, (double)newAcceleration);
 						DebugPrint("rm");
@@ -569,7 +569,7 @@ MovementError DDA::RecalculateMove(DDARing& ring) noexcept
 				{
 					// The deceleration increase is greater than we expect from rounding error, so record an error
 					ring.RecordLookaheadError();
-					if (reprap.GetDebugFlags(Module::Move).IsBitSet(MoveDebugFlags::lookahead))
+					if (ring.GetMove().GetDebugFlags(Module::Move).IsBitSet(MoveDebugFlags::lookahead))
 					{
 						DebugPrintf("DDA.cpp(%d) nd=%f", __LINE__, (double)newDeceleration);
 						DebugPrint("rm");
@@ -583,7 +583,7 @@ MovementError DDA::RecalculateMove(DDARing& ring) noexcept
 	// Set up flags.canPauseAfter
 	if (m_flags.canPauseAfter && m_endSpeed != 0.0)
 	{
-		const Move& m = reprap.GetMove();
+		const Duet::Sbc::Motion::MotionSystem& m = ring.GetMove();
 		for (size_t drive = 0; drive < maxAxesPlusExtruders; ++drive)
 		{
 			if (m_endSpeed * fabsf(m_directionVector[drive]) > m.GetMaxInstantDv(drive))
@@ -604,7 +604,7 @@ MovementError DDA::RecalculateMove(DDARing& ring) noexcept
 // Decide what speed we would really like this move to end at and the next move to start at, assuming we want to use the same speed for both.
 // On entry, targetNextSpeed is the speed we would like the next move after this one to start at and this one to end at
 // On return, targetNextSpeed is the actual speed we can achieve without exceeding the jerk limits.
-void DDA::MatchSpeeds() noexcept
+void DDA::MatchSpeeds(const Duet::Sbc::Motion::MotionSystem& move) noexcept
 {
 	for (size_t drive = 0; drive < maxAxesPlusExtruders; ++drive)
 	{
@@ -612,7 +612,7 @@ void DDA::MatchSpeeds() noexcept
 		{
 			const float totalFraction = fabsf(m_directionVector[drive] - m_next->m_directionVector[drive]);
 			const float instantDv = totalFraction * m_beforePrepare.targetNextSpeed;
-			const float allowedInstantDv = reprap.GetMove().GetPrintingInstantDv(drive);
+			const float allowedInstantDv = move.GetPrintingInstantDv(drive);
 			if (instantDv > allowedInstantDv)
 			{
 				m_beforePrepare.targetNextSpeed = allowedInstantDv/totalFraction;
@@ -635,21 +635,23 @@ void DDA::Prepare(DDARing& ring,
 #endif
 					uint32_t prepareAdvanceTime, SimulationMode simMode) noexcept
 {
-	PrepParams params;
 #if SUPPORT_S_CURVE
+	PrepParams params;
 	if (m_flags.useScurve)
 	{
 		AllocateMoveFromPlan(plannedProfile, params);
 	}
 	else
-#endif
 	{
-		params.SetFromDDA(*this);
+		params = BuildProfile();
 	}
+#else
+	PrepParams params = BuildProfile();
+#endif
 	params.useInputShaping = UsesInputShaping();
 
 #if SUPPORT_LASER
-	if (m_topSpeed < m_requestedSpeed && reprap.GetGCodes().GetMachineType() == MachineType::laser)
+	if (m_topSpeed < m_requestedSpeed && move.GetMachineType() == MachineType::laser)
 	{
 		// Scale back the laser power according to the actual speed
 		laserPwmOrIoBits.laserPwm = (Pwm_t)((laserPwmOrIoBits.laserPwm * m_topSpeed)/m_requestedSpeed);
@@ -658,7 +660,7 @@ void DDA::Prepare(DDARing& ring,
 
 	// Decide when this move should start.
 	// Avoid setting the move start time in the past or with very little time before it starts, because this can lead to us trying to modify a segment that is already executing
-	Move& move = reprap.GetMove();
+	Duet::Sbc::Motion::MotionSystem& move = ring.GetMove();
 	const uint32_t now = StepTimer::GetMovementTimerTicks();
 
 	// 'prepareAdvanceTime' includes lead time for CAN-connected drivers to receive and queue their movement commands before the deadline.
@@ -671,12 +673,12 @@ void DDA::Prepare(DDARing& ring,
 	// the window we would otherwise be cutting (prepareAdvanceTime - AbsoluteMinimumPreparedTime) and keep the full margin if one is found.
 	auto touchesRemoteDriver = [&move](const DDA& dda) noexcept -> bool
 	{
-		const size_t numTotalAxes = reprap.GetGCodes().GetTotalAxes();
+		const size_t numTotalAxes = move.GetTotalAxes();
 		for (size_t drive = 0; drive < numTotalAxes; ++drive)
 		{
 			if (dda.m_directionVector[drive] != 0.0)
 			{
-				const AxisDriversConfig& config = move.GetAxisDriversConfig(drive);
+				const Duet::Sbc::Motion::AxisDriversConfig& config = move.GetAxisDriversConfig(drive);
 				for (size_t i = 0; i < config.numDrivers; ++i)
 				{
 					if (config.driverNumbers[i].IsRemote())
@@ -686,7 +688,7 @@ void DDA::Prepare(DDARing& ring,
 				}
 			}
 		}
-		const size_t numExtruders = reprap.GetGCodes().GetNumExtruders();
+		const size_t numExtruders = move.GetNumExtruders();
 		for (size_t extruder = 0; extruder < numExtruders; ++extruder)
 		{
 			if (dda.m_directionVector[ExtruderToLogicalDrive(extruder)] != 0.0 && move.GetExtruderDriver(extruder).IsRemote())
@@ -747,9 +749,9 @@ void DDA::Prepare(DDARing& ring,
 
 	if (simMode < SimulationMode::Normal)
 	{
-		CanMotion::StartMovement();
+		Duet::Sbc::Motion::ScheduleMoveBuilder& scheduler = move.GetScheduleMoveBuilder();
+		scheduler.StartMovement();
 		float extrusionFraction = 0.0;
-		AxesBitmap additionalAxisMotorsToEnable, axisMotorsEnabled;
 		m_afterPrepare.drivesMoving.Clear();
 
 		// One counter per stop group rather than one for the move. An axis whose switches are shared
@@ -768,13 +770,12 @@ void DDA::Prepare(DDARing& ring,
 			if (m_ownedDrives.IsBitSet(drive))
 #endif
 			{
-				if (drive < reprap.GetGCodes().GetTotalAxes())
+				if (drive < move.GetTotalAxes())
 				{
 					// It's a linear axis
 					int32_t delta = m_endPoint[drive] - m_prev->m_endPoint[drive];
 					if (delta != 0)
 					{
-						move.EnableDrivers(drive, false);
 						if (m_flags.continuousRotationShortcut && move.IsContinuousRotationAxis(drive))
 						{
 							// This is a continuous rotation axis, so we may have adjusted the move to cross the 180 degrees position
@@ -795,7 +796,7 @@ void DDA::Prepare(DDARing& ring,
 						move.AddLinearSegments(drive, m_afterPrepare.moveStartTime, params, (motioncalc_t)delta, segFlags);
 						m_afterPrepare.drivesMoving.SetBit(drive);
 
-						const AxisDriversConfig& config = move.GetAxisDriversConfig(drive);
+						const Duet::Sbc::Motion::AxisDriversConfig& config = move.GetAxisDriversConfig(drive);
 						for (size_t i = 0; i < config.numDrivers; ++i)
 						{
 							const DriverId driver = config.driverNumbers[i];
@@ -825,15 +826,13 @@ void DDA::Prepare(DDARing& ring,
 
 								// The group is DCS's, because the kinematics is what says which drives
 								// have to stop together and the controller holds no axis-to-driver map
-								CanMotion::AddAxisMovement(
+								scheduler.AddAxisMovement(
 									params, driver, driverSteps,
 									Duet::Sbc::Motion::StopInputForSwitch(m_stopOnInput[drive], switchIndex,
 																		  driver.boardAddress),
 									m_stopOnInput[drive].stopGroup, m_stopOnInput[drive].stopAction);
 							}
 						}
-						axisMotorsEnabled.SetBit(drive);
-						additionalAxisMotorsToEnable |= move.GetControllingDrives(drive);
 					}
 				}
 				else
@@ -847,8 +846,7 @@ void DDA::Prepare(DDARing& ring,
 						// temperatures. DuetControlServer has both and refuses the move before it
 						// gets here, so there is nothing left to check.
 						{
-							move.EnableDrivers(drive, false);
-
+	
 							if (m_flags.isPrintingMove && m_directionVector[drive] > 0.0)
 							{
 								extrusionFraction += m_directionVector[drive];					// accumulate the total extrusion fraction
@@ -876,22 +874,13 @@ void DDA::Prepare(DDARing& ring,
 							if (driver.IsRemote())
 							{
 								// The MovementLinearShaped message requires the extrusion amount in steps to be passed as a float. The remote board adds the PA and handles fractional steps.
-								CanMotion::AddExtruderMovement(params, driver, (float)delta, m_flags.usePressureAdvance);
+								scheduler.AddExtruderMovement(params, driver, (float)delta, m_flags.usePressureAdvance);
 							}
 							m_afterPrepare.drivesMoving.SetBit(drive);
 						}
 					}
 				}
 			}
-		}
-
-		// On CoreXY and similar architectures, we also need to enable the motors controlling any connected axes
-		additionalAxisMotorsToEnable &= ~axisMotorsEnabled;
-		while (additionalAxisMotorsToEnable.IsNonEmpty())
-		{
-			const size_t drive = additionalAxisMotorsToEnable.LowestSetBit();
-			additionalAxisMotorsToEnable.ClearBit(drive);
-			move.EnableDrivers(drive, false);
 		}
 
 		m_afterPrepare.averageExtrusionSpeed = (extrusionFraction * m_totalDistance * (float)stepClockRate)/(float)m_clocksNeeded;
@@ -903,7 +892,9 @@ void DDA::Prepare(DDARing& ring,
 		// endstops belong to the expansion boards and to DCS: the boards stop their own drivers, and
 		// the ScheduleMove packet's CheckEndstops flag is what tells the controller to arm that.
 
-		const uint32_t canClocksNeeded = CanMotion::FinishMovement(*this, m_afterPrepare.moveStartTime, simMode != SimulationMode::Off);
+		const uint32_t canClocksNeeded = scheduler.FinishMovement(m_moveId, m_afterPrepare.moveStartTime,
+																 simMode != SimulationMode::Off, IsCheckingEndstops(),
+																 UsesInputShaping());
 		if (canClocksNeeded > m_clocksNeeded)
 		{
 			// Due to rounding error in the calculations, we quite often calculate the CAN move as being longer than our previously-calculated value, normally by just one clock.
@@ -911,7 +902,7 @@ void DDA::Prepare(DDARing& ring,
 			m_clocksNeeded = canClocksNeeded;
 		}
 
-		if (reprap.GetDebugFlags(Module::Move).IsBitSet(MoveDebugFlags::printAllMoves))		// show the prepared DDA if debug enabled
+		if (move.GetDebugFlags(Module::Move).IsBitSet(MoveDebugFlags::printAllMoves))		// show the prepared DDA if debug enabled
 		{
 			DebugPrint("pr");
 		}
@@ -938,11 +929,11 @@ void DDA::Prepare(DDARing& ring,
 }
 
 // Check whether a committed move has finished
-bool DDA::HasExpired() const noexcept
+bool DDA::HasExpired(const Duet::Sbc::Motion::MotionSystem& move) const noexcept
 {
 	// Note, for Z leadscrew adjustment moves (and any other individual motor moves that we may support in future), we must not use drivesMoving, because it doesn't describe the drivers that are moving.
 	return (m_flags.checkEndstops)
-			? reprap.GetMove().AreDrivesStopped(m_afterPrepare.drivesMoving)
+			? move.AreDrivesStopped(m_afterPrepare.drivesMoving)
 				: (int32_t)(StepTimer::GetMovementTimerTicks() - GetMoveFinishTime()) >= 0;
 }
 

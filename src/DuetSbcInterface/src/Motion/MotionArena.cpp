@@ -1,12 +1,15 @@
 /*
- * Tasks.cpp - the permanent arena behind Tasks::AllocPermanent. See Compat/Platform/Tasks.h.
+ * MotionArena.cpp - see MotionArena.h.
  */
 
-#include <Platform/Tasks.h>
+#include "MotionArena.h"
+
+#include <Motion/Log.h>
 
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <sys/mman.h>
 
 namespace
@@ -22,13 +25,13 @@ namespace
 		return (value + alignment - 1) & ~(alignment - 1);
 	}
 
-	void *Allocate(size_t count, size_t alignment) noexcept
+	void *AllocateAligned(size_t count, size_t alignment) noexcept
 	{
 		if (arenaBase == nullptr)
 		{
 			// Nothing reserved the arena. Every caller is a static-lifetime motion object, so this
 			// is a startup ordering bug rather than something to paper over with a fallback malloc.
-			std::fprintf(stderr, "duet_sbc: AllocPermanent called before InitPermanentArena\n");
+			std::fprintf(stderr, "duet_sbc: motion arena used before it was reserved\n");
 			std::abort();
 		}
 
@@ -46,7 +49,7 @@ namespace
 	}
 }
 
-bool Tasks::InitPermanentArena(size_t bytes) noexcept
+bool Duet::Sbc::Motion::MotionArena::Reserve(size_t bytes) noexcept
 {
 	if (arenaBase != nullptr)
 	{
@@ -77,7 +80,7 @@ bool Tasks::InitPermanentArena(size_t bytes) noexcept
 	return true;
 }
 
-void Tasks::ReleasePermanentArena() noexcept
+void Duet::Sbc::Motion::MotionArena::Release() noexcept
 {
 	if (arenaBase != nullptr)
 	{
@@ -88,17 +91,17 @@ void Tasks::ReleasePermanentArena() noexcept
 	}
 }
 
-void *Tasks::AllocPermanent(size_t count) noexcept
+void *Duet::Sbc::Motion::MotionArena::Allocate(size_t count) noexcept
 {
-	return Allocate(count, defaultAlignment);
+	return AllocateAligned(count, defaultAlignment);
 }
 
-void *Tasks::AllocPermanent(size_t count, std::align_val_t align) noexcept
+void *Duet::Sbc::Motion::MotionArena::Allocate(size_t count, std::align_val_t align) noexcept
 {
-	return Allocate(count, static_cast<size_t>(align));
+	return AllocateAligned(count, static_cast<size_t>(align));
 }
 
-ptrdiff_t Tasks::GetNeverUsedRam() noexcept
+ptrdiff_t Duet::Sbc::Motion::MotionArena::BytesFree() noexcept
 {
 	return (ptrdiff_t)(arenaSize - arenaUsed);
 }

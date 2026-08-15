@@ -31,7 +31,7 @@
 #include "MovementError.h"
 #include <Motion/MoveParams.h>
 #include <Motion/MoveProfile.h>
-#include <Platform/Tasks.h>
+#include <Motion/MotionArena.h>
 #include <GCodes/SimulationMode.h>
 
 class DDARing;
@@ -58,13 +58,9 @@ struct PrepParams : public Duet::Sbc::Motion::MoveProfile
 {
 	bool useInputShaping{};
 
-	[[nodiscard]] uint32_t SteadyClocks() const noexcept { return steadyClocks; }
-	[[nodiscard]] uint32_t TotalAccelClocks() const noexcept { return accelClocks; }
-	[[nodiscard]] uint32_t TotalDecelClocks() const noexcept { return decelClocks; }
-	[[nodiscard]] motioncalc_t TotalAccelDistance() const noexcept { return accelDistance; }
-
-	// Set up the parameters from the DDA. As a side effect it sets up dda.clocksNeeded.
-	void SetFromDDA(DDA& dda) noexcept;
+#if SUPPORT_S_CURVE
+	void EnsureSpeedsSet() const noexcept;
+#endif
 
 	void DebugPrint() const noexcept;
 };
@@ -72,8 +68,6 @@ struct PrepParams : public Duet::Sbc::Motion::MoveProfile
 // This defines a single coordinated movement of one or several motors
 class DDA final
 {
-	friend struct PrepParams;
-
 public:
 
 	enum DDAState : uint8_t
@@ -88,8 +82,8 @@ public:
 
 	explicit DDA(DDA *_ecv_null n) noexcept;
 
-	void* operator new(size_t count) { return Tasks::AllocPermanent(count); }
-	void* operator new(size_t count, std::align_val_t align) { return Tasks::AllocPermanent(count, align); }
+	void* operator new(size_t count) { return Duet::Sbc::Motion::MotionArena::Allocate(count); }
+	void* operator new(size_t count, std::align_val_t align) { return Duet::Sbc::Motion::MotionArena::Allocate(count, align); }
 	void operator delete(void* ptr) noexcept {}
 	void operator delete(void* ptr, std::align_val_t align) noexcept {}
 
@@ -111,7 +105,6 @@ public:
 	[[nodiscard]] bool IsCheckingEndstops() const noexcept { return m_flags.checkEndstops; }
 	// True if any watched input stops every driver of this move - RepRapFirmware's stopAll
 	[[nodiscard]] bool IsIsolatedMove() const noexcept { return m_flags.isolatedMove; }
-	[[nodiscard]] bool NoShaping() const noexcept { return m_flags.isolatedMove; }
 	[[nodiscard]] bool UsesInputShaping() const noexcept;									// return true if this move should use input shaping
 
 	[[nodiscard]] DDAState GetState() const noexcept { return (DDAState)m_flags.stateBits; }
@@ -159,7 +152,7 @@ public:
 	[[nodiscard]] float GetTotalDistance() const noexcept { return m_totalDistance; }
 
 	[[nodiscard]] uint32_t GetClocksNeeded() const noexcept { return m_clocksNeeded; }
-	[[nodiscard]] bool HasExpired() const noexcept pre(IsCommitted());
+	[[nodiscard]] bool HasExpired(const Duet::Sbc::Motion::MotionSystem& move) const noexcept pre(IsCommitted());
 	[[nodiscard]] bool IsNonPrintingExtruderMove() const noexcept { return m_flags.isNonPrintingExtruderMove; }
 	[[nodiscard]] uint32_t GetMoveStartTime() const noexcept { return m_afterPrepare.moveStartTime; }
 	[[nodiscard]] uint32_t GetMoveFinishTime() const noexcept { return m_afterPrepare.moveStartTime + m_clocksNeeded; }
@@ -175,6 +168,10 @@ public:
 private:
 	static constexpr float minimumAccelOrDecelClocks = 10.0;				// Minimum number of acceleration or deceleration clocks we try to ensure
 
+	// Work out the velocity profile this move will be executed with. As a side effect it sets
+	// m_clocksNeeded, which is why it is not const.
+	[[nodiscard]] PrepParams BuildProfile() noexcept;
+
 	MovementError RecalculateMove(DDARing& ring) noexcept SPEED_CRITICAL;
 	static void DoLookahead(DDARing& ring, DDA *laDDA) noexcept SPEED_CRITICAL;	// Try to smooth out moves in the queue
 
@@ -183,7 +180,7 @@ private:
 	void AllocateMoveFromPlan(MovementProfile& plannedProfile, PrepParams& params) noexcept SPEED_CRITICAL;
 #endif
 
-	void MatchSpeeds() noexcept SPEED_CRITICAL;
+	void MatchSpeeds(const Duet::Sbc::Motion::MotionSystem& move) noexcept SPEED_CRITICAL;
 	[[nodiscard]] bool IsDecelerationMove() const noexcept;								// return true if this move is or have been might have been intended to be a deceleration-only move
 	[[nodiscard]] bool IsAccelerationMove() const noexcept;								// return true if this move is or have been might have been intended to be an acceleration-only move
 	void DebugPrintVector(const char *_ecv_array name, const float *_ecv_array vec, size_t len) const noexcept;

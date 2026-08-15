@@ -6,7 +6,7 @@
 
 #include "MoveParams.h"
 
-#include <Platform/Platform.h>
+#include <Motion/Log.h>
 
 #include <cstring>
 
@@ -138,7 +138,7 @@ uint32_t ScheduleMoveBuilder::FinishMovement(uint32_t moveId, uint32_t moveStart
 			// discards those when it next sees a different moveId. Do not send the rest - a partial
 			// move reaching the boards would move some drives and not others.
 			++m_droppedPackets;
-			Platform::MessageF(ErrorMessage, "move %" PRIu32 " dropped: link busy\n", moveId);
+			LogMessage("move %" PRIu32 " dropped: link busy\n", moveId);
 			return 0;
 		}
 	}

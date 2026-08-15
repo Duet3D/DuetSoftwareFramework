@@ -15,7 +15,7 @@
 #include "TestSupport.h"
 
 #include <Motion/DriveTracker.h>
-#include <Platform/Tasks.h>
+#include <Motion/MotionArena.h>
 
 #include <cstdint>
 
@@ -295,7 +295,7 @@ static void TestOverlappingMoveInvalidatesCachedSegment()
 
 int main()
 {
-	if (!Tasks::InitPermanentArena(4 * 1024 * 1024))
+	if (!Duet::Sbc::Motion::MotionArena::Reserve(4 * 1024 * 1024))
 	{
 		std::printf("FAIL: could not reserve the permanent arena\n");
 		return 1;

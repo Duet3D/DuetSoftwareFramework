@@ -28,11 +28,9 @@ endforeach()
 # recursive glob is what pulled the unported tree into duet_sbc and broke the build, so a file
 # compiles here only once someone has ported it and said so.
 set(DUET_MOTION_SOURCES
-    Compat/Diagnostics.cpp
-    Compat/RepRap.cpp
-    Compat/Tasks.cpp
-    Motion/CanMotionShim.cpp
     Motion/DriveTracker.cpp
+    Motion/Log.cpp
+    Motion/MotionArena.cpp
     Motion/MotionSystem.cpp
     Motion/ScheduleMoveBuilder.cpp
     Motion/SegmentBuilder.cpp
