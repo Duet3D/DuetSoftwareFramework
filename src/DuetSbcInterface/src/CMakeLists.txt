@@ -37,7 +37,6 @@ set(DUET_MOTION_SOURCES
     Movement/DDA.cpp
     Movement/DDARing.cpp
     Movement/MoveSegment.cpp
-    Movement/MovementError.cpp
     Movement/StepTimer.cpp
 )
 

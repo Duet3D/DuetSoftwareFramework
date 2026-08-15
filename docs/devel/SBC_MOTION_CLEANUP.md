@@ -360,16 +360,24 @@ symbol name, so a grep of this repo is necessary but the ABI boundary deserves a
 
 **`MotionSystem`**: `GetLogicalDriveForDriver`.
 
-**`DriveTracker`**: `GetAndClearAccumulatedMovement` and the `m_movementAccumulator` it drains.
-
-**`MoveSegment`**: `IsLinear`, `IsAccelerating`, `CalcLinearRecipU`, `AdjustLength`,
-`NormaliseAndCheckLinear` (35 lines of commentary about a step ISR that does not exist here),
-`AppendDetails`, `minDuration`.
+**`MoveSegment`**: `CalcLinearRecipU`, `AdjustLength`, `NormaliseAndCheckLinear` (35 lines of
+commentary about a step ISR that does not exist here), `AppendDetails`, `minDuration`.
 `DebugPrint` and `DebugPrintList` stay — `SEGMENT_DEBUG` uses them. **`NumCreated` stays** — it is
 "Segments created" in M122 (§3.9).
 
-**`MoveParams.h`**: `StopInputForDriver` — a one-line alias of `StopInputForSwitch` with the arguments
-in the same order.
+**Three entries came off this list on a second pass**, because the first one only grepped for callers
+and these have tests. Deleting tested code is a larger call than deleting unreached code, and none of
+the three is misleading — they were only unused:
+
+- `MoveSegment::IsLinear` / `IsAccelerating` — asserted in `MoveSegmentTests`.
+- `DriveTracker::GetAndClearAccumulatedMovement` — four assertions in `DriveTrackerTests`. It is the
+  natural hook for filament monitoring, which is not ported.
+- `MotionSystem::GetPressureAdvanceK0ClocksForLogicalDrive` — asserted in `MotionSystemTests`, and
+  `AddLinearSegments` was reading the same field directly beside it. Fixed in the other direction:
+  the one reader goes through the accessor.
+
+`MoveParams.h`'s `StopInputForDriver` did have callers — nine, all in tests — but it is
+`StopInputForSwitch` with the arguments in the same order, so the tests call that instead.
 
 **`MovementError`**: `GetMovementErrorText` — no caller; the error reaches DCS as a byte in
 `MoveFailedEvent` and DCS renders the text. Delete it and `MovementError.cpp` with it.

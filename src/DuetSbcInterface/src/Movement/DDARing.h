@@ -35,7 +35,6 @@ public:
 	// The machine this ring plans for. The DDAs in it reach the configuration and the drive
 	// trackers through here rather than through a global.
 	[[nodiscard]] Duet::Sbc::Motion::MotionSystem& GetMove() const noexcept { return *m_move; }
-	void Exit() noexcept;
 
 	[[nodiscard]] unsigned int GetNumDdas() const noexcept { return m_numDdasInRing; }
 
@@ -66,19 +65,14 @@ public:
 
 	[[nodiscard]] uint32_t GetScheduledMoves() const noexcept { return m_scheduledMoves; }				// How many moves have been scheduled?
 	[[nodiscard]] uint32_t GetCompletedMoves() const noexcept { return m_completedMoves; }				// How many moves have been completed?
-	void ResetMoveCounters() noexcept { m_scheduledMoves = m_completedMoves = 0; }
 
 	[[nodiscard]] float GetSimulationTime() const noexcept { return m_simulationTime; }
-	void ResetSimulationTime() noexcept { m_simulationTime = 0.0; }
 
 	[[nodiscard]] float GetRequestedSpeedMmPerSec() const noexcept;
 	[[nodiscard]] float GetTopSpeedMmPerSec() const noexcept;
 	[[nodiscard]] float GetAccelerationMmPerSecSquared() const noexcept;								// Get the (peak) acceleration for reporting in the object model
 	[[nodiscard]] float GetDecelerationMmPerSecSquared() const noexcept;								// Get the (peak) deceleration for reporting in the object model
-	[[nodiscard]] float GetCurrentMoveDistance() const noexcept;
-	[[nodiscard]] float GetCurrentMoveDuration() const noexcept;
 
-	void GetLastEndpoints(LogicalDrivesBitmap logicalDrives, int32_t returnedEndpoints[maxAxesPlusExtruders]) const noexcept;
 	[[nodiscard]] int32_t GetLastEndpoint(size_t drive) const noexcept;
 	void SetLastEndpoints(LogicalDrivesBitmap logicalDrives, const int32_t *_ecv_array ep) noexcept;
 	void SetLastEndpoint(size_t drive, int32_t ep) noexcept;

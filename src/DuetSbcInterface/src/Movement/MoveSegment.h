@@ -133,9 +133,6 @@ public:
 	// Get the initial speed
 	[[nodiscard]] motioncalc_t CalcU() const noexcept;
 
-	// Get the reciprocal of the initial speed assuming this move has no acceleration, and no jerk if we are supporting 3rd order motion control
-	[[nodiscard]] motioncalc_t CalcLinearRecipU() const noexcept pre(m_a == (motioncalc_t)0.0) { return (motioncalc_t)m_duration/m_distance; }
-
 	// Get the acceleration (the initial acceleration f we are supporting 3rd order motion control)
 	[[nodiscard]] motioncalc_t GetA() const noexcept { return m_a; }
 
@@ -153,9 +150,6 @@ public:
 	// Get the length
 	[[nodiscard]] motioncalc_t GetLength() const noexcept { return m_distance; }
 
-	// Make a small correction to the length. Only ever called on the last segment in a list.
-	void AdjustLength(motioncalc_t adjustment) noexcept { m_distance += adjustment; }
-
 	// Set the parameters of this segment
 	void SetParameters(uint32_t pStartTime, uint32_t pDuration, motioncalc_t pDistance, motioncalc_t pA J_FORMAL_PARAMETER(p_j), MovementFlags pFlags) noexcept;
 
@@ -164,9 +158,6 @@ public:
 
 	// Merge the parameters for another segment with the same start time and duration into this one
 	void Merge(motioncalc_t pDistance, motioncalc_t pA J_FORMAL_PARAMETER(p_j), MovementFlags pFlags) noexcept;
-
-	// Normalise this segment by removing very small accelerations that cause problems, update t0, return true if it is linear
-	bool NormaliseAndCheckLinear(motioncalc_t distanceCarriedForwards, motioncalc_t& t0) noexcept;
 
 	// Set the 'executing' bit in the flags
 	void SetExecuting() noexcept { m_flags.executing = true; }
@@ -184,9 +175,6 @@ public:
 	// Print this segment to the debug channel
 	void DebugPrint() const noexcept;
 
-	// Append details of this segment to a string buffer
-	void AppendDetails(const StringRef& str) const noexcept;
-
 	// Print list of segments
 	static void DebugPrintList(const MoveSegment *_ecv_null segs) noexcept;
 
@@ -201,8 +189,6 @@ public:
 
 	// Return the number of MoveSegment objects that have been created
 	static unsigned int NumCreated() noexcept { return s_numCreated; }
-
-	static constexpr int32_t minDuration = 10;				// the minimum duration in movement clock ticks that we consider sensible
 
 private:
 	static MoveSegment *_ecv_null s_freeList;				// list of recycled segment objects
@@ -237,48 +223,6 @@ inline motioncalc_t MoveSegment::CalcU() const noexcept
 #else
 	return m_distance/(motioncalc_t)m_duration - oneHalf * m_a * (motioncalc_t)m_duration;
 #endif
-}
-
-// Normalise this segment by removing very small accelerations that cause problems, update t0, return true if it is linear.
-// When phase stepping is in use this is not called. As we only implement S-surve acceleration in conjunction with phase stepping, this function doesn't need to take account of j.
-// Called only from DriveMovement::NewSegment. Speed critical, hence inline and the rather unusual behaviour.
-// Returns:
-//  true if the segment is constant speed, with t0 = time from start of segment at which the distance would be/will be/would have been zero
-//  false if the segment has acceleration or deceleration, with t0 = time from start of segment at which the speed would have been/will be/would be zero
-inline bool MoveSegment::NormaliseAndCheckLinear(motioncalc_t distanceCarriedForwards, motioncalc_t& t0) noexcept
-{
-	if (m_a != (motioncalc_t)0.0)
-	{
-		// The move has acceleration or deceleration, but it may be small enough to cause problems with the calculations.
-		// The reason is that the step time is calculated as:
-		//   time_from_segment_start = t0 +/- sqrt(q - p*n)
-		// where q equals t0^2 or something very close to it. This gives rise to two issues:
-		// 1. The maximum value that can be represented by a float is a little more than 3.4e38, so t0 values greater than about 1e19 cause trouble when we square them to calculate q.
-		// 2. Rounding error may cause large errors in the step time, when t0 can't represented to within a small number of step clocks
-		// Issue #2 causes problems when abs(t0) exceeds about 2^24 because then the number of step clocks can't be represented exactly.
-		// Here are two possible ways round this:
-		// 1. When t0 gets large we could use the Maclaurin expansion of sqrt(q - p*n) to give:
-		//    time_from_segment_start ~= p*n/(2 * sqrt(q + p*n))
-		// This is accurate to within about 1 clock on the last step N when (p*N)^4 < 8*(q + p*N)^3
-		// so approximately when (p*N)^4 < 8*q^3, or very roughly when p*N << q
-		// However, using the Maclaurin expansion requires an extra division in each step calculation, which we would prefer to avoid.
-		// 2. We can convert the segment to a constant-speed segment, on the assumption that the speed won't change much during it. This is what we currently do.
-		const motioncalc_t provisionalT0 = oneHalf * (motioncalc_t)m_duration - m_distance/(m_a * (motioncalc_t)m_duration);
-		if (likely(std::fabs(provisionalT0) <= 4 * (motioncalc_t)16777216.0))
-		{
-			t0 = provisionalT0;
-			return false;
-		}
-		// The acceleration/deceleration is small enough to cause calculation problems, so change it to a linear move
-		m_a = (motioncalc_t)0.0;
-#if SUPPORT_S_CURVE
-		m_j = (motioncalc_t)0.0;
-#endif
-	}
-
-	// The move is constant speed
-	t0 = -distanceCarriedForwards * (motioncalc_t)m_duration/m_distance;
-	return true;
 }
 
 // Release a MoveSegment.

@@ -72,11 +72,6 @@ inline motioncalc_t Msquare(motioncalc_t a) noexcept
 	return a * a;
 }
 
-using FilePosition = uint32_t;
-constexpr FilePosition noFilePosition = 0xFFFFFFFFu;
-
-using MovementSystemNumber = unsigned int;
-
 // ---------------------------------------------------------------------------------------------
 // Machine limits
 //
@@ -92,7 +87,6 @@ constexpr size_t maxDriversPerAxis = 8;
 
 constexpr size_t xyzAxes = 3;
 constexpr size_t xAxis = 0, yAxis = 1, zAxis = 2;
-constexpr size_t noAxis = 0x3F;
 
 static_assert(maxAxesPlusExtruders <= maxAxes + maxExtruders);
 
@@ -116,8 +110,6 @@ using LogicalDrivesBitmap = Bitmap<uint32_t>;
 static_assert(maxAxesPlusExtruders <= AxesBitmap::MaxBits());
 static_assert(maxAxesPlusExtruders <= LogicalDrivesBitmap::MaxBits());
 static_assert(maxExtruders <= ExtrudersBitmap::MaxBits());
-
-constexpr AxesBitmap xyzAxesBitmap = AxesBitmap::MakeLowestNBits(xyzAxes);
 
 // ---------------------------------------------------------------------------------------------
 // Driver identifiers
@@ -166,7 +158,6 @@ struct DriverId
 
 constexpr uint32_t stepClockRate = 48000000 / 64;		// 750kHz, common to all Duet 3 boards
 constexpr uint64_t stepClockRateSquared = (uint64_t)stepClockRate * stepClockRate;
-constexpr float stepClocksToMillis = 1000.0f / (float)stepClockRate;
 constexpr float stepClocksToSeconds = 1.0f / (float)stepClockRate;
 
 constexpr unsigned int iMinutesToSeconds = 60;
@@ -177,32 +168,9 @@ static constexpr uint32_t MillisToStepClocks(uint32_t numMillis) noexcept
 	return numMillis * (stepClockRate / 1000);
 }
 
-// Rounds up without std::ceil, which is not usable in a constant expression under clang.
-static consteval uint32_t MicrosecondsToStepClocks(float us) noexcept
-{
-	const double clocks = stepClockRate * 0.000001 * us;
-	const auto truncated = (uint32_t)clocks;
-	return truncated + (((double)truncated < clocks) ? 1u : 0u);
-}
-
-static constexpr float ConvertSpeedFromMmPerSec(float speed) noexcept
-{
-	return speed * (1.0f / (float)stepClockRate);
-}
-
-static constexpr float ConvertSpeedFromMmPerMin(float speed) noexcept
-{
-	return speed * (1.0f / (float)(stepClockRate * iMinutesToSeconds));
-}
-
 static constexpr float InverseConvertSpeedToMmPerSec(float speed) noexcept
 {
 	return speed * (float)stepClockRate;
-}
-
-static constexpr float InverseConvertSpeedToMmPerMin(float speed) noexcept
-{
-	return speed * (float)(stepClockRate * iMinutesToSeconds);
 }
 
 static constexpr float ConvertAcceleration(float accel) noexcept
@@ -218,18 +186,6 @@ static constexpr float InverseConvertAcceleration(float accel) noexcept
 // ---------------------------------------------------------------------------------------------
 // Assorted helpers the imported code expects to be global
 // ---------------------------------------------------------------------------------------------
-
-// The firmware's versions exploit known alignment on Cortex-M. Here they are memcpy, which the
-// compiler lowers to the same thing.
-inline void Memcpyf(float *dst, const float *src, size_t numFloats) noexcept
-{
-	std::memcpy(dst, src, numFloats * sizeof(float));
-}
-
-inline void Memcpyu32(uint32_t *dst, const uint32_t *src, size_t numWords) noexcept
-{
-	std::memcpy(dst, src, numWords * sizeof(uint32_t));
-}
 
 // Branch hints. The firmware gets these from CoreIO; they mean the same thing anywhere.
 #ifndef likely
@@ -260,7 +216,5 @@ enum class Module : uint8_t
 class DDA;
 class DDARing;
 class MoveSegment;
-class Tool;
-class Platform;
 
 #endif /* SRC_COMPAT_REPRAPFIRMWARE_H_ */

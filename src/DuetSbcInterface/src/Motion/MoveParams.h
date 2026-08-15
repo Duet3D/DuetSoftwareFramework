@@ -249,13 +249,6 @@ namespace Duet::Sbc::Motion
 		return MakeStopInput(stop.boards[driverIndex], handle);
 	}
 
-	// The switch a driver watches when each motor has to reach the one beside it.
-	[[nodiscard]] constexpr uint32_t StopInputForDriver(const MoveStopInput& stop, size_t driverIndex,
-														uint8_t driverBoard) noexcept
-	{
-		return StopInputForSwitch(stop, driverIndex, driverBoard);
-	}
-
 	// Total size of a submission carrying `numDrives` drives.
 	[[nodiscard]] constexpr size_t MoveParamsLength(size_t numDrives) noexcept
 	{

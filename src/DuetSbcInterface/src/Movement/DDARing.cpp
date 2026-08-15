@@ -67,17 +67,6 @@ void DDARing::Init(Duet::Sbc::Motion::MotionSystem& move, unsigned int numDdas) 
 	m_getPointer = m_addPointer;
 }
 
-void DDARing::Exit() noexcept
-{
-	// Clear the DDA ring so that we don't report any moves as pending
-	DDA *gp;										// use a local variable to avoid loading volatile variable getPointer too often
-	while ((gp = m_getPointer) != m_addPointer)
-	{
-		gp->Free();
-		m_getPointer = gp = gp->GetNext();
-	}
-}
-
 bool DDARing::CanAddMove() const noexcept
 {
 	// We have two constraints here that may prevent us from using the last free element in the ring:
@@ -376,11 +365,6 @@ bool DDARing::SetWaitingToEmpty() noexcept
 	return ret;
 }
 
-void DDARing::GetLastEndpoints(LogicalDrivesBitmap logicalDrives, int32_t returnedEndpoints[maxAxesPlusExtruders]) const noexcept
-{
-	logicalDrives.Iterate([this, returnedEndpoints](unsigned int drive, unsigned int count) noexcept { returnedEndpoints[drive] = m_addPointer->GetPrevious()->DriveCoordinates()[drive]; } );
-}
-
 int32_t DDARing::GetLastEndpoint(size_t drive) const noexcept
 {
 	return m_addPointer->GetPrevious()->DriveCoordinates()[drive];
@@ -445,18 +429,6 @@ float DDARing::GetDecelerationMmPerSecSquared() const noexcept
 {
 	const DDA *_ecv_null const cdda = GetCurrentDDA();
 	return (cdda != nullptr) ? cdda->GetDecelerationMmPerSecSquared() : 0.0;
-}
-
-float DDARing::GetCurrentMoveDistance() const noexcept
-{
-	const DDA *_ecv_null const cdda = GetCurrentDDA();
-	return (cdda != nullptr) ? cdda->GetTotalDistance() : 0.0;;
-}
-
-float DDARing::GetCurrentMoveDuration() const noexcept
-{
-	const DDA *_ecv_null const cdda = GetCurrentDDA();
-	return (cdda != nullptr) ? (float)cdda->GetClocksNeeded() * stepClocksToSeconds : 0.0;;
 }
 
 // End

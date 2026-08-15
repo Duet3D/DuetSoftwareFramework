@@ -54,21 +54,6 @@ void MoveSegment::DebugPrint() const noexcept
 				m_flags.all);
 }
 
-// Append details of this segment to a string buffer
-void MoveSegment::AppendDetails(const StringRef& str) const noexcept
-{
-	str.catf("s=%" PRIu32 " t=%" PRIu32 " d=%.4f u=%.4e a=%.4e"
-#if SUPPORT_S_CURVE
-				" j=%.4e"
-#endif
-				" f=%02" PRIx32 "\n",
-				m_startTime, m_duration, (double)m_distance, (double)CalcU(), (double)m_a,
-#if SUPPORT_S_CURVE
-				(double)m_j,
-#endif
-				m_flags.all);
-}
-
 /*static*/ void MoveSegment::DebugPrintList(const MoveSegment *_ecv_null segs) noexcept
 {
 	if (segs == nullptr)

@@ -101,7 +101,6 @@ public:
 					uint32_t prepareAdvanceTime, SimulationMode simMode) noexcept SPEED_CRITICAL;	// Calculate all the values and freeze this DDA
 	[[nodiscard]] bool CanPauseAfter() const noexcept;
 	[[nodiscard]] bool IsPrintingMove() const noexcept { return m_flags.isPrintingMove; }							// Return true if this involves both XY movement and extrusion
-	[[nodiscard]] bool UsingStandardFeedrate() const noexcept { return m_flags.usingStandardFeedrate; }
 	[[nodiscard]] bool IsCheckingEndstops() const noexcept { return m_flags.checkEndstops; }
 	// True if any watched input stops every driver of this move - RepRapFirmware's stopAll
 	[[nodiscard]] bool IsIsolatedMove() const noexcept { return m_flags.isolatedMove; }
@@ -118,12 +117,9 @@ public:
 	[[nodiscard]] const int32_t *_ecv_array DriveCoordinates() const noexcept { return m_endPoint; }				// Get endpoints of a move in machine coordinates
 	void SetDriveCoordinate(size_t drive, int32_t ep) noexcept;										// Force an end point
 
-	void SetFeedRate(float rate) noexcept { m_requestedSpeed = rate; }
-
 	// DuetControlServer's correlation id for this move, quoted back when the move completes or fails
 	[[nodiscard]] uint32_t GetMoveId() const noexcept { return m_moveId; }
 
-	[[nodiscard]] float GetRequestedSpeedMmPerClock() const noexcept { return m_requestedSpeed; }
 	[[nodiscard]] float GetRequestedSpeedMmPerSec() const noexcept { return InverseConvertSpeedToMmPerSec(m_requestedSpeed); }
 	[[nodiscard]] float GetTopSpeedMmPerSec() const noexcept { return InverseConvertSpeedToMmPerSec(m_topSpeed); }
 	[[nodiscard]] float GetAccelerationMmPerSecSquared() const noexcept							// Get the (peak) acceleration for reporting in the object model
@@ -153,12 +149,9 @@ public:
 
 	[[nodiscard]] uint32_t GetClocksNeeded() const noexcept { return m_clocksNeeded; }
 	[[nodiscard]] bool HasExpired(const Duet::Sbc::Motion::MotionSystem& move) const noexcept pre(IsCommitted());
-	[[nodiscard]] bool IsNonPrintingExtruderMove() const noexcept { return m_flags.isNonPrintingExtruderMove; }
 	[[nodiscard]] uint32_t GetMoveStartTime() const noexcept { return m_afterPrepare.moveStartTime; }
 	[[nodiscard]] uint32_t GetMoveFinishTime() const noexcept { return m_afterPrepare.moveStartTime + m_clocksNeeded; }
 
-	[[nodiscard]] float GetAverageExtrusionSpeed() const noexcept pre(IsCommitted()) { return m_afterPrepare.averageExtrusionSpeed; }
-	[[nodiscard]] bool HasForwardExtrusion() const noexcept { return m_flags.hasForwardExtrusion; }
 
 	void DebugPrint(const char *_ecv_array tag) const noexcept;				// print the DDA only
 

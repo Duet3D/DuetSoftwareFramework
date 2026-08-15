@@ -126,7 +126,7 @@ void MotionSystem::AddLinearSegments(size_t drive, uint32_t startTime, const Mov
 									 motioncalc_t steps, MovementFlags moveFlags) noexcept
 {
 	const motioncalc_t pressureAdvance =
-		(moveFlags.isExtruder && !moveFlags.nonPrintingMove) ? m_config.pressureAdvanceClocks[drive] : 0;
+		(moveFlags.isExtruder && !moveFlags.nonPrintingMove) ? GetPressureAdvanceK0ClocksForLogicalDrive(drive) : 0;
 	m_trackers[drive].AddMove(startTime, profile, steps, moveFlags, pressureAdvance);
 }
 
