@@ -38,6 +38,15 @@ namespace Duet::Sbc::Motion
 	inline constexpr unsigned int minDdasPerRing = 3;
 	inline constexpr unsigned int maxDdasPerRing = 1000;
 
+	// M592 nonlinear extrusion correction, per extruder. The commanded extrusion is scaled by
+	// 1 + min((a + b*v) * v, limit), where v is the average extrusion speed of the move in mm/sec.
+	struct NonlinearExtrusion
+	{
+		float a = 0.0;
+		float b = 0.0;
+		float limit = 0.2;			// RepRapFirmware's DefaultNonlinearExtrusionLimit
+	};
+
 	// The drivers that move one axis. An axis with several drivers - a Z axis with three
 	// leadscrews, say - moves all of them together.
 	struct AxisDriversConfig
@@ -111,6 +120,14 @@ namespace Duet::Sbc::Motion
 		// shaping on the boards.
 		uint32_t shapingTimeClocks = 0;
 
+		// --- Extrusion correction --------------------------------------------------------------
+
+		// Appended rather than placed beside the other per-extruder values: everything below
+		// gracePeriodMs has an asserted offset that the C# mirror hardcodes, and there is nothing to
+		// be gained by moving them all. Both sides are built from this repository together, so the
+		// order carries no compatibility obligation of its own.
+		NonlinearExtrusion nonlinearExtrusion[maxExtruders];
+
 		// --- Derived --------------------------------------------------------------------------
 
 		[[nodiscard]] constexpr size_t FirstExtruderDrive() const noexcept
@@ -146,6 +163,8 @@ namespace Duet::Sbc::Motion
 	static_assert(offsetof(MotionConfig, backlashSteps) == 12 + (16 * maxAxesPlusExtruders));
 	static_assert(offsetof(MotionConfig, axisDrivers) == 20 + (16 * maxAxesPlusExtruders) + (4 * maxAxes));
 	static_assert(offsetof(MotionConfig, continuousRotationAxes) % 4 == 0, "the bitmaps must stay 4-aligned");
+	static_assert(sizeof(NonlinearExtrusion) == 12, "NonlinearExtrusion is three floats with no padding");
+	static_assert(offsetof(MotionConfig, nonlinearExtrusion) % 4 == 0, "the coefficients must stay 4-aligned");
 	static_assert(sizeof(MotionConfig) % 4 == 0, "no tail padding beyond what is declared");
 }
 

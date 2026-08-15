@@ -64,8 +64,9 @@ namespace
 		CHECK_OFFSET(MotionConfig, continuousRotationAxes, 1204);
 		CHECK_OFFSET(MotionConfig, controllingDrives, 1208);
 		CHECK_OFFSET(MotionConfig, shapingTimeClocks, 1328);
+		CHECK_OFFSET(MotionConfig, nonlinearExtrusion, 1332);
 
-		CHECK(sizeof(MotionConfig) == 1332, "MotionConfig is 1332 bytes");
+		CHECK(sizeof(MotionConfig) == 1572, "MotionConfig is 1572 bytes");
 	}
 
 	// The description arrives from another process, so the counts in it decide how far this side

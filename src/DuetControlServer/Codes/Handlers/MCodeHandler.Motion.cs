@@ -1306,6 +1306,12 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
+    /// <remarks>
+    /// The three coefficients are set together, not individually: RepRapFirmware's
+    /// <c>Move::ConfigureNonlinearExtrusion</c> starts from A=0, B=0, L=0.2 on every invocation, so
+    /// <c>M592 D0 A0.01</c> also resets B and the limit. Updating only the parameters present would
+    /// give a different machine from the same G-code.
+    /// </remarks>
     private async ValueTask<Message> HandleNonlinearExtrusionAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (!code.TryGetInt('D', out int extruderNumber))
@@ -1321,33 +1327,34 @@ internal partial class MCodeHandler
             }
 
             ExtruderNonlinear nonlinear = model.Move.Extruders[extruderNumber].Nonlinear;
-            bool seen = false;
-            if (code.TryGetFloat('A', out float a))
-            {
-                nonlinear.A = a;
-                seen = true;
-            }
-            if (code.TryGetFloat('B', out float b))
-            {
-                nonlinear.B = b;
-                seen = true;
-            }
-            if (code.TryGetFloat('L', out float limit))
-            {
-                nonlinear.UpperLimit = limit;
-                seen = true;
-            }
+            bool seenA = code.TryGetFloat('A', out float a);
+            bool seenB = code.TryGetFloat('B', out float b);
+            bool seenLimit = code.TryGetFloat('L', out float limit);
 
-            if (!seen)
+            if (!seenA && !seenB && !seenLimit)
             {
+                // RepRapFirmware's wording, which DWC, PanelDue and a decade of macros parse
                 return new Message(MessageType.Success,
                                    string.Format(CultureInfo.InvariantCulture,
-                                                 "Extruder {0} nonlinear extrusion A={1:F3} B={2:F3}, limit {3:F2}",
+                                                 "Drive {0} nonlinear extrusion coefficients: A={1:G3}, B={2:G3}, limit={3:F2}",
                                                  extruderNumber, nonlinear.A, nonlinear.B, nonlinear.UpperLimit));
             }
+
+            nonlinear.A = seenA ? a : 0.0F;
+            nonlinear.B = seenB ? b : 0.0F;
+            nonlinear.UpperLimit = seenLimit ? limit : DefaultNonlinearExtrusionLimit;
         }
-        return new Message();
+
+        // No standstill flush: RRF takes no movement lock for M592, and the coefficients are read
+        // when a move is prepared rather than when it is queued
+        return await planner.ReconfigureAsync(cancellationToken) ? new Message() : MotionConfigRejected;
     }
+
+    /// <summary>
+    /// Largest nonlinear extrusion correction M592 applies when no L parameter is given, matching
+    /// RepRapFirmware's <c>DefaultNonlinearExtrusionLimit</c>
+    /// </summary>
+    private const float DefaultNonlinearExtrusionLimit = 0.2F;
 
     /// <summary>
     /// M593: configure input shaping

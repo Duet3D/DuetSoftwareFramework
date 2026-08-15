@@ -314,16 +314,30 @@ being unresolvable stayed invisible.
 
 For a given set of move parameters the SBC-side DDA ring produces the same output RepRapFirmware's
 does — `DDA::InitFromParams` onward is upstream verbatim. What is absent is absent by a switch or a
-deletion, and it is worth separating the permanent from the pending:
+deletion, and it is worth separating the permanent from the pending.
+
+A switch that marked a decision already taken rather than work still to do — there is no local
+driver to step, monitor or stall-detect, and every drive is CAN-connected — is not listed here and no
+longer exists in the source: it was a fact stated as a preprocessor condition. What remains marks
+real gaps.
 
 | Dropped | Status |
 |---|---|
-| `SUPPORT_S_CURVE 0` — trapezoidal profiles only | Permanent for now; `DDA_3rdOrder` and `MovementProfile` are not ported |
-| `SUPPORT_LASER 0`, `SUPPORT_IOBITS 0` | Pending — both need machine mode and a wire-format field |
-| `SUPPORT_NONLINEAR_EXTRUSION 0` | Pending — M592 |
+| `SUPPORT_S_CURVE 0` — trapezoidal profiles only | Pending. `MovementProfile.h` and `DDA_3rdOrder.cpp` are not ported, and `afterPrepare` has no `peakAcceleration`/`peakDeceleration`; the rest of the branch compiles |
+| `SUPPORT_LASER 0` | Pending — needs `MachineType`, a `Pwm_t`, and a PWM field on the move for DCS to fill |
+| `SUPPORT_IOBITS 0` | Permanent — the boards own their own outputs |
 | `DDARing::PushBabyStepping` | Deliberate, see §5 |
 | `DDARing::PauseMoves`, `LowPowerOrStallPause` | Pending — follows restore points and pause/resume |
 | `DDARing::AddSpecialMove` | Pending — bed levelling and leadscrew adjustment moves |
+
+`SUPPORT_S_CURVE` and `SUPPORT_LASER` cannot be built with the switch flipped; everything else that
+has one is compiled both ways by CI, so a disabled path cannot rot unnoticed.
+
+**M592 nonlinear extrusion is implemented.** The coefficients travel down in `MotionConfig` and
+`DDA::Prepare` applies them exactly as RepRapFirmware does, scaling the commanded extrusion by
+`1 + min((A + B*v) * v, limit)` for an average extrusion speed `v`. As in RRF, the three are set
+together rather than individually — `M592 D0 A0.01` also resets `B` to zero and the limit to 0.2 —
+and no standstill is required, because the coefficients are read when a move is prepared.
 
 ---
 

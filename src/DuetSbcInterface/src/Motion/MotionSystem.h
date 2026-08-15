@@ -78,6 +78,14 @@ namespace Duet::Sbc::Motion
 			return (extruder < maxExtruders) ? m_config.extruderDrivers[extruder] : DriverId{};
 		}
 
+		// M592 coefficients for one extruder. An out-of-range extruder gets the neutral set, whose
+		// a and b are zero, so the correction it produces is no correction at all.
+		[[nodiscard]] const NonlinearExtrusion& GetExtrusionCoefficients(size_t extruder) const noexcept
+		{
+			static constexpr NonlinearExtrusion noCorrection{};
+			return (extruder < maxExtruders) ? m_config.nonlinearExtrusion[extruder] : noCorrection;
+		}
+
 		// Kinematics answers that DCS evaluated for us; see MotionConfig.
 		[[nodiscard]] bool IsContinuousRotationAxis(size_t axis) const noexcept
 		{

@@ -31,11 +31,12 @@ public class MotionConfigLayout
     private const int ContinuousRotationAxesOffset = 1204;
     private const int ControllingDrivesOffset = 1208;
     private const int ShapingTimeClocksOffset = 1328;
+    private const int NonlinearExtrusionOffset = 1332;
 
     [Test]
     public void SerializedLengthMatchesTheNativeStruct()
     {
-        Assert.That(MotionConfig.SerializedLength, Is.EqualTo(1332));
+        Assert.That(MotionConfig.SerializedLength, Is.EqualTo(1572));
     }
 
     [Test]
@@ -89,6 +90,7 @@ public class MotionConfigLayout
 
         config.AxisDrivers[0] = AxisDriversConfig.WithDrivers(new DriverId(1, 4), new DriverId(2, 5));
         config.ExtruderDrivers[0] = new DriverId(3, 6);
+        config.NonlinearExtrusions[0] = new NonlinearExtrusion { A = 0.01f, B = 0.002f, Limit = 0.15f };
 
         byte[] buffer = new byte[MotionConfig.SerializedLength];
         int written = config.Serialize(buffer);
@@ -126,6 +128,11 @@ public class MotionConfigLayout
         Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan(ContinuousRotationAxesOffset)), Is.EqualTo(0x0000_0020));
         Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan(ControllingDrivesOffset + 4)), Is.EqualTo(0x3));
         Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan(ShapingTimeClocksOffset)), Is.EqualTo(1234));
+
+        // M592 coefficients, three floats per extruder
+        Assert.That(BitConverter.ToSingle(buffer, NonlinearExtrusionOffset), Is.EqualTo(0.01f), "extruder 0 A");
+        Assert.That(BitConverter.ToSingle(buffer, NonlinearExtrusionOffset + 4), Is.EqualTo(0.002f), "extruder 0 B");
+        Assert.That(BitConverter.ToSingle(buffer, NonlinearExtrusionOffset + 8), Is.EqualTo(0.15f), "extruder 0 limit");
     }
 
     [Test]
@@ -139,6 +146,20 @@ public class MotionConfigLayout
 
         Assert.That(buffer[AxisDriversOffset + 2], Is.EqualTo(DriverId.NoCanAddress));
         Assert.That(buffer[ExtruderDriversOffset + 1], Is.EqualTo(DriverId.NoCanAddress));
+    }
+
+    [Test]
+    public void UnconfiguredExtrudersSerialiseWithNoCorrectionButTheDefaultLimit()
+    {
+        // A zeroed limit would clamp every correction to nothing, so an extruder nobody has
+        // configured has to carry RepRapFirmware's 0.2 rather than a default-constructed zero
+        MotionConfig config = new();
+        byte[] buffer = new byte[MotionConfig.SerializedLength];
+        config.Serialize(buffer);
+
+        Assert.That(BitConverter.ToSingle(buffer, NonlinearExtrusionOffset), Is.EqualTo(0.0f), "A");
+        Assert.That(BitConverter.ToSingle(buffer, NonlinearExtrusionOffset + 4), Is.EqualTo(0.0f), "B");
+        Assert.That(BitConverter.ToSingle(buffer, NonlinearExtrusionOffset + 8), Is.EqualTo(NonlinearExtrusion.DefaultLimit), "limit");
     }
 
     [Test]

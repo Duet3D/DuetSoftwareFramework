@@ -126,6 +126,38 @@ internal struct AxisDriversConfig
 }
 
 /// <summary>
+/// M592 nonlinear extrusion coefficients for one extruder
+/// </summary>
+/// <remarks>
+/// The commanded extrusion is scaled by <c>1 + min((A + B*v) * v, Limit)</c>, where <c>v</c> is the
+/// average extrusion speed of the move in mm/sec
+/// </remarks>
+[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 12)]
+internal struct NonlinearExtrusion
+{
+    /// <summary>A coefficient</summary>
+    public float A;
+
+    /// <summary>B coefficient</summary>
+    public float B;
+
+    /// <summary>Largest correction this may apply, as a fraction of the commanded extrusion</summary>
+    public float Limit;
+
+    /// <summary>
+    /// An extruder with no correction configured
+    /// </summary>
+    /// <remarks>
+    /// Not <c>new NonlinearExtrusion()</c>: <see cref="Limit"/> defaults to RepRapFirmware's 0.2 rather
+    /// than to zero, and a default-constructed array would silently clamp every correction to nothing
+    /// </remarks>
+    public static NonlinearExtrusion None => new() { A = 0.0F, B = 0.0F, Limit = DefaultLimit };
+
+    /// <summary>RepRapFirmware's <c>DefaultNonlinearExtrusionLimit</c></summary>
+    public const float DefaultLimit = 0.2F;
+}
+
+/// <summary>
 /// Managed mirror of <c>DuetSbcInterface/src/Motion/MotionConfig.h</c>: the machine description the
 /// native motion engine needs
 /// </summary>
@@ -245,6 +277,13 @@ internal sealed class MotionConfig
     /// </remarks>
     public uint ShapingTimeClocks { get; set; }
 
+    // --- Extrusion correction -------------------------------------------------------------------
+
+    /// <summary>
+    /// M592 nonlinear extrusion coefficients, per extruder
+    /// </summary>
+    public NonlinearExtrusion[] NonlinearExtrusions { get; } = CreateNonlinearExtrusions();
+
     // --- Derived ----------------------------------------------------------------------------------
 
     /// <summary>
@@ -283,7 +322,8 @@ internal sealed class MotionConfig
         + 2                                                          // padding2
         + 4                                                          // continuousRotationAxes
         + (4 * MotionLimits.MaxAxes)                                 // controllingDrives
-        + 4;                                                         // shapingTimeClocks
+        + 4                                                          // shapingTimeClocks
+        + (12 * MotionLimits.MaxExtruders);                          // nonlinearExtrusion
 
     /// <summary>
     /// Serialise this configuration into the byte layout the native side expects
@@ -342,6 +382,13 @@ internal sealed class MotionConfig
         writer.WriteUInt32s(ControllingDrives);
         writer.WriteUInt32(ShapingTimeClocks);
 
+        foreach (NonlinearExtrusion nonlinear in NonlinearExtrusions)
+        {
+            writer.WriteSingle(nonlinear.A);
+            writer.WriteSingle(nonlinear.B);
+            writer.WriteSingle(nonlinear.Limit);
+        }
+
         return writer.Position;
     }
 
@@ -352,6 +399,13 @@ internal sealed class MotionConfig
         {
             result[i] = AxisDriversConfig.Empty;
         }
+        return result;
+    }
+
+    private static NonlinearExtrusion[] CreateNonlinearExtrusions()
+    {
+        NonlinearExtrusion[] result = new NonlinearExtrusion[MotionLimits.MaxExtruders];
+        Array.Fill(result, NonlinearExtrusion.None);
         return result;
     }
 
@@ -385,6 +439,12 @@ internal sealed class MotionConfig
         {
             BitConverter.TryWriteBytes(_destination[Position..], value);
             Position += sizeof(uint);
+        }
+
+        public void WriteSingle(float value)
+        {
+            BitConverter.TryWriteBytes(_destination[Position..], value);
+            Position += sizeof(float);
         }
 
         public void WriteSingles(ReadOnlySpan<float> values)

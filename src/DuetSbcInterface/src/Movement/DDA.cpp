@@ -859,10 +859,10 @@ void DDA::Prepare(DDARing& ring,
 							// If we are given a stupidly short move to execute then clocksNeeded can be zero, which leads to NaNs in this code; so we need to guard against that.
 							if (m_flags.isPrintingMove && m_clocksNeeded != 0)
 							{
-								const NonlinearExtrusion& nl = move.GetExtrusionCoefficients(extruder);
+								const Duet::Sbc::Motion::NonlinearExtrusion& nl = move.GetExtrusionCoefficients(extruder);
 								float& dv = m_directionVector[drive];
 								const float averageExtrusionSpeed = (m_totalDistance * dv * stepClockRate)/(float)m_clocksNeeded;		// need speed in mm/sec for nonlinear extrusion calculation
-								const float factor = 1.0 + min<float>((nl.A + (nl.B * averageExtrusionSpeed)) * averageExtrusionSpeed, nl.limit);
+								const float factor = 1.0 + min<float>((nl.a + (nl.b * averageExtrusionSpeed)) * averageExtrusionSpeed, nl.limit);
 								dv *= factor;
 							}
 #endif

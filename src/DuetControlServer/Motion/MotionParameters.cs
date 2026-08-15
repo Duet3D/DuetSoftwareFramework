@@ -480,6 +480,12 @@ internal sealed class MotionParameters
             config.PrintingInstantDvs[drive] = MotionUnits.SpeedFromMmPerMin(e.PrintingJerk);
             config.PressureAdvanceClocks[drive] = MotionUnits.ClocksFromSeconds(e.PressAdv.K0);
             config.ExtruderDrivers[extruder] = e.Driver is not null ? ToNativeDriver(e.Driver) : DriverId.None;
+            config.NonlinearExtrusions[extruder] = new Native.NonlinearExtrusion
+            {
+                A = e.Nonlinear.A,
+                B = e.Nonlinear.B,
+                Limit = e.Nonlinear.UpperLimit
+            };
 
             if (e.Driver is not null)
             {

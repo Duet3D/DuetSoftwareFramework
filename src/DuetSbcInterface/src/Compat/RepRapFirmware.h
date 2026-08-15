@@ -48,10 +48,10 @@
 // ---------------------------------------------------------------------------------------------
 
 #define SUPPORT_ASYNC_MOVES			1	// two DDA rings, drives owned per movement system
+#define SUPPORT_NONLINEAR_EXTRUSION	1	// M592 extrusion correction
 
 #define SUPPORT_S_CURVE				0	// 3rd-order planning: needs DDA_3rdOrder and MovementProfile
 #define SUPPORT_LASER				0	// laser power scaling: needs a PWM field on the move
-#define SUPPORT_NONLINEAR_EXTRUSION	0	// M592 correction: needs the coefficients from DuetControlServer
 
 // In the firmware this is __attribute__((optimize("O2"))), to force optimisation of the step ISR in
 // a debug build. There is no step ISR here, and mixing per-function optimize attributes with the
