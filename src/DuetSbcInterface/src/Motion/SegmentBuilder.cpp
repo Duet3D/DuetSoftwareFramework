@@ -59,7 +59,7 @@ MoveSegment *Duet::Sbc::Motion::SegmentBuilder::AddSegment(MoveSegment *list, ui
 			const auto mFirstDuration = (motioncalc_t)firstDuration;
 			const motioncalc_t firstDistance =
 				(CalcInitialSpeed(duration, distance, a) + oneHalf * a * mFirstDuration) * mFirstDuration;
-			seg->SetParameters(startTime, firstDuration, firstDistance, a, moveFlags);
+			seg->SetParameters(startTime, firstDuration, firstDistance, a J_ACTUAL_PARAMETER((motioncalc_t)0.0), moveFlags);
 			if (prev == nullptr)
 			{
 				list = seg;
@@ -100,7 +100,7 @@ MoveSegment *Duet::Sbc::Motion::SegmentBuilder::AddSegment(MoveSegment *list, ui
 				const auto segDuration = (motioncalc_t)seg->GetDuration();
 				const motioncalc_t firstDistance =
 					(CalcInitialSpeed(duration, distance, a) + oneHalf * a * segDuration) * segDuration;
-				seg->Merge(firstDistance, a, moveFlags);
+				seg->Merge(firstDistance, a J_ACTUAL_PARAMETER((motioncalc_t)0.0), moveFlags);
 				distance -= firstDistance;
 				startTime += seg->GetDuration();
 				duration = (uint32_t)timeDifference;
@@ -113,7 +113,7 @@ MoveSegment *Duet::Sbc::Motion::SegmentBuilder::AddSegment(MoveSegment *list, ui
 				{
 					(void)seg->Split(duration);
 				}
-				seg->Merge(distance, a, moveFlags);
+				seg->Merge(distance, a J_ACTUAL_PARAMETER((motioncalc_t)0.0), moveFlags);
 				return list;
 			}
 		}
@@ -124,7 +124,7 @@ MoveSegment *Duet::Sbc::Motion::SegmentBuilder::AddSegment(MoveSegment *list, ui
 
 	// Whatever is left of the new segment goes before 'seg', which may be null.
 	MoveSegment *const newSeg = MoveSegment::Allocate(seg);
-	newSeg->SetParameters(startTime, duration, distance, a, moveFlags);
+	newSeg->SetParameters(startTime, duration, distance, a J_ACTUAL_PARAMETER((motioncalc_t)0.0), moveFlags);
 	if (prev == nullptr)
 	{
 		list = newSeg;

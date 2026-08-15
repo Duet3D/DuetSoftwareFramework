@@ -34,10 +34,19 @@
 #include <Platform/Tasks.h>
 #include <GCodes/SimulationMode.h>
 
-# define DDA_LOG_PROBE_CHANGES	0
-# define DDA_DEBUG_STEP_COUNT	0
-
 class DDARing;
+
+namespace Duet::Sbc::Motion
+{
+	class MotionSystem;
+}
+
+#if SUPPORT_S_CURVE
+// The 3rd-order planner. Declared rather than included: MovementProfile.h is not ported, so the
+// declarations below that take one by reference are as far as this side goes. See
+// src/Documentation/articles/rrf-differences.md.
+class MovementProfile;
+#endif
 
 // Struct for passing parameters to the segment builder and the schedule builder.
 //
@@ -71,7 +80,7 @@ public:
 	{
 		Empty,				// empty or being filled in
 #if SUPPORT_S_CURVE
-		created,			// filled in but not yet planned
+		Created,			// filled in but not yet planned
 #endif
 		Planned,			// ready, but could be subject to modifications
 		Committed			// has been converted into move segments already
@@ -137,12 +146,12 @@ public:
 		{ return InverseConvertAcceleration(m_maxAcceleration); }
 #endif
 #if SUPPORT_S_CURVE
-	bool IsSCurveMove() const noexcept { return flags.useScurve; }
-	bool IsFullyPlanned() const noexcept { return flags.fullyPlanned; }
+	bool IsSCurveMove() const noexcept { return m_flags.useScurve; }
+	bool IsFullyPlanned() const noexcept { return m_flags.fullyPlanned; }
 	float GetMovementRatio() const noexcept { return m_movementRatio; }
-	void SetSpeedRatioAndMaxJunctionSpeedForPrintingMoves(const Move& move) noexcept;
-	void SetSpeedRatioAndMaxJunctionSpeedForNonPrintingMoves(const Move& move) noexcept;
-	void SetStartSpeedAndAcceleration(float speed, float acceleration) noexcept { startSpeed = speed; m_startAcceleration = acceleration; }
+	void SetSpeedRatioAndMaxJunctionSpeedForPrintingMoves(const Duet::Sbc::Motion::MotionSystem& move) noexcept;
+	void SetSpeedRatioAndMaxJunctionSpeedForNonPrintingMoves(const Duet::Sbc::Motion::MotionSystem& move) noexcept;
+	void SetStartSpeedAndAcceleration(float speed, float acceleration) noexcept { m_startSpeed = speed; m_startAcceleration = acceleration; }
 
 	static void PlanMoves(DDA *firstUnpreparedMove, MovementProfile& plannedProfile, bool stopping) noexcept;
 #endif
@@ -162,11 +171,6 @@ public:
 
 	static void PrintMoves() noexcept;										// print saved moves for debugging
 
-#if DDA_LOG_PROBE_CHANGES
-	static const size_t maxLoggedProbePositions = 40;
-	static size_t numLoggedProbePositions;
-	static int32_t loggedProbePositions[xyzAxes * maxLoggedProbePositions];
-#endif
 
 private:
 	static constexpr float minimumAccelOrDecelClocks = 10.0;				// Minimum number of acceleration or deceleration clocks we try to ensure
@@ -269,11 +273,6 @@ private:
 		} m_afterPrepare;
 	};
 
-#if DDA_LOG_PROBE_CHANGES
-	static bool probeTriggered;
-
-	void LogProbePosition() noexcept;
-#endif
 };
 
 inline bool DDA::CanPauseAfter() const noexcept
@@ -284,7 +283,7 @@ inline bool DDA::CanPauseAfter() const noexcept
 inline bool DDA::IsProvisional() const noexcept
 {
 #if SUPPORT_S_CURVE
-	return GetState() == created || GetState() == planned;
+	return GetState() == Created || GetState() == Planned;
 #else
 	return GetState() == Planned;
 #endif

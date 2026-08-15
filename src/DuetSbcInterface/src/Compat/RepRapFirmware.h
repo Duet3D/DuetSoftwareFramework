@@ -38,27 +38,20 @@
 // ---------------------------------------------------------------------------------------------
 // Feature switches
 //
-// These are the compile-time configuration of the imported code. Unlike the firmware, where they
-// vary per board, here they describe one fixed target: an SBC that plans moves and owns no drivers.
+// Each of these marks work this side intends to do and has not finished. A switch that marked a
+// decision already taken - the SBC owns no drivers, so there is nothing local to step, monitor or
+// stall-detect - is not a switch, it is a fact, and is stated where it matters instead.
+//
+// What each disabled one is still waiting for is recorded in
+// src/Documentation/articles/rrf-differences.md. Anything whose disabled path does build is compiled
+// by CI with the switch flipped, so that it stays that way.
 // ---------------------------------------------------------------------------------------------
 
-#define SUPPORT_CAN_EXPANSION		1	// every drive is remote; there is no local driver at all
 #define SUPPORT_ASYNC_MOVES			1	// two DDA rings, drives owned per movement system
 
-#define SUPPORT_S_CURVE				0	// 3rd-order planning is not ported (DDA_3rdOrder, MovementProfile)
-#define SUPPORT_LASER				0
-#define SUPPORT_IOBITS				0
-#define SUPPORT_SCANNING_PROBES		0
-#define SUPPORT_PHASE_STEPPING		0
-#define SUPPORT_CLOSED_LOOP			0
-#define SUPPORT_REMOTE_COMMANDS		0
-#define SUPPORT_NONLINEAR_EXTRUSION	0
-#define SUPPORT_COORDINATE_ROTATION	0
-
-#define HAS_SMART_DRIVERS			0
-#define HAS_STALL_DETECT			0
-#define HAS_VOLTAGE_MONITOR			0
-#define HAS_SBC_INTERFACE			1
+#define SUPPORT_S_CURVE				0	// 3rd-order planning: needs DDA_3rdOrder and MovementProfile
+#define SUPPORT_LASER				0	// laser power scaling: needs a PWM field on the move
+#define SUPPORT_NONLINEAR_EXTRUSION	0	// M592 correction: needs the coefficients from DuetControlServer
 
 // In the firmware this is __attribute__((optimize("O2"))), to force optimisation of the step ISR in
 // a debug build. There is no step ISR here, and mixing per-function optimize attributes with the
@@ -72,13 +65,7 @@
 // Microstep counts including fractional microsteps. Must agree with the firmware's setting: the
 // two sides exchange the derived speeds and distances over SPI as explicit 32-bit floats, but the
 // intermediate arithmetic has to round the same way for the tracked position to match the boards'.
-#define USE_DOUBLE_MOTIONCALC	(0)
-
-#if USE_DOUBLE_MOTIONCALC
-using motioncalc_t = double;
-#else
 using motioncalc_t = float;
-#endif
 
 inline motioncalc_t Msquare(motioncalc_t a) noexcept
 {

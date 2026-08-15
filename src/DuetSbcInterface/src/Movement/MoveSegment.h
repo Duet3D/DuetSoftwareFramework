@@ -40,7 +40,6 @@
 #include <new>		// for align_val_t
 
 #define SEGMENT_DEBUG	(0)
-#define CHECK_SEGMENTS	(0)
 
 constexpr motioncalc_t oneHalf = (motioncalc_t)0.5;
 
@@ -122,10 +121,6 @@ public:
 	[[nodiscard]] bool IsLinear() const noexcept { return m_a == (motioncalc_t)0.0; }
 	[[nodiscard]] MovementFlags GetFlags() const noexcept { return m_flags; }
 
-#if 0 //SUPPORT_REMOTE_COMMANDS
-	bool IsRemote() const noexcept { return isRemote; }
-#endif
-
 	// Given that this is not a constant-speed segment, test whether it is accelerating or decelerating
 	[[nodiscard]] bool IsAccelerating() const noexcept { return m_a > (motioncalc_t)0.0; }
 
@@ -149,7 +144,7 @@ public:
 	motioncalc_t GetJ() const noexcept { return m_j; }
 
 	// Get the speed change
-	motioncalc_t GetSpeedChange() const noexcept { return (m_a + m_j * (motioncalc_t)m_duration * OneHalf) * (motioncalc_t)m_duration; }
+	motioncalc_t GetSpeedChange() const noexcept { return (m_a + m_j * (motioncalc_t)m_duration * oneHalf) * (motioncalc_t)m_duration; }
 
 	// Get the acceleration change
 	motioncalc_t GetAccChange() const noexcept { return m_j * (motioncalc_t)m_duration; }
@@ -239,7 +234,7 @@ inline MoveSegment::MoveSegment(MoveSegment *pNext) noexcept
 inline motioncalc_t MoveSegment::CalcU() const noexcept
 {
 #if SUPPORT_S_CURVE
-	return m_distance/(motioncalc_t)m_duration - (OneHalf * m_a + OneSixth * m_j * (motioncalc_t)m_duration) * (motioncalc_t)m_duration;
+	return m_distance/(motioncalc_t)m_duration - (oneHalf * m_a + OneSixth * m_j * (motioncalc_t)m_duration) * (motioncalc_t)m_duration;
 #else
 	return m_distance/(motioncalc_t)m_duration - oneHalf * m_a * (motioncalc_t)m_duration;
 #endif
@@ -324,14 +319,14 @@ inline MoveSegment *MoveSegment::Split(uint32_t firstDuration) noexcept
 {
 	MoveSegment *const secondSeg = Allocate(m_next);
 #if SUPPORT_S_CURVE
-	const motioncalc_t firstDistance = (CalcU() + (OneHalf * m_a + m_j * (motioncalc_t)firstDuration * OneSixth) * (motioncalc_t)firstDuration) * (motioncalc_t)firstDuration;
+	const motioncalc_t firstDistance = (CalcU() + (oneHalf * m_a + m_j * (motioncalc_t)firstDuration * OneSixth) * (motioncalc_t)firstDuration) * (motioncalc_t)firstDuration;
 	secondSeg->SetParameters(m_startTime + firstDuration, m_duration - firstDuration, m_distance - firstDistance, m_a + m_j * (motioncalc_t)firstDuration, m_j, m_flags);
 #else
 	const motioncalc_t firstDistance = (CalcU() + oneHalf * m_a * (motioncalc_t)firstDuration) * (motioncalc_t)firstDuration;
 	secondSeg->SetParameters(m_startTime + firstDuration, m_duration - firstDuration, m_distance - firstDistance, m_a, m_flags);
 #endif
 #if SEGMENT_DEBUG
-	debugPrintf("split at %" PRIu32 ", fd=%.2f, sd=%.2f\n", firstDuration, (double)firstDistance, (double)(m_distance - firstDistance));
+	DebugPrintf("split at %" PRIu32 ", fd=%.2f, sd=%.2f\n", firstDuration, (double)firstDistance, (double)(m_distance - firstDistance));
 #endif
 	m_duration = firstDuration;
 	m_distance = firstDistance;
@@ -344,7 +339,7 @@ inline MoveSegment *MoveSegment::Split(uint32_t firstDuration) noexcept
 inline void MoveSegment::Merge(motioncalc_t pDistance, motioncalc_t pA J_FORMAL_PARAMETER(p_j), MovementFlags pFlags) noexcept
 {
 #if SEGMENT_DEBUG
-	debugPrintf("merge d=%.2f a=%.4e into ", (double)p_distance, (double)p_a);
+	DebugPrintf("merge d=%.2f a=%.4e into ", (double)pDistance, (double)pA);
 	DebugPrint();
 #endif
 	m_distance += pDistance;

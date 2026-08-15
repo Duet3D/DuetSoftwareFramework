@@ -12,13 +12,11 @@
 
 #include "DDA.h"
 
-#include <ObjectModel/ObjectModel.h>
-
 #if SUPPORT_S_CURVE
 # include "MovementProfile.h"
 #endif
 
-class DDARing final INHERIT_OBJECT_MODEL
+class DDARing final
 {
 public:
 	// Until DCS pushes its own value down in MotionConfig::gracePeriodMs. Upstream this lives in
@@ -119,7 +117,7 @@ private:
 	uint32_t m_whenLastMoveAdded = 0;											// Step clock time at which the most recent move was queued
 
 #if SUPPORT_S_CURVE
-	MovementProfile plannedProfile;												// the profile planned for a collection of moves
+	MovementProfile m_plannedProfile;												// the profile planned for a collection of moves
 #endif
 
 	RetirementCallback m_retirementCallback = nullptr;

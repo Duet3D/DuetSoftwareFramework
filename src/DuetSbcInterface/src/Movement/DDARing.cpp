@@ -17,9 +17,7 @@
 
 #include <algorithm>
 
-#if SUPPORT_CAN_EXPANSION
-# include "CAN/CanMotion.h"
-#endif
+#include "CAN/CanMotion.h"
 
 /* Note on how the DDA ring works, using the new step-generation code that implements late input shaping:
  * A DDA represents a straight-line move with at least one of an acceleration segment, a steady speed segment, and a deceleration segment.
@@ -115,10 +113,6 @@ bool DDARing::CanAddMove() const noexcept
 	 }
 	 return false;
 }
-
-#if SUPPORT_ASYNC_MOVES
-
-#endif
 
 // Add a move that DuetControlServer has already worked out the shape of.
 MovementError DDARing::AddMove(const Duet::Sbc::Motion::MoveParamsHeader& params) noexcept
@@ -273,29 +267,29 @@ uint32_t DDARing::Spin(uint32_t prepareAdvanceTime, SimulationMode simulationMod
 // Return true if we need to create a new plan before we can prepare a move
 inline bool DDARing::NeedNewPlan(DDA *moveToPrepare) const noexcept
 {
-	if (plannedProfile.numberOfMovesCovered == 0)
+	if (m_plannedProfile.numberOfMovesCovered == 0)
 	{
 		return true;												// if we don't have a plan yet, we need one
 	}
-	if (!plannedProfile.usesAllMoves)
+	if (!m_plannedProfile.usesAllMoves)
 	{
 		return false;												// if the plan ends before all moves are used, we don't need a new plan
 	}
-	if (plannedProfile.scheduledMovesWhenCreated == scheduledMoves)
+	if (m_plannedProfile.scheduledMovesWhenCreated == m_scheduledMoves)
 	{
 		return false;												// if no moves have been added, we don't need to re-plan
 	}
-	if (plannedProfile.reachesRequestedSpeed && (double)moveToPrepare->GetTotalDistance() <= plannedProfile.NonDecelDistance())
+	if (m_plannedProfile.reachesRequestedSpeed && (double)moveToPrepare->GetTotalDistance() <= m_plannedProfile.NonDecelDistance())
 	{
 		return false;												// if the profile reaches its requested speed and deceleration begins later than the end of this move, we don't need to re-plan yet
 	}
-	if (plannedProfile.ReducingDeceleration())
+	if (m_plannedProfile.ReducingDeceleration())
 	{
 		return false;												// if we are already in the reducing deceleration phase then unless allowed jerk has increased we can't avoid stopping
 	}
 
 	// We have an existing plan but it is out of date. Update the start speed and acceleration in the move to prepare to agree with the plan.
-	moveToPrepare->SetStartSpeedAndAcceleration((float)plannedProfile.startSpeed/moveToPrepare->GetMovementRatio(), (float)plannedProfile.startAcceleration/moveToPrepare->GetMovementRatio());
+	moveToPrepare->SetStartSpeedAndAcceleration((float)m_plannedProfile.startSpeed/moveToPrepare->GetMovementRatio(), (float)m_plannedProfile.startAcceleration/moveToPrepare->GetMovementRatio());
 	return true;													// we do need to construct a [new] plan
 }
 
@@ -315,9 +309,7 @@ uint32_t DDARing::PrepareMoves(DDA *firstUnpreparedMove, uint32_t prepareAdvance
 	// Try to avoid preparing deceleration-only moves too early
 	while (	  firstUnpreparedMove->IsProvisional()
 		   && IsTimeToPrepareMove(prepareAdvanceTime, moveTimeLeft)
-#if SUPPORT_CAN_EXPANSION
 		   && CanMotion::CanPrepareMove()
-#endif
 		  )
 	{
 #if SUPPORT_S_CURVE
@@ -327,20 +319,20 @@ uint32_t DDARing::PrepareMoves(DDA *firstUnpreparedMove, uint32_t prepareAdvance
 		{
 			if (NeedNewPlan(firstUnpreparedMove))
 			{
-				DDA::PlanMoves(firstUnpreparedMove, plannedProfile, false);
-				plannedProfile.scheduledMovesWhenCreated = scheduledMoves;
+				DDA::PlanMoves(firstUnpreparedMove, m_plannedProfile, false);
+				m_plannedProfile.scheduledMovesWhenCreated = m_scheduledMoves;
 			}
 			else
 			{
 #if 0
-				if (reprap.GetDebugFlags(Module::Move).IsBitSet(MoveDebugFlags::Lookahead))
+				if (reprap.GetDebugFlags(Module::Move).IsBitSet(MoveDebugFlags::lookahead))
 				{
-					debugPrintf("Skipping planning\n");
+					DebugPrintf("Skipping planning\n");
 				}
 #endif
 			}
 		}
-		firstUnpreparedMove->Prepare(*this, plannedProfile, prepareAdvanceTime, simulationMode);
+		firstUnpreparedMove->Prepare(*this, m_plannedProfile, prepareAdvanceTime, simulationMode);
 #else
 		firstUnpreparedMove->Prepare(*this, prepareAdvanceTime, simulationMode);
 #endif
@@ -380,7 +372,7 @@ bool DDARing::SetWaitingToEmpty() noexcept
 	{
 		m_waitingForRingToEmpty = false;
 #if SUPPORT_S_CURVE
-		plannedProfile.Invalidate();				// we may be waiting for movement to stop after an asynchronous pause, in which case the planned profile may not have been completed
+		m_plannedProfile.Invalidate();				// we may be waiting for movement to stop after an asynchronous pause, in which case the planned profile may not have been completed
 #endif
 	}
 	return ret;
@@ -469,10 +461,6 @@ float DDARing::GetCurrentMoveDuration() const noexcept
 	return (cdda != nullptr) ? (float)cdda->GetClocksNeeded() * stepClocksToSeconds : 0.0;;
 }
 
-#if HAS_VOLTAGE_MONITOR || HAS_STALL_DETECT
-
-#endif
-
 void DDARing::Diagnostics(const StringRef& reply, unsigned int ringNumber) noexcept
 {
 	reply.lcatf("=== DDARing %u ===\nScheduled moves %" PRIu32 ", completed %" PRIu32 ", LaErrors %u, Underruns [%u, %u]\n",
@@ -480,9 +468,5 @@ void DDARing::Diagnostics(const StringRef& reply, unsigned int ringNumber) noexc
 			   );
 	m_numLookaheadUnderruns = m_numNoMoveUnderruns = m_numLookaheadErrors = 0;
 }
-
-#if SUPPORT_LASER
-
-#endif
 
 // End
