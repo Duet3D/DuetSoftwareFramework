@@ -430,6 +430,48 @@ extern "C"
 		return (h != nullptr && h->motion.HasPendingSubmissions()) ? 1 : 0;
 	}
 
+	static_assert(DUET_SBC_MAX_RINGS == Duet::Sbc::Motion::maxRings,
+				  "DUET_SBC_MAX_RINGS must match the number of rings the engine builds");
+
+	void DuetSbc_MotionGetStats(DuetSbcHandle* h, DuetSbcMotionStats* stats)
+	{
+		if (stats == nullptr)
+		{
+			return;
+		}
+
+		// Zeroed rather than left alone when there is no handle, so a caller that reports before the
+		// link is up sees nothing happening instead of whatever the stack held
+		*stats = DuetSbcMotionStats{};
+		if (h == nullptr)
+		{
+			return;
+		}
+
+		const Duet::Sbc::MotionService::Stats source = h->motion.GetStats();
+		stats->segmentsCreated = source.segmentsCreated;
+		stats->movementDelayTicks = source.movementDelayTicks;
+		stats->submissionsDropped = source.submissionsDropped;
+		stats->forcedPositionsApplied = source.forcedPositionsApplied;
+		stats->droppedSchedulePackets = source.droppedSchedulePackets;
+		for (unsigned int i = 0; i < DUET_SBC_MAX_RINGS; ++i)
+		{
+			stats->rings[i].scheduledMoves = source.rings[i].scheduledMoves;
+			stats->rings[i].completedMoves = source.rings[i].completedMoves;
+			stats->rings[i].numLookaheadErrors = source.rings[i].numLookaheadErrors;
+			stats->rings[i].numLookaheadUnderruns = source.rings[i].numLookaheadUnderruns;
+			stats->rings[i].numNoMoveUnderruns = source.rings[i].numNoMoveUnderruns;
+		}
+	}
+
+	void DuetSbc_MotionResetStats(DuetSbcHandle* h)
+	{
+		if (h != nullptr)
+		{
+			h->motion.ResetStats();
+		}
+	}
+
 	uint32_t DuetSbc_GetStepClockTicks(DuetSbcHandle* h)
 	{
 		(void)h;					// the model is process-wide, like the clock it tracks
