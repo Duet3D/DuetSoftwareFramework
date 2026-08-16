@@ -1,8 +1,11 @@
 // MachineConfig crosses the CApi boundary as raw bytes: DuetSbc_MotionConfigure memcpys whatever
 // DuetControlServer hands it straight into the struct. Unlike the other boundary structs it is not
 // packed, because driveStepsPerMm and its neighbours are read while preparing moves and a misaligned
-// float array is not worth the twenty bytes saved. The padding the compiler would insert is declared
-// instead, so the managed mirror can reproduce it rather than guess at it.
+// float array is not worth the twenty bytes saved.
+//
+// The gaps that leaves belong to the compiler and are not declared on either side. The managed
+// mirror is a sequential struct of the same fields in the same order, so both compilers align them
+// the same way; these offsets are what would catch them ever not doing so.
 //
 // This suite prints the layout and checks the offsets the mirror hardcodes, and it exercises the
 // validation Configure applies to a description it did not write.
@@ -46,14 +49,11 @@ namespace
 		CHECK_OFFSET(MachineConfig, numTotalAxes, 0);
 		CHECK_OFFSET(MachineConfig, numExtruders, 1);
 		CHECK_OFFSET(MachineConfig, numRings, 2);
-		CHECK_OFFSET(MachineConfig, padding0, 3);
 		CHECK_OFFSET(MachineConfig, numDdasPerRing, 4);
-		CHECK_OFFSET(MachineConfig, padding, 6);
 		CHECK_OFFSET(MachineConfig, gracePeriodMs, 8);
 		CHECK_OFFSET(MachineConfig, driveStepsPerMm, 12);
 		CHECK_OFFSET(MachineConfig, axisDrivers, 140);
 		CHECK_OFFSET(MachineConfig, extruderDrivers, 650);
-		CHECK_OFFSET(MachineConfig, padding2, 690);
 		CHECK_OFFSET(MachineConfig, continuousRotationAxes, 692);
 		CHECK_OFFSET(MachineConfig, controllingDrives, 696);
 

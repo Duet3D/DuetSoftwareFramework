@@ -229,7 +229,7 @@ internal struct UIntPerAxis
 /// values as given: what comes back from <c>GetConfig</c> natively is the authority on what was used.
 /// </para>
 /// </remarks>
-[StructLayout(LayoutKind.Sequential, Pack = 1)]
+[StructLayout(LayoutKind.Sequential)]
 internal struct MachineConfig
 {
     // --- Machine shape ------------------------------------------------------------------------
@@ -243,14 +243,8 @@ internal struct MachineConfig
     /// <summary>Movement systems: 1, or 2 for a second asynchronous one</summary>
     public byte NumRings;
 
-    /// <summary>Declared on the native side so that this can reproduce it</summary>
-    public byte Padding0;
-
     /// <summary>Lookahead depth, i.e. how many moves a ring holds</summary>
     public ushort NumDdasPerRing;
-
-    /// <summary>Declared on the native side so that this can reproduce it</summary>
-    public ushort Padding;
 
     /// <summary>How long to let moves accumulate before starting one, in milliseconds</summary>
     public uint GracePeriodMs;
@@ -267,9 +261,6 @@ internal struct MachineConfig
 
     /// <summary>Which driver drives each extruder</summary>
     public DriverIdPerExtruder ExtruderDrivers;
-
-    /// <summary>Declared on the native side so that this can reproduce it</summary>
-    public ushort Padding2;
 
     // --- Kinematics results ---------------------------------------------------------------------
 
@@ -331,9 +322,10 @@ internal struct MachineConfig
     /// <remarks>
     /// The bytes are the struct's own. This used to be written field by field against a hand-counted
     /// length, on the grounds that the native struct is not packed and reproducing its padding meant
-    /// guessing at it - but the native side declares every padding byte it has, so there is nothing
-    /// left to guess and nothing left to keep in step. <c>MachineConfigLayout</c> asserts the offsets
-    /// against the numbers the native side asserts
+    /// guessing at it. Neither side spells the padding out now: both are sequential structs of the
+    /// same fields in the same order, so both compilers insert the same gaps.
+    /// <c>MachineConfigLayout</c> asserts the offsets against the numbers the native side asserts,
+    /// which is what would catch the two ever disagreeing
     /// </remarks>
     public readonly int Serialize(Span<byte> destination)
     {

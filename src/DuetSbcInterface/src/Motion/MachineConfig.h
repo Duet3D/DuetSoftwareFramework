@@ -63,9 +63,7 @@ namespace Duet::Sbc::Motion
 		uint8_t numExtruders = 0;
 
 		uint8_t numRings = 1;		  // 1, or 2 for a second asynchronous movement system
-		uint8_t padding0 = 0;		  // explicit, so the layout is the same on both sides
 		uint16_t numDdasPerRing = 40; // lookahead depth
-		uint16_t padding = 0;
 
 		uint32_t gracePeriodMs = 10; // how long to let moves accumulate before starting one
 
@@ -77,7 +75,6 @@ namespace Duet::Sbc::Motion
 
 		AxisDriversConfig axisDrivers[maxAxes];
 		DriverId extruderDrivers[maxExtruders];
-		uint16_t padding2 = 0; // explicit, to realign what follows
 
 		// --- Kinematics results, evaluated by DCS ---------------------------------------------
 
@@ -104,11 +101,13 @@ namespace Duet::Sbc::Motion
 	// DuetSbc_MotionConfigure memcpys the managed side's bytes straight into a MachineConfig, so this
 	// struct is as much an ABI as LinkEvents.h and MoveParams.h are. It is not packed, because
 	// driveStepsPerMm and its neighbours are read on the move-preparation path and misaligned float
-	// arrays are not worth the few bytes saved; instead the padding the compiler would have inserted
-	// is declared, so that the C# mirror can reproduce it rather than having to guess at it.
+	// arrays are not worth the few bytes saved.
 	//
-	// The mirror is DuetControlServer/Motion/Native/MachineConfig.cs. Its layout test asserts the same
-	// numbers as these do.
+	// The gaps that leaves are the compiler's, and are not declared. The mirror -
+	// DuetControlServer/Motion/Native/MachineConfig.cs - is a sequential struct of the same fields in
+	// the same order, so the two compilers align them identically without being told to. What used to
+	// be spelled out in padding fields is now asserted instead: the offsets below, and the same
+	// numbers on the managed side.
 	// ---------------------------------------------------------------------------------------------
 
 	static_assert(sizeof(DriverId) == 2, "DriverId must be 2 bytes");
@@ -119,7 +118,8 @@ namespace Duet::Sbc::Motion
 	static_assert(offsetof(MachineConfig, driveStepsPerMm) == 12);
 	static_assert(offsetof(MachineConfig, axisDrivers) == 12 + (4 * maxAxesPlusExtruders));
 	static_assert(offsetof(MachineConfig, continuousRotationAxes) % 4 == 0, "the bitmaps must stay 4-aligned");
-	static_assert(sizeof(MachineConfig) % 4 == 0, "no tail padding beyond what is declared");
+	static_assert(offsetof(MachineConfig, controllingDrives) == 696);
+	static_assert(sizeof(MachineConfig) == 816);
 } // namespace Duet::Sbc::Motion
 
 #endif /* SRC_MOTION_MACHINECONFIG_H_ */

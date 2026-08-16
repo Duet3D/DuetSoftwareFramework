@@ -46,14 +46,11 @@ public class MachineConfigLayout
             Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.NumTotalAxes)), Is.EqualTo((nint)0));
             Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.NumExtruders)), Is.EqualTo((nint)1));
             Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.NumRings)), Is.EqualTo((nint)2));
-            Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.Padding0)), Is.EqualTo((nint)3));
             Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.NumDdasPerRing)), Is.EqualTo((nint)4));
-            Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.Padding)), Is.EqualTo((nint)6));
             Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.GracePeriodMs)), Is.EqualTo((nint)GracePeriodMsOffset));
             Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.DriveStepsPerMm)), Is.EqualTo((nint)DriveStepsPerMmOffset));
             Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.AxisDrivers)), Is.EqualTo((nint)AxisDriversOffset));
             Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.ExtruderDrivers)), Is.EqualTo((nint)ExtruderDriversOffset));
-            Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.Padding2)), Is.EqualTo((nint)690));
             Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.ContinuousRotationAxes)), Is.EqualTo((nint)ContinuousRotationAxesOffset));
             Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.ControllingDrives)), Is.EqualTo((nint)ControllingDrivesOffset));
         });
@@ -108,13 +105,11 @@ public class MachineConfigLayout
 
         Assert.That(written, Is.EqualTo(MachineConfig.SerializedLength));
 
-        // Machine shape, including the padding that only exists so both sides agree on the offsets
+        // Machine shape
         Assert.That(buffer[0], Is.EqualTo(4), "numTotalAxes");
         Assert.That(buffer[1], Is.EqualTo(2), "numExtruders");
         Assert.That(buffer[2], Is.EqualTo(1), "numRings");
-        Assert.That(buffer[3], Is.EqualTo(0), "padding0");
         Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(buffer.AsSpan(4)), Is.EqualTo(40));
-        Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(buffer.AsSpan(6)), Is.EqualTo(0), "padding");
         Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan(GracePeriodMsOffset)), Is.EqualTo(10));
 
         // Per-drive arrays
@@ -131,8 +126,7 @@ public class MachineConfigLayout
         Assert.That(buffer[ExtruderDriversOffset], Is.EqualTo(6), "extruder driver, local number");
         Assert.That(buffer[ExtruderDriversOffset + 1], Is.EqualTo(3), "extruder driver, board address");
 
-        // Kinematics results, after the second padding that realigns them
-        Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(buffer.AsSpan(ExtruderDriversOffset + (2 * MotionLimits.MaxExtruders))), Is.EqualTo(0), "padding2");
+        // Kinematics results, after the alignment gap that precedes them
         Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan(ContinuousRotationAxesOffset)), Is.EqualTo(0x0000_0020));
         Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan(ControllingDrivesOffset + 4)), Is.EqualTo(0x3));
     }
