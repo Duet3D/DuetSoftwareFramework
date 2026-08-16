@@ -128,6 +128,30 @@ An axis never needs the extruder values and an extruder never needs `backlashSte
 share storage in a union and take the per-drive figure to 46 B. Worth doing, not worth complicating
 the layout further for.
 
+### The obvious optimisation, and why not
+
+Most moves carry tuning identical to the move before them, so the values look redundant. The way to
+exploit that is for DuetControlServer to keep *numbered* tuning tables: it sends a table down once
+whenever any value changes, and each move then carries only its table number. Two bytes a move
+instead of nine hundred.
+
+It is not worth it, because the number has to stay valid for as long as any move referencing it might
+still be read:
+
+- The engine must hold every table that a queued move could still use, and free one only once no
+  unretired move refers to it. That is a lifetime rule, and it has to be exactly right - a table
+  freed one move early is a move prepared with somebody else's pressure advance.
+- The set of tables is finite. Change tuning more times than there are slots while moves are still
+  queued and there are two options, both bad: reuse a slot a queued move still points at, or make
+  DuetControlServer wait for the ring to drain first. The second is the standstill this design exists
+  to remove, reintroduced in a form that appears only under load and is harder to predict.
+
+Both are the kind of coupling between the two sides that carrying the values outright does not have.
+`MoveParams.h` already made this same trade for the endpoint and direction arrays, and said why: a
+sparse encoding would save most of the bytes and cost indexing complexity everywhere, which is not a
+trade worth making before anything has been measured. The same answer applies here, and if the record
+size is ever measured to matter this is the thing to reach for.
+
 ### What it makes explicit
 
 Junction limits are a property of a *pair* of moves, not of one: `MatchSpeeds` and `RecalculateMove`
@@ -228,7 +252,10 @@ Steps 1 and 2 are behaviour-preserving and can land before anything user-visible
 
 | | Question | Recommendation |
 | --- | --- | --- |
-| **D1** | Tuning inline in every move, or a small table of tuning generations that a move indexes into with two bytes? | Inline. The index is ~900 bytes a move cheaper but brings back a lifetime question — when a generation may be reused — and an eviction failure mode under repeated changes, which is most of the complexity this design exists to avoid. `MoveParams.h` already made this trade once for the endpoint and direction arrays and wrote down why; this follows it. Revisit only if the record size is measured to matter. |
-| **D2** | Which move's jerk limits govern a junction? | The later one (§3). It matches what reading the live configuration at add time already did. |
-| **D3** | Keep `numVisibleAxes`? | Drop it — no native reader since `GCodesShim` went. |
-| **D4** | Should `gracePeriodMs` stay in the pushed config? | Yes, and say that pushing it needs no standstill. It is ring behaviour rather than a move property, and it is safe to change at any moment. |
+| **D1** | Which move's jerk limits govern a junction? | The later one (§3). It matches what reading the live configuration at add time already did, so it is the same behaviour written down rather than a change. |
+| **D2** | Keep `numVisibleAxes`? | Drop it — no native reader since `GCodesShim` went. |
+| **D3** | Should `gracePeriodMs` stay in the pushed config? | Yes, and say that pushing it needs no standstill. It is ring behaviour rather than a move property, and it is safe to change at any moment. |
+
+Whether to carry the tuning values outright or index them by table number is not listed here: it is
+settled in §3 with the reasoning, because the alternative reintroduces a form of the very coupling
+this design removes.
