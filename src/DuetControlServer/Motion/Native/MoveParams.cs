@@ -59,11 +59,59 @@ internal struct MoveParamsHeader
     /// <summary>Which ring to queue this move on: 0 or 1</summary>
     public byte RingNumber;
 
-    /// <summary>Entries in each of the two trailing arrays</summary>
+    /// <summary>Entries in each of the trailing arrays</summary>
     public byte NumDrives;
 
     /// <summary>Padding</summary>
     public ushort Padding;
+
+    /// <summary>
+    /// M566 P. 0 allows a junction speed only between moves of the same kind
+    /// </summary>
+    /// <remarks>
+    /// Read natively when this move is melded with the one before it, so it is the later move of that
+    /// junction whose value governs
+    /// </remarks>
+    public uint JerkPolicy;
+
+    /// <summary>How long the boards' input shaper spreads this move over, in step clocks</summary>
+    public uint ShapingTimeClocks;
+
+    /// <summary>How far to spread a backlash correction, as a multiple of the backlash itself</summary>
+    public uint BacklashCorrectionDistanceFactor;
+}
+
+/// <summary>
+/// What one drive of a move is to be executed with. Mirrors the native <c>MoveDriveTuning</c>
+/// </summary>
+/// <remarks>
+/// These were read from the shared machine description until moves began carrying their own. A move
+/// carries the values that were in force when it was built, so changing them cannot reach a move that
+/// is already queued - see <c>docs/devel/MOTION_CONFIG_ORDERING.md</c>
+/// </remarks>
+[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 28)]
+internal struct MoveDriveTuning
+{
+    /// <summary>Instantaneous speed change this drive tolerates, mm per step clock</summary>
+    public float InstantDv;
+
+    /// <summary>The same, for a junction where both moves extrude</summary>
+    public float PrintingInstantDv;
+
+    /// <summary>Pressure advance time constant, step clocks. Extruders only</summary>
+    public float PressureAdvanceClocks;
+
+    /// <summary>Backlash to take up when this drive reverses, microsteps. Axes only</summary>
+    public int BacklashSteps;
+
+    /// <summary>M592 A coefficient. Extruders only</summary>
+    public float NonlinearA;
+
+    /// <summary>M592 B coefficient. Extruders only</summary>
+    public float NonlinearB;
+
+    /// <summary>Largest M592 correction, as a fraction of the commanded extrusion</summary>
+    public float NonlinearLimit;
 }
 
 /// <summary>
@@ -308,13 +356,13 @@ internal sealed class MoveStopInput
 }
 
 /// <summary>
-/// Builds the byte layout of a move submission: the header followed by its three arrays
+/// Builds the byte layout of a move submission: the header followed by its four arrays
 /// </summary>
 /// <remarks>
-/// The arrays are <c>int endPoint[NumDrives]</c>, <c>float directionVector[NumDrives]</c> and
-/// <c>MoveStopInput stopOnInput[NumDrives]</c>. <c>NumDrives</c> is the configured number of logical drives
-/// rather than the number that actually move, because the native lookahead and preparation index
-/// densely by logical drive
+/// The arrays are <c>int endPoint[NumDrives]</c>, <c>float directionVector[NumDrives]</c>,
+/// <c>MoveStopInput stopOnInput[NumDrives]</c> and <c>MoveDriveTuning tuning[NumDrives]</c>.
+/// <c>NumDrives</c> is the configured number of logical drives rather than the number that actually
+/// move, because the native lookahead and preparation index densely by logical drive
 /// </remarks>
 internal static class MoveParams
 {
@@ -324,7 +372,8 @@ internal static class MoveParams
     /// <param name="numDrives">Number of logical drives</param>
     /// <returns>Size in bytes</returns>
     public static int Length(int numDrives)
-        => Marshal.SizeOf<MoveParamsHeader>() + (numDrives * (sizeof(int) + sizeof(float) + MoveStopInput.Length));
+        => Marshal.SizeOf<MoveParamsHeader>()
+           + (numDrives * (sizeof(int) + sizeof(float) + MoveStopInput.Length + Marshal.SizeOf<MoveDriveTuning>()));
 
     /// <summary>
     /// Write a move submission into <paramref name="destination"/>
@@ -334,15 +383,18 @@ internal static class MoveParams
     /// <param name="endPoints">Machine position each drive ends at, in microsteps</param>
     /// <param name="directionVector">Normalised direction, first three entries Cartesian</param>
     /// <param name="stopOnInput">Which switches stop each drive</param>
+    /// <param name="tuning">The limits each drive is to be executed with</param>
     /// <returns>Number of bytes written</returns>
     /// <exception cref="ArgumentException">The buffer is too small, or the arrays disagree with the header</exception>
     public static int Write(Span<byte> destination, MoveParamsHeader header, ReadOnlySpan<int> endPoints,
-                            ReadOnlySpan<float> directionVector, ReadOnlySpan<MoveStopInput> stopOnInput)
+                            ReadOnlySpan<float> directionVector, ReadOnlySpan<MoveStopInput> stopOnInput,
+                            ReadOnlySpan<MoveDriveTuning> tuning)
     {
         int numDrives = header.NumDrives;
-        if (endPoints.Length != numDrives || directionVector.Length != numDrives || stopOnInput.Length != numDrives)
+        if (endPoints.Length != numDrives || directionVector.Length != numDrives || stopOnInput.Length != numDrives
+            || tuning.Length != numDrives)
         {
-            throw new ArgumentException($"Expected {numDrives} entries in each array, got {endPoints.Length}, {directionVector.Length} and {stopOnInput.Length}");
+            throw new ArgumentException($"Expected {numDrives} entries in each array, got {endPoints.Length}, {directionVector.Length}, {stopOnInput.Length} and {tuning.Length}");
         }
 
         int total = Length(numDrives);
@@ -370,6 +422,10 @@ internal static class MoveParams
             entry[4 + MotionLimits.MaxDriversPerAxis] = (byte)stop.Action;
             entry[5 + MotionLimits.MaxDriversPerAxis] = stop.Group;
         }
+
+        // Blittable, so this one copies as a block
+        int tuningOffset = headerSize + (numDrives * (sizeof(int) + sizeof(float) + MoveStopInput.Length));
+        MemoryMarshal.AsBytes(tuning).CopyTo(destination[tuningOffset..]);
         return total;
     }
 }

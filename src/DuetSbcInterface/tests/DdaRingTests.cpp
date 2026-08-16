@@ -146,6 +146,29 @@ namespace
 		}
 		endPoints[xAxis] = lrintf(endX * stepsPerMm);
 		directions[xAxis] = 1.0F;
+
+		// The tuning a move carries is what it will be executed with; ConfigureMachine's values are
+		// what DuetControlServer would have filled in here
+		const std::span<Duet::Sbc::Motion::MoveDriveTuning> tuning = MoveParamsDriveTuning(h);
+		for (auto& entry : tuning)
+		{
+			entry = {};
+			entry.instantDv = instantDv;
+			entry.printingInstantDv = instantDv;
+		}
+		h.backlashCorrectionDistanceFactor = 1;
+		return move;
+	}
+
+	// A move that travels back down X, which is what makes a backlash correction due. The distance is
+	// positive as it is for any move; it is the direction vector and the endpoint that reverse.
+	MoveRecord MakeReverseXMove(uint32_t moveId, float fromX, float toX, int32_t backlashSteps) noexcept
+	{
+		MoveRecord move = MakeXMove(moveId, 0.0F, fromX - toX);
+		MoveParamsHeader& h = move.Header();
+		MoveParamsEndPoints(h)[xAxis] = lrintf(toX * stepsPerMm);
+		MoveParamsDirectionVector(h)[xAxis] = -1.0F;
+		MoveParamsDriveTuning(h)[xAxis].backlashSteps = backlashSteps;
 		return move;
 	}
 
@@ -183,6 +206,39 @@ namespace
 	// moving and the log says only "move duration too long". Everything that writes an axis
 	// acceleration therefore has to keep it above zero, and everything that creates an axis has to
 	// give it one; this is the check that says why.
+	// The point of carrying tuning on the move: a value changed between two moves takes effect on the
+	// move after it and not on the moves already queued, without the ring ever having to be empty.
+	//
+	// This is the M572 case from docs/devel/MOTION_CONFIG_ORDERING.md, using backlash because it
+	// shows up directly in the steps the controller is told to take. Pressure advance and the rest
+	// travel the same way.
+	void TestTuningAppliesFromTheMoveThatCarriesIt(DDARing& ring, RecordingSink& sink) noexcept
+	{
+		sink.Clear();
+		CHECK(Drain(ring), "the ring starts empty");
+
+		// Establish a forward direction, so that the reversals below are what make a correction due
+		CHECK(ring.AddMove(MakeXMove(1, 0.0F, 10.0F).Header()) == MovementError::Ok, "the priming move is queued");
+
+		// Two reversals carrying no backlash, then one carrying 100 steps - all queued before any of
+		// them is prepared, which is exactly the case a shared configuration gets wrong
+		CHECK(ring.AddMove(MakeReverseXMove(2, 10.0F, 0.0F, 0).Header()) == MovementError::Ok, "the first reversal is queued");
+		CHECK(ring.AddMove(MakeXMove(3, 0.0F, 10.0F).Header()) == MovementError::Ok, "a forward move is queued");
+		CHECK(ring.AddMove(MakeReverseXMove(4, 10.0F, 0.0F, 100).Header()) == MovementError::Ok,
+			  "the reversal carrying backlash is queued");
+		CHECK(Drain(ring), "the ring drains");
+
+		CHECK(sink.headers.size() == 4, "every move reached the controller");
+		if (sink.firstDriverSteps.size() == 4)
+		{
+			const int32_t plain = lrintf(10.0F * stepsPerMm);
+			CHECK(sink.firstDriverSteps[1] == -plain,
+				  "the reversal queued before the change takes no correction");
+			CHECK(sink.firstDriverSteps[3] == -plain - 100,
+				  "the reversal that carries the change takes it, though both were queued together");
+		}
+	}
+
 	void TestZeroAccelerationIsRejected(DDARing& ring, RecordingSink& sink) noexcept
 	{
 		sink.Clear();
@@ -504,6 +560,7 @@ int main()
 	TestRejectedMoveLeavesTheRingUsable(ring, sink);
 	TestForcedEndpointIsWhatTheNextMoveIsMeasuredFrom(ring, sink);
 	TestSimulationSendsNothing(ring, sink);
+	TestTuningAppliesFromTheMoveThatCarriesIt(ring, sink);
 	TestZeroAccelerationIsRejected(ring, sink);
 
 	StepTimer::SetLocalClockSource(nullptr);

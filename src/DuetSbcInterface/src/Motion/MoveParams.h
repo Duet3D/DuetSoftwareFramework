@@ -62,16 +62,17 @@ namespace Duet::Sbc::Motion
 
 #pragma pack(push, 1)
 
-	// Fixed part of a move submission. Three arrays follow it in the same record:
+	// Fixed part of a move submission. Four arrays follow it in the same record:
 	//
-	//     int32_t       endPoint[numDrives];        machine position each drive ends at, microsteps
-	//     float         directionVector[numDrives]; normalised direction, first three Cartesian
-	//     MoveStopInput stopInputs[numDrives];      which switches stop each drive, if any
+	//     int32_t         endPoint[numDrives];        machine position each drive ends at, microsteps
+	//     float           directionVector[numDrives]; normalised direction, first three Cartesian
+	//     MoveStopInput   stopInputs[numDrives];      which switches stop each drive, if any
+	//     MoveDriveTuning tuning[numDrives];          the limits this move is to be executed with
 	//
 	// numDrives is the configured maxAxesPlusExtruders rather than the number of drives that
 	// actually move, because MatchSpeeds, RecalculateMove and Prepare all index densely by logical
-	// drive. That is 288 bytes a move; a sparse encoding would save most of it and cost indexing
-	// complexity everywhere, which is not a trade worth making before anything has been measured.
+	// drive. A sparse encoding would save most of it and cost indexing complexity everywhere, which
+	// is not a trade worth making before anything has been measured.
 	struct MoveParamsHeader
 	{
 		// DCS's correlation id, quoted back in MoveCompleted and MoveFailed. Never zero
@@ -90,14 +91,53 @@ namespace Duet::Sbc::Motion
 		float requestedSpeed;
 		// Which ring to queue this move on: 0 or 1 (SUPPORT_ASYNC_MOVES)
 		uint8_t ringNumber;
-		// Entries in each of the two trailing arrays
+		// Entries in each of the trailing arrays
 		uint8_t numDrives;
 		uint16_t padding;
+
+		// --- Tuning, machine-wide ---------------------------------------------------------------
+		//
+		// Carried by the move rather than read from a shared configuration, so that changing it
+		// cannot reach a move that was already queued. See docs/devel/MOTION_CONFIG_ORDERING.md.
+
+		// M566 P. 0 allows a junction speed only between moves of the same kind. Read when this move
+		// is melded with the one before it, so it is the later move of that junction that governs
+		uint32_t jerkPolicy;
+		// How long the boards' input shaper spreads this move over, in step clocks. Read from the
+		// *previous* move when deciding whether an unshaped move may follow a shaped one, because it
+		// is that move's own tail that has to finish
+		uint32_t shapingTimeClocks;
+		// How far to spread a backlash correction, as a multiple of the backlash itself
+		uint32_t backlashCorrectionDistanceFactor;
+	};
+
+	// What one drive of this move is to be executed with. Everything here was read from a shared
+	// MotionConfig until moves began carrying their own; see docs/devel/MOTION_CONFIG_ORDERING.md for
+	// why that could not be ordered against the moves around it.
+	//
+	// Flat rather than a union of the axis and extruder halves. An axis never uses the extruder
+	// fields and an extruder never uses backlashSteps, so four bytes a drive could be saved, which is
+	// not worth two shapes for the managed side to write and the layout tests to assert.
+	struct MoveDriveTuning
+	{
+		// Instantaneous speed change this drive tolerates, mm per step clock. The printing variant
+		// applies at a junction where both moves extrude
+		float instantDv;
+		float printingInstantDv;
+		// Extruders only; zero for an axis
+		float pressureAdvanceClocks;
+		// Axes only; zero for an extruder
+		int32_t backlashSteps;
+		// M592, extruders only. The commanded extrusion is scaled by 1 + min((a + b*v) * v, limit)
+		float nonlinearA;
+		float nonlinearB;
+		float nonlinearLimit;
 	};
 
 #pragma pack(pop)
 
-	static_assert(sizeof(MoveParamsHeader) == 28, "MoveParamsHeader must be 28 bytes");
+	static_assert(sizeof(MoveParamsHeader) == 40, "MoveParamsHeader must be 40 bytes");
+	static_assert(sizeof(MoveDriveTuning) == 28, "MoveDriveTuning must be 28 bytes");
 	static_assert(offsetof(MoveParamsHeader, totalDistance) == 12);
 	static_assert(offsetof(MoveParamsHeader, ringNumber) == 24);
 
@@ -254,7 +294,9 @@ namespace Duet::Sbc::Motion
 	// Total size of a submission carrying `numDrives` drives.
 	[[nodiscard]] constexpr size_t MoveParamsLength(size_t numDrives) noexcept
 	{
-		return sizeof(MoveParamsHeader) + (numDrives * (sizeof(int32_t) + sizeof(float) + sizeof(MoveStopInput)));
+		return sizeof(MoveParamsHeader)
+			   + (numDrives
+				  * (sizeof(int32_t) + sizeof(float) + sizeof(MoveStopInput) + sizeof(MoveDriveTuning)));
 	}
 
 	// The two trailing arrays. Both are read straight out of the record, so callers must not assume
@@ -297,7 +339,17 @@ namespace Duet::Sbc::Motion
 		return {first, header.numDrives};
 	}
 
-	// The same three, for filling a record in. numDrives must already be set: it is what says where
+	// The limits each drive is to be executed with. Only meaningful for drives the move touches, but
+	// carried for all of them for the same reason the other arrays are - the planner indexes densely.
+	[[nodiscard]] inline std::span<const MoveDriveTuning> MoveParamsDriveTuning(const MoveParamsHeader& header) noexcept
+	{
+		const std::span<const MoveStopInput> stopInputs = MoveParamsStopInputs(header);
+		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
+		const auto* const first = reinterpret_cast<const MoveDriveTuning*>(stopInputs.data() + stopInputs.size());
+		return {first, header.numDrives};
+	}
+
+	// The same four, for filling a record in. numDrives must already be set: it is what says where
 	// each array begins and how long each span is.
 	[[nodiscard]] inline std::span<int32_t> MoveParamsEndPoints(MoveParamsHeader& header) noexcept
 	{
@@ -319,6 +371,14 @@ namespace Duet::Sbc::Motion
 		const std::span<float> directionVector = MoveParamsDirectionVector(header);
 		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
 		auto* const first = reinterpret_cast<MoveStopInput*>(directionVector.data() + directionVector.size());
+		return {first, header.numDrives};
+	}
+
+	[[nodiscard]] inline std::span<MoveDriveTuning> MoveParamsDriveTuning(MoveParamsHeader& header) noexcept
+	{
+		const std::span<MoveStopInput> stopInputs = MoveParamsStopInputs(header);
+		// NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - the tail is part of the record
+		auto* const first = reinterpret_cast<MoveDriveTuning*>(stopInputs.data() + stopInputs.size());
 		return {first, header.numDrives};
 	}
 } // namespace Duet::Sbc::Motion

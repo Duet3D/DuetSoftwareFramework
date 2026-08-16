@@ -169,6 +169,15 @@ class DDA final
 
 	[[nodiscard]] float GetTotalDistance() const noexcept { return m_totalDistance; }
 
+	// The limits this move is to be executed with, as they stood when DuetControlServer built it.
+	// Carried per move so that changing them cannot reach a move that is already queued; see
+	// docs/devel/MOTION_CONFIG_ORDERING.md.
+	[[nodiscard]] const Duet::Sbc::Motion::MoveDriveTuning& DriveTuning(size_t drive) const noexcept
+	{
+		return m_tuning[drive];
+	}
+	[[nodiscard]] uint32_t GetShapingTimeClocks() const noexcept { return m_shapingTimeClocks; }
+
 	[[nodiscard]] uint32_t GetClocksNeeded() const noexcept { return m_clocksNeeded; }
 	[[nodiscard]] bool HasExpired(const Duet::Sbc::Motion::MotionSystem& move) const noexcept;
 	[[nodiscard]] uint32_t GetMoveStartTime() const noexcept { return m_afterPrepare.moveStartTime; }
@@ -196,7 +205,7 @@ class DDA final
 	void AllocateMoveFromPlan(MovementProfile& plannedProfile, PrepParams& params) noexcept SPEED_CRITICAL;
 #endif
 
-	void MatchSpeeds(const Duet::Sbc::Motion::MotionSystem& move) noexcept SPEED_CRITICAL;
+	void MatchSpeeds() noexcept SPEED_CRITICAL;
 	[[nodiscard]] bool IsDecelerationMove() const
 		noexcept; // return true if this move is or have been might have been intended to be a deceleration-only move
 	[[nodiscard]] bool IsAccelerationMove() const
@@ -254,6 +263,13 @@ class DDA final
 	// checkEndstops is set. Carried per drive so one move can home several axes at once, each
 	// stopping on its own endstop
 	Duet::Sbc::Motion::MoveStopInput m_stopOnInput[maxAxesPlusExtruders]{};
+
+	// The tuning this move carries. Read in place of MotionSystem's copy everywhere the planner used
+	// to reach for it
+	Duet::Sbc::Motion::MoveDriveTuning m_tuning[maxAxesPlusExtruders]{};
+	uint32_t m_jerkPolicy{};
+	uint32_t m_shapingTimeClocks{};
+	uint32_t m_backlashCorrectionDistanceFactor{};
 
 	float m_totalDistance{};   // How long is the move in hypercuboid space
 	float m_maxAcceleration{}; // The maximum acceleration and deceleration to use, always positive

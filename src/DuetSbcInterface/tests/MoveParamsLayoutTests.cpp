@@ -43,7 +43,7 @@ namespace
 	void TestMoveParamsLayout() noexcept
 	{
 		Report("MoveParamsHeader", sizeof(MoveParamsHeader));
-		CHECK(sizeof(MoveParamsHeader) == 28, "MoveParamsHeader is 28 bytes");
+		CHECK(sizeof(MoveParamsHeader) == 40, "MoveParamsHeader is 40 bytes");
 		CHECK_OFFSET(MoveParamsHeader, moveId, 0);
 		CHECK_OFFSET(MoveParamsHeader, ownedDrives, 4);
 		CHECK_OFFSET(MoveParamsHeader, flags, 8);
@@ -107,7 +107,8 @@ namespace
 		constexpr uint8_t numDrives = 4;
 		constexpr size_t length = MoveParamsLength(numDrives);
 		Report("MoveParams(4 drives)", length);
-		CHECK(length == 28 + (4 * (4 + 4 + 14)), "a four-drive submission is the header plus three four-entry arrays");
+		CHECK(length == 40 + (4 * (4 + 4 + 14 + 28)),
+			  "a four-drive submission is the header plus four four-entry arrays");
 
 		alignas(uint32_t) char record[MoveParamsLength(numDrives)]{};
 		auto *const header = reinterpret_cast<MoveParamsHeader *>(record);
@@ -118,9 +119,11 @@ namespace
 		const std::span<int32_t> endPoints = MoveParamsEndPoints(*header);
 		const std::span<float> directions = MoveParamsDirectionVector(*header);
 		const std::span<Duet::Sbc::Motion::MoveStopInput> stopInputs = MoveParamsStopInputs(*header);
+		const std::span<Duet::Sbc::Motion::MoveDriveTuning> tuning = MoveParamsDriveTuning(*header);
 		CHECK(endPoints.size() == numDrives, "the endpoint span covers the drives the header claims");
 		CHECK(directions.size() == numDrives, "the direction span covers the drives the header claims");
 		CHECK(stopInputs.size() == numDrives, "the stop input span covers the drives the header claims");
+		CHECK(tuning.size() == numDrives, "the tuning span covers the drives the header claims");
 		for (uint8_t i = 0; i < numDrives; ++i)
 		{
 			endPoints[i] = 1000 + i;
@@ -128,16 +131,20 @@ namespace
 			stopInputs[i].handle = (uint16_t)(0x100 + i);
 			stopInputs[i].numSwitches = 1;
 			stopInputs[i].boards[0] = (uint8_t)(i + 1);
+			tuning[i].instantDv = 0.5F * (float)(i + 1);
+			tuning[i].pressureAdvanceClocks = 10.0F * (float)(i + 1);
+			tuning[i].backlashSteps = 7 * (i + 1);
 		}
 
 		// A byte past the end would be a buffer overrun in the transfer, so check the span ends
 		// exactly where the record does.
-		const char *const lastByte = reinterpret_cast<const char *>(stopInputs.data() + stopInputs.size());
-		CHECK(lastByte == record + length, "the stop inputs end exactly at the end of the record");
+		const char *const lastByte = reinterpret_cast<const char *>(tuning.data() + tuning.size());
+		CHECK(lastByte == record + length, "the tuning entries end exactly at the end of the record");
 
 		const std::span<const int32_t> readEndPoints = MoveParamsEndPoints(*header);
 		const std::span<const float> readDirections = MoveParamsDirectionVector(*header);
 		const std::span<const Duet::Sbc::Motion::MoveStopInput> readStopInputs = MoveParamsStopInputs(*header);
+		const std::span<const Duet::Sbc::Motion::MoveDriveTuning> readTuning = MoveParamsDriveTuning(*header);
 		for (uint8_t i = 0; i < numDrives; ++i)
 		{
 			CHECK(readEndPoints[i] == 1000 + i, "endpoints read back as written");
@@ -150,6 +157,11 @@ namespace
 			const uint32_t forDriver = Duet::Sbc::Motion::StopInputForSwitch(readStopInputs[i], 0, 0xFF);
 			CHECK(Duet::Sbc::Motion::StopInputBoard(forDriver) == i + 1, "the stop input board reads back as written");
 			CHECK(Duet::Sbc::Motion::StopInputHandle(forDriver) == 0x100 + i, "the stop input handle reads back as written");
+
+			CHECK_NEAR(readTuning[i].instantDv, 0.5 * (i + 1), 1e-9, "the drive's jerk limit reads back as written");
+			CHECK_NEAR(readTuning[i].pressureAdvanceClocks, 10.0 * (i + 1), 1e-9,
+					   "the drive's pressure advance reads back as written");
+			CHECK(readTuning[i].backlashSteps == 7 * (i + 1), "the drive's backlash reads back as written");
 		}
 	}
 }

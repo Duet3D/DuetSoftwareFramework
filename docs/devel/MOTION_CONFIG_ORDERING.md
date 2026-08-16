@@ -250,11 +250,13 @@ Steps 1 and 2 are behaviour-preserving and can land before anything user-visible
 
 ## 8. Decisions
 
-| | Question | Recommendation |
+All settled.
+
+| | Question | Settled as |
 | --- | --- | --- |
-| **D1** | Which move's jerk limits govern a junction? | The later one (§3). It matches what reading the live configuration at add time already did, so it is the same behaviour written down rather than a change. |
-| **D2** | Keep `numVisibleAxes`? | Drop it — no native reader since `GCodesShim` went. |
-| **D3** | Should `gracePeriodMs` stay in the pushed config? | Yes, and say that pushing it needs no standstill. It is ring behaviour rather than a move property, and it is safe to change at any moment. |
+| **D1** | Which move's jerk limits govern a junction? | **The later move.** It matches what reading the live configuration at add time already did, so it is the same behaviour written down rather than a change. |
+| **D2** | Keep `numVisibleAxes`? | **Remove it** — no native reader since `GCodesShim` went. |
+| **D3** | Should `gracePeriodMs` stay in the pushed config? | **Keep it there**, and say that pushing it needs no standstill. It is ring behaviour rather than a move property, and it is safe to change at any moment. |
 
 Whether to carry the tuning values outright or index them by table number is not listed here: it is
 settled in §3 with the reasoning, because the alternative reintroduces a form of the very coupling

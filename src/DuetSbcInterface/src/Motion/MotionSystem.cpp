@@ -83,7 +83,8 @@ void MotionSystem::Configure(const MotionConfig& newConfig) noexcept
 	SanitiseConfig(m_config);
 }
 
-int32_t MotionSystem::ApplyBacklashCompensation(size_t drive, int32_t delta) noexcept
+int32_t MotionSystem::ApplyBacklashCompensation(size_t drive, int32_t delta, int32_t backlashSteps,
+												uint32_t distanceFactor) noexcept
 {
 	if (drive >= maxAxes)
 	{
@@ -96,8 +97,7 @@ int32_t MotionSystem::ApplyBacklashCompensation(size_t drive, int32_t delta) noe
 	if (backwards != m_lastMoveWasBackwards[drive])
 	{
 		m_lastMoveWasBackwards[drive] = backwards;
-		const int32_t backlash = m_config.backlashSteps[drive];
-		targetSteps += (backwards) ? -backlash : backlash;
+		targetSteps += (backwards) ? -backlashSteps : backlashSteps;
 	}
 
 	int32_t& currentSteps = m_currentBacklashSteps[drive];
@@ -107,7 +107,7 @@ int32_t MotionSystem::ApplyBacklashCompensation(size_t drive, int32_t delta) noe
 		// Spread the correction over several moves rather than injecting it in one: a whole
 		// backlash added to a short move would be a visible jolt. backlashCorrectionDistanceFactor
 		// is how many times the correction the move must be before it is all taken at once.
-		if ((uint32_t)labs(stepsDue) * m_config.backlashCorrectionDistanceFactor <= (uint32_t)labs(delta))
+		if ((uint32_t)labs(stepsDue) * distanceFactor <= (uint32_t)labs(delta))
 		{
 			delta += stepsDue;
 			currentSteps = targetSteps;
@@ -115,7 +115,7 @@ int32_t MotionSystem::ApplyBacklashCompensation(size_t drive, int32_t delta) noe
 		else
 		{
 			const auto maxAllowedSteps =
-				(int32_t)max<uint32_t>((uint32_t)labs(delta) / m_config.backlashCorrectionDistanceFactor, 1u);
+				(int32_t)max<uint32_t>((uint32_t)labs(delta) / distanceFactor, 1u);
 			const int32_t stepsToDo =
 				(stepsDue < 0) ? max<int32_t>(stepsDue, -maxAllowedSteps) : min<int32_t>(stepsDue, maxAllowedSteps);
 			currentSteps += stepsToDo;
@@ -125,11 +125,15 @@ int32_t MotionSystem::ApplyBacklashCompensation(size_t drive, int32_t delta) noe
 	return delta;
 }
 
-void MotionSystem::AddLinearSegments(
-	size_t drive, uint32_t startTime, const MoveProfile& profile, motioncalc_t steps, MovementFlags moveFlags) noexcept
+void MotionSystem::AddLinearSegments(size_t drive,
+									 uint32_t startTime,
+									 const MoveProfile& profile,
+									 motioncalc_t steps,
+									 MovementFlags moveFlags,
+									 motioncalc_t pressureAdvanceClocks) noexcept
 {
 	const motioncalc_t pressureAdvance =
-		(moveFlags.isExtruder && !moveFlags.nonPrintingMove) ? GetPressureAdvanceK0ClocksForLogicalDrive(drive) : 0;
+		(moveFlags.isExtruder && !moveFlags.nonPrintingMove) ? pressureAdvanceClocks : 0;
 	m_trackers[drive].AddMove(startTime, profile, steps, moveFlags, pressureAdvance);
 }
 

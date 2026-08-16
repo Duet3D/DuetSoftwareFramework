@@ -130,7 +130,12 @@ namespace Duet::Sbc::Motion
 		// Extend a reversing move so that the backlash is taken up. Not const: it tracks how much of
 		// the correction has been applied, because spreading it over several moves is the point -
 		// injecting it all at once would show up as a visible jolt.
-		[[nodiscard]] int32_t ApplyBacklashCompensation(size_t drive, int32_t delta) noexcept;
+		//
+		// `backlashSteps` and `distanceFactor` come from the move rather than from the configuration
+		// here, so that changing them cannot reach a move that is already queued. What stays here is
+		// the accumulator, which is machine state rather than configuration.
+		[[nodiscard]] int32_t ApplyBacklashCompensation(size_t drive, int32_t delta, int32_t backlashSteps,
+														uint32_t distanceFactor) noexcept;
 
 		// How long the boards' input shaper spreads a move over. Zero while shaping is off; see
 		// MotionConfig::shapingTimeClocks for why this is not simply absent.
@@ -177,11 +182,15 @@ namespace Duet::Sbc::Motion
 
 		// Hand one drive's share of a prepared move to its tracker. This is what DDA::Prepare calls
 		// in place of the firmware's Move::AddLinearSegments.
+		//
+		// `pressureAdvanceClocks` is the move's own, so that changing it cannot reach a move that is
+		// already queued. Ignored for anything that is not an extruder doing a printing move.
 		void AddLinearSegments(size_t drive,
 							   uint32_t startTime,
 							   const MoveProfile& profile,
 							   motioncalc_t steps,
-							   MovementFlags moveFlags) noexcept;
+							   MovementFlags moveFlags,
+							   motioncalc_t pressureAdvanceClocks) noexcept;
 
 		// Bring every drive's position up to `now`. Called once per pass of the motion loop.
 		void AdvanceTrackers(uint32_t now) noexcept;

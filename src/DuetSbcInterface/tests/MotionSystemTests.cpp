@@ -48,12 +48,27 @@ namespace
 
 	MotionSystem theMove;
 
+	// Backlash travels with the move now rather than being read from the configuration, so the tests
+	// have to supply it. These remember what the configuration under test asked for, so that the
+	// assertions below read as they did when the engine looked it up itself.
+	int32_t theBacklashSteps = 0;
+	uint32_t theDistanceFactor = 1;
+
 	MotionSystem& FreshSystem(const MotionConfig& config) noexcept
 	{
 		MotionSystem& move = theMove;
 		(void)move.Init();
 		move.Configure(config);
+		theBacklashSteps = config.backlashSteps[xAxis];
+		theDistanceFactor = config.backlashCorrectionDistanceFactor;
 		return move;
+	}
+
+	int32_t ApplyBacklash(MotionSystem& move, size_t drive, int32_t delta) noexcept
+	{
+		// An extruder carries no backlash, exactly as DuetControlServer would fill the move
+		const int32_t steps = (drive < maxAxes) ? theBacklashSteps : 0;
+		return move.ApplyBacklashCompensation(drive, delta, steps, theDistanceFactor);
 	}
 }
 
@@ -63,9 +78,9 @@ static void TestNoBacklashLeavesDeltasAlone()
 {
 	MotionSystem& move = FreshSystem(BasicConfig(0));
 
-	CHECK(move.ApplyBacklashCompensation(xAxis, 1000) == 1000, "forward move unchanged");
-	CHECK(move.ApplyBacklashCompensation(xAxis, -1000) == -1000, "reverse move unchanged");
-	CHECK(move.ApplyBacklashCompensation(xAxis, 1000) == 1000, "and back again");
+	CHECK(ApplyBacklash(move, xAxis, 1000) == 1000, "forward move unchanged");
+	CHECK(ApplyBacklash(move, xAxis, -1000) == -1000, "reverse move unchanged");
+	CHECK(ApplyBacklash(move, xAxis, 1000) == 1000, "and back again");
 }
 
 // Reversing direction calls for the whole backlash, and a move long enough to absorb it takes it
@@ -76,14 +91,14 @@ static void TestReversalInjectsBacklash()
 
 	// Drives start out recorded as moving forwards, so a forward move is not a reversal and needs
 	// no correction. Only a change of direction does.
-	CHECK(move.ApplyBacklashCompensation(xAxis, 1000) == 1000, "the first forward move needs no correction");
-	CHECK(move.ApplyBacklashCompensation(xAxis, 1000) == 1000, "nor does continuing forwards");
+	CHECK(ApplyBacklash(move, xAxis, 1000) == 1000, "the first forward move needs no correction");
+	CHECK(ApplyBacklash(move, xAxis, 1000) == 1000, "nor does continuing forwards");
 
-	CHECK(move.ApplyBacklashCompensation(xAxis, -1000) == -1020, "reversing takes up the backlash");
-	CHECK(move.ApplyBacklashCompensation(xAxis, -1000) == -1000, "continuing backwards needs no more");
+	CHECK(ApplyBacklash(move, xAxis, -1000) == -1020, "reversing takes up the backlash");
+	CHECK(ApplyBacklash(move, xAxis, -1000) == -1000, "continuing backwards needs no more");
 
 	// Reversing back swings the correction from -20 to 0, so this move owes 20 the other way.
-	CHECK(move.ApplyBacklashCompensation(xAxis, 1000) == 1020, "and reversing again takes it up the other way");
+	CHECK(ApplyBacklash(move, xAxis, 1000) == 1020, "and reversing again takes it up the other way");
 }
 
 // A move too short to hide the correction gets only a share of it, and the rest is carried.
@@ -94,25 +109,25 @@ static void TestShortMovesSpreadTheCorrection()
 	MotionSystem& move = FreshSystem(BasicConfig(backlash, distanceFactor));
 
 	// Establish a direction, then reverse so that a correction is owed.
-	CHECK(move.ApplyBacklashCompensation(xAxis, 200) == 200, "no correction until the drive reverses");
+	CHECK(ApplyBacklash(move, xAxis, 200) == 200, "no correction until the drive reverses");
 
 	// A 200-step move cannot absorb 100 steps of correction at a factor of 10: it may take at most
 	// 200/10 = 20. So the move becomes 220 and 80 steps remain owed.
-	CHECK(move.ApplyBacklashCompensation(xAxis, -200) == -220, "a short move takes only its share");
-	CHECK(move.ApplyBacklashCompensation(xAxis, -200) == -220, "the next one takes another share");
+	CHECK(ApplyBacklash(move, xAxis, -200) == -220, "a short move takes only its share");
+	CHECK(ApplyBacklash(move, xAxis, -200) == -220, "the next one takes another share");
 
 	// After enough short moves the whole correction has been delivered and moves return to normal.
 	int32_t delta = 0;
 	for (unsigned int i = 0; i < 10; ++i)
 	{
-		delta = move.ApplyBacklashCompensation(xAxis, -200);
+		delta = ApplyBacklash(move, xAxis, -200);
 	}
 	CHECK(delta == -200, "once the correction is delivered, moves are unmodified again");
 
 	// A long move takes whatever is outstanding in one go instead.
 	MotionSystem& other = FreshSystem(BasicConfig(backlash, distanceFactor));
-	CHECK(other.ApplyBacklashCompensation(xAxis, 5000) == 5000, "no correction until it reverses");
-	CHECK(other.ApplyBacklashCompensation(xAxis, -5000) == -5100, "a long move absorbs the whole correction");
+	CHECK(ApplyBacklash(other, xAxis, 5000) == 5000, "no correction until it reverses");
+	CHECK(ApplyBacklash(other, xAxis, -5000) == -5100, "a long move absorbs the whole correction");
 }
 
 // Backlash steps move the motor but not the axis, so they must not appear in the reported position.
@@ -126,8 +141,8 @@ static void TestReportedPositionExcludesBacklash()
 	CHECK(positions[xAxis] == 0, "starts at zero");
 
 	// Establish a direction, then reverse so that a correction is injected.
-	(void)move.ApplyBacklashCompensation(xAxis, 1000);
-	const int32_t compensated = move.ApplyBacklashCompensation(xAxis, -1000);
+	(void)ApplyBacklash(move, xAxis, 1000);
+	const int32_t compensated = ApplyBacklash(move, xAxis, -1000);
 	CHECK(compensated == -1020, "the reversing delta carries 20 steps of correction");
 
 	// Run both moves through a drive so the tracker holds what the motor really did: 1000 forwards,
@@ -142,8 +157,8 @@ static void TestReportedPositionExcludesBacklash()
 
 	MovementFlags flags{};
 	flags.Clear();
-	move.AddLinearSegments(xAxis, 0, profile, (motioncalc_t)1000.0, flags);
-	move.AddLinearSegments(xAxis, profile.TotalClocks(), profile, (motioncalc_t)compensated, flags);
+	move.AddLinearSegments(xAxis, 0, profile, (motioncalc_t)1000.0, flags, 0);
+	move.AddLinearSegments(xAxis, profile.TotalClocks(), profile, (motioncalc_t)compensated, flags, 0);
 	move.AdvanceTrackers(2 * profile.TotalClocks());
 
 	// Within a step: the two moves cover different step counts over the same profile, so the
@@ -164,8 +179,8 @@ static void TestExtrudersAreNotCompensated()
 	MotionSystem& move = FreshSystem(config);
 
 	const size_t extruderDrive = maxAxesPlusExtruders - 1;
-	CHECK(move.ApplyBacklashCompensation(extruderDrive, 500) == 500, "extruder deltas are untouched");
-	CHECK(move.ApplyBacklashCompensation(extruderDrive, -500) == -500, "in both directions");
+	CHECK(ApplyBacklash(move, extruderDrive, 500) == 500, "extruder deltas are untouched");
+	CHECK(ApplyBacklash(move, extruderDrive, -500) == -500, "in both directions");
 }
 
 // AreDrivesStopped is how a move that checks endstops knows it has finished, so it has to consider
@@ -187,7 +202,7 @@ static void TestAreDrivesStopped()
 
 	MovementFlags flags{};
 	flags.Clear();
-	move.AddLinearSegments(xAxis, 0, profile, (motioncalc_t)300.0, flags);
+	move.AddLinearSegments(xAxis, 0, profile, (motioncalc_t)300.0, flags, 0);
 
 	CHECK(!move.AreDrivesStopped(all), "not stopped while X has pending motion");
 	CHECK(move.AreDrivesStopped(LogicalDrivesBitmap::MakeFromBits(1, 2)), "but the other axes are");
@@ -216,7 +231,7 @@ static void TestCancelSteppingAbandonsPendingMotion()
 
 	MovementFlags flags{};
 	flags.Clear();
-	move.AddLinearSegments(xAxis, 0, profile, (motioncalc_t)300.0, flags);
+	move.AddLinearSegments(xAxis, 0, profile, (motioncalc_t)300.0, flags, 0);
 	move.AdvanceTrackers(1000);					// partway through
 
 	int32_t before[maxAxesPlusExtruders] = {};

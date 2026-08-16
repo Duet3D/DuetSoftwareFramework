@@ -318,6 +318,7 @@ MovementError DDA::InitFromParams(DDARing& ring, const Duet::Sbc::Motion::MovePa
 	const std::span<const int32_t> endPoints = MoveParamsEndPoints(params);
 	const std::span<const float> directions = MoveParamsDirectionVector(params);
 	const std::span<const Duet::Sbc::Motion::MoveStopInput> stopInputs = MoveParamsStopInputs(params);
+	const std::span<const MoveDriveTuning> tuning = MoveParamsDriveTuning(params);
 	for (size_t drive = 0; drive < maxAxesPlusExtruders; ++drive)
 	{
 		// The bound comes from the spans rather than from numDrives again: they were built from it
@@ -327,18 +328,26 @@ MovementError DDA::InitFromParams(DDARing& ring, const Duet::Sbc::Motion::MovePa
 			m_endPoint[drive] = endPoints[drive];
 			m_directionVector[drive] = directions[drive];
 			m_stopOnInput[drive] = stopInputs[drive];
+			m_tuning[drive] = tuning[drive];
 		}
 		else
 		{
 			m_endPoint[drive] = m_prev->m_endPoint[drive];
 			m_directionVector[drive] = 0.0;
 			m_stopOnInput[drive] = Duet::Sbc::Motion::kNoStopSwitches;
+			// A drive the record did not describe keeps whatever the move before it was executed
+			// with, for the same reason its endpoint does: the alternative is zero, and a zero
+			// instantaneous speed change would forbid every junction on that drive
+			m_tuning[drive] = m_prev->m_tuning[drive];
 		}
 	}
 
 	m_totalDistance = params.totalDistance;
 	m_maxAcceleration = params.maxAcceleration;
 	m_requestedSpeed = params.requestedSpeed;
+	m_jerkPolicy = params.jerkPolicy;
+	m_shapingTimeClocks = params.shapingTimeClocks;
+	m_backlashCorrectionDistanceFactor = params.backlashCorrectionDistanceFactor;
 
 	m_flags.canPauseAfter = (params.flags & MoveFlags::canPauseAfter) != 0;
 	m_flags.checkEndstops = (params.flags & MoveFlags::checkEndstops) != 0;
@@ -355,11 +364,10 @@ MovementError DDA::InitFromParams(DDARing& ring, const Duet::Sbc::Motion::MovePa
 	// 7. Calculate the provisional accelerate and decelerate distances and the top speed
 	m_endSpeed = 0.0; // until we have a following move
 
-	const Duet::Sbc::Motion::MotionSystem& move = ring.GetMove();
 	const bool melded =
 		m_prev->IsProvisional() // if previous move has not started yet
 		&&
-		(move.GetJerkPolicy() != 0 // and melding is allowed
+		(m_jerkPolicy != 0 // and melding is allowed
 		 || (m_flags.isPrintingMove == m_prev->m_flags.isPrintingMove && m_flags.xyMoving == m_prev->m_flags.xyMoving &&
 			 m_flags.isNonPrintingExtruderMove ==
 				 m_prev->m_flags.isNonPrintingExtruderMove // this is to prevent extruder-only move being melded with
@@ -471,14 +479,14 @@ bool DDA::IsAccelerationMove() const noexcept
 			// This is a deceleration-only move, and the previous one has a deceleration phase. We may have to adjust
 			// the previous move as well to get optimum behaviour.
 			if (laDDA->m_prev->IsProvisional() &&
-				(ring.GetMove().GetJerkPolicy() != 0 ||
+				(laDDA->m_jerkPolicy != 0 ||
 				 (laDDA->m_prev->m_flags.xyMoving == laDDA->m_flags.xyMoving &&
 				  (laDDA->m_prev->m_flags.isPrintingMove == laDDA->m_flags.isPrintingMove ||
 				   (laDDA->m_prev->m_flags.isPrintingMove &&
 					laDDA->m_prev->m_requestedSpeed == laDDA->m_requestedSpeed) // special case to support coast-to-end
 				   ))))
 			{
-				laDDA->MatchSpeeds(ring.GetMove());
+				laDDA->MatchSpeeds();
 				const float maxStartSpeed = fastSqrtf(fsquare(laDDA->m_beforePrepare.targetNextSpeed) +
 													  (2 * laDDA->m_maxAcceleration * laDDA->m_totalDistance));
 				laDDA->m_prev->m_beforePrepare.targetNextSpeed = min<float>(maxStartSpeed, laDDA->m_requestedSpeed);
@@ -504,7 +512,7 @@ bool DDA::IsAccelerationMove() const noexcept
 		break;
 	}
 
-	laDDA->MatchSpeeds(ring.GetMove()); // adjust the target end speed if necessary
+	laDDA->MatchSpeeds(); // adjust the target end speed if necessary
 
 	// Iterate back through the list towards later moves
 	for (;;)
@@ -658,10 +666,10 @@ MovementError DDA::RecalculateMove(DDARing& ring) noexcept
 	// Set up flags.canPauseAfter
 	if (m_flags.canPauseAfter && m_endSpeed != 0.0)
 	{
-		const Duet::Sbc::Motion::MotionSystem& m = ring.GetMove();
 		for (size_t drive = 0; drive < maxAxesPlusExtruders; ++drive)
 		{
-			if (m_endSpeed * fabsf(m_directionVector[drive]) > m.GetMaxInstantDv(drive))
+			// Stopping at the end of this move, so this move's own limit is the one that applies
+			if (m_endSpeed * fabsf(m_directionVector[drive]) > m_tuning[drive].instantDv)
 			{
 				m_flags.canPauseAfter = false;
 				break;
@@ -682,7 +690,7 @@ MovementError DDA::RecalculateMove(DDARing& ring) noexcept
 // same speed for both. On entry, targetNextSpeed is the speed we would like the next move after this one to start at
 // and this one to end at On return, targetNextSpeed is the actual speed we can achieve without exceeding the jerk
 // limits.
-void DDA::MatchSpeeds(const Duet::Sbc::Motion::MotionSystem& move) noexcept
+void DDA::MatchSpeeds() noexcept
 {
 	for (size_t drive = 0; drive < maxAxesPlusExtruders; ++drive)
 	{
@@ -690,7 +698,8 @@ void DDA::MatchSpeeds(const Duet::Sbc::Motion::MotionSystem& move) noexcept
 		{
 			const float totalFraction = fabsf(m_directionVector[drive] - m_next->m_directionVector[drive]);
 			const float instantDv = totalFraction * m_beforePrepare.targetNextSpeed;
-			const float allowedInstantDv = move.GetPrintingInstantDv(drive);
+			// The junction is between this move and the next, and the later of the two governs
+			const float allowedInstantDv = m_next->m_tuning[drive].printingInstantDv;
 			if (instantDv > allowedInstantDv)
 			{
 				m_beforePrepare.targetNextSpeed = allowedInstantDv / totalFraction;
@@ -815,7 +824,8 @@ void DDA::Prepare(DDARing& ring,
 		// input shaping
 		if (!params.useInputShaping && m_prev->UsesInputShaping())
 		{
-			prevEndTime += move.GetShapingTimeClocks();
+			// The previous move's own shaping tail is what has to finish first
+			prevEndTime += m_prev->m_shapingTimeClocks;
 		}
 		if ((int32_t)(prevEndTime - now) >= (int32_t)MoveTiming::absoluteMinimumPreparedTime)
 		{
@@ -880,12 +890,13 @@ void DDA::Prepare(DDARing& ring,
 							}
 						}
 
-						delta = move.ApplyBacklashCompensation(drive, delta);
+						delta = move.ApplyBacklashCompensation(drive, delta, m_tuning[drive].backlashSteps,
+															   m_backlashCorrectionDistanceFactor);
 
 						// We generate segments even for nonlocal drivers so that the final position is correct and to
 						// track the position in near real time
 						move.AddLinearSegments(
-							drive, m_afterPrepare.moveStartTime, params, (motioncalc_t)delta, segFlags);
+							drive, m_afterPrepare.moveStartTime, params, (motioncalc_t)delta, segFlags, 0);
 						m_afterPrepare.drivesMoving.SetBit(drive);
 
 						const Duet::Sbc::Motion::AxisDriversConfig& config = move.GetAxisDriversConfig(drive);
@@ -953,15 +964,15 @@ void DDA::Prepare(DDARing& ring,
 							// leads to NaNs in this code; so we need to guard against that.
 							if (m_flags.isPrintingMove && m_clocksNeeded != 0)
 							{
-								const Duet::Sbc::Motion::NonlinearExtrusion& nl =
-									move.GetExtrusionCoefficients(extruder);
+								const Duet::Sbc::Motion::MoveDriveTuning& nl = m_tuning[drive];
 								float& dv = m_directionVector[drive];
 								const float averageExtrusionSpeed =
 									(m_totalDistance * dv * stepClockRate) /
 									(float)m_clocksNeeded; // need speed in mm/sec for nonlinear extrusion calculation
 								const float factor =
-									1.0 + min<float>((nl.a + (nl.b * averageExtrusionSpeed)) * averageExtrusionSpeed,
-													 nl.limit);
+									1.0 + min<float>((nl.nonlinearA + (nl.nonlinearB * averageExtrusionSpeed)) *
+														 averageExtrusionSpeed,
+													 nl.nonlinearLimit);
 								dv *= factor;
 							}
 #endif
@@ -970,8 +981,8 @@ void DDA::Prepare(DDARing& ring,
 								m_totalDistance * m_directionVector[drive] * move.DriveStepsPerMm(drive);
 
 							// We generate segments even for nonlocal extruders in order to track extruder position
-							move.AddLinearSegments(
-								drive, m_afterPrepare.moveStartTime, params, delta, segFlags.AddIsExtruder());
+							move.AddLinearSegments(drive, m_afterPrepare.moveStartTime, params, delta,
+												   segFlags.AddIsExtruder(), m_tuning[drive].pressureAdvanceClocks);
 
 							const DriverId driver = move.GetExtruderDriver(extruder);
 							if (driver.IsRemote())
