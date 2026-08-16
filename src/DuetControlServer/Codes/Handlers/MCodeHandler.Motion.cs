@@ -28,7 +28,9 @@ namespace DuetControlServer.Codes.Handlers;
 /// Most of these write the object model and nothing else: <c>move.axes[]</c>,
 /// <c>move.extruders[]</c> and <c>move.motionSystems[]</c> are the configuration, and
 /// <see cref="Motion.MotionParameters"/> is rebuilt from them by
-/// <see cref="Motion.MovePlanner.ReconfigureAsync"/>. There is deliberately no second copy of a
+/// <see cref="Motion.MovePlanner.RefreshTuningAsync"/> - or, for the few that change what a
+/// microstep means, by <see cref="Motion.MovePlanner.ReconfigureAsync"/> at standstill. There is
+/// deliberately no second copy of a
 /// setting anywhere in this file.
 /// </para>
 /// <para>
@@ -223,7 +225,11 @@ internal partial class MCodeHandler
             return new Message(MessageType.Success, report!);
         }
 
-        return await planner.ReconfigureAsync(cancellationToken) ? new Message() : MotionConfigRejected;
+        // Accelerations are not held by the engine at all - every move carries its own in
+        // MoveParamsHeader - so this only has to bring the snapshot the next move is built from up to
+        // date. RepRapFirmware takes no lock here either, except for the S-curve T parameter
+        await planner.RefreshTuningAsync(cancellationToken);
+        return new Message();
     }
 
     /// <summary>
@@ -287,7 +293,8 @@ internal partial class MCodeHandler
             return new Message(MessageType.Success, report!);
         }
 
-        return await planner.ReconfigureAsync(cancellationToken) ? new Message() : MotionConfigRejected;
+        await planner.RefreshTuningAsync(cancellationToken);
+        return new Message();
     }
 
     /// <summary>
@@ -411,9 +418,9 @@ internal partial class MCodeHandler
             return new Message(MessageType.Success, report);
         }
 
-        if (seenAxis && !await planner.ReconfigureAsync(cancellationToken))
+        if (seenAxis)
         {
-            return MotionConfigRejected;
+            await planner.RefreshTuningAsync(cancellationToken);
         }
         return new Message();
     }
@@ -1254,11 +1261,6 @@ internal partial class MCodeHandler
             dk = transition;
         }
 
-        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
-        {
-            throw new OperationCanceledException();
-        }
-
         List<RemoteDrivers.DriverValue<float>> toUpdate = [];
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
@@ -1286,10 +1288,9 @@ internal partial class MCodeHandler
             }
         }
 
-        if (!await planner.ReconfigureAsync(cancellationToken))
-        {
-            return MotionConfigRejected;
-        }
+        // No standstill and no push: the coefficient rides on each move from here on, so the moves
+        // already queued keep the one they were built with. See docs/devel/MOTION_CONFIG_ORDERING.md
+        await planner.RefreshTuningAsync(cancellationToken);
 
         if (toUpdate.Count == 0)
         {
@@ -1345,9 +1346,10 @@ internal partial class MCodeHandler
             nonlinear.UpperLimit = seenLimit ? limit : DefaultNonlinearExtrusionLimit;
         }
 
-        // No standstill flush: RRF takes no movement lock for M592, and the coefficients are read
-        // when a move is prepared rather than when it is queued
-        return await planner.ReconfigureAsync(cancellationToken) ? new Message() : MotionConfigRejected;
+        // No standstill flush: RRF takes no movement lock for M592, and the coefficients ride on each
+        // move built from here on rather than being pushed to the engine
+        await planner.RefreshTuningAsync(cancellationToken);
+        return new Message();
     }
 
     /// <summary>
@@ -1370,11 +1372,6 @@ internal partial class MCodeHandler
     {
         bool seen = false;
         string? report = null;
-
-        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
-        {
-            throw new OperationCanceledException();
-        }
 
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
@@ -1420,7 +1417,8 @@ internal partial class MCodeHandler
             return new Message(MessageType.Success, report!);
         }
 
-        return await planner.ReconfigureAsync(cancellationToken) ? new Message() : MotionConfigRejected;
+        await planner.RefreshTuningAsync(cancellationToken);
+        return new Message();
     }
 
     /// <summary>
@@ -1675,11 +1673,6 @@ internal partial class MCodeHandler
         bool seen = false;
         string? report = null;
 
-        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
-        {
-            throw new OperationCanceledException();
-        }
-
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             Move move = model.Move;
@@ -1716,7 +1709,8 @@ internal partial class MCodeHandler
             return new Message(MessageType.Success, report!);
         }
 
-        return await planner.ReconfigureAsync(cancellationToken) ? new Message() : MotionConfigRejected;
+        await planner.RefreshTuningAsync(cancellationToken);
+        return new Message();
     }
 
     /// <summary>
