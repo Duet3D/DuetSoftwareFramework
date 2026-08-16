@@ -540,9 +540,13 @@ internal sealed class MoveBuilder(MotionParameters parameters)
     /// </remarks>
     private void FillTuning()
     {
+        // Read once: the configuration is a large struct held by value, so touching it inside the loop
+        // would copy it for every drive
+        int firstExtruderDrive = Parameters.Config.FirstExtruderDrive;
+
         for (int drive = 0; drive < NumDrives; drive++)
         {
-            NonlinearExtrusion nonlinear = drive >= Parameters.Config.FirstExtruderDrive
+            NonlinearExtrusion nonlinear = drive >= firstExtruderDrive
                 ? Parameters.NonlinearExtrusions[MotionLimits.MaxAxesPlusExtruders - 1 - drive]
                 : NonlinearExtrusion.None;
 
