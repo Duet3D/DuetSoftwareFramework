@@ -26,7 +26,7 @@ namespace DuetControlServer.Motion.Native;
 /// at startup, exactly as it does for the link event records.
 /// </para>
 /// </remarks>
-[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 28)]
+[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 40)]
 internal struct MoveParamsHeader
 {
     /// <summary>
