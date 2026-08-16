@@ -295,7 +295,7 @@ static void TestOverlappingMoveInvalidatesCachedSegment()
 
 int main()
 {
-	if (!Duet::Sbc::Motion::MemoryArena::Reserve(4 * 1024 * 1024))
+	if (!Duet::Sbc::MemoryArena::Reserve(4 * 1024 * 1024))
 	{
 		std::printf("FAIL: could not reserve the permanent arena\n");
 		return 1;

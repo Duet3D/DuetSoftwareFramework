@@ -21,7 +21,7 @@
 
 #include <new> // for std::align_val_t
 
-namespace Duet::Sbc::Motion::MemoryArena
+namespace Duet::Sbc::MemoryArena
 {
 	// Reserve the arena. Call once, before anything allocates from it. Returns false if the region
 	// could not be mapped; mlock failing is not fatal (it needs privileges the caller may not have)
@@ -38,6 +38,6 @@ namespace Duet::Sbc::Motion::MemoryArena
 
 	// Bytes still unallocated.
 	[[nodiscard]] ptrdiff_t BytesFree() noexcept;
-} // namespace Duet::Sbc::Motion::MemoryArena
+} // namespace Duet::Sbc::MemoryArena
 
 #endif /* SRC_PLATFORM_MEMORYARENA_H_ */

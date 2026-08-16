@@ -361,7 +361,7 @@ int main()
 {
 	// DDA and MoveSegment allocate from the permanent arena rather than the heap; see
 	// Motion/MemoryArena.h. 1MB is far more than these tests need.
-	if (!Duet::Sbc::Motion::MemoryArena::Reserve(1024 * 1024))
+	if (!Duet::Sbc::MemoryArena::Reserve(1024 * 1024))
 	{
 		std::printf("FAIL: could not reserve the permanent arena\n");
 		return 1;

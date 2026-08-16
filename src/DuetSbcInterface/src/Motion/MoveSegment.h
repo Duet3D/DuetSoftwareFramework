@@ -124,10 +124,10 @@ union MovementFlags final
 class MoveSegment final
 {
   public:
-	void* operator new(size_t count) noexcept { return Duet::Sbc::Motion::MemoryArena::Allocate(count); }
+	void* operator new(size_t count) noexcept { return Duet::Sbc::MemoryArena::Allocate(count); }
 	void* operator new(size_t count, std::align_val_t align) noexcept
 	{
-		return Duet::Sbc::Motion::MemoryArena::Allocate(count, align);
+		return Duet::Sbc::MemoryArena::Allocate(count, align);
 	}
 	void operator delete(void * /*ptr*/) noexcept {}
 	void operator delete(void * /*ptr*/, std::align_val_t /*align*/) noexcept {}

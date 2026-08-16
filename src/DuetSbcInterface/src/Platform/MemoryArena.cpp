@@ -48,7 +48,7 @@ namespace
 	}
 } // namespace
 
-bool Duet::Sbc::Motion::MemoryArena::Reserve(size_t bytes) noexcept
+bool Duet::Sbc::MemoryArena::Reserve(size_t bytes) noexcept
 {
 	if (arenaBase != nullptr)
 	{
@@ -78,7 +78,7 @@ bool Duet::Sbc::Motion::MemoryArena::Reserve(size_t bytes) noexcept
 	return true;
 }
 
-void Duet::Sbc::Motion::MemoryArena::Release() noexcept
+void Duet::Sbc::MemoryArena::Release() noexcept
 {
 	if (arenaBase != nullptr)
 	{
@@ -89,17 +89,17 @@ void Duet::Sbc::Motion::MemoryArena::Release() noexcept
 	}
 }
 
-void* Duet::Sbc::Motion::MemoryArena::Allocate(size_t count) noexcept
+void* Duet::Sbc::MemoryArena::Allocate(size_t count) noexcept
 {
 	return AllocateAligned(count, defaultAlignment);
 }
 
-void* Duet::Sbc::Motion::MemoryArena::Allocate(size_t count, std::align_val_t align) noexcept
+void* Duet::Sbc::MemoryArena::Allocate(size_t count, std::align_val_t align) noexcept
 {
 	return AllocateAligned(count, static_cast<size_t>(align));
 }
 
-ptrdiff_t Duet::Sbc::Motion::MemoryArena::BytesFree() noexcept
+ptrdiff_t Duet::Sbc::MemoryArena::BytesFree() noexcept
 {
 	return (ptrdiff_t)(arenaSize - arenaUsed);
 }

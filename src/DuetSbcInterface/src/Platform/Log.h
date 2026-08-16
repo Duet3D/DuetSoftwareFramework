@@ -30,7 +30,7 @@ enum class Module : uint8_t
 // thread runs SCHED_FIFO, and a write() to a pipe nobody is draining would block it.
 void DebugPrintf(const char* fmt, ...) noexcept __attribute__((format(printf, 1, 2)));
 
-namespace Duet::Sbc::Motion
+namespace Duet::Sbc
 {
 	// Receives one already-formatted, NUL-terminated line. Must not block.
 	using LogSink = void (*)(const char* message) noexcept;
@@ -41,6 +41,6 @@ namespace Duet::Sbc::Motion
 	// Format one line and hand it to the sink. This is what the motion sources reach through
 	// DebugPrintf, and what stands in for the firmware's Platform::MessageF.
 	void LogMessage(const char* fmt, ...) noexcept __attribute__((format(printf, 1, 2)));
-} // namespace Duet::Sbc::Motion
+} // namespace Duet::Sbc
 
 #endif /* SRC_PLATFORM_LOG_H_ */

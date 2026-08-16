@@ -48,7 +48,7 @@ struct MoveParameters
 
 	void DebugPrint() const noexcept
 	{
-		Duet::Sbc::Motion::LogMessage("%f,%f,%f,%f,%f,%f,%f,%f,%08" PRIX32 ",%08" PRIx32 "\n",
+		Duet::Sbc::LogMessage("%f,%f,%f,%f,%f,%f,%f,%f,%08" PRIX32 ",%08" PRIx32 "\n",
 									  (double)accelDistance,
 									  (double)steadyDistance,
 									  (double)decelDistance,
@@ -63,7 +63,7 @@ struct MoveParameters
 
 	static void PrintHeading() noexcept
 	{
-		Duet::Sbc::Motion::LogMessage("accelDistance,steadyDistance,decelDistance,requestedSpeed,startSpeed,"
+		Duet::Sbc::LogMessage("accelDistance,steadyDistance,decelDistance,requestedSpeed,startSpeed,"
 									  "topSpeed,endSpeed,targetNextSpeed,endstopChecks,flags\n");
 	}
 };
