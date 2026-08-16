@@ -1342,6 +1342,12 @@ internal partial class MCodeHandler
             bool seenA = code.TryGetFloat('A', out float a);
             bool seenB = code.TryGetFloat('B', out float b);
             bool seenLimit = code.TryGetFloat('L', out float limit);
+            if (seenLimit && limit < 0.0F)
+            {
+                // RepRapFirmware reads L with TryGetNonNegativeFValue. A negative limit would let the
+                // correction subtract more than the commanded extrusion
+                return new Message(MessageType.Error, "parameter 'L' too low");
+            }
 
             if (!seenA && !seenB && !seenLimit)
             {
