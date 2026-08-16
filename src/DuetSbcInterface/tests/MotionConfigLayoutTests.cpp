@@ -11,7 +11,7 @@
 
 #include <Motion/MotionConfig.h>
 #include <Motion/MotionSystem.h>
-#include <Movement/DDARing.h>
+#include <Motion/DDARing.h>
 
 #include <cstddef>
 

@@ -8,8 +8,8 @@
  * involved.
  */
 
-#ifndef SRC_MOVEMENT_DDARING_H_
-#define SRC_MOVEMENT_DDARING_H_
+#ifndef SRC_MOTION_DDARING_H_
+#define SRC_MOTION_DDARING_H_
 
 #include "DDA.h"
 
@@ -176,4 +176,4 @@ class DDARing final
 		false; // True if Move has signalled that we are waiting for this ring to empty
 };
 
-#endif /* SRC_MOVEMENT_DDARING_H_ */
+#endif /* SRC_MOTION_DDARING_H_ */

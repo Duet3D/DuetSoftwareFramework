@@ -13,8 +13,8 @@
  * counter from the samples every SPI transfer carries. See StepTimer.h.
  */
 
-#ifndef SRC_MOVEMENT_STEPCLOCK_H_
-#define SRC_MOVEMENT_STEPCLOCK_H_
+#ifndef SRC_MOTION_STEPCLOCK_H_
+#define SRC_MOTION_STEPCLOCK_H_
 
 #include <Config/MachineLimits.h>
 
@@ -45,4 +45,4 @@ static constexpr float InverseConvertAcceleration(float accel) noexcept
 	return accel * (float)stepClockRateSquared;
 }
 
-#endif /* SRC_MOVEMENT_STEPCLOCK_H_ */
+#endif /* SRC_MOTION_STEPCLOCK_H_ */

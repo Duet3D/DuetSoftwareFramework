@@ -25,7 +25,7 @@
 #define SRC_MOTION_DRIVETRACKER_H_
 
 #include <Motion/MoveProfile.h>
-#include <Movement/MoveSegment.h>
+#include <Motion/MoveSegment.h>
 
 namespace Duet::Sbc::Motion
 {

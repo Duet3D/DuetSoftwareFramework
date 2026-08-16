@@ -6,8 +6,8 @@
 #include <cmath>
 
 #include <Motion/MotionArena.h>
-#include <Movement/MoveTiming.h>
-#include <Movement/StepTimer.h>
+#include <Motion/MoveTiming.h>
+#include <Motion/StepTimer.h>
 
 #include <algorithm>
 #include <cstdlib>

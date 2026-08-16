@@ -9,8 +9,8 @@
  * scale with a gap in it.
  */
 
-#ifndef SRC_MOVEMENT_SIMULATIONMODE_H_
-#define SRC_MOVEMENT_SIMULATIONMODE_H_
+#ifndef SRC_MOTION_SIMULATIONMODE_H_
+#define SRC_MOTION_SIMULATIONMODE_H_
 
 #include <Config/MachineLimits.h>
 
@@ -23,4 +23,4 @@ enum class SimulationMode : uint8_t
 	Highest = Partial
 };
 
-#endif /* SRC_MOVEMENT_SIMULATIONMODE_H_ */
+#endif /* SRC_MOTION_SIMULATIONMODE_H_ */

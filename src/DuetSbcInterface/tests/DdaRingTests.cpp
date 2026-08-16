@@ -10,9 +10,9 @@
 // noisier than it should.
 
 #include <Motion/MoveParams.h>
-#include <Movement/DDARing.h>
-#include <Movement/MoveTiming.h>
-#include <Movement/StepTimer.h>
+#include <Motion/DDARing.h>
+#include <Motion/MoveTiming.h>
+#include <Motion/StepTimer.h>
 #include <Motion/MotionSystem.h>
 
 #include <TestSupport.h>

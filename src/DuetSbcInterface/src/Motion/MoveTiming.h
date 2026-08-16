@@ -5,11 +5,11 @@
  *      Author: David
  */
 
-#ifndef SRC_MOVEMENT_MOVETIMING_H_
-#define SRC_MOVEMENT_MOVETIMING_H_
+#ifndef SRC_MOTION_MOVETIMING_H_
+#define SRC_MOTION_MOVETIMING_H_
 
 #include "StepTimer.h"
-#include <Movement/StepClock.h>
+#include <Motion/StepClock.h>
 
 namespace MoveTiming
 {
@@ -38,4 +38,4 @@ namespace MoveTiming
 	constexpr uint32_t minimumExecutingSegmentDuration = (10 * stepClockRate) / 1000000; // 10us in step clocks
 } // namespace MoveTiming
 
-#endif /* SRC_MOVEMENT_MOVETIMING_H_ */
+#endif /* SRC_MOTION_MOVETIMING_H_ */

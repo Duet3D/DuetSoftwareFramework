@@ -13,7 +13,7 @@
 #include "TestSupport.h"
 
 #include <Motion/SegmentBuilder.h>
-#include <Movement/MoveSegment.h>
+#include <Motion/MoveSegment.h>
 #include <Motion/MotionArena.h>
 
 #include <cstdint>

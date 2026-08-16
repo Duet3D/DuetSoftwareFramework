@@ -4,7 +4,7 @@
  * The one region every long-lived motion object is allocated from.
  *
  * DDAs and MoveSegments are allocated once and never freed - see the operator new / no-op
- * operator delete pairs in Movement/DDA.h and Movement/MoveSegment.h. In RepRapFirmware that is a
+ * operator delete pairs in Motion/DDA.h and Motion/MoveSegment.h. In RepRapFirmware that is a
  * memory-fragmentation measure as much as anything; here the reason is latency. The motion thread
  * runs SCHED_FIFO, so an allocation that could take glibc's malloc arena lock, or fault in a page,
  * is a source of exactly the delay this component exists to avoid.

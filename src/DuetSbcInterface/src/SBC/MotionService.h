@@ -31,7 +31,7 @@
 #include <Motion/MotionConfig.h>
 #include <Motion/MotionSystem.h>
 #include <Motion/MoveParams.h>
-#include <Movement/DDARing.h>
+#include <Motion/DDARing.h>
 #include <Platform/RingBuffer.h>
 
 #include <atomic>

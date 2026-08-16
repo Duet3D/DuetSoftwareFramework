@@ -26,10 +26,10 @@
  * step-clock time; the motion thread polls.
  */
 
-#ifndef SRC_MOVEMENT_STEPTIMER_H_
-#define SRC_MOVEMENT_STEPTIMER_H_
+#ifndef SRC_MOTION_STEPTIMER_H_
+#define SRC_MOTION_STEPTIMER_H_
 
-#include <Movement/StepClock.h>
+#include <Motion/StepClock.h>
 
 #include <General/StringRef.h>
 
@@ -138,4 +138,4 @@ class StepTimer
 	// translation unit that only wants to read the clock.
 };
 
-#endif /* SRC_MOVEMENT_STEPTIMER_H_ */
+#endif /* SRC_MOTION_STEPTIMER_H_ */

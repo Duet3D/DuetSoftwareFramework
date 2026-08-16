@@ -26,8 +26,9 @@ A module includes its own headers as `"Foo.h"` and another module's as `<Module/
 ```
 src/                 duet_sbc(.a/.so)
   CApi.h/.cpp        C ABI for P/Invoke from DuetControlServer
-  Config/            build-time defaults and the runtime Config struct
+  Config/            build-time defaults, the runtime Config struct, and the machine's fixed limits
   Hardware/          spidev and GPIO chardev wrappers
+  Motion/            duet_motion(.a): the DDA ring, lookahead, segments and the step clock model
   Platform/          process/thread helpers (RT priority, affinity) and the lock-free ring buffer
   SBC/               transfer state machine, the interface loop, and the LinkEvents wire format
   Storage/           CRC16/CRC32

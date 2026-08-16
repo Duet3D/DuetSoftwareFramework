@@ -5,8 +5,8 @@
  *      Author: David
  */
 
-#ifndef SRC_MOVEMENT_MOVEDEBUGFLAGS_H_
-#define SRC_MOVEMENT_MOVEDEBUGFLAGS_H_
+#ifndef SRC_MOTION_MOVEDEBUGFLAGS_H_
+#define SRC_MOTION_MOVEDEBUGFLAGS_H_
 
 namespace MoveDebugFlags
 {
@@ -24,4 +24,4 @@ namespace MoveDebugFlags
 	constexpr unsigned int printTransforms = 14;
 } // namespace MoveDebugFlags
 
-#endif /* SRC_MOVEMENT_MOVEDEBUGFLAGS_H_ */
+#endif /* SRC_MOTION_MOVEDEBUGFLAGS_H_ */

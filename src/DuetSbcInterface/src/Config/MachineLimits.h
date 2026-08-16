@@ -39,13 +39,11 @@
 // decision already taken - the SBC owns no drivers, so there is nothing local to step, monitor or
 // stall-detect - is not a switch, it is a fact, and is stated where it matters instead.
 //
-// What each disabled one is still waiting for is recorded in
-// src/Documentation/articles/rrf-differences.md. Anything whose disabled path does build is compiled
-// by CI with the switch flipped, so that it stays that way.
+// What each disabled one is still waiting for is recorded in docs/devel/SBC_MOTION_CLEANUP.md.
 // ---------------------------------------------------------------------------------------------
 
-// Defaults, not fixed values: CI compiles the engine with each one flipped, so that a path nobody
-// builds cannot quietly stop building.
+// Defaults rather than fixed values, so that a build can flip one with -D to check that the other
+// path still compiles. Two of them cannot be flipped yet; see the document above.
 #ifndef SUPPORT_ASYNC_MOVES
 #  define SUPPORT_ASYNC_MOVES 1 // two DDA rings, drives owned per movement system
 #endif

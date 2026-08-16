@@ -6,8 +6,8 @@
 
 #include "SbcInterface.h"
 
-#include <Movement/MoveTiming.h>
-#include <Movement/StepTimer.h>
+#include <Motion/MoveTiming.h>
+#include <Motion/StepTimer.h>
 #include <Platform/ProcessHelpers.h>
 
 #include <chrono>

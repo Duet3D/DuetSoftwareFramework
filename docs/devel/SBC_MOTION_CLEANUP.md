@@ -7,6 +7,15 @@ own — while keeping the feature switches that still mark real, intended work.
 Baseline for everything below: commit `7fd2169`, `cmake --preset native` configures and builds clean
 and `ctest` passes 10/10.
 
+**Status: done.** Two things landed differently from what is written below, and the text is left as
+it was so the reasoning stays readable:
+
+- `src/Movement/` and `src/Motion/` are **one directory**, `src/Motion/`. Keeping them apart drew a
+  line between "imported" and "written here" that stopped meaning anything once the import stopped
+  being re-synced, and the names gave a reader no way to guess which held what. Paths below that say
+  `src/Movement/` describe the tree as it was.
+- §6.2's CI job is **not** added; see that section.
+
 ---
 
 ## 1. What this pass does and does not give up
@@ -102,8 +111,7 @@ ported.** `MovementProfile.h` does not exist, `DDARing::PlanMoves` is declared a
 `afterPrepare` has no `peakAcceleration`/`peakDeceleration`. That is the honest state and §7 should say
 so, rather than 18 renaming errors implying the port is further away than it is.
 
-`src/Documentation/articles/rrf-differences.md:321` already records S-curve as not ported — keep that
-as the single home for the statement and cross-reference it.
+§7 below is where that is recorded.
 
 ### 2.3.1 Implementing nonlinear extrusion (M592)
 
@@ -433,7 +441,7 @@ actually supplies what each one uses. `Compat` comes off `duet_motion`'s
   `PrepParams` use bare names. Finish the convention `.clang-tidy`'s `PrivateMemberPrefix` already
   states. **Do this before §2.3's naming fixes, or immediately after** — otherwise the S-curve and
   debug branches get fixed to names that then change again.
-- Run `clang-format` over `src/Movement/` and `src/Motion/`. `.clang-format` says Allman + tabs; the
+- Run `clang-format` over the motion sources. `.clang-format` says Allman + tabs; the
   imported files carry upstream's mixed style and nothing enforces it here.
 - `MoveSegment.h`'s 33-line header comment describes `DriveMovement` accumulating `s0`. Trim to what
   this class does, keeping the S-curve paragraph since the switch stays.
@@ -493,34 +501,32 @@ be churn in files that get re-synced against upstream" — the premise §1 retir
   uses: the "unported tree" it was protecting against no longer exists. Keep the two libraries separate
   — the engine's independence from the link is what the offline tests rely on.
 
-### 6.2 Compile the disabled paths in CI
+### 6.2 Compiling the disabled paths
 
-This is the part that decides whether §2.3 and §2.4 were worth doing. A branch nobody compiles rots
-again the first time a field is renamed — which is exactly how it got into this state.
+The switches are `#ifndef`-guarded defaults, so a build can flip one with `-DSUPPORT_ASYNC_MOVES=0`
+and check that the other path still compiles. Four configurations do:
 
-Add a compile-only CI job (no link, no tests needed) building `duet_motion` with the switches flipped.
-It can cover, today or after this pass:
-
-| Configuration | Status |
+| Configuration | |
 | --- | --- |
-| `SUPPORT_ASYNC_MOVES=0` | **Works now** — verified: clean build, 10/10 tests |
-| `SUPPORT_NONLINEAR_EXTRUSION=0` | After §2.3.1. Note the direction: the switch defaults to **1**, so it is the *disabled* path CI has to keep alive — the same job, flipped |
-| `SEGMENT_DEBUG=1` | After §2.4 |
-| `DDA_MOVE_DEBUG=1` | After §2.4 |
-| `SUPPORT_LASER=1`, `SUPPORT_S_CURVE=1` | **Not coverable** — the missing pieces in §7 have to land first |
+| `SUPPORT_ASYNC_MOVES=0` | verified |
+| `SUPPORT_NONLINEAR_EXTRUSION=0` | verified |
+| `SEGMENT_DEBUG=1` | verified |
+| `DDA_MOVE_DEBUG=1` | verified |
+| `SUPPORT_LASER=1`, `SUPPORT_S_CURVE=1` | not possible — the missing pieces in §7 have to land first |
 
-Being honest about that last row matters: `SUPPORT_S_CURVE`'s branches will drift again no matter how
-many of the 36 errors we clear now, because nothing can compile them. That is an argument for clearing
-the mechanical 25 (so the real gap is visible) and *not* an argument that the switch is then
-maintained. [`.github/workflows/build.yml`](.github/workflows/build.yml) is where the job goes.
+An earlier draft had CI run that loop on every build. It does not: nothing runs these today, so the
+same rot that this pass had to repair can happen again, and the only guard against it is that
+somebody flips them when they touch the engine. Being clear about that is better than implying a
+check exists.
 
 ---
 
 ## 7. Gaps to record
 
 Deleting a switch removes the marker that said a feature is missing, and keeping one that cannot
-compile overstates how close it is. Both need one honest home. `src/Documentation/articles/rrf-differences.md`
-already carries the S-curve entry; extend it rather than starting a second list.
+compile overstates how close it is. Both need one honest home, and this is it. It does **not** belong
+in `src/Documentation/articles/` — those describe what the software does today, for people using it;
+work that is planned but not done belongs here with the rest of the plans.
 
 | Gap | What is missing here |
 | --- | --- |

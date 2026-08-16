@@ -7,9 +7,9 @@
 # CApi.cpp is the one exception: it is the C ABI the shared library exports, and is deliberately kept
 # out of the static library the harness and the tests link.
 #
-# Movement/ and Motion/ are the second: they make up the duet_motion library below, which has its own
-# explicit source list. Anything added under them is picked up there, not here.
-set(DUET_MOTION_DIRS "/Movement/" "/Motion/")
+# Motion/ is the second: it is the duet_motion library below, which has its own explicit source list.
+# Anything added under it is picked up there, not here.
+set(DUET_MOTION_DIRS "/Motion/")
 
 file(GLOB_RECURSE DUET_SBC_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
 list(REMOVE_ITEM DUET_SBC_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/CApi.cpp")
@@ -17,25 +17,25 @@ foreach(_dir IN LISTS DUET_MOTION_DIRS)
     list(FILTER DUET_SBC_SOURCES EXCLUDE REGEX "${_dir}")
 endforeach()
 
-# The motion engine: the DDA ring and segment machinery under Movement/, which began as
-# RepRapFirmware's and keeps its algorithms, and the Motion/ code written here for the parts of the
-# firmware that have no counterpart on an SBC.
+# The motion engine. The DDA ring, the lookahead and the segment machinery began as
+# RepRapFirmware's and keep its algorithms; the rest is written here, for the parts of the firmware
+# that have no counterpart on an SBC.
 #
 # It is a separate library from duet_sbc so that the engine's independence from the link is
-# structural rather than a convention: nothing under Motion/ or Movement/ may refer back to the SPI
+# structural rather than a convention: nothing under Motion/ may refer back to the SPI
 # transfer loop, and the offline tests rely on that. The source list is explicit for the same reason
 # a glob would not be - a file compiles here only once someone has put it here deliberately.
 set(DUET_MOTION_SOURCES
+    Motion/DDA.cpp
+    Motion/DDARing.cpp
     Motion/DriveTracker.cpp
     Motion/Log.cpp
     Motion/MotionArena.cpp
     Motion/MotionSystem.cpp
+    Motion/MoveSegment.cpp
     Motion/ScheduleMoveBuilder.cpp
     Motion/SegmentBuilder.cpp
-    Movement/DDA.cpp
-    Movement/DDARing.cpp
-    Movement/MoveSegment.cpp
-    Movement/StepTimer.cpp
+    Motion/StepTimer.cpp
 )
 
 add_library(duet_motion STATIC ${DUET_MOTION_SOURCES})

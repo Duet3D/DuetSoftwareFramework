@@ -35,8 +35,8 @@
  * 		u = (d - 0.5*a*td^2 - (1/6)*j*td^3)/td = d/td - 0.5*a*td - (1/6)*j*td^2
  */
 
-#ifndef SRC_MOVEMENT_MOVESEGMENT_H_
-#define SRC_MOVEMENT_MOVESEGMENT_H_
+#ifndef SRC_MOTION_MOVESEGMENT_H_
+#define SRC_MOTION_MOVESEGMENT_H_
 
 #include <Config/MachineLimits.h>
 #include <Motion/Log.h>
@@ -356,4 +356,4 @@ inline void MoveSegment::CombinePrevious(const MoveSegment* prev) noexcept
 	m_flags.combined = true;
 }
 
-#endif /* SRC_MOVEMENT_MOVESEGMENT_H_ */
+#endif /* SRC_MOTION_MOVESEGMENT_H_ */

@@ -13,7 +13,7 @@
  * of it. Everything that fed the step interrupt is absent, because there is no local driver to step.
  *
  * What is not ported, and what each piece is waiting for, is recorded in
- * src/Documentation/articles/rrf-differences.md rather than here.
+ * docs/devel/SBC_MOTION_CLEANUP.md rather than here.
  */
 
 #ifndef DDA_H_
@@ -27,7 +27,7 @@
 #include <Motion/MotionArena.h>
 #include <Motion/MoveParams.h>
 #include <Motion/MoveProfile.h>
-#include <Movement/SimulationMode.h>
+#include <Motion/SimulationMode.h>
 
 class DDARing;
 
@@ -39,7 +39,7 @@ namespace Duet::Sbc::Motion
 #if SUPPORT_S_CURVE
 // The 3rd-order planner. Declared rather than included: MovementProfile.h is not ported, so the
 // declarations below that take one by reference are as far as this side goes. See
-// src/Documentation/articles/rrf-differences.md.
+// docs/devel/SBC_MOTION_CLEANUP.md.
 class MovementProfile;
 #endif
 

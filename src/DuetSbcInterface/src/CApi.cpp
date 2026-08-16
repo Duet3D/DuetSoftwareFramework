@@ -1,7 +1,7 @@
 #include "CApi.h"
 
 #include <Config/Configuration.h>
-#include <Movement/StepTimer.h>
+#include <Motion/StepTimer.h>
 #include <SBC/MotionService.h>
 #include <SBC/SbcInterface.h>
 

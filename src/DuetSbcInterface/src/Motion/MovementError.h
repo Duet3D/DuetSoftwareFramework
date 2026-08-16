@@ -5,8 +5,8 @@
  *      Author: David
  */
 
-#ifndef SRC_MOVEMENT_MOVEMENTERROR_H_
-#define SRC_MOVEMENT_MOVEMENTERROR_H_
+#ifndef SRC_MOTION_MOVEMENTERROR_H_
+#define SRC_MOTION_MOVEMENTERROR_H_
 
 #include <Config/MachineLimits.h>
 
@@ -20,4 +20,4 @@ enum class MovementError : uint8_t
 	MoveDurationTooLong		   // the move would take more than about 2^31 step clocks
 };
 
-#endif /* SRC_MOVEMENT_MOVEMENTERROR_H_ */
+#endif /* SRC_MOTION_MOVEMENTERROR_H_ */

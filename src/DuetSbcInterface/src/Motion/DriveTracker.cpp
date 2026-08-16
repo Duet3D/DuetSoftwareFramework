@@ -5,7 +5,7 @@
 #include "DriveTracker.h"
 
 #include <Motion/SegmentBuilder.h>
-#include <Movement/MoveTiming.h>
+#include <Motion/MoveTiming.h>
 
 using Duet::Sbc::Motion::DriveTracker;
 
