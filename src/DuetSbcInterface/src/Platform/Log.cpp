@@ -2,7 +2,7 @@
  * Log.cpp - see Log.h.
  */
 
-#include "Log.h"
+#include <Platform/Log.h>
 
 #include <cstdarg>
 

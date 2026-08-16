@@ -5,15 +5,15 @@
  *
  * The motion thread runs SCHED_FIFO, so it must not write to a file descriptor: a pipe nobody is
  * draining blocks, and blocking that thread is the failure this component exists to prevent. So the
- * sink is a function pointer that the owner installs, and DuetSbcInterface points it at the same
+ * sink is a function pointer that the owner installs, and DuetLinkService points it at the same
  * lock-free ring the rest of its logging uses, where the message is drained by DuetControlServer's
  * dispatcher thread instead.
  *
  * Left unset it writes to stderr, which is what the unit tests and the offline harness want.
  */
 
-#ifndef SRC_MOTION_LOG_H_
-#define SRC_MOTION_LOG_H_
+#ifndef SRC_PLATFORM_LOG_H_
+#define SRC_PLATFORM_LOG_H_
 
 #include <Config/MachineLimits.h>
 
@@ -43,4 +43,4 @@ namespace Duet::Sbc::Motion
 	void LogMessage(const char* fmt, ...) noexcept __attribute__((format(printf, 1, 2)));
 } // namespace Duet::Sbc::Motion
 
-#endif /* SRC_MOTION_LOG_H_ */
+#endif /* SRC_PLATFORM_LOG_H_ */

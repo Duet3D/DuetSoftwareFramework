@@ -23,8 +23,8 @@
 #include "MovementError.h"
 #include "StepTimer.h"
 #include <Config/MachineLimits.h>
-#include <Motion/Log.h>
-#include <Motion/MotionArena.h>
+#include <Platform/Log.h>
+#include <Platform/MemoryArena.h>
 #include <Motion/MoveParams.h>
 #include <Motion/MoveProfile.h>
 #include <Motion/SimulationMode.h>
@@ -76,10 +76,10 @@ class DDA final
 
 	explicit DDA(DDA* n) noexcept;
 
-	void* operator new(size_t count) { return Duet::Sbc::Motion::MotionArena::Allocate(count); }
+	void* operator new(size_t count) { return Duet::Sbc::Motion::MemoryArena::Allocate(count); }
 	void* operator new(size_t count, std::align_val_t align)
 	{
-		return Duet::Sbc::Motion::MotionArena::Allocate(count, align);
+		return Duet::Sbc::Motion::MemoryArena::Allocate(count, align);
 	}
 	void operator delete(void * /*ptr*/) noexcept {}
 	void operator delete(void * /*ptr*/, std::align_val_t /*align*/) noexcept {}

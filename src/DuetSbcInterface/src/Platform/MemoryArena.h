@@ -1,5 +1,5 @@
 /*
- * MotionArena.h
+ * MemoryArena.h
  *
  * The one region every long-lived motion object is allocated from.
  *
@@ -14,14 +14,14 @@
  * running out means the sizing is wrong rather than that the machine is busy.
  */
 
-#ifndef SRC_MOTION_MOTIONARENA_H_
-#define SRC_MOTION_MOTIONARENA_H_
+#ifndef SRC_PLATFORM_MEMORYARENA_H_
+#define SRC_PLATFORM_MEMORYARENA_H_
 
 #include <Config/MachineLimits.h>
 
 #include <new> // for std::align_val_t
 
-namespace Duet::Sbc::Motion::MotionArena
+namespace Duet::Sbc::Motion::MemoryArena
 {
 	// Reserve the arena. Call once, before anything allocates from it. Returns false if the region
 	// could not be mapped; mlock failing is not fatal (it needs privileges the caller may not have)
@@ -38,6 +38,6 @@ namespace Duet::Sbc::Motion::MotionArena
 
 	// Bytes still unallocated.
 	[[nodiscard]] ptrdiff_t BytesFree() noexcept;
-} // namespace Duet::Sbc::Motion::MotionArena
+} // namespace Duet::Sbc::Motion::MemoryArena
 
-#endif /* SRC_MOTION_MOTIONARENA_H_ */
+#endif /* SRC_PLATFORM_MEMORYARENA_H_ */

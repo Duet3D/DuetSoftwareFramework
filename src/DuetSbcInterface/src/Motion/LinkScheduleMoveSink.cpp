@@ -2,9 +2,9 @@
  * LinkScheduleMoveSink.cpp - see LinkScheduleMoveSink.h.
  */
 
-#include "LinkScheduleMoveSink.h"
+#include <Motion/LinkScheduleMoveSink.h>
 
-#include "SbcInterface.h"
+#include <Interface/LinkService.h>
 
 namespace Duet::Sbc
 {

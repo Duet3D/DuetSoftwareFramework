@@ -5,7 +5,7 @@
 #include "MotionSystem.h"
 #include <cmath>
 
-#include <Motion/MotionArena.h>
+#include <Platform/MemoryArena.h>
 #include <Motion/MoveTiming.h>
 #include <Motion/StepTimer.h>
 
@@ -33,7 +33,7 @@ MotionSystem::MotionSystem() noexcept
 
 bool MotionSystem::Init() noexcept
 {
-	if (!MotionArena::Reserve(permanentArenaBytes))
+	if (!MemoryArena::Reserve(permanentArenaBytes))
 	{
 		return false;
 	}

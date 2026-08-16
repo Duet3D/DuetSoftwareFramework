@@ -22,10 +22,10 @@
  * replaced with something rather than deleted.
  */
 
-#ifndef SRC_SBC_MOTIONSERVICE_H_
-#define SRC_SBC_MOTIONSERVICE_H_
+#ifndef SRC_MOTION_MOTIONSERVICE_H_
+#define SRC_MOTION_MOTIONSERVICE_H_
 
-#include "LinkScheduleMoveSink.h"
+#include <Motion/LinkScheduleMoveSink.h>
 
 #include <DuetSpiProtocol/MessageFormats.h>
 #include <Motion/MotionConfig.h>
@@ -40,7 +40,7 @@
 
 namespace Duet::Sbc
 {
-	class SbcInterface;
+	class LinkService;
 
 	class MotionService
 	{
@@ -49,7 +49,7 @@ namespace Duet::Sbc
 		// that a second motion system owns; it exists even when nothing uses it.
 		static constexpr unsigned int numRings = Motion::maxRings;
 
-		explicit MotionService(SbcInterface& link);
+		explicit MotionService(LinkService& link);
 		MotionService(const MotionService&) = delete;
 		MotionService& operator=(const MotionService&) = delete;
 		MotionService(MotionService&&) = delete;
@@ -194,7 +194,7 @@ namespace Duet::Sbc
 		void PostMoveCompleted(unsigned int ring, uint32_t moveId);
 		void PostMoveFailed(unsigned int ring, uint32_t moveId, MovementError error);
 
-		SbcInterface *m_link;
+		LinkService *m_link;
 		LinkScheduleMoveSink m_sink;
 
 		// The machine, and the rings that plan for it. Owned here rather than reached through a
@@ -266,4 +266,4 @@ namespace Duet::Sbc
 	};
 }
 
-#endif /* SRC_SBC_MOTIONSERVICE_H_ */
+#endif /* SRC_MOTION_MOTIONSERVICE_H_ */

@@ -1,4 +1,4 @@
-#include "SbcInterface.h"
+#include <Interface/LinkService.h>
 
 #include <Motion/StepTimer.h>
 #include <Platform/ProcessHelpers.h>
@@ -31,16 +31,16 @@ namespace Duet::Sbc
 
 	} // namespace
 
-	SbcInterface::SbcInterface(const Config& config)
+	LinkService::LinkService(const Config& config, std::unique_ptr<Transport> transport)
 		: m_config(config)
-		, m_transfer(config)
+		, m_transport(std::move(transport))
 		, m_inbound(kInboundCapacity)
 		, m_outbound(kOutboundCapacity)
 		, m_inboundEventFd(::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC))
 	{
 		// Route the transfer engine's internal recovery reporting into the inbound ring
-		m_transfer.SetLogCallback([this](const std::string& message) { PostLog(LogLevel::Warning, message); });
-		m_transfer.SetConnectionLostCallback(
+		m_transport->SetLogCallback([this](const std::string& message) { PostLog(LogLevel::Warning, message); });
+		m_transport->SetConnectionLostCallback(
 			[this](const std::string& reason)
 			{
 				m_wasConnected = false;
@@ -51,7 +51,7 @@ namespace Duet::Sbc
 			});
 	}
 
-	SbcInterface::~SbcInterface()
+	LinkService::~LinkService()
 	{
 		Stop();
 		if (m_inboundEventFd >= 0)
@@ -61,7 +61,7 @@ namespace Duet::Sbc
 		}
 	}
 
-	bool SbcInterface::WaitForInbound(int timeoutMs)
+	bool LinkService::WaitForInbound(int timeoutMs)
 	{
 		if (!m_inbound.IsEmpty())
 		{
@@ -92,24 +92,24 @@ namespace Duet::Sbc
 		return !m_inbound.IsEmpty();
 	}
 
-	void SbcInterface::Connect()
+	void LinkService::Connect()
 	{
-		m_transfer.Connect();
+		m_transport->Connect();
 	}
 
-	void SbcInterface::Start()
+	void LinkService::Start()
 	{
 		m_stop.store(false, std::memory_order_relaxed);
 		m_thread = std::thread([this] { Execute(); });
 	}
 
-	void SbcInterface::Stop()
+	void LinkService::Stop()
 	{
 		if (m_stop.exchange(true))
 		{
 			return;
 		}
-		m_transfer.Stop();
+		m_transport->Stop();
 
 		// Release a consumer parked in WaitForInbound so shutdown is prompt
 		if (m_inboundEventFd >= 0)
@@ -124,23 +124,23 @@ namespace Duet::Sbc
 		}
 	}
 
-	void SbcInterface::MarkRequest()
+	void LinkService::MarkRequest()
 	{
 		int64_t expected = 0;
 		// Only the first request since the last completed transfer sets the timestamp
 		m_pendingRequestNs.compare_exchange_strong(expected, NowNs(), std::memory_order_relaxed);
 	}
 
-	void SbcInterface::RequestTransfer()
+	void LinkService::RequestTransfer()
 	{
 		MarkRequest();
-		m_transfer.RequestTransfer();
+		m_transport->RequestTransfer();
 	}
 
 	// ---------------------------------------------------------------------------
 	// Outbound queueing (caller threads)
 	// ---------------------------------------------------------------------------
-	uint32_t SbcInterface::QueueMessage(uint32_t messageFlags, const char* message, size_t length)
+	uint32_t LinkService::QueueMessage(uint32_t messageFlags, const char* message, size_t length)
 	{
 		MessageCommand cmd{};
 		cmd.header.type = static_cast<uint16_t>(OutboundCommandType::Message);
@@ -156,7 +156,7 @@ namespace Duet::Sbc
 		return seq;
 	}
 
-	uint32_t SbcInterface::QueueCanMessage(uint16_t txToken,
+	uint32_t LinkService::QueueCanMessage(uint16_t txToken,
 									   uint16_t msgType,
 									   uint16_t replyType,
 									   uint8_t dstAddress,
@@ -182,7 +182,7 @@ namespace Duet::Sbc
 		return seq;
 	}
 
-	bool SbcInterface::OutboundHasHeadroom() const
+	bool LinkService::OutboundHasHeadroom() const
 	{
 		// Enough room for several full moves. Preparation stops here rather than at the point where
 		// a write is actually refused: a move that is dropped after its predecessor has been
@@ -193,13 +193,13 @@ namespace Duet::Sbc
 		return m_outbound.BytesFree() >= kScheduleMoveHeadroom;
 	}
 
-	void SbcInterface::PostEventFromOtherThread(
+	void LinkService::PostEventFromOtherThread(
 		InboundEventType type, const void* header, size_t headerLength, const void* tail, size_t tailLength)
 	{
 		PostEvent(type, header, headerLength, tail, tailLength);
 	}
 
-	uint32_t SbcInterface::QueueScheduleMove(std::span<const uint8_t> packet)
+	uint32_t LinkService::QueueScheduleMove(std::span<const uint8_t> packet)
 	{
 		OutboundCommandHeader header{};
 		header.type = static_cast<uint16_t>(OutboundCommandType::ScheduleMove);
@@ -214,7 +214,7 @@ namespace Duet::Sbc
 		return seq;
 	}
 
-	uint32_t SbcInterface::QueueEnableCan(bool enable, uint32_t requestId)
+	uint32_t LinkService::QueueEnableCan(bool enable, uint32_t requestId)
 	{
 		EnableCanCommand cmd{};
 		cmd.header.type = static_cast<uint16_t>(OutboundCommandType::EnableCan);
@@ -229,7 +229,7 @@ namespace Duet::Sbc
 		return seq;
 	}
 
-	void SbcInterface::RequestEmergencyStop(uint32_t requestId)
+	void LinkService::RequestEmergencyStop(uint32_t requestId)
 	{
 		// Latched rather than queued: an e-stop must not be lost because the transfer buffer was full, and
 		// must not queue up behind ordinary traffic
@@ -238,14 +238,14 @@ namespace Duet::Sbc
 		RequestTransfer();
 	}
 
-	void SbcInterface::RequestReset(uint32_t requestId)
+	void LinkService::RequestReset(uint32_t requestId)
 	{
 		m_resetRequestId.store(requestId, std::memory_order_relaxed);
 		m_pendingReset.store(true, std::memory_order_release);
 		RequestTransfer();
 	}
 
-	bool SbcInterface::RequestFirmwareUpdate(const uint8_t* iap,
+	bool LinkService::RequestFirmwareUpdate(const uint8_t* iap,
 											 size_t iapLength,
 											 const uint8_t* firmware,
 											 size_t firmwareLength,
@@ -278,7 +278,7 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	// Inbound event helpers (interface thread only)
 	// ---------------------------------------------------------------------------
-	void SbcInterface::PostEvent(
+	void LinkService::PostEvent(
 		InboundEventType type, const void* header, size_t headerLength, const void* tail, size_t tailLength)
 	{
 		// The caller has already filled in the type; this just performs the scattered write
@@ -295,7 +295,7 @@ namespace Duet::Sbc
 		}
 	}
 
-	void SbcInterface::PostLog(LogLevel level, const char* text, size_t length)
+	void LinkService::PostLog(LogLevel level, const char* text, size_t length)
 	{
 		LogEvent event{};
 		event.header.type = static_cast<uint16_t>(InboundEventType::Log);
@@ -303,7 +303,7 @@ namespace Duet::Sbc
 		PostEvent(InboundEventType::Log, &event, sizeof(event), text, length);
 	}
 
-	void SbcInterface::CompleteRequest(uint32_t requestId, RequestResult result, const char* error, size_t errorLength)
+	void LinkService::CompleteRequest(uint32_t requestId, RequestResult result, const char* error, size_t errorLength)
 	{
 		if (requestId == kNoRequestId)
 		{
@@ -319,7 +319,7 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	// The transfer loop (LinkService.cs Execute)
 	// ---------------------------------------------------------------------------
-	void SbcInterface::Execute()
+	void LinkService::Execute()
 	{
 		// Pin and prioritise the transfer thread. This is the whole reason the loop lives in C++: it can
 		// hold SCHED_FIFO on an isolated core without a managed runtime scheduling anything onto it.
@@ -333,12 +333,12 @@ namespace Duet::Sbc
 		}
 
 		// The initial Connect() already completed a transfer, so report the link as up before looping
-		if (m_transfer.IsConnected() && !m_wasConnected)
+		if (m_transport->IsConnected() && !m_wasConnected)
 		{
 			m_wasConnected = true;
 			ConnectionEstablishedEvent event{};
 			event.header.type = static_cast<uint16_t>(InboundEventType::ConnectionEstablished);
-			event.protocolVersion = static_cast<uint16_t>(m_transfer.ProtocolVersion());
+			event.protocolVersion = static_cast<uint16_t>(m_transport->ProtocolVersion());
 			PostEvent(InboundEventType::ConnectionEstablished, &event, sizeof(event));
 		}
 
@@ -357,7 +357,7 @@ namespace Duet::Sbc
 				}
 
 				// Report a controller reset so the caller can invalidate its pending resources
-				const bool hadReset = m_transfer.HadReset();
+				const bool hadReset = m_transport->HadReset();
 				if (hadReset)
 				{
 					// A reboot the link never timed out over: nothing dropped what was queued for the
@@ -371,22 +371,22 @@ namespace Duet::Sbc
 
 				// Then that the link is up, in that order: a reset belongs to the outage that is ending,
 				// and a reader told the link is back first would apply it to the connection that follows
-				if (m_transfer.IsConnected() && !m_wasConnected)
+				if (m_transport->IsConnected() && !m_wasConnected)
 				{
 					m_wasConnected = true;
 					ConnectionEstablishedEvent event{};
 					event.header.type = static_cast<uint16_t>(InboundEventType::ConnectionEstablished);
-					event.protocolVersion = static_cast<uint16_t>(m_transfer.ProtocolVersion());
+					event.protocolVersion = static_cast<uint16_t>(m_transport->ProtocolVersion());
 					event.hadReset = hadReset ? 1 : 0;
 					PostEvent(InboundEventType::ConnectionEstablished, &event, sizeof(event));
 				}
 
 				// Process incoming packets from the previous transfer
-				const int packets = m_transfer.PacketsToRead();
+				const int packets = m_transport->PacketsToRead();
 				for (int i = 0; i < packets; i++)
 				{
 					proto::PacketHeader packet{};
-					if (!m_transfer.ReadNextPacket(packet))
+					if (!m_transport->ReadNextPacket(packet))
 					{
 						break;
 					}
@@ -399,7 +399,7 @@ namespace Duet::Sbc
 				do
 				{
 					StageOutgoing();
-				} while (!m_transfer.WaitForTransferReason());
+				} while (!m_transport->WaitForTransferReason());
 
 				if (m_stop.load(std::memory_order_relaxed))
 				{
@@ -408,7 +408,7 @@ namespace Duet::Sbc
 
 				// Do another full SPI transfer. This recovers from transfer errors internally and only
 				// throws TransferTimeout to unwind on stop.
-				m_transfer.PerformFullTransfer();
+				m_transport->PerformFullTransfer();
 
 				// Timestamp every transfer at the same point, from the same clock the step-time model
 				// is fitted against, and pair it with the reading the header carried. Doing it here
@@ -419,12 +419,12 @@ namespace Duet::Sbc
 				PostOutboundSeq(InboundEventType::OutboundDelivered, m_stagedSeq);
 
 				m_lastTransferNs = StepTimer::GetLocalTimeNs();
-				if (m_transfer.IsConnected())
+				if (m_transport->IsConnected())
 				{
-					StepTimer::RecordMasterClockSample(m_transfer.RxMasterClock(), m_lastTransferNs);
+					StepTimer::RecordMasterClockSample(m_transport->RxMasterClock(), m_lastTransferNs);
 
 					// The controller reports its movement delay as a total, not a change
-					StepTimer::RaiseMovementDelayTo(m_transfer.RxHiccupTime());
+					StepTimer::RaiseMovementDelayTo(m_transport->RxHiccupTime());
 				}
 
 				// Report jitter for a served request, if any
@@ -451,7 +451,7 @@ namespace Duet::Sbc
 				const std::string message = std::string("Recovering from error in interface loop: ") + e.what();
 				PostLog(LogLevel::Error, message);
 				// Force a clean handshake on the next iteration
-				m_transfer.ResetConnection();
+				m_transport->ResetConnection();
 			}
 		}
 	}
@@ -459,12 +459,12 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	// Staging outgoing data (LinkService.cs, the do/while around WaitForTransferReason)
 	// ---------------------------------------------------------------------------
-	void SbcInterface::StageOutgoing()
+	void LinkService::StageOutgoing()
 	{
 		// Emergency stop first: it is unconditional and invalidates everything else
 		if (m_pendingEmergencyStop.load(std::memory_order_acquire))
 		{
-			if (m_transfer.WriteEmergencyStop())
+			if (m_transport->WriteEmergencyStop())
 			{
 				m_pendingEmergencyStop.store(false, std::memory_order_release);
 				CompleteRequest(m_emergencyStopRequestId.exchange(kNoRequestId, std::memory_order_relaxed),
@@ -479,7 +479,7 @@ namespace Duet::Sbc
 		// Firmware reset: like the e-stop this clears the transfer buffer, so nothing else is staged
 		if (m_pendingReset.load(std::memory_order_acquire))
 		{
-			if (m_transfer.WriteReset())
+			if (m_transport->WriteReset())
 			{
 				m_pendingReset.store(false, std::memory_order_release);
 				CompleteRequest(m_resetRequestId.exchange(kNoRequestId, std::memory_order_relaxed),
@@ -529,7 +529,7 @@ namespace Duet::Sbc
 				std::memcpy(&cmd, record, sizeof(cmd));
 				const char* text = reinterpret_cast<const char*>(record) + sizeof(MessageCommand);
 				const size_t textLength = length - sizeof(MessageCommand);
-				written = m_transfer.WriteMessage(cmd.flags, std::string(text, textLength));
+				written = m_transport->WriteMessage(cmd.flags, std::string(text, textLength));
 				break;
 			}
 			case OutboundCommandType::CanMessage:
@@ -543,7 +543,7 @@ namespace Duet::Sbc
 				std::memcpy(&cmd, record, sizeof(cmd));
 				const uint8_t* payload = record + sizeof(CanMessageCommand);
 				const size_t payloadLength = length - sizeof(CanMessageCommand);
-				written = m_transfer.WriteCanMessage(cmd.txToken,
+				written = m_transport->WriteCanMessage(cmd.txToken,
 													 cmd.msgType,
 													 cmd.replyType,
 													 cmd.dstAddress,
@@ -554,7 +554,7 @@ namespace Duet::Sbc
 			}
 			case OutboundCommandType::ScheduleMove:
 			{
-				written = m_transfer.WriteScheduleMove(tail, tailLength);
+				written = m_transport->WriteScheduleMove(tail, tailLength);
 				break;
 			}
 			case OutboundCommandType::EnableCan:
@@ -566,7 +566,7 @@ namespace Duet::Sbc
 				}
 				EnableCanCommand cmd{};
 				std::memcpy(&cmd, record, sizeof(cmd));
-				written = m_transfer.WriteEnableCan(cmd.enable != 0);
+				written = m_transport->WriteEnableCan(cmd.enable != 0);
 				if (written)
 				{
 					CompleteRequest(cmd.requestId, RequestResult::Success);
@@ -593,7 +593,7 @@ namespace Duet::Sbc
 
 	// Abandon the commands queued for a controller that is not there. Called when the link drops, from
 	// the interface thread, so this does not race with StageOutgoing.
-	void SbcInterface::DropOutgoing()
+	void LinkService::DropOutgoing()
 	{
 		unsigned int dropped = 0;
 		while (const std::optional<ByteSpan> peeked = m_outbound.Peek())
@@ -633,7 +633,7 @@ namespace Duet::Sbc
 	}
 
 	// Report how far the outbound queue has got, skipping a report that says nothing new
-	void SbcInterface::PostOutboundSeq(InboundEventType type, uint32_t sequenceNumber)
+	void LinkService::PostOutboundSeq(InboundEventType type, uint32_t sequenceNumber)
 	{
 		if (sequenceNumber == m_reportedSeq)
 		{
@@ -650,17 +650,17 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	// Incoming packets (LinkService.cs ProcessPacket)
 	// ---------------------------------------------------------------------------
-	void SbcInterface::ProcessPacket(const proto::PacketHeader& packet)
+	void LinkService::ProcessPacket(const proto::PacketHeader& packet)
 	{
-		const uint8_t* data = m_transfer.PacketData();
-		const uint16_t dataLength = m_transfer.PacketDataLength();
+		const uint8_t* data = m_transport->PacketData();
+		const uint16_t dataLength = m_transport->PacketDataLength();
 
 		switch (static_cast<proto::FirmwareRequest>(packet.request))
 		{
 		case proto::FirmwareRequest::ResendPacket:
 		{
 			proto::SbcRequest sbcRequest{};
-			m_transfer.ResendPacket(packet, sbcRequest);
+			m_transport->ResendPacket(packet, sbcRequest);
 			break;
 		}
 		case proto::FirmwareRequest::CodeBufferUpdate:
@@ -773,7 +773,7 @@ namespace Duet::Sbc
 			event.packetId = packet.id;
 			event.request = packet.request;
 			event.length = packet.length;
-			event.offset = static_cast<uint16_t>(m_transfer.RxPointer());
+			event.offset = static_cast<uint16_t>(m_transport->RxPointer());
 			PostEvent(InboundEventType::MalformedPacket, &event, sizeof(event), data, dataLength);
 			break;
 		}
@@ -783,7 +783,7 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	// Firmware update (LinkService.cs PerformFirmwareUpdate)
 	// ---------------------------------------------------------------------------
-	void SbcInterface::PerformFirmwareUpdate()
+	void LinkService::PerformFirmwareUpdate()
 	{
 		const uint8_t* iap = nullptr;
 		size_t iapLength = 0;
@@ -820,7 +820,7 @@ namespace Duet::Sbc
 			for (size_t offset = 0; offset < iapLength;)
 			{
 				const size_t chunk = std::min(proto::IapSegmentSize, iapLength - offset);
-				if (!m_transfer.WriteIapSegment(iap + offset, chunk))
+				if (!m_transport->WriteIapSegment(iap + offset, chunk))
 				{
 					break;
 				}
@@ -829,7 +829,7 @@ namespace Duet::Sbc
 
 			// Start the IAP binary. This is the point of no return: after this the board is running IAP
 			// and the firmware transfer must complete or the board will need manual recovery.
-			m_transfer.StartIap();
+			m_transport->StartIap();
 
 			// From here on a stop request is not honoured for the data transfer -- interrupting a
 			// flash-in-progress would brick the board. Only the retry boundary checks for shutdown.
@@ -852,7 +852,7 @@ namespace Duet::Sbc
 				for (size_t offset = 0; offset < firmwareLength;)
 				{
 					const size_t chunk = std::min(proto::FirmwareSegmentSize, firmwareLength - offset);
-					if (!m_transfer.FlashFirmwareSegment(firmware + offset, chunk))
+					if (!m_transport->FlashFirmwareSegment(firmware + offset, chunk))
 					{
 						break;
 					}
@@ -860,7 +860,7 @@ namespace Duet::Sbc
 				}
 
 				PostLog(LogLevel::Info, "Verifying checksum", 18);
-				verified = m_transfer.VerifyFirmwareChecksum(static_cast<uint32_t>(firmwareLength), crc16);
+				verified = m_transport->VerifyFirmwareChecksum(static_cast<uint32_t>(firmwareLength), crc16);
 			} while (!verified && ++numRetries < 3);
 
 			if (!verified)
@@ -871,7 +871,7 @@ namespace Duet::Sbc
 			}
 
 			// Wait for the IAP binary to restart the controller
-			m_transfer.WaitForIapReset();
+			m_transport->WaitForIapReset();
 			PostLog(LogLevel::Info, "Firmware update successful", 26);
 			finish(RequestResult::Success, nullptr);
 		}
@@ -880,7 +880,7 @@ namespace Duet::Sbc
 			const std::string message = std::string("Failed to update firmware: ") + e.what();
 			finish(RequestResult::Failed, message.c_str());
 			// Force a clean handshake; the controller state is unknown after a failed flash
-			m_transfer.ResetConnection();
+			m_transport->ResetConnection();
 		}
 	}
 

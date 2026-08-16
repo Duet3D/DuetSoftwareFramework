@@ -9,19 +9,19 @@
  * this side of the seam because it is the only part that knows there is a link.
  */
 
-#ifndef SRC_SBC_LINKSCHEDULEMOVESINK_H_
-#define SRC_SBC_LINKSCHEDULEMOVESINK_H_
+#ifndef SRC_MOTION_LINKSCHEDULEMOVESINK_H_
+#define SRC_MOTION_LINKSCHEDULEMOVESINK_H_
 
 #include <Motion/ScheduleMoveBuilder.h>
 
 namespace Duet::Sbc
 {
-	class SbcInterface;
+	class LinkService;
 
 	class LinkScheduleMoveSink final : public Motion::ScheduleMoveSink
 	{
 	public:
-		explicit LinkScheduleMoveSink(SbcInterface& link) noexcept : m_link(&link) { }
+		explicit LinkScheduleMoveSink(LinkService& link) noexcept : m_link(&link) { }
 
 		// Both are called from the motion thread and neither blocks: the ring is lock-free and a
 		// full ring is reported rather than waited on.
@@ -29,8 +29,8 @@ namespace Duet::Sbc
 		[[nodiscard]] bool CanAccept() const noexcept override;
 
 	private:
-		SbcInterface *m_link;
+		LinkService *m_link;
 	};
 }
 
-#endif /* SRC_SBC_LINKSCHEDULEMOVESINK_H_ */
+#endif /* SRC_MOTION_LINKSCHEDULEMOVESINK_H_ */

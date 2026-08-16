@@ -10,7 +10,7 @@
 #include "MoveDebugFlags.h"
 #include "MoveTiming.h"
 #include "StepTimer.h"
-#include <Motion/Log.h>
+#include <Platform/Log.h>
 
 #include <Motion/MotionSystem.h>
 #include <Motion/ScheduleMoveBuilder.h>

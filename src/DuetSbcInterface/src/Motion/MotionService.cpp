@@ -2,9 +2,9 @@
  * MotionService.cpp - see MotionService.h.
  */
 
-#include "MotionService.h"
+#include <Motion/MotionService.h>
 
-#include "SbcInterface.h"
+#include <Interface/LinkService.h>
 
 #include <Motion/MoveTiming.h>
 #include <Motion/StepTimer.h>
@@ -28,7 +28,7 @@ namespace Duet::Sbc
 		constexpr size_t kForcedPositionCapacity = 8 * 1024;
 	}
 
-	MotionService::MotionService(SbcInterface& link)
+	MotionService::MotionService(LinkService& link)
 		: m_link(&link)
 		, m_sink(link)
 		, m_submissions(kSubmissionCapacity)

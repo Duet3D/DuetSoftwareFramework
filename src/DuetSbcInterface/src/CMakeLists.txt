@@ -1,4 +1,4 @@
-# SBC-side interface implementation (port of DuetControlServer/Link SPI.cs + LinkService.cs).
+# The SBC side of the link to the controller, and the motion engine behind it.
 #
 # Every source under src/ is taken by glob, so adding a file to a module needs no edit here.
 # CONFIGURE_DEPENDS makes the build system re-run the glob when the set of matching
@@ -7,36 +7,35 @@
 # CApi.cpp is the one exception: it is the C ABI the shared library exports, and is deliberately kept
 # out of the static library the harness and the tests link.
 #
-# Motion/ is the second: it is the duet_motion library below, which has its own explicit source list.
-# Anything added under it is picked up there, not here.
-set(DUET_MOTION_DIRS "/Motion/")
-
-file(GLOB_RECURSE DUET_SBC_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
-list(REMOVE_ITEM DUET_SBC_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/CApi.cpp")
-foreach(_dir IN LISTS DUET_MOTION_DIRS)
-    list(FILTER DUET_SBC_SOURCES EXCLUDE REGEX "${_dir}")
-endforeach()
+# The duet_motion sources below are the other exception. They are excluded from the glob by name
+# rather than by directory, so that a file belongs to one library or the other because someone said
+# so and not because of where it happens to sit.
 
 # The motion engine. The DDA ring, the lookahead and the segment machinery began as
 # RepRapFirmware's and keep its algorithms; the rest is written here, for the parts of the firmware
 # that have no counterpart on an SBC.
 #
-# It is a separate library from duet_sbc so that the engine's independence from the link is
-# structural rather than a convention: nothing under Motion/ may refer back to the SPI
-# transfer loop, and the offline tests rely on that. The source list is explicit for the same reason
-# a glob would not be - a file compiles here only once someone has put it here deliberately.
+# It is a separate library from duet_sbc so that the engine's independence from the interface is
+# structural rather than a convention: nothing in it may refer back to the transfer loop, and the
+# offline tests rely on that.
 set(DUET_MOTION_SOURCES
     Motion/DDA.cpp
     Motion/DDARing.cpp
     Motion/DriveTracker.cpp
-    Motion/Log.cpp
-    Motion/MotionArena.cpp
     Motion/MotionSystem.cpp
     Motion/MoveSegment.cpp
     Motion/ScheduleMoveBuilder.cpp
     Motion/SegmentBuilder.cpp
     Motion/StepTimer.cpp
+    Platform/Log.cpp
+    Platform/MemoryArena.cpp
 )
+
+file(GLOB_RECURSE DUET_SBC_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
+list(REMOVE_ITEM DUET_SBC_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/CApi.cpp")
+foreach(_src IN LISTS DUET_MOTION_SOURCES)
+    list(REMOVE_ITEM DUET_SBC_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/${_src}")
+endforeach()
 
 add_library(duet_motion STATIC ${DUET_MOTION_SOURCES})
 target_include_directories(duet_motion PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
@@ -57,8 +56,8 @@ set_target_properties(duet_motion PROPERTIES POSITION_INDEPENDENT_CODE ON)
 # Static library used by the standalone harness.
 add_library(duet_sbc STATIC ${DUET_SBC_SOURCES})
 target_include_directories(duet_sbc PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-# duet_motion for the ScheduleMoveSink interface the link implements, and for the motion engine the
-# CApi exposes. The dependency is one-way: the motion engine never refers back to the link.
+# duet_motion for the ScheduleMoveSink the interface implements, and for the motion engine the CApi
+# exposes. The dependency is one-way: the engine never refers back to the interface.
 target_link_libraries(duet_sbc PUBLIC duet_spi_protocol duet_motion Threads::Threads)
 set_target_properties(duet_sbc PROPERTIES POSITION_INDEPENDENT_CODE ON)
 

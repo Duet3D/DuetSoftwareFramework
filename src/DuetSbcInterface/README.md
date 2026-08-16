@@ -27,10 +27,15 @@ A module includes its own headers as `"Foo.h"` and another module's as `<Module/
 src/                 duet_sbc(.a/.so)
   CApi.h/.cpp        C ABI for P/Invoke from DuetControlServer
   Config/            build-time defaults, the runtime Config struct, and the machine's fixed limits
-  Hardware/          spidev and GPIO chardev wrappers
-  Motion/            duet_motion(.a): the DDA ring, lookahead, segments and the step clock model
-  Platform/          process/thread helpers (RT priority, affinity) and the lock-free ring buffer
-  SBC/               transfer state machine, the interface loop, and the LinkEvents wire format
+  Hardware/          spidev and GPIO chardev wrappers - OS device access, no protocol
+  Interface/         the link to the controller
+    Transport.h        what the loop needs of a transport; SPI is the only implementation
+    TransportFactory   the one place that names a concrete transport
+    LinkService        the transfer loop, on its own pinned real-time thread
+    LinkEvents.h       the record formats that cross the C ABI
+    SPI/               the Duet SPI protocol: the transfer state machine and IAP
+  Motion/            duet_motion(.a): the DDA ring, lookahead, segments, and the engine's thread
+  Platform/          logging, the motion arena, thread helpers, and the lock-free ring buffer
   Storage/           CRC16/CRC32
 harness/             sbc_jitter_test — standalone latency/jitter test program
 tests/               host-side unit tests (no hardware required)

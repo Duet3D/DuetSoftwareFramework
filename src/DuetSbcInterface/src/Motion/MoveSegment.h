@@ -39,8 +39,8 @@
 #define SRC_MOTION_MOVESEGMENT_H_
 
 #include <Config/MachineLimits.h>
-#include <Motion/Log.h>
-#include <Motion/MotionArena.h>
+#include <Platform/Log.h>
+#include <Platform/MemoryArena.h>
 #include <new> // for align_val_t
 
 #ifndef SEGMENT_DEBUG
@@ -124,10 +124,10 @@ union MovementFlags final
 class MoveSegment final
 {
   public:
-	void* operator new(size_t count) noexcept { return Duet::Sbc::Motion::MotionArena::Allocate(count); }
+	void* operator new(size_t count) noexcept { return Duet::Sbc::Motion::MemoryArena::Allocate(count); }
 	void* operator new(size_t count, std::align_val_t align) noexcept
 	{
-		return Duet::Sbc::Motion::MotionArena::Allocate(count, align);
+		return Duet::Sbc::Motion::MemoryArena::Allocate(count, align);
 	}
 	void operator delete(void * /*ptr*/) noexcept {}
 	void operator delete(void * /*ptr*/, std::align_val_t /*align*/) noexcept {}

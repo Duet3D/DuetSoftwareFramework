@@ -1,4 +1,4 @@
-#include "SbcTransfer.h"
+#include <Interface/SPI/SpiTransfer.h>
 
 #include <Storage/Crc.h>
 
@@ -45,7 +45,7 @@ namespace Duet::Sbc
 
 	} // namespace
 
-	SbcTransfer::SbcTransfer(const Config& config)
+	SpiTransfer::SpiTransfer(const Config& config)
 		: config(config)
 		, bufferSize(config.bufferSize)
 		, m_requestEventFd(::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC))
@@ -97,7 +97,7 @@ namespace Duet::Sbc
 		m_keepAliveStart = clock::now();
 	}
 
-	SbcTransfer::~SbcTransfer()
+	SpiTransfer::~SpiTransfer()
 	{
 		Stop();
 		if (m_requestEventFd >= 0)
@@ -112,7 +112,7 @@ namespace Duet::Sbc
 		}
 	}
 
-	void SbcTransfer::Stop() noexcept
+	void SpiTransfer::Stop() noexcept
 	{
 		m_stop.store(true, std::memory_order_relaxed);
 		// Wake the interface thread if it is blocked in poll() (anywhere)
@@ -123,7 +123,7 @@ namespace Duet::Sbc
 		}
 	}
 
-	void SbcTransfer::ThrowIfStopped()
+	void SpiTransfer::ThrowIfStopped()
 	{
 		if (m_stop.load(std::memory_order_relaxed))
 		{
@@ -131,12 +131,12 @@ namespace Duet::Sbc
 		}
 	}
 
-	void SbcTransfer::Connect()
+	void SpiTransfer::Connect()
 	{
 		PerformFullTransfer(true);
 	}
 
-	bool SbcTransfer::HadReset() const noexcept
+	bool SpiTransfer::HadReset() const noexcept
 	{
 		return m_connected && (static_cast<uint16_t>(m_lastTransferNumber + 1) != m_rxHeader.sequenceNumber);
 	}
@@ -144,7 +144,7 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	// Full transfer (SPI.cs PerformFullTransfer)
 	// ---------------------------------------------------------------------------
-	void SbcTransfer::PerformFullTransfer(bool connecting)
+	void SpiTransfer::PerformFullTransfer(bool connecting)
 	{
 		m_packetsBeingResent.clear();
 		m_lastTransferNumber = m_rxHeader.sequenceNumber;
@@ -278,7 +278,7 @@ namespace Duet::Sbc
 
 	// Put the link back into the "reconnecting" state so the next transfer re-runs the handshake, and
 	// abandon whatever was staged for the transfer that did not happen.
-	void SbcTransfer::PrepareReconnect(const char* reason)
+	void SpiTransfer::PrepareReconnect(const char* reason)
 	{
 		m_txHeader.protocolVersion = proto::ProtocolVersion;
 		m_waitingForFirstTransfer = true;
@@ -339,7 +339,7 @@ namespace Duet::Sbc
 		}
 	}
 
-	void SbcTransfer::ResetConnection()
+	void SpiTransfer::ResetConnection()
 	{
 		// Abandon any partially-staged transfer and force a clean handshake on the next call
 		m_txPointer = 0;
@@ -350,7 +350,7 @@ namespace Duet::Sbc
 		PrepareReconnect("Connection reset");
 	}
 
-	void SbcTransfer::InterruptibleSleep(int ms)
+	void SpiTransfer::InterruptibleSleep(int ms)
 	{
 		if (ms <= 0 || m_stop.load(std::memory_order_relaxed))
 		{
@@ -364,7 +364,7 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	// Wait for the TfrRdy pin (SPI.cs WaitForTransfer)
 	// ---------------------------------------------------------------------------
-	void SbcTransfer::WaitForTransfer(bool inTransfer)
+	void SpiTransfer::WaitForTransfer(bool inTransfer)
 	{
 		const bool needFreshEdge = inTransfer && !m_waitingForFirstTransfer;
 
@@ -467,7 +467,7 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	// Checksums (SPI.cs WriteCRC)
 	// ---------------------------------------------------------------------------
-	void SbcTransfer::WriteCrc()
+	void SpiTransfer::WriteCrc()
 	{
 		auto* hdr = reinterpret_cast<uint8_t*>(&m_txHeader);
 		const uint8_t* txData = CurrentTxBuffer().data();
@@ -491,7 +491,7 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	// Header exchange (SPI.cs ExchangeHeader)
 	// ---------------------------------------------------------------------------
-	bool SbcTransfer::ExchangeHeader()
+	bool SpiTransfer::ExchangeHeader()
 	{
 		auto* txHdr = reinterpret_cast<uint8_t*>(&m_txHeader);
 		auto* rxHdr = reinterpret_cast<uint8_t*>(&m_rxHeader);
@@ -623,7 +623,7 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	// Response exchange (SPI.cs ExchangeResponse)
 	// ---------------------------------------------------------------------------
-	uint32_t SbcTransfer::ExchangeResponse(uint32_t response)
+	uint32_t SpiTransfer::ExchangeResponse(uint32_t response)
 	{
 		uint32_t tx = response;
 		uint32_t rx = 0;
@@ -636,7 +636,7 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	// Data exchange (SPI.cs ExchangeData)
 	// ---------------------------------------------------------------------------
-	bool SbcTransfer::ExchangeData()
+	bool SpiTransfer::ExchangeData()
 	{
 		const size_t bytesToTransfer = std::max<size_t>(m_rxHeader.dataLength, m_txPointer);
 		for (int retry = 0; retry < config.maxSbcRetries; retry++)
@@ -701,7 +701,7 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	// Data response exchange (SPI.cs ExchangeDataResponse)
 	// ---------------------------------------------------------------------------
-	bool SbcTransfer::ExchangeDataResponse(bool& success)
+	bool SpiTransfer::ExchangeDataResponse(bool& success)
 	{
 		const uint32_t responseCode = ExchangeResponse(proto::TransferResponse::Success);
 		switch (responseCode)
@@ -729,7 +729,7 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	// Transfer gating (SPI.cs WaitForTransferReason / RequestTransfer)
 	// ---------------------------------------------------------------------------
-	bool SbcTransfer::WaitForTransferReason()
+	bool SpiTransfer::WaitForTransferReason()
 	{
 		// Only gate during normal operation; while connecting, reconnecting, resetting or updating the
 		// protocol must always be free to make progress
@@ -798,7 +798,7 @@ namespace Duet::Sbc
 		return m_stop.load(std::memory_order_relaxed);
 	}
 
-	void SbcTransfer::RequestTransfer()
+	void SpiTransfer::RequestTransfer()
 	{
 		// Raise the scope trigger: the SBC now has a reason (typically staged data) to transfer
 		if (m_sbcDataAvailablePin)
@@ -816,7 +816,7 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	// Reading incoming packets (SPI.cs ReadNextPacket)
 	// ---------------------------------------------------------------------------
-	bool SbcTransfer::ReadNextPacket(proto::PacketHeader& packet)
+	bool SpiTransfer::ReadNextPacket(proto::PacketHeader& packet)
 	{
 		if (m_rxPointer >= m_rxHeader.dataLength)
 		{
@@ -837,12 +837,12 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	// Writing outgoing packets (SPI.cs Write* helpers)
 	// ---------------------------------------------------------------------------
-	bool SbcTransfer::CanWritePacket(size_t dataLength) const noexcept
+	bool SpiTransfer::CanWritePacket(size_t dataLength) const noexcept
 	{
 		return m_txPointer + sizeof(proto::PacketHeader) + dataLength <= bufferSize;
 	}
 
-	void SbcTransfer::WritePacketHeader(proto::SbcRequest request, size_t dataLength)
+	void SpiTransfer::WritePacketHeader(proto::SbcRequest request, size_t dataLength)
 	{
 		proto::PacketHeader header{};
 		header.request = static_cast<uint16_t>(request);
@@ -853,7 +853,7 @@ namespace Duet::Sbc
 		m_txPointer += sizeof(header);
 	}
 
-	uint8_t* SbcTransfer::GetWriteBuffer(size_t dataLength)
+	uint8_t* SpiTransfer::GetWriteBuffer(size_t dataLength)
 	{
 		const size_t padded = proto::AddPadding(dataLength);
 		uint8_t* result = CurrentTxBuffer().data() + m_txPointer;
@@ -866,7 +866,7 @@ namespace Duet::Sbc
 		return result;
 	}
 
-	bool SbcTransfer::WriteEmergencyStop()
+	bool SpiTransfer::WriteEmergencyStop()
 	{
 		if (!CanWritePacket())
 		{
@@ -876,7 +876,7 @@ namespace Duet::Sbc
 		return true;
 	}
 
-	bool SbcTransfer::WriteReset()
+	bool SpiTransfer::WriteReset()
 	{
 		if (!CanWritePacket())
 		{
@@ -888,7 +888,7 @@ namespace Duet::Sbc
 		return true;
 	}
 
-	bool SbcTransfer::WriteEnableCan(bool enable)
+	bool SpiTransfer::WriteEnableCan(bool enable)
 	{
 		if (!CanWritePacket(sizeof(proto::EnableCanHeader)))
 		{
@@ -902,7 +902,7 @@ namespace Duet::Sbc
 		return true;
 	}
 
-	bool SbcTransfer::WriteCanMessage(uint16_t txToken,
+	bool SpiTransfer::WriteCanMessage(uint16_t txToken,
 									  uint16_t msgType,
 									  uint16_t replyType,
 									  uint8_t dstAddress,
@@ -939,7 +939,7 @@ namespace Duet::Sbc
 		return true;
 	}
 
-	bool SbcTransfer::WriteScheduleMove(const uint8_t* packet, size_t length)
+	bool SpiTransfer::WriteScheduleMove(const uint8_t* packet, size_t length)
 	{
 		if (length < sizeof(proto::ScheduleMoveHeader))
 		{
@@ -959,7 +959,7 @@ namespace Duet::Sbc
 		return true;
 	}
 
-	bool SbcTransfer::WriteMessage(uint32_t messageFlags, const std::string& message)
+	bool SpiTransfer::WriteMessage(uint32_t messageFlags, const std::string& message)
 	{
 		// Don't send a new request if another one is still pending
 		if (std::ranges::find(m_packetsBeingResent, proto::SbcRequest::Message) != m_packetsBeingResent.end())
@@ -995,7 +995,7 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	// Resend a packet (SPI.cs ResendPacket)
 	// ---------------------------------------------------------------------------
-	void SbcTransfer::ResendPacket(const proto::PacketHeader& packet, proto::SbcRequest& sbcRequestOut)
+	void SpiTransfer::ResendPacket(const proto::PacketHeader& packet, proto::SbcRequest& sbcRequestOut)
 	{
 		// The packet to resend lives in the previously-used TX buffer
 		const int prevIndex = (m_txBufferIndex + 1) % kNumTxBuffers;
@@ -1033,7 +1033,7 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	// IAP / firmware update (SPI.cs WriteIapSegment .. WaitForIapReset)
 	// ---------------------------------------------------------------------------
-	bool SbcTransfer::WriteIapSegment(const uint8_t* data, size_t length)
+	bool SpiTransfer::WriteIapSegment(const uint8_t* data, size_t length)
 	{
 		if (data == nullptr || length == 0)
 		{
@@ -1050,7 +1050,7 @@ namespace Duet::Sbc
 		return true;
 	}
 
-	void SbcTransfer::StartIap()
+	void SpiTransfer::StartIap()
 	{
 		// Tell the firmware to boot the IAP program
 		WritePacketHeader(proto::SbcRequest::StartIap);
@@ -1061,7 +1061,7 @@ namespace Duet::Sbc
 		m_waitingForFirstTransfer = m_updating = true;
 	}
 
-	bool SbcTransfer::FlashFirmwareSegment(const uint8_t* data, size_t length)
+	bool SpiTransfer::FlashFirmwareSegment(const uint8_t* data, size_t length)
 	{
 		if (data == nullptr || length == 0)
 		{
@@ -1086,7 +1086,7 @@ namespace Duet::Sbc
 		return true;
 	}
 
-	bool SbcTransfer::VerifyFirmwareChecksum(uint32_t firmwareLength, uint16_t crc16)
+	bool SpiTransfer::VerifyFirmwareChecksum(uint32_t firmwareLength, uint16_t crc16)
 	{
 		// At this point IAP expects another segment, so wait for it to be ready first. After that give it
 		// a moment to acknowledge that we are done before sending the verification request.
@@ -1111,7 +1111,7 @@ namespace Duet::Sbc
 		return writeOk[0] == proto::FlashVerifyOk;
 	}
 
-	void SbcTransfer::WaitForIapReset()
+	void SpiTransfer::WaitForIapReset()
 	{
 		// Wait a moment for the firmware to start
 		InterruptibleSleep(proto::IapRebootDelay);

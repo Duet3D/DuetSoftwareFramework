@@ -1,10 +1,10 @@
 /*
- * MotionArena.cpp - see MotionArena.h.
+ * MemoryArena.cpp - see MemoryArena.h.
  */
 
-#include "MotionArena.h"
+#include <Platform/MemoryArena.h>
 
-#include <Motion/Log.h>
+#include <Platform/Log.h>
 
 #include <atomic>
 #include <cstdio>
@@ -48,7 +48,7 @@ namespace
 	}
 } // namespace
 
-bool Duet::Sbc::Motion::MotionArena::Reserve(size_t bytes) noexcept
+bool Duet::Sbc::Motion::MemoryArena::Reserve(size_t bytes) noexcept
 {
 	if (arenaBase != nullptr)
 	{
@@ -78,7 +78,7 @@ bool Duet::Sbc::Motion::MotionArena::Reserve(size_t bytes) noexcept
 	return true;
 }
 
-void Duet::Sbc::Motion::MotionArena::Release() noexcept
+void Duet::Sbc::Motion::MemoryArena::Release() noexcept
 {
 	if (arenaBase != nullptr)
 	{
@@ -89,17 +89,17 @@ void Duet::Sbc::Motion::MotionArena::Release() noexcept
 	}
 }
 
-void* Duet::Sbc::Motion::MotionArena::Allocate(size_t count) noexcept
+void* Duet::Sbc::Motion::MemoryArena::Allocate(size_t count) noexcept
 {
 	return AllocateAligned(count, defaultAlignment);
 }
 
-void* Duet::Sbc::Motion::MotionArena::Allocate(size_t count, std::align_val_t align) noexcept
+void* Duet::Sbc::Motion::MemoryArena::Allocate(size_t count, std::align_val_t align) noexcept
 {
 	return AllocateAligned(count, static_cast<size_t>(align));
 }
 
-ptrdiff_t Duet::Sbc::Motion::MotionArena::BytesFree() noexcept
+ptrdiff_t Duet::Sbc::Motion::MemoryArena::BytesFree() noexcept
 {
 	return (ptrdiff_t)(arenaSize - arenaUsed);
 }

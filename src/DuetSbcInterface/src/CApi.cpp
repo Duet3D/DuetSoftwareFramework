@@ -2,8 +2,10 @@
 
 #include <Config/Configuration.h>
 #include <Motion/StepTimer.h>
-#include <SBC/MotionService.h>
-#include <SBC/SbcInterface.h>
+#include <Motion/MotionService.h>
+#include <Interface/LinkService.h>
+#include <Interface/SPI/SpiTransfer.h>
+#include <Interface/TransportFactory.h>
 
 #include <algorithm>
 #include <cstring>
@@ -11,16 +13,16 @@
 #include <string>
 
 using Duet::Sbc::Config;
-using Duet::Sbc::SbcInterface;
+using Duet::Sbc::LinkService;
 
 struct DuetSbcHandle
 {
 	Config config;
-	SbcInterface interface;
+	LinkService interface;
 	Duet::Sbc::MotionService motion;
 	explicit DuetSbcHandle(const Config& cfg)
 		: config(cfg)
-		, interface(cfg)
+		, interface(cfg, Duet::Sbc::CreateTransport(cfg))
 		, motion(interface)
 	{
 	}
@@ -281,12 +283,14 @@ extern "C"
 
 	int32_t DuetSbc_GetTfrPinGlitches(DuetSbcHandle* h)
 	{
-		return h != nullptr ? h->interface.Transfer().TfrPinGlitches() : 0;
+		const auto* spi = (h != nullptr) ? dynamic_cast<const Duet::Sbc::SpiTransfer*>(&h->interface.Transfer()) : nullptr;
+		return (spi != nullptr) ? spi->TfrPinGlitches() : 0;
 	}
 
 	int32_t DuetSbc_GetMissedEdges(DuetSbcHandle* h)
 	{
-		return h != nullptr ? h->interface.Transfer().MissedEdges() : 0;
+		const auto* spi = (h != nullptr) ? dynamic_cast<const Duet::Sbc::SpiTransfer*>(&h->interface.Transfer()) : nullptr;
+		return (spi != nullptr) ? spi->MissedEdges() : 0;
 	}
 
 	int32_t DuetSbc_GetResyncCount(DuetSbcHandle* h)

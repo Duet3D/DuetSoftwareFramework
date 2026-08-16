@@ -9,8 +9,10 @@
 #include <Config/Configuration.h>
 #include <Platform/ProcessHelpers.h>
 #include <Motion/MoveParams.h>
-#include <SBC/MotionService.h>
-#include <SBC/SbcInterface.h>
+#include <Motion/MotionService.h>
+#include <Interface/LinkService.h>
+#include <Interface/SPI/SpiTransfer.h>
+#include <Interface/TransportFactory.h>
 
 #include <algorithm>
 #include <atomic>
@@ -201,7 +203,7 @@ int main(int argc, char** argv)
 
 	try
 	{
-		SbcInterface interface(config);
+		LinkService interface(config, CreateTransport(config));
 		interface.SetRequestServedCallback(RecordSample);
 
 		std::printf("Connecting to firmware...\n");
@@ -453,8 +455,13 @@ int main(int argc, char** argv)
 		}
 		std::printf("  Max pin wait during a transfer : %.3f ms\n", interface.Transfer().MaxPinWaitDurationMs());
 		std::printf("  Max delay between transfers    : %.3f ms\n", interface.Transfer().MaxFullTransferDelayMs());
-		std::printf("  TfrRdy pin glitches            : %d\n", interface.Transfer().TfrPinGlitches());
-		std::printf("  Missed GPIO edges              : %d\n", interface.Transfer().MissedEdges());
+		// The pin counters belong to the SPI transport rather than to every transport; this harness
+		// only ever builds that one, so the cast cannot fail here.
+		if (const auto* spi = dynamic_cast<const SpiTransfer*>(&interface.Transfer()))
+		{
+			std::printf("  TfrRdy pin glitches            : %d\n", spi->TfrPinGlitches());
+			std::printf("  Missed GPIO edges              : %d\n", spi->MissedEdges());
+		}
 		std::printf("  Connection resyncs (recoveries): %d\n", interface.Transfer().ResyncCount());
 		if (gSampleIndex.load() > kMaxSamples)
 		{

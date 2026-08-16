@@ -6,7 +6,7 @@
 
 #include "MoveParams.h"
 
-#include <Motion/Log.h>
+#include <Platform/Log.h>
 
 #include <cstring>
 

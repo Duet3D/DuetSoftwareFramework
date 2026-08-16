@@ -1,6 +1,6 @@
 // SBC-side communication loop: the C++ port of DuetControlServer/Link/LinkService.cs.
 //
-// Owns an SbcTransfer and runs the transfer loop on a pinned real-time thread. All communication with
+// Owns a Transport and runs the transfer loop on a pinned real-time thread. All communication with
 // the caller goes through two lock-free RingBuffers rather than callbacks, so the loop thread never
 // blocks on -- or executes -- foreign code. That is what lets DuetControlServer drive this from C#
 // without managed allocation, locks or GC pauses landing on a SCHED_FIFO thread mid-transfer.
@@ -18,8 +18,8 @@
 // reporting completion through the usual request id.
 #pragma once
 
-#include "LinkEvents.h"
-#include "SbcTransfer.h"
+#include <Interface/LinkEvents.h>
+#include <Interface/Transport.h>
 #include <Config/Configuration.h>
 #include <DuetSpiProtocol/MessageFormats.h>
 #include <Platform/RingBuffer.h>
@@ -27,6 +27,7 @@
 #include <atomic>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <span>
 #include <string>
@@ -36,7 +37,7 @@
 namespace Duet::Sbc
 {
 
-	class SbcInterface
+	class LinkService
 	{
 	  public:
 		// Called after each full transfer that served a request, with the measured latency from
@@ -52,13 +53,15 @@ namespace Duet::Sbc
 			std::function<void(uint32_t whenTriggered, uint32_t moveId,
 							   std::span<const duet::spi::protocol::MotionStoppedDriver>)>;
 
-		explicit SbcInterface(const Config& config);
-		~SbcInterface();
+		// The transport carries the link; this drives it. Ownership is taken so that the loop and the
+		// thing it drives cannot outlive each other. See Transport.h for what a second one must answer.
+		LinkService(const Config& config, std::unique_ptr<Transport> transport);
+		~LinkService();
 
-		SbcInterface(const SbcInterface&) = delete;
-		SbcInterface& operator=(const SbcInterface&) = delete;
-		SbcInterface(SbcInterface&&) = delete;
-		SbcInterface& operator=(SbcInterface&&) = delete;
+		LinkService(const LinkService&) = delete;
+		LinkService& operator=(const LinkService&) = delete;
+		LinkService(LinkService&&) = delete;
+		LinkService& operator=(LinkService&&) = delete;
 
 		// Connect to the firmware (blocks until the first transfer succeeds). Throws on failure.
 		void Connect();
@@ -131,7 +134,7 @@ namespace Duet::Sbc
 		void SetRequestServedCallback(RequestServedCallback cb) { m_onRequestServed = std::move(cb); }
 		void SetMotionStoppedCallback(MotionStoppedCallback cb) { m_onMotionStopped = std::move(cb); }
 
-		SbcTransfer& Transfer() noexcept { return m_transfer; }
+		Transport& Transfer() noexcept { return *m_transport; }
 
 	  private:
 		void Execute();
@@ -155,7 +158,7 @@ namespace Duet::Sbc
 							 size_t errorLength = 0);
 
 		Config m_config;
-		SbcTransfer m_transfer;
+		std::unique_ptr<Transport> m_transport;
 		std::thread m_thread;
 		std::atomic<bool> m_stop{false};
 

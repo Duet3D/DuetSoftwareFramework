@@ -14,7 +14,7 @@
 
 #include <Motion/SegmentBuilder.h>
 #include <Motion/MoveSegment.h>
-#include <Motion/MotionArena.h>
+#include <Platform/MemoryArena.h>
 
 #include <cstdint>
 #include <vector>
@@ -360,8 +360,8 @@ static void TestPressureAdvanceShiftsDistanceWithoutAddingAny()
 int main()
 {
 	// DDA and MoveSegment allocate from the permanent arena rather than the heap; see
-	// Motion/MotionArena.h. 1MB is far more than these tests need.
-	if (!Duet::Sbc::Motion::MotionArena::Reserve(1024 * 1024))
+	// Motion/MemoryArena.h. 1MB is far more than these tests need.
+	if (!Duet::Sbc::Motion::MemoryArena::Reserve(1024 * 1024))
 	{
 		std::printf("FAIL: could not reserve the permanent arena\n");
 		return 1;
