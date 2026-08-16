@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace DuetControlServer.Motion.Native;
@@ -86,6 +87,15 @@ internal struct DriverId
 /// <remarks>
 /// An axis with several drivers - a Z axis with three leadscrews, say - moves all of them together
 /// </remarks>
+/// <summary>
+/// The drivers of one axis, inline
+/// </summary>
+[InlineArray(MotionLimits.MaxDriversPerAxis)]
+internal struct DriverIdsPerAxis
+{
+    private DriverId _element0;
+}
+
 [StructLayout(LayoutKind.Sequential, Pack = 1, Size = 1 + (2 * MotionLimits.MaxDriversPerAxis))]
 internal struct AxisDriversConfig
 {
@@ -93,8 +103,7 @@ internal struct AxisDriversConfig
     public byte NumDrivers;
 
     /// <summary>The drivers themselves</summary>
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = MotionLimits.MaxDriversPerAxis)]
-    public DriverId[] DriverNumbers;
+    public DriverIdsPerAxis DriverNumbers;
 
     /// <summary>An axis with no drivers assigned</summary>
     /// <remarks>
@@ -118,10 +127,12 @@ internal struct AxisDriversConfig
             throw new ArgumentException($"An axis may have at most {MotionLimits.MaxDriversPerAxis} drivers, got {drivers.Length}");
         }
 
-        DriverId[] driverNumbers = new DriverId[MotionLimits.MaxDriversPerAxis];
-        Array.Fill(driverNumbers, DriverId.None);
-        drivers.CopyTo(driverNumbers, 0);
-        return new AxisDriversConfig { NumDrivers = (byte)drivers.Length, DriverNumbers = driverNumbers };
+        AxisDriversConfig result = new() { NumDrivers = (byte)drivers.Length };
+        for (int i = 0; i < MotionLimits.MaxDriversPerAxis; i++)
+        {
+            result.DriverNumbers[i] = i < drivers.Length ? drivers[i] : DriverId.None;
+        }
+        return result;
     }
 }
 
@@ -157,6 +168,34 @@ internal struct NonlinearExtrusion
     public const float DefaultLimit = 0.2F;
 }
 
+/// <summary>One float per logical drive</summary>
+[InlineArray(MotionLimits.MaxAxesPlusExtruders)]
+internal struct FloatPerDrive
+{
+    private float _element0;
+}
+
+/// <summary>One axis' driver configuration per axis</summary>
+[InlineArray(MotionLimits.MaxAxes)]
+internal struct AxisDriversPerAxis
+{
+    private AxisDriversConfig _element0;
+}
+
+/// <summary>One driver per extruder</summary>
+[InlineArray(MotionLimits.MaxExtruders)]
+internal struct DriverIdPerExtruder
+{
+    private DriverId _element0;
+}
+
+/// <summary>One bitmap per axis</summary>
+[InlineArray(MotionLimits.MaxAxes)]
+internal struct UIntPerAxis
+{
+    private uint _element0;
+}
+
 /// <summary>
 /// Managed mirror of <c>DuetSbcInterface/src/Motion/MachineConfig.h</c>: the machine description the
 /// native motion engine needs
@@ -190,210 +229,119 @@ internal struct NonlinearExtrusion
 /// values as given: what comes back from <c>GetConfig</c> natively is the authority on what was used.
 /// </para>
 /// </remarks>
-internal sealed class MachineConfig
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+internal struct MachineConfig
 {
     // --- Machine shape ------------------------------------------------------------------------
 
     /// <summary>Axes in total, including any that exist only in the kinematics</summary>
-    public byte NumTotalAxes { get; set; }
+    public byte NumTotalAxes;
 
     /// <summary>Number of extruders</summary>
-    public byte NumExtruders { get; set; }
+    public byte NumExtruders;
 
     /// <summary>Movement systems: 1, or 2 for a second asynchronous one</summary>
-    public byte NumRings { get; set; } = 1;
+    public byte NumRings;
+
+    /// <summary>Declared on the native side so that this can reproduce it</summary>
+    public byte Padding0;
 
     /// <summary>Lookahead depth, i.e. how many moves a ring holds</summary>
-    public ushort NumDdasPerRing { get; set; } = 40;
+    public ushort NumDdasPerRing;
+
+    /// <summary>Declared on the native side so that this can reproduce it</summary>
+    public ushort Padding;
 
     /// <summary>How long to let moves accumulate before starting one, in milliseconds</summary>
-    public uint GracePeriodMs { get; set; } = 10;
+    public uint GracePeriodMs;
 
-    // --- Per-drive limits ---------------------------------------------------------------------
+    // --- Per-drive ----------------------------------------------------------------------------
 
     /// <summary>Microsteps per mm for each logical drive</summary>
-    public float[] DriveStepsPerMm { get; } = new float[MotionLimits.MaxAxesPlusExtruders];
+    public FloatPerDrive DriveStepsPerMm;
 
     // --- Driver mapping -----------------------------------------------------------------------
 
     /// <summary>Which drivers move each axis</summary>
-    public AxisDriversConfig[] AxisDrivers { get; } = CreateAxisDrivers();
+    public AxisDriversPerAxis AxisDrivers;
 
     /// <summary>Which driver drives each extruder</summary>
-    public DriverId[] ExtruderDrivers { get; } = CreateExtruderDrivers();
+    public DriverIdPerExtruder ExtruderDrivers;
+
+    /// <summary>Declared on the native side so that this can reproduce it</summary>
+    public ushort Padding2;
 
     // --- Kinematics results ---------------------------------------------------------------------
 
     /// <summary>Axes that wrap at 360 degrees, so a move may take the short way round, as a bitmap</summary>
-    public uint ContinuousRotationAxes { get; set; }
+    public uint ContinuousRotationAxes;
 
     /// <summary>
     /// For each axis, the other drives that must be energised to hold it, as a bitmap. Empty on a
     /// Cartesian machine; on CoreXY, moving X requires both motors to be enabled
     /// </summary>
-    public uint[] ControllingDrives { get; } = new uint[MotionLimits.MaxAxes];
+    public UIntPerAxis ControllingDrives;
 
-    // --- Input shaping --------------------------------------------------------------------------
+    /// <summary>First logical drive that is an extruder</summary>
+    public readonly int FirstExtruderDrive => MotionLimits.MaxAxesPlusExtruders - NumExtruders;
 
     /// <summary>
-    /// How long the expansion boards' input shaper spreads a move over, in step clocks
+    /// A description of a machine that has not been configured
     /// </summary>
     /// <remarks>
-    /// Nothing on either side shapes anything: shaping happens on the boards. But the boards' motion
-    /// is the shaped profile while the segments built natively are the unshaped one, so during
-    /// acceleration the tracked position leads the real one by up to this long. Endpoints still agree
-    /// exactly. Zero until shaping is enabled on the boards
+    /// Not <c>new MachineConfig()</c>, which is all zeros. A zeroed <see cref="DriverId"/> has board
+    /// address 0, and 0 is the main board rather than "no board", so every unconfigured driver would
+    /// be addressed to a real one. The native struct avoids this with member initialisers, which do
+    /// not survive being memcpyed over
     /// </remarks>
-
-    // --- Derived ----------------------------------------------------------------------------------
+    public static MachineConfig Unconfigured()
+    {
+        MachineConfig config = new()
+        {
+            NumRings = 1,
+            NumDdasPerRing = 40,
+            GracePeriodMs = 10
+        };
+        for (int axis = 0; axis < MotionLimits.MaxAxes; axis++)
+        {
+            config.AxisDrivers[axis] = AxisDriversConfig.Empty;
+        }
+        for (int extruder = 0; extruder < MotionLimits.MaxExtruders; extruder++)
+        {
+            config.ExtruderDrivers[extruder] = DriverId.None;
+        }
+        return config;
+    }
 
     /// <summary>
-    /// First logical drive that is an extruder. Extruders count down from the top of the drive space,
-    /// which is how the native side packs axes and extruders into one index range
-    /// </summary>
-    public int FirstExtruderDrive => MotionLimits.MaxAxesPlusExtruders - NumExtruders;
-
-    /// <summary>
-    /// The logical drive number of an extruder
-    /// </summary>
-    /// <param name="extruder">Extruder number</param>
-    /// <returns>Logical drive number</returns>
-    public static int ExtruderToLogicalDrive(int extruder) => MotionLimits.MaxAxesPlusExtruders - 1 - extruder;
-
-    /// <summary>
-    /// Total size of the serialised struct
+    /// Size of the serialised form, which is the struct itself
     /// </summary>
     /// <remarks>
-    /// Computed from the layout below rather than from <c>Marshal.SizeOf</c>, because the struct is
-    /// written field by field: this is the number the native side asserts against
+    /// There is nothing to keep in step with the fields: the struct is blittable and laid out to
+    /// match the native one, so its own size is the answer. The native side asserts the same number
     /// </remarks>
-    public const int SerializedLength =
-        1 + 1 + 1 + 1                                                // numTotalAxes, numExtruders, numRings, padding0
-        + 2 + 2                                                      // numDdasPerRing, padding
-        + 4                                                          // gracePeriodMs
-        + (4 * MotionLimits.MaxAxesPlusExtruders)                    // driveStepsPerMm
-        + ((1 + (2 * MotionLimits.MaxDriversPerAxis)) * MotionLimits.MaxAxes)    // axisDrivers
-        + (2 * MotionLimits.MaxExtruders)                            // extruderDrivers
-        + 2                                                          // padding2
-        + 4                                                          // continuousRotationAxes
-        + (4 * MotionLimits.MaxAxes);                                // controllingDrives
+    public static int SerializedLength => Unsafe.SizeOf<MachineConfig>();
 
     /// <summary>
-    /// Serialise this configuration into the byte layout the native side expects
+    /// Copy this configuration into <paramref name="destination"/>
     /// </summary>
     /// <param name="destination">Buffer of at least <see cref="SerializedLength"/> bytes</param>
     /// <returns>Number of bytes written</returns>
     /// <exception cref="ArgumentException">The buffer is too small</exception>
     /// <remarks>
-    /// Written field by field rather than by marshalling a struct, because the native struct is not
-    /// packed: the compiler is free to insert padding between members, and reproducing that from here
-    /// would mean guessing at it. The native <c>CApi</c> reads the same sequence back
+    /// The bytes are the struct's own. This used to be written field by field against a hand-counted
+    /// length, on the grounds that the native struct is not packed and reproducing its padding meant
+    /// guessing at it - but the native side declares every padding byte it has, so there is nothing
+    /// left to guess and nothing left to keep in step. <c>MachineConfigLayout</c> asserts the offsets
+    /// against the numbers the native side asserts
     /// </remarks>
-    public int Serialize(Span<byte> destination)
+    public readonly int Serialize(Span<byte> destination)
     {
         if (destination.Length < SerializedLength)
         {
             throw new ArgumentException($"Need {SerializedLength} bytes for a MachineConfig, got {destination.Length}");
         }
-
-        SpanWriter writer = new(destination);
-        writer.WriteByte(NumTotalAxes);
-        writer.WriteByte(NumExtruders);
-        writer.WriteByte(NumRings);
-        writer.WriteByte(0);            // padding0, declared on the native side so this can match it
-        writer.WriteUInt16(NumDdasPerRing);
-        writer.WriteUInt16(0);          // padding
-        writer.WriteUInt32(GracePeriodMs);
-
-        writer.WriteSingles(DriveStepsPerMm);
-
-        foreach (AxisDriversConfig axis in AxisDrivers)
-        {
-            writer.WriteByte(axis.NumDrivers);
-            for (int i = 0; i < MotionLimits.MaxDriversPerAxis; i++)
-            {
-                DriverId driver = axis.DriverNumbers is not null && i < axis.DriverNumbers.Length ? axis.DriverNumbers[i] : DriverId.None;
-                writer.WriteByte(driver.LocalDriver);
-                writer.WriteByte(driver.BoardAddress);
-            }
-        }
-
-        foreach (DriverId driver in ExtruderDrivers)
-        {
-            writer.WriteByte(driver.LocalDriver);
-            writer.WriteByte(driver.BoardAddress);
-        }
-
-        writer.WriteUInt16(0);          // padding2, realigning the bitmaps that follow
-        writer.WriteUInt32(ContinuousRotationAxes);
-        writer.WriteUInt32s(ControllingDrives);
-        return writer.Position;
-    }
-
-    private static AxisDriversConfig[] CreateAxisDrivers()
-    {
-        AxisDriversConfig[] result = new AxisDriversConfig[MotionLimits.MaxAxes];
-        for (int i = 0; i < result.Length; i++)
-        {
-            result[i] = AxisDriversConfig.Empty;
-        }
-        return result;
-    }
-
-    private static DriverId[] CreateExtruderDrivers()
-    {
-        DriverId[] result = new DriverId[MotionLimits.MaxExtruders];
-        Array.Fill(result, DriverId.None);
-        return result;
-    }
-
-    /// <summary>
-    /// Sequential little-endian writer over a span
-    /// </summary>
-    /// <param name="destination">Buffer to write into</param>
-    private ref struct SpanWriter(Span<byte> destination)
-    {
-        private readonly Span<byte> _destination = destination;
-
-        /// <summary>Bytes written so far</summary>
-        public int Position { get; private set; }
-
-        public void WriteByte(byte value) => _destination[Position++] = value;
-
-        public void WriteUInt16(ushort value)
-        {
-            BitConverter.TryWriteBytes(_destination[Position..], value);
-            Position += sizeof(ushort);
-        }
-
-        public void WriteUInt32(uint value)
-        {
-            BitConverter.TryWriteBytes(_destination[Position..], value);
-            Position += sizeof(uint);
-        }
-
-        public void WriteSingle(float value)
-        {
-            BitConverter.TryWriteBytes(_destination[Position..], value);
-            Position += sizeof(float);
-        }
-
-        public void WriteSingles(ReadOnlySpan<float> values)
-        {
-            MemoryMarshal.AsBytes(values).CopyTo(_destination[Position..]);
-            Position += values.Length * sizeof(float);
-        }
-
-        public void WriteInt32s(ReadOnlySpan<int> values)
-        {
-            MemoryMarshal.AsBytes(values).CopyTo(_destination[Position..]);
-            Position += values.Length * sizeof(int);
-        }
-
-        public void WriteUInt32s(ReadOnlySpan<uint> values)
-        {
-            MemoryMarshal.AsBytes(values).CopyTo(_destination[Position..]);
-            Position += values.Length * sizeof(uint);
-        }
+        MemoryMarshal.Write(destination, in this);
+        return SerializedLength;
     }
 }

@@ -31,7 +31,32 @@ public class MachineConfigLayout
     [Test]
     public void SerializedLengthMatchesTheNativeStruct()
     {
+        // The struct's own size, so nothing is kept in step by hand. What this checks is that the
+        // two sides still agree on the number - the native side asserts the same 816
         Assert.That(MachineConfig.SerializedLength, Is.EqualTo(816));
+    }
+
+    [Test]
+    public void EveryFieldSitsAtTheNativeOffset()
+    {
+        // Serialize is a memcpy of the struct, so these offsets are the whole of the contract. The
+        // numbers are the ones tests/MachineConfigLayoutTests.cpp asserts on the other side
+        Assert.Multiple(() =>
+        {
+            Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.NumTotalAxes)), Is.EqualTo((nint)0));
+            Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.NumExtruders)), Is.EqualTo((nint)1));
+            Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.NumRings)), Is.EqualTo((nint)2));
+            Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.Padding0)), Is.EqualTo((nint)3));
+            Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.NumDdasPerRing)), Is.EqualTo((nint)4));
+            Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.Padding)), Is.EqualTo((nint)6));
+            Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.GracePeriodMs)), Is.EqualTo((nint)GracePeriodMsOffset));
+            Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.DriveStepsPerMm)), Is.EqualTo((nint)DriveStepsPerMmOffset));
+            Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.AxisDrivers)), Is.EqualTo((nint)AxisDriversOffset));
+            Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.ExtruderDrivers)), Is.EqualTo((nint)ExtruderDriversOffset));
+            Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.Padding2)), Is.EqualTo((nint)690));
+            Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.ContinuousRotationAxes)), Is.EqualTo((nint)ContinuousRotationAxesOffset));
+            Assert.That(Marshal.OffsetOf<MachineConfig>(nameof(MachineConfig.ControllingDrives)), Is.EqualTo((nint)ControllingDrivesOffset));
+        });
     }
 
     [Test]
@@ -64,15 +89,13 @@ public class MachineConfigLayout
     [Test]
     public void SerializeWritesEveryFieldAtTheNativeOffset()
     {
-        MachineConfig config = new()
-        {
-            NumTotalAxes = 4,
-            NumExtruders = 2,
-            NumRings = 1,
-            NumDdasPerRing = 40,
-            GracePeriodMs = 10,
-            ContinuousRotationAxes = 0x0000_0020
-        };
+        MachineConfig config = MachineConfig.Unconfigured();
+        config.NumTotalAxes = 4;
+        config.NumExtruders = 2;
+        config.NumRings = 1;
+        config.NumDdasPerRing = 40;
+        config.GracePeriodMs = 10;
+        config.ContinuousRotationAxes = 0x0000_0020;
         config.DriveStepsPerMm[0] = 80.0f;
         config.DriveStepsPerMm[MotionLimits.MaxAxesPlusExtruders - 1] = 420.0f;
         config.ControllingDrives[1] = 0x3;
@@ -117,14 +140,28 @@ public class MachineConfigLayout
     [Test]
     public void UnconfiguredDriversSerialiseAsNoBoard()
     {
-        // A default DriverId has no board address, which the native side reads as "not remote" and
-        // drops rather than addressing the movement to board zero
-        MachineConfig config = new();
+        // Board address 0 is the main board, not "no board", so a driver left at its default would
+        // be addressed to a real one. A zeroed struct says exactly that, which is why
+        // MachineConfig.Unconfigured() exists and why nothing may use new MachineConfig() as a
+        // starting point
+        MachineConfig config = MachineConfig.Unconfigured();
         byte[] buffer = new byte[MachineConfig.SerializedLength];
         config.Serialize(buffer);
 
         Assert.That(buffer[AxisDriversOffset + 2], Is.EqualTo(DriverId.NoCanAddress));
         Assert.That(buffer[ExtruderDriversOffset + 1], Is.EqualTo(DriverId.NoCanAddress));
+    }
+
+    [Test]
+    public void AZeroedConfigurationWouldAddressDriversToBoardZero()
+    {
+        // The reason the factory above is not optional, asserted so that anyone who makes the struct
+        // zero-safe can delete both this and the factory rather than wondering why it is there
+        MachineConfig zeroed = default;
+        byte[] buffer = new byte[MachineConfig.SerializedLength];
+        zeroed.Serialize(buffer);
+
+        Assert.That(buffer[AxisDriversOffset + 2], Is.EqualTo(0), "a zeroed struct names board 0");
     }
 
     [Test]

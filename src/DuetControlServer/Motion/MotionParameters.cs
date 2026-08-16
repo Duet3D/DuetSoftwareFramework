@@ -74,7 +74,7 @@ internal sealed class MotionParameters
     /// as the rest of this class so that a setting cannot reach one and not the other. It is what
     /// <see cref="MovePlanner.ReconfigureAsync"/> serialises and pushes down
     /// </remarks>
-    public MachineConfig Config { get; private init; } = new();
+    public MachineConfig Config { get; private set; } = MachineConfig.Unconfigured();
 
     /// <summary>Microsteps per mm, by logical drive</summary>
     public float[] StepsPerMm { get; } = new float[NumDrives];
@@ -415,14 +415,14 @@ internal sealed class MotionParameters
         MotionSystem? motionSystem = move.MotionSystems.Count > 0 ? move.MotionSystems[0] : null;
         MoveQueueItem? queue = move.Queue.Count > 0 ? move.Queue[0] : null;
 
-        MachineConfig config = new()
-        {
-            NumTotalAxes = (byte)numAxes,
-            NumExtruders = (byte)numExtruders,
-            NumRings = (byte)Math.Max(1, Math.Min(move.MotionSystems.Count, MotionLimits.MaxRings)),
-            NumDdasPerRing = (ushort)(queue is not null && queue.Length > 0 ? queue.Length : DefaultDdasPerRing),
-            GracePeriodMs = (uint)MathF.Round((queue?.GracePeriod ?? DefaultGracePeriodSec) * 1000.0f)
-        };
+        // Filled here and assigned to the snapshot at the end. MachineConfig is a value, so a copy
+        // taken before these writes would not see them
+        MachineConfig config = MachineConfig.Unconfigured();
+        config.NumTotalAxes = (byte)numAxes;
+        config.NumExtruders = (byte)numExtruders;
+        config.NumRings = (byte)Math.Max(1, Math.Min(move.MotionSystems.Count, MotionLimits.MaxRings));
+        config.NumDdasPerRing = (ushort)(queue is not null && queue.Length > 0 ? queue.Length : DefaultDdasPerRing);
+        config.GracePeriodMs = (uint)MathF.Round((queue?.GracePeriod ?? DefaultGracePeriodSec) * 1000.0f);
 
         MotionParameters parameters = new()
         {
@@ -433,7 +433,6 @@ internal sealed class MotionParameters
             ConfiguredAxes = move.Axes.Count,
             ConfiguredExtruders = move.Extruders.Count,
             Geometry = geometry,
-            Config = config,
             MaxPrintingAcceleration = MotionUnits.AccelerationFromMmPerSecSquared(motionSystem?.PrintingAcceleration ?? DefaultAcceleration),
             MaxTravelAcceleration = MotionUnits.AccelerationFromMmPerSecSquared(motionSystem?.TravelAcceleration ?? DefaultAcceleration),
             MinFeedrate = MotionUnits.SpeedFromMmPerSec(move.MinimumMovementSpeed)
@@ -522,6 +521,8 @@ internal sealed class MotionParameters
             }
         }
 
+        // Last, so that every write above is in the copy the snapshot keeps
+        parameters.Config = config;
         return parameters;
     }
 
