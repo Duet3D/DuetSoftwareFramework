@@ -1261,6 +1261,16 @@ internal partial class MCodeHandler
             dk = transition;
         }
 
+        // The coefficient still goes to the boards, which apply it to the moves already in their own
+        // queues, so those have to have run out first - what RepRapFirmware's
+        // Move::ConfigurePressureAdvance takes the movement lock for. The moves this side has queued
+        // carry the value they were built with, so once the push is gone this wait can go with it
+        // TODO revisit when pressure advance no longer has to be pushed to the drivers
+        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
+        {
+            throw new OperationCanceledException();
+        }
+
         List<RemoteDrivers.DriverValue<float>> toUpdate = [];
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
@@ -1288,8 +1298,9 @@ internal partial class MCodeHandler
             }
         }
 
-        // No standstill and no push: the coefficient rides on each move from here on, so the moves
-        // already queued keep the one they were built with. See docs/devel/MOTION_CONFIG_ORDERING.md
+        // Nothing is pushed to the motion engine: the coefficient rides on each move built from here
+        // on, so the moves already queued keep the one they were built with. See
+        // docs/devel/MOTION_CONFIG_ORDERING.md
         await planner.RefreshTuningAsync(cancellationToken);
 
         if (toUpdate.Count == 0)

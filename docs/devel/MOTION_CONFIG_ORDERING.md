@@ -203,8 +203,10 @@ stays in the pushed half and needs no standstill of its own — worth saying exp
 - `MoveBuilder` copies the tuning values into each move it builds, from the `MotionParameters`
   snapshot it already holds. That snapshot is already refreshed from the object model, so there is
   one source of truth and no new plumbing.
-- `HandlePressureAdvanceAsync`, `HandleBacklashAsync` and `HandleInputShapingAsync` lose their
-  `FlushAndWaitForStandstillAsync` — this is what removes the regression against RRF.
+- `HandleBacklashAsync` and `HandleInputShapingAsync` lose their `FlushAndWaitForStandstillAsync` —
+  this is what removes the regression against RRF. `HandlePressureAdvanceAsync` cannot yet: it also
+  sends the coefficient to the drivers with `M572`, and a board applies what it is sent to the moves
+  already in its own queue. The wait goes when that push does.
 - Those three, plus `HandleJerkAsync`, `HandleMaxFeedratesAsync` and `HandleNonlinearExtrusionAsync`,
   also lose their `ReconfigureAsync`: they write the object model and the next move carries the
   result. Six handlers get shorter.
