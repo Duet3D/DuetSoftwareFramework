@@ -62,7 +62,6 @@ void MotionSystem::SanitiseConfig(MotionConfig& config) noexcept
 	config.numExtruders = static_cast<uint8_t>(std::min<size_t>(config.numExtruders, maxExtruders));
 	config.numExtruders =
 		static_cast<uint8_t>(std::min<size_t>(config.numExtruders, maxAxesPlusExtruders - config.numTotalAxes));
-	config.numVisibleAxes = static_cast<uint8_t>(std::min(config.numVisibleAxes, config.numTotalAxes));
 
 	// Rings. DDARing::Init clamps the depth as well, but doing it here keeps GetConfig() honest
 	// about what was actually built.

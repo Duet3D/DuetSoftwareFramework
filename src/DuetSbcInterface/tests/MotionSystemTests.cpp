@@ -22,23 +22,25 @@ namespace
 {
 
 	// A three-axis, one-extruder Cartesian machine with one driver per axis.
+	// The backlash values a test wants; a move carries them, so FreshSystem records them for the
+	// helper below rather than the configuration holding them
+	int32_t theBacklashSteps = 0;
+	uint32_t theDistanceFactor = 1;
+
 	MotionConfig BasicConfig(int32_t backlash = 0, uint32_t distanceFactor = 10) noexcept
 	{
+		theBacklashSteps = backlash;
+		theDistanceFactor = distanceFactor;
 		MotionConfig c;
-		c.numVisibleAxes = 3;
 		c.numTotalAxes = 3;
 		c.numExtruders = 1;
-		c.backlashCorrectionDistanceFactor = distanceFactor;
 
 		for (size_t axis = 0; axis < 3; ++axis)
 		{
 			c.driveStepsPerMm[axis] = 80.0f;
-			c.instantDvs[axis] = 0.001f;
-			c.printingInstantDvs[axis] = 0.0005f;
-			c.axisDrivers[axis].numDrivers = 1;
+					c.axisDrivers[axis].numDrivers = 1;
 			c.axisDrivers[axis].driverNumbers[0] = DriverId((CanAddress)1, (uint8_t)axis);
-			c.backlashSteps[axis] = backlash;
-		}
+			}
 
 		const size_t extruderDrive = maxAxesPlusExtruders - 1;
 		c.driveStepsPerMm[extruderDrive] = 400.0f;
@@ -48,19 +50,11 @@ namespace
 
 	MotionSystem theMove;
 
-	// Backlash travels with the move now rather than being read from the configuration, so the tests
-	// have to supply it. These remember what the configuration under test asked for, so that the
-	// assertions below read as they did when the engine looked it up itself.
-	int32_t theBacklashSteps = 0;
-	uint32_t theDistanceFactor = 1;
-
 	MotionSystem& FreshSystem(const MotionConfig& config) noexcept
 	{
 		MotionSystem& move = theMove;
 		(void)move.Init();
 		move.Configure(config);
-		theBacklashSteps = config.backlashSteps[xAxis];
-		theDistanceFactor = config.backlashCorrectionDistanceFactor;
 		return move;
 	}
 
@@ -246,19 +240,16 @@ static void TestCancelSteppingAbandonsPendingMotion()
 	CHECK(after[xAxis] < 300, "and is short of the commanded travel");
 }
 
-// The config is what every accessor reads, so a reconfigure has to be visible through all of them.
+// The machine description is what every accessor reads, so a reconfigure has to be visible through
+// all of them. What a move carries is not here: that is tested where the move is built.
 static void TestConfigureIsVisibleThroughAccessors()
 {
 	MotionConfig config = BasicConfig();
-	config.jerkPolicy = 1;
 	config.continuousRotationAxes = AxesBitmap::MakeFromBits(2).GetRaw();
 	config.controllingDrives[xAxis] = AxesBitmap::MakeFromBits(0, 1).GetRaw();
-	config.pressureAdvanceClocks[maxAxesPlusExtruders - 1] = 30.0f;
-	config.shapingTimeClocks = 750;
 
 	const MotionSystem& move = FreshSystem(config);
 
-	CHECK(move.GetJerkPolicy() == 1, "jerk policy");
 	CHECK_NEAR(move.DriveStepsPerMm(xAxis), 80.0, 1e-6, "steps per mm");
 	CHECK(move.GetAxisDriversConfig(xAxis).numDrivers == 1, "driver count");
 	CHECK(move.GetAxisDriversConfig(xAxis).driverNumbers[0].IsRemote(), "axis drivers are on a remote board");
@@ -266,9 +257,6 @@ static void TestConfigureIsVisibleThroughAccessors()
 	CHECK(move.IsContinuousRotationAxis(2), "continuous rotation axis, as evaluated by DCS");
 	CHECK(!move.IsContinuousRotationAxis(xAxis), "and one that is not");
 	CHECK(move.GetControllingDrives(xAxis).IsBitSet(1), "controlling drives, as evaluated by DCS");
-	CHECK_NEAR(move.GetPressureAdvanceK0ClocksForLogicalDrive(maxAxesPlusExtruders - 1), 30.0, 1e-6,
-			   "pressure advance");
-	CHECK(move.GetShapingTimeClocks() == 750, "shaping time");
 	CHECK(move.GetTotalAxes() == 3, "the axis count comes from the same config");
 	CHECK(move.GetNumExtruders() == 1, "as does the extruder count");
 }

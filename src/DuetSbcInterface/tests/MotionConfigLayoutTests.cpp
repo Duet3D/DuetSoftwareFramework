@@ -43,29 +43,21 @@ namespace
 		CHECK(sizeof(DriverId) == 2, "DriverId is 2 bytes");
 		CHECK(sizeof(AxisDriversConfig) == 17, "AxisDriversConfig is 1 + 8*2 bytes with no padding");
 
-		CHECK_OFFSET(MotionConfig, numVisibleAxes, 0);
-		CHECK_OFFSET(MotionConfig, numTotalAxes, 1);
-		CHECK_OFFSET(MotionConfig, numExtruders, 2);
-		CHECK_OFFSET(MotionConfig, numRings, 3);
+		CHECK_OFFSET(MotionConfig, numTotalAxes, 0);
+		CHECK_OFFSET(MotionConfig, numExtruders, 1);
+		CHECK_OFFSET(MotionConfig, numRings, 2);
+		CHECK_OFFSET(MotionConfig, padding0, 3);
 		CHECK_OFFSET(MotionConfig, numDdasPerRing, 4);
 		CHECK_OFFSET(MotionConfig, padding, 6);
 		CHECK_OFFSET(MotionConfig, gracePeriodMs, 8);
 		CHECK_OFFSET(MotionConfig, driveStepsPerMm, 12);
-		CHECK_OFFSET(MotionConfig, instantDvs, 140);
-		CHECK_OFFSET(MotionConfig, printingInstantDvs, 268);
-		CHECK_OFFSET(MotionConfig, pressureAdvanceClocks, 396);
-		CHECK_OFFSET(MotionConfig, backlashSteps, 524);
-		CHECK_OFFSET(MotionConfig, backlashCorrectionDistanceFactor, 644);
-		CHECK_OFFSET(MotionConfig, jerkPolicy, 648);
-		CHECK_OFFSET(MotionConfig, axisDrivers, 652);
-		CHECK_OFFSET(MotionConfig, extruderDrivers, 1162);
-		CHECK_OFFSET(MotionConfig, padding2, 1202);
-		CHECK_OFFSET(MotionConfig, continuousRotationAxes, 1204);
-		CHECK_OFFSET(MotionConfig, controllingDrives, 1208);
-		CHECK_OFFSET(MotionConfig, shapingTimeClocks, 1328);
-		CHECK_OFFSET(MotionConfig, nonlinearExtrusion, 1332);
+		CHECK_OFFSET(MotionConfig, axisDrivers, 140);
+		CHECK_OFFSET(MotionConfig, extruderDrivers, 650);
+		CHECK_OFFSET(MotionConfig, padding2, 690);
+		CHECK_OFFSET(MotionConfig, continuousRotationAxes, 692);
+		CHECK_OFFSET(MotionConfig, controllingDrives, 696);
 
-		CHECK(sizeof(MotionConfig) == 1572, "MotionConfig is 1572 bytes");
+		CHECK(sizeof(MotionConfig) == 816, "MotionConfig is 816 bytes");
 	}
 
 	// The description arrives from another process, so the counts in it decide how far this side
@@ -74,12 +66,10 @@ namespace
 	{
 		MotionConfig config;
 		config.numTotalAxes = 200;
-		config.numVisibleAxes = 200;
 		config.numExtruders = 200;
 		MotionSystem::SanitiseConfig(config);
 
 		CHECK(config.numTotalAxes == maxAxes, "numTotalAxes is clamped to the axes there is room for");
-		CHECK(config.numVisibleAxes <= config.numTotalAxes, "visible axes cannot exceed total axes");
 
 		// This is the one that matters: FirstExtruderDrive is maxAxesPlusExtruders - numExtruders,
 		// and DDA::Prepare turns a drive at or above it into an extruder index. Too many extruders

@@ -515,9 +515,9 @@ internal sealed class MoveBuilder(MotionParameters parameters)
             RequestedSpeed = limits.RequestedSpeed,
             RingNumber = raw.RingNumber,
             NumDrives = NumDrives,
-            JerkPolicy = Parameters.Config.JerkPolicy,
-            ShapingTimeClocks = Parameters.Config.ShapingTimeClocks,
-            BacklashCorrectionDistanceFactor = Parameters.Config.BacklashCorrectionDistanceFactor
+            JerkPolicy = Parameters.JerkPolicy,
+            ShapingTimeClocks = Parameters.ShapingTimeClocks,
+            BacklashCorrectionDistanceFactor = Parameters.BacklashCorrectionDistanceFactor
         };
 
         FillTuning();
@@ -540,19 +540,18 @@ internal sealed class MoveBuilder(MotionParameters parameters)
     /// </remarks>
     private void FillTuning()
     {
-        MotionConfig config = Parameters.Config;
         for (int drive = 0; drive < NumDrives; drive++)
         {
-            NonlinearExtrusion nonlinear = drive >= config.FirstExtruderDrive
-                ? config.NonlinearExtrusions[MotionLimits.MaxAxesPlusExtruders - 1 - drive]
+            NonlinearExtrusion nonlinear = drive >= Parameters.Config.FirstExtruderDrive
+                ? Parameters.NonlinearExtrusions[MotionLimits.MaxAxesPlusExtruders - 1 - drive]
                 : NonlinearExtrusion.None;
 
             _tuning[drive] = new MoveDriveTuning
             {
-                InstantDv = config.InstantDvs[drive],
-                PrintingInstantDv = config.PrintingInstantDvs[drive],
-                PressureAdvanceClocks = config.PressureAdvanceClocks[drive],
-                BacklashSteps = drive < MotionLimits.MaxAxes ? config.BacklashSteps[drive] : 0,
+                InstantDv = Parameters.InstantDvs[drive],
+                PrintingInstantDv = Parameters.PrintingInstantDvs[drive],
+                PressureAdvanceClocks = Parameters.PressureAdvanceClocks[drive],
+                BacklashSteps = Parameters.BacklashSteps[drive],
                 NonlinearA = nonlinear.A,
                 NonlinearB = nonlinear.B,
                 NonlinearLimit = nonlinear.Limit

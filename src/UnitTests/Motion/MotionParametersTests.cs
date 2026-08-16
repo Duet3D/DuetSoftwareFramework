@@ -252,18 +252,20 @@ public class MotionParametersTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(config.NumVisibleAxes, Is.EqualTo(2));
+            Assert.That(config.NumTotalAxes, Is.EqualTo(2));
             Assert.That(config.NumExtruders, Is.EqualTo(1));
             Assert.That(config.DriveStepsPerMm[0], Is.EqualTo(80.0f));
 
-            // 900 mm/min is 15 mm/sec
-            Assert.That(config.InstantDvs[0], Is.EqualTo(15.0f / StepClockRate).Within(1e-10f));
-            Assert.That(config.PrintingInstantDvs[0], Is.EqualTo(10.0f / StepClockRate).Within(1e-10f));
-            Assert.That(config.InstantDvs[NumDrives - 1], Is.EqualTo(2.0f / StepClockRate).Within(1e-10f));
+            // The tuning a move carries is on the snapshot rather than in the pushed description
 
-            Assert.That(config.JerkPolicy, Is.EqualTo(1u));
-            Assert.That(config.BacklashCorrectionDistanceFactor, Is.EqualTo(7u));
-            Assert.That(config.BacklashSteps[0], Is.EqualTo(8), "0.1mm at 80 steps/mm");
+            // 900 mm/min is 15 mm/sec
+            Assert.That(parameters.InstantDvs[0], Is.EqualTo(15.0f / StepClockRate).Within(1e-10f));
+            Assert.That(parameters.PrintingInstantDvs[0], Is.EqualTo(10.0f / StepClockRate).Within(1e-10f));
+            Assert.That(parameters.InstantDvs[NumDrives - 1], Is.EqualTo(2.0f / StepClockRate).Within(1e-10f));
+
+            Assert.That(parameters.JerkPolicy, Is.EqualTo(1u));
+            Assert.That(parameters.BacklashCorrectionDistanceFactor, Is.EqualTo(7u));
+            Assert.That(parameters.BacklashSteps[0], Is.EqualTo(8), "0.1mm at 80 steps/mm");
         });
     }
 

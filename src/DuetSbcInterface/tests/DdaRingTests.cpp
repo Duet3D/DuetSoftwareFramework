@@ -93,17 +93,12 @@ namespace
 	void ConfigureMachine() noexcept
 	{
 		MotionConfig config;
-		config.numVisibleAxes = numAxes;
 		config.numTotalAxes = numAxes;
 		config.numExtruders = numExtruders;
-		config.jerkPolicy = 0;
 		for (size_t drive = 0; drive < maxAxesPlusExtruders; ++drive)
 		{
 			config.driveStepsPerMm[drive] = stepsPerMm;
-			config.instantDvs[drive] = instantDv;
-			config.printingInstantDvs[drive] = instantDv;
-			config.pressureAdvanceClocks[drive] = 0.0F;
-		}
+					}
 		for (size_t axis = 0; axis < numAxes; ++axis)
 		{
 			config.axisDrivers[axis].numDrivers = 1;

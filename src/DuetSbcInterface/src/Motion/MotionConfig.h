@@ -3,9 +3,19 @@
  *
  * The machine description the motion engine needs, as pushed down from DuetControlServer.
  *
- * DCS owns configuration: it parses M92, M201, M203, M566, M425, M569, M584, M592 and it owns the
- * kinematics. This is the subset of the result that the code on this side actually reads while
- * planning and preparing moves, reached through the MotionSystem each DDARing is built against.
+ * This is the machine itself - how many drives there are, what a microstep of each is worth, which
+ * board drives it, and what the kinematics says about it. It describes moves that are already
+ * queued, so replacing it is only safe at standstill: a DDA holds endpoints in microsteps computed
+ * under the old steps per mm, and Prepare turns them into driver steps by differencing against the
+ * previous DDA's.
+ *
+ * The settings that can change mid-print are not here. Jerk limits, pressure advance, backlash,
+ * nonlinear extrusion and input shaping travel on each move instead, so that changing one cannot
+ * reach a move that is already queued and nothing has to stop. See
+ * docs/devel/MOTION_CONFIG_ORDERING.md and Motion/MoveParams.h.
+ *
+ * gracePeriodMs is the exception that proves the rule: it is ring behaviour rather than anything a
+ * move carries, and it is safe to replace at any moment.
  *
  * Two entries are worth explaining because they are not configuration in the firmware's sense, but
  * kinematics results: continuousRotationAxes and controllingDrives. DDA::Prepare needs to know
@@ -37,15 +47,6 @@ namespace Duet::Sbc::Motion
 	inline constexpr unsigned int minDdasPerRing = 3;
 	inline constexpr unsigned int maxDdasPerRing = 1000;
 
-	// M592 nonlinear extrusion correction, per extruder. The commanded extrusion is scaled by
-	// 1 + min((a + b*v) * v, limit), where v is the average extrusion speed of the move in mm/sec.
-	struct NonlinearExtrusion
-	{
-		float a = 0.0;
-		float b = 0.0;
-		float limit = 0.2; // RepRapFirmware's DefaultNonlinearExtrusionLimit
-	};
-
 	// The drivers that move one axis. An axis with several drivers - a Z axis with three
 	// leadscrews, say - moves all of them together.
 	struct AxisDriversConfig
@@ -58,40 +59,19 @@ namespace Duet::Sbc::Motion
 	{
 		// --- Machine shape -------------------------------------------------------------------
 
-		uint8_t numVisibleAxes = 0; // axes the user can refer to
 		uint8_t numTotalAxes = 0;	// including axes that exist only in the kinematics
 		uint8_t numExtruders = 0;
 
 		uint8_t numRings = 1;		  // 1, or 2 for a second asynchronous movement system
+		uint8_t padding0 = 0;		  // explicit, so the layout is the same on both sides
 		uint16_t numDdasPerRing = 40; // lookahead depth
-		uint16_t padding = 0;		  // explicit, so the layout is the same on both sides
+		uint16_t padding = 0;
 
 		uint32_t gracePeriodMs = 10; // how long to let moves accumulate before starting one
 
-		// --- Per-drive limits ----------------------------------------------------------------
+		// --- Per-drive ------------------------------------------------------------------------
 
 		float driveStepsPerMm[maxAxesPlusExtruders]{};
-
-		// Instantaneous speed change a drive tolerates at a junction between moves, in mm per step
-		// clock. The printing variant applies when both moves are extruding, where a lower limit
-		// avoids visible artefacts.
-		float instantDvs[maxAxesPlusExtruders]{};
-		float printingInstantDvs[maxAxesPlusExtruders]{};
-
-		// Pressure advance time constant per drive, in step clocks. Zero for anything that is not
-		// an extruder.
-		float pressureAdvanceClocks[maxAxesPlusExtruders]{};
-
-		// Backlash to take up when a drive reverses, in microsteps, and the distance over which to
-		// spread it (as a multiple of the backlash itself).
-		int32_t backlashSteps[maxAxes]{};
-		uint32_t backlashCorrectionDistanceFactor = 10;
-
-		// --- Junction policy -----------------------------------------------------------------
-
-		// M566 P parameter. 0 allows a junction speed only between moves of the same kind;
-		// higher values allow melding more aggressively. Read by DDA::DoLookahead.
-		uint32_t jerkPolicy = 0;
 
 		// --- Driver mapping ------------------------------------------------------------------
 
@@ -107,25 +87,6 @@ namespace Duet::Sbc::Motion
 		// For each axis, the other drives that must be energised to hold it. On a Cartesian machine
 		// this is empty; on CoreXY moving X requires both motors to be enabled.
 		uint32_t controllingDrives[maxAxes]{}; // AxesBitmap raw
-
-		// --- Input shaping --------------------------------------------------------------------
-
-		// How long the expansion boards' input shaper spreads a move over, in step clocks.
-		//
-		// Nothing here shapes anything - AxisShaper was removed from this project and shaping now
-		// happens on the boards. But the boards' motion is the shaped profile while the segments
-		// built here are the unshaped one, so during acceleration the tracked position leads the
-		// real one by up to this long. Endpoints still agree exactly. Zero until DCS enables
-		// shaping on the boards.
-		uint32_t shapingTimeClocks = 0;
-
-		// --- Extrusion correction --------------------------------------------------------------
-
-		// Appended rather than placed beside the other per-extruder values: everything below
-		// gracePeriodMs has an asserted offset that the C# mirror hardcodes, and there is nothing to
-		// be gained by moving them all. Both sides are built from this repository together, so the
-		// order carries no compatibility obligation of its own.
-		NonlinearExtrusion nonlinearExtrusion[maxExtruders];
 
 		// --- Derived --------------------------------------------------------------------------
 
@@ -153,14 +114,11 @@ namespace Duet::Sbc::Motion
 	static_assert(sizeof(DriverId) == 2, "DriverId must be 2 bytes");
 	static_assert(sizeof(AxisDriversConfig) == 1 + (2 * maxDriversPerAxis), "AxisDriversConfig must be tightly packed");
 
+	static_assert(offsetof(MotionConfig, numDdasPerRing) == 4);
 	static_assert(offsetof(MotionConfig, gracePeriodMs) == 8);
 	static_assert(offsetof(MotionConfig, driveStepsPerMm) == 12);
-	static_assert(offsetof(MotionConfig, instantDvs) == 12 + (4 * maxAxesPlusExtruders));
-	static_assert(offsetof(MotionConfig, backlashSteps) == 12 + (16 * maxAxesPlusExtruders));
-	static_assert(offsetof(MotionConfig, axisDrivers) == 20 + (16 * maxAxesPlusExtruders) + (4 * maxAxes));
+	static_assert(offsetof(MotionConfig, axisDrivers) == 12 + (4 * maxAxesPlusExtruders));
 	static_assert(offsetof(MotionConfig, continuousRotationAxes) % 4 == 0, "the bitmaps must stay 4-aligned");
-	static_assert(sizeof(NonlinearExtrusion) == 12, "NonlinearExtrusion is three floats with no padding");
-	static_assert(offsetof(MotionConfig, nonlinearExtrusion) % 4 == 0, "the coefficients must stay 4-aligned");
 	static_assert(sizeof(MotionConfig) % 4 == 0, "no tail padding beyond what is declared");
 } // namespace Duet::Sbc::Motion
 

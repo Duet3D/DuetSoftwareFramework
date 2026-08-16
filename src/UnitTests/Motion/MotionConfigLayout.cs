@@ -23,20 +23,15 @@ public class MotionConfigLayout
     /// <summary>Offsets the native side asserts, so the two can be compared field by field</summary>
     private const int GracePeriodMsOffset = 8;
     private const int DriveStepsPerMmOffset = 12;
-    private const int InstantDvsOffset = 140;
-    private const int BacklashStepsOffset = 524;
-    private const int JerkPolicyOffset = 648;
-    private const int AxisDriversOffset = 652;
-    private const int ExtruderDriversOffset = 1162;
-    private const int ContinuousRotationAxesOffset = 1204;
-    private const int ControllingDrivesOffset = 1208;
-    private const int ShapingTimeClocksOffset = 1328;
-    private const int NonlinearExtrusionOffset = 1332;
+    private const int AxisDriversOffset = 140;
+    private const int ExtruderDriversOffset = 650;
+    private const int ContinuousRotationAxesOffset = 692;
+    private const int ControllingDrivesOffset = 696;
 
     [Test]
     public void SerializedLengthMatchesTheNativeStruct()
     {
-        Assert.That(MotionConfig.SerializedLength, Is.EqualTo(1572));
+        Assert.That(MotionConfig.SerializedLength, Is.EqualTo(816));
     }
 
     [Test]
@@ -71,26 +66,19 @@ public class MotionConfigLayout
     {
         MotionConfig config = new()
         {
-            NumVisibleAxes = 3,
             NumTotalAxes = 4,
             NumExtruders = 2,
             NumRings = 1,
             NumDdasPerRing = 40,
             GracePeriodMs = 10,
-            BacklashCorrectionDistanceFactor = 7,
-            JerkPolicy = 1,
-            ContinuousRotationAxes = 0x0000_0020,
-            ShapingTimeClocks = 1234
+            ContinuousRotationAxes = 0x0000_0020
         };
         config.DriveStepsPerMm[0] = 80.0f;
         config.DriveStepsPerMm[MotionLimits.MaxAxesPlusExtruders - 1] = 420.0f;
-        config.InstantDvs[0] = 0.25f;
-        config.BacklashSteps[0] = -13;
         config.ControllingDrives[1] = 0x3;
 
         config.AxisDrivers[0] = AxisDriversConfig.WithDrivers(new DriverId(1, 4), new DriverId(2, 5));
         config.ExtruderDrivers[0] = new DriverId(3, 6);
-        config.NonlinearExtrusions[0] = new NonlinearExtrusion { A = 0.01f, B = 0.002f, Limit = 0.15f };
 
         byte[] buffer = new byte[MotionConfig.SerializedLength];
         int written = config.Serialize(buffer);
@@ -98,10 +86,10 @@ public class MotionConfigLayout
         Assert.That(written, Is.EqualTo(MotionConfig.SerializedLength));
 
         // Machine shape, including the padding that only exists so both sides agree on the offsets
-        Assert.That(buffer[0], Is.EqualTo(3));
-        Assert.That(buffer[1], Is.EqualTo(4));
-        Assert.That(buffer[2], Is.EqualTo(2));
-        Assert.That(buffer[3], Is.EqualTo(1));
+        Assert.That(buffer[0], Is.EqualTo(4), "numTotalAxes");
+        Assert.That(buffer[1], Is.EqualTo(2), "numExtruders");
+        Assert.That(buffer[2], Is.EqualTo(1), "numRings");
+        Assert.That(buffer[3], Is.EqualTo(0), "padding0");
         Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(buffer.AsSpan(4)), Is.EqualTo(40));
         Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(buffer.AsSpan(6)), Is.EqualTo(0), "padding");
         Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan(GracePeriodMsOffset)), Is.EqualTo(10));
@@ -109,12 +97,9 @@ public class MotionConfigLayout
         // Per-drive arrays
         Assert.That(BitConverter.ToSingle(buffer, DriveStepsPerMmOffset), Is.EqualTo(80.0f));
         Assert.That(BitConverter.ToSingle(buffer, DriveStepsPerMmOffset + ((MotionLimits.MaxAxesPlusExtruders - 1) * 4)), Is.EqualTo(420.0f));
-        Assert.That(BitConverter.ToSingle(buffer, InstantDvsOffset), Is.EqualTo(0.25f));
-        Assert.That(BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(BacklashStepsOffset)), Is.EqualTo(-13));
-        Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan(JerkPolicyOffset)), Is.EqualTo(1));
 
         // Driver mapping. AxisDriversConfig is 1 + 8*2 bytes with no padding, which is what puts
-        // extruderDrivers at 1162 rather than somewhere the compiler chose
+        // extruderDrivers at 650 rather than somewhere the compiler chose
         Assert.That(buffer[AxisDriversOffset], Is.EqualTo(2), "numDrivers");
         Assert.That(buffer[AxisDriversOffset + 1], Is.EqualTo(4), "first driver, local number");
         Assert.That(buffer[AxisDriversOffset + 2], Is.EqualTo(1), "first driver, board address");
@@ -123,16 +108,10 @@ public class MotionConfigLayout
         Assert.That(buffer[ExtruderDriversOffset], Is.EqualTo(6), "extruder driver, local number");
         Assert.That(buffer[ExtruderDriversOffset + 1], Is.EqualTo(3), "extruder driver, board address");
 
-        // Kinematics results and shaping, after the second padding that realigns them
+        // Kinematics results, after the second padding that realigns them
         Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(buffer.AsSpan(ExtruderDriversOffset + (2 * MotionLimits.MaxExtruders))), Is.EqualTo(0), "padding2");
         Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan(ContinuousRotationAxesOffset)), Is.EqualTo(0x0000_0020));
         Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan(ControllingDrivesOffset + 4)), Is.EqualTo(0x3));
-        Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan(ShapingTimeClocksOffset)), Is.EqualTo(1234));
-
-        // M592 coefficients, three floats per extruder
-        Assert.That(BitConverter.ToSingle(buffer, NonlinearExtrusionOffset), Is.EqualTo(0.01f), "extruder 0 A");
-        Assert.That(BitConverter.ToSingle(buffer, NonlinearExtrusionOffset + 4), Is.EqualTo(0.002f), "extruder 0 B");
-        Assert.That(BitConverter.ToSingle(buffer, NonlinearExtrusionOffset + 8), Is.EqualTo(0.15f), "extruder 0 limit");
     }
 
     [Test]
@@ -146,20 +125,6 @@ public class MotionConfigLayout
 
         Assert.That(buffer[AxisDriversOffset + 2], Is.EqualTo(DriverId.NoCanAddress));
         Assert.That(buffer[ExtruderDriversOffset + 1], Is.EqualTo(DriverId.NoCanAddress));
-    }
-
-    [Test]
-    public void UnconfiguredExtrudersSerialiseWithNoCorrectionButTheDefaultLimit()
-    {
-        // A zeroed limit would clamp every correction to nothing, so an extruder nobody has
-        // configured has to carry RepRapFirmware's 0.2 rather than a default-constructed zero
-        MotionConfig config = new();
-        byte[] buffer = new byte[MotionConfig.SerializedLength];
-        config.Serialize(buffer);
-
-        Assert.That(BitConverter.ToSingle(buffer, NonlinearExtrusionOffset), Is.EqualTo(0.0f), "A");
-        Assert.That(BitConverter.ToSingle(buffer, NonlinearExtrusionOffset + 4), Is.EqualTo(0.0f), "B");
-        Assert.That(BitConverter.ToSingle(buffer, NonlinearExtrusionOffset + 8), Is.EqualTo(NonlinearExtrusion.DefaultLimit), "limit");
     }
 
     [Test]

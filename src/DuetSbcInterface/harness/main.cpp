@@ -283,14 +283,11 @@ int main(int argc, char** argv)
 			// A minimal machine: three axes and one extruder, one remote driver each. Enough for the
 			// engine to plan and prepare real moves, which is what puts load on the transfer loop.
 			Duet::Sbc::Motion::MotionConfig motionConfig;
-			motionConfig.numVisibleAxes = 3;
 			motionConfig.numTotalAxes = 3;
 			motionConfig.numExtruders = 1;
 			for (size_t drive = 0; drive < maxAxesPlusExtruders; ++drive)
 			{
 				motionConfig.driveStepsPerMm[drive] = 80.0F;
-				motionConfig.instantDvs[drive] = 10.0F / stepClockRate;
-				motionConfig.printingInstantDvs[drive] = 10.0F / stepClockRate;
 			}
 			for (size_t axis = 0; axis < 3; ++axis)
 			{

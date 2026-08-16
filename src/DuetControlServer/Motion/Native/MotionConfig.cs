@@ -163,9 +163,14 @@ internal struct NonlinearExtrusion
 /// </summary>
 /// <remarks>
 /// <para>
-/// This side owns configuration. It parses M92, M201, M203, M566, M425, M569 and M584, and it owns
-/// the kinematics; this is the subset of the result that the native planner actually reads while
-/// planning and preparing moves.
+/// This is the machine itself: how many drives there are, what a microstep of each is worth, which
+/// board drives it, and what the kinematics says about it. It describes moves that are already
+/// queued, so replacing it is only safe at standstill.
+/// </para>
+/// <para>
+/// The settings that can change mid-print are not here - jerk limits, pressure advance, backlash,
+/// nonlinear extrusion and input shaping travel on each move instead, so that changing one cannot
+/// reach a move that is already queued. See <c>docs/devel/MOTION_CONFIG_ORDERING.md</c>.
 /// </para>
 /// <para>
 /// Two entries are kinematics results rather than configuration in the firmware's sense:
@@ -189,9 +194,6 @@ internal sealed class MotionConfig
 {
     // --- Machine shape ------------------------------------------------------------------------
 
-    /// <summary>Axes the user can refer to</summary>
-    public byte NumVisibleAxes { get; set; }
-
     /// <summary>Axes in total, including any that exist only in the kinematics</summary>
     public byte NumTotalAxes { get; set; }
 
@@ -211,39 +213,6 @@ internal sealed class MotionConfig
 
     /// <summary>Microsteps per mm for each logical drive</summary>
     public float[] DriveStepsPerMm { get; } = new float[MotionLimits.MaxAxesPlusExtruders];
-
-    /// <summary>
-    /// Instantaneous speed change a drive tolerates at a junction between moves, in mm per step clock
-    /// </summary>
-    public float[] InstantDvs { get; } = new float[MotionLimits.MaxAxesPlusExtruders];
-
-    /// <summary>
-    /// The same, for a junction between two extruding moves, where a lower limit avoids visible
-    /// artefacts
-    /// </summary>
-    public float[] PrintingInstantDvs { get; } = new float[MotionLimits.MaxAxesPlusExtruders];
-
-    /// <summary>
-    /// Pressure advance time constant per drive, in step clocks. Zero for anything that is not an
-    /// extruder
-    /// </summary>
-    public float[] PressureAdvanceClocks { get; } = new float[MotionLimits.MaxAxesPlusExtruders];
-
-    /// <summary>Backlash to take up when a drive reverses, in microsteps</summary>
-    public int[] BacklashSteps { get; } = new int[MotionLimits.MaxAxes];
-
-    /// <summary>
-    /// How far to spread the backlash correction over, as a multiple of the backlash itself
-    /// </summary>
-    public uint BacklashCorrectionDistanceFactor { get; set; } = 10;
-
-    // --- Junction policy ----------------------------------------------------------------------
-
-    /// <summary>
-    /// M566 P parameter. 0 allows a junction speed only between moves of the same kind; higher values
-    /// allow melding more aggressively
-    /// </summary>
-    public uint JerkPolicy { get; set; }
 
     // --- Driver mapping -----------------------------------------------------------------------
 
@@ -275,14 +244,6 @@ internal sealed class MotionConfig
     /// acceleration the tracked position leads the real one by up to this long. Endpoints still agree
     /// exactly. Zero until shaping is enabled on the boards
     /// </remarks>
-    public uint ShapingTimeClocks { get; set; }
-
-    // --- Extrusion correction -------------------------------------------------------------------
-
-    /// <summary>
-    /// M592 nonlinear extrusion coefficients, per extruder
-    /// </summary>
-    public NonlinearExtrusion[] NonlinearExtrusions { get; } = CreateNonlinearExtrusions();
 
     // --- Derived ----------------------------------------------------------------------------------
 
@@ -307,23 +268,15 @@ internal sealed class MotionConfig
     /// written field by field: this is the number the native side asserts against
     /// </remarks>
     public const int SerializedLength =
-        1 + 1 + 1                                                    // numVisibleAxes, numTotalAxes, numExtruders
-        + 1 + 2 + 2                                                  // numRings, numDdasPerRing, padding
+        1 + 1 + 1 + 1                                                // numTotalAxes, numExtruders, numRings, padding0
+        + 2 + 2                                                      // numDdasPerRing, padding
         + 4                                                          // gracePeriodMs
         + (4 * MotionLimits.MaxAxesPlusExtruders)                    // driveStepsPerMm
-        + (4 * MotionLimits.MaxAxesPlusExtruders)                    // instantDvs
-        + (4 * MotionLimits.MaxAxesPlusExtruders)                    // printingInstantDvs
-        + (4 * MotionLimits.MaxAxesPlusExtruders)                    // pressureAdvanceClocks
-        + (4 * MotionLimits.MaxAxes)                                 // backlashSteps
-        + 4                                                          // backlashCorrectionDistanceFactor
-        + 4                                                          // jerkPolicy
         + ((1 + (2 * MotionLimits.MaxDriversPerAxis)) * MotionLimits.MaxAxes)    // axisDrivers
         + (2 * MotionLimits.MaxExtruders)                            // extruderDrivers
         + 2                                                          // padding2
         + 4                                                          // continuousRotationAxes
-        + (4 * MotionLimits.MaxAxes)                                 // controllingDrives
-        + 4                                                          // shapingTimeClocks
-        + (12 * MotionLimits.MaxExtruders);                          // nonlinearExtrusion
+        + (4 * MotionLimits.MaxAxes);                                // controllingDrives
 
     /// <summary>
     /// Serialise this configuration into the byte layout the native side expects
@@ -344,21 +297,15 @@ internal sealed class MotionConfig
         }
 
         SpanWriter writer = new(destination);
-        writer.WriteByte(NumVisibleAxes);
         writer.WriteByte(NumTotalAxes);
         writer.WriteByte(NumExtruders);
         writer.WriteByte(NumRings);
+        writer.WriteByte(0);            // padding0, declared on the native side so this can match it
         writer.WriteUInt16(NumDdasPerRing);
-        writer.WriteUInt16(0);          // padding, declared on the native side so this can match it
+        writer.WriteUInt16(0);          // padding
         writer.WriteUInt32(GracePeriodMs);
 
         writer.WriteSingles(DriveStepsPerMm);
-        writer.WriteSingles(InstantDvs);
-        writer.WriteSingles(PrintingInstantDvs);
-        writer.WriteSingles(PressureAdvanceClocks);
-        writer.WriteInt32s(BacklashSteps);
-        writer.WriteUInt32(BacklashCorrectionDistanceFactor);
-        writer.WriteUInt32(JerkPolicy);
 
         foreach (AxisDriversConfig axis in AxisDrivers)
         {
@@ -380,15 +327,6 @@ internal sealed class MotionConfig
         writer.WriteUInt16(0);          // padding2, realigning the bitmaps that follow
         writer.WriteUInt32(ContinuousRotationAxes);
         writer.WriteUInt32s(ControllingDrives);
-        writer.WriteUInt32(ShapingTimeClocks);
-
-        foreach (NonlinearExtrusion nonlinear in NonlinearExtrusions)
-        {
-            writer.WriteSingle(nonlinear.A);
-            writer.WriteSingle(nonlinear.B);
-            writer.WriteSingle(nonlinear.Limit);
-        }
-
         return writer.Position;
     }
 
@@ -399,13 +337,6 @@ internal sealed class MotionConfig
         {
             result[i] = AxisDriversConfig.Empty;
         }
-        return result;
-    }
-
-    private static NonlinearExtrusion[] CreateNonlinearExtrusions()
-    {
-        NonlinearExtrusion[] result = new NonlinearExtrusion[MotionLimits.MaxExtruders];
-        Array.Fill(result, NonlinearExtrusion.None);
         return result;
     }
 

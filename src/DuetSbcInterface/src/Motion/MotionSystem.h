@@ -83,17 +83,6 @@ namespace Duet::Sbc::Motion
 		// Names match the firmware's Move members, so the planning code reads as it does upstream.
 
 		[[nodiscard]] float DriveStepsPerMm(size_t drive) const noexcept { return m_config.driveStepsPerMm[drive]; }
-		[[nodiscard]] uint32_t GetJerkPolicy() const noexcept { return m_config.jerkPolicy; }
-		[[nodiscard]] float GetMaxInstantDv(size_t drive) const noexcept { return m_config.instantDvs[drive]; }
-		[[nodiscard]] float GetPrintingInstantDv(size_t drive) const noexcept
-		{
-			return m_config.printingInstantDvs[drive];
-		}
-		[[nodiscard]] float GetPressureAdvanceK0ClocksForLogicalDrive(size_t drive) const noexcept
-		{
-			return m_config.pressureAdvanceClocks[drive];
-		}
-
 		[[nodiscard]] const AxisDriversConfig& GetAxisDriversConfig(size_t axis) const noexcept
 		{
 			static constexpr AxisDriversConfig noDrivers{};
@@ -106,14 +95,6 @@ namespace Duet::Sbc::Motion
 		[[nodiscard]] DriverId GetExtruderDriver(size_t extruder) const noexcept
 		{
 			return (extruder < maxExtruders) ? m_config.extruderDrivers[extruder] : DriverId{};
-		}
-
-		// M592 coefficients for one extruder. An out-of-range extruder gets the neutral set, whose
-		// a and b are zero, so the correction it produces is no correction at all.
-		[[nodiscard]] const NonlinearExtrusion& GetExtrusionCoefficients(size_t extruder) const noexcept
-		{
-			static constexpr NonlinearExtrusion noCorrection{};
-			return (extruder < maxExtruders) ? m_config.nonlinearExtrusion[extruder] : noCorrection;
 		}
 
 		// Kinematics answers that DCS evaluated for us; see MotionConfig.
@@ -136,10 +117,6 @@ namespace Duet::Sbc::Motion
 		// the accumulator, which is machine state rather than configuration.
 		[[nodiscard]] int32_t ApplyBacklashCompensation(size_t drive, int32_t delta, int32_t backlashSteps,
 														uint32_t distanceFactor) noexcept;
-
-		// How long the boards' input shaper spreads a move over. Zero while shaping is off; see
-		// MotionConfig::shapingTimeClocks for why this is not simply absent.
-		[[nodiscard]] uint32_t GetShapingTimeClocks() const noexcept { return m_config.shapingTimeClocks; }
 
 		// Where prepared moves go out to the controller. Owned here because it is per-machine state
 		// with the same lifetime as the drive trackers.

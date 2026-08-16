@@ -237,6 +237,13 @@ confirming both that the machine does not pause and that the change lands on the
 
 ## 7. Order of work
 
+**Done.** One deviation: the machine half kept the name `MotionConfig` rather than becoming
+`MachineConfig`. The split the plan wanted is achieved by the tuning fields leaving it - what remains
+is only the machine - and renaming it would have churned the C ABI's mirror, both layout tests and
+every call site for a clearer name alone. Its header comment now says what it is and that replacing
+it needs standstill. The tuning that left lives on `MotionParameters`, DuetControlServer's snapshot,
+which is where `MoveBuilder` reads it once per move.
+
 | Step | Content | Risk |
 | --- | --- | --- |
 | 1 | Split `MotionConfig` into `MachineConfig` and the tuning fields, both still pushed whole under standstill. No behaviour change; this is the ABI move, with both layout tests updated. | Low, touches the C# mirror |
