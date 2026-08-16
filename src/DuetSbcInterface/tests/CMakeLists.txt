@@ -33,8 +33,8 @@ target_link_libraries(schedule_move_builder_tests PRIVATE duet_motion)
 duet_sbc_add_test(move_params_layout_tests MoveParamsLayoutTests.cpp)
 target_link_libraries(move_params_layout_tests PRIVATE duet_motion)
 
-duet_sbc_add_test(motion_config_layout_tests MotionConfigLayoutTests.cpp)
-target_link_libraries(motion_config_layout_tests PRIVATE duet_motion)
+duet_sbc_add_test(machine_config_layout_tests MachineConfigLayoutTests.cpp)
+target_link_libraries(machine_config_layout_tests PRIVATE duet_motion)
 
 # The rule DuetCANMaster matches an input change against. It lives in the shared protocol headers
 # rather than in the controller so that it can be tested at all: the controller is built for an ARM

@@ -9,7 +9,7 @@
 #include "DDA.h"
 #include "MoveDebugFlags.h"
 #include "MoveTiming.h"
-#include <Motion/MotionConfig.h>
+#include <Motion/MachineConfig.h>
 
 #include <algorithm>
 #include <cassert>

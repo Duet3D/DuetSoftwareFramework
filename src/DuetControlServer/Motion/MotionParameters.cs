@@ -74,7 +74,7 @@ internal sealed class MotionParameters
     /// as the rest of this class so that a setting cannot reach one and not the other. It is what
     /// <see cref="MovePlanner.ReconfigureAsync"/> serialises and pushes down
     /// </remarks>
-    public MotionConfig Config { get; private init; } = new();
+    public MachineConfig Config { get; private init; } = new();
 
     /// <summary>Microsteps per mm, by logical drive</summary>
     public float[] StepsPerMm { get; } = new float[NumDrives];
@@ -184,7 +184,7 @@ internal sealed class MotionParameters
 
     // --- What a move carries ------------------------------------------------------------------
     //
-    // These are not in MotionConfig: the engine holds no copy to update. MoveBuilder reads them here
+    // These are not in MachineConfig: the engine holds no copy to update. MoveBuilder reads them here
     // once per move and writes them into the submission, so a change takes effect on the next move
     // built and cannot reach one that is already queued. See docs/devel/MOTION_CONFIG_ORDERING.md
 
@@ -415,7 +415,7 @@ internal sealed class MotionParameters
         MotionSystem? motionSystem = move.MotionSystems.Count > 0 ? move.MotionSystems[0] : null;
         MoveQueueItem? queue = move.Queue.Count > 0 ? move.Queue[0] : null;
 
-        MotionConfig config = new()
+        MachineConfig config = new()
         {
             NumTotalAxes = (byte)numAxes,
             NumExtruders = (byte)numExtruders,

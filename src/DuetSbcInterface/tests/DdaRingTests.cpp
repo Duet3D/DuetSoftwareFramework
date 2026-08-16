@@ -19,7 +19,7 @@
 
 #include <vector>
 
-using Duet::Sbc::Motion::MotionConfig;
+using Duet::Sbc::Motion::MachineConfig;
 using Duet::Sbc::Motion::MotionSystem;
 using Duet::Sbc::Motion::MoveParamsDirectionVector;
 using Duet::Sbc::Motion::MoveParamsEndPoints;
@@ -92,7 +92,7 @@ namespace
 
 	void ConfigureMachine() noexcept
 	{
-		MotionConfig config;
+		MachineConfig config;
 		config.numTotalAxes = numAxes;
 		config.numExtruders = numExtruders;
 		for (size_t drive = 0; drive < maxAxesPlusExtruders; ++drive)

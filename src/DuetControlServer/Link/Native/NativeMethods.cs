@@ -347,7 +347,7 @@ internal static partial class NativeMethods
     /// Push the machine description down to the motion engine
     /// </summary>
     /// <param name="handle">Interface handle</param>
-    /// <param name="config">Serialised MotionConfig</param>
+    /// <param name="config">Serialised MachineConfig</param>
     /// <param name="length">Length of <paramref name="config"/> in bytes</param>
     /// <returns>1 on success, 0 if the length did not match</returns>
     /// <remarks>Safe only while no move is in flight</remarks>

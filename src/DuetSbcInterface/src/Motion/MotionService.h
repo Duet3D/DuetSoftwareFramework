@@ -28,7 +28,7 @@
 #include <Motion/LinkScheduleMoveSink.h>
 
 #include <DuetSpiProtocol/MessageFormats.h>
-#include <Motion/MotionConfig.h>
+#include <Motion/MachineConfig.h>
 #include <Motion/MotionSystem.h>
 #include <Motion/MoveParams.h>
 #include <Motion/DDARing.h>
@@ -67,7 +67,7 @@ namespace Duet::Sbc
 		// Replace the machine description. Safe only while no move is in flight, which is DCS's
 		// responsibility - it holds movement locked while it reconfigures, exactly as M92 requires
 		// in the firmware.
-		void Configure(const Motion::MotionConfig& config);
+		void Configure(const Motion::MachineConfig& config);
 
 		// --- Called from the managed side -------------------------------------------------------
 

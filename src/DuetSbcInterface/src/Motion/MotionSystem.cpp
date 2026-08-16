@@ -52,7 +52,7 @@ bool MotionSystem::Init() noexcept
 	return true;
 }
 
-void MotionSystem::SanitiseConfig(MotionConfig& config) noexcept
+void MotionSystem::SanitiseConfig(MachineConfig& config) noexcept
 {
 	// Axis and extruder counts. numTotalAxes and numExtruders together decide FirstExtruderDrive,
 	// which is what splits the logical drive space; if their sum exceeds maxAxesPlusExtruders then
@@ -76,7 +76,7 @@ void MotionSystem::SanitiseConfig(MotionConfig& config) noexcept
 	}
 }
 
-void MotionSystem::Configure(const MotionConfig& newConfig) noexcept
+void MotionSystem::Configure(const MachineConfig& newConfig) noexcept
 {
 	m_config = newConfig;
 	SanitiseConfig(m_config);

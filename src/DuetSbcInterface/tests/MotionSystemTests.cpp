@@ -14,7 +14,7 @@
 
 #include <cstdint>
 
-using Duet::Sbc::Motion::MotionConfig;
+using Duet::Sbc::Motion::MachineConfig;
 using Duet::Sbc::Motion::MotionSystem;
 using Duet::Sbc::Motion::MoveProfile;
 
@@ -27,11 +27,11 @@ namespace
 	int32_t theBacklashSteps = 0;
 	uint32_t theDistanceFactor = 1;
 
-	MotionConfig BasicConfig(int32_t backlash = 0, uint32_t distanceFactor = 10) noexcept
+	MachineConfig BasicConfig(int32_t backlash = 0, uint32_t distanceFactor = 10) noexcept
 	{
 		theBacklashSteps = backlash;
 		theDistanceFactor = distanceFactor;
-		MotionConfig c;
+		MachineConfig c;
 		c.numTotalAxes = 3;
 		c.numExtruders = 1;
 
@@ -50,7 +50,7 @@ namespace
 
 	MotionSystem theMove;
 
-	MotionSystem& FreshSystem(const MotionConfig& config) noexcept
+	MotionSystem& FreshSystem(const MachineConfig& config) noexcept
 	{
 		MotionSystem& move = theMove;
 		(void)move.Init();
@@ -169,7 +169,7 @@ static void TestReportedPositionExcludesBacklash()
 // the extrusion amount.
 static void TestExtrudersAreNotCompensated()
 {
-	const MotionConfig config = BasicConfig(50, 10);
+	const MachineConfig config = BasicConfig(50, 10);
 	MotionSystem& move = FreshSystem(config);
 
 	const size_t extruderDrive = maxAxesPlusExtruders - 1;
@@ -244,7 +244,7 @@ static void TestCancelSteppingAbandonsPendingMotion()
 // all of them. What a move carries is not here: that is tested where the move is built.
 static void TestConfigureIsVisibleThroughAccessors()
 {
-	MotionConfig config = BasicConfig();
+	MachineConfig config = BasicConfig();
 	config.continuousRotationAxes = AxesBitmap::MakeFromBits(2).GetRaw();
 	config.controllingDrives[xAxis] = AxesBitmap::MakeFromBits(0, 1).GetRaw();
 
@@ -266,7 +266,7 @@ static void TestConfigureIsVisibleThroughAccessors()
 // pairing the same as the one M574 registered the switches under.
 static void TestDriverIndexWithinAnAxis()
 {
-	MotionConfig config = BasicConfig();
+	MachineConfig config = BasicConfig();
 	constexpr size_t zAxis = 2;
 	config.axisDrivers[zAxis].numDrivers = 2;
 	config.axisDrivers[zAxis].driverNumbers[0] = DriverId((CanAddress)1, 2);

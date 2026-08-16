@@ -62,7 +62,7 @@ namespace Duet::Sbc
 		}
 		m_move.GetScheduleMoveBuilder().SetSink(&m_sink);
 
-		const Motion::MotionConfig& config = m_move.GetConfig();
+		const Motion::MachineConfig& config = m_move.GetConfig();
 		for (unsigned int i = 0; i < numRings; ++i)
 		{
 			m_rings[i].Init(m_move, config.numDdasPerRing);
@@ -77,7 +77,7 @@ namespace Duet::Sbc
 		return true;
 	}
 
-	void MotionService::Configure(const Motion::MotionConfig& config)
+	void MotionService::Configure(const Motion::MachineConfig& config)
 	{
 		m_move.Configure(config);
 	}

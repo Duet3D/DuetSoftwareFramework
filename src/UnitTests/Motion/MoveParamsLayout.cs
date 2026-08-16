@@ -48,7 +48,7 @@ public class MoveParamsLayout
             Assert.That(MoveStopInput.Length, Is.EqualTo(size), "Length covers every field of the entry");
 
             // 6 + maxDriversPerAxis is what MoveParams.h static_asserts sizeof(MoveStopInput) to be,
-            // and MotionConfigLayout pins maxDriversPerAxis itself to the native 8
+            // and MachineConfigLayout pins maxDriversPerAxis itself to the native 8
             Assert.That(size, Is.EqualTo(6 + MotionLimits.MaxDriversPerAxis), "sizeof(MoveStopInput)");
         });
     }

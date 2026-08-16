@@ -21,7 +21,7 @@ class DDARing final
 {
   public:
 	// How long to let moves accumulate before committing the first one, in step clocks. Upstream
-	// this is 10ms; DuetControlServer overrides it through MotionConfig::gracePeriodMs.
+	// this is 10ms; DuetControlServer overrides it through MachineConfig::gracePeriodMs.
 	static constexpr uint32_t defaultGracePeriod = (stepClockRate / 1000) * 10;
 
 	DDARing() noexcept;

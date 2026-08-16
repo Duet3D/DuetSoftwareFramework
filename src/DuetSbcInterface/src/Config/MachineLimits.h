@@ -5,12 +5,12 @@
  *
  * These bound the fixed-size arrays inside a DDA, which is why they are compile-time at all: a DDA
  * has to be a fixed-size object, allocated once from the motion arena and never freed. The axis and
- * extruder counts the machine actually has arrive at run time in MotionConfig and are never larger
+ * extruder counts the machine actually has arrive at run time in MachineConfig and are never larger
  * than these.
  *
  * The values are the firmware's, from Config/Pins_Duet3_MB6HC.h. The managed mirror is
- * DuetControlServer/Motion/Native/MotionConfig.cs, whose MotionLimits must agree with them or a
- * MotionConfig is a different length on each side.
+ * DuetControlServer/Motion/Native/MachineConfig.cs, whose MotionLimits must agree with them or a
+ * MachineConfig is a different length on each side.
  */
 
 #ifndef SRC_CONFIG_MACHINELIMITS_H_

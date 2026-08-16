@@ -19,7 +19,7 @@ machine ever coming to a stop.
 
 ## 1. What happens today
 
-`MovePlanner.ReconfigureAsync` serialises the **whole** `MotionConfig` and `MotionSystem::Configure`
+`MovePlanner.ReconfigureAsync` serialises the **whole** `MachineConfig` and `MotionSystem::Configure`
 memcpys it over the live one. There is one update path and it is all-or-nothing, so every caller has
 to choose between two wrong answers: stall the print, or overwrite configuration that queued moves
 are still going to read.
@@ -52,7 +52,7 @@ standstill was added to avoid.
 ## 2. Where each value is consumed
 
 This is what decides the design, because the values are not read at the same point in the pipeline.
-Every read of `MotionConfig` from the planner sits in one of two places:
+Every read of `MachineConfig` from the planner sits in one of two places:
 
 | Consumed in | Values | When that is, relative to the G-code |
 | --- | --- | --- |
@@ -70,7 +70,7 @@ that DuetControlServer computed under the old steps/mm, and `Prepare` turns them
 differencing against the previous DDA's endpoints. Change steps/mm between those two and the
 difference is not a distance any more. No ordering rescues that, so M92 and M584 keep the flush.
 
-**M201 and M203 already need nothing.** Acceleration and requested speed are not in `MotionConfig` at
+**M201 and M203 already need nothing.** Acceleration and requested speed are not in `MachineConfig` at
 all — DuetControlServer works them out per move and sends them in `MoveParamsHeader`. Every move
 carries its own, so they are ordered by construction and no code has to remember to synchronise
 anything.
@@ -173,7 +173,7 @@ recorded here so nobody reads it as an oversight.
 
 ## 4. What is left in the pushed configuration
 
-`MotionConfig` splits, so which update path a field takes is visible in the type rather than
+`MachineConfig` splits, so which update path a field takes is visible in the type rather than
 remembered:
 
 ```
@@ -237,7 +237,7 @@ confirming both that the machine does not pause and that the change lands on the
 
 ## 7. Order of work
 
-**Done.** One deviation: the machine half kept the name `MotionConfig` rather than becoming
+**Done.** One deviation: the machine half kept the name `MachineConfig` rather than becoming
 `MachineConfig`. The split the plan wanted is achieved by the tuning fields leaving it - what remains
 is only the machine - and renaming it would have churned the C ABI's mirror, both layout tests and
 every call site for a clearer name alone. Its header comment now says what it is and that replacing
@@ -246,7 +246,7 @@ which is where `MoveBuilder` reads it once per move.
 
 | Step | Content | Risk |
 | --- | --- | --- |
-| 1 | Split `MotionConfig` into `MachineConfig` and the tuning fields, both still pushed whole under standstill. No behaviour change; this is the ABI move, with both layout tests updated. | Low, touches the C# mirror |
+| 1 | Split `MachineConfig` into `MachineConfig` and the tuning fields, both still pushed whole under standstill. No behaviour change; this is the ABI move, with both layout tests updated. | Low, touches the C# mirror |
 | 2 | Grow `MoveParamsHeader` and the per-drive array with the tuning values; `DDA::InitFromParams` stores them; `Prepare` and the planning functions read them from the DDA instead of from `MotionSystem`. Tuning stays in the pushed config as the default a move inherits. | Medium — the mechanical heart of it |
 | 3 | `MoveBuilder` fills them; drop the six handlers' `ReconfigureAsync` and the three flushes. | Medium — user-visible |
 | 4 | Remove the tuning fields from the pushed config, and `numVisibleAxes` with them. | Low |

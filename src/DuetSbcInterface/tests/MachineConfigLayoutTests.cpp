@@ -1,4 +1,4 @@
-// MotionConfig crosses the CApi boundary as raw bytes: DuetSbc_MotionConfigure memcpys whatever
+// MachineConfig crosses the CApi boundary as raw bytes: DuetSbc_MotionConfigure memcpys whatever
 // DuetControlServer hands it straight into the struct. Unlike the other boundary structs it is not
 // packed, because driveStepsPerMm and its neighbours are read while preparing moves and a misaligned
 // float array is not worth the twenty bytes saved. The padding the compiler would insert is declared
@@ -9,14 +9,14 @@
 
 #include "TestSupport.h"
 
-#include <Motion/MotionConfig.h>
+#include <Motion/MachineConfig.h>
 #include <Motion/MotionSystem.h>
 #include <Motion/DDARing.h>
 
 #include <cstddef>
 
 using Duet::Sbc::Motion::AxisDriversConfig;
-using Duet::Sbc::Motion::MotionConfig;
+using Duet::Sbc::Motion::MachineConfig;
 using Duet::Sbc::Motion::MotionSystem;
 
 namespace
@@ -38,33 +38,33 @@ namespace
 	// and the order Serialize writes fields in have to move with it.
 	void TestLayout() noexcept
 	{
-		std::printf("  MotionConfig %zu bytes\n", sizeof(MotionConfig));
+		std::printf("  MachineConfig %zu bytes\n", sizeof(MachineConfig));
 
 		CHECK(sizeof(DriverId) == 2, "DriverId is 2 bytes");
 		CHECK(sizeof(AxisDriversConfig) == 17, "AxisDriversConfig is 1 + 8*2 bytes with no padding");
 
-		CHECK_OFFSET(MotionConfig, numTotalAxes, 0);
-		CHECK_OFFSET(MotionConfig, numExtruders, 1);
-		CHECK_OFFSET(MotionConfig, numRings, 2);
-		CHECK_OFFSET(MotionConfig, padding0, 3);
-		CHECK_OFFSET(MotionConfig, numDdasPerRing, 4);
-		CHECK_OFFSET(MotionConfig, padding, 6);
-		CHECK_OFFSET(MotionConfig, gracePeriodMs, 8);
-		CHECK_OFFSET(MotionConfig, driveStepsPerMm, 12);
-		CHECK_OFFSET(MotionConfig, axisDrivers, 140);
-		CHECK_OFFSET(MotionConfig, extruderDrivers, 650);
-		CHECK_OFFSET(MotionConfig, padding2, 690);
-		CHECK_OFFSET(MotionConfig, continuousRotationAxes, 692);
-		CHECK_OFFSET(MotionConfig, controllingDrives, 696);
+		CHECK_OFFSET(MachineConfig, numTotalAxes, 0);
+		CHECK_OFFSET(MachineConfig, numExtruders, 1);
+		CHECK_OFFSET(MachineConfig, numRings, 2);
+		CHECK_OFFSET(MachineConfig, padding0, 3);
+		CHECK_OFFSET(MachineConfig, numDdasPerRing, 4);
+		CHECK_OFFSET(MachineConfig, padding, 6);
+		CHECK_OFFSET(MachineConfig, gracePeriodMs, 8);
+		CHECK_OFFSET(MachineConfig, driveStepsPerMm, 12);
+		CHECK_OFFSET(MachineConfig, axisDrivers, 140);
+		CHECK_OFFSET(MachineConfig, extruderDrivers, 650);
+		CHECK_OFFSET(MachineConfig, padding2, 690);
+		CHECK_OFFSET(MachineConfig, continuousRotationAxes, 692);
+		CHECK_OFFSET(MachineConfig, controllingDrives, 696);
 
-		CHECK(sizeof(MotionConfig) == 816, "MotionConfig is 816 bytes");
+		CHECK(sizeof(MachineConfig) == 816, "MachineConfig is 816 bytes");
 	}
 
 	// The description arrives from another process, so the counts in it decide how far this side
 	// indexes into its own fixed arrays. None of them may be taken on trust.
 	void TestSanitiseCounts() noexcept
 	{
-		MotionConfig config;
+		MachineConfig config;
 		config.numTotalAxes = 200;
 		config.numExtruders = 200;
 		MotionSystem::SanitiseConfig(config);
@@ -87,7 +87,7 @@ namespace
 
 	void TestSanitiseDrivers() noexcept
 	{
-		MotionConfig config;
+		MachineConfig config;
 		for (AxisDriversConfig& axis : config.axisDrivers)
 		{
 			axis.numDrivers = 250;
@@ -102,14 +102,14 @@ namespace
 
 	void TestSanitiseRings() noexcept
 	{
-		MotionConfig zeroed;
+		MachineConfig zeroed;
 		zeroed.numRings = 0;
 		zeroed.numDdasPerRing = 0;
 		MotionSystem::SanitiseConfig(zeroed);
 		CHECK(zeroed.numRings >= 1, "there is always at least one ring");
 		CHECK(zeroed.numDdasPerRing >= Duet::Sbc::Motion::minDdasPerRing, "a ring is deep enough to be a ring");
 
-		MotionConfig huge;
+		MachineConfig huge;
 		huge.numRings = 200;
 		huge.numDdasPerRing = 60000;
 		MotionSystem::SanitiseConfig(huge);
@@ -139,7 +139,7 @@ namespace
 
 int main()
 {
-	std::printf("MotionConfig layout:\n");
+	std::printf("MachineConfig layout:\n");
 	TestLayout();
 	TestSanitiseCounts();
 	TestSanitiseDrivers();
@@ -153,5 +153,5 @@ int main()
 	}
 	TestRingDepthIsClamped();
 
-	return TestSupport::Summarise("MotionConfig layout");
+	return TestSupport::Summarise("MachineConfig layout");
 }

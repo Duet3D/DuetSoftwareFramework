@@ -248,7 +248,7 @@ public class MotionParametersTests
     {
         Move move = MachineWithOneOfEach();
         MotionParameters parameters = Snapshot(move);
-        MotionConfig config = parameters.Config;
+        MachineConfig config = parameters.Config;
 
         Assert.Multiple(() =>
         {
@@ -273,7 +273,7 @@ public class MotionParametersTests
     public void TheRingConfigurationComesFromTheQueue()
     {
         Move move = MachineWithOneOfEach();
-        MotionConfig config = Snapshot(move).Config;
+        MachineConfig config = Snapshot(move).Config;
 
         Assert.Multiple(() =>
         {
@@ -288,7 +288,7 @@ public class MotionParametersTests
         Move move = MachineWithOneOfEach();
         move.Axes[0].ContinuousRotation = true;         // X is linear, so this must be ignored
 
-        MotionConfig config = Snapshot(move).Config;
+        MachineConfig config = Snapshot(move).Config;
         Assert.That(config.ContinuousRotationAxes, Is.EqualTo(0b10u), "only the rotational C axis");
     }
 
@@ -301,7 +301,7 @@ public class MotionParametersTests
         move.Axes.Add(new Axis { Letter = 'Z', StepsPerMm = 400.0f });
         move.Kinematics = new PolarKinematics { RadiusMax = 150.0f };
 
-        MotionConfig config = Snapshot(move).Config;
+        MachineConfig config = Snapshot(move).Config;
 
         // Bit 1 is the turntable, which the polar geometry contributes; the C axis at bit 1 declares
         // it as well, so this is really a check that neither source is lost
@@ -317,7 +317,7 @@ public class MotionParametersTests
         move.Axes.Add(new Axis { Letter = 'X', StepsPerMm = 80.0f });
         move.Kinematics = new PolarKinematics { RadiusMax = 150.0f };
 
-        MotionConfig config = Snapshot(move).Config;
+        MachineConfig config = Snapshot(move).Config;
         Assert.That(config.ContinuousRotationAxes, Is.EqualTo(0u));
     }
 
@@ -325,7 +325,7 @@ public class MotionParametersTests
     public void DriversAreCarriedThroughWithTheirBoardAddress()
     {
         Move move = MachineWithOneOfEach();
-        MotionConfig config = Snapshot(move).Config;
+        MachineConfig config = Snapshot(move).Config;
 
         Assert.Multiple(() =>
         {
@@ -343,7 +343,7 @@ public class MotionParametersTests
         // Board 0 is the main board, so a default driver id would address an unconfigured axis to a
         // real board
         Move move = MachineWithOneOfEach();
-        MotionConfig config = Snapshot(move).Config;
+        MachineConfig config = Snapshot(move).Config;
 
         Assert.That(config.AxisDrivers[1].NumDrivers, Is.EqualTo(0), "the C axis has no driver");
         Assert.That(config.AxisDrivers[1].DriverNumbers[0].BoardAddress, Is.EqualTo(DriverId.NoCanAddress));

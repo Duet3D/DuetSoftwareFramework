@@ -155,7 +155,7 @@ internal sealed class MovePlanner(
                                                  bool adoptGeometryFromObjectModel = false)
     {
         MotionParameters parameters;
-        byte[] configBuffer = new byte[MotionConfig.SerializedLength];
+        byte[] configBuffer = new byte[MachineConfig.SerializedLength];
         int length;
 
         using (await model.AccessReadOnlyAsync(cancellationToken))

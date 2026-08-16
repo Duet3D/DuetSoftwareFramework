@@ -8,17 +8,17 @@ using UnitTests.Utility;
 namespace UnitTests.Motion;
 
 /// <summary>
-/// The serialised form of <see cref="MotionConfig"/> against the native struct it is copied into
+/// The serialised form of <see cref="MachineConfig"/> against the native struct it is copied into
 /// </summary>
 /// <remarks>
-/// <c>DuetSbc_MotionConfigure</c> memcpys these bytes straight into a C++ <c>MotionConfig</c> and
+/// <c>DuetSbc_MotionConfigure</c> memcpys these bytes straight into a C++ <c>MachineConfig</c> and
 /// refuses anything that is not exactly the right length, so a mismatch here is not a subtle bug: at
 /// best the configuration is rejected and no move is ever scheduled, at worst every field after the
 /// mismatch is read from the wrong offset. The numbers below are the ones
-/// <c>tests/MotionConfigLayoutTests.cpp</c> asserts on the other side
+/// <c>tests/MachineConfigLayoutTests.cpp</c> asserts on the other side
 /// </remarks>
 [TestFixture]
-public class MotionConfigLayout
+public class MachineConfigLayout
 {
     /// <summary>Offsets the native side asserts, so the two can be compared field by field</summary>
     private const int GracePeriodMsOffset = 8;
@@ -31,7 +31,7 @@ public class MotionConfigLayout
     [Test]
     public void SerializedLengthMatchesTheNativeStruct()
     {
-        Assert.That(MotionConfig.SerializedLength, Is.EqualTo(816));
+        Assert.That(MachineConfig.SerializedLength, Is.EqualTo(816));
     }
 
     [Test]
@@ -64,7 +64,7 @@ public class MotionConfigLayout
     [Test]
     public void SerializeWritesEveryFieldAtTheNativeOffset()
     {
-        MotionConfig config = new()
+        MachineConfig config = new()
         {
             NumTotalAxes = 4,
             NumExtruders = 2,
@@ -80,10 +80,10 @@ public class MotionConfigLayout
         config.AxisDrivers[0] = AxisDriversConfig.WithDrivers(new DriverId(1, 4), new DriverId(2, 5));
         config.ExtruderDrivers[0] = new DriverId(3, 6);
 
-        byte[] buffer = new byte[MotionConfig.SerializedLength];
+        byte[] buffer = new byte[MachineConfig.SerializedLength];
         int written = config.Serialize(buffer);
 
-        Assert.That(written, Is.EqualTo(MotionConfig.SerializedLength));
+        Assert.That(written, Is.EqualTo(MachineConfig.SerializedLength));
 
         // Machine shape, including the padding that only exists so both sides agree on the offsets
         Assert.That(buffer[0], Is.EqualTo(4), "numTotalAxes");
@@ -119,8 +119,8 @@ public class MotionConfigLayout
     {
         // A default DriverId has no board address, which the native side reads as "not remote" and
         // drops rather than addressing the movement to board zero
-        MotionConfig config = new();
-        byte[] buffer = new byte[MotionConfig.SerializedLength];
+        MachineConfig config = new();
+        byte[] buffer = new byte[MachineConfig.SerializedLength];
         config.Serialize(buffer);
 
         Assert.That(buffer[AxisDriversOffset + 2], Is.EqualTo(DriverId.NoCanAddress));
@@ -130,8 +130,8 @@ public class MotionConfigLayout
     [Test]
     public void SerializeRejectsAShortBuffer()
     {
-        MotionConfig config = new();
-        byte[] tooSmall = new byte[MotionConfig.SerializedLength - 1];
+        MachineConfig config = new();
+        byte[] tooSmall = new byte[MachineConfig.SerializedLength - 1];
         Assert.Throws<ArgumentException>(() => config.Serialize(tooSmall));
     }
 }

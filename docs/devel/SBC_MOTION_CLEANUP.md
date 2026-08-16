@@ -124,26 +124,26 @@ the coefficients themselves**:
 | Object model | ✅ `DuetAPI/ObjectModel/Move/ExtruderNonlinear.cs` — `A`, `B`, `UpperLimit` (defaulting to `0.2F`, matching RRF's `DefaultNonlinearExtrusionLimit`) |
 | M592 parsing | ✅ `MCodeHandler.Motion.cs:1309`, writing `model.Move.Extruders[n].Nonlinear` |
 | Per-extruder push-down loop | ✅ `MotionParameters.cs:466-489` — already fills `PressureAdvanceClocks` from `e.PressAdv.K0` in exactly the place these belong |
-| `MotionConfig` field | ❌ both sides |
+| `MachineConfig` field | ❌ both sides |
 | `MotionSystem::GetExtrusionCoefficients` | ❌ |
 | `DDA::Prepare` consumer | ⚠️ present, behind the switch, with 4 naming errors |
 
 So the work is:
 
-1. **Native**: add `struct NonlinearExtrusion { float a, b, limit; }` to `MotionConfig.h` and a
+1. **Native**: add `struct NonlinearExtrusion { float a, b, limit; }` to `MachineConfig.h` and a
    `NonlinearExtrusion nonlinearExtrusion[maxExtruders]` member, plus
    `MotionSystem::GetExtrusionCoefficients(size_t extruder)` returning a reference (bounds-checked, as
    `GetExtruderDriver` already is). Keep RRF's struct shape rather than three parallel `float[]` arrays:
-   the use site reads `nl.a`/`nl.b`/`nl.limit` and `MotionConfig` already carries one array-of-struct
+   the use site reads `nl.a`/`nl.b`/`nl.limit` and `MachineConfig` already carries one array-of-struct
    (`axisDrivers`), so the serialiser has the pattern.
 2. **Layout**: append after `shapingTimeClocks`. It is 4-aligned and 12 bytes per extruder, so
-   `sizeof(MotionConfig) % 4 == 0` still holds and no existing `static_assert` offset moves. Grouping it
+   `sizeof(MachineConfig) % 4 == 0` still holds and no existing `static_assert` offset moves. Grouping it
    next to `pressureAdvanceClocks`, where it belongs semantically, would shift four asserts and the C#
-   `SerializedLength` arithmetic for no benefit — `MotionConfig` is process-local and both ends are
+   `SerializedLength` arithmetic for no benefit — `MachineConfig` is process-local and both ends are
    rebuilt from this repo together, so there is no compatibility reason to prefer either.
-3. **Managed mirror**: `MotionConfig.cs` gains the property, the `SerializedLength` term
+3. **Managed mirror**: `MachineConfig.cs` gains the property, the `SerializedLength` term
    (`12 * MotionLimits.MaxExtruders`), and a write loop beside the `AxisDrivers` one. Extend the layout
-   test in `MotionConfigLayoutTests.cpp` and its C# counterpart.
+   test in `MachineConfigLayoutTests.cpp` and its C# counterpart.
 4. **Push-down**: one line in the `MotionParameters.cs` extruder loop, beside the `PressureAdvanceClocks`
    assignment, copying `e.Nonlinear`.
 5. **Reconfigure**: `HandleNonlinearExtrusionAsync` must call `ReconfigureAsync` — it does not today, so
@@ -222,7 +222,7 @@ the builder directly.
 ### 3.2 `reprap` — remove the global facade
 
 `RepRapShim` is a global named after a class that does not exist here, holding one `MotionSystem`, one
-`Platform` that only formats strings, and a `GCodesShim` answering three questions off `MotionConfig`
+`Platform` that only formats strings, and a `GCodesShim` answering three questions off `MachineConfig`
 (one of which, `GetVisibleAxes`, has no callers).
 
 - Delete `RepRapShim`, `GCodesShim`, `Compat/Platform/RepRap.h`, `Compat/GCodes/GCodes.h`,
@@ -532,7 +532,7 @@ work that is planned but not done belongs here with the rest of the plans.
 | --- | --- |
 | S-curve / 3rd-order planning | `MovementProfile.{h,cpp}` and `DDA_3rdOrder.cpp`; `afterPrepare.peakAcceleration`/`peakDeceleration`; `PrepParams`' 7-phase arrays. `DDARing::PlanMoves` is declared and never defined. |
 | Laser power scaling with speed | `MachineType`, `Pwm_t`, `DDA::laserPwmOrIoBits`, a machine-type accessor, and a PWM field in `MoveParamsHeader` for DCS to fill |
-| Input shaping on this side | Deliberate — the boards shape. The consequence (tracked position leads real position during acceleration by `shapingTimeClocks`) is documented in `MotionConfig.h`; cross-reference it. |
+| Input shaping on this side | Deliberate — the boards shape. The consequence (tracked position leads real position during acceleration by `shapingTimeClocks`) is documented in `MachineConfig.h`; cross-reference it. |
 | IOBits, scanning probes, coordinate rotation | Not ported; each needs a field on the move that DCS does not send. Switches deleted by §2.1. |
 | Leadscrew adjustment moves, `InitAsyncMove`, babystepping into a queued move | The three named in `DDA.h`'s "Gone for Phase 1" |
 | M111 driving the motion debug flags | DCS's M111 implements `P-1` only. `MotionSystem::SetDebugFlags` exists and nothing calls it; the CApi export and the `P<module> S<0\|1>` parsing land together, and until they do the `Module::Move` and `Module::DDA` branches stay compiled but switched off |
@@ -547,7 +547,7 @@ Each phase is a separate commit; each ends with `cmake --build --preset native &
 | --- | --- | --- |
 | 1a | §5.2's `m_` prefix completion, alone | Low, mechanical. **Before** 1b, so the branch fixes are not done twice. |
 | 1b | §2 — flag disposition, branch repairs, dead files (excluding §2.3.1) | Low. For deletions, confirm with a `-E` diff on `DDA.cpp`, `DDARing.cpp`, `MoveSegment.h`; for repairs, the check is the flipped-flag build. |
-| 1c | §2.3.1 — nonlinear extrusion, on its own | **The only phase that changes behaviour**, and the only one touching DuetControlServer. Keep it a separate commit: it spans an ABI (`MotionConfig` + its C# mirror + both layout tests), it settles D9, and it is the one piece here a `git revert` should be able to take back on its own. Needs a print with `M592 D0 A0.01 B0.001` to verify end to end — the unit tests only cover the layout. |
+| 1c | §2.3.1 — nonlinear extrusion, on its own | **The only phase that changes behaviour**, and the only one touching DuetControlServer. Keep it a separate commit: it spans an ABI (`MachineConfig` + its C# mirror + both layout tests), it settles D9, and it is the one piece here a `git revert` should be able to take back on its own. Needs a print with `M592 D0 A0.01 B0.001` to verify end to end — the unit tests only cover the layout. |
 | 2a | §3.1–3.8 — remove the shims, rename to what things are | Low. Mechanical, but the call graph genuinely changes. Tests touch `reprap.GetMove()` in 8 places and are the check that the ownership change is complete. |
 | 2b | §3.9 — the motion stats struct, its CApi calls, and the DCS `IDiagnostics` provider | Low, additive. Second phase touching DCS; keep it separate from 2a so the rename diff stays readable. Verified by running M122 and reading the output. |
 | 3 | §4 — delete unreachable API | Low. Compile-checked, plus the managed-side cross-check. |

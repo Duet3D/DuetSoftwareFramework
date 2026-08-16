@@ -703,7 +703,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     /// <summary>
     /// Push the machine description down to the native motion engine
     /// </summary>
-    /// <param name="config">Serialised MotionConfig</param>
+    /// <param name="config">Serialised MachineConfig</param>
     /// <returns>True if it was accepted</returns>
     /// <remarks>Safe only while no move is in flight</remarks>
     public bool ConfigureMotion(ReadOnlySpan<byte> config)

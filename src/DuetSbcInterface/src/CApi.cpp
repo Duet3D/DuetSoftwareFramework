@@ -305,11 +305,11 @@ extern "C"
 
 	int32_t DuetSbc_MotionConfigure(DuetSbcHandle* h, const void* config, int32_t length)
 	{
-		if (h == nullptr || config == nullptr || length != (int32_t)sizeof(Duet::Sbc::Motion::MotionConfig))
+		if (h == nullptr || config == nullptr || length != (int32_t)sizeof(Duet::Sbc::Motion::MachineConfig))
 		{
 			return 0;
 		}
-		Duet::Sbc::Motion::MotionConfig copy{};
+		Duet::Sbc::Motion::MachineConfig copy{};
 		std::memcpy(&copy, config, sizeof(copy));
 		h->motion.Configure(copy);
 		return 1;

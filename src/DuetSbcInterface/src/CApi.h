@@ -128,7 +128,7 @@ extern "C"
 	// read back what it has done; none of them blocks on that thread, because the caller is a
 	// garbage-collected runtime and the motion thread must not wait on one.
 
-	// Machine description, pushed down from DuetControlServer. Mirrors Motion::MotionConfig; the
+	// Machine description, pushed down from DuetControlServer. Mirrors Motion::MachineConfig; the
 	// managed side builds the bytes and this copies them, so the struct is not repeated here.
 	// Safe only while no move is in flight.
 	int32_t DuetSbc_MotionConfigure(DuetSbcHandle* h, const void* config, int32_t length);

@@ -12,7 +12,7 @@
  *   - Input shaping. AxisShaper was removed from this project, so only the unshaped path exists.
  *     Shaping happens on the expansion boards instead, which means the segment chain here is the
  *     unshaped profile and lags the boards' real motion slightly during acceleration - see the note
- *     on shapingTimeClocks in MotionConfig.
+ *     on shapingTimeClocks in MachineConfig.
  *
  * The list algebra in AddSegment is kept as-is, because it is the part that is genuinely subtle: a
  * new segment may start before, during or after any existing one, so adding it can mean splitting

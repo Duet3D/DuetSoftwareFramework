@@ -10,7 +10,7 @@
  *
  * What is left is the part DDA and DDARing still need: somewhere to ask how many steps per mm a
  * drive has, which board drives it, how much backlash to take up, and somewhere to put the segments
- * that Prepare produces. So this class is mostly the machine description (MotionConfig, pushed down
+ * that Prepare produces. So this class is mostly the machine description (MachineConfig, pushed down
  * by DCS) plus the array of DriveTrackers.
  *
  * A DDARing is given one of these when it is built, and the DDAs in it reach it through the ring.
@@ -20,7 +20,7 @@
 #define SRC_MOTION_MOTIONSYSTEM_H_
 
 #include <Motion/DriveTracker.h>
-#include <Motion/MotionConfig.h>
+#include <Motion/MachineConfig.h>
 #include <Motion/MoveProfile.h>
 #include <Motion/ScheduleMoveBuilder.h>
 
@@ -42,13 +42,13 @@ namespace Duet::Sbc::Motion
 		// The configuration arrives over the CApi from a separate process, so it is validated rather
 		// than trusted: counts are clamped to what the fixed-size arrays below can address. See
 		// SanitiseConfig for what is enforced.
-		void Configure(const MotionConfig& newConfig) noexcept;
+		void Configure(const MachineConfig& newConfig) noexcept;
 
 		// Clamp a configuration to the limits this build was compiled with. Exposed for testing;
 		// Configure applies it to everything that comes in.
-		static void SanitiseConfig(MotionConfig& config) noexcept;
+		static void SanitiseConfig(MachineConfig& config) noexcept;
 
-		[[nodiscard]] const MotionConfig& GetConfig() const noexcept { return m_config; }
+		[[nodiscard]] const MachineConfig& GetConfig() const noexcept { return m_config; }
 
 		// --- Machine shape ---------------------------------------------------------------------
 
@@ -97,7 +97,7 @@ namespace Duet::Sbc::Motion
 			return (extruder < maxExtruders) ? m_config.extruderDrivers[extruder] : DriverId{};
 		}
 
-		// Kinematics answers that DCS evaluated for us; see MotionConfig.
+		// Kinematics answers that DCS evaluated for us; see MachineConfig.
 		[[nodiscard]] bool IsContinuousRotationAxis(size_t axis) const noexcept
 		{
 			return AxesBitmap(m_config.continuousRotationAxes).IsBitSet(axis);
@@ -198,7 +198,7 @@ namespace Duet::Sbc::Motion
 		static void AddPrepareHiccup() noexcept;
 
 	  private:
-		MotionConfig m_config;
+		MachineConfig m_config;
 		uint32_t m_debugFlags[(unsigned int)Module::Num]{};
 		DriveTracker m_trackers[maxAxesPlusExtruders];
 		ScheduleMoveBuilder m_scheduleMoveBuilder;

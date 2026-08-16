@@ -130,7 +130,7 @@ internal enum LimitPositionResult : byte
 /// <para>
 /// It lives on this side of the split because the native engine no longer has it: the planner there
 /// takes endpoints that have already been through the kinematics, and asks for the two derived
-/// answers it still needs (see <c>MotionConfig</c>'s continuousRotationAxes and controllingDrives)
+/// answers it still needs (see <c>MachineConfig</c>'s continuousRotationAxes and controllingDrives)
 /// rather than recomputing them
 /// </para>
 /// </remarks>
@@ -374,7 +374,7 @@ internal abstract class KinematicsEngine
     /// <remarks>
     /// Just the corresponding motor on a Cartesian machine. On CoreXY holding X still requires both
     /// motors, because either one turning alone would move it. The native planner needs this to
-    /// decide which drivers to enable for a move, which is why it is pushed down in MotionConfig
+    /// decide which drivers to enable for a move, which is why it is pushed down in MachineConfig
     /// </remarks>
     public virtual uint GetControllingDrives(int axis) => axis >= 0 ? 1u << axis : 0u;
 

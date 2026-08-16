@@ -112,7 +112,7 @@ namespace Duet::Sbc::Motion
 	};
 
 	// What one drive of this move is to be executed with. Everything here was read from a shared
-	// MotionConfig until moves began carrying their own; see docs/devel/MOTION_CONFIG_ORDERING.md for
+	// MachineConfig until moves began carrying their own; see docs/devel/MOTION_CONFIG_ORDERING.md for
 	// why that could not be ordered against the moves around it.
 	//
 	// Flat rather than a union of the axis and extruder halves. An axis never uses the extruder

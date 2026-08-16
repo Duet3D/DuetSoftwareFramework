@@ -8,7 +8,7 @@ namespace DuetControlServer.Motion.Native;
 /// </summary>
 /// <remarks>
 /// These mirror the constants in <c>DuetSbcInterface/src/Compat/RepRapFirmware.h</c> and
-/// <c>Motion/MotionConfig.h</c>. They size the fixed arrays in <see cref="MotionConfig"/>, so the two
+/// <c>Motion/MachineConfig.h</c>. They size the fixed arrays in <see cref="MachineConfig"/>, so the two
 /// sides must agree on them or the struct is a different length on each side
 /// </remarks>
 internal static class MotionLimits
@@ -158,7 +158,7 @@ internal struct NonlinearExtrusion
 }
 
 /// <summary>
-/// Managed mirror of <c>DuetSbcInterface/src/Motion/MotionConfig.h</c>: the machine description the
+/// Managed mirror of <c>DuetSbcInterface/src/Motion/MachineConfig.h</c>: the machine description the
 /// native motion engine needs
 /// </summary>
 /// <remarks>
@@ -190,7 +190,7 @@ internal struct NonlinearExtrusion
 /// values as given: what comes back from <c>GetConfig</c> natively is the authority on what was used.
 /// </para>
 /// </remarks>
-internal sealed class MotionConfig
+internal sealed class MachineConfig
 {
     // --- Machine shape ------------------------------------------------------------------------
 
@@ -293,7 +293,7 @@ internal sealed class MotionConfig
     {
         if (destination.Length < SerializedLength)
         {
-            throw new ArgumentException($"Need {SerializedLength} bytes for a MotionConfig, got {destination.Length}");
+            throw new ArgumentException($"Need {SerializedLength} bytes for a MachineConfig, got {destination.Length}");
         }
 
         SpanWriter writer = new(destination);
