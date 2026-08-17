@@ -274,10 +274,7 @@ public class CodeFile(
                 do
                 {
                     // Fanuc CNC and LaserWeb G-code may omit the last major G-code number
-                    using (await model.AccessReadOnlyAsync(cancellationToken))
-                    {
-                        _parserBuffer.MayRepeatCode = model.State.MachineMode is MachineMode.CNC or MachineMode.Laser;
-                    }
+                    _parserBuffer.MayRepeatCode = model.CurrentMachineMode is MachineMode.CNC or MachineMode.Laser;
 
                     // Get the next code
                     codeRead = await DuetAPI.Commands.Code.ParseAsync(_fileStream, code, _parserBuffer, cancellationToken);

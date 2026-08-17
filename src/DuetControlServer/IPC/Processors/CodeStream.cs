@@ -127,11 +127,8 @@ public sealed class CodeStream : IProcessor, IDisposable
         try
         {
             CodeParserBuffer parserBuffer = new(_settings.FileBufferSize, false);
-            using (await _model.AccessReadOnlyAsync(cancellationToken))
-            {
-                // Fanuc CNC and LaserWeb G-code may omit the last major G-code number
-                parserBuffer.MayRepeatCode = _model.State.MachineMode is MachineMode.CNC or MachineMode.Laser;
-            }
+            // Fanuc CNC and LaserWeb G-code may omit the last major G-code number
+            parserBuffer.MayRepeatCode = _model.CurrentMachineMode is MachineMode.CNC or MachineMode.Laser;
 
             // Prepare some code instances as a buffer
             int numCodes = Math.Max(_bufferSize, 1);

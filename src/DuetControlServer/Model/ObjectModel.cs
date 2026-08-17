@@ -25,10 +25,20 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
 {
     /// <summary>
     /// Indicates whether multiple motion systems are configured.
-    /// When false, the channel Active check in FlushAsync is skipped for performance.
-    /// Updated by the model update service when the "move" key is refreshed.
+    /// When false, the channel Active check in FlushAsync is skipped for performance
     /// </summary>
     public volatile bool MultipleMotionSystemsConfigured;
+
+    /// <summary>
+    /// Machine mode as of the last object model update.
+    /// Mirrored here so the code parser does not have to take a read lock per code
+    /// </summary>
+    public volatile MachineMode CurrentMachineMode;
+
+    /// <summary>
+    /// Whether Marlin is being emulated, per input channel, as of the last object model update
+    /// </summary>
+    private readonly bool[] _emulatingMarlin = new bool[Enum.GetValues<CodeChannel>().Length];
 
     /// <summary>
     /// Lock for read/write access
@@ -97,7 +107,22 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     /// <summary>
     /// Function that is called when the object model has been updated
     /// </summary>
-    private void OnModelUpdated() => Interlocked.Exchange(ref _updateTcs, new(TaskCreationOptions.RunContinuationsAsynchronously)).SetResult();
+    private void OnModelUpdated()
+    {
+        // Refresh the lock-free mirrors while the write lock is still held
+        CurrentMachineMode = State.MachineMode;
+        MultipleMotionSystemsConfigured = Move.MotionSystems.Count > 1;
+        for (int i = 0; i < Inputs.Count; i++)
+        {
+            InputChannel? input = Inputs[i];
+            if (input is not null)
+            {
+                Volatile.Write(ref _emulatingMarlin[(int)input.Name], input.Compatibility is Compatibility.Marlin or Compatibility.NanoDLP);
+            }
+        }
+
+        Interlocked.Exchange(ref _updateTcs, new(TaskCreationOptions.RunContinuationsAsynchronously)).SetResult();
+    }
 
     /// <summary>
     /// Current sequence numbers for each object model section as reported by the firmware.
@@ -411,19 +436,11 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     public ValueTask<LockWrapper> AccessReadWriteAsync() => AccessReadWriteAsync(_lifetime.ApplicationStopping);
 
     /// <summary>
-    /// Check asynchronously if Marlin is being emulated on the given channel
+    /// Check if Marlin is being emulated on the given channel
     /// </summary>
     /// <param name="channel">Code channel</param>
-    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True if Marlin is being emulated</returns>
-    public async ValueTask<bool> IsEmulatingMarlinAsync(CodeChannel channel, CancellationToken cancellationToken = default)
-    {
-        using (await AccessReadOnlyAsync(cancellationToken))
-        {
-            Compatibility compatibility = Inputs[channel]?.Compatibility ?? Compatibility.RepRapFirmware;
-            return compatibility is Compatibility.Marlin or Compatibility.NanoDLP;
-        }
-    }
+    public bool IsEmulatingMarlin(CodeChannel channel) => Volatile.Read(ref _emulatingMarlin[(int)channel]);
 
     /// <summary>
     /// Wait for an update to occur
