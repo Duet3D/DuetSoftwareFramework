@@ -144,6 +144,38 @@ jobs:
         working-directory: src/DuetCANMaster
         run: cmake --build --preset ${{ matrix.preset }} -j"$(nproc)"
 
+  # Bare-metal Duet3Expansion firmware (arm-none-eabi), built through its own recursive Makefile.
+  # All ten boards share the library builds, so they go in one make invocation rather than a matrix.
+  expansion-firmware:
+    name: Build Duet3Expansion firmware
+    needs: image
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ${{ needs.image.outputs.image }}
+      # The image is private to the repository, so the job needs credentials to pull it
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Mark workspace as a safe git directory
+        run: git config --global --add safe.directory '*'
+
+      # The firmware itself is a submodule, and LIBRARIES_DIR points at lib/ so the boards link
+      # against the same libraries as the rest of the tree. Only these five are compiled.
+      - name: Check out the firmware and its libraries
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git submodule update --init --depth 1 src/Duet3Expansion \
+            lib/CANlib lib/CoreN2G lib/FreeRTOS lib/RRFLibraries lib/Qfplib-M0-full
+
+      - name: Build every expansion board
+        run: make Duet3Expansion -j"$(nproc)"
+
   test:
     name: Run unit tests
     needs: image
