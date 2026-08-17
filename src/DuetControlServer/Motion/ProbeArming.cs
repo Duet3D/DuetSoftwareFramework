@@ -19,10 +19,12 @@ namespace DuetControlServer.Motion;
 /// rather than at configuration time, and both have to be, for different reasons.
 /// </para>
 /// <para>
-/// The threshold, because <c>G31 P</c> may have changed it since <c>M558</c> ran. Reading it here
-/// means the board is given whatever last wrote it, so there is no <c>G31</c>-side message and no way
-/// for the two to disagree - which they would otherwise, since the board decides when to report and
-/// DCS decides what the report means.
+/// The threshold, because it decides when the board reports and therefore when the move stops, and
+/// the board must be comparing against the same number DCS judges the result by. <c>G31 P</c> pushes
+/// it as well, through <see cref="SetThresholdAsync"/>, because between the two codes the board is
+/// the only thing reading the probe: it reports a change and nothing else, so a threshold it has not
+/// been told about leaves <c>sensors.probes[].value</c> frozen at whatever the old one last
+/// reported. Sending it here too costs one message and removes the ordering question entirely
 /// </para>
 /// <para>
 /// The reporting interval, because a probe is only worth listening to closely while it is being used.
@@ -93,14 +95,10 @@ internal static class ProbeArming
     public static async ValueTask<Message> StartAsync(ProbeMonitor monitor, LinkInterface link,
                                                       CancellationToken cancellationToken)
     {
-        if (monitor.Threshold is uint threshold)
+        Message thresholdReply = await SetThresholdAsync(monitor, link, cancellationToken);
+        if (thresholdReply.Type == MessageType.Error)
         {
-            Message reply = await ChangeAsync(monitor, CanMessageChangeInputMonitorV1.ActionChangeThreshold,
-                                              threshold, link, cancellationToken);
-            if (reply.Type == MessageType.Error)
-            {
-                throw new GCodeException(reply.Content);
-            }
+            throw new GCodeException(thresholdReply.Content);
         }
 
         Message intervalReply = await ChangeAsync(monitor, CanMessageChangeInputMonitorV1.ActionChangeMinInterval,
@@ -110,6 +108,31 @@ internal static class ProbeArming
             throw new GCodeException(intervalReply.Content);
         }
         return intervalReply;
+    }
+
+    /// <summary>
+    /// Tell a probe's board what level to compare its input against
+    /// </summary>
+    /// <param name="monitor">What to tell, from <see cref="TryCapture"/></param>
+    /// <param name="link">Link interface</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>What the board said, empty if the probe has no threshold to send</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>RemoteZProbe::HandleG31</c>, which sends the same message from <c>G31 P</c>
+    /// for the same reason, and folds a refusal into that code's result rather than warning about it.
+    /// A probe with no threshold - anything digital - is left alone: it was created with zero, which
+    /// is what tells the board to read the pin digitally, and any other value would switch it to
+    /// analog reads and stop it reporting at all
+    /// </remarks>
+    public static async ValueTask<Message> SetThresholdAsync(ProbeMonitor monitor, LinkInterface link,
+                                                             CancellationToken cancellationToken)
+    {
+        if (monitor.Threshold is not uint threshold)
+        {
+            return new Message();
+        }
+        return await ChangeAsync(monitor, CanMessageChangeInputMonitorV1.ActionChangeThreshold, threshold, link,
+                                 cancellationToken);
     }
 
     /// <summary>

@@ -34,6 +34,8 @@ internal sealed partial class GCodeHandler
         }
 
         string? report = null;
+        ProbeArming.ProbeMonitor thresholdMonitor = default;
+        bool sendThreshold = false;
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             Probe? probe = probeNumber < model.Sensors.Probes.Count ? model.Sensors.Probes[probeNumber] : null;
@@ -84,6 +86,11 @@ internal sealed partial class GCodeHandler
             {
                 probe.Threshold = threshold;
                 seen = true;
+
+                // The board compares against the threshold it was last given, so one it has not been
+                // told about would leave it reporting - and so stopping a probing move - by the old
+                // one. Captured here and sent outside the lock, because sending is a CAN round trip
+                sendThreshold = ProbeArming.TryCapture(probe, probeNumber, out thresholdMonitor);
             }
 
             if (code.TryGetInt('H', out int sensor))
@@ -112,6 +119,20 @@ internal sealed partial class GCodeHandler
                 report = DescribeProbeParameters(probeNumber, probe, model.Move);
             }
         }
+
+        if (sendThreshold)
+        {
+            // A board that would not take it is this code's failure, as it is RepRapFirmware's
+            // HandleG31: the object model now says one thing and the board is doing another, and the
+            // G31 that caused it is the only place that can be noticed. A board that took it and
+            // still had something to say is passed on for the same reason
+            Message reply = await ProbeArming.SetThresholdAsync(thresholdMonitor, linkInterface, cancellationToken);
+            if (reply.Type != MessageType.Success || !string.IsNullOrEmpty(reply.Content))
+            {
+                return reply;
+            }
+        }
+
         return report is null ? new Message() : new Message(MessageType.Success, report);
     }
 
