@@ -74,8 +74,12 @@ internal partial class MCodeHandler
     /// Shortest interval in ms between an endstop reporting twice
     /// </summary>
     /// <remarks>
-    /// Zero, because an endstop change is what stops a move: delaying a report to debounce it would
-    /// delay the stop by the same amount
+    /// Zero, where RepRapFirmware's <c>SwitchEndstop::MinimumSwitchReportInterval</c> is 30. The
+    /// interval does not cost accuracy either way - the board timestamps the change in its interrupt
+    /// and <c>CommandProcessor</c> corrects the drives from that timestamp, not from when the message
+    /// arrived - so what 30 would buy is a bound on how much a bouncing switch can say, and what it
+    /// would cost is up to 30ms of travel that then has to be reverted. Zero trades an unbounded
+    /// message rate from a bad switch for stopping at the first edge
     /// </remarks>
     private const ushort EndstopMinReportInterval = 0;
 
@@ -1972,6 +1976,10 @@ internal partial class MCodeHandler
         }
 
         List<(int Axis, EndstopPosition Position)> configured = [];
+
+        // Kept per axis rather than in one list, because an axis whose monitors cannot all be created
+        // has to give back everything it holds, and that is a question about one axis at a time
+        Dictionary<int, List<InputMonitors.Monitored>> monitorsBefore = [], monitorsAfter = [];
         string? report = null;
 
         if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
@@ -2024,6 +2032,12 @@ internal partial class MCodeHandler
 
                 foreach ((int axis, EndstopPosition position) in configured)
                 {
+                    // What this axis has boards watching for it now, so that whatever the new
+                    // configuration does not want can be given back. Taken before the model is
+                    // overwritten, because the old ports are what name the boards holding them
+                    monitorsBefore[axis] = InputMonitors.Of(
+                        axis < model.Sensors.Endstops.Count ? model.Sensors.Endstops[axis] : null, axis);
+
                     if (position == EndstopPosition.None)
                     {
                         // Removing an endstop leaves the slot empty rather than absent, so the
@@ -2043,6 +2057,12 @@ internal partial class MCodeHandler
                         endstop.Port = port;
                     }
                 }
+
+                foreach ((int axis, _) in configured)
+                {
+                    monitorsAfter[axis] = InputMonitors.Of(
+                        axis < model.Sensors.Endstops.Count ? model.Sensors.Endstops[axis] : null, axis);
+                }
             }
         }
 
@@ -2050,6 +2070,16 @@ internal partial class MCodeHandler
         {
             return new Message(MessageType.Success, report);
         }
+
+        // Whatever the axes had watched for them and no longer want, before asking for what they do.
+        // RepRapFirmware releases first, in SwitchEndstop::Configure, and the order is what makes
+        // shrinking a multi-switch endstop work: P"1.io0.in+1.io1.in" reduced to P"1.io1.in" moves a
+        // pin from one handle to another, and the board will not give it to the second while the
+        // first still holds it. Only handles the new configuration will not re-create are dropped, so
+        // a create that then fails cannot have cost an axis a monitor it was keeping
+        await InputMonitors.ReleaseAsync(monitorsBefore.Values.SelectMany(monitors => monitors).ToList(),
+                                         monitorsAfter.Values.SelectMany(monitors => monitors).ToList(),
+                                         linkInterface, logger, cancellationToken);
 
         // Tell the boards to watch the ports. Done outside the model lock because it goes over CAN
         List<Message> replies = [];
@@ -2060,7 +2090,20 @@ internal partial class MCodeHandler
                 continue;
             }
 
-            replies.Add(await CreateEndstopMonitorAsync(axis, cancellationToken));
+            Message reply = await CreateEndstopMonitorAsync(axis, cancellationToken);
+            replies.Add(reply);
+
+            if (reply.Type == MessageType.Error)
+            {
+                // An axis that could not be set up whole must not be left holding pins for the part
+                // of it that worked - a switch-per-driver endstop whose second switch was refused
+                // would otherwise keep the first one claimed under a handle the object model now
+                // reads differently. RepRapFirmware's ReleasePorts on a failed Configure, which drops
+                // every port of the endstop for the same reason. Both lists, because the old ports
+                // may name a different board from the new ones
+                List<InputMonitors.Monitored> held = [.. monitorsBefore[axis], .. monitorsAfter[axis]];
+                await InputMonitors.ReleaseAsync(held, [], linkInterface, logger, cancellationToken);
+            }
         }
 
         return replies.ToMessage();

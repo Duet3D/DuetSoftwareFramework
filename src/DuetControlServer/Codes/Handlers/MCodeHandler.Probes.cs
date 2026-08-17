@@ -31,16 +31,6 @@ namespace DuetControlServer.Codes.Handlers;
 internal partial class MCodeHandler
 {
     /// <summary>
-    /// Shortest interval in ms between a probe reporting twice while it is being used
-    /// </summary>
-    /// <remarks>
-    /// RepRapFirmware's <c>RemoteZProbe::ActiveProbeReportInterval</c>. A probe is left at the active
-    /// interval here rather than being slowed down between probes: the interval is only lowered while
-    /// probing to save bus traffic, and nothing in the object model depends on the difference
-    /// </remarks>
-    private const ushort ProbeReportInterval = 2;
-
-    /// <summary>
     /// Most times M558 A may ask for a point to be probed, as in RepRapFirmware's <c>MaxTapsLimit</c>
     /// </summary>
     private const int MaxProbeTaps = 31;
@@ -93,6 +83,15 @@ internal partial class MCodeHandler
         // probe behind
         if (seenPort && !string.IsNullOrWhiteSpace(port))
         {
+            // A '+' separates an input from a modulating output, which is a local probe's second
+            // port. A board watches one pin per handle, so the whole string would go to it as one
+            // pin name and be refused as an unknown pin; RepRapFirmware's RemoteZProbe::Create says
+            // what is actually wrong instead
+            if (port.Contains('+'))
+            {
+                return new Message(MessageType.Error, "Expansion boards do not support Z probe output ports");
+            }
+
             if (!RemoteEndstops.TrySplitPort(port, "Z probe port", out _, out _, out string? portError))
             {
                 return new Message(MessageType.Error, portError);
@@ -122,6 +121,7 @@ internal partial class MCodeHandler
 
         string? monitorPort = null;
         string? report = null;
+        List<InputMonitors.Monitored> monitorsBefore = [], monitorsAfter = [];
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             Probe? probe = probeNumber < model.Sensors.Probes.Count ? model.Sensors.Probes[probeNumber] : null;
@@ -129,6 +129,11 @@ internal partial class MCodeHandler
             {
                 return new Message(MessageType.Error, $"Z probe {probeNumber} not found");
             }
+
+            // What a board is watching for this probe now, taken before the model is overwritten:
+            // the old port is what names the board holding it, and M558 P0 leaves no new port to
+            // work it out from afterwards
+            monitorsBefore = InputMonitors.Of(probe, probeNumber);
 
             if (seenType)
             {
@@ -149,12 +154,20 @@ internal partial class MCodeHandler
                 // Only ask the board for a monitor once the object model agrees with what is being
                 // asked for, so a rejected port leaves a probe that says what it is watching
                 monitorPort = WatchableProbePort(probe!);
+                monitorsAfter = InputMonitors.Of(probe, probeNumber);
             }
             else
             {
                 report = DescribeProbe(probeNumber, probe!);
+                monitorsAfter = monitorsBefore;         // nothing was changed, so nothing is given up
             }
         }
+
+        // Whatever the probe had watched for it and no longer wants, before asking for what it does.
+        // RepRapFirmware releases first for the same reason: a pin a board is still holding is one
+        // the create cannot claim. Only handles the new configuration will not re-create are dropped,
+        // so a create that then fails cannot have cost the probe a monitor it was keeping
+        await InputMonitors.ReleaseAsync(monitorsBefore, monitorsAfter, linkInterface, logger, cancellationToken);
 
         Message monitorReply = monitorPort is not null
             ? await CreateProbeMonitorAsync(probeNumber, monitorPort, cancellationToken)
@@ -309,7 +322,12 @@ internal partial class MCodeHandler
         {
             Handle = RemoteProbes.HandleFor(probeNumber),
             Threshold = threshold,
-            MinInterval = ProbeReportInterval
+
+            // Created idle, and raised to the probing rate by ProbeArming for the duration of a tap.
+            // RepRapFirmware creates at the probing rate and only slows the probe down once it has
+            // finished probing for the first time, which leaves a configured but unused probe
+            // reporting every change it sees
+            MinInterval = (ushort)Motion.ProbeArming.InactiveReportInterval
         };
         CanText.SetString(message.PinName, localPort);
 

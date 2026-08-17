@@ -23,6 +23,11 @@ internal readonly record struct WatchedDriver(DuetAPI.Utility.DriverId Driver, f
 /// <param name="Kind">What kind of endstop it has</param>
 /// <param name="Endstop">The endstop itself</param>
 /// <param name="Probe">The probe standing in for it, if this is a Z probe endstop</param>
+/// <param name="ProbeMonitor">
+/// What that probe's board has to be told before the move, or null if there is nothing to tell it.
+/// Taken here because it is read from the probe, and everything read from the object model is read
+/// once, under the lock, before either half of arming runs
+/// </param>
 /// <param name="NumAxisDrivers">
 /// How many drivers the axis itself has, which is what decides whether each motor gets its own switch
 /// </param>
@@ -35,6 +40,7 @@ internal sealed record EndstopPlan(
     EndstopType Kind,
     Endstop Endstop,
     Probe? Probe,
+    ProbeArming.ProbeMonitor? ProbeMonitor,
     int NumAxisDrivers,
     IReadOnlyList<WatchedDriver> DriversWatched);
 
@@ -90,7 +96,8 @@ internal static class EndstopPlanner
                 throw new GCodeException($"No endstop configured for axis {move.Axes[axis].Letter}");
             }
 
-            plans.Add(new EndstopPlan(axis, endstop.Type, endstop, ProbeFor(sensors, endstop),
+            Probe? probe = ProbeFor(sensors, endstop);
+            plans.Add(new EndstopPlan(axis, endstop.Type, endstop, probe, MonitorFor(probe, endstop),
                                       move.Axes[axis].Drivers.Count,
                                       WatchedDrivers(move, geometry, numAxes, axis, endstop.Type,
                                                      stepsPerMm, feedRateMmPerSec)));
@@ -114,6 +121,21 @@ internal static class EndstopPlanner
         int probeNumber = endstop.Probe ?? 0;
         return probeNumber < sensors.Probes.Count ? sensors.Probes[probeNumber] : null;
     }
+
+    /// <summary>
+    /// What a probe standing in for an endstop has to have pushed to its board before the move
+    /// </summary>
+    /// <param name="probe">The probe, or null if the endstop is not one</param>
+    /// <param name="endstop">The endstop</param>
+    /// <returns>The monitor, or null if there is nothing to tell a board</returns>
+    /// <remarks>
+    /// Null for a probe with no input - a motor stall probe, one of type none, one with no port yet -
+    /// which is the same question <c>M558</c> asks before creating a monitor
+    /// </remarks>
+    private static ProbeArming.ProbeMonitor? MonitorFor(Probe? probe, Endstop endstop)
+        => probe is not null && ProbeArming.TryCapture(probe, endstop.Probe ?? 0, out ProbeArming.ProbeMonitor monitor)
+           ? monitor
+           : null;
 
     /// <summary>
     /// The drivers a stall-homed axis watches, and how fast each of them will turn

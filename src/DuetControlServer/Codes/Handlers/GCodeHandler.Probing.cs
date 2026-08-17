@@ -227,12 +227,28 @@ internal sealed partial class GCodeHandler
                 : [];
             EndstopArmingState arming = new();
 
+            // The probe on a board is told the threshold to compare against and asked to report more
+            // often, for the duration of the tap. A stall probe has no input, so this finds nothing
+            // to tell
+            ProbeArming.ProbeMonitor probeMonitor = default;
+            bool armProbe;
+            using (await model.AccessReadOnlyAsync(cancellationToken))
+            {
+                Probe? probe = probeNumber < model.Sensors.Probes.Count ? model.Sensors.Probes[probeNumber] : null;
+                armProbe = probe is not null && ProbeArming.TryCapture(probe, probeNumber, out probeMonitor);
+            }
+
             float target = settings.ZMin - settings.DiveHeights[0] + settings.TriggerHeight;
             try
             {
                 if (stallDrivers.Count > 0)
                 {
                     await StallArming.ArmAsync(stallDrivers, arming, linkInterface, cancellationToken);
+                }
+
+                if (armProbe)
+                {
+                    await ProbeArming.StartAsync(probeMonitor, linkInterface, cancellationToken);
                 }
 
                 if (!await MoveToZAsync(settings.ZAxis, target, settings.Speeds[tapIndex],
@@ -243,8 +259,14 @@ internal sealed partial class GCodeHandler
             }
             finally
             {
-                // However the tap ended. A driver left armed reports a stall during an ordinary move
+                // However the tap ended. A driver left armed reports a stall during an ordinary move,
+                // and a probe left at the probing rate reports every change it sees for the rest of
+                // the job
                 await StallArming.ReleaseAsync(arming, linkInterface, logger, CancellationToken.None);
+                if (armProbe)
+                {
+                    await ProbeArming.StopAsync(probeMonitor, linkInterface, logger, CancellationToken.None);
+                }
             }
 
             if (!await IsProbeTriggeredAsync(probeNumber, settings.ZAxis, cancellationToken))

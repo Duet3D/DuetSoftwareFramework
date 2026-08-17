@@ -76,7 +76,9 @@ namespace CanMotion
 
 	// Record the level an input was last reported at, so that a move armed on one that is already
 	// active is stopped before it starts. What is held and what is not is decided by
-	// DuetSpiProtocol/StopRules.h. Called from the CAN receiver task
+	// DuetSpiProtocol/StopRules.h.
+	// Called from the CAN receiver task, for a level a board reported, and from the SBC task, for a
+	// handle whose monitor is being replaced or dropped
 	void NoteInputState(uint8_t inputBoard, uint16_t inputHandle, bool active) noexcept;
 #  endif
 

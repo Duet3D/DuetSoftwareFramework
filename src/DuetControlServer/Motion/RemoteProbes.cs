@@ -49,6 +49,26 @@ internal static class RemoteProbes
     }
 
     /// <summary>
+    /// The board watching a probe's input, if anything is
+    /// </summary>
+    /// <param name="probe">The probe</param>
+    /// <param name="board">CAN address of the board carrying its port</param>
+    /// <returns>True if the probe has an input a board was asked to watch</returns>
+    /// <remarks>
+    /// A probe of type none is a placeholder for manual probing and a motor stall probe is detected
+    /// by the driver, so neither has an input, and neither does one whose port has not been given
+    /// yet. This is the same question <c>M558</c> asks before creating a monitor, so that nothing is
+    /// sent to a handle that was never created
+    /// </remarks>
+    public static bool TryGetMonitoredBoard(Probe probe, out byte board)
+    {
+        board = 0;
+        return probe.Type is not (ProbeType.None or ProbeType.ZMotorStall)
+               && !string.IsNullOrWhiteSpace(probe.Port)
+               && RemoteEndstops.TrySplitPort(probe.Port, "Z probe port", out board, out _, out _);
+    }
+
+    /// <summary>
     /// Fill in the switch a probing move should stop on
     /// </summary>
     /// <param name="probe">The probe</param>
@@ -68,8 +88,7 @@ internal static class RemoteProbes
     public static bool TryGetStopInput(Probe probe, int probeNumber, StopAction action, MoveStopInput stopInput)
     {
         stopInput.Clear();
-        if (probe.Type is ProbeType.None or ProbeType.ZMotorStall || string.IsNullOrWhiteSpace(probe.Port) ||
-            !RemoteEndstops.TrySplitPort(probe.Port, "Z probe port", out byte board, out _, out _))
+        if (!TryGetMonitoredBoard(probe, out byte board))
         {
             return false;
         }

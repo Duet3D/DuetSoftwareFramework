@@ -87,13 +87,32 @@ axis in it, and why arming a stall endstop is a separate step from arming a swit
 
 **DuetControlServer.** [CreateEndstopMonitorAsync](src/DuetControlServer/Codes/Handlers/MCodeHandler.Motion.cs)
 sends one `CanMessageCreateInputMonitorV1` per port named by `M574`, each under the handle that
-driver's moves will name. `minInterval` is **zero**: the usual reason to rate-limit an input is to
-stop a chattering switch flooding the bus, and the usual cost of doing so is a delayed report, which
-here is a missed stop.
+driver's moves will name. `minInterval` is **zero**, where RepRapFirmware uses 30 ms. The interval
+costs no accuracy either way — the board timestamps the change in its interrupt and the drives are
+corrected from that timestamp rather than from when the message arrived — so what a nonzero interval
+buys is a bound on how much a chattering switch can say, and what it costs is travel that then has to
+be reverted. Zero stops at the first edge and accepts the chatter.
 
 *Why it must happen at all:* an endstop that is configured but never monitored is never reported, so
 the move would run its full length with nothing to stop it. The failure is silent and looks like a
 dead switch, so `M574` refuses rather than accepting a port it could not register.
+
+A **Z probe** is registered the same way by `M558`, but with an interval that is not zero and does
+not stay the same. An analog probe sitting near its threshold changes reading constantly, and a
+report per change costs bus a move is sharing, so the monitor is created at 25 ms and raised to 2 ms
+by [ProbeArming](src/DuetControlServer/Motion/ProbeArming.cs) for as long as the probe is being used
+— a `G30` tap, or a homing move on an axis whose endstop *is* the probe.
+
+The same message carries the trigger threshold, and so does `G31 P`. The board decides when to report
+and therefore when a probing move stops, so it has to be comparing against the number DCS will judge
+the result by; and because it reports a change and nothing else, a threshold it has not been told
+about also leaves `sensors.probes[].value` frozen at whatever the old one last reported. `G31 P`
+pushes it for that reason, as RepRapFirmware's `RemoteZProbe::HandleG31` does, and probing pushes it
+again so the two cannot be out of order.
+
+`M558 C` takes an input pin only. A `+` in the port name separates an input from a modulating output,
+which is a local probe's second port; a board watches one pin per handle, so `M558` refuses it rather
+than sending the pair as one pin name and letting the board report an unknown pin.
 
 **Duet3Expansion** creates an `InputMonitor` bound to the pin and starts watching it. From here the
 board owns the pin; nothing upstream reads it again.
@@ -117,6 +136,33 @@ probe is already triggered, and that test is only as good as the state behind it
 `M119` reports endstop states from the same change messages the controller acts on, so what a user
 sees and what stops a move come from one source.
 
+### Reconfiguring gives the old pins back first
+
+A board asked to watch a pin holds it until it is told otherwise. It goes on reporting an input
+nobody reads, and it keeps the pin claimed, so naming that pin in a later `M950` fails.
+[InputMonitors](src/DuetControlServer/Motion/InputMonitors.cs) works out what the *previous*
+configuration had watched — taken under the model lock, before the new ports overwrite the old ones,
+because the old port is what names the board holding it — and sends `actionDelete` for every handle
+the new configuration will not ask for again.
+
+Changing an endstop or a probe to a different pin under the **same** handle needs nothing: the board
+deletes the old monitor and frees its pin before assigning the new one. What has to be dropped is a
+handle that is *abandoned* — `M574 X0`, a switch changed to a stall, an endstop given fewer switches
+than it had, `M558 P0`, or a port moved to a different board.
+
+The deletes go out **before** the creates. Only handles nothing wants are dropped, so a create that
+then fails cannot have cost an axis a monitor it was keeping, and the order is what makes shrinking a
+multi-switch endstop work: reducing `P"1.io0.in+1.io1.in"` to `P"1.io1.in"` moves a pin from one
+handle to another, and the board will not give it to the second while the first still holds it.
+
+A board that refuses a delete is logged rather than failing the code — the pin being free is what the
+*next* `M950` needs, and turning a tidy-up into a configuration error would refuse an `M574` that is
+otherwise perfectly good. A board that never had the handle answers with a warning and is not worth
+mentioning: DCS sends these from what it believes, and a board that restarted has already forgotten
+them. An axis whose monitors cannot all be created is the one case where the code takes pins back on
+its own — a switch-per-driver endstop whose second switch was refused gives up the first too, rather
+than leaving a pin claimed under a handle the object model now reads differently.
+
 ---
 
 ## 4. Arming a move
@@ -135,9 +181,24 @@ two programs away and gets nothing but the move.
 
 Which kind of endstop an axis has is dispatched through
 [IEndstopKind](src/DuetControlServer/Motion/EndstopKinds.cs), one seam for all four types, as
-`Endstop::PrimeAxis` is one virtual in RepRapFirmware. A kind that has CAN work to do - a stall has
-to tell each driver what speed to expect - does it in `PrepareAsync` before the move is built, and
-undoes it in `ReleaseAsync` however the move ends.
+`Endstop::PrimeAxis` is one virtual in RepRapFirmware. A kind that has CAN work to do does it in
+`PrepareAsync` before the move is built, and undoes it in `ReleaseAsync` however the move ends. Two
+kinds have some:
+
+- a **stall** has to tell each driver what speed to expect, because that is what it compares the
+  back-EMF against
+- a **Z probe standing in for the endstop** has to be raised from the idle report interval to the
+  probing one, and told its threshold, exactly as a `G30` tap does — a probe left at 25 ms would stop
+  a homing move up to 25 ms late. RepRapFirmware leaves this undone: its `ZProbeEndstop::PrimeAxis`
+  is a comment saying a remote probe ought to be checked here, and it goes unnoticed because RRF
+  creates the monitor fast and only slows it down after the first `G30`
+
+A **switch** has nothing to send, and that is deliberate rather than unfinished — see §2.3 of the
+[design differences](rrf-differences.md).
+
+What each kind needs is read off the object model once, into the axis' `EndstopPlan`, under the model
+lock. `PrepareAsync` runs outside that lock because it is a CAN round trip, and a live `Probe` read
+there could be reconfigured half way through.
 
 ### The three stop actions
 
