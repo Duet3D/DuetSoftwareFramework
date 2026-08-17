@@ -2,9 +2,9 @@
 using DuetAPI.Utility;
 using DuetAPIClient;
 using DuetPluginService.PermissionManagers;
+using DuetSharedLibrary;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Nito.AsyncEx;
 using System;
 using System.Diagnostics;
 using System.IO;

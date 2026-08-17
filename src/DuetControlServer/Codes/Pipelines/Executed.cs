@@ -132,7 +132,7 @@ public sealed class Executed : PipelineBase
             // Deal with firmware emulation
             if (!code.Flags.HasFlag(CodeFlags.IsFromMacro))
             {
-                if (await _model.IsEmulatingMarlinAsync(code.Channel))
+                if (_model.IsEmulatingMarlin(code.Channel))
                 {
                     if (code.Flags.HasFlag(CodeFlags.IsLastCode))
                     {

@@ -12,6 +12,7 @@ using DuetAPI.ObjectModel;
 using DuetControlServer.Codes;
 using Microsoft.Extensions.Logging;
 using Nito.AsyncEx;
+using AsyncLock = DuetSharedLibrary.AsyncLock;
 using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer.IPC.Processors;

@@ -15,6 +15,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
+using AsyncLock = DuetSharedLibrary.AsyncLock;
 
 namespace DuetWebServer.Endpoints;
 

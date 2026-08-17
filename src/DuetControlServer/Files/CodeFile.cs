@@ -5,9 +5,9 @@ using DuetControlServer.Codes;
 using DuetControlServer.Codes.Meta;
 using DuetControlServer.Link;
 using DuetControlServer.Utility;
+using DuetSharedLibrary;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -61,7 +61,7 @@ public class CodeFile(
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Disposable lock</returns>
-    public AwaitableDisposable<IDisposable> LockAsync(CancellationToken cancellationToken) => _lock.LockAsync(cancellationToken);
+    public async ValueTask<IDisposable> LockAsync(CancellationToken cancellationToken) => await _lock.LockAsync(cancellationToken);
 
     /// <summary>
     /// File being read from
@@ -274,10 +274,7 @@ public class CodeFile(
                 do
                 {
                     // Fanuc CNC and LaserWeb G-code may omit the last major G-code number
-                    using (await model.AccessReadOnlyAsync(cancellationToken))
-                    {
-                        _parserBuffer.MayRepeatCode = model.State.MachineMode is MachineMode.CNC or MachineMode.Laser;
-                    }
+                    _parserBuffer.MayRepeatCode = model.CurrentMachineMode is MachineMode.CNC or MachineMode.Laser;
 
                     // Get the next code
                     codeRead = await DuetAPI.Commands.Code.ParseAsync(_fileStream, code, _parserBuffer, cancellationToken);

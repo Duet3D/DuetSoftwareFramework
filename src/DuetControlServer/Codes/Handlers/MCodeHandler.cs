@@ -348,7 +348,7 @@ public class MCodeHandler(
                             return new Message(MessageType.Error, "Filename expected");
                         }
 
-                        string prefix = await model.IsEmulatingMarlinAsync(code.Channel, cancellationToken) ? "ok\n" : string.Empty;
+                        string prefix = model.IsEmulatingMarlin(code.Channel) ? "ok\n" : string.Empty;
                         string physicalFile = await filePathResolver.ToPhysicalAsync(file, FileDirectory.GCodes, cancellationToken), parentDirectory = Path.GetDirectoryName(physicalFile)!;
                         try
                         {
@@ -386,7 +386,7 @@ public class MCodeHandler(
                             codeProcessor.FilesBeingWritten[numChannel] = null;
                             await stream.DisposeAsync();
 
-                            if (await model.IsEmulatingMarlinAsync(code.Channel, cancellationToken))
+                            if (model.IsEmulatingMarlin(code.Channel))
                             {
                                 return new Message(MessageType.Success, "Done saving file.");
                             }
