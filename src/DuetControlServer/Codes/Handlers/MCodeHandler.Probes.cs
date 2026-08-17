@@ -83,6 +83,15 @@ internal partial class MCodeHandler
         // probe behind
         if (seenPort && !string.IsNullOrWhiteSpace(port))
         {
+            // A '+' separates an input from a modulating output, which is a local probe's second
+            // port. A board watches one pin per handle, so the whole string would go to it as one
+            // pin name and be refused as an unknown pin; RepRapFirmware's RemoteZProbe::Create says
+            // what is actually wrong instead
+            if (port.Contains('+'))
+            {
+                return new Message(MessageType.Error, "Expansion boards do not support Z probe output ports");
+            }
+
             if (!RemoteEndstops.TrySplitPort(port, "Z probe port", out _, out _, out string? portError))
             {
                 return new Message(MessageType.Error, portError);
