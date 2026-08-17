@@ -24,6 +24,15 @@ internal sealed class EndstopArmingState
 {
     /// <summary>Boards this move sent an arming message to, and must therefore release</summary>
     public HashSet<byte> ArmedBoards { get; } = [];
+
+    /// <summary>
+    /// Probes this move raised to the probing report rate, and must therefore slow back down
+    /// </summary>
+    /// <remarks>
+    /// A list rather than a set because releasing twice costs a message and no correctness, while a
+    /// probe missed here is one left reporting at the probing rate for the rest of the job
+    /// </remarks>
+    public List<ProbeArming.ProbeMonitor> ArmedProbes { get; } = [];
 }
 
 /// <summary>
@@ -206,7 +215,19 @@ internal sealed class SwitchEndstopKind : IEndstopKind
 /// The Z probe standing in for the axis' endstop
 /// </summary>
 /// <remarks>
-/// Registered under a probe handle by <c>M558</c>, so like a switch there is nothing to send per move
+/// <para>
+/// The pin is already watched - <c>M558</c> registered it under a probe handle - so unlike a stall
+/// there is no handle to create. What is sent per move is what <see cref="ProbeArming"/> sends around
+/// a tap: the threshold, and the interval that decides how quickly a change is reported.
+/// </para>
+/// <para>
+/// A probe is created reporting at the idle rate, because a configured probe nobody is using has no
+/// business filling the bus, so a homing move that does not arm it would be stopped up to
+/// <see cref="ProbeArming.InactiveReportInterval"/> late. RepRapFirmware leaves this undone - its
+/// <c>ZProbeEndstop::PrimeAxis</c> is a comment saying a remote probe ought to be checked here - and
+/// gets away with it only until the first <c>G30</c>, which is what puts its probe on the idle rate
+/// for good
+/// </para>
 /// </remarks>
 internal sealed class ZProbeEndstopKind : IEndstopKind
 {
@@ -217,14 +238,29 @@ internal sealed class ZProbeEndstopKind : IEndstopKind
     public bool ReducesAcceleration => false;
 
     /// <inheritdoc/>
-    public ValueTask<Message> PrepareAsync(EndstopPlan plan, EndstopArmingState state, LinkInterface link,
-                                           CancellationToken cancellationToken)
-        => new(new Message());
+    public async ValueTask<Message> PrepareAsync(EndstopPlan plan, EndstopArmingState state, LinkInterface link,
+                                                 CancellationToken cancellationToken)
+    {
+        if (plan.ProbeMonitor is not ProbeArming.ProbeMonitor monitor)
+        {
+            return new Message();               // no input to tell anything, so nothing to say to it
+        }
+
+        // Recorded before it is sent, because arming stops at the first refusal and whatever went out
+        // before it still has to be undone
+        state.ArmedProbes.Add(monitor);
+        return await ProbeArming.StartAsync(monitor, link, cancellationToken);
+    }
 
     /// <inheritdoc/>
-    public ValueTask ReleaseAsync(EndstopArmingState state, LinkInterface link, ILogger logger,
-                                  CancellationToken cancellationToken)
-        => ValueTask.CompletedTask;
+    public async ValueTask ReleaseAsync(EndstopArmingState state, LinkInterface link, ILogger logger,
+                                        CancellationToken cancellationToken)
+    {
+        foreach (ProbeArming.ProbeMonitor monitor in state.ArmedProbes)
+        {
+            await ProbeArming.StopAsync(monitor, link, logger, cancellationToken);
+        }
+    }
 
     /// <inheritdoc/>
     public string? TryArm(EndstopPlan plan, MoveStopInput stopInput)

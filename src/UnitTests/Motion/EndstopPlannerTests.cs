@@ -240,4 +240,65 @@ public class EndstopPlannerTests
 
         Assert.That(EndstopKinds.Used(plans).Count(), Is.EqualTo(1));
     }
+
+    /// <summary>
+    /// The machine, with Z homed by the given probe rather than by a switch
+    /// </summary>
+    private static (Move Move, Sensors Sensors) ProbeHomedZ(Probe probe, int probeNumber = 0)
+    {
+        (Move move, Sensors sensors) = Machine();
+        while (sensors.Probes.Count <= probeNumber)
+        {
+            sensors.Probes.Add(null);
+        }
+        sensors.Probes[probeNumber] = probe;
+        sensors.Endstops[2] = new Endstop { Type = EndstopType.ZProbeAsEndstop, Probe = probeNumber };
+        return (move, sensors);
+    }
+
+    [Test]
+    public void AProbeHomedAxisCarriesWhatItsBoardHasToBeTold()
+    {
+        // A probe reports at the idle interval until something asks it not to, so a homing move that
+        // did not arm it would be stopped up to that interval late. What to send is read from the
+        // probe here, under the model lock, because the phase that sends it runs outside one
+        List<EndstopPlan> plans = Plan(ProbeHomedZ(new Probe
+        {
+            Type = ProbeType.Analog,
+            Port = "2.io4.in",
+            Threshold = 123
+        }, probeNumber: 1), Homing('Z'));
+
+        Assert.That(plans[0].ProbeMonitor, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(plans[0].ProbeMonitor!.Value.Board, Is.EqualTo(2));
+            Assert.That(plans[0].ProbeMonitor!.Value.ProbeNumber, Is.EqualTo(1),
+                        "the endstop's probe, not probe 0");
+            Assert.That(plans[0].ProbeMonitor!.Value.Threshold, Is.EqualTo(123u));
+        });
+    }
+
+    [Test]
+    public void AProbeHomedAxisWithNothingToTellCarriesNoMonitor()
+    {
+        // A stall probe is detected by the driver and has no handle to change. Arming it would send
+        // to a handle M558 never created
+        List<EndstopPlan> stall = Plan(ProbeHomedZ(new Probe { Type = ProbeType.ZMotorStall }), Homing('Z'));
+        List<EndstopPlan> unported = Plan(ProbeHomedZ(new Probe { Type = ProbeType.Digital }), Homing('Z'));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(stall[0].ProbeMonitor, Is.Null, "a stall probe is not an input");
+            Assert.That(unported[0].ProbeMonitor, Is.Null, "nor is a probe whose port has not been given yet");
+        });
+    }
+
+    [Test]
+    public void AnAxisHomedOnASwitchCarriesNoProbeMonitor()
+    {
+        // Only the Z probe kind sends anything per move. A switch was armed by M574 and has reported
+        // every change since
+        Assert.That(Plan(Machine(), Homing('X'))[0].ProbeMonitor, Is.Null);
+    }
 }

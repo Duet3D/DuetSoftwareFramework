@@ -191,6 +191,26 @@ is where a machine recovers, but nothing re-creates the monitors on its own and 
 macro does not. That is a gap rather than a difference — see
 [INPUT_MONITORS.md](https://github.com/Duet3D/DuetSoftwareFramework/blob/master/docs/devel/INPUT_MONITORS.md).
 
+### 2.4 A Z probe standing in for an endstop is armed, and a probe left alone is quiet
+
+Two halves of one difference, and they only make sense together.
+
+RepRapFirmware creates a remote probe's input monitor at the *probing* report interval — 2 ms — and
+only slows it to 25 ms when a probing operation ends. A machine that configures a probe in
+`config.g` and does not use it therefore has it reporting every change it sees, forever, on a bus
+that every move shares. DSF creates at 25 ms and raises it for the duration of a tap, which is the
+state RepRapFirmware reaches anyway, reached immediately.
+
+That inverts who is exposed by the other half. `M574 Z1 S2` homes Z on the probe, and a homing move
+is not a tap: RepRapFirmware's `ZProbeEndstop::PrimeAxis` carries a `//TODO` where the remote probe
+ought to be prepared, so nothing raises the rate — it simply goes unnoticed, because until the first
+`G30` the probe was already fast. Creating slow would make that hole permanent, so DSF closes it:
+`ZProbeEndstopKind` arms the probe on a homing move exactly as a tap does, through the same
+`ProbeArming`.
+
+The result is a probe that reports quickly whenever it is being used to stop something, and quietly
+the rest of the time. RepRapFirmware manages the first only by accident and never manages the second.
+
 ---
 
 ## 3. The object model has to be able to recreate the machine
