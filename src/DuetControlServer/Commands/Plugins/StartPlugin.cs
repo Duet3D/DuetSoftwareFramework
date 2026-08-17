@@ -3,7 +3,6 @@ using DuetAPI.Utility;
 using DuetControlServer.IPC.Processors;
 using DuetSharedLibrary;
 using Microsoft.Extensions.Options;
-using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
 using System.IO;

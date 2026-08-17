@@ -12,9 +12,9 @@ using DuetControlServer.Files;
 using DuetControlServer.Link.Adapter;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Utility;
+using DuetSharedLibrary;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Nito.AsyncEx;
 using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer.Link;

@@ -11,6 +11,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using AsyncLock = DuetSharedLibrary.AsyncLock;
 using Code = DuetControlServer.Commands.Code;
 using DuetControlServer.Link.Protocol.Shared;
 using Microsoft.Extensions.Logging;

@@ -2,8 +2,8 @@
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.IPC;
+using DuetSharedLibrary;
 using Microsoft.Extensions.Hosting;
-using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
 using System.IO;

@@ -6,11 +6,11 @@ using DuetControlServer.Files;
 using DuetControlServer.Link.Adapter;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Link.Requests;
+using DuetSharedLibrary;
 
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -109,7 +109,7 @@ public sealed class Processor
     /// Lock access to this code channel asynchronously
     /// </summary>
     /// <returns>Disposable lock</returns>
-    public AwaitableDisposable<IDisposable> LockAsync(CancellationToken cancellationToken = default) => _lock.LockAsync(cancellationToken);
+    public async ValueTask<IDisposable> LockAsync(CancellationToken cancellationToken = default) => await _lock.LockAsync(cancellationToken);
 
     /// <summary>
     /// This is set to true if all the files have been aborted and RRF has to be notified

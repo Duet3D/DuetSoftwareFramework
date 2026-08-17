@@ -1,9 +1,10 @@
 ﻿using DuetAPI.ObjectModel;
-using Nito.AsyncEx;
+using DuetSharedLibrary;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace DuetPluginService;
 
@@ -26,7 +27,7 @@ public sealed class PluginStore
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Lock instance</returns>
-    public AwaitableDisposable<IDisposable> LockAsync(CancellationToken cancellationToken) => _lock.LockAsync(cancellationToken);
+    public async ValueTask<IDisposable> LockAsync(CancellationToken cancellationToken) => await _lock.LockAsync(cancellationToken);
 
     /// <summary>
     /// List of plugins

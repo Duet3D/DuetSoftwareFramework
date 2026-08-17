@@ -1,10 +1,10 @@
 ﻿using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
+using DuetSharedLibrary;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Nito.AsyncEx;
 using System;
 using System.IO;
 using System.Text;

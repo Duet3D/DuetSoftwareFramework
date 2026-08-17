@@ -46,9 +46,9 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     private readonly AsyncReaderWriterLock _readWriteLock = new();
 
     /// <summary>
-    /// Base lock for update conditions
+    /// Base lock for update conditions. This stays a Nito lock because AsyncConditionVariable binds to it
     /// </summary>
-    private readonly AsyncLock _updateLock = new();
+    private readonly Nito.AsyncEx.AsyncLock _updateLock = new();
 
     /// <summary>
     /// Completion source that is pulsed whenever the machine model has been updated. Waiters race it against a

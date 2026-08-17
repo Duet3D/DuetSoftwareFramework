@@ -1,6 +1,6 @@
 ﻿using DuetAPI.ObjectModel;
+using DuetSharedLibrary;
 using Microsoft.Extensions.Options;
-using Nito.AsyncEx;
 using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Text;
