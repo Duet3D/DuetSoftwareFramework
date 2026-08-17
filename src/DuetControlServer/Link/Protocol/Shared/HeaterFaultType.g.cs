@@ -30,6 +30,9 @@ public enum HeaterFaultType : byte
     /// <summary>the heater needed more power than the model said it should</summary>
     PwmTooHigh = 4,
 
+    /// <summary>an inductive heater reported a load error; the board's message follows</summary>
+    InductiveHeaterError = 5,
+
     /// <summary>not a fault type, but how many there are</summary>
-    HeaterFaultTypeLimit = 5,
+    HeaterFaultTypeLimit = 6,
 }

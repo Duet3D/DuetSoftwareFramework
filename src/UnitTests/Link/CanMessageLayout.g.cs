@@ -1410,8 +1410,28 @@ public class CanMessageLayout
         }
         {
             FilamentMonitorDataV2 probe = default;
-            probe.Zero1 = (ushort)0xFFF;
-            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0x00, 0xF0, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }), "bit layout of FilamentMonitorDataV2.Zero1");
+            probe.FilamentPresentValid = true;
+            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }), "bit layout of FilamentMonitorDataV2.FilamentPresentValid");
+        }
+        {
+            FilamentMonitorDataV2 probe = default;
+            probe.FilamentPresent = true;
+            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }), "bit layout of FilamentMonitorDataV2.FilamentPresent");
+        }
+        {
+            FilamentMonitorDataV2 probe = default;
+            probe.MotionDetected = true;
+            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }), "bit layout of FilamentMonitorDataV2.MotionDetected");
+        }
+        {
+            FilamentMonitorDataV2 probe = default;
+            probe.ExtraDataValid = true;
+            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }), "bit layout of FilamentMonitorDataV2.ExtraDataValid");
+        }
+        {
+            FilamentMonitorDataV2 probe = default;
+            probe.ExtraData = (byte)0xFF;
+            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0x00, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }), "bit layout of FilamentMonitorDataV2.ExtraData");
         }
         {
             FilamentMonitorDataV2 probe = default;

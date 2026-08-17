@@ -2017,12 +2017,17 @@
         "on a byte boundary. This is deliberate and must be preserved."
       ],
       "clearReservedFields": true,
+      "clearAlsoClears": ["extraDataValid", "extraData"],
       "members": [
         {
           "kind": "bitfield", "storage": "u32",
           "fields": [
             { "name": "position", "width": 12, "doc": "Raw position from the sensor" },
-            { "name": "zero1", "width": 12, "reserved": true },
+            { "name": "filamentPresentValid", "width": 1, "bool": true, "doc": "True if the filamentPresent bit is meaningful" },
+            { "name": "filamentPresent", "width": 1, "bool": true, "doc": "True if the sensor reports filament present, only valid if filamentPresentValid is set" },
+            { "name": "motionDetected", "width": 1, "bool": true, "doc": "True if filament movement was detected within the last FilamentMonitorMotionLatchTime" },
+            { "name": "extraDataValid", "width": 1, "bool": true, "doc": "True if the extraData field is meaningful" },
+            { "name": "extraData", "width": 8, "doc": "AGC of a rotating magnet monitor or shutter of a laser monitor, only valid if extraDataValid is set" },
             { "name": "status", "width": 4, "enum": "FilamentSensorStatus", "doc": "Standard filament status" },
             { "name": "zero2", "width": 2, "reserved": true },
             { "name": "hasLiveData", "width": 1, "bool": true, "doc": "True if the following fields are meaningful for this sensor" }
@@ -2561,7 +2566,8 @@
       { "name": "exceededAllowedExcursion", "value": 2, "doc": "the temperature strayed further from the target than allowed" },
       { "name": "monitorTriggered", "value": 3, "doc": "a heater monitor fired" },
       { "name": "pwmTooHigh", "value": 4, "doc": "the heater needed more power than the model said it should" },
-      { "name": "heaterFaultTypeLimit", "value": 5, "doc": "not a fault type, but how many there are" }
+      { "name": "inductiveHeaterError", "value": 5, "doc": "an inductive heater reported a load error; the board's message follows" },
+      { "name": "heaterFaultTypeLimit", "value": 6, "doc": "not a fault type, but how many there are" }
     ]
    },
    {

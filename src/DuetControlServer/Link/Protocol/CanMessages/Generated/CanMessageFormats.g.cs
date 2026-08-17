@@ -3948,7 +3948,7 @@ public struct CanMessageDriversStatus : ICanMessage<CanMessageDriversStatus>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 12)]
 public struct FilamentMonitorDataV2
 {
-    /// <summary>Backing storage for the bitfields position:12, zero1:12, status:4, zero2:2, hasLiveData:1, minPercentage:10, maxPercentage:10, avgPercentage:10, lastPercentage:10, calibrationLength:24</summary>
+    /// <summary>Backing storage for the bitfields position:12, filamentPresentValid:1, filamentPresent:1, motionDetected:1, extraDataValid:1, extraData:8, status:4, zero2:2, hasLiveData:1, minPercentage:10, maxPercentage:10, avgPercentage:10, lastPercentage:10, calibrationLength:24</summary>
     [FieldOffset(0)] private ByteArray12 _bits0;
 
     /// <summary>
@@ -3962,13 +3962,53 @@ public struct FilamentMonitorDataV2
     }
 
     /// <summary>
-    /// Reserved for future use; must be set to 0 so that a later firmware can use it
-    /// (12-bit field, bits 12-23 of the message)
+    /// True if the filamentPresent bit is meaningful
+    /// (1-bit field, bit 12 of the message)
     /// </summary>
-    public ushort Zero1
+    public bool FilamentPresentValid
     {
-        readonly get => (ushort)CanBitFields.Get(_bits0, 12, 12);
-        set => CanBitFields.Set(_bits0, 12, 12, unchecked((ulong)value));
+        readonly get => CanBitFields.Get(_bits0, 12, 1) != 0;
+        set => CanBitFields.Set(_bits0, 12, 1, (value ? 1UL : 0UL));
+    }
+
+    /// <summary>
+    /// True if the sensor reports filament present, only valid if filamentPresentValid is set
+    /// (1-bit field, bit 13 of the message)
+    /// </summary>
+    public bool FilamentPresent
+    {
+        readonly get => CanBitFields.Get(_bits0, 13, 1) != 0;
+        set => CanBitFields.Set(_bits0, 13, 1, (value ? 1UL : 0UL));
+    }
+
+    /// <summary>
+    /// True if filament movement was detected within the last FilamentMonitorMotionLatchTime
+    /// (1-bit field, bit 14 of the message)
+    /// </summary>
+    public bool MotionDetected
+    {
+        readonly get => CanBitFields.Get(_bits0, 14, 1) != 0;
+        set => CanBitFields.Set(_bits0, 14, 1, (value ? 1UL : 0UL));
+    }
+
+    /// <summary>
+    /// True if the extraData field is meaningful
+    /// (1-bit field, bit 15 of the message)
+    /// </summary>
+    public bool ExtraDataValid
+    {
+        readonly get => CanBitFields.Get(_bits0, 15, 1) != 0;
+        set => CanBitFields.Set(_bits0, 15, 1, (value ? 1UL : 0UL));
+    }
+
+    /// <summary>
+    /// AGC of a rotating magnet monitor or shutter of a laser monitor, only valid if extraDataValid is set
+    /// (8-bit field, bits 16-23 of the message)
+    /// </summary>
+    public byte ExtraData
+    {
+        readonly get => (byte)CanBitFields.Get(_bits0, 16, 8);
+        set => CanBitFields.Set(_bits0, 16, 8, unchecked((ulong)value));
     }
 
     /// <summary>
@@ -4054,8 +4094,9 @@ public struct FilamentMonitorDataV2
     /// <summary>Clear the reserved fields of this message so that it stays compatible with future uses</summary>
     public void ClearReservedFields()
     {
-        Zero1 = 0;
         Zero2 = 0;
+        ExtraDataValid = false;
+        ExtraData = 0;
     }
 }
 

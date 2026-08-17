@@ -1601,7 +1601,11 @@ static_assert(sizeof(CanMessageDriversStatus) == 64);
 struct __attribute__((packed)) FilamentMonitorDataV2
 {
 	uint32_t position : 12,		// Raw position from the sensor
-	         zero1 : 12,
+	         filamentPresentValid : 1,		// True if the filamentPresent bit is meaningful
+	         filamentPresent : 1,		// True if the sensor reports filament present, only valid if filamentPresentValid is set
+	         motionDetected : 1,		// True if filament movement was detected within the last FilamentMonitorMotionLatchTime
+	         extraDataValid : 1,		// True if the extraData field is meaningful
+	         extraData : 8,		// AGC of a rotating magnet monitor or shutter of a laser monitor, only valid if extraDataValid is set
 	         status : 4,		// Standard filament status
 	         zero2 : 2,
 	         hasLiveData : 1;		// True if the following fields are meaningful for this sensor
@@ -1614,8 +1618,9 @@ struct __attribute__((packed)) FilamentMonitorDataV2
 	// Clear the reserved fields of this message so that it stays compatible with future uses
 	void ClearReservedFields() noexcept
 	{
-		zero1 = 0;
 		zero2 = 0;
+		extraDataValid = false;
+		extraData = 0;
 	}
 };
 static_assert(sizeof(FilamentMonitorDataV2) == 12);

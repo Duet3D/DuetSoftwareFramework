@@ -65,6 +65,7 @@ public static class EventText
         "exceeded allowed temperature excursion: ",     // "target ... actual ..." follows
         "",                                             // "monitor ... was triggered" follows
         "high PWM: ",                                   // "expected ... actual ..." follows
+        "inductive heater load error: ",                // the message the board sent follows
         "unknown error: "                               // the fault type was not one of the above
     ];
 
