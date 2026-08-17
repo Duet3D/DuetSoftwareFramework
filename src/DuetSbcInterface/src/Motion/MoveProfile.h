@@ -10,8 +10,9 @@
  * chains that position tracking walks, and ScheduleMoveBuilder puts it on the wire for the
  * controller to fan out to the boards. Two of those three have no reason to know what a DDA is.
  *
- * Fields map one-for-one onto the ScheduleMove packet, so that the wire format is a re-encoding of
- * this and not a separate description of the same move that could drift away from it.
+ * Every field here has a counterpart in the ScheduleMove packet, so the wire format is a re-encoding
+ * of this rather than a second description of the same move. ScheduleMoveBuilder::SendPacket copies
+ * them across one at a time, narrowing motioncalc_t to the float the packet carries.
  *
  * Units throughout are step clocks and millimetres, i.e. speed is mm per step clock and
  * acceleration mm per step clock squared. SegmentBuilder scales to steps per drive as it goes.
@@ -20,7 +21,7 @@
 #ifndef SRC_MOTION_MOVEPROFILE_H_
 #define SRC_MOTION_MOVEPROFILE_H_
 
-#include <RepRapFirmware.h>
+#include <Config/MachineLimits.h>
 
 namespace Duet::Sbc::Motion
 {
@@ -30,12 +31,12 @@ namespace Duet::Sbc::Motion
 		uint32_t steadyClocks = 0;
 		uint32_t decelClocks = 0;
 
-		motioncalc_t acceleration = 0;			// always positive
-		motioncalc_t deceleration = 0;			// always negative, matching the firmware's convention
+		motioncalc_t acceleration = 0; // always positive
+		motioncalc_t deceleration = 0; // always negative, matching the firmware's convention
 
 		motioncalc_t totalDistance = 0;
-		motioncalc_t accelDistance = 0;			// distance at the end of the acceleration phase
-		motioncalc_t decelStartDistance = 0;	// distance at which deceleration begins
+		motioncalc_t accelDistance = 0;		 // distance at the end of the acceleration phase
+		motioncalc_t decelStartDistance = 0; // distance at which deceleration begins
 
 		motioncalc_t startSpeed = 0;
 		motioncalc_t topSpeed = 0;
@@ -46,6 +47,6 @@ namespace Duet::Sbc::Motion
 			return accelClocks + steadyClocks + decelClocks;
 		}
 	};
-}
+} // namespace Duet::Sbc::Motion
 
 #endif /* SRC_MOTION_MOVEPROFILE_H_ */

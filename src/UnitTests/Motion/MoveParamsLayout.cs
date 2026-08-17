@@ -48,7 +48,7 @@ public class MoveParamsLayout
             Assert.That(MoveStopInput.Length, Is.EqualTo(size), "Length covers every field of the entry");
 
             // 6 + maxDriversPerAxis is what MoveParams.h static_asserts sizeof(MoveStopInput) to be,
-            // and MotionConfigLayout pins maxDriversPerAxis itself to the native 8
+            // and MachineConfigLayout pins maxDriversPerAxis itself to the native 8
             Assert.That(size, Is.EqualTo(6 + MotionLimits.MaxDriversPerAxis), "sizeof(MoveStopInput)");
         });
     }
@@ -56,16 +56,71 @@ public class MoveParamsLayout
     [Test]
     public void MoveParamsHeaderFillsItsDeclaredSize()
     {
-        // The header declares Size = 28, which sets the size rather than checking it: a field
-        // removed or narrowed leaves the runtime padding the tail out to 28 and the arrays after it
-        // still land where the native side looks for them, while every field this side of the gap
-        // has moved. Adding the fields up is what catches that
+        // The header declares its size, which sets it rather than checking it: a field removed or
+        // narrowed leaves the runtime padding the tail out and the arrays after it still land where
+        // the native side looks for them, while every field this side of the gap has moved. Adding
+        // the fields up is what catches that
         int size = PackedStructSize.OfFields(typeof(MoveParamsHeader));
 
         Assert.Multiple(() =>
         {
             Assert.That(size, Is.EqualTo(Marshal.SizeOf<MoveParamsHeader>()), "the fields fill the header, leaving no padding");
-            Assert.That(size, Is.EqualTo(28), "sizeof(MoveParamsHeader)");
+            Assert.That(size, Is.EqualTo(40), "sizeof(MoveParamsHeader)");
+        });
+    }
+
+    [Test]
+    public void MoveDriveTuningFillsItsDeclaredSize()
+    {
+        // Same trap as the header, and it matters more here: this one is copied as a block, so a
+        // field that has moved corrupts every drive of every move rather than failing loudly
+        int size = PackedStructSize.OfFields(typeof(MoveDriveTuning));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(size, Is.EqualTo(Marshal.SizeOf<MoveDriveTuning>()), "the fields fill the entry, leaving no padding");
+            Assert.That(size, Is.EqualTo(28), "sizeof(MoveDriveTuning)");
+        });
+    }
+
+    [Test]
+    public void SubmissionLengthCoversAllFourArrays()
+    {
+        const int numDrives = 4;
+
+        Assert.That(MoveParams.Length(numDrives),
+                    Is.EqualTo(40 + (numDrives * (sizeof(int) + sizeof(float) + MoveStopInput.Length + 28))),
+                    "a submission is the header plus four per-drive arrays");
+    }
+
+    [Test]
+    public void TuningIsWrittenAfterTheStopInputs()
+    {
+        // The tuning array is the last thing in the record, so its first entry begins exactly where
+        // the stop inputs end. Getting that wrong would have the engine read pressure advance out of
+        // somebody's endstop configuration
+        const int numDrives = 2;
+        MoveParamsHeader header = new() { NumDrives = numDrives };
+        int[] endPoints = new int[numDrives];
+        float[] directions = new float[numDrives];
+        MoveStopInput[] stops = [new(), new()];
+        MoveDriveTuning[] tuning =
+        [
+            new() { InstantDv = 1.5f, PressureAdvanceClocks = 30.0f, BacklashSteps = 11 },
+            new() { InstantDv = 2.5f, PressureAdvanceClocks = 40.0f, BacklashSteps = 22 }
+        ];
+
+        byte[] buffer = new byte[MoveParams.Length(numDrives)];
+        int written = MoveParams.Write(buffer, header, endPoints, directions, stops, tuning);
+
+        int tuningOffset = 40 + (numDrives * (sizeof(int) + sizeof(float) + MoveStopInput.Length));
+        Assert.Multiple(() =>
+        {
+            Assert.That(written, Is.EqualTo(buffer.Length));
+            Assert.That(BitConverter.ToSingle(buffer, tuningOffset), Is.EqualTo(1.5f), "drive 0 jerk limit");
+            Assert.That(BitConverter.ToSingle(buffer, tuningOffset + 8), Is.EqualTo(30.0f), "drive 0 pressure advance");
+            Assert.That(BitConverter.ToInt32(buffer, tuningOffset + 12), Is.EqualTo(11), "drive 0 backlash");
+            Assert.That(BitConverter.ToSingle(buffer, tuningOffset + 28), Is.EqualTo(2.5f), "drive 1 jerk limit");
         });
     }
 }

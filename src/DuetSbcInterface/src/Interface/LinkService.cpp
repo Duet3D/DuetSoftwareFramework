@@ -1,0 +1,887 @@
+#include <Interface/LinkService.h>
+
+#include <Motion/StepTimer.h>
+#include <Platform/ProcessHelpers.h>
+
+#include <poll.h>
+#include <sys/eventfd.h>
+#include <unistd.h>
+
+#include <algorithm>
+#include <chrono>
+#include <cstring>
+
+namespace Duet::Sbc
+{
+
+	namespace
+	{
+
+		int64_t NowNs()
+		{
+			return std::chrono::duration_cast<std::chrono::nanoseconds>(
+					   std::chrono::steady_clock::now().time_since_epoch())
+				.count();
+		}
+
+		// Ring capacities. The inbound ring must absorb a burst of incoming packets even if the managed
+		// dispatcher is briefly descheduled, so it is sized well beyond a single full transfer.
+		constexpr size_t kInboundCapacity = 256 * 1024;
+		constexpr size_t kOutboundCapacity = 128 * 1024;
+
+	} // namespace
+
+	LinkService::LinkService(const Config& config, std::unique_ptr<Transport> transport)
+		: m_config(config)
+		, m_transport(std::move(transport))
+		, m_inbound(kInboundCapacity)
+		, m_outbound(kOutboundCapacity)
+		, m_inboundEventFd(::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC))
+	{
+		// Route the transfer engine's internal recovery reporting into the inbound ring
+		m_transport->SetLogCallback([this](const std::string& message) { PostLog(LogLevel::Warning, message); });
+		m_transport->SetConnectionLostCallback(
+			[this](const std::string& reason)
+			{
+				m_wasConnected = false;
+				DropOutgoing();
+				InboundEventHeader header{};
+				header.type = static_cast<uint16_t>(InboundEventType::ConnectionLost);
+				PostEvent(InboundEventType::ConnectionLost, &header, sizeof(header), reason.c_str(), reason.size());
+			});
+	}
+
+	LinkService::~LinkService()
+	{
+		Stop();
+		if (m_inboundEventFd >= 0)
+		{
+			::close(m_inboundEventFd);
+			m_inboundEventFd = -1;
+		}
+	}
+
+	bool LinkService::WaitForInbound(int timeoutMs)
+	{
+		if (!m_inbound.IsEmpty())
+		{
+			return true;
+		}
+		if (m_inboundEventFd < 0 || m_stop.load(std::memory_order_relaxed))
+		{
+			return !m_inbound.IsEmpty();
+		}
+
+		// Announce that we are parking, then re-check: without this re-check an event posted between the
+		// IsEmpty() above and the poll() below would leave us blocked until the timeout.
+		m_consumerWaiting.store(true, std::memory_order_seq_cst);
+		if (!m_inbound.IsEmpty())
+		{
+			m_consumerWaiting.store(false, std::memory_order_relaxed);
+			return true;
+		}
+
+		pollfd pfd{m_inboundEventFd, POLLIN, 0};
+		::poll(&pfd, 1, timeoutMs);
+		m_consumerWaiting.store(false, std::memory_order_relaxed);
+
+		uint64_t value = 0;
+		while (::read(m_inboundEventFd, &value, sizeof(value)) > 0)
+		{
+		}
+		return !m_inbound.IsEmpty();
+	}
+
+	void LinkService::Connect()
+	{
+		m_transport->Connect();
+	}
+
+	void LinkService::Start()
+	{
+		m_stop.store(false, std::memory_order_relaxed);
+		m_thread = std::thread([this] { Execute(); });
+	}
+
+	void LinkService::Stop()
+	{
+		if (m_stop.exchange(true))
+		{
+			return;
+		}
+		m_transport->Stop();
+
+		// Release a consumer parked in WaitForInbound so shutdown is prompt
+		if (m_inboundEventFd >= 0)
+		{
+			const uint64_t one = 1;
+			[[maybe_unused]] const ssize_t n = ::write(m_inboundEventFd, &one, sizeof(one));
+		}
+
+		if (m_thread.joinable())
+		{
+			m_thread.join();
+		}
+	}
+
+	void LinkService::MarkRequest()
+	{
+		int64_t expected = 0;
+		// Only the first request since the last completed transfer sets the timestamp
+		m_pendingRequestNs.compare_exchange_strong(expected, NowNs(), std::memory_order_relaxed);
+	}
+
+	void LinkService::RequestTransfer()
+	{
+		MarkRequest();
+		m_transport->RequestTransfer();
+	}
+
+	// ---------------------------------------------------------------------------
+	// Outbound queueing (caller threads)
+	// ---------------------------------------------------------------------------
+	uint32_t LinkService::QueueMessage(uint32_t messageFlags, const char* message, size_t length)
+	{
+		MessageCommand cmd{};
+		cmd.header.type = static_cast<uint16_t>(OutboundCommandType::Message);
+		cmd.flags = messageFlags;
+
+		const ByteSpan fragments[2] = {AsBytes(cmd), AsBytes(message, length)};
+		if (!m_outbound.WriteScattered(fragments))
+		{
+			return 0;
+		}
+		const uint32_t seq = ++m_queuedSeq;
+		RequestTransfer();
+		return seq;
+	}
+
+	uint32_t LinkService::QueueCanMessage(uint16_t txToken,
+									   uint16_t msgType,
+									   uint16_t replyType,
+									   uint8_t dstAddress,
+									   bool isResponse,
+									   const uint8_t* payload,
+									   size_t payloadLength)
+	{
+		CanMessageCommand cmd{};
+		cmd.header.type = static_cast<uint16_t>(OutboundCommandType::CanMessage);
+		cmd.txToken = txToken;
+		cmd.msgType = msgType;
+		cmd.replyType = replyType;
+		cmd.dstAddress = dstAddress;
+		cmd.isResponse = isResponse ? 1 : 0;
+
+		const ByteSpan fragments[2] = {AsBytes(cmd), AsBytes(payload, payloadLength)};
+		if (!m_outbound.WriteScattered(fragments))
+		{
+			return 0;
+		}
+		const uint32_t seq = ++m_queuedSeq;
+		RequestTransfer();
+		return seq;
+	}
+
+	bool LinkService::OutboundHasHeadroom() const
+	{
+		// Enough room for several full moves. Preparation stops here rather than at the point where
+		// a write is actually refused: a move that is dropped after its predecessor has been
+		// scheduled leaves a gap the boards execute as a stop and a restart.
+		static constexpr size_t kScheduleMoveHeadroom =
+			8 * (sizeof(OutboundCommandHeader) + sizeof(proto::ScheduleMoveHeader)
+				 + (proto::MaxScheduleMoveDrivers * sizeof(proto::ScheduleMoveDriver)));
+		return m_outbound.BytesFree() >= kScheduleMoveHeadroom;
+	}
+
+	void LinkService::PostEventFromOtherThread(
+		InboundEventType type, const void* header, size_t headerLength, const void* tail, size_t tailLength)
+	{
+		PostEvent(type, header, headerLength, tail, tailLength);
+	}
+
+	uint32_t LinkService::QueueScheduleMove(std::span<const uint8_t> packet)
+	{
+		OutboundCommandHeader header{};
+		header.type = static_cast<uint16_t>(OutboundCommandType::ScheduleMove);
+
+		const ByteSpan fragments[2] = {AsBytes(header), packet};
+		if (!m_outbound.WriteScattered(fragments))
+		{
+			return 0;
+		}
+		const uint32_t seq = ++m_queuedSeq;
+		RequestTransfer();
+		return seq;
+	}
+
+	uint32_t LinkService::QueueEnableCan(bool enable, uint32_t requestId)
+	{
+		EnableCanCommand cmd{};
+		cmd.header.type = static_cast<uint16_t>(OutboundCommandType::EnableCan);
+		cmd.requestId = requestId;
+		cmd.enable = enable ? 1 : 0;
+		if (!m_outbound.Write(AsBytes(cmd)))
+		{
+			return 0;
+		}
+		const uint32_t seq = ++m_queuedSeq;
+		RequestTransfer();
+		return seq;
+	}
+
+	void LinkService::RequestEmergencyStop(uint32_t requestId)
+	{
+		// Latched rather than queued: an e-stop must not be lost because the transfer buffer was full, and
+		// must not queue up behind ordinary traffic
+		m_emergencyStopRequestId.store(requestId, std::memory_order_relaxed);
+		m_pendingEmergencyStop.store(true, std::memory_order_release);
+		RequestTransfer();
+	}
+
+	void LinkService::RequestReset(uint32_t requestId)
+	{
+		m_resetRequestId.store(requestId, std::memory_order_relaxed);
+		m_pendingReset.store(true, std::memory_order_release);
+		RequestTransfer();
+	}
+
+	bool LinkService::RequestFirmwareUpdate(const uint8_t* iap,
+											 size_t iapLength,
+											 const uint8_t* firmware,
+											 size_t firmwareLength,
+											 uint16_t firmwareCrc16,
+											 uint32_t requestId)
+	{
+		if (iap == nullptr || firmware == nullptr || iapLength == 0 || firmwareLength == 0)
+		{
+			return false;
+		}
+
+		{
+			const std::lock_guard<std::mutex> lock(m_firmwareMutex);
+			if (m_pendingFirmwareUpdate.load(std::memory_order_acquire))
+			{
+				return false;
+			}
+			m_iapData = iap;
+			m_iapLength = iapLength;
+			m_firmwareData = firmware;
+			m_firmwareLength = firmwareLength;
+			m_firmwareCrc16 = firmwareCrc16;
+			m_firmwareRequestId = requestId;
+			m_pendingFirmwareUpdate.store(true, std::memory_order_release);
+		}
+		RequestTransfer();
+		return true;
+	}
+
+	// ---------------------------------------------------------------------------
+	// Inbound event helpers (interface thread only)
+	// ---------------------------------------------------------------------------
+	void LinkService::PostEvent(
+		InboundEventType type, const void* header, size_t headerLength, const void* tail, size_t tailLength)
+	{
+		// The caller has already filled in the type; this just performs the scattered write
+		(void)type;
+		const ByteSpan fragments[2] = {AsBytes(header, headerLength), AsBytes(tail, tailLength)};
+		m_inbound.WriteScattered(fragments);
+
+		// Wake a parked consumer. Skipped entirely while the dispatcher is keeping up, so the real-time
+		// thread does not pay for a syscall on the hot path.
+		if (m_consumerWaiting.load(std::memory_order_seq_cst) && m_inboundEventFd >= 0)
+		{
+			const uint64_t one = 1;
+			[[maybe_unused]] const ssize_t n = ::write(m_inboundEventFd, &one, sizeof(one));
+		}
+	}
+
+	void LinkService::PostLog(LogLevel level, const char* text, size_t length)
+	{
+		LogEvent event{};
+		event.header.type = static_cast<uint16_t>(InboundEventType::Log);
+		event.level = static_cast<uint8_t>(level);
+		PostEvent(InboundEventType::Log, &event, sizeof(event), text, length);
+	}
+
+	void LinkService::CompleteRequest(uint32_t requestId, RequestResult result, const char* error, size_t errorLength)
+	{
+		if (requestId == kNoRequestId)
+		{
+			return;
+		}
+		RequestCompletedEvent event{};
+		event.header.type = static_cast<uint16_t>(InboundEventType::RequestCompleted);
+		event.requestId = requestId;
+		event.result = static_cast<uint8_t>(result);
+		PostEvent(InboundEventType::RequestCompleted, &event, sizeof(event), error, errorLength);
+	}
+
+	// ---------------------------------------------------------------------------
+	// The transfer loop (LinkService.cs Execute)
+	// ---------------------------------------------------------------------------
+	void LinkService::Execute()
+	{
+		// Pin and prioritise the transfer thread. This is the whole reason the loop lives in C++: it can
+		// hold SCHED_FIFO on an isolated core without a managed runtime scheduling anything onto it.
+		if (m_config.isolateInterfaceThread && IsRaspberryPi())
+		{
+			PinCurrentThreadToCore(m_config.isolatedCoreId);
+			if (m_config.useRealtimeScheduling)
+			{
+				SetCurrentThreadRealtimePriority(m_config.interfaceRtPriority);
+			}
+		}
+
+		// The initial Connect() already completed a transfer, so report the link as up before looping
+		if (m_transport->IsConnected() && !m_wasConnected)
+		{
+			m_wasConnected = true;
+			ConnectionEstablishedEvent event{};
+			event.header.type = static_cast<uint16_t>(InboundEventType::ConnectionEstablished);
+			event.protocolVersion = static_cast<uint16_t>(m_transport->ProtocolVersion());
+			PostEvent(InboundEventType::ConnectionEstablished, &event, sizeof(event));
+		}
+
+		while (!m_stop.load(std::memory_order_relaxed))
+		{
+			// The whole loop body is guarded so that any error -- a transfer failure the transfer engine
+			// could not resolve, a malformed incoming packet, an I/O error -- results in an automatic
+			// resync rather than terminating the thread.
+			try
+			{
+				// A staged firmware update takes the loop over completely for its duration
+				if (m_pendingFirmwareUpdate.load(std::memory_order_acquire))
+				{
+					PerformFirmwareUpdate();
+					continue;
+				}
+
+				// Report a controller reset so the caller can invalidate its pending resources
+				const bool hadReset = m_transport->HadReset();
+				if (hadReset)
+				{
+					// A reboot the link never timed out over: nothing dropped what was queued for the
+					// board that went away, and it was composed for a machine that no longer exists
+					DropOutgoing();
+
+					InboundEventHeader header{};
+					header.type = static_cast<uint16_t>(InboundEventType::ControllerReset);
+					PostEvent(InboundEventType::ControllerReset, &header, sizeof(header));
+				}
+
+				// Then that the link is up, in that order: a reset belongs to the outage that is ending,
+				// and a reader told the link is back first would apply it to the connection that follows
+				if (m_transport->IsConnected() && !m_wasConnected)
+				{
+					m_wasConnected = true;
+					ConnectionEstablishedEvent event{};
+					event.header.type = static_cast<uint16_t>(InboundEventType::ConnectionEstablished);
+					event.protocolVersion = static_cast<uint16_t>(m_transport->ProtocolVersion());
+					event.hadReset = hadReset ? 1 : 0;
+					PostEvent(InboundEventType::ConnectionEstablished, &event, sizeof(event));
+				}
+
+				// Process incoming packets from the previous transfer
+				const int packets = m_transport->PacketsToRead();
+				for (int i = 0; i < packets; i++)
+				{
+					proto::PacketHeader packet{};
+					if (!m_transport->ReadNextPacket(packet))
+					{
+						break;
+					}
+					ProcessPacket(packet);
+				}
+
+				// Stage outgoing data and wait until there is a reason to perform another transfer. Data
+				// is (re-)staged before every decision so that data queued while idle is sent in the next
+				// transfer without triggering an empty one either before or after it.
+				do
+				{
+					StageOutgoing();
+				} while (!m_transport->WaitForTransferReason());
+
+				if (m_stop.load(std::memory_order_relaxed))
+				{
+					break;
+				}
+
+				// Do another full SPI transfer. This recovers from transfer errors internally and only
+				// throws TransferTimeout to unwind on stop.
+				m_transport->PerformFullTransfer();
+
+				// Timestamp every transfer at the same point, from the same clock the step-time model
+				// is fitted against, and pair it with the reading the header carried. Doing it here
+				// rather than while walking the packets is what makes the pairing constant: a packet
+				// is reached after however long the ones before it took to process, and that
+				// variation is exactly what the fit cannot remove.
+				// Everything staged into the transfer that has just completed is now the controller's
+				PostOutboundSeq(InboundEventType::OutboundDelivered, m_stagedSeq);
+
+				m_lastTransferNs = StepTimer::GetLocalTimeNs();
+				if (m_transport->IsConnected())
+				{
+					StepTimer::RecordMasterClockSample(m_transport->RxMasterClock(), m_lastTransferNs);
+
+					// The controller reports its movement delay as a total, not a change
+					StepTimer::RaiseMovementDelayTo(m_transport->RxHiccupTime());
+				}
+
+				// Report jitter for a served request, if any
+				const int64_t requestNs = m_pendingRequestNs.exchange(0, std::memory_order_relaxed);
+				if (requestNs != 0 && m_onRequestServed)
+				{
+					m_onRequestServed(NowNs() - requestNs);
+				}
+			}
+			catch (const TransferTimeout&)
+			{
+				if (m_stop.load(std::memory_order_relaxed))
+				{
+					break;
+				}
+				// Reconnection is handled inside PerformFullTransfer; just loop again
+			}
+			catch (const std::exception& e)
+			{
+				if (m_stop.load(std::memory_order_relaxed))
+				{
+					break;
+				}
+				const std::string message = std::string("Recovering from error in interface loop: ") + e.what();
+				PostLog(LogLevel::Error, message);
+				// Force a clean handshake on the next iteration
+				m_transport->ResetConnection();
+			}
+		}
+	}
+
+	// ---------------------------------------------------------------------------
+	// Staging outgoing data (LinkService.cs, the do/while around WaitForTransferReason)
+	// ---------------------------------------------------------------------------
+	void LinkService::StageOutgoing()
+	{
+		// Emergency stop first: it is unconditional and invalidates everything else
+		if (m_pendingEmergencyStop.load(std::memory_order_acquire))
+		{
+			if (m_transport->WriteEmergencyStop())
+			{
+				m_pendingEmergencyStop.store(false, std::memory_order_release);
+				CompleteRequest(m_emergencyStopRequestId.exchange(kNoRequestId, std::memory_order_relaxed),
+								RequestResult::Success);
+				static constexpr char kMessage[] = "Emergency stop";
+				PostLog(LogLevel::Warning, kMessage, sizeof(kMessage) - 1);
+			}
+			// An e-stop drops everything that was queued behind it
+			return;
+		}
+
+		// Firmware reset: like the e-stop this clears the transfer buffer, so nothing else is staged
+		if (m_pendingReset.load(std::memory_order_acquire))
+		{
+			if (m_transport->WriteReset())
+			{
+				m_pendingReset.store(false, std::memory_order_release);
+				CompleteRequest(m_resetRequestId.exchange(kNoRequestId, std::memory_order_relaxed),
+								RequestResult::Success);
+				static constexpr char kMessage[] = "Resetting controller";
+				PostLog(LogLevel::Warning, kMessage, sizeof(kMessage) - 1);
+			}
+			return;
+		}
+
+		// Drain queued commands until the transfer buffer is full. A command that does not fit is left in
+		// the ring and retried on the next iteration, so ordering is preserved.
+		while (const std::optional<ByteSpan> peeked = m_outbound.Peek())
+		{
+			const ByteSpan bytes = *peeked;
+			if (bytes.size() < sizeof(OutboundCommandHeader))
+			{
+				// Malformed record; drop it rather than wedging the ring
+				m_outbound.Consume();
+				continue;
+			}
+
+			OutboundCommandHeader header{};
+			std::memcpy(&header, bytes.data(), sizeof(header));
+
+			// The cases below decode fixed-size command headers out of the record, which is pointer
+			// work either way. What the span buys is that these two now provably describe the same
+			// bytes, rather than being a pointer and a length that were filled in separately.
+			const uint8_t* const record = bytes.data();
+			const size_t length = bytes.size();
+
+			const ByteSpan tailSpan = bytes.subspan(sizeof(OutboundCommandHeader));
+			const uint8_t* tail = tailSpan.data();
+			const size_t tailLength = tailSpan.size();
+			bool written = false;
+
+			switch (static_cast<OutboundCommandType>(header.type))
+			{
+			case OutboundCommandType::Message:
+			{
+				if (length < sizeof(MessageCommand))
+				{
+					m_outbound.Consume();
+					continue;
+				}
+				MessageCommand cmd{};
+				std::memcpy(&cmd, record, sizeof(cmd));
+				const char* text = reinterpret_cast<const char*>(record) + sizeof(MessageCommand);
+				const size_t textLength = length - sizeof(MessageCommand);
+				written = m_transport->WriteMessage(cmd.flags, std::string(text, textLength));
+				break;
+			}
+			case OutboundCommandType::CanMessage:
+			{
+				if (length < sizeof(CanMessageCommand))
+				{
+					m_outbound.Consume();
+					continue;
+				}
+				CanMessageCommand cmd{};
+				std::memcpy(&cmd, record, sizeof(cmd));
+				const uint8_t* payload = record + sizeof(CanMessageCommand);
+				const size_t payloadLength = length - sizeof(CanMessageCommand);
+				written = m_transport->WriteCanMessage(cmd.txToken,
+													 cmd.msgType,
+													 cmd.replyType,
+													 cmd.dstAddress,
+													 cmd.isResponse != 0,
+													 payload,
+													 payloadLength);
+				break;
+			}
+			case OutboundCommandType::ScheduleMove:
+			{
+				written = m_transport->WriteScheduleMove(tail, tailLength);
+				break;
+			}
+			case OutboundCommandType::EnableCan:
+			{
+				if (length < sizeof(EnableCanCommand))
+				{
+					m_outbound.Consume();
+					continue;
+				}
+				EnableCanCommand cmd{};
+				std::memcpy(&cmd, record, sizeof(cmd));
+				written = m_transport->WriteEnableCan(cmd.enable != 0);
+				if (written)
+				{
+					CompleteRequest(cmd.requestId, RequestResult::Success);
+				}
+				break;
+			}
+			default:
+				// Unknown command; drop it
+				(void)tail;
+				(void)tailLength;
+				m_outbound.Consume();
+				continue;
+			}
+
+			if (!written)
+			{
+				// Transfer buffer is full: leave this command queued and try again next time
+				break;
+			}
+			m_outbound.Consume();
+			++m_stagedSeq;
+		}
+	}
+
+	// Abandon the commands queued for a controller that is not there. Called when the link drops, from
+	// the interface thread, so this does not race with StageOutgoing.
+	void LinkService::DropOutgoing()
+	{
+		unsigned int dropped = 0;
+		while (const std::optional<ByteSpan> peeked = m_outbound.Peek())
+		{
+			const ByteSpan bytes = *peeked;
+			if (bytes.size() >= sizeof(OutboundCommandHeader))
+			{
+				OutboundCommandHeader header{};
+				std::memcpy(&header, bytes.data(), sizeof(header));
+
+				// A command that someone is waiting on is failed rather than merely forgotten. The rest
+				// carry no way to say so, which is what the acknowledgement work in section 4.1.2 of
+				// docs/devel/EVENTS_MIGRATION.md is for
+				if (static_cast<OutboundCommandType>(header.type) == OutboundCommandType::EnableCan &&
+					bytes.size() >= sizeof(EnableCanCommand))
+				{
+					EnableCanCommand cmd{};
+					std::memcpy(&cmd, bytes.data(), sizeof(cmd));
+					CompleteRequest(cmd.requestId, RequestResult::Cancelled);
+				}
+			}
+			m_outbound.Consume();
+			++dropped;
+		}
+
+		if (dropped != 0)
+		{
+			// Said rather than counted silently: a queue that empties itself on an outage looks from
+			// the outside exactly like one that delivered everything
+			PostLog(LogLevel::Warning, "Dropped " + std::to_string(dropped) + " queued command(s) for the controller");
+		}
+
+		// Everything queued is now accounted for: what was staged into a transfer that never completed
+		// is as lost as what never left the ring, and the caller waiting on either needs telling
+		m_stagedSeq = m_queuedSeq.load(std::memory_order_relaxed);
+		PostOutboundSeq(InboundEventType::OutboundDropped, m_stagedSeq);
+	}
+
+	// Report how far the outbound queue has got, skipping a report that says nothing new
+	void LinkService::PostOutboundSeq(InboundEventType type, uint32_t sequenceNumber)
+	{
+		if (sequenceNumber == m_reportedSeq)
+		{
+			return;
+		}
+		m_reportedSeq = sequenceNumber;
+
+		OutboundSeqEvent event{};
+		event.header.type = static_cast<uint16_t>(type);
+		event.sequenceNumber = sequenceNumber;
+		PostEvent(type, &event, sizeof(event));
+	}
+
+	// ---------------------------------------------------------------------------
+	// Incoming packets (LinkService.cs ProcessPacket)
+	// ---------------------------------------------------------------------------
+	void LinkService::ProcessPacket(const proto::PacketHeader& packet)
+	{
+		const uint8_t* data = m_transport->PacketData();
+		const uint16_t dataLength = m_transport->PacketDataLength();
+
+		switch (static_cast<proto::FirmwareRequest>(packet.request))
+		{
+		case proto::FirmwareRequest::ResendPacket:
+		{
+			proto::SbcRequest sbcRequest{};
+			m_transport->ResendPacket(packet, sbcRequest);
+			break;
+		}
+		case proto::FirmwareRequest::CodeBufferUpdate:
+		{
+			if (dataLength < sizeof(proto::CodeBufferUpdateHeader))
+			{
+				break;
+			}
+			proto::CodeBufferUpdateHeader header{};
+			std::memcpy(&header, data, sizeof(header));
+
+			CodeBufferEvent event{};
+			event.header.type = static_cast<uint16_t>(InboundEventType::CodeBufferUpdate);
+			event.bufferSpace = header.bufferSpace;
+			PostEvent(InboundEventType::CodeBufferUpdate, &event, sizeof(event));
+			break;
+		}
+		case proto::FirmwareRequest::Message:
+		{
+			if (dataLength < sizeof(proto::MessageHeader))
+			{
+				break;
+			}
+			proto::MessageHeader header{};
+			std::memcpy(&header, data, sizeof(header));
+
+			MessageEvent event{};
+			event.header.type = static_cast<uint16_t>(InboundEventType::Message);
+			event.flags = header.messageType;
+			PostEvent(InboundEventType::Message, &event, sizeof(event), data + sizeof(header), header.length);
+			break;
+		}
+		case proto::FirmwareRequest::CANResponse:
+		{
+			if (dataLength < sizeof(proto::CanResponseHeader))
+			{
+				break;
+			}
+			proto::CanResponseHeader header{};
+			std::memcpy(&header, data, sizeof(header));
+
+			CanResponseEvent event{};
+			event.header.type = static_cast<uint16_t>(InboundEventType::CanResponse);
+			event.txToken = header.txToken;
+			event.msgType = header.msgType;
+			event.dataLength = header.dataLength;
+			event.srcAddress = header.srcAddress;
+			event.flags = header.flags;
+			event.status = header.status;
+			PostEvent(InboundEventType::CanResponse, &event, sizeof(event), data + sizeof(header), header.dataLength);
+			break;
+		}
+		case proto::FirmwareRequest::CanMessageSent:
+		{
+			if (dataLength < sizeof(proto::CanMessageSentHeader))
+			{
+				break;
+			}
+			proto::CanMessageSentHeader header{};
+			std::memcpy(&header, data, sizeof(header));
+
+			const size_t entriesLength = header.count * sizeof(proto::CanMessageSentEntry);
+			if (dataLength < sizeof(header) + entriesLength)
+			{
+				break;
+			}
+
+			CanMessagesSentEvent event{};
+			event.header.type = static_cast<uint16_t>(InboundEventType::CanMessagesSent);
+			event.count = header.count;
+			PostEvent(InboundEventType::CanMessagesSent, &event, sizeof(event), data + sizeof(header), entriesLength);
+			break;
+		}
+		case proto::FirmwareRequest::MotionStopped:
+		{
+			// Every way of not acting on this is reported. A stop that is dropped here leaves the
+			// machine believing a move that was cut short ran to its end, which shows up much later
+			// as a homing offset and points at everything except the packet that went missing
+			if (dataLength < sizeof(proto::MotionStoppedHeader))
+			{
+				PostLog(LogLevel::Error, "Discarded a truncated motion-stopped report");
+				break;
+			}
+			proto::MotionStoppedHeader header{};
+			std::memcpy(&header, data, sizeof(header));
+
+			const size_t driversBytes = header.numDrivers * sizeof(proto::MotionStoppedDriver);
+			if (dataLength < sizeof(header) + driversBytes ||
+				header.numDrivers > proto::MaxMotionStoppedDrivers)
+			{
+				PostLog(LogLevel::Error, "Discarded a motion-stopped report that does not carry the drivers it claims");
+				break;
+			}
+
+			proto::MotionStoppedDriver drivers[proto::MaxMotionStoppedDrivers];
+			std::memcpy(drivers, data + sizeof(header), driversBytes);
+			if (!m_onMotionStopped)
+			{
+				PostLog(LogLevel::Error, "A move was stopped by an endstop with nothing listening for it");
+				break;
+			}
+			m_onMotionStopped(header.whenTriggered, header.moveId, std::span{drivers, header.numDrivers});
+			break;
+		}
+		default:
+		{
+			// Unrecognised request: hand the raw bytes up so the caller can dump them for diagnostics
+			MalformedPacketEvent event{};
+			event.header.type = static_cast<uint16_t>(InboundEventType::MalformedPacket);
+			event.packetId = packet.id;
+			event.request = packet.request;
+			event.length = packet.length;
+			event.offset = static_cast<uint16_t>(m_transport->RxPointer());
+			PostEvent(InboundEventType::MalformedPacket, &event, sizeof(event), data, dataLength);
+			break;
+		}
+		}
+	}
+
+	// ---------------------------------------------------------------------------
+	// Firmware update (LinkService.cs PerformFirmwareUpdate)
+	// ---------------------------------------------------------------------------
+	void LinkService::PerformFirmwareUpdate()
+	{
+		const uint8_t* iap = nullptr;
+		size_t iapLength = 0;
+		const uint8_t* firmware = nullptr;
+		size_t firmwareLength = 0;
+		uint16_t crc16 = 0;
+		uint32_t requestId = 0;
+		{
+			const std::lock_guard<std::mutex> lock(m_firmwareMutex);
+			iap = m_iapData;
+			iapLength = m_iapLength;
+			firmware = m_firmwareData;
+			firmwareLength = m_firmwareLength;
+			crc16 = m_firmwareCrc16;
+			requestId = m_firmwareRequestId;
+		}
+
+		auto finish = [&](RequestResult result, const char* error)
+		{
+			{
+				const std::lock_guard<std::mutex> lock(m_firmwareMutex);
+				m_iapData = m_firmwareData = nullptr;
+				m_iapLength = m_firmwareLength = 0;
+				m_firmwareRequestId = kNoRequestId;
+				m_pendingFirmwareUpdate.store(false, std::memory_order_release);
+			}
+			CompleteRequest(requestId, result, error, error != nullptr ? std::strlen(error) : 0);
+		};
+
+		try
+		{
+			// Send the IAP binary. Cancellation is safe at this stage.
+			PostLog(LogLevel::Info, "Sending IAP binary", 18);
+			for (size_t offset = 0; offset < iapLength;)
+			{
+				const size_t chunk = std::min(proto::IapSegmentSize, iapLength - offset);
+				if (!m_transport->WriteIapSegment(iap + offset, chunk))
+				{
+					break;
+				}
+				offset += chunk;
+			}
+
+			// Start the IAP binary. This is the point of no return: after this the board is running IAP
+			// and the firmware transfer must complete or the board will need manual recovery.
+			m_transport->StartIap();
+
+			// From here on a stop request is not honoured for the data transfer -- interrupting a
+			// flash-in-progress would brick the board. Only the retry boundary checks for shutdown.
+			int numRetries = 0;
+			bool verified = false;
+			do
+			{
+				if (numRetries != 0)
+				{
+					if (m_stop.load(std::memory_order_relaxed))
+					{
+						finish(RequestResult::Failed,
+							   "Firmware update cancelled during retry. The board may need manual recovery.");
+						return;
+					}
+					PostLog(LogLevel::Error, "Firmware checksum verification failed", 36);
+				}
+
+				PostLog(LogLevel::Info, "Updating RepRapFirmware", 23);
+				for (size_t offset = 0; offset < firmwareLength;)
+				{
+					const size_t chunk = std::min(proto::FirmwareSegmentSize, firmwareLength - offset);
+					if (!m_transport->FlashFirmwareSegment(firmware + offset, chunk))
+					{
+						break;
+					}
+					offset += chunk;
+				}
+
+				PostLog(LogLevel::Info, "Verifying checksum", 18);
+				verified = m_transport->VerifyFirmwareChecksum(static_cast<uint32_t>(firmwareLength), crc16);
+			} while (!verified && ++numRetries < 3);
+
+			if (!verified)
+			{
+				finish(RequestResult::Failed,
+					   "Could not update firmware after 3 attempts. Please install it manually.");
+				return;
+			}
+
+			// Wait for the IAP binary to restart the controller
+			m_transport->WaitForIapReset();
+			PostLog(LogLevel::Info, "Firmware update successful", 26);
+			finish(RequestResult::Success, nullptr);
+		}
+		catch (const std::exception& e)
+		{
+			const std::string message = std::string("Failed to update firmware: ") + e.what();
+			finish(RequestResult::Failed, message.c_str());
+			// Force a clean handshake; the controller state is unknown after a failed flash
+			m_transport->ResetConnection();
+		}
+	}
+
+} // namespace Duet::Sbc

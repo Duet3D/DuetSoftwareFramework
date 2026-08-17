@@ -128,7 +128,7 @@ extern "C"
 	// read back what it has done; none of them blocks on that thread, because the caller is a
 	// garbage-collected runtime and the motion thread must not wait on one.
 
-	// Machine description, pushed down from DuetControlServer. Mirrors Motion::MotionConfig; the
+	// Machine description, pushed down from DuetControlServer. Mirrors Motion::MachineConfig; the
 	// managed side builds the bytes and this copies them, so the struct is not repeated here.
 	// Safe only while no move is in flight.
 	int32_t DuetSbc_MotionConfigure(DuetSbcHandle* h, const void* config, int32_t length);
@@ -196,6 +196,36 @@ extern "C"
 	// Forced positions the motion thread has adopted. Compared against what the caller believes it
 	// has sent, this is the difference between a position that was queued and one that took effect.
 	uint32_t DuetSbc_MotionGetForcedPositionsApplied(DuetSbcHandle* h);
+
+	// Everything M122 reports about the motion engine. Counters rather than text: the caller owns
+	// the wording of the report, as it does for the step clock stats below.
+	using DuetSbcRingStats = struct
+	{
+		uint32_t scheduledMoves;
+		uint32_t completedMoves;
+		uint32_t numLookaheadErrors;
+		uint32_t numLookaheadUnderruns;
+		uint32_t numNoMoveUnderruns;
+	};
+
+	// Movement systems the engine builds. Must match Motion::maxRings.
+	#define DUET_SBC_MAX_RINGS 2
+
+	using DuetSbcMotionStats = struct
+	{
+		uint32_t segmentsCreated;		 // MoveSegments allocated since startup
+		uint32_t movementDelayTicks;	 // how far the movement timebase lags the raw step clock
+		uint32_t submissionsDropped;	 // moves refused because the submission queue was full
+		uint32_t forcedPositionsApplied; // positions the motion thread has adopted
+		uint32_t droppedSchedulePackets; // ScheduleMove packets the link refused: motion was lost
+		DuetSbcRingStats rings[DUET_SBC_MAX_RINGS];
+	};
+
+	void DuetSbc_MotionGetStats(DuetSbcHandle* h, DuetSbcMotionStats* stats);
+
+	// Zero the error and underrun counters. Separate from reading them, so that reporting twice does
+	// not show zeros the second time.
+	void DuetSbc_MotionResetStats(DuetSbcHandle* h);
 
 	// --- Step clock ---
 	//

@@ -8,20 +8,19 @@
  * belongs here. Kinematics, compensation and homing moved to DuetControlServer, which is where the
  * moves are now built; there is no step interrupt because there are no local drivers.
  *
- * What is left is the part the imported DDA and DDARing sources still need: somewhere to ask how
- * many steps per mm a drive has, which board drives it, how much backlash to take up, and somewhere
- * to put the segments that Prepare produces. So this class is mostly the machine description
- * (MotionConfig, pushed down by DCS) plus the array of DriveTrackers.
+ * What is left is the part DDA and DDARing still need: somewhere to ask how many steps per mm a
+ * drive has, which board drives it, how much backlash to take up, and somewhere to put the segments
+ * that Prepare produces. So this class is mostly the machine description (MachineConfig, pushed down
+ * by DCS) plus the array of DriveTrackers.
  *
- * It is reached through the `reprap` facade in Compat/Platform/RepRap.h, so that the imported code
- * keeps its reprap.GetMove() call sites as they are written upstream.
+ * A DDARing is given one of these when it is built, and the DDAs in it reach it through the ring.
  */
 
 #ifndef SRC_MOTION_MOTIONSYSTEM_H_
 #define SRC_MOTION_MOTIONSYSTEM_H_
 
 #include <Motion/DriveTracker.h>
-#include <Motion/MotionConfig.h>
+#include <Motion/MachineConfig.h>
 #include <Motion/MoveProfile.h>
 #include <Motion/ScheduleMoveBuilder.h>
 
@@ -31,7 +30,7 @@ namespace Duet::Sbc::Motion
 {
 	class MotionSystem
 	{
-	public:
+	  public:
 		MotionSystem() noexcept;
 
 		// Reserve the permanent arena and reset every drive. Call once before use.
@@ -43,27 +42,47 @@ namespace Duet::Sbc::Motion
 		// The configuration arrives over the CApi from a separate process, so it is validated rather
 		// than trusted: counts are clamped to what the fixed-size arrays below can address. See
 		// SanitiseConfig for what is enforced.
-		void Configure(const MotionConfig& newConfig) noexcept;
+		void Configure(const MachineConfig& newConfig) noexcept;
 
 		// Clamp a configuration to the limits this build was compiled with. Exposed for testing;
 		// Configure applies it to everything that comes in.
-		static void SanitiseConfig(MotionConfig& config) noexcept;
+		static void SanitiseConfig(MachineConfig& config) noexcept;
 
-		[[nodiscard]] const MotionConfig& GetConfig() const noexcept { return m_config; }
+		[[nodiscard]] const MachineConfig& GetConfig() const noexcept { return m_config; }
 
-		// --- Accessors used by the imported DDA / DDARing sources ------------------------------
+		// --- Machine shape ---------------------------------------------------------------------
+
+		[[nodiscard]] size_t GetTotalAxes() const noexcept { return m_config.numTotalAxes; }
+		[[nodiscard]] size_t GetNumExtruders() const noexcept { return m_config.numExtruders; }
+
+		// --- Debug topics ----------------------------------------------------------------------
 		//
-		// Names match the firmware's Move members, so those call sites read as they do upstream.
+		// One bitmap per topic, as M111 sets them in the firmware. Nothing sets them yet, so the
+		// branches that read them are compiled but not taken; see the note on SetDebugFlags.
 
-		[[nodiscard]] float DriveStepsPerMm(size_t drive) const noexcept { return m_config.driveStepsPerMm[drive]; }
-		[[nodiscard]] uint32_t GetJerkPolicy() const noexcept { return m_config.jerkPolicy; }
-		[[nodiscard]] float GetMaxInstantDv(size_t drive) const noexcept { return m_config.instantDvs[drive]; }
-		[[nodiscard]] float GetPrintingInstantDv(size_t drive) const noexcept { return m_config.printingInstantDvs[drive]; }
-		[[nodiscard]] float GetPressureAdvanceK0ClocksForLogicalDrive(size_t drive) const noexcept
+		[[nodiscard]] AxesBitmap GetDebugFlags(Module module) const noexcept
 		{
-			return m_config.pressureAdvanceClocks[drive];
+			return AxesBitmap((module < Module::Num) ? m_debugFlags[(unsigned int)module] : 0);
 		}
 
+		[[nodiscard]] bool IsDebugEnabled(Module module) const noexcept { return GetDebugFlags(module).IsNonEmpty(); }
+
+		// Set one topic's flags. There is no caller yet: M111 is not ported, and until it is, the
+		// diagnostics behind these branches cannot be switched on. Kept so that a topic can be
+		// enabled from one place once it is, rather than the branches being deleted and rewritten.
+		void SetDebugFlags(Module module, uint32_t flags) noexcept
+		{
+			if (module < Module::Num)
+			{
+				m_debugFlags[(unsigned int)module] = flags;
+			}
+		}
+
+		// --- Per-drive configuration -----------------------------------------------------------
+		//
+		// Names match the firmware's Move members, so the planning code reads as it does upstream.
+
+		[[nodiscard]] float DriveStepsPerMm(size_t drive) const noexcept { return m_config.driveStepsPerMm[drive]; }
 		[[nodiscard]] const AxisDriversConfig& GetAxisDriversConfig(size_t axis) const noexcept
 		{
 			static constexpr AxisDriversConfig noDrivers{};
@@ -78,7 +97,7 @@ namespace Duet::Sbc::Motion
 			return (extruder < maxExtruders) ? m_config.extruderDrivers[extruder] : DriverId{};
 		}
 
-		// Kinematics answers that DCS evaluated for us; see MotionConfig.
+		// Kinematics answers that DCS evaluated for us; see MachineConfig.
 		[[nodiscard]] bool IsContinuousRotationAxis(size_t axis) const noexcept
 		{
 			return AxesBitmap(m_config.continuousRotationAxes).IsBitSet(axis);
@@ -92,51 +111,25 @@ namespace Duet::Sbc::Motion
 		// Extend a reversing move so that the backlash is taken up. Not const: it tracks how much of
 		// the correction has been applied, because spreading it over several moves is the point -
 		// injecting it all at once would show up as a visible jolt.
-		[[nodiscard]] int32_t ApplyBacklashCompensation(size_t drive, int32_t delta) noexcept;
-
-		// No-op: the drivers are on other boards and are enabled over CAN, not from here.
-		void EnableDrivers(size_t drive, bool unconditional) noexcept;
-
-		// How long the boards' input shaper spreads a move over. Zero while shaping is off; see
-		// MotionConfig::shapingTimeClocks for why this is not simply absent.
-		[[nodiscard]] uint32_t GetShapingTimeClocks() const noexcept { return m_config.shapingTimeClocks; }
+		//
+		// `backlashSteps` and `distanceFactor` come from the move rather than from the configuration
+		// here, so that changing them cannot reach a move that is already queued. What stays here is
+		// the accumulator, which is machine state rather than configuration.
+		[[nodiscard]] int32_t ApplyBacklashCompensation(size_t drive, int32_t delta, int32_t backlashSteps,
+														uint32_t distanceFactor) noexcept;
 
 		// Where prepared moves go out to the controller. Owned here because it is per-machine state
-		// with the same lifetime as the drive trackers, and because the CanMotion shim in front of
-		// it has to find it from somewhere without a second global.
+		// with the same lifetime as the drive trackers.
 		[[nodiscard]] ScheduleMoveBuilder& GetScheduleMoveBuilder() noexcept { return m_scheduleMoveBuilder; }
+		[[nodiscard]] const ScheduleMoveBuilder& GetScheduleMoveBuilder() const noexcept
+		{
+			return m_scheduleMoveBuilder;
+		}
 
 		// --- Per-drive motion -----------------------------------------------------------------
 
 		[[nodiscard]] DriveTracker& GetDriveTracker(size_t drive) noexcept { return m_trackers[drive]; }
-
-		// The logical drive a CAN-connected driver belongs to, or maxAxesPlusExtruders if none does.
-		//
-		// The controller only ever knows drivers, so anything it reports back has to be mapped
-		// through the configuration that placed them before it can be applied here
-		[[nodiscard]] size_t GetLogicalDriveForDriver(DriverId driver) const noexcept
-		{
-			for (size_t axis = 0; axis < maxAxes; ++axis)
-			{
-				const AxisDriversConfig& config = m_config.axisDrivers[axis];
-				for (size_t i = 0; i < config.numDrivers; ++i)
-				{
-					if (config.driverNumbers[i] == driver)
-					{
-						return axis;
-					}
-				}
-			}
-
-			for (size_t extruder = 0; extruder < maxExtruders; ++extruder)
-			{
-				if (m_config.extruderDrivers[extruder] == driver)
-				{
-					return ExtruderToLogicalDrive(extruder);
-				}
-			}
-			return maxAxesPlusExtruders;
-		}
+		[[nodiscard]] const DriveTracker& GetDriveTracker(size_t drive) const noexcept { return m_trackers[drive]; }
 
 		// How many drivers a logical drive has. An extruder has the one driver that is not listed in
 		// axisDrivers, so it answers 1 rather than 0
@@ -166,8 +159,15 @@ namespace Duet::Sbc::Motion
 
 		// Hand one drive's share of a prepared move to its tracker. This is what DDA::Prepare calls
 		// in place of the firmware's Move::AddLinearSegments.
-		void AddLinearSegments(size_t drive, uint32_t startTime, const MoveProfile& profile,
-							   motioncalc_t steps, MovementFlags moveFlags) noexcept;
+		//
+		// `pressureAdvanceClocks` is the move's own, so that changing it cannot reach a move that is
+		// already queued. Ignored for anything that is not an extruder doing a printing move.
+		void AddLinearSegments(size_t drive,
+							   uint32_t startTime,
+							   const MoveProfile& profile,
+							   motioncalc_t steps,
+							   MovementFlags moveFlags,
+							   motioncalc_t pressureAdvanceClocks) noexcept;
 
 		// Bring every drive's position up to `now`. Called once per pass of the motion loop.
 		void AdvanceTrackers(uint32_t now) noexcept;
@@ -195,10 +195,11 @@ namespace Duet::Sbc::Motion
 
 		// Record that preparation could not keep up and everything must slip. Reported to the
 		// controller so it can pass the delay on to the expansion boards.
-		void AddPrepareHiccup() noexcept;
+		static void AddPrepareHiccup() noexcept;
 
-	private:
-		MotionConfig m_config;
+	  private:
+		MachineConfig m_config;
+		uint32_t m_debugFlags[(unsigned int)Module::Num]{};
 		DriveTracker m_trackers[maxAxesPlusExtruders];
 		ScheduleMoveBuilder m_scheduleMoveBuilder;
 
@@ -216,6 +217,6 @@ namespace Duet::Sbc::Motion
 		int32_t m_targetBacklashSteps[maxAxesPlusExtruders]{};
 		int32_t m_currentBacklashSteps[maxAxesPlusExtruders]{};
 	};
-}
+} // namespace Duet::Sbc::Motion
 
 #endif /* SRC_MOTION_MOTIONSYSTEM_H_ */

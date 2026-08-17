@@ -155,7 +155,7 @@ internal sealed class MovePlanner(
                                                  bool adoptGeometryFromObjectModel = false)
     {
         MotionParameters parameters;
-        byte[] configBuffer = new byte[MotionConfig.SerializedLength];
+        byte[] configBuffer = new byte[MachineConfig.SerializedLength];
         int length;
 
         using (await model.AccessReadOnlyAsync(cancellationToken))
@@ -200,6 +200,42 @@ internal sealed class MovePlanner(
             Builder.RecalculateEndPoints();
             PushPositionsToEngine();
             return true;
+        }
+    }
+
+    /// <summary>
+    /// Take a fresh snapshot of the object model without pushing anything to the motion engine
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    /// <remarks>
+    /// <para>
+    /// For the settings a move carries with it - jerk limits, pressure advance, backlash, nonlinear
+    /// extrusion, input shaping. The engine holds no copy of those to update, so there is nothing to
+    /// push and nothing to synchronise: the next move built takes the new value and the moves already
+    /// queued keep the one they were built with. That is what lets M572 and its like take effect
+    /// mid-print without stopping the machine. See <c>docs/devel/MOTION_CONFIG_ORDERING.md</c>.
+    /// </para>
+    /// <para>
+    /// Not for anything that changes what a microstep means. Steps per mm, driver mapping and
+    /// geometry are held by the engine and describe moves that are already queued, so those go
+    /// through <see cref="ReconfigureAsync"/> at standstill.
+    /// </para>
+    /// </remarks>
+    public async ValueTask RefreshTuningAsync(CancellationToken cancellationToken = default)
+    {
+        MotionParameters parameters;
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            MotionParameters.ApplyAxisLimits(model.Move, Geometry);
+            parameters = MotionParameters.FromObjectModel(model.Move, Geometry);
+        }
+
+        using (_lock.EnterScope())
+        {
+            // No RecalculateEndPoints: nothing here changes what a microstep means, so where the
+            // machine is has not moved under us
+            Builder.Reconfigure(parameters);
         }
     }
 

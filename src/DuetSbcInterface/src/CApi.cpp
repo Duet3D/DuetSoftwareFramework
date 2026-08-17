@@ -1,9 +1,11 @@
 #include "CApi.h"
 
 #include <Config/Configuration.h>
-#include <Movement/StepTimer.h>
-#include <SBC/MotionService.h>
-#include <SBC/SbcInterface.h>
+#include <Motion/StepTimer.h>
+#include <Motion/MotionService.h>
+#include <Interface/LinkService.h>
+#include <Interface/SPI/SpiTransfer.h>
+#include <Interface/TransportFactory.h>
 
 #include <algorithm>
 #include <cstring>
@@ -11,16 +13,16 @@
 #include <string>
 
 using Duet::Sbc::Config;
-using Duet::Sbc::SbcInterface;
+using Duet::Sbc::LinkService;
 
 struct DuetSbcHandle
 {
 	Config config;
-	SbcInterface interface;
+	LinkService interface;
 	Duet::Sbc::MotionService motion;
 	explicit DuetSbcHandle(const Config& cfg)
 		: config(cfg)
-		, interface(cfg)
+		, interface(cfg, Duet::Sbc::CreateTransport(cfg))
 		, motion(interface)
 	{
 	}
@@ -281,12 +283,14 @@ extern "C"
 
 	int32_t DuetSbc_GetTfrPinGlitches(DuetSbcHandle* h)
 	{
-		return h != nullptr ? h->interface.Transfer().TfrPinGlitches() : 0;
+		const auto* spi = (h != nullptr) ? dynamic_cast<const Duet::Sbc::SpiTransfer*>(&h->interface.Transfer()) : nullptr;
+		return (spi != nullptr) ? spi->TfrPinGlitches() : 0;
 	}
 
 	int32_t DuetSbc_GetMissedEdges(DuetSbcHandle* h)
 	{
-		return h != nullptr ? h->interface.Transfer().MissedEdges() : 0;
+		const auto* spi = (h != nullptr) ? dynamic_cast<const Duet::Sbc::SpiTransfer*>(&h->interface.Transfer()) : nullptr;
+		return (spi != nullptr) ? spi->MissedEdges() : 0;
 	}
 
 	int32_t DuetSbc_GetResyncCount(DuetSbcHandle* h)
@@ -301,13 +305,13 @@ extern "C"
 
 	int32_t DuetSbc_MotionConfigure(DuetSbcHandle* h, const void* config, int32_t length)
 	{
-		if (h == nullptr || config == nullptr || length != (int32_t)sizeof(Duet::Sbc::Motion::MotionConfig))
+		if (h == nullptr || config == nullptr || length != (int32_t)sizeof(Duet::Sbc::Motion::MachineConfig))
 		{
 			return 0;
 		}
-		Duet::Sbc::Motion::MotionConfig copy{};
+		Duet::Sbc::Motion::MachineConfig copy{};
 		std::memcpy(&copy, config, sizeof(copy));
-		Duet::Sbc::MotionService::Configure(copy);
+		h->motion.Configure(copy);
 		return 1;
 	}
 
@@ -376,7 +380,7 @@ extern "C"
 		}
 
 		bool usedTimestamp = false;
-		if (!Duet::Sbc::MotionService::GetPositionAt((size_t)drive, whenTicks, *positionOut, *positionAtMoveStartOut, usedTimestamp))
+		if (!h->motion.GetPositionAt((size_t)drive, whenTicks, *positionOut, *positionAtMoveStartOut, usedTimestamp))
 		{
 			return 0;
 		}
@@ -424,6 +428,48 @@ extern "C"
 	int32_t DuetSbc_MotionHasPendingSubmissions(DuetSbcHandle* h)
 	{
 		return (h != nullptr && h->motion.HasPendingSubmissions()) ? 1 : 0;
+	}
+
+	static_assert(DUET_SBC_MAX_RINGS == Duet::Sbc::Motion::maxRings,
+				  "DUET_SBC_MAX_RINGS must match the number of rings the engine builds");
+
+	void DuetSbc_MotionGetStats(DuetSbcHandle* h, DuetSbcMotionStats* stats)
+	{
+		if (stats == nullptr)
+		{
+			return;
+		}
+
+		// Zeroed rather than left alone when there is no handle, so a caller that reports before the
+		// link is up sees nothing happening instead of whatever the stack held
+		*stats = DuetSbcMotionStats{};
+		if (h == nullptr)
+		{
+			return;
+		}
+
+		const Duet::Sbc::MotionService::Stats source = h->motion.GetStats();
+		stats->segmentsCreated = source.segmentsCreated;
+		stats->movementDelayTicks = source.movementDelayTicks;
+		stats->submissionsDropped = source.submissionsDropped;
+		stats->forcedPositionsApplied = source.forcedPositionsApplied;
+		stats->droppedSchedulePackets = source.droppedSchedulePackets;
+		for (unsigned int i = 0; i < DUET_SBC_MAX_RINGS; ++i)
+		{
+			stats->rings[i].scheduledMoves = source.rings[i].scheduledMoves;
+			stats->rings[i].completedMoves = source.rings[i].completedMoves;
+			stats->rings[i].numLookaheadErrors = source.rings[i].numLookaheadErrors;
+			stats->rings[i].numLookaheadUnderruns = source.rings[i].numLookaheadUnderruns;
+			stats->rings[i].numNoMoveUnderruns = source.rings[i].numNoMoveUnderruns;
+		}
+	}
+
+	void DuetSbc_MotionResetStats(DuetSbcHandle* h)
+	{
+		if (h != nullptr)
+		{
+			h->motion.ResetStats();
+		}
 	}
 
 	uint32_t DuetSbc_GetStepClockTicks(DuetSbcHandle* h)

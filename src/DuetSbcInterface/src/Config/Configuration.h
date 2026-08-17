@@ -9,8 +9,17 @@
 namespace Duet::Sbc
 {
 
+	// Which transport carries the link. Only Spi exists; the enum is here so that the choice has a
+	// place to live and CreateTransport has something to switch on. See Interface/Transport.h.
+	enum class TransportKind : uint8_t
+	{
+		Spi = 0
+	};
+
 	struct Config
 	{
+		TransportKind transport = TransportKind::Spi;
+
 		// SPI device
 		std::string spiDevice = "/dev/spidev0.0";
 		uint32_t spiFrequency = 8'000'000;

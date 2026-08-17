@@ -28,7 +28,9 @@ namespace DuetControlServer.Codes.Handlers;
 /// Most of these write the object model and nothing else: <c>move.axes[]</c>,
 /// <c>move.extruders[]</c> and <c>move.motionSystems[]</c> are the configuration, and
 /// <see cref="Motion.MotionParameters"/> is rebuilt from them by
-/// <see cref="Motion.MovePlanner.ReconfigureAsync"/>. There is deliberately no second copy of a
+/// <see cref="Motion.MovePlanner.RefreshTuningAsync"/> - or, for the few that change what a
+/// microstep means, by <see cref="Motion.MovePlanner.ReconfigureAsync"/> at standstill. There is
+/// deliberately no second copy of a
 /// setting anywhere in this file.
 /// </para>
 /// <para>
@@ -227,7 +229,11 @@ internal partial class MCodeHandler
             return new Message(MessageType.Success, report!);
         }
 
-        return await planner.ReconfigureAsync(cancellationToken) ? new Message() : MotionConfigRejected;
+        // Accelerations are not held by the engine at all - every move carries its own in
+        // MoveParamsHeader - so this only has to bring the snapshot the next move is built from up to
+        // date. RepRapFirmware takes no lock here either, except for the S-curve T parameter
+        await planner.RefreshTuningAsync(cancellationToken);
+        return new Message();
     }
 
     /// <summary>
@@ -291,7 +297,8 @@ internal partial class MCodeHandler
             return new Message(MessageType.Success, report!);
         }
 
-        return await planner.ReconfigureAsync(cancellationToken) ? new Message() : MotionConfigRejected;
+        await planner.RefreshTuningAsync(cancellationToken);
+        return new Message();
     }
 
     /// <summary>
@@ -415,9 +422,9 @@ internal partial class MCodeHandler
             return new Message(MessageType.Success, report);
         }
 
-        if (seenAxis && !await planner.ReconfigureAsync(cancellationToken))
+        if (seenAxis)
         {
-            return MotionConfigRejected;
+            await planner.RefreshTuningAsync(cancellationToken);
         }
         return new Message();
     }
@@ -1258,6 +1265,11 @@ internal partial class MCodeHandler
             dk = transition;
         }
 
+        // The coefficient still goes to the boards, which apply it to the moves already in their own
+        // queues, so those have to have run out first - what RepRapFirmware's
+        // Move::ConfigurePressureAdvance takes the movement lock for. The moves this side has queued
+        // carry the value they were built with, so once the push is gone this wait can go with it
+        // TODO revisit when pressure advance no longer has to be pushed to the drivers
         if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
         {
             throw new OperationCanceledException();
@@ -1290,10 +1302,10 @@ internal partial class MCodeHandler
             }
         }
 
-        if (!await planner.ReconfigureAsync(cancellationToken))
-        {
-            return MotionConfigRejected;
-        }
+        // Nothing is pushed to the motion engine: the coefficient rides on each move built from here
+        // on, so the moves already queued keep the one they were built with. See
+        // docs/devel/MOTION_CONFIG_ORDERING.md
+        await planner.RefreshTuningAsync(cancellationToken);
 
         if (toUpdate.Count == 0)
         {
@@ -1310,6 +1322,12 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
+    /// <remarks>
+    /// The three coefficients are set together, not individually: RepRapFirmware's
+    /// <c>Move::ConfigureNonlinearExtrusion</c> starts from A=0, B=0, L=0.2 on every invocation, so
+    /// <c>M592 D0 A0.01</c> also resets B and the limit. Updating only the parameters present would
+    /// give a different machine from the same G-code.
+    /// </remarks>
     private async ValueTask<Message> HandleNonlinearExtrusionAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (!code.TryGetInt('D', out int extruderNumber))
@@ -1325,33 +1343,41 @@ internal partial class MCodeHandler
             }
 
             ExtruderNonlinear nonlinear = model.Move.Extruders[extruderNumber].Nonlinear;
-            bool seen = false;
-            if (code.TryGetFloat('A', out float a))
+            bool seenA = code.TryGetFloat('A', out float a);
+            bool seenB = code.TryGetFloat('B', out float b);
+            bool seenLimit = code.TryGetFloat('L', out float limit);
+            if (seenLimit && limit < 0.0F)
             {
-                nonlinear.A = a;
-                seen = true;
-            }
-            if (code.TryGetFloat('B', out float b))
-            {
-                nonlinear.B = b;
-                seen = true;
-            }
-            if (code.TryGetFloat('L', out float limit))
-            {
-                nonlinear.UpperLimit = limit;
-                seen = true;
+                // RepRapFirmware reads L with TryGetNonNegativeFValue. A negative limit would let the
+                // correction subtract more than the commanded extrusion
+                return new Message(MessageType.Error, "parameter 'L' too low");
             }
 
-            if (!seen)
+            if (!seenA && !seenB && !seenLimit)
             {
+                // RepRapFirmware's wording, which DWC, PanelDue and a decade of macros parse
                 return new Message(MessageType.Success,
                                    string.Format(CultureInfo.InvariantCulture,
-                                                 "Extruder {0} nonlinear extrusion A={1:F3} B={2:F3}, limit {3:F2}",
+                                                 "Drive {0} nonlinear extrusion coefficients: A={1:G3}, B={2:G3}, limit={3:F2}",
                                                  extruderNumber, nonlinear.A, nonlinear.B, nonlinear.UpperLimit));
             }
+
+            nonlinear.A = seenA ? a : 0.0F;
+            nonlinear.B = seenB ? b : 0.0F;
+            nonlinear.UpperLimit = seenLimit ? limit : DefaultNonlinearExtrusionLimit;
         }
+
+        // No standstill flush: RRF takes no movement lock for M592, and the coefficients ride on each
+        // move built from here on rather than being pushed to the engine
+        await planner.RefreshTuningAsync(cancellationToken);
         return new Message();
     }
+
+    /// <summary>
+    /// Largest nonlinear extrusion correction M592 applies when no L parameter is given, matching
+    /// RepRapFirmware's <c>DefaultNonlinearExtrusionLimit</c>
+    /// </summary>
+    private const float DefaultNonlinearExtrusionLimit = 0.2F;
 
     /// <summary>
     /// M593: configure input shaping
@@ -1367,11 +1393,6 @@ internal partial class MCodeHandler
     {
         bool seen = false;
         string? report = null;
-
-        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
-        {
-            throw new OperationCanceledException();
-        }
 
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
@@ -1417,7 +1438,8 @@ internal partial class MCodeHandler
             return new Message(MessageType.Success, report!);
         }
 
-        return await planner.ReconfigureAsync(cancellationToken) ? new Message() : MotionConfigRejected;
+        await planner.RefreshTuningAsync(cancellationToken);
+        return new Message();
     }
 
     /// <summary>
@@ -1672,11 +1694,6 @@ internal partial class MCodeHandler
         bool seen = false;
         string? report = null;
 
-        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
-        {
-            throw new OperationCanceledException();
-        }
-
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             Move move = model.Move;
@@ -1713,7 +1730,8 @@ internal partial class MCodeHandler
             return new Message(MessageType.Success, report!);
         }
 
-        return await planner.ReconfigureAsync(cancellationToken) ? new Message() : MotionConfigRejected;
+        await planner.RefreshTuningAsync(cancellationToken);
+        return new Message();
     }
 
     /// <summary>

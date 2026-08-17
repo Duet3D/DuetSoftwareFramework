@@ -74,7 +74,7 @@ internal sealed class MotionParameters
     /// as the rest of this class so that a setting cannot reach one and not the other. It is what
     /// <see cref="MovePlanner.ReconfigureAsync"/> serialises and pushes down
     /// </remarks>
-    public MotionConfig Config { get; private init; } = new();
+    public MachineConfig Config { get; private set; } = MachineConfig.Unconfigured();
 
     /// <summary>Microsteps per mm, by logical drive</summary>
     public float[] StepsPerMm { get; } = new float[NumDrives];
@@ -181,6 +181,37 @@ internal sealed class MotionParameters
     /// pressure advance imposes, which is worked out while the move is being built
     /// </remarks>
     public float[] InstantDvs { get; } = new float[NumDrives];
+
+    // --- What a move carries ------------------------------------------------------------------
+    //
+    // These are not in MachineConfig: the engine holds no copy to update. MoveBuilder reads them here
+    // once per move and writes them into the submission, so a change takes effect on the next move
+    // built and cannot reach one that is already queued. See docs/devel/MOTION_CONFIG_ORDERING.md
+
+    /// <summary>Instantaneous speed change allowed at a junction where both moves extrude</summary>
+    public float[] PrintingInstantDvs { get; } = new float[NumDrives];
+
+    /// <summary>Backlash to take up when a drive reverses, in microsteps</summary>
+    public int[] BacklashSteps { get; } = new int[NumDrives];
+
+    /// <summary>M592 coefficients, indexed by extruder</summary>
+    public Native.NonlinearExtrusion[] NonlinearExtrusions { get; } = CreateNonlinearExtrusions();
+
+    /// <summary>How far to spread a backlash correction, as a multiple of the backlash itself</summary>
+    public uint BacklashCorrectionDistanceFactor { get; set; } = 10;
+
+    /// <summary>M566 P: 0 allows a junction speed only between moves of the same kind</summary>
+    public uint JerkPolicy { get; set; }
+
+    /// <summary>How long the boards' input shaper spreads a move over, in step clocks</summary>
+    public uint ShapingTimeClocks { get; set; }
+
+    private static Native.NonlinearExtrusion[] CreateNonlinearExtrusions()
+    {
+        Native.NonlinearExtrusion[] result = new Native.NonlinearExtrusion[MotionLimits.MaxExtruders];
+        Array.Fill(result, Native.NonlinearExtrusion.None);
+        return result;
+    }
 
     /// <summary>Axes that translate rather than rotate, as a bitmap</summary>
     public uint LinearAxes { get; private set; }
@@ -384,26 +415,24 @@ internal sealed class MotionParameters
         MotionSystem? motionSystem = move.MotionSystems.Count > 0 ? move.MotionSystems[0] : null;
         MoveQueueItem? queue = move.Queue.Count > 0 ? move.Queue[0] : null;
 
-        MotionConfig config = new()
-        {
-            NumVisibleAxes = (byte)numAxes,
-            NumTotalAxes = (byte)numAxes,
-            NumExtruders = (byte)numExtruders,
-            NumRings = (byte)Math.Max(1, Math.Min(move.MotionSystems.Count, MotionLimits.MaxRings)),
-            NumDdasPerRing = (ushort)(queue is not null && queue.Length > 0 ? queue.Length : DefaultDdasPerRing),
-            GracePeriodMs = (uint)MathF.Round((queue?.GracePeriod ?? DefaultGracePeriodSec) * 1000.0f),
-            JerkPolicy = (uint)move.JerkPolicy,
-            BacklashCorrectionDistanceFactor = (uint)Math.Max(1, move.BacklashFactor)
-        };
+        // Filled here and assigned to the snapshot at the end. MachineConfig is a value, so a copy
+        // taken before these writes would not see them
+        MachineConfig config = MachineConfig.Unconfigured();
+        config.NumTotalAxes = (byte)numAxes;
+        config.NumExtruders = (byte)numExtruders;
+        config.NumRings = (byte)Math.Max(1, Math.Min(move.MotionSystems.Count, MotionLimits.MaxRings));
+        config.NumDdasPerRing = (ushort)(queue is not null && queue.Length > 0 ? queue.Length : DefaultDdasPerRing);
+        config.GracePeriodMs = (uint)MathF.Round((queue?.GracePeriod ?? DefaultGracePeriodSec) * 1000.0f);
 
         MotionParameters parameters = new()
         {
+            JerkPolicy = (uint)move.JerkPolicy,
+            BacklashCorrectionDistanceFactor = (uint)Math.Max(1, move.BacklashFactor),
             NumAxes = numAxes,
             NumExtruders = numExtruders,
             ConfiguredAxes = move.Axes.Count,
             ConfiguredExtruders = move.Extruders.Count,
             Geometry = geometry,
-            Config = config,
             MaxPrintingAcceleration = MotionUnits.AccelerationFromMmPerSecSquared(motionSystem?.PrintingAcceleration ?? DefaultAcceleration),
             MaxTravelAcceleration = MotionUnits.AccelerationFromMmPerSecSquared(motionSystem?.TravelAcceleration ?? DefaultAcceleration),
             MinFeedrate = MotionUnits.SpeedFromMmPerSec(move.MinimumMovementSpeed)
@@ -437,11 +466,10 @@ internal sealed class MotionParameters
             // is the ordinary one only, because what it is for is the acceleration cap that pressure
             // advance imposes; the engine's lookahead is what needs the printing jerk as well
             parameters.InstantDvs[axis] = MotionUnits.SpeedFromMmPerMin(a.Jerk);
-            config.InstantDvs[axis] = MotionUnits.SpeedFromMmPerMin(a.Jerk);
-            config.PrintingInstantDvs[axis] = MotionUnits.SpeedFromMmPerMin(a.PrintingJerk);
+            parameters.PrintingInstantDvs[axis] = MotionUnits.SpeedFromMmPerMin(a.PrintingJerk);
+            parameters.BacklashSteps[axis] = (int)MathF.Round(a.Backlash * a.StepsPerMm);
 
             config.DriveStepsPerMm[axis] = a.StepsPerMm;
-            config.BacklashSteps[axis] = (int)MathF.Round(a.Backlash * a.StepsPerMm);
             config.ControllingDrives[axis] = geometry.GetControllingDrives(axis);
 
             DriverId[] drivers = new DriverId[a.Drivers.Count];
@@ -475,10 +503,15 @@ internal sealed class MotionParameters
             parameters.InstantDvs[drive] = MotionUnits.SpeedFromMmPerMin(e.Jerk);
             parameters.PressureAdvanceClocks[drive] = MotionUnits.ClocksFromSeconds(e.PressAdv.K0);
 
+            parameters.PrintingInstantDvs[drive] = MotionUnits.SpeedFromMmPerMin(e.PrintingJerk);
+            parameters.NonlinearExtrusions[extruder] = new Native.NonlinearExtrusion
+            {
+                A = e.Nonlinear.A,
+                B = e.Nonlinear.B,
+                Limit = e.Nonlinear.UpperLimit
+            };
+
             config.DriveStepsPerMm[drive] = e.StepsPerMm;
-            config.InstantDvs[drive] = MotionUnits.SpeedFromMmPerMin(e.Jerk);
-            config.PrintingInstantDvs[drive] = MotionUnits.SpeedFromMmPerMin(e.PrintingJerk);
-            config.PressureAdvanceClocks[drive] = MotionUnits.ClocksFromSeconds(e.PressAdv.K0);
             config.ExtruderDrivers[extruder] = e.Driver is not null ? ToNativeDriver(e.Driver) : DriverId.None;
 
             if (e.Driver is not null)
@@ -488,6 +521,8 @@ internal sealed class MotionParameters
             }
         }
 
+        // Last, so that every write above is in the copy the snapshot keeps
+        parameters.Config = config;
         return parameters;
     }
 

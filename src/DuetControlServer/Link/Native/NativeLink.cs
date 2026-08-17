@@ -108,7 +108,8 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
         Check<MoveFailedEvent>(12);
         Check<MotionStoppedEvent>(16);
         Check<MotionStoppedDriverEntry>(4);
-        Check<MoveParamsHeader>(28);
+        Check<MoveParamsHeader>(40);
+        Check<MoveDriveTuning>(28);
     }
 
     /// <summary>
@@ -676,9 +677,34 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     }
 
     /// <summary>
+    /// What the motion engine has done since the counters were last reset
+    /// </summary>
+    /// <returns>The statistics, or a zeroed struct if the link is not up</returns>
+    public NativeMotionStats GetMotionStats()
+    {
+        if (_handle == IntPtr.Zero)
+        {
+            return default;
+        }
+        NativeMethods.DuetSbc_MotionGetStats(_handle, out NativeMotionStats stats);
+        return stats;
+    }
+
+    /// <summary>
+    /// Zero the motion engine's error and underrun counters
+    /// </summary>
+    public void ResetMotionStats()
+    {
+        if (_handle != IntPtr.Zero)
+        {
+            NativeMethods.DuetSbc_MotionResetStats(_handle);
+        }
+    }
+
+    /// <summary>
     /// Push the machine description down to the native motion engine
     /// </summary>
-    /// <param name="config">Serialised MotionConfig</param>
+    /// <param name="config">Serialised MachineConfig</param>
     /// <returns>True if it was accepted</returns>
     /// <remarks>Safe only while no move is in flight</remarks>
     public bool ConfigureMotion(ReadOnlySpan<byte> config)

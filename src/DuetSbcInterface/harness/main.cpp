@@ -9,8 +9,10 @@
 #include <Config/Configuration.h>
 #include <Platform/ProcessHelpers.h>
 #include <Motion/MoveParams.h>
-#include <SBC/MotionService.h>
-#include <SBC/SbcInterface.h>
+#include <Motion/MotionService.h>
+#include <Interface/LinkService.h>
+#include <Interface/SPI/SpiTransfer.h>
+#include <Interface/TransportFactory.h>
 
 #include <algorithm>
 #include <atomic>
@@ -201,7 +203,7 @@ int main(int argc, char** argv)
 
 	try
 	{
-		SbcInterface interface(config);
+		LinkService interface(config, CreateTransport(config));
 		interface.SetRequestServedCallback(RecordSample);
 
 		std::printf("Connecting to firmware...\n");
@@ -280,15 +282,12 @@ int main(int argc, char** argv)
 		{
 			// A minimal machine: three axes and one extruder, one remote driver each. Enough for the
 			// engine to plan and prepare real moves, which is what puts load on the transfer loop.
-			Duet::Sbc::Motion::MotionConfig motionConfig;
-			motionConfig.numVisibleAxes = 3;
+			Duet::Sbc::Motion::MachineConfig motionConfig;
 			motionConfig.numTotalAxes = 3;
 			motionConfig.numExtruders = 1;
 			for (size_t drive = 0; drive < maxAxesPlusExtruders; ++drive)
 			{
 				motionConfig.driveStepsPerMm[drive] = 80.0F;
-				motionConfig.instantDvs[drive] = 10.0F / stepClockRate;
-				motionConfig.printingInstantDvs[drive] = 10.0F / stepClockRate;
 			}
 			for (size_t axis = 0; axis < 3; ++axis)
 			{
@@ -296,7 +295,7 @@ int main(int argc, char** argv)
 				motionConfig.axisDrivers[axis].driverNumbers[0] = DriverId((uint8_t)dstAddress, (uint8_t)axis);
 			}
 			motionConfig.extruderDrivers[0] = DriverId((uint8_t)dstAddress, 3);
-			MotionService::Configure(motionConfig);
+			motion.Configure(motionConfig);
 
 			if (!motion.Init())
 			{
@@ -453,8 +452,13 @@ int main(int argc, char** argv)
 		}
 		std::printf("  Max pin wait during a transfer : %.3f ms\n", interface.Transfer().MaxPinWaitDurationMs());
 		std::printf("  Max delay between transfers    : %.3f ms\n", interface.Transfer().MaxFullTransferDelayMs());
-		std::printf("  TfrRdy pin glitches            : %d\n", interface.Transfer().TfrPinGlitches());
-		std::printf("  Missed GPIO edges              : %d\n", interface.Transfer().MissedEdges());
+		// The pin counters belong to the SPI transport rather than to every transport; this harness
+		// only ever builds that one, so the cast cannot fail here.
+		if (const auto* spi = dynamic_cast<const SpiTransfer*>(&interface.Transfer()))
+		{
+			std::printf("  TfrRdy pin glitches            : %d\n", spi->TfrPinGlitches());
+			std::printf("  Missed GPIO edges              : %d\n", spi->MissedEdges());
+		}
 		std::printf("  Connection resyncs (recoveries): %d\n", interface.Transfer().ResyncCount());
 		if (gSampleIndex.load() > kMaxSamples)
 		{

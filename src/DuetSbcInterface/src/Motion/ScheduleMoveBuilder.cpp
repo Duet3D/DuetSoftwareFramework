@@ -6,7 +6,7 @@
 
 #include "MoveParams.h"
 
-#include <Platform/Platform.h>
+#include <Platform/Log.h>
 
 #include <cstring>
 
@@ -34,7 +34,7 @@ ScheduleMoveDriver& ScheduleMoveBuilder::NewDriver(const MoveProfile& profileToU
 	ScheduleMoveDriver& d = m_drivers[min<size_t>(m_numDrivers, maxDriversPerMove - 1)];
 	if (m_numDrivers < maxDriversPerMove)
 	{
-		++m_numDrivers;				// the bound on maxDriversPerMove says this is always taken
+		++m_numDrivers; // the bound on maxDriversPerMove says this is always taken
 	}
 	d.boardAddress = driver.boardAddress;
 	d.driverNumber = driver.localDriver;
@@ -45,8 +45,11 @@ ScheduleMoveDriver& ScheduleMoveBuilder::NewDriver(const MoveProfile& profileToU
 	return d;
 }
 
-void ScheduleMoveBuilder::AddAxisMovement(const MoveProfile& profileToUse, DriverId driver, int32_t steps,
-										  uint32_t stopOnInput, uint8_t stopGroup,
+void ScheduleMoveBuilder::AddAxisMovement(const MoveProfile& profileToUse,
+										  DriverId driver,
+										  int32_t steps,
+										  uint32_t stopOnInput,
+										  uint8_t stopGroup,
 										  duet::spi::protocol::StopAction stopAction) noexcept
 {
 	ScheduleMoveDriver& d = NewDriver(profileToUse, driver);
@@ -65,7 +68,9 @@ void ScheduleMoveBuilder::AddAxisMovement(const MoveProfile& profileToUse, Drive
 	}
 }
 
-void ScheduleMoveBuilder::AddExtruderMovement(const MoveProfile& profileToUse, DriverId driver, float extrusion,
+void ScheduleMoveBuilder::AddExtruderMovement(const MoveProfile& profileToUse,
+											  DriverId driver,
+											  float extrusion,
 											  bool usePressureAdvanceForThisDrive) noexcept
 {
 	ScheduleMoveDriver& d = NewDriver(profileToUse, driver);
@@ -78,14 +83,14 @@ void ScheduleMoveBuilder::AddExtruderMovement(const MoveProfile& profileToUse, D
 	m_usePressureAdvance = m_usePressureAdvance || usePressureAdvanceForThisDrive;
 }
 
-bool ScheduleMoveBuilder::SendPacket(uint32_t moveId, uint32_t moveStartTime, uint8_t flags,
-									 size_t first, size_t count) noexcept
+bool ScheduleMoveBuilder::SendPacket(
+	uint32_t moveId, uint32_t moveStartTime, uint8_t flags, size_t first, size_t count) noexcept
 {
 	// One contiguous block: the header, then the drivers this packet carries. Built on the stack
 	// because the sink copies it out - nothing downstream keeps a pointer into here.
 	alignas(uint32_t) char packet[sizeof(ScheduleMoveHeader) + (MaxScheduleMoveDrivers * sizeof(ScheduleMoveDriver))];
 
-	auto *const header = reinterpret_cast<ScheduleMoveHeader *>(packet);
+	auto* const header = reinterpret_cast<ScheduleMoveHeader*>(packet);
 	header->whenToExecute = moveStartTime;
 	header->accelClocks = m_profile.accelClocks;
 	header->steadyClocks = m_profile.steadyClocks;
@@ -106,12 +111,12 @@ bool ScheduleMoveBuilder::SendPacket(uint32_t moveId, uint32_t moveStartTime, ui
 	const size_t driversBytes = count * sizeof(ScheduleMoveDriver);
 	memcpy(packet + sizeof(ScheduleMoveHeader), &m_drivers[first], driversBytes);
 
-	return m_sink != nullptr
-		   && m_sink->Send({reinterpret_cast<const uint8_t *>(packet), sizeof(ScheduleMoveHeader) + driversBytes});
+	return m_sink != nullptr &&
+		   m_sink->Send({reinterpret_cast<const uint8_t*>(packet), sizeof(ScheduleMoveHeader) + driversBytes});
 }
 
-uint32_t ScheduleMoveBuilder::FinishMovement(uint32_t moveId, uint32_t moveStartTime, bool simulating,
-											 bool checkEndstops, bool useInputShaping) noexcept
+uint32_t ScheduleMoveBuilder::FinishMovement(
+	uint32_t moveId, uint32_t moveStartTime, bool simulating, bool checkEndstops, bool useInputShaping) noexcept
 {
 	const size_t total = m_numDrivers;
 	m_numDrivers = 0;
@@ -123,13 +128,22 @@ uint32_t ScheduleMoveBuilder::FinishMovement(uint32_t moveId, uint32_t moveStart
 	}
 
 	uint8_t commonFlags = 0;
-	if (useInputShaping) { commonFlags |= ScheduleMoveFlags::UseInputShaping; }
-	if (m_usePressureAdvance) { commonFlags |= ScheduleMoveFlags::UsePressureAdvance; }
-	if (checkEndstops) { commonFlags |= ScheduleMoveFlags::CheckEndstops; }
+	if (useInputShaping)
+	{
+		commonFlags |= ScheduleMoveFlags::UseInputShaping;
+	}
+	if (m_usePressureAdvance)
+	{
+		commonFlags |= ScheduleMoveFlags::UsePressureAdvance;
+	}
+	if (checkEndstops)
+	{
+		commonFlags |= ScheduleMoveFlags::CheckEndstops;
+	}
 
 	for (size_t first = 0; first < total; first += MaxScheduleMoveDrivers)
 	{
-		const size_t count = min<size_t>(total - first, MaxScheduleMoveDrivers);
+		const auto count = min<size_t>(total - first, MaxScheduleMoveDrivers);
 		const bool isLast = (first + count == total);
 		const uint8_t flags = (isLast) ? (uint8_t)(commonFlags | ScheduleMoveFlags::LastPacket) : commonFlags;
 		if (!SendPacket(moveId, moveStartTime, flags, first, count))
@@ -138,7 +152,7 @@ uint32_t ScheduleMoveBuilder::FinishMovement(uint32_t moveId, uint32_t moveStart
 			// discards those when it next sees a different moveId. Do not send the rest - a partial
 			// move reaching the boards would move some drives and not others.
 			++m_droppedPackets;
-			Platform::MessageF(ErrorMessage, "move %" PRIu32 " dropped: link busy\n", moveId);
+			LogMessage("move %" PRIu32 " dropped: link busy\n", moveId);
 			return 0;
 		}
 	}

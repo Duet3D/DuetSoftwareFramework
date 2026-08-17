@@ -43,7 +43,7 @@ namespace
 	void TestMoveParamsLayout() noexcept
 	{
 		Report("MoveParamsHeader", sizeof(MoveParamsHeader));
-		CHECK(sizeof(MoveParamsHeader) == 28, "MoveParamsHeader is 28 bytes");
+		CHECK(sizeof(MoveParamsHeader) == 40, "MoveParamsHeader is 40 bytes");
 		CHECK_OFFSET(MoveParamsHeader, moveId, 0);
 		CHECK_OFFSET(MoveParamsHeader, ownedDrives, 4);
 		CHECK_OFFSET(MoveParamsHeader, flags, 8);
@@ -107,7 +107,8 @@ namespace
 		constexpr uint8_t numDrives = 4;
 		constexpr size_t length = MoveParamsLength(numDrives);
 		Report("MoveParams(4 drives)", length);
-		CHECK(length == 28 + (4 * (4 + 4 + 14)), "a four-drive submission is the header plus three four-entry arrays");
+		CHECK(length == 40 + (4 * (4 + 4 + 14 + 28)),
+			  "a four-drive submission is the header plus four four-entry arrays");
 
 		alignas(uint32_t) char record[MoveParamsLength(numDrives)]{};
 		auto *const header = reinterpret_cast<MoveParamsHeader *>(record);
@@ -118,9 +119,11 @@ namespace
 		const std::span<int32_t> endPoints = MoveParamsEndPoints(*header);
 		const std::span<float> directions = MoveParamsDirectionVector(*header);
 		const std::span<Duet::Sbc::Motion::MoveStopInput> stopInputs = MoveParamsStopInputs(*header);
+		const std::span<Duet::Sbc::Motion::MoveDriveTuning> tuning = MoveParamsDriveTuning(*header);
 		CHECK(endPoints.size() == numDrives, "the endpoint span covers the drives the header claims");
 		CHECK(directions.size() == numDrives, "the direction span covers the drives the header claims");
 		CHECK(stopInputs.size() == numDrives, "the stop input span covers the drives the header claims");
+		CHECK(tuning.size() == numDrives, "the tuning span covers the drives the header claims");
 		for (uint8_t i = 0; i < numDrives; ++i)
 		{
 			endPoints[i] = 1000 + i;
@@ -128,16 +131,20 @@ namespace
 			stopInputs[i].handle = (uint16_t)(0x100 + i);
 			stopInputs[i].numSwitches = 1;
 			stopInputs[i].boards[0] = (uint8_t)(i + 1);
+			tuning[i].instantDv = 0.5F * (float)(i + 1);
+			tuning[i].pressureAdvanceClocks = 10.0F * (float)(i + 1);
+			tuning[i].backlashSteps = 7 * (i + 1);
 		}
 
 		// A byte past the end would be a buffer overrun in the transfer, so check the span ends
 		// exactly where the record does.
-		const char *const lastByte = reinterpret_cast<const char *>(stopInputs.data() + stopInputs.size());
-		CHECK(lastByte == record + length, "the stop inputs end exactly at the end of the record");
+		const char *const lastByte = reinterpret_cast<const char *>(tuning.data() + tuning.size());
+		CHECK(lastByte == record + length, "the tuning entries end exactly at the end of the record");
 
 		const std::span<const int32_t> readEndPoints = MoveParamsEndPoints(*header);
 		const std::span<const float> readDirections = MoveParamsDirectionVector(*header);
 		const std::span<const Duet::Sbc::Motion::MoveStopInput> readStopInputs = MoveParamsStopInputs(*header);
+		const std::span<const Duet::Sbc::Motion::MoveDriveTuning> readTuning = MoveParamsDriveTuning(*header);
 		for (uint8_t i = 0; i < numDrives; ++i)
 		{
 			CHECK(readEndPoints[i] == 1000 + i, "endpoints read back as written");
@@ -147,9 +154,14 @@ namespace
 			// against an incoming input change one field at a time
 			// 0xFF as the emitting driver's board, which a switch must ignore: only a stall watch
 			// reads it
-			const uint32_t forDriver = Duet::Sbc::Motion::StopInputForDriver(readStopInputs[i], 0, 0xFF);
+			const uint32_t forDriver = Duet::Sbc::Motion::StopInputForSwitch(readStopInputs[i], 0, 0xFF);
 			CHECK(Duet::Sbc::Motion::StopInputBoard(forDriver) == i + 1, "the stop input board reads back as written");
 			CHECK(Duet::Sbc::Motion::StopInputHandle(forDriver) == 0x100 + i, "the stop input handle reads back as written");
+
+			CHECK_NEAR(readTuning[i].instantDv, 0.5 * (i + 1), 1e-9, "the drive's jerk limit reads back as written");
+			CHECK_NEAR(readTuning[i].pressureAdvanceClocks, 10.0 * (i + 1), 1e-9,
+					   "the drive's pressure advance reads back as written");
+			CHECK(readTuning[i].backlashSteps == 7 * (i + 1), "the drive's backlash reads back as written");
 		}
 	}
 }
@@ -172,7 +184,7 @@ void TestStopInputPerDriver() noexcept
 	shared.boards[0] = 3;
 	for (size_t driver = 0; driver < 3; ++driver)
 	{
-		const uint32_t forDriver = StopInputForDriver(shared, driver, 0xFF);
+		const uint32_t forDriver = StopInputForSwitch(shared, driver, 0xFF);
 		CHECK(StopInputBoard(forDriver) == 3, "every driver watches the axis' board");
 		CHECK(StopInputHandle(forDriver) == handle, "and the axis' switch");
 	}
@@ -187,17 +199,17 @@ void TestStopInputPerDriver() noexcept
 	perDriver.boards[2] = 0;
 	for (size_t driver = 0; driver < perDriver.numSwitches; ++driver)
 	{
-		const uint32_t forDriver = StopInputForDriver(perDriver, driver, 0xFF);
+		const uint32_t forDriver = StopInputForSwitch(perDriver, driver, 0xFF);
 		CHECK(StopInputBoard(forDriver) == perDriver.boards[driver], "each switch keeps its own board");
 		CHECK(StopInputHandle(forDriver) == handle + driver, "the minor field selects the driver's switch");
 	}
 
 	// A driver with no switch of its own must not fall back to another motor's, which would stop it
 	// at the wrong place and defeat the point of giving each motor one
-	CHECK(StopInputForDriver(perDriver, 3, 0xFF) == kNoStopInput, "a driver past the last switch watches nothing");
+	CHECK(StopInputForSwitch(perDriver, 3, 0xFF) == kNoStopInput, "a driver past the last switch watches nothing");
 
 	// A drive with no endstop has to stay without one, or it would start watching switch 0
-	CHECK(StopInputForDriver(kNoStopSwitches, 1, 0xFF) == kNoStopInput, "a drive watching nothing keeps the sentinel");
+	CHECK(StopInputForSwitch(kNoStopSwitches, 1, 0xFF) == kNoStopInput, "a drive watching nothing keeps the sentinel");
 
 	// A motor already sitting on its own switch is given no steps while the rest of the axis moves,
 	// which is what lets a gantry that starts with one side down square itself. Holding the whole
@@ -215,7 +227,7 @@ void TestStopInputPerDriver() noexcept
 	// driver is given are independent
 	for (size_t driver = 0; driver < held.numSwitches; ++driver)
 	{
-		CHECK(StopInputForDriver(held, driver, 0xFF) == StopInputForDriver(perDriver, driver, 0xFF),
+		CHECK(StopInputForSwitch(held, driver, 0xFF) == StopInputForSwitch(perDriver, driver, 0xFF),
 			  "holding a driver leaves every driver watching the switch it was given");
 	}
 
@@ -238,14 +250,14 @@ void TestStallWatchesTheDriversOwnBoard() noexcept
 
 	for (uint8_t board = 1; board <= 4; ++board)
 	{
-		const uint32_t forDriver = StopInputForDriver(stall, 0, board);
+		const uint32_t forDriver = StopInputForSwitch(stall, 0, board);
 		CHECK(StopInputBoard(forDriver) == board, "each driver watches the board carrying it");
 		CHECK(StopInputHandle(forDriver) == stallHandle, "under the one board-wide stall handle");
 	}
 
 	// Deriving a minor per driver would name a handle no board ever reports, and the move would run
 	// on as though it had no endstop
-	CHECK(StopInputHandle(StopInputForDriver(stall, 2, 7)) == stallHandle,
+	CHECK(StopInputHandle(StopInputForSwitch(stall, 2, 7)) == stallHandle,
 		  "the minor field is not derived for a stall handle");
 
 	// On a coupled move every drive carries the one axis' entry and the switch index is handed out

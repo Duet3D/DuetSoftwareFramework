@@ -11,7 +11,7 @@
 
 #include "TestSupport.h"
 
-#include <Movement/StepTimer.h>
+#include <Motion/StepTimer.h>
 
 #include <cstdint>
 #include <vector>

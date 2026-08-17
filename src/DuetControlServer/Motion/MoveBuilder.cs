@@ -52,6 +52,17 @@ internal sealed class MoveBuilder(MotionParameters parameters)
     private readonly int[] _newEndPoints = new int[NumDrives];
     private readonly float[] _accelerations = new float[NumDrives];
 
+    /// <summary>
+    /// The limits each drive is to be executed with, refilled for every move
+    /// </summary>
+    /// <remarks>
+    /// A move carries these rather than the engine reading them from a shared machine description,
+    /// which is what lets M572 and its like take effect between two moves without stopping the
+    /// machine and without reaching a move that is already queued. See
+    /// <c>docs/devel/MOTION_CONFIG_ORDERING.md</c>
+    /// </remarks>
+    private readonly MoveDriveTuning[] _tuning = new MoveDriveTuning[NumDrives];
+
     /// <summary>The machine being planned for, as derived from the object model</summary>
     public MotionParameters Parameters { get; private set; } = parameters;
 
@@ -503,14 +514,52 @@ internal sealed class MoveBuilder(MotionParameters parameters)
             MaxAcceleration = limits.MaxAcceleration,
             RequestedSpeed = limits.RequestedSpeed,
             RingNumber = raw.RingNumber,
-            NumDrives = NumDrives
+            NumDrives = NumDrives,
+            JerkPolicy = Parameters.JerkPolicy,
+            ShapingTimeClocks = Parameters.ShapingTimeClocks,
+            BacklashCorrectionDistanceFactor = Parameters.BacklashCorrectionDistanceFactor
         };
 
-        int length = MoveParams.Write(destination, header, _newEndPoints, _directionVector, raw.StopOnInput);
+        FillTuning();
+
+        int length = MoveParams.Write(destination, header, _newEndPoints, _directionVector, raw.StopOnInput, _tuning);
 
         // The machine is now where this move leaves it, so a move that is built must be submitted
         _newEndPoints.CopyTo(_endPoints, 0);
 
         return new MoveBuildResult(NativeMovementError.Ok, length);
+    }
+
+    /// <summary>
+    /// Take the tuning this move is to be executed with from the current snapshot
+    /// </summary>
+    /// <remarks>
+    /// Read here, once per move, rather than pushed to the engine when it changes. That is the whole
+    /// of the ordering guarantee: a move is fixed at the values in force when it was built, and a
+    /// later change cannot reach it
+    /// </remarks>
+    private void FillTuning()
+    {
+        // Read once: the configuration is a large struct held by value, so touching it inside the loop
+        // would copy it for every drive
+        int firstExtruderDrive = Parameters.Config.FirstExtruderDrive;
+
+        for (int drive = 0; drive < NumDrives; drive++)
+        {
+            NonlinearExtrusion nonlinear = drive >= firstExtruderDrive
+                ? Parameters.NonlinearExtrusions[MotionLimits.MaxAxesPlusExtruders - 1 - drive]
+                : NonlinearExtrusion.None;
+
+            _tuning[drive] = new MoveDriveTuning
+            {
+                InstantDv = Parameters.InstantDvs[drive],
+                PrintingInstantDv = Parameters.PrintingInstantDvs[drive],
+                PressureAdvanceClocks = Parameters.PressureAdvanceClocks[drive],
+                BacklashSteps = Parameters.BacklashSteps[drive],
+                NonlinearA = nonlinear.A,
+                NonlinearB = nonlinear.B,
+                NonlinearLimit = nonlinear.Limit
+            };
+        }
     }
 }

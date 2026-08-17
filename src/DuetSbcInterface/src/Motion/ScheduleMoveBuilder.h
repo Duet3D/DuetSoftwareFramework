@@ -9,9 +9,8 @@
  * information, puts it on the SPI link as one ScheduleMove packet, and the controller's CanMotion
  * does the grouping by board and the CAN send, which is code that already exists and works.
  *
- * The interface deliberately mirrors CanMotion's: StartMovement, AddAxisMovement, AddExtruderMovement,
- * FinishMovement, CanPrepareMove. In step 9 a thin `namespace CanMotion` shim forwards to it, so the
- * imported DDA::Prepare needs no edits at its call sites.
+ * The call sequence is the firmware's - StartMovement, AddAxisMovement, AddExtruderMovement,
+ * FinishMovement - because DDA::Prepare drives it in that order and for the same reasons.
  *
  * Where the packets go is a sink the caller supplies. The real one queues onto the outbound ring
  * that the SPI transfer loop drains; the tests supply one that records, which is how the whole
@@ -32,7 +31,7 @@ namespace Duet::Sbc::Motion
 	// thread, and everything downstream of it is a lock-free queue for that reason.
 	class ScheduleMoveSink
 	{
-	public:
+	  public:
 		ScheduleMoveSink() noexcept = default;
 		ScheduleMoveSink(const ScheduleMoveSink&) = delete;
 		ScheduleMoveSink& operator=(const ScheduleMoveSink&) = delete;
@@ -53,8 +52,8 @@ namespace Duet::Sbc::Motion
 
 	class ScheduleMoveBuilder
 	{
-	public:
-		void SetSink(ScheduleMoveSink *sinkToUse) noexcept { m_sink = sinkToUse; }
+	  public:
+		void SetSink(ScheduleMoveSink* sinkToUse) noexcept { m_sink = sinkToUse; }
 
 		// Begin a move. Discards anything left over from a move that was abandoned part way through.
 		void StartMovement() noexcept;
@@ -64,19 +63,28 @@ namespace Duet::Sbc::Motion
 		// `stopGroup` and `stopAction` say what a trigger on this driver's input stops: itself, every
 		// driver of the group, or every driver of the move. The group is the logical drive. A driver
 		// that watches nothing passes StopAction::none, which is what NewDriver writes anyway.
-		void AddAxisMovement(const MoveProfile& profile, DriverId driver, int32_t steps, uint32_t stopOnInput,
-							 uint8_t stopGroup, duet::spi::protocol::StopAction stopAction) noexcept;
+		void AddAxisMovement(const MoveProfile& profile,
+							 DriverId driver,
+							 int32_t steps,
+							 uint32_t stopOnInput,
+							 uint8_t stopGroup,
+							 duet::spi::protocol::StopAction stopAction) noexcept;
 
 		// Add one extruder driver's share, in microsteps including fractional parts. The board adds
 		// pressure advance and carries the fraction forward, which is why this is not rounded here.
-		void AddExtruderMovement(const MoveProfile& profile, DriverId driver, float extrusion,
+		void AddExtruderMovement(const MoveProfile& profile,
+								 DriverId driver,
+								 float extrusion,
 								 bool usePressureAdvance) noexcept;
 
 		// Emit the move and return how many step clocks it will take the boards to run it, or 0 if
 		// nothing was sent. The caller compares that against its own figure and extends its move if
 		// the boards' is longer, so that they never have to catch up.
-		uint32_t FinishMovement(uint32_t moveId, uint32_t moveStartTime, bool simulating,
-								bool checkEndstops, bool useInputShaping) noexcept;
+		uint32_t FinishMovement(uint32_t moveId,
+								uint32_t moveStartTime,
+								bool simulating,
+								bool checkEndstops,
+								bool useInputShaping) noexcept;
 
 		// False when the sink is backed up, so that PrepareMoves throttles instead of dropping.
 		[[nodiscard]] bool CanPrepareMove() const noexcept;
@@ -84,15 +92,14 @@ namespace Duet::Sbc::Motion
 		// Packets the sink refused. Non-zero means motion was lost and the machine must be stopped.
 		[[nodiscard]] uint32_t GetDroppedPackets() const noexcept { return m_droppedPackets; }
 
-	private:
+	  private:
 		// Append a driver record and take the move's profile from this call.
 		duet::spi::protocol::ScheduleMoveDriver& NewDriver(const MoveProfile& profileToUse, DriverId driver) noexcept;
 
 		// Send drivers [first, first + count) as one packet.
-		bool SendPacket(uint32_t moveId, uint32_t moveStartTime, uint8_t flags,
-						size_t first, size_t count) noexcept;
+		bool SendPacket(uint32_t moveId, uint32_t moveStartTime, uint8_t flags, size_t first, size_t count) noexcept;
 
-		ScheduleMoveSink *m_sink = nullptr;
+		ScheduleMoveSink* m_sink = nullptr;
 
 		// The profile of the move being built. Shared by every driver in it, so the packet carries
 		// it once rather than per driver
@@ -110,6 +117,6 @@ namespace Duet::Sbc::Motion
 
 		uint32_t m_droppedPackets = 0;
 	};
-}
+} // namespace Duet::Sbc::Motion
 
 #endif /* SRC_MOTION_SCHEDULEMOVEBUILDER_H_ */

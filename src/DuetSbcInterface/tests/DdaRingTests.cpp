@@ -10,16 +10,17 @@
 // noisier than it should.
 
 #include <Motion/MoveParams.h>
-#include <Movement/DDARing.h>
-#include <Movement/MoveTiming.h>
-#include <Movement/StepTimer.h>
-#include <Platform/RepRap.h>
+#include <Motion/DDARing.h>
+#include <Motion/MoveTiming.h>
+#include <Motion/StepTimer.h>
+#include <Motion/MotionSystem.h>
 
 #include <TestSupport.h>
 
 #include <vector>
 
-using Duet::Sbc::Motion::MotionConfig;
+using Duet::Sbc::Motion::MachineConfig;
+using Duet::Sbc::Motion::MotionSystem;
 using Duet::Sbc::Motion::MoveParamsDirectionVector;
 using Duet::Sbc::Motion::MoveParamsEndPoints;
 using Duet::Sbc::Motion::MoveParamsHeader;
@@ -87,27 +88,24 @@ namespace
 	constexpr float acceleration = 1000.0F / ((float)stepClockRate * stepClockRate);
 	constexpr float instantDv = 10.0F / stepClockRate;
 
+	MotionSystem theMove;
+
 	void ConfigureMachine() noexcept
 	{
-		MotionConfig config;
-		config.numVisibleAxes = numAxes;
+		MachineConfig config;
 		config.numTotalAxes = numAxes;
 		config.numExtruders = numExtruders;
-		config.jerkPolicy = 0;
 		for (size_t drive = 0; drive < maxAxesPlusExtruders; ++drive)
 		{
 			config.driveStepsPerMm[drive] = stepsPerMm;
-			config.instantDvs[drive] = instantDv;
-			config.printingInstantDvs[drive] = instantDv;
-			config.pressureAdvanceClocks[drive] = 0.0F;
-		}
+					}
 		for (size_t axis = 0; axis < numAxes; ++axis)
 		{
 			config.axisDrivers[axis].numDrivers = 1;
 			config.axisDrivers[axis].driverNumbers[0] = DriverId(1, (uint8_t)axis);
 		}
 		config.extruderDrivers[0] = DriverId(1, 3);
-		reprap.GetMove().Configure(config);
+		theMove.Configure(config);
 	}
 
 	// --- Building a move ---------------------------------------------------------------------
@@ -143,6 +141,29 @@ namespace
 		}
 		endPoints[xAxis] = lrintf(endX * stepsPerMm);
 		directions[xAxis] = 1.0F;
+
+		// The tuning a move carries is what it will be executed with; ConfigureMachine's values are
+		// what DuetControlServer would have filled in here
+		const std::span<Duet::Sbc::Motion::MoveDriveTuning> tuning = MoveParamsDriveTuning(h);
+		for (auto& entry : tuning)
+		{
+			entry = {};
+			entry.instantDv = instantDv;
+			entry.printingInstantDv = instantDv;
+		}
+		h.backlashCorrectionDistanceFactor = 1;
+		return move;
+	}
+
+	// A move that travels back down X, which is what makes a backlash correction due. The distance is
+	// positive as it is for any move; it is the direction vector and the endpoint that reverse.
+	MoveRecord MakeReverseXMove(uint32_t moveId, float fromX, float toX, int32_t backlashSteps) noexcept
+	{
+		MoveRecord move = MakeXMove(moveId, 0.0F, fromX - toX);
+		MoveParamsHeader& h = move.Header();
+		MoveParamsEndPoints(h)[xAxis] = lrintf(toX * stepsPerMm);
+		MoveParamsDirectionVector(h)[xAxis] = -1.0F;
+		MoveParamsDriveTuning(h)[xAxis].backlashSteps = backlashSteps;
 		return move;
 	}
 
@@ -180,6 +201,39 @@ namespace
 	// moving and the log says only "move duration too long". Everything that writes an axis
 	// acceleration therefore has to keep it above zero, and everything that creates an axis has to
 	// give it one; this is the check that says why.
+	// The point of carrying tuning on the move: a value changed between two moves takes effect on the
+	// move after it and not on the moves already queued, without the ring ever having to be empty.
+	//
+	// This is the M572 case from docs/devel/MOTION_CONFIG_ORDERING.md, using backlash because it
+	// shows up directly in the steps the controller is told to take. Pressure advance and the rest
+	// travel the same way.
+	void TestTuningAppliesFromTheMoveThatCarriesIt(DDARing& ring, RecordingSink& sink) noexcept
+	{
+		sink.Clear();
+		CHECK(Drain(ring), "the ring starts empty");
+
+		// Establish a forward direction, so that the reversals below are what make a correction due
+		CHECK(ring.AddMove(MakeXMove(1, 0.0F, 10.0F).Header()) == MovementError::Ok, "the priming move is queued");
+
+		// Two reversals carrying no backlash, then one carrying 100 steps - all queued before any of
+		// them is prepared, which is exactly the case a shared configuration gets wrong
+		CHECK(ring.AddMove(MakeReverseXMove(2, 10.0F, 0.0F, 0).Header()) == MovementError::Ok, "the first reversal is queued");
+		CHECK(ring.AddMove(MakeXMove(3, 0.0F, 10.0F).Header()) == MovementError::Ok, "a forward move is queued");
+		CHECK(ring.AddMove(MakeReverseXMove(4, 10.0F, 0.0F, 100).Header()) == MovementError::Ok,
+			  "the reversal carrying backlash is queued");
+		CHECK(Drain(ring), "the ring drains");
+
+		CHECK(sink.headers.size() == 4, "every move reached the controller");
+		if (sink.firstDriverSteps.size() == 4)
+		{
+			const int32_t plain = lrintf(10.0F * stepsPerMm);
+			CHECK(sink.firstDriverSteps[1] == -plain,
+				  "the reversal queued before the change takes no correction");
+			CHECK(sink.firstDriverSteps[3] == -plain - 100,
+				  "the reversal that carries the change takes it, though both were queued together");
+		}
+	}
+
 	void TestZeroAccelerationIsRejected(DDARing& ring, RecordingSink& sink) noexcept
 	{
 		sink.Clear();
@@ -479,7 +533,7 @@ int main()
 {
 	StepTimer::Init();
 	StepTimer::SetLocalClockSource(FakeClock);
-	if (!reprap.GetMove().Init())
+	if (!theMove.Init())
 	{
 		std::printf("FAIL: could not initialise the motion system\n");
 		return 1;
@@ -487,10 +541,10 @@ int main()
 	ConfigureMachine();
 
 	RecordingSink sink;
-	reprap.GetMove().GetScheduleMoveBuilder().SetSink(&sink);
+	theMove.GetScheduleMoveBuilder().SetSink(&sink);
 
 	DDARing ring;
-	ring.Init(20);
+	ring.Init(theMove, 20);
 
 	TestSingleMove(ring, sink);
 	TestGracePeriodCommitsTheMove(ring, sink);
@@ -501,6 +555,7 @@ int main()
 	TestRejectedMoveLeavesTheRingUsable(ring, sink);
 	TestForcedEndpointIsWhatTheNextMoveIsMeasuredFrom(ring, sink);
 	TestSimulationSendsNothing(ring, sink);
+	TestTuningAppliesFromTheMoveThatCarriesIt(ring, sink);
 	TestZeroAccelerationIsRejected(ring, sink);
 
 	StepTimer::SetLocalClockSource(nullptr);

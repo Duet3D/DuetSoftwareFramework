@@ -2,12 +2,12 @@
  * MotionSystem.cpp - see MotionSystem.h.
  */
 
-#include <cmath>
 #include "MotionSystem.h"
+#include <cmath>
 
-#include <Movement/MoveTiming.h>
-#include <Movement/StepTimer.h>
-#include <Platform/Tasks.h>
+#include <Platform/MemoryArena.h>
+#include <Motion/MoveTiming.h>
+#include <Motion/StepTimer.h>
 
 #include <algorithm>
 #include <cstdlib>
@@ -21,7 +21,7 @@ namespace
 	// equivalent from whatever RAM is left over; here memory is not the constraint, so this is
 	// generous enough that exhaustion means a bug rather than a busy machine.
 	constexpr size_t permanentArenaBytes = 4 * 1024 * 1024;
-}
+} // namespace
 
 MotionSystem::MotionSystem() noexcept
 {
@@ -33,7 +33,7 @@ MotionSystem::MotionSystem() noexcept
 
 bool MotionSystem::Init() noexcept
 {
-	if (!Tasks::InitPermanentArena(permanentArenaBytes))
+	if (!MemoryArena::Reserve(permanentArenaBytes))
 	{
 		return false;
 	}
@@ -45,11 +45,14 @@ bool MotionSystem::Init() noexcept
 		m_targetBacklashSteps[drive] = 0;
 		m_currentBacklashSteps[drive] = 0;
 	}
-	for (auto& d : m_lastMoveWasBackwards) { d = false; }
+	for (auto& d : m_lastMoveWasBackwards)
+	{
+		d = false;
+	}
 	return true;
 }
 
-void MotionSystem::SanitiseConfig(MotionConfig& config) noexcept
+void MotionSystem::SanitiseConfig(MachineConfig& config) noexcept
 {
 	// Axis and extruder counts. numTotalAxes and numExtruders together decide FirstExtruderDrive,
 	// which is what splits the logical drive space; if their sum exceeds maxAxesPlusExtruders then
@@ -57,15 +60,14 @@ void MotionSystem::SanitiseConfig(MotionConfig& config) noexcept
 	// end of extruderDrivers. Extruders are what give way, because the axes are already placed.
 	config.numTotalAxes = static_cast<uint8_t>(std::min<size_t>(config.numTotalAxes, maxAxes));
 	config.numExtruders = static_cast<uint8_t>(std::min<size_t>(config.numExtruders, maxExtruders));
-	config.numExtruders = static_cast<uint8_t>(
-		std::min<size_t>(config.numExtruders, maxAxesPlusExtruders - config.numTotalAxes));
-	config.numVisibleAxes = static_cast<uint8_t>(std::min(config.numVisibleAxes, config.numTotalAxes));
+	config.numExtruders =
+		static_cast<uint8_t>(std::min<size_t>(config.numExtruders, maxAxesPlusExtruders - config.numTotalAxes));
 
 	// Rings. DDARing::Init clamps the depth as well, but doing it here keeps GetConfig() honest
 	// about what was actually built.
 	config.numRings = static_cast<uint8_t>(std::clamp<unsigned int>(config.numRings, 1, maxRings));
-	config.numDdasPerRing = static_cast<uint16_t>(
-		std::clamp<unsigned int>(config.numDdasPerRing, minDdasPerRing, maxDdasPerRing));
+	config.numDdasPerRing =
+		static_cast<uint16_t>(std::clamp<unsigned int>(config.numDdasPerRing, minDdasPerRing, maxDdasPerRing));
 
 	// Driver mapping. numDrivers indexes driverNumbers[maxDriversPerAxis] in DDA::Prepare.
 	for (AxisDriversConfig& axis : config.axisDrivers)
@@ -74,17 +76,18 @@ void MotionSystem::SanitiseConfig(MotionConfig& config) noexcept
 	}
 }
 
-void MotionSystem::Configure(const MotionConfig& newConfig) noexcept
+void MotionSystem::Configure(const MachineConfig& newConfig) noexcept
 {
 	m_config = newConfig;
 	SanitiseConfig(m_config);
 }
 
-int32_t MotionSystem::ApplyBacklashCompensation(size_t drive, int32_t delta) noexcept
+int32_t MotionSystem::ApplyBacklashCompensation(size_t drive, int32_t delta, int32_t backlashSteps,
+												uint32_t distanceFactor) noexcept
 {
 	if (drive >= maxAxes)
 	{
-		return delta;						// extruders have no backlash to take up
+		return delta; // extruders have no backlash to take up
 	}
 
 	// A change of direction means the whole backlash has to be taken up again, in the new direction.
@@ -93,8 +96,7 @@ int32_t MotionSystem::ApplyBacklashCompensation(size_t drive, int32_t delta) noe
 	if (backwards != m_lastMoveWasBackwards[drive])
 	{
 		m_lastMoveWasBackwards[drive] = backwards;
-		const int32_t backlash = m_config.backlashSteps[drive];
-		targetSteps += (backwards) ? -backlash : backlash;
+		targetSteps += (backwards) ? -backlashSteps : backlashSteps;
 	}
 
 	int32_t& currentSteps = m_currentBacklashSteps[drive];
@@ -104,7 +106,7 @@ int32_t MotionSystem::ApplyBacklashCompensation(size_t drive, int32_t delta) noe
 		// Spread the correction over several moves rather than injecting it in one: a whole
 		// backlash added to a short move would be a visible jolt. backlashCorrectionDistanceFactor
 		// is how many times the correction the move must be before it is all taken at once.
-		if ((uint32_t)labs(stepsDue) * m_config.backlashCorrectionDistanceFactor <= (uint32_t)labs(delta))
+		if ((uint32_t)labs(stepsDue) * distanceFactor <= (uint32_t)labs(delta))
 		{
 			delta += stepsDue;
 			currentSteps = targetSteps;
@@ -112,9 +114,9 @@ int32_t MotionSystem::ApplyBacklashCompensation(size_t drive, int32_t delta) noe
 		else
 		{
 			const auto maxAllowedSteps =
-				(int32_t)max<uint32_t>((uint32_t)labs(delta) / m_config.backlashCorrectionDistanceFactor, 1u);
-			const int32_t stepsToDo = (stepsDue < 0) ? max<int32_t>(stepsDue, -maxAllowedSteps)
-													 : min<int32_t>(stepsDue, maxAllowedSteps);
+				(int32_t)max<uint32_t>((uint32_t)labs(delta) / distanceFactor, 1u);
+			const int32_t stepsToDo =
+				(stepsDue < 0) ? max<int32_t>(stepsDue, -maxAllowedSteps) : min<int32_t>(stepsDue, maxAllowedSteps);
 			currentSteps += stepsToDo;
 			delta += stepsToDo;
 		}
@@ -122,20 +124,15 @@ int32_t MotionSystem::ApplyBacklashCompensation(size_t drive, int32_t delta) noe
 	return delta;
 }
 
-void MotionSystem::EnableDrivers(size_t drive, bool unconditional) noexcept
-{
-	// Nothing to do. Every driver is on a CAN-connected board and is enabled by the move messages
-	// the controller sends it; the SBC has no driver enable line of its own. Kept so that
-	// DDA::Prepare needs no edits.
-	(void)drive;
-	(void)unconditional;
-}
-
-void MotionSystem::AddLinearSegments(size_t drive, uint32_t startTime, const MoveProfile& profile,
-									 motioncalc_t steps, MovementFlags moveFlags) noexcept
+void MotionSystem::AddLinearSegments(size_t drive,
+									 uint32_t startTime,
+									 const MoveProfile& profile,
+									 motioncalc_t steps,
+									 MovementFlags moveFlags,
+									 motioncalc_t pressureAdvanceClocks) noexcept
 {
 	const motioncalc_t pressureAdvance =
-		(moveFlags.isExtruder && !moveFlags.nonPrintingMove) ? m_config.pressureAdvanceClocks[drive] : 0;
+		(moveFlags.isExtruder && !moveFlags.nonPrintingMove) ? pressureAdvanceClocks : 0;
 	m_trackers[drive].AddMove(startTime, profile, steps, moveFlags, pressureAdvance);
 }
 
@@ -193,13 +190,14 @@ void MotionSystem::SetMotorPositions(LogicalDrivesBitmap drives, std::span<const
 bool MotionSystem::AreDrivesStopped(LogicalDrivesBitmap drives) const noexcept
 {
 	bool stopped = true;
-	drives.Iterate([this, &stopped](unsigned int drive, unsigned int) noexcept
-				   {
-					   if (drive < maxAxesPlusExtruders && m_trackers[drive].MotionPending())
-					   {
-						   stopped = false;
-					   }
-				   });
+	drives.Iterate(
+		[this, &stopped](unsigned int drive, unsigned int) noexcept
+		{
+			if (drive < maxAxesPlusExtruders && m_trackers[drive].MotionPending())
+			{
+				stopped = false;
+			}
+		});
 	return stopped;
 }
 
@@ -211,7 +209,7 @@ void MotionSystem::CancelStepping() noexcept
 	}
 }
 
-void MotionSystem::AddPrepareHiccup() noexcept
+/*static*/ void MotionSystem::AddPrepareHiccup() noexcept
 {
 	// Preparation did not finish before the move was due to start. Slip the whole movement timebase
 	// rather than starting the move late: every board shares this delay, so their moves stay in

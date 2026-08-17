@@ -31,6 +31,8 @@ public static partial class ServiceCollectionExtensions
             // that says how far along the chain from the switch to the machine position it got
             .AddSingleton<EndstopCorrection>()
             .AddSingleton<IDiagnostics, EndstopCorrection>(services => services.GetRequiredService<EndstopCorrection>())
+            .AddSingleton<MotionDiagnostics>()
+            .AddSingleton<IDiagnostics, MotionDiagnostics>(services => services.GetRequiredService<MotionDiagnostics>())
             // The height map in effect. Shared between the codes that load it and the move builder
             // that applies it, which is why it is not simply a field of either
             .AddSingleton<BedCompensation>()

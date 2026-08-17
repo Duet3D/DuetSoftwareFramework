@@ -360,20 +360,16 @@ being unresolvable stayed invisible.
 
 ---
 
-## 7. Dropped by build switch, not by divergence
+## 7. What the SBC motion engine does not do
 
 For a given set of move parameters the SBC-side DDA ring produces the same output RepRapFirmware's
-does — `DDA::InitFromParams` onward is upstream verbatim. What is absent is absent by a switch or a
-deletion, and it is worth separating the permanent from the pending:
+does — `DDA::InitFromParams` onward is upstream verbatim. Three things it deliberately never will:
 
-| Dropped | Status |
+| Absent | Why |
 |---|---|
-| `SUPPORT_S_CURVE 0` — trapezoidal profiles only | Permanent for now; `DDA_3rdOrder` and `MovementProfile` are not ported |
-| `SUPPORT_LASER 0`, `SUPPORT_IOBITS 0` | Pending — both need machine mode and a wire-format field |
-| `SUPPORT_NONLINEAR_EXTRUSION 0` | Pending — M592 |
-| `DDARing::PushBabyStepping` | Deliberate, see §5 |
-| `DDARing::PauseMoves`, `LowPowerOrStallPause` | Pending — follows restore points and pause/resume |
-| `DDARing::AddSpecialMove` | Pending — bed levelling and leadscrew adjustment moves |
+| IOBits | The expansion boards own their own outputs, so there is nothing for a move to carry |
+| Babystepping into a queued move | Deliberate, see §5 |
+| Input shaping on the SBC | The boards shape. The tracked position therefore leads the real one by up to the configured shaping time during acceleration; endpoints still agree exactly |
 
 ---
 
