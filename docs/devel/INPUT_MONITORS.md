@@ -28,7 +28,7 @@ only six call sites in the whole of it. They are the evidence for everything bel
 
 | RRF call | Action | Called from | DSF |
 |---|---|---|---|
-| `ChangeHandleThreshold` | 3 | `RemoteZProbe::SetProbing`, `SetTargetAdcValue` | **Gap** - §2 |
+| `ChangeHandleThreshold` | 3 | `RemoteZProbe::SetProbing`, `RemoteZProbe::HandleG31` | **Gap** - §2 |
 | `ChangeHandleResponseTime` | 4 | `RemoteZProbe::SetProbing` | **Gap** - §2 |
 | `DeleteHandle` | 2 | `RemoteZProbe`, `SwitchEndstop`, `GpInPort` reconfigure | **Gap** - §3 |
 | `EnableHandle` | 1 | `SwitchEndstop::PrimeAxis` | Divergence - §4 |
@@ -111,9 +111,16 @@ Details that decide its shape:
   left at 2 ms is the state DSF is in today, so a leak here is not a regression, but it is the whole
   point of 2.2.
 
-Doing it this way fixes 2.1 without touching `G31` at all: the threshold is read when probing starts,
-so whatever last wrote it - `G31 P`, `M558`, a restored configuration - is what the board is given.
-That is why RRF has no `G31`-side CAN call either.
+**And `G31` needs the message as well.** Reading the threshold when probing starts is not on its own
+enough, and RepRapFirmware does not rely on it either: `RemoteZProbe::HandleG31` sends
+`ChangeHandleThreshold` from `G31 P` for analog probes, and folds a refusal into that code's result.
+The reason is that between the two codes the board is the only thing reading the probe. It reports a
+change and nothing else, and `InputMonitor::AnalogInterrupt` decides what a change *is* by comparing
+against the threshold it currently holds - so a threshold it has not been told about leaves
+`sensors.probes[].value` frozen at whatever the old one last reported. Everything downstream reads
+that stale value: `M558`'s "current reading", and the already-triggered check that a probing move
+makes *before* it arms anything. A probe resting on the bed after `G31 P<lower>` would pass the check
+that exists to catch exactly that, and record a height at the start position.
 
 ---
 
@@ -307,6 +314,7 @@ same commit that does it; `git log --grep` finds them.
 | 2 | Tell a probe when it is probing (§2) | ⬜ |
 | 3 | Delete abandoned monitors (§3) | ⬜ |
 | 4 | Clear a held input when its monitor goes (§3) | ⬜ |
+| 5 | Check the finished work against the reference | ⬜ |
 | - | A board that lost its monitors (§4.1) | ❓ open question, not planned |
 
 Phase 1 first because it changes no behaviour and settles what the empty `PrepareAsync` means, which
@@ -346,7 +354,8 @@ traffic, which is where DSF already was, so it is not worth failing a probe that
 `ActiveProbeReportInterval` and only slows it down when its first probing operation *ends*, so a
 configured but unused probe reports every change it sees. DSF creates at the inactive interval
 instead. It is the state RRF reaches anyway, reached immediately, and creating fast would leave §2.2
-half unfixed for exactly the machines that configure a probe and do not use it.
+half unfixed for exactly the machines that configure a probe and do not use it. What that departure
+costs, and what Phase 5 does about it, is a probe used as the Z *endstop*.
 
 Tested by [ProbeArmingTests](src/UnitTests/Motion/ProbeArmingTests.cs): an analog and a scanning probe
 carry the threshold the object model holds now, a digital probe carries none, the board is the one
@@ -361,8 +370,8 @@ the endstop case.
 [InputMonitors](src/DuetControlServer/Motion/InputMonitors.cs) answers "what is this endstop or probe
 having watched for it" from the object model, and `ReleaseAsync` sends `actionDelete` for everything
 in the before list that is not in the after list. Both handlers capture the before list under the
-model lock, before overwriting it, and release after creating - so a board that will not give a pin
-back cannot stop the endstop or probe being set up.
+model lock, before overwriting it, and release before creating - the order Phase 5 corrected, and
+why.
 
 A monitor is compared on `Handle.All` rather than on the handle struct: `RemoteInputHandle` is a union
 of the whole and its bitfields, and only the whole is meaningful to compare.
@@ -403,6 +412,78 @@ lets the host suite build it at all. What *is* tested there is the clearing itse
 `TestAnInputIsHeldFromWhenItGoesActiveUntilItGoesInactive` and
 `TestAnInputThatDoesNotFitIsSimplyNotHeld` - the call site is the untested part, and forcing it into
 the shared header to change that would put a CANlib dependency somewhere it must not go.
+
+**The guard on the call site was wrong and the whole thing was dead.** It required
+`dataLength >= sizeof(CanMessageCreateInputMonitorV1)`, which is 64 bytes, but a create is sent
+truncated to its terminating null - `GetActualDataLength()` is 10 plus the pin name, so 16 for
+`io0.in`. The condition could never be true. It is `offsetof(..., pinName)` now, which is what
+`GetMaxPinNameLength` measures from. Phase 5 found this; it is the reason a plan phase can be ✅ and
+still not be doing anything.
+
+### Phase 5 - check the finished work against the reference ✅
+
+Phases 1-4 read RepRapFirmware for the shape of each message. This phase read it for the *behaviour*,
+which turned up five things the earlier reading had missed and one claim in this document that was
+simply false.
+
+#### A probe standing in for the Z endstop is armed too
+
+Phase 2's deliberate departure - creating at the inactive interval - has a cost Phase 2 did not name.
+`M574 Z1 S2` homes on the probe, and a homing move is not a tap, so nothing raised the report rate:
+the axis homed at 25 ms where RRF's first homing move gets 2 ms.
+
+`ZProbeEndstopKind` now arms in `PrepareAsync` and releases in `ReleaseAsync`, through the same
+`ProbeArming` a tap uses. RRF does *not* do this - `ZProbeEndstop::PrimeAxis` carries a `//TODO if the
+Z probe is remote, check that the expansion board knows about it` - so this is the departure that
+pays for the other one. What to send is captured into `EndstopPlan` under the model lock, beside the
+drivers a stall watches, for the reason that file already gives: both halves of arming are handed one
+answer rather than deriving their own.
+
+#### The deletes have to go out first
+
+§3 said deleting first "makes a failed create leave the axis with no monitor where it previously had
+one". That is true of deleting *everything* and false of deleting only what is abandoned, which is
+what `ReleaseAsync` does - a kept handle is never sent a delete, so a failed create cannot cost the
+axis anything it was keeping.
+
+Meanwhile the create-last order broke a case §3 listed as a leak and did not notice was also a
+failure: reducing `P"1.io0.in+1.io1.in"` to `P"1.io1.in"` moves `1.io1.in` from handle `(0,1)` to
+handle `(0,0)`, and the board refuses it as in use, because `(0,1)` still holds it. `SwitchEndstop::
+Configure` opens with `ReleasePorts()` for exactly this reason.
+
+Moving the release ahead of the create in both handlers fixes that, and incidentally fixes a second
+defect: `M558`'s create-error path returned before reaching the release, so a rejected new port left
+the old board holding the pin *and* still writing `sensors.probes[0].value`.
+
+#### A half-created endstop gives its pins back
+
+RRF's `SwitchEndstop::Configure` calls `ReleasePorts()` on *any* create failure, so a switch-per-driver
+endstop whose second switch is refused ends up holding neither. DSF returned early and kept the first,
+under a handle the object model now reads as the new port. `M574` now releases that axis' handles -
+old and new, since the boards may differ - when `CreateEndstopMonitorAsync` fails.
+
+#### `G31 P` sends the threshold
+
+§2's fix was wrong about the reference and about the consequence; the corrected reasoning is in §2
+above. `GCodeHandler.Probes` sends `actionChangeThreshold` when `G31 P` is seen, for probes with a
+threshold to send, and fails the code if the board refuses.
+
+#### Things that were already right, and two smaller corrections
+
+`ProbeArming` matches `RemoteZProbe::SetProbing` exactly - threshold only while probing and only for
+analog types, interval both ways - and DSF's supported remote probe types are RRF's set. The handle
+layouts match. `InputMonitor::Create` really does delete a same-handle monitor first, so §3's
+same-pin claim holds.
+
+Two smaller things: `M558 C` now refuses a `+` in the port with RRF's message rather than sending the
+pair to a board as one pin name, and `InputMonitor::Change` answers an unknown handle with
+`GCodeResult::warning`, not silence as §3 assumed - so `ReleaseAsync` logs that at debug and keeps
+the warning for a board that had the handle and would not let go.
+
+**Not everything found was changed.** `EndstopMinReportInterval` is zero against RRF's 30 ms, which is
+a real divergence and stays, but the comment justifying it was wrong: it claimed a nonzero interval
+would delay the stop, when `inputChangedV2` carries the interrupt timestamp and `CommandProcessor`
+corrects from that. The trade is chatter against travel-to-revert, and it is written down as that now.
 
 ---
 
