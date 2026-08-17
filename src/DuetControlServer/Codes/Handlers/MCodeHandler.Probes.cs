@@ -163,6 +163,12 @@ internal partial class MCodeHandler
             }
         }
 
+        // Whatever the probe had watched for it and no longer wants, before asking for what it does.
+        // RepRapFirmware releases first for the same reason: a pin a board is still holding is one
+        // the create cannot claim. Only handles the new configuration will not re-create are dropped,
+        // so a create that then fails cannot have cost the probe a monitor it was keeping
+        await InputMonitors.ReleaseAsync(monitorsBefore, monitorsAfter, linkInterface, logger, cancellationToken);
+
         Message monitorReply = monitorPort is not null
             ? await CreateProbeMonitorAsync(probeNumber, monitorPort, cancellationToken)
             : new Message();
@@ -170,10 +176,6 @@ internal partial class MCodeHandler
         {
             return monitorReply;
         }
-
-        // Whatever the probe had watched for it and no longer wants. Last, so that a board that
-        // refuses to give a pin back cannot stop the probe being set up
-        await InputMonitors.ReleaseAsync(monitorsBefore, monitorsAfter, linkInterface, logger, cancellationToken);
 
         // A board that took the port but had something to say about it is reported too, since M558
         // otherwise looks like it configured exactly what was asked for

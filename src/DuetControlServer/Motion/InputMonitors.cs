@@ -122,8 +122,10 @@ internal static class InputMonitors
     /// <remarks>
     /// <para>
     /// A monitor that appears in both is left alone rather than deleted and re-created. Creating
-    /// replaces it anyway, and deleting first would mean a create that failed left the axis with no
-    /// monitor where it had a working one.
+    /// replaces it anyway, and the board frees the old pin before claiming the new one, so there is
+    /// nothing a delete would add. That is what makes this safe to send before the creates, which it
+    /// is: a pin moving from one handle to another needs the first handle gone before the second can
+    /// take it.
     /// </para>
     /// <para>
     /// Nothing here fails the code that asked for it. The reason to delete is to release a pin for
@@ -151,13 +153,20 @@ internal static class InputMonitors
 
             try
             {
-                // A board that does not have the handle answers without complaint, which is what
-                // makes this safe to send from what DSF believes rather than from what the board
-                // confirmed: a board that restarted since has already forgotten it
                 CanResponse response = await link.SendCanMessageAsync(monitor.Board, in message,
                                                                       CanMessageType.StandardReply,
                                                                       cancellationToken: cancellationToken);
-                if (response.Severity != MessageType.Success)
+                if (response.Severity == MessageType.Warning)
+                {
+                    // A board answers a handle it does not have with a warning, and this is sent from
+                    // what DSF believes rather than from what the board confirmed - a board that
+                    // restarted since has already forgotten it, and so has one being told twice
+                    // because an endstop is giving up everything it held. Nothing is being kept from
+                    // the next M950 in either case, so it is not the user's problem
+                    logger.LogDebug("Board {Board} had nothing to release behind handle {Handle}: {Reply}",
+                                    monitor.Board, monitor.Handle.All, response.ToMessage().Content);
+                }
+                else if (response.Severity != MessageType.Success)
                 {
                     logger.LogWarning("Board {Board} did not release the pin behind handle {Handle}: {Reply}",
                                       monitor.Board, monitor.Handle.All, response.ToMessage().Content);
