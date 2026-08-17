@@ -627,7 +627,11 @@ void SbcInterface::ExchangeData() noexcept
 			// A handle whose monitor is being replaced or dropped must not leave a level behind. The
 			// level held for it was reported by a monitor that is about to stop existing, and acting
 			// on it would stop the first move armed on the handle its replacement is created under
-			if (msgType == CanMessageType::createInputMonitorV1 && dataLength >= sizeof(CanMessageCreateInputMonitorV1))
+			// The pin name is the tail of a createInputMonitor and is sent truncated to its terminating
+			// null, so the message on the wire is nothing like sizeof the struct: what must be present
+			// is everything up to the name, which is where the handle is
+			if (msgType == CanMessageType::createInputMonitorV1 &&
+				dataLength >= offsetof(CanMessageCreateInputMonitorV1, pinName))
 			{
 				const auto* const createMsg = reinterpret_cast<const CanMessageCreateInputMonitorV1*>(payload);
 				CanMotion::NoteInputState(dstAddress, createMsg->handle.asU16(), false);
