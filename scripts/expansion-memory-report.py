@@ -168,7 +168,7 @@ def build_rows(boards):
         row = [board["board"], board["mcu"]]
         for name, _ in PRIMARY_REGIONS:
             used, total = usage.get(name, (0, 0))
-            row += [kib(used), kib(total), percent(used, total)]
+            row += [kib(used), kib(total), percent(used, total), kib(total - used)]
         rows.append(row)
 
         primary = {name for name, _ in PRIMARY_REGIONS}
@@ -179,9 +179,16 @@ def build_rows(boards):
 
 
 def headers():
+    # Free RAM is worth a column of its own: it is the pool the heap, the permanently allocated
+    # blocks and the system stack all come out of at runtime, none of which the ELF accounts for.
     columns = ["Board", "MCU"]
     for _, label in PRIMARY_REGIONS:
-        columns += [f"{label} used (KiB)", f"{label} size (KiB)", f"{label} %"]
+        columns += [
+            f"{label} used (KiB)",
+            f"{label} size (KiB)",
+            f"{label} %",
+            f"{label} free (KiB)",
+        ]
     return columns
 
 
