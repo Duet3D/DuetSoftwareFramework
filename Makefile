@@ -137,7 +137,7 @@ else
 ARM_GNU_TOOLCHAIN_HOST_ARCH := $(HOST_ARCH_RAW)
 endif
 
-CROSS_COMPILE ?= $(abspath ../arm-gnu-toolchain-$(ARM_GNU_TOOLCHAIN_VERSION)-$(ARM_GNU_TOOLCHAIN_HOST_ARCH)-arm-none-eabi/bin/arm-none-eabi-)
+CROSS_COMPILE ?= $(abspath $(ARM_GNU_TOOLCHAIN_DIR)/bin/arm-none-eabi-)
 export CROSS_COMPILE
 
 # These variables are static and only need to be expanded once
