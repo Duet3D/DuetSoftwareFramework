@@ -176,6 +176,13 @@ jobs:
       - name: Build every expansion board
         run: make Duet3Expansion -j"$(nproc)"
 
+      # Puts each board's flash and RAM headroom on the run's summary page, so a change that eats
+      # into a board's budget is visible without downloading anything.
+      - name: Report firmware memory usage
+        run: |
+          ./scripts/expansion-memory-report.py
+          ./scripts/expansion-memory-report.py --markdown >> "$GITHUB_STEP_SUMMARY"
+
   test:
     name: Run unit tests
     needs: image
