@@ -270,6 +270,11 @@ $(addprefix clean-,$(EXPANSION_CONFIGS)):
 	$(CMD_PREFIX)$(MAKE) -C src/Duet3Expansion $@ \
 		LIBRARIES_DIR=$(abspath $(LIBRARIES_DIR)) V=$(V)
 
+# Flash and RAM occupancy for every board, measured against the MEMORY regions its linker script
+# declares. The boards are built first so the report always describes the current sources.
+Duet3Expansion.memory: Duet3Expansion
+	$(CMD_PREFIX)scripts/expansion-memory-report.py
+
 Duet3Expansion.clean:
 	$(CMD_PREFIX)$(MAKE) -C src/Duet3Expansion clean \
 		LIBRARIES_DIR=$(abspath $(LIBRARIES_DIR)) V=$(V)
