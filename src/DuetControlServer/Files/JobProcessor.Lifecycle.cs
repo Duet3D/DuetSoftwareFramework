@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
+using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Motion;
 using Microsoft.Extensions.Logging;
 
@@ -226,6 +227,119 @@ internal partial class JobProcessor
                     }
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// Stop the job, running whatever macro the reason calls for
+    /// </summary>
+    /// <param name="channel">Channel the stop was commanded from, which the macro runs on</param>
+    /// <param name="reason">Why the job stopped</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>GCodes::StopPrint</c> and the <c>stopping</c> / <c>cancelling</c> states.
+    /// Which macro runs depends on how the job ended, and the order is not interchangeable: a
+    /// cancelled job runs <c>cancel.g</c> <em>instead of</em> <c>stop.g</c>, and only when there is
+    /// no macro at all do the heaters go off.
+    /// </para>
+    /// <para>
+    /// An aborted job runs no macro. It stopped because something went wrong, so the machine is put
+    /// in a safe state directly rather than through a file that may itself depend on what broke
+    /// </para>
+    /// </remarks>
+    public async ValueTask StopAsync(CodeChannel channel, PrintStoppedReason reason, CancellationToken cancellationToken)
+    {
+        using (await LockAsync(cancellationToken))
+        {
+            if (_stopped)
+            {
+                return;
+            }
+
+            // The guard is only about a job finishing twice - once because M0 stopped it and again
+            // because its file then ran out of codes. With no job selected, M0 is the operator
+            // putting the machine down and must work every time it is given
+            _stopped = IsFileSelected;
+
+            if (reason == PrintStoppedReason.UserCancelled)
+            {
+                // Observable while cancel.g runs, which is after the job file has already closed
+                PauseState = PauseState.Cancelling;
+            }
+        }
+
+        try
+        {
+            await UnwindZHopAsync(cancellationToken);
+
+            switch (reason)
+            {
+                case PrintStoppedReason.UserCancelled:
+                    // cancel.g replaces stop.g entirely, and only when neither exists do the heaters
+                    // go off. RepRapFirmware writes this as two nested DoFileMacro calls
+                    if (!await _macroRunner.TryRunAsync(channel, "cancel.g", cancellationToken: cancellationToken) &&
+                        !await _macroRunner.TryRunAsync(channel, "stop.g", cancellationToken: cancellationToken))
+                    {
+                        await _heatManager.SwitchOffAllAsync(includingChamberAndBed: true, cancellationToken);
+                    }
+                    break;
+
+                case PrintStoppedReason.NormalCompletion:
+                    if (!await _macroRunner.TryRunAsync(channel, "stop.g", cancellationToken: cancellationToken))
+                    {
+                        await _heatManager.SwitchOffAllAsync(includingChamberAndBed: true, cancellationToken);
+                    }
+                    break;
+
+                case PrintStoppedReason.Abort:
+                    // No macro: the job stopped because something went wrong, and a file that depends
+                    // on the machine working is the wrong thing to reach for
+                    await _heatManager.SwitchOffAllAsync(includingChamberAndBed: true, cancellationToken);
+                    await _spindleManager.StopAllAsync(cancellationToken);
+                    // TODO the laser is switched off here too in RepRapFirmware, once M452 exists
+                    break;
+            }
+        }
+        finally
+        {
+            using (await LockAsync(CancellationToken.None))
+            {
+                if (PauseState == PauseState.Cancelling)
+                {
+                    PauseState = PauseState.NotPaused;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Put back the Z hop of a retraction the job never undid
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <remarks>
+    /// RepRapFirmware's <c>StopPrint</c> does this to every motion system: a job stopped between a
+    /// G10 and its G11 leaves the tool retracted, and the hop is part of the transform, so the user
+    /// position has to gain it back or the machine reports a height it is not at
+    /// </remarks>
+    private async ValueTask UnwindZHopAsync(CancellationToken cancellationToken)
+    {
+        using (await _model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (_toolManager.Current is not Tool tool || !tool.IsRetracted)
+            {
+                return;
+            }
+
+            int zAxis = AxisIndices.ZAxisIndex(_model.Move);
+            if (zAxis >= 0)
+            {
+                using (_planner.Lock())
+                {
+                    _planner.State.CurrentUserPosition[zAxis] += ToolTransform.ActualZHop(tool);
+                }
+            }
+            tool.IsRetracted = false;
         }
     }
 

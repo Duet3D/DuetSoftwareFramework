@@ -5,6 +5,7 @@ using DuetAPI.Utility;
 using DuetControlServer.Commands;
 using DuetControlServer.Files;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
+using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Files.Parser;
 using DuetControlServer.Link;
 using DuetControlServer.Link.Protocol.CanMessages;
@@ -356,22 +357,29 @@ internal partial class MCodeHandler(
     {
         if (await codeProcessor.FlushAsync(code, syncFileStreams: true, cancellationToken: cancellationToken))
         {
-            // Attempt to cancel the print from any channel other than File2
-            if (code.Channel != CodeChannel.File2)
+            if (code.Channel == CodeChannel.File2)
             {
-                using (await jobProcessor.LockAsync(cancellationToken))
-                {
-                    if (jobProcessor.IsFileSelected)
-                    {
-                        // M0/M1/M2 is permitted from inside a job file, but only permitted from elsewhere if the job is already paused
-                        if (!code.IsFromFileChannel && !jobProcessor.IsPaused)
-                        {
-                            return new Message(MessageType.Error, "Pause the print before attempting to cancel it");
-                        }
+                return new Message();
+            }
 
-                        // Invalidate the print file and make sure no more codes are read from it
-                        jobProcessor.Cancel();
+            // How the job ended decides which macro runs. A stop from inside the job file is the job
+            // reaching its end; a stop from anywhere else is the operator cancelling one that has
+            // already been paused, which is the only state RepRapFirmware allows it from
+            PrintStoppedReason? reason = null;
+            using (await jobProcessor.LockAsync(cancellationToken))
+            {
+                if (jobProcessor.IsFileSelected)
+                {
+                    if (!code.IsFromFileChannel && !jobProcessor.IsPaused)
+                    {
+                        return new Message(MessageType.Error, "Pause the print before attempting to cancel it");
                     }
+
+                    reason = code.IsFromFileChannel ? PrintStoppedReason.NormalCompletion
+                                                    : PrintStoppedReason.UserCancelled;
+
+                    // Invalidate the print file and make sure no more codes are read from it
+                    jobProcessor.Cancel();
                 }
             }
 
@@ -381,8 +389,16 @@ internal partial class MCodeHandler(
                 code.ResetCancellationToken();
             }
 
-            // The machine-side of a stop - heaters off, spindles off, motors idle - belongs to
-            // subsystems that are not ported yet, so this is only the job half for now
+            if (reason is not null)
+            {
+                await jobProcessor.StopAsync(code.Channel, reason.Value, cancellationToken);
+            }
+            else
+            {
+                // No job to stop, so M0/M1/M2 is the machine being put down for the night. RRF runs
+                // stop.g here too, through the same state
+                await jobProcessor.StopAsync(code.Channel, PrintStoppedReason.NormalCompletion, cancellationToken);
+            }
             return new Message();
         }
         throw new OperationCanceledException();

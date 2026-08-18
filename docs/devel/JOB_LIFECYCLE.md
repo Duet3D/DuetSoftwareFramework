@@ -663,16 +663,21 @@ Three things the port had to get right that reading the RRF state machine alone 
 when the head is at or below the pause height, and only splits the move - travel across, then descend
 - when the head is above it, which is where the dragging risk actually is.
 
-### Phase 3 — stopping ⬜
+### Phase 3 — stopping 🟡
 
-- [ ] `JobProcessor.StopPrint(reason)` carrying `PrintStoppedReason` properly, replacing
-      `IsCancelled = IsPaused`
-- [ ] `M0/M1/M2` from inside the file → normal completion → `stop.g`, or all heaters off if absent
-- [ ] `M0/M1/M2` while paused → user cancelled → `cancel.g`, *or* `stop.g` and the heater switch-off
+- [x] `JobProcessor.StopAsync(channel, reason)` carrying `PrintStoppedReason` properly
+- [x] `M0/M1/M2` from inside the file → normal completion → `stop.g`, or all heaters off if absent
+- [x] `M0/M1/M2` while paused → user cancelled → `cancel.g`, *or* `stop.g` and the heater switch-off
       if there is no `cancel.g`
-- [ ] Abort → heaters off, spindles stopped
-- [ ] The G10 Z hop unwind, the temperature-wait cancellation and the job file's local variables
-- [ ] `Cancelling` is observable while `cancel.g` runs
+- [x] Abort → heaters off, spindles stopped
+- [x] A job that simply runs out of codes goes through the same sequence, guarded so that a file
+      ending in M0 does not run `stop.g` twice - and the guard applies only to a selected job, so
+      `M0` with no job still works every time
+- [x] `HeatManager.SwitchOffAllAsync`, which did not exist
+- [x] The G10 Z hop unwind
+- [x] `Cancelling` is observable while `cancel.g` runs
+- [ ] The temperature-wait cancellation and the job file's local variables
+- [ ] The laser is switched off on abort — `// TODO` at the point of use, waiting on M452
 
 ### Phase 4 — feedhold ⬜
 

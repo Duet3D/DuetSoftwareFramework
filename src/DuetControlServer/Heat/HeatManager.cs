@@ -349,4 +349,59 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
             }
         }
     }
+
+    /// <summary>
+    /// Switch every heater off
+    /// </summary>
+    /// <param name="includingChamberAndBed">Whether the bed and chamber heaters go off too</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <remarks>
+    /// RepRapFirmware's <c>Heat::SwitchOffAll</c>. It is what a job that has finished or been
+    /// aborted does when there is no <c>stop.g</c> to decide otherwise, so it must not stop at the
+    /// first heater that refuses - a board that has dropped off the bus would otherwise leave every
+    /// heater after it running
+    /// </remarks>
+    public async ValueTask SwitchOffAllAsync(bool includingChamberAndBed, CancellationToken cancellationToken)
+    {
+        List<int> heaterNumbers = [];
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            for (int heaterNumber = 0; heaterNumber < model.Heat.Heaters.Count; heaterNumber++)
+            {
+                if (model.Heat.Heaters[heaterNumber] is not Heater heater)
+                {
+                    continue;
+                }
+                if (!includingChamberAndBed && !IsToolHeater(heaterNumber))
+                {
+                    continue;
+                }
+
+                heater.State = HeaterState.Off;
+                heaterNumbers.Add(heaterNumber);
+            }
+        }
+
+        foreach (int heaterNumber in heaterNumbers)
+        {
+            if (await SetTemperatureAsync(heaterNumber, 0.0f, CanMessageSetHeaterTemperatureV1.CommandOff,
+                                          cancellationToken) is string error)
+            {
+                logger.LogWarning("Could not switch heater {Heater} off: {Error}", heaterNumber, error);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether a heater is neither a bed nor a chamber heater
+    /// </summary>
+    /// <param name="heaterNumber">The heater</param>
+    /// <returns>True if nothing has claimed it as a bed or chamber heater</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>HeaterFunction::tool</c>, which it stores on the heater. Here the
+    /// assignment lives in <c>heat.bedHeaters</c> and <c>heat.chamberHeaters</c>, so the question is
+    /// asked of those. The caller must hold the object model lock
+    /// </remarks>
+    private bool IsToolHeater(int heaterNumber)
+        => !model.Heat.BedHeaters.Contains(heaterNumber) && !model.Heat.ChamberHeaters.Contains(heaterNumber);
 }

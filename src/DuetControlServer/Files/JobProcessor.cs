@@ -13,6 +13,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using DuetControlServer.Codes;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
+using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Codes.Meta;
 using Microsoft.Extensions.Logging;
 
@@ -31,7 +32,9 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
     private readonly Expressions _expressions;
     private readonly FileFactory _fileFactory;
     private readonly Parser.FileInfoParser _fileInfoParser;
+    private readonly Heat.HeatManager _heatManager;
     private readonly MacroRunner _macroRunner;
+    private readonly Spindles.SpindleManager _spindleManager;
     private readonly Motion.MovePlanner _planner;
     private readonly Tools.ToolManager _toolManager;
     private readonly Model.ObjectModel _model;
@@ -48,7 +51,9 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// <param name="expressions">Expressions</param>
     /// <param name="fileFactory">File factory</param>
     /// <param name="fileInfoParser">File info parser</param>
+    /// <param name="heatManager">The heaters, which a stop switches off when no macro does</param>
     /// <param name="macroRunner">Runs the lifecycle macros</param>
+    /// <param name="spindleManager">The spindles, which an aborted job stops</param>
     /// <param name="planner">Where the restore point is saved from and the resume move is queued</param>
     /// <param name="toolManager">The selected tool, whose offsets the resume move goes through</param>
     /// <param name="model">Object Model</param>
@@ -61,7 +66,9 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
         Expressions expressions,
         FileFactory fileFactory,
         Parser.FileInfoParser fileInfoParser,
+        Heat.HeatManager heatManager,
         MacroRunner macroRunner,
+        Spindles.SpindleManager spindleManager,
         Motion.MovePlanner planner,
         Tools.ToolManager toolManager,
         Model.ObjectModel model,
@@ -75,7 +82,9 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
         _expressions = expressions;
         _fileFactory = fileFactory;
         _fileInfoParser = fileInfoParser;
+        _heatManager = heatManager;
         _macroRunner = macroRunner;
+        _spindleManager = spindleManager;
         _planner = planner;
         _toolManager = toolManager;
         _model = model;
@@ -241,6 +250,16 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
     private PrintPausedReason _pauseReason;
 
     /// <summary>
+    /// Whether the stop sequence has already run for the job that is finishing
+    /// </summary>
+    /// <remarks>
+    /// M0, M1 and M2 stop the job themselves, and the job file then runs out of codes, which is the
+    /// same thing arriving from the other side. Without this the macro would run twice for a file
+    /// that ends the way most files do
+    /// </remarks>
+    private bool _stopped;
+
+    /// <summary>
     /// Get the current file position
     /// </summary>
     /// <param name="motionSystem">Motion system</param>
@@ -324,7 +343,7 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
         }
 
         // Update the state
-        IsCancelled = IsAborted = false;
+        IsCancelled = IsAborted = _stopped = false;
         PauseState = PauseState.NotPaused;
         IsSimulating = simulating;
         _file = file;
@@ -626,6 +645,22 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
                     _logger.LogInformation(isCancelled ? "Cancelled job file"
                                             : isAborted ? "Aborted job file"
                                                 : "Finished job file");
+
+                    // Put the machine down. A job stopped by M0/M1/M2 has already been through this,
+                    // and an abort has not - it is the path where nothing asked for the stop
+                    bool alreadyStopped;
+                    using (await LockAsync(stoppingToken))
+                    {
+                        alreadyStopped = _stopped;
+                    }
+                    if (!alreadyStopped)
+                    {
+                        await StopAsync(CodeChannel.File,
+                                        isAborted ? PrintStoppedReason.Abort
+                                        : isCancelled ? PrintStoppedReason.UserCancelled
+                                        : PrintStoppedReason.NormalCompletion,
+                                        stoppingToken);
+                    }
 
                     // Update special fields that are not available in RRF
                     using (await _model.AccessReadWriteAsync(stoppingToken))
