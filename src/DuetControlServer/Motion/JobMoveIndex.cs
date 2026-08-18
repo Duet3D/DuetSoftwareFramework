@@ -52,6 +52,20 @@ internal readonly record struct JobMoveOrigin
 }
 
 /// <summary>
+/// A submission a stop ended part-way through
+/// </summary>
+/// <param name="Origin">The code it was submitting, and how much of it went out</param>
+/// <param name="PurgeGeneration">
+/// Which stop ended it, as <see cref="MovementState.PurgeGeneration"/> counted them
+/// </param>
+/// <remarks>
+/// The generation is what makes this safe to leave lying about. There is one slot for it - the
+/// interpreter state is shared - so a record could otherwise be read by a later pause that has
+/// nothing to do with the stop that wrote it. Keyed to the stop, a stale record simply does not match
+/// </remarks>
+internal readonly record struct AbandonedJobMove(JobMoveOrigin Origin, uint PurgeGeneration);
+
+/// <summary>
 /// Remembers where each queued job move came from, so a feedhold can say where to resume
 /// </summary>
 /// <remarks>

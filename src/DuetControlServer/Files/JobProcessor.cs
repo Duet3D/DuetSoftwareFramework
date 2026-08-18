@@ -623,6 +623,15 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// </remarks>
     private void RestoreModalStateForResume(CodeFile file)
     {
+        // There is one interpreter state and one pause restore point, so both of these describe the
+        // first file channel's job and neither means anything for a fork of it. TODO when M596 and
+        // M598 give each motion system its own, this becomes per channel - the restore point that
+        // recorded them as much as the file that reads them back
+        if (file.Channel != CodeChannel.File)
+        {
+            return;
+        }
+
         using (_planner.Lock())
         {
             Motion.RestorePoint rp = _planner.State.RestorePoints[Motion.RestorePoint.PauseNumber];
@@ -630,10 +639,7 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
             {
                 file.ModalGCommand = rp.GCommandNumber;
             }
-            if (file.Channel == CodeChannel.File)
-            {
-                _planner.State.MoveFractionToSkip = rp.ProportionDone;
-            }
+            _planner.State.MoveFractionToSkip = rp.ProportionDone;
         }
     }
 

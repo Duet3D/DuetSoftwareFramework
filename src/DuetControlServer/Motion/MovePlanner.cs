@@ -509,6 +509,11 @@ internal sealed class MovePlanner(
     /// enough to stop at and finds none during a fast print; true for the feedhold, which plans a
     /// deceleration at the first move the engine has not committed
     /// </param>
+    /// <param name="interpreter">
+    /// The interpreter whose position this has to put right. Passed in rather than left to the
+    /// caller because it has to happen under the lock that the purge happens under: a move built in
+    /// between would be measured from the end of a queue that no longer exists
+    /// </param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>What the stop did</returns>
     /// <remarks>
@@ -523,7 +528,7 @@ internal sealed class MovePlanner(
     /// built from it would start from somewhere the machine never reached
     /// </para>
     /// </remarks>
-    public async ValueTask<FeedholdOutcome> StopEarlyAsync(bool plannedDeceleration,
+    public async ValueTask<FeedholdOutcome> StopEarlyAsync(bool plannedDeceleration, MoveInterpreter interpreter,
                                                            CancellationToken cancellationToken = default)
     {
         uint sequenceBefore;
@@ -536,6 +541,16 @@ internal sealed class MovePlanner(
         {
             logger.LogWarning("The motion engine would not take a stop request; draining the queue instead");
             return new FeedholdOutcome(false, null, 0);
+        }
+
+        // As soon as the request is in, not when the answer comes back. The motion thread acts on it
+        // in its own time, and a segmented move part-way out would otherwise spend that window
+        // queueing segments the machine has just been told not to make. Nothing is lost if the
+        // engine turns out not to have stopped: the submission gives up either way, and the pause
+        // reads back how far it got
+        using (Lock())
+        {
+            State.NotePurge();
         }
 
         // The motion thread acts on the request within one pass of its loop
@@ -559,6 +574,11 @@ internal sealed class MovePlanner(
         }
 
         JobMoveOrigin? origin = null;
+
+        // The read lock because putting the interpreter's position back reads the transform out of
+        // the object model, and the planner lock because everything below is the state a move is
+        // built from. This order everywhere: the object model first, the planner second
+        using (await model.AccessReadOnlyAsync(cancellationToken))
         using (Lock())
         {
             if (JobMoves.TryGet(firstPurgedMoveId, out JobMoveOrigin found))
@@ -566,15 +586,16 @@ internal sealed class MovePlanner(
                 origin = found;
             }
 
-            // The interpreter ran ahead of the machine by everything that was dropped, so its
-            // position is now fiction. The engine's is what the drives were actually commanded to
+            // Both sides of the position ran ahead of the machine by everything that was dropped, so
+            // both are fiction. The engine's copy is what the drives were actually commanded to, and
+            // the interpreter's follows from it - under this lock, so that the next move built
+            // anywhere is measured from where the machine really is
             ResyncFromEngine();
+            interpreter.SyncInterpreterToMachine();
 
             // A segmented move that was part-way through submitting has had its remaining segments
-            // dropped with the rest, so the claim on the ring goes with them - and the loop that
-            // holds them is told to stop rather than feeding a ring the machine has just left
+            // dropped with the rest, so the claim on the ring goes with them
             State.SegmentsLeft = 0;
-            State.NotePurge();
             JobMoves.Clear();
         }
 

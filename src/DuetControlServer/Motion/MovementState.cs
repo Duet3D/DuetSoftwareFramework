@@ -104,13 +104,21 @@ internal sealed class MovementState
     /// The code a submission gave up part-way through, if the last one did
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The counterpart of <see cref="JobMoveIndex"/> for the segments that never reached the ring.
     /// A stop that purges nothing - because everything queued was already committed - still ends a
     /// submission that was in flight, and what ran is then every segment that went out. Nothing on
     /// the ring records that, so the loop leaves it here for the pause to pick up, which is
-    /// RepRapFirmware's "we can skip the move that is waiting" branch of <c>DoAsynchronousPause</c>
+    /// RepRapFirmware's "we can skip the move that is waiting" branch of <c>DoAsynchronousPause</c>.
+    /// </para>
+    /// <para>
+    /// Written only by a submission a stop ended, and read only by the pause for that same stop -
+    /// see <see cref="Motion.AbandonedJobMove.PurgeGeneration"/>. A submission that ends for its own
+    /// reasons leaves this alone rather than clearing it, because the slot is shared and clearing it
+    /// would be one channel throwing away what another channel's stop recorded
+    /// </para>
     /// </remarks>
-    public JobMoveOrigin? AbandonedJobMove { get; set; }
+    public AbandonedJobMove? AbandonedJobMove { get; set; }
 
     /// <summary>
     /// The fraction of the first line M26 named that has already been made, 0..1

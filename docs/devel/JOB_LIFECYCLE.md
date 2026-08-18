@@ -467,7 +467,10 @@ point, or the same filament is counted twice.
 So the fraction is carried from the segment that was dropped
 ([`JobMoveOrigin.ProportionDone`](../../src/DuetControlServer/Motion/JobMoveIndex.cs)) to the restore
 point and then to [`MovementState.MoveFractionToSkip`](../../src/DuetControlServer/Motion/MovementState.cs),
-which the first job-file move built after the resume spends and clears. That is RRF's
+which the first move the job file reads afterwards spends and clears. The first file channel's
+throughout: there is one interpreter state and one pause restore point, both of them `File`'s, so a
+fork of the job neither records a fraction nor may spend one — a stream that cannot have recorded it
+must not consume what the other is owed. That widens with M596 and M598, both halves together. That is RRF's
 `proportionDone` / `moveFractionToSkip` pair, reaching the same place by a shorter route: RRF re-reads
 the whole original move and walks its segments forward without emitting the ones already made, because
 its restore point may sit inside a segment; here the stop is always *on* a boundary, so there is no
@@ -522,12 +525,17 @@ else runs:
 - **`MovementState.CurrentUserPosition`**, which is the interpreter's position and has run ahead of
   the machine by however many moves were queued. It becomes the reported stop position and the
   restore point the resume moves back to, so it is put back into step with the machine — through the
-  builder's endpoints and the inverse transform, `MoveInterpreter.SyncInterpreterToMachine` — before
-  the restore point is taken from it. RRF's equivalent is setting `ms.positionMayBeInaccurate = true`
-  so the position is re-read at the next standstill; here it is read back directly, because
-  `ResyncFromEngine` already exists for this. Getting this wrong is not a reporting detail: the
-  restore point would name the end of the queue that was just discarded, and the resume would drive
-  the head there before reading the file again.
+  builder's endpoints and the inverse transform, `MoveInterpreter.SyncInterpreterToMachine`. RRF's
+  equivalent is setting `ms.positionMayBeInaccurate = true` so the position is re-read at the next
+  standstill; here it is read back directly, because `ResyncFromEngine` already exists for this.
+  Getting this wrong is not a reporting detail: the restore point would name the end of the queue
+  that was just discarded, and the resume would drive the head there before reading the file again.
+
+  **Under the same lock as the purge**, which is why `StopEarlyAsync` is given the interpreter rather
+  than left to the caller to correct afterwards. Everything between the purge and the restore point —
+  the flush, abandoning the macros, waiting for standstill — is time in which another channel can
+  build a move, and a move built from the end of a discarded queue starts from a place the machine
+  has never been.
 - **`MovementState.SegmentsLeft`**, if the interpreter was mid-way through submitting a segmented
   move. Those segments must be abandoned, not submitted into a ring that has just been emptied —
   queueing them after the purge would start the machine moving again once it had come to rest. The
@@ -535,13 +543,22 @@ else runs:
   compares against what it saw when it built the move. RepRapFirmware needs no equivalent because
   its pause runs in the same task as the loop it is interrupting.
 
+  The generation is bumped when the stop is *requested*, not when its result is read back: the motion
+  thread acts in its own time, and that window is exactly when a submission would otherwise keep
+  feeding the ring. Nothing is lost if the engine turns out not to have stopped — the submission
+  gives up either way, and the pause reads back how far it got.
+
   A submission abandoned that way is also the one case where the ring cannot say how much of a line
   was made: if the purge dropped nothing — everything queued was already committed — then what ran is
   every segment that went out, and no dropped move names it. So the loop records that fraction as it
-  gives up (`MovementState.AbandonedJobMove`) and the pause reads it when there is no purged move to
-  ask. The file position needs no such rescue: rewinding to the last completed code lands at the
-  start of the line that was still going out, which is the line the fraction belongs to. This is
-  RRF's "we can skip the move that is waiting" branch of `DoAsynchronousPause`.
+  gives up (`MovementState.AbandonedJobMove`, keyed to the generation of the stop that ended it, so a
+  later pause cannot mistake it for its own) and the pause reads it *only* when nothing was purged.
+  Where moves were dropped, the ring's own record is the true boundary — and when none of the dropped
+  moves can be named, the earliest belonged to a macro, so the resume rewinds to the macro invocation
+  with nothing of the job's own line to skip. The file position needs no such rescue: rewinding to
+  the last completed code lands at the start of the line that was still going out, which is the line
+  the fraction belongs to. This is RRF's "we can skip the move that is waiting" branch of
+  `DoAsynchronousPause`.
 
 #### Resuming needs no replan
 

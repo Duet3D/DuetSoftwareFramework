@@ -432,18 +432,20 @@ public class MoveInterpreterTests
         });
     }
 
-    [Test]
-    public void AnotherChannelsMoveDoesNotSpendTheResumedFraction()
+    [TestCase(CodeChannel.Daemon)]
+    [TestCase(CodeChannel.File2)]
+    public void AnotherChannelsMoveDoesNotSpendTheResumedFraction(CodeChannel channel)
     {
         // The interpreter position is shared by every channel here, and the fraction describes the
-        // job's next line. A daemon.g move landing in the window before the job reads it must not be
-        // shortened - nor consume what the job is owed
+        // job's next line on the first file channel. A daemon.g move landing in the window before the
+        // job reads it must not be shortened - nor consume what the job is owed - and neither must a
+        // fork of the job, which has no restore point of its own to have recorded a fraction with
         Machine machine = NewMachine(NewTool());
         machine.State.MoveFractionToSkip = 0.5f;
 
-        Code daemon = G("G1 X10 E4");
-        daemon.Channel = CodeChannel.Daemon;
-        RawMove raw = Build(machine, daemon, NewInput(), isCoordinated: true, MoveType.Normal);
+        Code other = G("G1 X10 E4");
+        other.Channel = channel;
+        RawMove raw = Build(machine, other, NewInput(), isCoordinated: true, MoveType.Normal);
 
         Assert.Multiple(() =>
         {

@@ -530,11 +530,18 @@ internal sealed class MoveInterpreter(
     /// test is what keeps it from being spent on somebody else's move: the interpreter state is
     /// shared by every channel here - RepRapFirmware's is per motion system - so a
     /// <c>daemon.g</c> move landing in the window between the resume and the job's first code would
-    /// otherwise be shortened instead
+    /// otherwise be shortened instead.
+    /// </para>
+    /// <para>
+    /// <c>File</c> and not <c>File2</c>, because there is one of this state and only the first file
+    /// channel ever stores a fraction in it. Letting the second spend what the first is owed would be
+    /// worse than not restoring it at all. TODO when M596 gives each motion system its own
+    /// <see cref="MovementState"/>, both halves become per system together - the restore point that
+    /// records the fraction as well as the move that spends it
     /// </para>
     /// </remarks>
     private float MoveFractionToSkipFor(DuetAPI.Commands.Code code)
-        => code.Channel is CodeChannel.File or CodeChannel.File2 ? state.MoveFractionToSkip : 0.0f;
+        => code.Channel == CodeChannel.File ? state.MoveFractionToSkip : 0.0f;
 
     /// <summary>
     /// Whether the code moves anything other than Z

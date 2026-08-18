@@ -106,7 +106,7 @@ internal partial class JobProcessor
             MovePlanner.FeedholdOutcome held = default;
             if (!synchronous)
             {
-                held = await _planner.StopEarlyAsync(plannedDeceleration: feedhold, cancellationToken);
+                held = await _planner.StopEarlyAsync(plannedDeceleration: feedhold, _moveInterpreter, cancellationToken);
             }
 
             using (await LockAsync(cancellationToken))
@@ -523,18 +523,29 @@ internal partial class JobProcessor
 
             using (_planner.Lock())
             {
-                // The ring's own record first: it names the earliest move actually dropped. The
-                // abandoned submission is the case where nothing was dropped because nothing queued
-                // could be - the line still ended part-way, and its remaining segments never went
-                Motion.JobMoveOrigin? abandoned = _planner.State.AbandonedJobMove;
-                Motion.JobMoveOrigin? interrupted = held.Origin ?? abandoned;
+                // What this stop left behind, if it ended a submission part-way. A record from an
+                // earlier stop is not this pause's business, which is what the generation says
+                Motion.JobMoveOrigin? abandoned =
+                    _planner.State.AbandonedJobMove is Motion.AbandonedJobMove record
+                    && record.PurgeGeneration == _planner.State.PurgeGeneration
+                        ? record.Origin
+                        : null;
                 _planner.State.AbandonedJobMove = null;
 
-                // Either of those means moves the interpreter had already accounted for will not be
-                // made, so its position is the end of a queue that no longer exists
-                if (held.MovesPurged > 0 || abandoned is not null)
+                // The ring's own record wins wherever there is one: it names the earliest move
+                // actually dropped, which is the true boundary. The abandoned submission answers only
+                // the case where nothing was dropped at all - everything queued was already
+                // committed - and the line still ended part-way. When moves *were* dropped and none
+                // of them can be named, the earliest was a macro's, and the resume rewinds to the
+                // macro invocation with nothing of the job's own line to skip
+                Motion.JobMoveOrigin? interrupted = held.Origin ?? (held.MovesPurged == 0 ? abandoned : null);
+
+                // The stop put the interpreter's position right under the lock it purged in, and the
+                // submission that gave up did the same as it unwound, so there is nothing to correct
+                // here - only to report, because a client's idea of where the machine is came from
+                // the queue that was dropped
+                if (held.Stopped || abandoned is not null)
                 {
-                    _moveInterpreter.SyncInterpreterToMachine();
                     _planner.PublishCommittedPosition();
                 }
 

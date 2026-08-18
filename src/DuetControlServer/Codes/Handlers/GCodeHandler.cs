@@ -288,7 +288,11 @@ internal sealed partial class GCodeHandler(
         List<int> armedAxes = [];
         int submitted = 0;
         uint purgeGeneration = 0;
-        bool isJobCode = code.IsFromFileChannel && code.File is not Files.MacroFile;
+        // Whether a stop dropping this move can say where to resume from it. The first file channel
+        // only: there is one pause restore point and one interpreter state, both of them the first
+        // channel's, so an offset measured in a fork of the job would be restored against the wrong
+        // stream. TODO this widens with M596/M598, along with the state it feeds
+        bool isJobCode = code.Channel == CodeChannel.File && code.File is not Files.MacroFile;
 
         try
         {
@@ -413,14 +417,14 @@ internal sealed partial class GCodeHandler(
                             // resume. Every segment of a move carries the same file position, because
                             // they all came from the one code.
                             //
-                            // Only a move whose code came from the job file itself. A code read from a
-                            // macro carries an offset into the *macro*, and a resume rewinds the *job*
-                            // file, so recording one would send the job to an unrelated position -
-                            // macros being small and job files large, to somewhere near its start.
-                            // With no origin the pause falls back to the last completed job-file code,
-                            // which is the macro invocation, so the macro re-runs whole. That is
-                            // RepRapFirmware's GetJobFilePosition, which returns noFilePosition for
-                            // exactly this case
+                            // Only a move whose code came from the job file itself - see isJobCode. A
+                            // code read from a macro carries an offset into the *macro*, and a resume
+                            // rewinds the *job* file, so recording one would send the job to an
+                            // unrelated position - macros being small and job files large, to
+                            // somewhere near its start. With no origin the pause falls back to the
+                            // last completed job-file code, which is the macro invocation, so the
+                            // macro re-runs whole. That is RepRapFirmware's GetJobFilePosition, which
+                            // returns noFilePosition for exactly this case
                             if (isJobCode)
                             {
                                 planner.JobMoves.Note(raw.MoveId, new JobMoveOrigin
@@ -473,24 +477,43 @@ internal sealed partial class GCodeHandler(
             if (raw is not null)
             {
                 // However this ended - submitted, rejected, thrown or cancelled - the move is no
-                // longer part-way through, and a channel waiting on it must not be left waiting
+                // longer part-way through, and a channel waiting on it must not be left waiting.
+                // The object model read lock because putting the interpreter's position back reads
+                // the transform out of it; it is not published here, which the pause does once the
+                // machine has settled
+                using (await model.AccessReadOnlyAsync(CancellationToken.None))
                 using (planner.Lock())
                 {
-                    planner.State.SegmentsLeft = 0;
+                    MovementState state = planner.State;
+                    state.SegmentsLeft = 0;
 
-                    // A submission that ended early leaves the code part done with nothing on the
-                    // ring to say so, because the segments that would have said it were never
-                    // queued. A pause reads this to find out how much of the line it has to skip on
-                    // the way back in; a submission that finished leaves nothing to read
-                    planner.State.AbandonedJobMove = isJobCode && submitted > 0 && submitted < segments.Count
-                        ? new JobMoveOrigin
+                    if (submitted < segments.Count)
+                    {
+                        // The interpreter accounted for the whole move when it built it, so a
+                        // submission that ended early leaves it describing segments the machine will
+                        // never make - and the next move built anywhere would start from them
+                        moveInterpreter.SyncInterpreterToMachine();
+
+                        // A code left part done has nothing on the ring to say so, because the
+                        // segments that would have said it were never queued. A pause reads this to
+                        // find out how much of the line it has to skip on the way back in - but only
+                        // the pause whose own stop ended this submission, which is what the
+                        // generation says. Anything else that ends a submission leaves the slot
+                        // alone rather than clearing it: it is shared, and the record in it may
+                        // belong to another channel's stop
+                        if (isJobCode && submitted > 0 && state.PurgeGeneration != purgeGeneration)
                         {
-                            FilePosition = code.FilePosition,
-                            GCommandNumber = code.MajorNumber ?? -1,
-                            FeedRateMmPerSec = raw.OriginalFeedRateMmPerSec,
-                            ProportionDone = (float)submitted / segments.Count
+                            state.AbandonedJobMove = new AbandonedJobMove(
+                                new JobMoveOrigin
+                                {
+                                    FilePosition = code.FilePosition,
+                                    GCommandNumber = code.MajorNumber ?? -1,
+                                    FeedRateMmPerSec = raw.OriginalFeedRateMmPerSec,
+                                    ProportionDone = (float)submitted / segments.Count
+                                },
+                                state.PurgeGeneration);
                         }
-                        : null;
+                    }
                 }
             }
         }
