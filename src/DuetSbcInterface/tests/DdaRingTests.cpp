@@ -529,6 +529,168 @@ namespace
 	}
 }
 
+	// --- Stopping early ---------------------------------------------------------------------
+	//
+	// Two ways to stop the ring before it has run: PauseMoves looks for a junction the toolpath is
+	// already slow enough to stop at, which is RepRapFirmware's, and Feedhold makes one. What both
+	// have to get right is the boundary between what may be dropped and what may not - a move whose
+	// segments have gone to the boards cannot be recalled - and that the moves left behind still add
+	// up to a motion that comes to rest.
+
+	// A run of colinear moves along X, each starting where the last ended - which is what makes
+	// lookahead raise the junction speeds between them, and so what makes the run one that
+	// RepRapFirmware's search cannot stop in. Nothing is spun, so every move is still provisional.
+	//
+	// `restartable` clears the flag that says a print may resume from the end of a move, which is
+	// how an arc segment or a retraction reaches the ring.
+	unsigned int FillWithRun(DDARing& ring, unsigned int count, float lengthMm, uint32_t firstMoveId,
+							 bool restartable = true) noexcept
+	{
+		unsigned int added = 0;
+		for (unsigned int i = 0; i < count && ring.CanAddMove(); ++i)
+		{
+			MoveRecord move = MakeXMove(firstMoveId + i, (float)i * lengthMm, (float)(i + 1) * lengthMm);
+			if (!restartable)
+			{
+				move.Header().flags &= ~MoveFlags::canPauseAfter;
+			}
+			if (ring.AddMove(move.Header()) != MovementError::Ok)
+			{
+				break;
+			}
+			++added;
+		}
+		return added;
+	}
+
+	// A ring of moves that never slow down between them melds into one run, so there is no junction
+	// at or below jerk anywhere in it. That is the case RepRapFirmware cannot stop early in, and it
+	// is the ordinary state of a machine printing at speed - so the answer has to be "no", not a
+	// stop at a junction the machine could not actually have taken.
+	void TestPauseMovesFindsNothingInAFastRun(DDARing& ring, RecordingSink& sink) noexcept
+	{
+		sink.Clear();
+		CHECK(Drain(ring), "the ring starts empty so the counts below are this test's own");
+		const uint32_t scheduledBefore = ring.GetScheduledMoves();
+		const unsigned int added = FillWithRun(ring, 8, 50.0F, 100);
+		CHECK(added >= 4, "the ring took enough moves to have junctions in it");
+
+		DDARing::FeedholdOutcome outcome{};
+		const bool stopped = ring.PauseMoves(outcome);
+		CHECK(!stopped, "a run that never drops to jerk speed offers nowhere to stop");
+		CHECK(outcome.movesPurged == 0, "nothing is dropped when there is nowhere to stop");
+		CHECK(ring.GetScheduledMoves() == scheduledBefore + added, "the moves are all still scheduled");
+
+		CHECK(Drain(ring), "the ring still finishes normally afterwards");
+	}
+
+	// The feedhold's whole purpose: where PauseMoves finds nothing, this makes a stopping point. What
+	// it must not do is drop everything - the machine has to be left enough distance to decelerate in.
+	void TestFeedholdStopsWhereAPauseCannot(DDARing& ring, RecordingSink& sink) noexcept
+	{
+		sink.Clear();
+		CHECK(Drain(ring), "the ring starts empty");
+		const unsigned int added = FillWithRun(ring, 8, 50.0F, 110);
+		CHECK(added >= 4, "the ring took enough moves to stop within");
+		const uint32_t scheduledBefore = ring.GetScheduledMoves();
+
+		DDARing::FeedholdOutcome outcome{};
+		const bool stopped = ring.Feedhold(outcome);
+		CHECK(stopped, "the feedhold finds a stopping point where PauseMoves found none");
+		CHECK(outcome.movesPurged > 0, "it drops the moves after the stop");
+		CHECK(outcome.movesPurged < added, "it leaves the machine somewhere to decelerate");
+		CHECK(outcome.firstPurgedMoveId >= 110, "it names the first move it dropped");
+		CHECK(ring.GetScheduledMoves() == scheduledBefore - outcome.movesPurged,
+			  "the scheduled count drops by exactly what was purged");
+
+		CHECK(Drain(ring), "what is left of the ring runs to a standstill");
+	}
+
+	// The first move keeps the start speed it already had, because the move before it is committed
+	// and its end speed has already gone to the boards. A feedhold that reduced it would be asking
+	// the machine to arrive at a speed it was never told to reach.
+	void TestFeedholdLeavesCommittedMovesAlone(DDARing& ring, RecordingSink& sink) noexcept
+	{
+		sink.Clear();
+		CHECK(Drain(ring), "the ring starts empty");
+		const unsigned int added = FillWithRun(ring, 8, 50.0F, 120);
+		CHECK(added >= 4, "the ring took enough moves");
+
+		// Let the front of the ring commit and reach the boards
+		for (int i = 0; i < 2000 && sink.headers.empty(); ++i)
+		{
+			(void)ring.Spin(MoveTiming::usualMinimumPreparedTime, SimulationMode::Off, true, true);
+			AdvanceTicks(stepClockRate / 1000);
+		}
+		const size_t sentBeforeStop = sink.headers.size();
+		CHECK(sentBeforeStop > 0, "at least one move has been committed and sent");
+
+		DDARing::FeedholdOutcome outcome{};
+		(void)ring.Feedhold(outcome);
+
+		// Nothing already sent may be taken back, and the count of what was sent cannot fall
+		CHECK(sink.headers.size() >= sentBeforeStop, "a feedhold does not unsend a committed move");
+		CHECK(outcome.movesPurged <= added - sentBeforeStop,
+			  "it purges only moves that had not been committed");
+
+		CHECK(Drain(ring), "the ring finishes after the stop");
+	}
+
+	// A move that is not a restartable boundary - one segment of an arc, a retraction - is not a
+	// place a print can resume from however much room there is to stop in. Neither kind of stop may
+	// choose one.
+	void TestNeitherStopChoosesAnUnrestartableBoundary(DDARing& ring, RecordingSink& sink) noexcept
+	{
+		sink.Clear();
+
+		CHECK(Drain(ring), "the ring starts empty");
+		const unsigned int added = FillWithRun(ring, 8, 50.0F, 200, /*restartable=*/false);
+		CHECK(added >= 4, "the ring took the indivisible moves");
+		const uint32_t scheduledBefore = ring.GetScheduledMoves();
+
+		DDARing::FeedholdOutcome pauseOutcome{};
+		CHECK(!ring.PauseMoves(pauseOutcome), "PauseMoves will not stop inside an indivisible run");
+
+		DDARing::FeedholdOutcome feedholdOutcome{};
+		CHECK(!ring.Feedhold(feedholdOutcome), "the feedhold will not stop inside one either");
+		CHECK(feedholdOutcome.movesPurged == 0, "so nothing is dropped");
+		CHECK(ring.GetScheduledMoves() == scheduledBefore, "and every move is still scheduled");
+
+		CHECK(Drain(ring), "the indivisible run finishes intact");
+	}
+
+	// An empty ring has nothing to stop, and asking must not walk off the end of it.
+	void TestStoppingAnEmptyRingDoesNothing(DDARing& ring, RecordingSink& sink) noexcept
+	{
+		sink.Clear();
+		CHECK(Drain(ring), "the ring starts empty");
+
+		DDARing::FeedholdOutcome outcome{};
+		CHECK(!ring.Feedhold(outcome), "a feedhold on an empty ring stops nothing");
+		CHECK(!ring.PauseMoves(outcome), "and neither does a pause");
+		CHECK(outcome.movesPurged == 0, "nothing is dropped");
+		CHECK(ring.CanAddMove(), "the ring is still usable");
+	}
+
+	// After a stop the ring must be usable again: the add pointer has moved back over the moves that
+	// were dropped, and a move queued next has to go in behind the one the machine will stop at.
+	void TestRingIsUsableAfterAStop(DDARing& ring, RecordingSink& sink) noexcept
+	{
+		sink.Clear();
+		CHECK(Drain(ring), "the ring starts empty");
+		const unsigned int added = FillWithRun(ring, 8, 50.0F, 210);
+		CHECK(added >= 4, "the ring took enough moves");
+
+		DDARing::FeedholdOutcome outcome{};
+		CHECK(ring.Feedhold(outcome), "the feedhold stops the ring");
+		CHECK(Drain(ring), "what was left runs out");
+
+		MoveRecord resumed = MakeXMove(300, 0.0F, 20.0F);
+		CHECK(ring.CanAddMove(), "the ring accepts moves again");
+		CHECK(ring.AddMove(resumed.Header()) == MovementError::Ok, "a move queued after the stop is taken");
+		CHECK(Drain(ring), "and it runs");
+	}
+
 int main()
 {
 	StepTimer::Init();
@@ -557,6 +719,12 @@ int main()
 	TestSimulationSendsNothing(ring, sink);
 	TestTuningAppliesFromTheMoveThatCarriesIt(ring, sink);
 	TestZeroAccelerationIsRejected(ring, sink);
+	TestPauseMovesFindsNothingInAFastRun(ring, sink);
+	TestFeedholdStopsWhereAPauseCannot(ring, sink);
+	TestFeedholdLeavesCommittedMovesAlone(ring, sink);
+	TestNeitherStopChoosesAnUnrestartableBoundary(ring, sink);
+	TestStoppingAnEmptyRingDoesNothing(ring, sink);
+	TestRingIsUsableAfterAStop(ring, sink);
 
 	StepTimer::SetLocalClockSource(nullptr);
 	return TestSupport::Summarise("DDARing");

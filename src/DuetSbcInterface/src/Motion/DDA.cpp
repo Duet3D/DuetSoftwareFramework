@@ -350,6 +350,10 @@ MovementError DDA::InitFromParams(DDARing& ring, const Duet::Sbc::Motion::MovePa
 	m_backlashCorrectionDistanceFactor = params.backlashCorrectionDistanceFactor;
 
 	m_flags.canPauseAfter = (params.flags & MoveFlags::canPauseAfter) != 0;
+
+	// The same bit, kept as it arrived. canPauseAfter above is about to acquire a second meaning in
+	// RecalculateMove; this one stays what DuetControlServer said - see IsRestartableBoundary
+	m_flags.restartableBoundary = m_flags.canPauseAfter;
 	m_flags.checkEndstops = (params.flags & MoveFlags::checkEndstops) != 0;
 	m_flags.sharedSwitches = (params.flags & MoveFlags::sharedSwitches) != 0;
 	m_flags.usingStandardFeedrate = (params.flags & MoveFlags::usingStandardFeedrate) != 0;

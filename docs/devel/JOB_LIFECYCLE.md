@@ -712,8 +712,11 @@ when the head is at or below the pause height, and only splits the move - travel
       draining the ring — the feedhold supersedes it only for `M25.1`
 - [ ] MCODE_MIGRATION §11.6's row for `PauseMoves` records that it is ported
 - [ ] `rrf-differences.md` entry, now that there is shipped behaviour to describe
-- [ ] Native tests for `DDARing::Feedhold` — the boundary search, the backward re-plan and the
-      committed-move floor are all arithmetic that a test can pin and review cannot
+- [x] Native tests for both stops — the boundary search, the committed-move floor, the indivisible-run
+      refusal and the ring being usable afterwards. They caught a design bug on their first run: the
+      feedhold was reading `canPauseAfter`, which `RecalculateMove` overwrites with "...and already at
+      or below jerk", so it could only stop where RepRapFirmware could. `restartableBoundary` is now a
+      flag of its own, kept as DuetControlServer sent it
 - [ ] Only ring 0 is stopped; a `// TODO` in `DrainFeedholds` names M596
 
 ### Phase 5 — pausable macros and the deferred pause ⬜

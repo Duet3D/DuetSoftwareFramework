@@ -175,11 +175,15 @@ class DDA final
 	[[nodiscard]] float GetEndSpeed() const noexcept { return m_endSpeed; }
 	[[nodiscard]] float GetMaxAcceleration() const noexcept { return m_maxAcceleration; }
 
-	// Whether a print stopped after this move can be restarted from the move that follows it. This is
-	// the flag on its own, without CanPauseAfter's extra test that the next move is uncommitted: a
-	// feedhold only ever looks at moves it has established are uncommitted, and it is deciding where
-	// a stop is *restartable* rather than where the toolpath happens to be slow enough already.
-	[[nodiscard]] bool IsRestartableBoundary() const noexcept { return m_flags.canPauseAfter; }
+	// Whether a print stopped after this move can be restarted from the move that follows it.
+	//
+	// Deliberately a different flag from canPauseAfter, which starts out saying the same thing and
+	// then has RecalculateMove overwrite it with "...and the end speed is already at or below jerk on
+	// every drive". RepRapFirmware never needs the two apart, because its only stop is the one that
+	// looks for a junction already slow enough. A feedhold does: it is asking where a stop would be
+	// *restartable*, and then making it slow enough itself. Reading the overwritten flag would have
+	// it stop only where RepRapFirmware could, which is the whole thing it exists to escape.
+	[[nodiscard]] bool IsRestartableBoundary() const noexcept { return m_flags.restartableBoundary; }
 
 	// Bring this move to rest at `endSpeed`, for a feedhold re-planning the tail of the ring. Only
 	// valid on a provisional move: a committed one has had its segments generated and sent.
@@ -248,6 +252,7 @@ class DDA final
 			// the same order so that the compiler can copy them using a ubfx instruction.
 			uint32_t stateBits : 3,		   // What state this DDA is in
 				canPauseAfter : 1,		   // True if we can pause at the end of this move
+				restartableBoundary : 1,   // True if a print stopped after this move can be restarted
 				checkEndstops : 1,		   // True if this move monitors endstops or Z probe
 				usingStandardFeedrate : 1, // True if this move uses the standard feed rate
 				usePressureAdvance : 1,	   // True if pressure advance should be applied to any forward extrusion
