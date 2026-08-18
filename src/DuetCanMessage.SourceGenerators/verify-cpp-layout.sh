@@ -27,9 +27,25 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 CXX="${CXX:-g++}"
-# CANlib targets ARM, where float16_t is __fp16; on x86-64 the equivalent is _Float16.
 INCLUDES=(-I "$ROOT/lib/CANlib/src" -I "$ROOT/lib/RRFLibraries/src" -I "$ROOT/lib/CoreN2G/src")
-FLAGS=(-std=c++17 -w -D__fp16=_Float16)
+FLAGS=(-std=c++17 -w)
+
+# CANlib targets ARM, where float16_t is __fp16. Which spelling of a 16-bit float the host compiler
+# accepts depends on the host: an AArch64 g++ has __fp16 as a keyword and (before g++ 13) rejects
+# _Float16 in C++, while on x86-64 it is the other way round. Substituting one for the other
+# unconditionally therefore fixes one host by breaking the other, so ask the compiler instead.
+cxx_accepts_type() {
+	echo "typedef $1 probe_float16_t; probe_float16_t v;" | "$CXX" -std=c++17 -w -x c++ -fsyntax-only - 2>/dev/null
+}
+
+if cxx_accepts_type __fp16; then
+	: # Native __fp16 (ARM hosts); CANlib's headers compile as written
+elif cxx_accepts_type _Float16; then
+	FLAGS+=(-D__fp16=_Float16)
+else
+	echo "error: $CXX supports neither __fp16 nor _Float16, so CANlib's float16_t cannot be compiled here" >&2
+	exit 1
+fi
 
 for dir in "$ROOT/lib/CANlib/src" "$ROOT/lib/RRFLibraries/src" "$ROOT/lib/CoreN2G/src"; do
 	if [ ! -d "$dir" ]; then
