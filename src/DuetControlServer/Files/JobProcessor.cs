@@ -22,7 +22,7 @@ namespace DuetControlServer.Files;
 /// Main class dealing with job files
 /// </summary>
 [DiagnosticsPriority(-1)]
-public class JobProcessor : BackgroundService, IAsyncDiagnostics
+internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
 {
     // Private fields
     private readonly CodeProcessor _codeProcessor;
@@ -31,6 +31,9 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     private readonly Expressions _expressions;
     private readonly FileFactory _fileFactory;
     private readonly Parser.FileInfoParser _fileInfoParser;
+    private readonly MacroRunner _macroRunner;
+    private readonly Motion.MovePlanner _planner;
+    private readonly Tools.ToolManager _toolManager;
     private readonly Model.ObjectModel _model;
     private readonly ILogger<JobProcessor> _logger;
     private readonly IHostApplicationLifetime _lifetime;
@@ -45,6 +48,9 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// <param name="expressions">Expressions</param>
     /// <param name="fileFactory">File factory</param>
     /// <param name="fileInfoParser">File info parser</param>
+    /// <param name="macroRunner">Runs the lifecycle macros</param>
+    /// <param name="planner">Where the restore point is saved from and the resume move is queued</param>
+    /// <param name="toolManager">The selected tool, whose offsets the resume move goes through</param>
     /// <param name="model">Object Model</param>
     /// <param name="lifetime">Host application lifetime</param>
     /// <param name="logger">Logger</param>
@@ -55,6 +61,9 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
         Expressions expressions,
         FileFactory fileFactory,
         Parser.FileInfoParser fileInfoParser,
+        MacroRunner macroRunner,
+        Motion.MovePlanner planner,
+        Tools.ToolManager toolManager,
         Model.ObjectModel model,
         IHostApplicationLifetime lifetime,
         ILogger<JobProcessor> logger,
@@ -66,6 +75,9 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
         _expressions = expressions;
         _fileFactory = fileFactory;
         _fileInfoParser = fileInfoParser;
+        _macroRunner = macroRunner;
+        _planner = planner;
+        _toolManager = toolManager;
         _model = model;
         _lifetime = lifetime;
         _logger = logger;
@@ -679,12 +691,18 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     }
 
     /// <summary>
-    /// Called when the print is being paused
+    /// Stop the job reading and cancel what it has read ahead
     /// </summary>
-    /// <param name="filePosition">File position where the print was paused</param>
-    /// <param name="filePosition2">File position of the second motion system where the print was paused</param>
-    /// <param name="pauseReason">Reason why the print has been paused</param>
-    public void Pause(long? filePosition, long? filePosition2, PrintPausedReason pauseReason)
+    /// <param name="filePosition">File position to resume from, or null to use the last completed code</param>
+    /// <param name="filePosition2">The same for the second motion system</param>
+    /// <param name="pauseReason">Reason why the print is pausing</param>
+    /// <remarks>
+    /// One step of <see cref="PauseAsync"/> rather than the whole of a pause, and deliberately does
+    /// not touch <see cref="PauseState"/>: the sequence owns that, because the machine is not paused
+    /// until it has stopped moving and <c>pause.g</c> has run. This class has to be locked when this
+    /// method is called
+    /// </remarks>
+    private void StopReadingForPause(long? filePosition, long? filePosition2, PrintPausedReason pauseReason)
     {
         if (IsFileSelected)
         {
@@ -692,7 +710,6 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
             _cancellationTokenSource.Dispose();
             _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.ApplicationStopping);
 
-            PauseState = PauseState.Paused;
             _pausePosition = filePosition;
             _pausePosition2 = filePosition2;
             _pauseReason = pauseReason;

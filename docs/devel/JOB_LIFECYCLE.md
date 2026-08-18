@@ -625,25 +625,43 @@ machine is. C++ selects members with a table; here the model class *is* the wire
 is between two classes rather than between a class and its table. It is qualified as
 `Motion.RestorePoint` in the two files that see both, which is what `Model.ObjectModel` already does.
 
-### Phase 2 — pause and resume, without skipping queued moves ⬜
+### Phase 2 — pause and resume, without skipping queued moves ✅
 
 The `movesSkipped == false` branch of `DoAsynchronousPause`: flush to standstill, save the restore
 point from where the machine actually stopped, take the file position from the job file.
 
-- [ ] `JobProcessor.PauseSequenceAsync(channel, reason, runPauseMacro)` — flush, save the restore
+- [x] `JobProcessor.PauseAsync(channel, reason, macro, synchronous, reportPosition, pausingCode)` — flush, save the restore
       point, cancel the file channel's in-flight codes, set `Pausing`, run `pause.g` (or
       `filament-change.g` falling back to it), settle to `Paused` in a `finally`
-- [ ] `M25` — from a file, from elsewhere, "Printing is already paused!", "Cannot pause print,
+- [x] `M25` — from a file, from elsewhere, "Printing is already paused!", "Cannot pause print,
       because no file is being printed!"
-- [ ] `M226`, `M600`, `M601`, including `M226 P0` skipping `pause.g` and the "use M226/600/601 only
+- [x] `M226`, `M600`, `M601`, including `M226 P0` skipping `pause.g` and the "use M226/600/601 only
       within a file being printed" refusal
-- [ ] A synchronous pause supplies no file position (§2.9)
-- [ ] `M24` — refuse while `Pausing` or `Resuming`; `resuming1`/`2`/`3` equivalent restoring the feed
+- [x] A synchronous pause supplies no file position (§2.9)
+- [x] `M24` — refuse while `Pausing` or `Resuming`; `resuming1`/`2`/`3` equivalent restoring the feed
       rate and moving the head back in **two** moves, Z ordered last or first by direction (§3.3);
       `M24 P0` skips `resume.g`; `pause.g` and `resume.g` only when all axes are homed
-- [ ] A `// TODO` on the resume moves naming M596 — the multi-motion-system branch of `resuming1` is
+- [x] A `// TODO` on the resume moves naming M596 — the multi-motion-system branch of `resuming1` is
       not ported and the Z ordering has to be revisited across both systems when it is
-- [ ] `M24` on a selected-but-not-started file runs `start.g`
+- [x] `M24` on a selected-but-not-started file runs `start.g`, and so does M32
+
+Three things the port had to get right that reading the RRF state machine alone does not show:
+
+- **The pause sequence must not flush the channel it is running on.** `FlushAsync(channel, flushAll)`
+  drains every pipeline stage including the pausing code's own, so a synchronous pause would wait for
+  itself. Only the asynchronous path flushes the job channel; the synchronous one relies on the
+  handler's `FlushAsync(code, ...)`, which by construction only flushes stages ahead of the code.
+- **Cancelling the read-ahead cancels the pausing code with it.** A code's cancellation token is the
+  job's, so `M226` cancels its own token and every step after it. The code is re-armed the way
+  `HandleStopAsync` already re-arms one, and the rest of the sequence runs on
+  `ApplicationStopping` rather than the caller's token.
+- **The cancel has to come before the flush**, not after. A job code waiting on a temperature would
+  otherwise hold the flush up for as long as the heater takes. RepRapFirmware reaches the same place
+  from the other side, with `CancelWaitForTemperatures(true)` inside `DoAsynchronousPause`.
+
+`resuming1`'s two moves are conditional, not unconditional: RepRapFirmware moves every axis together
+when the head is at or below the pause height, and only splits the move - travel across, then descend
+- when the head is above it, which is where the dragging risk actually is.
 
 ### Phase 3 — stopping ⬜
 

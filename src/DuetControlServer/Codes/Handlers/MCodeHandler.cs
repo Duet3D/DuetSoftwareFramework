@@ -4,6 +4,7 @@ using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetControlServer.Commands;
 using DuetControlServer.Files;
+using DuetControlServer.Link.Protocol.FirmwareRequests;
 using DuetControlServer.Files.Parser;
 using DuetControlServer.Link;
 using DuetControlServer.Link.Protocol.CanMessages;
@@ -132,6 +133,8 @@ internal partial class MCodeHandler(
             23 or 32 => await HandleSelectFileAsync(code, cancellationToken),
             // Resume a file print
             24 => await HandleResumePrintAsync(code, cancellationToken),
+            // Pause the print
+            25 => await HandlePausePrintAsync(code, cancellationToken),
             // Set SD position
             26 => await HandleSetFilePositionAsync(code, cancellationToken),
             // Report SD print status
@@ -210,6 +213,8 @@ internal partial class MCodeHandler(
             208 => await HandleAxisLimitsAsync(code, cancellationToken),
             // Set the speed factor
             220 => await HandleSpeedFactorAsync(code, cancellationToken),
+            // Synchronous pause, filament change pause, Prusa-style pause
+            226 or 600 or 601 => await HandleSynchronousPauseAsync(code, cancellationToken),
             // Set the extrusion factor
             221 => await HandleExtrusionFactorAsync(code, cancellationToken),
             // Servo control
@@ -531,6 +536,13 @@ internal partial class MCodeHandler(
                     }
                     await jobProcessor.SelectFileAsync(fileName, physicalFile, false, cancellationToken);
                 }
+
+                // M32 starts what it selected; M23 only selects. Starting goes through the same call
+                // M24 makes, so start.g runs for both of them
+                if (code.MajorNumber == 32)
+                {
+                    return await jobProcessor.ResumeAsync(code.Channel, runMacro: true, cancellationToken);
+                }
             }
 
             return new Message();
@@ -548,20 +560,89 @@ internal partial class MCodeHandler(
     {
         if (await codeProcessor.FlushAsync(code, syncFileStreams: true, cancellationToken: cancellationToken))
         {
-            if (code.Channel != CodeChannel.File2)
+            if (code.Channel == CodeChannel.File2)
             {
-                using (await jobProcessor.LockAsync(cancellationToken))
-                {
-                    if (!jobProcessor.IsFileSelected)
-                    {
-                        return new Message(MessageType.Error, "Cannot print, because no file is selected!");
-                    }
-                }
+                return new Message();
             }
 
-            // resume.g is not run: macro execution is not wired up yet. The job itself resumes from
-            // CodeExecutedAsync once this code completes
-            return new Message();
+            // P0 skips resume.g, as it does in RepRapFirmware
+            bool runMacro = code.GetInt('P', 1) != 0;
+            return await jobProcessor.ResumeAsync(code.Channel, runMacro, cancellationToken);
+        }
+        throw new OperationCanceledException();
+    }
+
+    /// <summary>
+    /// M25: pause the print
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// <para>
+    /// A pause from inside the job file is <em>synchronous</em>: the file has already reached the
+    /// point it is pausing at, so everything before it runs and the machine stops there. A pause from
+    /// anywhere else interrupts whatever the job was doing, which is RepRapFirmware's distinction
+    /// between <c>DoSynchronousPause</c> and <c>DoAsynchronousPause</c>.
+    /// </para>
+    /// <para>
+    /// TODO RepRapFirmware defers a pause requested while the job is inside a macro that cannot be
+    /// restarted, by stashing an M226 and injecting it once the job is back out - see
+    /// <c>deferredPauseCommandPending</c> and JOB_LIFECYCLE.md phase 5. Until that lands the pause
+    /// happens immediately, macro or no macro
+    /// </para>
+    /// </remarks>
+    private async ValueTask<Message> HandlePausePrintAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        if (await codeProcessor.FlushAsync(code, syncFileStreams: true, cancellationToken: cancellationToken))
+        {
+            if (code.Channel == CodeChannel.File2)
+            {
+                return new Message();
+            }
+
+            return await jobProcessor.PauseAsync(code.Channel, PrintPausedReason.User, PauseMacro.Pause,
+                                                 synchronous: code.IsFromFileChannel, reportPosition: true,
+                                                 pausingCode: code.IsFromFileChannel ? code : null,
+                                                 cancellationToken);
+        }
+        throw new OperationCanceledException();
+    }
+
+    /// <summary>
+    /// M226, M600 and M601: pause from within the job file
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// M600 asks for a filament change, so it prefers <c>filament-change.g</c> and says so when it
+    /// reports where it stopped. <c>M226 P0</c> runs no macro at all. M601 is M226 under the name
+    /// Prusa slicers emit
+    /// </remarks>
+    private async ValueTask<Message> HandleSynchronousPauseAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        if (!code.IsFromFileChannel)
+        {
+            return new Message(MessageType.Error, "use M226/600/601 only within a file being printed");
+        }
+
+        if (await codeProcessor.FlushAsync(code, syncFileStreams: true, cancellationToken: cancellationToken))
+        {
+            if (code.Channel == CodeChannel.File2)
+            {
+                return new Message();
+            }
+
+            bool filamentChange = code.MajorNumber == 600;
+            PauseMacro macro = filamentChange ? PauseMacro.FilamentChange
+                               : code.GetInt('P', 1) == 0 ? PauseMacro.None
+                               : PauseMacro.Pause;
+            PrintPausedReason reason = filamentChange ? PrintPausedReason.FilamentChange : PrintPausedReason.GCode;
+
+            return await jobProcessor.PauseAsync(code.Channel, reason, macro,
+                                                 synchronous: true, reportPosition: true,
+                                                 pausingCode: code, cancellationToken);
         }
         throw new OperationCanceledException();
     }
@@ -1972,13 +2053,12 @@ internal partial class MCodeHandler(
         switch (code.MajorNumber)
         {
             // Stop or unconditional stop, sleep or conditional stop
-            // Resume print
-            // Select file and start SD print
             // Simulate file
+            // M24 and M32 no longer appear here: starting and resuming a job is what
+            // JobProcessor.ResumeAsync does, and it has to happen before the code returns so that
+            // start.g and resume.g run inside it
             case 0:
             case 1:
-            case 24:
-            case 32:
             case 37:
                 using (await jobProcessor.LockAsync(cancellationToken))
                 {
