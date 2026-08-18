@@ -1,23 +1,30 @@
+using System;
 using System.Collections.Generic;
+using DuetAPI;
 
 namespace DuetControlServer.Motion;
 
 /// <summary>
-/// What a queued move came from in the job file
+/// A job-file movement code the interpreter is part-way through
 /// </summary>
 /// <remarks>
-/// The motion engine knows a move by its id and nothing else about it: <c>MoveParams</c> carries no
-/// file position, and it should not - the engine has no idea what a file is. So a feedhold reports
-/// the id of the first move it dropped and this is what turns that back into somewhere to resume
-/// from. <c>EndstopCorrection.NoteMoveId</c> is the same arrangement for the same reason.
-///
-/// Only moves whose code came from the job file are recorded. A position is meaningful only against
-/// the file it was measured in, and the resume rewinds the job file
+/// <para>
+/// One of these per code, not per queued move: a code that segments produces several moves and they
+/// all describe the same line of the file. It is RepRapFirmware's <c>ms.raw</c> together with
+/// <c>ms.totalSegments</c> and <c>ms.segmentsLeft</c>, which is the set <c>DoAsynchronousPause</c>
+/// reads when it stops part-way through a code (GCodes.cpp:1092).
+/// </para>
+/// <para>
+/// Where to rewind the file to and how much of the code the machine has already made are two halves
+/// of one fact, so they are fields of one record and <see cref="PointAt"/> is the only way to read
+/// them. A fraction that names no file position cannot be expressed, which is what keeps the rewind
+/// and the scaling describing the same line
+/// </para>
 /// </remarks>
-internal readonly record struct JobMoveOrigin
+internal sealed class JobMoveOrigin
 {
     /// <summary>
-    /// Where in the job file the code that produced the move started
+    /// Where in the job file the code started
     /// </summary>
     public long? FilePosition { get; init; }
 
@@ -38,42 +45,135 @@ internal readonly record struct JobMoveOrigin
     public float FeedRateMmPerSec { get; init; }
 
     /// <summary>
-    /// How much of the code that produced this move had already been done before it, 0..1
+    /// How much of the code was already made when this move was built, 0..1
     /// </summary>
     /// <remarks>
-    /// A code that segments produces several moves, and a feedhold may drop them part-way through
-    /// the run. The resume rewinds to the code - every segment carries the same file position - so
-    /// what it has to be told as well is how much of that code is already behind the machine. This
-    /// is that fraction, and it becomes <see cref="RestorePoint.ProportionDone"/> and then
-    /// <see cref="MovementState.MoveFractionToSkip"/>. RepRapFirmware carries the same number on the
-    /// DDA as <c>proportionDone</c>
+    /// Non-zero only for the first move built after a resume that landed part-way through a code:
+    /// that build is the remainder of the code rather than the whole of it, so a stop inside it has
+    /// to compose its own fraction on top of this one. RepRapFirmware needs no equivalent because it
+    /// re-reads the whole code and skips the leading segments, leaving <c>totalSegments</c> always
+    /// the whole code's
     /// </remarks>
-    public float ProportionDone { get; init; }
+    public float FractionAtStart { get; init; }
+
+    /// <summary>
+    /// How long the code is in the file
+    /// </summary>
+    /// <remarks>
+    /// So that a code every segment of which was queued can name the code after it. What is left of
+    /// a code that will be made in full is the next one
+    /// </remarks>
+    public long CodeLength { get; init; }
+
+    /// <summary>
+    /// How many segments the build produced
+    /// </summary>
+    public int SegmentCount { get; init; }
+
+    /// <summary>
+    /// How many of them have been queued
+    /// </summary>
+    /// <remarks>
+    /// Advanced as each segment goes out. A stop that purges nothing takes the boundary from here,
+    /// because everything queued was already committed and will run, so the first segment not queued
+    /// is the first the machine will not make
+    /// </remarks>
+    public int SegmentsQueued { get; set; }
+
+    /// <summary>
+    /// Where a resume would have to carry on from, having made this many of the segments
+    /// </summary>
+    /// <param name="segmentsMade">Segments of this build the machine will have made</param>
+    /// <returns>The resume point, or null if the code has no file position to rewind to</returns>
+    public JobResumePoint? PointAt(int segmentsMade)
+    {
+        if (FilePosition is not long filePosition)
+        {
+            return null;
+        }
+
+        // Every segment queued means the whole code will be made, so what is left of it is the code
+        // after it. RepRapFirmware reaches the same place with a proportion of one, which skips every
+        // segment when the code is read again
+        if (SegmentCount > 0 && segmentsMade >= SegmentCount)
+        {
+            return new JobResumePoint(filePosition + CodeLength, 0.0f, GCommandNumber, FeedRateMmPerSec);
+        }
+        return new JobResumePoint(filePosition, ProportionAt(segmentsMade), GCommandNumber, FeedRateMmPerSec);
+    }
+
+    /// <summary>
+    /// How much of the whole code has been made, having made this many of the segments
+    /// </summary>
+    /// <param name="segmentsMade">Segments of this build the machine will have made</param>
+    /// <returns>The fraction, 0..1</returns>
+    /// <remarks>
+    /// Of the whole code, however many times the job has been stopped inside it: the build is only
+    /// what was left of the code when it started, so its own share is what is left to give
+    /// </remarks>
+    private float ProportionAt(int segmentsMade)
+    {
+        if (SegmentCount <= 0)
+        {
+            return FractionAtStart;
+        }
+
+        float made = Math.Clamp((float)segmentsMade / SegmentCount, 0.0f, 1.0f);
+        return FractionAtStart + (1.0f - FractionAtStart) * made;
+    }
+
+    /// <summary>
+    /// Whether a code is one of the job file's own
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <returns>True if a stop may record it and a resume may scale it</returns>
+    /// <remarks>
+    /// <para>
+    /// A code read from a macro carries an offset into the <em>macro</em>, and a resume rewinds the
+    /// <em>job</em> file, so recording one would send the job to an unrelated position. It must not
+    /// spend the fraction either: a macro invoked between the resume and the job's next move runs on
+    /// the same channel, and shortening its move would consume what the job is owed.
+    /// </para>
+    /// <para>
+    /// <c>File</c> and not <c>File2</c>, because there is one interpreter state and one pause restore
+    /// point and both of them are the first channel's. TODO this widens with M596 and M598, along
+    /// with the state it feeds
+    /// </para>
+    /// </remarks>
+    public static bool IsJobFileCode(DuetAPI.Commands.Code code)
+        => code.Channel == CodeChannel.File && (code as Commands.Code)?.File is not Files.MacroFile;
 }
 
 /// <summary>
-/// A submission a stop ended part-way through
+/// Where a resume has to carry on from
 /// </summary>
-/// <param name="Origin">The code it was submitting, and how much of it went out</param>
-/// <param name="PurgeGeneration">
-/// Which stop ended it, as <see cref="MovementState.PurgeGeneration"/> counted them
-/// </param>
+/// <param name="FilePosition">Where in the job file to read from again</param>
+/// <param name="ProportionDone">How much of the code at that position is already made, 0..1</param>
+/// <param name="GCommandNumber">The modal G command that code was read under, or -1</param>
+/// <param name="FeedRateMmPerSec">The feed rate it was read with, unscaled by M220</param>
 /// <remarks>
-/// The generation is what makes this safe to leave lying about. There is one slot for it - the
-/// interpreter state is shared - so a record could otherwise be read by a later pause that has
-/// nothing to do with the stop that wrote it. Keyed to the stop, a stale record simply does not match
+/// The whole of what a stop tells the job file, in one value. It is produced by
+/// <see cref="MovePlanner.TakeJobResumePoint"/> and read by the rewind, the restore point and the
+/// modal state the resume puts back
 /// </remarks>
-internal readonly record struct AbandonedJobMove(JobMoveOrigin Origin, uint PurgeGeneration);
+internal readonly record struct JobResumePoint(long FilePosition, float ProportionDone, int GCommandNumber,
+                                               float FeedRateMmPerSec);
 
 /// <summary>
-/// Remembers where each queued job move came from, so a feedhold can say where to resume
+/// Remembers which job code each queued move came from, so a stop can say where to resume
 /// </summary>
 /// <remarks>
 /// <para>
-/// Bounded on purpose. A job queues moves far faster than they run, so an index that only forgot
-/// what completed would still grow without limit whenever the ring is full and the engine is behind.
-/// The oldest entry is dropped once the index is full, and <see cref="Capacity"/> is what makes that
-/// safe rather than merely tidy.
+/// The motion engine knows a move by its id and nothing else about it: <c>MoveParams</c> carries no
+/// file position, and it should not - the engine has no idea what a file is. So a stop reports the id
+/// of the first move it dropped and this is what turns that back into somewhere to resume from.
+/// <c>EndstopCorrection.NoteMoveId</c> is the same arrangement for the same reason.
+/// </para>
+/// <para>
+/// Bounded on purpose. A job queues moves far faster than they run, so an index that only forgot what
+/// completed would still grow without limit whenever the ring is full and the engine is behind. The
+/// oldest entry is dropped once the index is full, and <see cref="Capacity"/> is what makes that safe
+/// rather than merely tidy.
 /// </para>
 /// <para>
 /// Not thread-safe: the planner lock covers it, as it covers everything else the planner queues
@@ -103,33 +203,40 @@ internal sealed class JobMoveIndex
     /// </remarks>
     private const int Capacity = Native.MotionLimits.MaxDdasPerRing * 2;
 
-    private readonly Dictionary<uint, JobMoveOrigin> _origins = new(Capacity);
+    /// <summary>
+    /// One queued move: the code it came from, and its own place in that code
+    /// </summary>
+    private readonly record struct Entry(JobMoveOrigin Origin, int Segment);
+
+    private readonly Dictionary<uint, Entry> _moves = new(Capacity);
     private readonly Queue<uint> _order = new(Capacity);
 
     /// <summary>
     /// Record where a move came from
     /// </summary>
     /// <param name="moveId">Id the move was queued under</param>
-    /// <param name="origin">Where it came from</param>
-    public void Note(uint moveId, JobMoveOrigin origin)
+    /// <param name="origin">The code it came from</param>
+    /// <param name="segment">Which of that code's segments it is, counted from zero</param>
+    public void Note(uint moveId, JobMoveOrigin origin, int segment)
     {
         if (moveId == 0)
         {
             return;             // zero means "no id" on the wire, so there is nothing to key on
         }
 
-        if (_origins.TryAdd(moveId, origin))
+        Entry entry = new(origin, segment);
+        if (_moves.TryAdd(moveId, entry))
         {
             _order.Enqueue(moveId);
         }
         else
         {
-            _origins[moveId] = origin;
+            _moves[moveId] = entry;
         }
 
         while (_order.Count > Capacity && _order.TryDequeue(out uint oldest))
         {
-            _origins.Remove(oldest);
+            _moves.Remove(oldest);
         }
     }
 
@@ -137,16 +244,29 @@ internal sealed class JobMoveIndex
     /// Look up where a move came from
     /// </summary>
     /// <param name="moveId">Id the move was queued under</param>
-    /// <param name="origin">Receives where it came from</param>
+    /// <param name="origin">Receives the code it came from</param>
+    /// <param name="segment">Receives which of that code's segments it is</param>
     /// <returns>True if the move is still remembered</returns>
-    public bool TryGet(uint moveId, out JobMoveOrigin origin) => _origins.TryGetValue(moveId, out origin);
+    public bool TryGet(uint moveId, out JobMoveOrigin origin, out int segment)
+    {
+        if (_moves.TryGetValue(moveId, out Entry entry))
+        {
+            origin = entry.Origin;
+            segment = entry.Segment;
+            return true;
+        }
+
+        origin = null!;
+        segment = 0;
+        return false;
+    }
 
     /// <summary>
     /// Forget everything, for when the moves it describes are gone
     /// </summary>
     public void Clear()
     {
-        _origins.Clear();
+        _moves.Clear();
         _order.Clear();
     }
 }

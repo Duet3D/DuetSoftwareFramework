@@ -109,21 +109,28 @@ internal partial class JobProcessor
                 held = await _planner.StopEarlyAsync(plannedDeceleration: feedhold, _moveInterpreter, cancellationToken);
             }
 
+            Motion.JobResumePoint? resume;
             using (await LockAsync(cancellationToken))
             {
+                // Where the job carries on from, taken once and before the read-ahead is cancelled:
+                // taking the record of the code that was going out is what fixes how much of it the
+                // machine will have made, and the cancellation would otherwise end that submission
+                // somewhere this has not looked
+                resume = _planner.TakeJobResumePoint(held);
+
                 // Cancel what the job has read ahead. This comes first because it is what lets the
                 // flush below finish: a job code waiting on a temperature would otherwise hold it up
                 // for as long as the heater takes.
                 //
-                // The file position is deliberately not supplied. DoFilePrint rewinds to the end of
-                // the last code that actually completed, and the read-ahead codes cancelled here do
-                // not complete, so that is the pause point without anything having to compute it. For
-                // a synchronous pause it is the code after the M226 - supplying the position of the
-                // M226 itself would re-run it on resume and never make progress.
-                // A stop that skipped moves is the exception: it dropped queued moves the job had
-                // already read past, so the last completed code is *not* the pause point and the
-                // first dropped move is
-                StopReadingForPause(held.Origin?.FilePosition, filePosition2: null, reason);
+                // A pause with no code left part-way through supplies no file position. DoFilePrint
+                // rewinds to the end of the last code that actually completed, and the read-ahead
+                // codes cancelled here do not complete, so that is the pause point without anything
+                // having to compute it. For a synchronous pause it is the code after the M226 -
+                // supplying the position of the M226 itself would re-run it on resume and never make
+                // progress. A stop that interrupted a code is the other case: the job had already
+                // read past the point the machine will come to rest at, so the resume point says
+                // where to go back to, and the fraction of that code not to make again goes with it
+                StopReadingForPause(resume?.FilePosition, filePosition2: null, reason);
 
                 // A pause commanded from within the job cancelled its own code along with the rest of
                 // the job's, and its token is the one every step below is waiting on. Re-arm it so the
@@ -152,7 +159,7 @@ internal partial class JobProcessor
             await _planner.WaitForStandstillAsync(cancellationToken);
 
             // Where the machine came to rest, so the resume can put it back there
-            await SaveRestorePointAsync(channel, held, cancellationToken);
+            await SaveRestorePointAsync(channel, held, resume, cancellationToken);
 
             await RunPauseMacroAsync(channel, macro, cancellationToken);
             return reportPosition ? await PausedAtMessageAsync(macro, cancellationToken) : new Message();
@@ -495,6 +502,7 @@ internal partial class JobProcessor
     /// </summary>
     /// <param name="channel">Channel the pause was commanded from, whose feed rate is saved</param>
     /// <param name="held">What the stop did, if the pause made one</param>
+    /// <param name="resume">Where the job carries on from, as the pause took it</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <remarks>
     /// <para>
@@ -505,15 +513,12 @@ internal partial class JobProcessor
     /// coordinates of the last move it kept, inverse-transformed - in <c>DDARing::PausePrint</c>.
     /// </para>
     /// <para>
-    /// The move that was dropped then supplies what the file position alone cannot: the fraction of
-    /// its own code the machine had already made, the modal G command that code was read under, and
-    /// the feed rate it was read with. Without them a resume that lands part-way through a line
-    /// re-runs the part already made, and a line that names neither G nor F is read with whatever
-    /// happens to be modal after <c>resume.g</c>
+    /// The resume point is the same value the file was rewound to, so the fraction written here and
+    /// the position the job reads from cannot describe different lines
     /// </para>
     /// </remarks>
     private async ValueTask SaveRestorePointAsync(CodeChannel channel, MovePlanner.FeedholdOutcome held,
-                                                  CancellationToken cancellationToken)
+                                                  Motion.JobResumePoint? resume, CancellationToken cancellationToken)
     {
         using (await _model.AccessReadWriteAsync(cancellationToken))
         {
@@ -523,28 +528,11 @@ internal partial class JobProcessor
 
             using (_planner.Lock())
             {
-                // What this stop left behind, if it ended a submission part-way. A record from an
-                // earlier stop is not this pause's business, which is what the generation says
-                Motion.JobMoveOrigin? abandoned =
-                    _planner.State.AbandonedJobMove is Motion.AbandonedJobMove record
-                    && record.PurgeGeneration == _planner.State.PurgeGeneration
-                        ? record.Origin
-                        : null;
-                _planner.State.AbandonedJobMove = null;
-
-                // The ring's own record wins wherever there is one: it names the earliest move
-                // actually dropped, which is the true boundary. The abandoned submission answers only
-                // the case where nothing was dropped at all - everything queued was already
-                // committed - and the line still ended part-way. When moves *were* dropped and none
-                // of them can be named, the earliest was a macro's, and the resume rewinds to the
-                // macro invocation with nothing of the job's own line to skip
-                Motion.JobMoveOrigin? interrupted = held.Origin ?? (held.MovesPurged == 0 ? abandoned : null);
-
                 // The stop put the interpreter's position right under the lock it purged in, and the
-                // submission that gave up did the same as it unwound, so there is nothing to correct
-                // here - only to report, because a client's idea of where the machine is came from
-                // the queue that was dropped
-                if (held.Stopped || abandoned is not null)
+                // submission it interrupted did the same as it unwound, so there is nothing to
+                // correct here - only to report, because a client's idea of where the machine is came
+                // from the queue that was dropped
+                if (held.Stopped || resume is not null)
                 {
                     _planner.PublishCommittedPosition();
                 }
@@ -553,12 +541,17 @@ internal partial class JobProcessor
                                             _planner.Parameters.SharedAxisCount(_model.Move),
                                             feedRateMmPerSec, _model.State.CurrentTool, filePosition: null);
 
-                if (interrupted is Motion.JobMoveOrigin origin)
+                // What the file position alone cannot say, from the same value that supplied it: the
+                // fraction of the code the machine has already made, the modal G command that code
+                // was read under, and the feed rate it was read with. Without them a resume that
+                // lands part-way through a line re-runs the part already made, and a line that names
+                // neither G nor F is read with whatever happens to be modal after resume.g
+                if (resume is Motion.JobResumePoint point)
                 {
                     Motion.RestorePoint rp = _planner.State.RestorePoints[Motion.RestorePoint.PauseNumber];
-                    rp.ProportionDone = origin.ProportionDone;
-                    rp.GCommandNumber = origin.GCommandNumber;
-                    rp.FeedRate = origin.FeedRateMmPerSec;
+                    rp.ProportionDone = point.ProportionDone;
+                    rp.GCommandNumber = point.GCommandNumber;
+                    rp.FeedRate = point.FeedRateMmPerSec;
                 }
                 _planner.PublishRestorePoints();
             }

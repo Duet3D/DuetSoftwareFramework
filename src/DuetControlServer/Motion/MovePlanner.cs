@@ -494,12 +494,17 @@ internal sealed class MovePlanner(
     public JobMoveIndex JobMoves { get; } = new();
 
     /// <summary>
-    /// What a feedhold did
+    /// What a stop did
     /// </summary>
     /// <param name="Stopped">Whether the engine was brought to a planned stop</param>
-    /// <param name="Origin">Where the earliest dropped move came from, if it is still known</param>
+    /// <param name="FirstPurgedMoveId">Id of the earliest move that was dropped, if any were</param>
     /// <param name="MovesPurged">How many moves were dropped</param>
-    public readonly record struct FeedholdOutcome(bool Stopped, JobMoveOrigin? Origin, uint MovesPurged);
+    /// <remarks>
+    /// Motion facts only. What they mean for the job file is
+    /// <see cref="TakeJobResumePoint"/>'s to say, because the file is not something the engine or
+    /// this call knows anything about
+    /// </remarks>
+    public readonly record struct FeedholdOutcome(bool Stopped, uint FirstPurgedMoveId, uint MovesPurged);
 
     /// <summary>
     /// Stop the machine before the queue has run, and drop the moves after the stopping point
@@ -534,13 +539,13 @@ internal sealed class MovePlanner(
         uint sequenceBefore;
         if (!linkInterface.Native.TryGetFeedholdResult(out sequenceBefore, out _, out _, out _))
         {
-            return new FeedholdOutcome(false, null, 0);
+            return new FeedholdOutcome(false, 0, 0);
         }
 
         if (!linkInterface.Native.RequestStop(plannedDeceleration))
         {
             logger.LogWarning("The motion engine would not take a stop request; draining the queue instead");
-            return new FeedholdOutcome(false, null, 0);
+            return new FeedholdOutcome(false, 0, 0);
         }
 
         // As soon as the request is in, not when the answer comes back. The motion thread acts on it
@@ -570,10 +575,8 @@ internal sealed class MovePlanner(
 
         if (!stopped)
         {
-            return new FeedholdOutcome(false, null, 0);
+            return new FeedholdOutcome(false, 0, 0);
         }
-
-        JobMoveOrigin? origin = null;
 
         // The read lock because putting the interpreter's position back reads the transform out of
         // the object model, and the planner lock because everything below is the state a move is
@@ -581,11 +584,6 @@ internal sealed class MovePlanner(
         using (await model.AccessReadOnlyAsync(cancellationToken))
         using (Lock())
         {
-            if (JobMoves.TryGet(firstPurgedMoveId, out JobMoveOrigin found))
-            {
-                origin = found;
-            }
-
             // Both sides of the position ran ahead of the machine by everything that was dropped, so
             // both are fiction. The engine's copy is what the drives were actually commanded to, and
             // the interpreter's follows from it - under this lock, so that the next move built
@@ -596,11 +594,55 @@ internal sealed class MovePlanner(
             // A segmented move that was part-way through submitting has had its remaining segments
             // dropped with the rest, so the claim on the ring goes with them
             State.SegmentsLeft = 0;
-            JobMoves.Clear();
         }
 
         logger.LogInformation("Stopped the machine early, dropping {Count} queued move(s)", movesPurged);
-        return new FeedholdOutcome(true, origin, movesPurged);
+        return new FeedholdOutcome(true, firstPurgedMoveId, movesPurged);
+    }
+
+    /// <summary>
+    /// Take where a resume would have to carry the job on from
+    /// </summary>
+    /// <param name="held">What the stop did, or the default if there was no stop</param>
+    /// <returns>The resume point, or null to resume from the last completed job code</returns>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's three branches of <c>DoAsynchronousPause</c> (GCodes.cpp:1086), each of which
+    /// fills in the file position and the proportion together and then calls <c>ClearMove</c>:
+    /// wherever moves were dropped the ring names the boundary, and where none were the code that was
+    /// still going out does, because everything queued was already committed and will run.
+    /// </para>
+    /// <para>
+    /// Called once per pause, and before the job's read-ahead is cancelled. Taking the record is what
+    /// fixes the segment count in it: a submission that finds the record is no longer its own queues
+    /// nothing more, so what is read here stays true however that submission then unwinds
+    /// </para>
+    /// </remarks>
+    public JobResumePoint? TakeJobResumePoint(FeedholdOutcome held)
+    {
+        using (Lock())
+        {
+            JobMoveOrigin? current = State.CurrentJobMove;
+            State.CurrentJobMove = null;
+
+            JobResumePoint? resume;
+            if (held.MovesPurged > 0)
+            {
+                // The earliest dropped move names the boundary. When it cannot be named it was a
+                // macro's, so the job's own code had not started and the resume rewinds to the macro
+                // invocation, which is the last job code that completed
+                resume = JobMoves.TryGet(held.FirstPurgedMoveId, out JobMoveOrigin origin, out int segment)
+                    ? origin.PointAt(segment)
+                    : null;
+            }
+            else
+            {
+                resume = current?.PointAt(current.SegmentsQueued);
+            }
+
+            JobMoves.Clear();
+            return resume;
+        }
     }
 
     /// <summary>

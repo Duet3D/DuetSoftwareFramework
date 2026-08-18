@@ -537,11 +537,16 @@ internal sealed class MoveInterpreter(
     /// channel ever stores a fraction in it. Letting the second spend what the first is owed would be
     /// worse than not restoring it at all. TODO when M596 gives each motion system its own
     /// <see cref="MovementState"/>, both halves become per system together - the restore point that
-    /// records the fraction as well as the move that spends it
+    /// records the fraction as well as the move that spends it.
+    /// </para>
+    /// <para>
+    /// The job file's own codes and not a macro's, by the same test that decides whether a move is
+    /// recorded at all: a macro invoked between the resume and the job's next move runs on this
+    /// channel too, and shortening its move would consume what the job is owed
     /// </para>
     /// </remarks>
     private float MoveFractionToSkipFor(DuetAPI.Commands.Code code)
-        => code.Channel == CodeChannel.File ? state.MoveFractionToSkip : 0.0f;
+        => JobMoveOrigin.IsJobFileCode(code) ? state.MoveFractionToSkip : 0.0f;
 
     /// <summary>
     /// Whether the code moves anything other than Z

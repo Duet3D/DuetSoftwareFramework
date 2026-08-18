@@ -574,9 +574,9 @@ current one, as `MovementState` holds `raw` there, and `JobMoveIndex` maps each 
 that record and to the move's own index within it. A file position and a fraction read from one
 record cannot describe different codes, which is what the arrangement is for.
 
-The record is cleared by whatever ends the code: the submission, once every segment has been queued,
-or the pause, which **takes** it. The take is one call under the planner lock and it produces the
-whole resume point:
+The record is cleared by whatever ends the code: the submission, when it is done with it, or the
+pause, which **takes** it. The take is one call under the planner lock and it produces the whole
+resume point:
 
 | What the stop did | Where the resume point comes from |
 |---|---|
@@ -592,6 +592,12 @@ carrying a file position, a fraction, a G command number and a feed rate, so a f
 position cannot be expressed. Three things read it, and all three read that one value: the position
 `DoFilePrint` seeks to, the restore point's `ProportionDone`, `GCommandNumber` and `FeedRate`, and
 through the restore point the modal state `RestoreModalStateForResume` puts back.
+
+A code every segment of which reached the ring resumes at the code *after* it, not at its own start
+with all of it skipped. Everything queued is committed and will run, so nothing of that code is still
+owed, and rewinding to it would ask the machine for a move of no length. RepRapFirmware reaches the
+same place from the other side, with a proportion of one that skips every segment when the code is
+read again.
 
 Taking the record is also what fixes the segment count in it. A submission whose record has been
 taken queues no more segments of that code, so what the take read stays true; the take therefore
@@ -815,21 +821,21 @@ when the head is at or below the pause height, and only splits the move - travel
 
 - [x] `JobMoveIndex`, bounded rather than pruned on completion: a job queues faster than the engine
       runs, so forgetting only what completed still grows without limit
-- [ ] One record per interrupted job code rather than a copy of its fields per queued move. The file
+- [x] One record per interrupted job code rather than a copy of its fields per queued move. The file
       position, the modal G command, the feed rate, the fraction the build started from and its
       segment count, held by `MovementState` while the code is in flight and indexed by move id and
       segment
-- [ ] `JobResumePoint` and the take: one call under the planner lock, before the read-ahead is
-      cancelled, yielding the file position and the fraction together or neither. It replaces
-      `MovementState.AbandonedJobMove`, whose generation key still admits a record left by a pause
+- [x] `JobResumePoint` and the take: one call under the planner lock, before the read-ahead is
+      cancelled, yielding the file position and the fraction together or neither. It replaced
+      `MovementState.AbandonedJobMove`, whose generation key still admitted a record left by a pause
       sequence that made no stop of its own
-- [ ] The fraction composes over the whole code rather than over the part the build was given, so a
+- [x] The fraction composes over the whole code rather than over the part the build was given, so a
       second stop inside one code reports what the machine has made and not what the remainder had
-- [ ] A submission the take ends reports its code as cancelled rather than as done, so the position
+- [x] A submission the take ends reports its code as cancelled rather than as done, so the position
       `DoFilePrint` falls back to stays the end of the last code that completed
-- [ ] Only the job file's own codes spend `MoveFractionToSkip`, by the same test that decides whether
+- [x] Only the job file's own codes spend `MoveFractionToSkip`, by the same test that decides whether
       a move is recorded at all; a macro on the `File` channel does not
-- [ ] Tests for the accounting: a stop inside a segmented code, a second stop inside the same code, a
+- [x] Tests for the accounting: a stop inside a segmented code, a second stop inside the same code, a
       stop the engine refuses, a purge whose earliest move is a macro's, and a synchronous pause
       following an aborted pause sequence
 - [x] `DDARing::Feedhold` in `src/DuetSbcInterface`: pick the stopping point at or after the first

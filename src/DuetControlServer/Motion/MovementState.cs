@@ -86,12 +86,19 @@ internal sealed class MovementState
     /// Bumped every time a stop drops queued moves
     /// </summary>
     /// <remarks>
+    /// <para>
     /// A segmented move is submitted a few segments at a time and gives the ring up in between, so a
     /// stop can happen while one is part-way out. The segments that have not gone yet must not go:
     /// the machine has been told to stop, and feeding the ring afterwards would start it again. The
     /// submitting loop compares this against what it saw when it built the move and abandons the rest
     /// if it has moved on. RepRapFirmware needs no equivalent because its pause runs in the same task
-    /// as the loop it is interrupting
+    /// as the loop it is interrupting.
+    /// </para>
+    /// <para>
+    /// It says one thing, and it is global because a purge is global: a macro's segmented move is as
+    /// void as the job's. What it does not say is anything about the job file, which is
+    /// <see cref="CurrentJobMove"/>'s job
+    /// </para>
     /// </remarks>
     public uint PurgeGeneration { get; private set; }
 
@@ -101,24 +108,22 @@ internal sealed class MovementState
     public void NotePurge() => PurgeGeneration++;
 
     /// <summary>
-    /// The code a submission gave up part-way through, if the last one did
+    /// The job-file code the interpreter is part-way through, if it is part-way through one
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The counterpart of <see cref="JobMoveIndex"/> for the segments that never reached the ring.
-    /// A stop that purges nothing - because everything queued was already committed - still ends a
-    /// submission that was in flight, and what ran is then every segment that went out. Nothing on
-    /// the ring records that, so the loop leaves it here for the pause to pick up, which is
-    /// RepRapFirmware's "we can skip the move that is waiting" branch of <c>DoAsynchronousPause</c>.
+    /// RepRapFirmware's <c>ms.raw</c> together with <c>ms.totalSegments</c> and
+    /// <c>ms.segmentsLeft</c>, which is what <c>DoAsynchronousPause</c> reads when it stops part-way
+    /// through a code. It is set when the code's move is built and cleared by whatever ends the code:
+    /// the submission once every segment has been queued, or the pause, which takes it.
     /// </para>
     /// <para>
-    /// Written only by a submission a stop ended, and read only by the pause for that same stop -
-    /// see <see cref="Motion.AbandonedJobMove.PurgeGeneration"/>. A submission that ends for its own
-    /// reasons leaves this alone rather than clearing it, because the slot is shared and clearing it
-    /// would be one channel throwing away what another channel's stop recorded
+    /// Taking it is what fixes the segment count in it. A submission finding a record that is no
+    /// longer its own queues nothing more of that code, so what the pause read stays true however the
+    /// submission then unwinds
     /// </para>
     /// </remarks>
-    public AbandonedJobMove? AbandonedJobMove { get; set; }
+    public JobMoveOrigin? CurrentJobMove { get; set; }
 
     /// <summary>
     /// The fraction of the first line M26 named that has already been made, 0..1
@@ -259,7 +264,7 @@ internal sealed class MovementState
         EndstopsTriggered = 0;
         SegmentsLeft = 0;
         MoveFractionToSkip = 0.0f;
-        AbandonedJobMove = null;
+        CurrentJobMove = null;
         RestartMoveFractionDone = 0.0f;
         RestartGCommandNumber = -1;
         VirtualFanSpeed = 0.0f;

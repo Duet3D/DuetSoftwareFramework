@@ -288,11 +288,11 @@ internal sealed partial class GCodeHandler(
         List<int> armedAxes = [];
         int submitted = 0;
         uint purgeGeneration = 0;
-        // Whether a stop dropping this move can say where to resume from it. The first file channel
-        // only: there is one pause restore point and one interpreter state, both of them the first
-        // channel's, so an offset measured in a fork of the job would be restored against the wrong
-        // stream. TODO this widens with M596/M598, along with the state it feeds
-        bool isJobCode = code.Channel == CodeChannel.File && code.File is not Files.MacroFile;
+        // Where a stop dropping this move would send the job back to, for a move that came from the
+        // job file itself. It is created with the move and cleared by whatever ends the code: this
+        // method, or the pause, which takes it
+        JobMoveOrigin? origin = null;
+        bool isJobCode = JobMoveOrigin.IsJobFileCode(code);
 
         try
         {
@@ -344,6 +344,11 @@ internal sealed partial class GCodeHandler(
                         }
                         else if (raw is null)
                         {
+                            // What the build is about to spend, which the record has to keep: it is
+                            // the fraction of the code that was already made before this build, and
+                            // this build covers only the rest of it
+                            float fractionAtStart = isJobCode ? state.MoveFractionToSkip : 0.0f;
+
                             // Built once, however many segments it turns into and however many times the
                             // ring is too full to take the next one. Rebuilding would apply a relative
                             // move a second time, and cannot be done at all once a segment has gone out
@@ -374,6 +379,32 @@ internal sealed partial class GCodeHandler(
                             // the windows in between - which is exactly what the claim is for
                             state.SegmentsLeft = segments.Count;
 
+                            // Where this code came from, so that a stop can say where to resume it.
+                            // One record for the whole code however many segments it becomes, because
+                            // every one of them describes the same line of the file, and the file
+                            // position and the fraction already made are two halves of one fact.
+                            //
+                            // Only a code from the job file itself - see IsJobFileCode. A code read
+                            // from a macro carries an offset into the *macro*, and a resume rewinds
+                            // the *job* file, so recording one would send the job to an unrelated
+                            // position. With no record the pause falls back to the last completed
+                            // job-file code, which is the macro invocation, so the macro re-runs
+                            // whole. That is RepRapFirmware's GetJobFilePosition, which returns
+                            // noFilePosition for exactly this case
+                            if (isJobCode)
+                            {
+                                origin = new JobMoveOrigin
+                                {
+                                    FilePosition = code.FilePosition,
+                                    CodeLength = code.Length ?? 0,
+                                    GCommandNumber = code.MajorNumber ?? -1,
+                                    FeedRateMmPerSec = raw.OriginalFeedRateMmPerSec,
+                                    FractionAtStart = fractionAtStart,
+                                    SegmentCount = segments.Count
+                                };
+                                state.CurrentJobMove = origin;
+                            }
+
                             // What the ring had been through when this move was measured. A stop
                             // that empties the ring in one of the windows below invalidates the rest
                             // of this move, and this is what the loop notices it by
@@ -384,16 +415,24 @@ internal sealed partial class GCodeHandler(
                         // up from the same place is what keeps a long segmented move from blocking
                         while (raw is not null && submitted < segments.Count)
                         {
-                            if (state.PurgeGeneration != purgeGeneration)
+                            if (state.PurgeGeneration != purgeGeneration ||
+                                (origin is not null && !ReferenceEquals(state.CurrentJobMove, origin)))
                             {
-                                // A stop emptied the ring while this move was part-way out. The
-                                // segments still in hand describe a path the machine has been told
-                                // not to travel, and queueing them now would start it moving again
-                                // after it had come to rest
+                                // Either a stop emptied the ring while this move was part-way out, or
+                                // a pause took the record of this code. The segments still in hand
+                                // describe a path the machine has been told not to travel, and
+                                // queueing them now would start it moving again after it had come to
+                                // rest - or, where the queue is draining rather than emptied, would
+                                // move the boundary the pause has already recorded.
+                                //
+                                // Cancelled rather than finished, because that is what it is: the
+                                // code did not do what it was asked to. DoFilePrint advances its own
+                                // idea of the file position by every code that completes, and that
+                                // position is the one a stop with nothing to say falls back to
                                 logger.LogInformation(
                                     "Abandoning {Count} remaining segment(s) of {Code} because the machine stopped",
                                     segments.Count - submitted, code);
-                                return new Message();
+                                throw new OperationCanceledException($"{code} was interrupted by a stop");
                             }
 
                             moveInterpreter.PrepareSegment(raw, segments, submitted + 1);
@@ -413,35 +452,20 @@ internal sealed partial class GCodeHandler(
                                 endstopCorrection.NoteMoveId(raw.MoveId);
                             }
 
-                            // Where this move came from, so that a stop dropping it can say where to
-                            // resume. Every segment of a move carries the same file position, because
-                            // they all came from the one code.
-                            //
-                            // Only a move whose code came from the job file itself - see isJobCode. A
-                            // code read from a macro carries an offset into the *macro*, and a resume
-                            // rewinds the *job* file, so recording one would send the job to an
-                            // unrelated position - macros being small and job files large, to
-                            // somewhere near its start. With no origin the pause falls back to the
-                            // last completed job-file code, which is the macro invocation, so the
-                            // macro re-runs whole. That is RepRapFirmware's GetJobFilePosition, which
-                            // returns noFilePosition for exactly this case
-                            if (isJobCode)
+                            // Which code this move belongs to, and where in that code it comes. A
+                            // stop that drops it therefore knows both where in the file to resume and
+                            // how much of that line is already behind the machine, and both come from
+                            // the one record
+                            if (origin is not null)
                             {
-                                planner.JobMoves.Note(raw.MoveId, new JobMoveOrigin
-                                {
-                                    FilePosition = code.FilePosition,
-                                    GCommandNumber = code.MajorNumber ?? -1,
-                                    FeedRateMmPerSec = raw.OriginalFeedRateMmPerSec,
-
-                                    // What the machine will have done by the time this segment
-                                    // starts. A stop that drops this segment therefore knows both
-                                    // where in the file to resume and how much of that line is
-                                    // already behind it
-                                    ProportionDone = (float)submitted / segments.Count
-                                });
+                                planner.JobMoves.Note(raw.MoveId, origin, submitted);
                             }
                             submitted++;
                             state.SegmentsLeft = segments.Count - submitted;
+                            if (origin is not null)
+                            {
+                                origin.SegmentsQueued = submitted;
+                            }
                         }
                     }
                 }
@@ -487,32 +511,20 @@ internal sealed partial class GCodeHandler(
                     MovementState state = planner.State;
                     state.SegmentsLeft = 0;
 
+                    // The record belongs to this submission until something else takes it. A pause
+                    // that did take it has put another value there, or none, and must not have this
+                    // one written over the top of it
+                    if (origin is not null && ReferenceEquals(state.CurrentJobMove, origin))
+                    {
+                        state.CurrentJobMove = null;
+                    }
+
                     if (submitted < segments.Count)
                     {
                         // The interpreter accounted for the whole move when it built it, so a
                         // submission that ended early leaves it describing segments the machine will
                         // never make - and the next move built anywhere would start from them
                         moveInterpreter.SyncInterpreterToMachine();
-
-                        // A code left part done has nothing on the ring to say so, because the
-                        // segments that would have said it were never queued. A pause reads this to
-                        // find out how much of the line it has to skip on the way back in - but only
-                        // the pause whose own stop ended this submission, which is what the
-                        // generation says. Anything else that ends a submission leaves the slot
-                        // alone rather than clearing it: it is shared, and the record in it may
-                        // belong to another channel's stop
-                        if (isJobCode && submitted > 0 && state.PurgeGeneration != purgeGeneration)
-                        {
-                            state.AbandonedJobMove = new AbandonedJobMove(
-                                new JobMoveOrigin
-                                {
-                                    FilePosition = code.FilePosition,
-                                    GCommandNumber = code.MajorNumber ?? -1,
-                                    FeedRateMmPerSec = raw.OriginalFeedRateMmPerSec,
-                                    ProportionDone = (float)submitted / segments.Count
-                                },
-                                state.PurgeGeneration);
-                        }
                     }
                 }
             }
