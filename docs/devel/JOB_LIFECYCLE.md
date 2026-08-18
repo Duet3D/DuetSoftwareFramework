@@ -15,7 +15,9 @@ M24 at :1160, M226/M600/M601 at :1249, M25 at :1281.
 
 The contract in MCODE_MIGRATION §1 applies unchanged: port the behaviour, keep the CAN branch and
 drop the local-hardware one, and leave a `// TODO` naming the missing piece rather than inventing a
-stand-in.
+stand-in. **One deviation is approved**, and §1.8 is why it is written down at this length rather
+than decided while typing: the asynchronous pause plans a controlled deceleration instead of
+searching for a stopping point that already exists. That is §3.5, and it is what phase 4 builds.
 
 ---
 
@@ -36,7 +38,8 @@ deleted the caller went with it. The same deletion left two `await`s in the job 
 never complete — §2.1, which has to be fixed before anything else here can be tested at all.
 
 So this is not a subsystem to build from nothing. It is a state machine to add, a restore point to
-capture, five macros to call, and one native entry point to write.
+capture, five macros to call, and one native entry point to write — the feedhold of §3.5, which is
+where the only deliberate divergence from RepRapFirmware lives.
 
 ---
 
@@ -143,10 +146,13 @@ point for it — there is no `DuetSbc_MotionPauseMoves` in
 Without it, the only pause available is "stop feeding the ring and let it drain", which is RRF's
 `movesSkipped == false` branch: correct, but it means the head keeps moving until every queued move
 has run. That is a usable first step and RRF has to handle that case anyway, so it is where phase 2
-starts and phase 4 finishes.
+starts.
 
 Moves already handed to an expansion board are a separate question, and the answer is the same as
 RRF's: they are not recalled. RRF skips moves in its own ring only, and so should this.
+
+**Phase 4 does not port `PauseMoves` as it stands.** It replaces it with a feedhold, which is the one
+approved deviation in this document — §3.5.
 
 ### 2.6 None of the lifecycle macros run
 
@@ -316,6 +322,155 @@ is explicit about why: "so that any M82/M83 codes will be executed in the correc
 
 ---
 
+### 3.5 Feedhold: the asynchronous pause plans its own stop — *approved deviation*
+
+This is the one place the port deliberately does something RepRapFirmware does not, so it is set out
+in full: what RRF does, why it is not enough here, what replaces it, and what that costs.
+
+#### What RepRapFirmware does
+
+`DDARing::PauseMoves` ([DDARing.cpp:592](../../lib/RepRapFirmware/src/Movement/DDARing.cpp)) does not
+*create* a stopping point. It **searches for one that already exists**: it walks the ring for the
+first DDA whose predecessor returns `CanPauseAfter()`, frees everything from there on, and reports
+the endpoint of the last move that will run.
+
+`CanPauseAfter` is true only when both of these hold
+([DDA.cpp:1092](../../lib/RepRapFirmware/src/Movement/DDA.cpp),
+[DDA.h:367](../../lib/RepRapFirmware/src/Movement/DDA.h)):
+
+- the move's end speed, projected onto every drive, is at or below that drive's instantaneous speed
+  change — i.e. the toolpath already happens to slow to a full stop's worth of jerk at that junction;
+- the following DDA is not committed, because a move already sent to an expansion board cannot be
+  recalled.
+
+The first condition is the problem. In a continuous print at speed, lookahead has deliberately raised
+every junction speed above jerk — that is what lookahead is *for* — so `canPauseAfter` is false at
+essentially every junction in the ring. `PauseMoves` then finds nothing, returns false, and
+`DoAsynchronousPause` takes its `movesSkipped == false` branch: **no moves are skipped and the whole
+ring drains**. The head carries on to the end of everything queued before it stops.
+
+RRF accepts that because the alternative it has is the emergency path, `LowPowerOrStallPause`
+([DDARing.cpp:687](../../lib/RepRapFirmware/src/Movement/DDARing.cpp)), which stops abruptly by
+cancelling the step interrupt mid-move. That is a correct response to a power failure and the wrong
+one to a user pressing pause, so a normal pause gets the conservative search and lives with the
+overshoot.
+
+#### What DSF does instead
+
+There is a third option RRF does not take: rather than looking for a junction that is already slow
+enough, **make one**. Force the end speed at the chosen point to zero and let the existing profile
+planner produce the deceleration ramp that gets there.
+
+The earliest point at which this is possible is the **first uncommitted DDA**. A committed move has
+had its segments generated and dispatched to the expansion boards
+([DDARing.cpp:29-31](../../src/DuetSbcInterface/src/Motion/DDARing.cpp)), which fixes both its
+profile and — because the next move's start speed is the committed move's end speed — the speed the
+hold has to start from. Moves are committed `MoveTiming::usualMinimumPreparedTime` ahead, which is
+50 ms, so a feedhold costs at most 50 ms of already-dispatched motion plus one deceleration ramp,
+against RRF's "however long the rest of the ring takes".
+
+The mechanism needs less new code than it sounds like, because **the ring already decelerates to zero
+constantly**. A newly added DDA is created with its end speed at zero and only has it raised when a
+successor arrives and `DoLookahead` propagates backwards
+([DDARing.cpp:24-27](../../src/DuetSbcInterface/src/Motion/DDARing.cpp)). Every trailing edge of every
+print is already this operation. A feedhold is therefore:
+
+1. take the first uncommitted DDA;
+2. choose the stopping point at or after it (see the fork below);
+3. set that DDA's end speed to zero and re-run `RecalculateMove` backwards over the uncommitted DDAs
+   in front of it, exactly as adding a move re-runs it forwards;
+4. `Free()` everything after the stopping point;
+5. report back what was purged.
+
+Step 3 is bounded on the near side: the backward pass stops at the last committed DDA, whose end
+speed cannot change. If the distance between there and the stopping point is not enough to decelerate
+to zero, the stopping point has to move further out — which is the fork.
+
+#### The fork: stop at a boundary, or truncate a move
+
+Two variants, and this is the decision §6 asks for:
+
+**(a) Boundary.** Walk forward from the first uncommitted DDA accumulating distance until there is
+enough to decelerate to zero at the most restrictive deceleration of the drives involved, and stop at
+that DDA's *end*. Nothing is truncated, so the machine stops at a real move endpoint and resume works
+exactly as RRF's `PauseMoves` resume works: rewind the file to the first purged move and re-read from
+there.
+
+**(b) Truncating.** Stop the instant the ramp reaches zero, part-way through a DDA, shortening that
+DDA and recording how much of it was done. This is the theoretical minimum distance, and it is what
+"earliest possible opportunity" strictly means.
+
+**(a) is the recommendation**, and (b) is a refinement to consider afterwards, for three reasons:
+
+- (b) needs resume-part-way-through-a-move — RRF's `moveFractionToSkip` / `proportionDone` /
+  `initialUserC0`, none of which exists here (MCODE_MIGRATION §11.4 item 29 tracks all three). (a)
+  needs none of it;
+- (b) reopens the correctness exclusions `canPauseAfter` encodes. It is cleared for arc segments
+  ("the arc centre gets recomputed incorrectly when we resume",
+  [GCodes.cpp:3213](../../lib/RepRapFirmware/src/GCodes/GCodes.cpp)), for retractions ("that could
+  cause too much retraction", GCodes.cpp:4557) and for endstop, probing and `G1 H` moves. Stopping at
+  a boundary lets those exclusions be honoured by choosing the next permitted boundary; stopping
+  inside a move has to argue each case afresh;
+- the overshoot (a) accepts is small in practice, because the moves are already segmented
+  (MCODE_MIGRATION §11.4 phase E), so boundaries are dense along exactly the long fast moves where
+  the ramp is longest.
+
+Either way, `canPauseAfter` stays and keeps the meaning it has: **not** "the junction is slow enough"
+— the feedhold no longer cares about that — but "this is a junction a print can be restarted from".
+The jerk half of the test at `DDA.cpp:667` becomes dead for the feedhold path and should be left
+alone rather than deleted, because `LowPowerOrStallPause` will want it if the power-fail work ever
+lands (§5).
+
+#### What DuetControlServer has to be told
+
+The purge invalidates state on both sides of the C ABI, and the native side knows nothing about files
+— which is the right split and should stay that way. So the native call reports motion facts and DCS
+maps them back to the file itself:
+
+| Reported | Used for |
+|---|---|
+| Drive endpoints where motion actually stops | `ResyncFromEngine`, and `RestorePoint.Coords` |
+| `MoveId` of the first purged move | The file position to rewind to — see below |
+| Number of moves purged | Diagnostics, and telling steps 2 and 4 apart when nothing could be skipped |
+
+`MoveParams` carries a `MoveId` and no file position, and it should stay that way. DCS already keeps
+side tables keyed on that id — `EndstopCorrection.NoteMoveId`
+([GCodeHandler.cs:351](../../src/DuetControlServer/Codes/Handlers/GCodeHandler.cs)) is the precedent,
+and `MotionTracker` already tracks `LastCompletedMoveId` per ring — so the feedhold adds one more:
+`MoveId` → file position, modal G-command number, feed rate and virtual extruder position, pruned as
+moves complete. That is the same set of fields RRF stashes in the restore point, held on the side that
+knows what a file is.
+
+Two pieces of DCS state are stale the moment the purge happens and must be corrected before anything
+else runs:
+
+- **`MovementState.CurrentUserPosition`**, which is the interpreter's position and has run ahead of
+  the machine by however many moves were queued. It becomes the reported stop position. RRF's
+  equivalent is setting `ms.positionMayBeInaccurate = true` so the position is re-read at the next
+  standstill; here it is read back directly, because `ResyncFromEngine` already exists for this.
+- **`MovementState.SegmentsLeft`**, if the interpreter was mid-way through submitting a segmented
+  move. Those segments must be abandoned, not submitted into a ring that has just been emptied.
+
+#### Resuming needs no replan
+
+Worth stating plainly, because "replan the purged moves" is the natural thing to expect and it is not
+what happens. The purged DDAs are not stored, re-planned or re-submitted. Resume rewinds the job file
+to the recorded position and the codes are read again from there, so `MoveInterpreter` and
+`MoveBuilder` rebuild the moves from scratch — through whatever the machine's state is *after*
+`resume.g`, which is the only correct thing to do anyway, since `resume.g` may have changed the tool,
+the temperatures or the position. This is exactly RRF's resume path (`fgb->RestartFrom(filePos)`,
+GCodes4.cpp:723) and the feedhold inherits it unchanged.
+
+The one thing resume gains is that its restore-point coordinates now describe a point the toolpath
+passes through mid-decel rather than a move endpoint — under variant (a), still a real endpoint, so
+nothing changes at all.
+
+#### Recording the deviation
+
+`src/Documentation/articles/rrf-differences.md` gets an entry **when phase 4 lands and not before** —
+that article is for deviations that are present and working, and an entry written ahead of the code
+would read as a settled behaviour that does not exist yet.
+
 ## 4. The plan
 
 ### Phase 0 — delete the two dead awaits ⬜
@@ -371,13 +526,23 @@ point from where the machine actually stopped, take the file position from the j
 - [ ] The G10 Z hop unwind, the temperature-wait cancellation and the job file's local variables
 - [ ] `Cancelling` is observable while `cancel.g` runs
 
-### Phase 4 — pausing part-way through the queue ⬜
+### Phase 4 — feedhold ⬜
 
-- [ ] `DDARing::PauseMoves` ported into `src/DuetSbcInterface`, plus `DuetSbc_MotionPauseMoves`
-- [ ] `MovePlanner.PauseMovesAsync` returning the skipped-move restore data, or nothing if no move
-      could be skipped
-- [ ] The pause sequence uses it, falling back to phase 2's behaviour when it returns nothing
-- [ ] MCODE_MIGRATION §11.6's row for `PauseMoves` updated
+§3.5. Not a port of `DDARing::PauseMoves`; the approved deviation replaces it.
+
+- [ ] `MoveId` → file position / G-command number / feed rate / virtual extruder position side table
+      in `MovePlanner`, pruned as moves complete
+- [ ] `DDARing::Feedhold` in `src/DuetSbcInterface`: pick the stopping point at or after the first
+      uncommitted DDA, force its end speed to zero, re-run the backward pass to the last committed
+      DDA, free the rest
+- [ ] Honour the `canPauseAfter` exclusions when choosing the boundary — arcs, retractions, endstop,
+      probing and `G1 H` moves
+- [ ] `DuetSbc_MotionFeedhold`, reporting the stop endpoints, the first purged `MoveId` and the count
+- [ ] `MovePlanner.FeedholdAsync`, resyncing `CurrentUserPosition` and dropping `SegmentsLeft`
+- [ ] The pause sequence uses it, falling back to phase 2's drain-the-ring behaviour when nothing
+      could be purged
+- [ ] MCODE_MIGRATION §11.6's row for `PauseMoves` records that it is superseded rather than pending
+- [ ] `rrf-differences.md` entry, now that there is shipped behaviour to describe
 
 ### Phase 5 — pausable macros and the deferred pause ⬜
 
@@ -433,3 +598,12 @@ The `PrintMonitor` port. Its own phase because nothing above depends on it.
 2. **Where does `PauseState` live** — on `JobProcessor`, or on `MovementState` next to the restore
    points? RRF has it on `GCodes` and the restore points on `MovementState`, which argues for
    `JobProcessor`. That is what §3.1 assumes.
+3. **Feedhold variant (a) or (b)** — stop at the first DDA boundary that gives enough deceleration
+   distance, or truncate a move and stop at the theoretical minimum. §3.5 recommends (a) and phase 4
+   is written for it; (b) is a later refinement that needs `moveFractionToSkip` first and reopens the
+   arc and retraction exclusions.
+4. **Does a feedhold reuse `pause.g`?** RRF has one asynchronous pause path and one macro. A feedhold
+   stops sooner but is otherwise the same event, so the assumption throughout is yes — same reason
+   codes, same `pause.g`, same restore point. If a rapid pause should be distinguishable from an
+   ordinary one in the macro, it needs a `PrintPausedReason` of its own or a parameter, and that is a
+   decision to take before phase 2 fixes the reason set.
