@@ -180,6 +180,15 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     [GeneratedRegex(@"^Hardware\s*:\s*(\w+)", RegexOptions.IgnoreCase)]
     private static partial Regex _hardwareRegex();
 
+    [GeneratedRegex(@"^model name\s*:\s*(.+)", RegexOptions.IgnoreCase)]
+    private static partial Regex _modelNameRegex();
+
+    [GeneratedRegex(@"^CPU implementer\s*:\s*0x([0-9a-f]+)", RegexOptions.IgnoreCase)]
+    private static partial Regex _cpuImplementerRegex();
+
+    [GeneratedRegex(@"^CPU part\s*:\s*0x([0-9a-f]+)", RegexOptions.IgnoreCase)]
+    private static partial Regex _cpuPartRegex();
+
     /// <summary>
     /// Get the CPU hardware
     /// </summary>
@@ -188,7 +197,11 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     {
         try
         {
-            Regex hardwareRegex = _hardwareRegex();
+            // 64-bit RPi kernels no longer report a Hardware line, so fall back to the x86 model name or to the ARM implementer/part IDs
+            Regex hardwareRegex = _hardwareRegex(), modelNameRegex = _modelNameRegex();
+            Regex implementerRegex = _cpuImplementerRegex(), partRegex = _cpuPartRegex();
+            int implementer = -1, part = -1;
+
             IEnumerable<string> procInfo = File.ReadLines("/proc/cpuinfo");
             foreach (string line in procInfo)
             {
@@ -197,6 +210,29 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
                 {
                     return hardwareMatch.Groups[1].Value;
                 }
+
+                Match modelNameMatch = modelNameRegex.Match(line);
+                if (modelNameMatch.Success)
+                {
+                    return modelNameMatch.Groups[1].Value.Trim();
+                }
+
+                Match implementerMatch = implementerRegex.Match(line);
+                if (implementerMatch.Success)
+                {
+                    implementer = Convert.ToInt32(implementerMatch.Groups[1].Value, 16);
+                }
+
+                Match partMatch = partRegex.Match(line);
+                if (partMatch.Success)
+                {
+                    part = Convert.ToInt32(partMatch.Groups[1].Value, 16);
+                }
+            }
+
+            if (implementer >= 0 && part >= 0)
+            {
+                return GetArmCpuName(implementer, part);
             }
         }
         catch (Exception e)
@@ -204,6 +240,60 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
             _logger.LogWarning(e, "Failed to get CPU hardware");
         }
         return null;
+    }
+
+    /// <summary>
+    /// Get the CPU name from the IDs reported by /proc/cpuinfo on ARM
+    /// </summary>
+    /// <param name="implementer">CPU implementer ID</param>
+    /// <param name="part">CPU part ID</param>
+    /// <returns>CPU name</returns>
+    private static string GetArmCpuName(int implementer, int part)
+    {
+        if (implementer == 0x41)
+        {
+            string? armPartName = part switch
+            {
+                0xb76 => "ARM1176",
+                0xc07 => "Cortex-A7",
+                0xc08 => "Cortex-A8",
+                0xc09 => "Cortex-A9",
+                0xc0f => "Cortex-A15",
+                0xd03 => "Cortex-A53",
+                0xd04 => "Cortex-A35",
+                0xd05 => "Cortex-A55",
+                0xd07 => "Cortex-A57",
+                0xd08 => "Cortex-A72",
+                0xd09 => "Cortex-A73",
+                0xd0a => "Cortex-A75",
+                0xd0b => "Cortex-A76",
+                0xd0d => "Cortex-A77",
+                0xd41 => "Cortex-A78",
+                0xd46 => "Cortex-A510",
+                0xd47 => "Cortex-A710",
+                0xd80 => "Cortex-A520",
+                0xd81 => "Cortex-A720",
+                _ => null
+            };
+            if (armPartName is not null)
+            {
+                return $"ARM {armPartName}";
+            }
+        }
+
+        string implementerName = implementer switch
+        {
+            0x41 => "ARM",
+            0x42 => "Broadcom",
+            0x48 => "HiSilicon",
+            0x4e => "NVIDIA",
+            0x51 => "Qualcomm",
+            0x53 => "Samsung",
+            0x61 => "Apple",
+            0x69 => "Intel",
+            _ => $"0x{implementer:x2}"
+        };
+        return $"{implementerName} 0x{part:x3}";
     }
 
     [GeneratedRegex(@"^cpu\d", RegexOptions.IgnoreCase)]
