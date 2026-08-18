@@ -10,14 +10,14 @@ an effect the machine performs must land where the path says it does.
 The worked example throughout is:
 
 ```gcode
-G1 X100 F3000   ; DDA 1
-G1 X200 F3000   ; DDA 2
+G1 X100 F3000   ; move A
+G1 X200 F3000   ; move B
 M106 S255       ; fan to full
-G1 X300 F3000   ; DDA 3
+G1 X300 F3000   ; move C
 ```
 
 The fan must reach full as the head arrives at X200, without the machine coming to a stop, and
-without the fan going to full while DDA 1 is still running.
+without the fan going to full while move A is still running.
 
 ---
 
@@ -26,31 +26,31 @@ without the fan going to full while DDA 1 is still running.
 A handler has exactly two tools, and both are wrong for this:
 
 - **Apply it now.** The effect happens as DuetControlServer processes the code, which may be a full
-  queue ahead of where the machine physically is. In the example the fan reaches full during DDA 1.
+  queue ahead of where the machine physically is. In the example the fan reaches full during move A.
 - **`FlushAndWaitForStandstillAsync`.** Correct ordering, at the cost of stopping the machine — a
   blob, a ringing mark, a layer line, and a print that takes longer for every fan change in it.
 
-Neither is what the user asked for. What is missing is a third option: place the effect on the
-machine's timeline and let the queue keep running.
+What is missing is a third option: place the effect on the machine's timeline and let the queue keep
+running.
 
 The codes divide into four classes, and only two of them are about stopping:
 
 | Class | Meaning | Examples | Mechanism |
 | --- | --- | --- | --- |
-| **Immediate** | no relation to motion | M115, M409, M122, M550 | act now |
+| **Immediate** | no relation to motion | M115, M409, M122, M550 | act now, without waiting for the channel's pending codes |
 | **Deferred** | the physical effect belongs at a point in the path | M106/107, M42, M280, M300, M150, M117, M3/M4/M5, M568, M104/140/141 | this document — **from a job file or its macros only**, see §3 |
 | **Ordered** | applies to moves built after it, must not reach moves already built | M201/203/205/566, M204, M592, M425, M572 | solved: the move carries it |
 | **Barrier** | changes what an already-queued move *means* | M92, M584, M350, M208, M669/M665, tool change, homing | standstill, honestly |
 
 Today the class is implicit in whether a handler happens to call the flush, and nothing can test
-that. §8 makes it declarative.
+that. M115 and M122 do not flush; M409 does; nothing states which is intended. §8 makes the class
+declarative, which is also what makes the Immediate row a decision rather than an accident.
 
-M572 is the code that sits across the boundary and is worth stating separately. Its *value* is now
-Ordered — each move carries the pressure advance it was built with — but the handler still pushes the
-coefficient to the drivers, and a board applies what it is sent to the moves already in its own
-queue. So M572 keeps a standstill it should not need, marked with a `TODO` in
-`MCodeHandler.Motion.cs`. It becomes the first customer of this plan: once the push is a scheduled
-action, the wait goes.
+M572 sits across the boundary and is worth stating separately. Its *value* is Ordered — each move
+carries the pressure advance it was built with — but the handler still pushes the coefficient to the
+drivers, and a board applies what it is sent to the moves already in its own queue. So M572 keeps a
+standstill it should not need, marked with a `TODO` in `MCodeHandler.Motion.cs`. It is the first
+customer of this plan: once the push is a scheduled action, the wait goes.
 
 ---
 
@@ -68,13 +68,12 @@ limits are structural rather than incidental:
 
 DuetControlServer has something stronger. The SBC owns a fitted model of the controller's step clock,
 every move already carries an absolute `whenToExecute` to the boards, and moves are dispatched ahead
-of execution by `MoveTiming::usualMinimumPreparedTime` — 50 ms. **The machine already has "do this at
-time T" as a first-class primitive.** It is simply reserved for motion; everything else is "do this
-now".
+of execution. **The machine already has "do this at time T" as a first-class primitive.** It is
+simply reserved for motion; everything else is "do this now".
 
-The plan is to generalise that: make time the currency for every effect, not just for moves.
+This plan generalises that: time becomes the currency for every effect, not just for moves.
 
-One property makes this safe here and would not be safe in the firmware: the speed factor is applied
+One property makes it safe here that would not be safe in the firmware: the speed factor is applied
 when the move is *built* (`MoveInterpreter`), not retroactively to queued moves. So M220 cannot
 retime a move whose action has already been scheduled against it.
 
@@ -88,82 +87,119 @@ The handler validates, replies, and writes the object model exactly as it does t
 sending the CAN message, it posts an *action* onto the motion timeline. The code then completes
 normally.
 
-This is the whole difference from `GCodeQueue`, and everything else follows from it: expressions
-work, replies work, plugins see codes in stream order, the requested side of the object model keeps
-up with the parser, and there is no list of which codes may be queued.
+Everything else follows from that: expressions work, replies work, plugins see codes in stream order,
+the requested side of the object model keeps up with the parser, and there is no list of which codes
+may be queued.
 
 ### Only the file channels defer
 
-**Decision: a code is deferred only when it comes from a job file. From every other channel it applies
+**A code is deferred only when it comes from a job file. From every other channel it applies
 immediately, as it does today.**
 
-Two reasons, and the second is the one that makes it a requirement rather than a simplification:
+Two reasons, and the second makes it a requirement rather than a simplification:
 
 - It is what the user means. `M106 S128` typed into DWC or sent over HTTP during a print is a manual
-  intervention — the operator wants the fan to change *now*, not at some point in the path they cannot
-  see. Deferring it would be surprising and unhelpful.
+  intervention — the operator wants the fan to change *now*, not at some point in the path they
+  cannot see.
 - **Only a file code can be replayed.** §5 shows that surviving a pause depends on the purged actions
-  being exactly the codes that will be re-read when the file rewinds. A code with no file position can
-  never be re-read, so it can never be safely purged — it would have to fire or be reported lost, a
-  third case with no good answer. Restricting to file channels removes the case rather than handling
-  it.
+  being exactly the codes that will be re-read when the file rewinds. A code with no file position
+  can never be re-read, so it can never be safely purged — it would have to fire or be reported lost,
+  a third case with no good answer. Restricting to file channels removes the case rather than
+  handling it.
 
 RepRapFirmware reaches the same place from the same direction: `CanQueueCodes()` requires
 `machineState->DoingFile()`.
 
 **Macros invoked from a job file are included.** A layer-change or tool-change macro is part of the
 job, and its `M106` belongs at the point in the path where the macro was called; refusing to defer it
-would put back exactly the defect this plan removes, for the codes most likely to matter. This is also
-what RepRapFirmware does — `CanQueueCodes()` is true inside a macro.
+would put back exactly the defect this plan removes, for the codes most likely to matter.
 
-The reason that is safe is §5: a pause inside a macro abandons the macro and re-runs it whole, so a
-deferred code there can execute twice. But **macro re-run repeats every side effect equally** — a
-direct `M106` is duplicated exactly as a deferred one is — so deferring introduces no failure mode
-that was not already there. The unit of recovery is the macro, not the line, and that is a property of
-macro restart rather than of this design.
-
-What the macro case does change is which file position an action must carry. See §5.
+That is safe because a pause inside a macro abandons the macro and re-runs it whole, so a deferred
+code there can execute twice — and **macro re-run repeats every side effect equally**. A direct
+`M106` is duplicated exactly as a deferred one is, so deferring introduces no failure mode that was
+not already there. The unit of recovery is the macro, not the line, and that is a property of macro
+restart rather than of this design. §5 works it through.
 
 ### The anchor
 
-An action is `{ anchor, filePos, payload, policy }`. The anchor is a **sequence position, not a
-time**: it sits between two moves in the same submission stream the moves travel down. `filePos` is
-the position in the **job file** that a resume would rewind to for this code — its own line, or the
-macro invocation if it came from inside a macro. It takes no part in deciding when the action fires,
-and exists solely so that a pause can purge exactly the set the resume will replay (§5).
+An action is `{ afterMoveId, payload, timeOffset }` — the id of the move it was submitted behind, the
+CAN frame to send, and where in that frame the timestamp goes. It carries no file position and no
+offset into the move; §5 shows why neither is needed.
 
-**Resolve to time at prepare.** When the engine prepares the move that follows the action, that
-move's `moveStartTime` is known, so the action's absolute time falls out of the same number the
-boards get for the move itself. An action and the move it precedes cannot then disagree, and nothing
-upstream can invalidate the time because it is computed 50 ms before it is needed.
+### Resolving the anchor to a time
 
-Make the anchor `(moveId, offsetIntoMove)` from the start, even though the offset is always zero at
-first. That one field is what later buys "change the fan halfway through this long move" and
-per-pixel laser power without redesigning anything, and it costs nothing to carry now.
+**The time is the end of the preceding move**: `m_afterPrepare.moveStartTime + m_clocksNeeded`,
+computed when that move is prepared.
 
-### Delivery, in three tiers
+The alternative is the start of the *following* move, and for two chained moves the two are
+identical — `DDA::Prepare` sets a chained move's start time to exactly
+`prev.moveStartTime + prev.clocksNeeded`. They differ across a **gap**, where the machine came to rest
+and the next move was issued later, and there start-of-next is wrong: an `M107` between two moves
+separated by five seconds of code-stream latency would keep the fan running for those five seconds.
+End-of-previous is right in both cases.
 
-The anchoring is one mechanism; only the last hop differs by what the target can do.
+It is also simpler. Anchoring forward needs the following move to exist, and an action at the end of
+the queue then needs a special case. Anchoring backward needs only the move the action was submitted
+behind, which is by definition already there.
 
-| Tier | How | Accuracy | Cost |
-| --- | --- | --- | --- |
-| **D1** SBC-timed release | the SBC holds the message and releases it shortly before it is due; the controller forwards it on receipt | transfer jitter plus CAN latency | **none** — no protocol change anywhere |
-| **D2** board-timed | the message carries `whenToExecute` and the board acts on that tick | exact | a field per message type, plus a scheduled-action ring in the expansion firmware |
-| **D3** sequence point | the effect is local to DuetControlServer — object model, M117, a plugin notification, or a genuine barrier | — | none |
+**The time is in the movement timebase**, which is what `moveStartTime` is in: the controller's step
+clock less the shared movement delay
+([StepTimer.h](../../src/DuetSbcInterface/src/Motion/StepTimer.h)). That is not a detail to gloss.
+The movement delay is how the machine slips *everything* when some part of it falls behind, and it is
+shared so that boards do not lose sync with each other. An action expressed in the raw step clock
+would keep its original time while the path around it slipped, and would land in the wrong place by
+exactly the amount the machine had fallen behind. Taking the number from `moveStartTime` puts the
+action in the same timebase as the path for free.
 
-**D1 is the default and the starting point.** It mirrors what moves already do — held on the SBC,
-released shortly before they are needed — except that a move is released 50 ms early *with* a
-timestamp, while a D1 action is released just-in-time *without* one. It needs nothing from CANlib,
-nothing from the controller, and nothing from the expansion boards, and §4 shows it is also the only
-option that keeps the boards' scarce buffer pool out of the picture entirely.
+**The action is emitted with the preceding move's own message**, from the same `Prepare` pass, down
+the same sink. So it inherits the movement path's lead time rather than needing one of its own, and
+its parked lifetime on a board is bounded by that lead plus the preceding move's duration —
+`CanAddMove` already bounds unprepared time to two seconds, so that is the bound.
 
-D2 is the escalation for effects where transfer jitter is too coarse — laser being the expected
-customer, and possibly the only one. Promoting an individual message to D2 is a local change that does
-not touch the anchoring or the scheduling, so it can be done one message type at a time, and §4 lists
-which ones have the room.
+### How far ahead that is
 
-An earlier draft had a middle tier where the controller held frames until due. §4 records why that was
-dropped.
+For movement the answer is a horizon, not a constant. `DDARing::Spin` prepares moves while less than
+`MoveTiming::usualMinimumPreparedTime` — **50 ms** — of prepared motion remains, and `DDA::Prepare`
+then sets the start time one of two ways:
+
+| Case | Start time | Effective lead |
+| --- | --- | --- |
+| Chained onto a committed predecessor | `prev.moveStartTime + prev.clocksNeeded` | whatever is still prepared ahead of it, up to the 50 ms horizon |
+| Starting from rest | `now + prepareAdvanceTime` | 50 ms |
+
+So: **50 ms**, less the transfer and CAN latency by the time a message reaches a board. The boards
+already report `minAdvance`/`maxAdvance` — how far ahead messages actually arrive — so the realised
+figure is measurable rather than assumed.
+
+### Delivery: one mechanism
+
+**Every command message gains a `whenToExecute`, and the board acts on it.** A message with a time in
+the past — or with the "now" sentinel — is acted on as it arrives, which is every message the machine
+sends today. A message with a future time is parked on the board and acted on at that tick.
+
+The alternative is to hold the message on the SBC and release it just in time, so that nothing
+downstream changes. That looks like the cheap option and is not:
+
+| | Hold on the SBC | Time it on the board |
+| --- | --- | --- |
+| Accuracy | one transfer interval + jitter + CAN latency | exact |
+| SBC | a due-time-ordered hold list, per-destination FIFO release, a **measured lead time**, and a path to recall a released-but-unsent message from the outbound ring | nothing: the message goes out with the moves |
+| Controller | nothing | nothing — it forwards frames |
+| Boards | nothing | one gate in `CommandProcessor::Spin` and a parked-command ring |
+| Protocol | nothing | a 4-byte field per command message |
+| Purge | a local list operation | a broadcast (§4) |
+
+The hold list is the thing to notice. It needs ordering, per-destination FIFO discipline so effects
+cannot be silently reordered, backpressure tied to move preparation, a policy for a deadline that
+passes while a message is held, and a recall path for the window between release and transmission.
+**All of it exists to reproduce, less accurately, what a timestamp gives for free** — on a machine
+whose motion path already works exactly this way. Moves are not held on the SBC and released just in
+time; they are sent early *with a time on them*. There is no reason for an effect on that same path
+to be different.
+
+An effect local to DuetControlServer — the object model, M117, a plugin notification — has no message
+and no timestamp. It is applied when the anchoring move is prepared, and shares nothing with the
+above but the anchor.
 
 ### What this costs
 
@@ -178,9 +214,9 @@ than it first appears:
 
 The requested side is written by the handler at parse time and the actual side comes back from the
 board once the effect has landed, which is exactly the behaviour wanted. What changes is only how far
-apart they can drift: today `requestedValue` means "requested and sent", and afterwards it means
-"requested and scheduled". Nothing in the model has to move, but that shift has to be said once, out
-loud, rather than discovered.
+apart they can drift: `requestedValue` means "requested and sent" today, and "requested and scheduled"
+afterwards. Nothing in the model has to move, but that shift has to be said once, out loud, rather
+than discovered.
 
 The same applies to the code's own result: for a deferred code a successful reply means *accepted and
 scheduled*, not *done*.
@@ -205,18 +241,24 @@ payloads quantise to 0–8, 12, 16, 20, 24, 32, 48 and 64 bytes, most take it fo
 `CanMessageMovementLinearShaped` is 60 bytes with `whenToExecute` already at offset 0. The precedent
 is in the protocol.
 
-Eighteen message types are at 61 bytes or more and cannot take an appended field. Fifteen of them are
-reports or replies travelling from the boards, where a command timestamp is meaningless.
-`FirmwareBlockResponse` never needs one. That leaves two real cases: `CanMessageCreateInputMonitorV1`,
-which is configuration rather than path-positioned, and `CanMessageGeneric`.
+Eighteen message types are at 61 bytes or more and cannot take an appended field. Fifteen are reports
+travelling *from* the boards, where a command timestamp is meaningless, and `FirmwareBlockResponse`
+never needs one. The two that matter both carry a trailing array whose capacity is larger than
+anything real uses, so both take the field by **shortening the array**:
 
-`CanMessageGeneric` is the one worth knowing about. The struct is 64 bytes but instances are variable
-— `GetActualDataLength(paramLength) = paramLength + 4`, over a 20-bit parameter map and 60 bytes of
-packed data — so a real `M950 P0 C"out1" Q500` is well under 20 bytes. A time can ride as an extra
-parameter in the table, with no layout change and no new message type. Only an instance already
-packing more than 56 bytes of parameters, which in practice means one carrying a long string, would
-fail. It matters strategically, because generic is where every new parameterised command lands, but
-it is not a wall.
+| Message | Trailing array | Shorten to | Note |
+| --- | --- | --- | --- |
+| `CanMessageGeneric` | `ByteArray60 Data` at offset 4 | 56 | Instances are already variable — `GetActualDataLength(paramLength) = paramLength + 4` — so a real `M950 P0 C"out1" Q500` is well under 20 bytes. Only an instance packing more than 56 bytes of parameters, meaning one carrying a very long string, is affected |
+| `CanMessageCreateInputMonitorV1` | `CharArray54 PinName` at offset 10 | 50 | A 50-character pin name is far beyond anything a port syntax produces |
+
+`CanMessageGeneric` could instead carry a time as an extra entry in its parameter table, with no
+layout change at all. It should not: one message type would then have the time somewhere different
+from every other, the board's dispatch gate could not read it without unpacking parameters first, and
+"every command carries a time" would acquire an exception. Shorten the array.
+
+The field need not be at the same offset in every message. The board dispatches by message type and
+knows each layout, and the SBC-side patcher is told the offset in the action record — one byte, and no
+constraint on existing layouts.
 
 ### What an expansion board does with a message it cannot take
 
@@ -241,64 +283,89 @@ traffic. That priority split is the precedent for anything else that must not be
 
 For movement there is detection but no recovery. `CanMessageMovementLinearShaped.seq` is four bits,
 the board tracks `expectedSeq`, and it counts `duplicateMotionMessages` and out-of-sequence messages
-by distance — then sets `expectedSeq = seq + 1` and carries on. No resend, no stop. A lost move is
-noticed afterwards and counted. Separately, movement is only queued at all `if (StepTimer::IsSynced())`;
-otherwise it is discarded and counted as `messagesIgnored`, on the reasoning that unsynced moves would
-"just get queued and not executed within a reasonable time".
+by distance — then sets `expectedSeq = seq + 1` and carries on. Separately, movement is only queued at
+all `if (StepTimer::IsSynced())`; otherwise it is discarded and counted as `messagesIgnored`, on the
+reasoning that unsynced moves would "just get queued and not executed within a reasonable time".
 
 **The decisive detail** is what the Move task does with a movement message: it copies it into the
 board's own ring and **frees the CAN buffer immediately**. A `CanMessageBuffer` is held for transit
 only, never until `whenToExecute`; the timed holding happens in a separate, purpose-sized structure.
 
-That is the rule to obey. A timed message occupies a buffer for its whole lead time rather than for
-one task pass, and *lead time × rate* comes out of a pool of 40 — or **10** — that is **shared with
-movement**. Starving it stalls the receiver, overruns the FIFO, and the thing lost is motion. Timed
-non-motion messages must never wait in a `CanMessageBuffer`.
+### Where the message waits: on the board
 
-### Where the message waits: on the SBC
+**The message is sent as soon as it is built, carrying the time it is due, and the board parks it
+until then.** The buffer analysis above is what makes this safe rather than what forbids it, and the
+rule it yields is one line:
 
-**Decision: the SBC holds every scheduled message until shortly before it is due, then releases it,
-and the controller forwards it on receipt.** This is tier D1, and it is the default.
+> A parked command is copied into a ring of its own and its `CanMessageBuffer` freed in the same pass,
+> exactly as `Move::TaskLoop` already does with a movement message.
 
-It is the same shape as the move path — held on the SBC, released shortly before it is needed — and
-it puts the queue where the memory is, where the fitted clock is, and where a 1 ms motion thread
-already runs. Everything downstream stays as it is today:
+Obey that and the pool pressure never arises: a `CanMessageBuffer` is held for transit only, which is
+the invariant the boards already keep for the only timed thing they handle today. Break it — park the
+message *in* its buffer — and lead time × rate comes out of a pool of ten on a SAMC21, the receive
+task blocks, FIFO 0 overruns, and the thing lost is motion.
 
-- **The controller needs no buffer of its own.** It is not a scheduler and holds no state, so it has
-  nothing to invalidate on stop, pause, abort or reset. `SendCanMessageHeader` does not have to grow,
-  and RepRapFirmware does not have to change at all.
-- **The expansion boards are untouched.** A D1 message arrives when it is due, is consumed at once,
-  and its `CanMessageBuffer` is freed in the same pass — exactly like every command they take today.
-  The pool pressure above never arises.
-- **Overflow stops being a case to handle.** There is no hold buffer downstream to overflow. The only
-  remaining resource is the SBC's outbound ring, which already has `OutboundHasHeadroom()` and the
-  rule `LinkScheduleMoveSink::CanAccept` states for moves: stop producing rather than fill the ring
-  and have something refused halfway.
+The parked ring is small and fixed. It needs no allocator, no flow control and no reply path, because
+a parked command is one that has already been accepted; what it needs is a bound, and a bound that is
+reached must be a full ring rather than a stalled receiver.
 
-The cost is accuracy: release time is quantised to the transfer the message catches, so the error is
-one transfer interval plus jitter plus CAN latency. That is comfortably enough for fans, heaters,
-GPIO and spindles, and not enough for a laser — which is what D2 is for.
+**When the ring is full, execute the parked command with the nearest due time, and park the arrival in
+the slot that frees.** If the arrival is itself the nearest due, execute that instead and park nothing.
+Nothing is dropped and nothing is reordered: everything still fires in due-time order, and the error
+is that one command fired early — the one that was closest to being due anyway.
 
-An earlier draft had the controller hold frames until due, with `whenToExecute` in
-`SendCanMessageHeader` and credit-based flow control reporting its free slots. It was dropped once the
-expansion-board findings were in: it makes the controller a second scheduler with its own lifetime
-rules for no accuracy that D1 does not already give, since it still cannot beat CAN latency. If a
-middle tier is ever wanted, the three spare padding bytes in `SendCanMessageHeader` are still there.
+The obvious alternative, executing the *arrival* immediately, is wrong in a way worth spelling out
+because it looks harmless. Commands arrive in path order, so an arrival is normally the **latest** due
+of the set. Executing it first puts it ahead of parked commands that are due earlier and that address
+the same thing, and they then overwrite it:
 
-**Lead time is a measurement, not a guess.** It should be derived from the observed transfer interval
-and jitter, and the boards already report the telemetry to check the result: `minAdvance`/`maxAdvance`
-(how far ahead messages actually arrive), `maxMotionProcessingDelay`, and `GetFreeBuffers()` /
-`GetAndClearMinFreeBuffers()` — a buffer-pool low-water mark. Run a worst-case file on a SAMC21-based
-board and read the low-water mark before choosing anything.
+```
+parked:  fan → 50%   due T=100
+arrives: fan → 100%  due T=200, ring full
 
-**Ordering still has to be preserved on release.** Held messages are released in due-time order per
-destination, and a release that cannot proceed must halt the ones behind it rather than let them
-overtake. Otherwise an action that is due earlier is delayed while a later one goes out, and the
-effects have been silently reordered.
+execute the arrival:      100% now, then 50% at T=100   → ends at 50%
+execute the nearest due:  50% now,  then 100% at T=200  → ends at 100%
+```
 
-Because actions are anchored to moves, throttling *move preparation* throttles action production for
-free, so one backpressure signal covers both. The threshold has to bite well before the prepared
-window drains, or the backpressure is itself an underrun.
+The first leaves the machine in a state no line of the file asked for. That is a different class of
+failure from an effect landing a few milliseconds early, and it is why the rule is about due time
+rather than about arrival.
+
+**Nearest due, not head of the ring.** The two coincide while arrivals are in due-time order, which is
+the normal case — but different message types carry different CAN IDs and therefore different
+arbitration priority, so a later-due command of a high-priority type can overtake an earlier-due one.
+The ring is a set executed by due time, and the overflow rule picks its minimum.
+
+Under sustained pressure this degrades to "execute in order, as fast as they arrive", which is the
+right thing to degrade to: the effects are early but their sequence is intact.
+
+How deep the ring has to be follows from §3: an action is emitted with the move it trails, so the
+parked set at any instant is the actions falling within the prepared window plus one move's duration.
+A print changing a fan once a layer parks one entry at a time; the pathological case is an `M42`
+toggling on every segment, and that is what the overflow rule is for. Early executions are counted, so
+a ring that is too shallow for a real machine is visible in the diagnostics the boards already report
+rather than being inferred from a print that came out wrong.
+
+**The controller is unchanged.** It forwards frames and holds no state, so it has nothing to
+invalidate on stop, pause, abort or reset. `SendCanMessageHeader` does not have to grow.
+
+**The SBC gains no holding machinery either.** An action is resolved to a time when its anchoring move
+is prepared and goes out with that move's own dispatch. Ordering is submission order, down the same
+single-producer queue the moves use — so effects cannot overtake each other without moves overtaking
+each other first, which is a stronger guarantee than a per-destination FIFO on a hold list, and it is
+free.
+
+### What a late message means
+
+A due time can pass before the message is acted on — a delayed transfer, a board that was busy. **A
+late command is acted on immediately and counted**, with the count in the diagnostics the boards
+already report, so a machine that is consistently late is visible before it is a surprise.
+
+That is the whole policy. A per-action choice between "send anyway", "send and raise" and "abort" is
+worth adding when something needs it: a fan wants the first, a laser the second, an interlock the
+third — and laser power belongs on the move record rather than on this timeline (§9), while interlocks
+do not exist. Two bits beside a four-byte timestamp is cheap to add later, with a customer whose
+requirements are known.
 
 ### If movement becomes a broadcast
 
@@ -319,179 +386,125 @@ Two further consequences worth carrying into that decision:
   address.
 
 For scheduled actions the same applies: a broadcast "all fans off at T" is one frame instead of N,
-with the same per-board receive cost. D1 is unaffected either way, since nothing is held on the
-boards.
+and lands one entry in every board's parked ring rather than one in the addressed board's. That is the
+same multiplication as for moves, on a much smaller stream — and the drop broadcast below is an
+example of the shape working.
 
-### The late-deadline policy
+### Purging reaches the boards
 
-Holding on the SBC removes the overflow case. It does not remove a due time passing while a message
-is held — a delayed transfer alone can cause that — and the right response differs per effect:
+Scheduling on the board means a purge has to reach the board. A parked "laser on at T" that survives
+an emergency stop and then fires is the failure that would make this feature dangerous rather than
+merely wrong.
 
-- a fan or a heater setpoint: **send anyway**, a few milliseconds late is invisible;
-- a laser or a spindle: late is wrong, and a missed *off* is a safety event;
-- an interlock: **abort and stop the machine**.
+**A broadcast "drop every parked command", sent on every purge.** No id arithmetic, no per-action
+bookkeeping, no partial state to get wrong — and correct in every case, because *every* purge is
+followed by the machine stopping:
 
-Carry a two-bit policy on the action — `sendAnyway` / `sendAndRaiseEvent` / `abort`. It costs nothing
-and forces the decision at the point the action is built, where the caller knows what the effect is,
-instead of leaving it to a global default that is wrong half the time. Under D1 the policy is read on
-the SBC at release time, so it needs no room in the message itself; under D2 it travels with the
-timestamp.
+- a pause purges, stops, and then either resumes — which replays from the file and re-creates whatever
+  is still owed — or is cancelled;
+- a stop or abort purges and the path is over;
+- an emergency stop purges and everything is over.
 
-**Stop, pause and abort must purge held messages.** A held "laser on at T" that survives an emergency
-stop and then fires is the failure that makes this feature dangerous rather than merely wrong. Under
-D1 this is straightforward and is most of the argument for it: everything unreleased is on the SBC,
-in one list, owned by the component that also knows which moves were abandoned. Nothing is in flight
-on the boards to chase.
+There is never a case where some parked commands should survive a purge and others should not, so the
+mechanism does not need to express one.
+
+Two prerequisites, both to be verified rather than assumed:
+
+- **The boards must latch outputs off on an emergency stop**, rather than setting them off once. A
+  command sent just before M112 can arrive just after it, and a latch is what stops it undoing the
+  halt. This needs checking in `Duet3Expansion`.
+- **The drop must not be lost.** It is a broadcast on a bus with no delivery guarantee, so it must be
+  idempotent and repeated — the boards already handle repeated emergency stops — rather than sent once
+  and assumed.
 
 ---
 
 ## 5. M400, pause, stop and emergency stop
 
 An action outlives the code that created it, so every event that abandons part of the path has to say
-what becomes of the actions anchored to it. Getting this wrong is not a cosmetic bug: a purged "laser
-off" never happens, and a surviving "spindle on" fires into a machine somebody has just halted.
+what becomes of the actions anchored to it. Getting this wrong is not cosmetic: a purged "laser off"
+never happens, and a surviving "spindle on" fires into a machine somebody has just halted.
 
-The rule underneath all of it is that **an action belongs to a point in the path**. If the machine
-travelled that point, the action is owed. If it never will, the action is void.
+The rule underneath all of it: **an action belongs to a point in the path. If the machine travelled
+that point, the action is owed. If it never will, the action is void.**
 
 ### M400 must wait for actions too
 
 `HandleWaitForMovesAsync` is `FlushAndWaitForStandstillAsync`, and `MovePlanner.IsMoving` asks only
 about submissions and the ring's scheduled/completed counts. **It has to gain a third term: no action
-is held or in flight.**
+is pending.**
+
+An action is pending from the moment it is submitted until the tick it is due, which spans two places
+— the SBC's unresolved list and the boards' parked rings. Only the first is directly observable, so
+the term is "no unresolved action, and the last resolved one's due time has passed". That is exact
+rather than approximate: the due time is a step-clock instant the SBC computed, so it knows when it is
+over without asking.
 
 Without that, `M106 S255` followed by `M400` returns before the fan has changed — and §7 tells users
 to reach for exactly that sequence when they need what has been asked for and what the machine has
-done to coincide. An M400 that does not drain the actions makes that advice quietly false, and it
-would make M400 mean "the machine has stopped" rather than "everything up to here has happened".
+done to coincide. An M400 that does not drain the actions makes that advice quietly false, and would
+make M400 mean "the machine has stopped" rather than "everything up to here has happened".
 RepRapFirmware already does this: its standstill wait includes `ms.codeQueue->IsIdle()`.
 
-There is no deadlock risk in the other direction. An action with no following move degrades to
-immediate (§11), so waiting for the list to empty cannot wait for a move that never comes.
+There is no deadlock risk in the other direction. An action is resolved when the move it was submitted
+behind is prepared, and that move is already in the ring, so waiting for the list to empty never waits
+for a move that has not been issued.
 
-### Pause: the purge and the rewind are one boundary
+### Pause: the purge boundary and the rewind boundary are one number
 
-A pause is always part way through a G-code move. RepRapFirmware has two paths and both land there:
+A pause stops the machine before the queue has run and drops the moves after the stopping point
+([JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) §3.5). It reports the first move it dropped, and the job file is
+rewound to the position that move's code came from.
 
-- **`Move::PausePrint`** (M25) stops at a *DDA* boundary where `CanPauseAfter()` holds. A single G1 is
-  split into many DDAs, so a DDA boundary is normally somewhere in the middle of the G1 the user
-  wrote. This is what `proportionDone` exists for — it is literally
-  `(totalSegments - segmentsLeft) / totalSegments`, recorded on every segment handed to the ring, and
-  restored on resume as `moveFractionToSkip` so the parent G1 is replayed from where it got to.
-- **`Move::LowPowerOrStallPause`** (power fail, stall) additionally aborts the executing DDA with
-  `CancelStepping()`, so it can stop part way through a single segment as well.
+**So the rewind point is computed from the purge point.** Purging the actions anchored to purged moves
+is therefore already exactly purging what the replay will re-create — not by agreement between two
+rules, but because there is only one rule. That is why an action needs no file position of its own.
 
-Both decrement `scheduledMoves` for every move that will not fully run — the aborted one included, so
-a partly-executed move counts as **not run**.
+Work the cases through on the example at the top:
 
-On resume the file is rewound with `fgb.RestartFrom(rp.filePos)` and everything after that point is
-re-read, deferred codes included. `PurgeEntries` drops entries whose `executeAtMove` exceeds the
-reduced `scheduledMoves`, and the two boundaries line up exactly:
+| Pause purges | Action anchored after B | Job rewinds to | Is M106 re-read? | Net |
+| --- | --- | --- | --- | --- |
+| C only | kept — B ran, so the point was travelled | C's position, after the M106 | no | fires once |
+| B and C | purged — B never ran | B's position, before the M106 | yes | fires once |
 
-| Code's position in the file | Purge | Re-read on resume | Net |
-| --- | --- | --- | --- |
-| before `rp.filePos` | kept — its anchors all ran | no | fires once |
-| after `rp.filePos` | purged — an anchor was skipped | yes | fires once |
+The awkward middle case — an action whose anchor ran but whose code sits after the rewind point —
+cannot arise, because the rewind point *is* the first purged anchor.
 
-**That correspondence is the whole invariant, and it is what this design has to reproduce.** Neither
-lost nor duplicated, and it holds only because the set of purged codes is exactly the set that will be
-re-read.
+Two things follow, and both remove work rather than add it:
 
-So the naive rule — purge by anchor, keep what ran — is necessary and **not sufficient**. Purging by
-anchor gets the firing right and says nothing about replay; derive the two boundaries separately and
-every pause produces double-fires or silent losses.
+- **There is no partial move to replay.** The pause stops at a move boundary and never truncates one,
+  so nothing corresponds to RepRapFirmware's `proportionDone` / `moveFractionToSkip`.
+- **The purge hook already exists.** `MovePlanner.StopEarlyAsync` is where the moves are dropped and
+  where the action list is dropped with them.
 
-**Each action therefore carries the job-file position that a resume would rewind to, and the purge is
-`filePos >= rp.filePos`.** The two boundaries become the same number rather than two things that have
-to be kept in agreement, the partial-move case falls out for free, and the move id keeps its single
-job of deciding *when* the action fires.
-
-Note *job-file* position, not the position of the line that created the action. For a code inside a
-macro those differ: the code's own offset is in the macro file, while `rp.filePos` is an offset in the
-job file, and comparing them is meaningless. What the action must carry is the position the job file
-would restart from — which for a macro-sourced code is the position of the **macro invocation**. This
-is RepRapFirmware's own split:
-
-```cpp
-FilePosition GCodeBuffer::GetJobFilePosition() const noexcept
-{
-	return (IsFileChannel() && !IsDoingFileMacro()) ? GetFilePosition() : noFilePosition;
-}
-
-const FilePosition pos = IsDoingFileMacro()
-		? printFilePositionAtMacroStart		// the position before we started executing the macro
-		: GetJobFilePosition();
-```
-
-With that, the boundary correspondence holds — at line granularity for job-file codes, and at macro
-granularity for codes inside a macro.
-
-Anchoring by move id still pays off in the other half of the problem: the engine knows exactly which
-move ids it abandoned, so nothing depends on counter arithmetic that a discarded no-motion segment can
-throw out. That fragility is real, and is why RepRapFirmware needs `segmentsLeft == 0` before it will
-queue anything — `executeAtMove` counts segments, so queueing mid-segmentation would anchor to a count
-that does not correspond to a G-code boundary.
-
-Timing needs no repair. An action's absolute time comes from its anchoring move's `moveStartTime`, and
-a pause does not retime the moves *before* it, so every action still owed still has a valid time. One
-that is owed but whose time passes while the machine sits paused falls to the `onLate` policy in §4.
-
-**The purged list is not the re-apply list.** An action dropped at pause may describe state the
-machine should still be in when it resumes — a fan speed, a spindle. Restoring that is the restore
-point's job. Deleting an action is not the same as undoing its intent, and nothing about the purge
-should be read as handling resume.
+**The purged list is not the re-apply list.** An action dropped at pause may describe state the machine
+should still be in when it resumes — a fan speed, a spindle. Restoring that is the restore point's job.
+Deleting an action is not the same as undoing its intent.
 
 ### Pausing inside a macro: at-least-once, not exactly-once
 
-A pause that lands inside a macro **abandons the macro outright.** RepRapFirmware's
-`DoAsynchronousPause` captures the restore point and then unwinds the whole stack:
+A pause that lands inside a macro abandons the macro. `AbandonMacrosForPauseAsync` unwinds the macro
+levels and leaves the job file in place, and the resume rewinds the job file to before the macro was
+invoked, so **the macro runs again from the beginning**.
 
-```cpp
-ms.GetPauseRestorePoint().filePos = fgb.GetPrintingFilePosition(true);
-while (fgb.LatestMachineState().doingFileMacro)   // must call this after GetFilePosition
-{                                                 // because this changes IsDoingFileMacro
-    ms.pausedInMacro = true;
-    fgb.PopState(false);
-}
-```
+That the rewind lands there rather than somewhere arbitrary is a property worth naming, because it is
+what the table above depends on: a move whose code came from a macro records **no** origin, so a pause
+that purges one falls back to the last completed job-file code — which is the macro invocation, still
+executing. A position is meaningful only against the file it was measured in, and the resume rewinds
+the job file.
 
-The macro does not resume where it stopped. `rp.filePos` is the job-file position *before the macro
-was invoked*, so on resume the job restarts there and **the macro runs again from the beginning**.
+For actions that means the exactly-once property degrades to **at-least-once** inside a macro: an
+action whose anchoring moves ran is kept and fires, and then the macro re-runs and creates it again.
 
-The consequence for actions is worth stating plainly: **inside a macro the exactly-once property above
-degrades to at-least-once.** An action whose anchoring moves ran is kept by the purge and fires, and
-then the macro re-runs and creates it again.
+That is not introduced here. Macro restart repeats *every* side effect in the macro — a direct `M106`
+is duplicated exactly as a deferred one is — so the unit of recovery is the macro rather than the line,
+for deferred and immediate codes alike. Deferring adds nothing, which is why §3 includes macros rather
+than excluding them.
 
-That is not a defect introduced here. Macro restart repeats *every* side effect in the macro — a
-direct `M106` is duplicated exactly as a deferred one is — so the unit of recovery is the macro rather
-than the line, for deferred and immediate codes alike. Deferring adds nothing to the problem, which is
-why §3 includes macros rather than excluding them.
-
-The guard already exists and should be documented rather than invented: RepRapFirmware sets
-`firstCommandAfterRestart`, which surfaces through `GCodes::GetMacroRestarted()` as
-**`state.macroRestarted`**, so a macro can detect that it is a re-run and skip what must not repeat.
-DuetSoftwareFramework already carries the field — `State.MacroRestarted` — but nothing in
-DuetControlServer sets it today, so making it true is part of this work rather than something to rely
-on.
-
-Two details that shape our version of the pause path, both of which are ours to define because the SBC
-path differs from the standalone one:
-
-- When `PausePrint` skips moves that came from a *macro*, those moves carry `noFilePosition`, so
-  `rp.filePos` is unknown and RepRapFirmware guards the rewind with
-  `if (rp.filePos != noFilePosition)`. The purge still runs, so in that narrow case queued codes are
-  dropped and never replayed. Whatever we build must not have a state where the purge runs and the
-  rewind does not: **the purge must be driven by the resume position actually adopted**, not run
-  unconditionally alongside it.
-- On the SBC path RepRapFirmware does not rewind at all — it calls `fgb.Init()` and `UnlockAll`, and
-  the file positioning is DuetSoftwareFramework's, driven by the pause offset it is sent. So the
-  boundary this section depends on is one we own end to end, which is the good case: there is no
-  second implementation to keep in agreement.
-
-Worth being explicit: DuetControlServer has no move-abandon path today. Pause stops the code feed and
-the queue drains, so nothing is abandoned and nothing would need purging. The rules above are
-requirements on whatever pause-with-deceleration is built later, not a description of a hook that
-already exists.
+The guard exists and should be used rather than invented: RepRapFirmware sets
+`firstCommandAfterRestart`, which surfaces as **`state.macroRestarted`** so a macro can tell it is a
+re-run and skip what must not repeat. DuetSoftwareFramework carries the field and **nothing writes
+it**, so making it true is part of this work.
 
 ### Stop and abort
 
@@ -501,31 +514,21 @@ The invariant to state alongside that: **a purge must never be the reason the ma
 Turning the spindle and the laser off belongs to `stop.g` / `cancel.g`, which run afterwards, and must
 not be delegated to an action that the same event has just discarded.
 
-Purging is silent for a `sendAnyway` action and should raise an event for the other two policies. An
-action that was marked `abort` because losing it matters has just been lost, and that is worth the
-same words as failing to deliver it.
-
 ### Emergency stop
 
-Everything held is discarded and nothing further is released. On the SBC that is trivial, because
-under D1 the whole list is there.
+Everything parked is dropped by the broadcast in §4, and nothing further is scheduled.
 
-The sharp case is what has already gone. The release window is small but not zero, so an action
-released shortly before M112 can reach a board *after* the emergency stop has shut its outputs down,
-and turn one back on. Two things bound it:
-
-- an action that has been released but has not yet gone out on a transfer can still be pulled from the
-  outbound ring, so the real exposure is one transfer, not one lead time;
-- the boards' emergency-stop handling must **latch** outputs off rather than set them off once, or a
-  late frame undoes the halt. That needs verifying in `Duet3Expansion` rather than assuming — it is
-  recorded here as a prerequisite for shipping D1, not as a known-good property.
+The sharp case is what has already been sent. A command in flight can reach a board *after* the
+emergency stop has shut its outputs down, and turn one back on. The answer is the prerequisite in §4:
+**the boards must latch outputs off rather than set them off once.**
 
 ### Link loss and controller reset
 
 `LinkService.Invalidate()` already resets `motionTracker` and `expansionBoardManager` when the
-connection drops or the controller restarts. The action list joins them and is discarded whole:
-the moves it was anchored to no longer exist, and the boards have reset regardless. No event is
-raised for the individual actions — the link loss is the event.
+connection drops or the controller restarts. The pending actions join them and are discarded whole: the
+moves they were anchored to no longer exist. Nothing has to reach the boards — they have reset, or the
+link they would be told over is the thing that is gone. No event is raised for the individual actions;
+the link loss is the event.
 
 ### Resume
 
@@ -547,27 +550,25 @@ the port is configured, whether the value is in range — DuetControlServer hold
 `GpioManager.WriteAsync` already performs exactly that lookup before sending.
 
 So the handler fails the code **synchronously** on anything that is a configuration or parameter
-error, and only genuinely late failures — bus error, board gone, buffer refusal — can become
-asynchronous. A user's mistake still gets an immediate error on the offending line; only a hardware
-fault escalates later.
+error, and only genuinely late failures — bus error, board gone, buffer refusal — become asynchronous.
+A user's mistake still gets an immediate error on the offending line; only a hardware fault escalates
+later.
 
 ### What is left escalates as an event
 
 Two residual failures, and they are not the same:
 
 - **Delivery failure** — the controller or the bus refused it (`CanStatus::NoBuffer`, `BusError`,
-  `Timeout`). The effect never happened. Raise a `MachineEvent`, with the severity taken from the
-  same policy field: a message for a fan, a pause for a laser, an emergency stop for a safety output.
-  The `Events` subsystem is already the port of `GCodes::ProcessEvent` and already runs a macro named
-  after the event with a default action, so this needs no new escalation path and stays overridable
-  by the machine.
+  `Timeout`). The effect never happened. Raise a `MachineEvent`: the `Events` subsystem is already the
+  port of `GCodes::ProcessEvent` and already runs a macro named after the event with a default action,
+  so this needs no new escalation path and stays overridable by the machine.
 - **The board acted but complained** — "fan 3 not configured". Diagnostic. `Model.Messages`, tagged
   with the originating code so it is traceable: `M106 S255 (deferred): fan 3 not configured`.
 
 ### Needing a reply is the test for "not deferrable"
 
-Deferred actions are sent with `replyType = NoReply`. Asking for a reply buys nothing when the code
-has already completed and nothing is waiting on it, and the `txToken` → `CanMessageSent` path already
+Deferred actions are sent with `replyType = NoReply`. Asking for a reply buys nothing when the code has
+already completed and nothing is waiting on it, and the `txToken` → `CanMessageSent` path already
 reports the half that matters — whether the message was accepted for transmission.
 
 That gives a rule instead of a maintained list:
@@ -576,8 +577,8 @@ That gives a rule instead of a maintained list:
 
 M106 needs no answer. M950 does — it reports the port it took — and M950 is configuration rather than
 path-positioned, so it stays synchronous anyway. The classification falls out of the semantics.
-`SendCanMessageHeader.txToken` still matches a late reply to its request; it simply has no code left
-to attach to, so it goes to `Model.Messages`.
+`SendCanMessageHeader.txToken` still matches a late reply to its request; it simply has no code left to
+attach to, so it goes to `Model.Messages`.
 
 ---
 
@@ -587,9 +588,9 @@ to attach to, so it goes to `Model.Messages`.
 the action payload.** No new rule, and no restriction.
 
 RepRapFirmware refuses to queue any code containing an expression, and has to: it defers the whole
-code, so the expression would be evaluated at release time, tens of moves later, against a machine
-that has moved on. Because this plan runs the code now and schedules only the effect, that problem
-does not arise and the restriction disappears rather than being ported.
+code, so the expression would be evaluated at release time, tens of moves later, against a machine that
+has moved on. Because this plan runs the code now and schedules only the effect, that problem does not
+arise and the restriction never needs porting.
 
 One thing to protect. `CodeProcessor.FlushAsync` couples two jobs — waiting for the channel's pending
 codes and evaluating expressions — and the standstill is the *separate* second half of
@@ -600,13 +601,13 @@ plan touched.
 
 ### Position in expressions
 
-The two position fields answer two different questions, and a deferred code makes the difference
-matter where it previously did not:
+The two position fields answer two different questions, and a deferred code makes the difference matter
+where it previously did not:
 
 - **`userPosition`** is the parser's position — the target of the last move fed into lookahead, with
   offsets applied. It is the position *at the point in the file where the expression sits*.
-- **`machinePosition`** is the live position, interpolated within the segment each drive is running.
-  It lags the parser by however much is queued.
+- **`machinePosition`** is the live position, interpolated within the segment each drive is running. It
+  lags the parser by however much is queued.
 
 **For a deferred code, `userPosition` is the one that means what the author almost certainly intends**,
 because the point in the file where the code sits is also the point in the path where its effect will
@@ -617,25 +618,20 @@ M42 P0 S{move.axes[2].userPosition > 10 ? 1 : 0}
 ```
 
 `machinePosition` in a file is a different thing: read at parse time it is a race against the queue,
-returning wherever the machine happened to have got to when the line was read. That is legitimate —
-it is how you ask "where is the machine *now*" — but it is rarely what a positional condition in a
-part program wants, and it was never well defined against a deep queue even before this plan.
+returning wherever the machine happened to have got to when the line was read. That is legitimate — it
+is how you ask "where is the machine *now*" — but it is rarely what a positional condition in a part
+program wants, and it was never well defined against a deep queue.
 
-**Decision: expressions are evaluated at parse time, and this stays as it is.** A user who wants the
-machine actually to be at the position they are testing writes `M400` first, which is what
-RepRapFirmware users already do and what makes `machinePosition` catch up with `userPosition`.
+A user who wants the machine actually to be at the position they are testing writes `M400` first, which
+is what RepRapFirmware users already do and what makes `machinePosition` catch up with `userPosition`.
 Evaluating later instead would reintroduce the staleness problem in §2 and, worse, would let an
 expression fail *after* its code had reported success.
 
-That rests on M400 draining the held actions as well as the moves, which is why §5 makes it a
-requirement rather than an improvement. An M400 that waits only for motion would leave the advice
-above true for position and false for every deferred effect.
+That rests on M400 draining the actions as well as the moves, which is why §5 makes it a requirement
+rather than an improvement.
 
 No object model change is needed. The requested/actual split this plan widens is already modelled
-throughout — `userPosition`/`machinePosition`, `fans[].requestedValue`/`actualValue` — so the work is
-to document which field answers which question, not to add fields. Where a deferred effect has no
-actual-side counterpart today, adding one is the same shape as what already exists rather than a new
-idea.
+throughout, so the work is to document which field answers which question, not to add fields.
 
 ---
 
@@ -645,8 +641,9 @@ The four classes in §1 should be declared per code rather than implied by which
 which call. One table, asserted by a test, diffable against RepRapFirmware's own behaviour.
 
 The value is not the taxonomy. It is that "does this code need a standstill" becomes a reviewable
-statement instead of an invisible omission, and that the *Ordered* class acquires a name — so the
-next person to read a handler with no flush in it can tell that this was decided rather than
+statement instead of an invisible omission; that "does this code need to wait for the channel at all"
+becomes one too, which is what the Immediate class is for; and that the *Ordered* class acquires a name,
+so the next person to read a handler with no flush in it can tell that this was decided rather than
 forgotten.
 
 ---
@@ -654,65 +651,83 @@ forgotten.
 ## 9. Order of work
 
 1. **Declare the classes** (§8). Pure DuetControlServer, no behaviour change, and it makes the rest
-   reviewable.
-2. **Action entries in `MotionService`** — an ordered list of `{ afterMoveId, offset, filePos, payload,
-   policy }`, drained as the anchoring move is prepared. A side list keyed by move id is enough; the
-   DDA ring itself does not have to change.
-3. **`DuetSbc_MotionSubmitAction`**, down the *same* single-producer queue as `SubmitMove`. If
-   actions travel a different path from moves, the race this plan exists to remove comes back.
-4. **Timed release on the SBC** (D1) — a due-time-ordered hold list, released by the motion thread at
-   `T − leadTime`, with FIFO release per destination and the `onLate` policy applied at release.
-   **No controller or expansion firmware change.**
-5. **The lifecycle rules** (§5) — M400 waits for the list to drain, purge driven by the resume
-   position actually adopted, discard on emergency stop and on `LinkService.Invalidate()`, and
-   cancellation of a released-but-unsent action from the outbound ring. Set `state.macroRestarted`,
-   which DuetControlServer never writes today. This belongs with step 4 rather than after the
-   conversions: a half-built lifecycle is how a stale action reaches a halted machine.
-6. **Measure the lead time.** Instrument the transfer interval and its jitter, then confirm against
-   the boards' own `minAdvance`/`maxAdvance` and the `GetAndClearMinFreeBuffers()` low-water mark on a
-   SAMC21-based board under a worst-case file. Confirm at the same time that the expansion firmware
-   latches outputs off on emergency stop.
-7. **Convert the deferred codes**, M106 first because it is the easiest to see and the easiest to
-   test, then M42/M280, the spindle codes, and the heater setpoints.
-8. **Remove M572's standstill**, once the driver push is a scheduled action. This is the item that
-   closes the `TODO` left in `MCodeHandler.Motion.cs`.
-9. **Per-message `whenToExecute` fields** (D2), only where step 6's measurement shows D1 is not
-   accurate enough. Laser is the expected first and possibly only customer, and this step is what
-   requires a scheduled-action ring on the boards — with the buffer freed on entry, as `Move::TaskLoop`
-   already does for movement.
+   reviewable. This is where "some codes execute immediately" lands: M115 and M122 do not flush today,
+   M409 does, and nothing says which is intended.
 
-Laser is deliberately not in this list. Laser power must track the move's actual top speed — the
-native `DDA` already scales it by `topSpeed / requestedSpeed` — so it belongs *on the move record*,
-like the tuning in [MOTION_CONFIG_ORDERING.md](MOTION_CONFIG_ORDERING.md), not on the action
-timeline. `MoveBuilder` carries a `TODO` for the `controlLaserOrIoBits` flag that this needs.
+2. **`whenToExecute` on the command messages** — the field, the two shortened arrays (§4), and the
+   "now" sentinel that means what every message means today. No behaviour change: everything sends
+   "now" and every board acts on arrival, exactly as now. Landing the protocol change on its own, with
+   nothing depending on it yet, is what makes the next step's failures legible.
+
+3. **The parked-command ring in `Duet3Expansion`** — one gate in `CommandProcessor::Spin`, copy out and
+   free the buffer in the same pass, and on a full ring execute the nearest-due command and park the
+   arrival in its place. Still no behaviour change, because nothing sends a future time yet.
+
+4. **Action entries in `MotionService`** — an ordered list of `{ afterMoveId, payload, timeOffset }`,
+   resolved as the anchoring move is prepared and emitted with it. A side list keyed by move id; the
+   DDA ring does not have to change.
+
+5. **`DuetSbc_MotionSubmitAction`**, down the *same* single-producer queue as `SubmitMove`. If actions
+   travel a different path from moves, the race this plan exists to remove comes back.
+
+6. **The lifecycle rules** (§5) — M400 waits for the list to drain, the purge hangs off
+   `MovePlanner.StopEarlyAsync` beside the move purge, the drop broadcast on every purge, discard on
+   `LinkService.Invalidate()`. Set `state.macroRestarted`, which nothing writes today. This belongs with
+   step 5 rather than after the conversions: a half-built lifecycle is how a stale action reaches a
+   halted machine.
+
+7. **Verify the emergency-stop latch** in `Duet3Expansion` (§4). A prerequisite for shipping, not a step
+   that can follow the conversions.
+
+8. **Convert the deferred codes**, M106 first because it is the easiest to see and to test, then
+   M42/M280, the spindle codes, and the heater setpoints.
+
+9. **Remove M572's standstill**, once the driver push is a scheduled action. This closes the `TODO` in
+   `MCodeHandler.Motion.cs`.
+
+Laser is deliberately not in this list. Laser power must track the move's actual top speed — the native
+`DDA` already scales it by `topSpeed / requestedSpeed` — so it belongs *on the move record*, like the
+tuning in [MOTION_CONFIG_ORDERING.md](MOTION_CONFIG_ORDERING.md), not on the action timeline.
+`MoveBuilder` carries a `TODO` for the `controlLaserOrIoBits` flag that this needs.
 
 ---
 
 ## 10. Verification
 
-The property is testable offline, with no hardware and no timing, in the same way `DdaRingTests`
-proves the tuning property:
+The property is testable offline, with no hardware and no timing, in the same way `DdaRingTests` proves
+the tuning and stop properties:
 
-- submit two moves, an action, and a third move; spin; assert the action is emitted with the third
-  move's `moveStartTime` and not before the first two have been scheduled;
-- an action submitted when the queue is empty is emitted immediately, rather than waiting for a move
-  that never comes;
-- a refused action halts the actions behind it and does not reorder them;
-- an action anchored to a move that is abandoned is purged, and one anchored to a move that ran is
-  not — including the case where the move ran only partly;
-- each `onLate` policy does what it says when the due time is forced into the past;
-- `WaitForStandstillAsync` does not return while an action is held, and does return when the last one
+- submit two moves and an action; spin; assert the action resolves to the second move's
+  `moveStartTime + clocksNeeded` and is emitted in that move's own prepare pass;
+- add a third move that chains onto the second, and assert the action's time is unchanged — the two
+  candidate anchors coincide for chained moves, so a test that only ever chains cannot tell which one
+  was implemented;
+- separate the second and third moves by a gap, so the third starts from rest, and assert the action
+  still fires at the second's end rather than being dragged out to the third's start;
+- an action submitted after the last move in the queue still resolves, because it anchors backwards;
+- an action anchored to a move a stop abandons is purged; one anchored to a move that ran is not.
+  `DdaRingTests`' feedhold tests already build the ring states this needs;
+- `WaitForStandstillAsync` does not return while an action is pending, and does return when the last one
   has gone;
-- an emergency stop leaves nothing in the hold list and nothing releasable, and a released-but-unsent
-  action is pulled back out of the outbound ring;
-- purging a `sendAnyway` action is silent and purging an `abort` action raises;
-- the purge boundary and the rewind boundary agree: for a pause at an arbitrary file position, every
-  action either survives and fires or is re-created by the replay — never both, never neither;
-- the same code from a non-file channel is not deferred at all;
-- an action created inside a macro carries the job-file position of the macro invocation, not an
-  offset in the macro, so it is purged when the resume rewinds to before the macro call;
-- with a fake clock, an action is released at `T − leadTime` and not before, and two actions due in
-  one release window leave in due-time order.
+- the purge boundary and the rewind boundary agree — which, since one is computed from the other (§5),
+  is a test that the *computation* is used rather than that two rules were kept in step: for a pause at
+  an arbitrary point, every action either survives and fires or is re-created by the replay, never both
+  and never neither;
+- the same code from a non-file channel is not deferred at all.
+
+On the board side, and needing no hardware either — `CommandProcessor` is ordinary C++:
+
+- a command with a past time or the "now" sentinel is dispatched on arrival, which is every message the
+  machine sends today;
+- a command with a future time is parked, its `CanMessageBuffer` freed in the same pass, and dispatched
+  at that tick;
+- a full parked ring executes the nearest-due command, parks the arrival in the freed slot, and counts
+  the early execution — rather than dropping silently or blocking;
+- a full parked ring whose nearest-due command *is* the arrival executes that and parks nothing;
+- commands whose effects overwrite each other — two fan speeds — end in the state the latest-due one
+  asked for, however the ring overflowed. This is the check that distinguishes the rule from executing
+  the arrival, and the one a test of timing alone would pass either way;
+- the drop broadcast empties the ring, and is idempotent when repeated.
 
 What needs hardware is the end-to-end check: `M106 S255` mid-print, confirming both that the machine
 does not pause and that the fan changes at the right point in the path.
@@ -721,24 +736,17 @@ does not pause and that the fan changes at the right point in the path.
 
 ## 11. Open questions
 
-- Does an action between two moves inhibit their junction meld? The default must be **no** — actions
-  do not influence planning — because that is what RepRapFirmware does and it is what keeps the print
+- Does an action between two moves inhibit their junction meld? The default must be **no** — actions do
+  not influence planning — because that is what RepRapFirmware does and it is what keeps the print
   moving. `GCodeQueue` gets that answer by construction: it holds code text and creates no DDA, so
-  lookahead never learns the command existed and the corner is planned as if it were absent. The
-  effect then lands somewhere on the rounded arc after the junction, at a point set by latency rather
-  than by geometry.
+  lookahead never learns the command existed. The effect then lands somewhere on the rounded arc after
+  the junction, at a point set by latency rather than by geometry.
 
-  Anchoring in-band means we get the same answer by *choice*, and gain an option RepRapFirmware
-  structurally cannot have: an individual action could ask for its junction to be planned to a stop,
-  or to a bounded speed, when the effect must land at a place rather than approximately. That is
-  proposed as a per-action flag defaulting to "no effect on planning" — `MoveFlags.CanPauseAfter`
-  already sits in that family — and not as a global rule. RepRapFirmware can only choose between
-  queueing and accepting the smear, or not queueing and stopping the whole machine.
-- Which reference point does the anchor mean: the start of the following move, or the end of the
-  preceding one? They coincide only for contiguous moves. Start-of-next is proposed, because that is
-  the number the boards already receive.
-- What does an action mean on a machine running two motion systems? An action belongs to one ring;
-  whether anything needs to span both is undecided.
-- How does an action interact with a pause that later resumes from a restore point? Purging is
-  correct for the abandoned moves, but an effect that was purged may need reapplying on resume, and
-  that is not the same list.
+  Anchoring in-band means the same answer by *choice*, and an option RepRapFirmware structurally cannot
+  have: an action could ask for its junction to be planned to a stop when the effect must land at a
+  place rather than approximately. Nothing has asked for it, and the feedhold already shows how to force
+  a junction speed if it is ever wanted, so the default is no and there is no flag.
+
+- What does an action mean on a machine running two motion systems? An action belongs to one ring. The
+  feedhold has the same gap and names it the same way — only ring 0 is stopped, with a `// TODO` for
+  M596 — so the two should be answered together rather than separately.
