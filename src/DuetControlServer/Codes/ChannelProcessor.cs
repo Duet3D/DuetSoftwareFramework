@@ -129,6 +129,72 @@ public sealed class ChannelProcessor
     public CodeFile? CurrentFile => _pipelines.Value[(int)PipelineStage.Start].CurrentStackItem.File;
 
     /// <summary>
+    /// Whether every macro running on this channel can be restarted from its beginning
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>GCodeMachineState::CanRestartMacro</c>, which walks its stack and returns
+    /// false if any level is a macro that has not said it is restartable. A pause abandons the macros
+    /// it unwinds, so one that cannot be restarted must not be interrupted part-way - the pause waits
+    /// until the channel is back out of it instead. <c>M98 R1</c> is what marks one restartable
+    /// </remarks>
+    public bool CanRestartMacros
+    {
+        get
+        {
+            foreach (CodeFile? file in _pipelines.Value[(int)PipelineStage.Start].StackedFiles())
+            {
+                if (file is MacroFile macro && !macro.IsPausable)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Whether this channel is running any macro at all
+    /// </summary>
+    public bool IsDoingMacro
+    {
+        get
+        {
+            foreach (CodeFile? file in _pipelines.Value[(int)PipelineStage.Start].StackedFiles())
+            {
+                if (file is MacroFile)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Abandon the macros a pause interrupts, leaving the job file itself in place
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    /// <remarks>
+    /// The macro half of RepRapFirmware's pause: the machine is stopping somewhere the macro did not
+    /// expect, so whatever it had left to do is no longer meaningful and its codes are cancelled with
+    /// it. Only macros are popped - the job file underneath them is what the resume will read from
+    /// again, and it stays. This is deliberately not <see cref="AbortAllFilesAsync"/>, which unwinds
+    /// everything regardless: that is right for an abort and wrong for a pause
+    /// </remarks>
+    public async Task AbandonMacrosForPauseAsync(CancellationToken cancellationToken = default)
+    {
+        while (CurrentFile is MacroFile macro)
+        {
+            using (await macro.LockAsync(cancellationToken))
+            {
+                macro.Abort();
+            }
+            Pop();
+        }
+    }
+
+    /// <summary>
     /// Abort every file on this channel's stack, unwinding it back to the base level
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>

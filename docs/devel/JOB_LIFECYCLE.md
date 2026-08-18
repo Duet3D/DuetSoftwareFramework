@@ -719,12 +719,19 @@ when the head is at or below the pause height, and only splits the move - travel
       flag of its own, kept as DuetControlServer sent it
 - [ ] Only ring 0 is stopped; a `// TODO` in `DrainFeedholds` names M596
 
-### Phase 5 — pausable macros and the deferred pause ⬜
+### Phase 5 — pausable macros and the deferred pause 🟡
 
-- [ ] A `CanRestartMacro` equivalent walking the channel's stack
-- [ ] A pause unwinds only the pausable macros, cancelling their buffered and suspended codes
-- [ ] `deferredPauseCommandPending` and its injection point, including the tool-change exclusion
-- [ ] `M25` during a non-restartable macro defers instead of refusing
+- [x] `ChannelProcessor.CanRestartMacros`, walking the channel's stack as
+      `GCodeMachineState::CanRestartMacro` walks its own
+- [x] A pause unwinds only the macros, cancelling their codes, and leaves the job file in place -
+      `AbandonMacrosForPauseAsync`, deliberately not `AbortAllFilesAsync`, which is right for an
+      abort and wrong for a pause
+- [x] `_deferredPause` and its injection point in the job loop, with a filament change taking
+      priority over an ordinary pause
+- [x] `M25` and `M226`/`M600`/`M601` during a non-restartable macro defer instead of acting
+- [ ] The tool-change exclusion — RepRapFirmware also waits for `!doingToolChange`, and nothing here
+      says a tool change is in progress. `// TODO` at the point of use; it is the same gap
+      `MachineStatusService` names for `ChangingTool`
 
 ### Phase 6 — the callers that were waiting ⬜
 

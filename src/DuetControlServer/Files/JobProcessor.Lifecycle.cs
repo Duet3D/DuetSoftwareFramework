@@ -131,6 +131,11 @@ internal partial class JobProcessor
                 pausingCode?.ResetCancellationToken();
             }
 
+            // The macros the job was inside are abandoned: the machine is stopping somewhere they did
+            // not expect, so what they had left to do is no longer meaningful. The job file itself
+            // stays, because the resume reads from it again
+            await _codeProcessor.AbandonMacrosForPauseAsync(CodeChannel.File, cancellationToken);
+
             // Not the caller's token: for a synchronous pause that is the token just cancelled above.
             // The rest of the sequence stops for a shutdown and nothing else
             cancellationToken = _lifetime.ApplicationStopping;
@@ -166,6 +171,96 @@ internal partial class JobProcessor
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// A pause that has been asked for but cannot happen yet, and the macro it will run
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>deferredPauseCommandPending</c>. A job inside a macro that has not said it
+    /// is restartable must not be interrupted part-way - the macro would be abandoned with no way to
+    /// put back what it had already done - so the request is held until the job is back out of it
+    /// </remarks>
+    private PauseMacro? _deferredPause;
+
+    /// <summary>
+    /// Whether a pause is waiting for the job to leave a macro it cannot be interrupted inside
+    /// </summary>
+    public bool IsPauseDeferred
+    {
+        get
+        {
+            using (Lock())
+            {
+                return _deferredPause is not null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Ask for a pause once the job is out of the macro it is in
+    /// </summary>
+    /// <param name="macro">Which macro the pause will run</param>
+    /// <returns>True if the request was taken, false if one was already pending</returns>
+    /// <remarks>
+    /// A filament change takes priority over an ordinary pause, which is RepRapFirmware's rule: it
+    /// stashes the stronger request and refuses the weaker one rather than replacing it
+    /// </remarks>
+    public bool TryDeferPause(PauseMacro macro)
+    {
+        using (Lock())
+        {
+            if (_deferredPause is not null && _deferredPause != PauseMacro.FilamentChange)
+            {
+                if (macro != PauseMacro.FilamentChange)
+                {
+                    return false;
+                }
+            }
+            else if (_deferredPause is not null)
+            {
+                return false;
+            }
+            _deferredPause = macro;
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Action a pause that was deferred, if the job is now somewhere it can be paused
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>CheckForDeferredPause</c>, called as each code on the job channel
+    /// finishes. It waits for the job to be out of macros, because that is what it was waiting for
+    /// in the first place.
+    ///
+    /// TODO RepRapFirmware also waits for a tool change to finish (<c>!doingToolChange</c>). Nothing
+    /// here says a tool change is in progress yet - the same gap MachineStatusService names for
+    /// <c>ChangingTool</c> - so a pause deferred into one would act part-way through it
+    /// </remarks>
+    public async ValueTask CheckForDeferredPauseAsync(CancellationToken cancellationToken)
+    {
+        PauseMacro macro;
+        using (await LockAsync(cancellationToken))
+        {
+            if (_deferredPause is null || PauseState != PauseState.NotPaused || !IsProcessing)
+            {
+                return;
+            }
+            if (_codeProcessor.IsDoingMacro(CodeChannel.File))
+            {
+                return;         // still inside the macro it was deferred out of
+            }
+            macro = _deferredPause.Value;
+            _deferredPause = null;
+        }
+
+        await PauseAsync(CodeChannel.File,
+                         macro == PauseMacro.FilamentChange ? PrintPausedReason.FilamentChange : PrintPausedReason.User,
+                         macro, synchronous: true, feedhold: false, reportPosition: true,
+                         pausingCode: null, cancellationToken);
     }
 
     /// <summary>

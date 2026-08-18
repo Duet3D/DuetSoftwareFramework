@@ -259,6 +259,22 @@ public abstract class PipelineBase
     }
 
     /// <summary>
+    /// The files this pipeline's stack holds, innermost first
+    /// </summary>
+    /// <returns>A snapshot of the stack's files</returns>
+    /// <remarks>
+    /// A snapshot rather than the stack itself, so that a caller deciding what to do about the stack
+    /// is not walking it while another thread pushes onto it
+    /// </remarks>
+    public IReadOnlyList<Files.CodeFile?> StackedFiles()
+    {
+        lock (_stack)
+        {
+            return [.. _stack.Select(item => item.File)];
+        }
+    }
+
+    /// <summary>
     /// Push a new element onto the stack
     /// </summary>
     /// <param name="file">Code file or null if waiting for acknowledgment</param>

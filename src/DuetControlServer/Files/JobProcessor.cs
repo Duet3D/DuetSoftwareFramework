@@ -345,6 +345,7 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
         // Update the state
         IsCancelled = IsAborted = _stopped = false;
         PauseState = PauseState.NotPaused;
+        _deferredPause = null;
         IsSimulating = simulating;
         _file = file;
         _pausePosition = _pausePosition2 = null;
@@ -523,6 +524,14 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
                 {
                     // Code has finished, add it back to the code pool
                     codePool.Enqueue(code);
+                }
+
+                // A pause asked for while the job was inside a macro it could not be interrupted in
+                // happens here, once it is back out. RepRapFirmware checks at the same point, after
+                // each command on the job channel completes
+                if (file.Channel == CodeChannel.File)
+                {
+                    await CheckForDeferredPauseAsync(cancellationToken);
                 }
             }
             else

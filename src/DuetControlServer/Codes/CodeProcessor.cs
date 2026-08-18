@@ -109,6 +109,29 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     }
 
     /// <summary>
+    /// Whether every macro running on a channel can be restarted from its beginning
+    /// </summary>
+    /// <param name="channel">Code channel</param>
+    /// <returns>True if no macro on the channel refuses to be interrupted</returns>
+    public bool CanRestartMacros(CodeChannel channel) => Processors.Value[(int)channel].CanRestartMacros;
+
+    /// <summary>
+    /// Whether a channel is running any macro at all
+    /// </summary>
+    /// <param name="channel">Code channel</param>
+    /// <returns>True if a macro is on its stack</returns>
+    public bool IsDoingMacro(CodeChannel channel) => Processors.Value[(int)channel].IsDoingMacro;
+
+    /// <summary>
+    /// Abandon the macros a pause interrupts on a channel, leaving its job file in place
+    /// </summary>
+    /// <param name="channel">Code channel</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public Task AbandonMacrosForPauseAsync(CodeChannel channel, CancellationToken cancellationToken = default)
+        => Processors.Value[(int)channel].AbandonMacrosForPauseAsync(cancellationToken);
+
+    /// <summary>
     /// Assign the job file to the given channel. Only used by the job tasks!
     /// </summary>
     /// <param name="channel">Code channel</param>

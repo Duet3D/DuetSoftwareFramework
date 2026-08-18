@@ -627,6 +627,17 @@ internal partial class MCodeHandler(
                 return new Message();
             }
 
+            // A job inside a macro that has not said it can be restarted must not be interrupted
+            // part-way: the macro would be abandoned with no way to put back what it had already
+            // done. RepRapFirmware stashes the request and injects it once the job is back out
+            if (!code.IsFromFileChannel && jobProcessor.IsProcessing &&
+                codeProcessor.IsDoingMacro(CodeChannel.File) && !codeProcessor.CanRestartMacros(CodeChannel.File))
+            {
+                return jobProcessor.TryDeferPause(PauseMacro.Pause)
+                       ? new Message()
+                       : new Message(MessageType.Warning, "Pausing is already pending");
+            }
+
             return await jobProcessor.PauseAsync(code.Channel, PrintPausedReason.User, PauseMacro.Pause,
                                                  synchronous: code.IsFromFileChannel, feedhold: feedhold,
                                                  reportPosition: true,
@@ -666,6 +677,14 @@ internal partial class MCodeHandler(
                                : code.GetInt('P', 1) == 0 ? PauseMacro.None
                                : PauseMacro.Pause;
             PrintPausedReason reason = filamentChange ? PrintPausedReason.FilamentChange : PrintPausedReason.GCode;
+
+            // Inside a macro that cannot be restarted, the pause waits until the job is back out of
+            // it, exactly as an M25 from elsewhere does
+            if (codeProcessor.IsDoingMacro(code.Channel) && !codeProcessor.CanRestartMacros(code.Channel))
+            {
+                jobProcessor.TryDeferPause(macro);
+                return new Message();
+            }
 
             return await jobProcessor.PauseAsync(code.Channel, reason, macro,
                                                  synchronous: true, feedhold: false, reportPosition: true,
