@@ -966,13 +966,42 @@ internal partial class MCodeHandler(
                     await jobProcessor.SelectFileAsync(fileName, physicalFile, true, cancellationToken);
                     // F0 suppresses writing the simulated time back to the file; absent or F1 updates it, as in standalone mode
                     jobProcessor.UpdateSimulatedTime = code.GetInt('F', 1) == 1;
-                    // Simulation is started when M37 has been processed by the firmware
                 }
+
+                // Where the machine was before the simulation ran, so it can be put back afterwards.
+                // RepRapFirmware saves it into the simulation restore point for the same reason
+                await SaveSimulationRestorePointAsync(code, cancellationToken);
+
+                // Starting a simulation is starting a job, so it goes through the same call M24 makes
+                return await jobProcessor.ResumeAsync(code.Channel, runMacro: true, cancellationToken);
             }
 
             return new Message();
         }
         throw new OperationCanceledException();
+    }
+
+    /// <summary>
+    /// Save where the machine is before a simulation runs
+    /// </summary>
+    /// <param name="code">The code that started the simulation</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <remarks>RepRapFirmware's <c>SimulationRestorePointNumber</c></remarks>
+    private async ValueTask SaveSimulationRestorePointAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            InputChannel? input = model.Inputs[code.Channel];
+            float unitScale = input?.DistanceUnit == DistanceUnit.Inch ? 25.4f : 1.0f;
+            float feedRateMmPerSec = (input?.FeedRate ?? 0.0f) * unitScale / 60.0f;
+
+            using (planner.Lock())
+            {
+                planner.State.SavePosition(Motion.RestorePoint.SimulationNumber,
+                                           planner.Parameters.SharedAxisCount(model.Move),
+                                           feedRateMmPerSec, model.State.CurrentTool, filePosition: null);
+            }
+        }
     }
 
     /// <summary>
@@ -2099,13 +2128,11 @@ internal partial class MCodeHandler(
         switch (code.MajorNumber)
         {
             // Stop or unconditional stop, sleep or conditional stop
-            // Simulate file
-            // M24 and M32 no longer appear here: starting and resuming a job is what
+            // M24, M32 and M37 no longer appear here: starting and resuming a job is what
             // JobProcessor.ResumeAsync does, and it has to happen before the code returns so that
             // start.g and resume.g run inside it
             case 0:
             case 1:
-            case 37:
                 using (await jobProcessor.LockAsync(cancellationToken))
                 {
                     // Start reading from the job file, or finish the cancellation process

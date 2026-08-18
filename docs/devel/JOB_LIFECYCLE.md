@@ -733,18 +733,23 @@ when the head is at or below the pause height, and only splits the move - travel
       says a tool change is in progress. `// TODO` at the point of use; it is the same gap
       `MachineStatusService` names for `ChangingTool`
 
-### Phase 6 — the callers that were waiting ⬜
+### Phase 6 — the callers that were waiting 🟡
 
 **Depends on phase 4**, not just phase 2: every pause RepRapFirmware makes here becomes a feedhold
 (§3.5.1). Landing them on the faithful path first would change their behaviour underneath machines
 that had started relying on it. No event gains or loses a pause — only the stop changes.
 
-- [ ] EVENTS_MIGRATION phase E's pausing default actions, as feedholds (still needs M291 for the
-      message box)
-- [ ] `driver_error` pauses as a feedhold **without** `pause.g`; `heater_fault` and `filament_error`
+- [x] EVENTS_MIGRATION phase E's pausing default actions, as feedholds
+- [x] `driver_error` pauses as a feedhold **without** `pause.g`; `heater_fault` and `filament_error`
       as feedholds **with** it
-- [ ] `trigger<n>.g`, and trigger 1's built-in pause as a feedhold
-- [ ] `M37` starts the simulation it selects, and the simulation restore point
+- [x] `M37` starts the simulation it selects, and the simulation restore point
+- [ ] The message box RepRapFirmware raises alongside an event's pause — `// TODO` at the point of
+      use, waiting on M291
+- [ ] `trigger<n>.g`, and trigger 1's built-in pause. **Blocked, and further back than it looked**:
+      plain `M581` is not implemented at all. Only the expression form `M581.1` exists, so there is
+      no pin-trigger system for a trigger number to come from and nothing for `trigger1` to mean.
+      That is MCODE_MIGRATION §5.11's gap rather than this one's, and it belongs with the input
+      monitors rather than here
 
 ### Phase 7 — job progress ⬜
 

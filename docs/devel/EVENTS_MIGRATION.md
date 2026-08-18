@@ -804,7 +804,7 @@ Each phase is independently useful and independently testable.
 - [x] Validate the event type (`Invalid event type` when the name is not one), but allow **any** valid
       type including the 128+ block — that is how the link macros get tested (§7)
 
-### Phase E — the blocked default actions ⬜
+### Phase E — the blocked default actions 🟡
 
 Gated on MCODE_MIGRATION's `M291`/`M292`, and on [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md)'s **phase 4**
 rather than its phase 2. The pause itself lands in phase 2, but JOB_LIFECYCLE §3.5.1 decides that
@@ -818,10 +818,11 @@ events pause and which of them run `pause.g`. The feedhold changes how the machi
 stops it, so an event with no default pause here — a stall, a warning, an over- or undervoltage —
 still has none.
 
-- [ ] Message box for pausing events, titled `Printing paused` / `Event notification`
-- [ ] `HeaterFault` / `FilamentError` feedhold via `pause.g`; `DriverError` feedhold without it —
+- [x] `HeaterFault` / `FilamentError` feedhold via `pause.g`; `DriverError` feedhold without it —
       the two flags are independent, because `pause.g` parks the head and a driver in error cannot
       be trusted to move
+- [ ] Message box for pausing events, titled `Printing paused` / `Event notification` — still the
+      only thing phase E waits on, and it waits on M291
 
 ---
 
@@ -832,9 +833,9 @@ still has none.
 | `main_board_power_fail` | — | ⛔ never raised in RRF either | — | — | — |
 | `expansion_reconnect` | `expansion-reconnect.g` | 🟡 announcement seen, state not compared | ⬜ | ⬜ | ⬜ log |
 | `expansion_timeout` | `expansion-timeout.g` | ⬜ no watchdog | ⬜ | ⬜ | ⬜ log |
-| `heater_fault` | `heater-fault.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ blocked: feedhold |
-| `driver_error` | `driver-error.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ blocked: feedhold, no `pause.g` |
-| `filament_error` | `filament-error.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ blocked: feedhold |
+| `heater_fault` | `heater-fault.g` | 🟡 logged only | ⬜ | ⬜ | 🟡 feedhold via `pause.g`; no message box |
+| `driver_error` | `driver-error.g` | 🟡 logged only | ⬜ | ⬜ | 🟡 feedhold without `pause.g`; no message box |
+| `filament_error` | `filament-error.g` | 🟡 logged only | ⬜ | ⬜ | 🟡 feedhold via `pause.g`; no message box |
 | `driver_stall` | `driver-stall.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ log |
 | `driver_warning` | `driver-warning.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ log |
 | `mcu_temperature_warning` | `mcu-temperature-warning.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ log |

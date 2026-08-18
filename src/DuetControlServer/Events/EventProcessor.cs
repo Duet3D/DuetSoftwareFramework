@@ -1,6 +1,7 @@
 using DuetAPI;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
+using DuetControlServer.Link.Protocol.FirmwareRequests;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Utility;
 using Microsoft.Extensions.Hosting;
@@ -32,8 +33,28 @@ namespace DuetControlServer.Events;
 /// <param name="macroRunner">Macro runner</param>
 /// <param name="eventLogger">Event logger</param>
 /// <param name="logger">Logger</param>
-public sealed class EventProcessor(EventQueue queue, MacroRunner macroRunner, EventLogger eventLogger, ILogger<EventProcessor> logger) : BackgroundService
+internal sealed class EventProcessor(EventQueue queue, MacroRunner macroRunner, EventLogger eventLogger,
+                                   JobProcessor jobProcessor, ILogger<EventProcessor> logger) : BackgroundService
 {
+    /// <summary>
+    /// Why a job would pause because of an event, or null if the event does not pause one
+    /// </summary>
+    /// <param name="type">Event type</param>
+    /// <returns>The pause reason, or null</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>Event::GetDefaultPauseReason</c>, and deliberately the same three events.
+    /// Which events pause is its decision to make and this is only reading it back - an event it does
+    /// not pause for still does not pause here. What differs is <em>how</em> the machine stops; see
+    /// JOB_LIFECYCLE.md §3.5.1
+    /// </remarks>
+    private static PrintPausedReason? DefaultPauseReason(EventType type) => type switch
+    {
+        EventType.HeaterFault => PrintPausedReason.HeaterFault,
+        EventType.FilamentError => PrintPausedReason.Filament,
+        EventType.DriverError => PrintPausedReason.DriverError,
+        _ => null
+    };
+
     /// <summary>
     /// What to do for an event whose macro is absent and whose default action is not just to say so
     /// </summary>
@@ -107,17 +128,64 @@ public sealed class EventProcessor(EventQueue queue, MacroRunner macroRunner, Ev
             return;
         }
 
-        // No macro, so the default action. RepRapFirmware also raises a message box and pauses the
-        // print for a heater fault, a filament error or a driver error
-        // TODO: raise the message box and pause once M291 and the feedhold are implemented; see
-        // §3.5 of docs/devel/EVENTS_MIGRATION.md for which events pause and which of them run
-        // pause.g, and §3.5.1 of docs/devel/JOB_LIFECYCLE.md for why an event pauses by feedhold
+        // No macro, so the default action
+        // TODO: raise the message box RepRapFirmware raises alongside the pause, titled "Printing
+        // paused" while printing and "Event notification" otherwise, once M291 exists
         eventLogger.LogOutput(description);
 
         if (machineEvent.Type == EventType.ControllerReconnect && ReconnectDefaultAction is not null)
         {
             // The machine came back and nothing said what that should mean, so put it back as it was
             await ReconnectDefaultAction(cancellationToken);
+        }
+
+        if (DefaultPauseReason(machineEvent.Type) is PrintPausedReason reason)
+        {
+            await PauseForEventAsync(machineEvent.Type, reason, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Pause the job because an event asked for it and no macro handled it
+    /// </summary>
+    /// <param name="type">Event type</param>
+    /// <param name="reason">Why the job is pausing</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    /// <remarks>
+    /// <para>
+    /// The pause is a feedhold: nobody typed it, and the reasons an event pauses - a heater that has
+    /// faulted, filament that has run out, a driver reporting an error - are all cases where running
+    /// the rest of the queue prints air or damages the part. JOB_LIFECYCLE.md §3.5.1 is the decision
+    /// and what it does not change.
+    /// </para>
+    /// <para>
+    /// A driver error runs no macro. RepRapFirmware routes it to <c>eventPausing2</c> rather than
+    /// <c>eventPausing1</c> because <c>pause.g</c> typically lifts and parks the head, and a driver
+    /// in error cannot be trusted to move. The feedhold is still right for it - it asks that driver
+    /// for strictly less motion than draining the queue would
+    /// </para>
+    /// </remarks>
+    private async Task PauseForEventAsync(EventType type, PrintPausedReason reason, CancellationToken cancellationToken)
+    {
+        using (await jobProcessor.LockAsync(cancellationToken))
+        {
+            // A job that is already stopping is not paused a second time, which is RepRapFirmware's
+            // test in the processingEvent state
+            if (!jobProcessor.IsProcessing || jobProcessor.PauseState != PauseState.NotPaused)
+            {
+                return;
+            }
+        }
+
+        PauseMacro macro = type == EventType.DriverError ? PauseMacro.None : PauseMacro.Pause;
+        Message result = await jobProcessor.PauseAsync(CodeChannel.Autopause, reason, macro,
+                                                       synchronous: false, feedhold: true,
+                                                       reportPosition: false, pausingCode: null,
+                                                       cancellationToken);
+        if (result.Type == MessageType.Error)
+        {
+            logger.LogWarning("Could not pause the job for event {Type}: {Message}", type, result.Content);
         }
     }
 }
