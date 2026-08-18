@@ -38,7 +38,7 @@ The codes divide into four classes, and only two of them are about stopping:
 | Class | Meaning | Examples | Mechanism |
 | --- | --- | --- | --- |
 | **Immediate** | no relation to motion | M115, M409, M122, M550 | act now, without waiting for the channel's pending codes |
-| **Deferred** | the physical effect belongs at a point in the path | M106/107, M42, M280, M300, M150, M117, M3/M4/M5, M568, M104/140/141 | this document — **from a job file or its macros only**, see §3 |
+| **Deferred** | the physical effect belongs at a point in the path | M106/107, M42, M280, M300, M150, M117, M3/M4/M5, M568, M104/140/141, M144, `G10` without axis letters — §9 is the list | this document — **from a job file or its macros only**, see §3 |
 | **Ordered** | applies to moves built after it, must not reach moves already built | M201/203/205/566, M204, M592, M425, M572 | solved: the move carries it |
 | **Barrier** | changes what an already-queued move *means* | M92, M584, M350, M208, M669/M665, tool change, homing | standstill, honestly |
 
@@ -122,9 +122,10 @@ restart rather than of this design. §5 works it through.
 
 ### The anchor
 
-An action is `{ afterMoveId, payload, timeOffset }` — the id of the move it was submitted behind, the
-CAN frame to send, and where in that frame the timestamp goes. It carries no file position and no
-offset into the move; §5 shows why neither is needed.
+An action is `{ afterMoveId, payload }` — the id of the move it was submitted behind, and the CAN frame
+to send. Where the timestamp goes in that frame is a lookup on the message type rather than a field on
+the action (§4). It carries no file position and no offset into the move; §5 shows why neither is
+needed.
 
 ### Resolving the anchor to a time
 
@@ -256,9 +257,26 @@ layout change at all. It should not: one message type would then have the time s
 from every other, the board's dispatch gate could not read it without unpacking parameters first, and
 "every command carries a time" would acquire an exception. Shorten the array.
 
-The field need not be at the same offset in every message. The board dispatches by message type and
-knows each layout, and the SBC-side patcher is told the offset in the action record — one byte, and no
-constraint on existing layouts.
+### All of this is one schema edit
+
+The wire formats are not written twice. `Schema/can-messages.json` is the single description, and
+`DuetCanMessage.SourceGenerators` emits from it the CANlib header, the C# mirror, and a conformance
+harness on each side that asserts the two agree. So:
+
+- adding `whenToExecute` is a field in the schema, and both languages follow;
+- shortening an array is one character in the schema — `"length": "60"` becomes `"56"`;
+- the layouts cannot drift, because nothing transcribes them.
+
+That also removes a field from the action. The board finds the timestamp by knowing its own message
+layouts, but the SBC has to patch the time into an opaque frame, which means knowing the offset for
+that message type. Rather than carrying the offset in every action, **generate the offset table** —
+message type to `whenToExecute` offset — the way `CanMessageGenericTables` is already generated from
+the same schema. The action is then `{ afterMoveId, payload }` and the offset is a lookup that cannot
+disagree with the layout it describes.
+
+Two numbers to name rather than write twice while doing it: the shortened array lengths belong in the
+schema and nowhere else, and the "now" sentinel needs a constant in it too, so that the board's
+dispatch gate and the SBC's default are the same value by construction.
 
 ### What an expansion board does with a message it cannot take
 
@@ -363,7 +381,7 @@ already report, so a machine that is consistently late is visible before it is a
 
 That is the whole policy. A per-action choice between "send anyway", "send and raise" and "abort" is
 worth adding when something needs it: a fan wants the first, a laser the second, an interlock the
-third — and laser power belongs on the move record rather than on this timeline (§9), while interlocks
+third — and laser power belongs on the move record rather than on this timeline (§10), while interlocks
 do not exist. Two bits beside a four-byte timestamp is cheap to add later, with a customer whose
 requirements are known.
 
@@ -648,24 +666,75 @@ forgotten.
 
 ---
 
-## 9. Order of work
+## 9. The codes RepRapFirmware defers
+
+`GCodeQueue::ShouldQueueMCode` and `ShouldQueueG10` are the whole of RepRapFirmware's list. It is
+hand-maintained rather than derived, so this is a copy of it to tick off — a code deferred here that
+RRF applies immediately, or the reverse, is a difference somebody chose rather than a gap.
+
+Tick a row when the code defers in DuetControlServer through §3's mechanism.
+
+| Code | What it does | RRF condition | Done |
+| --- | --- | --- | --- |
+| M3 | Spindle on, clockwise | only when `machineType != laser` — in laser mode it sets the power for the next `G1` | ⬜ |
+| M4 | Spindle on, counter-clockwise | always | ⬜ |
+| M5 | Spindle off | only when `machineType != laser` | ⬜ |
+| M42 | Set output pin | always | ⬜ |
+| M104 | Set tool temperature, no wait | always | ⬜ |
+| M106 | Fan speed | always | ⬜ |
+| M107 | Fan off | always | ⬜ |
+| M117 | Display message | always | ⬜ |
+| M140 | Set bed temperature, no wait | always | ⬜ |
+| M141 | Set chamber temperature, no wait | always | ⬜ |
+| M144 | Bed standby | always | ⬜ |
+| M150 | Set LED colours | only when the strip does not need a standstill — a DMA-less strip does, and `MustStopMovement` says so | ⬜ |
+| M280 | Set servo position | always | ⬜ |
+| M300 | Beep | always | ⬜ |
+| M568 | Tool settings — spindle RPM and temperatures | always | ⬜ |
+| `G10` | Set tool temperatures | only when it modifies a *tool* and mentions **no axis letter**, because a tool offset change moves the axes and cannot be deferred | ⬜ |
+
+Four gates apply on top of the list, and they are the reason it is short. Each has a counterpart here:
+
+| RRF gate | Where it lands here |
+| --- | --- |
+| `machineState->DoingFile()` | §3, "only the file channels defer" — the same rule for the same reason |
+| `!ContainsExpression()` | **Not needed.** RRF must refuse expressions because it defers the *code*; deferring only the effect evaluates them at parse time (§7) |
+| `GetScheduledMoves() != GetCompletedMoves()` — nothing is queued unless the machine is actually moving | Falls out of the anchor: with nothing in the ring there is no preceding move to anchor to, so the effect applies now |
+| `gb.DataLength() <= BufferSizePerQueueItem` — it must fit a fixed queue item | **Not needed.** The payload is the CAN frame the handler would have sent, which is bounded by the protocol rather than by a text buffer |
+| `segmentsLeft == 0` — never queue mid-segmentation | Falls out of anchoring by move id rather than by a move *count*: a segment that turns out to command no movement cannot throw the anchor out |
+
+Two entries are worth reading as decisions rather than omissions:
+
+- **M291 is deliberately not queued**, and the comment in `ShouldQueueMCode` explains why at length: a
+  non-blocking M291 sitting in the queue can be displayed *after* a later blocking one, overwriting it,
+  leaving the blocking one unacknowledgeable except by a manual M292. That reasoning is about deferring
+  the *code*. Whether it applies to deferring only the effect is an open question and M291 does not
+  exist here yet, so the row is absent rather than unticked.
+- **M116, M109 and M190 are absent** from RRF's list because they wait for temperature by definition. A
+  code that waits is a barrier (§1), not a deferred code.
+
+---
+
+## 10. Order of work
 
 1. **Declare the classes** (§8). Pure DuetControlServer, no behaviour change, and it makes the rest
    reviewable. This is where "some codes execute immediately" lands: M115 and M122 do not flush today,
    M409 does, and nothing says which is intended.
 
-2. **`whenToExecute` on the command messages** — the field, the two shortened arrays (§4), and the
-   "now" sentinel that means what every message means today. No behaviour change: everything sends
-   "now" and every board acts on arrival, exactly as now. Landing the protocol change on its own, with
-   nothing depending on it yet, is what makes the next step's failures legible.
+2. **`whenToExecute` on the command messages** — one edit to `Schema/can-messages.json`: the field, the
+   two shortened arrays, the "now" sentinel and the generated offset table (§4). The generator emits
+   the CANlib header, the C# mirror and both conformance harnesses, so the layouts cannot drift. No
+   behaviour change: everything sends "now" and every board acts on arrival, exactly as now. Landing
+   the protocol change on its own, with nothing depending on it yet, is what makes the next step's
+   failures legible.
 
 3. **The parked-command ring in `Duet3Expansion`** — one gate in `CommandProcessor::Spin`, copy out and
    free the buffer in the same pass, and on a full ring execute the nearest-due command and park the
    arrival in its place. Still no behaviour change, because nothing sends a future time yet.
 
-4. **Action entries in `MotionService`** — an ordered list of `{ afterMoveId, payload, timeOffset }`,
-   resolved as the anchoring move is prepared and emitted with it. A side list keyed by move id; the
-   DDA ring does not have to change.
+4. **Action entries in `MotionService`** — an ordered list of `{ afterMoveId, payload }`, resolved as
+   the anchoring move is prepared and emitted with it. A side list keyed by move id; the DDA ring does
+   not have to change.
 
 5. **`DuetSbc_MotionSubmitAction`**, down the *same* single-producer queue as `SubmitMove`. If actions
    travel a different path from moves, the race this plan exists to remove comes back.
@@ -692,7 +761,7 @@ tuning in [MOTION_CONFIG_ORDERING.md](MOTION_CONFIG_ORDERING.md), not on the act
 
 ---
 
-## 10. Verification
+## 11. Verification
 
 The property is testable offline, with no hardware and no timing, in the same way `DdaRingTests` proves
 the tuning and stop properties:
@@ -734,7 +803,7 @@ does not pause and that the fan changes at the right point in the path.
 
 ---
 
-## 11. Open questions
+## 12. Open questions
 
 - Does an action between two moves inhibit their junction meld? The default must be **no** — actions do
   not influence planning — because that is what RepRapFirmware does and it is what keeps the print
