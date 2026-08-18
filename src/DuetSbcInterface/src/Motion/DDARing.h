@@ -89,6 +89,29 @@ class DDARing final
 		const noexcept; // Get the (peak) deceleration for reporting in the object model
 
 	[[nodiscard]] int32_t GetLastEndpoint(size_t drive) const noexcept;
+	// What a feedhold did, for DuetControlServer to act on.
+	struct FeedholdOutcome
+	{
+		uint32_t firstPurgedMoveId; // id of the earliest move dropped, 0 if none was
+		uint32_t movesPurged;		// how many were dropped
+		bool stopped;				// true if the ring was brought to a planned stop
+	};
+
+	// Bring the ring to a controlled stop as early as it can, and drop everything after it.
+	//
+	// RepRapFirmware's PauseMoves searches for a junction whose end speed is already at or below
+	// jerk on every drive, and during a fast print lookahead has made sure there is not one, so it
+	// finds nothing and the whole ring drains. This makes a stopping point instead: it takes the
+	// earliest restartable boundary that is far enough away to decelerate to rest by, forces the end
+	// speed there to zero, re-plans backwards to the last committed move and frees the rest.
+	//
+	// A committed move cannot be touched - its segments are generated and on their way to the boards
+	// - so the earliest this can act is the first move after them. Returns false if nothing could be
+	// purged, in which case the caller waits for the ring to drain as before.
+	//
+	// Must run on the motion thread: freeing a move frees its segments.
+	bool Feedhold(FeedholdOutcome& outcome) noexcept;
+
 	void SetLastEndpoints(LogicalDrivesBitmap logicalDrives, const int32_t* ep) noexcept;
 	void SetLastEndpoint(size_t drive, int32_t ep) noexcept;
 

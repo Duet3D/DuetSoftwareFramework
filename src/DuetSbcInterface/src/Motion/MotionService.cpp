@@ -26,6 +26,9 @@ namespace Duet::Sbc
 		// Forced positions are rare - homing, probing, G92, a reconfiguration - and the motion thread
 		// takes every one of them within a millisecond. Room for a burst, not for a backlog.
 		constexpr size_t kForcedPositionCapacity = 8 * 1024;
+		// A feedhold request carries nothing; the ring only has to hold the fact that one was asked
+		// for. Several arriving at once collapse into one stop, which is what they mean anyway
+		constexpr size_t kFeedholdCapacity = 1024;
 	}
 
 	MotionService::MotionService(LinkService& link)
@@ -33,6 +36,7 @@ namespace Duet::Sbc
 		, m_sink(link)
 		, m_submissions(kSubmissionCapacity)
 		, m_forcedPositions(kForcedPositionCapacity)
+		, m_feedholdRequests(kFeedholdCapacity)
 	{
 		// The controller stops an endstop move itself. Where the drives should end up is decided in
 		// DuetControlServer, from the positions this side can evaluate - see GetPositionAt - so all
@@ -125,6 +129,7 @@ namespace Duet::Sbc
 	{
 		// Before the submissions, so that a move queued after a position was forced is planned from
 		// that position rather than from the one it replaced
+		DrainFeedholds();
 		DrainForcedPositions();
 		DrainSubmissions();
 
@@ -304,6 +309,68 @@ namespace Duet::Sbc
 				m_forcedPositionsApplied.fetch_add(1, std::memory_order_relaxed);
 			}
 			m_forcedPositions.Consume();
+		}
+	}
+
+	bool MotionService::RequestFeedhold()
+	{
+		// The request has no payload: it is the fact of being asked, and one byte carries that
+		const uint8_t token = 0;
+		return m_feedholdRequests.Write({&token, 1});
+	}
+
+	void MotionService::DrainFeedholds()
+	{
+		bool asked = false;
+		while (m_feedholdRequests.Peek())
+		{
+			asked = true;
+			m_feedholdRequests.Consume();
+		}
+		if (!asked)
+		{
+			return;
+		}
+
+		// Only the first ring stops. A second motion system would need its own stopping point and its
+		// own restore data, and M596 is what brings one into existence
+		// TODO extend this to every ring when multiple motion systems land
+		DDARing::FeedholdOutcome outcome{};
+		m_rings[0].Feedhold(outcome);
+
+		// Seqlock, as for the position snapshot: the reader is a managed thread that may stop for a
+		// garbage collection part-way through the read
+		const uint32_t sequence = m_feedholdSequence.load(std::memory_order_relaxed);
+		m_feedholdSequence.store(sequence + 1, std::memory_order_release);
+		std::atomic_thread_fence(std::memory_order_release);
+
+		m_feedholdResult.sequence = sequence / 2 + 1;
+		m_feedholdResult.firstPurgedMoveId = outcome.firstPurgedMoveId;
+		m_feedholdResult.movesPurged = outcome.movesPurged;
+		m_feedholdResult.stopped = outcome.stopped;
+
+		std::atomic_thread_fence(std::memory_order_release);
+		m_feedholdSequence.store(sequence + 2, std::memory_order_release);
+	}
+
+	MotionService::FeedholdResult MotionService::GetFeedholdResult() const
+	{
+		for (;;)
+		{
+			const uint32_t before = m_feedholdSequence.load(std::memory_order_acquire);
+			if ((before & 1u) != 0)
+			{
+				continue; // a write is in progress
+			}
+			std::atomic_thread_fence(std::memory_order_acquire);
+
+			const FeedholdResult result = m_feedholdResult;
+
+			std::atomic_thread_fence(std::memory_order_acquire);
+			if (m_feedholdSequence.load(std::memory_order_acquire) == before)
+			{
+				return result;
+			}
 		}
 	}
 

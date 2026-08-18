@@ -85,6 +85,30 @@ namespace Duet::Sbc
 		size_t GetMotorPositions(std::span<int32_t> positions, uint32_t *whenTicks) const;
 		size_t GetLivePositions(std::span<int32_t> positions, uint32_t *whenTicks) const;
 
+		// Ask for a feedhold: bring the machine to a controlled stop as early as the ring allows and
+		// drop the moves after it. See DDARing::Feedhold for what "as early as the ring allows"
+		// means and why it is not RepRapFirmware's search for a slow-enough junction.
+		//
+		// Queued for the motion thread rather than done here, for the reason SetMotorPositions is:
+		// dropping a move frees its segments, and the freelist is not thread-safe. So the answer
+		// cannot come back from this call - GetFeedholdResult is where it appears, once the motion
+		// thread has acted. `sequence` counts completed feedholds, so a caller reads it before
+		// asking and waits for it to change.
+		//
+		// False means the request queue was full and nothing was asked for - never a silent drop.
+		bool RequestFeedhold();
+
+		// What the last feedhold did. `sequence` increments once per completed feedhold, including
+		// one that found nothing it could stop before, which reports stopped = false.
+		struct FeedholdResult
+		{
+			uint32_t sequence = 0;
+			uint32_t firstPurgedMoveId = 0;
+			uint32_t movesPurged = 0;
+			bool stopped = false;
+		};
+		[[nodiscard]] FeedholdResult GetFeedholdResult() const;
+
 		// Force motor positions, after homing or a move that was cut short.
 		//
 		// The rings are told as well as the trackers. A move is scheduled as the difference between
@@ -176,6 +200,7 @@ namespace Duet::Sbc
 		void SpinOnce();
 		void DrainSubmissions();
 		void DrainForcedPositions();
+		void DrainFeedholds();
 		void PublishPositions();
 
 		// True if `record` is long enough for the header and for the two trailing arrays that the
@@ -229,6 +254,14 @@ namespace Duet::Sbc
 		// replaced.
 		RingBuffer m_forcedPositions;
 		std::atomic<uint32_t> m_forcedPositionsApplied{0};
+
+		// Feedhold requests waiting to be acted on, and what the last one did. Drained before the
+		// forced positions and the submissions: a feedhold changes where the machine will come to
+		// rest, so anything queued behind it has to be planned from that point and not from where
+		// the discarded moves would have left it.
+		RingBuffer m_feedholdRequests;
+		mutable std::atomic<uint32_t> m_feedholdSequence{0};
+		FeedholdResult m_feedholdResult;
 
 		// Per-ring state that DCS sets and the motion thread reads. Plain atomics: the answer is
 		// allowed to be one cycle stale, and waiting for a fresh one would be far worse.

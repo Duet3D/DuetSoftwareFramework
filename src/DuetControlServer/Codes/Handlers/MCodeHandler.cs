@@ -610,6 +610,16 @@ internal partial class MCodeHandler(
     /// </remarks>
     private async ValueTask<Message> HandlePausePrintAsync(Commands.Code code, CancellationToken cancellationToken)
     {
+        if (code.MinorNumber > 1)
+        {
+            return new Message(MessageType.Error, $"M25.{code.MinorNumber} is not supported");
+        }
+
+        // M25.1 asks for the rapid pause: rather than letting the queued moves run, the engine plans
+        // a deceleration at the first move it has not committed and drops the rest. Everything past
+        // the stop is shared with M25 - the same pause.g, the same restore point, the same reason
+        bool feedhold = code.MinorNumber == 1;
+
         if (await codeProcessor.FlushAsync(code, syncFileStreams: true, cancellationToken: cancellationToken))
         {
             if (code.Channel == CodeChannel.File2)
@@ -618,7 +628,8 @@ internal partial class MCodeHandler(
             }
 
             return await jobProcessor.PauseAsync(code.Channel, PrintPausedReason.User, PauseMacro.Pause,
-                                                 synchronous: code.IsFromFileChannel, reportPosition: true,
+                                                 synchronous: code.IsFromFileChannel, feedhold: feedhold,
+                                                 reportPosition: true,
                                                  pausingCode: code.IsFromFileChannel ? code : null,
                                                  cancellationToken);
         }
@@ -657,7 +668,7 @@ internal partial class MCodeHandler(
             PrintPausedReason reason = filamentChange ? PrintPausedReason.FilamentChange : PrintPausedReason.GCode;
 
             return await jobProcessor.PauseAsync(code.Channel, reason, macro,
-                                                 synchronous: true, reportPosition: true,
+                                                 synchronous: true, feedhold: false, reportPosition: true,
                                                  pausingCode: code, cancellationToken);
         }
         throw new OperationCanceledException();

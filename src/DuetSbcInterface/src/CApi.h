@@ -146,6 +146,21 @@ extern "C"
 	// Motion/MoveParams.h and its C# mirror. Returns 1 if queued, 0 if the caller must retry.
 	int32_t DuetSbc_MotionSubmitMove(DuetSbcHandle* h, const void* moveParams, int32_t length);
 
+	// Ask for a feedhold: stop the machine under control as early as the ring allows and drop the
+	// moves after it. Returns 1 if the request was queued, 0 if the queue was full and it was not.
+	//
+	// The answer does not come back from this call. Dropping a move frees its segments, which only
+	// the motion thread may do, so the request is queued and DuetSbc_MotionGetFeedholdResult reports
+	// what happened once it has acted. Read the sequence first and wait for it to change.
+	int32_t DuetSbc_MotionRequestFeedhold(DuetSbcHandle* h);
+
+	// What the last feedhold did. `sequence` counts completed feedholds, `stopped` is 1 if the ring
+	// was brought to a planned stop and 0 if there was nothing it could stop before, in which case
+	// the caller waits for the ring to drain as it did before. Returns 1 on success.
+	int32_t DuetSbc_MotionGetFeedholdResult(DuetSbcHandle* h, uint32_t* sequenceOut,
+											uint32_t* firstPurgedMoveIdOut, uint32_t* movesPurgedOut,
+											int32_t* stoppedOut);
+
 	// Motor positions in microsteps and the step-clock time they were taken at. Returns how many
 	// were written. Reads a snapshot rather than the live state, so it never stalls the motion
 	// thread and never tears.

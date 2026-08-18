@@ -488,6 +488,98 @@ internal sealed class MovePlanner(
     }
 
     /// <summary>
+    /// Where each queued job move came from, so a feedhold can say where to resume
+    /// </summary>
+    /// <remarks>The caller must hold <see cref="Lock"/></remarks>
+    public JobMoveIndex JobMoves { get; } = new();
+
+    /// <summary>
+    /// What a feedhold did
+    /// </summary>
+    /// <param name="Stopped">Whether the engine was brought to a planned stop</param>
+    /// <param name="Origin">Where the earliest dropped move came from, if it is still known</param>
+    /// <param name="MovesPurged">How many moves were dropped</param>
+    public readonly record struct FeedholdOutcome(bool Stopped, JobMoveOrigin? Origin, uint MovesPurged);
+
+    /// <summary>
+    /// Bring the machine to a controlled stop as early as the engine allows
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>What the feedhold did</returns>
+    /// <remarks>
+    /// <para>
+    /// The engine acts on this from its own thread, because dropping a move frees its segments. So
+    /// this asks and then waits for the answer, which is the one place in the planner that waits on
+    /// the motion thread rather than the other way round.
+    /// </para>
+    /// <para>
+    /// Whatever it purges, this side's idea of where the machine is has to come back from the
+    /// engine: the interpreter position ran ahead by however many moves were dropped, and a move
+    /// built from it would start from somewhere the machine never reached
+    /// </para>
+    /// </remarks>
+    public async ValueTask<FeedholdOutcome> FeedholdAsync(CancellationToken cancellationToken = default)
+    {
+        uint sequenceBefore;
+        if (!linkInterface.Native.TryGetFeedholdResult(out sequenceBefore, out _, out _, out _))
+        {
+            return new FeedholdOutcome(false, null, 0);
+        }
+
+        if (!linkInterface.Native.RequestFeedhold())
+        {
+            logger.LogWarning("The motion engine would not take a feedhold request; draining the queue instead");
+            return new FeedholdOutcome(false, null, 0);
+        }
+
+        // The motion thread acts on the request within one pass of its loop
+        uint firstPurgedMoveId = 0, movesPurged = 0;
+        bool stopped = false;
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            if (linkInterface.Native.TryGetFeedholdResult(out uint sequence, out firstPurgedMoveId,
+                                                          out movesPurged, out stopped)
+                && sequence != sequenceBefore)
+            {
+                break;
+            }
+            await Task.Delay(FeedholdPollInterval, cancellationToken);
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!stopped)
+        {
+            return new FeedholdOutcome(false, null, 0);
+        }
+
+        JobMoveOrigin? origin = null;
+        using (Lock())
+        {
+            if (JobMoves.TryGet(firstPurgedMoveId, out JobMoveOrigin found))
+            {
+                origin = found;
+            }
+
+            // The interpreter ran ahead of the machine by everything that was dropped, so its
+            // position is now fiction. The engine's is what the drives were actually commanded to
+            ResyncFromEngine();
+
+            // A segmented move that was part-way through submitting has had its remaining segments
+            // dropped with the rest, so the claim on the ring goes with them
+            State.SegmentsLeft = 0;
+            JobMoves.Clear();
+        }
+
+        logger.LogInformation("Feedhold stopped the machine, dropping {Count} queued move(s)", movesPurged);
+        return new FeedholdOutcome(true, origin, movesPurged);
+    }
+
+    /// <summary>
+    /// How often to ask whether the motion thread has acted on a feedhold
+    /// </summary>
+    private static readonly TimeSpan FeedholdPollInterval = TimeSpan.FromMilliseconds(2);
+
+    /// <summary>
     /// Tell the engine where the machine is, from the endpoints the builder holds
     /// </summary>
     /// <remarks>

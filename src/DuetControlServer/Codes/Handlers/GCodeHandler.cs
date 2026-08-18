@@ -389,6 +389,19 @@ internal sealed partial class GCodeHandler(
                             {
                                 endstopCorrection.NoteMoveId(raw.MoveId);
                             }
+
+                            // Where this move came from, so that a feedhold dropping it can say where
+                            // to resume. Every segment of a move carries the same file position,
+                            // because they all came from the one code
+                            if (code.IsFromFileChannel)
+                            {
+                                planner.JobMoves.Note(raw.MoveId, new JobMoveOrigin
+                                {
+                                    FilePosition = code.FilePosition,
+                                    GCommandNumber = code.MajorNumber ?? -1,
+                                    FeedRateMmPerSec = raw.FeedRateMmPerSec
+                                });
+                            }
                             submitted++;
                             state.SegmentsLeft = segments.Count - submitted;
                         }

@@ -834,6 +834,43 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
            && NativeMethods.DuetSbc_MotionSetMotorPositions(_handle, driveMask, positions, positions.Length) != 0;
 
     /// <summary>
+    /// Ask the motion engine for a feedhold
+    /// </summary>
+    /// <returns>True if the request was queued</returns>
+    /// <remarks>
+    /// The result arrives through <see cref="TryGetFeedholdResult"/> once the motion thread has
+    /// acted, because dropping a move frees its segments and only that thread may do it
+    /// </remarks>
+    public bool RequestFeedhold()
+        => _handle != IntPtr.Zero && NativeMethods.DuetSbc_MotionRequestFeedhold(_handle) != 0;
+
+    /// <summary>
+    /// What the last feedhold did
+    /// </summary>
+    /// <param name="sequence">Receives the number of completed feedholds</param>
+    /// <param name="firstPurgedMoveId">Receives the id of the earliest move dropped</param>
+    /// <param name="movesPurged">Receives how many moves were dropped</param>
+    /// <param name="stopped">Receives whether the ring was brought to a planned stop</param>
+    /// <returns>True if the engine answered</returns>
+    public bool TryGetFeedholdResult(out uint sequence, out uint firstPurgedMoveId, out uint movesPurged, out bool stopped)
+    {
+        sequence = firstPurgedMoveId = movesPurged = 0;
+        stopped = false;
+        if (_handle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        if (NativeMethods.DuetSbc_MotionGetFeedholdResult(_handle, out sequence, out firstPurgedMoveId,
+                                                          out movesPurged, out int stoppedFlag) == 0)
+        {
+            return false;
+        }
+        stopped = stoppedFlag != 0;
+        return true;
+    }
+
+    /// <summary>
     /// Store the ring state decided here for the motion thread to read
     /// </summary>
     /// <param name="ring">Ring number</param>

@@ -12,6 +12,7 @@
 #include <Motion/MachineConfig.h>
 
 #include <algorithm>
+#include <limits>
 #include <cassert>
 
 #include <Motion/MotionSystem.h>
@@ -408,6 +409,103 @@ int32_t DDARing::GetLastEndpoint(size_t drive) const noexcept
 }
 
 // Set the endpoints of some drives that we have just allocated. The drives must not be owned in the previous move!
+// Bring the ring to a controlled stop as early as it can, and drop everything after it.
+// See the comment on the declaration for why this makes a stopping point rather than looking for one.
+bool DDARing::Feedhold(FeedholdOutcome& outcome) noexcept
+{
+	outcome = FeedholdOutcome{};
+
+	// The earliest move that can still be changed. Everything before it has had its segments
+	// generated and sent to the boards, so its profile and its end speed are already committed - and
+	// that end speed is the speed this stop has to start from.
+	DDA* first = m_getPointer;
+	while (first != m_addPointer && !first->IsProvisional())
+	{
+		first = first->GetNext();
+	}
+	if (first == m_addPointer)
+	{
+		return false; // nothing uncommitted to work with
+	}
+
+	// Walk forward for the earliest boundary that is both restartable and far enough away to have
+	// come to rest by. Both conditions matter: a boundary inside an arc or a retraction is not a
+	// place a print can be restarted from, however much room there is to stop in.
+	const float startSpeed = first->GetStartSpeed();
+	const float startSpeedSquared = startSpeed * startSpeed;
+	float distance = 0.0;
+	float deceleration = std::numeric_limits<float>::max();
+	DDA* stopAfter = nullptr;
+
+	for (DDA* dda = first; dda != m_addPointer && dda->IsProvisional(); dda = dda->GetNext())
+	{
+		distance += dda->GetTotalDistance();
+		deceleration = std::min(deceleration, dda->GetMaxAcceleration());
+		if (dda->IsRestartableBoundary() && startSpeedSquared <= 2 * deceleration * distance)
+		{
+			stopAfter = dda;
+			break;
+		}
+	}
+
+	if (stopAfter == nullptr)
+	{
+		// Either every remaining move is part of something indivisible, or there is not enough left
+		// in the ring to stop in. Both mean the machine has to run what it has
+		return false;
+	}
+
+	// Re-plan backwards from the stopping point. Each move must end slow enough that everything
+	// after it can still reach rest, which is the same relation DoLookahead propagates - it is
+	// running the other way here because the constraint is at the end rather than the start.
+	stopAfter->SetSpeedsForFeedhold(stopAfter->GetStartSpeed(), 0.0);
+	for (DDA* dda = stopAfter; dda != first; )
+	{
+		DDA* const prev = dda->GetPrevious();
+		const float reachable =
+			fastSqrtf(fsquare(dda->GetEndSpeed()) + 2 * dda->GetMaxAcceleration() * dda->GetTotalDistance());
+		if (prev->GetEndSpeed() > reachable)
+		{
+			prev->SetSpeedsForFeedhold(prev->GetStartSpeed(), reachable);
+		}
+		dda = prev;
+	}
+
+	// Then forwards, taking each start speed from the move before it and rebuilding the profile. The
+	// first move keeps the start speed it already had: its predecessor is committed and cannot change
+	for (DDA* dda = first; ; dda = dda->GetNext())
+	{
+		if (dda != first)
+		{
+			dda->SetSpeedsForFeedhold(dda->GetPrevious()->GetEndSpeed(), dda->GetEndSpeed());
+		}
+		dda->RecalculateMove(*this);
+		if (dda == stopAfter)
+		{
+			break;
+		}
+	}
+
+	// Drop what comes after the stop. The ring's add pointer follows, so the next move built is
+	// measured from where the machine will actually be
+	for (DDA* dda = stopAfter->GetNext(); dda != m_addPointer; )
+	{
+		DDA* const next = dda->GetNext();
+		if (outcome.movesPurged == 0)
+		{
+			outcome.firstPurgedMoveId = dda->GetMoveId();
+		}
+		dda->Free();
+		++outcome.movesPurged;
+		--m_scheduledMoves;
+		dda = next;
+	}
+	m_addPointer = stopAfter->GetNext();
+
+	outcome.stopped = true;
+	return true;
+}
+
 void DDARing::SetLastEndpoints(LogicalDrivesBitmap logicalDrives, const int32_t* ep) noexcept
 {
 	DDA* prev = m_addPointer->GetPrevious();

@@ -679,25 +679,33 @@ when the head is at or below the pause height, and only splits the move - travel
 - [ ] The temperature-wait cancellation and the job file's local variables
 - [ ] The laser is switched off on abort — `// TODO` at the point of use, waiting on M452
 
-### Phase 4 — feedhold ⬜
+### Phase 4 — feedhold 🟡
 
 §3.5. Not a port of `DDARing::PauseMoves`; the approved deviation replaces it.
 
-- [ ] `MoveId` → file position / G-command number / feed rate / virtual extruder position side table
-      in `MovePlanner`, pruned as moves complete
-- [ ] `DDARing::Feedhold` in `src/DuetSbcInterface`: pick the stopping point at or after the first
+- [x] `MoveId` → file position / G-command number / feed rate side table (`JobMoveIndex`), bounded
+      rather than pruned on completion — a job queues faster than the engine runs, so forgetting only
+      what completed still grows without limit
+- [x] `DDARing::Feedhold` in `src/DuetSbcInterface`: pick the stopping point at or after the first
       uncommitted DDA, force its end speed to zero, re-run the backward pass to the last committed
       DDA, free the rest
-- [ ] Honour the `canPauseAfter` exclusions when choosing the boundary — arcs, retractions, endstop,
-      probing and `G1 H` moves
-- [ ] `DuetSbc_MotionFeedhold`, reporting the stop endpoints, the first purged `MoveId` and the count
-- [ ] `MovePlanner.FeedholdAsync`, resyncing `CurrentUserPosition` and dropping `SegmentsLeft`
-- [ ] `M25.1` — the same `25 =>` arm branching on `MinorNumber`, refusing `M25.2` and above; from a
+- [x] Honour the `canPauseAfter` exclusions when choosing the boundary — arcs, retractions, endstop,
+      probing and `G1 H` moves, through `DDA::IsRestartableBoundary`
+- [x] `DuetSbc_MotionRequestFeedhold` and `DuetSbc_MotionGetFeedholdResult` — a request and a
+      seqlock-published result, because freeing a move frees its segments and only the motion thread
+      may do that, so the answer cannot come back from the call that asks
+- [x] `MovePlanner.FeedholdAsync`, resyncing from the engine and dropping `SegmentsLeft`
+- [x] `M25.1` — the same `25 =>` arm branching on `MinorNumber`, refusing `M25.2` and above; from a
       file channel it behaves as `M25` (§3.5)
-- [ ] The pause sequence takes the feedhold as a flag **independent of** the run-`pause.g` flag
+- [x] The pause sequence takes the feedhold as a flag **independent of** the run-`pause.g` flag
       (§3.5.1), and falls back to phase 2's drain-the-ring behaviour when nothing could be purged
+- [x] The feedhold supplies the resume position, which is the one case where the last completed code
+      is *not* the pause point
 - [ ] MCODE_MIGRATION §11.6's row for `PauseMoves` records that it is superseded rather than pending
 - [ ] `rrf-differences.md` entry, now that there is shipped behaviour to describe
+- [ ] Native tests for `DDARing::Feedhold` — the boundary search, the backward re-plan and the
+      committed-move floor are all arithmetic that a test can pin and review cannot
+- [ ] Only ring 0 is stopped; a `// TODO` in `DrainFeedholds` names M596
 
 ### Phase 5 — pausable macros and the deferred pause ⬜
 

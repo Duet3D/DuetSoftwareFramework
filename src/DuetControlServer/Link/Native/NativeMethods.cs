@@ -443,6 +443,32 @@ internal static partial class NativeMethods
     internal static partial int DuetSbc_MotionSetMotorPositions(IntPtr handle, uint driveMask, ReadOnlySpan<int> positions, int count);
 
     /// <summary>
+    /// Ask the engine to bring the machine to a controlled stop and drop the moves after it
+    /// </summary>
+    /// <param name="handle">Engine handle</param>
+    /// <returns>Non-zero if the request was queued, zero if its queue was full</returns>
+    /// <remarks>
+    /// The answer does not come back from this call: dropping a move frees its segments and only the
+    /// motion thread may do that. <see cref="DuetSbc_MotionGetFeedholdResult"/> reports what happened
+    /// </remarks>
+    [LibraryImport(LibraryName)]
+    internal static partial int DuetSbc_MotionRequestFeedhold(IntPtr handle);
+
+    /// <summary>
+    /// What the last feedhold did
+    /// </summary>
+    /// <param name="handle">Engine handle</param>
+    /// <param name="sequence">Receives the number of completed feedholds</param>
+    /// <param name="firstPurgedMoveId">Receives the id of the earliest move dropped</param>
+    /// <param name="movesPurged">Receives how many moves were dropped</param>
+    /// <param name="stopped">Receives non-zero if the ring was brought to a planned stop</param>
+    /// <returns>Non-zero on success</returns>
+    [LibraryImport(LibraryName)]
+    internal static partial int DuetSbc_MotionGetFeedholdResult(IntPtr handle, out uint sequence,
+                                                                out uint firstPurgedMoveId, out uint movesPurged,
+                                                                out int stopped);
+
+    /// <summary>
     /// Store the ring state this side decides from its own bookkeeping
     /// </summary>
     /// <param name="handle">Interface handle</param>

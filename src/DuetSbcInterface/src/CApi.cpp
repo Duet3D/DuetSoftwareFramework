@@ -351,6 +351,33 @@ extern "C"
 		return h->motion.SubmitMove({static_cast<const uint8_t*>(moveParams), (size_t)length}) ? 1 : 0;
 	}
 
+	int32_t DuetSbc_MotionRequestFeedhold(DuetSbcHandle* h)
+	{
+		if (h == nullptr)
+		{
+			return 0;
+		}
+		return h->motion.RequestFeedhold() ? 1 : 0;
+	}
+
+	int32_t DuetSbc_MotionGetFeedholdResult(DuetSbcHandle* h, uint32_t* sequenceOut,
+											uint32_t* firstPurgedMoveIdOut, uint32_t* movesPurgedOut,
+											int32_t* stoppedOut)
+	{
+		if (h == nullptr || sequenceOut == nullptr || firstPurgedMoveIdOut == nullptr
+			|| movesPurgedOut == nullptr || stoppedOut == nullptr)
+		{
+			return 0;
+		}
+
+		const auto result = h->motion.GetFeedholdResult();
+		*sequenceOut = result.sequence;
+		*firstPurgedMoveIdOut = result.firstPurgedMoveId;
+		*movesPurgedOut = result.movesPurged;
+		*stoppedOut = result.stopped ? 1 : 0;
+		return 1;
+	}
+
 	int32_t DuetSbc_MotionGetMotorPositions(DuetSbcHandle* h, int32_t* stepsOut, int32_t count, uint32_t* whenTicks)
 	{
 		if (h == nullptr || stepsOut == nullptr || count <= 0)

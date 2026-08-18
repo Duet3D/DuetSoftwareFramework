@@ -55,6 +55,7 @@ internal partial class JobProcessor
     /// <param name="reason">Why the job is pausing</param>
     /// <param name="macro">Which macro to run once the machine has stopped</param>
     /// <param name="synchronous">Whether the pause came from a command in the job file itself</param>
+    /// <param name="feedhold">Whether to stop by planned deceleration rather than by draining the queue</param>
     /// <param name="reportPosition">Whether to announce where the job paused</param>
     /// <param name="pausingCode">The code asking for the pause, if it is one of the job's own</param>
     /// <param name="cancellationToken">Cancellation token</param>
@@ -75,7 +76,7 @@ internal partial class JobProcessor
     /// </para>
     /// </remarks>
     public async ValueTask<Message> PauseAsync(CodeChannel channel, PrintPausedReason reason, PauseMacro macro,
-                                               bool synchronous, bool reportPosition,
+                                               bool synchronous, bool feedhold, bool reportPosition,
                                                Commands.Code? pausingCode, CancellationToken cancellationToken)
     {
         using (await LockAsync(cancellationToken))
@@ -93,6 +94,16 @@ internal partial class JobProcessor
 
         try
         {
+            // A feedhold stops the machine before the queue has run, so it happens first: everything
+            // below is about what the machine does once it has stopped, and there is no point
+            // recording where that is until it has. A synchronous pause never feedholds - the job
+            // file has reached the pause point, so the queue ahead of it is what has to run
+            MovePlanner.FeedholdOutcome held = default;
+            if (feedhold && !synchronous)
+            {
+                held = await _planner.FeedholdAsync(cancellationToken);
+            }
+
             using (await LockAsync(cancellationToken))
             {
                 // Cancel what the job has read ahead. This comes first because it is what lets the
@@ -104,9 +115,9 @@ internal partial class JobProcessor
                 // not complete, so that is the pause point without anything having to compute it. For
                 // a synchronous pause it is the code after the M226 - supplying the position of the
                 // M226 itself would re-run it on resume and never make progress.
-                // TODO the feedhold of JOB_LIFECYCLE.md §3.5 is what supplies a real position, taken
-                // from the first move it purges
-                StopReadingForPause(filePosition: null, filePosition2: null, reason);
+                // A feedhold is the exception: it dropped queued moves the job had already read past,
+                // so the last completed code is *not* the pause point and the first dropped move is
+                StopReadingForPause(held.Origin?.FilePosition, filePosition2: null, reason);
 
                 // A pause commanded from within the job cancelled its own code along with the rest of
                 // the job's, and its token is the one every step below is waiting on. Re-arm it so the

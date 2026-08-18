@@ -169,6 +169,26 @@ class DDA final
 
 	[[nodiscard]] float GetTotalDistance() const noexcept { return m_totalDistance; }
 
+	// What a feedhold needs to re-plan a move it is bringing to a stop. The speeds are in the
+	// engine's own units, which is what RecalculateMove works in, so nothing is converted here.
+	[[nodiscard]] float GetStartSpeed() const noexcept { return m_startSpeed; }
+	[[nodiscard]] float GetEndSpeed() const noexcept { return m_endSpeed; }
+	[[nodiscard]] float GetMaxAcceleration() const noexcept { return m_maxAcceleration; }
+
+	// Whether a print stopped after this move can be restarted from the move that follows it. This is
+	// the flag on its own, without CanPauseAfter's extra test that the next move is uncommitted: a
+	// feedhold only ever looks at moves it has established are uncommitted, and it is deciding where
+	// a stop is *restartable* rather than where the toolpath happens to be slow enough already.
+	[[nodiscard]] bool IsRestartableBoundary() const noexcept { return m_flags.canPauseAfter; }
+
+	// Bring this move to rest at `endSpeed`, for a feedhold re-planning the tail of the ring. Only
+	// valid on a provisional move: a committed one has had its segments generated and sent.
+	void SetSpeedsForFeedhold(float startSpeed, float endSpeed) noexcept
+	{
+		m_startSpeed = startSpeed;
+		m_endSpeed = endSpeed;
+	}
+
 	// The limits this move is to be executed with, as they stood when DuetControlServer built it.
 	// Carried per move so that changing them cannot reach a move that is already queued; see
 	// docs/devel/MOTION_CONFIG_ORDERING.md.
@@ -195,7 +215,10 @@ class DDA final
 	// m_clocksNeeded, which is why it is not const.
 	[[nodiscard]] PrepParams BuildProfile() noexcept;
 
+  public:
 	MovementError RecalculateMove(DDARing& ring) noexcept SPEED_CRITICAL;
+
+  private:
 	static void DoLookahead(DDARing& ring, DDA* laDDA) noexcept SPEED_CRITICAL; // Try to smooth out moves in the queue
 
 #if SUPPORT_S_CURVE
