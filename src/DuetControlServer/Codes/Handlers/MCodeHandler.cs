@@ -37,6 +37,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="filePathResolver">File path resolver</param>
 /// <param name="diagnosticsProvider">Diagnostics provider</param>
 /// <param name="jobProcessor">Job processor</param>
+/// <param name="jobMonitor">How the job is getting on, which M73 tells what the slicer expects</param>
 /// <param name="linkInterface">Link interface</param>
 /// <param name="model">Object model</param>
 /// <param name="expansionBoardManager">What the expansion boards have reported about themselves</param>
@@ -69,6 +70,7 @@ internal partial class MCodeHandler(
     MQTT mqtt,
     SbcTriggerService sbcTriggerService,
     JobProcessor jobProcessor,
+    JobMonitor jobMonitor,
     ILogger<MCodeHandler> logger,
     ILoggerFactory loggerFactory,
     IHostApplicationLifetime lifetime,
@@ -148,6 +150,8 @@ internal partial class MCodeHandler(
             30 => await HandleDeleteFileAsync(code, cancellationToken),
             // Return file information
             36 => await HandleFileInfoAsync(code, cancellationToken),
+            // Slicer-inserted print time values
+            73 => HandleSlicerTimeHints(code),
             // Simulate file
             37 => await HandleSimulateFileAsync(code, cancellationToken),
             // Compute CRC32 checksum of target file
@@ -756,7 +760,9 @@ internal partial class MCodeHandler(
 
             using (await jobProcessor.LockAsync(cancellationToken))
             {
-                if (jobProcessor.IsFileSelected)
+                // A file that is only selected is not being printed, which is what RepRapFirmware
+                // reports: Pronterface polls this and takes "SD printing byte" as the job running
+                if (jobProcessor.IsProcessing || jobProcessor.IsPausedOrChanging)
                 {
                     long filePosition = await jobProcessor.GetFilePositionAsync(motionSystem, cancellationToken);
                     return new Message(MessageType.Success, $"SD printing byte {filePosition}/{jobProcessor.FileLength}");
@@ -1002,6 +1008,25 @@ internal partial class MCodeHandler(
                                            feedRateMmPerSec, model.State.CurrentTool, filePosition: null);
             }
         }
+    }
+
+    /// <summary>
+    /// M73: what the slicer expects the job to take
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// A slicer knows what it generated, so its estimate is better than anything measured from the
+    /// outside until the job has been running for a while. R is the time left in minutes; P is the
+    /// percentage done, which is the slicer's own view and is not used - the file position says that
+    /// </remarks>
+    private Message HandleSlicerTimeHints(Commands.Code code)
+    {
+        if (code.TryGetFloat('R', out float minutesLeft))
+        {
+            jobMonitor.SetSlicerTimeLeft(minutesLeft * 60.0f);
+        }
+        return new Message();
     }
 
     /// <summary>

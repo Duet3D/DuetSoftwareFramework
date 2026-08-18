@@ -28,6 +28,8 @@ public static partial class ServiceCollectionExtensions
             .AddSingleton<IAsyncDiagnostics, JobProcessor>(services => services.GetRequiredService<JobProcessor>())
             .AddSingleton<FileFactory>()
             .AddSingleton<MacroRunner>()
-            .AddHostedService((provider) => provider.GetRequiredService<JobProcessor>());
+            .AddSingleton<JobMonitor>()
+            .AddHostedService((provider) => provider.GetRequiredService<JobProcessor>())
+            .AddHostedService((provider) => provider.GetRequiredService<JobMonitor>());
     }
 }

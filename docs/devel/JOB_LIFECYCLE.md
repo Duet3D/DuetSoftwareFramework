@@ -751,17 +751,31 @@ that had started relying on it. No event gains or loses a pause — only the sto
       That is MCODE_MIGRATION §5.11's gap rather than this one's, and it belongs with the input
       monitors rather than here
 
-### Phase 7 — job progress ⬜
+### Phase 7 — job progress 🟡
 
-The `PrintMonitor` port. Its own phase because nothing above depends on it.
+The `PrintMonitor` port, as `JobMonitor`. Its own phase because nothing above depends on it.
 
-- [ ] `job.duration`, `warmUpDuration`, `pauseDuration`, `lastFileName`, `lastDuration`
-- [ ] `job.layer`, `job.layerTime`, `job.layers[]` — `UpdateService.UpdateLayers` is the existing
-      code and can be lifted out of the `#if false`
-- [ ] `job.timesLeft` — the file, filament and slicer estimates
-- [ ] `job.filePosition`, `job.rawExtrusion`
-- [ ] `M73`
-- [ ] `M27` reports "Not SD printing." when a file is selected but not printing
+- [x] `job.duration`, `warmUpDuration`, `pauseDuration`, `lastFileName`, `lastDuration`,
+      `lastWarmUpDuration`
+- [x] `job.timesLeft` — the file, filament and slicer estimates
+- [x] `job.filePosition`
+- [x] `M73`
+- [x] `M27` reports "Not SD printing." when a file is selected but not printing
+- [x] `HeatManager.IsWaitingForTemperatures`, which is what separates warm-up from printing and
+      which nothing tracked
+- [ ] `job.layer`, `job.layerTime`, `job.layers[]`. `UpdateService.UpdateLayers` is the existing
+      code, but it works from `job.layer` having already been set — in the split architecture
+      RepRapFirmware decided when a layer changed and DSF only recorded the statistics. Nothing
+      decides it now, so the layer-change detection has to be ported before that code can be lifted
+      out of its `#if false`
+- [ ] `job.rawExtrusion`, which the filament estimate reads and which stays null until the extrusion
+      totals exist — MCODE_MIGRATION §15.2. The estimate is written to return nothing rather than a
+      wrong answer while it does
+
+The whole of it turns on separating the time a job spent printing from the time it spent waiting: a
+job paused for ten minutes has not printed for ten minutes, and an estimate that counted them would
+report the job as having slowed down. Warm-up and pause time are accumulated apart and taken back
+off, which is what `PrintMonitor::Spin` does and why it has the flags it has.
 
 ---
 

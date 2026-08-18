@@ -176,6 +176,11 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
     public async ValueTask<bool> WaitForTemperaturesAsync(IReadOnlyList<int> heaters,
                                                           CancellationToken cancellationToken)
     {
+        // Counted rather than flagged, because several channels may be waiting at once and a flag
+        // would be cleared by whichever finished first
+        Interlocked.Increment(ref _waitingForTemperatures);
+        try
+        {
         while (!cancellationToken.IsCancellationRequested)
         {
             bool allReady = true;
@@ -205,7 +210,23 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
             await Task.Delay(WaitPollInterval, cancellationToken);
         }
         return false;
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _waitingForTemperatures);
+        }
     }
+
+    /// <summary>
+    /// Whether anything is waiting for a heater to reach its target
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>GCodes::IsHeatingUp</c>, and what tells the job monitor that the time
+    /// passing is warm-up rather than printing. A job that counted it would look as though it had
+    /// started slowly and then sped up
+    /// </remarks>
+    public bool IsWaitingForTemperatures => Volatile.Read(ref _waitingForTemperatures) > 0;
+    private int _waitingForTemperatures;
 
     /// <summary>
     /// The heaters M140 or M141 addresses
