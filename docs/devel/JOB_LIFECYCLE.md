@@ -16,8 +16,10 @@ M24 at :1160, M226/M600/M601 at :1249, M25 at :1281.
 The contract in MCODE_MIGRATION §1 applies unchanged: port the behaviour, keep the CAN branch and
 drop the local-hardware one, and leave a `// TODO` naming the missing piece rather than inventing a
 stand-in. **One deviation is approved**, and §1.8 is why it is written down at this length rather
-than decided while typing: the asynchronous pause plans a controlled deceleration instead of
-searching for a stopping point that already exists. That is §3.5, and it is what phase 4 builds.
+than decided while typing: a new code, `M25.1`, pauses by planning a controlled deceleration instead
+of searching for a stopping point that already exists. `M25` keeps RepRapFirmware's behaviour
+unchanged, so the deviation is an addition rather than a substitution. That is §3.5, and it is what
+phase 4 builds.
 
 ---
 
@@ -81,6 +83,7 @@ There is no M25, no M226, no M600 and no M601 in `MCodeHandler`'s switch, and no
 |---|---|---|
 | M25 from a file | `DoSynchronousPause(user, pausing1)` | GCodes2.cpp:1294 |
 | M25 from elsewhere | `DoAsynchronousPause(user, pausing1)` | GCodes2.cpp:1312 |
+| `M25.1` from elsewhere | — no RRF equivalent | The feedhold, §3.5. Phase 4 |
 | M25 while a non-restartable macro runs | deferred — §2.8 | GCodes2.cpp:1298 |
 | M226 | `DoSynchronousPause(gcode, pausing1)`; `M226 P0` → `pausing2`, skipping `pause.g` | GCodes2.cpp:1269 |
 | M600 | `DoSynchronousPause(filamentChange, filamentChangePause1)` — runs `filament-change.g`, falling back to `pause.g` | GCodes4.cpp:571 |
@@ -311,6 +314,19 @@ The two things the state machine buys that an `await` does not, and how each is 
 - **Re-entrancy**: a second M25 arriving while `pause.g` runs must be refused, which is what the
   `pausing` state is for (§2.3).
 
+**The resume still moves the head back in two moves, not one.** Collapsing `resuming1` and
+`resuming2` into a single move is the obvious simplification once the states are gone, and it is
+wrong: the split is behaviour, not bookkeeping. RRF restores Z last when the head has to come down
+and first when it has to go up, so the nozzle never drags across the print on its way back to the
+pause point. `ResumeSequenceAsync` keeps both moves and the condition that orders them.
+
+Only the single-motion-system branch of `resuming1` is ported — the `#else` at
+[GCodes4.cpp:665](../../lib/RepRapFirmware/src/GCodes/GCodes4.cpp). The `SUPPORT_ASYNC_MOVES` branch
+above it allocates each axis to whichever motion system owns it before restoring it, which needs
+axis ownership that does not exist here yet. That is a `// TODO` at the point of use naming M596, not
+a silent simplification, and it has to be revisited when multiple motion systems land: with two
+systems the restore is per-system and the Z ordering has to hold across both.
+
 ### 3.4 Which channel each macro runs on
 
 `pause.g`, `resume.g`, `cancel.g` and `stop.g` run on the channel that commanded the operation in
@@ -322,10 +338,15 @@ is explicit about why: "so that any M82/M83 codes will be executed in the correc
 
 ---
 
-### 3.5 Feedhold: the asynchronous pause plans its own stop — *approved deviation*
+### 3.5 `M25.1`, a feedhold that plans its own stop — *approved deviation*
 
 This is the one place the port deliberately does something RepRapFirmware does not, so it is set out
-in full: what RRF does, why it is not enough here, what replaces it, and what that costs.
+in full: what RRF does, why it is not enough, what is added alongside it, and what that costs.
+
+It is an **addition, not a substitution**. `M25` stays a faithful port and keeps RRF's behaviour
+including its overshoot; `M25.1` is a new code with no RepRapFirmware equivalent. Nothing that works
+today changes, which is why the deviation is as cheap as it is — the failure mode §1.8 warns about,
+where a divergence hides until the missing piece lands, cannot happen to a code RRF does not have.
 
 #### What RepRapFirmware does
 
@@ -355,7 +376,7 @@ cancelling the step interrupt mid-move. That is a correct response to a power fa
 one to a user pressing pause, so a normal pause gets the conservative search and lives with the
 overshoot.
 
-#### What DSF does instead
+#### What `M25.1` does
 
 There is a third option RRF does not take: rather than looking for a junction that is already slow
 enough, **make one**. Force the end speed at the chosen point to zero and let the existing profile
@@ -388,7 +409,7 @@ to zero, the stopping point has to move further out — which is the fork.
 
 #### The fork: stop at a boundary, or truncate a move
 
-Two variants, and this is the decision §6 asks for:
+Two variants were considered. **(a) is the decision** — recorded in §6, and what phase 4 builds:
 
 **(a) Boundary.** Walk forward from the first uncommitted DDA accumulating distance until there is
 enough to decelerate to zero at the most restrictive deceleration of the drives involved, and stop at
@@ -400,7 +421,8 @@ there.
 DDA and recording how much of it was done. This is the theoretical minimum distance, and it is what
 "earliest possible opportunity" strictly means.
 
-**(a) is the recommendation**, and (b) is a refinement to consider afterwards, for three reasons:
+(b) stays available as a later refinement, and the three reasons (a) was chosen are the three things
+(b) would have to pay for first:
 
 - (b) needs resume-part-way-through-a-move — RRF's `moveFractionToSkip` / `proportionDone` /
   `initialUserC0`, none of which exists here (MCODE_MIGRATION §11.4 item 29 tracks all three). (a)
@@ -465,6 +487,41 @@ The one thing resume gains is that its restore-point coordinates now describe a 
 passes through mid-decel rather than a move endpoint — under variant (a), still a real endpoint, so
 nothing changes at all.
 
+#### The code, and what it shares with `M25`
+
+`M25.1` dispatches from the same `25 =>` arm of `MCodeHandler.ProcessAsync` — `MajorNumber` is 25
+either way — and branches on `MinorNumber`, which is `-1` when no fraction was given. The house
+pattern for this is `HandleAccelerationsAsync`
+([MCodeHandler.Motion.cs:175](../../src/DuetControlServer/Codes/Handlers/MCodeHandler.Motion.cs)):
+refuse anything above the highest fraction handled, then treat the rest as a flag.
+
+```
+if (code.MinorNumber > 1) return new Message(MessageType.Error, $"M25.{code.MinorNumber} is not supported");
+bool feedhold = code.MinorNumber == 1;
+```
+
+Refusing the unknown fractions explicitly matters here: the default arm of the switch falls back to a
+macro named after the code (MCODE_MIGRATION §9), so an unhandled `M25.2` would silently look for
+`sys/M25.2.g` rather than saying it is not a code.
+
+Everything past the stop is shared with `M25`:
+
+- **`pause.g` runs**, unchanged. A feedhold stops sooner but is otherwise the same event — the machine
+  is paused, at a restore point, waiting to resume — so it takes the same macro, the same restore
+  point and the same resume path. A macro that had to ask *how* the machine stopped would be asking
+  about something already finished by the time it runs.
+- **The pause reason stays `PrintPausedReason.User`.** `M25.1` is the same person pressing the same
+  button and wanting it to take effect sooner, so it is not a new reason. The reason set describes
+  *why* the job paused and the feedhold is a fact about *how*; conflating them would put a transport
+  detail into an enum that `pause.g`, the object model and the event system all read.
+
+**`M25.1` is asynchronous only.** A synchronous pause — `M25` from inside the job file, `M226`, `M600`
+— waits for standstill by definition (`LockCurrentMovementSystemAndWaitForStandstill`), so the queue
+has already drained and there is nothing for a feedhold to purge. From a file channel `M25.1`
+therefore behaves exactly as `M25`, rather than being refused: the fraction asks for the stop to be
+as early as possible, and for a synchronous pause the earliest possible stop is the one `M25` already
+makes.
+
 #### Recording the deviation
 
 `src/Documentation/articles/rrf-differences.md` gets an entry **when phase 4 lands and not before** —
@@ -510,9 +567,11 @@ point from where the machine actually stopped, take the file position from the j
 - [ ] `M226`, `M600`, `M601`, including `M226 P0` skipping `pause.g` and the "use M226/600/601 only
       within a file being printed" refusal
 - [ ] A synchronous pause supplies no file position (§2.9)
-- [ ] `M24` — refuse while `Pausing` or `Resuming`; `resuming1`/`2`/`3` equivalent moving the head
-      back with Z last and restoring the feed rate; `M24 P0` skips `resume.g`; `pause.g` and
-      `resume.g` only when all axes are homed
+- [ ] `M24` — refuse while `Pausing` or `Resuming`; `resuming1`/`2`/`3` equivalent restoring the feed
+      rate and moving the head back in **two** moves, Z ordered last or first by direction (§3.3);
+      `M24 P0` skips `resume.g`; `pause.g` and `resume.g` only when all axes are homed
+- [ ] A `// TODO` on the resume moves naming M596 — the multi-motion-system branch of `resuming1` is
+      not ported and the Z ordering has to be revisited across both systems when it is
 - [ ] `M24` on a selected-but-not-started file runs `start.g`
 
 ### Phase 3 — stopping ⬜
@@ -539,8 +598,11 @@ point from where the machine actually stopped, take the file position from the j
       probing and `G1 H` moves
 - [ ] `DuetSbc_MotionFeedhold`, reporting the stop endpoints, the first purged `MoveId` and the count
 - [ ] `MovePlanner.FeedholdAsync`, resyncing `CurrentUserPosition` and dropping `SegmentsLeft`
-- [ ] The pause sequence uses it, falling back to phase 2's drain-the-ring behaviour when nothing
-      could be purged
+- [ ] `M25.1` — the same `25 =>` arm branching on `MinorNumber`, refusing `M25.2` and above; from a
+      file channel it behaves as `M25` (§3.5)
+- [ ] The pause sequence takes the feedhold as a flag, running the same `pause.g` and recording the
+      same `PrintPausedReason.User`, and falls back to phase 2's drain-the-ring behaviour when
+      nothing could be purged
 - [ ] MCODE_MIGRATION §11.6's row for `PauseMoves` records that it is superseded rather than pending
 - [ ] `rrf-differences.md` entry, now that there is shipped behaviour to describe
 
@@ -587,23 +649,26 @@ The `PrintMonitor` port. Its own phase because nothing above depends on it.
 
 ---
 
-## 6. Open questions
+## 6. Decisions taken
 
-1. **Should the resume move go through `resuming1`/`resuming2` as two moves?** RRF splits it so that
-   Z is restored last when moving down and first when moving up, so the nozzle does not drag. The
-   split is the behaviour, not an artefact of the state machine, so the port keeps it — but it
-   needs the axis allocation that `SUPPORT_ASYNC_MOVES` uses, and only the single-motion-system
-   branch is required until M596 lands. Porting only the `#else` branch is a departure worth
-   confirming.
-2. **Where does `PauseState` live** — on `JobProcessor`, or on `MovementState` next to the restore
-   points? RRF has it on `GCodes` and the restore points on `MovementState`, which argues for
-   `JobProcessor`. That is what §3.1 assumes.
-3. **Feedhold variant (a) or (b)** — stop at the first DDA boundary that gives enough deceleration
-   distance, or truncate a move and stop at the theoretical minimum. §3.5 recommends (a) and phase 4
-   is written for it; (b) is a later refinement that needs `moveFractionToSkip` first and reopens the
-   arc and retraction exclusions.
-4. **Does a feedhold reuse `pause.g`?** RRF has one asynchronous pause path and one macro. A feedhold
-   stops sooner but is otherwise the same event, so the assumption throughout is yes — same reason
-   codes, same `pause.g`, same restore point. If a rapid pause should be distinguishable from an
-   ordinary one in the macro, it needs a `PrintPausedReason` of its own or a parameter, and that is a
-   decision to take before phase 2 fixes the reason set.
+1. **The resume moves the head back in two moves.** `resuming1` and `resuming2` are kept as two, so
+   Z is restored last coming down and first going up. Only the single-motion-system branch is
+   ported, with a `// TODO` naming M596; §3.3.
+2. **`PauseState` lives on `JobProcessor`**, as RRF has it on `GCodes` and the restore points on
+   `MovementState`; §3.1.
+3. **Feedhold variant (a)** — stop at the first DDA boundary with enough deceleration distance, no
+   truncation. (b) stays available later and needs `moveFractionToSkip` first; §3.5.
+4. **The feedhold runs `pause.g`** and records `PrintPausedReason.User`, exactly as `M25` does; §3.5.
+5. **The feedhold is `M25.1`.** `M25` stays a faithful port, so the deviation is an added code rather
+   than changed behaviour; §3.5.
+
+## 7. Still open
+
+1. **Which path do the non-user asynchronous pauses take?** A trigger firing, a heater fault, a
+   filament error and a driver error all reach `DoAsynchronousPause` in RepRapFirmware, and with
+   `M25` faithful they would inherit its overshoot. A filament error in particular is a case where
+   stopping sooner is the point. The options are to leave them on `M25`'s path (faithful, and the
+   overshoot is what RRF does today), to move all of them onto the feedhold, or to choose per event
+   the way `GetDefaultPauseReason` already chooses per event
+   ([EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) §1.5). Nothing before phase 6 depends on the answer,
+   so it can wait — but phase 6 is where it has to be settled, not discovered.
