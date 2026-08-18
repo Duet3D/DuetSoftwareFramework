@@ -13,9 +13,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using DuetControlServer.Codes;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
-using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Codes.Meta;
-using DuetControlServer.Link;
 using Microsoft.Extensions.Logging;
 
 namespace DuetControlServer.Files;
@@ -33,7 +31,6 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     private readonly Expressions _expressions;
     private readonly FileFactory _fileFactory;
     private readonly Parser.FileInfoParser _fileInfoParser;
-    private readonly LinkInterface _linkInterface;
     private readonly Model.ObjectModel _model;
     private readonly ILogger<JobProcessor> _logger;
     private readonly IHostApplicationLifetime _lifetime;
@@ -48,7 +45,6 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// <param name="expressions">Expressions</param>
     /// <param name="fileFactory">File factory</param>
     /// <param name="fileInfoParser">File info parser</param>
-    /// <param name="linkInterface">Link interface</param>
     /// <param name="model">Object Model</param>
     /// <param name="lifetime">Host application lifetime</param>
     /// <param name="logger">Logger</param>
@@ -59,7 +55,6 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
         Expressions expressions,
         FileFactory fileFactory,
         Parser.FileInfoParser fileInfoParser,
-        LinkInterface linkInterface,
         Model.ObjectModel model,
         IHostApplicationLifetime lifetime,
         ILogger<JobProcessor> logger,
@@ -71,7 +66,6 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
         _expressions = expressions;
         _fileFactory = fileFactory;
         _fileInfoParser = fileInfoParser;
-        _linkInterface = linkInterface;
         _model = model;
         _lifetime = lifetime;
         _logger = logger;
@@ -301,8 +295,6 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
             _model.Job.File.Assign(info);
         }
 
-        // Notify RepRapFirmware and start processing the file in the background
-        await _linkInterface.SetPrintFileInfo(cancellationToken);
         _logger.LogInformation("Selected file {File}", virtualFile);
     }
 
@@ -587,30 +579,11 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                         physicalFileName = _file.FilePath.Physical;
                     }
 
-                    // Notify RRF
-                    try
-                    {
-                        if (isCancelled)
-                        {
-                            // Prints are cancelled by M0/M1/M2 which is processed by RRF
-                            _logger.LogInformation("Cancelled job file");
-                        }
-                        else if (isAborted)
-                        {
-                            await _linkInterface.StopPrintAsync(PrintStoppedReason.Abort, stoppingToken);
-                            _logger.LogInformation("Aborted job file");
-                        }
-                        else
-                        {
-                            await _linkInterface.StopPrintAsync(PrintStoppedReason.NormalCompletion, stoppingToken);
-                            _logger.LogInformation("Finished job file");
-                        }
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        // SPI link lost while attempting to notify RRF, don't attempt anything else next
-                        isAborted = true;
-                    }
+                    // Say how the job ended. M0/M1/M2 is what cancels one, and it has already run
+                    // by the time the file task returns
+                    _logger.LogInformation(isCancelled ? "Cancelled job file"
+                                            : isAborted ? "Aborted job file"
+                                                : "Finished job file");
 
                     // Update special fields that are not available in RRF
                     using (await _model.AccessReadWriteAsync(stoppingToken))

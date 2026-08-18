@@ -153,7 +153,7 @@ internal sealed class LinkService(
         }
 
         // Shut down the link subsystem
-        await linkInterface.InvalidateAsync(stoppingToken);
+        linkInterface.Invalidate();
 
         // Stop the native transfer loop, which releases the dispatcher from its wait
         nativeLink.Stop();

@@ -79,12 +79,6 @@ public sealed partial class LinkInterface(
     /// </summary>
     internal Action? InvalidateCallback;
 
-    // Print handling
-    internal readonly AsyncLock PrintStateLock = new();
-    internal TaskCompletionSource? SetPrintInfoRequest;
-    internal PrintStoppedReason StopPrintReason;
-    internal TaskCompletionSource? StopPrintRequest;
-
     /// <summary>
     /// Print diagnostics of this class
     /// </summary>
@@ -361,43 +355,6 @@ public sealed partial class LinkInterface(
     }
 
     /// <summary>
-    /// Update the print file info in the firmware
-    /// </summary>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    public async Task SetPrintFileInfo(CancellationToken cancellationToken = default)
-    {
-        Task task;
-        using (await PrintStateLock.LockAsync(cancellationToken))
-        {
-            SetPrintInfoRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            task = SetPrintInfoRequest.Task;
-        }
-        await task.WaitAsync(cancellationToken);
-    }
-
-    /// <summary>
-    /// Notify the firmware that the file print has been stopped
-    /// </summary>
-    /// <param name="reason">Reason why the print has stopped</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    /// <exception cref="OperationCanceledException">Connection lost while trying to notify RRF</exception>
-    public async Task StopPrintAsync(PrintStoppedReason reason, CancellationToken cancellationToken = default)
-    {
-        Task onPrintStopped;
-        using (await PrintStateLock.LockAsync(cancellationToken))
-        {
-            StopPrintReason = reason;
-            StopPrintRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            onPrintStopped = StopPrintRequest.Task;
-        }
-        await onPrintStopped.WaitAsync(cancellationToken);
-    }
-
-    /// <summary>
     /// Wait for potential firmware update to finish
     /// </summary>
     public void WaitForUpdate()
@@ -518,21 +475,6 @@ public sealed partial class LinkInterface(
     /// </summary>
     internal void InvalidateCodes()
     {
-        // No longer starting or stopping a print. Must do this before aborting the print
-        using (PrintStateLock.Lock())
-        {
-            if (SetPrintInfoRequest is not null)
-            {
-                SetPrintInfoRequest.SetCanceled();
-                SetPrintInfoRequest = null;
-            }
-            if (StopPrintRequest is not null)
-            {
-                StopPrintRequest.SetCanceled();
-                StopPrintRequest = null;
-            }
-        }
-
         BytesReserved = BufferSpace = 0;
 
         // Resolve pending CAN requests
@@ -556,48 +498,4 @@ public sealed partial class LinkInterface(
         InvalidateCodes();
     }
 
-    /// <summary>
-    /// Invalidate pending codes and code-relevant requests due to an emergency stop asynchronously
-    /// </summary>
-    /// <returns>Asynchronous task</returns>
-    internal async Task InvalidateCodesAsync(CancellationToken cancellationToken)
-    {
-        // No longer starting or stopping a print. Must do this before aborting the print
-        using (await PrintStateLock.LockAsync(cancellationToken))
-        {
-            if (SetPrintInfoRequest is not null)
-            {
-                SetPrintInfoRequest.SetCanceled(cancellationToken);
-                SetPrintInfoRequest = null;
-            }
-            if (StopPrintRequest is not null)
-            {
-                StopPrintRequest.SetCanceled(cancellationToken);
-                StopPrintRequest = null;
-            }
-        }
-
-        BytesReserved = BufferSpace = 0;
-
-        // Resolve pending CAN requests
-        lock (CanRequests)
-        {
-            foreach (CanRequest request in CanRequests)
-            {
-                request.SetCanceled();
-            }
-            CanRequests.Clear();
-        }
-    }
-
-    /// <summary>
-    /// Invalidate every resource due to a disconnect or reset asynchronously
-    /// </summary>
-    /// <returns>Asynchronous task</returns>
-    internal async Task InvalidateAsync(CancellationToken cancellationToken)
-    {
-        // Invalidate codes and code-relevant requests. See Invalidate() on why messages need no
-        // clearing here
-        await InvalidateCodesAsync(cancellationToken);
-    }
 }

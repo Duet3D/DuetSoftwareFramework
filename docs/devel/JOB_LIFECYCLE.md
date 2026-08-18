@@ -589,7 +589,7 @@ would read as a settled behaviour that does not exist yet.
 
 ## 4. The plan
 
-### Phase 0 — delete the two dead awaits ⬜
+### Phase 0 — delete the two dead awaits ✅
 
 `SetPrintFileInfo` and `StopPrintAsync` and their `TaskCompletionSource`s go, along with
 `InvalidateCodes`' handling of them. `SelectFileAsync` ends after logging; `ExecuteAsync` keeps the
@@ -599,11 +599,13 @@ three log lines and the `PrintStoppedReason` it picks, which phase 3 turns into 
 Nothing else in this document can be tested until this lands: today a job can neither be selected nor
 finish.
 
-- [ ] Remove `SetPrintInfoRequest`, `StopPrintRequest`, `StopPrintReason`, `PrintStateLock` and the
+- [x] Remove `SetPrintInfoRequest`, `StopPrintRequest`, `StopPrintReason`, `PrintStateLock` and the
       two methods
-- [ ] `SelectFileAsync` no longer awaits the firmware
-- [ ] `ExecuteAsync` reaches its teardown
-- [ ] Correct the stale comment "Prints are cancelled by M0/M1/M2 which is processed by RRF"
+- [x] `SelectFileAsync` no longer awaits the firmware
+- [x] `ExecuteAsync` reaches its teardown
+- [x] Correct the stale comment "Prints are cancelled by M0/M1/M2 which is processed by RRF"
+- [x] `InvalidateCodesAsync` / `InvalidateAsync` went with them: the print lock was the only thing
+      async about either, so they had become duplicates of the synchronous pair
 
 ### Phase 1 — the state and the restore point ⬜
 
