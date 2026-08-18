@@ -161,6 +161,9 @@ public class MoveInterpreterTests
 
     private static Code G(string text) => new(text);
 
+    /// <summary>A code as the job file channel would deliver it</summary>
+    private static Code Job(string text) => new(text) { Channel = CodeChannel.File };
+
     /// <summary>
     /// A tool an E word can address, filled in the way M563 leaves one
     /// </summary>
@@ -374,6 +377,123 @@ public class MoveInterpreterTests
             Assert.That(raw.Coords[MotionParameters.ExtruderToDrive(0)], Is.EqualTo(2.0f));
             Assert.That(raw.HasPositiveExtrusion, Is.True);
         });
+    }
+
+    [Test]
+    public void AResumedMoveAsksOnlyForWhatIsLeftOfIt()
+    {
+        // A feedhold stops at a segment boundary, so the code that produced the segments may be part
+        // done when the job file is rewound to it. What is relative - the axis word and the
+        // extrusion alike - is an amount, and only the rest of that amount is still owed
+        Machine machine = NewMachine(NewTool());
+        machine.State.MoveFractionToSkip = 0.25f;
+
+        RawMove raw = Build(machine, Job("G1 X10 E4"), NewInput(axesRelative: true), isCoordinated: true,
+                            MoveType.Normal);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(raw.Coords[0], Is.EqualTo(7.5f).Within(1e-4f));
+            Assert.That(machine.State.CurrentUserPosition[0], Is.EqualTo(7.5f).Within(1e-4f));
+            Assert.That(raw.Coords[MotionParameters.ExtruderToDrive(0)], Is.EqualTo(3.0f).Within(1e-4f));
+        });
+    }
+
+    [Test]
+    public void AResumedMoveStillTargetsTheCoordinateItNames()
+    {
+        // The machine restarts from where it stopped, so an absolute target is already the rest of
+        // the move. Scaling it as well would leave the line short of where the file said
+        Machine machine = NewMachine(NewTool());
+        machine.State.MoveFractionToSkip = 0.25f;
+
+        RawMove raw = Build(machine, Job("G1 X10 E4"), NewInput(), isCoordinated: true, MoveType.Normal);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(raw.Coords[0], Is.EqualTo(10.0f));
+            Assert.That(raw.Coords[MotionParameters.ExtruderToDrive(0)], Is.EqualTo(3.0f).Within(1e-4f));
+        });
+    }
+
+    [Test]
+    public void TheResumedFractionIsSpentOnOneMove()
+    {
+        Machine machine = NewMachine(NewTool());
+        machine.State.MoveFractionToSkip = 0.5f;
+
+        Build(machine, Job("G1 X10 E4"), NewInput(), isCoordinated: true, MoveType.Normal);
+        RawMove next = Build(machine, Job("G1 X20 E4"), NewInput(), isCoordinated: true, MoveType.Normal);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(machine.State.MoveFractionToSkip, Is.Zero);
+            Assert.That(next.Coords[MotionParameters.ExtruderToDrive(0)], Is.EqualTo(4.0f).Within(1e-4f));
+        });
+    }
+
+    [Test]
+    public void AnotherChannelsMoveDoesNotSpendTheResumedFraction()
+    {
+        // The interpreter position is shared by every channel here, and the fraction describes the
+        // job's next line. A daemon.g move landing in the window before the job reads it must not be
+        // shortened - nor consume what the job is owed
+        Machine machine = NewMachine(NewTool());
+        machine.State.MoveFractionToSkip = 0.5f;
+
+        Code daemon = G("G1 X10 E4");
+        daemon.Channel = CodeChannel.Daemon;
+        RawMove raw = Build(machine, daemon, NewInput(), isCoordinated: true, MoveType.Normal);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(raw.Coords[MotionParameters.ExtruderToDrive(0)], Is.EqualTo(4.0f).Within(1e-4f));
+            Assert.That(machine.State.MoveFractionToSkip, Is.EqualTo(0.5f), "the job still gets it");
+        });
+    }
+
+    [Test]
+    public void AMoveRecordsTheFeedRateItWasReadWithRatherThanTheOneItRunsAt()
+    {
+        // What a pause saves and a resume puts back is the file's own F, so the speed factor must not
+        // be folded into it - and a rapid, which ignores F altogether, must still record it
+        Machine machine = NewMachine();
+        machine.Model.Move.SpeedFactor = 2.0f;
+
+        RawMove printing = Build(machine, G("G1 X10 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(printing.FeedRateMmPerSec, Is.EqualTo(100.0f).Within(1e-4f));
+            Assert.That(printing.OriginalFeedRateMmPerSec, Is.EqualTo(50.0f).Within(1e-4f));
+        });
+    }
+
+    [Test]
+    public void TheInterpreterCanBePutBackInStepWithTheMachine()
+    {
+        // Where the machine has ended up somewhere the interpreter did not put it: a homing or
+        // probing move that stopped short, or a feedhold that discarded the moves it had built. The
+        // builder holds what the machine was really commanded, in machine coordinates, so coming
+        // back the other way is the transform inverted
+        Tool tool = NewTool();
+        tool.Offsets.Add(2.0f);
+        tool.Offsets.Add(0.0f);
+        tool.Offsets.Add(0.0f);
+        Machine machine = NewMachine(tool);
+        machine.Builder.SetAxisPosition(0, 4.0f);
+
+        // Built but never queued, which is what the interpreter running ahead of the machine looks
+        // like from here
+        Build(machine, G("G1 X100"), NewInput(), isCoordinated: true, MoveType.Normal);
+        Assert.That(machine.State.CurrentUserPosition[0], Is.EqualTo(100.0f), "the interpreter ran ahead");
+
+        machine.Interpreter.SyncInterpreterToMachine();
+
+        // A tool offset of 2 puts the machine 2 below the coordinate the user named, so a machine
+        // position of 4 is a user position of 6 - the transform run the other way
+        Assert.That(machine.State.CurrentUserPosition[0], Is.EqualTo(6.0f).Within(1e-4f),
+                    "and comes back to where the machine really is");
     }
 
     [Test]

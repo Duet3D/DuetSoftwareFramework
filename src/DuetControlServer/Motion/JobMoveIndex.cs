@@ -27,9 +27,28 @@ internal readonly record struct JobMoveOrigin
     public int GCommandNumber { get; init; }
 
     /// <summary>
-    /// Feed rate the move was asked for, in mm/s
+    /// Feed rate in effect when the move was built, in mm/s
     /// </summary>
+    /// <remarks>
+    /// The modal feed rate the code was read with, not the speed the move was planned at:
+    /// RepRapFirmware's <c>originalFeedRate</c>, which is what a resume puts back as the channel's F.
+    /// The two differ by M220, and restoring the scaled one would fold the speed factor into the
+    /// file's own feed rate every time the job was paused
+    /// </remarks>
     public float FeedRateMmPerSec { get; init; }
+
+    /// <summary>
+    /// How much of the code that produced this move had already been done before it, 0..1
+    /// </summary>
+    /// <remarks>
+    /// A code that segments produces several moves, and a feedhold may drop them part-way through
+    /// the run. The resume rewinds to the code - every segment carries the same file position - so
+    /// what it has to be told as well is how much of that code is already behind the machine. This
+    /// is that fraction, and it becomes <see cref="RestorePoint.ProportionDone"/> and then
+    /// <see cref="MovementState.MoveFractionToSkip"/>. RepRapFirmware carries the same number on the
+    /// DDA as <c>proportionDone</c>
+    /// </remarks>
+    public float ProportionDone { get; init; }
 }
 
 /// <summary>

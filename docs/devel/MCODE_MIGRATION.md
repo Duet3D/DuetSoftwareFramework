@@ -1857,9 +1857,14 @@ scanning the rings" harder, and §12 deletes that scan rather than complicating 
     lock cannot be held across that wait. Building happens once and submission resumes from the
     segment it reached, which is also what stops a relative move being applied twice.
 25. ✅ Move `ApplyBedCompensation` into that loop and out of `BuildRawMove`.
-26. ⬜ Only now does `moveFractionToSkip` have anything to attach to — `segmentsLeftToStartAt`,
-    `firstSegmentFractionToSkip` and `proportionDone` are all per-segment quantities. Still blocked on
-    restore points (phase F).
+26. ✅ `moveFractionToSkip` and `proportionDone`, which only have something to attach to once moves
+    are segmented: a feedhold stops on a segment boundary, which is generally inside a code, so the
+    resume asks for `1 - proportionDone` of what that code's relative words and extrusion say. This
+    landed as `MovementState.MoveFractionToSkip` fed from `JobMoveIndex`, along with the modal G
+    command and feed rate a rewound line may not name — see JOB_LIFECYCLE.md §3.5.
+    `segmentsLeftToStartAt` and `firstSegmentFractionToSkip` have no counterpart: the stop is always
+    *on* a boundary, so no segment is ever re-entered part-way. `initialUserC0` / `initialUserC1` go
+    with arcs (item 33).
 
 `LimitPosition` is deliberately **not** re-applied per segment, where RRF's `ReadMove` does. RRF needs
 it there because that function also generates arc segments, whose intermediate points are not on the
@@ -1875,7 +1880,9 @@ within **15 microns** of the line when cut into 32 segments.
 27. **`G1 P` I/O bits** — field on `RawMove`, slot in `MoveParams`, native consumer. *(item 4)*
 28. **G68/G69 coordinate rotation** — needs `g68Angle` per motion system; a term in the phase A
     transform. *(item 13)*
-29. **Restore points** — `R`, `moveFractionToSkip`, `filePos`, and pause/resume generally.
+29. 🟡 **Restore points** — the pause point, its file position, the fraction of the interrupted line
+    already made and the modal state to re-read it with are all carried (JOB_LIFECYCLE.md §3.5).
+    Still missing: the `R` parameter on a move, and `virtualExtruderPosition`, which needs §15.2.
     *(items 1, 2)*
 30. 🟡 **Tools** — mixing, tool drive mapping, tool offsets, axis mapping and the no-tool refusal
     landed with §16, and the offsets and mapping are terms in the phase A transform as planned. Axis
@@ -1886,8 +1893,10 @@ within **15 microns** of the line when cut into 32 segments.
 32. 🟡 **Machine mode** — G0 is a rapid at `MaximumG0FeedRate` outside FFF mode, and the overrides do
     not apply to it. The laser half is untouched and also needs a per-segment hook from phase E for
     pixel data. *(items 3, 11)*
-33. **Arc moves (G2/G3)**, and with them `initialUserC0` / `initialUserC1`. The arc generator is the
-    other half of the phase E segment loop. *(item 2)*
+33. **Arc moves (G2/G3)**, and with them `initialUserC0` / `initialUserC1` — without which an arc
+    resumed part-way recomputes its centre from where the machine stopped. Until they land with it,
+    arc segments must not carry `canPauseAfter`, which is RRF's own exclusion. The arc generator is
+    the other half of the phase E segment loop. *(item 2)*
 34. **M486 object cancellation** — dropping the move, the object coordinate bounds, and
     `IsFirstMoveSincePrintingResumed` / `TravelToStartPoint`. **M597 collision checking**,
     **M599 keepout zones**. *(§11.3)*

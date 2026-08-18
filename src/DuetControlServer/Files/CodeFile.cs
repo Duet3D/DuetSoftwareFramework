@@ -120,6 +120,22 @@ public class CodeFile(
     public long NextFilePosition { get; set; }
 
     /// <summary>
+    /// The G-code number a line that names no command letter repeats, or -1 if there is none
+    /// </summary>
+    /// <remarks>
+    /// Reading from a new position throws this away with the rest of the parser state, which is
+    /// right for a seek to somewhere unrelated and wrong for the seek a pause makes: the job carries
+    /// on from a line that may well be a bare <c>X100 Y100 E5</c>, and what makes that a move is the
+    /// G1 several lines above it. So a resume puts it back, which is RepRapFirmware's
+    /// <c>SetModalGCommand</c>
+    /// </remarks>
+    public int ModalGCommand
+    {
+        get => _parserBuffer.LastGCode;
+        set => _parserBuffer.LastGCode = value;
+    }
+
+    /// <summary>
     /// Get the current number of iterations of the current loop
     /// </summary>
     /// <param name="code">Code that requested the number of iterations</param>

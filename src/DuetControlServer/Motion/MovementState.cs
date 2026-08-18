@@ -62,6 +62,75 @@ internal sealed class MovementState
     public int SegmentsLeft { get; set; }
 
     /// <summary>
+    /// How much of the next move has already been made, 0..1
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>ms.moveFractionToSkip</c>. A feedhold stops at a segment boundary, which
+    /// may be part-way through the code that produced the segments, and the resume rewinds the job
+    /// file to that code and reads it again. What is left to do is then only <c>1 - this</c> of what
+    /// the code asks for, and everything the code expresses <em>as an amount</em> rather than as a
+    /// destination has to be scaled by that: a G91 axis word, a raw motor move, and the extrusion.
+    /// An absolute axis target needs no scaling, because the machine restarting from where it
+    /// stopped already makes the rest of the line the rest of the move.
+    /// </para>
+    /// <para>
+    /// It is consumed by the first job-file move built after a resume and cleared there, so it
+    /// describes one move rather than a mode the interpreter is in. RepRapFirmware clears it in
+    /// <c>ClearMove</c> for the same reason
+    /// </para>
+    /// </remarks>
+    public float MoveFractionToSkip { get; set; }
+
+    /// <summary>
+    /// Bumped every time a stop drops queued moves
+    /// </summary>
+    /// <remarks>
+    /// A segmented move is submitted a few segments at a time and gives the ring up in between, so a
+    /// stop can happen while one is part-way out. The segments that have not gone yet must not go:
+    /// the machine has been told to stop, and feeding the ring afterwards would start it again. The
+    /// submitting loop compares this against what it saw when it built the move and abandons the rest
+    /// if it has moved on. RepRapFirmware needs no equivalent because its pause runs in the same task
+    /// as the loop it is interrupting
+    /// </remarks>
+    public uint PurgeGeneration { get; private set; }
+
+    /// <summary>
+    /// Note that a stop has dropped queued moves
+    /// </summary>
+    public void NotePurge() => PurgeGeneration++;
+
+    /// <summary>
+    /// The code a submission gave up part-way through, if the last one did
+    /// </summary>
+    /// <remarks>
+    /// The counterpart of <see cref="JobMoveIndex"/> for the segments that never reached the ring.
+    /// A stop that purges nothing - because everything queued was already committed - still ends a
+    /// submission that was in flight, and what ran is then every segment that went out. Nothing on
+    /// the ring records that, so the loop leaves it here for the pause to pick up, which is
+    /// RepRapFirmware's "we can skip the move that is waiting" branch of <c>DoAsynchronousPause</c>
+    /// </remarks>
+    public JobMoveOrigin? AbandonedJobMove { get; set; }
+
+    /// <summary>
+    /// The fraction of the first line M26 named that has already been made, 0..1
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>ms.restartMoveFractionDone</c>, and the entry a file written by
+    /// <c>M911</c> uses: <c>resurrect.g</c> says <c>M26 S&lt;offset&gt; P&lt;fraction&gt;</c> to
+    /// restart a job where the power failed, which is the same problem as resuming a pause and takes
+    /// the same route. It waits here rather than in <see cref="MoveFractionToSkip"/> because M26 sets
+    /// it up and M24 is what starts printing
+    /// </remarks>
+    public float RestartMoveFractionDone { get; set; }
+
+    /// <summary>
+    /// The modal G command M26 said its line is to be read under, or -1 for none
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>ms.restartGCommandNumber</c>, which is M26's C parameter</remarks>
+    public int RestartGCommandNumber { get; set; } = -1;
+
+    /// <summary>
     /// Axes whose endstop stopped the move that is running, as a bitmap
     /// </summary>
     /// <remarks>
@@ -142,8 +211,10 @@ internal sealed class MovementState
     /// RepRapFirmware's <c>MovementState::SavePosition</c>. The modal command number is deliberately
     /// left unknown: every caller of this - a synchronous pause, a tool change, G60, the start of a
     /// simulation - is a command that has already replaced the modal motion command, so a value saved
-    /// here would be the wrong one. The asynchronous pause path fills it in from the move it stopped
-    /// before instead
+    /// here would be the wrong one. The same goes for the fraction of a move already done, which is
+    /// zero for every caller that reaches a code boundary before saving. An asynchronous pause is the
+    /// one that does not, and it overwrites both from the move it stopped before - see
+    /// <c>JobProcessor.SaveRestorePointAsync</c>
     /// </remarks>
     public void SavePosition(int restorePointNumber, int numAxes, float feedRate, int toolNumber, long? filePosition)
     {
@@ -161,9 +232,13 @@ internal sealed class MovementState
 
         // TODO virtualExtruderPosition needs the extrusion totals RepRapFirmware keeps in
         // ms.latestVirtualExtruderPosition, which ApplyExtrusion does not track yet - see
-        // MCODE_MIGRATION.md §15.2. It stays zero until it does
+        // MCODE_MIGRATION.md §15.2. It stays zero until it does. What has to be recorded here is the
+        // extruder position at the *start* of the interrupted line, because a resume rewinds the
+        // absolute-extrusion reference to it and then asks for 1 - ProportionDone of the line; see
+        // the note on the scaling in MoveInterpreter.ApplyExtrusion
         rp.VirtualExtruderPosition = 0.0f;
         rp.ProportionDone = 0.0f;
+
         rp.InitialUserC0 = rp.InitialUserC1 = 0.0f;
     }
 
@@ -175,6 +250,10 @@ internal sealed class MovementState
         Array.Clear(CurrentUserPosition);
         EndstopsTriggered = 0;
         SegmentsLeft = 0;
+        MoveFractionToSkip = 0.0f;
+        AbandonedJobMove = null;
+        RestartMoveFractionDone = 0.0f;
+        RestartGCommandNumber = -1;
         VirtualFanSpeed = 0.0f;
         foreach (RestorePoint rp in RestorePoints)
         {

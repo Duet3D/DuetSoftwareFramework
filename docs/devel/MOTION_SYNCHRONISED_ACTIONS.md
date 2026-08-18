@@ -490,8 +490,12 @@ cannot arise, because the rewind point *is* the first purged anchor.
 
 Two things follow, and both remove work rather than add it:
 
-- **There is no partial move to replay.** The pause stops at a move boundary and never truncates one,
-  so nothing corresponds to RepRapFirmware's `proportionDone` / `moveFractionToSkip`.
+- **No action is ever half done.** The pause purges whole moves and never truncates one, so an action
+  is either owed in full or void. The move the machine stops inside may be part of a code that is
+  only part done — a code segments, and the stop lands on a segment boundary — and the resume takes
+  that fraction off the line it re-reads ([JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) §3.5). An action is
+  not divisible in that way and does not have to be: it is anchored to a move, and that move either
+  ran or did not.
 - **The purge hook already exists.** `MovePlanner.StopEarlyAsync` is where the moves are dropped and
   where the action list is dropped with them.
 

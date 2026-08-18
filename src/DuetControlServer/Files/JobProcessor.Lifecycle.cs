@@ -152,7 +152,7 @@ internal partial class JobProcessor
             await _planner.WaitForStandstillAsync(cancellationToken);
 
             // Where the machine came to rest, so the resume can put it back there
-            await SaveRestorePointAsync(channel, cancellationToken);
+            await SaveRestorePointAsync(channel, held, cancellationToken);
 
             await RunPauseMacroAsync(channel, macro, cancellationToken);
             return reportPosition ? await PausedAtMessageAsync(macro, cancellationToken) : new Message();
@@ -308,6 +308,11 @@ internal partial class JobProcessor
 
             using (await LockAsync(cancellationToken))
             {
+                // What M26 said about the line the job starts on, applied here rather than there
+                // because start.g comes between the two and its own moves must not spend it. This is
+                // RepRapFirmware's M24, which copies restartMoveFractionDone into moveFractionToSkip
+                // and puts the modal G command back before StartPrinting
+                await ApplyRestartStateAsync(cancellationToken);
                 Resume();
             }
             return new Message();
@@ -456,11 +461,59 @@ internal partial class JobProcessor
     }
 
     /// <summary>
+    /// Start the job reading in the state M26 said the line it starts on was written in
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <remarks>
+    /// Only a job started from a file position has any of this to do: <c>resurrect.g</c> is the file
+    /// that writes it, and a job started from the beginning has nothing to put back. The fraction is
+    /// spent by the first move the job reads, so both are cleared here rather than left to leak into
+    /// whatever runs next. This class must be locked
+    /// </remarks>
+    private async ValueTask ApplyRestartStateAsync(CancellationToken cancellationToken)
+    {
+        int modalGCommand;
+        using (_planner.Lock())
+        {
+            _planner.State.MoveFractionToSkip = _planner.State.RestartMoveFractionDone;
+            modalGCommand = _planner.State.RestartGCommandNumber;
+            _planner.State.RestartMoveFractionDone = 0.0f;
+            _planner.State.RestartGCommandNumber = -1;
+        }
+
+        if (modalGCommand >= 0 && _file is not null)
+        {
+            using (await _file.LockAsync(cancellationToken))
+            {
+                _file.ModalGCommand = modalGCommand;
+            }
+        }
+    }
+
+    /// <summary>
     /// Save where the machine came to rest, so a resume can put it back
     /// </summary>
     /// <param name="channel">Channel the pause was commanded from, whose feed rate is saved</param>
+    /// <param name="held">What the stop did, if the pause made one</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    private async ValueTask SaveRestorePointAsync(CodeChannel channel, CancellationToken cancellationToken)
+    /// <remarks>
+    /// <para>
+    /// A stop that dropped queued moves leaves the interpreter's position describing the end of the
+    /// queue rather than where the machine stopped, so it is put back into step with the machine
+    /// first: everything below reads it, and the whole point of the restore point is that it says
+    /// where the head actually is. RepRapFirmware takes the same value from the same place - the end
+    /// coordinates of the last move it kept, inverse-transformed - in <c>DDARing::PausePrint</c>.
+    /// </para>
+    /// <para>
+    /// The move that was dropped then supplies what the file position alone cannot: the fraction of
+    /// its own code the machine had already made, the modal G command that code was read under, and
+    /// the feed rate it was read with. Without them a resume that lands part-way through a line
+    /// re-runs the part already made, and a line that names neither G nor F is read with whatever
+    /// happens to be modal after <c>resume.g</c>
+    /// </para>
+    /// </remarks>
+    private async ValueTask SaveRestorePointAsync(CodeChannel channel, MovePlanner.FeedholdOutcome held,
+                                                  CancellationToken cancellationToken)
     {
         using (await _model.AccessReadWriteAsync(cancellationToken))
         {
@@ -470,9 +523,32 @@ internal partial class JobProcessor
 
             using (_planner.Lock())
             {
+                // The ring's own record first: it names the earliest move actually dropped. The
+                // abandoned submission is the case where nothing was dropped because nothing queued
+                // could be - the line still ended part-way, and its remaining segments never went
+                Motion.JobMoveOrigin? abandoned = _planner.State.AbandonedJobMove;
+                Motion.JobMoveOrigin? interrupted = held.Origin ?? abandoned;
+                _planner.State.AbandonedJobMove = null;
+
+                // Either of those means moves the interpreter had already accounted for will not be
+                // made, so its position is the end of a queue that no longer exists
+                if (held.MovesPurged > 0 || abandoned is not null)
+                {
+                    _moveInterpreter.SyncInterpreterToMachine();
+                    _planner.PublishCommittedPosition();
+                }
+
                 _planner.State.SavePosition(Motion.RestorePoint.PauseNumber,
                                             _planner.Parameters.SharedAxisCount(_model.Move),
                                             feedRateMmPerSec, _model.State.CurrentTool, filePosition: null);
+
+                if (interrupted is Motion.JobMoveOrigin origin)
+                {
+                    Motion.RestorePoint rp = _planner.State.RestorePoints[Motion.RestorePoint.PauseNumber];
+                    rp.ProportionDone = origin.ProportionDone;
+                    rp.GCommandNumber = origin.GCommandNumber;
+                    rp.FeedRate = origin.FeedRateMmPerSec;
+                }
                 _planner.PublishRestorePoints();
             }
         }

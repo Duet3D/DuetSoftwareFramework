@@ -287,6 +287,8 @@ internal sealed partial class GCodeHandler(
         SegmentedMove segments = default;
         List<int> armedAxes = [];
         int submitted = 0;
+        uint purgeGeneration = 0;
+        bool isJobCode = code.IsFromFileChannel && code.File is not Files.MacroFile;
 
         try
         {
@@ -367,12 +369,29 @@ internal sealed partial class GCodeHandler(
                             // Claimed here rather than as each segment goes out, so that the claim covers
                             // the windows in between - which is exactly what the claim is for
                             state.SegmentsLeft = segments.Count;
+
+                            // What the ring had been through when this move was measured. A stop
+                            // that empties the ring in one of the windows below invalidates the rest
+                            // of this move, and this is what the loop notices it by
+                            purgeGeneration = state.PurgeGeneration;
                         }
 
                         // As many segments as the engine will take. Stopping when it is full and picking
                         // up from the same place is what keeps a long segmented move from blocking
                         while (raw is not null && submitted < segments.Count)
                         {
+                            if (state.PurgeGeneration != purgeGeneration)
+                            {
+                                // A stop emptied the ring while this move was part-way out. The
+                                // segments still in hand describe a path the machine has been told
+                                // not to travel, and queueing them now would start it moving again
+                                // after it had come to rest
+                                logger.LogInformation(
+                                    "Abandoning {Count} remaining segment(s) of {Code} because the machine stopped",
+                                    segments.Count - submitted, code);
+                                return new Message();
+                            }
+
                             moveInterpreter.PrepareSegment(raw, segments, submitted + 1);
 
                             result = planner.QueueMove(raw);
@@ -402,13 +421,19 @@ internal sealed partial class GCodeHandler(
                             // which is the macro invocation, so the macro re-runs whole. That is
                             // RepRapFirmware's GetJobFilePosition, which returns noFilePosition for
                             // exactly this case
-                            if (code.IsFromFileChannel && code.File is not Files.MacroFile)
+                            if (isJobCode)
                             {
                                 planner.JobMoves.Note(raw.MoveId, new JobMoveOrigin
                                 {
                                     FilePosition = code.FilePosition,
                                     GCommandNumber = code.MajorNumber ?? -1,
-                                    FeedRateMmPerSec = raw.FeedRateMmPerSec
+                                    FeedRateMmPerSec = raw.OriginalFeedRateMmPerSec,
+
+                                    // What the machine will have done by the time this segment
+                                    // starts. A stop that drops this segment therefore knows both
+                                    // where in the file to resume and how much of that line is
+                                    // already behind it
+                                    ProportionDone = (float)submitted / segments.Count
                                 });
                             }
                             submitted++;
@@ -452,6 +477,20 @@ internal sealed partial class GCodeHandler(
                 using (planner.Lock())
                 {
                     planner.State.SegmentsLeft = 0;
+
+                    // A submission that ended early leaves the code part done with nothing on the
+                    // ring to say so, because the segments that would have said it were never
+                    // queued. A pause reads this to find out how much of the line it has to skip on
+                    // the way back in; a submission that finished leaves nothing to read
+                    planner.State.AbandonedJobMove = isJobCode && submitted > 0 && submitted < segments.Count
+                        ? new JobMoveOrigin
+                        {
+                            FilePosition = code.FilePosition,
+                            GCommandNumber = code.MajorNumber ?? -1,
+                            FeedRateMmPerSec = raw.OriginalFeedRateMmPerSec,
+                            ProportionDone = (float)submitted / segments.Count
+                        }
+                        : null;
                 }
             }
         }
@@ -569,37 +608,17 @@ internal sealed partial class GCodeHandler(
     }
 
     /// <summary>
-    /// Bring the interpreter's position back into step with where the machine actually is
+    /// Bring the interpreter's position back into step with where the machine actually is, and say
+    /// where that is
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// RepRapFirmware's <c>ToolOffsetInverseTransform</c> after a homing or probing move, and the
-    /// only place the transform is inverted. Everywhere else the interpreter is authoritative and the
-    /// machine follows it; here the machine is somewhere the interpreter did not put it. The caller
-    /// must hold the object model write lock and the planner lock.
-    /// </para>
-    /// <para>
-    /// The bed transform is undone first, as RepRapFirmware's <c>InverseBedTransform</c> is before
-    /// <c>ToolOffsetInverseTransform</c>. The builder's position is where the machine was
-    /// <em>commanded</em>, correction included, so leaving the correction in would hand the
-    /// interpreter a Z that is already compensated - and it would then be compensated a second time
-    /// on the next move
-    /// </para>
+    /// The inversion itself is <see cref="MoveInterpreter.SyncInterpreterToMachine"/>, which a
+    /// feedhold needs as well; this is that plus telling a client about it. The caller must hold the
+    /// object model write lock and the planner lock
     /// </remarks>
     private void SyncInterpreterToMachine()
     {
-        MovementState state = planner.State;
-        int numAxes = planner.Parameters.SharedAxisCount(model.Move);
-        ReadOnlySpan<float> machinePosition = planner.Builder.StartCoordinates;
-
-        machinePosition[..numAxes].CopyTo(state.CurrentUserPosition);
-
-        // The bed transform first and the axis transform second, which is the order RepRapFirmware's
-        // InverseAxisAndBedTransform uses - the mirror of applying the axis transform before the bed
-        // one, because the map is indexed by coordinates the skew has already moved
-        bedCompensation.Remove(state.CurrentUserPosition, numAxes);
-        AxisSkew.Remove(toolManager.Current, model.Move, state.CurrentUserPosition, numAxes);
-        ToolTransform.Remove(toolManager.Current, model.Move, state.CurrentUserPosition, numAxes);
+        moveInterpreter.SyncInterpreterToMachine();
         planner.PublishCommittedPosition();
     }
 }

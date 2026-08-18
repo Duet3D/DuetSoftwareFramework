@@ -395,13 +395,21 @@ to rest in a different place, and sooner. Everything after the stop is unchanged
 `pause.g`, the same restore point, the same `PrintPausedReason`, and resuming rewinds the job file
 and re-reads it exactly as before.
 
+The boundaries it has to choose between are the *segments* a line is built from — a line becomes
+several moves wherever the height map or the geometry needs it — so a pause may stop part-way through
+a line, and the resume then asks that line for only the part that is left. RepRapFirmware's
+`moveFractionToSkip` is the same accounting for the same reason. It is also what keeps the stop
+short, because the boundaries are densest along exactly the long fast moves where the deceleration
+ramp is longest.
+
 Three things the deviation deliberately leaves alone:
 
 - **A committed move is never recalled.** Its segments have been generated and sent to the boards.
   The stop begins at the first move after them, and the speed that move starts at is fixed by them.
-- **A boundary has to be restartable, not merely reachable.** An arc segment, a retraction and an
-  endstop move are not places a print can resume from, however much room there is to stop in — so
-  the stop never chooses one.
+- **A boundary has to be restartable, not merely reachable.** An endstop move may stop short, so
+  where it would resume from is not known until it has run; the stop never chooses a boundary like
+  that, however much room there is to stop in. RepRapFirmware's own exclusions carry over as the
+  codes they belong to are implemented.
 - **It is not the emergency path.** RepRapFirmware's `LowPowerOrStallPause` cancels stepping
   mid-move and accepts the position loss, which is right for a power failure and wrong here. The
   stop stays under the motion planner throughout.

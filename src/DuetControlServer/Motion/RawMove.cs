@@ -54,6 +54,18 @@ internal sealed class RawMove
     public float FeedRateMmPerSec { get; set; } = 50.0f;
 
     /// <summary>
+    /// The channel's modal feed rate when the move was built, in mm/sec
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>raw.originalFeedRate</c>, and it exists for the one thing that field is
+    /// for: a pause records it and a resume puts it back as the channel's F, so that a job rewound to
+    /// a line which does not name F carries on at the speed it was going. It is the feed rate
+    /// <em>as the file gave it</em> - <see cref="FeedRateMmPerSec"/> has the speed factor applied and
+    /// a rapid ignores F altogether, so neither can be restored without changing what the file said
+    /// </remarks>
+    public float OriginalFeedRateMmPerSec { get; set; }
+
+    /// <summary>
     /// How long the whole move should take, in seconds; only used when <see cref="InverseTimeMode"/>
     /// is set
     /// </summary>

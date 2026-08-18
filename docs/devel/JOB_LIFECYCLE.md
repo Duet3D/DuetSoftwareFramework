@@ -416,20 +416,15 @@ Two variants were considered. **(a) is the decision** — recorded in §6, and w
 
 **(a) Boundary.** Walk forward from the first uncommitted DDA accumulating distance until there is
 enough to decelerate to zero at the most restrictive deceleration of the drives involved, and stop at
-that DDA's *end*. Nothing is truncated, so the machine stops at a real move endpoint and resume works
-exactly as RRF's `PauseMoves` resume works: rewind the file to the first purged move and re-read from
-there.
+that DDA's *end*. No DDA is truncated, so the machine stops where a move was always going to end.
 
 **(b) Truncating.** Stop the instant the ramp reaches zero, part-way through a DDA, shortening that
 DDA and recording how much of it was done. This is the theoretical minimum distance, and it is what
 "earliest possible opportunity" strictly means.
 
-(b) stays available as a later refinement, and the three reasons (a) was chosen are the three things
-(b) would have to pay for first:
+(b) stays available as a later refinement. The two reasons (a) was chosen are the two things (b)
+would have to pay for first:
 
-- (b) needs resume-part-way-through-a-move — RRF's `moveFractionToSkip` / `proportionDone` /
-  `initialUserC0`, none of which exists here (MCODE_MIGRATION §11.4 item 29 tracks all three). (a)
-  needs none of it;
 - (b) reopens the correctness exclusions `canPauseAfter` encodes. It is cleared for arc segments
   ("the arc centre gets recomputed incorrectly when we resume",
   [GCodes.cpp:3213](../../lib/RepRapFirmware/src/GCodes/GCodes.cpp)), for retractions ("that could
@@ -439,6 +434,59 @@ DDA and recording how much of it was done. This is the theoretical minimum dista
 - the overshoot (a) accepts is small in practice, because the moves are already segmented
   (MCODE_MIGRATION §11.4 phase E), so boundaries are dense along exactly the long fast moves where
   the ramp is longest.
+
+#### A boundary is a segment boundary, so the resume carries a fraction
+
+The density that makes (a) cheap is the same fact that decides what the resume has to do. **A move
+the engine knows is one segment, not one line of the file** — segmentation is what the height map and
+a non-Cartesian geometry require — so the boundary the stop lands on is usually *inside* a G-code, and
+every segment of that code carries the same file position. Rewinding to it and re-reading the line
+plainly would ask for the whole line a second time.
+
+What the machine still owes is `1 - proportionDone` of it, and which of the line's words that applies
+to follows from what a word means:
+
+| The line says | Owed after resuming from the stop point | Why |
+|---|---|---|
+| an absolute axis target (G90) | the target, unscaled | the machine restarts from where it stopped, so the rest of the line *is* the rest of the move |
+| a relative axis word (G91) | the word × `1 - proportionDone` | it is a distance to travel, and part of it has been travelled |
+| extrusion, in either mode | the movement × `1 - proportionDone` | extrusion is an amount however the file expresses it |
+
+The last row includes *absolute* extrusion, and the asymmetry with the row above it is deliberate
+rather than an oversight. An absolute axis target needs no scaling because the resume moves the
+axes' **start** — the head goes back to where it stopped and the interpreter position with it — so
+what the line names is already what is left. An extruder has no start to move: the resync is
+axes-only, because the engine carries the fraction of a step between moves. RepRapFirmware therefore
+moves the *reference* instead, rewinding `latestVirtualExtruderPosition` to the extruder position at
+the start of the interrupted line, so that `E250` again means the whole line's extrusion and the
+scale factor takes the rest. Both E modes then behave identically, which is the property worth
+having. That rewind is the one part not yet built here, because nothing tracks the absolute extruder
+position at all (§15.2): what lands with it must restore the line's *start* value, not the stop
+point, or the same filament is counted twice.
+
+So the fraction is carried from the segment that was dropped
+([`JobMoveOrigin.ProportionDone`](../../src/DuetControlServer/Motion/JobMoveIndex.cs)) to the restore
+point and then to [`MovementState.MoveFractionToSkip`](../../src/DuetControlServer/Motion/MovementState.cs),
+which the first job-file move built after the resume spends and clears. That is RRF's
+`proportionDone` / `moveFractionToSkip` pair, reaching the same place by a shorter route: RRF re-reads
+the whole original move and walks its segments forward without emitting the ones already made, because
+its restore point may sit inside a segment; here the stop is always *on* a boundary, so there is no
+partial segment to re-enter and `segmentsLeftToStartAt` / `firstSegmentFractionToSkip` have no
+counterpart.
+
+Two things the resume needs for the same reason, since the line it lands on is a line the file was
+already reading rather than one it was about to start:
+
+- **the modal G command**, because that line may be a bare `X100 Y100 E5` whose G1 is several lines
+  above the rewind point. Seeking throws the parser's `LastGCode` away, so the resume puts it back —
+  RRF's `SetModalGCommand`;
+- **the feed rate the line was read with**, unscaled by M220, because the line need not name F.
+
+`InitialUserC0` / `InitialUserC1` are the one part of RRF's set with no counterpart here yet. They
+exist so that a re-read *arc* reconstructs its centre from where the arc began rather than from where
+the machine stopped, and until G2/G3 is implemented there is no arc to reconstruct — at which point
+either they land with it or arc segments stop carrying `canPauseAfter`, which is the exclusion RRF
+uses. The same goes for firmware retraction.
 
 Either way, `canPauseAfter` stays and keeps the meaning it has: **not** "the junction is slow enough"
 — the feedhold no longer cares about that — but "this is a junction a print can be restarted from".
@@ -461,20 +509,39 @@ maps them back to the file itself:
 `MoveParams` carries a `MoveId` and no file position, and it should stay that way. DCS already keeps
 side tables keyed on that id — `EndstopCorrection.NoteMoveId`
 ([GCodeHandler.cs:351](../../src/DuetControlServer/Codes/Handlers/GCodeHandler.cs)) is the precedent,
-and `MotionTracker` already tracks `LastCompletedMoveId` per ring — so the feedhold adds one more:
-`MoveId` → file position, modal G-command number, feed rate and virtual extruder position, pruned as
-moves complete. That is the same set of fields RRF stashes in the restore point, held on the side that
-knows what a file is.
+and `MotionTracker` already tracks `LastCompletedMoveId` per ring — so the feedhold adds one more
+([`JobMoveIndex`](../../src/DuetControlServer/Motion/JobMoveIndex.cs)): `MoveId` → file position,
+modal G-command number, feed rate, and how much of that code the move's own segment comes after. That
+is the set of fields RRF stashes in the restore point, held on the side that knows what a file is,
+less the virtual extruder position — which needs the extrusion totals of MCODE_MIGRATION §15.2 before
+there is anything to record.
 
 Two pieces of DCS state are stale the moment the purge happens and must be corrected before anything
 else runs:
 
 - **`MovementState.CurrentUserPosition`**, which is the interpreter's position and has run ahead of
-  the machine by however many moves were queued. It becomes the reported stop position. RRF's
-  equivalent is setting `ms.positionMayBeInaccurate = true` so the position is re-read at the next
-  standstill; here it is read back directly, because `ResyncFromEngine` already exists for this.
+  the machine by however many moves were queued. It becomes the reported stop position and the
+  restore point the resume moves back to, so it is put back into step with the machine — through the
+  builder's endpoints and the inverse transform, `MoveInterpreter.SyncInterpreterToMachine` — before
+  the restore point is taken from it. RRF's equivalent is setting `ms.positionMayBeInaccurate = true`
+  so the position is re-read at the next standstill; here it is read back directly, because
+  `ResyncFromEngine` already exists for this. Getting this wrong is not a reporting detail: the
+  restore point would name the end of the queue that was just discarded, and the resume would drive
+  the head there before reading the file again.
 - **`MovementState.SegmentsLeft`**, if the interpreter was mid-way through submitting a segmented
-  move. Those segments must be abandoned, not submitted into a ring that has just been emptied.
+  move. Those segments must be abandoned, not submitted into a ring that has just been emptied —
+  queueing them after the purge would start the machine moving again once it had come to rest. The
+  claim is dropped here and the loop that holds the segments is told by `PurgeGeneration`, which it
+  compares against what it saw when it built the move. RepRapFirmware needs no equivalent because
+  its pause runs in the same task as the loop it is interrupting.
+
+  A submission abandoned that way is also the one case where the ring cannot say how much of a line
+  was made: if the purge dropped nothing — everything queued was already committed — then what ran is
+  every segment that went out, and no dropped move names it. So the loop records that fraction as it
+  gives up (`MovementState.AbandonedJobMove`) and the pause reads it when there is no purged move to
+  ask. The file position needs no such rescue: rewinding to the last completed code lands at the
+  start of the line that was still going out, which is the line the fraction belongs to. This is
+  RRF's "we can skip the move that is waiting" branch of `DoAsynchronousPause`.
 
 #### Resuming needs no replan
 
@@ -486,9 +553,10 @@ to the recorded position and the codes are read again from there, so `MoveInterp
 the temperatures or the position. This is exactly RRF's resume path (`fgb->RestartFrom(filePos)`,
 GCodes4.cpp:723) and the feedhold inherits it unchanged.
 
-The one thing resume gains is that its restore-point coordinates now describe a point the toolpath
-passes through mid-decel rather than a move endpoint — under variant (a), still a real endpoint, so
-nothing changes at all.
+What resume gains is that its restore-point coordinates describe a point the toolpath passes through
+mid-decel rather than the end of a line — under variant (a) still a real segment endpoint, which is
+what makes re-reading the line from there exact once the already-made fraction of it is taken off (see
+above).
 
 #### What the stop shares with a pause that drains
 
@@ -794,7 +862,8 @@ off, which is what `PrintMonitor::Spin` does and why it has the flags it has.
 2. **`PauseState` lives on `JobProcessor`**, as RRF has it on `GCodes` and the restore points on
    `MovementState`; §3.1.
 3. **Feedhold variant (a)** — stop at the first DDA boundary with enough deceleration distance, no
-   truncation. (b) stays available later and needs `moveFractionToSkip` first; §3.5.
+   truncation. A DDA is a segment, so that boundary is usually inside a G-code and the resume takes
+   the already-made fraction of the line off it. (b) stays available later; §3.5.
 4. **The feedhold runs `pause.g`** and keeps the pause reason it would have had. The feedhold and the
    run-`pause.g` flag are independent, which is what lets `driver_error` have one without the other;
    §3.5, §3.5.1.

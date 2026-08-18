@@ -36,6 +36,7 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
     private readonly MacroRunner _macroRunner;
     private readonly Spindles.SpindleManager _spindleManager;
     private readonly Motion.MovePlanner _planner;
+    private readonly Motion.MoveInterpreter _moveInterpreter;
     private readonly Tools.ToolManager _toolManager;
     private readonly Model.ObjectModel _model;
     private readonly ILogger<JobProcessor> _logger;
@@ -55,6 +56,10 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// <param name="macroRunner">Runs the lifecycle macros</param>
     /// <param name="spindleManager">The spindles, which an aborted job stops</param>
     /// <param name="planner">Where the restore point is saved from and the resume move is queued</param>
+    /// <param name="moveInterpreter">
+    /// The interpreter position, which a stop that dropped queued moves has to bring back into step
+    /// with the machine before the restore point is taken from it
+    /// </param>
     /// <param name="toolManager">The selected tool, whose offsets the resume move goes through</param>
     /// <param name="model">Object Model</param>
     /// <param name="lifetime">Host application lifetime</param>
@@ -70,6 +75,7 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
         MacroRunner macroRunner,
         Spindles.SpindleManager spindleManager,
         Motion.MovePlanner planner,
+        Motion.MoveInterpreter moveInterpreter,
         Tools.ToolManager toolManager,
         Model.ObjectModel model,
         IHostApplicationLifetime lifetime,
@@ -86,6 +92,7 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
         _macroRunner = macroRunner;
         _spindleManager = spindleManager;
         _planner = planner;
+        _moveInterpreter = moveInterpreter;
         _toolManager = toolManager;
         _model = model;
         _lifetime = lifetime;
@@ -350,6 +357,15 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
         _file = file;
         _pausePosition = _pausePosition2 = null;
 
+        // A file is selected before M26 says where in it to start, so anything an earlier job left
+        // behind belongs to that job rather than to this one
+        using (_planner.Lock())
+        {
+            _planner.State.RestartMoveFractionDone = 0.0f;
+            _planner.State.RestartGCommandNumber = -1;
+            _planner.State.AbandonedJobMove = null;
+        }
+
         // Update the object model
         using (await _model.AccessReadWriteAsync())
         {
@@ -571,6 +587,7 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
                         {
                             IsProcessing = true;
                             _codeProcessor.SetJobFile(file.Channel, file);
+                            RestoreModalStateForResume(file);
                         }
                     }
                     else
@@ -584,6 +601,40 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
 
         // No longer printing
         _codeProcessor.SetJobFile(file.Channel, null);
+    }
+
+    /// <summary>
+    /// Put back the state the job was reading with when it paused
+    /// </summary>
+    /// <param name="file">The job file, already rewound to where it is to carry on from</param>
+    /// <remarks>
+    /// <para>
+    /// Done here rather than in <c>ResumeAsync</c> because this is the one point that is after both
+    /// the rewind and the restore point being written, and before the next code is read. The two
+    /// happen on different tasks, so anywhere earlier is a race with one of them.
+    /// </para>
+    /// <para>
+    /// RepRapFirmware's resume does the same pair: <c>SetModalGCommand</c> so that a line naming no
+    /// command letter still means what it did, and <c>ResumeAfterPause</c> so that a line the machine
+    /// is already part-way through asks only for the rest of itself. The fraction goes to the shared
+    /// interpreter state and is spent by the first move the job reads - see
+    /// <see cref="Motion.MovementState.MoveFractionToSkip"/>
+    /// </para>
+    /// </remarks>
+    private void RestoreModalStateForResume(CodeFile file)
+    {
+        using (_planner.Lock())
+        {
+            Motion.RestorePoint rp = _planner.State.RestorePoints[Motion.RestorePoint.PauseNumber];
+            if (rp.GCommandNumber >= 0)
+            {
+                file.ModalGCommand = rp.GCommandNumber;
+            }
+            if (file.Channel == CodeChannel.File)
+            {
+                _planner.State.MoveFractionToSkip = rp.ProportionDone;
+            }
+        }
     }
 
     /// <summary>

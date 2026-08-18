@@ -89,7 +89,7 @@ internal sealed class MoveInterpreter(
     /// <summary>
     /// Read a movement code's parameters into a move
     /// </summary>
-    /// <param name="code">The code, as parsed: nothing here needs the channel it came from</param>
+    /// <param name="code">The code, as parsed</param>
     /// <param name="input">The channel's interpreter state</param>
     /// <param name="isCoordinated">Whether this is a G1</param>
     /// <param name="moveType">What kind of move the H parameter asked for</param>
@@ -117,6 +117,10 @@ internal sealed class MoveInterpreter(
             MoveType = moveType,
             CheckEndstops = moveType.ChecksEndstops()
         };
+
+        // How much of this code is still to do. It is one for everything except the first job-file
+        // move after a resume that stopped part-way through a code - see MoveFractionToSkip
+        float moveFraction = 1.0f - MoveFractionToSkipFor(code);
 
         // G53 asks for machine coordinates on this line only, so neither the workplace offset nor
         // (once tools exist) the tool offset applies to it
@@ -161,7 +165,9 @@ internal sealed class MoveInterpreter(
                 // exactly why it cannot be read back out of the object model's reported positions
                 if (input.AxesRelative)
                 {
-                    state.CurrentUserPosition[axis] += moveArg;
+                    // A relative word says how far to go rather than where to end up, so a move
+                    // that is already part done has only the rest of it left to ask for
+                    state.CurrentUserPosition[axis] += moveArg * moveFraction;
                 }
                 else if (machineCoordinates)
                 {
@@ -228,7 +234,7 @@ internal sealed class MoveInterpreter(
                 float moveArg = axisConfig.Rotational ? value : value * unitScale;
                 if (input.AxesRelative)
                 {
-                    raw.Coords[axis] += moveArg;
+                    raw.Coords[axis] += moveArg * moveFraction;
                 }
                 else
                 {
@@ -247,7 +253,16 @@ internal sealed class MoveInterpreter(
         }
 
         // Pausing during an endstop move is not safe: it may stop short, so where it would resume
-        // from is not known until it has finished
+        // from is not known until it has finished. Every other move may be stopped after, segment
+        // boundaries included - the resume re-reads the code and asks only for the rest of it, which
+        // is what MoveFractionToSkip is for.
+        //
+        // TODO an arc move must not carry this on anything but its last segment, and firmware
+        // retraction must not carry it at all. RepRapFirmware clears it for both (GCodes.cpp:3213
+        // and :4557): an arc re-read from part-way along recomputes its centre from the wrong start
+        // - which is what its restart point's InitialUserC0/InitialUserC1 exist to prevent - and a
+        // retraction re-read is a second retraction. Neither G2/G3 nor G10/G11 is implemented yet,
+        // so there is nothing to clear it on today
         raw.CanPauseAfter = !raw.CheckEndstops;
 
         // Before the endstops, because arming a stall endstop needs the speeds this works out
@@ -267,7 +282,7 @@ internal sealed class MoveInterpreter(
             ApplyEndstops(endstopPlans, raw, numAxes); // can throw GCodeException
         }
 
-        bool hasExtrusion = ApplyExtrusion(code, input, raw, unitScale);
+        bool hasExtrusion = ApplyExtrusion(code, input, raw, unitScale, moveFraction);
         if (hasExtrusion || axesMentioned != 0)
         {
             // TODO check if first move since skipping an object
@@ -328,12 +343,19 @@ internal sealed class MoveInterpreter(
                 raw.SegmentCount = SegmentCountFor(raw, numAxes);
             }
 
-            // TODO `FinaliseMove()` in RRF does the following things:
-            // - adjust the move parameters to account for segmentation and/or part of the move having been done already
-            // - set `canPauseAfter`
-            // - set file position
-            // - change the extrusion to extrusion per segment - done in `SegmentedMove.From()` after this function returns
-            // - use `moveFractionToSkip` to skip some of the move if it has already been done (e.g. after a pause)
+            // The fraction belongs to one move and this is it, so it goes no further. Cleared here
+            // rather than when the move completes because the interpreter is what reads it, and the
+            // interpreter has already moved on to the next code by then. RepRapFirmware's ClearMove
+            if (moveFraction != 1.0f)
+            {
+                state.MoveFractionToSkip = 0.0f;
+            }
+
+            // This is where RepRapFirmware's `FinaliseMove()` ends. The rest of what it does is here
+            // or has moved: `canPauseAfter` above, the segment count above that, the extrusion per
+            // segment in `SegmentedMove.From()` once this returns. The one thing that is deliberately
+            // elsewhere is the file position, which no move carries - the engine has no idea what a
+            // file is, so `JobMoveIndex` keeps it on this side, keyed by move id
         }
 
         return raw;
@@ -436,6 +458,11 @@ internal sealed class MoveInterpreter(
         bool isRapid = !raw.IsCoordinated && model.State.MachineMode != MachineMode.FFF;
         raw.UsingStandardFeedrate = !isRapid;
 
+        // What the channel would use if the move named no F, kept unscaled and in mm/sec. Recorded
+        // before anything below decides what this move actually travels at, because it is the file's
+        // feed rate rather than this move's that a resume has to put back
+        raw.OriginalFeedRateMmPerSec = ModalFeedRateMmPerSec(input);
+
         if (isRapid)
         {
             // RepRapFirmware's MaximumG0FeedRate, and the overrides do not apply to it - M220 scales
@@ -467,6 +494,7 @@ internal sealed class MoveInterpreter(
         {
             // Kept raw, which is also what inputs[].feedRate reports
             input.FeedRate = feedRate;
+            raw.OriginalFeedRateMmPerSec = ModalFeedRateMmPerSec(input);
         }
 
         // A move that names only rotational axes is measured in degrees, so G20 does not scale its
@@ -477,6 +505,36 @@ internal sealed class MoveInterpreter(
 
         raw.FeedRateMmPerSec = raw.ApplyM220M221 ? converted * model.Move.SpeedFactor : converted;
     }
+
+    /// <summary>
+    /// The feed rate a channel is set to, in mm/sec
+    /// </summary>
+    /// <param name="input">The channel</param>
+    /// <returns>The rate</returns>
+    /// <remarks>
+    /// The same conversion a restore point is written with, so that what a pause saves and what a
+    /// resume puts back are the same quantity in both directions
+    /// </remarks>
+    private static float ModalFeedRateMmPerSec(InputChannel input)
+        => input.FeedRate * (input.DistanceUnit == DistanceUnit.Inch ? MmPerInch : 1.0f) / SecondsPerMinute;
+
+    /// <summary>
+    /// How much of the code about to be built has already been done, 0..1
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <returns>The fraction, which is zero for every code but one</returns>
+    /// <remarks>
+    /// <para>
+    /// <see cref="MovementState.MoveFractionToSkip"/> is set when a job is resumed part-way through a
+    /// code, and the code it describes is the first one the job file reads afterwards. The channel
+    /// test is what keeps it from being spent on somebody else's move: the interpreter state is
+    /// shared by every channel here - RepRapFirmware's is per motion system - so a
+    /// <c>daemon.g</c> move landing in the window between the resume and the job's first code would
+    /// otherwise be shortened instead
+    /// </para>
+    /// </remarks>
+    private float MoveFractionToSkipFor(DuetAPI.Commands.Code code)
+        => code.Channel is CodeChannel.File or CodeChannel.File2 ? state.MoveFractionToSkip : 0.0f;
 
     /// <summary>
     /// Whether the code moves anything other than Z
@@ -752,6 +810,39 @@ internal sealed class MoveInterpreter(
     }
 
     /// <summary>
+    /// Bring the interpreter's position back into step with where the machine actually is
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>ToolOffsetInverseTransform</c> after a homing or probing move, and the
+    /// only place the whole transform is inverted. Everywhere else the interpreter is authoritative
+    /// and the machine follows it; here the machine is somewhere the interpreter did not put it.
+    /// That is homing, probing, and a feedhold, which stops the machine before the moves the
+    /// interpreter had already built have run.
+    /// </para>
+    /// <para>
+    /// The bed transform is undone first, as RepRapFirmware's <c>InverseBedTransform</c> is before
+    /// <c>ToolOffsetInverseTransform</c>. The builder's position is where the machine was
+    /// <em>commanded</em>, correction included, so leaving the correction in would hand the
+    /// interpreter a Z that is already compensated - and it would then be compensated a second time
+    /// on the next move. The caller must hold the object model write lock and the planner lock, and
+    /// is what publishes the result
+    /// </para>
+    /// </remarks>
+    public void SyncInterpreterToMachine()
+    {
+        int numAxes = Parameters.SharedAxisCount(model.Move);
+        builder.StartCoordinates[..numAxes].CopyTo(state.CurrentUserPosition);
+
+        // The bed transform first and the axis transform second, which is the order RepRapFirmware's
+        // InverseAxisAndBedTransform uses - the mirror of applying the axis transform before the bed
+        // one, because the map is indexed by coordinates the skew has already moved
+        bedCompensation.Remove(state.CurrentUserPosition, numAxes);
+        AxisSkew.Remove(currentTool(), model.Move, state.CurrentUserPosition, numAxes);
+        ToolTransform.Remove(currentTool(), model.Move, state.CurrentUserPosition, numAxes);
+    }
+
+    /// <summary>
     /// Fill in where a special move starts from
     /// </summary>
     /// <param name="raw">The move being built</param>
@@ -801,10 +892,12 @@ internal sealed class MoveInterpreter(
     /// <param name="input">The channel's interpreter state</param>
     /// <param name="raw">Move to fill in</param>
     /// <param name="unitScale">Millimetres per user unit</param>
+    /// <param name="moveFraction">How much of the move is still to do, 1 unless it is being resumed</param>
     /// <returns>True if the move extrudes forwards, which is what pressure advance applies to</returns>
     /// <exception cref="GCodeException">The extrusion cannot be applied</exception>
     /// <remarks>The caller must hold the object model lock</remarks>
-    public bool ApplyExtrusion(DuetAPI.Commands.Code code, InputChannel input, RawMove raw, float unitScale)
+    public bool ApplyExtrusion(DuetAPI.Commands.Code code, InputChannel input, RawMove raw, float unitScale,
+                               float moveFraction = 1.0f)
     {
         bool hasExtrusion = false;
         raw.HasPositiveExtrusion = false;
@@ -854,6 +947,28 @@ internal sealed class MoveInterpreter(
             // Absolute extrusion is a running total, so the movement is the difference from where
             // the extruder was last told it had reached
             float movement = input.DrivesRelative ? requestedMm : requestedMm - extruderConfig.RawPosition;
+
+            // Extrusion is an amount however the file expresses it, so a move that is already part
+            // done owes only the rest of it. This is what RepRapFirmware gets by skipping whole
+            // segments of the re-read move and scaling the one it restarts inside.
+            //
+            // Why this scales where an absolute *axis* target does not: the resume puts the axes
+            // right by moving their start, back to where the machine stopped, so what the line names
+            // is already the rest of the move. An extruder has no such start to move - the resync is
+            // axes-only, because the engine carries the fraction of a step between moves - so
+            // RepRapFirmware moves the reference the other way instead, rewinding
+            // latestVirtualExtruderPosition to the extruder position at the *start* of the
+            // interrupted line (RestorePoint's virtualExtruderPosition). The difference below is
+            // then the whole line's extrusion, and this is the part of it still owed - which makes
+            // the two E modes behave identically, as they must.
+            //
+            // TODO that rewind does not happen yet, because nothing tracks the absolute extruder
+            // position at all: RawPosition is only ever written by G92 E and
+            // RestorePoint.VirtualExtruderPosition is hardwired to zero (§15.2). Whoever lands that
+            // tracking has to restore it here to the value at the start of the interrupted line, not
+            // to where the machine stopped - restoring the stop point would count the same filament
+            // twice, once in the difference and once in this scale factor
+            movement *= moveFraction;
             if (movement != 0.0f)
             {
                 hasExtrusion = true;

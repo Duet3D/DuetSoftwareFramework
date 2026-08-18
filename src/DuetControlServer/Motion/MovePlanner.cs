@@ -571,8 +571,10 @@ internal sealed class MovePlanner(
             ResyncFromEngine();
 
             // A segmented move that was part-way through submitting has had its remaining segments
-            // dropped with the rest, so the claim on the ring goes with them
+            // dropped with the rest, so the claim on the ring goes with them - and the loop that
+            // holds them is told to stop rather than feeding a ring the machine has just left
             State.SegmentsLeft = 0;
+            State.NotePurge();
             JobMoves.Clear();
         }
 

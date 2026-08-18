@@ -725,10 +725,23 @@ internal partial class MCodeHandler(
 
                     await jobProcessor.SetFilePositionAsync(motionSystem, newPosition, cancellationToken);
                 }
+
+                // How the line at that position is to be read when the job starts. P is how much of
+                // it the machine has already made - a job restarted by resurrect.g after a power
+                // failure is part-way through a line exactly as a resumed pause is - and C is the
+                // modal command it was read under, which the line itself may not name. They are held
+                // until M24 because that is what starts printing
+                //
+                // TODO M26 also takes the arc restart point in the selected plane's two axis words,
+                // which needs InitialUserC0 / InitialUserC1 and so waits for G2/G3
+                using (planner.Lock())
+                {
+                    planner.State.RestartMoveFractionDone = code.GetFloatLimited('P', 0.0f, 1.0f, 0.0f);
+                    planner.State.RestartGCommandNumber = code.GetInt('C', -1);
+                }
             }
 
-            // TODO handle P parameter if present (used to be handled by RRF)
-            return new Message(MessageType.Warning, "Not implemented yet");
+            return new Message();
         }
         throw new OperationCanceledException();
     }
