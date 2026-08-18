@@ -834,15 +834,19 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
            && NativeMethods.DuetSbc_MotionSetMotorPositions(_handle, driveMask, positions, positions.Length) != 0;
 
     /// <summary>
-    /// Ask the motion engine for a feedhold
+    /// Ask the motion engine to stop early and drop the moves after it
     /// </summary>
+    /// <param name="plannedDeceleration">
+    /// False to look for a junction the toolpath is already slow enough to stop at, which is what
+    /// RepRapFirmware does; true to plan a deceleration of its own
+    /// </param>
     /// <returns>True if the request was queued</returns>
     /// <remarks>
     /// The result arrives through <see cref="TryGetFeedholdResult"/> once the motion thread has
     /// acted, because dropping a move frees its segments and only that thread may do it
     /// </remarks>
-    public bool RequestFeedhold()
-        => _handle != IntPtr.Zero && NativeMethods.DuetSbc_MotionRequestFeedhold(_handle) != 0;
+    public bool RequestStop(bool plannedDeceleration)
+        => _handle != IntPtr.Zero && NativeMethods.DuetSbc_MotionRequestStop(_handle, plannedDeceleration ? 1 : 0) != 0;
 
     /// <summary>
     /// What the last feedhold did

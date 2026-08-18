@@ -486,9 +486,55 @@ bool DDARing::Feedhold(FeedholdOutcome& outcome) noexcept
 		}
 	}
 
-	// Drop what comes after the stop. The ring's add pointer follows, so the next move built is
-	// measured from where the machine will actually be
-	for (DDA* dda = stopAfter->GetNext(); dda != m_addPointer; )
+	PurgeAfter(stopAfter, outcome);
+	return true;
+}
+
+// Skip to the first junction the ring can already stop at. A faithful port of RepRapFirmware's
+// DDARing::PauseMoves; see the comment on the declaration for what "already" costs.
+bool DDARing::PauseMoves(FeedholdOutcome& outcome) noexcept
+{
+	outcome = FeedholdOutcome{};
+
+	DDA* const savedAddPointer = m_addPointer;
+	DDA* dda = m_getPointer;
+	if (dda == savedAddPointer)
+	{
+		return false; // nothing queued
+	}
+
+	// Walk the ring for the first move we can stop *before*, which is the one whose predecessor may
+	// be paused after. CanPauseAfter also requires the following move to be uncommitted, because a
+	// move already sent to the boards cannot be recalled
+	DDA* stopAfter = nullptr;
+	bool pauseOkHere = dda->CanPauseAfter();
+	dda = dda->GetNext();
+	while (dda != savedAddPointer)
+	{
+		if (pauseOkHere)
+		{
+			stopAfter = dda->GetPrevious();
+			break;
+		}
+		pauseOkHere = dda->CanPauseAfter();
+		dda = dda->GetNext();
+	}
+
+	if (stopAfter == nullptr)
+	{
+		return false; // no junction is slow enough; the caller drains the ring
+	}
+
+	PurgeAfter(stopAfter, outcome);
+	return true;
+}
+
+// Drop every move after `stopAfter`. Shared by both kinds of stop, which differ only in how they
+// choose where to stop.
+void DDARing::PurgeAfter(DDA* stopAfter, FeedholdOutcome& outcome) noexcept
+{
+	DDA* const savedAddPointer = m_addPointer;
+	for (DDA* dda = stopAfter->GetNext(); dda != savedAddPointer; )
 	{
 		DDA* const next = dda->GetNext();
 		if (outcome.movesPurged == 0)
@@ -500,10 +546,11 @@ bool DDARing::Feedhold(FeedholdOutcome& outcome) noexcept
 		--m_scheduledMoves;
 		dda = next;
 	}
-	m_addPointer = stopAfter->GetNext();
 
+	// The add pointer follows, so the next move built is measured from where the machine will
+	// actually come to rest rather than from where the discarded moves would have left it
+	m_addPointer = stopAfter->GetNext();
 	outcome.stopped = true;
-	return true;
 }
 
 void DDARing::SetLastEndpoints(LogicalDrivesBitmap logicalDrives, const int32_t* ep) noexcept

@@ -85,9 +85,9 @@ namespace Duet::Sbc
 		size_t GetMotorPositions(std::span<int32_t> positions, uint32_t *whenTicks) const;
 		size_t GetLivePositions(std::span<int32_t> positions, uint32_t *whenTicks) const;
 
-		// Ask for a feedhold: bring the machine to a controlled stop as early as the ring allows and
-		// drop the moves after it. See DDARing::Feedhold for what "as early as the ring allows"
-		// means and why it is not RepRapFirmware's search for a slow-enough junction.
+		// Ask the ring to stop early and drop the moves after it. `kind` chooses between
+		// RepRapFirmware's search for a junction that is already slow enough and the feedhold that
+		// plans a stop of its own - see DDARing::StopKind.
 		//
 		// Queued for the motion thread rather than done here, for the reason SetMotorPositions is:
 		// dropping a move frees its segments, and the freelist is not thread-safe. So the answer
@@ -96,10 +96,10 @@ namespace Duet::Sbc
 		// asking and waits for it to change.
 		//
 		// False means the request queue was full and nothing was asked for - never a silent drop.
-		bool RequestFeedhold();
+		bool RequestStop(DDARing::StopKind kind);
 
-		// What the last feedhold did. `sequence` increments once per completed feedhold, including
-		// one that found nothing it could stop before, which reports stopped = false.
+		// What the last stop did. `sequence` increments once per completed request, including one
+		// that found nothing it could stop before, which reports stopped = false.
 		struct FeedholdResult
 		{
 			uint32_t sequence = 0;

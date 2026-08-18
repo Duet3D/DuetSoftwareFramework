@@ -443,16 +443,17 @@ internal static partial class NativeMethods
     internal static partial int DuetSbc_MotionSetMotorPositions(IntPtr handle, uint driveMask, ReadOnlySpan<int> positions, int count);
 
     /// <summary>
-    /// Ask the engine to bring the machine to a controlled stop and drop the moves after it
+    /// Ask the engine to stop early and drop the moves after it
     /// </summary>
     /// <param name="handle">Engine handle</param>
+    /// <param name="kind">0 for RepRapFirmware's search for a slow-enough junction, 1 for a planned deceleration</param>
     /// <returns>Non-zero if the request was queued, zero if its queue was full</returns>
     /// <remarks>
     /// The answer does not come back from this call: dropping a move frees its segments and only the
     /// motion thread may do that. <see cref="DuetSbc_MotionGetFeedholdResult"/> reports what happened
     /// </remarks>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_MotionRequestFeedhold(IntPtr handle);
+    internal static partial int DuetSbc_MotionRequestStop(IntPtr handle, int kind);
 
     /// <summary>
     /// What the last feedhold did

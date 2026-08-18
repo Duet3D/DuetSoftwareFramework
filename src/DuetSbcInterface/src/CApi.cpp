@@ -351,13 +351,13 @@ extern "C"
 		return h->motion.SubmitMove({static_cast<const uint8_t*>(moveParams), (size_t)length}) ? 1 : 0;
 	}
 
-	int32_t DuetSbc_MotionRequestFeedhold(DuetSbcHandle* h)
+	int32_t DuetSbc_MotionRequestStop(DuetSbcHandle* h, int32_t kind)
 	{
-		if (h == nullptr)
+		if (h == nullptr || kind < 0 || kind > 1)
 		{
 			return 0;
 		}
-		return h->motion.RequestFeedhold() ? 1 : 0;
+		return h->motion.RequestStop(static_cast<DDARing::StopKind>(kind)) ? 1 : 0;
 	}
 
 	int32_t DuetSbc_MotionGetFeedholdResult(DuetSbcHandle* h, uint32_t* sequenceOut,

@@ -146,13 +146,15 @@ extern "C"
 	// Motion/MoveParams.h and its C# mirror. Returns 1 if queued, 0 if the caller must retry.
 	int32_t DuetSbc_MotionSubmitMove(DuetSbcHandle* h, const void* moveParams, int32_t length);
 
-	// Ask for a feedhold: stop the machine under control as early as the ring allows and drop the
-	// moves after it. Returns 1 if the request was queued, 0 if the queue was full and it was not.
+	// Ask the ring to stop early and drop the moves after it. Returns 1 if the request was queued,
+	// 0 if the queue was full and it was not.
 	//
 	// The answer does not come back from this call. Dropping a move frees its segments, which only
 	// the motion thread may do, so the request is queued and DuetSbc_MotionGetFeedholdResult reports
 	// what happened once it has acted. Read the sequence first and wait for it to change.
-	int32_t DuetSbc_MotionRequestFeedhold(DuetSbcHandle* h);
+	// `kind` is 0 for RepRapFirmware's search for a junction that is already slow enough to stop at,
+	// and 1 for the feedhold that plans a deceleration of its own.
+	int32_t DuetSbc_MotionRequestStop(DuetSbcHandle* h, int32_t kind);
 
 	// What the last feedhold did. `sequence` counts completed feedholds, `stopped` is 1 if the ring
 	// was brought to a planned stop and 0 if there was nothing it could stop before, in which case

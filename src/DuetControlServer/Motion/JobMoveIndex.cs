@@ -36,8 +36,8 @@ internal readonly record struct JobMoveOrigin
 /// <para>
 /// Bounded on purpose. A job queues moves far faster than they run, so an index that only forgot
 /// what completed would still grow without limit whenever the ring is full and the engine is behind.
-/// The oldest entry is dropped once the index is full, which is safe because a feedhold can only
-/// ever name a move that is still queued.
+/// The oldest entry is dropped once the index is full, and <see cref="Capacity"/> is what makes that
+/// safe rather than merely tidy.
 /// </para>
 /// <para>
 /// Not thread-safe: the planner lock covers it, as it covers everything else the planner queues
@@ -49,10 +49,23 @@ internal sealed class JobMoveIndex
     /// How many moves are remembered
     /// </summary>
     /// <remarks>
-    /// Comfortably more than a ring holds, so the entry a feedhold asks about is always still here.
-    /// The ring is what bounds how many moves can be queued at once, and it is far smaller
+    /// <para>
+    /// A stop can only name a move that is still queued, and what bounds how many those are is the
+    /// engine's ring. So this has to be at least
+    /// <see cref="Native.MotionLimits.MaxDdasPerRing"/> - the largest ring M595 can ask for - or a
+    /// machine configured with a big queue would evict an entry that was still needed, and the stop
+    /// would fall back to resuming from the last completed code. That is *before* where the machine
+    /// actually came to rest, so the job would re-run moves it had already made.
+    /// </para>
+    /// <para>
+    /// The margin above it covers the moves that have been submitted but not yet taken into the
+    /// ring: <c>CanAddMove</c> keeps that small, but it is not zero, and it is not worth being
+    /// exact about when the entries cost a few dozen bytes each. Every segment of a segmented move
+    /// is its own move to the engine and so has its own entry, which is why the count is of moves
+    /// rather than of codes
+    /// </para>
     /// </remarks>
-    private const int Capacity = 512;
+    private const int Capacity = Native.MotionLimits.MaxDdasPerRing * 2;
 
     private readonly Dictionary<uint, JobMoveOrigin> _origins = new(Capacity);
     private readonly Queue<uint> _order = new(Capacity);

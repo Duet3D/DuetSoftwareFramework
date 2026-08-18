@@ -577,6 +577,13 @@ Three things this does **not** change, each easy to assume otherwise:
   here. They stay out of scope (§5). The feedhold sits between them and the faithful pause: sooner
   than RRF's, still under full control of the motion planner.
 
+`M25` itself is a faithful port and therefore still *tries* to stop early: RepRapFirmware's
+`PauseMoves` skips to the first junction the toolpath is already slow enough to stop at, and only
+drains the ring when there is no such junction. Both are ported — `DDARing::PauseMoves` alongside
+`DDARing::Feedhold`, differing only in how they choose the stopping point and sharing the purge. What
+`M25.1` adds is making a stopping point when the search would not have found one, which during a fast
+print is nearly always.
+
 The consequence for the plan is that **phase 6 depends on phase 4**, where before it only depended on
 phase 2. Landing the event pauses first would ship them on the faithful path and then change their
 behaviour underneath machines that had started relying on it.
@@ -701,7 +708,9 @@ when the head is at or below the pause height, and only splits the move - travel
       (§3.5.1), and falls back to phase 2's drain-the-ring behaviour when nothing could be purged
 - [x] The feedhold supplies the resume position, which is the one case where the last completed code
       is *not* the pause point
-- [ ] MCODE_MIGRATION §11.6's row for `PauseMoves` records that it is superseded rather than pending
+- [x] `DDARing::PauseMoves` ported too, so `M25` keeps RepRapFirmware's early stop rather than always
+      draining the ring — the feedhold supersedes it only for `M25.1`
+- [ ] MCODE_MIGRATION §11.6's row for `PauseMoves` records that it is ported
 - [ ] `rrf-differences.md` entry, now that there is shipped behaviour to describe
 - [ ] Native tests for `DDARing::Feedhold` — the boundary search, the backward re-plan and the
       committed-move floor are all arithmetic that a test can pin and review cannot

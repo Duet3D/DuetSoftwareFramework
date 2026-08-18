@@ -312,18 +312,28 @@ namespace Duet::Sbc
 		}
 	}
 
-	bool MotionService::RequestFeedhold()
+	bool MotionService::RequestStop(DDARing::StopKind kind)
 	{
-		// The request has no payload: it is the fact of being asked, and one byte carries that
-		const uint8_t token = 0;
+		const uint8_t token = static_cast<uint8_t>(kind);
 		return m_feedholdRequests.Write({&token, 1});
 	}
 
 	void MotionService::DrainFeedholds()
 	{
 		bool asked = false;
-		while (m_feedholdRequests.Peek())
+		DDARing::StopKind kind = DDARing::StopKind::AtExistingJunction;
+		while (const std::optional<ByteSpan> record = m_feedholdRequests.Peek())
 		{
+			if (!record->empty())
+			{
+				// Several requests collapse into one stop, and the strongest wins: a feedhold asked
+				// for while an ordinary pause was still queued must not be weakened into a search
+				const auto requested = static_cast<DDARing::StopKind>((*record)[0]);
+				if (!asked || requested == DDARing::StopKind::PlannedDeceleration)
+				{
+					kind = requested;
+				}
+			}
 			asked = true;
 			m_feedholdRequests.Consume();
 		}
@@ -336,7 +346,14 @@ namespace Duet::Sbc
 		// own restore data, and M596 is what brings one into existence
 		// TODO extend this to every ring when multiple motion systems land
 		DDARing::FeedholdOutcome outcome{};
-		m_rings[0].Feedhold(outcome);
+		if (kind == DDARing::StopKind::PlannedDeceleration)
+		{
+			m_rings[0].Feedhold(outcome);
+		}
+		else
+		{
+			m_rings[0].PauseMoves(outcome);
+		}
 
 		// Seqlock, as for the position snapshot: the reader is a managed thread that may stop for a
 		// garbage collection part-way through the read

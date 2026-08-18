@@ -2173,7 +2173,7 @@ steps 1-6. What is gone is gone by build switch or by deletion, not by divergenc
 | `SUPPORT_LASER 0`, `SUPPORT_IOBITS 0` | `:49-50` | Follows §11.4 items 27 and 32 |
 | `SUPPORT_NONLINEAR_EXTRUSION 0` | `:55` | M592 |
 | `DDARing::PushBabyStepping` | `DDARing.cpp:462` | A babystep change takes effect on the next move built rather than being pushed into moves already queued — [ApplyAxisTransform](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L1022) says so |
-| `DDARing::PauseMoves`, `LowPowerOrStallPause` | `:592`, `:687` | No pausing part-way through a queued move; follows restore points (§11.4 item 29). [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) phase 4 ports `PauseMoves` back |
+| `LowPowerOrStallPause` | `:687` | The emergency stop that cancels stepping mid-move; follows the power-fail work, which is out of scope. `DDARing::PauseMoves` is no longer dropped — [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) phase 4 ported it, alongside the feedhold `M25.1` uses |
 | `DDARing::AddSpecialMove` | `:194` | Bed levelling / leadscrew adjustment moves (M671) |
 
 ---

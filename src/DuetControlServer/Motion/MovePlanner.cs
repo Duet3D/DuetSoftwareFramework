@@ -502,10 +502,15 @@ internal sealed class MovePlanner(
     public readonly record struct FeedholdOutcome(bool Stopped, JobMoveOrigin? Origin, uint MovesPurged);
 
     /// <summary>
-    /// Bring the machine to a controlled stop as early as the engine allows
+    /// Stop the machine before the queue has run, and drop the moves after the stopping point
     /// </summary>
+    /// <param name="plannedDeceleration">
+    /// False for RepRapFirmware's behaviour, which skips to a junction the toolpath is already slow
+    /// enough to stop at and finds none during a fast print; true for the feedhold, which plans a
+    /// deceleration at the first move the engine has not committed
+    /// </param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>What the feedhold did</returns>
+    /// <returns>What the stop did</returns>
     /// <remarks>
     /// <para>
     /// The engine acts on this from its own thread, because dropping a move frees its segments. So
@@ -518,7 +523,8 @@ internal sealed class MovePlanner(
     /// built from it would start from somewhere the machine never reached
     /// </para>
     /// </remarks>
-    public async ValueTask<FeedholdOutcome> FeedholdAsync(CancellationToken cancellationToken = default)
+    public async ValueTask<FeedholdOutcome> StopEarlyAsync(bool plannedDeceleration,
+                                                           CancellationToken cancellationToken = default)
     {
         uint sequenceBefore;
         if (!linkInterface.Native.TryGetFeedholdResult(out sequenceBefore, out _, out _, out _))
@@ -526,9 +532,9 @@ internal sealed class MovePlanner(
             return new FeedholdOutcome(false, null, 0);
         }
 
-        if (!linkInterface.Native.RequestFeedhold())
+        if (!linkInterface.Native.RequestStop(plannedDeceleration))
         {
-            logger.LogWarning("The motion engine would not take a feedhold request; draining the queue instead");
+            logger.LogWarning("The motion engine would not take a stop request; draining the queue instead");
             return new FeedholdOutcome(false, null, 0);
         }
 
@@ -570,12 +576,12 @@ internal sealed class MovePlanner(
             JobMoves.Clear();
         }
 
-        logger.LogInformation("Feedhold stopped the machine, dropping {Count} queued move(s)", movesPurged);
+        logger.LogInformation("Stopped the machine early, dropping {Count} queued move(s)", movesPurged);
         return new FeedholdOutcome(true, origin, movesPurged);
     }
 
     /// <summary>
-    /// How often to ask whether the motion thread has acted on a feedhold
+    /// How often to ask whether the motion thread has acted on a stop request
     /// </summary>
     private static readonly TimeSpan FeedholdPollInterval = TimeSpan.FromMilliseconds(2);
 

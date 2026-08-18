@@ -94,14 +94,19 @@ internal partial class JobProcessor
 
         try
         {
-            // A feedhold stops the machine before the queue has run, so it happens first: everything
-            // below is about what the machine does once it has stopped, and there is no point
-            // recording where that is until it has. A synchronous pause never feedholds - the job
-            // file has reached the pause point, so the queue ahead of it is what has to run
+            // An asynchronous pause stops the machine before the queue has run, so it happens first:
+            // everything below is about what the machine does once it has stopped, and there is no
+            // point recording where that is until it has.
+            //
+            // M25 asks the engine to skip to a junction the toolpath is already slow enough to stop
+            // at, which is what RepRapFirmware does and which during a fast print usually finds
+            // nothing - the queue then drains, as it does there. M25.1 asks it to plan a stop
+            // instead. A synchronous pause does neither: the job file has reached the pause point,
+            // so everything queued ahead of it is what has to run
             MovePlanner.FeedholdOutcome held = default;
-            if (feedhold && !synchronous)
+            if (!synchronous)
             {
-                held = await _planner.FeedholdAsync(cancellationToken);
+                held = await _planner.StopEarlyAsync(plannedDeceleration: feedhold, cancellationToken);
             }
 
             using (await LockAsync(cancellationToken))
@@ -115,8 +120,9 @@ internal partial class JobProcessor
                 // not complete, so that is the pause point without anything having to compute it. For
                 // a synchronous pause it is the code after the M226 - supplying the position of the
                 // M226 itself would re-run it on resume and never make progress.
-                // A feedhold is the exception: it dropped queued moves the job had already read past,
-                // so the last completed code is *not* the pause point and the first dropped move is
+                // A stop that skipped moves is the exception: it dropped queued moves the job had
+                // already read past, so the last completed code is *not* the pause point and the
+                // first dropped move is
                 StopReadingForPause(held.Origin?.FilePosition, filePosition2: null, reason);
 
                 // A pause commanded from within the job cancelled its own code along with the rest of

@@ -89,13 +89,36 @@ class DDARing final
 		const noexcept; // Get the (peak) deceleration for reporting in the object model
 
 	[[nodiscard]] int32_t GetLastEndpoint(size_t drive) const noexcept;
-	// What a feedhold did, for DuetControlServer to act on.
+	// What a stop did, for DuetControlServer to act on.
 	struct FeedholdOutcome
 	{
 		uint32_t firstPurgedMoveId; // id of the earliest move dropped, 0 if none was
 		uint32_t movesPurged;		// how many were dropped
 		bool stopped;				// true if the ring was brought to a planned stop
 	};
+
+	// How a stop chooses where to stop.
+	enum class StopKind : uint8_t
+	{
+		// RepRapFirmware's PauseMoves: skip to the first junction the toolpath is already slow
+		// enough to stop at, and change no move's profile. Finds nothing during a fast print,
+		// because lookahead has raised every junction speed above jerk, and the ring then drains.
+		AtExistingJunction = 0,
+
+		// Make a stopping point rather than looking for one - see Feedhold.
+		PlannedDeceleration = 1
+	};
+
+	// Skip to the first junction the ring can already stop at, and drop everything after it.
+	//
+	// A faithful port of RepRapFirmware's DDARing::PauseMoves, and the meaning of "already" is the
+	// whole of it: a move may be paused after only when its end speed is at or below the
+	// instantaneous speed change of every drive, so this changes no profile and commands no
+	// deceleration. Returns false when there is no such junction, which during a fast print is the
+	// usual answer - the caller then waits for the ring to drain, as RepRapFirmware does.
+	//
+	// Must run on the motion thread: freeing a move frees its segments.
+	bool PauseMoves(FeedholdOutcome& outcome) noexcept;
 
 	// Bring the ring to a controlled stop as early as it can, and drop everything after it.
 	//
@@ -111,6 +134,14 @@ class DDARing final
 	//
 	// Must run on the motion thread: freeing a move frees its segments.
 	bool Feedhold(FeedholdOutcome& outcome) noexcept;
+
+  private:
+	// Drop every move after `stopAfter` and bring the add pointer back to it, so the next move built
+	// is measured from where the machine will actually come to rest. Shared by both kinds of stop,
+	// which differ only in how they choose `stopAfter`.
+	void PurgeAfter(DDA* stopAfter, FeedholdOutcome& outcome) noexcept;
+
+  public:
 
 	void SetLastEndpoints(LogicalDrivesBitmap logicalDrives, const int32_t* ep) noexcept;
 	void SetLastEndpoint(size_t drive, int32_t ep) noexcept;
