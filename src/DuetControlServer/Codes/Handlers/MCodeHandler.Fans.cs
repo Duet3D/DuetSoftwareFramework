@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -174,6 +175,7 @@ internal partial class MCodeHandler
                     return new Message(MessageType.Error, error);
                 }
             }
+            await RecordVirtualFanSpeedAsync(code, fans, pwm, cancellationToken);
             seen = true;
         }
 
@@ -206,6 +208,41 @@ internal partial class MCodeHandler
             }
         }
         return new Message();
+    }
+
+    /// <summary>
+    /// Remember the speed as the one the operator asked the current tool for
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="fans">Fans the code addressed</param>
+    /// <param name="pwm">Speed that was set, 0..1</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <remarks>
+    /// RepRapFirmware's <c>ms.virtualFanSpeed</c>, set from both of the places that write it: an
+    /// M106 naming a fan the current tool maps, and an M106 with no P at all, which addresses the
+    /// tool's fans. It is what a restore point saves, because a tool may map several fans and what
+    /// has to be put back is the one speed that was asked for rather than any one fan's
+    /// </remarks>
+    private async ValueTask RecordVirtualFanSpeedAsync(Commands.Code code, IReadOnlyList<int> fans, float pwm,
+                                                       CancellationToken cancellationToken)
+    {
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            if (toolManager.Current is not Tool tool)
+            {
+                return;
+            }
+
+            // Without P the fans came from the tool already; with it, only a fan the tool maps counts
+            bool addressesTool = !code.HasParameter('P') || fans.Any(tool.Fans.Contains);
+            if (addressesTool)
+            {
+                using (planner.Lock())
+                {
+                    planner.State.VirtualFanSpeed = pwm;
+                }
+            }
+        }
     }
 
     /// <summary>

@@ -525,7 +525,7 @@ internal partial class MCodeHandler(
 
                 using (await jobProcessor.LockAsync(cancellationToken))
                 {
-                    if (!code.IsFromFileChannel && (jobProcessor.IsProcessing || jobProcessor.IsPaused))
+                    if (!code.IsFromFileChannel && (jobProcessor.IsProcessing || jobProcessor.IsPausedOrChanging))
                     {
                         return new Message(MessageType.Error, "Cannot set file to print, because a file is already being printed");
                     }
@@ -831,7 +831,7 @@ internal partial class MCodeHandler(
 
                 using (await jobProcessor.LockAsync(cancellationToken))
                 {
-                    if (!code.IsFromFileChannel && (jobProcessor.IsProcessing || jobProcessor.IsPaused))
+                    if (!code.IsFromFileChannel && (jobProcessor.IsProcessing || jobProcessor.IsPausedOrChanging))
                     {
                         return new Message(MessageType.Error, "Cannot set file to simulate, because a file is already being printed");
                     }

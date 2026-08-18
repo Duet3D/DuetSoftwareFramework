@@ -30,7 +30,8 @@ namespace DuetControlServer.Model;
 /// The order the conditions are tested in is the order RepRapFirmware tests them, and it is not
 /// arbitrary. A halted machine is halted whatever else is true of it, and a paused job is paused even
 /// though its file is still selected - so the tests run from the most overriding to the least, and
-/// the first that matches wins
+/// the first that matches wins. Within the job states the transitions come before the settled ones,
+/// because a job that is pausing is also still processing
 /// </para>
 /// </remarks>
 /// <param name="model">Object model</param>
@@ -122,21 +123,29 @@ internal sealed class MachineStatusService(
             return MachineStatus.Starting;
         }
 
-        // Then the job, which is what most of the remaining states describe. Paused before
-        // processing, because a paused job is still the selected file
-        if (jobProcessor.IsPaused)
+        // Then the job. The transitions come before the settled states, because a job that is
+        // pausing is still processing and one that is resuming is still paused - so testing the
+        // settled state first would report the state the machine is leaving
+        switch (jobProcessor.PauseState)
         {
-            return MachineStatus.Paused;
+            case PauseState.Pausing:
+                return MachineStatus.Pausing;
+            case PauseState.Resuming:
+                return MachineStatus.Resuming;
+            case PauseState.Paused:
+                return MachineStatus.Paused;
+            case PauseState.Cancelling:
+                return MachineStatus.Cancelling;
         }
+
         if (jobProcessor.IsProcessing)
         {
             return jobProcessor.IsSimulating ? MachineStatus.Simulating : MachineStatus.Processing;
         }
 
-        // TODO Pausing, Resuming, Cancelling and ChangingTool are the transitions between the states
-        // above. Each needs the operation to be observable while it runs - the job processor reports
-        // paused or not paused rather than pausing, and a tool change is a macro like any other - so
-        // they are gaps in what can be observed rather than missing branches here
+        // TODO ChangingTool is the one remaining transition. A tool change is a macro like any other
+        // here, so nothing distinguishes it from the Busy below; it needs the tool subsystem to say
+        // that a change is in progress
 
         // Anything left is the machine working through codes that did not come from a job, which is
         // what a macro or a console command is

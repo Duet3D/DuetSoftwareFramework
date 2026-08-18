@@ -413,6 +413,81 @@ internal sealed class MovePlanner(
     }
 
     /// <summary>
+    /// Say in the object model where the restore points are
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware publishes the same points twice, and so does this: <c>state.restorePoints[]</c>
+    /// is what a client reads and <c>move.motionSystems[].restorePoints[]</c> is the same list per
+    /// motion system, which is where it will belong once there is more than one of them.
+    /// </para>
+    /// <para>
+    /// Called after a point changes rather than on a timer, because they change rarely - a pause, a
+    /// tool change, a G60 - and a projection that is rebuilt when nothing moved is patch traffic for
+    /// no reader. Both locks have to be held on entry, as for <see cref="PublishCommittedPosition"/>
+    /// </para>
+    /// </remarks>
+    public void PublishRestorePoints()
+    {
+        int numAxes = Parameters.SharedAxisCount(model.Move);
+
+        // state.restorePoints is deprecated in favour of the per-motion-system copy, and is written
+        // anyway because RepRapFirmware writes both and a client still reading the old one would
+        // otherwise see a machine that never saves a restore point. Deprecation is a message to
+        // clients about which to read, not a reason for the server to stop filling it
+#pragma warning disable CS0618
+        while (model.State.RestorePoints.Count < RestorePoint.NumVisible)
+        {
+            model.State.RestorePoints.Add(new DuetAPI.ObjectModel.RestorePoint());
+        }
+        if (model.Move.MotionSystems.Count == 0)
+        {
+            model.Move.MotionSystems.Add(new DuetAPI.ObjectModel.MotionSystem());
+        }
+        DuetAPI.ObjectModel.MotionSystem motionSystem = model.Move.MotionSystems[0];
+        while (motionSystem.RestorePoints.Count < RestorePoint.NumVisible)
+        {
+            motionSystem.RestorePoints.Add(new DuetAPI.ObjectModel.RestorePoint());
+        }
+
+        for (int i = 0; i < RestorePoint.NumVisible; i++)
+        {
+            Project(State.RestorePoints[i], model.State.RestorePoints[i], numAxes);
+            Project(State.RestorePoints[i], motionSystem.RestorePoints[i], numAxes);
+        }
+#pragma warning restore CS0618
+    }
+
+    /// <summary>
+    /// Copy one restore point into its object model counterpart
+    /// </summary>
+    /// <param name="from">Restore point held by the interpreter</param>
+    /// <param name="to">Object model copy</param>
+    /// <param name="numAxes">How many axes are visible</param>
+    /// <remarks>
+    /// The file position, the proportion done and the arc start coordinates are not copied: they say
+    /// how to resume the job rather than where the machine is, and RepRapFirmware does not publish
+    /// them either
+    /// </remarks>
+    private static void Project(RestorePoint from, DuetAPI.ObjectModel.RestorePoint to, int numAxes)
+    {
+        while (to.Coords.Count < numAxes)
+        {
+            to.Coords.Add(0.0f);
+        }
+        for (int axis = 0; axis < numAxes; axis++)
+        {
+            to.Coords[axis] = from.Coords[axis];
+        }
+
+        to.ExtruderPos = from.VirtualExtruderPosition;
+        to.FanPwm = from.FanSpeed;
+        to.FeedRate = from.FeedRate;
+        to.GCommandNumber = from.GCommandNumber;
+        to.ToolNumber = from.ToolNumber;
+    }
+
+    /// <summary>
     /// Tell the engine where the machine is, from the endpoints the builder holds
     /// </summary>
     /// <remarks>

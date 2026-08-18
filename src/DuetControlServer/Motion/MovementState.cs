@@ -84,6 +84,26 @@ internal sealed class MovementState
     public uint EndstopsTriggered { get; private set; }
 
     /// <summary>
+    /// The saved positions a pause, a tool change, a simulation or G60 can put the machine back to
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>ms.restorePoints</c>, numbered the same way: see
+    /// <see cref="RestorePoint.PauseNumber"/> and its siblings. The first
+    /// <see cref="RestorePoint.NumVisible"/> are published; the last two are working state
+    /// </remarks>
+    public RestorePoint[] RestorePoints { get; } = CreateRestorePoints();
+
+    /// <summary>
+    /// Last speed an M106 set on the current tool's fans, 0..1
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>ms.virtualFanSpeed</c>. It is not the speed of any particular fan: a tool
+    /// may map several, and what has to be saved in a restore point and written to
+    /// <c>config-override.g</c> is the one speed the operator asked for
+    /// </remarks>
+    public float VirtualFanSpeed { get; set; }
+
+    /// <summary>
     /// What the last <c>G1 H</c> move concluded, for M122
     /// </summary>
     /// <remarks>
@@ -111,6 +131,43 @@ internal sealed class MovementState
     public void RecordEndstopTriggered(uint axes) => EndstopsTriggered |= axes;
 
     /// <summary>
+    /// Save where the machine is to one of the restore points
+    /// </summary>
+    /// <param name="restorePointNumber">Which point to write</param>
+    /// <param name="numAxes">How many axes are visible</param>
+    /// <param name="feedRate">Feed rate of the channel that asked, in mm/s</param>
+    /// <param name="toolNumber">Tool that is active, or -1 if none</param>
+    /// <param name="filePosition">Position in the job file to resume from, if there is one</param>
+    /// <remarks>
+    /// RepRapFirmware's <c>MovementState::SavePosition</c>. The modal command number is deliberately
+    /// left unknown: every caller of this - a synchronous pause, a tool change, G60, the start of a
+    /// simulation - is a command that has already replaced the modal motion command, so a value saved
+    /// here would be the wrong one. The asynchronous pause path fills it in from the move it stopped
+    /// before instead
+    /// </remarks>
+    public void SavePosition(int restorePointNumber, int numAxes, float feedRate, int toolNumber, long? filePosition)
+    {
+        RestorePoint rp = RestorePoints[restorePointNumber];
+        for (int axis = 0; axis < Math.Min(numAxes, MotionLimits.MaxAxes); axis++)
+        {
+            rp.Coords[axis] = CurrentUserPosition[axis];
+        }
+
+        rp.FeedRate = feedRate;
+        rp.FilePosition = filePosition;
+        rp.GCommandNumber = -1;
+        rp.ToolNumber = toolNumber;
+        rp.FanSpeed = VirtualFanSpeed;
+
+        // TODO virtualExtruderPosition needs the extrusion totals RepRapFirmware keeps in
+        // ms.latestVirtualExtruderPosition, which ApplyExtrusion does not track yet - see
+        // MCODE_MIGRATION.md §15.2. It stays zero until it does
+        rp.VirtualExtruderPosition = 0.0f;
+        rp.ProportionDone = 0.0f;
+        rp.InitialUserC0 = rp.InitialUserC1 = 0.0f;
+    }
+
+    /// <summary>
     /// Forget everything, for when the machine position is no longer meaningful
     /// </summary>
     public void Reset()
@@ -118,5 +175,23 @@ internal sealed class MovementState
         Array.Clear(CurrentUserPosition);
         EndstopsTriggered = 0;
         SegmentsLeft = 0;
+        VirtualFanSpeed = 0.0f;
+        foreach (RestorePoint rp in RestorePoints)
+        {
+            rp.Reset();
+        }
+    }
+
+    /// <summary>
+    /// Build the restore point array
+    /// </summary>
+    private static RestorePoint[] CreateRestorePoints()
+    {
+        RestorePoint[] points = new RestorePoint[RestorePoint.NumTotal];
+        for (int i = 0; i < points.Length; i++)
+        {
+            points[i] = new RestorePoint();
+        }
+        return points;
     }
 }

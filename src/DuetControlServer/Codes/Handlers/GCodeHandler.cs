@@ -125,6 +125,11 @@ internal sealed partial class GCodeHandler(
                 rslt = await HandleProbeParametersAsync(code, cancellationToken);
                 break;
 
+            // Save the current position to a restore point
+            case 60:
+                rslt = await HandleSavePositionAsync(code, cancellationToken);
+                break;
+
             // Set position without moving
             case 92:
                 rslt = await HandleSetPositionAsync(code, cancellationToken);
@@ -140,6 +145,40 @@ internal sealed partial class GCodeHandler(
                 throw new NotSupportedException($"Unsupported code '{code}'");
         }
         return rslt;
+    }
+
+    /// <summary>
+    /// G60: save the current position to a restore point
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>GCodes::SavePosition</c>. S names the point and defaults to 0, so a G60
+    /// with no parameters writes the first of the general-purpose points rather than the pause point
+    /// </remarks>
+    private async ValueTask<Message> HandleSavePositionAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        int restorePointNumber = code.GetInt('S', 0);
+        if (restorePointNumber < 0 || restorePointNumber >= Motion.RestorePoint.NumVisible)
+        {
+            return new Message(MessageType.Error, $"S parameter must be between 0 and {Motion.RestorePoint.NumVisible - 1}");
+        }
+
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            InputChannel? input = model.Inputs[code.Channel];
+            float unitScale = input?.DistanceUnit == DistanceUnit.Inch ? MmPerInch : 1.0f;
+            float feedRateMmPerSec = (input?.FeedRate ?? 0.0f) * unitScale / SecondsPerMinute;
+
+            using (planner.Lock())
+            {
+                planner.State.SavePosition(restorePointNumber, planner.Parameters.SharedAxisCount(model.Move),
+                                           feedRateMmPerSec, model.State.CurrentTool, filePosition: null);
+                planner.PublishRestorePoints();
+            }
+        }
+        return new Message();
     }
 
     /// <summary>

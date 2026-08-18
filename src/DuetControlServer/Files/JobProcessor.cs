@@ -171,9 +171,37 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     public bool UpdateSimulatedTime { get; set; } = true;
 
     /// <summary>
-    /// Indicates if the file print has been paused
+    /// Where the job is between running and paused
     /// </summary>
-    public bool IsPaused { get; private set; }
+    /// <remarks>
+    /// RepRapFirmware's <c>pauseState</c>. Written only by the pause, resume and cancel paths, and by
+    /// the teardown that ends a job
+    /// </remarks>
+    public PauseState PauseState { get; private set; }
+
+    /// <summary>
+    /// Indicates if the file print is paused and can be resumed or cancelled
+    /// </summary>
+    /// <remarks>
+    /// Deliberately strict: a job that is still coming to a stop is not yet cancellable, which is
+    /// what RepRapFirmware's <c>pauseState == PauseState::paused</c> tests mean
+    /// </remarks>
+    public bool IsPaused => PauseState == PauseState.Paused;
+
+    /// <summary>
+    /// Indicates if the job is anywhere other than running normally
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>pauseState != PauseState::notPaused</c>, which is what refuses a second
+    /// pause and what tells a code that a job is still in the way
+    /// </remarks>
+    public bool IsPausedOrChanging => PauseState != PauseState.NotPaused;
+
+    /// <summary>
+    /// Indicates if a job is running and not pausing, paused or resuming
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>IsReallyPrinting()</c></remarks>
+    public bool IsReallyPrinting => IsProcessing && PauseState == PauseState.NotPaused;
 
     /// <summary>
     /// Indicates if the file print has been cancelled
@@ -285,6 +313,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
 
         // Update the state
         IsCancelled = IsAborted = false;
+        PauseState = PauseState.NotPaused;
         IsSimulating = simulating;
         _file = file;
         _pausePosition = _pausePosition2 = null;
@@ -370,10 +399,11 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
             // Fill up the code buffer
             while (codePool.TryDequeue(out Code? sharedCode))
             {
-                // Stop reading codes if the print has been paused or aborted
+                // Stop reading codes if the print has been paused or aborted. The comparison relies
+                // on PauseState's order: anything past NotPaused means the job is not to run on
                 using (await LockAsync())
                 {
-                    if (IsPaused || IsAborted)
+                    if (PauseState >= PauseState.Pausing || IsAborted)
                     {
                         cancellationToken = _cancellationTokenSource.Token;
                         codePool.Enqueue(sharedCode);
@@ -482,7 +512,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
 
                 using (await LockAsync())
                 {
-                    if (IsPaused)
+                    if (PauseState >= PauseState.Pausing)
                     {
                         // Adjust the file position for this motion system. Each MS may have advanced its file
                         // independently between sync points, so rewind to the firmware-reported pause offset
@@ -637,7 +667,8 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                     _file = _file2 = null;
 
                     // End
-                    IsProcessing = IsSimulating = IsPaused = false;
+                    IsProcessing = IsSimulating = false;
+                    PauseState = PauseState.NotPaused;
                 }
             } while (!stoppingToken.IsCancellationRequested);
         }
@@ -661,7 +692,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
             _cancellationTokenSource.Dispose();
             _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.ApplicationStopping);
 
-            IsPaused = true;
+            PauseState = PauseState.Paused;
             _pausePosition = filePosition;
             _pausePosition2 = filePosition2;
             _pauseReason = pauseReason;
@@ -675,7 +706,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     {
         if (IsFileSelected && !IsProcessing)
         {
-            IsPaused = false;
+            PauseState = PauseState.NotPaused;
             _resume.NotifyAll();
         }
     }
@@ -695,7 +726,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
             _file2?.Close();
 
             IsCancelled = IsPaused;
-            IsPaused = false;
+            PauseState = PauseState.NotPaused;
             _resume.NotifyAll();
         }
     }
@@ -716,7 +747,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
             _file2?.Close();
 
             IsAborted = true;
-            IsPaused = false;
+            PauseState = PauseState.NotPaused;
             _resume.NotifyAll();
         }
     }
@@ -742,9 +773,9 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                 {
                     builder.Append(", simulating");
                 }
-                if (IsPaused)
+                if (PauseState != PauseState.NotPaused)
                 {
-                    builder.Append(", paused");
+                    builder.Append($", {char.ToLowerInvariant(PauseState.ToString()[0])}{PauseState.ToString()[1..]}");
                 }
                 if (IsCancelled)
                 {

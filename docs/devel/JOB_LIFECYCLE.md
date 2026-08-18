@@ -607,13 +607,23 @@ finish.
 - [x] `InvalidateCodesAsync` / `InvalidateAsync` went with them: the print lock was the only thing
       async about either, so they had become duplicates of the synchronous pair
 
-### Phase 1 — the state and the restore point ⬜
+### Phase 1 — the state and the restore point ✅
 
-- [ ] `PauseState` on `JobProcessor`, in RRF's order
-- [ ] `MachineStatusService` gains Pausing, Resuming and Cancelling, and its `// TODO` goes
-- [ ] `RestorePoint[]` on `MovementState`, `SavePosition`, and the projection into
+- [x] `PauseState` on `JobProcessor`, in RRF's order
+- [x] `MachineStatusService` gains Pausing, Resuming and Cancelling, and its `// TODO` goes
+- [x] `RestorePoint[]` on `MovementState`, `SavePosition`, and the projection into
       `state.restorePoints[]` and `move.motionSystems[].restorePoints[]`
-- [ ] G60
+- [x] G60
+- [x] `MovementState.VirtualFanSpeed`, which the restore point's fan speed comes from and which
+      nothing tracked
+
+The three transitional states are produced by phase 2; phase 1 is what makes them representable and
+observable. `Motion.RestorePoint` is a separate class from `DuetAPI.ObjectModel.RestorePoint` because
+RepRapFirmware's object model table publishes six of its eleven members and the other five - the file
+position, the proportion done and the arc start coordinates - are how to resume rather than where the
+machine is. C++ selects members with a table; here the model class *is* the wire format, so the split
+is between two classes rather than between a class and its table. It is qualified as
+`Motion.RestorePoint` in the two files that see both, which is what `Model.ObjectModel` already does.
 
 ### Phase 2 — pause and resume, without skipping queued moves ⬜
 
