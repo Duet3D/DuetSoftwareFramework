@@ -806,7 +806,8 @@ Each phase is independently useful and independently testable.
 
 ### Phase E — the blocked default actions ⬜
 
-Gated on MCODE_MIGRATION's `M291`/`M292` and `M25`:
+Gated on MCODE_MIGRATION's `M291`/`M292` and on `M25`, which [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md)
+plans as its phase 2:
 
 - [ ] Message box for pausing events, titled `Printing paused` / `Event notification`
 - [ ] `HeaterFault` / `FilamentError` pause via `pause.g`; `DriverError` pause without it

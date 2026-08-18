@@ -248,7 +248,7 @@ three columns sum to the row count, which is the arithmetic that catches a misco
 | **Tool subsystem: nearly done** | Firmware retraction, M701-M703 | [ToolManager](src/DuetControlServer/Tools/ToolManager.cs) holds definition, selection, offsets, axis mapping, mixing and — through M568 and the Heat subsystem — the active and standby temperatures. What is left is firmware retraction (M207, `G10` without P, `G11`), which is a synthesised move rather than a message, and the filament codes |
 | **Spindle subsystem: done** | Laser | [SpindleManager](src/DuetControlServer/Spindles/SpindleManager.cs) builds a spindle out of three general-purpose outputs, which is what RepRapFirmware's three `IoPort`s are - CANlib has no spindle message at all, only a `MaxSpindles` constant. The GPIO layer it needed is [GpioManager](src/DuetControlServer/Ports/GpioManager.cs). `state.machineMode` exists now, so what is left is the laser itself: M452's port and power parameters, `M3` in laser mode, and a power field on the move |
 | **Endstops and probes: done** | M585, M672, M558.1/.2 | The input-monitor CAN messages (`CanMessageCreateInputMonitorV1`, `CanMessageChangeInputMonitorV1`, `CanMessageInputChangedV2`) are wired to `sensors.endstops[]` / `sensors.probes[]`, and §10 covers the whole path. What is left needs `G30 P` — see §10's "What is left in phase 5" |
-| **No job lifecycle hooks** | M25, M226/M600/M601, `start.g`, `stop.g`, `cancel.g`, `pause.g`, `resume.g` | Macros run (§9), so what is missing is the pause/resume state itself: restore points, the file position to resume from, and the calls that run those macros. §11.4's phase F item 29 is the same gap seen from the move path |
+| **No job lifecycle hooks** | M25, M226/M600/M601, `start.g`, `stop.g`, `cancel.g`, `pause.g`, `resume.g` | Macros run (§9), so what is missing is the pause/resume state itself: restore points, the file position to resume from, and the calls that run those macros. §11.4's phase F item 29 is the same gap seen from the move path. Planned in [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) |
 
 Motion (§5.1-§5.4) is essentially complete and heat, fans, tools, spindles and probing have landed
 since this table was first written. What gates the remaining rows is now mostly the job lifecycle and
@@ -597,6 +597,8 @@ the order to do them in; the "Phase N" names are the original labels, which §8'
 9. **The job lifecycle.** M25, M226/M600/M601, restore points, and the macros that hang off them —
    `start.g`, `stop.g`, `cancel.g`, `pause.g`, `resume.g`. This is the same gap as §11.4's phase F
    item 29 and the ⬜ half of §9's table, and it is what M0/M1/M2, M24 and M37 are each missing.
+   Planned in [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md), which also records two dead SPI `await`s that
+   block selecting and finishing a job today.
 10. **Phase 6 — queue and multi-system.** M595, M596, M597, M598, M599. M596 is what
     `RawMove.OwnedDrives` waits for (§15.2).
 11. **The laser.** M452's parameters, `M3` in laser mode, a power field on the move and on the wire,
@@ -2171,7 +2173,7 @@ steps 1-6. What is gone is gone by build switch or by deletion, not by divergenc
 | `SUPPORT_LASER 0`, `SUPPORT_IOBITS 0` | `:49-50` | Follows §11.4 items 27 and 32 |
 | `SUPPORT_NONLINEAR_EXTRUSION 0` | `:55` | M592 |
 | `DDARing::PushBabyStepping` | `DDARing.cpp:462` | A babystep change takes effect on the next move built rather than being pushed into moves already queued — [ApplyAxisTransform](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L1022) says so |
-| `DDARing::PauseMoves`, `LowPowerOrStallPause` | `:592`, `:687` | No pausing part-way through a queued move; follows restore points (§11.4 item 29) |
+| `DDARing::PauseMoves`, `LowPowerOrStallPause` | `:592`, `:687` | No pausing part-way through a queued move; follows restore points (§11.4 item 29). [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) phase 4 ports `PauseMoves` back |
 | `DDARing::AddSpecialMove` | `:194` | Bed levelling / leadscrew adjustment moves (M671) |
 
 ---
