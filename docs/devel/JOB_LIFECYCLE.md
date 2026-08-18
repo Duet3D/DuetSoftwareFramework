@@ -16,10 +16,8 @@ M24 at :1160, M226/M600/M601 at :1249, M25 at :1281.
 The contract in MCODE_MIGRATION §1 applies unchanged: port the behaviour, keep the CAN branch and
 drop the local-hardware one, and leave a `// TODO` naming the missing piece rather than inventing a
 stand-in. **One deviation is approved**, and §1.8 is why it is written down at this length rather
-than decided while typing: a new code, `M25.1`, pauses by planning a controlled deceleration instead
-of searching for a stopping point that already exists. `M25` keeps RepRapFirmware's behaviour
-unchanged, so the deviation is an addition rather than a substitution. That is §3.5, and it is what
-phase 4 builds.
+than decided while typing: an asynchronous pause plans a controlled deceleration instead of searching
+for a stopping point that already exists. That is §3.5, and it is what phase 4 builds.
 
 ---
 
@@ -82,8 +80,7 @@ There is no M25, no M226, no M600 and no M601 in `MCodeHandler`'s switch, and no
 | Entry point | RRF | Notes |
 |---|---|---|
 | M25 from a file | `DoSynchronousPause(user, pausing1)` | GCodes2.cpp:1294 |
-| M25 from elsewhere | `DoAsynchronousPause(user, pausing1)` | GCodes2.cpp:1312 |
-| `M25.1` from elsewhere | — no RRF equivalent | The feedhold, §3.5. Phase 4 |
+| M25 from elsewhere | `DoAsynchronousPause(user, pausing1)` | GCodes2.cpp:1312. Stops by feedhold — §3.5 |
 | M25 while a non-restartable macro runs | deferred — §2.8 | GCodes2.cpp:1298 |
 | M226 | `DoSynchronousPause(gcode, pausing1)`; `M226 P0` → `pausing2`, skipping `pause.g` | GCodes2.cpp:1269 |
 | M600 | `DoSynchronousPause(filamentChange, filamentChangePause1)` — runs `filament-change.g`, falling back to `pause.g` | GCodes4.cpp:571 |
@@ -338,22 +335,21 @@ is explicit about why: "so that any M82/M83 codes will be executed in the correc
 
 ---
 
-### 3.5 `M25.1`, a feedhold that plans its own stop — *approved deviation*
+### 3.5 The feedhold: an asynchronous pause plans its own stop — *approved deviation*
 
 This is the one place the port deliberately does something RepRapFirmware does not, so it is set out
-in full: what RRF does, why it is not enough, what is added alongside it, and what that costs.
+in full: what RRF does, why it is not enough, what replaces it, and what that costs.
 
-For the operator it is an **addition, not a substitution**: `M25` stays a faithful port and keeps
-RRF's behaviour including its overshoot, and `M25.1` is a new code with no RepRapFirmware equivalent.
-Nothing anyone types behaves differently, which is what makes the deviation cheap — the failure mode
-§1.8 warns about, where a divergence hides until the missing piece lands, cannot happen to a code RRF
-does not have.
+It is a **substitution, not an addition**. Every asynchronous pause stops this way — `M25` from a
+console or an interface, and the default action of the three events that pause. The machine comes to
+rest in a different place from RepRapFirmware's, and sooner. That is a difference an operator can
+see, so it is the entry in
+[rrf-differences.md](../../src/Documentation/articles/rrf-differences.md) §8 as well as being written
+up here.
 
-For the **pauses nobody typed** it is a substitution, and that is deliberate but narrow: where
-RepRapFirmware pauses for an event, that pause becomes a feedhold. Which events pause and which of
-them run `pause.g` is untouched — RepRapFirmware still decides that, and an event it does not pause
-for still does not pause. §3.5.1 is the rule and its table, and it is the one part of this deviation
-that changes behaviour a machine already relies on.
+What is *not* substituted is the synchronous pause. `M25` from inside the job file, and `M226`,
+`M600` and `M601`, which may only appear there, all wait for standstill exactly as RepRapFirmware
+does — see the end of this section for why there is nothing else they could do.
 
 #### What RepRapFirmware does
 
@@ -383,7 +379,7 @@ cancelling the step interrupt mid-move. That is a correct response to a power fa
 one to a user pressing pause, so a normal pause gets the conservative search and lives with the
 overshoot.
 
-#### What `M25.1` does
+#### What the feedhold does instead
 
 There is a third option RRF does not take: rather than looking for a junction that is already slow
 enough, **make one**. Force the end speed at the chosen point to zero and let the existing profile
@@ -494,52 +490,40 @@ The one thing resume gains is that its restore-point coordinates now describe a 
 passes through mid-decel rather than a move endpoint — under variant (a), still a real endpoint, so
 nothing changes at all.
 
-#### The code, and what it shares with `M25`
+#### What the stop shares with a pause that drains
 
-`M25.1` dispatches from the same `25 =>` arm of `MCodeHandler.ProcessAsync` — `MajorNumber` is 25
-either way — and branches on `MinorNumber`, which is `-1` when no fraction was given. The house
-pattern for this is `HandleAccelerationsAsync`
-([MCodeHandler.Motion.cs:175](../../src/DuetControlServer/Codes/Handlers/MCodeHandler.Motion.cs)):
-refuse anything above the highest fraction handled, then treat the rest as a flag.
-
-```
-if (code.MinorNumber > 1) return new Message(MessageType.Error, $"M25.{code.MinorNumber} is not supported");
-bool feedhold = code.MinorNumber == 1;
-```
-
-Refusing the unknown fractions explicitly matters here: the default arm of the switch falls back to a
-macro named after the code (MCODE_MIGRATION §9), so an unhandled `M25.2` would silently look for
-`sys/M25.2.g` rather than saying it is not a code.
-
-Everything past the stop is shared with `M25`:
+Only the stopping is different. Everything past it is the pause that was already there:
 
 - **`pause.g` runs**, unchanged. A feedhold stops sooner but is otherwise the same event — the machine
   is paused, at a restore point, waiting to resume — so it takes the same macro, the same restore
   point and the same resume path. A macro that had to ask *how* the machine stopped would be asking
   about something already finished by the time it runs.
-- **The pause reason stays `PrintPausedReason.User`.** `M25.1` is the same person pressing the same
-  button and wanting it to take effect sooner, so it is not a new reason. The reason set describes
-  *why* the job paused and the feedhold is a fact about *how*; conflating them would put a transport
-  detail into an enum that `pause.g`, the object model and the event system all read.
+- **The pause reason is unchanged.** `M25` is still `PrintPausedReason.User` and an event still
+  carries its own. The reason set describes *why* the job paused and the feedhold is a fact about
+  *how*; conflating them would put a transport detail into an enum that `pause.g`, the object model
+  and the event system all read.
+- **Resuming is unchanged**, because it never depended on how the machine stopped — see "Resuming
+  needs no replan" above.
 
-**`M25.1` is asynchronous only.** A synchronous pause — `M25` from inside the job file, `M226`, `M600`
-— waits for standstill by definition (`LockCurrentMovementSystemAndWaitForStandstill`), so the queue
-has already drained and there is nothing for a feedhold to purge. From a file channel `M25.1`
-therefore behaves exactly as `M25`, rather than being refused: the fraction asks for the stop to be
-as early as possible, and for a synchronous pause the earliest possible stop is the one `M25` already
-makes.
+**The stop is asynchronous only, and that is not a policy but an observation.** A synchronous pause —
+`M25` from inside the job file, `M226`, `M600`, `M601` — waits for standstill by definition
+(`LockCurrentMovementSystemAndWaitForStandstill`), because the job file has itself reached the pause
+point and everything queued ahead of it is what has to run. There is nothing left to purge, so there
+is nothing for a feedhold to do. `PauseAsync` therefore skips the stop entirely when `synchronous` is
+set rather than asking for one that would find nothing.
 
 #### 3.5.1 Which pauses are feedholds
 
-The rule is deliberately narrow: **where RepRapFirmware would pause for an event, that pause becomes
-a feedhold.** Nothing else about the event system moves. Which events pause, and which of them run
-`pause.g`, stays exactly as RepRapFirmware decides it — the deviation changes *how the machine comes
-to a stop*, not *what stops it*.
+Every asynchronous pause is a feedhold. What the rule still has to be narrow about is the event
+system: **where RepRapFirmware would pause for an event, that pause becomes a feedhold** — and
+nothing else about events moves. Which events pause, and which of them run `pause.g`, stays exactly
+as RepRapFirmware decides it. The deviation changes *how the machine comes to a stop*, not *what
+stops it*.
 
 | Pause | Path | Why |
 |---|---|---|
-| `M25`, `M226`, `M600`, `M601` | Faithful | The operator asked for RepRapFirmware's pause and gets it |
-| `M25.1` | Feedhold | The operator asked for the rapid one |
+| `M25` from a console or an interface | **Feedhold** | Nothing is queued ahead of it that has to run |
+| `M25` from the job file, `M226`, `M600`, `M601` | Faithful | Synchronous: the queue ahead of the pause point is what has to run, so there is nothing to purge |
 | `heater_fault`, `filament_error` default action | **Feedhold** | RRF pauses here, so this pause is a feedhold |
 | `driver_error` default action | **Feedhold**, without `pause.g` | RRF pauses here too, and already skips the macro |
 | Trigger 1 firing (M581) | **Feedhold** | RRF pauses here as well — see the note below |
@@ -577,12 +561,12 @@ Three things this does **not** change, each easy to assume otherwise:
   here. They stay out of scope (§5). The feedhold sits between them and the faithful pause: sooner
   than RRF's, still under full control of the motion planner.
 
-`M25` itself is a faithful port and therefore still *tries* to stop early: RepRapFirmware's
-`PauseMoves` skips to the first junction the toolpath is already slow enough to stop at, and only
-drains the ring when there is no such junction. Both are ported — `DDARing::PauseMoves` alongside
-`DDARing::Feedhold`, differing only in how they choose the stopping point and sharing the purge. What
-`M25.1` adds is making a stopping point when the search would not have found one, which during a fast
-print is nearly always.
+`DDARing::PauseMoves` — RepRapFirmware's search — is ported and tested alongside
+`DDARing::Feedhold`, and the two differ only in how they choose the stopping point and share the
+purge. **Nothing in DuetControlServer asks for it any more**, now that every asynchronous pause
+feedholds. It is kept rather than deleted because it is the reference behaviour this deviation is
+measured against and because the power-fail work (§5) will want a stop that changes no profile, but
+it is unreachable code and should be recorded as such rather than assumed live.
 
 The consequence for the plan is that **phase 6 depends on phase 4**, where before it only depended on
 phase 2. Landing the event pauses first would ship them on the faithful path and then change their
@@ -702,14 +686,14 @@ when the head is at or below the pause height, and only splits the move - travel
       seqlock-published result, because freeing a move frees its segments and only the motion thread
       may do that, so the answer cannot come back from the call that asks
 - [x] `MovePlanner.FeedholdAsync`, resyncing from the engine and dropping `SegmentsLeft`
-- [x] `M25.1` — the same `25 =>` arm branching on `MinorNumber`, refusing `M25.2` and above; from a
-      file channel it behaves as `M25` (§3.5)
+- [x] `M25` from a console or an interface stops by feedhold; from the job file it is synchronous and
+      unchanged (§3.5)
 - [x] The pause sequence takes the feedhold as a flag **independent of** the run-`pause.g` flag
       (§3.5.1), and falls back to phase 2's drain-the-ring behaviour when nothing could be purged
 - [x] The feedhold supplies the resume position, which is the one case where the last completed code
       is *not* the pause point
-- [x] `DDARing::PauseMoves` ported too, so `M25` keeps RepRapFirmware's early stop rather than always
-      draining the ring — the feedhold supersedes it only for `M25.1`
+- [x] `DDARing::PauseMoves` ported and tested as the reference behaviour, though nothing in
+      DuetControlServer now asks for it — see §3.5
 - [x] MCODE_MIGRATION §11.6's row for `PauseMoves` records that it is ported
 - [x] `rrf-differences.md` §8, now that there is shipped behaviour to describe
 - [x] Native tests for both stops — the boundary search, the committed-move floor, the indivisible-run
@@ -718,6 +702,13 @@ when the head is at or below the pause height, and only splits the move - travel
       or below jerk", so it could only stop where RepRapFirmware could. `restartableBoundary` is now a
       flag of its own, kept as DuetControlServer sent it
 - [ ] Only ring 0 is stopped; a `// TODO` in `DrainFeedholds` names M596
+- [ ] **`M25` with a fraction is silently accepted as `M25`.** RepRapFirmware guards this centrally
+      ([GCodes2.cpp:737](../../lib/RepRapFirmware/src/GCodes/GCodes2.cpp)): an M-code carrying a
+      fraction that is not in its allow-list goes to `TryMacroFile`, and M25 is not in that list — so
+      `M25.1` there looks for `sys/M25.1.g` and otherwise reports the code unsupported. Here it now
+      reaches `HandlePausePrintAsync` and pauses. The fix is one line, throwing
+      `NotSupportedException` when `MinorNumber >= 0` so the code reaches the same fallback, but
+      whether `M25.1` should error or stay an alias is a decision rather than an oversight
 
 ### Phase 5 — pausable macros and the deferred pause 🟡
 
@@ -804,11 +795,13 @@ off, which is what `PrintMonitor::Spin` does and why it has the flags it has.
    `MovementState`; §3.1.
 3. **Feedhold variant (a)** — stop at the first DDA boundary with enough deceleration distance, no
    truncation. (b) stays available later and needs `moveFractionToSkip` first; §3.5.
-4. **The feedhold runs `pause.g`** and records `PrintPausedReason.User` when `M25.1` asks for it,
-   exactly as `M25` does. The feedhold and the run-`pause.g` flag are independent, which is what lets
-   `driver_error` have one without the other; §3.5, §3.5.1.
-5. **The feedhold is `M25.1`.** `M25` stays a faithful port, so for anything anyone types the
-   deviation is an added code rather than changed behaviour; §3.5.
+4. **The feedhold runs `pause.g`** and keeps the pause reason it would have had. The feedhold and the
+   run-`pause.g` flag are independent, which is what lets `driver_error` have one without the other;
+   §3.5, §3.5.1.
+5. **Every asynchronous pause feedholds**, `M25` included. It was briefly a separate code, `M25.1`,
+   with `M25` kept faithful; that was withdrawn, so the deviation is a change to `M25` rather than an
+   addition beside it and an operator sees the machine stop in a different place. A synchronous pause
+   is untouched, because there is nothing queued past its stopping point to purge; §3.5.
 6. **Where RepRapFirmware pauses for an event, that pause is a feedhold** — the default action of a
    heater fault, filament error or driver error, and by extension trigger 1. Which events pause and
    which run `pause.g` is unchanged; only the manner of stopping differs. Those are the deviation's

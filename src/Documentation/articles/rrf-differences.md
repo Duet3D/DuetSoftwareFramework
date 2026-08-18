@@ -373,7 +373,7 @@ does — `DDA::InitFromParams` onward is upstream verbatim. Three things it deli
 
 ---
 
-## 8. `M25.1` stops the machine sooner than `M25` can
+## 8. A pause stops the machine sooner than RepRapFirmware's does
 
 RepRapFirmware's pause does not *create* a stopping point — it looks for one that already exists.
 `DDARing::PauseMoves` walks the queued moves for the first junction whose end speed is at or below
@@ -381,17 +381,19 @@ the instantaneous speed change of every drive, drops everything after it, and ch
 profile. When there is no such junction it reports as much and the whole queue runs.
 
 During a print at speed there usually is no such junction, because look-ahead has spent the print
-raising every junction speed above jerk — that is what look-ahead is for. So a pause typically lets
-the head travel to the end of everything already planned before it stops.
+raising every junction speed above jerk — that is what look-ahead is for. So a RepRapFirmware pause
+typically lets the head travel to the end of everything already planned before it stops.
 
-`M25.1` is an added code with no RepRapFirmware equivalent. It makes a stopping point: the motion
-engine takes the earliest boundary far enough away to decelerate to rest by, forces the end speed
-there to zero, re-plans backwards to the last move it has already committed, and drops the rest.
-Moves are committed 50 ms ahead, so what it cannot recall is bounded by that plus one deceleration
-ramp.
+**`M25` here plans its own stop instead.** The motion engine takes the earliest boundary far enough
+away to decelerate to rest by, forces the end speed there to zero, re-plans backwards to the last
+move it has already committed, and drops the rest. Moves are committed 50 ms ahead, so what a pause
+cannot recall is bounded by that plus one deceleration ramp — rather than by however long the rest of
+the queue takes.
 
-**`M25` is unchanged.** It still asks for RepRapFirmware's search and still drains the queue when the
-search finds nothing, so nothing anyone already types behaves differently.
+This is a real behavioural difference and not a refinement of the same behaviour: the machine comes
+to rest in a different place, and sooner. Everything after the stop is unchanged — the same
+`pause.g`, the same restore point, the same `PrintPausedReason`, and resuming rewinds the job file
+and re-reads it exactly as before.
 
 Three things the deviation deliberately leaves alone:
 
@@ -399,15 +401,20 @@ Three things the deviation deliberately leaves alone:
   The stop begins at the first move after them, and the speed that move starts at is fixed by them.
 - **A boundary has to be restartable, not merely reachable.** An arc segment, a retraction and an
   endstop move are not places a print can resume from, however much room there is to stop in — so
-  neither kind of stop chooses one.
+  the stop never chooses one.
 - **It is not the emergency path.** RepRapFirmware's `LowPowerOrStallPause` cancels stepping
   mid-move and accepts the position loss, which is right for a power failure and wrong here. The
-  feedhold stays under the motion planner throughout.
+  stop stays under the motion planner throughout.
 
-A pause the operator did not type takes the feedhold rather than the search: the default action of a
-heater fault, a filament error or a driver error. *Which* events pause is unchanged — that is still
-`Event::GetDefaultPauseReason`'s decision, and an event RepRapFirmware does not pause for still does
-not pause here. Only the manner of stopping differs.
+A **synchronous** pause — `M25` from inside the job file, and `M226`, `M600` and `M601`, which may
+only appear there — is unaffected. The job file has already reached the pause point, so everything
+queued ahead of it is what has to run and there is nothing to stop early; those wait for standstill
+exactly as RepRapFirmware does.
+
+The pauses nobody typed take the same stop: the default action of a heater fault, a filament error or
+a driver error. *Which* events pause is unchanged — that is still `Event::GetDefaultPauseReason`'s
+decision, and an event RepRapFirmware does not pause for still does not pause here. Only the manner
+of stopping differs.
 
 ---
 

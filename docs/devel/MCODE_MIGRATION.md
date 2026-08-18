@@ -248,7 +248,7 @@ three columns sum to the row count, which is the arithmetic that catches a misco
 | **Tool subsystem: nearly done** | Firmware retraction, M701-M703 | [ToolManager](src/DuetControlServer/Tools/ToolManager.cs) holds definition, selection, offsets, axis mapping, mixing and — through M568 and the Heat subsystem — the active and standby temperatures. What is left is firmware retraction (M207, `G10` without P, `G11`), which is a synthesised move rather than a message, and the filament codes |
 | **Spindle subsystem: done** | Laser | [SpindleManager](src/DuetControlServer/Spindles/SpindleManager.cs) builds a spindle out of three general-purpose outputs, which is what RepRapFirmware's three `IoPort`s are - CANlib has no spindle message at all, only a `MaxSpindles` constant. The GPIO layer it needed is [GpioManager](src/DuetControlServer/Ports/GpioManager.cs). `state.machineMode` exists now, so what is left is the laser itself: M452's port and power parameters, `M3` in laser mode, and a power field on the move |
 | **Endstops and probes: done** | M585, M672, M558.1/.2 | The input-monitor CAN messages (`CanMessageCreateInputMonitorV1`, `CanMessageChangeInputMonitorV1`, `CanMessageInputChangedV2`) are wired to `sensors.endstops[]` / `sensors.probes[]`, and §10 covers the whole path. What is left needs `G30 P` — see §10's "What is left in phase 5" |
-| **No job lifecycle hooks** | M25, M226/M600/M601, `start.g`, `stop.g`, `cancel.g`, `pause.g`, `resume.g` | Macros run (§9), so what is missing is the pause/resume state itself: restore points, the file position to resume from, and the calls that run those macros. §11.4's phase F item 29 is the same gap seen from the move path. Planned in [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) |
+| ~~**No job lifecycle hooks**~~ | — | **Resolved.** The pause/resume state, the restore points and the lifecycle macros all landed — see [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md), which records what is left per phase |
 
 Motion (§5.1-§5.4) is essentially complete and heat, fans, tools, spindles and probing have landed
 since this table was first written. What gates the remaining rows is now mostly the job lifecycle and
@@ -439,26 +439,26 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 
 | M-code | RRF | Purpose | Status |
 |---|---|---|---|
-| M0 / M1 / M2 | 755 | Stop / sleep / program end | 🟡 cancels the job; heaters, spindles and motors are not stopped and `stop.g` is not run |
+| M0 / M1 / M2 | 755 | Stop / sleep / program end | ✅ runs `cancel.g` / `stop.g`, or switches the heaters off if there is neither |
 | M20 | 990 | List files | ✅ |
 | M21 | 1068 | Initialise SD card | ✅ P0 succeeds because the volume is always mounted |
 | M22 | 1079 | Release SD card | ⬜ throws `NotSupportedException`, so it answers "Command is not supported" |
 | M23 / M32 | 1092 | Select file / select and start | ✅ |
-| M24 | 1160 | Start or resume print | 🟡 resumes the job; `resume.g` is not run |
-| M25 | 1281 | Pause print | ⬜ |
+| M24 | 1160 | Start or resume print | ✅ starts or resumes, runs `start.g` / `resume.g` and moves the head back |
+| M25 | 1281 | Pause print | ✅ deliberately stops sooner than RepRapFirmware — [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) §3.5 |
 | M26 | 1319 | Set SD position | ✅ |
 | M27 | 1339 | Report print status | ✅ |
 | M28 | 1356 | Begin write to file | ✅ |
 | M29 | 1373 | End write to file | ✅ |
 | M30 | 1377 | Delete file | ✅ |
 | M36 | 1397 | File information and thumbnails | ✅ |
-| M37 | 1451 | Simulation mode | 🟡 selects the file to simulate; nothing starts the simulation |
+| M37 | 1451 | Simulation mode | ✅ selects the file and starts it, saving the simulation restore point |
 | M38 | 1487 | File CRC32 | ✅ |
 | M39 | 1517 | SD card info | ✅ |
-| M73 | 1584 | Slicer print-time hints | ⬜ |
+| M73 | 1584 | Slicer print-time hints | ✅ feeds `job.timesLeft.slicer` |
 | M98 | 1701 | Call macro | ✅ |
 | M99 | 1729 | Return from macro | ⛔ handled by the meta parser |
-| M226 / M600 / M601 | 1249 | Synchronous pause / filament change | ⬜ |
+| M226 / M600 / M601 | 1249 | Synchronous pause / filament change | ✅ |
 | M470 | 3308 | mkdir | ✅ |
 | M471 | 3325 | Rename file or directory | ✅ |
 | M472 | 3346 | Delete file or directory | ✅ |
@@ -2173,7 +2173,7 @@ steps 1-6. What is gone is gone by build switch or by deletion, not by divergenc
 | `SUPPORT_LASER 0`, `SUPPORT_IOBITS 0` | `:49-50` | Follows §11.4 items 27 and 32 |
 | `SUPPORT_NONLINEAR_EXTRUSION 0` | `:55` | M592 |
 | `DDARing::PushBabyStepping` | `DDARing.cpp:462` | A babystep change takes effect on the next move built rather than being pushed into moves already queued — [ApplyAxisTransform](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L1022) says so |
-| `LowPowerOrStallPause` | `:687` | The emergency stop that cancels stepping mid-move; follows the power-fail work, which is out of scope. `DDARing::PauseMoves` is no longer dropped — [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) phase 4 ported it, alongside the feedhold `M25.1` uses |
+| `LowPowerOrStallPause` | `:687` | The emergency stop that cancels stepping mid-move; follows the power-fail work, which is out of scope. `DDARing::PauseMoves` is no longer dropped — [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) phase 4 ported it, alongside the feedhold that has replaced it for every asynchronous pause |
 | `DDARing::AddSpecialMove` | `:194` | Bed levelling / leadscrew adjustment moves (M671) |
 
 ---

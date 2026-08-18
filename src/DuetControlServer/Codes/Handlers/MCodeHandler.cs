@@ -1,4 +1,4 @@
-using DuetAPI;
+﻿using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
@@ -9,7 +9,6 @@ using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Files.Parser;
 using DuetControlServer.Link;
 using DuetControlServer.Link.Protocol.CanMessages;
-using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Model;
 using DuetControlServer.Motion;
 using DuetControlServer.Utility;
@@ -614,15 +613,9 @@ internal partial class MCodeHandler(
     /// </remarks>
     private async ValueTask<Message> HandlePausePrintAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (code.MinorNumber > 1)
-        {
-            return new Message(MessageType.Error, $"M25.{code.MinorNumber} is not supported");
-        }
-
-        // M25.1 asks for the rapid pause: rather than letting the queued moves run, the engine plans
-        // a deceleration at the first move it has not committed and drops the rest. Everything past
-        // the stop is shared with M25 - the same pause.g, the same restore point, the same reason
-        bool feedhold = code.MinorNumber == 1;
+        // Rather than letting the queued moves run, the engine plans a deceleration at the first move it has not
+        // committed and drops the rest.
+        bool feedhold = true;
 
         if (await codeProcessor.FlushAsync(code, syncFileStreams: true, cancellationToken: cancellationToken))
         {

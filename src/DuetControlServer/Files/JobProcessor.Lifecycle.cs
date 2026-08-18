@@ -98,11 +98,11 @@ internal partial class JobProcessor
             // everything below is about what the machine does once it has stopped, and there is no
             // point recording where that is until it has.
             //
-            // M25 asks the engine to skip to a junction the toolpath is already slow enough to stop
-            // at, which is what RepRapFirmware does and which during a fast print usually finds
-            // nothing - the queue then drains, as it does there. M25.1 asks it to plan a stop
-            // instead. A synchronous pause does neither: the job file has reached the pause point,
-            // so everything queued ahead of it is what has to run
+            // The engine plans a deceleration at the first move it has not committed and drops the
+            // rest, rather than looking for a junction the toolpath is already slow enough to stop
+            // at as RepRapFirmware does - during a fast print that search finds nothing and the whole
+            // queue runs. A synchronous pause does neither: the job file has reached the pause point,
+            // so everything queued ahead of it is what has to run and there is nothing to purge
             MovePlanner.FeedholdOutcome held = default;
             if (!synchronous)
             {

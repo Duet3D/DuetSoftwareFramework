@@ -536,6 +536,11 @@ namespace
 	// have to get right is the boundary between what may be dropped and what may not - a move whose
 	// segments have gone to the boards cannot be recalled - and that the moves left behind still add
 	// up to a motion that comes to rest.
+	//
+	// DuetControlServer asks only for the feedhold now: every asynchronous pause stops that way. The
+	// tests keep PauseMoves because it is the reference behaviour the deviation is measured against,
+	// and the pair of them is what shows the difference is real - a run these tests can stop by
+	// planning a deceleration is one the search declines to stop in at all.
 
 	// A run of colinear moves along X, each starting where the last ended - which is what makes
 	// lookahead raise the junction speeds between them, and so what makes the run one that

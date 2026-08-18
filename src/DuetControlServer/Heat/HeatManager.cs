@@ -420,9 +420,32 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
     /// <returns>True if nothing has claimed it as a bed or chamber heater</returns>
     /// <remarks>
     /// RepRapFirmware's <c>HeaterFunction::tool</c>, which it stores on the heater. Here the
-    /// assignment lives in <c>heat.bedHeaters</c> and <c>heat.chamberHeaters</c>, so the question is
-    /// asked of those. The caller must hold the object model lock
+    /// assignment lives in the bed and chamber mappings, so the question is asked of those - a
+    /// machine may have several beds and each bed several heaters. The caller must hold the object
+    /// model lock
     /// </remarks>
     private bool IsToolHeater(int heaterNumber)
-        => !model.Heat.BedHeaters.Contains(heaterNumber) && !model.Heat.ChamberHeaters.Contains(heaterNumber);
+        => !IsMapped(model.Heat.BedHeaterMapping, heaterNumber)
+           && !IsMapped(model.Heat.ChamberHeaterMapping, heaterNumber);
+
+    /// <summary>
+    /// Whether a bed or chamber mapping claims a heater
+    /// </summary>
+    /// <param name="mapping">The mapping</param>
+    /// <param name="heaterNumber">The heater</param>
+    /// <returns>True if any entry names it</returns>
+    private static bool IsMapped(IReadOnlyList<int[]> mapping, int heaterNumber)
+    {
+        foreach (int[] heaters in mapping)
+        {
+            foreach (int heater in heaters)
+            {
+                if (heater == heaterNumber)
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 }
