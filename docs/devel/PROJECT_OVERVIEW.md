@@ -23,7 +23,7 @@ against the reference tree in `lib/RepRapFirmware`.
 | 3 | Input monitors | [INPUT_MONITORS.md](INPUT_MONITORS.md) | ✅ **Complete** | | |
 | 4 | Stall detection | [STALL_DETECTION.md](STALL_DETECTION.md) | 🟢 8 of 9 phases | 1 × S | |
 | 5 | Events migration | [EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) | 🟢 4 of 5 phases | 1 × M, 1 × S | M291 (WS7) |
-| 6 | Job lifecycle | [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) | 🟢 8 phases, 5 with tails | 2 × M, 6 × S | M291, M581, M452 (all WS7) |
+| 6 | Job lifecycle | [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) | 🟢 8 phases, 5 with tails | 3 × M, 6 × S | M291, M581, M452 (all WS7) |
 | 7 | M-code / motion migration | [MCODE_MIGRATION.md](MCODE_MIGRATION.md) | 🟡 ~58% of inventory | 7 × L, 14 × M, 5 × S | see §3 |
 | 8 | Synchronised actions | [MOTION_SYNCHRONISED_ACTIONS.md](MOTION_SYNCHRONISED_ACTIONS.md) | ⬜ **Not started** | 2 × L, 3 × M, 3 × S | |
 
@@ -89,10 +89,13 @@ Recorded so the remaining list is read against what it sits on rather than as a 
 
 ### WS6, job lifecycle
 
-Five phases have landed with a named tail each. None is large; three wait on a WS7 code.
+Five phases carry a named tail, and three of those wait on a WS7 code. The largest item is the first
+row below, which is unblocked: a pause that stops part-way through a G-code records where to resume
+from through three separate mechanisms, and the plan replaces them with one record taken once.
 
 | Task | Size | Depends on |
 |---|---|---|
+| Phase 4: the resume-point accounting, one record per interrupted code taken once | M | |
 | Phase 3 tail: temperature-wait cancellation, job-file local variables | S | |
 | Phase 3 tail: laser off on abort | S | **M452** (WS7) |
 | Phase 4 tail: decide whether `M25.1` errors or stays an alias | S | decision, see §5 |
@@ -200,6 +203,7 @@ graph TD
 
     E_C["WS5 Phase C tail · M"]
     E_E["WS5 Phase E · S"]
+    J4["WS6 Phase 4 accounting · M"]
     J6["WS6 Phase 6 tails · M"]
     J3["WS6 Phase 3 tail · S"]
     J7["WS6 Phase 7 tails · M"]
@@ -221,7 +225,7 @@ graph TD
     WS8 -.->|step 9 closes| WS1
 ```
 
-`WS5 Phase C tail` has no incoming edge because nothing blocks it.
+`WS5 Phase C tail` and `WS6 Phase 4 accounting` have no incoming edge because nothing blocks them.
 
 **Four tracks can run in parallel immediately:**
 

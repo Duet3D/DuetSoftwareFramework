@@ -464,18 +464,26 @@ having. That rewind is the one part not yet built here, because nothing tracks t
 position at all (§15.2): what lands with it must restore the line's *start* value, not the stop
 point, or the same filament is counted twice.
 
-So the fraction is carried from the segment that was dropped
-([`JobMoveOrigin.ProportionDone`](../../src/DuetControlServer/Motion/JobMoveIndex.cs)) to the restore
-point and then to [`MovementState.MoveFractionToSkip`](../../src/DuetControlServer/Motion/MovementState.cs),
-which the first move the job file reads afterwards spends and clears. The first file channel's
-throughout: there is one interpreter state and one pause restore point, both of them `File`'s, so a
-fork of the job neither records a fraction nor may spend one — a stream that cannot have recorded it
-must not consume what the other is owed. That widens with M596 and M598, both halves together. That is RRF's
-`proportionDone` / `moveFractionToSkip` pair, reaching the same place by a shorter route: RRF re-reads
-the whole original move and walks its segments forward without emitting the ones already made, because
-its restore point may sit inside a segment; here the stop is always *on* a boundary, so there is no
-partial segment to re-enter and `segmentsLeftToStartAt` / `firstSegmentFractionToSkip` have no
-counterpart.
+The fraction is a fraction of the **whole code**, however many times the job has been stopped inside
+it. A resume rebuilds the code scaled by `1 - proportionDone`, so a second stop inside the same code
+measures its segments against a move that is already the remainder of one, and what is recorded is
+`fractionAtStart + (1 - fractionAtStart) × segmentsMade / segmentCount`, where `fractionAtStart` is
+what that build itself skipped. RepRapFirmware needs no such composition because it re-reads the
+whole code and walks all of its segments, emitting only from `segmentsLeftToStartAt` onwards, so its
+`totalSegments` is always the whole code's. Scaling the move instead is the shorter route and is
+exact here, because the stop is always *on* a segment boundary and there is no partial segment to
+re-enter, which is why `segmentsLeftToStartAt` and `firstSegmentFractionToSkip` have no counterpart;
+composing the fraction is what that route costs.
+
+The fraction travels from the record of the interrupted code to the restore point and then to
+[`MovementState.MoveFractionToSkip`](../../src/DuetControlServer/Motion/MovementState.cs), which the
+first job-file move read afterwards spends and clears. The first file channel's throughout: there is
+one interpreter state and one pause restore point, both of them `File`'s, so a fork of the job
+neither records a fraction nor may spend one, and a stream that cannot have recorded it must not
+consume what the other is owed. That widens with M596 and M598, both halves together. Only the job
+file's own codes may spend it, by the same test that decides whether a move is recorded at all: a
+macro invoked between the resume and the job's next move runs on the `File` channel too, and would
+otherwise shorten its own move by the fraction the job is owed.
 
 Two things the resume needs for the same reason, since the line it lands on is a line the file was
 already reading rather than one it was about to start:
@@ -506,18 +514,16 @@ maps them back to the file itself:
 | Reported | Used for |
 |---|---|
 | Drive endpoints where motion actually stops | `ResyncFromEngine`, and `RestorePoint.Coords` |
-| `MoveId` of the first purged move | The file position to rewind to — see below |
-| Number of moves purged | Diagnostics, and telling steps 2 and 4 apart when nothing could be skipped |
+| `MoveId` of the first purged move | The code to rewind to, and how much of it was made |
+| Number of moves purged | Diagnostics, and which of the two sources names the resume point |
 
 `MoveParams` carries a `MoveId` and no file position, and it should stay that way. DCS already keeps
-side tables keyed on that id — `EndstopCorrection.NoteMoveId`
+side tables keyed on that id: `EndstopCorrection.NoteMoveId`
 ([GCodeHandler.cs:351](../../src/DuetControlServer/Codes/Handlers/GCodeHandler.cs)) is the precedent,
-and `MotionTracker` already tracks `LastCompletedMoveId` per ring — so the feedhold adds one more
-([`JobMoveIndex`](../../src/DuetControlServer/Motion/JobMoveIndex.cs)): `MoveId` → file position,
-modal G-command number, feed rate, and how much of that code the move's own segment comes after. That
-is the set of fields RRF stashes in the restore point, held on the side that knows what a file is,
-less the virtual extruder position — which needs the extrusion totals of MCODE_MIGRATION §15.2 before
-there is anything to record.
+and `MotionTracker` already tracks `LastCompletedMoveId` per ring. The feedhold adds one more,
+[`JobMoveIndex`](../../src/DuetControlServer/Motion/JobMoveIndex.cs), which maps a `MoveId` to the
+job code the move came from and to the move's own place in that code. What it maps to, and why that
+is one record per code rather than a copy of the fields per move, is below.
 
 Two pieces of DCS state are stale the moment the purge happens and must be corrected before anything
 else runs:
@@ -545,20 +551,68 @@ else runs:
 
   The generation is bumped when the stop is *requested*, not when its result is read back: the motion
   thread acts in its own time, and that window is exactly when a submission would otherwise keep
-  feeding the ring. Nothing is lost if the engine turns out not to have stopped — the submission
-  gives up either way, and the pause reads back how far it got.
+  feeding a ring that is about to be emptied. It says one thing, and it is global because a purge is
+  global: a macro's segmented move is as void as the job's. Voiding one costs nothing even where the
+  engine turns out not to have stopped, because the only caller is a pause and a pause abandons the
+  macros immediately afterwards. What the generation does not say is anything about the job file.
+  That is the record's job, below.
 
-  A submission abandoned that way is also the one case where the ring cannot say how much of a line
-  was made: if the purge dropped nothing — everything queued was already committed — then what ran is
-  every segment that went out, and no dropped move names it. So the loop records that fraction as it
-  gives up (`MovementState.AbandonedJobMove`, keyed to the generation of the stop that ended it, so a
-  later pause cannot mistake it for its own) and the pause reads it *only* when nothing was purged.
-  Where moves were dropped, the ring's own record is the true boundary — and when none of the dropped
-  moves can be named, the earliest belonged to a macro, so the resume rewinds to the macro invocation
-  with nothing of the job's own line to skip. The file position needs no such rescue: rewinding to
-  the last completed code lands at the start of the line that was still going out, which is the line
-  the fraction belongs to. This is RRF's "we can skip the move that is waiting" branch of
-  `DoAsynchronousPause`.
+#### The resume point is one record, taken once
+
+Where to rewind the file to and how much of that code the machine has already made are two halves of
+one fact, so nothing derives them separately. One record describes the job code the interpreter is
+part-way through, and every consumer reads that record.
+
+[`JobMoveOrigin`](../../src/DuetControlServer/Motion/JobMoveIndex.cs) is it, one per job-file
+movement code rather than one per queued move: the code's file position, the modal G command it was
+read under, the feed rate it was read with unscaled by M220, the fraction the build itself started
+from, how many segments that build produced, and how many of them have gone to the ring. That is
+RepRapFirmware's `ms.raw` together with `ms.totalSegments` and `ms.segmentsLeft`, which is the set
+`DoAsynchronousPause` reads in its `segmentsLeft != 0` branch
+([GCodes.cpp:1092](../../lib/RepRapFirmware/src/GCodes/GCodes.cpp)). `MovementState` holds the
+current one, as `MovementState` holds `raw` there, and `JobMoveIndex` maps each queued move id to
+that record and to the move's own index within it. A file position and a fraction read from one
+record cannot describe different codes, which is what the arrangement is for.
+
+The record is cleared by whatever ends the code: the submission, once every segment has been queued,
+or the pause, which **takes** it. The take is one call under the planner lock and it produces the
+whole resume point:
+
+| What the stop did | Where the resume point comes from |
+|---|---|
+| Moves were purged and the earliest is a job move | The index: that move's record, at that move's segment |
+| Moves were purged and the earliest cannot be named | Nothing. The earliest was a macro's, so the job's own code had not started; the resume rewinds to the last completed job code, which is the macro invocation |
+| Nothing was purged | The current record, at the segments it has queued. Everything queued was already committed and will run, so the first segment not queued is the boundary |
+| No job code was in flight | Nothing. The last completed code is the pause point, which is every synchronous pause |
+
+Those are RepRapFirmware's three branches of `DoAsynchronousPause`
+([GCodes.cpp:1086](../../lib/RepRapFirmware/src/GCodes/GCodes.cpp)), each of which fills in the file
+position and the proportion together and then calls `ClearMove`. The result is one nullable value
+carrying a file position, a fraction, a G command number and a feed rate, so a fraction that names no
+position cannot be expressed. Three things read it, and all three read that one value: the position
+`DoFilePrint` seeks to, the restore point's `ProportionDone`, `GCommandNumber` and `FeedRate`, and
+through the restore point the modal state `RestoreModalStateForResume` puts back.
+
+Taking the record is also what fixes the segment count in it. A submission whose record has been
+taken queues no more segments of that code, so what the take read stays true; the take therefore
+comes before the read-ahead is cancelled rather than after, since the cancellation would otherwise
+end the submission somewhere the take had not looked. Between the stop and the take nothing can add
+to the index either, because `PurgeGeneration` is already raised and only a job move is ever
+recorded. A submission ended this way reports its code as cancelled rather than as done, which is
+what keeps `DoFilePrint`'s own position, the fallback in the two rows above that name nothing, at the
+end of the last code that really completed.
+
+An interrupted code is truncated whether or not the engine stopped early, and the truncation is
+recorded rather than silent. That is what makes a refused stop safe: the machine drains the queue as
+phase 2's pause does, the code that was going out ends where it ends, and the record says how much of
+it was made, so the resume asks for the rest of that code and no more. RepRapFirmware does the same
+in the branch above, discarding the waiting move after recording it.
+
+The one race left is RepRapFirmware's own, and it notes it at the same place
+([GCodes.cpp:1112](../../lib/RepRapFirmware/src/GCodes/GCodes.cpp)): a submission that ends for its
+own reasons in the same instant as the take leaves nothing to take, and the resume re-reads the code
+from its start. Here that costs one code re-run rather than a wrong fraction, because a record is
+never left behind for another pause to adopt.
 
 #### Resuming needs no replan
 
@@ -759,9 +813,25 @@ when the head is at or below the pause height, and only splits the move - travel
 
 §3.5. Not a port of `DDARing::PauseMoves`; the approved deviation replaces it.
 
-- [x] `MoveId` → file position / G-command number / feed rate side table (`JobMoveIndex`), bounded
-      rather than pruned on completion — a job queues faster than the engine runs, so forgetting only
-      what completed still grows without limit
+- [x] `JobMoveIndex`, bounded rather than pruned on completion: a job queues faster than the engine
+      runs, so forgetting only what completed still grows without limit
+- [ ] One record per interrupted job code rather than a copy of its fields per queued move. The file
+      position, the modal G command, the feed rate, the fraction the build started from and its
+      segment count, held by `MovementState` while the code is in flight and indexed by move id and
+      segment
+- [ ] `JobResumePoint` and the take: one call under the planner lock, before the read-ahead is
+      cancelled, yielding the file position and the fraction together or neither. It replaces
+      `MovementState.AbandonedJobMove`, whose generation key still admits a record left by a pause
+      sequence that made no stop of its own
+- [ ] The fraction composes over the whole code rather than over the part the build was given, so a
+      second stop inside one code reports what the machine has made and not what the remainder had
+- [ ] A submission the take ends reports its code as cancelled rather than as done, so the position
+      `DoFilePrint` falls back to stays the end of the last code that completed
+- [ ] Only the job file's own codes spend `MoveFractionToSkip`, by the same test that decides whether
+      a move is recorded at all; a macro on the `File` channel does not
+- [ ] Tests for the accounting: a stop inside a segmented code, a second stop inside the same code, a
+      stop the engine refuses, a purge whose earliest move is a macro's, and a synchronous pause
+      following an aborted pause sequence
 - [x] `DDARing::Feedhold` in `src/DuetSbcInterface`: pick the stopping point at or after the first
       uncommitted DDA, force its end speed to zero, re-run the backward pass to the last committed
       DDA, free the rest
@@ -770,13 +840,11 @@ when the head is at or below the pause height, and only splits the move - travel
 - [x] `DuetSbc_MotionRequestFeedhold` and `DuetSbc_MotionGetFeedholdResult` — a request and a
       seqlock-published result, because freeing a move frees its segments and only the motion thread
       may do that, so the answer cannot come back from the call that asks
-- [x] `MovePlanner.FeedholdAsync`, resyncing from the engine and dropping `SegmentsLeft`
+- [x] `MovePlanner.StopEarlyAsync`, resyncing from the engine and dropping `SegmentsLeft`
 - [x] `M25` from a console or an interface stops by feedhold; from the job file it is synchronous and
       unchanged (§3.5)
 - [x] The pause sequence takes the feedhold as a flag **independent of** the run-`pause.g` flag
       (§3.5.1), and falls back to phase 2's drain-the-ring behaviour when nothing could be purged
-- [x] The feedhold supplies the resume position, which is the one case where the last completed code
-      is *not* the pause point
 - [x] `DDARing::PauseMoves` ported and tested as the reference behaviour, though nothing in
       DuetControlServer now asks for it — see §3.5
 - [x] MCODE_MIGRATION §11.6's row for `PauseMoves` records that it is ported
@@ -892,6 +960,11 @@ off, which is what `PrintMonitor::Spin` does and why it has the flags it has.
    heater fault, filament error or driver error, and by extension trigger 1. Which events pause and
    which run `pause.g` is unchanged; only the manner of stopping differs. Those are the deviation's
    only changes to existing behaviour, and they make phase 6 depend on phase 4; §3.5.1.
+7. **The resume point is one record, taken once.** The file position, the fraction of the code
+   already made, the modal G command and the feed rate all come from one record of the interrupted
+   code, which the pause takes under the planner lock before the read-ahead is cancelled. Nothing is
+   left in a shared slot for a later pause to find, and a fraction that names no file position cannot
+   be expressed; §3.5.
 
 Nothing is open. The questions this document opened are answered above, and what is left is the work
 in §4.
