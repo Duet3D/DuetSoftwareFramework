@@ -806,11 +806,22 @@ Each phase is independently useful and independently testable.
 
 ### Phase E — the blocked default actions ⬜
 
-Gated on MCODE_MIGRATION's `M291`/`M292` and on `M25`, which [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md)
-plans as its phase 2:
+Gated on MCODE_MIGRATION's `M291`/`M292`, and on [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md)'s **phase 4**
+rather than its phase 2. The pause itself lands in phase 2, but JOB_LIFECYCLE §3.5.1 decides that
+**where RepRapFirmware pauses for an event, that pause is a feedhold** — a controlled deceleration
+planned at the first uncommitted move, rather than RepRapFirmware's search for a junction that is
+already slow enough. Landing these on the faithful path first would ship one behaviour and then
+change it underneath machines relying on it.
+
+The table in §1.5 is untouched by that decision, and deliberately so: it stays the record of which
+events pause and which of them run `pause.g`. The feedhold changes how the machine stops, not what
+stops it, so an event with no default pause here — a stall, a warning, an over- or undervoltage —
+still has none.
 
 - [ ] Message box for pausing events, titled `Printing paused` / `Event notification`
-- [ ] `HeaterFault` / `FilamentError` pause via `pause.g`; `DriverError` pause without it
+- [ ] `HeaterFault` / `FilamentError` feedhold via `pause.g`; `DriverError` feedhold without it —
+      the two flags are independent, because `pause.g` parks the head and a driver in error cannot
+      be trusted to move
 
 ---
 
@@ -821,9 +832,9 @@ plans as its phase 2:
 | `main_board_power_fail` | — | ⛔ never raised in RRF either | — | — | — |
 | `expansion_reconnect` | `expansion-reconnect.g` | 🟡 announcement seen, state not compared | ⬜ | ⬜ | ⬜ log |
 | `expansion_timeout` | `expansion-timeout.g` | ⬜ no watchdog | ⬜ | ⬜ | ⬜ log |
-| `heater_fault` | `heater-fault.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ blocked: pause |
-| `driver_error` | `driver-error.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ blocked: pause |
-| `filament_error` | `filament-error.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ blocked: pause |
+| `heater_fault` | `heater-fault.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ blocked: feedhold |
+| `driver_error` | `driver-error.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ blocked: feedhold, no `pause.g` |
+| `filament_error` | `filament-error.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ blocked: feedhold |
 | `driver_stall` | `driver-stall.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ log |
 | `driver_warning` | `driver-warning.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ log |
 | `mcu_temperature_warning` | `mcu-temperature-warning.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ log |
@@ -838,8 +849,8 @@ scope.
 Phase B finished all three middle columns for every event a board can send: the text and macro name
 exist (§3.5.1, a test walks all thirteen), the CAN event message is decoded and queued, and the
 processor runs the macro named after it with `param.D/B/P/S`. What is left per event is the **default
-action** where a macro is absent, and only for the three that pause — they wait on `M291` and `M25`
-(§3.5). The two `controller_*` rows wait on phase C, which is what raises them.
+action** where a macro is absent, and only for the three that pause — they wait on `M291` and on the
+feedhold (§3.5). The two `controller_*` rows wait on phase C, which is what raises them.
 
 ---
 

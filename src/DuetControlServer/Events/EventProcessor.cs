@@ -109,8 +109,9 @@ public sealed class EventProcessor(EventQueue queue, MacroRunner macroRunner, Ev
 
         // No macro, so the default action. RepRapFirmware also raises a message box and pauses the
         // print for a heater fault, a filament error or a driver error
-        // TODO: raise the message box and pause once M291 and M25 are implemented; see §3.5 of
-        // docs/devel/EVENTS_MIGRATION.md for which events pause and which of them run pause.g
+        // TODO: raise the message box and pause once M291 and the feedhold are implemented; see
+        // §3.5 of docs/devel/EVENTS_MIGRATION.md for which events pause and which of them run
+        // pause.g, and §3.5.1 of docs/devel/JOB_LIFECYCLE.md for why an event pauses by feedhold
         eventLogger.LogOutput(description);
 
         if (machineEvent.Type == EventType.ControllerReconnect && ReconnectDefaultAction is not null)

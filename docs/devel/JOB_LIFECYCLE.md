@@ -88,8 +88,8 @@ There is no M25, no M226, no M600 and no M601 in `MCodeHandler`'s switch, and no
 | M226 | `DoSynchronousPause(gcode, pausing1)`; `M226 P0` → `pausing2`, skipping `pause.g` | GCodes2.cpp:1269 |
 | M600 | `DoSynchronousPause(filamentChange, filamentChangePause1)` — runs `filament-change.g`, falling back to `pause.g` | GCodes4.cpp:571 |
 | M601 | as M226 | |
-| A trigger firing | `DoAsynchronousPause(trigger, pausing1)` | GCodes.cpp:954 |
-| A heater fault, filament error or driver error | `DoAsynchronousPause(...)` from the event handler | GCodes4.cpp:1981 |
+| A trigger firing | `DoAsynchronousPause(trigger, pausing1)` | GCodes.cpp:954. Takes the feedhold — §3.5 |
+| A heater fault, filament error or driver error | `DoAsynchronousPause(...)` from the event handler | GCodes4.cpp:1981. Takes the feedhold — §3.5 |
 | Low voltage or a stall | `DoEmergencyPause` → `LowPowerOrStallPause` | GCodes.cpp:1292 |
 
 The event rows are [EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) phase E, which is blocked on this
@@ -343,10 +343,17 @@ is explicit about why: "so that any M82/M83 codes will be executed in the correc
 This is the one place the port deliberately does something RepRapFirmware does not, so it is set out
 in full: what RRF does, why it is not enough, what is added alongside it, and what that costs.
 
-It is an **addition, not a substitution**. `M25` stays a faithful port and keeps RRF's behaviour
-including its overshoot; `M25.1` is a new code with no RepRapFirmware equivalent. Nothing that works
-today changes, which is why the deviation is as cheap as it is — the failure mode §1.8 warns about,
-where a divergence hides until the missing piece lands, cannot happen to a code RRF does not have.
+For the operator it is an **addition, not a substitution**: `M25` stays a faithful port and keeps
+RRF's behaviour including its overshoot, and `M25.1` is a new code with no RepRapFirmware equivalent.
+Nothing anyone types behaves differently, which is what makes the deviation cheap — the failure mode
+§1.8 warns about, where a divergence hides until the missing piece lands, cannot happen to a code RRF
+does not have.
+
+For the **pauses nobody typed** it is a substitution, and that is deliberate but narrow: where
+RepRapFirmware pauses for an event, that pause becomes a feedhold. Which events pause and which of
+them run `pause.g` is untouched — RepRapFirmware still decides that, and an event it does not pause
+for still does not pause. §3.5.1 is the rule and its table, and it is the one part of this deviation
+that changes behaviour a machine already relies on.
 
 #### What RepRapFirmware does
 
@@ -522,6 +529,58 @@ therefore behaves exactly as `M25`, rather than being refused: the fraction asks
 as early as possible, and for a synchronous pause the earliest possible stop is the one `M25` already
 makes.
 
+#### 3.5.1 Which pauses are feedholds
+
+The rule is deliberately narrow: **where RepRapFirmware would pause for an event, that pause becomes
+a feedhold.** Nothing else about the event system moves. Which events pause, and which of them run
+`pause.g`, stays exactly as RepRapFirmware decides it — the deviation changes *how the machine comes
+to a stop*, not *what stops it*.
+
+| Pause | Path | Why |
+|---|---|---|
+| `M25`, `M226`, `M600`, `M601` | Faithful | The operator asked for RepRapFirmware's pause and gets it |
+| `M25.1` | Feedhold | The operator asked for the rapid one |
+| `heater_fault`, `filament_error` default action | **Feedhold** | RRF pauses here, so this pause is a feedhold |
+| `driver_error` default action | **Feedhold**, without `pause.g` | RRF pauses here too, and already skips the macro |
+| Trigger 1 firing (M581) | **Feedhold** | RRF pauses here as well — see the note below |
+| `driver_stall`, `driver_warning`, `mcu_temperature_warning`, `overvoltage`, `undervoltage` | — | RRF does not pause for these, so neither does this. They log, as they do today |
+| `expansion_reconnect`, `expansion_timeout` | — | Likewise |
+
+Stating it this way rather than as "an event should stop as soon as it can" is the point.
+`Event::GetDefaultPauseReason` ([Event.cpp:115](../../lib/RepRapFirmware/src/Platform/Event.cpp))
+stays the one place that decides whether an event pauses at all, and the feedhold is one more
+property hanging off that decision rather than a reason to revisit it. A rule phrased around urgency
+would invite exactly that revisiting — someone would notice that an undervoltage warning is urgent
+too — and the deviation would grow a new pause RepRapFirmware does not have, in a codebase where
+[EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) §1.5 is the only record of which events pause.
+
+**Trigger 1 is an inference, not an event.** It is a separate call site
+([GCodes.cpp:954](../../lib/RepRapFirmware/src/GCodes/GCodes.cpp)), not one of `Event.cpp`'s types,
+so "where RRF would pause for an event" does not literally reach it. It is included because it is the
+same kind of pause — asynchronous, nobody typed it, RRF pauses — and excluding it would leave one
+async pause source on the faithful path for no reason anyone could reconstruct later. If trigger 1
+should stay faithful, this is the row to change.
+
+Three things this does **not** change, each easy to assume otherwise:
+
+- **The macro path still wins.** These are *default* actions. An event whose macro exists runs the
+  macro and pauses nothing (EVENTS_MIGRATION §1.5), and that is the path machines actually configure.
+  The feedhold applies only where RepRapFirmware would have paused by itself.
+- **`driver_error` still skips `pause.g`.** RRF routes it to `eventPausing2` rather than
+  `eventPausing1` ([GCodes4.cpp:1981](../../lib/RepRapFirmware/src/GCodes/GCodes4.cpp)), because
+  `pause.g` typically lifts and parks the head and a driver in error cannot be trusted to move.
+  "Stop by a controlled deceleration" and "then run `pause.g`" are separate flags on the pause
+  sequence and stay separate — a feedhold does not imply the macro. The feedhold is still the right
+  stop for it: it asks the erroring driver for strictly *less* motion than draining the ring would.
+- **This is not the emergency path.** `DoEmergencyPause` / `LowPowerOrStallPause` cancel stepping
+  mid-move and accept the position loss, which is right for a power failure and wrong for everything
+  here. They stay out of scope (§5). The feedhold sits between them and the faithful pause: sooner
+  than RRF's, still under full control of the motion planner.
+
+The consequence for the plan is that **phase 6 depends on phase 4**, where before it only depended on
+phase 2. Landing the event pauses first would ship them on the faithful path and then change their
+behaviour underneath machines that had started relying on it.
+
 #### Recording the deviation
 
 `src/Documentation/articles/rrf-differences.md` gets an entry **when phase 4 lands and not before** —
@@ -600,9 +659,8 @@ point from where the machine actually stopped, take the file position from the j
 - [ ] `MovePlanner.FeedholdAsync`, resyncing `CurrentUserPosition` and dropping `SegmentsLeft`
 - [ ] `M25.1` — the same `25 =>` arm branching on `MinorNumber`, refusing `M25.2` and above; from a
       file channel it behaves as `M25` (§3.5)
-- [ ] The pause sequence takes the feedhold as a flag, running the same `pause.g` and recording the
-      same `PrintPausedReason.User`, and falls back to phase 2's drain-the-ring behaviour when
-      nothing could be purged
+- [ ] The pause sequence takes the feedhold as a flag **independent of** the run-`pause.g` flag
+      (§3.5.1), and falls back to phase 2's drain-the-ring behaviour when nothing could be purged
 - [ ] MCODE_MIGRATION §11.6's row for `PauseMoves` records that it is superseded rather than pending
 - [ ] `rrf-differences.md` entry, now that there is shipped behaviour to describe
 
@@ -615,8 +673,15 @@ point from where the machine actually stopped, take the file position from the j
 
 ### Phase 6 — the callers that were waiting ⬜
 
-- [ ] EVENTS_MIGRATION phase E's pausing default actions (still needs M291 for the message box)
-- [ ] `trigger<n>.g` and the pause a trigger can request
+**Depends on phase 4**, not just phase 2: every pause RepRapFirmware makes here becomes a feedhold
+(§3.5.1). Landing them on the faithful path first would change their behaviour underneath machines
+that had started relying on it. No event gains or loses a pause — only the stop changes.
+
+- [ ] EVENTS_MIGRATION phase E's pausing default actions, as feedholds (still needs M291 for the
+      message box)
+- [ ] `driver_error` pauses as a feedhold **without** `pause.g`; `heater_fault` and `filament_error`
+      as feedholds **with** it
+- [ ] `trigger<n>.g`, and trigger 1's built-in pause as a feedhold
 - [ ] `M37` starts the simulation it selects, and the simulation restore point
 
 ### Phase 7 — job progress ⬜
@@ -658,17 +723,15 @@ The `PrintMonitor` port. Its own phase because nothing above depends on it.
    `MovementState`; §3.1.
 3. **Feedhold variant (a)** — stop at the first DDA boundary with enough deceleration distance, no
    truncation. (b) stays available later and needs `moveFractionToSkip` first; §3.5.
-4. **The feedhold runs `pause.g`** and records `PrintPausedReason.User`, exactly as `M25` does; §3.5.
-5. **The feedhold is `M25.1`.** `M25` stays a faithful port, so the deviation is an added code rather
-   than changed behaviour; §3.5.
+4. **The feedhold runs `pause.g`** and records `PrintPausedReason.User` when `M25.1` asks for it,
+   exactly as `M25` does. The feedhold and the run-`pause.g` flag are independent, which is what lets
+   `driver_error` have one without the other; §3.5, §3.5.1.
+5. **The feedhold is `M25.1`.** `M25` stays a faithful port, so for anything anyone types the
+   deviation is an added code rather than changed behaviour; §3.5.
+6. **Where RepRapFirmware pauses for an event, that pause is a feedhold** — the default action of a
+   heater fault, filament error or driver error, and by extension trigger 1. Which events pause and
+   which run `pause.g` is unchanged; only the manner of stopping differs. Those are the deviation's
+   only changes to existing behaviour, and they make phase 6 depend on phase 4; §3.5.1.
 
-## 7. Still open
-
-1. **Which path do the non-user asynchronous pauses take?** A trigger firing, a heater fault, a
-   filament error and a driver error all reach `DoAsynchronousPause` in RepRapFirmware, and with
-   `M25` faithful they would inherit its overshoot. A filament error in particular is a case where
-   stopping sooner is the point. The options are to leave them on `M25`'s path (faithful, and the
-   overshoot is what RRF does today), to move all of them onto the feedhold, or to choose per event
-   the way `GetDefaultPauseReason` already chooses per event
-   ([EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) §1.5). Nothing before phase 6 depends on the answer,
-   so it can wait — but phase 6 is where it has to be settled, not discovered.
+Nothing is open. The questions this document opened are answered above, and what is left is the work
+in §4.
