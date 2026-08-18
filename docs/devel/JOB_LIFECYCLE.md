@@ -710,8 +710,8 @@ when the head is at or below the pause height, and only splits the move - travel
       is *not* the pause point
 - [x] `DDARing::PauseMoves` ported too, so `M25` keeps RepRapFirmware's early stop rather than always
       draining the ring — the feedhold supersedes it only for `M25.1`
-- [ ] MCODE_MIGRATION §11.6's row for `PauseMoves` records that it is ported
-- [ ] `rrf-differences.md` entry, now that there is shipped behaviour to describe
+- [x] MCODE_MIGRATION §11.6's row for `PauseMoves` records that it is ported
+- [x] `rrf-differences.md` §8, now that there is shipped behaviour to describe
 - [x] Native tests for both stops — the boundary search, the committed-move floor, the indivisible-run
       refusal and the ring being usable afterwards. They caught a design bug on their first run: the
       feedhold was reading `canPauseAfter`, which `RecalculateMove` overwrites with "...and already at

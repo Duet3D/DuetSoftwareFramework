@@ -373,7 +373,45 @@ does — `DDA::InitFromParams` onward is upstream verbatim. Three things it deli
 
 ---
 
-## 8. What is deliberately *not* different
+## 8. `M25.1` stops the machine sooner than `M25` can
+
+RepRapFirmware's pause does not *create* a stopping point — it looks for one that already exists.
+`DDARing::PauseMoves` walks the queued moves for the first junction whose end speed is at or below
+the instantaneous speed change of every drive, drops everything after it, and changes no move's
+profile. When there is no such junction it reports as much and the whole queue runs.
+
+During a print at speed there usually is no such junction, because look-ahead has spent the print
+raising every junction speed above jerk — that is what look-ahead is for. So a pause typically lets
+the head travel to the end of everything already planned before it stops.
+
+`M25.1` is an added code with no RepRapFirmware equivalent. It makes a stopping point: the motion
+engine takes the earliest boundary far enough away to decelerate to rest by, forces the end speed
+there to zero, re-plans backwards to the last move it has already committed, and drops the rest.
+Moves are committed 50 ms ahead, so what it cannot recall is bounded by that plus one deceleration
+ramp.
+
+**`M25` is unchanged.** It still asks for RepRapFirmware's search and still drains the queue when the
+search finds nothing, so nothing anyone already types behaves differently.
+
+Three things the deviation deliberately leaves alone:
+
+- **A committed move is never recalled.** Its segments have been generated and sent to the boards.
+  The stop begins at the first move after them, and the speed that move starts at is fixed by them.
+- **A boundary has to be restartable, not merely reachable.** An arc segment, a retraction and an
+  endstop move are not places a print can resume from, however much room there is to stop in — so
+  neither kind of stop chooses one.
+- **It is not the emergency path.** RepRapFirmware's `LowPowerOrStallPause` cancels stepping
+  mid-move and accepts the position loss, which is right for a power failure and wrong here. The
+  feedhold stays under the motion planner throughout.
+
+A pause the operator did not type takes the feedhold rather than the search: the default action of a
+heater fault, a filament error or a driver error. *Which* events pause is unchanged — that is still
+`Event::GetDefaultPauseReason`'s decision, and an event RepRapFirmware does not pause for still does
+not pause here. Only the manner of stopping differs.
+
+---
+
+## 9. What is deliberately *not* different
 
 The divergences above work inside constraints that were treated as fixed, and they are worth stating
 because they explain why several of the entries are shaped the way they are:
