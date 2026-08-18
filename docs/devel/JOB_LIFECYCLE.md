@@ -843,9 +843,9 @@ when the head is at or below the pause height, and only splits the move - travel
       DDA, free the rest
 - [x] Honour the `canPauseAfter` exclusions when choosing the boundary — arcs, retractions, endstop,
       probing and `G1 H` moves, through `DDA::IsRestartableBoundary`
-- [x] `DuetSbc_MotionRequestFeedhold` and `DuetSbc_MotionGetFeedholdResult` — a request and a
-      seqlock-published result, because freeing a move frees its segments and only the motion thread
-      may do that, so the answer cannot come back from the call that asks
+- [x] `DuetSbc_MotionRequestStop` and `DuetSbc_MotionGetFeedholdResult` — a request carrying which
+      kind of stop it is, and a seqlock-published result, because freeing a move frees its segments
+      and only the motion thread may do that, so the answer cannot come back from the call that asks
 - [x] `MovePlanner.StopEarlyAsync`, resyncing from the engine and dropping `SegmentsLeft`
 - [x] `M25` from a console or an interface stops by feedhold; from the job file it is synchronous and
       unchanged (§3.5)

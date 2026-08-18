@@ -424,6 +424,10 @@ a driver error. *Which* events pause is unchanged — that is still `Event::GetD
 decision, and an event RepRapFirmware does not pause for still does not pause here. Only the manner
 of stopping differs.
 
+[Pausing and resuming a job](pause-and-resume.md) has the mechanics: how the stop is requested and
+answered, what is recorded where the machine comes to rest, and how the resume asks the interrupted
+line for only the part of it that is left.
+
 ---
 
 ## 9. What is deliberately *not* different

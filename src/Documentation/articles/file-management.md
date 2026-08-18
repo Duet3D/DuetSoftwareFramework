@@ -72,8 +72,10 @@ into the [pipeline](gcode-flow.md#the-five-stage-code-pipeline). File position a
 `FilePosition + Length` per code.
 
 On **pause**, the current position is saved and the loop waits on a resume signal; on **resume** it
-seeks back and continues. Note that block state is not persisted across a pause - on resume the file
-seeks to the saved byte offset and re-parses any open blocks from there, so a `while` counter resets.
+seeks back and continues. Which position is saved, and how a line the machine is half way through is
+finished rather than repeated, is [Pausing and resuming a job](pause-and-resume.md). Note that block
+state is not persisted across a pause - on resume the file seeks to the saved byte offset and
+re-parses any open blocks from there, so a `while` counter resets.
 
 `M606 S1` **forks** the job (`ForkAsync`): the `CodeFile` state, including the block stack and parser
 buffer, is copied onto the [`File2` channel](gcode-flow.md#code-channels) so two motion systems can
@@ -127,5 +129,6 @@ thumbnail data and file fragments on demand.
 ## See also
 
 - [G-code flow](gcode-flow.md) - the pipeline these files feed, and the flow-control details
+- [Pausing and resuming a job](pause-and-resume.md) - what a pause does to the loop above
 - [Object model](object-model.md) - the `Job`, `Directories`, and `Volumes` keys
 - [Differences from RepRapFirmware](rrf-differences.md) - including what `M500` writes and what it does not

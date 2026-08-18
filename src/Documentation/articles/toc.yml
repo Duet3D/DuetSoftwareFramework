@@ -16,6 +16,8 @@
   href: can-messages.md
 - name: Endstops
   href: endstops.md
+- name: Pausing and Resuming a Job
+  href: pause-and-resume.md
 - name: Differences from RepRapFirmware
   href: rrf-differences.md
 - name: File Management
