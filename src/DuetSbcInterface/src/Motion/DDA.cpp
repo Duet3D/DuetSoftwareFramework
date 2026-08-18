@@ -756,71 +756,11 @@ void DDA::Prepare(DDARing& ring,
 	Duet::Sbc::Motion::MotionSystem& move = ring.GetMove();
 	const uint32_t now = StepTimer::GetMovementTimerTicks();
 
-	// 'prepareAdvanceTime' includes lead time for CAN-connected drivers to receive and queue their movement commands
-	// before the deadline. If this move doesn't touch any CAN-connected driver, that lead time is wasted latency
-	// (causes M400/G4 stalls under fast host-driven pipelines like OpenPnP); we still need enough of a margin to avoid
-	// the Move task modifying a segment list that the step ISR is already executing, so fall back to
-	// MoveTiming::AbsoluteMinimumPreparedTime, the same value already trusted elsewhere in this function for that exact
-	// purpose. A move that chains directly onto this one (see the 'start this move directly after the previous one'
-	// case below) inherits whatever margin we gave this move, so if this move is short and a CAN-connected move is
-	// queued close behind it in the ring, that move could end up with less than the CAN lead time it needs. So before
-	// shortening our own margin, check the ring for a CAN-connected move that's due within the window we would
-	// otherwise be cutting (prepareAdvanceTime - AbsoluteMinimumPreparedTime) and keep the full margin if one is found.
-	auto touchesRemoteDriver = [&move](const DDA& dda) noexcept -> bool
-	{
-		const size_t numTotalAxes = move.GetTotalAxes();
-		for (size_t drive = 0; drive < numTotalAxes; ++drive)
-		{
-			if (dda.m_directionVector[drive] != 0.0)
-			{
-				const Duet::Sbc::Motion::AxisDriversConfig& config = move.GetAxisDriversConfig(drive);
-				for (size_t i = 0; i < config.numDrivers; ++i)
-				{
-					if (config.driverNumbers[i].IsRemote())
-					{
-						return true;
-					}
-				}
-			}
-		}
-		const size_t numExtruders = move.GetNumExtruders();
-		for (size_t extruder = 0; extruder < numExtruders; ++extruder)
-		{
-			if (dda.m_directionVector[ExtruderToLogicalDrive(extruder)] != 0.0 &&
-				move.GetExtruderDriver(extruder).IsRemote())
-			{
-				return true;
-			}
-		}
-		return false;
-	};
-
-	bool involvesRemoteDriver = touchesRemoteDriver(*this);
-	if (!involvesRemoteDriver)
-	{
-		// Walk forward through the moves currently queued behind this one. Anything beyond the window we are about to
-		// cut (prepareAdvanceTime - AbsoluteMinimumPreparedTime) will get its own fresh margin decision when it's
-		// prepared, so we only need to worry about moves that could inherit a start time within that window via direct
-		// chaining.
-		uint32_t clocksScanned = 0;
-		const uint32_t dangerWindow = prepareAdvanceTime - MoveTiming::absoluteMinimumPreparedTime;
-		for (const DDA* dda = GetNext(); dda != this && dda->GetState() != DDA::Empty && clocksScanned < dangerWindow;
-			 dda = dda->GetNext())
-		{
-			if (touchesRemoteDriver(*dda))
-			{
-				involvesRemoteDriver = true;
-				break;
-			}
-			// Underestimate this move's duration (ignore acceleration/deceleration ramps) so that we err on the side of
-			// not reducing the margin
-			clocksScanned += (dda->m_topSpeed > 0.0) ? (uint32_t)(dda->m_totalDistance / dda->m_topSpeed) : 0;
-		}
-	}
-	const uint32_t localPrepareAdvanceTime =
-		(involvesRemoteDriver) ? prepareAdvanceTime
-							   : min<uint32_t>(prepareAdvanceTime, MoveTiming::absoluteMinimumPreparedTime);
-
+	// 'prepareAdvanceTime' includes lead time for the drivers to receive and queue their movement
+	// commands before the deadline. Every driver needs it: there is no local CAN address in this build,
+	// so DriverId::IsLocal() is a compile-time false and the SBC never drives a motor itself. A move
+	// that appears to need no lead time is one addressing drives that are not configured, which
+	// commands nothing and gains nothing from a shorter margin.
 	if (m_prev->GetState() == Committed)
 	{
 		uint32_t prevEndTime = m_prev->m_afterPrepare.moveStartTime + m_prev->m_clocksNeeded;
@@ -837,7 +777,7 @@ void DDA::Prepare(DDARing& ring,
 		}
 		else if (m_startSpeed == 0.0)
 		{
-			m_afterPrepare.moveStartTime = now + localPrepareAdvanceTime;
+			m_afterPrepare.moveStartTime = now + prepareAdvanceTime;
 		}
 		else
 		{
@@ -847,7 +787,7 @@ void DDA::Prepare(DDARing& ring,
 	}
 	else
 	{
-		m_afterPrepare.moveStartTime = now + localPrepareAdvanceTime;
+		m_afterPrepare.moveStartTime = now + prepareAdvanceTime;
 	}
 
 	if (simMode < SimulationMode::Normal)
