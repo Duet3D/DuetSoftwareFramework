@@ -9,7 +9,10 @@ namespace DuetControlServer.Motion;
 /// The motion engine knows a move by its id and nothing else about it: <c>MoveParams</c> carries no
 /// file position, and it should not - the engine has no idea what a file is. So a feedhold reports
 /// the id of the first move it dropped and this is what turns that back into somewhere to resume
-/// from. <c>EndstopCorrection.NoteMoveId</c> is the same arrangement for the same reason
+/// from. <c>EndstopCorrection.NoteMoveId</c> is the same arrangement for the same reason.
+///
+/// Only moves whose code came from the job file are recorded. A position is meaningful only against
+/// the file it was measured in, and the resume rewinds the job file
 /// </remarks>
 internal readonly record struct JobMoveOrigin
 {

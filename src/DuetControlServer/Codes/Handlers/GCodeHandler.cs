@@ -390,10 +390,19 @@ internal sealed partial class GCodeHandler(
                                 endstopCorrection.NoteMoveId(raw.MoveId);
                             }
 
-                            // Where this move came from, so that a feedhold dropping it can say where
-                            // to resume. Every segment of a move carries the same file position,
-                            // because they all came from the one code
-                            if (code.IsFromFileChannel)
+                            // Where this move came from, so that a stop dropping it can say where to
+                            // resume. Every segment of a move carries the same file position, because
+                            // they all came from the one code.
+                            //
+                            // Only a move whose code came from the job file itself. A code read from a
+                            // macro carries an offset into the *macro*, and a resume rewinds the *job*
+                            // file, so recording one would send the job to an unrelated position -
+                            // macros being small and job files large, to somewhere near its start.
+                            // With no origin the pause falls back to the last completed job-file code,
+                            // which is the macro invocation, so the macro re-runs whole. That is
+                            // RepRapFirmware's GetJobFilePosition, which returns noFilePosition for
+                            // exactly this case
+                            if (code.IsFromFileChannel && code.File is not Files.MacroFile)
                             {
                                 planner.JobMoves.Note(raw.MoveId, new JobMoveOrigin
                                 {
