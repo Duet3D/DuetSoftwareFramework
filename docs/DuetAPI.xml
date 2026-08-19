@@ -4705,10 +4705,24 @@
             Number of collected data points in the last run or 0 if it failed
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.Accelerometer.Resolution">
+            <summary>
+            Resolution the accelerometer is programmed for (in bits) or 0 if unknown
+            </summary>
+        </member>
         <member name="P:DuetAPI.ObjectModel.Accelerometer.Runs">
             <summary>
             Number of completed sampling runs
             </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.Accelerometer.SamplingRate">
+            <summary>
+            Rate the accelerometer is programmed for (in Hz) or 0 if unknown
+            </summary>
+            <remarks>
+            This is the rate the accelerometer settled on, which may be lower than the one M955 asked for.
+            Once it has completed a run, the rate measured during that run is reported instead
+            </remarks>
         </member>
         <member name="M:DuetAPI.ObjectModel.Accelerometer.Assign(DuetAPI.ObjectModel.IStaticModelObject)">
             <summary>
@@ -17699,6 +17713,34 @@
             <returns>Asynchronous task</returns>
             <exception cref="T:System.OperationCanceledException">Operation has been cancelled</exception>
             <exception cref="T:System.Net.Sockets.SocketException">Connection has been closed</exception>
+        </member>
+        <member name="T:DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1">
+            <summary>
+            Class for easier access to JsonStringEnumConverter with lower-case naming.
+            Use this for enums whose members mix upper-case letters and digits (e.g. EI2), because the camel-case policy would only lower the first letter of those
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.#ctor">
+            <summary>
+            Constructor of this class
+            </summary>
+        </member>
+        <member name="T:DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.LowerCaseNamingPolicy">
+            <summary>
+            Naming policy that lowers every character
+            </summary>
+        </member>
+        <member name="F:DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.LowerCaseNamingPolicy.Instance">
+            <summary>
+            Shared instance
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonLowerCaseStringEnumConverter`1.LowerCaseNamingPolicy.ConvertName(System.String)">
+            <summary>
+            Convert a member name
+            </summary>
+            <param name="name">Member name</param>
+            <returns>Lower-case name</returns>
         </member>
         <member name="T:DuetAPI.Utility.JsonOptionalShortDateTimeConverter">
             <summary>
