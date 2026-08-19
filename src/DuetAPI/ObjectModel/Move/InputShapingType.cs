@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel;
 /// <summary>
 /// Enumeration of possible input shaping methods
 /// </summary>
-[JsonConverter(typeof(JsonCamelCaseStringEnumConverter<InputShapingType>))]
+[JsonConverter(typeof(JsonLowerCaseStringEnumConverter<InputShapingType>))]
 public enum InputShapingType
 {
     /// <summary>
