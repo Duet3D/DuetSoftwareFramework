@@ -201,11 +201,74 @@ Required by both implementations, and useful on its own.
 
 ### 5.1 The class table
 
-One declarative table in DuetControlServer, `Codes/CodeClass.cs`: code (and, where needed,
-sub-case such as "M106 from a file" vs "M109") to Immediate / Deferred / Ordered / Barrier, asserted
-by a unit test and diffable against the §3 table. The value is that "does this code need a
-standstill" and "does this code need to wait for the channel at all" become reviewable statements
-instead of invisible omissions.
+Today the class of a code is implicit in whether its handler happens to call
+`FlushAndWaitForStandstillAsync`, and each of the 13 call sites carries its own guard
+(`SetsAnyDrive` for M92/M350/M906, "parameters present" for M584, and so on). The table makes the
+class a declared fact, and moves the enforcement out of the handlers into the pipeline, so "does
+this code need a standstill" becomes one reviewable line instead of an invisible omission.
+
+**Added:**
+
+- `Codes/CodeClass.cs`:
+
+  ```csharp
+  public enum CodeClass
+  {
+      Immediate,   // act now, do not wait for the channel's pending codes
+      Ordered,     // flush the pipeline (order + expressions), no standstill; the move carries the value
+      Deferred,    // the effect belongs at a point in the path (§5.2, §5.3)
+      Barrier      // flush, then wait for standstill before the handler runs
+  }
+  ```
+
+- `Codes/CodeClassifier.cs`: a frozen dictionary keyed on `(CodeType, MajorNumber)` whose value is
+  either a fixed `CodeClass` or a resolver `Func<Commands.Code, CodeClass>` for the rows whose class
+  depends on the parameters. The resolvers are today's handler guards, relocated:
+  `M92/M350/M906/M913/M917` are Barrier when a drive letter is present and Immediate when bare (a
+  report, which DWC polls mid-print); `M584` and `M593` are Barrier only when setting; `G10` is
+  Barrier with an axis letter and Deferred without; `M150` asks the strip whether it needs a
+  standstill (the `MustStopMovement` capability) and is Barrier then, Deferred otherwise. A code
+  with no row is Immediate. `Classify(code)` is total and side-effect free.
+
+**Changed:**
+
+- `Pipelines/ProcessInternally.cs` classifies each G/M/T code before dispatching
+  `code.ProcessInternally()` and performs the class's synchronisation itself (diagram below).
+  Keywords and comments are not classified. A flush that reports "not ready" cancels and retries the
+  code exactly as the in-handler flushes do today.
+- `MCodeHandler.FlushAndWaitForStandstillAsync` and its 13 call sites
+  (`MCodeHandler.Motion.cs`, `MCodeHandler.Compensation.cs`) are deleted; their guards become the
+  resolvers above. Multi-phase codes that wait *inside* their sequence (G28, G30, a tool change,
+  M400 itself) keep those internal waits: their row reads Barrier, and the pipeline's pre-dispatch
+  wait subsumes only the wait a handler performed first thing.
+- Both deferral implementations later hook the one `Deferred` branch; until one lands, that branch
+  dispatches immediately, which is today's behaviour.
+
+```mermaid
+flowchart TD
+    A[code reaches ProcessInternally] --> B{G / M / T code?}
+    B -- no: keyword, comment --> D0[dispatch handler as today]
+    B -- yes --> C["CodeClassifier.Classify(code)"]
+    C -- Immediate --> D1[dispatch handler, no flush]
+    C -- Ordered --> F1["CodeProcessor.FlushAsync(code)<br/>(pipeline order + expressions)"] --> D2[dispatch handler]
+    C -- Barrier --> F2["FlushAsync(code)"] --> W["planner.WaitForStandstillAsync()"] --> D3[dispatch handler]
+    C -- Deferred --> F3["FlushAsync(code)"] --> G{"file channel and<br/>anchor exists? (§5.2, §5.3)"}
+    G -- no --> D4[dispatch handler: applies now]
+    G -- yes --> H["defer: §6 queue / §7 action"]
+```
+
+**Tests (`UnitTests`):**
+
+- a data-driven test holding the expected class of every code in §3 and §9, diffed both ways
+  against `CodeClassifier`, so a new handler without a row and a row without a handler both fail;
+- a regression pin for the mechanical move: the set of codes classified Barrier equals the set
+  whose handlers waited before the move, commit for commit.
+
+**Landing order.** First the types, table and tests with nothing consuming them (no behaviour
+change). Then the pipeline enforcement and the deletion of the 13 sites, behaviour-preserving by
+the pin test. Then, each as its own visible commit, the rows where the declared class *changes*
+behaviour: M409 loses a flush it never needed, and M999 B and M952 gain the standstill RRF never
+took (§3).
 
 ### 5.2 Only job-file channels defer, macros included
 
@@ -627,7 +690,8 @@ right point in the path.
 
 ## 11. Order of work and open decisions
 
-1. **The class table** (§5.1). DuetControlServer only, no behaviour change.
+1. **The class table** (§5.1). DuetControlServer only; behaviour-preserving until the final row
+   flips (M409, M999 B, M952), which land one per commit.
 2. **Emergency-stop output handling in Duet3Expansion** (§5.7). A live gap independent of this plan.
 3. **`state.macroRestarted`** written on macro re-run after a pause (§5.2).
 4. **The implementation decision** (§8), then:

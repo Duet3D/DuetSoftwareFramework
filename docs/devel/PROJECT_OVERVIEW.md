@@ -25,7 +25,7 @@ against the reference tree in `lib/RepRapFirmware`.
 | 5 | Events migration | [EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) | 🟢 4 of 5 phases | 1 × M, 1 × S | M291 (WS7) |
 | 6 | Job lifecycle | [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) | 🟢 8 phases, 5 with tails | 2 × M, 6 × S | M291, M581, M452 (all WS7) |
 | 7 | M-code / motion migration | [MCODE_MIGRATION.md](MCODE_MIGRATION.md) | 🟡 ~58% of inventory | 7 × L, 14 × M, 5 × S | see §3 |
-| 8 | Synchronised actions | [MOTION_SYNCHRONISED_ACTIONS.md](MOTION_SYNCHRONISED_ACTIONS.md) | ⬜ **Not started** | 2 × S, 1 × M shared, then A (2 × M) or B (2 × L, 3 × M) | implementation decision (§5) |
+| 8 | Synchronised actions | [MOTION_SYNCHRONISED_ACTIONS.md](MOTION_SYNCHRONISED_ACTIONS.md) | ⬜ **Not started** | 1 × S, 2 × M shared, then A (2 × M) or B (2 × L, 3 × M) | implementation decision (§5) |
 
 Workstream 7 is the umbrella the others were carved out of, and is most of what remains. Workstream 8
 is fully specified and independent; its shared groundwork can start immediately, and which of its two
@@ -173,7 +173,7 @@ way.
 
 | Step | Task | Size | Notes |
 |---|---|---|---|
-| 1 | Declare which codes execute immediately and which defer | S | DCS only, no behaviour change |
+| 1 | Declare which codes execute immediately and which defer, enforced in the pipeline | M | DCS only; behaviour-preserving apart from three explicit row flips |
 | 2 | Emergency-stop output handling in `Duet3Expansion` | M 🔧 | A live gap today: fans and GPIO survive an M112 until the board resets, and commands still execute in the pre-reset window |
 | 3 | Write `state.macroRestarted` on macro re-run after a pause | S | The field exists; nothing writes it |
 | A | Queue store, release on `MoveCompletedEvent`, purge hooks, M400 term | M | DCS only |
