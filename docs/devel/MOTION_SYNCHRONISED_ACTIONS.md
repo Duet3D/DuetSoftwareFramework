@@ -66,6 +66,44 @@ limits are structural rather than incidental:
   `ShouldQueueMCode` is a hand-maintained switch statement that someone has to keep correct;
 - the object model lags, because the code itself has not run yet.
 
+### Why not queue the code instead
+
+`GCodeQueue` is the alternative design, not merely the prior art, and it wins on real points. Setting
+them out honestly:
+
+| | Queue the code (RRF) | Schedule the effect (this plan) |
+| --- | --- | --- |
+| Protocol change | **none** | `whenToExecute`, two shortened arrays, the offset table, board-side parking, the purge broadcast, latched outputs |
+| Handler can act on the board's reply | **yes** — the handler runs late, so it can branch, retry and report | reported, not branched on: §6 attributes the answer to the originating code, but the code has already replied |
+| A code emitting several messages | **naturally together** — one handler, one moment | needs them to share an anchor, which §4 has to carry |
+| Reported object model vs machine | **never disagree** — nothing has happened yet | diverge while an action is parked |
+| Timing | move boundary, and the message still has to travel after completion | absolute time against the step clock |
+| Expressions | refused; `!ContainsExpression()` | work, evaluated at parse time (§7) |
+| Errors on the offending line | no — the code has not run | yes, for everything knowable at parse time (§6) |
+| Requested object model | lags the parser | keeps up |
+| Stream order for plugins and IPC | broken; codes execute out of order | preserved |
+| Which codes may defer | hand-maintained `ShouldQueueMCode` | falls out of the semantics |
+| Payload limit | `BufferSizePerQueueItem` of text | the protocol's own frame size |
+
+Two of those rows deserve more than a line, because they are the ones that decide it.
+
+**Queueing the code does not actually solve the reply problem; it relocates it.** RepRapFirmware
+executes queued codes on dedicated `Queue` and `Queue2` channels whose responses go to
+`GenericMessage`. The answer still does not reach the line that asked, in the order it asked — it
+surfaces on the console, detached from its origin, which is what §6 does with a late failure anyway.
+What queueing genuinely buys is that *handler logic* survives to see the reply and can branch on it.
+That is a real capability and this plan gives it up. It is not the same as the code reporting its own
+result.
+
+**And the cost is much higher here than in the firmware.** In RepRapFirmware a queued code is a line
+of text re-parsed later. In DuetControlServer a `Code` has already traversed `Start`, `Pre`,
+`ProcessInternally`, `Post` and `Executed`, been reported to plugins and IPC clients, and has a caller
+awaiting its result. Deferring the whole code means either holding the file reader — which defeats the
+purpose — or completing the code with a fabricated result and re-entering the pipeline later. The
+second is the same asynchronous-failure trade §6 is criticised for, bought at the price of
+expressions, stream order and the requested object model. **Queueing the code pays more for the same
+compromise**, which is what settles it.
+
 DuetControlServer has something stronger. The SBC owns a fitted model of the controller's step clock,
 every move already carries an absolute `whenToExecute` to the boards, and moves are dispatched ahead
 of execution. **The machine already has "do this at time T" as a first-class primitive.** It is
@@ -122,8 +160,9 @@ restart rather than of this design. §5 works it through.
 
 ### The anchor
 
-An action is `{ afterMoveId, payload }` — the id of the move it was submitted behind, and the CAN frame
-to send. Where the timestamp goes in that frame is a lookup on the message type rather than a field on
+An action is `{ afterMoveId, payloads, origin }` — the id of the move it was submitted behind, the CAN
+frames to send (plural: M106 emits two, see §4), and enough of the originating code to name itself if
+a board answers late (§6). Where the timestamp goes in that frame is a lookup on the message type rather than a field on
 the action (§4). It carries no file position and no offset into the move; §5 shows why neither is
 needed.
 
@@ -189,6 +228,34 @@ downstream changes. That looks like the cheap option and is not:
 | Boards | nothing | one gate in `CommandProcessor::Spin` and a parked-command ring |
 | Protocol | nothing | a 4-byte field per command message |
 | Purge | a local list operation | a broadcast (§4) |
+
+A third option sits between those two and is easy to miss, because the table above reads as though it
+had already been dismissed: **keep the timestamp on the board, but hold the frame on the SBC until its
+due time is within the same 50 ms horizon.** Accuracy is then exact, as in the right-hand column, and
+a command's parked lifetime on a board is 50 ms flat rather than 50 ms plus the anchoring move's
+duration. It is the better idea of the two hold designs and it is still not worth doing.
+
+- **The ring depth it saves is not the depth the ring is sized for.** Depth is driven by action
+  *rate*, not by parked lifetime. The pathological case is §4's `M42` on every segment: at 1 ms
+  segments, 50 ms of horizon holds about fifty entries either way, because the anchoring move's
+  duration is itself 1 ms. Holding on the SBC helps only the single-long-move case, and that is one
+  entry sitting for longer, not a deeper ring.
+- **It introduces a second timebase conversion, and the current design has none.** The due time is in
+  the movement timebase — the step clock less the shared movement delay — so a hiccup slips the parked
+  action and the path together, automatically, because the board applies the same delay. An SBC hold
+  list has to decide *locally* when 50 ms before that moment is, which means tracking the movement
+  delay as it changes and re-evaluating held entries when it does. Sending immediately means nobody
+  ever converts.
+- **Ordering stops being free.** Riding the move sink means an effect cannot overtake another without
+  moves overtaking each other first. A hold list releasing by due time has to re-establish that on its
+  own, for actions to different boards and for actions sharing a due time.
+
+Its one real merit is the residual §6 names: parked lifetime bounds how long a `pendingRequests` slot
+must live, and a 50 ms bound would remove the awkward case entirely. But that matters only if a
+deferred action ever needs a reply, and if that day comes, changing which clock the timeout counts
+from is far cheaper than a hold list. **Purging gets simpler too — a held action is dropped locally —
+but not simpler enough: actions already sent still need §4's broadcast, so that would be two
+mechanisms where there is now one.**
 
 The hold list is the thing to notice. It needs ordering, per-destination FIFO discipline so effects
 cannot be silently reordered, backpressure tied to move preparation, a policy for a deadline that
@@ -295,6 +362,54 @@ classes already say why none of it defers. §9 lists which codes those four serv
 this architecture forces: a spindle is `CanMessageWriteGpio` here, so M3, M4 and M5 join M42 and M280
 on that row.
 
+`CanMessageSetHeaterTemperatureV1` is the row that proves the class is a property of the **code**, not
+the layout. The same nine bytes carry a deferrable setpoint for M104 and a barrier for M109, and no
+field in the message distinguishes them: M109 blocks later G-code on a condition derived from the
+target, so deferring the target would leave it waiting on something the machine has not been told to
+do. §8 has to attach the class to the code for exactly this reason, and a table keyed on message types
+cannot do it.
+
+M574 and M558 are worth stating carefully, because the obvious argument for them is wrong in both
+directions. A homing or probing move waits for standstill at **both** ends — RepRapFirmware in
+`WaitForEndstopOrProbingMoveToFinish`, DuetControlServer in `planner.WaitForStandstillAsync` — so no
+such move can still be running when the next code is read, and
+
+```gcode
+M574 ...        ; configure endstop
+G1 H1 ...       ; home, using that endstop
+M574 ...        ; reconfigure
+G1 H1 ...       ; home again, using the new one
+```
+
+is already safe without M574 waiting for anything. That is also why RepRapFirmware not stopping for
+M558 is consistent rather than an oversight, and why its M574 standstill is explained by the reason
+its own code gives — protecting a lock-free walk of `activeEndstops` from the step path — rather than
+by ordering.
+
+**It is still the wrong basis for the class.** It makes M574 correct because of what `G1 H1` does, an
+invisible coupling of exactly the kind §8 exists to remove: chaining homing moves without an
+intervening standstill is a plausible optimisation, multiple motion systems put the reconfiguration on
+a channel the homing move's wait does not cover, and nothing would fail a test when either lands. So
+declare the class on the code's own terms — *no move that consults an endstop or probe may be queued
+or running* — which is true however the neighbouring move behaves. The wait costs nothing where it
+matters anyway: after a `G1 H1` the machine is already stopped, and an M574 with no homing move near
+it has nothing to protect.
+
+Deferring them instead is not an option, and §6 already says why: both need the board's answer.
+`CreateInputMonitorV1` returns the handle and whether the port was created, `ChangeInputMonitorV1`
+returns the monitor's current state, and M574 has to report a bad pin name to whoever wrote it. A code
+that needs a reply is not a deferrable code. The deeper reason is that an endstop configuration does
+not belong at a point in the *path* at all — it belongs before the moves that consult it, which is
+Barrier, not Deferred.
+
+M106 is the row that breaks one message per code. It sends `CanMessageSetFanSpeed` for the fan and
+`CanMessageHeaterFeedForwardV1` to every heater of the tool that fan cools, through
+`Tool::SetFansPwm`, and the second is only right if it lands with the first: feedforward that arrives
+early has a heater compensating for a fan that is not running yet, which is this document's defect
+pointed at the heater instead of the fan. So **an action is not one per code**. §4's
+`{ afterMoveId, payload }` has to carry a list of payloads, and the anchor has to be resolved once for
+the code rather than once per message, or the pair can straddle a move boundary and land split.
+
 *RRF waits for standstill* is the same claim from the other side, and it holds: **no code both defers
 and waits for standstill.** Where a message shows *sometimes* in both, the two sets are complementary
 rather than overlapping — M104 defers and M109 waits, M150 defers exactly when its strip does not force the
@@ -355,7 +470,7 @@ That also removes a field from the action. The board finds the timestamp by know
 layouts, but the SBC has to patch the time into an opaque frame, which means knowing the offset for
 that message type. Rather than carrying the offset in every action, **generate the offset table** —
 message type to `whenToExecute` offset — the way `CanMessageGenericTables` is already generated from
-the same schema. The action is then `{ afterMoveId, payload }` and the offset is a lookup that cannot
+the same schema. The action is then `{ afterMoveId, payloads, origin }` and the offset is a lookup that cannot
 disagree with the layout it describes.
 
 Two numbers to name rather than write twice while doing it: the shortened array lengths belong in the
@@ -671,18 +786,76 @@ Two residual failures, and they are not the same:
 - **The board acted but complained** — "fan 3 not configured". Diagnostic. `Model.Messages`, tagged
   with the originating code so it is traceable: `M106 S255 (deferred): fan 3 not configured`.
 
-### Needing a reply is the test for "not deferrable"
+### Deferred actions still get their reply
 
-Deferred actions are sent with `replyType = NoReply`. Asking for a reply buys nothing when the code has
-already completed and nothing is waiting on it, and the `txToken` → `CanMessageSent` path already
-reports the half that matters — whether the message was accepted for transmission.
+This is not hypothetical and cannot be designed away. The messages this plan most wants to defer are
+exactly the ones DuetControlServer sends with `CanMessageType.StandardReply` today and whose answer it
+turns into the code's result:
 
-That gives a rule instead of a maintained list:
+| Helper | Message | What it does with the reply |
+| --- | --- | --- |
+| `FanManager.SetPwmAsync` | `CanMessageSetFanSpeed` | `reply.Type == MessageType.Error ? reply.Content : null` |
+| `GpioManager.WriteAsync` | `CanMessageWriteGpio` | the same |
+| `HeatManager.SetTemperatureAsync` | `CanMessageSetHeaterTemperatureV1` | the same |
+| `RemoteLedStrip`'s equivalent | `CanMessageGeneric` / `writeLedStrip` | the same |
 
-> **If a code needs the board's answer to produce its own reply, it is not a deferrable code.**
+Only `CanMessageHeaterFeedForwardV1` is already fire-and-forget. So "deferred means no reply" would
+lose error reporting the machine has today, which is a regression rather than a simplification.
 
-M106 needs no answer. M950 does — it reports the port it took — and M950 is configuration rather than
-path-positioned, so it stays synchronous anyway. The classification falls out of the semantics.
+### The rule, stated properly
+
+The distinction is not *whether the answer matters*. It is **whether the code's own result depends on
+it**:
+
+> **If a code needs the board's answer to produce its own reply, it is not deferrable.**
+> **If it only needs the answer *reported*, it defers, and the answer is attributed to it late.**
+
+M106 is the second kind, which is why it was always the worked example. It replies `ok`; the board's
+"fan 3 not configured" has to reach the *user*, and nothing about that requires it to reach the code's
+return value. M950 is the first kind — it reports which port it took, so the answer *is* the result —
+and M950 is configuration rather than path-positioned, so it never wanted deferring anyway.
+
+`GpioManager.WriteAsync` already splits along that line without meaning to. `TryGetBoard` fails the
+code synchronously with "Output 5 is not configured" *before* the send; only what the board itself
+discovers can arrive late. §6's "validate early, deliver late" is therefore not a new discipline to
+impose — it is a description of where the existing code already draws the line.
+
+### What carries the answer back
+
+The action becomes `{ afterMoveId, payloads, origin }`, where `origin` is what the late message needs
+in order to name itself: the code's short form, its channel and its file position.
+
+**Identity needs nothing new.** DuetControlServer allocates a `txToken` in `NextCanTxToken`;
+DuetCANMaster allocates the CAN request id in `SendCanRequest` and stores the token beside it so the
+reply routes back. A deferred action is still *sent* at an ordinary moment — 50 ms ahead, with its
+anchoring move — and it is the board that parks it, not the link. So the rid is allocated at send
+exactly as now, and nothing is reserved early or plumbed through DuetSbcInterface.
+
+What changes is lifetime and destination:
+
+| Component | Change |
+| --- | --- |
+| DuetCANMaster | read `whenToExecute` from the outgoing frame with the same generated offset table §4 gives the SBC, and base the slot's expiry on it instead of `millis()` at send. It already keeps a step clock for time sync, so it can compare directly, and `SendCanMessageHeader` still does not have to grow |
+| DuetCANMaster | `pendingRequests` is 32 slots. The outstanding set is the actions inside the 50 ms prepared window plus the anchoring move's duration — the same bound §4 gives the boards' parked rings — so 32 should be ample. It already sets `noReplyPossible` when it cannot find a slot; that path must be counted and surfaced rather than silently degrading |
+| DuetControlServer | a deferred action's `txToken` maps to an `origin`, not to a `TaskCompletionSource`. Nothing awaits it, so its arrival completes no code |
+| DuetControlServer | on §5's purge, drop the outstanding mappings locally. The broadcast is fire-and-forget, so nothing will ever reply and the entries would otherwise leak |
+
+### What the late answer may do
+
+Three outcomes, and the first is the common one:
+
+- **`GCodeResult::ok`** — nothing. The effect landed.
+- **The board acted but complained** — `Model.Messages`, tagged from `origin` so it is traceable:
+  `M106 S255 (deferred): fan 3 not configured`. This is the case the table above would otherwise lose.
+- **No reply by `whenToExecute` + `UsualResponseTimeout`, or a delivery failure** — a `MachineEvent`,
+  as §6 already specifies for the bus-error case. The effect did not happen, which is a different
+  class of thing from the board disagreeing with it.
+
+**The continuation may not write the requested object model.** It runs after the code completed, so a
+later code may already have moved the same field, and a late write would silently undo it. It writes
+messages and events only. That is not a limitation of this mechanism so much as the honest shape of an
+answer that arrives after the question has been filed.
+
 `SendCanMessageHeader.txToken` still matches a late reply to its request; it simply has no code left to
 attach to, so it goes to `Model.Messages`.
 
