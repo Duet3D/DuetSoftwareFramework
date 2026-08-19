@@ -30,9 +30,9 @@ public sealed class FallbackMiddleware(ILogger<FallbackMiddleware> logger) : IMi
         if (context.Request.Method == HttpMethods.Get &&
             !path.Equals("/") &&
             !path.StartsWith("/rr_") && !path.StartsWith("/machine/") &&
-            // A path without a dot is a client-side route; the Explorer editor (e.g.
-            // /Explorer/edit/sys/config.g) is one too but carries the target filename, so admit it explicitly
-            (!path.Contains('.') || path.StartsWith("/Explorer/")))
+            // A path without a dot is a client-side route; Explorer and Jobs routes carry arbitrary
+            // SD card paths (e.g. /Explorer/edit/sys/config.g or /Jobs/0.4mm%20Nozzle), so admit them explicitly
+            (!path.Contains('.') || path.StartsWith("/Explorer/") || path.StartsWith("/Jobs/")))
         {
             logger.LogWarning("Could not find resource {Path}, serving index file", context.Request.Path);
             context.Request.Path = PathString.FromUriComponent("/");
