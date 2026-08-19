@@ -5,7 +5,18 @@ is recorded there, and how a line the machine is half way through is finished ra
 
 The parts that are unusual all come from one fact. RepRapFirmware pauses from inside the loop it is
 interrupting, so the interpreter, the move queue and the pause are the same task. Here they are four
-tasks that run at once, and a pause has to interrupt three of them from outside.
+tasks that run at once, in two programs, and a pause has to interrupt three of them from outside.
+
+| Program | Runs on | What it contributes to a pause |
+|---|---|---|
+| [DuetControlServer](src/DuetControlServer), DCS below | the SBC, managed C# | Everything that knows what a file is: which kind of pause this is, where to rewind to, how much of the interrupted line is owed, the restore point, the macros |
+| [DuetSbcInterface](src/DuetSbcInterface) | the SBC, native C++ | Everything that knows what a move is: the DDA ring, the deceleration it plans, which queued moves it frees, and the ids it reports back |
+
+They meet at one C ABI call and one result published beside it, and neither side reaches across.
+`MoveParams` carries a move id and no file position, so the native side is told nothing about files;
+a stop reports the id of the earliest move it dropped, and DuetControlServer is what turns that back
+into a place in the job file. Anything below that names a `.cs` file is DuetControlServer, and
+anything that names a `.cpp` file is DuetSbcInterface; §10 is the full map.
 
 Related reading: [File management](file-management.md#print-jobs) covers the job loop and the seek
 this hangs off; [G-Code flow](gcode-flow.md) covers the pipeline whose codes a pause cancels;
@@ -19,47 +30,46 @@ still missing, is [JOB_LIFECYCLE.md](docs/devel/JOB_LIFECYCLE.md).
 
 ```mermaid
 flowchart LR
-    subgraph JOB["Job task"]
+    subgraph DCS["DuetControlServer, managed"]
         direction TB
-        J1["DoFilePrint reads ahead"]
-        J2["rewind and wait on _resume"]
+        subgraph JOB["Job task"]
+            J1["DoFilePrint reads ahead"]
+            J2["rewind and wait on _resume"]
+        end
+        subgraph CODE["Code task, one per code"]
+            C1["SubmitMoveAsync builds once"]
+            C2["queues segment by segment"]
+        end
+        subgraph PAUSE["Pause task"]
+            P1["PauseAsync"]
+        end
+        ST["MovementState and JobMoveIndex<br/>under the planner lock<br/>CurrentJobMove<br/>SegmentsLeft<br/>PurgeGeneration<br/>MoveFractionToSkip<br/>RestorePoints"]
     end
-    subgraph CODE["Code task, one per code"]
+    subgraph SBCI["DuetSbcInterface, native"]
         direction TB
-        C1["SubmitMoveAsync builds once"]
-        C2["queues segment by segment"]
+        N1["MotionService loop<br/>DrainFeedholds"]
+        N2["DDARing ring 0<br/>Feedhold, PauseMoves"]
     end
-    subgraph PAUSE["Pause task"]
-        direction TB
-        P1["PauseAsync"]
-    end
-    subgraph NAT["Motion thread, native"]
-        direction TB
-        N1["DrainFeedholds"]
-        N2["DDARing ring 0"]
-    end
-
-    ST["MovementState, under the planner lock<br/>CurrentJobMove<br/>SegmentsLeft<br/>PurgeGeneration<br/>MoveFractionToSkip<br/>RestorePoints<br/>JobMoveIndex"]
 
     J1 -- executes --> C1
     C1 --> C2
     C2 -- writes the record --> ST
-    C2 -- queues moves --> N2
-    P1 -- requests the stop --> N1
+    C2 -- queues moves, C ABI --> N2
+    P1 -- DuetSbc_MotionRequestStop --> N1
     N1 --> N2
-    N2 -. seqlock result .-> P1
+    N2 -. seqlock result, DuetSbc_MotionGetFeedholdResult .-> P1
     P1 -- takes the record --> ST
     P1 -- cancels the read-ahead --> J2
     ST -- fraction and modal G --> J2
     J2 -- carries on --> J1
 ```
 
-| Task | Entered from | What it owns |
-|---|---|---|
-| `DoFilePrint` | the job's background task | reading codes, the file position it falls back to, the seek and the wait |
-| `SubmitMoveAsync` | each `G0`/`G1` on the job channel | building the move once, queueing its segments, the record while the code is in flight |
-| `PauseAsync` | `M25`, `M226`/`M600`/`M601`, an event's default action | the stop, the take, the restore point, `pause.g` |
-| `MotionService` loop | the native motion thread | the DDA ring, and the only code allowed to free a queued move |
+| Task | Where | Entered from | What it owns |
+|---|---|---|---|
+| `DoFilePrint` | DCS, `Files/JobProcessor.cs` | the job's background task | reading codes, the file position it falls back to, the seek and the wait |
+| `SubmitMoveAsync` | DCS, `Codes/Handlers/GCodeHandler.cs` | each `G0`/`G1` on the job channel | building the move once, queueing its segments, the record while the code is in flight |
+| `PauseAsync` | DCS, `Files/JobProcessor.Lifecycle.cs` | `M25`, `M226`/`M600`/`M601`, an event's default action | the stop, the take, the restore point, `pause.g` |
+| `MotionService` loop | DuetSbcInterface, `src/Motion/MotionService.cpp` | the native motion thread | the DDA ring, and the only code allowed to free a queued move |
 
 The job reads far ahead of the machine, so at the instant a pause arrives the file is typically some
 lines past the move the head is making, and one of those lines is usually part-way into the queue.
@@ -103,27 +113,32 @@ point.
 An asynchronous pause plans its own stop. This is the one deliberate deviation from RepRapFirmware in
 this subsystem, and [rrf-differences §8](rrf-differences.md#8-a-pause-stops-the-machine-sooner-than-reprapfirmwares-does)
 is the entry for it: RepRapFirmware searches the queue for a junction that is already slow enough to
-stop at and, during a print at speed, finds none, so the whole queue runs. Here the engine takes the
-earliest boundary far enough away to decelerate by, forces the end speed there to zero, re-plans
-backwards to the last move it has already committed, and frees the rest.
+stop at and, during a print at speed, finds none, so the whole queue runs. Here the motion engine
+takes the earliest boundary far enough away to decelerate by, forces the end speed there to zero,
+re-plans backwards to the last move it has already committed, and frees the rest.
+
+The stop itself is entirely DuetSbcInterface: `DDARing::Feedhold` chooses the boundary and re-plans,
+`DDARing::PauseMoves` is RepRapFirmware's search kept beside it as the reference behaviour, and
+`MotionService::DrainFeedholds` is what runs either of them on the motion thread. DuetControlServer's
+half is a request, a poll, and what it makes of the answer.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant M as M25 handler
-    participant P as PauseAsync
-    participant PL as MovePlanner
-    participant E as Motion thread
-    participant S as SubmitMoveAsync
-    participant J as DoFilePrint
+    participant M as M25 handler, DCS
+    participant P as PauseAsync, DCS
+    participant PL as MovePlanner, DCS
+    participant E as Motion thread, DuetSbcInterface
+    participant S as SubmitMoveAsync, DCS
+    participant J as DoFilePrint, DCS
 
     M->>P: PauseAsync, synchronous false, feedhold true
     P->>P: PauseState = Pausing
     P->>PL: StopEarlyAsync, plannedDeceleration true
-    PL->>E: DuetSbc_MotionRequestStop
+    PL->>E: DuetSbc_MotionRequestStop, the only call that crosses
     PL->>PL: State.NotePurge, under the planner lock
     E->>E: DrainFeedholds, then Feedhold on ring 0
-    E-->>PL: stopped, firstPurgedMoveId, movesPurged
+    E-->>PL: DuetSbc_MotionGetFeedholdResult, polled<br/>stopped, firstPurgedMoveId, movesPurged
     PL->>PL: ResyncFromEngine, SyncInterpreterToMachine, SegmentsLeft = 0
     PL-->>P: FeedholdOutcome
     P->>PL: TakeJobResumePoint
@@ -141,10 +156,10 @@ sequenceDiagram
 
 Three parts of that order are load bearing:
 
-- **The request and the answer are separate calls.** Freeing a move frees its segments, and only the
-  motion thread may do that, so the result cannot come back from the call that asks for the stop. It
-  is published through a seqlock and polled every 2 ms, which is also why `DrainFeedholds` collapses
-  several requests into one stop, the strongest winning.
+- **The request and the answer are separate calls across the C ABI.** Freeing a move frees its
+  segments, and only the native motion thread may do that, so the result cannot come back from the
+  call that asks for the stop. It is published through a seqlock and polled every 2 ms, which is also
+  why `DrainFeedholds` collapses several requests into one stop, the strongest winning.
 - **`NotePurge` runs when the stop is requested, not when it is answered.** `PurgeGeneration` says
   one thing to every channel: the ring was emptied, so anything you were part-way through is void.
   Bumping it early is what keeps a segmented move from feeding a ring that is about to be emptied.
@@ -168,14 +183,17 @@ non-Cartesian geometry both need a line divided. So the boundary a stop lands on
 G-code, and every segment of that code carries the same file position. Rewinding to it and reading
 the line again plainly would ask for the whole line a second time.
 
-While a job movement code is in flight the interpreter holds one record of it,
-`MovementState.CurrentJobMove`: the file position, the code's length, the modal G command, the feed
-rate it was read with, the fraction the build started from, its segment count, and how many segments
-have gone to the ring. `JobMoveIndex` maps each queued move id to that record and to the move's own
-place in it. The file position and the fraction are fields of one record, so they cannot come to
-describe different lines.
+All of this bookkeeping is DuetControlServer's, in `Motion/JobMoveIndex.cs`, and it exists because
+the native side deliberately holds none of it. While a job movement code is in flight the interpreter
+holds one record of it, `MovementState.CurrentJobMove`: the file position, the code's length, the
+modal G command, the feed rate it was read with, the fraction the build started from, its segment
+count, and how many segments have gone to the ring. `JobMoveIndex` maps each queued move id, which is
+the only name the native side knows a move by, to that record and to the move's own place in it. The
+file position and the fraction are fields of one record, so they cannot come to describe different
+lines.
 
-`MovePlanner.TakeJobResumePoint` reads it once, under the planner lock:
+`MovePlanner.TakeJobResumePoint` reads it once, under the planner lock, and the id it looks up is the
+one the stop reported:
 
 ```mermaid
 flowchart TD
@@ -284,6 +302,10 @@ sequenceDiagram
     S->>PL: MoveFractionToSkip = 0, spent by this one move
 ```
 
+Nothing in that diagram crosses to the native side except the moves themselves: the resume is
+DuetControlServer putting the machine, the interpreter and the file back into step, and the moves it
+queues to do so are ordinary moves.
+
 **The head goes back in one move or two.** When it is above the pause point the resume travels across
 first and descends afterwards, so the nozzle does not drag through the print; when it is at or below
 the pause point every axis moves together. That is RepRapFirmware's `resuming1` and `resuming2`, and
@@ -354,3 +376,35 @@ not implemented (§9).
 
 [JOB_LIFECYCLE.md](docs/devel/JOB_LIFECYCLE.md) tracks all of these, along with the reasoning behind
 the design above.
+
+Two of those rows are gaps on the native side and the rest are DuetControlServer's. The arc and
+retraction row is `DDA::IsRestartableBoundary` needing to be cleared for boundaries a print cannot be
+restarted from; the second motion system row is `DrainFeedholds` stopping ring 0 only, and DCS having
+one restore point and one interpreter state.
+
+---
+
+## 10. Where each piece lives
+
+**DuetControlServer**, `src/DuetControlServer`, everything that knows what a file is:
+
+| File | What is in it |
+|---|---|
+| `Files/JobProcessor.Lifecycle.cs` | `PauseAsync`, `ResumeAsync`, `StopAsync`, `SaveRestorePointAsync`, `MoveBackToRestorePointAsync`, `CheckForDeferredPauseAsync` |
+| `Files/JobProcessor.cs` | `DoFilePrint`, `StopReadingForPause`, `RestoreModalStateForResume`, the seek and the wait |
+| `Codes/Handlers/MCodeHandler.cs` | `M25`, `M226`/`M600`/`M601`, `M24`, `M26` |
+| `Motion/MovePlanner.cs` | `StopEarlyAsync`, `TakeJobResumePoint`, `FeedholdOutcome` |
+| `Motion/JobMoveIndex.cs` | `JobMoveOrigin` and its `PointAt`, `JobResumePoint`, the move id index |
+| `Motion/MovementState.cs` | `CurrentJobMove`, `SegmentsLeft`, `PurgeGeneration`, `MoveFractionToSkip`, `RestorePoints` |
+| `Motion/MoveInterpreter.cs` | the scaling of §4, and `SyncInterpreterToMachine` |
+| `Codes/Handlers/GCodeHandler.cs` | `SubmitMoveAsync`: the record's creation, the per-segment checks, the unwind |
+| `Link/Native/NativeLink.cs` | `RequestStop` and `TryGetFeedholdResult`, the managed side of the two calls |
+
+**DuetSbcInterface**, `src/DuetSbcInterface`, everything that knows what a move is:
+
+| File | What is in it |
+|---|---|
+| `src/Motion/MotionService.cpp` | `DrainFeedholds`, collapsing requests and publishing the result through the seqlock |
+| `src/Motion/DDARing.cpp` | `Feedhold`, the planned deceleration; `PauseMoves`, RepRapFirmware's search kept as the reference |
+| `src/Motion/DDA.cpp`, `DDA.h` | `IsRestartableBoundary`, `SetSpeedsForFeedhold` |
+| `src/CApi.cpp` | `DuetSbc_MotionRequestStop` and `DuetSbc_MotionGetFeedholdResult`, the C ABI both sides meet at |
