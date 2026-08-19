@@ -300,6 +300,9 @@ build/
 # Claude Code
 .claude/*
 !.claude/memory/
+# Private memories: kept in the workspace so they survive a container rebuild,
+# never committed.
+.claude/memory/private/
 
 # Reference checkout of RepRapFirmware; not a submodule of this repo.
 lib/RepRapFirmware/

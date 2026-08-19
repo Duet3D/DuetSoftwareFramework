@@ -15,4 +15,4 @@ silently, and they have to notice and redo it. It also reads as tidying up after
 **How to apply:** before committing, check `git status --short` to see what is already staged, then
 commit the intended paths explicitly rather than reshaping the index around them. Verify afterwards
 with `git show --stat` that the commit holds what was intended - that is the check that matters, not
-what the index looked like. See [[no-coauthor-in-commits]] for the other standing commit rule.
+what the index looked like.
