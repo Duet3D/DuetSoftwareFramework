@@ -298,7 +298,8 @@ aot/out
 
 build/
 # Claude Code
-.claude/
+.claude/*
+!.claude/memory/
 
 # Reference checkout of RepRapFirmware; not a submodule of this repo.
 lib/RepRapFirmware/
