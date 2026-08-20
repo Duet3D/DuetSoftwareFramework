@@ -127,8 +127,7 @@ public class CodeTableTests
     /// </summary>
     private static DuetControlServer.Commands.Code MakeCommand(string text)
         => new(text, codeProcessor: null!, expressions: null!, gCodes: null!, mCodes: null!,
-               tCodes: null!, keywords: null!, lifetime: null!, linkInterface: null!,
-               macroRunner: null!,
+               tCodes: null!, keywords: null!, lifetime: null!, macroRunner: null!,
                logger: Microsoft.Extensions.Logging.Abstractions.NullLogger<DuetControlServer.Commands.Code>.Instance,
                settings: Microsoft.Extensions.Options.Options.Create(new DuetControlServer.Settings()));
 }

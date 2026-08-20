@@ -156,31 +156,19 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     public ValueTask<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default) => Processors.Value[(int)file.Channel].FlushAsync(file, cancellationToken);
 
     /// <summary>
-    /// Wait for all pending codes on the same stack level as the given code to finish.
-    /// By default this replaces all expressions as well for convenient parsing by the code processors.
+    /// Wait for the codes ahead of the given one on its stack level to finish their remaining
+    /// pipeline stages. Execution itself is serial per stage, so this orders the caller against
+    /// what completes asynchronously behind it: codes a plugin is still executing, replies and log
+    /// output emitted at the Executed stage, the meta G-code <c>result</c>, and file positions.
+    /// By default this evaluates the code's expressions afterwards, so they see settled state.
     /// </summary>
     /// <param name="code">Code waiting for the flush</param>
     /// <param name="evaluateExpressions">Evaluate all expressions when pending codes have been flushed</param>
-    /// <param name="evaluateAll">Evaluate the expressions or only SBC fields if evaluateExpressions is set to true</param>
     /// <param name="syncFileStreams">Whether the file streams are supposed to be synchronized (if applicable)</param>
     /// <param name="ifExecuting">Return true only if the corresponding code input is actually active (ignored if syncFileStreams is true)</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes have been flushed successfully</returns>
-    /// <summary>
-    /// Motion planner, resolved lazily because it is built after the code processor
-    /// </summary>
-    private Motion.MovePlanner? _planner;
-
-    /// <summary>
-    /// Wait for the machine to come to a standstill, as a Barrier-class code requires before its
-    /// handler runs
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>True when the machine is at a standstill, false when cancelled</returns>
-    public ValueTask<bool> WaitForStandstillAsync(CancellationToken cancellationToken = default)
-        => (_planner ??= serviceProvider.GetRequiredService<Motion.MovePlanner>()).WaitForStandstillAsync(cancellationToken);
-
-    public async ValueTask<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true, bool syncFileStreams = false, bool ifExecuting = true, CancellationToken cancellationToken = default)
+    public async ValueTask<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool syncFileStreams = false, bool ifExecuting = true, CancellationToken cancellationToken = default)
     {
         // Wait for the pending codes on this channel to go
         if (!await Processors.Value[(int)code.Channel].FlushAsync(code, cancellationToken))
@@ -192,7 +180,7 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
         if (evaluateExpressions)
         {
             // Code is about to be processed internally, evaluate potential expressions
-            await expressions.EvaluateAsync(code, evaluateAll, cancellationToken);
+            await expressions.EvaluateAsync(code, cancellationToken);
         }
 
         if (syncFileStreams && code.IsFromFileChannel)
@@ -223,6 +211,20 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
         await code.UpdateNextFilePositionAsync(cancellationToken);
         return true;
     }
+
+    /// <summary>
+    /// Motion planner, resolved lazily because it is built after the code processor
+    /// </summary>
+    private Motion.MovePlanner? _planner;
+
+    /// <summary>
+    /// Wait for the machine to come to a standstill, as a Barrier-class code requires before its
+    /// handler runs
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>True when the machine is at a standstill, false when cancelled</returns>
+    public ValueTask<bool> WaitForStandstillAsync(CancellationToken cancellationToken = default)
+        => (_planner ??= serviceProvider.GetRequiredService<Motion.MovePlanner>()).WaitForStandstillAsync(cancellationToken);
 
     /// <summary>
     /// Start the execution of a given code

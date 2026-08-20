@@ -450,92 +450,88 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleListFilesAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        // Resolve the directory
+        if (!code.TryGetString('P', out string? virtualDirectory))
         {
-            // Resolve the directory
-            if (!code.TryGetString('P', out string? virtualDirectory))
-            {
-                using (await model.AccessReadOnlyAsync(cancellationToken))
-                {
-                    virtualDirectory = model.Directories.GCodes;
-                }
-            }
-            string physicalDirectory = await filePathResolver.ToPhysicalAsync(virtualDirectory, cancellationToken: cancellationToken);
-
-            // Make sure to stay within limits if it is a request from the firmware
-            int maxSize = -1;
-            if (code.Flags.HasFlag(CodeFlags.IsFromFirmware))
-            {
-                maxSize = settings.Value.MaxMessageLength;
-            }
-
-            // Check if JSON file lists were requested
-            int startAt = Math.Max(code.GetInt('R', 0), 0), type = code.GetInt('S', 0), maxItems = code.GetInt('C', -1);
-            if (type == 2)
-            {
-                string json = FileLists.GetFiles(virtualDirectory, physicalDirectory, startAt, true, maxSize, maxItems, code.ExplicitLineNumber);
-                return new Message(MessageType.Success, json);
-            }
-            if (type == 3)
-            {
-                string json = FileLists.GetFileList(virtualDirectory, physicalDirectory, startAt, maxSize, maxItems, code.ExplicitLineNumber);
-                return new Message(MessageType.Success, json);
-            }
-
-            // Print standard G-code response
-            Compatibility compatibility;
             using (await model.AccessReadOnlyAsync(cancellationToken))
             {
-                compatibility = model.Inputs[code.Channel]?.Compatibility ?? Compatibility.RepRapFirmware;
+                virtualDirectory = model.Directories.GCodes;
             }
+        }
+        string physicalDirectory = await filePathResolver.ToPhysicalAsync(virtualDirectory, cancellationToken: cancellationToken);
 
-            StringBuilder result = new();
-            if (compatibility == Compatibility.Default || compatibility == Compatibility.RepRapFirmware)
-            {
-                result.AppendLine("GCode files:");
-            }
-            else if (compatibility == Compatibility.Marlin || compatibility == Compatibility.NanoDLP)
-            {
-                result.AppendLine("Begin file list:");
-            }
+        // Make sure to stay within limits if it is a request from the firmware
+        int maxSize = -1;
+        if (code.Flags.HasFlag(CodeFlags.IsFromFirmware))
+        {
+            maxSize = settings.Value.MaxMessageLength;
+        }
 
-            bool itemFound = false;
-            foreach (string file in Directory.EnumerateFileSystemEntries(physicalDirectory))
-            {
-                string filename = Path.GetFileName(file);
-                if (maxSize > 0 && result.Length + filename.Length + 3 > maxSize)
-                {
-                    // Stay within limits...
-                    break;
-                }
+        // Check if JSON file lists were requested
+        int startAt = Math.Max(code.GetInt('R', 0), 0), type = code.GetInt('S', 0), maxItems = code.GetInt('C', -1);
+        if (type == 2)
+        {
+            string json = FileLists.GetFiles(virtualDirectory, physicalDirectory, startAt, true, maxSize, maxItems, code.ExplicitLineNumber);
+            return new Message(MessageType.Success, json);
+        }
+        if (type == 3)
+        {
+            string json = FileLists.GetFileList(virtualDirectory, physicalDirectory, startAt, maxSize, maxItems, code.ExplicitLineNumber);
+            return new Message(MessageType.Success, json);
+        }
 
-                if (compatibility == Compatibility.Marlin || compatibility == Compatibility.NanoDLP)
-                {
-                    result.AppendLine(filename);
-                }
-                else
-                {
-                    if (itemFound)
-                    {
-                        result.Append(',');
-                    }
-                    result.Append($"\"{filename}\"");
-                }
-                itemFound = true;
+        // Print standard G-code response
+        Compatibility compatibility;
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            compatibility = model.Inputs[code.Channel]?.Compatibility ?? Compatibility.RepRapFirmware;
+        }
+
+        StringBuilder result = new();
+        if (compatibility == Compatibility.Default || compatibility == Compatibility.RepRapFirmware)
+        {
+            result.AppendLine("GCode files:");
+        }
+        else if (compatibility == Compatibility.Marlin || compatibility == Compatibility.NanoDLP)
+        {
+            result.AppendLine("Begin file list:");
+        }
+
+        bool itemFound = false;
+        foreach (string file in Directory.EnumerateFileSystemEntries(physicalDirectory))
+        {
+            string filename = Path.GetFileName(file);
+            if (maxSize > 0 && result.Length + filename.Length + 3 > maxSize)
+            {
+                // Stay within limits...
+                break;
             }
 
             if (compatibility == Compatibility.Marlin || compatibility == Compatibility.NanoDLP)
             {
-                if (!itemFound)
-                {
-                    result.AppendLine("NONE");
-                }
-                result.Append("End file list");
+                result.AppendLine(filename);
             }
-
-            return new Message(MessageType.Success, result.ToString());
+            else
+            {
+                if (itemFound)
+                {
+                    result.Append(',');
+                }
+                result.Append($"\"{filename}\"");
+            }
+            itemFound = true;
         }
-        throw new OperationCanceledException();
+
+        if (compatibility == Compatibility.Marlin || compatibility == Compatibility.NanoDLP)
+        {
+            if (!itemFound)
+            {
+                result.AppendLine("NONE");
+            }
+            result.Append("End file list");
+        }
+
+        return new Message(MessageType.Success, result.ToString());
     }
 
     /// <summary>
@@ -546,16 +542,12 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleInitializeSDCardAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        if (code.GetInt('P', 0) == 0)
         {
-            if (code.GetInt('P', 0) == 0)
-            {
-                // M21 (P0) will always work because it's always mounted
-                return new Message();
-            }
-            throw new NotSupportedException();
+            // M21 (P0) will always work because it's always mounted
+            return new Message();
         }
-        throw new OperationCanceledException();
+        throw new NotSupportedException();
     }
 
     /// <summary>
@@ -1178,56 +1170,52 @@ internal partial class MCodeHandler(
     {
         if (code.TryGetInt('P', out int pParam) && pParam == -1)
         {
-            if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+            bool seen = false;
+            if (code.TryGetString('S', out string? levelString))
             {
-                bool seen = false;
-                if (code.TryGetString('S', out string? levelString))
+                // Parse the log level using shared helper that supports short aliases
+                if (LogLevelHelper.TryParseLogLevel(levelString, out LogLevel level))
                 {
-                    // Parse the log level using shared helper that supports short aliases
-                    if (LogLevelHelper.TryParseLogLevel(levelString, out LogLevel level))
+                    // Writing settings.Value.LogLevel is all that's needed: the dynamic
+                    // logging filter in Program.cs reads it directly on every IsEnabled() call.
+                    settings.Value.LogLevel = level;
+                    logger.LogInformation("Log level changed to {Level}", level);
+                    seen = true;
+                }
+                else
+                {
+                    return new Message(MessageType.Error, $"Invalid log level '{levelString}'. Valid values: {LogLevelHelper.ValidLogLevels}");
+                }
+            }
+            if (code.TryGetBool('O', out bool oParam))
+            {
+                if (oParam)
+                {
+                    if (_messageLoggerProvider == null)
                     {
-                        // Writing settings.Value.LogLevel is all that's needed: the dynamic
-                        // logging filter in Program.cs reads it directly on every IsEnabled() call.
-                        settings.Value.LogLevel = level;
-                        logger.LogInformation("Log level changed to {Level}", level);
-                        seen = true;
+                        // Only add this provider once and don't allow higher log level than debug, else we may get recursion
+                        LogLevel minimumLevel = settings.Value.LogLevel > LogLevel.Trace ? settings.Value.LogLevel : LogLevel.Debug;
+                        _messageLoggerProvider = new MessageLoggerProvider(model, minimumLevel);
+                        loggerFactory.AddProvider(_messageLoggerProvider);
                     }
                     else
                     {
-                        return new Message(MessageType.Error, $"Invalid log level '{levelString}'. Valid values: {LogLevelHelper.ValidLogLevels}");
+                        _messageLoggerProvider.Enabled = true;
                     }
                 }
-                if (code.TryGetBool('O', out bool oParam))
+                else if (_messageLoggerProvider is not null)
                 {
-                    if (oParam)
-                    {
-                        if (_messageLoggerProvider == null)
-                        {
-                            // Only add this provider once and don't allow higher log level than debug, else we may get recursion
-                            LogLevel minimumLevel = settings.Value.LogLevel > LogLevel.Trace ? settings.Value.LogLevel : LogLevel.Debug;
-                            _messageLoggerProvider = new MessageLoggerProvider(model, minimumLevel);
-                            loggerFactory.AddProvider(_messageLoggerProvider);
-                        }
-                        else
-                        {
-                            _messageLoggerProvider.Enabled = true;
-                        }
-                    }
-                    else if (_messageLoggerProvider is not null)
-                    {
-                        // The logger factory offers no way to remove the provider again, so just disable its output
-                        _messageLoggerProvider.Enabled = false;
-                    }
-                    seen = true;
+                    // The logger factory offers no way to remove the provider again, so just disable its output
+                    _messageLoggerProvider.Enabled = false;
                 }
-
-                if (seen)
-                {
-                    return new Message();
-                }
-                return new Message(MessageType.Success, $"Current DCS log level: {settings.Value.LogLevel}");
+                seen = true;
             }
-            throw new OperationCanceledException();
+
+            if (seen)
+            {
+                return new Message();
+            }
+            return new Message(MessageType.Success, $"Current DCS log level: {settings.Value.LogLevel}");
         }
         return new Message(MessageType.Success, $"Current DCS log level: {settings.Value.LogLevel}");
     }
@@ -1644,17 +1632,10 @@ internal partial class MCodeHandler(
     {
         if (expressionForm)
         {
+            // The seed evaluation reads the object model, so pending codes settle first
             if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
             {
-                Message? result = await sbcTriggerService.ConfigureAsync(code, cancellationToken);
-                if (result != null)
-                {
-                    // Expression was handled by SbcTriggerService (contains SBC fields)
-                    return result;
-                }
-                // No SBC fields in the expression — let RRF handle M581.1 natively
-                // TODO this used to fallthrough to RRF
-                return new Message(MessageType.Warning, "Not implemented");
+                return await sbcTriggerService.ConfigureAsync(code, cancellationToken);
             }
             throw new OperationCanceledException();
         }
@@ -1948,97 +1929,93 @@ internal partial class MCodeHandler(
     {
         if (code.GetIntArray('S', [0]).Contains(0) && code.GetInt('B', 0) == 0)
         {
-            if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+            // Get the IAP and Firmware files
+            string? iapFile, firmwareFile;
+            using (await model.AccessReadOnlyAsync(cancellationToken))
             {
-                // Get the IAP and Firmware files
-                string? iapFile, firmwareFile;
-                using (await model.AccessReadOnlyAsync(cancellationToken))
+                if (model.Boards.Count == 0)
                 {
-                    if (model.Boards.Count == 0)
-                    {
-                        return new Message(MessageType.Error, "No boards have been detected");
-                    }
-
-                    // There are now two different IAP binaries, check which one to use
-                    iapFile = model.Boards[0].IapFileNameSBC;
-                    if (!code.TryGetString('P', out firmwareFile))
-                    {
-                        firmwareFile = model.Boards[0].FirmwareFileName;
-                    }
+                    return new Message(MessageType.Error, "No boards have been detected");
                 }
 
-                if (string.IsNullOrEmpty(iapFile) || string.IsNullOrEmpty(firmwareFile))
+                // There are now two different IAP binaries, check which one to use
+                iapFile = model.Boards[0].IapFileNameSBC;
+                if (!code.TryGetString('P', out firmwareFile))
                 {
-                    return new Message(MessageType.Error, "Cannot update firmware because IAP and firmware filenames are unknown");
+                    firmwareFile = model.Boards[0].FirmwareFileName;
                 }
+            }
 
-                string physicalIapFile = await filePathResolver.ToPhysicalAsync(iapFile, FileDirectory.Firmware, cancellationToken);
-                if (!File.Exists(physicalIapFile))
+            if (string.IsNullOrEmpty(iapFile) || string.IsNullOrEmpty(firmwareFile))
+            {
+                return new Message(MessageType.Error, "Cannot update firmware because IAP and firmware filenames are unknown");
+            }
+
+            string physicalIapFile = await filePathResolver.ToPhysicalAsync(iapFile, FileDirectory.Firmware, cancellationToken);
+            if (!File.Exists(physicalIapFile))
+            {
+                string fallbackIapFile = await filePathResolver.ToPhysicalAsync($"0:/firmware/{iapFile}", cancellationToken: cancellationToken);
+                if (!File.Exists(fallbackIapFile))
                 {
-                    string fallbackIapFile = await filePathResolver.ToPhysicalAsync($"0:/firmware/{iapFile}", cancellationToken: cancellationToken);
+                    fallbackIapFile = await filePathResolver.ToPhysicalAsync(iapFile, FileDirectory.System, cancellationToken);
                     if (!File.Exists(fallbackIapFile))
                     {
-                        fallbackIapFile = await filePathResolver.ToPhysicalAsync(iapFile, FileDirectory.System, cancellationToken);
-                        if (!File.Exists(fallbackIapFile))
-                        {
-                            return new Message(MessageType.Error, $"Failed to find IAP file {iapFile}");
-                        }
+                        return new Message(MessageType.Error, $"Failed to find IAP file {iapFile}");
                     }
-                    logger.LogWarning("Using fallback IAP file {File}", fallbackIapFile);
-                    physicalIapFile = fallbackIapFile;
                 }
+                logger.LogWarning("Using fallback IAP file {File}", fallbackIapFile);
+                physicalIapFile = fallbackIapFile;
+            }
 
-                string physicalFirmwareFile = await filePathResolver.ToPhysicalAsync(firmwareFile, FileDirectory.Firmware, cancellationToken);
-                if (!File.Exists(physicalFirmwareFile))
+            string physicalFirmwareFile = await filePathResolver.ToPhysicalAsync(firmwareFile, FileDirectory.Firmware, cancellationToken);
+            if (!File.Exists(physicalFirmwareFile))
+            {
+                string fallbackFirmwareFile = await filePathResolver.ToPhysicalAsync($"0:/firmware/{firmwareFile}", cancellationToken: cancellationToken);
+                if (!File.Exists(fallbackFirmwareFile))
                 {
-                    string fallbackFirmwareFile = await filePathResolver.ToPhysicalAsync($"0:/firmware/{firmwareFile}", cancellationToken: cancellationToken);
+                    fallbackFirmwareFile = await filePathResolver.ToPhysicalAsync(firmwareFile, FileDirectory.System, cancellationToken);
                     if (!File.Exists(fallbackFirmwareFile))
                     {
-                        fallbackFirmwareFile = await filePathResolver.ToPhysicalAsync(firmwareFile, FileDirectory.System, cancellationToken);
-                        if (!File.Exists(fallbackFirmwareFile))
-                        {
-                            return new Message(MessageType.Error, $"Failed to find firmware file {firmwareFile}");
-                        }
+                        return new Message(MessageType.Error, $"Failed to find firmware file {firmwareFile}");
                     }
-                    logger.LogWarning("Using fallback firmware file {File}", fallbackFirmwareFile);
-                    physicalFirmwareFile = fallbackFirmwareFile;
                 }
-
-                // Stop all the plugins
-                Commands.StopPlugins stopCommand = commandFactory.Create<Commands.StopPlugins>();
-                await stopCommand.ExecuteAsync(cancellationToken);
-
-                // Update the firmware
-                await using FileStream iapStream = new(physicalIapFile, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
-                await using FileStream firmwareStream = new(physicalFirmwareFile, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
-                if (Path.GetExtension(firmwareFile) == ".uf2")
-                {
-                    await using MemoryStream unpackedFirmwareStream = await Firmware.UnpackUF2Async(firmwareStream);
-                    await linkInterface.UpdateFirmware(iapStream, unpackedFirmwareStream, lifetime.ApplicationStopped);
-                }
-                else
-                {
-                    await linkInterface.UpdateFirmware(iapStream, firmwareStream, lifetime.ApplicationStopped);
-                }
-
-                // Updating the firmware resets the controller, which invalidates every channel and cancels
-                // this very code. Reassign its cancellation token so it can report success instead of cancelled
-                code.ResetCancellationToken();
-
-                // Terminate the program once this code has finished. Give the success response a
-                // moment to propagate through DWS to the clients first - stopping immediately tears
-                // down the IPC connections, which lets the reply race against the shutdown
-                _ = code.Task.ContinueWith(async task =>
-                {
-                    await task;
-                    await Task.Delay(1000);
-                    lifetime.StopApplication();
-                }, TaskContinuationOptions.RunContinuationsAsynchronously);
-
-                // Done
-                return new Message();
+                logger.LogWarning("Using fallback firmware file {File}", fallbackFirmwareFile);
+                physicalFirmwareFile = fallbackFirmwareFile;
             }
-            throw new OperationCanceledException();
+
+            // Stop all the plugins
+            Commands.StopPlugins stopCommand = commandFactory.Create<Commands.StopPlugins>();
+            await stopCommand.ExecuteAsync(cancellationToken);
+
+            // Update the firmware
+            await using FileStream iapStream = new(physicalIapFile, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
+            await using FileStream firmwareStream = new(physicalFirmwareFile, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
+            if (Path.GetExtension(firmwareFile) == ".uf2")
+            {
+                await using MemoryStream unpackedFirmwareStream = await Firmware.UnpackUF2Async(firmwareStream);
+                await linkInterface.UpdateFirmware(iapStream, unpackedFirmwareStream, lifetime.ApplicationStopped);
+            }
+            else
+            {
+                await linkInterface.UpdateFirmware(iapStream, firmwareStream, lifetime.ApplicationStopped);
+            }
+
+            // Updating the firmware resets the controller, which invalidates every channel and cancels
+            // this very code. Reassign its cancellation token so it can report success instead of cancelled
+            code.ResetCancellationToken();
+
+            // Terminate the program once this code has finished. Give the success response a
+            // moment to propagate through DWS to the clients first - stopping immediately tears
+            // down the IPC connections, which lets the reply race against the shutdown
+            _ = code.Task.ContinueWith(async task =>
+            {
+                await task;
+                await Task.Delay(1000);
+                lifetime.StopApplication();
+            }, TaskContinuationOptions.RunContinuationsAsynchronously);
+
+            // Done
+            return new Message();
         }
         // TODO this used to fallthrough to RRF
         return new Message(MessageType.Warning, "Not implemented");

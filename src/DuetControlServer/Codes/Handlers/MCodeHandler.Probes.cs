@@ -107,11 +107,6 @@ internal partial class MCodeHandler
             }
         }
 
-        if (!await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
-        {
-            throw new OperationCanceledException();
-        }
-
         string? monitorPort = null;
         string? report = null;
         List<InputMonitors.Monitored> monitorsBefore = [], monitorsAfter = [];

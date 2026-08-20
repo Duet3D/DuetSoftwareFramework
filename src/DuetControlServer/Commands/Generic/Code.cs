@@ -33,7 +33,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     private readonly TCodeHandler _tCodes;
     private readonly KeywordHandler _keywords;
     private readonly IHostApplicationLifetime _lifetime;
-    private readonly LinkInterface _linkInterface;
     private readonly MacroRunner _macroRunner;
     private readonly ILogger<Code> _logger;
     private readonly Settings _settings;
@@ -48,7 +47,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <param name="tCodes">T-code handler</param>
     /// <param name="keywords">Keyword handler</param>
     /// <param name="lifetime">Host application lifetime</param>
-    /// <param name="linkInterface">Link interface</param>
     /// <param name="macroRunner">Runs macro files</param>
     /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
@@ -59,7 +57,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         [FromKeyedServices(Keys.TCodes)] ICodeHandler tCodes,
         [FromKeyedServices(Keys.Keywords)] ICodeHandler keywords,
         IHostApplicationLifetime lifetime,
-        LinkInterface linkInterface,
         MacroRunner macroRunner,
         ILogger<Code> logger,
         IOptions<Settings> settings) : base()
@@ -71,7 +68,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         _tCodes = (TCodeHandler)tCodes;
         _keywords = (KeywordHandler)keywords;
         _lifetime = lifetime;
-        _linkInterface = linkInterface;
         _macroRunner = macroRunner;
         _logger = logger;
         _settings = settings.Value;
@@ -88,7 +84,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <param name="tCodes">T-code handler</param>
     /// <param name="keywords">Keyword handler</param>
     /// <param name="lifetime">Host application lifetime</param>
-    /// <param name="linkInterface">Link interface</param>
     /// <param name="macroRunner">Runs macro files</param>
     /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
@@ -100,7 +95,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         [FromKeyedServices(Keys.TCodes)] ICodeHandler tCodes,
         [FromKeyedServices(Keys.Keywords)] ICodeHandler keywords,
         IHostApplicationLifetime lifetime,
-        LinkInterface linkInterface,
         MacroRunner macroRunner,
         ILogger<Code> logger,
         IOptions<Settings> settings) : base(code)
@@ -112,7 +106,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         _tCodes = (TCodeHandler)tCodes;
         _keywords = (KeywordHandler)keywords;
         _lifetime = lifetime;
-        _linkInterface = linkInterface;
         _macroRunner = macroRunner;
         _logger = logger;
         _settings = settings.Value;
@@ -280,8 +273,9 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         // Try to process this code internally
         _logger.LogDebug("Processing {Code}", this);
 
-        // Flush the code channel and populate SBC fields where applicable
-        if (Keyword == KeywordType.None && _expressions.ContainsSbcFields(this) && !await _codeProcessor.FlushAsync(this, true, false))
+        // An expression reading the object model must not be evaluated while earlier codes are
+        // still completing, so such a code waits for them first
+        if (Keyword == KeywordType.None && _expressions.ContainsModelFields(this) && !await _codeProcessor.FlushAsync(this))
         {
             throw new OperationCanceledException();
         }
@@ -357,9 +351,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
             Flags |= CodeFlags.IsPostProcessed;
             if (resolved)
             {
-#if false // TODO: do we need to do anything now RRF is removed?
-                await _linkInterface.SetLastCodeResultAsync(this, CancellationToken);
-#endif
                 return true;
             }
         }

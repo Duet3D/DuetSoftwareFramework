@@ -495,7 +495,7 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
                 string key = comment[..index].Trim(), value = comment[(index + 1)..].Trim();
                 logger.LogDebug("Evaluating user-defined key '{Key}' with value '{Value}'", key, value);
                 // Use the indexer so a duplicate key overwrites the previous value instead of throwing
-                userDefinedKeys[key] = expressions.EvaluateExpressionToValueAsync(code, value, false);
+                userDefinedKeys[key] = expressions.EvaluateExpressionToValueAsync(code, value);
                 return true;
             }
         }

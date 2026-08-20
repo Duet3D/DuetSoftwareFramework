@@ -132,7 +132,6 @@ public sealed class PipelineStackItem
 
     /// <summary>
     /// Current code being executed.
-    /// This is not applicable on the Firmware stage because we buffer multiple codes there
     /// </summary>
     public Code? CodeBeingExecuted;
 

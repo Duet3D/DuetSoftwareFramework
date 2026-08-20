@@ -204,43 +204,37 @@ namespace UnitTests.Machine
             model.Network.Hostname = "duet3";
             DcsFilter filter = new(model);
 
-            Assert.That(filter.GetSpecific("heat/coldExtrudeTemperature", false, out object result), Is.True);
+            Assert.That(filter.GetSpecific("heat/coldExtrudeTemperature", out object result), Is.True);
             Assert.That(result, Is.EqualTo(145F));
 
-            Assert.That(filter.GetSpecific("network/hostname", false, out result), Is.True);
+            Assert.That(filter.GetSpecific("network/hostname", out result), Is.True);
             Assert.That(result, Is.EqualTo("duet3"));
 
             // Property names are matched against the CLR names without regard to case
-            Assert.That(filter.GetSpecific("HEAT/COLDEXTRUDETEMPERATURE", false, out result), Is.True);
+            Assert.That(filter.GetSpecific("HEAT/COLDEXTRUDETEMPERATURE", out result), Is.True);
             Assert.That(result, Is.EqualTo(145F));
 
-            Assert.That(filter.GetSpecific("heat/nonExistingProperty", false, out result), Is.False);
+            Assert.That(filter.GetSpecific("heat/nonExistingProperty", out result), Is.False);
             Assert.That(result, Is.Null);
 
-            Assert.That(filter.GetSpecific("nonExistingProperty", false, out result), Is.False);
+            Assert.That(filter.GetSpecific("nonExistingProperty", out result), Is.False);
             Assert.That(result, Is.Null);
         }
 
         [Test]
-        public void GetSpecificSbcProperty()
+        public void GetSpecificFormerSbcProperties()
         {
+            // The SBC-property distinction is gone: these resolve like any other field
             DcsModel model = CreateModel();
             model.Network.CorsSite = "http://localhost";
             model.State.LogFile = "0:/sys/eventlog.txt";
             DcsFilter filter = new(model);
 
-            Assert.That(filter.GetSpecific("network/corsSite", true, out object result), Is.True);
+            Assert.That(filter.GetSpecific("network/corsSite", out object result), Is.True);
             Assert.That(result, Is.EqualTo("http://localhost"));
 
-            Assert.That(filter.GetSpecific("state/logFile", true, out result), Is.True);
+            Assert.That(filter.GetSpecific("state/logFile", out result), Is.True);
             Assert.That(result, Is.EqualTo("0:/sys/eventlog.txt"));
-
-            // No SBC property is crossed on this path, so it must not be reported as one
-            Assert.That(filter.GetSpecific("network/hostname", true, out result), Is.False);
-            Assert.That(result, Is.Null);
-
-            Assert.That(filter.GetSpecific("heat/coldExtrudeTemperature", true, out result), Is.False);
-            Assert.That(result, Is.Null);
         }
     }
 }

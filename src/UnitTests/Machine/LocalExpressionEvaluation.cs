@@ -118,35 +118,30 @@ namespace UnitTests.Machine
         }
 
         [Test]
-        public void ExistsOnNonSbcPath()
+        public void ExistsOnModelPath()
         {
             Assert.That(TryEval("exists(move.axes[0])", out object value), Is.True);
             Assert.That(value, Is.EqualTo(true));
         }
 
         [Test]
-        public void SbcPathsAreDetected()
+        public void ModelPathsAreDetected()
         {
-            Assert.That(_expressions.IsSbcExpression("volumes", false), Is.True);
-            Assert.That(_expressions.IsSbcExpression("volumes[0].freeSpace", false), Is.True);
-            Assert.That(_expressions.IsSbcExpression("messages", false), Is.True);
-            Assert.That(_expressions.IsSbcExpression("directories.system", false), Is.True);
+            Assert.That(_expressions.IsModelExpression("volumes", false), Is.True);
+            Assert.That(_expressions.IsModelExpression("volumes[0].freeSpace", false), Is.True);
+            Assert.That(_expressions.IsModelExpression("messages", false), Is.True);
+            Assert.That(_expressions.IsModelExpression("directories.system", false), Is.True);
+            Assert.That(_expressions.IsModelExpression("move.axes[0].machinePosition", false), Is.True);
+            Assert.That(_expressions.IsModelExpression("heat.heaters[0].current", false), Is.True);
+            Assert.That(_expressions.IsModelExpression("directories.filaments", false), Is.True);
+            Assert.That(_expressions.IsModelExpression("state", false), Is.True);
 
             // Case-insensitive since the object model is addressed in camelCase
-            Assert.That(_expressions.IsSbcExpression("Directories.Web", false), Is.True);
+            Assert.That(_expressions.IsModelExpression("Directories.Web", false), Is.True);
 
             // Special variables are always resolved locally
-            Assert.That(_expressions.IsSbcExpression("iterations", false), Is.True);
-            Assert.That(_expressions.IsSbcExpression("line", false), Is.True);
-        }
-
-        [Test]
-        public void NonSbcPathsAreNotDetected()
-        {
-            Assert.That(_expressions.IsSbcExpression("move.axes[0].machinePosition", false), Is.False);
-            Assert.That(_expressions.IsSbcExpression("heat.heaters[0].current", false), Is.False);
-            Assert.That(_expressions.IsSbcExpression("directories.filaments", false), Is.False);
-            Assert.That(_expressions.IsSbcExpression("state", false), Is.False);
+            Assert.That(_expressions.IsModelExpression("iterations", false), Is.True);
+            Assert.That(_expressions.IsModelExpression("line", false), Is.True);
         }
 
         [Test]
@@ -527,15 +522,18 @@ namespace UnitTests.Machine
         }
 
         [Test]
-        public void UnknownPathsAreNotSbcExpressions()
+        public void UnknownPathsAreNotModelExpressions()
         {
-            Assert.That(_expressions.IsSbcExpression("foo", false), Is.False);
-            Assert.That(_expressions.IsSbcExpression("move.foo.bar", false), Is.False);
-            Assert.That(_expressions.IsSbcExpression(string.Empty, false), Is.False);
-            Assert.That(_expressions.IsSbcExpression("move..axes", false), Is.False);
+            Assert.That(_expressions.IsModelExpression("foo", false), Is.False);
+            Assert.That(_expressions.IsModelExpression("move.foo.bar", false), Is.False);
+            Assert.That(_expressions.IsModelExpression(string.Empty, false), Is.False);
+            Assert.That(_expressions.IsModelExpression("move..axes", false), Is.False);
+
+            // A path that continues past a scalar names nothing
+            Assert.That(_expressions.IsModelExpression("network.hostname.foo", false), Is.False);
 
             // No custom functions are registered without plugins
-            Assert.That(_expressions.IsSbcExpression("foo", true), Is.False);
+            Assert.That(_expressions.IsModelExpression("foo", true), Is.False);
         }
     }
 }

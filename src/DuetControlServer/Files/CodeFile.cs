@@ -434,7 +434,7 @@ public class CodeFile(
                         }
 
                         // Evaluate the condition
-                        string? stringEvaluationResult = await expressions.EvaluateAsync(code, true, cancellationToken);
+                        string? stringEvaluationResult = await expressions.EvaluateAsync(code, cancellationToken);
                         if (bool.TryParse(stringEvaluationResult, out bool evaluationResult))
                         {
                             logger.LogDebug("Evaluation result: ({KeywordArgument}) = {Result}", code.KeywordArgument, evaluationResult);
