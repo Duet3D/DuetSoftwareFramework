@@ -20,7 +20,7 @@ namespace UnitTests.Machine
             // Populate three fans
             Utf8JsonReader reader = new(Encoding.UTF8.GetBytes("[{\"actualValue\":0.5},{\"actualValue\":0.7},{\"actualValue\":0.9}]"));
             reader.Read();
-            model.Fans.UpdateFromJsonReader(ref reader, false);
+            model.Fans.UpdateFromJsonReader(ref reader);
 
             Assert.That(model.Fans, Has.Count.EqualTo(3));
             Assert.That(model.Fans[1], Is.Not.Null);
@@ -28,7 +28,7 @@ namespace UnitTests.Machine
             // A null item must overwrite the existing fan instead of appending a new element
             reader = new(Encoding.UTF8.GetBytes("[{\"actualValue\":0.5},null,{\"actualValue\":0.9}]"));
             reader.Read();
-            model.Fans.UpdateFromJsonReader(ref reader, false);
+            model.Fans.UpdateFromJsonReader(ref reader);
 
             Assert.That(model.Fans, Has.Count.EqualTo(3));
             Assert.That(model.Fans[0], Is.Not.Null);
@@ -106,7 +106,7 @@ namespace UnitTests.Machine
             // First update must fire a change event
             using (JsonDocument json = JsonDocument.Parse("{\"myVar\":123}"))
             {
-                model.Global.UpdateFromJson(json.RootElement, false);
+                model.Global.UpdateFromJson(json.RootElement);
             }
             Assert.That(numChangedEvents, Is.EqualTo(1));
             Assert.That(model.Global["myVar"].Value.GetInt32(), Is.EqualTo(123));
@@ -114,14 +114,14 @@ namespace UnitTests.Machine
             // The same value coming from a different JSON document must not fire another one
             using (JsonDocument json = JsonDocument.Parse("{\"myVar\":123}"))
             {
-                model.Global.UpdateFromJson(json.RootElement, false);
+                model.Global.UpdateFromJson(json.RootElement);
             }
             Assert.That(numChangedEvents, Is.EqualTo(1));
 
             // A different value must fire one again
             using (JsonDocument json = JsonDocument.Parse("{\"myVar\":456}"))
             {
-                model.Global.UpdateFromJson(json.RootElement, false);
+                model.Global.UpdateFromJson(json.RootElement);
             }
             Assert.That(numChangedEvents, Is.EqualTo(2));
             Assert.That(model.Global["myVar"].Value.GetInt32(), Is.EqualTo(456));
@@ -138,20 +138,20 @@ namespace UnitTests.Machine
             // Updating with the default identity matrix must not raise Replace events
             using (JsonDocument json = JsonDocument.Parse("{\"forwardMatrix\":[[1,0,0],[0,1,0],[0,0,1]]}"))
             {
-                kinematics.UpdateFromJson(json.RootElement, false);
+                kinematics.UpdateFromJson(json.RootElement);
             }
             Assert.That(numChangedEvents, Is.EqualTo(0));
 
             // Same for the reader-based update path
             Utf8JsonReader reader = new(Encoding.UTF8.GetBytes("{\"forwardMatrix\":[[1,0,0],[0,1,0],[0,0,1]]}"));
             reader.Read();
-            kinematics.UpdateFromJsonReader(ref reader, false);
+            kinematics.UpdateFromJsonReader(ref reader);
             Assert.That(numChangedEvents, Is.EqualTo(0));
 
             // A different matrix must raise an event
             using (JsonDocument json = JsonDocument.Parse("{\"forwardMatrix\":[[1,0,0],[0,1,0],[0.5,0,1]]}"))
             {
-                kinematics.UpdateFromJson(json.RootElement, false);
+                kinematics.UpdateFromJson(json.RootElement);
             }
             Assert.That(numChangedEvents, Is.EqualTo(1));
         }

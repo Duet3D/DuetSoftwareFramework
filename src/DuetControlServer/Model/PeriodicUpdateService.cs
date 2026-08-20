@@ -97,7 +97,7 @@ public partial class PeriodicUpdateService(
                         await using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
                         using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream, cancellationToken: cancellationToken);
                         Plugin plugin = new();
-                        plugin.UpdateFromJson(manifestJson.RootElement, false);
+                        plugin.UpdateFromJson(manifestJson.RootElement);
                         plugin.Pid = -1;
 
                         // Do not add incomplete manifests to the object model, a plugin without id or

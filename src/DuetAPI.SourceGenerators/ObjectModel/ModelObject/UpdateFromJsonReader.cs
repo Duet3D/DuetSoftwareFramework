@@ -49,15 +49,6 @@ internal static class UpdateFromJsonReader
                 writer.WriteLine("reader.Read();");
                 first = false;
 
-                // SBC property check
-                bool isSbcProperty = prop.IsSbcProperty();
-                if (isSbcProperty)
-                {
-                    writer.WriteLine("if (!ignoreSbcProperties)");
-                    writer.WriteLine("{");
-                    writer.Indent++;
-                }
-
                 // assignment
                 if (propType is "DynamicModelCollection" or "StaticModelCollection" or "MessageCollection" or "JsonModelDictionary" or "StaticModelDictionary" ||
                     receiver.ModelCollectionMembers.ContainsKey(propType) || receiver.ModelObjectMembers.ContainsKey(propType))
@@ -81,26 +72,26 @@ internal static class UpdateFromJsonReader
                         writer.WriteLine("}");
                         if (receiver.DynamicModelObjectClasses.Contains(nts.ElementType.ToString()))
                         {
-                            writer.WriteLine($"{prop.Identifier.ValueText} = ({nts.ElementType}){prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties);");
+                            writer.WriteLine($"{prop.Identifier.ValueText} = ({nts.ElementType}){prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader);");
                         }
                         else
                         {
-                            writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties);");
+                            writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader);");
                         }
                         writer.Indent--;
                         writer.WriteLine("}");
                     }
                     else if (receiver.DynamicModelObjectClasses.Contains(propType))
                     {
-                        writer.WriteLine($"{prop.Identifier.ValueText} = ({propType}){prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties)!;");
+                        writer.WriteLine($"{prop.Identifier.ValueText} = ({propType}){prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader)!;");
                     }
                     else if (cls == "Move" && prop.Identifier.ValueText == "Axes")
                     {
-                        writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties, 0, last);");
+                        writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, 0, last);");
                     }
                     else
                     {
-                        writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader, ignoreSbcProperties);");
+                        writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJsonReader(ref reader);");
                     }
                 }
                 else if (propType is "ObservableCollection")
@@ -398,18 +389,6 @@ internal static class UpdateFromJsonReader
                     writer.WriteLine("}");
                 }
 
-                if (isSbcProperty)
-                {
-                    writer.Indent--;
-                    writer.WriteLine("}");
-                    writer.WriteLine("else");
-                    writer.WriteLine("{");
-                    writer.Indent++;
-                    writer.WriteLine("reader.Skip();");
-                    writer.Indent--;
-                    writer.WriteLine("}");
-                }
-
                 // }
                 writer.Indent--;
                 writer.WriteLine("}");
@@ -418,7 +397,7 @@ internal static class UpdateFromJsonReader
         }
 
         // Check if we need to generate the UpdateFromJson(Reader) methods
-        bool useGeneratedUpdateFromJsonReader = methods.Any(mds => mds.Identifier.ValueText == "UpdateFromJsonReader" && mds.ParameterList.Parameters.Count == 2 && mds.ParameterList.Parameters[0].Identifier.ValueText == "reader" && mds.ParameterList.Parameters[1].Identifier.ValueText == "ignoreSbcProperties");
+        bool useGeneratedUpdateFromJsonReader = methods.Any(mds => mds.Identifier.ValueText == "UpdateFromJsonReader" && mds.ParameterList.Parameters.Count == 1 && mds.ParameterList.Parameters[0].Identifier.ValueText == "reader");
 
         // Generate method
         return SourceText.From($@"/// <summary>
@@ -426,9 +405,8 @@ internal static class UpdateFromJsonReader
     /// </summary>
     /// <remarks>This method is auto-generated</remarks>
     /// <param name=""reader"">Reader to update this intance from</param>
-    /// <param name=""ignoreSbcProperties"">Whether SBC properties are ignored</param>{(isDynamic ? "\n        /// <returns>Updated instance</returns>" : "")}{(cls == "Move" ? "\n        /// <param name=\"last\">Whether Move.Axes is final</param>" : "")}
     /// <exception cref=""JsonException"">Failed to deserialize data</exception>
-    public {(isInherited ? "override " : isInheritedFrom ? "virtual " : "") + (isDynamic ? "IDynamicModelObject?" : "void")} {(useGeneratedUpdateFromJsonReader ? "Generated" : "")}UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties{(cls == "Move" ? ", bool last" : string.Empty)})
+    public {(isInherited ? "override " : isInheritedFrom ? "virtual " : "") + (isDynamic ? "IDynamicModelObject?" : "void")} {(useGeneratedUpdateFromJsonReader ? "Generated" : "")}UpdateFromJsonReader(ref Utf8JsonReader reader{(cls == "Move" ? ", bool last" : string.Empty)})
     {{
         if (reader.TokenType == JsonTokenType.None && !reader.Read())
         {{
@@ -463,6 +441,6 @@ internal static class UpdateFromJsonReader
                 }}
             }}
         }}{(isDynamic ? "\n            return this;" : "")}
-    }}{(cls == "Move" ? "\n        /// <summary>Wrapper function for JSON updates</summary>\n        /// <param name=\"reader\">JSON reader</param>\n        /// <param name=\"ignoreSbcProperties\">Ignore SBC properties</param>\n        public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties) => UpdateFromJsonReader(ref reader, ignoreSbcProperties, true);" : "")}", Encoding.UTF8);
+    }}{(cls == "Move" ? "\n        /// <summary>Wrapper function for JSON updates</summary>\n        /// <param name=\"reader\">JSON reader</param>\n        public void UpdateFromJsonReader(ref Utf8JsonReader reader) => UpdateFromJsonReader(ref reader, true);" : "")}", Encoding.UTF8);
     }
 }

@@ -49,7 +49,7 @@ public sealed class ReloadPlugin(Model.ObjectModel model, IOptions<Settings> set
 
                 await using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
                 using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream, cancellationToken: cancellationToken);
-                plugin.UpdateFromJson(manifestJson.RootElement, false);
+                plugin.UpdateFromJson(manifestJson.RootElement);
                 plugin.Pid = -1;
                 plugin.Started = false;
             }

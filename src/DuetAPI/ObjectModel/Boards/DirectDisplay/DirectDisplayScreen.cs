@@ -63,10 +63,9 @@ public partial class DirectDisplayScreen : ModelObject, IDynamicModelObject
     /// Update this instance from a given JSON element
     /// </summary>
     /// <param name="jsonElement">Element to update this intance from</param>
-    /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
     /// <returns>Updated instance</returns>
     /// <exception cref="JsonException">Failed to deserialize data</exception>
-    public IDynamicModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+    public IDynamicModelObject? UpdateFromJson(JsonElement jsonElement)
     {
         if (jsonElement.ValueKind == JsonValueKind.Null)
         {
@@ -80,27 +79,26 @@ public partial class DirectDisplayScreen : ModelObject, IDynamicModelObject
                 if (this is not DirectDisplayScreenST7567)
                 {
                     DirectDisplayScreenST7567 newInstance = new();
-                    return newInstance.UpdateFromJson(jsonElement, ignoreSbcProperties);
+                    return newInstance.UpdateFromJson(jsonElement);
                 }
             }
             else if (this is DirectDisplayScreenST7567)
             {
                 DirectDisplayScreen newInstance = new();
-                return newInstance.UpdateFromJson(jsonElement, ignoreSbcProperties);
+                return newInstance.UpdateFromJson(jsonElement);
             }
         }
-        return GeneratedUpdateFromJson(jsonElement, ignoreSbcProperties);
+        return GeneratedUpdateFromJson(jsonElement);
     }
 
     /// <summary>
     /// Update this instance from a given JSON reader
     /// </summary>
     /// <param name="reader">JSON reader</param>
-    /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
     /// <returns>Updated instance</returns>
     /// <exception cref="JsonException">Failed to deserialize data</exception>
 
-    public IDynamicModelObject? UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
+    public IDynamicModelObject? UpdateFromJsonReader(ref Utf8JsonReader reader)
     {
         if (reader.TokenType == JsonTokenType.None && !reader.Read())
         {
@@ -127,13 +125,13 @@ public partial class DirectDisplayScreen : ModelObject, IDynamicModelObject
                         if (this is not DirectDisplayScreenST7567)
                         {
                             DirectDisplayScreenST7567 newInstance = new();
-                            return newInstance.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            return newInstance.UpdateFromJsonReader(ref reader);
                         }
                     }
                     else if (this is DirectDisplayScreenST7567)
                     {
                         DirectDisplayScreen newInstance = new();
-                        return newInstance.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                        return newInstance.UpdateFromJsonReader(ref reader);
                     }
                 }
                 else
@@ -142,6 +140,6 @@ public partial class DirectDisplayScreen : ModelObject, IDynamicModelObject
                 }
             }
         }
-        return GeneratedUpdateFromJsonReader(ref reader, ignoreSbcProperties);
+        return GeneratedUpdateFromJsonReader(ref reader);
     }
 }

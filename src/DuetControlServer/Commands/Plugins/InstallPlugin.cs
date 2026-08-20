@@ -163,7 +163,7 @@ public sealed class InstallPlugin(CommandFactory commandFactory, Model.ObjectMod
             await using (FileStream manifestStream = new(manifestFilename, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize))
             {
                 using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream, cancellationToken: cancellationToken);
-                plugin.UpdateFromJson(manifestJson.RootElement, false);
+                plugin.UpdateFromJson(manifestJson.RootElement);
             }
 
             using (await model.AccessReadWriteAsync(cancellationToken))
@@ -188,7 +188,7 @@ public sealed class InstallPlugin(CommandFactory commandFactory, Model.ObjectMod
         await using (Stream manifestStream = manifestFile.Open())
         {
             using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream, cancellationToken: cancellationToken);
-            plugin.UpdateFromJson(manifestJson.RootElement, false);
+            plugin.UpdateFromJson(manifestJson.RootElement);
         }
         plugin.Pid = -1;
         plugin.Started = false;

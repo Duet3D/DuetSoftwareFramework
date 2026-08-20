@@ -421,6 +421,6 @@ internal static class UpdateFromJsonReader
                 }}
             }}
         }}
-    }}{(cls == "Move" ? "\n        /// <summary>Wrapper function for JSON updates</summary>\n        /// <param name=\"reader\">JSON reader</param>\n        /// <param name=\"ignoreSbcProperties\">Ignore SBC properties</param>\n        public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties) => UpdateFromJsonReader(ref reader, ignoreSbcProperties, true);" : "")}", Encoding.UTF8);
+    }}{(cls == "Move" ? "\n        /// <summary>Wrapper function for JSON updates</summary>\n        /// <param name=\"reader\">JSON reader</param>\n        public void UpdateFromJsonReader(ref Utf8JsonReader reader) => UpdateFromJsonReader(ref reader, true);" : "")}", Encoding.UTF8);
     }
 }

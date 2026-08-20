@@ -93,7 +93,6 @@ public partial class State : ModelObject, IStaticModelObject
     /// <summary>
     /// Log file being written to or null if logging is disabled
     /// </summary>
-    [SbcProperty(true)]
     public string? LogFile
     {
         get => _logFile;
@@ -104,7 +103,6 @@ public partial class State : ModelObject, IStaticModelObject
     /// <summary>
     /// Current log level
     /// </summary>
-    [SbcProperty(true)]
     public EventLogLevel LogLevel
     {
         get => _logLevel;
@@ -167,7 +165,6 @@ public partial class State : ModelObject, IStaticModelObject
     /// <summary>
     /// This value is set to true when the plugins have been started
     /// </summary>
-    [SbcProperty(false)]
     public bool PluginsStarted
     {
         get => _pluginsStarted;
@@ -205,7 +202,6 @@ public partial class State : ModelObject, IStaticModelObject
     /// <summary>
     /// First error on start-up or null if there was none
     /// </summary>
-    [SbcProperty(true)]
     public StartupError? StartupError
     {
         get => _startupError;
