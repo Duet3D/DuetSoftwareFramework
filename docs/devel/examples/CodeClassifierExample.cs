@@ -23,16 +23,8 @@
 //  - nothing allocates per code: keys are structs, each table freezes its dictionary on first
 //    lookup, and the entries and their lambdas are singletons created at static initialisation.
 
-// Implicit usings would import System.Threading, whose Barrier type collides with the bare
-// CodeClass.Barrier that `using static` provides; the alias keeps CancellationToken reachable
-#:property ImplicitUsings=disable
-using System;
 using System.Collections;
 using System.Collections.Frozen;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using CancellationToken = System.Threading.CancellationToken;
 using static CodeClass;
 
 // ---------------------------------------------------------------------------------------------
@@ -48,19 +40,19 @@ string[] job =
 [
     "M106 S255",        // Deferred row: the worked example
     "M104 S210",        // Deferred row sharing its handler with M109, wait: baked into the entry
-    "M109 S210",        // Barrier row, same handler, wait: true
+    "M109 S210",        // FlushAndStandstill row, same handler, wait: true
     "M0",               // shared row: [0, 1, 2] is one entry
     "M115",             // Immediate row
-    "M906 X800",        // resolver row: drive letter present -> Barrier
+    "M906 X800",        // resolver row: drive letter present -> FlushAndStandstill
     "M906",             // resolver row: bare report -> Immediate
     "M906.1",           // no row: not a fractional code DSF implements -> no macro -> unsupported
     "M569.1 P0.1 S5",   // fractional row: dispatches directly, no minor switch in the handler
     "M569.3",           // no row -> unsupported (RRF implements M569.3; DSF does not: a §9-style gap)
     "M36.1 P\"job.gcode\" S0",  // fractional row: the minor is a boolean argument in the entry
-    "G10 P0 X5",        // resolver row: axis letter -> Barrier (sets tool offsets)
+    "G10 P0 X5",        // resolver row: axis letter -> FlushAndStandstill (sets tool offsets)
     "G10 P0 S210",      // resolver row: no axis letter -> Deferred (tool temperatures)
     "M1234 X5",         // no row, but sys/M1234.g exists -> the macro runs with param.X = 5
-    "T1",               // no table: TCodeHandler classifies with an expression, Barrier here
+    "T1",               // no table: TCodeHandler classifies with an expression, FlushAndStandstill here
 ];
 
 foreach (string line in job)
@@ -106,8 +98,8 @@ async Task ProcessAsync(Code code)
     string sync = cls switch
     {
         Immediate => "dispatch now",
-        Ordered => "flush, dispatch",
-        Barrier => "flush, wait for standstill, dispatch",
+        Flush => "flush, dispatch",
+        FlushAndStandstill => "flush, wait for standstill, dispatch",
         Deferred => "flush, defer to the channel's anchor",
         _ => throw new InvalidOperationException($"unexpected class {cls}")
     };
@@ -124,13 +116,13 @@ void RunClassTableTest()
 {
     (string Code, CodeClass? Class)[] expected =
     [
-        ("M0", Barrier), ("M1", Barrier), ("M2", Barrier),
+        ("M0", FlushAndStandstill), ("M1", FlushAndStandstill), ("M2", FlushAndStandstill),
         ("M36", Immediate), ("M36.1", Immediate), ("M36.2", Immediate),
-        ("M104", Deferred), ("M106", Deferred), ("M109", Barrier), ("M115", Immediate),
-        ("M569", Barrier), ("M569.1", Barrier), ("M569.2", Barrier),
-        ("M569.4", Barrier), ("M569.6", Barrier), ("M569.7", Barrier),
-        ("M906", null),     // resolver: Barrier with a drive letter
-        ("G10", null),      // resolver: Barrier with an axis letter
+        ("M104", Deferred), ("M106", Deferred), ("M109", FlushAndStandstill), ("M115", Immediate),
+        ("M569", FlushAndStandstill), ("M569.1", FlushAndStandstill), ("M569.2", FlushAndStandstill),
+        ("M569.4", FlushAndStandstill), ("M569.6", FlushAndStandstill), ("M569.7", FlushAndStandstill),
+        ("M906", null),     // resolver: FlushAndStandstill with a drive letter
+        ("G10", null),      // resolver: FlushAndStandstill with an axis letter
     ];
     Dictionary<CodeKey, CodeClass?> expectedByKey = expected.ToDictionary(e => CodeKey.Parse(e.Code), e => e.Class);
 
@@ -172,9 +164,9 @@ void RunClassTableTest()
 public enum CodeClass
 {
     Immediate,   // act now, do not wait for the channel's pending codes
-    Ordered,     // flush the pipeline (order + expressions), no standstill; the move carries the value
+    Flush,     // flush the pipeline (order + expressions), no standstill; the move carries the value
     Deferred,    // the effect belongs at a point in the path
-    Barrier      // flush, then wait for standstill before the handler runs
+    FlushAndStandstill      // flush, then wait for standstill before the handler runs
 }
 
 /// <summary>A code's identity: type, major and minor number. Minor is null for the fraction-less
@@ -274,17 +266,17 @@ public sealed class MCodeHandler : ICodeHandler
     // path without reaching this class
     public static readonly CodeTable<MCodeHandler> Rows = new(CodeType.MCode)
     {
-        { [0, 1, 2],  Barrier,   (h, c, ct) => h.HandleStopAsync(c, ct) },
+        { [0, 1, 2],  FlushAndStandstill,   (h, c, ct) => h.HandleStopAsync(c, ct) },
         { 36,         Immediate, (h, c, ct) => h.HandleFileInfoAsync(c, fragment: null, ct) },
         { (36, 1),    Immediate, (h, c, ct) => h.HandleFileInfoAsync(c, fragment: true, ct) },
         { (36, 2),    Immediate, (h, c, ct) => h.HandleFileInfoAsync(c, fragment: false, ct) },
         { 104,        Deferred,  (h, c, ct) => h.SetTemperaturesAsync(c, wait: false, ct) },
         { 106,        Deferred,  (h, c, ct) => h.HandleFanSpeedAsync(c, ct) },
-        { 109,        Barrier,   (h, c, ct) => h.SetTemperaturesAsync(c, wait: true, ct) },
+        { 109,        FlushAndStandstill,   (h, c, ct) => h.SetTemperaturesAsync(c, wait: true, ct) },
         { 115,        Immediate, (h, c, ct) => h.HandleFirmwareVersionAsync(c, ct) },
         { [569, (569, 1), (569, 2), (569, 4), (569, 6), (569, 7)],
-                      Barrier,   (h, c, ct) => h.SendDriverConfigAsync(c, c.Minor ?? 0, ct) },
-        { 906,        c => c.HasAny("XYZE") ? Barrier : Immediate,
+                      FlushAndStandstill,   (h, c, ct) => h.SendDriverConfigAsync(c, c.Minor ?? 0, ct) },
+        { 906,        c => c.HasAny("XYZE") ? FlushAndStandstill : Immediate,
                                  (h, c, ct) => h.HandleMotorCurrentsAsync(c, ct) },
     };
 
@@ -310,9 +302,9 @@ public sealed class GCodeHandler : ICodeHandler
 {
     public static readonly CodeTable<GCodeHandler> Rows = new(CodeType.GCode)
     {
-        // Barrier with an axis letter (offsets change what queued moves mean),
+        // FlushAndStandstill with an axis letter (offsets change what queued moves mean),
         // Deferred without (tool temperatures belong at the point in the path)
-        { 10, c => c.HasAny("XYZUVWABC") ? Barrier : Deferred,
+        { 10, c => c.HasAny("XYZUVWABC") ? FlushAndStandstill : Deferred,
               (h, c, ct) => h.HandleSetOffsetsOrTemperaturesAsync(c, ct) },
     };
 
@@ -328,8 +320,8 @@ public sealed class TCodeHandler : ICodeHandler
 {
     // No table: every T code is handled the same way, so there is no number to key on. The class
     // is an expression instead; in DCS a bare T is a report of the selected tool, Immediate, and
-    // anything else is a tool change, Barrier
-    public CodeClass? Classify(Code code) => Barrier;
+    // anything else is a tool change, FlushAndStandstill
+    public CodeClass? Classify(Code code) => FlushAndStandstill;
 
     public ValueTask<Message?> ProcessAsync(Code code, CancellationToken cancellationToken)
         => ValueTask.FromResult<Message?>(new(MessageType.Success, $"tool change to T{code.Major}"));

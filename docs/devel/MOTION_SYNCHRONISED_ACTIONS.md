@@ -34,24 +34,24 @@ A DuetControlServer handler has two tools, and both are wrong for this:
   `MCodeHandler.Heat.cs` call `FanManager.SetSpeedAsync`, `GpioManager.WriteAsync` and
   `HeatManager.SetTemperatureAsync` with no flush and no wait: in the example the fan reaches full
   during move A.
-- **Wait for standstill first**, the Barrier class of §5.1's table. Correct ordering, at the cost
+- **Wait for standstill first**, the FlushAndStandstill class of §5.1's table. Correct ordering, at the cost
   of stopping the machine: a blob, a ringing mark, a longer print.
 
-The codes divide into four classes, and only two of them are about stopping:
+The codes divide into four classes, and only one of them stops the machine:
 
 | Class | Meaning | Examples | Mechanism |
 | --- | --- | --- | --- |
-| **Immediate** | no relation to motion | M115, M409, M122, M550 | act now, without waiting for the channel's pending codes |
+| **Immediate** | no relation to motion, or the move carries the value (MOTION_CONFIG_ORDERING), so nothing needs holding back | M115, M409, M122, M201/203/204/205/566, M592 | act now, without waiting for the channel's pending codes |
+| **Flush** | reads what earlier codes are still completing: results, file positions, settings | M26/M27, M28/M29, M36, the file and settings codes, M425 | pipeline flush before dispatch |
 | **Deferred** | the physical effect belongs at a point in the path | M106/107, M42, M280, M300, M150, M117, M3/M4/M5, M568, M104/140/141, M144, `G10` without axis letters (§9) | this document, from a job file or its macros only (§5.2) |
-| **Ordered** | applies to moves built after it, must not reach moves already built | M201/203/205/566, M204, M592, M425, M572's value | solved: the move carries it (MOTION_CONFIG_ORDERING) |
-| **Barrier** | changes what an already-queued move *means*, or needs the board's reply to produce its own | M92, M584, M350, M208, M669/M665, M574, M558, tool change, homing | standstill |
+| **FlushAndStandstill** | changes what an already-queued move *means*, or needs the board's reply to produce its own | M92, M584, M350, M208, M669/M665, M574, M558, tool change, homing | flush, then standstill |
 
 The class used to be implicit in whether a handler happened to call a flush, and nothing could
 test that. §5.1 (implemented) makes it declarative: each handler's table names every code's class,
 the pipeline enforces it before dispatch, and a unit test diffs the tables against this document.
 
-M572 sits across the boundary. Its *value* is Ordered and already rides the move on the SBC side,
-but the handler still pushes the coefficient to the drivers, so its row stays Barrier, marked
+M572 sits across the boundary. Its *value* already rides the move on the SBC side, but the
+handler still pushes the coefficient to the drivers, so its row stays FlushAndStandstill, marked
 `TODO` in the table. §7.7 explains why neither implementation fully removes that wait and what
 would.
 
@@ -156,7 +156,7 @@ Four observations the table forces:
   `FanParameters` when it carries configuration), and feedforward that lands before the fan change
   has a heater compensating for a fan that is not running. A deferred unit is a *code's set of
   sends*, anchored once.
-- **Deferred and Barrier are disjoint in RRF**: no code both queues and waits for standstill, and
+- **Deferred and FlushAndStandstill are disjoint in RRF**: no code both queues and waits for standstill, and
   where a layout shows both (the heater row, M150) the generating codes split cleanly.
 - The 8 declared types RRF never sends (`startup`, `controlledStop`, `powerFailing`, `insertHiccup`,
   `setFastTiming`, `setDateTime`, `updateDeltaParameters`, `setPressureAdvanceV1`, the last
@@ -213,8 +213,8 @@ internal static readonly CodeTable<MCodeHandler> Rows = new(CodeType.MCode)
     { [0, 1, 2],  CodeClass.Immediate, (h, c, ct) => h.HandleStopAsync(c, ct) },
     { 104,        CodeClass.Deferred,  async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.CurrentToolHeatersAsync(c, ct), wait: false, ct) },
     { [569, (569, 1), (569, 2), (569, 4), (569, 6), (569, 7)],
-                  CodeClass.Barrier,   (h, c, ct) => h.HandleDriverConfigAsync(c, ct) },
-    { [906, 913, 917], BarrierWhenSettingDrives, (h, c, ct) => h.HandleMotorCurrentsAsync(c, ct) },
+                  CodeClass.FlushAndStandstill,   (h, c, ct) => h.HandleDriverConfigAsync(c, ct) },
+    { [906, 913, 917], FlushAndStandstillWhenSettingDrives, (h, c, ct) => h.HandleMotorCurrentsAsync(c, ct) },
 };
 ```
 
@@ -224,21 +224,22 @@ a list of numbers sharing one row, which is how codes that shared a switch arm (
 computed arguments (M104 and M109 differ only in `wait:`) became lambdas that pass them. Tables
 exist only in `GCodeHandler` and `MCodeHandler`: `TCodeHandler` handles every T code the same way,
 the tool number is a value with no number to key on, so it answers with expressions (Immediate for
-the bare `T` report, Barrier for a tool change), and `KeywordHandler` answers Immediate, keywords
+the bare `T` report, FlushAndStandstill for a tool change), and `KeywordHandler` answers Immediate, keywords
 are not classified.
 
 The class is either fixed or a resolver for rows whose class depends on the parameters:
-`M92/M350/M906/M913/M917` are Barrier when a drive letter is present and Immediate when bare (a
+`M92/M350/M906/M913/M917` are FlushAndStandstill when a drive letter is present and Immediate when bare (a
 report, which DWC polls mid-print; the guard is `SetsAnyDrive`, relocated from the handlers);
-`M584` and `M593` are Barrier only when setting; `M558` is Barrier unless bare or naming only `K`,
-a report; `M563` is Barrier only with `P`, without it a report; `M999` is Barrier with `B` (§3);
-`G10` is Barrier with an axis letter and Deferred without. Every fractional code a handler
+`M584` and `M593` are FlushAndStandstill only when setting; `M558` is FlushAndStandstill unless
+bare or naming only `K`, a report; `M563` is FlushAndStandstill only with `P`, without it a
+report; `M999` is FlushAndStandstill with `B` (§3); `G10` is FlushAndStandstill with an axis
+letter and Deferred without. Every fractional code a handler
 implements is its own row (M36.1/.2, M201.1, M505.1, M569.1/.2/.4/.6/.7, M581.1, M586.4), the
 minor decided by the row's lambda as an argument, except M569, which keeps a switch over its valid
 minors because each maps to a different CAN message type. A minor of zero is the fraction-less
 form, as RepRapFirmware's `fraction > 0` gates read it: M569.0 is M569. Lookup is exact: a
 fraction never falls back to the bare-major row. M150 has no handler yet; its row (a resolver on
-the strip's `MustStopMovement` capability, Barrier or Deferred) lands with M150 itself.
+the strip's `MustStopMovement` capability, FlushAndStandstill or Deferred) lands with M150 itself.
 
 `ICodeHandler` gained `Classify(code)` beside its existing `ProcessAsync(code)`: the row's class,
 resolved from the parameters where declared, or null for "no such code". `ProcessAsync` is the
@@ -274,8 +275,8 @@ flowchart TD
     M0 -- yes --> M1[run the macro]
     M0 -- no --> M2["resolve as unsupported"]
     C -- Immediate --> D1[dispatch handler, no flush]
-    C -- Ordered --> F1["CodeProcessor.FlushAsync(code)<br/>(pipeline order + expressions)"] --> D2[dispatch handler]
-    C -- Barrier --> F2["FlushAsync(code)"] --> W["WaitForStandstillAsync()"] --> D3[dispatch handler]
+    C -- Flush --> F1["CodeProcessor.FlushAsync(code)<br/>(pipeline order + expressions)"] --> D2[dispatch handler]
+    C -- FlushAndStandstill --> F2["FlushAsync(code)"] --> W["WaitForStandstillAsync()"] --> D3[dispatch handler]
     C -- Deferred --> F3["FlushAsync(code)"] --> G{"file channel and<br/>anchor exists? (§5.2, §5.3)"}
     G -- no --> D4[dispatch handler: applies now]
     G -- yes --> H["defer: §6 queue / §7 action"]
@@ -301,17 +302,21 @@ discovery:
   fraction previously executed as its bare major and an unknown major resolved unsupported without
   the macro attempt;
 - M409 lost the flush it never needed: a model query answers from the current model;
-- M109, M116, M190 and M191 are Barrier, barriers by definition (§9): they block later G-code on a
+- M109, M116, M190 and M191 are FlushAndStandstill, barriers by definition (§9): they block later G-code on a
   condition derived from the target, so the target must be in force before the wait begins; they
   previously set targets while moves were still running;
 - M558 and M593 gained the standstill §3 requires when they configure; M999 B and M952 gained the
   standstill RRF never took (§3); M997 locks as §3 requires;
-- the Ordered codes (M201, M203, M204, M205/M566, M425, M592) gained a pipeline flush;
+- M201, M203, M204, M205/M566 and M592 are Immediate: the move carries their values
+  (MOTION_CONFIG_ORDERING), so they wait for nothing; the codes whose handlers flushed inline
+  (M26-M30, M36, M38, M39, M425, M470-M472, M501, M503, M505, M550-M552, M557, M586, M606, M929)
+  are Flush class instead, the pipeline performing the same wait before dispatch;
 - M451-453, and M563 with `P`, wait exactly as before but in the pipeline instead of the handler,
   so a parameter error now surfaces after the wait rather than before it, which is
   RepRapFirmware's order too.
 
-M208 and the reassigning forms of M950 are declared Immediate although §1 and §3 argue Barrier:
+M208 and the reassigning forms of M950 are declared Immediate although §1 and §3 argue
+FlushAndStandstill:
 neither handler waited before, and flipping them is recorded here as an open decision rather than
 smuggled in.
 
@@ -343,7 +348,7 @@ under the planner lock. If no move is in flight (nothing submitted, or everythin
 completed), the code executes immediately: with an empty queue there is nothing to synchronise with.
 Ids skip zero on wrap, so comparisons use signed distance.
 
-Codes that produce endstop-terminated moves (homing, probing, `G1 H`) are Barrier class and hold the
+Codes that produce endstop-terminated moves (homing, probing, `G1 H`) are FlushAndStandstill class and hold the
 channel to standstill, so no deferred code can anchor to a move that may end early; §5.1's test
 asserts that.
 
@@ -371,7 +376,7 @@ event just discarded.
 
 ### 5.5 M400 waits for deferred work
 
-M400 is a Barrier row, so the pipeline performs its flush and standstill before the handler runs,
+M400 is a FlushAndStandstill row, so the pipeline performs its flush and standstill before the handler runs,
 and `MovePlanner.IsMoving` asks only about submissions and the ring counters. It gains a third
 term: no deferred work pending. Without it,
 `M106 S255` followed by `M400` returns before the fan changed, and M400 stops meaning "everything up
@@ -640,7 +645,7 @@ stays.
 | Plugins / IPC stream order | code visible twice (File, then Queue) | preserved: one code, one execution |
 | Requested object model | written at fire time, lags the parser | written at parse, runs ahead of the machine |
 | Expressions | evaluated at parse, frozen into the queued code | evaluated at parse, frozen into the frames |
-| Endstop-terminated anchors | correct by construction (retirement follows the stop) | excluded by the Barrier rule (§5.3) |
+| Endstop-terminated anchors | correct by construction (retirement follows the stop) | excluded by the FlushAndStandstill rule (§5.3) |
 | Local effects (M117, M300) | same mechanism as everything else | need A's release hook anyway |
 | Purge | one list, in-process | SBC list plus the estop broadcast plus the CANMaster expiry field |
 | Codebases touched, one-time | DuetControlServer | schema, DuetControlServer, DuetSbcInterface, Duet3Expansion, DuetCANMaster (one field) |

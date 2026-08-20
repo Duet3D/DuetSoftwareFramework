@@ -136,7 +136,7 @@ internal partial class MCodeHandler(
     /// Whether a drive-configuration code names a drive to change rather than only asking for a
     /// report, which decides between a standstill and acting immediately
     /// </summary>
-    private static CodeClass BarrierWhenSettingDrives(DuetAPI.Commands.Code code)
+    private static CodeClass FlushAndStandstillWhenSettingDrives(DuetAPI.Commands.Code code)
         => SetsAnyDrive(code) ? CodeClass.FlushAndStandstill : CodeClass.Immediate;
 
     /// <summary>
@@ -197,7 +197,7 @@ internal partial class MCodeHandler(
         // Set the idle timeout
         { 85, CodeClass.Immediate, (h, c, ct) => h.HandleIdleTimeoutAsync(c, ct) },
         // Set steps per mm; a bare M92 is a report, which DWC polls mid-print
-        { 92, BarrierWhenSettingDrives, (h, c, ct) => h.HandleStepsPerMmAsync(c, ct) },
+        { 92, FlushAndStandstillWhenSettingDrives, (h, c, ct) => h.HandleStepsPerMmAsync(c, ct) },
         // Flag current macro file as (not) pausable
         { 98, CodeClass.Immediate, (h, c, ct) => h.HandleMacroPausableAsync(c, ct) },
         // Set extruder temperature without waiting
@@ -267,7 +267,7 @@ internal partial class MCodeHandler(
         // Configure a temperature sensor
         { 308, CodeClass.Immediate, (h, c, ct) => h.HandleConfigureSensorAsync(c, ct) },
         // Set microstepping; a bare M350 is a report
-        { 350, BarrierWhenSettingDrives, (h, c, ct) => h.HandleMicrosteppingAsync(c, ct) },
+        { 350, FlushAndStandstillWhenSettingDrives, (h, c, ct) => h.HandleMicrosteppingAsync(c, ct) },
         // Save and load the height map, and set the compensation taper
         { 374, CodeClass.Immediate, (h, c, ct) => h.HandleSaveHeightMapAsync(c, ct) },
         { 375, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleLoadHeightMapAsync(c, ct) },
@@ -364,7 +364,7 @@ internal partial class MCodeHandler(
         { 851, CodeClass.Immediate, (h, c, ct) => h.HandleProbeOffsetAsync(c, ct) },
         // Set motor currents, current percentage and standstill current percentage; bare forms are
         // reports, which DWC polls mid-print
-        { [906, 913, 917], BarrierWhenSettingDrives, (h, c, ct) => h.HandleMotorCurrentsAsync(c, ct) },
+        { [906, 913, 917], FlushAndStandstillWhenSettingDrives, (h, c, ct) => h.HandleMotorCurrentsAsync(c, ct) },
         // Configure stall detection
         { 915, CodeClass.Immediate, (h, c, ct) => h.HandleStallDetectionAsync(c, ct) },
         // Start/stop event logging to SD card
