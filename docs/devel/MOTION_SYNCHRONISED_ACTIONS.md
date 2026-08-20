@@ -41,8 +41,8 @@ The codes divide into four classes, and only one of them stops the machine:
 
 | Class | Meaning | Examples | Mechanism |
 | --- | --- | --- | --- |
-| **Immediate** | no relation to motion, or the move carries the value (MOTION_CONFIG_ORDERING), so nothing needs holding back | M115, M409, M122, M201/203/204/205/566, M592 | act now, without waiting for the channel's pending codes |
-| **Flush** | reads what earlier codes are still completing: results, file positions, settings | M26/M27, M28/M29, M36, the file and settings codes, M425 | pipeline flush before dispatch |
+| **Immediate** | no relation to motion, or the move carries the value (MOTION_CONFIG_ORDERING), so nothing needs holding back | M115, M409, M122, M201/203/204/205/566, M425, M592 | act now, without waiting for the channel's pending codes |
+| **Flush** | reads what earlier codes are still completing: results, file positions, settings | M26/M27, M28/M29, M36, the file and settings codes | pipeline flush before dispatch |
 | **Deferred** | the physical effect belongs at a point in the path | M106/107, M42, M280, M300, M150, M117, M3/M4/M5, M568, M104/140/141, M144, `G10` without axis letters (§9) | this document, from a job file or its macros only (§5.2) |
 | **FlushAndStandstill** | changes what an already-queued move *means*, or needs the board's reply to produce its own | M92, M584, M350, M208, M669/M665, M574, M558, tool change, homing | flush, then standstill |
 
@@ -307,9 +307,9 @@ discovery:
   previously set targets while moves were still running;
 - M558 and M593 gained the standstill §3 requires when they configure; M999 B and M952 gained the
   standstill RRF never took (§3); M997 locks as §3 requires;
-- M201, M203, M204, M205/M566 and M592 are Immediate: the move carries their values
+- M201, M203, M204, M205/M566, M425 and M592 are Immediate: the move carries their values
   (MOTION_CONFIG_ORDERING), so they wait for nothing; the codes whose handlers flushed inline
-  (M26-M30, M36, M38, M39, M425, M470-M472, M501, M503, M505, M550-M552, M557, M586, M606, M929)
+  (M26-M30, M36, M38, M39, M470-M472, M501, M503, M505, M550-M552, M557, M586, M606, M929)
   are Flush class instead, the pipeline performing the same wait before dispatch;
 - M451-453, and M563 with `P`, wait exactly as before but in the pipeline instead of the handler,
   so a parameter error now surfaces after the wait rather than before it, which is

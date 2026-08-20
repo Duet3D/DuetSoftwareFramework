@@ -89,7 +89,7 @@ internal sealed partial class GCodeHandler(
     {
         // Rapid and coordinated moves. Immediate: they are the motion; a special move waits for
         // standstill inside the handler where its type is known
-        { [0, 1], CodeClass.Immediate, (h, c, ct) => h.HandleMoveAsync(c, isCoordinated: c.MajorNumber == 1, ct) },
+        { [0, 1], CodeClass.Immediate, (h, c, ct) => h.HandleMoveAsync(c, isCoordinated: c.MajorNumber == 1, ct) }, // it is the motion; a special move waits inside, where its type is known
         // Set tool offsets, or retract. The offsets are part of the transform every queued move was
         // planned against, so an axis letter is a barrier; without one the code sets tool
         // temperatures, which belong at the point in the path
@@ -97,7 +97,7 @@ internal sealed partial class GCodeHandler(
         // Set units to inches / millimetres
         { [20, 21], CodeClass.Immediate, async (h, c, ct) =>
             {
-                await h.UpdateInputAsync(c, input => input.DistanceUnit = c.MajorNumber == 20 ? DistanceUnit.Inch : DistanceUnit.MM, ct);
+                await h.UpdateInputAsync(c, input => input.DistanceUnit = c.MajorNumber == 20 ? DistanceUnit.Inch : DistanceUnit.MM, ct); // interpreter state, serial by construction
                 return new Message();
             } },
         // Home the machine
@@ -107,21 +107,21 @@ internal sealed partial class GCodeHandler(
         // Probe the bed
         { 30, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleProbeAsync(c, ct) },
         // Set or report the Z probe trigger height, offsets and threshold
-        { 31, CodeClass.Immediate, (h, c, ct) => h.HandleProbeParametersAsync(c, ct) },
+        { 31, CodeClass.Immediate, (h, c, ct) => h.HandleProbeParametersAsync(c, ct) }, // read by probing sequences, which run at standstill
         // Save the current position to a restore point
-        { 60, CodeClass.Immediate, (h, c, ct) => h.HandleSavePositionAsync(c, ct) },
+        { 60, CodeClass.Immediate, (h, c, ct) => h.HandleSavePositionAsync(c, ct) }, // snapshots the current planned position, as RRF does
         // Absolute / relative positioning
         { [90, 91], CodeClass.Immediate, async (h, c, ct) =>
             {
-                await h.UpdateInputAsync(c, input => input.AxesRelative = c.MajorNumber == 91, ct);
+                await h.UpdateInputAsync(c, input => input.AxesRelative = c.MajorNumber == 91, ct); // interpreter state, serial by construction
                 return new Message();
             } },
         // Set position without moving
-        { 92, CodeClass.Immediate, (h, c, ct) => h.HandleSetPositionAsync(c, ct) },
+        { 92, CodeClass.Immediate, (h, c, ct) => h.HandleSetPositionAsync(c, ct) }, // rewrites where the next built move starts; builds are serial behind it
         // Inverse time / feed rate mode
         { [93, 94], CodeClass.Immediate, async (h, c, ct) =>
             {
-                await h.UpdateInputAsync(c, input => input.InverseTimeMode = c.MajorNumber == 93, ct);
+                await h.UpdateInputAsync(c, input => input.InverseTimeMode = c.MajorNumber == 93, ct); // interpreter state, serial by construction
                 return new Message();
             } },
     };
