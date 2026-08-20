@@ -173,7 +173,7 @@ way.
 
 | Step | Task | Size | Notes |
 |---|---|---|---|
-| 1 | Declare which codes execute immediately and which defer, enforced in the pipeline | M | DCS only; behaviour-preserving apart from three explicit row flips |
+| 1 | Declare which codes execute immediately and which defer, enforced in the pipeline | M | ✅ **Complete**: per-handler `CodeTable` rows, pipeline enforcement, macro-then-unsupported miss path; behaviour changes listed in §5.1 |
 | 2 | Emergency-stop output handling in `Duet3Expansion` | M 🔧 | A live gap today: fans and GPIO survive an M112 until the board resets, and commands still execute in the pre-reset window |
 | 3 | Write `state.macroRestarted` on macro re-run after a pause | S | The field exists; nothing writes it |
 | A | Queue store, release on `MoveCompletedEvent`, purge hooks, M400 term | M | DCS only |

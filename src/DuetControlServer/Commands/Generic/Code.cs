@@ -286,23 +286,51 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
             throw new OperationCanceledException();
         }
 
-        // Attempt to process the code internally
+        // Attempt to process the code internally. The handler declares each code's class in its
+        // table; the class's synchronisation runs here, before the handler sees the code, so "does
+        // this code need a standstill" is a declared fact rather than a call the handler remembers
+        // to make. A code its handler does not classify has no row: no handler runs, and the code
+        // goes down the macro-then-unsupported path below
         try
         {
-            switch (Type)
+            ICodeHandler? handler = Type switch
             {
-                case CodeType.GCode:
-                    Result = await _gCodes.ProcessAsync(this, CancellationToken);
-                    break;
-                case CodeType.MCode:
-                    Result = await _mCodes.ProcessAsync(this, CancellationToken);
-                    break;
-                case CodeType.TCode:
-                    Result = await _tCodes.ProcessAsync(this, CancellationToken);
-                    break;
-                case CodeType.Keyword:
-                    Result = await _keywords.ProcessAsync(this, CancellationToken);
-                    break;
+                CodeType.GCode => _gCodes,
+                CodeType.MCode => _mCodes,
+                CodeType.TCode => _tCodes,
+                CodeType.Keyword => _keywords,
+                _ => null
+            };
+            if (handler is not null && handler.Classify(this) is Codes.CodeClass codeClass)
+            {
+                // A prioritized code jumps every queue by definition
+                if (!Flags.HasFlag(CodeFlags.IsPrioritized))
+                {
+                    switch (codeClass)
+                    {
+                        case Codes.CodeClass.Ordered:
+                            // The move carries the value; the flush keeps evaluation order
+                            if (!await _codeProcessor.FlushAsync(this, cancellationToken: CancellationToken))
+                            {
+                                throw new OperationCanceledException();
+                            }
+                            break;
+                        case Codes.CodeClass.Barrier:
+                            // The code changes what a queued move means, or needs the board's
+                            // reply: nothing may be moving when the handler runs
+                            if (!await _codeProcessor.FlushAsync(this, cancellationToken: CancellationToken) ||
+                                !await _codeProcessor.WaitForStandstillAsync(CancellationToken))
+                            {
+                                throw new OperationCanceledException();
+                            }
+                            break;
+                        case Codes.CodeClass.Deferred:
+                            // The effect belongs at a point in the path. Until a deferral
+                            // implementation lands this dispatches immediately
+                            break;
+                    }
+                }
+                Result = await handler.ProcessAsync(this, CancellationToken);
             }
 
             if (Result is not null)

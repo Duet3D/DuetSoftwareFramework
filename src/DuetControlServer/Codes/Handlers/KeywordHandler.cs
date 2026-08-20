@@ -26,6 +26,13 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="settings">Settings</param>
 public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expressions, FilePathResolver filePathResolver, VariableStore variableStore, ILogger<KeywordHandler> logger, IOptions<Settings> settings) : ICodeHandler
 {
+    /// <inheritdoc />
+    /// <remarks>
+    /// Keywords are not classified: the pipeline dispatches them without synchronisation, and this
+    /// member exists only to satisfy the handler contract
+    /// </remarks>
+    public CodeClass? Classify(DuetAPI.Commands.Code code) => CodeClass.Immediate;
+
     // Private fields
     private readonly ILogger<KeywordHandler> _logger = logger;
     private readonly Settings _settings = settings.Value;

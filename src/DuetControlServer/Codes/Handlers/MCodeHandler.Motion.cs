@@ -113,11 +113,6 @@ internal partial class MCodeHandler
         bool seen = false;
         string? report = null;
 
-        if (SetsAnyDrive(code) && !await FlushAndWaitForStandstillAsync(code, cancellationToken))
-        {
-            throw new OperationCanceledException();
-        }
-
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             Move move = model.Move;
@@ -170,14 +165,8 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message> HandleAccelerationsAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleAccelerationsAsync(Commands.Code code, bool reduced, CancellationToken cancellationToken)
     {
-        if (code.MinorNumber > 1)
-        {
-            return new Message(MessageType.Error, $"M201.{code.MinorNumber} is not supported");
-        }
-        bool reduced = code.MinorNumber == 1;
-
         bool seen = false;
         string? report = null;
 
@@ -507,11 +496,6 @@ internal partial class MCodeHandler
         bool seen = false;
         string? report = null;
 
-        if (SetsAnyDrive(code) && !await FlushAndWaitForStandstillAsync(code, cancellationToken))
-        {
-            throw new OperationCanceledException();
-        }
-
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             Move move = model.Move;
@@ -580,13 +564,13 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message> HandleWaitForMovesAsync(Commands.Code code, CancellationToken cancellationToken)
+    private ValueTask<Message> HandleWaitForMovesAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
-        {
-            throw new OperationCanceledException();
-        }
-        return new Message();
+        // The wait is the code, and the pipeline has already performed it: M400 is Barrier class,
+        // so reaching this handler means the flush and the standstill both completed
+        _ = code;
+        _ = cancellationToken;
+        return ValueTask.FromResult(new Message());
     }
 
     /// <summary>
@@ -605,11 +589,6 @@ internal partial class MCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleDriveMappingAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (code.Parameters.Count > 0 && !await FlushAndWaitForStandstillAsync(code, cancellationToken))
-        {
-            throw new OperationCanceledException();
-        }
-
         List<RemoteDrivers.DriverValue<(float, int, bool)>> toUpdate = [];
         List<string> warnings = [];
         bool seen = false;
@@ -741,11 +720,6 @@ internal partial class MCodeHandler
         bool seen = false;
         string? report = null;
 
-        if (SetsAnyDrive(code) && !await FlushAndWaitForStandstillAsync(code, cancellationToken))
-        {
-            throw new OperationCanceledException();
-        }
-
         int which = code.MajorNumber ?? 906;
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
@@ -840,11 +814,6 @@ internal partial class MCodeHandler
     {
         bool enable = code.MajorNumber == 17;
         List<RemoteDrivers.DriverValue<(ushort, ushort)>> toUpdate = [];
-
-        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
-        {
-            throw new OperationCanceledException();
-        }
 
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
@@ -954,11 +923,6 @@ internal partial class MCodeHandler
         {
             // Nothing there would answer, and the code would sit out its timeout before saying so
             return new Message(MessageType.Error, CanAddresses.NoHardwareMessage($"Driver {driver}"));
-        }
-
-        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
-        {
-            throw new OperationCanceledException();
         }
 
         CanResponse response;
@@ -1268,12 +1232,9 @@ internal partial class MCodeHandler
         // The coefficient still goes to the boards, which apply it to the moves already in their own
         // queues, so those have to have run out first - what RepRapFirmware's
         // Move::ConfigurePressureAdvance takes the movement lock for. The moves this side has queued
-        // carry the value they were built with, so once the push is gone this wait can go with it
+        // carry the value they were built with, so once the push is gone the Barrier class this code
+        // is declared with can become Ordered
         // TODO revisit when pressure advance no longer has to be pushed to the drivers
-        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
-        {
-            throw new OperationCanceledException();
-        }
 
         List<RemoteDrivers.DriverValue<float>> toUpdate = [];
         using (await model.AccessReadWriteAsync(cancellationToken))
@@ -1859,11 +1820,6 @@ internal partial class MCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleKinematicsAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
-        {
-            throw new OperationCanceledException();
-        }
-
         int mCode = code.MajorNumber!.Value;
         bool seen = false;
         KinematicsEngine geometry = KinematicsConfigurator.Apply(planner.Geometry, code, ref seen);
@@ -1999,11 +1955,6 @@ internal partial class MCodeHandler
         // has to give back everything it holds, and that is a question about one axis at a time
         Dictionary<int, List<InputMonitors.Monitored>> monitorsBefore = [], monitorsAfter = [];
         string? report = null;
-
-        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
-        {
-            throw new OperationCanceledException();
-        }
 
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
@@ -2359,21 +2310,6 @@ internal partial class MCodeHandler
     }
 
     /// <summary>
-    /// Flush the code pipeline and then wait for the machine to come to a stop
-    /// </summary>
-    /// <param name="code">The code being executed</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>True if the machine is at a standstill</returns>
-    private async ValueTask<bool> FlushAndWaitForStandstillAsync(Commands.Code code, CancellationToken cancellationToken)
-    {
-        if (!await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
-        {
-            return false;
-        }
-        return await planner.WaitForStandstillAsync(cancellationToken);
-    }
-
-    /// <summary>
     /// Whether the code names a drive to configure rather than only asking for a report
     /// </summary>
     /// <param name="code">The code</param>
@@ -2383,7 +2319,7 @@ internal partial class MCodeHandler
     /// unconditionally would make a bare M92 or M906 - which DWC polls for - stall until the machine
     /// stopped, in the middle of a print
     /// </remarks>
-    private static bool SetsAnyDrive(Commands.Code code)
+    private static bool SetsAnyDrive(DuetAPI.Commands.Code code)
         => code.Parameters.Any(parameter => parameter.Letter == 'E' || Axis.Letters.Contains(parameter.Letter));
 
     /// <summary>

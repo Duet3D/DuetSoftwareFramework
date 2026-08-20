@@ -49,11 +49,6 @@ internal partial class MCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleProbeGridAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (!await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
-        {
-            throw new OperationCanceledException();
-        }
-
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             char[] letters = ['X', 'Y'];
@@ -298,11 +293,6 @@ internal partial class MCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleLoadHeightMapAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
-        {
-            throw new OperationCanceledException();
-        }
-
         await bedCompensation.ClearAsync(cancellationToken);
 
         string fileName = code.GetString('P', DefaultHeightMapFile);
@@ -358,11 +348,6 @@ internal partial class MCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleClearCompensationAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (!await FlushAndWaitForStandstillAsync(code, cancellationToken))
-        {
-            throw new OperationCanceledException();
-        }
-
         await bedCompensation.ClearAsync(cancellationToken);
         return new Message();
     }

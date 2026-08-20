@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -74,78 +75,56 @@ internal sealed partial class GCodeHandler(
     /// <param name="code">Code to process</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result of the code if the code completed, else null</returns>
-    public async ValueTask<Message> ProcessAsync(Commands.Code code, CancellationToken cancellationToken)
+    public ValueTask<Message> ProcessAsync(Commands.Code code, CancellationToken cancellationToken)
+        => Rows.Invoke(this, code, cancellationToken);
+
+    /// <inheritdoc />
+    public CodeClass? Classify(DuetAPI.Commands.Code code) => Rows.Classify(code);
+
+    /// <summary>
+    /// Every G-code this handler implements: its class, enforced by the pipeline before dispatch,
+    /// and its handler. A G-code with no row takes the macro-then-unsupported path
+    /// </summary>
+    internal static readonly CodeTable<GCodeHandler> Rows = new(CodeType.GCode)
     {
-        Message rslt = new();
-        switch (code.MajorNumber)
-        {
-            // Rapid and coordinated moves
-            case 0:
-            case 1:
-                rslt = await HandleMoveAsync(code, isCoordinated: code.MajorNumber == 1, cancellationToken);
-                break;
-
-            // Set tool offsets, or retract
-            case 10:
-                rslt = await HandleToolOffsetsAsync(code, cancellationToken);
-                break;
-
-            // Set units to inches / millimetres
-            case 20:
-            case 21:
-                await UpdateInputAsync(code, input => input.DistanceUnit = code.MajorNumber == 20 ? DistanceUnit.Inch : DistanceUnit.MM, cancellationToken);
-                break;
-
-            // Absolute / relative positioning.
-            case 90:
-            case 91:
-                await UpdateInputAsync(code, input =>
-                {
-                    input.AxesRelative = code.MajorNumber == 91;
-                }, cancellationToken);
-                break;
-
-            // Home the machine
-            case 28:
-                rslt = await HandleHomeAsync(code, cancellationToken);
-                break;
-
-            // Probe the grid and build a height map
-            case 29:
-                rslt = await HandleProbeGridAsync(code, cancellationToken);
-                break;
-
-            // Probe the bed
-            case 30:
-                rslt = await HandleProbeAsync(code, cancellationToken);
-                break;
-
-            // Set or report the Z probe trigger height, offsets and threshold
-            case 31:
-                rslt = await HandleProbeParametersAsync(code, cancellationToken);
-                break;
-
-            // Save the current position to a restore point
-            case 60:
-                rslt = await HandleSavePositionAsync(code, cancellationToken);
-                break;
-
-            // Set position without moving
-            case 92:
-                rslt = await HandleSetPositionAsync(code, cancellationToken);
-                break;
-
-            // Inverse time / feed rate mode
-            case 93:
-            case 94:
-                await UpdateInputAsync(code, input => input.InverseTimeMode = code.MajorNumber == 93, cancellationToken);
-                break;
-
-            default:
-                throw new NotSupportedException($"Unsupported code '{code}'");
-        }
-        return rslt;
-    }
+        // Rapid and coordinated moves. Immediate: they are the motion; a special move waits for
+        // standstill inside the handler where its type is known
+        { [0, 1], CodeClass.Immediate, (h, c, ct) => h.HandleMoveAsync(c, isCoordinated: c.MajorNumber == 1, ct) },
+        // Set tool offsets, or retract. The offsets are part of the transform every queued move was
+        // planned against, so an axis letter is a barrier; without one the code sets tool
+        // temperatures, which belong at the point in the path
+        { 10, c => c.Parameters.Any(p => Axis.Letters.Contains(p.Letter)) ? CodeClass.Barrier : CodeClass.Deferred, (h, c, ct) => h.HandleToolOffsetsAsync(c, ct) },
+        // Set units to inches / millimetres
+        { [20, 21], CodeClass.Immediate, async (h, c, ct) =>
+            {
+                await h.UpdateInputAsync(c, input => input.DistanceUnit = c.MajorNumber == 20 ? DistanceUnit.Inch : DistanceUnit.MM, ct);
+                return new Message();
+            } },
+        // Home the machine
+        { 28, CodeClass.Barrier, (h, c, ct) => h.HandleHomeAsync(c, ct) },
+        // Probe the grid and build a height map
+        { 29, CodeClass.Barrier, (h, c, ct) => h.HandleProbeGridAsync(c, ct) },
+        // Probe the bed
+        { 30, CodeClass.Barrier, (h, c, ct) => h.HandleProbeAsync(c, ct) },
+        // Set or report the Z probe trigger height, offsets and threshold
+        { 31, CodeClass.Immediate, (h, c, ct) => h.HandleProbeParametersAsync(c, ct) },
+        // Save the current position to a restore point
+        { 60, CodeClass.Immediate, (h, c, ct) => h.HandleSavePositionAsync(c, ct) },
+        // Absolute / relative positioning
+        { [90, 91], CodeClass.Immediate, async (h, c, ct) =>
+            {
+                await h.UpdateInputAsync(c, input => input.AxesRelative = c.MajorNumber == 91, ct);
+                return new Message();
+            } },
+        // Set position without moving
+        { 92, CodeClass.Immediate, (h, c, ct) => h.HandleSetPositionAsync(c, ct) },
+        // Inverse time / feed rate mode
+        { [93, 94], CodeClass.Immediate, async (h, c, ct) =>
+            {
+                await h.UpdateInputAsync(c, input => input.InverseTimeMode = c.MajorNumber == 93, ct);
+                return new Message();
+            } },
+    };
 
     /// <summary>
     /// G60: save the current position to a restore point

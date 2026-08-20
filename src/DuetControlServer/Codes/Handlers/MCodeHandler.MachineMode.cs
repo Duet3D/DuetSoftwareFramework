@@ -51,11 +51,6 @@ internal partial class MCodeHandler
     private async ValueTask<Message> HandleSetMachineModeAsync(Commands.Code code, MachineMode mode,
                                                                CancellationToken cancellationToken)
     {
-        if (!await planner.WaitForStandstillAsync(cancellationToken))
-        {
-            throw new System.OperationCanceledException();
-        }
-
         bool changed;
         using (await model.AccessReadWriteAsync(cancellationToken))
         {

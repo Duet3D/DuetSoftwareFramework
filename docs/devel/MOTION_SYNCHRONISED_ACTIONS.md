@@ -34,8 +34,8 @@ A DuetControlServer handler has two tools, and both are wrong for this:
   `MCodeHandler.Heat.cs` call `FanManager.SetSpeedAsync`, `GpioManager.WriteAsync` and
   `HeatManager.SetTemperatureAsync` with no flush and no wait: in the example the fan reaches full
   during move A.
-- **`FlushAndWaitForStandstillAsync`** ([MCodeHandler.Motion.cs:2367](../../src/DuetControlServer/Codes/Handlers/MCodeHandler.Motion.cs)).
-  Correct ordering, at the cost of stopping the machine: a blob, a ringing mark, a longer print.
+- **Wait for standstill first**, the Barrier class of §5.1's table. Correct ordering, at the cost
+  of stopping the machine: a blob, a ringing mark, a longer print.
 
 The codes divide into four classes, and only two of them are about stopping:
 
@@ -46,14 +46,14 @@ The codes divide into four classes, and only two of them are about stopping:
 | **Ordered** | applies to moves built after it, must not reach moves already built | M201/203/205/566, M204, M592, M425, M572's value | solved: the move carries it (MOTION_CONFIG_ORDERING) |
 | **Barrier** | changes what an already-queued move *means*, or needs the board's reply to produce its own | M92, M584, M350, M208, M669/M665, M574, M558, tool change, homing | standstill |
 
-Today the class is implicit in whether a handler happens to call the flush, and nothing can test
-that. M115 and M122 do not flush; M409 does; nothing states which is intended. §5.1 makes the class
-declarative.
+The class used to be implicit in whether a handler happened to call a flush, and nothing could
+test that. §5.1 (implemented) makes it declarative: each handler's table names every code's class,
+the pipeline enforces it before dispatch, and a unit test diffs the tables against this document.
 
 M572 sits across the boundary. Its *value* is Ordered and already rides the move on the SBC side,
-but the handler still pushes the coefficient to the drivers, so it keeps a standstill marked `TODO`
-in [MCodeHandler.Motion.cs:1268](../../src/DuetControlServer/Codes/Handlers/MCodeHandler.Motion.cs).
-§7.7 explains why neither implementation fully removes that wait and what would.
+but the handler still pushes the coefficient to the drivers, so its row stays Barrier, marked
+`TODO` in the table. §7.7 explains why neither implementation fully removes that wait and what
+would.
 
 ---
 
@@ -201,133 +201,69 @@ Required by both implementations, and useful on its own.
 
 ### 5.1 The class table
 
-Today the class of a code is implicit in whether its handler happens to call
-`FlushAndWaitForStandstillAsync`, and each of the 13 call sites carries its own guard
-(`SetsAnyDrive` for M92/M350/M906, "parameters present" for M584, and so on). The table makes the
-class a declared fact, and moves the enforcement out of the handlers into the pipeline, so "does
-this code need a standstill" becomes one reviewable line instead of an invisible omission.
+Implemented. The class of every code is a declared fact: each handler declares the codes it
+implements as a static `CodeTable<THandler>`
+([Codes/CodeTable.cs](../../src/DuetControlServer/Codes/CodeTable.cs)), one entry per row, an
+entry being the code number(s), the class
+([Codes/CodeClass.cs](../../src/DuetControlServer/Codes/CodeClass.cs)) and the handler:
 
-Dispatch has the same shape as the class: the `MajorNumber` switches in the handlers enumerate
-exactly the key space the table does, and keeping them as a second structure would mean two
-enumerations of the same facts, policed by a diff test. The table therefore carries the handler
-alongside the class: one row declares that a code exists, what class it is, and what runs it, so "a
-handler without a row" becomes impossible to write rather than a test failure.
+```csharp
+internal static readonly CodeTable<MCodeHandler> Rows = new(CodeType.MCode)
+{
+    { [0, 1, 2],  CodeClass.Immediate, (h, c, ct) => h.HandleStopAsync(c, ct) },
+    { 104,        CodeClass.Deferred,  async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.CurrentToolHeatersAsync(c, ct), wait: false, ct) },
+    { [569, (569, 1), (569, 2), (569, 4), (569, 6), (569, 7)],
+                  CodeClass.Barrier,   (h, c, ct) => h.HandleDriverConfigAsync(c, ct) },
+    { [906, 913, 917], BarrierWhenSettingDrives, (h, c, ct) => h.HandleMotorCurrentsAsync(c, ct) },
+};
+```
 
-The fractional part of a code number is a second instance of the same implicitness, and today it is
-a bug: dispatch switches on `MajorNumber` alone
-([MCodeHandler.cs:116](../../src/DuetControlServer/Codes/Handlers/MCodeHandler.cs)), so `M906.1`
-executes as `M906`. The handlers that do honour minors carry their own scattered guards, each with
-its own wording for an invalid minor: M36, M505, M581 and M586 in `MCodeHandler.cs`, M201 and M569
-in `MCodeHandler.Motion.cs`, M558 in `MCodeHandler.Probes.cs`. Nothing lists which fractional codes
-exist. RepRapFirmware gates fractions once, at the top of each switch
-([GCodes2.cpp:200](../../lib/RepRapFirmware/src/GCodes/GCodes2.cpp) for G,
-[GCodes2.cpp:742](../../lib/RepRapFirmware/src/GCodes/GCodes2.cpp) for M): a fraction on a major
-with no hardcoded fractional parts diverts to `TryMacroFile`, which runs
-`<letter><major>.<minor>.g` if it exists and answers `warningNotSupported` otherwise; inside a
-major that does implement fractions, an invalid minor is whatever its developer wrote. The table
-takes the stronger, uniform form: every fractional code DSF implements is an explicit row, and a
-fraction without a row takes the macro-then-unsupported path, never the bare major's handler, so
-`M906.1` and `M558.5` stop depending on which handler they happen to hit.
+An entry names its code by major number (`104`), by `(major, minor)` for a fractional code, or by
+a list of numbers sharing one row, which is how codes that shared a switch arm (`0 or 1 or 2`,
+`17 or 18 or 84`) and a handler's internal minor switch (M569) are written; arms that passed
+computed arguments (M104 and M109 differ only in `wait:`) became lambdas that pass them. Tables
+exist only in `GCodeHandler` and `MCodeHandler`: `TCodeHandler` handles every T code the same way,
+the tool number is a value with no number to key on, so it answers with expressions (Immediate for
+the bare `T` report, Barrier for a tool change), and `KeywordHandler` answers Immediate, keywords
+are not classified.
 
-**Added:**
+The class is either fixed or a resolver for rows whose class depends on the parameters:
+`M92/M350/M906/M913/M917` are Barrier when a drive letter is present and Immediate when bare (a
+report, which DWC polls mid-print; the guard is `SetsAnyDrive`, relocated from the handlers);
+`M584` and `M593` are Barrier only when setting; `M558` is Barrier unless bare or naming only `K`,
+a report; `M563` is Barrier only with `P`, without it a report; `M999` is Barrier with `B` (§3);
+`G10` is Barrier with an axis letter and Deferred without. Every fractional code a handler
+implements is its own row (M36.1/.2, M201.1, M505.1, M569.1/.2/.4/.6/.7, M581.1, M586.4), the
+minor decided by the row's lambda as an argument, except M569, which keeps a switch over its valid
+minors because each maps to a different CAN message type. A minor of zero is the fraction-less
+form, as RepRapFirmware's `fraction > 0` gates read it: M569.0 is M569. Lookup is exact: a
+fraction never falls back to the bare-major row. M150 has no handler yet; its row (a resolver on
+the strip's `MustStopMovement` capability, Barrier or Deferred) lands with M150 itself.
 
-- `Codes/CodeClass.cs`:
+`ICodeHandler` gained `Classify(code)` beside its existing `ProcessAsync(code)`: the row's class,
+resolved from the parameters where declared, or null for "no such code". `ProcessAsync` is the
+simulation gate around `Rows.Invoke`, and a code the simulation gate is going to ignore classifies
+Immediate, so simulation never waits for motion. `Classify` is side-effect free, nothing allocates
+per code (struct keys, tables frozen on first lookup, singleton rows), and the class column
+(`Rows.ClassColumn`) is readable without instantiating anything, which is what the tests read.
 
-  ```csharp
-  public enum CodeClass
-  {
-      Immediate,   // act now, do not wait for the channel's pending codes
-      Ordered,     // flush the pipeline (order + expressions), no standstill; the move carries the value
-      Deferred,    // the effect belongs at a point in the path (§5.2, §5.3)
-      Barrier      // flush, then wait for standstill before the handler runs
-  }
-  ```
-
-- `Codes/CodeTable.cs`: each handler class declares the codes it implements as a static
-  `CodeTable<THandler>`, one entry per row, an entry being the code number(s), the class, and the
-  handler; the letter comes from the table's constructor:
-
-  ```csharp
-  public static readonly CodeTable<MCodeHandler> Rows = new(CodeType.MCode)
-  {
-      { [0, 1, 2],  Barrier,   (h, c, ct) => h.HandleStopAsync(c, ct) },
-      { 104,        Deferred,  (h, c, ct) => h.SetTemperaturesAsync(c, wait: false, ct) },
-      { 109,        Barrier,   (h, c, ct) => h.SetTemperaturesAsync(c, wait: true, ct) },
-      { [569, (569, 1), (569, 2), (569, 4), (569, 6), (569, 7)],
-                    Barrier,   (h, c, ct) => h.SendDriverConfigAsync(c, c.Minor ?? 0, ct) },
-      { 906,        c => c.SetsAnyDrive() ? Barrier : Immediate,
-                               (h, c, ct) => h.HandleMotorCurrentsAsync(c, ct) },
-  };
-  ```
-
-  An entry names its code by major number (`104`), by `(major, minor)` for a fractional code, or
-  by a list of numbers sharing one row, which is how codes that shared a switch arm (`0 or 1 or
-  2`, `17 or 18 or 84`) and a handler's internal minor switch (M569) are written; arms that passed
-  computed arguments (M104 and M109 differ only in `wait:`) become lambdas that pass them. Tables
-  exist only in `GCodeHandler` and `MCodeHandler`: `TCodeHandler` handles every T code the same
-  way, the tool number is a value with no number to key on, so it answers with plain expressions
-  instead (its class is Immediate for the bare `T` report and Barrier for a tool change).
-  The class is either fixed or a resolver `Func<Commands.Code, CodeClass>` for rows
-  whose class depends on the parameters; the resolvers are today's handler guards, relocated:
-  `M92/M350/M906/M913/M917` are Barrier when a drive letter is present and Immediate when bare (a
-  report, which DWC polls mid-print); `M584` and `M593` are Barrier only when setting; `G10` is
-  Barrier with an axis letter and Deferred without; `M150` asks the strip whether it needs a
-  standstill (the `MustStopMovement` capability) and is Barrier then, Deferred otherwise. Every
-  fractional code a handler implements is its own row (today: M36.1/.2, M201.1, M505.1,
-  M569.1/.2/.4/.6/.7, M581.1, M586.4), so the tables are the complete list of codes DSF supports,
-  fractional and bare. There is no merged classifier: `ICodeHandler` gains `Classify(code)`,
-  returning the code's class or null for "no such code" (below), beside its existing
-  `ProcessAsync(code)`, which becomes a one-liner over the handler's own table where one exists,
-  and the pipeline routes by code letter exactly as `Code.ProcessInternallyAsync` does today; the
-  letters partition the key space, so merging the tables would buy nothing. Lookup is exact: a
-  code with a fraction looks up `(type, major,
-  minor)` and never falls back to the bare-major row. `Classify` is side-effect free, and nothing
-  allocates per code: the key is a struct, each table freezes its dictionary on first lookup, and
-  the entries and their lambdas are singletons created at static initialisation, which also keeps
-  the class column (`Rows.ClassColumn`) readable without instantiating anything. A runnable
-  demonstration of the whole shape, tables, resolvers, shared entries, the miss path and the class
-  test, is [examples/CodeClassifierExample.cs](examples/CodeClassifierExample.cs)
-  (`dotnet run CodeClassifierExample.cs`).
-
-**Changed:**
-
-- `Pipelines/ProcessInternally.cs` routes each G/M/T code to its handler by letter, as
-  `Code.ProcessInternallyAsync` does today, asks it `Classify(code)`, performs the class's
-  synchronisation, and calls `ProcessAsync(code)` (diagram below). Keywords and comments are not
-  classified. A flush that reports "not ready" cancels and retries the code exactly as the
-  in-handler flushes do today.
-- The `MajorNumber` switches in `MCodeHandler.ProcessAsync`
-  ([MCodeHandler.cs:116](../../src/DuetControlServer/Codes/Handlers/MCodeHandler.cs)) and
-  `GCodeHandler` are deleted (`TCodeHandler` has none); the simulation gate at
-  [MCodeHandler.cs:109](../../src/DuetControlServer/Codes/Handlers/MCodeHandler.cs) remains,
-  wrapped around the invocation of M-code rows. The `_ => throw new NotSupportedException` default
-  arms go with the switches: an unknown code is a lookup miss, not an exception. M22 and M998,
-  whose arms exist only to throw, get no rows and share the miss path.
-- A code with no row, an unknown bare major and an unlisted fraction alike, has no handler. The
-  pipeline runs the macro named after the code via the existing `TryRunCodeMacroAsync`
-  ([Code.cs](../../src/DuetControlServer/Commands/Generic/Code.cs)), which already builds the
-  `<letter><major>.<minor>.g` name and passes the code's parameters as `param.*`; if no such macro
-  exists, the code resolves as unsupported (`Command is not supported`, a warning, RRF's wording).
-  This restores a fallback that is dead code today: the `NotSupportedException` catch in
-  `Code.ProcessInternallyAsync` ([Code.cs:313](../../src/DuetControlServer/Commands/Generic/Code.cs))
-  resolves the code as unsupported before `TryRunCodeMacroAsync` at
-  [Code.cs:349](../../src/DuetControlServer/Commands/Generic/Code.cs) can run, so `M1234` never
-  tries `sys/M1234.g` despite the comment there saying it must. Ending every miss in
-  macro-then-unsupported is what RepRapFirmware's `default:` case does
-  ([GCodes2.cpp:4789](../../lib/RepRapFirmware/src/GCodes/GCodes2.cpp)).
-- The per-handler invalid-minor guards are deleted: their knowledge is now the absence of a row, and
-  a handler can no longer be reached with a minor it does not implement. That removes the M201
-  and M569 rejections in `MCodeHandler.Motion.cs`, the M558 rejection in `MCodeHandler.Probes.cs`,
-  and the equivalents in M36, M505, M581 and M586. Handlers keep no minor logic at all: each
-  fractional row's lambda passes what the minor decided (M36.1 against M36.2 is a boolean
-  argument).
-- `MCodeHandler.FlushAndWaitForStandstillAsync` and its 13 call sites
-  (`MCodeHandler.Motion.cs`, `MCodeHandler.Compensation.cs`) are deleted; their guards become the
-  resolvers above. Multi-phase codes that wait *inside* their sequence (G28, G30, a tool change,
-  M400 itself) keep those internal waits: their row reads Barrier, and the pipeline's pre-dispatch
-  wait subsumes only the wait a handler performed first thing.
-- Both deferral implementations later hook the one `Deferred` branch; until one lands, that branch
-  dispatches immediately, which is today's behaviour.
+The enforcement is in `Code.ProcessInternallyAsync`
+([Code.cs](../../src/DuetControlServer/Commands/Generic/Code.cs)), the body of the
+ProcessInternally pipeline stage, which routes to the handler by letter as it always did, asks it
+`Classify`, performs the class's synchronisation, and calls `ProcessAsync`; the standstill is
+`CodeProcessor.WaitForStandstillAsync`. A prioritized code skips the synchronisation: it jumps
+every queue by definition. A flush that reports "not ready" cancels and retries the code exactly
+as the in-handler flushes did. A null class dispatches no handler: the code takes the existing
+post-interception, then `TryRunCodeMacroAsync`, which builds `<letter><major>.<minor>.g` and
+passes the code's parameters as `param.*`, then `Command is not supported`. That fallback used to
+be dead code, because the `NotSupportedException` catch resolved unknown codes first; the order is
+what RepRapFirmware's `default:` case does
+([GCodes2.cpp:4789](../../lib/RepRapFirmware/src/GCodes/GCodes2.cpp)).
+`MCodeHandler.FlushAndWaitForStandstillAsync` and its 12 call sites are deleted, along with the
+first-thing standstill waits of M451-453 and M563 and the invalid-minor guards of M36, M201, M505,
+M558, M569, M581 and M586. The mid-sequence waits of multi-phase codes (G28, G29, G30, the
+special-move wait inside G0/G1, M505's guarded wait) remain: the pipeline's pre-dispatch wait
+subsumes only a wait a handler performed first thing.
 
 ```mermaid
 flowchart TD
@@ -339,33 +275,45 @@ flowchart TD
     M0 -- no --> M2["resolve as unsupported"]
     C -- Immediate --> D1[dispatch handler, no flush]
     C -- Ordered --> F1["CodeProcessor.FlushAsync(code)<br/>(pipeline order + expressions)"] --> D2[dispatch handler]
-    C -- Barrier --> F2["FlushAsync(code)"] --> W["planner.WaitForStandstillAsync()"] --> D3[dispatch handler]
+    C -- Barrier --> F2["FlushAsync(code)"] --> W["WaitForStandstillAsync()"] --> D3[dispatch handler]
     C -- Deferred --> F3["FlushAsync(code)"] --> G{"file channel and<br/>anchor exists? (§5.2, §5.3)"}
     G -- no --> D4[dispatch handler: applies now]
     G -- yes --> H["defer: §6 queue / §7 action"]
 ```
 
-**Tests (`UnitTests`):**
+The Deferred branch's flush and anchor check land with the deferral implementation; today the
+class is declared and the branch dispatches immediately, which is the previous behaviour.
 
-- a data-driven test holding the expected class of every code in §3 and §9, fractional forms
-  included, diffed both ways against the row tables' class columns, read statically. There is no
-  handler side to diff: a row cannot be written without a handler, and a handler method without a
-  row is unreachable, so the only drift left is between the tables and this document;
-- a fractional code with no row never reaches its major's handler: `M906.1` runs `sys/M906.1.g`
-  when the file exists, answers `Command is not supported` when it does not, and in neither case
-  executes as `M906`;
-- a regression pin for the mechanical move: the set of codes classified Barrier equals the set
-  whose handlers waited before the move, commit for commit.
+**Tests** ([UnitTests/Codes/CodeTableTests.cs](../../src/UnitTests/Codes/CodeTableTests.cs)):
+the `CodeTable` mechanism, exercised on a table built for the test rather than the handlers' own:
+shared rows, resolver rows classifying from parameters, exact fractional lookup with no fallback
+to the bare major (the M906.1-executes-as-M906 bug), a minor of zero reading as the fraction-less
+form, null for a code with no row, dispatch running the row the minor selected, a duplicate row
+refusing to register, and the class column. The handlers' tables themselves are declarations and
+are not mirrored into an expected list: a row cannot exist without a handler, dispatch is the row,
+and a duplicated class column would only turn every class change into a two-file edit.
 
-**Landing order.** First the types, the row tables and dispatch through them, deleting the
-switches. This commit is behaviour-preserving: every row invokes what its switch arm invoked, and
-the miss path temporarily reproduces today's outcomes (a fraction with no row falls back to the
-bare-major row; an unknown major resolves as unsupported without the macro attempt). Then the
-pipeline's class enforcement and the deletion of the 13 flush sites, behaviour-preserving by the
-pin test. Then, each as its own visible commit, the changes in behaviour: the miss path proper
-(the bare-major fallback goes, so `M906.1` and every other unlisted fraction take the
-macro-then-unsupported path, and unknown majors regain the macro attempt); M409 loses a flush it
-never needed; M999 B and M952 gain the standstill RRF never took (§3).
+**Behaviour changes against the switch-based dispatch**, each a declared class rather than a
+discovery:
+
+- the miss path: an unknown major or an unlisted fraction (`M906.1`, `M569.3`, M22, M998) runs the
+  macro named after it when one exists and answers `Command is not supported` otherwise, where a
+  fraction previously executed as its bare major and an unknown major resolved unsupported without
+  the macro attempt;
+- M409 lost the flush it never needed: a model query answers from the current model;
+- M109, M116, M190 and M191 are Barrier, barriers by definition (§9): they block later G-code on a
+  condition derived from the target, so the target must be in force before the wait begins; they
+  previously set targets while moves were still running;
+- M558 and M593 gained the standstill §3 requires when they configure; M999 B and M952 gained the
+  standstill RRF never took (§3); M997 locks as §3 requires;
+- the Ordered codes (M201, M203, M204, M205/M566, M425, M592) gained a pipeline flush;
+- M451-453, and M563 with `P`, wait exactly as before but in the pipeline instead of the handler,
+  so a parameter error now surfaces after the wait rather than before it, which is
+  RepRapFirmware's order too.
+
+M208 and the reassigning forms of M950 are declared Immediate although §1 and §3 argue Barrier:
+neither handler waited before, and flipping them is recorded here as an open decision rather than
+smuggled in.
 
 ### 5.2 Only job-file channels defer, macros included
 
@@ -423,8 +371,9 @@ event just discarded.
 
 ### 5.5 M400 waits for deferred work
 
-`HandleWaitForMovesAsync` is `FlushAndWaitForStandstillAsync`, and `MovePlanner.IsMoving` asks only
-about submissions and the ring counters. It gains a third term: no deferred work pending. Without it,
+M400 is a Barrier row, so the pipeline performs its flush and standstill before the handler runs,
+and `MovePlanner.IsMoving` asks only about submissions and the ring counters. It gains a third
+term: no deferred work pending. Without it,
 `M106 S255` followed by `M400` returns before the fan changed, and M400 stops meaning "everything up
 to here has happened". RepRapFirmware's standstill wait already includes `codeQueue->IsIdle()`.
 The per-implementation mechanics are in §6 and §7.
@@ -787,10 +736,8 @@ right point in the path.
 
 ## 11. Order of work and open decisions
 
-1. **The class table and dispatch through it** (§5.1). DuetControlServer only;
-   behaviour-preserving until the final commits, which land one change each: the miss path
-   (fractional enforcement and the restored macro fallback), then the rows that flip (M409,
-   M999 B, M952).
+1. **The class table and dispatch through it** (§5.1). Done: tables, enforcement, the miss path
+   and the row flips are implemented; §5.1 lists the behaviour changes.
 2. **Emergency-stop output handling in Duet3Expansion** (§5.7). A live gap independent of this plan.
 3. **`state.macroRestarted`** written on macro re-run after a pause (§5.2).
 4. **The implementation decision** (§8), then:

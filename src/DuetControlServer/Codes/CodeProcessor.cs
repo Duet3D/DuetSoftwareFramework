@@ -166,6 +166,20 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     /// <param name="ifExecuting">Return true only if the corresponding code input is actually active (ignored if syncFileStreams is true)</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Whether the codes have been flushed successfully</returns>
+    /// <summary>
+    /// Motion planner, resolved lazily because it is built after the code processor
+    /// </summary>
+    private Motion.MovePlanner? _planner;
+
+    /// <summary>
+    /// Wait for the machine to come to a standstill, as a Barrier-class code requires before its
+    /// handler runs
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>True when the machine is at a standstill, false when cancelled</returns>
+    public ValueTask<bool> WaitForStandstillAsync(CancellationToken cancellationToken = default)
+        => (_planner ??= serviceProvider.GetRequiredService<Motion.MovePlanner>()).WaitForStandstillAsync(cancellationToken);
+
     public async ValueTask<bool> FlushAsync(Commands.Code code, bool evaluateExpressions = true, bool evaluateAll = true, bool syncFileStreams = false, bool ifExecuting = true, CancellationToken cancellationToken = default)
     {
         // Wait for the pending codes on this channel to go
