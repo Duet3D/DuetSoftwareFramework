@@ -207,6 +207,22 @@ Today the class of a code is implicit in whether its handler happens to call
 class a declared fact, and moves the enforcement out of the handlers into the pipeline, so "does
 this code need a standstill" becomes one reviewable line instead of an invisible omission.
 
+The fractional part of a code number is a second instance of the same implicitness, and today it is
+a bug: dispatch switches on `MajorNumber` alone
+([MCodeHandler.cs:116](../../src/DuetControlServer/Codes/Handlers/MCodeHandler.cs)), so `M906.1`
+executes as `M906`. The handlers that do honour minors carry their own scattered guards, each with
+its own wording for an invalid minor: M36, M505, M581 and M586 in `MCodeHandler.cs`, M201 and M569
+in `MCodeHandler.Motion.cs`, M558 in `MCodeHandler.Probes.cs`. Nothing lists which fractional codes
+exist. RepRapFirmware gates fractions once, at the top of each switch
+([GCodes2.cpp:200](../../lib/RepRapFirmware/src/GCodes/GCodes2.cpp) for G,
+[GCodes2.cpp:742](../../lib/RepRapFirmware/src/GCodes/GCodes2.cpp) for M): a fraction on a major
+with no hardcoded fractional parts diverts to `TryMacroFile`, which runs
+`<letter><major>.<minor>.g` if it exists and answers `warningNotSupported` otherwise; inside a
+major that does implement fractions, an invalid minor is whatever its developer wrote. The table
+takes the stronger, uniform form: every fractional code DSF implements is an explicit row, and a
+fraction without a row takes the macro-then-unsupported path, never the bare major's handler, so
+`M906.1` and `M558.5` stop depending on which handler they happen to hit.
+
 **Added:**
 
 - `Codes/CodeClass.cs`:
@@ -221,14 +237,19 @@ this code need a standstill" becomes one reviewable line instead of an invisible
   }
   ```
 
-- `Codes/CodeClassifier.cs`: a frozen dictionary keyed on `(CodeType, MajorNumber)` whose value is
-  either a fixed `CodeClass` or a resolver `Func<Commands.Code, CodeClass>` for the rows whose class
-  depends on the parameters. The resolvers are today's handler guards, relocated:
-  `M92/M350/M906/M913/M917` are Barrier when a drive letter is present and Immediate when bare (a
-  report, which DWC polls mid-print); `M584` and `M593` are Barrier only when setting; `G10` is
-  Barrier with an axis letter and Deferred without; `M150` asks the strip whether it needs a
-  standstill (the `MustStopMovement` capability) and is Barrier then, Deferred otherwise. A code
-  with no row is Immediate. `Classify(code)` is total and side-effect free.
+- `Codes/CodeClassifier.cs`: a frozen dictionary keyed on `(CodeType, MajorNumber, MinorNumber)`,
+  with the minor absent for the fraction-less form, whose value is either a fixed `CodeClass` or a
+  resolver `Func<Commands.Code, CodeClass>` for the rows whose class depends on the parameters. The
+  resolvers are today's handler guards, relocated: `M92/M350/M906/M913/M917` are Barrier when a
+  drive letter is present and Immediate when bare (a report, which DWC polls mid-print); `M584` and
+  `M593` are Barrier only when setting; `G10` is Barrier with an axis letter and Deferred without;
+  `M150` asks the strip whether it needs a standstill (the `MustStopMovement` capability) and is
+  Barrier then, Deferred otherwise. Every fractional code a handler implements is its own row
+  (today: M36.1/.2, M201.1, M505.1, M569.1/.2/.4/.6/.7, M581.1, M586.4), so the table is the
+  complete list of fractional codes DSF supports. Lookup is exact: a code with a fraction looks up
+  `(type, major, minor)` and never falls back to the bare-major row. `Classify(code)` is
+  side-effect free and returns the row's class, Immediate for a fraction-less code with no row, and
+  null for a fractional code with no row, which means "no such code" (below).
 
 **Changed:**
 
@@ -236,6 +257,23 @@ this code need a standstill" becomes one reviewable line instead of an invisible
   `code.ProcessInternally()` and performs the class's synchronisation itself (diagram below).
   Keywords and comments are not classified. A flush that reports "not ready" cancels and retries the
   code exactly as the in-handler flushes do today.
+- A null classification (a fractional code with no row) never dispatches a handler. The pipeline
+  runs the macro named after the code via the existing `TryRunCodeMacroAsync`
+  ([Code.cs](../../src/DuetControlServer/Commands/Generic/Code.cs)), which already builds the
+  `<letter><major>.<minor>.g` name and passes the code's parameters as `param.*`; if no such macro
+  exists, the code resolves as unsupported (`Command is not supported`, a warning, RRF's wording).
+- The per-handler invalid-minor guards are deleted: their knowledge is now the absence of a row, and
+  a handler can no longer be reached with a minor it does not implement. That removes the M201
+  and M569 rejections in `MCodeHandler.Motion.cs`, the M558 rejection in `MCodeHandler.Probes.cs`,
+  and the equivalents in M36, M505, M581 and M586. Handlers keep switching on `MinorNumber` to pick
+  behaviour among their valid minors.
+- The `NotSupportedException` catch in `Code.ProcessInternallyAsync`
+  ([Code.cs:313](../../src/DuetControlServer/Commands/Generic/Code.cs)) resolves the code as
+  unsupported before `TryRunCodeMacroAsync` is reached, so the documented fallback for unknown
+  majors (`M1234` runs `sys/M1234.g`) is dead code today. The catch is changed to try the code
+  macro first, which is what RepRapFirmware's `default:` case does
+  ([GCodes2.cpp:4789](../../lib/RepRapFirmware/src/GCodes/GCodes2.cpp)), so unknown bare majors and
+  unlisted fractions end in the same place: macro if present, unsupported otherwise.
 - `MCodeHandler.FlushAndWaitForStandstillAsync` and its 13 call sites
   (`MCodeHandler.Motion.cs`, `MCodeHandler.Compensation.cs`) are deleted; their guards become the
   resolvers above. Multi-phase codes that wait *inside* their sequence (G28, G30, a tool change,
@@ -249,6 +287,9 @@ flowchart TD
     A[code reaches ProcessInternally] --> B{G / M / T code?}
     B -- no: keyword, comment --> D0[dispatch handler as today]
     B -- yes --> C["CodeClassifier.Classify(code)"]
+    C -- "null: fraction with no row" --> M0{"macro<br/>&lt;letter&gt;&lt;major&gt;.&lt;minor&gt;.g<br/>exists?"}
+    M0 -- yes --> M1[run the macro]
+    M0 -- no --> M2["resolve as unsupported"]
     C -- Immediate --> D1[dispatch handler, no flush]
     C -- Ordered --> F1["CodeProcessor.FlushAsync(code)<br/>(pipeline order + expressions)"] --> D2[dispatch handler]
     C -- Barrier --> F2["FlushAsync(code)"] --> W["planner.WaitForStandstillAsync()"] --> D3[dispatch handler]
@@ -259,16 +300,22 @@ flowchart TD
 
 **Tests (`UnitTests`):**
 
-- a data-driven test holding the expected class of every code in §3 and §9, diffed both ways
-  against `CodeClassifier`, so a new handler without a row and a row without a handler both fail;
+- a data-driven test holding the expected class of every code in §3 and §9, fractional forms
+  included, diffed both ways against `CodeClassifier`, so a new handler without a row and a row
+  without a handler both fail; the fractional half of the diff is what keeps the table the complete
+  list, because a handler gaining a minor without a row fails it;
+- a fractional code with no row never reaches its major's handler: `M906.1` runs `sys/M906.1.g`
+  when the file exists, answers `Command is not supported` when it does not, and in neither case
+  executes as `M906`;
 - a regression pin for the mechanical move: the set of codes classified Barrier equals the set
   whose handlers waited before the move, commit for commit.
 
 **Landing order.** First the types, table and tests with nothing consuming them (no behaviour
 change). Then the pipeline enforcement and the deletion of the 13 sites, behaviour-preserving by
-the pin test. Then, each as its own visible commit, the rows where the declared class *changes*
-behaviour: M409 loses a flush it never needed, and M999 B and M952 gain the standstill RRF never
-took (§3).
+the pin test. Then, each as its own visible commit, the changes in behaviour: the fractional
+enforcement (`M906.1` and every other unlisted fraction stop executing as their bare major and take
+the macro-then-unsupported path) together with the restored unknown-major macro fallback; M409
+loses a flush it never needed; M999 B and M952 gain the standstill RRF never took (§3).
 
 ### 5.2 Only job-file channels defer, macros included
 
@@ -690,8 +737,9 @@ right point in the path.
 
 ## 11. Order of work and open decisions
 
-1. **The class table** (§5.1). DuetControlServer only; behaviour-preserving until the final row
-   flips (M409, M999 B, M952), which land one per commit.
+1. **The class table** (§5.1). DuetControlServer only; behaviour-preserving until the final
+   commits, which land one change each: the fractional enforcement with the restored macro
+   fallback, then the rows that flip (M409, M999 B, M952).
 2. **Emergency-stop output handling in Duet3Expansion** (§5.7). A live gap independent of this plan.
 3. **`state.macroRestarted`** written on macro re-run after a pause (§5.2).
 4. **The implementation decision** (§8), then:
