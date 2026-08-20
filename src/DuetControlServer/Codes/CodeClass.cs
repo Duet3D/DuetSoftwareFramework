@@ -15,7 +15,7 @@ public enum CodeClass
     /// Applies to moves built after it and must not reach moves already built: flush the pipeline
     /// (order and expressions), no standstill; the move carries the value
     /// </summary>
-    Ordered,
+    Flush,
 
     /// <summary>
     /// The physical effect belongs at a point in the path. Until a deferral implementation lands,
@@ -27,5 +27,5 @@ public enum CodeClass
     /// Changes what an already-queued move means, or needs the board's reply to produce its own:
     /// flush, then wait for standstill before the handler runs
     /// </summary>
-    Barrier
+    FlushAndStandstill
 }

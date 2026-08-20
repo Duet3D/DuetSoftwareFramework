@@ -302,14 +302,14 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
                 {
                     switch (codeClass)
                     {
-                        case Codes.CodeClass.Ordered:
+                        case Codes.CodeClass.Flush:
                             // The move carries the value; the flush keeps evaluation order
                             if (!await _codeProcessor.FlushAsync(this, cancellationToken: CancellationToken))
                             {
                                 throw new OperationCanceledException();
                             }
                             break;
-                        case Codes.CodeClass.Barrier:
+                        case Codes.CodeClass.FlushAndStandstill:
                             // The code changes what a queued move means, or needs the board's
                             // reply: nothing may be moving when the handler runs
                             if (!await _codeProcessor.FlushAsync(this, cancellationToken: CancellationToken) ||

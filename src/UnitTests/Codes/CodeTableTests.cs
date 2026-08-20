@@ -38,9 +38,9 @@ public class CodeTableTests
         // A bare major and two of its fractions, each row passing what the minor decided
         { 100, CodeClass.Deferred, (h, c, ct) => h.Handle("bare") },
         { (100, 1), CodeClass.Deferred, (h, c, ct) => h.Handle("minor 1") },
-        { (100, 2), CodeClass.Ordered, (h, c, ct) => h.Handle("minor 2") },
+        { (100, 2), CodeClass.Flush, (h, c, ct) => h.Handle("minor 2") },
         // A resolver row, whose class depends on the parameters, as M906 does
-        { 200, c => c.Parameters.Count > 0 ? CodeClass.Barrier : CodeClass.Immediate, (h, c, ct) => h.Handle("resolver") },
+        { 200, c => c.Parameters.Count > 0 ? CodeClass.FlushAndStandstill : CodeClass.Immediate, (h, c, ct) => h.Handle("resolver") },
     };
 
     private static DuetAPI.Commands.Code Parse(string text) => new(text);
@@ -50,7 +50,7 @@ public class CodeTableTests
     [TestCase("M2", CodeClass.Immediate)]
     [TestCase("M100", CodeClass.Deferred)]
     [TestCase("M100.1", CodeClass.Deferred)]
-    [TestCase("M100.2", CodeClass.Ordered)]
+    [TestCase("M100.2", CodeClass.Flush)]
     public void FixedRowsClassify(string code, CodeClass expected)
     {
         Assert.That(Table.Classify(Parse(code)), Is.EqualTo(expected));
@@ -60,7 +60,7 @@ public class CodeTableTests
     public void ResolverRowsClassifyFromParameters()
     {
         Assert.That(Table.Classify(Parse("M200")), Is.EqualTo(CodeClass.Immediate));
-        Assert.That(Table.Classify(Parse("M200 X1")), Is.EqualTo(CodeClass.Barrier));
+        Assert.That(Table.Classify(Parse("M200 X1")), Is.EqualTo(CodeClass.FlushAndStandstill));
     }
 
     /// <summary>
@@ -104,7 +104,7 @@ public class CodeTableTests
         Assert.Throws<ArgumentException>(() => _ = new CodeTable<Recorder>(CodeType.MCode)
         {
             { 1, CodeClass.Immediate, (h, c, ct) => h.Handle("first") },
-            { [1, 2], CodeClass.Barrier, (h, c, ct) => h.Handle("second") },
+            { [1, 2], CodeClass.FlushAndStandstill, (h, c, ct) => h.Handle("second") },
         });
     }
 
@@ -117,7 +117,7 @@ public class CodeTableTests
         Dictionary<CodeKey, CodeClass?> column = Table.ClassColumn;
         Assert.That(column, Has.Count.EqualTo(7));
         Assert.That(column[new CodeKey(CodeType.MCode, 0, null)], Is.EqualTo(CodeClass.Immediate));
-        Assert.That(column[new CodeKey(CodeType.MCode, 100, 2)], Is.EqualTo(CodeClass.Ordered));
+        Assert.That(column[new CodeKey(CodeType.MCode, 100, 2)], Is.EqualTo(CodeClass.Flush));
         Assert.That(column[new CodeKey(CodeType.MCode, 200, null)], Is.Null);
     }
 

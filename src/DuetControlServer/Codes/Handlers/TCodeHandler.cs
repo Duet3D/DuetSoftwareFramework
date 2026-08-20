@@ -24,7 +24,7 @@ public sealed class TCodeHandler(ToolManager toolManager, Model.ObjectModel mode
     /// run while a queued move still uses the old tool's transform
     /// </remarks>
     public CodeClass? Classify(DuetAPI.Commands.Code code)
-        => code.MajorNumber is null ? CodeClass.Immediate : CodeClass.Barrier;
+        => code.MajorNumber is null ? CodeClass.Immediate : CodeClass.FlushAndStandstill;
 
     /// <summary>
     /// Process a T-code that should be interpreted by the control server

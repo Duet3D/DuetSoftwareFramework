@@ -137,7 +137,7 @@ internal partial class MCodeHandler(
     /// report, which decides between a standstill and acting immediately
     /// </summary>
     private static CodeClass BarrierWhenSettingDrives(DuetAPI.Commands.Code code)
-        => SetsAnyDrive(code) ? CodeClass.Barrier : CodeClass.Immediate;
+        => SetsAnyDrive(code) ? CodeClass.FlushAndStandstill : CodeClass.Immediate;
 
     /// <summary>
     /// Every M-code this handler implements: its class, enforced by the pipeline before dispatch,
@@ -157,7 +157,7 @@ internal partial class MCodeHandler(
         // Spindle off
         { 5, CodeClass.Deferred, (h, c, ct) => h.HandleSpindleOffAsync(c, ct) },
         // Motors on / motors off
-        { [17, 18, 84], CodeClass.Barrier, (h, c, ct) => h.HandleDriverStateAsync(c, ct) },
+        { [17, 18, 84], CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleDriverStateAsync(c, ct) },
         // List SD card
         { 20, CodeClass.Immediate, (h, c, ct) => h.HandleListFilesAsync(c, ct) },
         // Initialize SD card
@@ -169,25 +169,25 @@ internal partial class MCodeHandler(
         // Pause the print
         { 25, CodeClass.Immediate, (h, c, ct) => h.HandlePausePrintAsync(c, ct) }, // TODO synchronous flush
         // Set SD position
-        { 26, CodeClass.Ordered, (h, c, ct) => h.HandleSetFilePositionAsync(c, ct) },
+        { 26, CodeClass.Flush, (h, c, ct) => h.HandleSetFilePositionAsync(c, ct) },
         // Report SD print status
-        { 27, CodeClass.Ordered, (h, c, ct) => h.HandleReportPrintStatusAsync(c, ct) },
+        { 27, CodeClass.Flush, (h, c, ct) => h.HandleReportPrintStatusAsync(c, ct) },
         // Begin write to SD card
-        { 28, CodeClass.Ordered, (h, c, ct) => h.HandleBeginFileWriteAsync(c, ct) },
+        { 28, CodeClass.Flush, (h, c, ct) => h.HandleBeginFileWriteAsync(c, ct) },
         // End write to SD card
-        { 29, CodeClass.Ordered, (h, c, ct) => h.HandleEndFileWriteAsync(c, ct) },
+        { 29, CodeClass.Flush, (h, c, ct) => h.HandleEndFileWriteAsync(c, ct) },
         // Delete a file on the SD card
-        { 30, CodeClass.Ordered, (h, c, ct) => h.HandleDeleteFileAsync(c, ct) },
+        { 30, CodeClass.Flush, (h, c, ct) => h.HandleDeleteFileAsync(c, ct) },
         // Return file information; M36.1 reads a thumbnail fragment, M36.2 a plain file fragment
-        { 36, CodeClass.Ordered, (h, c, ct) => h.HandleFileInfoAsync(c, thumbnail: null, ct) },
-        { (36, 1), CodeClass.Ordered, (h, c, ct) => h.HandleFileInfoAsync(c, thumbnail: true, ct) },
-        { (36, 2), CodeClass.Ordered, (h, c, ct) => h.HandleFileInfoAsync(c, thumbnail: false, ct) },
+        { 36, CodeClass.Flush, (h, c, ct) => h.HandleFileInfoAsync(c, thumbnail: null, ct) },
+        { (36, 1), CodeClass.Flush, (h, c, ct) => h.HandleFileInfoAsync(c, thumbnail: true, ct) },
+        { (36, 2), CodeClass.Flush, (h, c, ct) => h.HandleFileInfoAsync(c, thumbnail: false, ct) },
         // Simulate file
         { 37, CodeClass.Immediate, (h, c, ct) => h.HandleSimulateFileAsync(c, ct) },
         // Compute CRC32 checksum of target file
-        { 38, CodeClass.Ordered, (h, c, ct) => h.HandleFileChecksumAsync(c, ct) },
+        { 38, CodeClass.Flush, (h, c, ct) => h.HandleFileChecksumAsync(c, ct) },
         // Report SD card information
-        { 39, CodeClass.Ordered, (h, c, ct) => h.HandleSDCardInfoAsync(c, ct) },
+        { 39, CodeClass.Flush, (h, c, ct) => h.HandleSDCardInfoAsync(c, ct) },
         // Set output pin
         { 42, CodeClass.Deferred, (h, c, ct) => h.HandleSetOutputAsync(c, ct) },
         // Slicer-inserted print time values
@@ -209,7 +209,7 @@ internal partial class MCodeHandler(
         // Fan off
         { 107, CodeClass.Deferred, (h, c, ct) => h.HandleFanOffAsync(c, ct) },
         // Set extruder temperature and wait: the target must be in force before the wait begins
-        { 109, CodeClass.Barrier, async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.CurrentToolHeatersAsync(c, ct), wait: true, ct) },
+        { 109, CodeClass.FlushAndStandstill, async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.CurrentToolHeatersAsync(c, ct), wait: true, ct) },
         // Set debug level
         { 111, CodeClass.Immediate, (h, c, ct) => h.HandleDebugLevelAsync(c, ct) }, // TODO sometimes flushes
         // Emergency stop
@@ -220,7 +220,7 @@ internal partial class MCodeHandler(
         { 115, CodeClass.Immediate, (h, c, ct) => h.HandleFirmwareVersionAsync(c, ct) },
         // Wait for temperatures: a barrier by definition, it blocks later G-code on a condition
         // derived from the targets
-        { 116, CodeClass.Barrier, (h, c, ct) => h.HandleWaitForTemperaturesAsync(c, ct) },
+        { 116, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleWaitForTemperaturesAsync(c, ct) },
         // Publish MQTT message
         { 118, CodeClass.Immediate, (h, c, ct) => h.HandlePublishMqttAsync(c, ct) }, // TODO sometimes flushes
         // Report the endstop states
@@ -236,9 +236,9 @@ internal partial class MCodeHandler(
         // Heater monitors
         { 143, CodeClass.Immediate, (h, c, ct) => h.HandleHeaterMonitorAsync(c, ct) },
         // Set bed temperature and wait
-        { 190, CodeClass.Barrier, async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.BedOrChamberHeatersAsync(c, chamber: false, ct), wait: true, ct) },
+        { 190, CodeClass.FlushAndStandstill, async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.BedOrChamberHeatersAsync(c, chamber: false, ct), wait: true, ct) },
         // Set chamber temperature and wait
-        { 191, CodeClass.Barrier, async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.BedOrChamberHeatersAsync(c, chamber: true, ct), wait: true, ct) },
+        { 191, CodeClass.FlushAndStandstill, async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.BedOrChamberHeatersAsync(c, chamber: true, ct), wait: true, ct) },
         // Set axis and extruder accelerations; M201.1 sets the reduced set
         { 201, CodeClass.Immediate, (h, c, ct) => h.HandleAccelerationsAsync(c, reduced: false, ct) },
         { (201, 1), CodeClass.Immediate, (h, c, ct) => h.HandleAccelerationsAsync(c, reduced: true, ct) },
@@ -270,58 +270,58 @@ internal partial class MCodeHandler(
         { 350, BarrierWhenSettingDrives, (h, c, ct) => h.HandleMicrosteppingAsync(c, ct) },
         // Save and load the height map, and set the compensation taper
         { 374, CodeClass.Immediate, (h, c, ct) => h.HandleSaveHeightMapAsync(c, ct) },
-        { 375, CodeClass.Barrier, (h, c, ct) => h.HandleLoadHeightMapAsync(c, ct) },
+        { 375, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleLoadHeightMapAsync(c, ct) },
         { 376, CodeClass.Immediate, (h, c, ct) => h.HandleTaperHeightAsync(c, ct) },
         // Wait for the current moves to finish
-        { 400, CodeClass.Barrier, (h, c, ct) => h.HandleWaitForMovesAsync(c, ct) },
+        { 400, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleWaitForMovesAsync(c, ct) },
         // Deploy and retract the Z probe
         { 401, CodeClass.Immediate, (h, c, ct) => h.HandleDeployProbeAsync(c, ct) },
         { 402, CodeClass.Immediate, (h, c, ct) => h.HandleRetractProbeAsync(c, ct) },
         // Query object model
         { 409, CodeClass.Immediate, (h, c, ct) => h.HandleQueryObjectModelAsync(c, ct) },
         // Backlash compensation
-        { 425, CodeClass.Ordered, (h, c, ct) => h.HandleBacklashAsync(c, ct) },
+        { 425, CodeClass.Flush, (h, c, ct) => h.HandleBacklashAsync(c, ct) },
         // Report the machine mode
         { 450, CodeClass.Immediate, (h, c, ct) => h.HandleReportMachineModeAsync(ct) },
         // Select FFF, laser or CNC mode
-        { 451, CodeClass.Barrier, (h, c, ct) => h.HandleSetMachineModeAsync(c, MachineMode.FFF, ct) },
-        { 452, CodeClass.Barrier, (h, c, ct) => h.HandleSetMachineModeAsync(c, MachineMode.Laser, ct) },
-        { 453, CodeClass.Barrier, (h, c, ct) => h.HandleSetMachineModeAsync(c, MachineMode.CNC, ct) },
+        { 451, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleSetMachineModeAsync(c, MachineMode.FFF, ct) },
+        { 452, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleSetMachineModeAsync(c, MachineMode.Laser, ct) },
+        { 453, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleSetMachineModeAsync(c, MachineMode.CNC, ct) },
         // Create directory on SD card
-        { 470, CodeClass.Ordered, (h, c, ct) => h.HandleCreateDirectoryAsync(c, ct) },
+        { 470, CodeClass.Flush, (h, c, ct) => h.HandleCreateDirectoryAsync(c, ct) },
         // Rename file or directory on SD card
-        { 471, CodeClass.Ordered, (h, c, ct) => h.HandleRenameFileAsync(c, ct) },
+        { 471, CodeClass.Flush, (h, c, ct) => h.HandleRenameFileAsync(c, ct) },
         // Delete file or directory
-        { 472, CodeClass.Ordered, (h, c, ct) => h.HandleDeleteFileOrDirectoryAsync(c, ct) },
+        { 472, CodeClass.Flush, (h, c, ct) => h.HandleDeleteFileOrDirectoryAsync(c, ct) },
         // Save parameters to config-override.g
         { 500, CodeClass.Immediate, (h, c, ct) => h.HandleSaveConfigOverrideAsync(c, ct) },
         // Load parameters from config-override.g
-        { 501, CodeClass.Ordered, (h, c, ct) => h.HandleLoadConfigOverrideAsync(c, ct) },
+        { 501, CodeClass.Flush, (h, c, ct) => h.HandleLoadConfigOverrideAsync(c, ct) },
         // Print settings
-        { 503, CodeClass.Ordered, (h, c, ct) => h.HandlePrintSettingsAsync(c, ct) },
+        { 503, CodeClass.Flush, (h, c, ct) => h.HandlePrintSettingsAsync(c, ct) },
         // Set the system folder, or with M505.1 the web folder
-        { 505, CodeClass.Ordered, (h, c, ct) => h.HandleSetFolderAsync(c, web: false, ct) }, // TODO sometimes standstill
-        { (505, 1), CodeClass.Ordered, (h, c, ct) => h.HandleSetFolderAsync(c, web: true, ct) }, // TODO sometimes standstill
+        { 505, CodeClass.Flush, (h, c, ct) => h.HandleSetFolderAsync(c, web: false, ct) }, // TODO sometimes standstill
+        { (505, 1), CodeClass.Flush, (h, c, ct) => h.HandleSetFolderAsync(c, web: true, ct) }, // TODO sometimes standstill
         // Set machine name
-        { 550, CodeClass.Ordered, (h, c, ct) => h.HandleSetNameAsync(c, ct) },
+        { 550, CodeClass.Flush, (h, c, ct) => h.HandleSetNameAsync(c, ct) },
         // Set password
-        { 551, CodeClass.Ordered, (h, c, ct) => h.HandleSetPasswordAsync(c, ct) },
+        { 551, CodeClass.Flush, (h, c, ct) => h.HandleSetPasswordAsync(c, ct) },
         // Set IP address
-        { 552, CodeClass.Ordered, (h, c, ct) => h.HandleSetIPAddressAsync(c, ct) },
+        { 552, CodeClass.Flush, (h, c, ct) => h.HandleSetIPAddressAsync(c, ct) },
         // Axis compensation
         { 556, CodeClass.Immediate, (h, c, ct) => h.HandleAxisCompensationAsync(c, ct) },
         // Define the mesh compensation grid
-        { 557, CodeClass.Ordered, (h, c, ct) => h.HandleProbeGridAsync(c, ct) },
+        { 557, CodeClass.Flush, (h, c, ct) => h.HandleProbeGridAsync(c, ct) },
         // Configure a Z probe: no move that consults a probe may be queued or running while its
         // input monitor is replaced. A bare M558, or with K only, is a report
-        { 558, c => c.Parameters.Any(p => p.Letter != 'K') ? CodeClass.Barrier : CodeClass.Immediate, (h, c, ct) => h.HandleProbeConfigAsync(c, ct) },
+        { 558, c => c.Parameters.Any(p => p.Letter != 'K') ? CodeClass.FlushAndStandstill : CodeClass.Immediate, (h, c, ct) => h.HandleProbeConfigAsync(c, ct) },
         // Stop applying bed compensation
-        { 561, CodeClass.Barrier, (h, c, ct) => h.HandleClearCompensationAsync(c, ct) },
+        { 561, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleClearCompensationAsync(c, ct) },
         // Clear a heater fault
         { 562, CodeClass.Immediate, (h, c, ct) => h.HandleClearHeaterFaultAsync(c, ct) },
         // Define or delete a tool: its offsets are part of the transform queued moves were planned
         // against. A bare M563 is a report
-        { 563, c => c.Parameters.Any(p => p.Letter == 'P') ? CodeClass.Barrier : CodeClass.Immediate, (h, c, ct) => h.HandleDefineToolAsync(c, ct) },
+        { 563, c => c.Parameters.Any(p => p.Letter == 'P') ? CodeClass.FlushAndStandstill : CodeClass.Immediate, (h, c, ct) => h.HandleDefineToolAsync(c, ct) },
         // Limit axes and movement before homing
         { 564, CodeClass.Immediate, (h, c, ct) => h.HandleMovementLimitsAsync(c, ct) },
         // Set the mixing ratios of a tool
@@ -329,33 +329,33 @@ internal partial class MCodeHandler(
         // Tool settings
         { 568, CodeClass.Deferred, (h, c, ct) => h.HandleToolSettingsAsync(c, ct) },
         // Configure a stepper driver and its subfunctions; unlisted minors have no row
-        { [569, (569, 1), (569, 2), (569, 4), (569, 6), (569, 7)], CodeClass.Barrier, (h, c, ct) => h.HandleDriverConfigAsync(c, ct) },
+        { [569, (569, 1), (569, 2), (569, 4), (569, 6), (569, 7)], CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleDriverConfigAsync(c, ct) },
         // Heater fault detection
         { 570, CodeClass.Immediate, (h, c, ct) => h.HandleHeaterFaultDetectionAsync(c, ct) },
         // Set pressure advance. TODO the value already rides the move on the SBC side; the
         // standstill remains until D3 of MOTION_SYNCHRONISED_ACTIONS.md is decided
-        { 572, CodeClass.Barrier, (h, c, ct) => h.HandlePressureAdvanceAsync(c, ct) }, // TODO sync with motion
+        { 572, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandlePressureAdvanceAsync(c, ct) }, // TODO sync with motion
         // Configure the endstops
-        { 574, CodeClass.Barrier, (h, c, ct) => h.HandleEndstopConfigAsync(c, ct) },
+        { 574, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleEndstopConfigAsync(c, ct) },
         // Wait for an endstop or input to reach a state
         { 577, CodeClass.Immediate, (h, c, ct) => h.HandleWaitForInputAsync(c, ct) },
         // Configure external trigger; M581.1 is the expression form
         { 581, CodeClass.Immediate, (h, c, ct) => h.HandleConfigureTriggerAsync(c, expressionForm: false, ct) },
         { (581, 1), CodeClass.Immediate, (h, c, ct) => h.HandleConfigureTriggerAsync(c, expressionForm: true, ct) },
         // Map axes and extruders onto stepper drivers; a bare M584 is a report
-        { 584, c => c.Parameters.Count > 0 ? CodeClass.Barrier : CodeClass.Immediate, (h, c, ct) => h.HandleDriveMappingAsync(c, ct) },
+        { 584, c => c.Parameters.Count > 0 ? CodeClass.FlushAndStandstill : CodeClass.Immediate, (h, c, ct) => h.HandleDriveMappingAsync(c, ct) },
         // Configure network protocols; M586.4 configures MQTT
-        { 586, CodeClass.Ordered, (h, c, ct) => h.HandleNetworkProtocolsAsync(c, configureMqtt: false, ct) },
-        { (586, 4), CodeClass.Ordered, (h, c, ct) => h.HandleNetworkProtocolsAsync(c, configureMqtt: true, ct) },
+        { 586, CodeClass.Flush, (h, c, ct) => h.HandleNetworkProtocolsAsync(c, configureMqtt: false, ct) },
+        { (586, 4), CodeClass.Flush, (h, c, ct) => h.HandleNetworkProtocolsAsync(c, configureMqtt: true, ct) },
         // Configure nonlinear extrusion
         { 592, CodeClass.Immediate, (h, c, ct) => h.HandleNonlinearExtrusionAsync(c, ct) },
         // Configure input shaping: queued moves were shaped with the old filter, so setting waits;
         // a bare M593 is a report
-        { 593, c => c.Parameters.Count > 0 ? CodeClass.Barrier : CodeClass.Immediate, (h, c, ct) => h.HandleInputShapingAsync(c, ct) },
+        { 593, c => c.Parameters.Count > 0 ? CodeClass.FlushAndStandstill : CodeClass.Immediate, (h, c, ct) => h.HandleInputShapingAsync(c, ct) },
         // Fork input reader
-        { 606, CodeClass.Ordered, (h, c, ct) => h.HandleForkInputReaderAsync(c, ct) },
+        { 606, CodeClass.Flush, (h, c, ct) => h.HandleForkInputReaderAsync(c, ct) },
         // Delta configuration and endstop adjustments, and selecting and configuring kinematics
-        { [665, 666, 669], CodeClass.Barrier, (h, c, ct) => h.HandleKinematicsAsync(c, ct) },
+        { [665, 666, 669], CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleKinematicsAsync(c, ct) },
         // Retired in RepRapFirmware in favour of M669
         { 667, CodeClass.Immediate, (h, c, ct) => new ValueTask<Message>(new Message(MessageType.Error, "M667 is no longer supported - use M669 instead")) },
         // Z leadscrew positions
@@ -368,11 +368,11 @@ internal partial class MCodeHandler(
         // Configure stall detection
         { 915, CodeClass.Immediate, (h, c, ct) => h.HandleStallDetectionAsync(c, ct) },
         // Start/stop event logging to SD card
-        { 929, CodeClass.Ordered, (h, c, ct) => h.HandleEventLoggingAsync(c, ct) },
+        { 929, CodeClass.Flush, (h, c, ct) => h.HandleEventLoggingAsync(c, ct) },
         // Create a heater, fan or other I/O device
         { 950, CodeClass.Immediate, (h, c, ct) => h.HandleCreateDeviceAsync(c, ct) },
         // Configure CAN: it changes the bus the moves travel on
-        { 952, CodeClass.Barrier, (h, c, ct) => h.HandleConfigureCanAsync(c, ct) },
+        { 952, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleConfigureCanAsync(c, ct) },
         // Enable CAN
         { 953, CodeClass.Immediate, (h, c, ct) => h.HandleEnableCanAsync(c, ct) },
         // Raise an event
@@ -380,9 +380,9 @@ internal partial class MCodeHandler(
         // Configure phase stepping
         { 970, CodeClass.Immediate, (h, c, ct) => h.HandlePhaseSteppingAsync(c, ct) },
         // Update the firmware: everything is locked while it runs
-        { 997, CodeClass.Barrier, (h, c, ct) => h.HandleFirmwareUpdateAsync(c, ct) }, // TODO sometimes flushes
+        { 997, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleFirmwareUpdateAsync(c, ct) }, // TODO sometimes flushes
         // Reset the controller; M999 B resets a board, which must not happen with moves in its queue
-        { 999, c => c.Parameters.Any(p => p.Letter == 'B') ? CodeClass.Barrier : CodeClass.Immediate, (h, c, ct) => h.HandleResetAsync(c, ct) },
+        { 999, c => c.Parameters.Any(p => p.Letter == 'B') ? CodeClass.FlushAndStandstill : CodeClass.Immediate, (h, c, ct) => h.HandleResetAsync(c, ct) },
     };
 
     /// <summary>

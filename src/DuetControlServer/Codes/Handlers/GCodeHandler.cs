@@ -93,7 +93,7 @@ internal sealed partial class GCodeHandler(
         // Set tool offsets, or retract. The offsets are part of the transform every queued move was
         // planned against, so an axis letter is a barrier; without one the code sets tool
         // temperatures, which belong at the point in the path
-        { 10, c => c.Parameters.Any(p => Axis.Letters.Contains(p.Letter)) ? CodeClass.Barrier : CodeClass.Deferred, (h, c, ct) => h.HandleToolOffsetsAsync(c, ct) },
+        { 10, c => c.Parameters.Any(p => Axis.Letters.Contains(p.Letter)) ? CodeClass.FlushAndStandstill : CodeClass.Deferred, (h, c, ct) => h.HandleToolOffsetsAsync(c, ct) },
         // Set units to inches / millimetres
         { [20, 21], CodeClass.Immediate, async (h, c, ct) =>
             {
@@ -101,11 +101,11 @@ internal sealed partial class GCodeHandler(
                 return new Message();
             } },
         // Home the machine
-        { 28, CodeClass.Barrier, (h, c, ct) => h.HandleHomeAsync(c, ct) },
+        { 28, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleHomeAsync(c, ct) },
         // Probe the grid and build a height map
-        { 29, CodeClass.Barrier, (h, c, ct) => h.HandleProbeGridAsync(c, ct) },
+        { 29, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleProbeGridAsync(c, ct) },
         // Probe the bed
-        { 30, CodeClass.Barrier, (h, c, ct) => h.HandleProbeAsync(c, ct) },
+        { 30, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleProbeAsync(c, ct) },
         // Set or report the Z probe trigger height, offsets and threshold
         { 31, CodeClass.Immediate, (h, c, ct) => h.HandleProbeParametersAsync(c, ct) },
         // Save the current position to a restore point
