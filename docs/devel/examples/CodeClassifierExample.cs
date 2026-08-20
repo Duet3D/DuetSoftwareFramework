@@ -47,7 +47,7 @@ string[] job =
     "M906",             // resolver row: bare report -> Immediate
     "M906.1",           // no row: not a fractional code DSF implements -> no macro -> unsupported
     "M569.1 P0.1 S5",   // fractional row: dispatches directly, no minor switch in the handler
-    "M569.3",           // no row -> unsupported (RRF implements M569.3; DSF does not: a §9-style gap)
+    "M569.3",           // no row -> unsupported (RRF implements M569.3; DSF does not: a §10-style gap)
     "M36.1 P\"job.gcode\" S0",  // fractional row: the minor is a boolean argument in the entry
     "G10 P0 X5",        // resolver row: axis letter -> FlushAndStandstill (sets tool offsets)
     "G10 P0 S210",      // resolver row: no axis letter -> Deferred (tool temperatures)

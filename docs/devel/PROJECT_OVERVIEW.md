@@ -25,10 +25,10 @@ against the reference tree in `lib/RepRapFirmware`.
 | 5 | Events migration | [EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) | 🟢 4 of 5 phases | 1 × M, 1 × S | M291 (WS7) |
 | 6 | Job lifecycle | [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) | 🟢 8 phases, 5 with tails | 2 × M, 6 × S | M291, M581, M452 (all WS7) |
 | 7 | M-code / motion migration | [MCODE_MIGRATION.md](MCODE_MIGRATION.md) | 🟡 ~58% of inventory | 7 × L, 14 × M, 5 × S | see §3 |
-| 8 | Synchronised actions | [MOTION_SYNCHRONISED_ACTIONS.md](MOTION_SYNCHRONISED_ACTIONS.md) | ⬜ **Not started** | 1 × S, 2 × M shared, then A (2 × M) or B (2 × L, 3 × M) | implementation decision (§5) |
+| 8 | Synchronised actions | [MOTION_SYNCHRONISED_ACTIONS.md](MOTION_SYNCHRONISED_ACTIONS.md) | 🟡 groundwork 1 of 3 | 1 × S, 1 × M shared, then A (2 × M), B (2 × L, 3 × M) or C (B's items + 1 × M) | implementation decision (§5) |
 
 Workstream 7 is the umbrella the others were carved out of, and is most of what remains. Workstream 8
-is fully specified and independent; its shared groundwork can start immediately, and which of its two
+is fully specified and independent; its class-table groundwork is in, and which of its three
 implementations to build is an open decision (§5).
 
 **Reference documents, not work:** [DCS_INTERNALS.md](DCS_INTERNALS.md),
@@ -166,10 +166,10 @@ Found by reading the plan back against the tree. Each is small and each is a liv
 ### WS8, synchronised actions
 
 Performing an action at a point in the path without stopping the machine. Today a fan change or a
-servo move mid-print either fires early or forces the machine to standstill. The plan specifies two
-implementations, A (a deferred-code queue, DCS only) and B (timestamped effects parked on the
-boards); choosing between them is an open decision (§5). The shared groundwork lands first either
-way.
+servo move mid-print either fires early or forces the machine to standstill. The plan specifies
+three implementations, A (a deferred-code queue, DCS only), B (timestamped effects parked on the
+boards) and C (B with the code parked in the pipeline, so the handler keeps the board's reply);
+choosing between them is an open decision (§5). The shared groundwork lands first either way.
 
 | Step | Task | Size | Notes |
 |---|---|---|---|
@@ -183,9 +183,10 @@ way.
 | B | `SubmitAction` and anchor resolution in `DuetSbcInterface` | L | The mechanical core |
 | B | DCS action path and late-reply routing; the CANMaster reply-timeout field | M | |
 | B | Convert the 16 deferred codes | L 🔧 | M106 first |
+| C | B's rows with the late-reply routing replaced by an awaited token map, plus the parked set in `ProcessInternally`, the two pending predicates and purge cancellation | M | DCS only, on top of B's other rows; code conversion as B |
 
 M572's standstill is no longer a WS8 step: the board applies pressure advance at message arrival, so
-neither implementation makes a deferred push exact, and removing the wait is the plan's open
+no implementation makes a deferred push exact, and removing the wait is the plan's open
 decision D3.
 
 ---
@@ -236,7 +237,7 @@ graph TD
 
 | Track | Contents | Why it is independent |
 |---|---|---|
-| **A, synchronised actions** | All of WS8 | Nothing blocks the shared groundwork; the rest waits on the implementation decision (§5). Implementation B touches the CAN schema and expansion firmware, so it overlaps least with the others |
+| **A, synchronised actions** | All of WS8 | Nothing blocks the shared groundwork; the rest waits on the implementation decision (§5). Implementations B and C touch the CAN schema and expansion firmware, so they overlap least with the others |
 | **B, unblocking codes** | M291, M581, M452, M596 | Four codes that between them release every blocked tail in WS5, WS6, and parts of WS7 |
 | **C, motion pipeline** | WS7a, plus WS4 phase 8 | Self-contained DCS work; arcs are the longest item |
 | **D, probing and levelling** | WS7b | Needs machine time; `G30 P` gates the other two |
@@ -263,14 +264,14 @@ Items where the plans stop short of an answer and someone has to decide.
 | 4 | Firmware emulation mode (M555): global, or per input channel? | Engineering | Blocks M555 |
 | 5 | What should detect an expansion board that lost its input monitors? | Engineering | A board that resets mid-job silently loses its endstops |
 | 6 | Watchdog timing for the board sweep now that it runs on the SBC | Engineering | A board may be wrongly timed out just after a reconnect |
-| 7 | WS8: implementation A (deferred-code queue, DCS only, ~2-10 ms late) or B (board timestamps, exact, four codebases)? MOTION_SYNCHRONISED_ACTIONS §8 | Engineering | Blocks everything in WS8 past the shared groundwork |
-| 8 | Do per-pixel laser segments need WS8's action timeline, or does pixel data ride the move record? (WS8 decision D2) | Engineering | If pixel data needs per-segment actions, only implementation B serves it |
+| 7 | WS8: implementation A (deferred-code queue, DCS only, ~2-10 ms late), B (board timestamps, exact, four codebases) or C (B with the code parked in the pipeline, keeping the handler's reply)? MOTION_SYNCHRONISED_ACTIONS §9 | Engineering | Blocks everything in WS8 past the shared groundwork |
+| 8 | Do per-pixel laser segments need WS8's action timeline, or does pixel data ride the move record? (WS8 decision D2) | Engineering | If pixel data needs per-segment actions, only implementations B and C serve it |
 
 **Risks**
 
 - **Hardware verification is a shared bottleneck.** Six tasks across three workstreams are marked 🔧
   and each needs a real machine. Schedule them as a batch rather than per task.
-- **WS8's implementation B spans four codebases plus the CAN schema**; implementation A is DCS-only.
+- **WS8's implementations B and C span four codebases plus the CAN schema**; implementation A is DCS-only.
   The shared steps 1 to 3 are behaviour-neutral and land first whichever is chosen. Preserve that
   ordering.
 - **Status drift in the plans.** Two instances found while writing this: WS3's summary table
