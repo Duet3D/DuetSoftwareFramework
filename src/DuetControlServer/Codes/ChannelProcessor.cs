@@ -3,6 +3,7 @@ using DuetControlServer.Files;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -153,6 +154,23 @@ public sealed class ChannelProcessor
     }
 
     /// <summary>
+    /// Whether the macro this channel is executing was restarted after a pause
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>GCodes::GetMacroRestarted</c>: the channel is inside a macro and the
+    /// level that started it is still on its first command since a restart. Published as
+    /// <c>state.macroRestarted</c> for the file channel
+    /// </remarks>
+    public bool IsMacroRestarted
+    {
+        get
+        {
+            IReadOnlyList<CodeFile?> files = _pipelines.Value[(int)PipelineStage.Start].StackedFiles();
+            return files.Count > 1 && files[0] is MacroFile && files[1]?.FirstCommandAfterRestart == true;
+        }
+    }
+
+    /// <summary>
     /// Whether this channel is running any macro at all
     /// </summary>
     public bool IsDoingMacro
@@ -174,16 +192,19 @@ public sealed class ChannelProcessor
     /// Abandon the macros a pause interrupts, leaving the job file itself in place
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <returns>Whether any macro was abandoned</returns>
     /// <remarks>
     /// The macro half of RepRapFirmware's pause: the machine is stopping somewhere the macro did not
     /// expect, so whatever it had left to do is no longer meaningful and its codes are cancelled with
     /// it. Only macros are popped - the job file underneath them is what the resume will read from
     /// again, and it stays. This is deliberately not <see cref="AbortAllFilesAsync"/>, which unwinds
-    /// everything regardless: that is right for an abort and wrong for a pause
+    /// everything regardless: that is right for an abort and wrong for a pause. The return value is
+    /// RepRapFirmware's <c>pausedInMacro</c>, set there in the same loop that pops the machine
+    /// states: the resume reads it to mark the job file's replayed command as a restart
     /// </remarks>
-    public async Task AbandonMacrosForPauseAsync(CancellationToken cancellationToken = default)
+    public async Task<bool> AbandonMacrosForPauseAsync(CancellationToken cancellationToken = default)
     {
+        bool abandonedMacro = false;
         while (CurrentFile is MacroFile macro)
         {
             using (await macro.LockAsync(cancellationToken))
@@ -191,7 +212,9 @@ public sealed class ChannelProcessor
                 macro.Abort();
             }
             Pop();
+            abandonedMacro = true;
         }
+        return abandonedMacro;
     }
 
     /// <summary>

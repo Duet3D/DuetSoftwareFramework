@@ -140,8 +140,9 @@ internal partial class JobProcessor
 
             // The macros the job was inside are abandoned: the machine is stopping somewhere they did
             // not expect, so what they had left to do is no longer meaningful. The job file itself
-            // stays, because the resume reads from it again
-            await _codeProcessor.AbandonMacrosForPauseAsync(CodeChannel.File, cancellationToken);
+            // stays, because the resume reads from it again. Whether anything was abandoned is
+            // RepRapFirmware's pausedInMacro: the resume marks the replayed command as a restart
+            _pausedInMacro = await _codeProcessor.AbandonMacrosForPauseAsync(CodeChannel.File, cancellationToken);
 
             // Not the caller's token: for a synchronous pause that is the token just cancelled above.
             // The rest of the sequence stops for a shutdown and nothing else
@@ -179,6 +180,16 @@ internal partial class JobProcessor
             }
         }
     }
+
+    /// <summary>
+    /// Whether the last pause abandoned macros the job was inside
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>MovementState::pausedInMacro</c>. The rewind point of such a pause is the
+    /// command that started the outermost abandoned macro, so the resume re-runs the macro whole;
+    /// marking the job file lets it read <c>state.macroRestarted</c> and skip what must not repeat
+    /// </remarks>
+    private bool _pausedInMacro;
 
     /// <summary>
     /// A pause that has been asked for but cannot happen yet, and the macro it will run
@@ -320,6 +331,19 @@ internal partial class JobProcessor
                 // RepRapFirmware's M24, which copies restartMoveFractionDone into moveFractionToSkip
                 // and puts the modal G command back before StartPrinting
                 await ApplyRestartStateAsync(cancellationToken);
+
+                // A job that does not begin at the top of the file is a restart - resurrect.g wrote
+                // the M26 - and RepRapFirmware's StartPrinting marks its first command as one
+                if (_file is not null)
+                {
+                    using (await _file.LockAsync(cancellationToken))
+                    {
+                        if (_file.Position > 0)
+                        {
+                            _file.FirstCommandAfterRestart = true;
+                        }
+                    }
+                }
                 Resume();
             }
             return new Message();
@@ -334,6 +358,19 @@ internal partial class JobProcessor
 
             await MoveBackToRestorePointAsync(cancellationToken);
             await RestoreFeedRateAsync(cancellationToken);
+
+            // The pause abandoned the macro the job was inside and rewound the file to the command
+            // that started it, so that command is about to run again. RepRapFirmware's resuming3
+            // marks it the same way through firstCommandAfterRestart
+            if (_pausedInMacro && _file is not null)
+            {
+                _pausedInMacro = false;
+                using (await _file.LockAsync(cancellationToken))
+                {
+                    _file.FirstCommandAfterRestart = true;
+                }
+            }
+
             _logger.LogInformation("Printing resumed");
             await _eventLogger.LogOutputAsync(MessageType.Warning, "Printing resumed");
             return new Message();

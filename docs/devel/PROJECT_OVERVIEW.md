@@ -25,7 +25,7 @@ against the reference tree in `lib/RepRapFirmware`.
 | 5 | Events migration | [EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) | 🟢 4 of 5 phases | 1 × M, 1 × S | M291 (WS7) |
 | 6 | Job lifecycle | [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) | 🟢 8 phases, 5 with tails | 2 × M, 6 × S | M291, M581, M452 (all WS7) |
 | 7 | M-code / motion migration | [MCODE_MIGRATION.md](MCODE_MIGRATION.md) | 🟡 ~58% of inventory | 7 × L, 14 × M, 5 × S | see §3 |
-| 8 | Synchronised actions | [MOTION_SYNCHRONISED_ACTIONS.md](MOTION_SYNCHRONISED_ACTIONS.md) | 🟡 groundwork 1 of 3 | 1 × S, 1 × M shared, then stage 1 (2 × M, DCS only), stage 2 (2 × L, 2 × M, 1 × S) | laser pixel data (§5) |
+| 8 | Synchronised actions | [MOTION_SYNCHRONISED_ACTIONS.md](MOTION_SYNCHRONISED_ACTIONS.md) | 🟡 groundwork 2 of 3 | 1 × S, 1 × M shared, then stage 1 (2 × M, DCS only), stage 2 (2 × L, 2 × M, 1 × S) | laser pixel data (§5) |
 
 Workstream 7 is the umbrella the others were carved out of, and is most of what remains. Workstream 8
 is fully specified and independent; its class-table groundwork is in, and which of its three
@@ -176,7 +176,7 @@ type. The shared groundwork lands first.
 |---|---|---|---|
 | 1 | Declare which codes execute immediately and which defer, enforced in the pipeline | M | ✅ **Complete**: per-handler `CodeTable` rows, pipeline enforcement, macro-then-unsupported miss path; behaviour changes listed in §5.1 |
 | 2 | Emergency-stop output handling in `Duet3Expansion` | M 🔧 | A live gap today: fans and GPIO survive an M112 until the board resets, and commands still execute in the pre-reset window. Does not gate stage 1; required before stage 2 parks commands on the boards |
-| 3 | Write `state.macroRestarted` on macro re-run after a pause | S | The field exists; nothing writes it |
+| 3 | Write `state.macroRestarted` on macro re-run after a pause | S | ✅ **Complete**: the resume marks the job file's replayed command, macros inherit the mark, and it clears when the command finishes |
 | S1 | `LastSubmittedMoveId`, the per-anchor wake on `MotionTracker`, the defer branch, the parked set and pending predicates, purge cancellation | M | DCS only |
 | S1 | Convert the 16 deferred codes | M 🔧 | M106 first |
 | S2 | Schema: `whenToExecute`, the offset table, the drop broadcast | M | Regenerates both sides |

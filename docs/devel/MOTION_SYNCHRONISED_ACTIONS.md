@@ -338,9 +338,12 @@ so the purge rule cannot hold for it.
 Macros are included because a layer-change macro's `M106` belongs where the macro was called.
 A pause inside a macro abandons it (`AbandonMacrosForPauseAsync`) and the resume re-runs it whole, so
 every side effect in a macro is at-least-once, deferred or not; deferral adds no new failure mode.
-The guard is `state.macroRestarted`, which exists in the object model and which nothing writes:
-setting it on macro re-run after a pause is part of this work, so a macro can skip what must not
-repeat.
+The guard is `state.macroRestarted`, implemented as RepRapFirmware computes it: the resume of a
+pause that abandoned macros marks the job file's replayed command
+(`CodeFile.FirstCommandAfterRestart`), as does starting a job from a saved position; a macro
+started by a marked file inherits the mark; a command clears its file's mark as it finishes
+executing; and the object model reports whether the file channel is inside a macro whose invoking
+level is marked. A macro reads it to skip what must not repeat.
 
 ### 5.3 The anchor
 
@@ -933,7 +936,9 @@ right point in the path.
 2. **Emergency-stop output handling in Duet3Expansion** (§5.7). A live gap independent of this
    plan; it does not gate stage 1, which parks nothing on the boards, and it must be in place
    before stage 2 does.
-3. **`state.macroRestarted`** written on macro re-run after a pause (§5.2).
+3. **`state.macroRestarted`** written on macro re-run after a pause (§5.2). Done: the resume marks
+   the job file's replayed command, macros inherit the mark, and the file channel publishes the
+   flag.
 4. **Stage 1** (§8.6, DuetControlServer only):
    - `MovePlanner.LastSubmittedMoveId` (§5.3) and a per-anchor await on `MotionTracker`;
    - the defer branch: flush, park on the anchor's retirement, dispatch the handler on wake;

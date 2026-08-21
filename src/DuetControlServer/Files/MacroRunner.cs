@@ -29,11 +29,13 @@ namespace DuetControlServer.Files;
 /// <param name="codeProcessor">Code processor owning the channel pipelines</param>
 /// <param name="fileFactory">Creates the macro file</param>
 /// <param name="filePathResolver">Resolves the macro's physical path</param>
+/// <param name="model">Object model</param>
 /// <param name="logger">Logger</param>
 public sealed class MacroRunner(
     CodeProcessor codeProcessor,
     FileFactory fileFactory,
     FilePathResolver filePathResolver,
+    Model.ObjectModel model,
     ILogger<MacroRunner> logger)
 {
     /// <summary>
@@ -96,6 +98,10 @@ public sealed class MacroRunner(
             return false;
         }
         macro.IsSystemMacro = isSystemMacro || startCode?.Flags.HasFlag(CodeFlags.IsFromSystemMacro) == true;
+
+        // Whether the invoking level is on its first command since a restart travels down the
+        // stack with the macro, as RepRapFirmware copies firstCommandAfterRestart on Push
+        macro.FirstCommandAfterRestart = startCode?.File?.FirstCommandAfterRestart == true;
         if (parameters is not null)
         {
             // Before the first code runs, which is what makes them read-only to the macro itself
@@ -105,6 +111,7 @@ public sealed class MacroRunner(
         // The stack level has to exist before the macro starts reading, because its codes are routed
         // to the level whose file they belong to
         codeProcessor.Push(channel, macro);
+        await PublishMacroRestartedAsync(channel, cancellationToken);
         try
         {
             macro.Start(false);
@@ -114,7 +121,30 @@ public sealed class MacroRunner(
         {
             // Popping completes the level's code queues, so it has to happen however the macro ended
             codeProcessor.Pop(channel);
+            await PublishMacroRestartedAsync(channel, CancellationToken.None);
         }
         return true;
+    }
+
+    /// <summary>
+    /// Publish whether the file channel is inside a restarted macro
+    /// </summary>
+    /// <param name="channel">Channel a macro started or finished on</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <remarks>
+    /// RepRapFirmware computes <c>state.macroRestarted</c> on demand from the file channel's stack;
+    /// the object model here is pushed, so the value is republished where it can change, which is
+    /// when a macro starts or finishes on that channel
+    /// </remarks>
+    private async ValueTask PublishMacroRestartedAsync(CodeChannel channel, CancellationToken cancellationToken)
+    {
+        if (channel == CodeChannel.File)
+        {
+            bool macroRestarted = codeProcessor.IsMacroRestarted(channel);
+            using (await model.AccessReadWriteAsync(cancellationToken))
+            {
+                model.State.MacroRestarted = macroRestarted;
+            }
+        }
     }
 }
