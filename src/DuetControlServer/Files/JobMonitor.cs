@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -87,6 +88,14 @@ internal sealed class JobMonitor(
     // What the slicer said, and when, so the answer can age
     private float _slicerTimeLeft;
     private TimeSpan _slicerTimeLeftSetAt;
+
+    // Where the last layer change left off, so each job.layers[] entry describes only its own layer
+    private int _lastLayer = -1;
+    private int _lastLayerDuration;
+    private List<float> _lastLayerFilamentUsage = [];
+    private float _lastLayerTotalFilamentUsage;
+    private long _lastLayerFilePosition;
+    private float _lastLayerHeight;
 
     /// <summary>
     /// Record what a slicer said is left, from M73
@@ -241,6 +250,161 @@ internal sealed class JobMonitor(
             model.Job.TimesLeft.File = AsReportedTime(FileBasedEstimate(fraction));
             model.Job.TimesLeft.Filament = AsReportedTime(FilamentBasedEstimate(model));
             model.Job.TimesLeft.Slicer = AsReportedTime(SlicerBasedEstimate(now));
+
+            UpdateLayers(model);
+        }
+    }
+
+    /// <summary>
+    /// Maintain <c>job.layers[]</c>, the per-layer statistics DWC charts: how long each layer took
+    /// and what it used, apportioned from the totals at each layer change
+    /// </summary>
+    /// <param name="model">Object model, which the caller holds the write lock on</param>
+    /// <remarks>
+    /// TODO Nothing maintains <c>job.layer</c> yet, so the guard below keeps this from recording
+    /// anything. RepRapFirmware's PrintMonitor derives the current layer from the Z height and the
+    /// layer height the file info reported; when that lands, these statistics come back to life
+    /// </remarks>
+    private void UpdateLayers(Model.ObjectModel model)
+    {
+        // Are we printing?
+        if (model.Job.Duration is null)
+        {
+            if (_lastLayer != -1)
+            {
+                _lastLayer = -1;
+                _lastLayerDuration = 0;
+                _lastLayerFilamentUsage.Clear();
+                _lastLayerTotalFilamentUsage = 0F;
+                _lastLayerFilePosition = 0L;
+                _lastLayerHeight = 0F;
+            }
+            return;
+        }
+
+        // Reset the layers when a new print is started
+        if (_lastLayer == -1)
+        {
+            _lastLayer = 0;
+            model.Job.Layers.Clear();
+        }
+
+        // Don't continue from here unless the layer number is known and valid
+        if (model.Job.Layer is null || model.Job.Layer.Value < 0)
+        {
+            return;
+        }
+
+        if (model.Job.Layer.Value > 0 && model.Job.Layer.Value != _lastLayer)
+        {
+            // Compute layer usage stats first
+            int numChangedLayers = (model.Job.Layer.Value > _lastLayer) ? Math.Abs(model.Job.Layer.Value - _lastLayer) : 1;
+            int printDuration = model.Job.Duration.Value - (model.Job.WarmUpDuration is not null ? model.Job.WarmUpDuration.Value : 0);
+            float avgLayerDuration = (float)(printDuration - _lastLayerDuration) / numChangedLayers;
+            long bytesPrinted = (model.Job.FilePosition is not null) ? (model.Job.FilePosition.Value - _lastLayerFilePosition) : 0L;
+            float avgFractionPrinted = (model.Job.File.Size > 0) ? (float)bytesPrinted / (model.Job.File.Size * numChangedLayers) : 0F;
+            #region deprecated, to be removed in v3.8
+            List<float> totalFilamentUsage = [], avgFilamentUsage = [];
+            for (int i = 0; i < model.Move.Extruders.Count; i++)
+            {
+                if (model.Move.Extruders[i] is not null)
+                {
+                    float lastFilamentUsage = (i < _lastLayerFilamentUsage.Count) ? _lastLayerFilamentUsage[i] : 0F;
+                    totalFilamentUsage.Add(model.Move.Extruders[i].RawPosition);
+                    avgFilamentUsage.Add((model.Move.Extruders[i].RawPosition - lastFilamentUsage) / numChangedLayers);
+                }
+            }
+            #endregion
+            float totalAvgFilamentUsage = (model.Job.RawExtrusion != null) ? (model.Job.RawExtrusion.Value - _lastLayerTotalFilamentUsage) / numChangedLayers : 0F;
+
+            // Get layer height
+            float currentHeight = 0F;
+            foreach (Axis axis in model.Move.Axes)
+            {
+                if (axis is { Letter: 'Z', UserPosition: { } })
+                {
+                    currentHeight = axis.UserPosition.Value;
+                    break;
+                }
+            }
+            float avgLayerHeight = Math.Abs(currentHeight - _lastLayerHeight) / Math.Abs(model.Job.Layer.Value - _lastLayer);
+
+            if (model.Job.Layer > _lastLayer)
+            {
+                // Add new layers
+                for (int i = model.Job.Layers.Count; i < model.Job.Layer.Value - 1; i++)
+                {
+                    Layer newLayer = new()
+                    {
+                        Duration = avgLayerDuration,
+                        FilamentUsage = totalAvgFilamentUsage
+                    };
+                    foreach (float filamentUsage in avgFilamentUsage)
+                    {
+#pragma warning disable CS0618 // Type or member is obsolete
+                        newLayer.Filament.Add(filamentUsage);
+#pragma warning restore CS0618 // Type or member is obsolete
+                    }
+                    newLayer.FractionPrinted = avgFractionPrinted;
+                    newLayer.Height = avgLayerHeight;
+                    foreach (AnalogSensor? sensor in model.Sensors.Analog)
+                    {
+                        if (sensor is not null)
+                        {
+                            newLayer.Temperatures.Add(sensor.LastReading);
+                        }
+                    }
+                    model.Job.Layers.Add(newLayer);
+                }
+            }
+            else if (model.Job.Layer < _lastLayer)
+            {
+                // Layer count went down (probably printing sequentially), update the last layer
+                Layer lastLayer;
+                if (model.Job.Layers.Count < _lastLayer)
+                {
+                    lastLayer = new()
+                    {
+                        Height = avgLayerHeight
+                    };
+                    foreach (AnalogSensor? sensor in model.Sensors.Analog)
+                    {
+                        if (sensor is not null)
+                        {
+                            lastLayer.Temperatures.Add(sensor.LastReading);
+                        }
+                    }
+                    model.Job.Layers.Add(lastLayer);
+                }
+                else
+                {
+                    lastLayer = model.Job.Layers[_lastLayer - 1];
+                }
+
+                lastLayer.Duration += avgLayerDuration;
+                for (int i = 0; i < avgFilamentUsage.Count; i++)
+                {
+#pragma warning disable CS0618 // Type or member is obsolete
+                    if (i >= lastLayer.Filament.Count)
+                    {
+                        lastLayer.Filament.Add(avgFilamentUsage[i]);
+                    }
+                    else
+                    {
+                        lastLayer.Filament[i] += avgFilamentUsage[i];
+                    }
+#pragma warning restore CS0618 // Type or member is obsolete
+                }
+                lastLayer.FractionPrinted += avgFractionPrinted;
+            }
+
+            // Record values for the next layer change
+            _lastLayerDuration = printDuration;
+            _lastLayerFilamentUsage = totalFilamentUsage;
+            _lastLayerTotalFilamentUsage = model.Job.RawExtrusion ?? 0F;
+            _lastLayerFilePosition = model.Job.FilePosition ?? 0L;
+            _lastLayerHeight = currentHeight;
+            _lastLayer = model.Job.Layer.Value;
         }
     }
 

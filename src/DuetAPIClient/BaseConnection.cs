@@ -248,13 +248,13 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
                 if (typeof(T) == typeof(ObjectModel))
                 {
                     ObjectModel model = new();
-                    model.UpdateFromJsonReader(ref reader, false);
+                    model.UpdateFromJsonReader(ref reader);
                     return (T)(object)model;
                 }
                 else if (typeof(T) == typeof(GCodeFileInfo))
                 {
                     GCodeFileInfo fileInfo = new();
-                    fileInfo.UpdateFromJsonReader(ref reader, false);
+                    fileInfo.UpdateFromJsonReader(ref reader);
                     return (T)(object)fileInfo;
                 }
                 else
@@ -359,13 +359,13 @@ public abstract class BaseConnection(ConnectionMode mode) : IDisposable
                 if (typeof(T) == typeof(ObjectModel))
                 {
                     ObjectModel model = new();
-                    model.UpdateFromJsonReader(ref reader, false);
+                    model.UpdateFromJsonReader(ref reader);
                     return (T)(object)model;
                 }
                 else if (typeof(T) == typeof(GCodeFileInfo))
                 {
                     GCodeFileInfo fileInfo = new();
-                    fileInfo.UpdateFromJsonReader(ref reader, false);
+                    fileInfo.UpdateFromJsonReader(ref reader);
                     return (T)(object)fileInfo;
                 }
                 else

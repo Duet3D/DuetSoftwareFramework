@@ -48,15 +48,6 @@ internal static class UpdateFromJson
                 writer.Indent++;
                 first = false;
 
-                // SBC property check
-                bool isSbcProperty = prop.IsSbcProperty();
-                if (isSbcProperty)
-                {
-                    writer.WriteLine("if (!ignoreSbcProperties)");
-                    writer.WriteLine("{");
-                    writer.Indent++;
-                }
-
                 // assignment
                 if (propType is "DynamicModelCollection" or "StaticModelCollection" or "MessageCollection" or "JsonModelDictionary" or "StaticModelDictionary" ||
                     receiver.ModelCollectionMembers.ContainsKey(propType) || receiver.ModelObjectMembers.ContainsKey(propType))
@@ -80,26 +71,26 @@ internal static class UpdateFromJson
                         writer.WriteLine("}");
                         if (receiver.DynamicModelObjectClasses.Contains(nts.ElementType.ToString()))
                         {
-                            writer.WriteLine($"{prop.Identifier.ValueText} = ({nts.ElementType}){prop.Identifier.ValueText}.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);");
+                            writer.WriteLine($"{prop.Identifier.ValueText} = ({nts.ElementType}){prop.Identifier.ValueText}.UpdateFromJson(jsonProperty.Value);");
                         }
                         else
                         {
-                            writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);");
+                            writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJson(jsonProperty.Value);");
                         }
                         writer.Indent--;
                         writer.WriteLine("}");
                     }
                     else if (receiver.DynamicModelObjectClasses.Contains(propType))
                     {
-                        writer.WriteLine($"{prop.Identifier.ValueText} = ({propType}){prop.Identifier.ValueText}.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties)!;");
+                        writer.WriteLine($"{prop.Identifier.ValueText} = ({propType}){prop.Identifier.ValueText}.UpdateFromJson(jsonProperty.Value)!;");
                     }
                     else if (cls == "Move" && prop.Identifier.ValueText == "Axes")
                     {
-                        writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties, 0, last);");
+                        writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJson(jsonProperty.Value, 0, last);");
                     }
                     else
                     {
-                        writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);");
+                        writer.WriteLine($"{prop.Identifier.ValueText}.UpdateFromJson(jsonProperty.Value);");
                     }
                 }
                 else if (propType is "ObservableCollection")
@@ -422,12 +413,6 @@ internal static class UpdateFromJson
                     writer.WriteLine("}");
                 }
 
-                if (isSbcProperty)
-                {
-                    writer.Indent--;
-                    writer.WriteLine("}");
-                }
-
                 // }
                 writer.Indent--;
                 writer.WriteLine("}");
@@ -436,7 +421,7 @@ internal static class UpdateFromJson
         }
 
         // Check if we need to generate the UpdateFromJson(Reader) methods
-        bool useGeneratedUpdateFromJson = methods.Any(mds => mds.Identifier.ValueText == "UpdateFromJson" && mds.ParameterList.Parameters.Count == 2 && mds.ParameterList.Parameters[0].Identifier.ValueText == "jsonElement" && mds.ParameterList.Parameters[1].Identifier.ValueText == "ignoreSbcProperties");
+        bool useGeneratedUpdateFromJson = methods.Any(mds => mds.Identifier.ValueText == "UpdateFromJson" && mds.ParameterList.Parameters.Count == 1 && mds.ParameterList.Parameters[0].Identifier.ValueText == "jsonElement");
 
         // Generate method
         return SourceText.From($@"/// <summary>
@@ -444,9 +429,8 @@ internal static class UpdateFromJson
     /// </summary>
     /// <remarks>This method is auto-generated</remarks>
     /// <param name=""jsonElement"">Element to update this intance from</param>
-    /// <param name=""ignoreSbcProperties"">Whether SBC properties are ignored</param>{(isDynamic ? "\n        /// <returns>Updated instance</returns>" : "")}{(cls == "Move" ? "\n        /// <param name=\"last\">Whether Move.Axes is final</param>" : "")}
     /// <exception cref=""JsonException"">Failed to deserialize data</exception>
-    public {(isInherited ? "override " : isInheritedFrom ? "virtual " : "") + (isDynamic ? "IDynamicModelObject?" : "void")} {(useGeneratedUpdateFromJson ? "Generated" : "")}UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties{(cls == "Move" ? ", bool last" : string.Empty)})
+    public {(isInherited ? "override " : isInheritedFrom ? "virtual " : "") + (isDynamic ? "IDynamicModelObject?" : "void")} {(useGeneratedUpdateFromJson ? "Generated" : "")}UpdateFromJson(JsonElement jsonElement{(cls == "Move" ? ", bool last" : string.Empty)})
     {{
         if (jsonElement.ValueKind == JsonValueKind.Null)
         {{
@@ -463,6 +447,6 @@ internal static class UpdateFromJson
             }}
 #endif 
         }}{(isDynamic ? "\n            return this;" : "")}
-    }}{(cls == "Move" ? "\n        /// <summary>Wrapper function</summary>\n        /// <param name=\"jsonElement\">JSON element</param>\n        /// <param name=\"ignoreSbcProperties\">Ignore SBC properties</param>\n        public void UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties) => UpdateFromJson(jsonElement, ignoreSbcProperties, true);" : "")}", Encoding.UTF8);
+    }}{(cls == "Move" ? "\n        /// <summary>Wrapper function</summary>\n        /// <param name=\"jsonElement\">JSON element</param>\n        public void UpdateFromJson(JsonElement jsonElement) => UpdateFromJson(jsonElement, true);" : "")}", Encoding.UTF8);
     }
 }

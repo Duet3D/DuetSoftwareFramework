@@ -12,7 +12,6 @@ public partial class GCodeFileInfo : ModelObject, IStaticModelObject
     /// <summary>
     /// User-defined key-value pairs
     /// </summary>
-    [SbcProperty(true)]
     public JsonModelDictionary CustomInfo { get; } = new JsonModelDictionary(false);
 
     /// <summary>
@@ -114,6 +113,5 @@ public partial class GCodeFileInfo : ModelObject, IStaticModelObject
     /// <summary>
     /// Collection of thumbnails parsed from Gcode
     /// </summary>
-    [SbcProperty(true)]
     public StaticModelCollection<ThumbnailInfo> Thumbnails { get; } = [];
 }

@@ -101,7 +101,7 @@ internal partial class MCodeHandler(
     /// </para>
     /// <para>
     /// The machine configuration and motion codes are implemented in MCodeHandler.Motion.cs. They are
-    /// dispatched from the same switch as everything else; only their bodies live elsewhere
+    /// dispatched from the same table as everything else; only their bodies live elsewhere
     /// </para>
     /// </remarks>
     public async ValueTask<Message> ProcessAsync(Commands.Code code, CancellationToken cancellationToken)
@@ -112,243 +112,278 @@ internal partial class MCodeHandler(
             return new Message();
         }
 
-        // Keep numerically ordered (where possible) for easier maintenance.
-        return code.MajorNumber switch
-        {
-            // Stop or unconditional stop, sleep or conditional stop, program end
-            0 or 1 or 2 => await HandleStopAsync(code, cancellationToken),
-            // Spindle clockwise / laser power
-            3 => await HandleSpindleOnAsync(code, reverse: false, cancellationToken),
-            // Spindle counter-clockwise
-            4 => await HandleSpindleOnAsync(code, reverse: true, cancellationToken),
-            // Spindle off
-            5 => await HandleSpindleOffAsync(code, cancellationToken),
-            // Motors on / motors off
-            17 or 18 or 84 => await HandleDriverStateAsync(code, cancellationToken),
-            // List SD card
-            20 => await HandleListFilesAsync(code, cancellationToken),
-            // Initialize SD card
-            21 => await HandleInitializeSDCardAsync(code, cancellationToken),
-            // Release SD card
-            22 => throw new NotSupportedException(),
-            // Select a file to print, or select it and start printing
-            23 or 32 => await HandleSelectFileAsync(code, cancellationToken),
-            // Resume a file print
-            24 => await HandleResumePrintAsync(code, cancellationToken),
-            // Pause the print
-            25 => await HandlePausePrintAsync(code, cancellationToken),
-            // Set SD position
-            26 => await HandleSetFilePositionAsync(code, cancellationToken),
-            // Report SD print status
-            27 => await HandleReportPrintStatusAsync(code, cancellationToken),
-            // Begin write to SD card
-            28 => await HandleBeginFileWriteAsync(code, cancellationToken),
-            // End write to SD card
-            29 => await HandleEndFileWriteAsync(code, cancellationToken),
-            // Delete a file on the SD card
-            30 => await HandleDeleteFileAsync(code, cancellationToken),
-            // Return file information
-            36 => await HandleFileInfoAsync(code, cancellationToken),
-            // Slicer-inserted print time values
-            73 => HandleSlicerTimeHints(code),
-            // Simulate file
-            37 => await HandleSimulateFileAsync(code, cancellationToken),
-            // Compute CRC32 checksum of target file
-            38 => await HandleFileChecksumAsync(code, cancellationToken),
-            // Report SD card information
-            39 => await HandleSDCardInfoAsync(code, cancellationToken),
-            // Set output pin
-            42 => await HandleSetOutputAsync(code, cancellationToken),
-            // Absolute / relative extruder positioning
-            82 or 83 => await HandleExtruderPositioningAsync(code, cancellationToken),
-            // Set the idle timeout
-            85 => await HandleIdleTimeoutAsync(code, cancellationToken),
-            // Set steps per mm
-            92 => await HandleStepsPerMmAsync(code, cancellationToken),
-            // Flag current macro file as (not) pausable
-            98 => await HandleMacroPausableAsync(code, cancellationToken),
-            // Set extruder temperature without waiting
-            104 => await SetTemperaturesAsync(code, await CurrentToolHeatersAsync(code, cancellationToken), wait: false, cancellationToken),
-            // Report temperatures
-            105 => await ReportTemperaturesAsync(cancellationToken),
-            // Set fan speed
-            106 => await HandleFanSpeedAsync(code, cancellationToken),
-            // Fan off
-            107 => await HandleFanOffAsync(code, cancellationToken),
-            // Set extruder temperature and wait
-            109 => await SetTemperaturesAsync(code, await CurrentToolHeatersAsync(code, cancellationToken), wait: true, cancellationToken),
-            // Set debug level
-            111 => await HandleDebugLevelAsync(code, cancellationToken),
-            // Emergency stop
-            112 => await HandleEmergencyStopAsync(code, cancellationToken),
-            // Report the current position
-            114 => await HandleReportPositionAsync(code, cancellationToken),
-            // Report firmware version
-            115 => await HandleFirmwareVersionAsync(code, cancellationToken),
-            // Wait for temperatures
-            116 => await HandleWaitForTemperaturesAsync(code, cancellationToken),
-            // Publish MQTT message
-            118 => await HandlePublishMqttAsync(code, cancellationToken),
-            // Report the endstop states
-            119 => await HandleReportEndstopsAsync(code, cancellationToken),
-            // Push and pop the interpreter state
-            120 or 121 => await HandleStateStackAsync(code, cancellationToken),
-            // Immediate DSF diagnostics
-            122 => await HandleDiagnosticsAsync(code, cancellationToken),
-            // Set bed temperature without waiting
-            140 => await SetTemperaturesAsync(code, await BedOrChamberHeatersAsync(code, chamber: false, cancellationToken), wait: false, cancellationToken),
-            // Set chamber temperature without waiting
-            141 => await SetTemperaturesAsync(code, await BedOrChamberHeatersAsync(code, chamber: true, cancellationToken), wait: false, cancellationToken),
-            // Heater monitors
-            143 => await HandleHeaterMonitorAsync(code, cancellationToken),
-            // Set bed temperature and wait
-            190 => await SetTemperaturesAsync(code, await BedOrChamberHeatersAsync(code, chamber: false, cancellationToken), wait: true, cancellationToken),
-            // Set chamber temperature and wait
-            191 => await SetTemperaturesAsync(code, await BedOrChamberHeatersAsync(code, chamber: true, cancellationToken), wait: true, cancellationToken),
-            // Set axis and extruder accelerations
-            201 => await HandleAccelerationsAsync(code, cancellationToken),
-            // Set maximum feedrates
-            203 => await HandleMaxFeedratesAsync(code, cancellationToken),
-            // Set printing and travel accelerations
-            204 => await HandleMoveAccelerationsAsync(code, cancellationToken),
-            // Set jerk, in mm/sec (M205) or mm/min (M566)
-            205 or 566 => await HandleJerkAsync(code, cancellationToken),
-            // Set axis limits
-            208 => await HandleAxisLimitsAsync(code, cancellationToken),
-            // Set the speed factor
-            220 => await HandleSpeedFactorAsync(code, cancellationToken),
-            // Synchronous pause, filament change pause, Prusa-style pause
-            226 or 600 or 601 => await HandleSynchronousPauseAsync(code, cancellationToken),
-            // Set the extrusion factor
-            221 => await HandleExtrusionFactorAsync(code, cancellationToken),
-            // Servo control
-            280 => await HandleServoAsync(code, cancellationToken),
-            // Babystepping
-            290 => await HandleBabysteppingAsync(code, cancellationToken),
-            // Cold extrude and retract limits
-            302 => await HandleColdExtrusionAsync(code, cancellationToken),
-            // Heater process model
-            307 => await HandleHeaterModelAsync(code, cancellationToken),
-            // Configure a temperature sensor
-            308 => await HandleConfigureSensorAsync(code, cancellationToken),
-            // Set microstepping
-            350 => await HandleMicrosteppingAsync(code, cancellationToken),
-            // Save and load the height map, and set the compensation taper
-            374 => await HandleSaveHeightMapAsync(code, cancellationToken),
-            375 => await HandleLoadHeightMapAsync(code, cancellationToken),
-            376 => await HandleTaperHeightAsync(code, cancellationToken),
-            // Wait for the current moves to finish
-            400 => await HandleWaitForMovesAsync(code, cancellationToken),
-            // Deploy and retract the Z probe
-            401 => await HandleDeployProbeAsync(code, cancellationToken),
-            402 => await HandleRetractProbeAsync(code, cancellationToken),
-            // Query object model
-            409 => await HandleQueryObjectModelAsync(code, cancellationToken),
-            // Backlash compensation
-            425 => await HandleBacklashAsync(code, cancellationToken),
-            // Report the machine mode
-            450 => await HandleReportMachineModeAsync(cancellationToken),
-            // Select FFF mode
-            451 => await HandleSetMachineModeAsync(code, MachineMode.FFF, cancellationToken),
-            // Select laser mode
-            452 => await HandleSetMachineModeAsync(code, MachineMode.Laser, cancellationToken),
-            // Select CNC mode
-            453 => await HandleSetMachineModeAsync(code, MachineMode.CNC, cancellationToken),
-            // Create directory on SD card
-            470 => await HandleCreateDirectoryAsync(code, cancellationToken),
-            // Rename file or directory on SD card
-            471 => await HandleRenameFileAsync(code, cancellationToken),
-            // Delete file or directory
-            472 => await HandleDeleteFileOrDirectoryAsync(code, cancellationToken),
-            // Save parameters to config-override.g
-            500 => await HandleSaveConfigOverrideAsync(code, cancellationToken),
-            // Load parameters from config-override.g
-            501 => await HandleLoadConfigOverrideAsync(code, cancellationToken),
-            // Print settings
-            503 => await HandlePrintSettingsAsync(code, cancellationToken),
-            // Set configuration file folder
-            505 => await HandleSetFolderAsync(code, cancellationToken),
-            // Set machine name
-            550 => await HandleSetNameAsync(code, cancellationToken),
-            // Set password
-            551 => await HandleSetPasswordAsync(code, cancellationToken),
-            // Set IP address
-            552 => await HandleSetIPAddressAsync(code, cancellationToken),
-            // Axis compensation
-            556 => await HandleAxisCompensationAsync(code, cancellationToken),
-            // Define the mesh compensation grid
-            557 => await HandleProbeGridAsync(code, cancellationToken),
-            // Configure a Z probe
-            558 => await HandleProbeConfigAsync(code, cancellationToken),
-            // Stop applying bed compensation
-            561 => await HandleClearCompensationAsync(code, cancellationToken),
-            // Clear a heater fault
-            562 => await HandleClearHeaterFaultAsync(code, cancellationToken),
-            // Define or delete a tool
-            563 => await HandleDefineToolAsync(code, cancellationToken),
-            // Limit axes and movement before homing
-            564 => await HandleMovementLimitsAsync(code, cancellationToken),
-            // Set the mixing ratios of a tool
-            567 => await HandleMixRatiosAsync(code, cancellationToken),
-            // Tool settings
-            568 => await HandleToolSettingsAsync(code, cancellationToken),
-            // Configure a stepper driver
-            569 => await HandleDriverConfigAsync(code, cancellationToken),
-            // Heater fault detection
-            570 => await HandleHeaterFaultDetectionAsync(code, cancellationToken),
-            // Set pressure advance
-            572 => await HandlePressureAdvanceAsync(code, cancellationToken),
-            // Configure the endstops
-            574 => await HandleEndstopConfigAsync(code, cancellationToken),
-            // Wait for an endstop or input to reach a state
-            577 => await HandleWaitForInputAsync(code, cancellationToken),
-            // Configure external trigger
-            581 => await HandleConfigureTriggerAsync(code, cancellationToken),
-            // Map axes and extruders onto stepper drivers
-            584 => await HandleDriveMappingAsync(code, cancellationToken),
-            // Configure network protocols
-            586 => await HandleNetworkProtocolsAsync(code, cancellationToken),
-            // Configure nonlinear extrusion
-            592 => await HandleNonlinearExtrusionAsync(code, cancellationToken),
-            // Configure input shaping
-            593 => await HandleInputShapingAsync(code, cancellationToken),
-            // Fork input reader
-            606 => await HandleForkInputReaderAsync(code, cancellationToken),
-            // Delta configuration and delta endstop adjustments
-            665 or 666 => await HandleKinematicsAsync(code, cancellationToken),
-            // Retired in RepRapFirmware in favour of M669
-            667 => new Message(MessageType.Error, "M667 is no longer supported - use M669 instead"),
-            // Select the kinematics and configure them
-            669 => await HandleKinematicsAsync(code, cancellationToken),
-            // Z leadscrew positions
-            671 => await HandleLeadscrewsAsync(code, cancellationToken),
-            // Z probe offset, for Marlin compatibility
-            851 => await HandleProbeOffsetAsync(code, cancellationToken),
-            // Set motor currents, current percentage and standstill current percentage
-            906 or 913 or 917 => await HandleMotorCurrentsAsync(code, cancellationToken),
-            // Configure stall detection
-            915 => await HandleStallDetectionAsync(code, cancellationToken),
-            // Start/stop event logging to SD card
-            929 => await HandleEventLoggingAsync(code, cancellationToken),
-            // Create a heater, fan or other I/O device
-            950 => await HandleCreateDeviceAsync(code, cancellationToken),
-            // Configure CAN
-            952 => await HandleConfigureCanAsync(code, cancellationToken),
-            // Enable CAN
-            953 => await HandleEnableCanAsync(code, cancellationToken),
-            // Configure phase stepping
-            970 => await HandlePhaseSteppingAsync(code, cancellationToken),
-            // Raise an event
-            957 => HandleRaiseEvent(code),
-            // Update the firmware
-            997 => await HandleFirmwareUpdateAsync(code, cancellationToken),
-            // Request resend of line
-            998 => throw new NotSupportedException(),
-            // Reset controller
-            999 => await HandleResetAsync(code, cancellationToken),
-            _ => throw new NotSupportedException($"Unsupported code '{code}'")
-        };
+        return await Rows.Invoke(this, code, cancellationToken);
     }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// A code the simulation gate in <see cref="ProcessAsync"/> is going to ignore needs no
+    /// synchronisation either, so it classifies Immediate; whether it exists at all still comes
+    /// from the table
+    /// </remarks>
+    public CodeClass? Classify(DuetAPI.Commands.Code code)
+    {
+        CodeClass? codeClass = Rows.Classify(code);
+        if (codeClass is not null && code.IsFromFileChannel && jobProcessor.IsSimulating &&
+            code.MajorNumber is not 0 and not 1 and not 2)
+        {
+            return CodeClass.Immediate;
+        }
+        return codeClass;
+    }
+
+    /// <summary>
+    /// Whether a drive-configuration code names a drive to change rather than only asking for a
+    /// report, which decides between a standstill and acting immediately
+    /// </summary>
+    private static CodeClass FlushAndStandstillWhenSettingDrives(DuetAPI.Commands.Code code)
+        => SetsAnyDrive(code) ? CodeClass.FlushAndStandstill : CodeClass.Immediate;
+
+    /// <summary>
+    /// Every M-code this handler implements: its class, enforced by the pipeline before dispatch,
+    /// and its handler. A fractional code is its own row; an M-code with no row takes the
+    /// macro-then-unsupported path, which is why M22 (release SD card) and M998 (resend request)
+    /// are absent
+    /// </summary>
+    internal static readonly CodeTable<MCodeHandler> Rows = new(CodeType.MCode)
+    {
+        // Keep numerically ordered (where possible) for easier maintenance.
+        // Stop or unconditional stop, sleep or conditional stop, program end
+        { [0, 1, 2], CodeClass.Immediate, (h, c, ct) => h.HandleStopAsync(c, ct) }, // TODO synchronous flush
+        // Spindle clockwise / laser power
+        { 3, CodeClass.Deferred, (h, c, ct) => h.HandleSpindleOnAsync(c, reverse: false, ct) },
+        // Spindle counter-clockwise
+        { 4, CodeClass.Deferred, (h, c, ct) => h.HandleSpindleOnAsync(c, reverse: true, ct) },
+        // Spindle off
+        { 5, CodeClass.Deferred, (h, c, ct) => h.HandleSpindleOffAsync(c, ct) },
+        // Motors on / motors off
+        { [17, 18, 84], CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleDriverStateAsync(c, ct) },
+        // List SD card
+        { 20, CodeClass.Immediate, (h, c, ct) => h.HandleListFilesAsync(c, ct) },
+        // Initialize SD card
+        { 21, CodeClass.Immediate, (h, c, ct) => h.HandleInitializeSDCardAsync(c, ct) },
+        // Select a file to print, or select it and start printing
+        { [23, 32], CodeClass.Immediate, (h, c, ct) => h.HandleSelectFileAsync(c, ct) }, // the handler flushes inline before swapping the job file
+        // Resume a file print
+        { 24, CodeClass.Immediate, (h, c, ct) => h.HandleResumePrintAsync(c, ct) }, // resume sequences its macros itself; the handler flushes inline first
+        // Pause the print
+        { 25, CodeClass.Immediate, (h, c, ct) => h.HandlePausePrintAsync(c, ct) }, // a pause must not queue behind the codes it is meant to interrupt. TODO synchronous flush
+        // Set SD position
+        { 26, CodeClass.Flush, (h, c, ct) => h.HandleSetFilePositionAsync(c, ct) }, // the file position it overwrites settles when the pending codes finish
+        // Report SD print status
+        { 27, CodeClass.Flush, (h, c, ct) => h.HandleReportPrintStatusAsync(c, ct) }, // reports the file position, which pending codes are still advancing
+        // Begin write to SD card
+        { 28, CodeClass.Flush, (h, c, ct) => h.HandleBeginFileWriteAsync(c, ct) }, // codes already in flight must finish before capture starts, or be swallowed
+        // End write to SD card
+        { 29, CodeClass.Flush, (h, c, ct) => h.HandleEndFileWriteAsync(c, ct) }, // pending captured writes must reach the file before it closes
+        // Delete a file on the SD card
+        { 30, CodeClass.Flush, (h, c, ct) => h.HandleDeleteFileAsync(c, ct) }, // a file a pending code is still writing must not vanish under it
+        // Return file information; M36.1 reads a thumbnail fragment, M36.2 a plain file fragment
+        { 36, CodeClass.Flush, (h, c, ct) => h.HandleFileInfoAsync(c, thumbnail: null, ct) }, // a pending capture may still be writing the file it inspects
+        { (36, 1), CodeClass.Flush, (h, c, ct) => h.HandleFileInfoAsync(c, thumbnail: true, ct) }, // the thumbnail source must be complete
+        { (36, 2), CodeClass.Flush, (h, c, ct) => h.HandleFileInfoAsync(c, thumbnail: false, ct) }, // the fragment source must be complete
+        // Simulate file
+        { 37, CodeClass.Immediate, (h, c, ct) => h.HandleSimulateFileAsync(c, ct) }, // the handler flushes inline with file-stream sync, which no class expresses
+        // Compute CRC32 checksum of target file
+        { 38, CodeClass.Flush, (h, c, ct) => h.HandleFileChecksumAsync(c, ct) }, // checksums a file a pending capture may still be writing
+        // Report SD card information
+        { 39, CodeClass.Flush, (h, c, ct) => h.HandleSDCardInfoAsync(c, ct) }, // free space is settled once pending file operations complete
+        // Set output pin
+        { 42, CodeClass.Deferred, (h, c, ct) => h.HandleSetOutputAsync(c, ct) },
+        // Slicer-inserted print time values
+        { 73, CodeClass.Immediate, (h, c, ct) => new ValueTask<Message>(h.HandleSlicerTimeHints(c)) }, // feeds the job monitor; nothing reads it in pipeline order
+        // Absolute / relative extruder positioning
+        { [82, 83], CodeClass.Immediate, (h, c, ct) => h.HandleExtruderPositioningAsync(c, ct) }, // interpreter state; later codes are processed behind it by construction
+        // Set the idle timeout
+        { 85, CodeClass.Immediate, (h, c, ct) => h.HandleIdleTimeoutAsync(c, ct) }, // a timer setting with no relation to pending codes
+        // Set steps per mm; a bare M92 is a report, which DWC polls mid-print
+        { 92, FlushAndStandstillWhenSettingDrives, (h, c, ct) => h.HandleStepsPerMmAsync(c, ct) },
+        // Flag current macro file as (not) pausable
+        { 98, CodeClass.Immediate, (h, c, ct) => h.HandleMacroPausableAsync(c, ct) }, // M98 P starts the macro on its own stack level; the handler flushes inline first
+        // Set extruder temperature without waiting
+        { 104, CodeClass.Deferred, async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.CurrentToolHeatersAsync(c, ct), wait: false, ct) },
+        // Report temperatures
+        { 105, CodeClass.Immediate, (h, c, ct) => h.ReportTemperaturesAsync(ct) },
+        // Set fan speed
+        { 106, CodeClass.Deferred, (h, c, ct) => h.HandleFanSpeedAsync(c, ct) },
+        // Fan off
+        { 107, CodeClass.Deferred, (h, c, ct) => h.HandleFanOffAsync(c, ct) },
+        // Set extruder temperature and wait: the target must be in force before the wait begins
+        { 109, CodeClass.FlushAndStandstill, async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.CurrentToolHeatersAsync(c, ct), wait: true, ct) },
+        // Set debug level
+        { 111, CodeClass.Immediate, (h, c, ct) => h.HandleDebugLevelAsync(c, ct) },
+        // Emergency stop
+        { 112, CodeClass.Immediate, (h, c, ct) => h.HandleEmergencyStopAsync(c, ct) }, // must never wait behind anything
+        // Report the current position
+        { 114, CodeClass.Immediate, (h, c, ct) => h.HandleReportPositionAsync(c, ct) },
+        // Report firmware version
+        { 115, CodeClass.Immediate, (h, c, ct) => h.HandleFirmwareVersionAsync(c, ct) },
+        // Wait for temperatures: a barrier by definition, it blocks later G-code on a condition
+        // derived from the targets
+        { 116, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleWaitForTemperaturesAsync(c, ct) },
+        // Publish MQTT message
+        { 118, CodeClass.Immediate, (h, c, ct) => h.HandlePublishMqttAsync(c, ct) }, // the handler flushes inline so the message lands after earlier replies.
+        // Report the endstop states
+        { 119, CodeClass.Immediate, (h, c, ct) => h.HandleReportEndstopsAsync(c, ct) },
+        // Push and pop the interpreter state
+        { [120, 121], CodeClass.Immediate, (h, c, ct) => h.HandleStateStackAsync(c, ct) },
+        // Immediate DSF diagnostics
+        { 122, CodeClass.Immediate, (h, c, ct) => h.HandleDiagnosticsAsync(c, ct) },
+        // Set bed temperature without waiting
+        { 140, CodeClass.Deferred, async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.BedOrChamberHeatersAsync(c, chamber: false, ct), wait: false, ct) },
+        // Set chamber temperature without waiting
+        { 141, CodeClass.Deferred, async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.BedOrChamberHeatersAsync(c, chamber: true, ct), wait: false, ct) },
+        // Heater monitors
+        { 143, CodeClass.Immediate, (h, c, ct) => h.HandleHeaterMonitorAsync(c, ct) },
+        // Set bed temperature and wait
+        { 190, CodeClass.FlushAndStandstill, async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.BedOrChamberHeatersAsync(c, chamber: false, ct), wait: true, ct) },
+        // Set chamber temperature and wait
+        { 191, CodeClass.FlushAndStandstill, async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.BedOrChamberHeatersAsync(c, chamber: true, ct), wait: true, ct) },
+        // Set axis and extruder accelerations; M201.1 sets the reduced set
+        { 201, CodeClass.Immediate, (h, c, ct) => h.HandleAccelerationsAsync(c, reduced: false, ct) },
+        { (201, 1), CodeClass.Immediate, (h, c, ct) => h.HandleAccelerationsAsync(c, reduced: true, ct) },
+        // Set maximum feedrates
+        { 203, CodeClass.Immediate, (h, c, ct) => h.HandleMaxFeedratesAsync(c, ct) },
+        // Set printing and travel accelerations
+        { 204, CodeClass.Immediate, (h, c, ct) => h.HandleMoveAccelerationsAsync(c, ct) },
+        // Set jerk, in mm/sec (M205) or mm/min (M566)
+        { [205, 566], CodeClass.Immediate, (h, c, ct) => h.HandleJerkAsync(c, ct) },
+        // Set axis limits
+        { 208, CodeClass.Immediate, (h, c, ct) => h.HandleAxisLimitsAsync(c, ct) }, // open decision (§5.1): §1 argues a standstill, but no handler ever waited
+        // Set the speed factor
+        { 220, CodeClass.Immediate, (h, c, ct) => h.HandleSpeedFactorAsync(c, ct) },
+        // Set the extrusion factor
+        { 221, CodeClass.Immediate, (h, c, ct) => h.HandleExtrusionFactorAsync(c, ct) },
+        // Synchronous pause, filament change pause, Prusa-style pause
+        { [226, 600, 601], CodeClass.Immediate, (h, c, ct) => h.HandleSynchronousPauseAsync(c, ct) }, // the pause point is where the handler's inline flush lands.
+        // Servo control
+        { 280, CodeClass.Deferred, (h, c, ct) => h.HandleServoAsync(c, ct) },
+        // Babystepping
+        { 290, CodeClass.Immediate, (h, c, ct) => h.HandleBabysteppingAsync(c, ct) },
+        // Cold extrude and retract limits
+        { 302, CodeClass.Immediate, (h, c, ct) => h.HandleColdExtrusionAsync(c, ct) },
+        // Heater process model
+        { 307, CodeClass.Immediate, (h, c, ct) => h.HandleHeaterModelAsync(c, ct) },
+        // Configure a temperature sensor
+        { 308, CodeClass.Immediate, (h, c, ct) => h.HandleConfigureSensorAsync(c, ct) },
+        // Set microstepping; a bare M350 is a report
+        { 350, FlushAndStandstillWhenSettingDrives, (h, c, ct) => h.HandleMicrosteppingAsync(c, ct) },
+        // Save and load the height map, and set the compensation taper
+        { 374, CodeClass.Immediate, (h, c, ct) => h.HandleSaveHeightMapAsync(c, ct) },
+        { 375, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleLoadHeightMapAsync(c, ct) },
+        { 376, CodeClass.Immediate, (h, c, ct) => h.HandleTaperHeightAsync(c, ct) },
+        // Wait for the current moves to finish
+        { 400, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleWaitForMovesAsync(c, ct) },
+        // Deploy and retract the Z probe
+        { 401, CodeClass.Immediate, (h, c, ct) => h.HandleDeployProbeAsync(c, ct) }, // runs deployprobe.g; the macro system sequences it
+        { 402, CodeClass.Immediate, (h, c, ct) => h.HandleRetractProbeAsync(c, ct) }, // runs retractprobe.g; the macro system sequences it
+        // Query object model
+        { 409, CodeClass.Immediate, (h, c, ct) => h.HandleQueryObjectModelAsync(c, ct) }, // answers from the current model
+        // Backlash compensation
+        { 425, CodeClass.Immediate, (h, c, ct) => h.HandleBacklashAsync(c, ct) },
+        // Report the machine mode
+        { 450, CodeClass.Immediate, (h, c, ct) => h.HandleReportMachineModeAsync(ct) },
+        // Select FFF, laser or CNC mode
+        { 451, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleSetMachineModeAsync(c, MachineMode.FFF, ct) },
+        { 452, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleSetMachineModeAsync(c, MachineMode.Laser, ct) },
+        { 453, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleSetMachineModeAsync(c, MachineMode.CNC, ct) },
+        // Create directory on SD card
+        { 470, CodeClass.Flush, (h, c, ct) => h.HandleCreateDirectoryAsync(c, ct) }, // file operations land between codes, not while one is mid-completion
+        // Rename file or directory on SD card
+        { 471, CodeClass.Flush, (h, c, ct) => h.HandleRenameFileAsync(c, ct) }, // a pending code may still hold the old name
+        // Delete file or directory
+        { 472, CodeClass.Flush, (h, c, ct) => h.HandleDeleteFileOrDirectoryAsync(c, ct) }, // nothing pending may still be writing what it deletes
+        // Save parameters to config-override.g
+        { 500, CodeClass.Immediate, (h, c, ct) => h.HandleSaveConfigOverrideAsync(c, ct) },
+        // Load parameters from config-override.g
+        { 501, CodeClass.Flush, (h, c, ct) => h.HandleLoadConfigOverrideAsync(c, ct) }, // the override lands after pending codes stop writing what it replaces
+        // Print settings
+        { 503, CodeClass.Flush, (h, c, ct) => h.HandlePrintSettingsAsync(c, ct) }, // prints config.g, which a pending capture could be rewriting
+        // Set the system folder, or with M505.1 the web folder
+        { 505, CodeClass.Flush, (h, c, ct) => h.HandleSetFolderAsync(c, web: false, ct) }, // sys/ decides what macros resolve to, so it changes between codes. sometimes standstill
+        { (505, 1), CodeClass.Flush, (h, c, ct) => h.HandleSetFolderAsync(c, web: true, ct) }, // as M505. sometimes standstill
+        // Set machine name
+        { 550, CodeClass.Flush, (h, c, ct) => h.HandleSetNameAsync(c, ct) }, // identity changes land between codes, not while replies are in flight
+        // Set password
+        { 551, CodeClass.Flush, (h, c, ct) => h.HandleSetPasswordAsync(c, ct) }, // as M550
+        // Set IP address
+        { 552, CodeClass.Flush, (h, c, ct) => h.HandleSetIPAddressAsync(c, ct) }, // as M550
+        // Axis compensation
+        { 556, CodeClass.Immediate, (h, c, ct) => h.HandleAxisCompensationAsync(c, ct) }, // the skew transform is applied when a move is built
+        // Define the mesh compensation grid
+        { 557, CodeClass.Flush, (h, c, ct) => h.HandleProbeGridAsync(c, ct) }, // the grid lands between codes; G29 itself is FlushAndStandstill
+        // Configure a Z probe: no move that consults a probe may be queued or running while its
+        // input monitor is replaced. A bare M558, or with K only, is a report
+        { 558, c => c.Parameters.Any(p => p.Letter != 'K') ? CodeClass.FlushAndStandstill : CodeClass.Immediate, (h, c, ct) => h.HandleProbeConfigAsync(c, ct) },
+        // Stop applying bed compensation
+        { 561, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleClearCompensationAsync(c, ct) },
+        // Clear a heater fault
+        { 562, CodeClass.Immediate, (h, c, ct) => h.HandleClearHeaterFaultAsync(c, ct) }, // clearing a fault must not wait on a queue the fault may be blocking
+        // Define or delete a tool: its offsets are part of the transform queued moves were planned
+        // against. A bare M563 is a report
+        { 563, c => c.Parameters.Any(p => p.Letter == 'P') ? CodeClass.FlushAndStandstill : CodeClass.Immediate, (h, c, ct) => h.HandleDefineToolAsync(c, ct) },
+        // Limit axes and movement before homing
+        { 564, CodeClass.Immediate, (h, c, ct) => h.HandleMovementLimitsAsync(c, ct) },
+        // Set the mixing ratios of a tool
+        { 567, CodeClass.Immediate, (h, c, ct) => h.HandleMixRatiosAsync(c, ct) },
+        // Tool settings
+        { 568, CodeClass.Deferred, (h, c, ct) => h.HandleToolSettingsAsync(c, ct) },
+        // Configure a stepper driver and its subfunctions; unlisted minors have no row
+        { [569, (569, 1), (569, 2), (569, 4), (569, 6), (569, 7)], CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleDriverConfigAsync(c, ct) },
+        // Heater fault detection
+        { 570, CodeClass.Immediate, (h, c, ct) => h.HandleHeaterFaultDetectionAsync(c, ct) },
+        // Set pressure advance. TODO the value already rides the move on the SBC side; the
+        // standstill remains until D3 of MOTION_SYNCHRONISED_ACTIONS.md is decided
+        { 572, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandlePressureAdvanceAsync(c, ct) }, // TODO sync with motion
+        // Configure the endstops
+        { 574, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleEndstopConfigAsync(c, ct) },
+        // Wait for an endstop or input to reach a state
+        { 577, CodeClass.Immediate, (h, c, ct) => h.HandleWaitForInputAsync(c, ct) },
+        // Configure external trigger; M581.1 is the expression form
+        { 581, CodeClass.Immediate, (h, c, ct) => h.HandleConfigureTriggerAsync(c, expressionForm: false, ct) },
+        { (581, 1), CodeClass.Immediate, (h, c, ct) => h.HandleConfigureTriggerAsync(c, expressionForm: true, ct) }, // the handler flushes inline before seeding from the model
+        // Map axes and extruders onto stepper drivers; a bare M584 is a report
+        { 584, c => c.Parameters.Count > 0 ? CodeClass.FlushAndStandstill : CodeClass.Immediate, (h, c, ct) => h.HandleDriveMappingAsync(c, ct) },
+        // Configure network protocols; M586.4 configures MQTT
+        { 586, CodeClass.Flush, (h, c, ct) => h.HandleNetworkProtocolsAsync(c, configureMqtt: false, ct) }, // protocol changes land between codes
+        { (586, 4), CodeClass.Flush, (h, c, ct) => h.HandleNetworkProtocolsAsync(c, configureMqtt: true, ct) }, // as M586
+        // Configure nonlinear extrusion
+        { 592, CodeClass.Immediate, (h, c, ct) => h.HandleNonlinearExtrusionAsync(c, ct) },
+        // Configure input shaping: queued moves were shaped with the old filter, so setting waits;
+        // a bare M593 is a report
+        { 593, c => c.Parameters.Count > 0 ? CodeClass.FlushAndStandstill : CodeClass.Immediate, (h, c, ct) => h.HandleInputShapingAsync(c, ct) },
+        // Fork input reader
+        { 606, CodeClass.Flush, (h, c, ct) => h.HandleForkInputReaderAsync(c, ct) }, // the fork point is the settled file position of the pending codes
+        // Delta configuration and endstop adjustments, and selecting and configuring kinematics
+        { [665, 666, 669], CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleKinematicsAsync(c, ct) },
+        // Retired in RepRapFirmware in favour of M669
+        { 667, CodeClass.Immediate, (h, c, ct) => new ValueTask<Message>(new Message(MessageType.Error, "M667 is no longer supported - use M669 instead")) },
+        // Z leadscrew positions
+        { 671, CodeClass.Immediate, (h, c, ct) => h.HandleLeadscrewsAsync(c, ct) },
+        // Z probe offset, for Marlin compatibility
+        { 851, CodeClass.Immediate, (h, c, ct) => h.HandleProbeOffsetAsync(c, ct) }, // rewrites G31 values; probing runs at standstill anyway
+        // Set motor currents, current percentage and standstill current percentage; bare forms are
+        // reports, which DWC polls mid-print
+        { [906, 913, 917], FlushAndStandstillWhenSettingDrives, (h, c, ct) => h.HandleMotorCurrentsAsync(c, ct) },
+        // Configure stall detection
+        { 915, CodeClass.Immediate, (h, c, ct) => h.HandleStallDetectionAsync(c, ct) },
+        // Start/stop event logging to SD card
+        { 929, CodeClass.Flush, (h, c, ct) => h.HandleEventLoggingAsync(c, ct) }, // log entries are written as codes complete; start and stop order with them
+        // Create a heater, fan or other I/O device
+        { 950, CodeClass.Immediate, (h, c, ct) => h.HandleCreateDeviceAsync(c, ct) }, // open decision (§5.1): reassigning a live driver or port argues a standstill
+        // Configure CAN: it changes the bus the moves travel on
+        { 952, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleConfigureCanAsync(c, ct) },
+        // Enable CAN
+        { 953, CodeClass.Immediate, (h, c, ct) => h.HandleEnableCanAsync(c, ct) },
+        // Raise an event
+        { 957, CodeClass.Immediate, (h, c, ct) => new ValueTask<Message>(h.HandleRaiseEvent(c)) },
+        // Configure phase stepping
+        { 970, CodeClass.Immediate, (h, c, ct) => h.HandlePhaseSteppingAsync(c, ct) },
+        // Update the firmware: everything is locked while it runs
+        { 997, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleFirmwareUpdateAsync(c, ct) }, // TODO sometimes flushes
+        // Reset the controller; M999 B resets a board, which must not happen with moves in its queue
+        { 999, c => c.Parameters.Any(p => p.Letter == 'B') ? CodeClass.FlushAndStandstill : CodeClass.Immediate, (h, c, ct) => h.HandleResetAsync(c, ct) }, // the bare form flushes inline before rebooting DCS
+    };
 
     /// <summary>
     /// M0, M1 and M2: stop, sleep or end the program
@@ -415,92 +450,88 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleListFilesAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        // Resolve the directory
+        if (!code.TryGetString('P', out string? virtualDirectory))
         {
-            // Resolve the directory
-            if (!code.TryGetString('P', out string? virtualDirectory))
-            {
-                using (await model.AccessReadOnlyAsync(cancellationToken))
-                {
-                    virtualDirectory = model.Directories.GCodes;
-                }
-            }
-            string physicalDirectory = await filePathResolver.ToPhysicalAsync(virtualDirectory, cancellationToken: cancellationToken);
-
-            // Make sure to stay within limits if it is a request from the firmware
-            int maxSize = -1;
-            if (code.Flags.HasFlag(CodeFlags.IsFromFirmware))
-            {
-                maxSize = settings.Value.MaxMessageLength;
-            }
-
-            // Check if JSON file lists were requested
-            int startAt = Math.Max(code.GetInt('R', 0), 0), type = code.GetInt('S', 0), maxItems = code.GetInt('C', -1);
-            if (type == 2)
-            {
-                string json = FileLists.GetFiles(virtualDirectory, physicalDirectory, startAt, true, maxSize, maxItems, code.ExplicitLineNumber);
-                return new Message(MessageType.Success, json);
-            }
-            if (type == 3)
-            {
-                string json = FileLists.GetFileList(virtualDirectory, physicalDirectory, startAt, maxSize, maxItems, code.ExplicitLineNumber);
-                return new Message(MessageType.Success, json);
-            }
-
-            // Print standard G-code response
-            Compatibility compatibility;
             using (await model.AccessReadOnlyAsync(cancellationToken))
             {
-                compatibility = model.Inputs[code.Channel]?.Compatibility ?? Compatibility.RepRapFirmware;
+                virtualDirectory = model.Directories.GCodes;
             }
+        }
+        string physicalDirectory = await filePathResolver.ToPhysicalAsync(virtualDirectory, cancellationToken: cancellationToken);
 
-            StringBuilder result = new();
-            if (compatibility == Compatibility.Default || compatibility == Compatibility.RepRapFirmware)
-            {
-                result.AppendLine("GCode files:");
-            }
-            else if (compatibility == Compatibility.Marlin || compatibility == Compatibility.NanoDLP)
-            {
-                result.AppendLine("Begin file list:");
-            }
+        // Make sure to stay within limits if it is a request from the firmware
+        int maxSize = -1;
+        if (code.Flags.HasFlag(CodeFlags.IsFromFirmware))
+        {
+            maxSize = settings.Value.MaxMessageLength;
+        }
 
-            bool itemFound = false;
-            foreach (string file in Directory.EnumerateFileSystemEntries(physicalDirectory))
-            {
-                string filename = Path.GetFileName(file);
-                if (maxSize > 0 && result.Length + filename.Length + 3 > maxSize)
-                {
-                    // Stay within limits...
-                    break;
-                }
+        // Check if JSON file lists were requested
+        int startAt = Math.Max(code.GetInt('R', 0), 0), type = code.GetInt('S', 0), maxItems = code.GetInt('C', -1);
+        if (type == 2)
+        {
+            string json = FileLists.GetFiles(virtualDirectory, physicalDirectory, startAt, true, maxSize, maxItems, code.ExplicitLineNumber);
+            return new Message(MessageType.Success, json);
+        }
+        if (type == 3)
+        {
+            string json = FileLists.GetFileList(virtualDirectory, physicalDirectory, startAt, maxSize, maxItems, code.ExplicitLineNumber);
+            return new Message(MessageType.Success, json);
+        }
 
-                if (compatibility == Compatibility.Marlin || compatibility == Compatibility.NanoDLP)
-                {
-                    result.AppendLine(filename);
-                }
-                else
-                {
-                    if (itemFound)
-                    {
-                        result.Append(',');
-                    }
-                    result.Append($"\"{filename}\"");
-                }
-                itemFound = true;
+        // Print standard G-code response
+        Compatibility compatibility;
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            compatibility = model.Inputs[code.Channel]?.Compatibility ?? Compatibility.RepRapFirmware;
+        }
+
+        StringBuilder result = new();
+        if (compatibility == Compatibility.Default || compatibility == Compatibility.RepRapFirmware)
+        {
+            result.AppendLine("GCode files:");
+        }
+        else if (compatibility == Compatibility.Marlin || compatibility == Compatibility.NanoDLP)
+        {
+            result.AppendLine("Begin file list:");
+        }
+
+        bool itemFound = false;
+        foreach (string file in Directory.EnumerateFileSystemEntries(physicalDirectory))
+        {
+            string filename = Path.GetFileName(file);
+            if (maxSize > 0 && result.Length + filename.Length + 3 > maxSize)
+            {
+                // Stay within limits...
+                break;
             }
 
             if (compatibility == Compatibility.Marlin || compatibility == Compatibility.NanoDLP)
             {
-                if (!itemFound)
-                {
-                    result.AppendLine("NONE");
-                }
-                result.Append("End file list");
+                result.AppendLine(filename);
             }
-
-            return new Message(MessageType.Success, result.ToString());
+            else
+            {
+                if (itemFound)
+                {
+                    result.Append(',');
+                }
+                result.Append($"\"{filename}\"");
+            }
+            itemFound = true;
         }
-        throw new OperationCanceledException();
+
+        if (compatibility == Compatibility.Marlin || compatibility == Compatibility.NanoDLP)
+        {
+            if (!itemFound)
+            {
+                result.AppendLine("NONE");
+            }
+            result.Append("End file list");
+        }
+
+        return new Message(MessageType.Success, result.ToString());
     }
 
     /// <summary>
@@ -511,16 +542,12 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleInitializeSDCardAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        if (code.GetInt('P', 0) == 0)
         {
-            if (code.GetInt('P', 0) == 0)
-            {
-                // M21 (P0) will always work because it's always mounted
-                return new Message();
-            }
-            throw new NotSupportedException();
+            // M21 (P0) will always work because it's always mounted
+            return new Message();
         }
-        throw new OperationCanceledException();
+        throw new NotSupportedException();
     }
 
     /// <summary>
@@ -577,18 +604,18 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleResumePrintAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, syncFileStreams: true, cancellationToken: cancellationToken))
+        if (!await codeProcessor.FlushAsync(code, syncFileStreams: true, cancellationToken: cancellationToken))
         {
-            if (code.Channel == CodeChannel.File2)
-            {
-                return new Message();
-            }
-
-            // P0 skips resume.g, as it does in RepRapFirmware
-            bool runMacro = code.GetInt('P', 1) != 0;
-            return await jobProcessor.ResumeAsync(code.Channel, runMacro, cancellationToken);
+            throw new OperationCanceledException();
         }
-        throw new OperationCanceledException();
+        if (code.Channel == CodeChannel.File2)
+        {
+            return new Message();
+        }
+
+        // P0 skips resume.g, as it does in RepRapFirmware
+        bool runMacro = code.GetInt('P', 1) != 0;
+        return await jobProcessor.ResumeAsync(code.Channel, runMacro, cancellationToken);
     }
 
     /// <summary>
@@ -617,31 +644,32 @@ internal partial class MCodeHandler(
         // committed and drops the rest.
         bool feedhold = true;
 
-        if (await codeProcessor.FlushAsync(code, syncFileStreams: true, cancellationToken: cancellationToken))
+        if (!await codeProcessor.FlushAsync(code, syncFileStreams: true, cancellationToken: cancellationToken))
         {
-            if (code.Channel == CodeChannel.File2)
-            {
-                return new Message();
-            }
-
-            // A job inside a macro that has not said it can be restarted must not be interrupted
-            // part-way: the macro would be abandoned with no way to put back what it had already
-            // done. RepRapFirmware stashes the request and injects it once the job is back out
-            if (!code.IsFromFileChannel && jobProcessor.IsProcessing &&
-                codeProcessor.IsDoingMacro(CodeChannel.File) && !codeProcessor.CanRestartMacros(CodeChannel.File))
-            {
-                return jobProcessor.TryDeferPause(PauseMacro.Pause)
-                       ? new Message()
-                       : new Message(MessageType.Warning, "Pausing is already pending");
-            }
-
-            return await jobProcessor.PauseAsync(code.Channel, PrintPausedReason.User, PauseMacro.Pause,
-                                                 synchronous: code.IsFromFileChannel, feedhold: feedhold,
-                                                 reportPosition: true,
-                                                 pausingCode: code.IsFromFileChannel ? code : null,
-                                                 cancellationToken);
+            throw new OperationCanceledException();
         }
-        throw new OperationCanceledException();
+
+        if (code.Channel == CodeChannel.File2)
+        {
+            return new Message();
+        }
+
+        // A job inside a macro that has not said it can be restarted must not be interrupted
+        // part-way: the macro would be abandoned with no way to put back what it had already
+        // done. RepRapFirmware stashes the request and injects it once the job is back out
+        if (!code.IsFromFileChannel && jobProcessor.IsProcessing &&
+            codeProcessor.IsDoingMacro(CodeChannel.File) && !codeProcessor.CanRestartMacros(CodeChannel.File))
+        {
+            return jobProcessor.TryDeferPause(PauseMacro.Pause)
+                    ? new Message()
+                    : new Message(MessageType.Warning, "Pausing is already pending");
+        }
+
+        return await jobProcessor.PauseAsync(code.Channel, PrintPausedReason.User, PauseMacro.Pause,
+                                                synchronous: code.IsFromFileChannel, feedhold: feedhold,
+                                                reportPosition: true,
+                                                pausingCode: code.IsFromFileChannel ? code : null,
+                                                cancellationToken);
     }
 
     /// <summary>
@@ -698,52 +726,48 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleSetFilePositionAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        // Wait for inputs[].motionSystem to be up-to-date
+        await model.WaitForFullUpdateAsync(cancellationToken);
+
+        int motionSystem;
+        using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            // Wait for inputs[].motionSystem to be up-to-date
-            await model.WaitForFullUpdateAsync(cancellationToken);
-
-            int motionSystem;
-            using (await model.AccessReadOnlyAsync(cancellationToken))
-            {
-                motionSystem = model.Inputs[code.Channel]?.MotionSystem ?? 0;
-            }
-
-            using (await jobProcessor.LockAsync(cancellationToken))
-            {
-                if (!jobProcessor.IsFileSelected)
-                {
-                    return new Message(MessageType.Error, "Not printing a file");
-                }
-
-                if (code.TryGetLong('S', out long newPosition))
-                {
-                    if (newPosition < 0L || newPosition > jobProcessor.FileLength)
-                    {
-                        return new Message(MessageType.Error, "Position is out of range");
-                    }
-
-                    await jobProcessor.SetFilePositionAsync(motionSystem, newPosition, cancellationToken);
-                }
-
-                // How the line at that position is to be read when the job starts. P is how much of
-                // it the machine has already made - a job restarted by resurrect.g after a power
-                // failure is part-way through a line exactly as a resumed pause is - and C is the
-                // modal command it was read under, which the line itself may not name. They are held
-                // until M24 because that is what starts printing
-                //
-                // TODO M26 also takes the arc restart point in the selected plane's two axis words,
-                // which needs InitialUserC0 / InitialUserC1 and so waits for G2/G3
-                using (planner.Lock())
-                {
-                    planner.State.RestartMoveFractionDone = code.GetFloatLimited('P', 0.0f, 1.0f, 0.0f);
-                    planner.State.RestartGCommandNumber = code.GetInt('C', -1);
-                }
-            }
-
-            return new Message();
+            motionSystem = model.Inputs[code.Channel]?.MotionSystem ?? 0;
         }
-        throw new OperationCanceledException();
+
+        using (await jobProcessor.LockAsync(cancellationToken))
+        {
+            if (!jobProcessor.IsFileSelected)
+            {
+                return new Message(MessageType.Error, "Not printing a file");
+            }
+
+            if (code.TryGetLong('S', out long newPosition))
+            {
+                if (newPosition < 0L || newPosition > jobProcessor.FileLength)
+                {
+                    return new Message(MessageType.Error, "Position is out of range");
+                }
+
+                await jobProcessor.SetFilePositionAsync(motionSystem, newPosition, cancellationToken);
+            }
+
+            // How the line at that position is to be read when the job starts. P is how much of
+            // it the machine has already made - a job restarted by resurrect.g after a power
+            // failure is part-way through a line exactly as a resumed pause is - and C is the
+            // modal command it was read under, which the line itself may not name. They are held
+            // until M24 because that is what starts printing
+            //
+            // TODO M26 also takes the arc restart point in the selected plane's two axis words,
+            // which needs InitialUserC0 / InitialUserC1 and so waits for G2/G3
+            using (planner.Lock())
+            {
+                planner.State.RestartMoveFractionDone = code.GetFloatLimited('P', 0.0f, 1.0f, 0.0f);
+                planner.State.RestartGCommandNumber = code.GetInt('C', -1);
+            }
+        }
+
+        return new Message();
     }
 
     /// <summary>
@@ -754,29 +778,25 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleReportPrintStatusAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        // Wait for inputs[].motionSystem to be up-to-date
+        await model.WaitForFullUpdateAsync(cancellationToken);
+        int motionSystem;
+        using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            // Wait for inputs[].motionSystem to be up-to-date
-            await model.WaitForFullUpdateAsync(cancellationToken);
-            int motionSystem;
-            using (await model.AccessReadOnlyAsync(cancellationToken))
-            {
-                motionSystem = model.Inputs[code.Channel]?.MotionSystem ?? 0;
-            }
-
-            using (await jobProcessor.LockAsync(cancellationToken))
-            {
-                // A file that is only selected is not being printed, which is what RepRapFirmware
-                // reports: Pronterface polls this and takes "SD printing byte" as the job running
-                if (jobProcessor.IsProcessing || jobProcessor.IsPausedOrChanging)
-                {
-                    long filePosition = await jobProcessor.GetFilePositionAsync(motionSystem, cancellationToken);
-                    return new Message(MessageType.Success, $"SD printing byte {filePosition}/{jobProcessor.FileLength}");
-                }
-                return new Message(MessageType.Success, "Not SD printing.");
-            }
+            motionSystem = model.Inputs[code.Channel]?.MotionSystem ?? 0;
         }
-        throw new OperationCanceledException();
+
+        using (await jobProcessor.LockAsync(cancellationToken))
+        {
+            // A file that is only selected is not being printed, which is what RepRapFirmware
+            // reports: Pronterface polls this and takes "SD printing byte" as the job running
+            if (jobProcessor.IsProcessing || jobProcessor.IsPausedOrChanging)
+            {
+                long filePosition = await jobProcessor.GetFilePositionAsync(motionSystem, cancellationToken);
+                return new Message(MessageType.Success, $"SD printing byte {filePosition}/{jobProcessor.FileLength}");
+            }
+            return new Message(MessageType.Success, "Not SD printing.");
+        }
     }
 
     /// <summary>
@@ -787,44 +807,40 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleBeginFileWriteAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        int numChannel = (int)code.Channel;
+        using (await codeProcessor.FileLocks[numChannel].LockAsync(cancellationToken))
         {
-            int numChannel = (int)code.Channel;
-            using (await codeProcessor.FileLocks[numChannel].LockAsync(cancellationToken))
+            if (codeProcessor.FilesBeingWritten[numChannel] is not null)
             {
-                if (codeProcessor.FilesBeingWritten[numChannel] is not null)
+                return new Message(MessageType.Error, "Another file is already being written to");
+            }
+
+            string file = code.GetUnprecedentedString();
+            if (string.IsNullOrWhiteSpace(file))
+            {
+                return new Message(MessageType.Error, "Filename expected");
+            }
+
+            string prefix = await model.IsEmulatingMarlinAsync(code.Channel, cancellationToken) ? "ok\n" : string.Empty;
+            string physicalFile = await filePathResolver.ToPhysicalAsync(file, FileDirectory.GCodes, cancellationToken), parentDirectory = Path.GetDirectoryName(physicalFile)!;
+            try
+            {
+                if (!Directory.Exists(parentDirectory))
                 {
-                    return new Message(MessageType.Error, "Another file is already being written to");
+                    Directory.CreateDirectory(parentDirectory);
                 }
 
-                string file = code.GetUnprecedentedString();
-                if (string.IsNullOrWhiteSpace(file))
-                {
-                    return new Message(MessageType.Error, "Filename expected");
-                }
-
-                string prefix = await model.IsEmulatingMarlinAsync(code.Channel, cancellationToken) ? "ok\n" : string.Empty;
-                string physicalFile = await filePathResolver.ToPhysicalAsync(file, FileDirectory.GCodes, cancellationToken), parentDirectory = Path.GetDirectoryName(physicalFile)!;
-                try
-                {
-                    if (!Directory.Exists(parentDirectory))
-                    {
-                        Directory.CreateDirectory(parentDirectory);
-                    }
-
-                    FileStream fileStream = new(physicalFile, FileMode.Create, FileAccess.Write, FileShare.Read, settings.Value.FileBufferSize);
-                    StreamWriter writer = new(fileStream, Encoding.UTF8, settings.Value.FileBufferSize);
-                    codeProcessor.FilesBeingWritten[numChannel] = writer;
-                    return new Message(MessageType.Success, prefix + $"Writing to file: {file}");
-                }
-                catch (Exception e)
-                {
-                    logger.LogDebug(e, "Failed to open file for writing");
-                    return new Message(MessageType.Error, prefix + $"Can't open file {file} for writing.");
-                }
+                FileStream fileStream = new(physicalFile, FileMode.Create, FileAccess.Write, FileShare.Read, settings.Value.FileBufferSize);
+                StreamWriter writer = new(fileStream, Encoding.UTF8, settings.Value.FileBufferSize);
+                codeProcessor.FilesBeingWritten[numChannel] = writer;
+                return new Message(MessageType.Success, prefix + $"Writing to file: {file}");
+            }
+            catch (Exception e)
+            {
+                logger.LogDebug(e, "Failed to open file for writing");
+                return new Message(MessageType.Error, prefix + $"Can't open file {file} for writing.");
             }
         }
-        throw new OperationCanceledException();
     }
 
     /// <summary>
@@ -835,30 +851,26 @@ internal partial class MCodeHandler(
     /// <returns>The result</returns>
     private async ValueTask<Message> HandleEndFileWriteAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        int numChannel = (int)code.Channel;
+        using (await codeProcessor.FileLocks[numChannel].LockAsync(cancellationToken))
         {
-            int numChannel = (int)code.Channel;
-            using (await codeProcessor.FileLocks[numChannel].LockAsync(cancellationToken))
+            StreamWriter? writer = codeProcessor.FilesBeingWritten[numChannel];
+            if (writer is not null)
             {
-                StreamWriter? writer = codeProcessor.FilesBeingWritten[numChannel];
-                if (writer is not null)
-                {
-                    Stream stream = writer.BaseStream;
-                    await writer.DisposeAsync();
-                    codeProcessor.FilesBeingWritten[numChannel] = null;
-                    await stream.DisposeAsync();
+                Stream stream = writer.BaseStream;
+                await writer.DisposeAsync();
+                codeProcessor.FilesBeingWritten[numChannel] = null;
+                await stream.DisposeAsync();
 
-                    if (await model.IsEmulatingMarlinAsync(code.Channel, cancellationToken))
-                    {
-                        return new Message(MessageType.Success, "Done saving file.");
-                    }
-                    return new Message();
+                if (await model.IsEmulatingMarlinAsync(code.Channel, cancellationToken))
+                {
+                    return new Message(MessageType.Success, "Done saving file.");
                 }
-                // TODO DSF used to let this fall through to RRF. Determine what actually needs to happen
-                return new Message(MessageType.Warning, "Possibly undefined behaviour");
+                return new Message();
             }
+            // TODO DSF used to let this fall through to RRF. Determine what actually needs to happen
+            return new Message(MessageType.Warning, "Possibly undefined behaviour");
         }
-        throw new OperationCanceledException();
     }
 
     /// <summary>
@@ -869,23 +881,19 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleDeleteFileAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
-        {
-            string file = code.GetUnprecedentedString();
-            string physicalFile = await filePathResolver.ToPhysicalAsync(file, cancellationToken: cancellationToken);
+        string file = code.GetUnprecedentedString();
+        string physicalFile = await filePathResolver.ToPhysicalAsync(file, cancellationToken: cancellationToken);
 
-            try
-            {
-                File.Delete(physicalFile);
-                return new Message();
-            }
-            catch (Exception e)
-            {
-                logger.LogDebug(e, "Failed to delete file");
-                return new Message(MessageType.Error, $"Failed to delete file {file}: {e.Message}");
-            }
+        try
+        {
+            File.Delete(physicalFile);
+            return new Message();
         }
-        throw new OperationCanceledException();
+        catch (Exception e)
+        {
+            logger.LogDebug(e, "Failed to delete file");
+            return new Message(MessageType.Error, $"Failed to delete file {file}: {e.Message}");
+        }
     }
 
     /// <summary>
@@ -894,59 +902,51 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message> HandleFileInfoAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleFileInfoAsync(Commands.Code code, bool? thumbnail, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        if (code.Parameters.Count > 0)
         {
-            if (code.Parameters.Count > 0)
+            string virtualFilename = string.Empty;
+            try
             {
-                string virtualFilename = string.Empty;
-                try
+                if (thumbnail is null)
                 {
-                    if (code.MinorNumber <= 0)
-                    {
-                        // Get fileinfo
-                        virtualFilename = code.GetUnprecedentedString();
-                        string physicalFilename = await filePathResolver.ToPhysicalAsync(virtualFilename, FileDirectory.GCodes, cancellationToken);
-                        GCodeFileInfo info = await fileInfoParser.ParseAsync(physicalFilename, false, cancellationToken);
+                    // Get fileinfo
+                    virtualFilename = code.GetUnprecedentedString();
+                    string physicalFilename = await filePathResolver.ToPhysicalAsync(virtualFilename, FileDirectory.GCodes, cancellationToken);
+                    GCodeFileInfo info = await fileInfoParser.ParseAsync(physicalFilename, false, cancellationToken);
 
-                        string json = JsonSerializer.Serialize(info, ObjectModelContext.Default.GCodeFileInfo);
-                        return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":0," : "{\"err\":0,") + json[1..]);
-                    }
-                    else if (code.MinorNumber == 1 || code.MinorNumber == 2)
-                    {
-                        // Get thumbnail or file fragment
-                        virtualFilename = code.GetString('P');
-                        string physicalFilename = await filePathResolver.ToPhysicalAsync(virtualFilename, FileDirectory.GCodes, cancellationToken);
-
-                        string json = await fileInfoParser.ParseFileFragment(physicalFilename, code.GetLong('S'), code.MinorNumber == 1, code.ExplicitLineNumber);
-                        return new Message(MessageType.Success, json);
-                    }
-                    else
-                    {
-                        throw new NotSupportedException();
-                    }
+                    string json = JsonSerializer.Serialize(info, ObjectModelContext.Default.GCodeFileInfo);
+                    return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":0," : "{\"err\":0,") + json[1..]);
                 }
-                catch (Exception e) when (e is not MissingParameterException and not InvalidParameterTypeException)
+                else
                 {
-                    logger.LogDebug(e, "Failed to return file information");
-                    return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":1,\"fileName:" : "{\"err\":1,\"fileName:") + JsonSerializer.Serialize(virtualFilename, CommonContext.Default.String) + "}");
+                    // Get thumbnail or file fragment
+                    virtualFilename = code.GetString('P');
+                    string physicalFilename = await filePathResolver.ToPhysicalAsync(virtualFilename, FileDirectory.GCodes, cancellationToken);
+
+                    string json = await fileInfoParser.ParseFileFragment(physicalFilename, code.GetLong('S'), thumbnail.Value, code.ExplicitLineNumber);
+                    return new Message(MessageType.Success, json);
                 }
             }
-            else
+            catch (Exception e) when (e is not MissingParameterException and not InvalidParameterTypeException)
             {
-                using (await model.AccessReadOnlyAsync(cancellationToken))
-                {
-                    if (model.Job.File.FileName != null)
-                    {
-                        string json = JsonSerializer.Serialize(model.Job.File, ObjectModelContext.Default.GCodeFileInfo);
-                        return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":0," : "{\"err\":0,") + json[1..]);
-                    }
-                }
-                return new Message(MessageType.Success, (code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":1}}" : "{\"err\":1}");
+                logger.LogDebug(e, "Failed to return file information");
+                return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":1,\"fileName:" : "{\"err\":1,\"fileName:") + JsonSerializer.Serialize(virtualFilename, CommonContext.Default.String) + "}");
             }
         }
-        throw new OperationCanceledException();
+        else
+        {
+            using (await model.AccessReadOnlyAsync(cancellationToken))
+            {
+                if (model.Job.File.FileName != null)
+                {
+                    string json = JsonSerializer.Serialize(model.Job.File, ObjectModelContext.Default.GCodeFileInfo);
+                    return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":0," : "{\"err\":0,") + json[1..]);
+                }
+            }
+            return new Message(MessageType.Success, (code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":1}}" : "{\"err\":1}");
+        }
     }
 
     /// <summary>
@@ -1043,26 +1043,22 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleFileChecksumAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        string file = code.GetUnprecedentedString(), physicalFile = await filePathResolver.ToPhysicalAsync(file, cancellationToken: cancellationToken);
+        try
         {
-            string file = code.GetUnprecedentedString(), physicalFile = await filePathResolver.ToPhysicalAsync(file, cancellationToken: cancellationToken);
-            try
-            {
-                await using FileStream stream = new(physicalFile, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
-                uint checksum = await CRC32.CalculateAsync(stream, settings.Value.FileBufferSize, cancellationToken);
-                return new Message(MessageType.Success, checksum.ToString("x8"));
-            }
-            catch (Exception e)
-            {
-                logger.LogDebug(e, "Failed to compute CRC32 checksum");
-                if (e is AggregateException ae)
-                {
-                    e = ae.InnerException!;
-                }
-                return new Message(MessageType.Error, $"Could not compute CRC32 checksum for file {file}: {e.Message}");
-            }
+            await using FileStream stream = new(physicalFile, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
+            uint checksum = await CRC32.CalculateAsync(stream, settings.Value.FileBufferSize, cancellationToken);
+            return new Message(MessageType.Success, checksum.ToString("x8"));
         }
-        throw new OperationCanceledException();
+        catch (Exception e)
+        {
+            logger.LogDebug(e, "Failed to compute CRC32 checksum");
+            if (e is AggregateException ae)
+            {
+                e = ae.InnerException!;
+            }
+            return new Message(MessageType.Error, $"Could not compute CRC32 checksum for file {file}: {e.Message}");
+        }
     }
 
     /// <summary>
@@ -1073,45 +1069,41 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleSDCardInfoAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            using (await model.AccessReadOnlyAsync(cancellationToken))
+            int index = code.GetInt('P', 0);
+            if (code.GetInt('S', 0) == 2)
             {
-                int index = code.GetInt('P', 0);
-                if (code.GetInt('S', 0) == 2)
+                if (index < 0 || index >= model.Volumes.Count)
                 {
-                    if (index < 0 || index >= model.Volumes.Count)
-                    {
-                        return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber}," : "{") + $"\"SDinfo\":{{\"slot\":{index},\"present\":0}}}}");
-                    }
-
-                    Volume storage = model.Volumes[index];
-                    SDInfoDetails output = new()
-                    {
-                        Slot = index,
-                        Present = 1,
-                        Capacity = storage.Capacity,
-                        PartitionSize = storage.PartitionSize,
-                        Free = storage.FreeSpace,
-                        Speed = storage.Speed
-                    };
-
-                    string sdInfo = JsonSerializer.Serialize(output, MCodeResponseContext.Default.SDInfoDetails);
-                    return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber}," : "{") + $"\"SDinfo\":{sdInfo}}}");
+                    return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber}," : "{") + $"\"SDinfo\":{{\"slot\":{index},\"present\":0}}}}");
                 }
-                else
+
+                Volume storage = model.Volumes[index];
+                SDInfoDetails output = new()
                 {
-                    if (index < 0 || index >= model.Volumes.Count)
-                    {
-                        return new Message(MessageType.Error, $"Bad SD slot number: {index}");
-                    }
+                    Slot = index,
+                    Present = 1,
+                    Capacity = storage.Capacity,
+                    PartitionSize = storage.PartitionSize,
+                    Free = storage.FreeSpace,
+                    Speed = storage.Speed
+                };
 
-                    Volume storage = model.Volumes[index];
-                    return new Message(MessageType.Success, $"SD card in slot {index}: capacity {storage.Capacity / 1000000000.0:F2}Gb, partition size {storage.PartitionSize / 1000000000.0:F2}Gb, free space {storage.FreeSpace / 1000000000.0:F2}Gb, speed {storage.Speed / 1000000.0:F2}MBytes/sec");
+                string sdInfo = JsonSerializer.Serialize(output, MCodeResponseContext.Default.SDInfoDetails);
+                return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber}," : "{") + $"\"SDinfo\":{sdInfo}}}");
+            }
+            else
+            {
+                if (index < 0 || index >= model.Volumes.Count)
+                {
+                    return new Message(MessageType.Error, $"Bad SD slot number: {index}");
                 }
+
+                Volume storage = model.Volumes[index];
+                return new Message(MessageType.Success, $"SD card in slot {index}: capacity {storage.Capacity / 1000000000.0:F2}Gb, partition size {storage.PartitionSize / 1000000000.0:F2}Gb, free space {storage.FreeSpace / 1000000000.0:F2}Gb, speed {storage.Speed / 1000000.0:F2}MBytes/sec");
             }
         }
-        throw new OperationCanceledException();
     }
 
     /// <summary>
@@ -1178,56 +1170,52 @@ internal partial class MCodeHandler(
     {
         if (code.TryGetInt('P', out int pParam) && pParam == -1)
         {
-            if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+            bool seen = false;
+            if (code.TryGetString('S', out string? levelString))
             {
-                bool seen = false;
-                if (code.TryGetString('S', out string? levelString))
+                // Parse the log level using shared helper that supports short aliases
+                if (LogLevelHelper.TryParseLogLevel(levelString, out LogLevel level))
                 {
-                    // Parse the log level using shared helper that supports short aliases
-                    if (LogLevelHelper.TryParseLogLevel(levelString, out LogLevel level))
+                    // Writing settings.Value.LogLevel is all that's needed: the dynamic
+                    // logging filter in Program.cs reads it directly on every IsEnabled() call.
+                    settings.Value.LogLevel = level;
+                    logger.LogInformation("Log level changed to {Level}", level);
+                    seen = true;
+                }
+                else
+                {
+                    return new Message(MessageType.Error, $"Invalid log level '{levelString}'. Valid values: {LogLevelHelper.ValidLogLevels}");
+                }
+            }
+            if (code.TryGetBool('O', out bool oParam))
+            {
+                if (oParam)
+                {
+                    if (_messageLoggerProvider == null)
                     {
-                        // Writing settings.Value.LogLevel is all that's needed: the dynamic
-                        // logging filter in Program.cs reads it directly on every IsEnabled() call.
-                        settings.Value.LogLevel = level;
-                        logger.LogInformation("Log level changed to {Level}", level);
-                        seen = true;
+                        // Only add this provider once and don't allow higher log level than debug, else we may get recursion
+                        LogLevel minimumLevel = settings.Value.LogLevel > LogLevel.Trace ? settings.Value.LogLevel : LogLevel.Debug;
+                        _messageLoggerProvider = new MessageLoggerProvider(model, minimumLevel);
+                        loggerFactory.AddProvider(_messageLoggerProvider);
                     }
                     else
                     {
-                        return new Message(MessageType.Error, $"Invalid log level '{levelString}'. Valid values: {LogLevelHelper.ValidLogLevels}");
+                        _messageLoggerProvider.Enabled = true;
                     }
                 }
-                if (code.TryGetBool('O', out bool oParam))
+                else if (_messageLoggerProvider is not null)
                 {
-                    if (oParam)
-                    {
-                        if (_messageLoggerProvider == null)
-                        {
-                            // Only add this provider once and don't allow higher log level than debug, else we may get recursion
-                            LogLevel minimumLevel = settings.Value.LogLevel > LogLevel.Trace ? settings.Value.LogLevel : LogLevel.Debug;
-                            _messageLoggerProvider = new MessageLoggerProvider(model, minimumLevel);
-                            loggerFactory.AddProvider(_messageLoggerProvider);
-                        }
-                        else
-                        {
-                            _messageLoggerProvider.Enabled = true;
-                        }
-                    }
-                    else if (_messageLoggerProvider is not null)
-                    {
-                        // The logger factory offers no way to remove the provider again, so just disable its output
-                        _messageLoggerProvider.Enabled = false;
-                    }
-                    seen = true;
+                    // The logger factory offers no way to remove the provider again, so just disable its output
+                    _messageLoggerProvider.Enabled = false;
                 }
-
-                if (seen)
-                {
-                    return new Message();
-                }
-                return new Message(MessageType.Success, $"Current DCS log level: {settings.Value.LogLevel}");
+                seen = true;
             }
-            throw new OperationCanceledException();
+
+            if (seen)
+            {
+                return new Message();
+            }
+            return new Message(MessageType.Success, $"Current DCS log level: {settings.Value.LogLevel}");
         }
         return new Message(MessageType.Success, $"Current DCS log level: {settings.Value.LogLevel}");
     }
@@ -1351,13 +1339,9 @@ internal partial class MCodeHandler(
         {
             // This used to answer only for the keys the SBC owned - network, plugins, sbc, volumes -
             // and leave the rest to the firmware's copy of the object model. There is one object
-            // model now and it is this one, so every key is answered here
-
-            // Wait until pending codes have finished
-            if (!await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
-            {
-                throw new OperationCanceledException();
-            }
+            // model now and it is this one, so every key is answered here. A read of the model does
+            // not wait for pending codes: DWC polls this mid-print and the answer is a snapshot
+            // either way
 
             // Query the object model using the new command
             code.TryGetString('F', out string? flags);
@@ -1381,21 +1365,17 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleCreateDirectoryAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        string path = code.GetString('P'), physicalPath = await filePathResolver.ToPhysicalAsync(path, cancellationToken: cancellationToken);
+        try
         {
-            string path = code.GetString('P'), physicalPath = await filePathResolver.ToPhysicalAsync(path, cancellationToken: cancellationToken);
-            try
-            {
-                Directory.CreateDirectory(physicalPath);
-                return new Message();
-            }
-            catch (Exception e)
-            {
-                logger.LogDebug(e, "Failed to create directory");
-                return new Message(MessageType.Error, $"Failed to create directory {path}: {e.Message}");
-            }
+            Directory.CreateDirectory(physicalPath);
+            return new Message();
         }
-        throw new OperationCanceledException();
+        catch (Exception e)
+        {
+            logger.LogDebug(e, "Failed to create directory");
+            return new Message(MessageType.Error, $"Failed to create directory {path}: {e.Message}");
+        }
     }
 
     /// <summary>
@@ -1406,42 +1386,38 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleRenameFileAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        string from = code.GetString('S'), to = code.GetString('T');
+        try
         {
-            string from = code.GetString('S'), to = code.GetString('T');
-            try
+            string source = await filePathResolver.ToPhysicalAsync(from, cancellationToken: cancellationToken), destination = await filePathResolver.ToPhysicalAsync(to, cancellationToken: cancellationToken);
+            if (File.Exists(source))
             {
-                string source = await filePathResolver.ToPhysicalAsync(from, cancellationToken: cancellationToken), destination = await filePathResolver.ToPhysicalAsync(to, cancellationToken: cancellationToken);
-                if (File.Exists(source))
+                if (File.Exists(destination) && code.GetBool('D', false))
                 {
-                    if (File.Exists(destination) && code.GetBool('D', false))
-                    {
-                        File.Delete(destination);
-                    }
-                    File.Move(source, destination);
+                    File.Delete(destination);
                 }
-                else if (Directory.Exists(source))
-                {
-                    if (Directory.Exists(destination) && code.GetBool('D', false))
-                    {
-                        // This could be recursive but at the moment we mimic RRF's behaviour
-                        Directory.Delete(destination);
-                    }
-                    Directory.Move(source, destination);
-                }
-                else
-                {
-                    throw new FileNotFoundException();
-                }
-                return new Message();
+                File.Move(source, destination);
             }
-            catch (Exception e)
+            else if (Directory.Exists(source))
             {
-                logger.LogDebug(e, "Failed to rename file or directory");
-                return new Message(MessageType.Error, $"Failed to rename file or directory {from} to {to}: {e.Message}");
+                if (Directory.Exists(destination) && code.GetBool('D', false))
+                {
+                    // This could be recursive but at the moment we mimic RRF's behaviour
+                    Directory.Delete(destination);
+                }
+                Directory.Move(source, destination);
             }
+            else
+            {
+                throw new FileNotFoundException();
+            }
+            return new Message();
         }
-        throw new OperationCanceledException();
+        catch (Exception e)
+        {
+            logger.LogDebug(e, "Failed to rename file or directory");
+            return new Message(MessageType.Error, $"Failed to rename file or directory {from} to {to}: {e.Message}");
+        }
     }
 
     /// <summary>
@@ -1452,29 +1428,25 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleDeleteFileOrDirectoryAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        string path = code.GetString('P'), physicalPath = await filePathResolver.ToPhysicalAsync(path, cancellationToken: cancellationToken);
+        try
         {
-            string path = code.GetString('P'), physicalPath = await filePathResolver.ToPhysicalAsync(path, cancellationToken: cancellationToken);
-            try
+            if (Directory.Exists(physicalPath))
             {
-                if (Directory.Exists(physicalPath))
-                {
-                    _ = code.TryGetBool('R', out bool recursive);
-                    Directory.Delete(physicalPath, recursive);
-                }
-                else
-                {
-                    File.Delete(physicalPath);
-                }
-                return new Message();
+                _ = code.TryGetBool('R', out bool recursive);
+                Directory.Delete(physicalPath, recursive);
             }
-            catch (Exception e)
+            else
             {
-                logger.LogDebug(e, "Failed to delete file or directory");
-                return new Message(MessageType.Error, $"Failed to delete file or directory {path}: {e.Message}");
+                File.Delete(physicalPath);
             }
+            return new Message();
         }
-        throw new OperationCanceledException();
+        catch (Exception e)
+        {
+            logger.LogDebug(e, "Failed to delete file or directory");
+            return new Message(MessageType.Error, $"Failed to delete file or directory {path}: {e.Message}");
+        }
     }
 
     /// <summary>
@@ -1489,11 +1461,6 @@ internal partial class MCodeHandler(
     /// </remarks>
     private async ValueTask<Message> HandleLoadConfigOverrideAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (!await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
-        {
-            throw new OperationCanceledException();
-        }
-
         if (!await macroRunner.TryRunAsync(code.Channel, FilePathResolver.ConfigOverrideFile, code, cancellationToken: cancellationToken))
         {
             return new Message(MessageType.Error, $"Macro file {FilePathResolver.ConfigOverrideFile} not found");
@@ -1509,24 +1476,20 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandlePrintSettingsAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        string configFile = await filePathResolver.ToPhysicalAsync(FilePathResolver.ConfigFile, FileDirectory.System, cancellationToken);
+        if (File.Exists(configFile))
         {
-            string configFile = await filePathResolver.ToPhysicalAsync(FilePathResolver.ConfigFile, FileDirectory.System, cancellationToken);
-            if (File.Exists(configFile))
-            {
-                string content = await File.ReadAllTextAsync(configFile, cancellationToken);
-                return new Message(MessageType.Success, content);
-            }
-
-            string configFileFallback = await filePathResolver.ToPhysicalAsync(FilePathResolver.ConfigFileFallback, FileDirectory.System, cancellationToken);
-            if (File.Exists(configFileFallback))
-            {
-                string content = await File.ReadAllTextAsync(configFileFallback, cancellationToken);
-                return new Message(MessageType.Success, content);
-            }
-            return new Message(MessageType.Error, "Configuration file not found");
+            string content = await File.ReadAllTextAsync(configFile, cancellationToken);
+            return new Message(MessageType.Success, content);
         }
-        throw new OperationCanceledException();
+
+        string configFileFallback = await filePathResolver.ToPhysicalAsync(FilePathResolver.ConfigFileFallback, FileDirectory.System, cancellationToken);
+        if (File.Exists(configFileFallback))
+        {
+            string content = await File.ReadAllTextAsync(configFileFallback, cancellationToken);
+            return new Message(MessageType.Success, content);
+        }
+        return new Message(MessageType.Error, "Configuration file not found");
     }
 
     /// <summary>
@@ -1535,45 +1498,39 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message> HandleSetFolderAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleSetFolderAsync(Commands.Code code, bool web, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        if (code.TryGetString('P', out string? directory))
         {
-            if (code.TryGetString('P', out string? directory))
+            // Changing the system folder under a running job would change which macros a queued
+            // move's callbacks resolve to, so wait for the machine to stop first
+            if (await planner.WaitForStandstillAsync(cancellationToken))
             {
-                // Changing the system folder under a running job would change which macros a queued
-                // move's callbacks resolve to, so wait for the machine to stop first
-                if (await planner.WaitForStandstillAsync(cancellationToken))
+                string physicalDirectory = await filePathResolver.ToPhysicalAsync(directory, web ? "www" : "sys", cancellationToken);
+                if (Directory.Exists(physicalDirectory))
                 {
-                    string physicalDirectory = (code.MinorNumber != 1)
-                        ? await filePathResolver.ToPhysicalAsync(directory, "sys", cancellationToken)
-                        : await filePathResolver.ToPhysicalAsync(directory, "www", cancellationToken);
-                    if (Directory.Exists(physicalDirectory))
+                    string virtualDirectory = await filePathResolver.ToVirtualAsync(physicalDirectory, cancellationToken);
+                    using (await model.AccessReadWriteAsync(cancellationToken))
                     {
-                        string virtualDirectory = await filePathResolver.ToVirtualAsync(physicalDirectory, cancellationToken);
-                        using (await model.AccessReadWriteAsync(cancellationToken))
+                        if (web)
                         {
-                            if (code.MinorNumber != 1)
-                            {
-                                model.Directories.System = virtualDirectory;
-                            }
-                            else
-                            {
-                                model.Directories.Web = virtualDirectory;
-                            }
+                            model.Directories.Web = virtualDirectory;
                         }
-                        return new Message();
+                        else
+                        {
+                            model.Directories.System = virtualDirectory;
+                        }
                     }
+                    return new Message();
                 }
-                return new Message(MessageType.Error, "Directory not found");
             }
-
-            using (await model.AccessReadOnlyAsync(cancellationToken))
-            {
-                return new Message(MessageType.Success, $"{((code.MinorNumber != 1) ? "Sys" : "HTTP")} file path is {((code.MinorNumber != 1) ? model.Directories.System : model.Directories.Web)}");
-            }
+            return new Message(MessageType.Error, "Directory not found");
         }
-        throw new OperationCanceledException();
+
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            return new Message(MessageType.Success, $"{(web ? "HTTP" : "Sys")} file path is {(web ? model.Directories.Web : model.Directories.System)}");
+        }
     }
 
     /// <summary>
@@ -1584,55 +1541,51 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleSetNameAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        if (code.TryGetString('P', out string? newName))
         {
-            if (code.TryGetString('P', out string? newName))
+            if (newName.Length > 40)
             {
-                if (newName.Length > 40)
-                {
-                    return new Message(MessageType.Error, "Machine name is too long");
-                }
-
-                // Strip letters and digits from the machine name
-                string machineName = string.Empty;
-                foreach (char c in Environment.MachineName)
-                {
-                    if (char.IsLetterOrDigit(c))
-                    {
-                        machineName += c;
-                    }
-                }
-
-                // Strip letters and digits from the desired name
-                string desiredName = string.Empty;
-                foreach (char c in newName)
-                {
-                    if (char.IsLetterOrDigit(c))
-                    {
-                        desiredName += c;
-                    }
-                }
-
-                // Make sure the subset of letters and digits is equal
-                if (!machineName.Equals(desiredName, StringComparison.CurrentCultureIgnoreCase))
-                {
-                    return new Message(MessageType.Error, "Machine name must consist of the same letters and digits as configured by the Linux hostname");
-                }
-
-                // The name matches the Linux hostname, so it is safe to adopt
-                using (await model.AccessReadWriteAsync(cancellationToken))
-                {
-                    model.Network.Name = newName;
-                }
-                return new Message();
+                return new Message(MessageType.Error, "Machine name is too long");
             }
 
-            using (await model.AccessReadOnlyAsync(cancellationToken))
+            // Strip letters and digits from the machine name
+            string machineName = string.Empty;
+            foreach (char c in Environment.MachineName)
             {
-                return new Message(MessageType.Success, $"RepRap name: {model.Network.Name}");
+                if (char.IsLetterOrDigit(c))
+                {
+                    machineName += c;
+                }
             }
+
+            // Strip letters and digits from the desired name
+            string desiredName = string.Empty;
+            foreach (char c in newName)
+            {
+                if (char.IsLetterOrDigit(c))
+                {
+                    desiredName += c;
+                }
+            }
+
+            // Make sure the subset of letters and digits is equal
+            if (!machineName.Equals(desiredName, StringComparison.CurrentCultureIgnoreCase))
+            {
+                return new Message(MessageType.Error, "Machine name must consist of the same letters and digits as configured by the Linux hostname");
+            }
+
+            // The name matches the Linux hostname, so it is safe to adopt
+            using (await model.AccessReadWriteAsync(cancellationToken))
+            {
+                model.Network.Name = newName;
+            }
+            return new Message();
         }
-        throw new OperationCanceledException();
+
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            return new Message(MessageType.Success, $"RepRap name: {model.Network.Name}");
+        }
     }
 
     /// <summary>
@@ -1643,33 +1596,26 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleSetPasswordAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        if (code.TryGetString('P', out string? password))
         {
-            if (code.TryGetString('P', out string? password))
+            using (await model.AccessReadWriteAsync(cancellationToken))
             {
-                using (await model.AccessReadWriteAsync(cancellationToken))
-                {
-                    model.Password = password;
-                }
+                model.Password = password;
             }
-            return new Message();
         }
-        throw new OperationCanceledException();
+        return new Message();
     }
 
     /// <summary>
-    /// M552: set the IP address, which is the SBC's business rather than the firmware's
+    /// M552: set the IP address
     /// </summary>
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleSetIPAddressAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
-        {
-            return new Message(MessageType.Error, "M552 is reserved for SBC mode");
-        }
-        throw new OperationCanceledException();
+        // TODO implement M552
+        throw new NotImplementedException();
     }
 
     /// <summary>
@@ -1682,21 +1628,14 @@ internal partial class MCodeHandler(
     /// Only the expression form M581.1 is handled here, and only when the expression names SBC fields.
     /// Plain M581 hands the slot back to the firmware
     /// </remarks>
-    private async ValueTask<Message> HandleConfigureTriggerAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleConfigureTriggerAsync(Commands.Code code, bool expressionForm, CancellationToken cancellationToken)
     {
-        if (code.MinorNumber == 1)
+        if (expressionForm)
         {
+            // The seed evaluation reads the object model, so pending codes settle first
             if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
             {
-                Message? result = await sbcTriggerService.ConfigureAsync(code, cancellationToken);
-                if (result != null)
-                {
-                    // Expression was handled by SbcTriggerService (contains SBC fields)
-                    return result;
-                }
-                // No SBC fields in the expression — let RRF handle M581.1 natively
-                // TODO this used to fallthrough to RRF
-                return new Message(MessageType.Warning, "Not implemented");
+                return await sbcTriggerService.ConfigureAsync(code, cancellationToken);
             }
             throw new OperationCanceledException();
         }
@@ -1717,41 +1656,37 @@ internal partial class MCodeHandler(
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message> HandleNetworkProtocolsAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleNetworkProtocolsAsync(Commands.Code code, bool configureMqtt, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        // Configure MQTT
+        if (configureMqtt)
         {
-            // Configure MQTT
-            if (code.MinorNumber == 4)
-            {
-                return mqtt.Configure(code);
-            }
-            else if (code.TryGetInt('P', out int pParam) && pParam == 4)
-            {
-                return await mqtt.ConfigureProtocolAsync(code);
-            }
-
-            // Set CORS site
-            if (code.TryGetString('C', out string? corsSite))
-            {
-                using (await model.AccessReadWriteAsync(cancellationToken))
-                {
-                    model.Network.CorsSite = string.IsNullOrWhiteSpace(corsSite) ? null : corsSite;
-                }
-                return new Message();
-            }
-
-            // Report CORS state
-            using (await model.AccessReadOnlyAsync(cancellationToken))
-            {
-                if (string.IsNullOrEmpty(model.Network.CorsSite))
-                {
-                    return new Message(MessageType.Success, "CORS disabled");
-                }
-                return new Message(MessageType.Success, $"CORS enabled for site '{model.Network.CorsSite}'");
-            }
+            return mqtt.Configure(code);
         }
-        throw new OperationCanceledException();
+        else if (code.TryGetInt('P', out int pParam) && pParam == 4)
+        {
+            return await mqtt.ConfigureProtocolAsync(code);
+        }
+
+        // Set CORS site
+        if (code.TryGetString('C', out string? corsSite))
+        {
+            using (await model.AccessReadWriteAsync(cancellationToken))
+            {
+                model.Network.CorsSite = string.IsNullOrWhiteSpace(corsSite) ? null : corsSite;
+            }
+            return new Message();
+        }
+
+        // Report CORS state
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            if (string.IsNullOrEmpty(model.Network.CorsSite))
+            {
+                return new Message(MessageType.Success, "CORS disabled");
+            }
+            return new Message(MessageType.Success, $"CORS enabled for site '{model.Network.CorsSite}'");
+        }
     }
 
     /// <summary>
@@ -1762,34 +1697,30 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleForkInputReaderAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        if (code.TryGetInt('S', out int sParam) && sParam == 1)
         {
-            if (code.TryGetInt('S', out int sParam) && sParam == 1)
+            using (await model.AccessReadOnlyAsync(cancellationToken))
             {
-                using (await model.AccessReadOnlyAsync(cancellationToken))
+                if (model.Inputs[CodeChannel.File2] is null)
                 {
-                    if (model.Inputs[CodeChannel.File2] is null)
-                    {
-                        // Command not supported. Let RRF decide what to do
-                        // TODO this used to fallthrough to RRF
-                        return new Message(MessageType.Warning, "Not implemented");
-                    }
-                }
-
-                // Try to fork the file and report an error if anything went wrong
-                using (await jobProcessor.LockAsync(cancellationToken))
-                {
-                    Message result = await jobProcessor.ForkAsync(cancellationToken);
-                    if (result.Type != MessageType.Success)
-                    {
-                        return result;
-                    }
+                    // Command not supported. Let RRF decide what to do
+                    // TODO this used to fallthrough to RRF
+                    return new Message(MessageType.Warning, "Not implemented");
                 }
             }
 
-            return new Message();
+            // Try to fork the file and report an error if anything went wrong
+            using (await jobProcessor.LockAsync(cancellationToken))
+            {
+                Message result = await jobProcessor.ForkAsync(cancellationToken);
+                if (result.Type != MessageType.Success)
+                {
+                    return result;
+                }
+            }
         }
-        throw new OperationCanceledException();
+
+        return new Message();
     }
 
     /// <summary>
@@ -1800,48 +1731,44 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleEventLoggingAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+        if (!code.TryGetInt('S', out int sParam))
         {
-            if (!code.TryGetInt('S', out int sParam))
+            using (await model.AccessReadOnlyAsync(cancellationToken))
             {
-                using (await model.AccessReadOnlyAsync(cancellationToken))
+                if (model.State.LogLevel == EventLogLevel.Off)
                 {
-                    if (model.State.LogLevel == EventLogLevel.Off)
-                    {
-                        return new Message(MessageType.Success, "Event logging is disabled");
-                    }
-                    return new Message(MessageType.Success, $"Event logging is enabled at log level {model.State.LogLevel.ToString().ToLowerInvariant()}");
+                    return new Message(MessageType.Success, "Event logging is disabled");
                 }
+                return new Message(MessageType.Success, $"Event logging is enabled at log level {model.State.LogLevel.ToString().ToLowerInvariant()}");
             }
-
-            if (sParam > 0 && sParam < 4)
-            {
-                EventLogLevel logLevel = sParam switch
-                {
-                    1 => EventLogLevel.Warn,
-                    2 => EventLogLevel.Info,
-                    3 => EventLogLevel.Debug,
-                    _ => EventLogLevel.Off
-                };
-
-                string defaultLogFile = EventLogger.DefaultLogFile;
-                using (await model.AccessReadOnlyAsync(cancellationToken))
-                {
-                    if (!string.IsNullOrEmpty(model.State.LogFile))
-                    {
-                        defaultLogFile = model.State.LogFile;
-                    }
-                }
-
-                await eventLogger.StartAsync(code.GetString('P', defaultLogFile), logLevel);
-            }
-            else
-            {
-                await eventLogger.StopAsync();
-            }
-            return new Message();
         }
-        throw new OperationCanceledException();
+
+        if (sParam > 0 && sParam < 4)
+        {
+            EventLogLevel logLevel = sParam switch
+            {
+                1 => EventLogLevel.Warn,
+                2 => EventLogLevel.Info,
+                3 => EventLogLevel.Debug,
+                _ => EventLogLevel.Off
+            };
+
+            string defaultLogFile = EventLogger.DefaultLogFile;
+            using (await model.AccessReadOnlyAsync(cancellationToken))
+            {
+                if (!string.IsNullOrEmpty(model.State.LogFile))
+                {
+                    defaultLogFile = model.State.LogFile;
+                }
+            }
+
+            await eventLogger.StartAsync(code.GetString('P', defaultLogFile), logLevel);
+        }
+        else
+        {
+            await eventLogger.StopAsync();
+        }
+        return new Message();
     }
 
     /// <summary>
@@ -2002,97 +1929,93 @@ internal partial class MCodeHandler(
     {
         if (code.GetIntArray('S', [0]).Contains(0) && code.GetInt('B', 0) == 0)
         {
-            if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+            // Get the IAP and Firmware files
+            string? iapFile, firmwareFile;
+            using (await model.AccessReadOnlyAsync(cancellationToken))
             {
-                // Get the IAP and Firmware files
-                string? iapFile, firmwareFile;
-                using (await model.AccessReadOnlyAsync(cancellationToken))
+                if (model.Boards.Count == 0)
                 {
-                    if (model.Boards.Count == 0)
-                    {
-                        return new Message(MessageType.Error, "No boards have been detected");
-                    }
-
-                    // There are now two different IAP binaries, check which one to use
-                    iapFile = model.Boards[0].IapFileNameSBC;
-                    if (!code.TryGetString('P', out firmwareFile))
-                    {
-                        firmwareFile = model.Boards[0].FirmwareFileName;
-                    }
+                    return new Message(MessageType.Error, "No boards have been detected");
                 }
 
-                if (string.IsNullOrEmpty(iapFile) || string.IsNullOrEmpty(firmwareFile))
+                // There are now two different IAP binaries, check which one to use
+                iapFile = model.Boards[0].IapFileNameSBC;
+                if (!code.TryGetString('P', out firmwareFile))
                 {
-                    return new Message(MessageType.Error, "Cannot update firmware because IAP and firmware filenames are unknown");
+                    firmwareFile = model.Boards[0].FirmwareFileName;
                 }
+            }
 
-                string physicalIapFile = await filePathResolver.ToPhysicalAsync(iapFile, FileDirectory.Firmware, cancellationToken);
-                if (!File.Exists(physicalIapFile))
+            if (string.IsNullOrEmpty(iapFile) || string.IsNullOrEmpty(firmwareFile))
+            {
+                return new Message(MessageType.Error, "Cannot update firmware because IAP and firmware filenames are unknown");
+            }
+
+            string physicalIapFile = await filePathResolver.ToPhysicalAsync(iapFile, FileDirectory.Firmware, cancellationToken);
+            if (!File.Exists(physicalIapFile))
+            {
+                string fallbackIapFile = await filePathResolver.ToPhysicalAsync($"0:/firmware/{iapFile}", cancellationToken: cancellationToken);
+                if (!File.Exists(fallbackIapFile))
                 {
-                    string fallbackIapFile = await filePathResolver.ToPhysicalAsync($"0:/firmware/{iapFile}", cancellationToken: cancellationToken);
+                    fallbackIapFile = await filePathResolver.ToPhysicalAsync(iapFile, FileDirectory.System, cancellationToken);
                     if (!File.Exists(fallbackIapFile))
                     {
-                        fallbackIapFile = await filePathResolver.ToPhysicalAsync(iapFile, FileDirectory.System, cancellationToken);
-                        if (!File.Exists(fallbackIapFile))
-                        {
-                            return new Message(MessageType.Error, $"Failed to find IAP file {iapFile}");
-                        }
+                        return new Message(MessageType.Error, $"Failed to find IAP file {iapFile}");
                     }
-                    logger.LogWarning("Using fallback IAP file {File}", fallbackIapFile);
-                    physicalIapFile = fallbackIapFile;
                 }
+                logger.LogWarning("Using fallback IAP file {File}", fallbackIapFile);
+                physicalIapFile = fallbackIapFile;
+            }
 
-                string physicalFirmwareFile = await filePathResolver.ToPhysicalAsync(firmwareFile, FileDirectory.Firmware, cancellationToken);
-                if (!File.Exists(physicalFirmwareFile))
+            string physicalFirmwareFile = await filePathResolver.ToPhysicalAsync(firmwareFile, FileDirectory.Firmware, cancellationToken);
+            if (!File.Exists(physicalFirmwareFile))
+            {
+                string fallbackFirmwareFile = await filePathResolver.ToPhysicalAsync($"0:/firmware/{firmwareFile}", cancellationToken: cancellationToken);
+                if (!File.Exists(fallbackFirmwareFile))
                 {
-                    string fallbackFirmwareFile = await filePathResolver.ToPhysicalAsync($"0:/firmware/{firmwareFile}", cancellationToken: cancellationToken);
+                    fallbackFirmwareFile = await filePathResolver.ToPhysicalAsync(firmwareFile, FileDirectory.System, cancellationToken);
                     if (!File.Exists(fallbackFirmwareFile))
                     {
-                        fallbackFirmwareFile = await filePathResolver.ToPhysicalAsync(firmwareFile, FileDirectory.System, cancellationToken);
-                        if (!File.Exists(fallbackFirmwareFile))
-                        {
-                            return new Message(MessageType.Error, $"Failed to find firmware file {firmwareFile}");
-                        }
+                        return new Message(MessageType.Error, $"Failed to find firmware file {firmwareFile}");
                     }
-                    logger.LogWarning("Using fallback firmware file {File}", fallbackFirmwareFile);
-                    physicalFirmwareFile = fallbackFirmwareFile;
                 }
-
-                // Stop all the plugins
-                Commands.StopPlugins stopCommand = commandFactory.Create<Commands.StopPlugins>();
-                await stopCommand.ExecuteAsync(cancellationToken);
-
-                // Update the firmware
-                await using FileStream iapStream = new(physicalIapFile, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
-                await using FileStream firmwareStream = new(physicalFirmwareFile, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
-                if (Path.GetExtension(firmwareFile) == ".uf2")
-                {
-                    await using MemoryStream unpackedFirmwareStream = await Firmware.UnpackUF2Async(firmwareStream);
-                    await linkInterface.UpdateFirmware(iapStream, unpackedFirmwareStream, lifetime.ApplicationStopped);
-                }
-                else
-                {
-                    await linkInterface.UpdateFirmware(iapStream, firmwareStream, lifetime.ApplicationStopped);
-                }
-
-                // Updating the firmware resets the controller, which invalidates every channel and cancels
-                // this very code. Reassign its cancellation token so it can report success instead of cancelled
-                code.ResetCancellationToken();
-
-                // Terminate the program once this code has finished. Give the success response a
-                // moment to propagate through DWS to the clients first - stopping immediately tears
-                // down the IPC connections, which lets the reply race against the shutdown
-                _ = code.Task.ContinueWith(async task =>
-                {
-                    await task;
-                    await Task.Delay(1000);
-                    lifetime.StopApplication();
-                }, TaskContinuationOptions.RunContinuationsAsynchronously);
-
-                // Done
-                return new Message();
+                logger.LogWarning("Using fallback firmware file {File}", fallbackFirmwareFile);
+                physicalFirmwareFile = fallbackFirmwareFile;
             }
-            throw new OperationCanceledException();
+
+            // Stop all the plugins
+            Commands.StopPlugins stopCommand = commandFactory.Create<Commands.StopPlugins>();
+            await stopCommand.ExecuteAsync(cancellationToken);
+
+            // Update the firmware
+            await using FileStream iapStream = new(physicalIapFile, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
+            await using FileStream firmwareStream = new(physicalFirmwareFile, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
+            if (Path.GetExtension(firmwareFile) == ".uf2")
+            {
+                await using MemoryStream unpackedFirmwareStream = await Firmware.UnpackUF2Async(firmwareStream);
+                await linkInterface.UpdateFirmware(iapStream, unpackedFirmwareStream, lifetime.ApplicationStopped);
+            }
+            else
+            {
+                await linkInterface.UpdateFirmware(iapStream, firmwareStream, lifetime.ApplicationStopped);
+            }
+
+            // Updating the firmware resets the controller, which invalidates every channel and cancels
+            // this very code. Reassign its cancellation token so it can report success instead of cancelled
+            code.ResetCancellationToken();
+
+            // Terminate the program once this code has finished. Give the success response a
+            // moment to propagate through DWS to the clients first - stopping immediately tears
+            // down the IPC connections, which lets the reply race against the shutdown
+            _ = code.Task.ContinueWith(async task =>
+            {
+                await task;
+                await Task.Delay(1000);
+                lifetime.StopApplication();
+            }, TaskContinuationOptions.RunContinuationsAsynchronously);
+
+            // Done
+            return new Message();
         }
         // TODO this used to fallthrough to RRF
         return new Message(MessageType.Warning, "Not implemented");

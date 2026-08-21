@@ -27,6 +27,16 @@ public sealed class ProcessInternally(ChannelProcessor channelProcessor, CodePro
             {
                 bool resolved = await code.ProcessInternally();
                 code.Flags |= CodeFlags.IsInternallyProcessed;
+
+                // The file's command at the restart point has now run. RepRapFirmware clears this
+                // in GCodeBuffer::SetFinished, but the next code enters this stage before the
+                // previous one has left Executed, so waiting until then would let a second command
+                // start a macro that still reads as restarted
+                if (code.File is { FirstCommandAfterRestart: true } file)
+                {
+                    file.FirstCommandAfterRestart = false;
+                }
+
                 await ChannelProcessor.WriteCodeAsync(code, resolved ? PipelineStage.Executed : PipelineStage.Post);
             }
             catch (Exception e)

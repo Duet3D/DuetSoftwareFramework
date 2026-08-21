@@ -50,7 +50,7 @@ public sealed class ReloadPlugin(PluginStore pluginStore, IOptions<Settings> set
 
                 await using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read);
                 using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
-                plugin.UpdateFromJson(manifestJson.RootElement, false);
+                plugin.UpdateFromJson(manifestJson.RootElement);
                 plugin.Pid = -1;
             }
             else

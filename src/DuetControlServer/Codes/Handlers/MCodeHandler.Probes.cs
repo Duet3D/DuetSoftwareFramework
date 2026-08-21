@@ -48,13 +48,6 @@ internal partial class MCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleProbeConfigAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (code.MinorNumber >= 0)
-        {
-            // M558.1 and M558.2 calibrate a scanning probe, which needs the probe to be read back
-            // over CAN while it moves. Nothing here reads a probe yet
-            return new Message(MessageType.Error, $"M558.{code.MinorNumber} is not supported");
-        }
-
         int probeNumber = code.GetInt('K', 0);
         if (probeNumber is < 0 || probeNumber >= RemoteProbes.MaxProbes)
         {
@@ -112,11 +105,6 @@ internal partial class MCodeHandler
             {
                 return new Message(MessageType.Error, "Missing Z probe pin name");
             }
-        }
-
-        if (!await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
-        {
-            throw new OperationCanceledException();
         }
 
         string? monitorPort = null;

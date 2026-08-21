@@ -23,7 +23,6 @@ public partial class Network : ModelObject, IStaticModelObject
     /// <summary>
     /// If this is set, the web server will allow cross-origin requests via the Access-Control-Allow-Origin header
     /// </summary>
-    [SbcProperty(true)]
     public string? CorsSite
     {
         get =>_corsSite;
@@ -45,7 +44,6 @@ public partial class Network : ModelObject, IStaticModelObject
     /// List of available network interfaces
     /// </summary>
     /// <seealso cref="NetworkInterface"/>
-    [SbcProperty(true)]
     public StaticModelCollection<NetworkInterface> Interfaces { get; } = [];
 
     /// <summary>

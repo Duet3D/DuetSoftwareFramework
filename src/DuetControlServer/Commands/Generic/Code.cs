@@ -33,7 +33,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     private readonly TCodeHandler _tCodes;
     private readonly KeywordHandler _keywords;
     private readonly IHostApplicationLifetime _lifetime;
-    private readonly LinkInterface _linkInterface;
     private readonly MacroRunner _macroRunner;
     private readonly ILogger<Code> _logger;
     private readonly Settings _settings;
@@ -48,7 +47,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <param name="tCodes">T-code handler</param>
     /// <param name="keywords">Keyword handler</param>
     /// <param name="lifetime">Host application lifetime</param>
-    /// <param name="linkInterface">Link interface</param>
     /// <param name="macroRunner">Runs macro files</param>
     /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
@@ -59,7 +57,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         [FromKeyedServices(Keys.TCodes)] ICodeHandler tCodes,
         [FromKeyedServices(Keys.Keywords)] ICodeHandler keywords,
         IHostApplicationLifetime lifetime,
-        LinkInterface linkInterface,
         MacroRunner macroRunner,
         ILogger<Code> logger,
         IOptions<Settings> settings) : base()
@@ -71,7 +68,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         _tCodes = (TCodeHandler)tCodes;
         _keywords = (KeywordHandler)keywords;
         _lifetime = lifetime;
-        _linkInterface = linkInterface;
         _macroRunner = macroRunner;
         _logger = logger;
         _settings = settings.Value;
@@ -88,7 +84,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <param name="tCodes">T-code handler</param>
     /// <param name="keywords">Keyword handler</param>
     /// <param name="lifetime">Host application lifetime</param>
-    /// <param name="linkInterface">Link interface</param>
     /// <param name="macroRunner">Runs macro files</param>
     /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
@@ -100,7 +95,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         [FromKeyedServices(Keys.TCodes)] ICodeHandler tCodes,
         [FromKeyedServices(Keys.Keywords)] ICodeHandler keywords,
         IHostApplicationLifetime lifetime,
-        LinkInterface linkInterface,
         MacroRunner macroRunner,
         ILogger<Code> logger,
         IOptions<Settings> settings) : base(code)
@@ -112,7 +106,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         _tCodes = (TCodeHandler)tCodes;
         _keywords = (KeywordHandler)keywords;
         _lifetime = lifetime;
-        _linkInterface = linkInterface;
         _macroRunner = macroRunner;
         _logger = logger;
         _settings = settings.Value;
@@ -199,6 +192,48 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     internal Files.CodeFile? File { get; set; }
 
     /// <summary>
+    /// Whether the ProcessInternally worker is deferring this code: the channel continues past it,
+    /// and its handler runs when its anchor move has retired
+    /// </summary>
+    internal bool IsCurrentlyDeferred { get; set; }
+
+    /// <summary>
+    /// Ring the anchor move was queued on
+    /// </summary>
+    internal int DeferredRing { get; set; }
+
+    /// <summary>
+    /// Id of the anchor: the last move submitted on the channel's ring when this code was read.
+    /// The code's effect belongs after the end of that move
+    /// </summary>
+    internal uint DeferredAnchor { get; set; }
+
+    /// <summary>
+    /// Completion of the previously deferred code on the same pipeline, or null if there is none
+    /// pending. Handlers of deferred codes must run in file order even when they share an anchor,
+    /// and the anchor wait alone does not order their wakes
+    /// </summary>
+    internal Task? DeferredPredecessor { get; set; }
+
+    /// <summary>
+    /// The handler this code's type routes to, or null if none does
+    /// </summary>
+    private ICodeHandler? InternalHandler => Type switch
+    {
+        CodeType.GCode => _gCodes,
+        CodeType.MCode => _mCodes,
+        CodeType.TCode => _tCodes,
+        CodeType.Keyword => _keywords,
+        _ => null
+    };
+
+    /// <summary>
+    /// Classify this code through the handler its type routes to
+    /// </summary>
+    /// <returns>The declared class, or null if no handler implements the code</returns>
+    internal Codes.CodeClass? ClassifyInternally() => InternalHandler?.Classify(this);
+
+    /// <summary>
     /// Update the next file position in case we need to fork this file
     /// </summary>
     internal void UpdateNextFilePosition()
@@ -280,29 +315,83 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         // Try to process this code internally
         _logger.LogDebug("Processing {Code}", this);
 
-        // Flush the code channel and populate SBC fields where applicable
-        if (Keyword == KeywordType.None && _expressions.ContainsSbcFields(this) && !await _codeProcessor.FlushAsync(this, true, false))
+        // An expression reading the object model must not be evaluated while earlier codes are
+        // still completing, so such a code waits for them first; the flush evaluates the
+        // expressions once the state has settled. One referencing only variables needs no wait,
+        // because this stage runs codes in stream order, but its parameters still have to be
+        // evaluated here: the handlers read numeric parameters only
+        if (Keyword == KeywordType.None)
         {
-            throw new OperationCanceledException();
+            if (_expressions.ContainsModelFields(this))
+            {
+                if (!await _codeProcessor.FlushAsync(this, evaluateExpressions: true, cancellationToken: CancellationToken))
+                {
+                    throw new OperationCanceledException();
+                }
+            }
+            else
+            {
+                await _expressions.EvaluateAsync(this, CancellationToken);
+            }
         }
 
-        // Attempt to process the code internally
+        // Attempt to process the code internally. The handler declares each code's class in its
+        // table; the class's synchronisation runs here, before the handler sees the code, so "does
+        // this code need a standstill" is a declared fact rather than a call the handler remembers
+        // to make. A code its handler does not classify has no row: no handler runs, and the code
+        // goes down the macro-then-unsupported path below
         try
         {
-            switch (Type)
+            ICodeHandler? handler = InternalHandler;
+            if (handler is not null && handler.Classify(this) is Codes.CodeClass codeClass)
             {
-                case CodeType.GCode:
-                    Result = await _gCodes.ProcessAsync(this, CancellationToken);
-                    break;
-                case CodeType.MCode:
-                    Result = await _mCodes.ProcessAsync(this, CancellationToken);
-                    break;
-                case CodeType.TCode:
-                    Result = await _tCodes.ProcessAsync(this, CancellationToken);
-                    break;
-                case CodeType.Keyword:
-                    Result = await _keywords.ProcessAsync(this, CancellationToken);
-                    break;
+                // A prioritized code jumps every queue by definition
+                if (!Flags.HasFlag(CodeFlags.IsPrioritized))
+                {
+                    switch (codeClass)
+                    {
+                        case Codes.CodeClass.Flush:
+                            // The move carries the value; the flush keeps evaluation order
+                            if (!await _codeProcessor.FlushAsync(this, cancellationToken: CancellationToken))
+                            {
+                                throw new OperationCanceledException();
+                            }
+                            break;
+                        case Codes.CodeClass.FlushAndStandstill:
+                            // The code changes what a queued move means, or needs the board's
+                            // reply: nothing may be moving when the handler runs
+                            if (!await _codeProcessor.FlushAsync(this, cancellationToken: CancellationToken) ||
+                                !await _codeProcessor.WaitForStandstillAsync(CancellationToken))
+                            {
+                                throw new OperationCanceledException();
+                            }
+                            break;
+                        case Codes.CodeClass.Deferred:
+                            // The effect belongs at a point in the path. A currently deferred
+                            // code was flushed by the worker beforehand, so its parameters are
+                            // frozen; it holds its handler back until its anchor move has
+                            // retired, after the deferred code before it so that effects land in
+                            // file order even when they share an anchor. One not being deferred
+                            // (no move in flight, or not from the job) flushes and applies now
+                            if (IsCurrentlyDeferred)
+                            {
+                                if (DeferredPredecessor is not null)
+                                {
+                                    await DeferredPredecessor;
+                                }
+                                if (DeferredAnchor != 0)
+                                {
+                                    await _codeProcessor.WaitForMoveAsync(DeferredRing, DeferredAnchor, CancellationToken);
+                                }
+                            }
+                            else if (!await _codeProcessor.FlushAsync(this, cancellationToken: CancellationToken))
+                            {
+                                throw new OperationCanceledException();
+                            }
+                            break;
+                    }
+                }
+                Result = await handler.ProcessAsync(this, CancellationToken);
             }
 
             if (Result is not null)
@@ -329,9 +418,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
             Flags |= CodeFlags.IsPostProcessed;
             if (resolved)
             {
-#if false // TODO: do we need to do anything now RRF is removed?
-                await _linkInterface.SetLastCodeResultAsync(this, CancellationToken);
-#endif
                 return true;
             }
         }

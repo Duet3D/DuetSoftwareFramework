@@ -17,6 +17,15 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="model">Object model</param>
 public sealed class TCodeHandler(ToolManager toolManager, Model.ObjectModel model) : ICodeHandler
 {
+    /// <inheritdoc />
+    /// <remarks>
+    /// No table: every T code is handled the same way, so there is no number to key on. A bare
+    /// <c>T</c> reports the selected tool; anything else is a tool change, whose macros must not
+    /// run while a queued move still uses the old tool's transform
+    /// </remarks>
+    public CodeClass? Classify(DuetAPI.Commands.Code code)
+        => code.MajorNumber is null ? CodeClass.Immediate : CodeClass.FlushAndStandstill;
+
     /// <summary>
     /// Process a T-code that should be interpreted by the control server
     /// </summary>

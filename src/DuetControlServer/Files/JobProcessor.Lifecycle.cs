@@ -107,6 +107,15 @@ internal partial class JobProcessor
             if (!synchronous)
             {
                 held = await _planner.StopEarlyAsync(plannedDeceleration: feedhold, _moveInterpreter, cancellationToken);
+
+                // Deferred codes anchored at or past the first purged move are dropped: the moves
+                // they were waiting for will never run, and the rewind re-reads their lines, so
+                // each fires exactly once. Codes anchored before it are owed, because committed
+                // moves always run to completion
+                if (held.MovesPurged > 0)
+                {
+                    _codeProcessor.CancelDeferredCodesAfter(CodeChannel.File, held.FirstPurgedMoveId);
+                }
             }
 
             Motion.JobResumePoint? resume;
@@ -140,8 +149,9 @@ internal partial class JobProcessor
 
             // The macros the job was inside are abandoned: the machine is stopping somewhere they did
             // not expect, so what they had left to do is no longer meaningful. The job file itself
-            // stays, because the resume reads from it again
-            await _codeProcessor.AbandonMacrosForPauseAsync(CodeChannel.File, cancellationToken);
+            // stays, because the resume reads from it again. Whether anything was abandoned is
+            // RepRapFirmware's pausedInMacro: the resume marks the replayed command as a restart
+            _pausedInMacro = await _codeProcessor.AbandonMacrosForPauseAsync(CodeChannel.File, cancellationToken);
 
             // Not the caller's token: for a synchronous pause that is the token just cancelled above.
             // The rest of the sequence stops for a shutdown and nothing else
@@ -156,7 +166,10 @@ internal partial class JobProcessor
                 // the pausing code itself
                 await _codeProcessor.FlushAsync(CodeChannel.File, flushAll: true, cancellationToken);
             }
-            await _planner.WaitForStandstillAsync(cancellationToken);
+
+            // Through the code processor rather than the planner: the machine is not stopped while
+            // owed deferred codes are still delivering their effects
+            await _codeProcessor.WaitForStandstillAsync(cancellationToken);
 
             // Where the machine came to rest, so the resume can put it back there
             await SaveRestorePointAsync(channel, held, resume, cancellationToken);
@@ -179,6 +192,16 @@ internal partial class JobProcessor
             }
         }
     }
+
+    /// <summary>
+    /// Whether the last pause abandoned macros the job was inside
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>MovementState::pausedInMacro</c>. The rewind point of such a pause is the
+    /// command that started the outermost abandoned macro, so the resume re-runs the macro whole;
+    /// marking the job file lets it read <c>state.macroRestarted</c> and skip what must not repeat
+    /// </remarks>
+    private bool _pausedInMacro;
 
     /// <summary>
     /// A pause that has been asked for but cannot happen yet, and the macro it will run
@@ -320,6 +343,19 @@ internal partial class JobProcessor
                 // RepRapFirmware's M24, which copies restartMoveFractionDone into moveFractionToSkip
                 // and puts the modal G command back before StartPrinting
                 await ApplyRestartStateAsync(cancellationToken);
+
+                // A job that does not begin at the top of the file is a restart - resurrect.g wrote
+                // the M26 - and RepRapFirmware's StartPrinting marks its first command as one
+                if (_file is not null)
+                {
+                    using (await _file.LockAsync(cancellationToken))
+                    {
+                        if (_file.Position > 0)
+                        {
+                            _file.FirstCommandAfterRestart = true;
+                        }
+                    }
+                }
                 Resume();
             }
             return new Message();
@@ -334,6 +370,19 @@ internal partial class JobProcessor
 
             await MoveBackToRestorePointAsync(cancellationToken);
             await RestoreFeedRateAsync(cancellationToken);
+
+            // The pause abandoned the macro the job was inside and rewound the file to the command
+            // that started it, so that command is about to run again. RepRapFirmware's resuming3
+            // marks it the same way through firstCommandAfterRestart
+            if (_pausedInMacro && _file is not null)
+            {
+                _pausedInMacro = false;
+                using (await _file.LockAsync(cancellationToken))
+                {
+                    _file.FirstCommandAfterRestart = true;
+                }
+            }
+
             _logger.LogInformation("Printing resumed");
             await _eventLogger.LogOutputAsync(MessageType.Warning, "Printing resumed");
             return new Message();

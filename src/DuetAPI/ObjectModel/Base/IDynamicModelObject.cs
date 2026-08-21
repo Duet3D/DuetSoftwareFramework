@@ -19,17 +19,15 @@ public interface IDynamicModelObject : IModelObject
     /// Update this instance from a given JSON element
     /// </summary>
     /// <param name="jsonElement">Element to update this intance from</param>
-    /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
     /// <returns>Updated instance</returns>
     /// <exception cref="JsonException">Failed to deserialize data</exception>
-    IDynamicModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties);
+    IDynamicModelObject? UpdateFromJson(JsonElement jsonElement);
 
     /// <summary>
     /// Update this instance from a given JSON reader
     /// </summary>
     /// <param name="reader">JSON reader</param>
-    /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
     /// <returns>Updated instance</returns>
     /// <exception cref="JsonException">Failed to deserialize data</exception>
-    IDynamicModelObject? UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties);
+    IDynamicModelObject? UpdateFromJsonReader(ref Utf8JsonReader reader);
 }

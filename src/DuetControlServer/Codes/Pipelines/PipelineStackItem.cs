@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Nito.AsyncEx;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -75,6 +76,25 @@ public sealed class PipelineStackItem
                         // Do not deal with cancelled codes
                         codeProcessor.CancelCode(code);
                     }
+                    else if (pipeline.Stage == PipelineStage.ProcessInternally &&
+                             !code.Flags.HasFlag(DuetAPI.Commands.CodeFlags.IsInternallyProcessed) &&
+                             codeProcessor.ShouldDefer(code, pipeline.LastDeferredCodeTask() is not null, out int ring, out uint anchor))
+                    {
+                        // A Deferred-class code with a live anchor is deferred: dispatched
+                        // without being awaited, so the channel continues past it while its
+                        // handler waits for the anchor move to retire. Every other class is awaited,
+                        // which keeps dispatch order FIFO. The flush comes first and is awaited,
+                        // because it freezes the code's parameters and its place in the
+                        // evaluation order, which must happen before anything later runs
+                        if (await codeProcessor.FlushAsync(code, cancellationToken: code.CancellationToken))
+                        {
+                            pipeline.DeferCode(code, ring, anchor);
+                        }
+                        else
+                        {
+                            codeProcessor.CancelCode(code);
+                        }
+                    }
                     else
                     {
                         await pipeline.ProcessCodeAsync(code);
@@ -94,6 +114,7 @@ public sealed class PipelineStackItem
             }
         }).Unwrap();
     }
+
 
     /// <summary>
     /// Pending codes to be executed
@@ -132,7 +153,6 @@ public sealed class PipelineStackItem
 
     /// <summary>
     /// Current code being executed.
-    /// This is not applicable on the Firmware stage because we buffer multiple codes there
     /// </summary>
     public Code? CodeBeingExecuted;
 

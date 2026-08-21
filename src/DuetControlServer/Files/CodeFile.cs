@@ -120,6 +120,18 @@ public class CodeFile(
     public long NextFilePosition { get; set; }
 
     /// <summary>
+    /// Whether this file is on its first command since a restart
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>GCodeMachineState::firstCommandAfterRestart</c>. A resume after a pause
+    /// that abandoned macros sets it on the job file, as does starting a job from a saved position.
+    /// A macro started while the invoking file holds it inherits it, which is what
+    /// <c>state.macroRestarted</c> is computed from, and it is cleared once the file's first
+    /// command has executed, so only the command at the restart point ever carries it
+    /// </remarks>
+    public bool FirstCommandAfterRestart { get; set; }
+
+    /// <summary>
     /// The G-code number a line that names no command letter repeats, or -1 if there is none
     /// </summary>
     /// <remarks>
@@ -202,6 +214,7 @@ public class CodeFile(
 
         // Seek to the next code's file position and shallow-copy the parser state
         Position = copyFrom.NextFilePosition;
+        FirstCommandAfterRestart = copyFrom.FirstCommandAfterRestart;
 
         _parserBuffer.LineNumber = copyFrom._parserBuffer.LineNumber;
         _parserBuffer.LastGCode = copyFrom._parserBuffer.LastGCode;
@@ -434,7 +447,7 @@ public class CodeFile(
                         }
 
                         // Evaluate the condition
-                        string? stringEvaluationResult = await expressions.EvaluateAsync(code, true, cancellationToken);
+                        string? stringEvaluationResult = await expressions.EvaluateAsync(code, cancellationToken);
                         if (bool.TryParse(stringEvaluationResult, out bool evaluationResult))
                         {
                             logger.LogDebug("Evaluation result: ({KeywordArgument}) = {Result}", code.KeywordArgument, evaluationResult);

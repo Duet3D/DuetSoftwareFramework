@@ -66,7 +66,6 @@ public partial class Directories : ModelObject, IStaticModelObject
     /// <summary>
     /// Path to the system directory
     /// </summary>
-    [SbcProperty(true)]
     public string System
     {
         get => _system;
@@ -77,7 +76,6 @@ public partial class Directories : ModelObject, IStaticModelObject
     /// <summary>
     /// Path to the web directory
     /// </summary>
-    [SbcProperty(true)]
     public string Web
     {
         get => _web;

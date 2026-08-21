@@ -50,8 +50,6 @@ internal static class Helpers
         return propertySyntax.AccessorList != null && propertySyntax.AccessorList.Accessors.Any(SyntaxKind.SetAccessorDeclaration);
     }
 
-    public static bool IsSbcProperty(this PropertyDeclarationSyntax propertySyntax) => propertySyntax.HasAttribute("SbcProperty");
-
     public static bool IsLiveProperty(this PropertyDeclarationSyntax propertySyntax) => propertySyntax.HasAttribute("Live");
 
     public static bool IsVerboseProperty(this PropertyDeclarationSyntax propertySyntax) => propertySyntax.HasAttribute("Verbose");

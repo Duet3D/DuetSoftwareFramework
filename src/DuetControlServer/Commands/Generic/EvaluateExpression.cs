@@ -35,7 +35,7 @@ public sealed class EvaluateExpression(CodeFactory codeFactory, Model.ObjectMode
         Code dummyCode = codeFactory.Create();
         dummyCode.Channel = Channel;
 
-        object? result = await expressions.EvaluateExpressionToValueAsync(dummyCode, Expression, false, cancellationToken);
+        object? result = await expressions.EvaluateExpressionToValueAsync(dummyCode, Expression, cancellationToken);
 
         // An expression can evaluate to anything, so the metadata for the result has to be looked up at runtime
         return JsonSerializer.SerializeToElement(result, JsonHelper.DefaultJsonOptions.GetTypeInfo(result?.GetType() ?? typeof(object)));

@@ -879,6 +879,14 @@ when the head is at or below the pause height, and only splits the move - travel
 - [x] `_deferredPause` and its injection point in the job loop, with a filament change taking
       priority over an ordinary pause
 - [x] `M25` and `M226`/`M600`/`M601` during a non-restartable macro defer instead of acting
+- [x] A macro re-run by the resume can tell: the pause reports whether it abandoned macros
+      (RepRapFirmware's `pausedInMacro`, returned by `AbandonMacrosForPauseAsync`), the resume marks
+      the job file's replayed command (`CodeFile.FirstCommandAfterRestart`, RepRapFirmware's
+      `firstCommandAfterRestart`, set too when a job starts from a saved position), macros inherit
+      the mark, and the file channel publishes `state.macroRestarted` while inside a marked macro,
+      so the macro can skip what must not repeat
+      ([MOTION_SYNCHRONISED_ACTIONS.md](MOTION_SYNCHRONISED_ACTIONS.md) §5.2, whose deferral relies
+      on it)
 - [ ] The tool-change exclusion — RepRapFirmware also waits for `!doingToolChange`, and nothing here
       says a tool change is in progress. `// TODO` at the point of use; it is the same gap
       `MachineStatusService` names for `ChangingTool`

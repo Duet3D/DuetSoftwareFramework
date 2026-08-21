@@ -26,6 +26,13 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="settings">Settings</param>
 public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expressions, FilePathResolver filePathResolver, VariableStore variableStore, ILogger<KeywordHandler> logger, IOptions<Settings> settings) : ICodeHandler
 {
+    /// <inheritdoc />
+    /// <remarks>
+    /// Keywords are not classified: the pipeline dispatches them without synchronisation, and this
+    /// member exists only to satisfy the handler contract
+    /// </remarks>
+    public CodeClass? Classify(DuetAPI.Commands.Code code) => CodeClass.Immediate;
+
     // Private fields
     private readonly ILogger<KeywordHandler> _logger = logger;
     private readonly Settings _settings = settings.Value;
@@ -130,9 +137,9 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
                         }
 
                         // Evaluate the filename and result to write
-                        string filename = await expressions.EvaluateExpressionToStringAsync(code, filenameExpression, false, false, cancellationToken);
+                        string filename = await expressions.EvaluateExpressionToStringAsync(code, filenameExpression, false, cancellationToken);
                         string physicalFilename = await filePathResolver.ToPhysicalAsync(filename, FileDirectory.System, cancellationToken), parentDirectory = Path.GetDirectoryName(physicalFilename)!;
-                        result = await expressions.EvaluateAsync(code, true, cancellationToken);
+                        result = await expressions.EvaluateAsync(code, cancellationToken);
 
                         // Write it to the designated file
                         _logger.LogDebug("{Operation} '{Expression}' to {File}", append ? "Appending" : "Writing", result, filename);
@@ -159,7 +166,7 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
                         return new Message();
                     }
                 }
-                result = await expressions.EvaluateAsync(code, true, cancellationToken);
+                result = await expressions.EvaluateAsync(code, cancellationToken);
 
                 if (code.Keyword == KeywordType.Abort)
                 {
@@ -257,7 +264,6 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
                 bool isGlobal = code.Keyword == KeywordType.Global;
                 if (code.Keyword == KeywordType.Set)
                 {
-                    varName = await expressions.EvaluateExpressionToStringAsync(code, varName, true, false, cancellationToken);
                     if (varName.StartsWith("global.", StringComparison.Ordinal))
                     {
                         isGlobal = true;
@@ -289,7 +295,7 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
                 int[] indices = new int[indexExpressions.Count];
                 for (int index = 0; index < indexExpressions.Count; index++)
                 {
-                    object? indexValue = await expressions.EvaluateExpressionToValueAsync(code, indexExpressions[index], false, cancellationToken);
+                    object? indexValue = await expressions.EvaluateExpressionToValueAsync(code, indexExpressions[index], cancellationToken);
                     indices[index] = indexValue switch
                     {
                         int intIndex => intIndex,
@@ -304,7 +310,7 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
                 }
 
                 // Evaluate what it is being assigned to
-                object? value = await expressions.EvaluateExpressionToValueAsync(code, expression, false, cancellationToken);
+                object? value = await expressions.EvaluateExpressionToValueAsync(code, expression, cancellationToken);
                 if (Meta.Parsing.ObjectModelValue.OccursIn(value))
                 {
                     // An object is not a value, and an array of them is not one either: what would be

@@ -64,7 +64,7 @@ public class MessageCollection : ObservableCollection<Message>, IModelCollection
     }
 
     /// <inheritdoc />
-    public void UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+    public void UpdateFromJson(JsonElement jsonElement)
     {
         foreach (JsonElement item in jsonElement.EnumerateArray())
         {
@@ -80,10 +80,10 @@ public class MessageCollection : ObservableCollection<Message>, IModelCollection
     }
 
     /// <inheritdoc />
-    public void UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties, int offset = 0, bool last = true) => UpdateFromJson(jsonElement, ignoreSbcProperties);
+    public void UpdateFromJson(JsonElement jsonElement, int offset = 0, bool last = true) => UpdateFromJson(jsonElement);
 
     /// <inheritdoc />
-    public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties, int offset = 0, bool last = true)
+    public void UpdateFromJsonReader(ref Utf8JsonReader reader, int offset = 0, bool last = true)
     {
         if (reader.TokenType != JsonTokenType.StartArray)
         {
@@ -107,5 +107,5 @@ public class MessageCollection : ObservableCollection<Message>, IModelCollection
     }
 
     /// <inheritdoc />
-    public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties) => UpdateFromJsonReader(ref reader, ignoreSbcProperties, 0, true);
+    public void UpdateFromJsonReader(ref Utf8JsonReader reader) => UpdateFromJsonReader(ref reader, 0, true);
 }

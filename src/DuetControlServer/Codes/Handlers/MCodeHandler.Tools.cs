@@ -35,13 +35,6 @@ internal partial class MCodeHandler
             return await ReportToolsAsync(cancellationToken);
         }
 
-        // The offsets a tool carries are part of the transform every queued move was planned against,
-        // so they cannot change while one is in flight
-        if (!await planner.WaitForStandstillAsync(cancellationToken))
-        {
-            throw new System.OperationCanceledException();
-        }
-
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             List<int> extruders = IntArray(code, 'D');

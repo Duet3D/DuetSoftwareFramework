@@ -66,7 +66,6 @@ public partial class Job : ModelObject, IStaticModelObject
     /// <summary>
     /// Indicates if the last file was aborted (unexpected cancellation)
     /// </summary>
-    [SbcProperty(false)]
     public bool LastFileAborted
     {
         get => _lastFileAborted;
@@ -77,7 +76,6 @@ public partial class Job : ModelObject, IStaticModelObject
     /// <summary>
     /// Indicates if the last file was cancelled (user cancelled)
     /// </summary>
-    [SbcProperty(false)]
     public bool LastFileCancelled
     {
         get => _lastFileCancelled;
@@ -89,7 +87,6 @@ public partial class Job : ModelObject, IStaticModelObject
     /// Indicates if the last file processed was simulated
     /// </summary>
     /// <remarks>This is not set if the file was aborted or cancelled</remarks>
-    [SbcProperty(false)]
     public bool LastFileSimulated
     {
         get => _lastFileSimulated;
@@ -127,7 +124,6 @@ public partial class Job : ModelObject, IStaticModelObject
     /// updates about this property to avoid memory leaks
     /// </remarks>
     /// <seealso cref="Layer"/>
-    [SbcProperty(false)]
     public StaticModelCollection<Layer> Layers { get; } = [];
 
     /// <summary>
