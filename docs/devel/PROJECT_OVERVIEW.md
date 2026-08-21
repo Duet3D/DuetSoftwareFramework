@@ -25,11 +25,11 @@ against the reference tree in `lib/RepRapFirmware`.
 | 5 | Events migration | [EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) | 🟢 4 of 5 phases | 1 × M, 1 × S | M291 (WS7) |
 | 6 | Job lifecycle | [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) | 🟢 8 phases, 5 with tails | 2 × M, 6 × S | M291, M581, M452 (all WS7) |
 | 7 | M-code / motion migration | [MCODE_MIGRATION.md](MCODE_MIGRATION.md) | 🟡 ~58% of inventory | 7 × L, 14 × M, 5 × S | see §3 |
-| 8 | Synchronised actions | [MOTION_SYNCHRONISED_ACTIONS.md](MOTION_SYNCHRONISED_ACTIONS.md) | 🟡 groundwork 2 of 3 | 1 × S, 1 × M shared, then stage 1 (2 × M, DCS only), stage 2 (2 × L, 2 × M, 1 × S) | laser pixel data (§5) |
+| 8 | Synchronised actions | [MOTION_SYNCHRONISED_ACTIONS.md](MOTION_SYNCHRONISED_ACTIONS.md) | 🟡 stage 1 landed, verification 🔧 | 1 × M shared open, stage 2 (2 × L, 2 × M, 1 × S) | laser pixel data (§5) |
 
 Workstream 7 is the umbrella the others were carved out of, and is most of what remains. Workstream 8
-is fully specified and independent; its class-table groundwork is in, and which of its three
-implementations to build is an open decision (§5).
+is fully specified and independent; its groundwork and stage 1, deferral in the pipeline, are in,
+and stage 2 promotes codes to timestamped dispatch, message type by message type.
 
 **Reference documents, not work:** [DCS_INTERNALS.md](DCS_INTERNALS.md),
 [HTTP_API.md](HTTP_API.md), and [SPI_LINK.md](SPI_LINK.md) describe the system as built and carry no
@@ -167,7 +167,7 @@ Found by reading the plan back against the tree. Each is small and each is a liv
 
 Performing an action at a point in the path without stopping the machine. Today a fan change or a
 servo move mid-print either fires early or forces the machine to standstill. The plan chooses
-implementation C, the code parked in the pipeline, delivered in two stages (plan §8.6): stage 1
+implementation C, the code deferred in the pipeline, delivered in two stages (plan §8.6): stage 1
 defers every code by move id and wakes it when its anchor retires, DuetControlServer only; stage 2
 adds the timestamped transport and promotes codes to step-clock exactness message type by message
 type. The shared groundwork lands first.
@@ -177,8 +177,8 @@ type. The shared groundwork lands first.
 | 1 | Declare which codes execute immediately and which defer, enforced in the pipeline | M | ✅ **Complete**: per-handler `CodeTable` rows, pipeline enforcement, macro-then-unsupported miss path; behaviour changes listed in §5.1 |
 | 2 | Emergency-stop output handling in `Duet3Expansion` | M 🔧 | A live gap today: fans and GPIO survive an M112 until the board resets, and commands still execute in the pre-reset window. Does not gate stage 1; required before stage 2 parks commands on the boards |
 | 3 | Write `state.macroRestarted` on macro re-run after a pause | S | ✅ **Complete**: the resume marks the job file's replayed command, macros inherit the mark, and it clears when the command finishes |
-| S1 | `LastSubmittedMoveId`, the per-anchor wake on `MotionTracker`, the defer branch, the parked set and pending predicates, purge cancellation | M | DCS only |
-| S1 | Convert the 16 deferred codes | M 🔧 | M106 first |
+| S1 | `LastSubmittedMoveId`, the per-anchor wake on `MotionTracker`, the defer branch, the deferred set and pending predicates, purge cancellation | M | ✅ **Complete**: DCS only, wake covered by unit tests |
+| S1 | Convert the deferred codes | M 🔧 | ✅ every code with a Deferred row is deferred (12 of the 16; M117/M144/M150/M300 wait on their handlers). Hardware verification outstanding |
 | S2 | Schema: `whenToExecute`, the offset table, the drop broadcast | M | Regenerates both sides |
 | S2 | Parked-command ring in `Duet3Expansion` | M | No behaviour change until something sends a future time |
 | S2 | `SubmitAction` and anchor resolution in `DuetSbcInterface` | L | The mechanical core |

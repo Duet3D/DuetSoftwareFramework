@@ -107,6 +107,15 @@ internal partial class JobProcessor
             if (!synchronous)
             {
                 held = await _planner.StopEarlyAsync(plannedDeceleration: feedhold, _moveInterpreter, cancellationToken);
+
+                // Deferred codes anchored at or past the first purged move are dropped: the moves
+                // they were waiting for will never run, and the rewind re-reads their lines, so
+                // each fires exactly once. Codes anchored before it are owed, because committed
+                // moves always run to completion
+                if (held.MovesPurged > 0)
+                {
+                    _codeProcessor.CancelDeferredCodesAfter(CodeChannel.File, held.FirstPurgedMoveId);
+                }
             }
 
             Motion.JobResumePoint? resume;
@@ -157,7 +166,10 @@ internal partial class JobProcessor
                 // the pausing code itself
                 await _codeProcessor.FlushAsync(CodeChannel.File, flushAll: true, cancellationToken);
             }
-            await _planner.WaitForStandstillAsync(cancellationToken);
+
+            // Through the code processor rather than the planner: the machine is not stopped while
+            // owed deferred codes are still delivering their effects
+            await _codeProcessor.WaitForStandstillAsync(cancellationToken);
 
             // Where the machine came to rest, so the resume can put it back there
             await SaveRestorePointAsync(channel, held, resume, cancellationToken);

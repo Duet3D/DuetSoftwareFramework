@@ -62,6 +62,7 @@ internal sealed class MovePlanner(
     private readonly byte[] _buffer = new byte[MoveParams.Length(MotionLimits.MaxAxesPlusExtruders)];
     private readonly int[] _resyncBuffer = new int[MotionLimits.MaxAxesPlusExtruders];
     private uint _nextMoveId = 1;
+    private readonly uint[] _lastSubmittedMoveId = new uint[MotionLimits.MaxRings];
 
     /// <summary>
     /// The machine being planned for, as last read from the object model
@@ -356,6 +357,7 @@ internal sealed class MovePlanner(
                 return MoveSubmitResult.Busy;
             }
 
+            _lastSubmittedMoveId[move.RingNumber] = move.MoveId;
             PublishCommittedPosition();
             return MoveSubmitResult.Queued;
         }
@@ -693,6 +695,25 @@ internal sealed class MovePlanner(
         if (linkInterface.Native.GetMotorPositions(_resyncBuffer, out _) > 0)
         {
             Builder.ResyncEndpoints(_resyncBuffer);
+        }
+    }
+
+    /// <summary>
+    /// Id of the last move handed to the engine on the given ring, or 0 if none has been
+    /// </summary>
+    /// <param name="ring">Ring to read</param>
+    /// <returns>Move id, or 0</returns>
+    /// <remarks>
+    /// The anchor of a deferred code: the point in the path its effect belongs after is the end of
+    /// the last move submitted when the code was read. Moves the engine discarded
+    /// (<see cref="MoveSubmitResult.NoMovement"/>) never become the anchor, because they never
+    /// retire - which is what RepRapFirmware's <c>segmentsLeft == 0</c> gate protects against
+    /// </remarks>
+    public uint LastSubmittedMoveId(int ring)
+    {
+        using (_lock.EnterScope())
+        {
+            return (ring >= 0 && ring < _lastSubmittedMoveId.Length) ? _lastSubmittedMoveId[ring] : 0;
         }
     }
 

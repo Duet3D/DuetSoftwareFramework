@@ -225,13 +225,126 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     private Motion.MovePlanner? _planner;
 
     /// <summary>
+    /// Motion tracker, resolved lazily for the same reason
+    /// </summary>
+    private Motion.MotionTracker? _motionTracker;
+
+    /// <summary>
     /// Wait for the machine to come to a standstill, as a Barrier-class code requires before its
     /// handler runs
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True when the machine is at a standstill, false when cancelled</returns>
-    public ValueTask<bool> WaitForStandstillAsync(CancellationToken cancellationToken = default)
-        => (_planner ??= serviceProvider.GetRequiredService<Motion.MovePlanner>()).WaitForStandstillAsync(cancellationToken);
+    /// <remarks>
+    /// Standstill includes the deferred codes, on every channel: their anchors have retired by the
+    /// time the rings are drained, so what remains is their handlers finishing, and "everything up
+    /// to here has happened" - M400's meaning - is not true until they have. This is the second of
+    /// the two pending predicates: flushes exclude deferred codes, standstill counts them
+    /// </remarks>
+    public async ValueTask<bool> WaitForStandstillAsync(CancellationToken cancellationToken = default)
+    {
+        Motion.MovePlanner planner = _planner ??= serviceProvider.GetRequiredService<Motion.MovePlanner>();
+        while (true)
+        {
+            if (!await planner.WaitForStandstillAsync(cancellationToken))
+            {
+                return false;
+            }
+
+            Task? deferredCode = null;
+            foreach (ChannelProcessor processor in Processors.Value)
+            {
+                if (processor.LastDeferredCodeTask() is Task task)
+                {
+                    deferredCode = task;
+                    break;
+                }
+            }
+            if (deferredCode is null)
+            {
+                return true;
+            }
+
+            try
+            {
+                await deferredCode.WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return false;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Decide whether a code defers, and name its anchor if it does
+    /// </summary>
+    /// <param name="code">Code about to be dispatched by the ProcessInternally worker</param>
+    /// <param name="chainPending">Whether earlier deferred codes are still pending on the pipeline</param>
+    /// <param name="ring">Ring the anchor was queued on</param>
+    /// <param name="anchor">Id of the anchor move, or 0 when the code defers only to keep order</param>
+    /// <returns>True if the code defers</returns>
+    /// <remarks>
+    /// A code defers when it is Deferred class, comes from the job file or a macro the job invoked,
+    /// is not prioritized, and either a move is in flight on its ring to anchor to or an earlier
+    /// deferred code has not delivered its effect yet - without the second condition it could
+    /// overtake an effect written before it in the file. Only the File channel defers: a deferred
+    /// code from any other channel is a manual intervention meaning "now", and a job streamed over
+    /// IPC has no file position to rewind to, so the purge rule could not hold for it. With an
+    /// empty queue and nothing deferred there is nothing to synchronise with and the code applies
+    /// immediately.
+    /// TODO Deferred work belongs to ring 0 until M596 assigns rings, the same gap as the feedhold
+    /// stopping only ring 0
+    /// </remarks>
+    internal bool ShouldDefer(Commands.Code code, bool chainPending, out int ring, out uint anchor)
+    {
+        ring = 0;
+        anchor = 0;
+        if (code.Channel != CodeChannel.File || code.File is null || code.Flags.HasFlag(CodeFlags.IsPrioritized))
+        {
+            return false;
+        }
+        if (code.ClassifyInternally() != CodeClass.Deferred)
+        {
+            return false;
+        }
+
+        Motion.MovePlanner planner = _planner ??= serviceProvider.GetRequiredService<Motion.MovePlanner>();
+        Motion.MotionTracker tracker = _motionTracker ??= serviceProvider.GetRequiredService<Motion.MotionTracker>();
+        anchor = planner.LastSubmittedMoveId(ring);
+        if (anchor != 0 && !tracker.HasRetired(ring, anchor))
+        {
+            return true;
+        }
+
+        anchor = 0;
+        return chainPending;
+    }
+
+    /// <summary>
+    /// Wait until the given move has retired
+    /// </summary>
+    /// <param name="ring">Ring the move was queued on</param>
+    /// <param name="moveId">Id of the move to wait for</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Task completing when the move has retired</returns>
+    public Task WaitForMoveAsync(int ring, uint moveId, CancellationToken cancellationToken)
+        => (_motionTracker ??= serviceProvider.GetRequiredService<Motion.MotionTracker>()).WaitForMoveAsync(ring, moveId, cancellationToken);
+
+    /// <summary>
+    /// Cancel every deferred code on a channel whose anchor is at or past the given move id
+    /// </summary>
+    /// <param name="channel">Code channel</param>
+    /// <param name="firstPurgedMoveId">Id of the earliest move a feedhold purged</param>
+    /// <remarks>
+    /// The purge boundary and the job's rewind point are one number, so the cancelled codes are
+    /// exactly the ones the replay re-reads
+    /// </remarks>
+    public void CancelDeferredCodesAfter(CodeChannel channel, uint firstPurgedMoveId)
+        => Processors.Value[(int)channel].CancelDeferredCodesAfter(firstPurgedMoveId);
 
     /// <summary>
     /// Start the execution of a given code

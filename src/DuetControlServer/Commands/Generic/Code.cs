@@ -192,6 +192,48 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     internal Files.CodeFile? File { get; set; }
 
     /// <summary>
+    /// Whether the ProcessInternally worker is deferring this code: the channel continues past it,
+    /// and its handler runs when its anchor move has retired
+    /// </summary>
+    internal bool IsCurrentlyDeferred { get; set; }
+
+    /// <summary>
+    /// Ring the anchor move was queued on
+    /// </summary>
+    internal int DeferredRing { get; set; }
+
+    /// <summary>
+    /// Id of the anchor: the last move submitted on the channel's ring when this code was read.
+    /// The code's effect belongs after the end of that move
+    /// </summary>
+    internal uint DeferredAnchor { get; set; }
+
+    /// <summary>
+    /// Completion of the previously deferred code on the same pipeline, or null if there is none
+    /// pending. Handlers of deferred codes must run in file order even when they share an anchor,
+    /// and the anchor wait alone does not order their wakes
+    /// </summary>
+    internal Task? DeferredPredecessor { get; set; }
+
+    /// <summary>
+    /// The handler this code's type routes to, or null if none does
+    /// </summary>
+    private ICodeHandler? InternalHandler => Type switch
+    {
+        CodeType.GCode => _gCodes,
+        CodeType.MCode => _mCodes,
+        CodeType.TCode => _tCodes,
+        CodeType.Keyword => _keywords,
+        _ => null
+    };
+
+    /// <summary>
+    /// Classify this code through the handler its type routes to
+    /// </summary>
+    /// <returns>The declared class, or null if no handler implements the code</returns>
+    internal Codes.CodeClass? ClassifyInternally() => InternalHandler?.Classify(this);
+
+    /// <summary>
     /// Update the next file position in case we need to fork this file
     /// </summary>
     internal void UpdateNextFilePosition()
@@ -287,14 +329,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         // goes down the macro-then-unsupported path below
         try
         {
-            ICodeHandler? handler = Type switch
-            {
-                CodeType.GCode => _gCodes,
-                CodeType.MCode => _mCodes,
-                CodeType.TCode => _tCodes,
-                CodeType.Keyword => _keywords,
-                _ => null
-            };
+            ICodeHandler? handler = InternalHandler;
             if (handler is not null && handler.Classify(this) is Codes.CodeClass codeClass)
             {
                 // A prioritized code jumps every queue by definition
@@ -319,8 +354,27 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
                             }
                             break;
                         case Codes.CodeClass.Deferred:
-                            // The effect belongs at a point in the path. Until a deferral
-                            // implementation lands this dispatches immediately
+                            // The effect belongs at a point in the path. A currently deferred
+                            // code was flushed by the worker beforehand, so its parameters are
+                            // frozen; it holds its handler back until its anchor move has
+                            // retired, after the deferred code before it so that effects land in
+                            // file order even when they share an anchor. One not being deferred
+                            // (no move in flight, or not from the job) flushes and applies now
+                            if (IsCurrentlyDeferred)
+                            {
+                                if (DeferredPredecessor is not null)
+                                {
+                                    await DeferredPredecessor;
+                                }
+                                if (DeferredAnchor != 0)
+                                {
+                                    await _codeProcessor.WaitForMoveAsync(DeferredRing, DeferredAnchor, CancellationToken);
+                                }
+                            }
+                            else if (!await _codeProcessor.FlushAsync(this, cancellationToken: CancellationToken))
+                            {
+                                throw new OperationCanceledException();
+                            }
                             break;
                     }
                 }

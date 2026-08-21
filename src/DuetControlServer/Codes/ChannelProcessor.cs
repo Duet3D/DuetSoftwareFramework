@@ -204,6 +204,14 @@ public sealed class ChannelProcessor
     /// </remarks>
     public async Task<bool> AbandonMacrosForPauseAsync(CancellationToken cancellationToken = default)
     {
+        // Deferred codes the purge did not claim are owed and fire as the machine decelerates; the
+        // codes the purge did claim were cancelled before this runs. Draining them first means no
+        // deferred code resolves into a level this is about to abandon
+        while (_pipelines.Value[(int)PipelineStage.ProcessInternally].LastDeferredCodeTask() is Task deferredCodes)
+        {
+            await deferredCodes.WaitAsync(cancellationToken);
+        }
+
         bool abandonedMacro = false;
         while (CurrentFile is MacroFile macro)
         {
@@ -218,12 +226,28 @@ public sealed class ChannelProcessor
     }
 
     /// <summary>
+    /// Completion of a deferred code on this channel, or null if none is deferred
+    /// </summary>
+    public Task? LastDeferredCodeTask() => _pipelines.Value[(int)PipelineStage.ProcessInternally].LastDeferredCodeTask();
+
+    /// <summary>
+    /// Cancel every deferred code on this channel whose anchor is at or past the given move id
+    /// </summary>
+    /// <param name="firstPurgedMoveId">Id of the earliest move a feedhold purged</param>
+    public void CancelDeferredCodesAfter(uint firstPurgedMoveId)
+        => _pipelines.Value[(int)PipelineStage.ProcessInternally].CancelDeferredCodesAfter(firstPurgedMoveId);
+
+    /// <summary>
     /// Abort every file on this channel's stack, unwinding it back to the base level
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
     public async Task AbortAllFilesAsync(CancellationToken cancellationToken = default)
     {
+        // Everything pending is discarded, deferred codes included: the moves they were anchored to
+        // either drain or no longer exist, and nothing pending is replayed
+        _pipelines.Value[(int)PipelineStage.ProcessInternally].CancelAllDeferredCodes();
+
         while (CurrentFile is MacroFile macro)
         {
             using (await macro.LockAsync(cancellationToken))
