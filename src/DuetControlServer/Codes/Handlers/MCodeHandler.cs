@@ -259,7 +259,7 @@ internal partial class MCodeHandler(
         // Servo control
         { 280, CodeClass.Deferred, (h, c, ct) => h.HandleServoAsync(c, ct) },
         // Babystepping
-        { 290, CodeClass.Deferred, (h, c, ct) => h.HandleBabysteppingAsync(c, ct) },
+        { 290, CodeClass.Immediate, (h, c, ct) => h.HandleBabysteppingAsync(c, ct) },
         // Cold extrude and retract limits
         { 302, CodeClass.Immediate, (h, c, ct) => h.HandleColdExtrusionAsync(c, ct) },
         // Heater process model
