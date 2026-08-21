@@ -25,7 +25,7 @@ against the reference tree in `lib/RepRapFirmware`.
 | 5 | Events migration | [EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) | 🟢 4 of 5 phases | 1 × M, 1 × S | M291 (WS7) |
 | 6 | Job lifecycle | [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) | 🟢 8 phases, 5 with tails | 2 × M, 6 × S | M291, M581, M452 (all WS7) |
 | 7 | M-code / motion migration | [MCODE_MIGRATION.md](MCODE_MIGRATION.md) | 🟡 ~58% of inventory | 7 × L, 14 × M, 5 × S | see §3 |
-| 8 | Synchronised actions | [MOTION_SYNCHRONISED_ACTIONS.md](MOTION_SYNCHRONISED_ACTIONS.md) | 🟡 groundwork 1 of 3 | 1 × S, 1 × M shared, then A (2 × M), B (2 × L, 3 × M) or C (B's items + 1 × M) | implementation decision (§5) |
+| 8 | Synchronised actions | [MOTION_SYNCHRONISED_ACTIONS.md](MOTION_SYNCHRONISED_ACTIONS.md) | 🟡 groundwork 1 of 3 | 1 × S, 1 × M shared, then stage 1 (2 × M, DCS only), stage 2 (2 × L, 2 × M, 1 × S) | laser pixel data (§5) |
 
 Workstream 7 is the umbrella the others were carved out of, and is most of what remains. Workstream 8
 is fully specified and independent; its class-table groundwork is in, and which of its three
@@ -166,28 +166,28 @@ Found by reading the plan back against the tree. Each is small and each is a liv
 ### WS8, synchronised actions
 
 Performing an action at a point in the path without stopping the machine. Today a fan change or a
-servo move mid-print either fires early or forces the machine to standstill. The plan specifies
-three implementations, A (a deferred-code queue, DCS only), B (timestamped effects parked on the
-boards) and C (B with the code parked in the pipeline, so the handler keeps the board's reply);
-choosing between them is an open decision (§5). The shared groundwork lands first either way.
+servo move mid-print either fires early or forces the machine to standstill. The plan chooses
+implementation C, the code parked in the pipeline, delivered in two stages (plan §8.6): stage 1
+defers every code by move id and wakes it when its anchor retires, DuetControlServer only; stage 2
+adds the timestamped transport and promotes codes to step-clock exactness message type by message
+type. The shared groundwork lands first.
 
 | Step | Task | Size | Notes |
 |---|---|---|---|
 | 1 | Declare which codes execute immediately and which defer, enforced in the pipeline | M | ✅ **Complete**: per-handler `CodeTable` rows, pipeline enforcement, macro-then-unsupported miss path; behaviour changes listed in §5.1 |
-| 2 | Emergency-stop output handling in `Duet3Expansion` | M 🔧 | A live gap today: fans and GPIO survive an M112 until the board resets, and commands still execute in the pre-reset window |
+| 2 | Emergency-stop output handling in `Duet3Expansion` | M 🔧 | A live gap today: fans and GPIO survive an M112 until the board resets, and commands still execute in the pre-reset window. Does not gate stage 1; required before stage 2 parks commands on the boards |
 | 3 | Write `state.macroRestarted` on macro re-run after a pause | S | The field exists; nothing writes it |
-| A | Queue store, release on `MoveCompletedEvent`, purge hooks, M400 term | M | DCS only |
-| A | Convert the 16 deferred codes | M 🔧 | M106 first |
-| B | Schema: `whenToExecute`, the offset table, the drop broadcast | M | Regenerates both sides |
-| B | Parked-command ring in `Duet3Expansion` | M | No behaviour change until something sends a future time |
-| B | `SubmitAction` and anchor resolution in `DuetSbcInterface` | L | The mechanical core |
-| B | DCS action path and late-reply routing; the CANMaster reply-timeout field | M | |
-| B | Convert the 16 deferred codes | L 🔧 | M106 first |
-| C | B's rows with the late-reply routing replaced by an awaited token map, plus the parked set in `ProcessInternally`, the two pending predicates and purge cancellation | M | DCS only, on top of B's other rows; code conversion as B |
+| S1 | `LastSubmittedMoveId`, the per-anchor wake on `MotionTracker`, the defer branch, the parked set and pending predicates, purge cancellation | M | DCS only |
+| S1 | Convert the 16 deferred codes | M 🔧 | M106 first |
+| S2 | Schema: `whenToExecute`, the offset table, the drop broadcast | M | Regenerates both sides |
+| S2 | Parked-command ring in `Duet3Expansion` | M | No behaviour change until something sends a future time |
+| S2 | `SubmitAction` and anchor resolution in `DuetSbcInterface` | L | The mechanical core |
+| S2 | The CANMaster reply-timeout field | S | |
+| S2 | Promote the codes to timestamped dispatch | L 🔧 | Each a handler and table-row change; M106 first |
 
 M572's standstill is no longer a WS8 step: the board applies pressure advance at message arrival, so
-no implementation makes a deferred push exact, and removing the wait is the plan's open
-decision D3.
+no stage makes a deferred push exact, and removing the wait is the plan's open
+decision D2.
 
 ---
 
@@ -228,7 +228,7 @@ graph TD
     M596 -.->|closes TODOs in| WS8
     WS8 --> LASERSEG
     M452 --> LASERSEG
-    WS8 -.->|decision D3 settles M572| WS1
+    WS8 -.->|decision D2 settles M572| WS1
 ```
 
 `WS5 Phase C tail` has no incoming edge because nothing blocks it.
@@ -237,7 +237,7 @@ graph TD
 
 | Track | Contents | Why it is independent |
 |---|---|---|
-| **A, synchronised actions** | All of WS8 | Nothing blocks the shared groundwork; the rest waits on the implementation decision (§5). Implementations B and C touch the CAN schema and expansion firmware, so they overlap least with the others |
+| **A, synchronised actions** | All of WS8 | Nothing blocks it: the shared groundwork and stage 1 are DCS-only. Stage 2 touches the CAN schema and expansion firmware, so it overlaps least with the others |
 | **B, unblocking codes** | M291, M581, M452, M596 | Four codes that between them release every blocked tail in WS5, WS6, and parts of WS7 |
 | **C, motion pipeline** | WS7a, plus WS4 phase 8 | Self-contained DCS work; arcs are the longest item |
 | **D, probing and levelling** | WS7b | Needs machine time; `G30 P` gates the other two |
@@ -264,16 +264,15 @@ Items where the plans stop short of an answer and someone has to decide.
 | 4 | Firmware emulation mode (M555): global, or per input channel? | Engineering | Blocks M555 |
 | 5 | What should detect an expansion board that lost its input monitors? | Engineering | A board that resets mid-job silently loses its endstops |
 | 6 | Watchdog timing for the board sweep now that it runs on the SBC | Engineering | A board may be wrongly timed out just after a reconnect |
-| 7 | WS8: implementation A (deferred-code queue, DCS only, ~2-10 ms late), B (board timestamps, exact, four codebases) or C (B with the code parked in the pipeline, keeping the handler's reply)? MOTION_SYNCHRONISED_ACTIONS §9 | Engineering | Blocks everything in WS8 past the shared groundwork |
-| 8 | Do per-pixel laser segments need WS8's action timeline, or does pixel data ride the move record? (WS8 decision D2) | Engineering | If pixel data needs per-segment actions, only implementations B and C serve it |
+| 7 | Do per-pixel laser segments need WS8's action timeline, or does pixel data ride the move record? (WS8 decision D1) | Engineering | If pixel data needs per-segment actions, it needs WS8 stage 2, with the parked ring sized for segment rate |
 
 **Risks**
 
 - **Hardware verification is a shared bottleneck.** Six tasks across three workstreams are marked 🔧
   and each needs a real machine. Schedule them as a batch rather than per task.
-- **WS8's implementations B and C span four codebases plus the CAN schema**; implementation A is DCS-only.
-  The shared steps 1 to 3 are behaviour-neutral and land first whichever is chosen. Preserve that
-  ordering.
+- **WS8's stage 2 spans four codebases plus the CAN schema**; the shared groundwork and stage 1 are
+  DCS-only. The shared steps 1 to 3 are behaviour-neutral and land first; the emergency-stop output
+  handling must land before stage 2 parks commands on the boards. Preserve that ordering.
 - **Status drift in the plans.** Two instances found while writing this: WS3's summary table
   contradicts its own phase sections, and WS7's group totals had gone stale before they were
   recounted. A status that reads ✅ wrongly is the expensive direction, because it is discovered at

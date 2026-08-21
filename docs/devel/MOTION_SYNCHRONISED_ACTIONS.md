@@ -20,8 +20,10 @@ G1 X300 F3000   ; move C
 The fan must reach full as the head arrives at X200, without the machine stopping, and without the
 fan going to full while move A is still running.
 
-Three implementations are specified in full (§6, §7 and §8) and compared (§9). Everything in §5 is
-needed by all of them and can land before the choice is made.
+Three implementations are specified in full (§6, §7 and §8) and compared (§9). Implementation C is
+chosen, delivered in two stages (§8.6): first the parked pipeline, with every deferred code woken by
+its anchor's retirement, a DuetControlServer-only change; then §7's timestamped transport, promoted
+message type by message type. Everything in §5 is needed by every stage and lands first.
 
 ---
 
@@ -279,7 +281,7 @@ flowchart TD
     C -- FlushAndStandstill --> F2["FlushAsync(code)"] --> W["WaitForStandstillAsync()"] --> D3[dispatch handler]
     C -- Deferred --> F3["FlushAsync(code)"] --> G{"file channel and<br/>anchor exists? (§5.2, §5.3)"}
     G -- no --> D4[dispatch handler: applies now]
-    G -- yes --> H["defer: §6 / §7 / §8"]
+    G -- yes --> H["park: §8, woken per §8.6"]
 ```
 
 The Deferred branch's flush and anchor check land with the deferral implementation; today the
@@ -423,7 +425,9 @@ needed even if neither is.
 ## 6. Implementation A: the deferred-code queue
 
 **Hold the whole code in DuetControlServer; run it when its anchor retires.** RepRapFirmware's
-design rebuilt on this tree's primitives. No change outside DuetControlServer.
+design rebuilt on this tree's primitives. No change outside DuetControlServer. Not chosen as a
+whole: its release hook, run at the anchor's retirement, is stage 1's wake source inside C's
+pipeline (§8.6).
 
 ```mermaid
 sequenceDiagram
@@ -491,7 +495,8 @@ retirement follows the actual stop.
 
 **Run the code now; give its CAN messages a `whenToExecute`; the board executes them at that tick.**
 The mechanism moves already use, extended to effects. Touches the schema, DuetControlServer,
-DuetSbcInterface, Duet3Expansion, and one field DuetCANMaster honors without parsing.
+DuetSbcInterface, Duet3Expansion, and one field DuetCANMaster honors without parsing. This is
+stage 2's transport (§8.6), with §7.2's completion-at-submission replaced by §8's parked code.
 
 ```mermaid
 sequenceDiagram
@@ -644,7 +649,8 @@ channel continues past it.** The handler is alive when the reply arrives, which 
 capability §7 gives up, and the board's complaint becomes the code's own result instead of a
 detached message. Everything below §7.2 is unchanged: the protocol (§7.1), the action list with its
 resolution and purge (§7.3), the parked ring and its gate (§7.4) and the CANMaster expiry field
-(§7.5) carry over verbatim. The differences are confined to DuetControlServer.
+(§7.5) carry over verbatim. The differences are confined to DuetControlServer. This is the chosen
+implementation; §8.6 stages its delivery so the transport arrives after the pipeline.
 
 ```mermaid
 sequenceDiagram
@@ -748,6 +754,41 @@ actions. The DCS parked set is bounded by the same argument as the ring: a code 
 live anchor, so the set at any instant is the actions anchored inside the move queue, plus the
 replies in flight.
 
+### 8.6 Staging: every code anchored by move id first, timestamps per message type later
+
+Implementation C arrives in two stages. Stage 1 is DuetControlServer only and defers every §10 code
+the same way; stage 2 adds §7's transport and buys §7.6's exactness, message type by message type.
+The boundary is drawn so that promotion is an increment, not a rewrite: §8.1's parked set, §8.2's
+predicates, §8.3's reordering rules and §8.4's purge are all stage 1, and none of them changes when
+a code is promoted.
+
+**Stage 1.** The defer branch flushes, records the code in the stack item's parked set, and parks
+it awaiting its anchor's retirement, the `MoveCompletedEvent` that `MotionTracker` already receives
+(§4); the handler is dispatched on wake and runs as it does today: validate, write the object
+model, send the CAN messages, await the replies. This is RepRapFirmware's `executeAtMove` semantics
+(§2) inside C's pipeline: one execution, the board's reply on the originating line, completion out
+of order per §8.3. Two rows of §9 read as implementation A's until promotion: timing (2 to 10 ms
+late, one-sided, the unbounded managed tail) and the requested object model (written at fire time,
+so it lags the parser). §8.4 applies with one simplification: a cancelled parked code has
+dispatched nothing, so cancellation is complete in-process, there are no board-side actions to
+drop, and no reply can arrive late; the handler awaits replies with today's timeout machinery, so
+§7.5's expiry field is not needed until stage 2.
+
+**The park never knows its wake source.** The parked set, both pending predicates, the purge rule
+and the anchor definition are keyed on the code and its anchor id; what the code awaits is supplied
+at park time. Stage 1 supplies a per-anchor completion from `MotionTracker`; a promoted code
+supplies the reply token; M117 and M300 keep the retirement wake permanently (§8.1). Holding that
+boundary is what makes stage 2 a set of local changes.
+
+**Stage 2.** The transport lands once, behaviour-neutral until used: §7.1's schema field and offset
+table, §7.3's `SubmitAction` and anchor resolution, §7.4's parked ring and gate, §7.5's expiry
+field. Promoting a code then touches its handler and its table row only: the row declares promoted
+dispatch, so the defer branch dispatches the handler at parse instead of parking first, and the
+handler validates, writes the object model, builds all frames, calls `SubmitAction` and parks
+itself on the reply token, §8.1 as written. Unpromoted codes keep the stage 1 wake unchanged, and
+§8.4's owed-versus-cancelled distinction gains its board-side half, actions dropped from the list,
+only for promoted codes.
+
 ---
 
 ## 9. Comparison
@@ -770,12 +811,13 @@ replies in flight.
 | Multi-board simultaneity | no (N sends, serialised) | yes: same tick on every board; a broadcast "all fans off at T" is one frame | as B |
 | Headroom | anything content with ~10 ms | per-segment effects (laser pixels, M42-triggered hardware), effects that must not jitter | as B |
 
-What decides it:
+What decided it:
 
 1. **Does anything need better than ~10 ms, one-sided?** Everything in §10 today is content: a fan
    takes ~100 ms to spin up, a heater ramps over seconds, a servo transits in tens of milliseconds.
    The two candidates that would not be content are per-pixel laser data (open, §12) and `M42`
-   triggering external hardware (hypothetical). If either becomes real, only B or C serves it.
+   triggering external hardware (hypothetical). If either becomes real, only the timestamped
+   transport serves it, which is why stage 2 stays on the plan rather than being an option.
 2. **Are managed-runtime tails acceptable in the firing path?** A GC pause moves an effect further
    into the following move. For a fan, invisible; as a matter of architecture, it re-enters the
    process the native split was designed to exclude. B and C keep the SBC out of the firing path;
@@ -788,11 +830,11 @@ What decides it:
    the pipeline concurrency change, whose subtle cases live in the drain waits (§8.2) and the purge
    cancellation (§8.4).
 
-The designs compose. They share §5 entirely; A's release hook is B's local-effect mechanism and
-C's local wake source; the class table is where a code's mechanism is recorded. A can ship first
-and individual codes can be promoted when a customer needs exactness, message type by message
-type; and C is reachable from B by a DuetControlServer-only change, so B can be upgraded to C
-without touching the schema or the boards.
+The designs compose, and the decision is built on that: C's pipeline ships first with A's wake
+source driving every deferred code, so stage 1 comes from DuetControlServer alone with A's timing,
+and B's transport is added later with individual codes promoted to exactness message type by
+message type (§8.6). The class table is where a code's mechanism is recorded; A's release hook is
+the stage 1 wake source and remains M117's and M300's permanently.
 
 ---
 
@@ -841,10 +883,21 @@ Shared, offline:
   existing `DdaRingTests` feedhold states;
 - M400 does not return while deferred work is pending.
 
-Implementation A: release order and timing against synthetic `MoveCompletedEvent`s; the
-Queue-channel FIFO property; the purge hooks.
+Stage 1 (§8.6), the pipeline against synthetic `MoveCompletedEvent`s:
 
-Implementation B, in `DdaRingTests` (no hardware, fake clock):
+- a parked code's handler runs after its anchor's retirement and not before, and parked codes
+  sharing an anchor run in dispatch order;
+- a parked code blocks neither the dispatch of a second deferred code nor a Flush-class code, and
+  dispatch order stays FIFO with parked codes present;
+- macro end and job end do not wait for a parked code; M400 and every FlushAndStandstill code do;
+- after a feedhold, parked codes anchored at or past `FirstPurgedMoveId` are cancelled before any
+  side effect fires and the others run to completion; stop, abort and M112 cancel all of them;
+- a board error resolves the code with the message on the originating line;
+- `NextFilePosition` with a code parked equals its in-order value: a late resolution does not move
+  it, a cancelled parked code does not touch it, and after a rewind a surviving parked code cannot
+  push it past the rewind point (§8.3).
+
+Stage 2, in `DdaRingTests` (no hardware, fake clock):
 
 - an action resolves to its anchor's `moveStartTime + clocksNeeded` and is emitted in the anchor's
   own prepare pass;
@@ -854,23 +907,19 @@ Implementation B, in `DdaRingTests` (no hardware, fake clock):
 - an action submitted after the last move in the queue still resolves; an action whose anchor a stop
   purges is dropped, one whose anchor ran is not.
 
-Implementation B, board side (`CommandProcessor` is ordinary C++): past/sentinel times dispatch on
+Stage 2, board side (`CommandProcessor` is ordinary C++): past/sentinel times dispatch on
 arrival; a future time parks, frees the buffer in the same pass, and fires at its tick; a full ring
 executes nearest-due and parks the arrival; two fan speeds end in the state the latest-due asked
 for however the ring overflowed; the drop broadcast empties the ring and is idempotent.
 
-Implementation C: everything under implementation B, plus the pipeline against a fake link:
+Stage 2, per promoted code, against a fake link:
 
-- a parked code blocks neither the dispatch of a second deferred code nor a Flush-class code, and
-  dispatch order to the action list stays FIFO with parked codes present;
-- macro end and job end do not wait for a parked code; M400 and every FlushAndStandstill code do;
-- after a feedhold, parked codes anchored at or past `FirstPurgedMoveId` are cancelled and the
-  others resolve on their replies; stop cancels all of them and empties the token map;
-- a board error resolves the code with the message on the originating line; a reply timeout
-  resolves it with the delivery error and raises the event;
-- `NextFilePosition` with a code parked equals its in-order value: a late resolution does not move
-  it, a cancelled parked code does not touch it, and after a rewind a surviving parked code cannot
-  push it past the rewind point (§8.3).
+- the row's promoted dispatch runs the handler at parse and parks the code on the reply token;
+  unpromoted rows keep the stage 1 behaviour unchanged;
+- a reply timeout resolves the code with the delivery error and raises the event; stop cancels
+  every parked code and empties the token map;
+- after a feedhold, a cancelled promoted code's actions were dropped from the list in the same
+  operation (§7.3), and parked codes with committed anchors resolve on their replies.
 
 On hardware: `M106 S255` mid-print, confirming the machine does not pause and the fan changes at the
 right point in the path.
@@ -881,23 +930,25 @@ right point in the path.
 
 1. **The class table and dispatch through it** (§5.1). Done: tables, enforcement, the miss path
    and the row flips are implemented; §5.1 lists the behaviour changes.
-2. **Emergency-stop output handling in Duet3Expansion** (§5.7). A live gap independent of this plan.
+2. **Emergency-stop output handling in Duet3Expansion** (§5.7). A live gap independent of this
+   plan; it does not gate stage 1, which parks nothing on the boards, and it must be in place
+   before stage 2 does.
 3. **`state.macroRestarted`** written on macro re-run after a pause (§5.2).
-4. **The implementation decision** (§9), then:
-   - A: the queue store, release hook, purge hooks, M400 term; then convert the §10 codes, M106
-     first.
-   - B: the schema change and offset table; the parked ring; `SubmitAction` and resolution in
-     DuetSbcInterface; the DCS action path and late-reply routing; the lifecycle rules; the
-     CANMaster expiry field; then convert the codes.
-   - C: B's list with the late-reply routing replaced by the token map; plus the parked set in
-     ProcessInternally, the two pending predicates and the purge cancellation (§8); then convert
-     the codes.
+4. **Stage 1** (§8.6, DuetControlServer only):
+   - `MovePlanner.LastSubmittedMoveId` (§5.3) and a per-anchor await on `MotionTracker`;
+   - the defer branch: flush, park on the anchor's retirement, dispatch the handler on wake;
+   - the parked set and the two pending predicates (§8.2);
+   - purge cancellation (§8.4);
+   - convert the §10 codes, M106 first.
+5. **Stage 2** (§8.6, exactness per message type):
+   - the schema change and offset table (§7.1); the parked ring (§7.4); `SubmitAction` and
+     resolution in DuetSbcInterface (§7.3); the CANMaster expiry field (§7.5);
+   - promote codes, each a handler and table-row change, M106 first.
 
 Open decisions:
 
 | | Question | Why it matters |
 | --- | --- | --- |
-| D1 | Which implementation, or A now with promotion per code later (§9)? C is B plus a DuetControlServer-only change, so B to C is an upgrade, not a fork | The whole of §6 vs §7 vs §8 |
-| D2 | Do per-pixel laser segments need the action timeline, or does pixel data ride the move record? Laser *power* must scale with the move's actual top speed, so it belongs on the move either way (`MoveBuilder` carries a `TODO` for `controlLaserOrIoBits`); the question is the pixel stream. | If pixel data needs per-segment actions, only B or C serves it, and the parked ring must be sized for segment rate |
-| D3 | M572: accept ≤ one horizon of stale pressure advance and drop the standstill, or carry the coefficient on the movement message (§7.7)? | Closes the `TODO` in `MCodeHandler.Motion.cs` |
-| D4 | Two motion systems: deferred work belongs to one ring, and the feedhold today stops only ring 0 (a shared `TODO` with M596). | Answer together with M596, not separately |
+| D1 | Do per-pixel laser segments need the action timeline, or does pixel data ride the move record? Laser *power* must scale with the move's actual top speed, so it belongs on the move either way (`MoveBuilder` carries a `TODO` for `controlLaserOrIoBits`); the question is the pixel stream. | If pixel data needs per-segment actions, it needs stage 2, and the parked ring (§7.4) must be sized for segment rate |
+| D2 | M572: accept ≤ one horizon of stale pressure advance and drop the standstill, or carry the coefficient on the movement message (§7.7)? | Closes the `TODO` in `MCodeHandler.Motion.cs` |
+| D3 | Two motion systems: deferred work belongs to one ring, and the feedhold today stops only ring 0 (a shared `TODO` with M596). | Answer together with M596, not separately |
