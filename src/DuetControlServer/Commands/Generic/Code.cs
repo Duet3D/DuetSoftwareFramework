@@ -316,10 +316,23 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         _logger.LogDebug("Processing {Code}", this);
 
         // An expression reading the object model must not be evaluated while earlier codes are
-        // still completing, so such a code waits for them first
-        if (Keyword == KeywordType.None && _expressions.ContainsModelFields(this) && !await _codeProcessor.FlushAsync(this))
+        // still completing, so such a code waits for them first; the flush evaluates the
+        // expressions once the state has settled. One referencing only variables needs no wait,
+        // because this stage runs codes in stream order, but its parameters still have to be
+        // evaluated here: the handlers read numeric parameters only
+        if (Keyword == KeywordType.None)
         {
-            throw new OperationCanceledException();
+            if (_expressions.ContainsModelFields(this))
+            {
+                if (!await _codeProcessor.FlushAsync(this, evaluateExpressions: true, cancellationToken: CancellationToken))
+                {
+                    throw new OperationCanceledException();
+                }
+            }
+            else
+            {
+                await _expressions.EvaluateAsync(this, CancellationToken);
+            }
         }
 
         // Attempt to process the code internally. The handler declares each code's class in its
