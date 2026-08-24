@@ -243,7 +243,6 @@ public class RepRapFirmwareEndpoints
         {
             if (!string.IsNullOrWhiteSpace(name))
             {
-                name = HttpUtility.UrlDecode(name);
                 sessionStorage.SetLongRunningHttpRequest(context.User, true);
                 try
                 {
@@ -326,7 +325,6 @@ public class RepRapFirmwareEndpoints
         {
             if (!string.IsNullOrWhiteSpace(name))
             {
-                name = HttpUtility.UrlDecode(name);
                 string resolvedPath = await EndpointHelper.ResolvePathAsync(settings.SocketPath, name);
                 if (!File.Exists(resolvedPath))
                 {
@@ -360,7 +358,6 @@ public class RepRapFirmwareEndpoints
         {
             if (!string.IsNullOrWhiteSpace(name))
             {
-                name = HttpUtility.UrlDecode(name);
                 string resolvedPath = await EndpointHelper.ResolvePathAsync(settings.SocketPath, name);
 
                 if (Directory.Exists(resolvedPath))

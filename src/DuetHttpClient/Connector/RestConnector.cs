@@ -196,7 +196,7 @@ internal class RestConnector : BaseConnector
                 webSocket.Options.KeepAliveInterval = Options.KeepAliveInterval;
 
                 string wsScheme = (HttpClient.BaseAddress?.Scheme == "https") ? "wss" : "ws";
-                Uri wsUri = new($"{wsScheme}://{HttpClient.BaseAddress?.Host}:{HttpClient.BaseAddress?.Port}/machine?sessionKey={HttpUtility.UrlPathEncode(_sessionKey)}");
+                Uri wsUri = new($"{wsScheme}://{HttpClient.BaseAddress?.Host}:{HttpClient.BaseAddress?.Port}/machine?sessionKey={HttpUtility.UrlEncode(_sessionKey)}");
 
                 try
                 {
@@ -465,10 +465,21 @@ internal class RestConnector : BaseConnector
         throw new HttpRequestException(errorMessage);
     }
 
+    /// <summary>
+    /// Encode a virtual path for use as a catch-all route value
+    /// </summary>
+    /// <param name="path">Virtual path to encode</param>
+    /// <returns>Encoded path</returns>
+    /// <remarks>
+    /// The whole path becomes a single route value, so the separators are sent percent-encoded like DWC does it.
+    /// ASP.NET decodes route values but leaves %2F alone, and DuetWebServer restores the separators from that
+    /// </remarks>
+    private static string EncodePath(string path) => Uri.EscapeDataString(path);
+
     /// <inheritdoc />
     public override async Task UploadAsync(string filename, Stream content, DateTime? lastModified = null, CancellationToken cancellationToken = default)
     {
-        using HttpRequestMessage request = new(HttpMethod.Put, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
+        using HttpRequestMessage request = new(HttpMethod.Put, $"machine/file/{EncodePath(filename)}");
         request.Content = new StreamContent(content);
 
         using HttpResponseMessage response = await SendRequestAsync(request, Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
@@ -483,7 +494,7 @@ internal class RestConnector : BaseConnector
         {
             try
             {
-                using HttpRequestMessage request = new(HttpMethod.Delete, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
+                using HttpRequestMessage request = new(HttpMethod.Delete, $"machine/file/{EncodePath(filename)}");
                 using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
@@ -567,7 +578,7 @@ internal class RestConnector : BaseConnector
         {
             try
             {
-                using HttpRequestMessage request = new(HttpMethod.Put, $"machine/directory/{HttpUtility.UrlPathEncode(directory)}");
+                using HttpRequestMessage request = new(HttpMethod.Put, $"machine/directory/{EncodePath(directory)}");
                 using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
@@ -600,7 +611,7 @@ internal class RestConnector : BaseConnector
     /// <returns>Disposable download response</returns>
     public override async Task<HttpResponseMessage> DownloadAsync(string filename, CancellationToken cancellationToken = default)
     {
-        using HttpRequestMessage request = new(HttpMethod.Get, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
+        using HttpRequestMessage request = new(HttpMethod.Get, $"machine/file/{EncodePath(filename)}");
         HttpResponseMessage response = await SendRequestAsync(request, Timeout.InfiniteTimeSpan, cancellationToken, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
@@ -619,7 +630,7 @@ internal class RestConnector : BaseConnector
         {
             try
             {
-                using HttpRequestMessage request = new(HttpMethod.Get, $"machine/directory/{HttpUtility.UrlPathEncode(directory)}");
+                using HttpRequestMessage request = new(HttpMethod.Get, $"machine/directory/{EncodePath(directory)}");
                 using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
@@ -670,7 +681,7 @@ internal class RestConnector : BaseConnector
         {
             try
             {
-                using HttpRequestMessage request = new(HttpMethod.Get, $"machine/fileinfo/{HttpUtility.UrlPathEncode(filename)}?readThumbnailContent={(readThumbnailContent ? "true" : "false")}");
+                using HttpRequestMessage request = new(HttpMethod.Get, $"machine/fileinfo/{EncodePath(filename)}?readThumbnailContent={(readThumbnailContent ? "true" : "false")}");
                 using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {

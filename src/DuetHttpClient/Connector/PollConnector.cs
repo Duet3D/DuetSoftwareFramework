@@ -751,7 +751,7 @@ internal partial class PollConnector : BaseConnector
             {
                 try
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_gcode?gcode={HttpUtility.UrlPathEncode(code)}");
+                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_gcode?gcode={HttpUtility.UrlEncode(code)}");
                     using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
                     if (response.IsSuccessStatusCode)
                     {
@@ -913,7 +913,7 @@ internal partial class PollConnector : BaseConnector
         content.Seek(0, SeekOrigin.Begin);
 
         // Try to upload it
-        string query = (lastModified is not null) ? $"rr_upload?name={HttpUtility.UrlPathEncode(filename)}&time={lastModified:s}&crc32={checksum}" : $"rr_upload?name={HttpUtility.UrlPathEncode(filename)}&crc32={checksum}";
+        string query = (lastModified is not null) ? $"rr_upload?name={HttpUtility.UrlEncode(filename)}&time={lastModified:s}&crc32={checksum}" : $"rr_upload?name={HttpUtility.UrlEncode(filename)}&crc32={checksum}";
         using HttpRequestMessage request = new(HttpMethod.Post, query);
         request.Content = new StreamContent(content);
 
@@ -941,7 +941,7 @@ internal partial class PollConnector : BaseConnector
         {
             try
             {
-                using HttpRequestMessage request = new(HttpMethod.Get, $"rr_delete?name={HttpUtility.UrlPathEncode(filename)}");
+                using HttpRequestMessage request = new(HttpMethod.Get, $"rr_delete?name={HttpUtility.UrlEncode(filename)}");
                 using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
@@ -991,7 +991,7 @@ internal partial class PollConnector : BaseConnector
         {
             try
             {
-                using HttpRequestMessage request = new(HttpMethod.Get, $"rr_move?old={HttpUtility.UrlPathEncode(from)}&new={HttpUtility.UrlPathEncode(to)}&deleteexisting={(force ? "yes" : "no")}");
+                using HttpRequestMessage request = new(HttpMethod.Get, $"rr_move?old={HttpUtility.UrlEncode(from)}&new={HttpUtility.UrlEncode(to)}&deleteexisting={(force ? "yes" : "no")}");
                 using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
@@ -1041,7 +1041,7 @@ internal partial class PollConnector : BaseConnector
         {
             try
             {
-                using HttpRequestMessage request = new(HttpMethod.Get, $"rr_mkdir?dir={HttpUtility.UrlPathEncode(directory)}");
+                using HttpRequestMessage request = new(HttpMethod.Get, $"rr_mkdir?dir={HttpUtility.UrlEncode(directory)}");
                 using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
@@ -1087,7 +1087,7 @@ internal partial class PollConnector : BaseConnector
     /// <returns>Disposable download response</returns>
     public override async Task<HttpResponseMessage> DownloadAsync(string filename, CancellationToken cancellationToken = default)
     {
-        using HttpRequestMessage request = new(HttpMethod.Get, $"rr_download?name={HttpUtility.UrlPathEncode(filename)}");
+        using HttpRequestMessage request = new(HttpMethod.Get, $"rr_download?name={HttpUtility.UrlEncode(filename)}");
         HttpResponseMessage response = await SendRequestAsync(request, Timeout.InfiniteTimeSpan, cancellationToken, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
@@ -1111,7 +1111,7 @@ internal partial class PollConnector : BaseConnector
             {
                 try
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_filelist?dir={HttpUtility.UrlPathEncode(directory)}&first={nextIndex}");
+                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_filelist?dir={HttpUtility.UrlEncode(directory)}&first={nextIndex}");
                     using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
 
                     if (response.IsSuccessStatusCode)
@@ -1176,7 +1176,7 @@ internal partial class PollConnector : BaseConnector
     public override async Task<GCodeFileInfo> GetFileInfoAsync(string filename, bool readThumbnailContent, CancellationToken cancellationToken = default)
     {
         string errorMessage = "Invalid number of maximum retries configured";
-        string encodedFilename = HttpUtility.UrlPathEncode(filename);
+        string encodedFilename = HttpUtility.UrlEncode(filename);
         for (int i = 0; i <= Options.MaxRetries; i++)
         {
             try
@@ -1254,7 +1254,7 @@ internal partial class PollConnector : BaseConnector
 
                         do
                         {
-                            using HttpRequestMessage request = new(HttpMethod.Get, $"rr_thumbnail?name={HttpUtility.UrlPathEncode(fileinfo.FileName)}&offset={offset}");
+                            using HttpRequestMessage request = new(HttpMethod.Get, $"rr_thumbnail?name={HttpUtility.UrlEncode(fileinfo.FileName)}&offset={offset}");
                             using HttpResponseMessage response = await SendRequestAsync(request, Options.Timeout, cancellationToken).ConfigureAwait(false);
                             if (!response.IsSuccessStatusCode)
                             {
