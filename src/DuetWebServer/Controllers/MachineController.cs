@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
@@ -37,6 +38,20 @@ namespace DuetWebServer.Controllers
         /// App settings
         /// </summary>
         private readonly Settings _settings = configuration.Get<Settings>() ?? new();
+
+        /// <summary>
+        /// Restore path separators that were sent percent-encoded
+        /// </summary>
+        /// <param name="path">Path taken from a catch-all route parameter</param>
+        /// <returns>Path with its separators restored</returns>
+        /// <remarks>
+        /// ASP.NET decodes route parameters but leaves %2F alone so that it cannot be mistaken for a segment
+        /// separator, whereas DWC sends virtual paths with encoded slashes. Only that one escape may be
+        /// resolved here; decoding the whole value again would eat a literal percent sign in a file name and
+        /// turn a plus into a space
+        /// </remarks>
+        [return: NotNullIfNotNull(nameof(path))]
+        private static string? RestorePathSeparators(string? path) => path?.Replace("%2F", "/", StringComparison.OrdinalIgnoreCase);
 
         #region Logging
         /// <summary>
@@ -359,7 +374,7 @@ namespace DuetWebServer.Controllers
         [HttpGet("file/{*filename}")]
         public async Task<IActionResult> DownloadFile(string filename)
         {
-            filename = HttpUtility.UrlDecode(filename);
+            filename = RestorePathSeparators(filename);
 
             string resolvedPath = "n/a";
             try
@@ -421,7 +436,7 @@ namespace DuetWebServer.Controllers
         [HttpPut("file/{*filename}")]
         public async Task<IActionResult> UploadFile(string filename, DateTime? timeModified, [FromServices] ISessionStorage sessionStorage)
         {
-            filename = HttpUtility.UrlDecode(filename);
+            filename = RestorePathSeparators(filename);
 
             string resolvedPath = "n/a";
             try
@@ -515,7 +530,7 @@ namespace DuetWebServer.Controllers
         [HttpGet("fileinfo/{*filename}")]
         public async Task<IActionResult> GetFileInfo(string filename, bool readThumbnailContent = false)
         {
-            filename = HttpUtility.UrlDecode(filename);
+            filename = RestorePathSeparators(filename);
 
             string resolvedPath = "n/a";
             try
@@ -581,7 +596,7 @@ namespace DuetWebServer.Controllers
         [HttpDelete("file/{*filename}")]
         public async Task<IActionResult> DeleteFileOrDirectory(string filename, bool recursive = false)
         {
-            filename = HttpUtility.UrlDecode(filename);
+            filename = RestorePathSeparators(filename);
 
             string resolvedPath = "n/a";
             try
@@ -741,7 +756,7 @@ namespace DuetWebServer.Controllers
         [HttpGet("directory/{*directory}")]
         public async Task<IActionResult> GetFileList(string? directory)
         {
-            directory = HttpUtility.UrlDecode(directory);
+            directory = RestorePathSeparators(directory);
 
             string resolvedPath = "n/a";
             try
@@ -798,7 +813,7 @@ namespace DuetWebServer.Controllers
         [HttpPut("directory/{*directory}")]
         public async Task<IActionResult> CreateDirectory(string directory)
         {
-            directory = HttpUtility.UrlDecode(directory);
+            directory = RestorePathSeparators(directory);
 
             string resolvedPath = "n/a";
             try

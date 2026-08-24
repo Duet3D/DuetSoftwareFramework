@@ -117,8 +117,8 @@ namespace DuetPluginService.Commands
                                 if (Path.GetFileName(sdFile).Equals("daemon.g"))
                                 {
                                     // daemon.g may be still open at this time
-                                    logger.Debug("Renaming file {0} to {1}", sdFile, sdFile + ".bak");
-                                    File.Move(sdFile, sdFile + ".bak", true);
+                                    logger.Debug("Renaming file {0} to {1}", fileName, fileName + ".bak");
+                                    File.Move(fileName, fileName + ".bak", true);
                                 }
                                 else
                                 {

@@ -23,6 +23,26 @@ namespace DuetControlServer.Files
         }
 
         /// <summary>
+        /// Copy constructor used by with-expressions. The local variables need a deep copy, else forked
+        /// files share the same list and clearing it in one file clears it in the other one too
+        /// </summary>
+        /// <param name="original">Block to copy from</param>
+        protected CodeBlock(CodeBlock original)
+        {
+            Indent = original.Indent;
+            FilePosition = original.FilePosition;
+            LineNumber = original.LineNumber;
+            Keyword = original.Keyword;
+            ProcessBlock = original.ProcessBlock;
+            SeenCodes = original.SeenCodes;
+            ExpectingElse = original.ExpectingElse;
+            ContinueLoop = original.ContinueLoop;
+            Iterations = original.Iterations;
+            HasLocalVariables = original.HasLocalVariables;
+            LocalVariables = [.. original.LocalVariables];
+        }
+
+        /// <summary>
         /// Indentation of this block
         /// </summary>
         public int Indent { get; }

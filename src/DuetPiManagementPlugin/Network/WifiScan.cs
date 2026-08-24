@@ -148,7 +148,7 @@ namespace DuetPiManagementPlugin.Network
 
                         // Reset collected data
                         highestSupportedRate = 0;
-                        vht = ht = wpa = wpa2 = false;
+                        vht = ht = wpa = wpa2 = wpa3 = false;
                     }
                 }
 

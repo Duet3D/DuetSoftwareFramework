@@ -35,7 +35,7 @@ namespace DuetHttpClient.Connector
         public static async Task<RestConnector> ConnectAsync(Uri baseUri, DuetHttpOptions options, CancellationToken cancellationToken)
         {
             using HttpClient client = new() { Timeout = options.Timeout };
-            using HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, $"machine/connect?password={HttpUtility.UrlPathEncode(options.Password)}&time={DateTime.Now:s}"), cancellationToken);
+            using HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, $"machine/connect?password={HttpUtility.UrlEncode(options.Password)}&time={DateTime.Now:s}"), cancellationToken);
             if (response.IsSuccessStatusCode)
             {
 #if NET6_0_OR_GREATER
@@ -96,7 +96,7 @@ namespace DuetHttpClient.Connector
             using CancellationTokenSource connectCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _terminateSession.Token);
             connectCts.CancelAfter(Options.Timeout);
 
-            using HttpResponseMessage response = await HttpClient.GetAsync($"machine/connect?password={Options.Password}", connectCts.Token);
+            using HttpResponseMessage response = await HttpClient.GetAsync($"machine/connect?password={HttpUtility.UrlEncode(Options.Password)}", connectCts.Token);
             if (response.IsSuccessStatusCode)
             {
 #if NET6_0_OR_GREATER
@@ -192,7 +192,7 @@ namespace DuetHttpClient.Connector
                     webSocket.Options.KeepAliveInterval = Options.KeepAliveInterval;
 
                     string wsScheme = (HttpClient.BaseAddress?.Scheme == "https") ? "wss" : "ws";
-                    Uri wsUri = new($"{wsScheme}://{HttpClient.BaseAddress?.Host}:{HttpClient.BaseAddress?.Port}/machine?sessionKey={HttpUtility.UrlPathEncode(_sessionKey)}");
+                    Uri wsUri = new($"{wsScheme}://{HttpClient.BaseAddress?.Host}:{HttpClient.BaseAddress?.Port}/machine?sessionKey={HttpUtility.UrlEncode(_sessionKey)}");
 
                     try
                     {
@@ -463,6 +463,17 @@ namespace DuetHttpClient.Connector
         }
 
         /// <summary>
+        /// Encode a virtual path for use as a catch-all route value
+        /// </summary>
+        /// <param name="path">Virtual path to encode</param>
+        /// <returns>Encoded path</returns>
+        /// <remarks>
+        /// The whole path becomes a single route value, so the separators are sent percent-encoded like DWC does it.
+        /// ASP.NET decodes route values but leaves %2F alone, and DuetWebServer restores the separators from that
+        /// </remarks>
+        private static string EncodePath(string path) => Uri.EscapeDataString(path);
+
+        /// <summary>
         /// Upload arbitrary content to a file
         /// </summary>
         /// <param name="filename">Target filename</param>
@@ -472,7 +483,7 @@ namespace DuetHttpClient.Connector
         /// <returns>Asynchronous task</returns>
         public override async Task Upload(string filename, Stream content, DateTime? lastModified = null, CancellationToken cancellationToken = default)
         {
-            using HttpRequestMessage request = new(HttpMethod.Put, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
+            using HttpRequestMessage request = new(HttpMethod.Put, $"machine/file/{EncodePath(filename)}");
             request.Content = new StreamContent(content);
 
             using HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
@@ -492,7 +503,7 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Delete, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
+                    using HttpRequestMessage request = new(HttpMethod.Delete, $"machine/file/{EncodePath(filename)}");
                     using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
                     if (response.IsSuccessStatusCode)
                     {
@@ -588,7 +599,7 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Put, $"machine/directory/{HttpUtility.UrlPathEncode(directory)}");
+                    using HttpRequestMessage request = new(HttpMethod.Put, $"machine/directory/{EncodePath(directory)}");
                     using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
                     if (response.IsSuccessStatusCode)
                     {
@@ -621,7 +632,7 @@ namespace DuetHttpClient.Connector
         /// <returns>Disposable download response</returns>
         public override async Task<HttpResponseMessage> Download(string filename, CancellationToken cancellationToken = default)
         {
-            using HttpRequestMessage request = new(HttpMethod.Get, $"machine/file/{HttpUtility.UrlPathEncode(filename)}");
+            using HttpRequestMessage request = new(HttpMethod.Get, $"machine/file/{EncodePath(filename)}");
             HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
@@ -645,7 +656,7 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Get, $"machine/directory/{HttpUtility.UrlPathEncode(directory)}");
+                    using HttpRequestMessage request = new(HttpMethod.Get, $"machine/directory/{EncodePath(directory)}");
                     using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
                     if (response.IsSuccessStatusCode)
                     {
@@ -702,7 +713,7 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Get, $"machine/fileinfo/{HttpUtility.UrlPathEncode(filename)}?readThumbnailContent={(readThumbnailContent ? "true" : "false")}");
+                    using HttpRequestMessage request = new(HttpMethod.Get, $"machine/fileinfo/{EncodePath(filename)}?readThumbnailContent={(readThumbnailContent ? "true" : "false")}");
                     using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
                     if (response.IsSuccessStatusCode)
                     {

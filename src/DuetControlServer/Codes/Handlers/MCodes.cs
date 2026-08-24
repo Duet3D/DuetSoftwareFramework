@@ -1135,6 +1135,10 @@ namespace DuetControlServer.Codes.Handlers
                                 await SPI.Interface.UpdateFirmware(iapStream, firmwareStream);
                             }
 
+                            // Updating the firmware resets the controller, which invalidates every channel and cancels
+                            // this very code. Reassign its cancellation token so it can report success instead of cancelled
+                            code.ResetCancellationToken();
+
                             // Terminate the program - or - restart the plugins when done
                             if (Settings.UpdateOnly || !Settings.NoTerminateOnReset)
                             {

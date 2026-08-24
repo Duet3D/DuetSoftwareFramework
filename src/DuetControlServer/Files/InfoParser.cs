@@ -471,7 +471,8 @@ namespace DuetControlServer.Files
                 {
                     string key = comment[..index].Trim(), value = comment[(index + 1)..].Trim();
                     _logger.Debug("Evaluating user-defined key '{0}' with value '{1}'", key, value);
-                    userDefinedKeys.Add(key, Model.Expressions.EvaluateExpressionRaw(code, value, false));
+                    // Use the indexer so a duplicate key overwrites the previous value instead of throwing
+                    userDefinedKeys[key] = Model.Expressions.EvaluateExpressionRaw(code, value, false);
                     return true;
                 }
             }
@@ -608,30 +609,39 @@ namespace DuetControlServer.Files
 
             // This is the start of an embedded thumbnail image
             string trimmedComment = code.Comment.TrimStart();
-            if (trimmedComment.StartsWith("thumbnail begin", StringComparison.InvariantCultureIgnoreCase))
+            try
             {
-                _logger.Debug("Found embedded thumbnail PNG image");
-                await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.PNG);
-                return true;
-            }
-            if (trimmedComment.StartsWith("thumbnail_JPG", StringComparison.InvariantCultureIgnoreCase))
-            {
-                _logger.Debug("Found embedded thumbnail JPG Image");
-                await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.JPEG);
-                return true;
-            }
-            if (trimmedComment.StartsWith("thumbnail_QOI", StringComparison.InvariantCultureIgnoreCase))
-            {
-                _logger.Debug("Found embedded thumbnail QOI Image");
-                await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.QOI);
-                return true;
-            }
+                if (trimmedComment.StartsWith("thumbnail begin", StringComparison.InvariantCultureIgnoreCase))
+                {
+                    _logger.Debug("Found embedded thumbnail PNG image");
+                    await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.PNG);
+                    return true;
+                }
+                if (trimmedComment.StartsWith("thumbnail_JPG", StringComparison.InvariantCultureIgnoreCase))
+                {
+                    _logger.Debug("Found embedded thumbnail JPG Image");
+                    await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.JPEG);
+                    return true;
+                }
+                if (trimmedComment.StartsWith("thumbnail_QOI", StringComparison.InvariantCultureIgnoreCase))
+                {
+                    _logger.Debug("Found embedded thumbnail QOI Image");
+                    await ImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent, ThumbnailInfoFormat.QOI);
+                    return true;
+                }
 
-            // Icon Image (proprietary)
-            if (trimmedComment.Contains("Icon:"))
+                // Icon Image (proprietary)
+                if (trimmedComment.Contains("Icon:"))
+                {
+                    _logger.Debug("Found Icon Image");
+                    await IconImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent);
+                    return true;
+                }
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
             {
-                _logger.Debug("Found Icon Image");
-                await IconImageParser.ProcessAsync(stream, codeParserBuffer, parsedFileInfo, code, readThumbnailContent);
+                // A malformed thumbnail must not abort the whole file info parse
+                _logger.Warn(e, "Failed to parse thumbnail image, skipping it");
                 return true;
             }
 
@@ -811,6 +821,30 @@ namespace DuetControlServer.Files
             // Update the simulated time in the file
             await using (FileStream fileStream = new(filename, FileMode.Open, FileAccess.ReadWrite, FileShare.Read, Settings.FileBufferSize))
             {
+                // Search the marker in the raw bytes to obtain a byte offset. The marker is plain ASCII, but the
+                // surrounding file content may not be, so a char index from the decoded string would be wrong
+                static int FindSimulationMarker(ReadOnlySpan<byte> buffer)
+                {
+                    ReadOnlySpan<char> marker = SimulatedTimeString;
+                    for (int i = 0; i + marker.Length <= buffer.Length; i++)
+                    {
+                        bool found = true;
+                        for (int k = 0; k < marker.Length; k++)
+                        {
+                            if (char.ToLowerInvariant((char)buffer[i + k]) != char.ToLowerInvariant(marker[k]))
+                            {
+                                found = false;
+                                break;
+                            }
+                        }
+                        if (found)
+                        {
+                            return i;
+                        }
+                    }
+                    return -1;
+                }
+
                 // Check if we need to truncate the file before the last simulated time
                 bool truncate = false;
                 Memory<byte> buffer = new byte[64];
@@ -820,8 +854,7 @@ namespace DuetControlServer.Files
                     int bytesRead = await fileStream.ReadAsync(buffer), offset = 0;
                     if (bytesRead > 0)
                     {
-                        string bufferString = Encoding.UTF8.GetString(buffer[..bytesRead].Span);
-                        int simulationMarkerPosition = bufferString.IndexOf(SimulatedTimeString, StringComparison.InvariantCultureIgnoreCase);
+                        int simulationMarkerPosition = FindSimulationMarker(buffer[..bytesRead].Span);
                         if (simulationMarkerPosition >= 0)
                         {
                             offset = bytesRead - simulationMarkerPosition;

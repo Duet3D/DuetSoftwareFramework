@@ -6,8 +6,10 @@ chmod 664 /opt/dsf/conf/http.json
 # Update systemd services
 systemctl -q --no-ask-password daemon-reload
 
-# Start DWS again if it is enabled via systemd
+# Start DWS again if it is enabled via systemd. Ignore the return code so a failed start does not
+# abort package configuration of the meta package
 if (systemctl -q is-enabled duetwebserver); then
-    systemctl -q --no-ask-password start duetwebserver
+    systemctl -q --no-ask-password start duetwebserver || true
 fi
 
+exit 0

@@ -241,6 +241,7 @@ namespace DuetWebServer.Controllers
 
             // Register this client and keep it up-to-date
             using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(applicationLifetime.ApplicationStopping);
+            Task? rxTask = null, txTask = null;
             try
             {
                 // Fetch full model copy and send it over initially
@@ -249,10 +250,12 @@ namespace DuetWebServer.Controllers
                     await webSocket.SendAsync(json.ToArray(), WebSocketMessageType.Text, true, default);
                 }
 
-                // Deal with this connection in full-duplex mode
+                // Deal with this connection in full-duplex mode. All sends must be serialized via a shared
+                // lock because WebSocket forbids concurrent SendAsync calls (e.g. PONG vs model patch)
                 AsyncAutoResetEvent dataAcknowledged = new();
-                Task rxTask = ReadFromClient(webSocket, dataAcknowledged, cts.Token);
-                Task txTask = WriteToClient(webSocket, subscribeConnection, dataAcknowledged, cts.Token);
+                AsyncLock sendLock = new();
+                rxTask = ReadFromClient(webSocket, dataAcknowledged, sendLock, cts.Token);
+                txTask = WriteToClient(webSocket, subscribeConnection, dataAcknowledged, sendLock, cts.Token);
 
                 // Deal with the tasks' lifecycles
                 Task terminatedTask = await Task.WhenAny(rxTask, txTask);
@@ -285,6 +288,17 @@ namespace DuetWebServer.Controllers
             finally
             {
                 cts.Cancel();
+
+                // Wait for both tasks to finish before the socket is disposed
+                try
+                {
+                    await Task.WhenAll(rxTask ?? Task.CompletedTask, txTask ?? Task.CompletedTask);
+                }
+                catch
+                {
+                    // ignored, the connection is being torn down anyway
+                }
+
                 LogInformation($"WebSocket disconnected from {ipAddress}:{port}");
             }
         }
@@ -294,9 +308,10 @@ namespace DuetWebServer.Controllers
         /// </summary>
         /// <param name="webSocket">WebSocket to read from</param>
         /// <param name="dataAcknowledged">Event to trigger when the client has acknowledged data</param>
+        /// <param name="sendLock">Lock to serialize send operations on the WebSocket</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        private async Task ReadFromClient(WebSocket webSocket, AsyncAutoResetEvent dataAcknowledged, CancellationToken cancellationToken)
+        private async Task ReadFromClient(WebSocket webSocket, AsyncAutoResetEvent dataAcknowledged, AsyncLock sendLock, CancellationToken cancellationToken)
         {
             byte[] receiveBuffer = new byte[128];
             do
@@ -331,7 +346,10 @@ namespace DuetWebServer.Controllers
                     else if (line == "PING")
                     {
                         // Client hasn't received an update in a while, send back a PONG response
-                        await webSocket.SendAsync(PONG, WebSocketMessageType.Text, true, cancellationToken);
+                        using (await sendLock.LockAsync(cancellationToken))
+                        {
+                            await webSocket.SendAsync(PONG, WebSocketMessageType.Text, true, cancellationToken);
+                        }
                     }
                     else if (!string.IsNullOrWhiteSpace(line))
                     {
@@ -350,9 +368,10 @@ namespace DuetWebServer.Controllers
         /// <param name="webSocket">WebSocket to write to</param>
         /// <param name="subscribeConnection">IPC connection to supply model updates</param>
         /// <param name="dataAcknowledged">Event that is triggered when the client has acknowledged data</param>
+        /// <param name="sendLock">Lock to serialize send operations on the WebSocket</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        private static async Task WriteToClient(WebSocket webSocket, SubscribeConnection subscribeConnection, AsyncAutoResetEvent dataAcknowledged, CancellationToken cancellationToken)
+        private static async Task WriteToClient(WebSocket webSocket, SubscribeConnection subscribeConnection, AsyncAutoResetEvent dataAcknowledged, AsyncLock sendLock, CancellationToken cancellationToken)
         {
             do
             {
@@ -365,7 +384,10 @@ namespace DuetWebServer.Controllers
 
                 // Wait for another object model update and send it to the client
                 await using MemoryStream objectModelPatch = await subscribeConnection.GetSerializedObjectModel(cancellationToken);
-                await webSocket.SendAsync(objectModelPatch.ToArray(), WebSocketMessageType.Text, true, cancellationToken);
+                using (await sendLock.LockAsync(cancellationToken))
+                {
+                    await webSocket.SendAsync(objectModelPatch.ToArray(), WebSocketMessageType.Text, true, cancellationToken);
+                }
             }
             while (webSocket.State == WebSocketState.Open);
         }

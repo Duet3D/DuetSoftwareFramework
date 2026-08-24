@@ -156,7 +156,7 @@ namespace DuetPiManagementPlugin.Network
                         {
                             // IP address
                             item.IP = IPAddress.Parse(match.Groups[1].Value);
-                            if (match.Groups.Count == 3)
+                            if (match.Groups[2].Success)
                             {
                                 // Subnet mask (CIDR)
                                 item.CIDR = int.Parse(match.Groups[2].Value);

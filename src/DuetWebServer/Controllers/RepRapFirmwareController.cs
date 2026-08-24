@@ -306,7 +306,6 @@ namespace DuetWebServer.Controllers
             {
                 if (!string.IsNullOrWhiteSpace(name))
                 {
-                    name = HttpUtility.UrlDecode(name);
                     sessionStorage.SetLongRunningHttpRequest(HttpContext.User, true);
                     try
                     {
@@ -391,7 +390,6 @@ namespace DuetWebServer.Controllers
             {
                 if (!string.IsNullOrWhiteSpace(name))
                 {
-                    name = HttpUtility.UrlDecode(name);
                     string resolvedPath = await ResolvePath(name);
                     if (!System.IO.File.Exists(resolvedPath))
                     {
@@ -427,7 +425,6 @@ namespace DuetWebServer.Controllers
             {
                 if (!string.IsNullOrWhiteSpace(name))
                 {
-                    name = HttpUtility.UrlDecode(name);
                     string resolvedPath = await ResolvePath(name);
 
                     if (Directory.Exists(resolvedPath))

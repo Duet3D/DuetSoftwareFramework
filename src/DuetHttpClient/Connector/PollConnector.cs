@@ -42,7 +42,7 @@ namespace DuetHttpClient.Connector
             uint? sessionKey = null;
             using (HttpClient client = new() { Timeout = options.Timeout })
             {
-                using HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, $"rr_connect?password={HttpUtility.UrlPathEncode(options.Password)}&time={DateTime.Now:s}"), cancellationToken);
+                using HttpResponseMessage response = await client.GetAsync(new Uri(baseUri, $"rr_connect?password={HttpUtility.UrlEncode(options.Password)}&time={DateTime.Now:s}"), cancellationToken);
                 response.EnsureSuccessStatusCode();
 
 #if NET6_0_OR_GREATER
@@ -58,14 +58,28 @@ namespace DuetHttpClient.Connector
                     2 => throw new NoFreeSessionException(),
                     _ => throw new LoginException($"rr_connect returned unknown err {connectResponse.Err}"),
                 };
-                if (connectResponse.IsEmulated)
+                if (connectResponse.IsEmulated || connectResponse.ApiLevel < MinApiLevel)
                 {
-                    // Don't attempt to use emulated endpoints since the remote server provides support for RESTful calls too
-                    throw new HttpRequestException("HTTP backend is emulated");
-                }
+                    // Free the just-created session again, boards only support a limited number of them
+                    try
+                    {
+                        using HttpRequestMessage disconnectRequest = new(HttpMethod.Get, new Uri(baseUri, "rr_disconnect"));
+                        if (sessionKey is not null)
+                        {
+                            disconnectRequest.Headers.Add("X-Session-Key", sessionKey.ToString());
+                        }
+                        using HttpResponseMessage disconnectResponse = await client.SendAsync(disconnectRequest, cancellationToken);
+                    }
+                    catch
+                    {
+                        // ignored
+                    }
 
-                if (connectResponse.ApiLevel < MinApiLevel)
-                {
+                    if (connectResponse.IsEmulated)
+                    {
+                        // Don't attempt to use emulated endpoints since the remote server provides support for RESTful calls too
+                        throw new HttpRequestException("HTTP backend is emulated");
+                    }
                     throw new InvalidVersionException("Incompatible API level");
                 }
             }
@@ -119,8 +133,11 @@ namespace DuetHttpClient.Connector
                 _runningCodes.Clear();
             }
 
-            using HttpRequestMessage request = new(HttpMethod.Get, $"rr_connect?password={HttpUtility.UrlPathEncode(Options.Password)}&time={DateTime.Now:s}");
-            using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
+            // Send rr_connect directly. Going through SendRequest could recurse without bounds if
+            // the remote end answered the connect request itself with a 401 code
+            using CancellationTokenSource connectCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _terminateSession.Token);
+            connectCts.CancelAfter(Options.Timeout);
+            using HttpResponseMessage response = await HttpClient.GetAsync($"rr_connect?password={HttpUtility.UrlEncode(Options.Password)}&time={DateTime.Now:s}", connectCts.Token);
             response.EnsureSuccessStatusCode();
 
 #if NET6_0_OR_GREATER
@@ -226,7 +243,7 @@ namespace DuetHttpClient.Connector
         /// </summary>
         /// <param name="cancellationToken">Optional cancellation token</param>
         /// <returns>Asynchronous task</returns>
-        public override Task WaitForModelUpdate(CancellationToken cancellationToken = default)
+        public override async Task WaitForModelUpdate(CancellationToken cancellationToken = default)
         {
             if (disposed)
             {
@@ -238,24 +255,24 @@ namespace DuetHttpClient.Connector
             }
 
             TaskCompletionSource<object?> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_terminateSession.Token, cancellationToken);
+            using CancellationTokenRegistration ctsRegistration = cts.Token.Register(() => tcs.TrySetCanceled());
             lock (_modelUpdateTcs)
             {
                 _modelUpdateTcs.Add(tcs);
             }
 
-            CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_terminateSession.Token, cancellationToken);
-            CancellationTokenRegistration ctsRegistration = cts.Token.Register(() => tcs.TrySetCanceled());
-            return tcs.Task.ContinueWith(async task =>
+            try
             {
-                try
+                await tcs.Task;
+            }
+            finally
+            {
+                lock (_modelUpdateTcs)
                 {
-                    await task;
+                    _modelUpdateTcs.Remove(tcs);
                 }
-                finally
-                {
-                    ctsRegistration.Dispose();
-                }
-            }, TaskContinuationOptions.RunContinuationsAsynchronously);
+            }
         }
 
         /// <summary>
@@ -273,6 +290,7 @@ namespace DuetHttpClient.Connector
             {
                 do
                 {
+                    bool hadError = false;
                     try
                     {
                         if (Options.ObserveObjectModel)
@@ -412,28 +430,20 @@ namespace DuetHttpClient.Connector
                             }
                             else
                             {
-                                // Request only seqs.reply to know when to query rr_reply
-                                using JsonDocument replySeqDocument = await GetObjectModel("seqs.reply", string.Empty);
-                                if (replySeqDocument.RootElement.TryGetProperty("result", out JsonElement replySeqElement) &&
-                                    replySeqElement.ValueKind == JsonValueKind.Number)
-                                {
-                                    int seq, newSeq = replySeqElement.GetInt32();
-                                    lock (_seqs)
-                                    {
-                                        _seqs.TryGetValue("reply", out seq);
-                                    }
-
-                                    if (newSeq > seq)
-                                    {
-                                        await GetGCodeReply(newSeq);
-                                    }
-                                }
+                                await PollReplySeq();
                             }
+                        }
+                        else
+                        {
+                            // Even without model observation the reply seq must be polled so that
+                            // SendCode gets its replies and the HTTP session stays alive
+                            await PollReplySeq();
                         }
                     }
                     catch (Exception e) when (e is OperationCanceledException || e is HttpRequestException)
                     {
                         // This happens when the remote end is offline or unavailable
+                        hadError = true;
                         lock (Model)
                         {
                             Model.State.Status = MachineStatus.Disconnected;
@@ -445,10 +455,10 @@ namespace DuetHttpClient.Connector
                         }
                     }
 
-                    // Wait a moment before attempting to reconnect
+                    // Wait a moment before polling again
                     try
                     {
-                        await Task.Delay(Options.RetryDelay, _terminateSession.Token);
+                        await Task.Delay(hadError ? Options.RetryDelay : Options.UpdateInterval, _terminateSession.Token);
                     }
                     catch (OperationCanceledException)
                     {
@@ -460,6 +470,29 @@ namespace DuetHttpClient.Connector
             finally
             {
                 _sessionTaskTerminated.SetResult(null);
+            }
+        }
+
+        /// <summary>
+        /// Request only seqs.reply to know when to query rr_reply. This also serves as a session keepalive
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        private async Task PollReplySeq()
+        {
+            using JsonDocument replySeqDocument = await GetObjectModel("seqs.reply", string.Empty);
+            if (replySeqDocument.RootElement.TryGetProperty("result", out JsonElement replySeqElement) &&
+                replySeqElement.ValueKind == JsonValueKind.Number)
+            {
+                int seq, newSeq = replySeqElement.GetInt32();
+                lock (_seqs)
+                {
+                    _seqs.TryGetValue("reply", out seq);
+                }
+
+                if (newSeq > seq)
+                {
+                    await GetGCodeReply(newSeq);
+                }
             }
         }
 
@@ -705,7 +738,7 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_gcode?gcode={HttpUtility.UrlPathEncode(code)}");
+                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_gcode?gcode={HttpUtility.UrlEncode(code)}");
                     using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
                     if (response.IsSuccessStatusCode)
                     {
@@ -871,7 +904,7 @@ namespace DuetHttpClient.Connector
             content.Seek(0, SeekOrigin.Begin);
 
             // Try to upload it
-            string query = (lastModified is not null) ? $"rr_upload?name={HttpUtility.UrlPathEncode(filename)}&time={lastModified:s}&crc32={checksum}" : $"rr_upload?name={HttpUtility.UrlPathEncode(filename)}&crc32={checksum}";
+            string query = (lastModified is not null) ? $"rr_upload?name={HttpUtility.UrlEncode(filename)}&time={lastModified:s}&crc32={checksum}" : $"rr_upload?name={HttpUtility.UrlEncode(filename)}&crc32={checksum}";
             using HttpRequestMessage request = new(HttpMethod.Post, query);
             request.Content = new StreamContent(content);
 
@@ -904,7 +937,7 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_delete?name={HttpUtility.UrlPathEncode(filename)}");
+                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_delete?name={HttpUtility.UrlEncode(filename)}");
                     using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
                     if (response.IsSuccessStatusCode)
                     {
@@ -961,7 +994,7 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_move?old={HttpUtility.UrlPathEncode(from)}&new={HttpUtility.UrlPathEncode(to)}&deleteexisting={(force ? "yes" : "no")}");
+                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_move?old={HttpUtility.UrlEncode(from)}&new={HttpUtility.UrlEncode(to)}&deleteexisting={(force ? "yes" : "no")}");
                     using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
                     if (response.IsSuccessStatusCode)
                     {
@@ -1016,7 +1049,7 @@ namespace DuetHttpClient.Connector
             {
                 try
                 {
-                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_mkdir?dir={HttpUtility.UrlPathEncode(directory)}");
+                    using HttpRequestMessage request = new(HttpMethod.Get, $"rr_mkdir?dir={HttpUtility.UrlEncode(directory)}");
                     using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
                     if (response.IsSuccessStatusCode)
                     {
@@ -1062,7 +1095,7 @@ namespace DuetHttpClient.Connector
         /// <returns>Disposable download response</returns>
         public override async Task<HttpResponseMessage> Download(string filename, CancellationToken cancellationToken = default)
         {
-            using HttpRequestMessage request = new(HttpMethod.Get, $"rr_download?name={HttpUtility.UrlPathEncode(filename)}");
+            using HttpRequestMessage request = new(HttpMethod.Get, $"rr_download?name={HttpUtility.UrlEncode(filename)}");
             HttpResponseMessage response = await SendRequest(request, Timeout.InfiniteTimeSpan, cancellationToken);
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
@@ -1091,7 +1124,7 @@ namespace DuetHttpClient.Connector
                 {
                     try
                     {
-                        using HttpRequestMessage request = new(HttpMethod.Get, $"rr_filelist?dir={HttpUtility.UrlPathEncode(directory)}&first={nextIndex}");
+                        using HttpRequestMessage request = new(HttpMethod.Get, $"rr_filelist?dir={HttpUtility.UrlEncode(directory)}&first={nextIndex}");
                         using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
 
                         if (response.IsSuccessStatusCode)
@@ -1162,7 +1195,7 @@ namespace DuetHttpClient.Connector
         public override async Task<GCodeFileInfo> GetFileInfo(string filename, bool readThumbnailContent, CancellationToken cancellationToken = default)
         {
             string errorMessage = "Invalid number of maximum retries configured";
-            string encodedFilename = HttpUtility.UrlPathEncode(filename);
+            string encodedFilename = HttpUtility.UrlEncode(filename);
             for (int i = 0; i <= Options.MaxRetries; i++)
             {
                 try
@@ -1240,7 +1273,7 @@ namespace DuetHttpClient.Connector
 
                             do
                             {
-                                using HttpRequestMessage request = new(HttpMethod.Get, $"rr_thumbnail?name={fileinfo.FileName}&offset={offset}");
+                                using HttpRequestMessage request = new(HttpMethod.Get, $"rr_thumbnail?name={HttpUtility.UrlEncode(fileinfo.FileName)}&offset={offset}");
                                 using HttpResponseMessage response = await SendRequest(request, Options.Timeout, cancellationToken);
                                 if (response.IsSuccessStatusCode)
                                 {

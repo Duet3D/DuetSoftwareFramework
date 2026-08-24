@@ -10,6 +10,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
@@ -90,6 +91,20 @@ namespace DuetWebServer.Middleware
 
                         await Task.WhenAny(webSocketTask, unixSocketTask);
                         cts.Cancel();
+
+                        // Wait for both tasks to finish before the sockets are disposed and log faults
+                        try
+                        {
+                            await Task.WhenAll(webSocketTask, unixSocketTask);
+                        }
+                        catch (Exception e) when (e is OperationCanceledException or SocketException)
+                        {
+                            // expected when the connection is being torn down
+                        }
+                        catch (Exception e)
+                        {
+                            logger.LogError(e, "Failed to deal with custom WebSocket endpoint");
+                        }
                     }
                 }
                 else
@@ -275,12 +290,20 @@ namespace DuetWebServer.Middleware
                     Method = new HttpMethod(context.Request.Method),
                     RequestUri = new Uri(httpResponse.Response)
                 };
+                requestMessage.Content = new StringContent(body);
                 requestMessage.Headers.Host = requestMessage.RequestUri.Host;
                 foreach (var header in context.Request.Headers)
                 {
-                    requestMessage.Content?.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
+                    if (header.Key.Equals("Host", StringComparison.OrdinalIgnoreCase) || header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // The Host header is set above and Content-Length is computed from the new content
+                        continue;
+                    }
+                    if (!requestMessage.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray()))
+                    {
+                        requestMessage.Content.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
+                    }
                 }
-                requestMessage.Content = new StringContent(body);
 
                 // Send it
                 using HttpClient client = new();

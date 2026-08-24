@@ -207,10 +207,18 @@ namespace DuetWebServer.Services
         {
             if (e.PropertyName == nameof(Directories.Web))
             {
-                Directories directories = (Directories)sender!;
-                modelProvider.WebDirectory = await _commandConnection!.ResolvePath(directories.Web);
+                // This handler is async void, an unhandled exception here would crash the process
+                try
+                {
+                    Directories directories = (Directories)sender!;
+                    modelProvider.WebDirectory = await _commandConnection!.ResolvePath(directories.Web);
 
-                logger.LogInformation("Web directory changed to {webDirectory}", modelProvider.WebDirectory);
+                    logger.LogInformation("Web directory changed to {webDirectory}", modelProvider.WebDirectory);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Failed to resolve new web directory");
+                }
             }
         }
     }

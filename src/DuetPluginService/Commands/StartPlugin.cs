@@ -72,6 +72,14 @@ namespace DuetPluginService.Commands
                 }
             }
 
+            // Python plugins are launched via a double-quoted bash -c string, so the executable path must not be able
+            // to break out of the quoting. SbcExecutableArguments is restricted the same way at install time, but the
+            // executable filename is plugin-controlled and only checked against ".." so far
+            if (plugin.SbcPythonDependencies.Count > 0 && sbcExecutable.AsSpan().IndexOfAny(['"', '$', '`', '\\', '\n', '\r', ' ']) >= 0)
+            {
+                throw new ArgumentException($"Refusing to launch plugin {plugin.Id}: executable path contains shell metacharacters");
+            }
+
             using (await Plugins.LockAsync())
             {
                 // Make sure the same process isn't started twice
