@@ -95,6 +95,15 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
 
 
     /// <inheritdoc />
+    /// <remarks>All three arm motors are pinned down only when X, Y and Z are all named</remarks>
+    public override uint AxesAssumedHomed(uint g92Axes)
+    {
+        const uint xyzAxes = (1u << XAxis) | (1u << YAxis) | (1u << ZAxis);
+        return (g92Axes & xyzAxes) == xyzAxes ? g92Axes : g92Axes & ~xyzAxes;
+    }
+
+
+    /// <inheritdoc />
     /// <remarks>An arm's switch is at the top of its swing, adjusted per tower by M666</remarks>
     public override float GetEndstopPosition(int drive, bool highEnd, float axisMin, float axisMax,
                                              ReadOnlySpan<int> endPoints, ReadOnlySpan<float> stepsPerMm)

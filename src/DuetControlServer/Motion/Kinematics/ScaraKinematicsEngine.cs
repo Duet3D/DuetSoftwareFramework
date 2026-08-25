@@ -228,6 +228,15 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
 
 
     /// <inheritdoc />
+    /// <remarks>Both arm motors are pinned down only when X and Y are both named</remarks>
+    public override uint AxesAssumedHomed(uint g92Axes)
+    {
+        const uint xyAxes = (1u << XAxis) | (1u << YAxis);
+        return (g92Axes & xyAxes) == xyAxes ? g92Axes : g92Axes & ~xyAxes;
+    }
+
+
+    /// <inheritdoc />
     /// <remarks>
     /// The joint limits, less the crosstalk from the joints already homed. Turning the proximal arm
     /// drags the distal one, and turning either drags Z on machines that are belted that way, so

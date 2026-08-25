@@ -48,6 +48,7 @@ internal sealed partial class GCodeHandler(
     MovePlanner planner,
     BedCompensation bedCompensation,
     Files.MacroRunner macroRunner,
+    Files.JobProcessor jobProcessor,
     Link.LinkInterface linkInterface,
     EndstopCorrection endstopCorrection,
     Tools.ToolManager toolManager,
@@ -563,6 +564,28 @@ internal sealed partial class GCodeHandler(
                     // MovementState::SetNewPositionOfOwnedAxes
                     planner.PushPositionsToEngine();
                     planner.PublishCommittedPosition();
+
+                    // The axes whose position is now known count as homed, as RepRapFirmware's
+                    // SetPositions records through Kinematics::AxesAssumedHomed: naming a position
+                    // establishes what homing would have, wherever the geometry agrees the named
+                    // axes pin their motors down. Not while simulating, as in RepRapFirmware: a
+                    // simulated job must not leave the real machine believing it is homed
+                    if (!jobProcessor.IsSimulating)
+                    {
+                        uint g92Axes = 0;
+                        foreach (int axis in axesIncluded)
+                        {
+                            g92Axes |= 1u << axis;
+                        }
+                        uint assumedHomed = planner.Parameters.Geometry.AxesAssumedHomed(g92Axes);
+                        for (int axis = 0; axis < model.Move.Axes.Count; axis++)
+                        {
+                            if ((assumedHomed & (1u << axis)) != 0)
+                            {
+                                model.Move.Axes[axis].Homed = true;
+                            }
+                        }
+                    }
                 }
 
                 if (code.TryGetFloat('E', out float extruderPosition))

@@ -108,6 +108,15 @@ internal sealed class FiveBarScaraKinematicsEngine : KinematicsEngine
 
 
     /// <inheritdoc />
+    /// <remarks>Both arm motors are pinned down only when X and Y are both named</remarks>
+    public override uint AxesAssumedHomed(uint g92Axes)
+    {
+        const uint xyAxes = (1u << XAxis) | (1u << YAxis);
+        return (g92Axes & xyAxes) == xyAxes ? g92Axes : g92Axes & ~xyAxes;
+    }
+
+
+    /// <inheritdoc />
     /// <remarks>
     /// Each actuator homes to a known angle rather than to an axis limit. RepRapFirmware takes these
     /// from M669 B and falls back to a pair per work mode; nothing in the object model configures a
