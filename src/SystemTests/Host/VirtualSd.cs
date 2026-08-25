@@ -27,4 +27,8 @@ internal sealed class VirtualSd
     /// <summary>Write a job file (0:/gcodes)</summary>
     public void WriteGCode(string name, string content)
         => File.WriteAllText(Path.Combine(Root, "gcodes", name), content);
+
+    /// <summary>Write a macro file (0:/macros)</summary>
+    public void WriteMacro(string name, string content)
+        => File.WriteAllText(Path.Combine(Root, "macros", name), content);
 }

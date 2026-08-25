@@ -89,6 +89,8 @@ public class HeatingTests : SystemTests.Host.BenchFixture
         await host.WaitForStatusAsync(MachineStatus.Paused);
         Assert.That(heat.IsWaitingForTemperatures, Is.False, "the pause released the temperature wait");
         Assert.That(MoveDistances(canMaster), Does.Not.Contain(7.0f), "pausing must not run the move after M116");
+        Assert.That(await host.EvaluateAsync("state.restorePoints[1].coords[0]"), Is.EqualTo(5.0).Within(0.01),
+                    "with the queue empty the feedhold had nothing to stop: the pause landed between codes at the completed move's target");
 
         // The resume replays the M116, so the job waits for the bed again
         await host.ExecuteCodeAsync("M24");
