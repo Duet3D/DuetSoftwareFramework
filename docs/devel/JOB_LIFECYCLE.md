@@ -231,6 +231,14 @@ keeping from the deleted SPI path, because both are non-obvious and both were de
 - **Comments must not advance the position.** `DoFilePrint` already handles this
   (`!code.IsNonFirmwareComment`), and the reason is the same one: comments resolve internally and
   finish even while the job is paused.
+- **`PauseState` alone cannot tell the loop a pause is owed.** A resume that lands before
+  `DoFilePrint` has parked puts the state back to `NotPaused`, and the loop then reads its drained
+  read-ahead as "no more codes, the print finished" and ends the job in silence.
+  `JobProcessor._pausePending` is the flag that survives that window, set by `StopReadingForPause`
+  and cleared by the loop when it acts on it. It is one flag today because there is one job loop;
+  when multiple motion systems land, `File` and `File2` run `DoFilePrint` concurrently and whichever
+  drains first would clear it for both, so it has to be indexed by motion system alongside
+  `_pausePosition`/`_pausePosition2`. That is a `// TODO` at the field, not a silent simplification.
 
 RRF also cancels temperature waits on the file channel when it pauses
 (`CancelWaitForTemperatures(true)`, and only for macros that can be restarted).

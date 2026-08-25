@@ -247,6 +247,23 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
     private long? _pausePosition;
 
     /// <summary>
+    /// Set when a pause has cancelled the job's read-ahead and the file loop has not yet acted on
+    /// it. The loop cannot take <see cref="PauseState"/> as that signal: a resume that lands before
+    /// the loop has parked puts the state back to <see cref="PauseState.NotPaused"/>, and the loop
+    /// would then read "no more codes" as the print finishing rather than as the pause it still
+    /// owes a rewind for
+    ///
+    /// TODO this is one flag for what is per-motion-system state. <see cref="StopReadingForPause"/>
+    /// already keeps <see cref="_pausePosition"/> and <see cref="_pausePosition2"/> per channel, and
+    /// this belongs with them: once multiple motion systems are implemented, <c>File</c> and
+    /// <c>File2</c> run <see cref="DoFilePrint"/> concurrently, so whichever loop drains first
+    /// clears the flag for both and the other can still read "no more codes" as the print finishing
+    /// - the defect this flag exists to prevent. Index it by motion system when that lands; the
+    /// drain already computes that index for the pause position
+    /// </summary>
+    private bool _pausePending;
+
+    /// <summary>
     /// Defines the second file position to be set by the Print task on pause
     /// </summary>
     private long? _pausePosition2;
@@ -356,6 +373,7 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
         IsSimulating = simulating;
         _file = file;
         _pausePosition = _pausePosition2 = null;
+        _pausePending = false;
 
         // A file is selected before M26 says where in it to start, so anything an earlier job left
         // behind belongs to that job rather than to this one
@@ -439,6 +457,9 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
         // Copy the full stack and assign the job file so flush requests are properly handled
         _codeProcessor.SetJobFile(file.Channel, file);
 
+        try
+        {
+
         // Process the file being printed
         Queue<Code> codes = new();
         long currentFilePosition = 0L;
@@ -471,7 +492,6 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
                             codePool.Enqueue(sharedCode);
                             break;
                         }
-                        readCode.CancellationToken = cancellationToken;
                     }
                     catch
                     {
@@ -481,13 +501,29 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
 
                     readCode.Flags |= CodeFlags.Asynchronous;
                     codes.Enqueue(readCode);
-                    await readCode.ExecuteAsync();
+
+                    // The job token goes into the execution, so that a pause or cancel reaches the
+                    // codes already read ahead: StopReadingForPause cancels it precisely so that a
+                    // job code blocked in a wait (M116 on a heater, a full move ring) lets go of its
+                    // channel instead of holding the pause up for as long as the wait would take.
+                    // Passed here rather than assigned to the property, which ExecuteAsync overwrites
+                    await readCode.ExecuteAsync(cancellationToken);
                 }
                 catch (Exception e)
                 {
                     using (await LockAsync())
                     {
-                        if (!IsAborted)
+                        if (e is OperationCanceledException &&
+                            (PauseState >= PauseState.Pausing || _pausePending || IsCancelled))
+                        {
+                            // A pause or cancel interrupted this code, not the code failing: it
+                            // cancelled the job token while this read-ahead was in flight. The
+                            // drain below settles what that means for the job; aborting here would
+                            // silently end a print that was only being paused. The token is
+                            // re-armed so the reads after a resume use the job's live one
+                            cancellationToken = _cancellationTokenSource.Token;
+                        }
+                        else if (!IsAborted)
                         {
                             if (e is not OperationCanceledException)
                             {
@@ -544,10 +580,30 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
 
                 // A pause asked for while the job was inside a macro it could not be interrupted in
                 // happens here, once it is back out. RepRapFirmware checks at the same point, after
-                // each command on the job channel completes
+                // each command on the job channel completes.
+                //
+                // The token is re-read first, and the check must still not die on it: a pause or
+                // cancel may land at any moment, including between the refresh and the check, and
+                // cancel the very token just read. An exception escaping here takes the whole file
+                // task down, and with it the park and rewind the pause is waiting on - so a
+                // cancelled check is treated as what it is, a pause the next loop pass settles
                 if (file.Channel == CodeChannel.File)
                 {
-                    await CheckForDeferredPauseAsync(cancellationToken);
+                    using (await LockAsync())
+                    {
+                        cancellationToken = _cancellationTokenSource.Token;
+                    }
+                    try
+                    {
+                        await CheckForDeferredPauseAsync(cancellationToken);
+                    }
+                    catch (OperationCanceledException) when (!_lifetime.ApplicationStopping.IsCancellationRequested)
+                    {
+                        using (await LockAsync())
+                        {
+                            cancellationToken = _cancellationTokenSource.Token;
+                        }
+                    }
                 }
             }
             else
@@ -568,19 +624,32 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
 
                 using (await LockAsync())
                 {
-                    if (PauseState >= PauseState.Pausing)
+                    // _pausePending is checked as well as PauseState: a resume that lands before
+                    // this loop has parked puts the state back to NotPaused, and reading that as
+                    // "no more codes, the print finished" would silently end a job that was only
+                    // paused. The pending flag survives that window; the state alone does not
+                    if (PauseState >= PauseState.Pausing || _pausePending)
                     {
-                        // Adjust the file position for this motion system. Each MS may have advanced its file
-                        // independently between sync points, so rewind to the firmware-reported pause offset
-                        // for this channel (falling back to the last code we executed if RRF didn't supply one)
-                        long? msPausePosition = (file.Channel == CodeChannel.File) ? _pausePosition : _pausePosition2;
-                        long newFilePosition = msPausePosition ?? currentFilePosition;
-                        await SetFilePositionAsync(file.Channel == CodeChannel.File ? 0 : 1, newFilePosition);
-                        _logger.LogInformation("Job on {Channel} has been paused at byte {Offset}, reason {PauseReason}", file.Channel, (msPausePosition == null) ? $"{newFilePosition} (no fpos from firmware)" : newFilePosition.ToString(), _pauseReason);
+                        _pausePending = false;
+                        if (!IsAborted && !IsCancelled)
+                        {
+                            // Adjust the file position for this motion system. Each MS may have advanced its file
+                            // independently between sync points, so rewind to the firmware-reported pause offset
+                            // for this channel (falling back to the last code we executed if RRF didn't supply one)
+                            long? msPausePosition = (file.Channel == CodeChannel.File) ? _pausePosition : _pausePosition2;
+                            long newFilePosition = msPausePosition ?? currentFilePosition;
+                            await SetFilePositionAsync(file.Channel == CodeChannel.File ? 0 : 1, newFilePosition);
+                            _logger.LogInformation("Job on {Channel} has been paused at byte {Offset}, reason {PauseReason}", file.Channel, (msPausePosition == null) ? $"{newFilePosition} (no fpos from firmware)" : newFilePosition.ToString(), _pauseReason);
+                        }
 
-                        // Wait for the print to be resumed
+                        // Wait for the print to be resumed - unless it already has been: the state
+                        // only returns to NotPaused once the machine may carry on, and waiting then
+                        // would sleep through a wake-up that has already been given
                         IsProcessing = false;
-                        await _resume.WaitAsync(_lifetime.ApplicationStopping);
+                        if (PauseState != PauseState.NotPaused)
+                        {
+                            await _resume.WaitAsync(_lifetime.ApplicationStopping);
+                        }
 
                         // Reassign the file being printed unless the print is aborted
                         if (!IsAborted && !IsCancelled)
@@ -598,6 +667,15 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
                 }
             }
         } while (!_lifetime.ApplicationStopping.IsCancellationRequested);
+        }
+        catch (Exception e)
+        {
+            // This task is started and forgotten, so anything that escapes it would otherwise end
+            // the job in silence - which is how the pause races the system test bench caught were
+            // able to hide. Whatever threw, say so before the job disappears
+            _logger.LogError(e, "Job file task for {Channel} terminated by an unhandled exception", file.Channel);
+            throw;
+        }
 
         // No longer printing
         _codeProcessor.SetJobFile(file.Channel, null);
@@ -814,6 +892,7 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
             _pausePosition = filePosition;
             _pausePosition2 = filePosition2;
             _pauseReason = pauseReason;
+            _pausePending = true;
         }
     }
 
