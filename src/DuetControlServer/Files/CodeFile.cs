@@ -321,6 +321,18 @@ public class CodeFile(
             {
                 if (!codeRead || (code.Type != CodeType.Comment && state.IsFinished(code.Indent)))
                 {
+                    // Blocks the end of the file would close are left standing, unless an enclosing
+                    // loop is about to run the file again: the machine may still be executing codes
+                    // that were read ahead, and a pause in that window rewinds the file into them, so
+                    // the local variables they reference must stay resolvable. The blocks die with
+                    // this instance instead, which is when RepRapFirmware deletes them too: its
+                    // StopPrint clears the job file's blocks, not the read-ahead reaching the end of
+                    // the file
+                    if (!codeRead && !IsInsideActiveLoop())
+                    {
+                        break;
+                    }
+
                     if (state.HasLocalVariables)
                     {
                         // Wait for pending commands to be executed so all the local variables can be disposed of again.
@@ -582,6 +594,25 @@ public class CodeFile(
         }
         codeBlock.LocalVariables.Clear();
         codeBlock.HasLocalVariables = false;
+    }
+
+    /// <summary>
+    /// Whether any code block on the stack is a while loop that is going to run again
+    /// </summary>
+    /// <returns>True if an enclosing while loop is still looping</returns>
+    private bool IsInsideActiveLoop()
+    {
+        lock (_codeBlocks)
+        {
+            foreach (CodeBlock codeBlock in _codeBlocks)
+            {
+                if (codeBlock.Keyword == KeywordType.While && (codeBlock.ProcessBlock || codeBlock.ContinueLoop))
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /// <summary>

@@ -191,7 +191,9 @@ What is missing against `GCodes::StopPrint` ([GCodes.cpp:4700](../../lib/RepRapF
 - on abort: heaters off, spindles stopped, laser off;
 - on normal completion: run `stop.g`, or switch all heaters off if there is none;
 - clearing the tool's un-undone G10 Z hop back into the user position;
-- `CancelWaitForTemperatures`, `buildObjects.Init()`, and clearing the job file's local variables;
+- `CancelWaitForTemperatures` and `buildObjects.Init()` (clearing the job file's local variables
+  needs no equivalent: they die with the `CodeFile` when the job is torn down, and must not go
+  earlier — see the rewind note under "Resuming needs no replan");
 - deleting `resurrect.g` on normal completion (out of scope — §5).
 
 `HandleResumePrintAsync` likewise says "resume.g is not run: macro execution is not wired up yet",
@@ -637,6 +639,15 @@ to the recorded position and the codes are read again from there, so `MoveInterp
 `resume.g`, which is the only correct thing to do anyway, since `resume.g` may have changed the tool,
 the temperatures or the position. This is exactly RRF's resume path (`fgb->RestartFrom(filePos)`,
 GCodes4.cpp:723) and the feedhold inherits it unchanged.
+
+The rewind also constrains what the reader may throw away. The read-ahead can reach the end of the
+file while the machine is still executing its moves (any short job with deferred codes behind the
+moves sits in that state for its whole tail), and a pause in that window rewinds into codes whose
+enclosing blocks the reader has already left. `CodeFile.ReadCodeAsync` therefore leaves the open
+blocks standing when the file runs out, unless an enclosing `while` is about to loop, and the local
+variables they track stay resolvable until the `CodeFile` is disposed of. That is RepRapFirmware's
+lifetime too: `StopPrint` clears the job file's blocks, nothing does so at end of file. The
+`SystemTests` scenario `PauseAndResumeWithLocalVariables` pins both this and the resync above.
 
 What resume gains is that its restore-point coordinates describe a point the toolpath passes through
 mid-decel rather than the end of a line — under variant (a) still a real segment endpoint, which is

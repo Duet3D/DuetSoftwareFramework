@@ -95,7 +95,7 @@ Five phases carry a named tail. None is large; three wait on a WS7 code.
 
 | Task | Size | Depends on |
 |---|---|---|
-| Phase 3 tail: temperature-wait cancellation, job-file local variables | S | |
+| Phase 3 tail: temperature-wait cancellation on stop | S | |
 | Phase 3 tail: laser off on abort | S | **M452** (WS7) |
 | Phase 4 tail: decide whether `M25.1` errors or stays an alias | S | decision, see §5 |
 | Phase 5 tail: do not pause during a tool change | S | tool-change state tracking |

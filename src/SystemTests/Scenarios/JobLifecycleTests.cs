@@ -88,4 +88,64 @@ public class JobLifecycleTests : SystemTests.Host.BenchFixture
         await host.ExecuteCodeAsync("M0");
         await host.WaitForStatusAsync(MachineStatus.Idle);
     }
+
+    /// <summary>
+    /// A job whose moves are computed from local variables declared at the top of the file, and
+    /// short enough that the reader finishes the whole file while the machine is still executing
+    /// the moves - the deferred M106/M107 keep the job alive in that window, exactly as in the
+    /// reported failure. A pause then rewinds the file into the middle of the moves, and the
+    /// resume must still be able to evaluate <c>var.distance</c> on the lines it re-reads:
+    /// RepRapFirmware keeps a job file's local variables until the print stops, not until the
+    /// reader happens to reach the end of the file
+    /// </summary>
+    [Test]
+    public async Task PauseAndResumeWithLocalVariables()
+    {
+        using ScriptedCanMaster fake = new(SocketPath());
+        fake.AckCanRequestsWithStandardReplies();
+        await using DcsTestHost host = await DcsTestHost.StartAsync(fake, prepareSd: sd =>
+        {
+            sd.WriteSys("config.g", OneAxisConfig + "\nM950 F0 C\"1.out1\"\n" + DcsTestHost.ConfigDoneMarker);
+            sd.WriteGCode("vars.gcode", """
+                var speed = 20   ; mm/s
+                var time = 0.5   ; sec
+                var distance = var.speed * var.time
+
+                G91
+                G1 X{var.distance} F{var.speed * 60}
+                G1 X{var.distance}
+                M106 S1
+                G1 X{var.distance}
+                G1 X{var.distance}
+                M107
+                """);
+        });
+        await host.WaitForConfigDoneAsync();
+
+        // Start the job; the reader runs to the end of the file long before the four 0.5 s moves
+        // have been executed, and the M106/M107 defer behind the moves they follow
+        await host.ExecuteCodeAsync("M32 \"0:/gcodes/vars.gcode\"");
+        await host.WaitForStatusAsync(MachineStatus.Processing);
+        await fake.WaitForSbcPacketAsync(SbcRequest.ScheduleMove);
+
+        // Pause while the machine is still working through the queued moves
+        await host.ExecuteCodeAsync("M25");
+        await host.WaitForStatusAsync(MachineStatus.Paused);
+
+        // Resume: the rewound G1 X{var.distance} lines must still see the variable
+        await host.ExecuteCodeAsync("M24");
+        await host.WaitForStatusAsync(MachineStatus.Idle, timeoutMs: 30_000);
+
+        bool aborted;
+        using (await host.Model.AccessReadOnlyAsync(CancellationToken.None))
+        {
+            aborted = host.Model.Job.LastFileAborted;
+        }
+        Assert.That(aborted, Is.False, "the job ran to completion");
+
+        // Every move ran exactly once: four relative moves of 10 mm each
+        string position = (await host.ExecuteCodeAsync("echo move.axes[0].userPosition")).Trim();
+        Assert.That(float.Parse(position, System.Globalization.CultureInfo.InvariantCulture),
+                    Is.EqualTo(40.0f).Within(0.01f), "all four moves completed");
+    }
 }
