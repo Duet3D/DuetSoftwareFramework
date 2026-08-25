@@ -43,8 +43,10 @@
 
 #include <cstdint>
 #include <functional>
+#include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
 namespace Duet::Sbc
 {
@@ -88,14 +90,15 @@ namespace Duet::Sbc
 
 		// --- Reporting -------------------------------------------------------------------------
 
-		// Recovery and resync events, from the interface thread.
-		using LogCallback = std::function<void(const std::string& message)>;
+		// Recovery and resync events, from the interface thread. The view is only valid for the
+		// duration of the call; a receiver that keeps the text copies it.
+		using LogCallback = std::function<void(std::string_view message)>;
 		virtual void SetLogCallback(LogCallback cb) = 0;
 
 		// Called when a live connection is first seen to have dropped, from the thread that saw it.
 		// Reporting it here rather than after PerformFullTransfer returns is the point: that call
 		// does not return until the link is back, so anything waiting on it learns too late.
-		using ConnectionLostCallback = std::function<void(const std::string& reason)>;
+		using ConnectionLostCallback = std::function<void(std::string_view reason)>;
 		virtual void SetConnectionLostCallback(ConnectionLostCallback cb) = 0;
 
 		// --- Connection ------------------------------------------------------------------------
@@ -142,15 +145,15 @@ namespace Duet::Sbc
 
 		// Read the next packet header, or false if none remain. Advances to the payload.
 		virtual bool ReadNextPacket(proto::PacketHeader& packet) = 0;
-		[[nodiscard]] virtual const uint8_t* PacketData() const = 0;
-		[[nodiscard]] virtual uint16_t PacketDataLength() const = 0;
+		// The payload of the packet most recently returned by ReadNextPacket. Valid until the next
+		// full transfer overwrites the receive buffer.
+		[[nodiscard]] virtual std::span<const uint8_t> PacketData() const = 0;
 		[[nodiscard]] virtual int PacketsToRead() const = 0;
 
 		// Where the read cursor is, and the received block as a whole, for dumping a malformed
 		// packet to the log.
 		[[nodiscard]] virtual size_t RxPointer() const = 0;
-		[[nodiscard]] virtual const uint8_t* RxBuffer() const = 0;
-		[[nodiscard]] virtual uint16_t RxDataLength() const = 0;
+		[[nodiscard]] virtual std::span<const uint8_t> RxData() const = 0;
 		[[nodiscard]] virtual const proto::PacketHeader& LastPacket() const = 0;
 
 		// Resend a packet the controller asked for. Throws if the id is unknown.
@@ -164,24 +167,23 @@ namespace Duet::Sbc
 		virtual bool WriteEmergencyStop() = 0;
 		virtual bool WriteReset() = 0;
 		virtual bool WriteEnableCan(bool enable) = 0;
-		virtual bool WriteScheduleMove(const uint8_t* packet, size_t length) = 0;
+		virtual bool WriteScheduleMove(std::span<const uint8_t> packet) = 0;
 		virtual bool WriteCanMessage(uint16_t txToken,
 									 uint16_t msgType,
 									 uint16_t replyType,
 									 uint8_t dstAddress,
 									 bool isResponse,
-									 const uint8_t* payload,
-									 size_t payloadLength) = 0;
-		virtual bool WriteMessage(uint32_t messageFlags, const std::string& message) = 0;
+									 std::span<const uint8_t> payload) = 0;
+		virtual bool WriteMessage(uint32_t messageFlags, std::string_view message) = 0;
 
 		// --- Firmware update -------------------------------------------------------------------
 		//
 		// The flashing handshake bypasses the regular protocol; see the note at the top of this file
 		// for why that is a problem a second transport has to answer.
 
-		virtual bool WriteIapSegment(const uint8_t* data, size_t length) = 0;
+		virtual bool WriteIapSegment(std::span<const uint8_t> segment) = 0;
 		virtual void StartIap() = 0;
-		virtual bool FlashFirmwareSegment(const uint8_t* data, size_t length) = 0;
+		virtual bool FlashFirmwareSegment(std::span<const uint8_t> segment) = 0;
 		virtual bool VerifyFirmwareChecksum(uint32_t length, uint16_t crc16) = 0;
 		virtual void WaitForIapReset() = 0;
 

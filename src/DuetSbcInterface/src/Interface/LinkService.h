@@ -31,6 +31,7 @@
 #include <mutex>
 #include <span>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -79,14 +80,13 @@ namespace Duet::Sbc
 		// The Queue* calls return the sequence number the command was given, or 0 if the ring was full.
 		// Every command gets one, and OutboundDelivered/OutboundDropped say what became of everything up
 		// to a given number - which works because the queue is FIFO end to end
-		uint32_t QueueMessage(uint32_t messageFlags, const char* message, size_t length);
+		uint32_t QueueMessage(uint32_t messageFlags, std::string_view message);
 		uint32_t QueueCanMessage(uint16_t txToken,
 							 uint16_t msgType,
 							 uint16_t replyType,
 							 uint8_t dstAddress,
 							 bool isResponse,
-							 const uint8_t* payload,
-							 size_t payloadLength);
+							 ByteSpan payload);
 		uint32_t QueueEnableCan(bool enable, uint32_t requestId = kNoRequestId);
 
 		// Queue a prepared move. Called from the motion thread, which must never block, so this
@@ -97,11 +97,7 @@ namespace Duet::Sbc
 		// its producers with a mutex held only for the copy, so this does not wait on a transfer -
 		// but it does mean the interface thread can briefly wait on this one, which is why the
 		// motion thread's real-time priority has to stay below the interface thread's.
-		void PostEventFromOtherThread(InboundEventType type,
-									  const void* header,
-									  size_t headerLength,
-									  const void* tail = nullptr,
-									  size_t tailLength = 0);
+		void PostEventFromOtherThread(InboundEventType type, ByteSpan header, ByteSpan tail = {});
 
 		// How much of the outbound ring is free, as a fraction. The motion engine stops preparing
 		// moves below a threshold rather than filling the ring and having a move refused halfway.
@@ -111,10 +107,8 @@ namespace Duet::Sbc
 
 		// Stage a firmware update. The buffers must stay valid until the matching RequestCompleted event
 		// arrives. Returns false if an update is already in progress.
-		bool RequestFirmwareUpdate(const uint8_t* iap,
-								   size_t iapLength,
-								   const uint8_t* firmware,
-								   size_t firmwareLength,
+		bool RequestFirmwareUpdate(ByteSpan iap,
+								   ByteSpan firmware,
 								   uint16_t firmwareCrc16,
 								   uint32_t requestId);
 
@@ -145,17 +139,9 @@ namespace Duet::Sbc
 		void PerformFirmwareUpdate();
 
 		// Inbound helpers. All of these are called on the interface thread and never allocate.
-		void PostEvent(InboundEventType type,
-					   const void* header,
-					   size_t headerLength,
-					   const void* tail = nullptr,
-					   size_t tailLength = 0);
-		void PostLog(LogLevel level, const char* text, size_t length);
-		void PostLog(LogLevel level, const std::string& text) { PostLog(level, text.data(), text.size()); }
-		void CompleteRequest(uint32_t requestId,
-							 RequestResult result,
-							 const char* error = nullptr,
-							 size_t errorLength = 0);
+		void PostEvent(InboundEventType type, ByteSpan header, ByteSpan tail = {});
+		void PostLog(LogLevel level, std::string_view text);
+		void CompleteRequest(uint32_t requestId, RequestResult result, std::string_view error = {});
 
 		Config m_config;
 		std::unique_ptr<Transport> m_transport;
@@ -194,10 +180,8 @@ namespace Duet::Sbc
 		// an atomic flag: the mutex is only taken once an update is actually pending.
 		std::atomic<bool> m_pendingFirmwareUpdate{false};
 		std::mutex m_firmwareMutex;
-		const uint8_t* m_iapData = nullptr;
-		size_t m_iapLength = 0;
-		const uint8_t* m_firmwareData = nullptr;
-		size_t m_firmwareLength = 0;
+		ByteSpan m_iap;
+		ByteSpan m_firmware;
 		uint16_t m_firmwareCrc16 = 0;
 		uint32_t m_firmwareRequestId = kNoRequestId;
 

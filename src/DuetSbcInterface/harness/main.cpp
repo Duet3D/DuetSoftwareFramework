@@ -393,7 +393,7 @@ int main(int argc, char** argv)
 						case 8:
 						{
 							static constexpr char kGreeting[] = "Hello from SBC harness";
-							interface.QueueMessage(0, kGreeting, sizeof(kGreeting) - 1);
+							interface.QueueMessage(0, kGreeting);
 							break;
 						}
 						default:

@@ -23,17 +23,20 @@ remain the tools for that.
 
 ## 1. What exists today
 
-**The transport seam is already designed for this.**
+**The transport seam carries two transports.**
 [Transport.h](../../src/DuetSbcInterface/src/Interface/Transport.h) is the contract `LinkService`
 drives; it never names SPI, and
 [TransportFactory.cpp](../../src/DuetSbcInterface/src/Interface/TransportFactory.cpp) is the one
 place a concrete transport is chosen. `TransportKind` in
-[Configuration.h](../../src/DuetSbcInterface/src/Config/Configuration.h) has a single value, `Spi`.
-The contract's header names the three things a second transport must answer: the framing is a
-fixed-size full-duplex lockstep exchange, flow control is out of band (a pin, today), and firmware
-update bypasses the protocol once IAP runs. The only SPI leak past the seam is the
+[Configuration.h](../../src/DuetSbcInterface/src/Config/Configuration.h) selects `Spi` or `Socket`.
+The contract's header names the three things a transport must answer: the framing is a fixed-size
+full-duplex lockstep exchange, flow control is out of band (a pin on SPI), and firmware update
+bypasses the protocol once IAP runs. What is common to the lockstep transports - the packet
+buffers, CRC bookkeeping and the retry/recovery skeleton - lives in
+[FullDuplexExchangeTransport](../../src/DuetSbcInterface/src/Interface/FullDuplexExchangeTransport.h), which
+`SpiTransfer` and `SocketTransport` both derive from. The only SPI leak past the seam is the
 `dynamic_cast<const SpiTransfer*>` pin diagnostics in
-[CApi.cpp](../../src/DuetSbcInterface/src/CApi.cpp).
+[CApi.cpp](../../src/DuetSbcInterface/src/CApi.cpp), which report zero for any other transport.
 
 **The device side has a second-transport precedent.** `SbcTransportType { spi, Usb }` in
 [SbcMessageFormats.h](../../src/DuetCANMaster/src/SBC/SbcMessageFormats.h) and
@@ -44,8 +47,13 @@ transfer ([MessageFormats.h](../../lib/DuetSpiInterface/include/DuetSpiProtocol/
 the SBC has no step clock of its own, it fits one to those samples and schedules every move by
 absolute start time in the result. Move retirement, and with it deferred-code wake-up and feedhold
 outcomes, follows from the clock the controller reports. A fake controller that advances its
-reported clock only when a test tells it to therefore makes the entire motion timeline
-deterministic. This is the central design lever of stage 1.
+reported clock only when a test tells it to therefore makes the motion timeline scriptable. This is
+the central design lever of stage 1. One nuance the SBC side adds: its model extrapolates between
+samples at the nominal rate and is clamped never to run backwards
+([StepTimer.cpp](../../src/DuetSbcInterface/src/Motion/StepTimer.cpp)), so freezing the master clock
+alone does not freeze the modelled one. Full determinism pairs the stepped clock with the pinned
+local time base (`DuetSbc_PinLocalClock` in [CApi.h](../../src/DuetSbcInterface/src/CApi.h)),
+advancing both together.
 
 **DuetCANMaster is a board that has already been emulated.** The
 [duet3-emulation](https://github.com/meeloo/duet3-emulation) project runs RepRapFirmware images on
@@ -65,10 +73,12 @@ emulated bus as a host `vcan` interface. Both DuetCANMaster (SAME70 MCAN) and Du
 (SAME5x/SAMC21 CAN) drive the same Bosch M_CAN IP through CoreN2G's `CanDevice`, so one peripheral
 model serves every machine on the bus.
 
-**Nothing else exists.** There is no loopback or mock transport, no emulation infrastructure
-anywhere in the tree, and `LinkService::StartAsync` aborts DuetControlServer startup when
-`NativeLink.Connect()` fails, so today the full stack cannot even start without a controller
-attached.
+**Stage 1 is the bench that exists.** The socket transport, the `ScriptedCanMaster` endpoint and
+the `SystemTests` host below are implemented; the framing they speak is defined in
+[SocketLinkFormats.h](../../lib/DuetSpiInterface/include/DuetSpiProtocol/SocketLinkFormats.h) and
+its executable specification is the loopback peer in
+[SocketTransportTests.cpp](../../src/DuetSbcInterface/tests/SocketTransportTests.cpp). No Renode
+emulation infrastructure exists yet; stages 2 and 3 are unstarted.
 
 ---
 
@@ -161,12 +171,27 @@ for what a readable rendering of that capture looks like.
 
 ### The test host
 
-A new `src/SystemTests` NUnit project (separate from `src/UnitTests`, which stays fast and
-link-free) that builds the DCS generic host in-process with the real `NativeLink` and real
-`libduet_sbc.so`, pointed at the fake endpoint, with a per-test virtual SD tree. The seams this
-needs are the ones the unit-test survey already identified: `InternalsVisibleTo` for `JobProcessor`
-and friends, a configurable `FilePathResolver` root in place of the fixed `/opt/dsf/sd`, and
-transfer timeouts taken from `Settings` so a debugger-paused test does not trip the reconnect path.
+The `src/SystemTests` NUnit project (separate from `src/UnitTests`, which stays fast and
+link-free) builds the DCS generic host in-process with the real `NativeLink` and real
+`libduet_sbc.so`, pointed at the fake endpoint, with a per-test virtual SD tree
+(`Host/DcsTestHost.cs`). The enabling seams: `InternalsVisibleTo` for `JobProcessor` and friends,
+the configurable SD root (`Settings.BaseDirectory`), transfer timeouts taken from `Settings` so a
+debugger-paused test does not trip the reconnect path, and the pinned local clock described in §1.
+
+Running the bench is one command:
+
+```sh
+cd src/SystemTests && dotnet test
+```
+
+Building the test project also builds the host `libduet_sbc.so` (a CMake configure on first use,
+then an incremental build that is a no-op when the native sources are unchanged), so the library
+can never be stale relative to the C++ it was built from. `Host/NativeLibraryLocator.cs` resolves
+the freshest host build from the CMake tree at run time - no copy step is involved. Opt out of the
+native build with `-p:BuildNativeLink=false`, or pin a specific library by setting
+`DUET_SBC_LIBRARY`, which skips the build too so nothing rebuilds underneath the pin. Test configs enable the CAN
+bus first: a config code that sends CAN traffic before `M953` is answered with `BusError`, exactly
+as DuetCANMaster answers a send with no CAN device.
 
 ### What stage 1 unlocks
 
@@ -177,16 +202,43 @@ event pauses from injected CAN traffic, and cancel/abort. Everything
 [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) marks 🔧 for hardware verification gets a first automated home
 here, with hardware retaining only what involves real motion.
 
-- [ ] `SocketTransport` and `TransportKind::Socket`, with the loop's recovery semantics preserved
-- [ ] Config, C ABI and `Settings` plumbing for transport selection
-- [ ] SPI-only diagnostics in `CApi` guarded by transport kind
-- [ ] Fake endpoint: default response table, stepped and free-running clock policies
-- [ ] Injection: `MotionStopped`, `CANResponse`, `CodeBufferUpdate`, `ResendPacket`
-- [ ] Scripted failure modes: non-`Ok` `CanStatus`, corrupted CRCs, withheld readiness
-- [ ] Total capture with typed decoding for assertions
-- [ ] `SystemTests` project hosting DCS in-process against the fake
-- [ ] The enabling seams: `InternalsVisibleTo`, configurable SD root, timeouts from `Settings`
-- [ ] First scenario suite: pause/resume/restore, deferred codes, event pause, resync after reset
+- [x] `SocketTransport` and `TransportKind::Socket`, with the loop's recovery semantics preserved
+      (validated by the loopback suite in `SocketTransportTests.cpp`)
+- [x] Config, C ABI and `Settings` plumbing for transport selection (`SbcTransport`,
+      `SbcSocketPath`)
+- [x] SPI-only diagnostics in `CApi` guarded by transport kind (the `dynamic_cast` reports zero)
+- [x] Fake endpoint: default response table, stepped and free-running clock policies, and the
+      `CanEnabled` gate answering sends on a disabled bus with `BusError` as DuetCANMaster does
+- [x] Injection: `MotionStopped`, `CANResponse`, `CodeBufferUpdate`, `ResendPacket`, plus
+      `InjectStandardReply`/`AckCanRequestsWithStandardReplies` built on the DCS CAN mirrors
+- [x] Scripted failure modes: non-`Ok` `CanStatus`, corrupted CRCs, withheld readiness
+      (`PauseArming`/`ResumeArming`), `SimulateReboot`
+- [x] Total capture with typed decoding for assertions and a dumpable exchange log
+- [x] `SystemTests` project hosting DCS in-process against the fake
+- [x] The enabling seams: `InternalsVisibleTo`, the configurable SD root (`BaseDirectory`),
+      timeouts from `Settings`, and the pinned local clock (`DuetSbc_PinLocalClock`)
+- [x] First scenarios: boot and keep-alive, CRC corruption retried without a resync, reconnect and
+      reconfigure after a controller reboot, withheld readiness recovering, injected traffic
+      reaching the dispatcher, a commanded move decoded as its `ScheduleMove`,
+      pause/resume/restore/cancel through the whole job lifecycle, and a pause interrupting a
+      blocking `M116` with the fake playing the heater's board (its status reports are the only
+      source of heater state and temperature, so the bench owns the whole heating loop)
+- [ ] Scenarios still to write: deferred codes waking on retirement, event pause from injected CAN
+      traffic, `MotionStopped` closing a homing move, resend-request replay, non-`Ok` send status
+      surfacing, and the stepped clock paired with the pinned local time base for a fully
+      deterministic timeline
+- [ ] CI wiring for `SystemTests` (the native library builds automatically as part of the test
+      project, so a CI job needs only cmake, a host toolchain and `dotnet test`)
+
+The first scenario runs surfaced real DuetControlServer defects the unit tests could not see, all
+in the pause path: the file task read `PauseState` back at `NotPaused` as "the print finished", a
+read-ahead code cancelled by the pause was turned into a job abort, the deferred-pause check ran on
+the token the pause had just cancelled and took the file task down with it, and the pause's
+cancellation of the read-ahead reached nothing at all because `Code.ExecuteAsync` overwrote the
+token the job loop had assigned - which both let purged moves keep executing while "pausing" and
+hung a pause behind a blocking `M116`. All are fixed in `JobProcessor` and the heating scenario
+also exposed the heater-mode mapping defect fixed in `ExpansionBoardManager` (a board's
+`HeaterMode` was cast straight to a `HeaterState`).
 
 ---
 

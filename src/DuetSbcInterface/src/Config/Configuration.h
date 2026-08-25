@@ -9,11 +9,14 @@
 namespace Duet::Sbc
 {
 
-	// Which transport carries the link. Only Spi exists; the enum is here so that the choice has a
-	// place to live and CreateTransport has something to switch on. See Interface/Transport.h.
+	// Which transport carries the link. Spi is the real controller over spidev; Socket speaks the
+	// same transfer protocol over a Unix domain stream socket to a virtual controller (the system
+	// test bench's fake endpoint, or the Renode link peripheral). See Interface/Transport.h and
+	// DuetSpiProtocol/SocketLinkFormats.h.
 	enum class TransportKind : uint8_t
 	{
-		Spi = 0
+		Spi = 0,
+		Socket = 1
 	};
 
 	struct Config
@@ -25,6 +28,9 @@ namespace Duet::Sbc
 		uint32_t spiFrequency = 8'000'000;
 		int spiTransferMode = 0;
 		size_t bufferSize = 8192;
+
+		// Socket transport: path of the Unix domain socket the virtual controller listens on
+		std::string socketPath = "/run/dsf/sbc.sock";
 
 		// GPIO
 		std::string gpioChipDevice = "/dev/gpiochip0";

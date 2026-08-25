@@ -12,6 +12,11 @@ endfunction()
 duet_sbc_add_test(ring_buffer_tests RingBufferTests.cpp)
 target_link_libraries(ring_buffer_tests PRIVATE duet_sbc)
 
+# The socket transport against an in-process peer speaking the SocketLinkFormats framing. That peer
+# is the executable specification the C# fake endpoint in src/SystemTests follows.
+duet_sbc_add_test(socket_transport_tests SocketTransportTests.cpp)
+target_link_libraries(socket_transport_tests PRIVATE duet_sbc)
+
 duet_sbc_add_test(step_timer_tests StepTimerTests.cpp)
 target_link_libraries(step_timer_tests PRIVATE duet_motion)
 

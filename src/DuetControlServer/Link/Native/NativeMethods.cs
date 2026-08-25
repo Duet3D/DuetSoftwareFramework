@@ -68,6 +68,25 @@ internal struct NativeConfig
 
     /// <summary>Whether to tolerate a newer-than-supported protocol version so it can be flashed</summary>
     public int UpdateOnly;
+
+    /// <summary>Transport that carries the link: 0 = SPI, 1 = Unix domain socket</summary>
+    public int Transport;
+
+    /// <summary>Socket transport only: path of the socket the virtual controller listens on (UTF-8, NUL-terminated)</summary>
+    public IntPtr SocketPath;
+}
+
+/// <summary>
+/// Transport values for <see cref="NativeConfig.Transport"/>. Mirrors <c>TransportKind</c> in
+/// <c>DuetSbcInterface/src/Config/Configuration.h</c>
+/// </summary>
+internal enum NativeTransport
+{
+    /// <summary>The real controller over spidev</summary>
+    Spi = 0,
+
+    /// <summary>A virtual controller over a Unix domain socket (see DuetSpiProtocol/SocketLinkFormats.h)</summary>
+    Socket = 1
 }
 
 /// <summary>

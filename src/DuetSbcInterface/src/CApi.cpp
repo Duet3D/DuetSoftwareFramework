@@ -8,9 +8,11 @@
 #include <Interface/TransportFactory.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cstring>
 #include <exception>
 #include <string>
+#include <string_view>
 
 using Duet::Sbc::Config;
 using Duet::Sbc::LinkService;
@@ -70,6 +72,9 @@ namespace
 		cfg.sbcConnectionKeepAliveInterval = c->sbcConnectionKeepAliveInterval;
 		cfg.maxSbcRetries = c->maxSbcRetries;
 		cfg.updateOnly = c->updateOnly != 0;
+		cfg.transport = static_cast<Duet::Sbc::TransportKind>(c->transport);
+		if (c->socketPath)
+			cfg.socketPath = c->socketPath;
 		return cfg;
 	}
 
@@ -103,6 +108,7 @@ extern "C"
 		config->sbcConnectionKeepAliveInterval = def.sbcConnectionKeepAliveInterval;
 		config->maxSbcRetries = def.maxSbcRetries;
 		config->updateOnly = def.updateOnly ? 1 : 0;
+		config->transport = static_cast<int32_t>(def.transport);
 	}
 
 	DuetSbcHandle* DuetSbc_Create(const DuetSbcConfig* config, char* errorBuf, int32_t errorBufLen)
@@ -163,7 +169,9 @@ extern "C"
 		if (h == nullptr)
 			return -1;
 		const uint32_t seq = h->interface.QueueMessage(
-			flags, message, (message != nullptr && length > 0) ? static_cast<size_t>(length) : 0);
+			flags, (message != nullptr && length > 0)
+					   ? std::string_view{message, static_cast<size_t>(length)}
+					   : std::string_view{});
 		return (seq != 0) ? static_cast<int64_t>(seq) : -1;
 	}
 
@@ -184,8 +192,9 @@ extern "C"
 										 replyType,
 										 dstAddress,
 										 isResponse != 0,
-										 payload,
-										 (payload != nullptr && length > 0) ? static_cast<size_t>(length) : 0);
+										 (payload != nullptr && length > 0)
+											 ? Duet::Sbc::ByteSpan{payload, static_cast<size_t>(length)}
+											 : Duet::Sbc::ByteSpan{});
 		return (seq != 0) ? static_cast<int64_t>(seq) : -1;
 	}
 
@@ -219,10 +228,8 @@ extern "C"
 	{
 		if (h == nullptr || iapLength <= 0 || firmwareLength <= 0)
 			return -1;
-		return h->interface.RequestFirmwareUpdate(iap,
-												  static_cast<size_t>(iapLength),
-												  firmware,
-												  static_cast<size_t>(firmwareLength),
+		return h->interface.RequestFirmwareUpdate({iap, static_cast<size_t>(iapLength)},
+												  {firmware, static_cast<size_t>(firmwareLength)},
 												  firmwareCrc16,
 												  requestId)
 				   ? 0
@@ -509,6 +516,25 @@ extern "C"
 	{
 		(void)h;					// as above
 		return StepTimer::GetMovementDelay();
+	}
+
+	// The pinned local clock reading, and the source function StepTimer calls while it is pinned.
+	// Static because the local time base is process-wide, like the CLOCK_MONOTONIC it stands in for.
+	static std::atomic<int64_t> pinnedLocalClockNs{0};
+	static int64_t ReadPinnedLocalClock() noexcept
+	{
+		return pinnedLocalClockNs.load(std::memory_order_relaxed);
+	}
+
+	void DuetSbc_PinLocalClock(int64_t ns)
+	{
+		pinnedLocalClockNs.store(ns, std::memory_order_relaxed);
+		StepTimer::SetLocalClockSource(ReadPinnedLocalClock);
+	}
+
+	void DuetSbc_UnpinLocalClock(void)
+	{
+		StepTimer::SetLocalClockSource(nullptr);
 	}
 
 	void DuetSbc_GetClockStats(DuetSbcHandle* h, DuetSbcClockStats* stats)

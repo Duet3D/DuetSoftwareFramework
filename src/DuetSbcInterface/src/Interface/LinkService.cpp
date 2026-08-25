@@ -39,15 +39,15 @@ namespace Duet::Sbc
 		, m_inboundEventFd(::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC))
 	{
 		// Route the transfer engine's internal recovery reporting into the inbound ring
-		m_transport->SetLogCallback([this](const std::string& message) { PostLog(LogLevel::Warning, message); });
+		m_transport->SetLogCallback([this](std::string_view message) { PostLog(LogLevel::Warning, message); });
 		m_transport->SetConnectionLostCallback(
-			[this](const std::string& reason)
+			[this](std::string_view reason)
 			{
 				m_wasConnected = false;
 				DropOutgoing();
 				InboundEventHeader header{};
 				header.type = static_cast<uint16_t>(InboundEventType::ConnectionLost);
-				PostEvent(InboundEventType::ConnectionLost, &header, sizeof(header), reason.c_str(), reason.size());
+				PostEvent(InboundEventType::ConnectionLost, AsBytes(header), AsBytes(reason.data(), reason.size()));
 			});
 	}
 
@@ -140,13 +140,13 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	// Outbound queueing (caller threads)
 	// ---------------------------------------------------------------------------
-	uint32_t LinkService::QueueMessage(uint32_t messageFlags, const char* message, size_t length)
+	uint32_t LinkService::QueueMessage(uint32_t messageFlags, std::string_view message)
 	{
 		MessageCommand cmd{};
 		cmd.header.type = static_cast<uint16_t>(OutboundCommandType::Message);
 		cmd.flags = messageFlags;
 
-		const ByteSpan fragments[2] = {AsBytes(cmd), AsBytes(message, length)};
+		const ByteSpan fragments[2] = {AsBytes(cmd), AsBytes(message.data(), message.size())};
 		if (!m_outbound.WriteScattered(fragments))
 		{
 			return 0;
@@ -161,8 +161,7 @@ namespace Duet::Sbc
 									   uint16_t replyType,
 									   uint8_t dstAddress,
 									   bool isResponse,
-									   const uint8_t* payload,
-									   size_t payloadLength)
+									   ByteSpan payload)
 	{
 		CanMessageCommand cmd{};
 		cmd.header.type = static_cast<uint16_t>(OutboundCommandType::CanMessage);
@@ -172,7 +171,7 @@ namespace Duet::Sbc
 		cmd.dstAddress = dstAddress;
 		cmd.isResponse = isResponse ? 1 : 0;
 
-		const ByteSpan fragments[2] = {AsBytes(cmd), AsBytes(payload, payloadLength)};
+		const ByteSpan fragments[2] = {AsBytes(cmd), payload};
 		if (!m_outbound.WriteScattered(fragments))
 		{
 			return 0;
@@ -193,10 +192,9 @@ namespace Duet::Sbc
 		return m_outbound.BytesFree() >= kScheduleMoveHeadroom;
 	}
 
-	void LinkService::PostEventFromOtherThread(
-		InboundEventType type, const void* header, size_t headerLength, const void* tail, size_t tailLength)
+	void LinkService::PostEventFromOtherThread(InboundEventType type, ByteSpan header, ByteSpan tail)
 	{
-		PostEvent(type, header, headerLength, tail, tailLength);
+		PostEvent(type, header, tail);
 	}
 
 	uint32_t LinkService::QueueScheduleMove(std::span<const uint8_t> packet)
@@ -245,14 +243,12 @@ namespace Duet::Sbc
 		RequestTransfer();
 	}
 
-	bool LinkService::RequestFirmwareUpdate(const uint8_t* iap,
-											 size_t iapLength,
-											 const uint8_t* firmware,
-											 size_t firmwareLength,
+	bool LinkService::RequestFirmwareUpdate(ByteSpan iap,
+											 ByteSpan firmware,
 											 uint16_t firmwareCrc16,
 											 uint32_t requestId)
 	{
-		if (iap == nullptr || firmware == nullptr || iapLength == 0 || firmwareLength == 0)
+		if (iap.empty() || firmware.empty())
 		{
 			return false;
 		}
@@ -263,10 +259,8 @@ namespace Duet::Sbc
 			{
 				return false;
 			}
-			m_iapData = iap;
-			m_iapLength = iapLength;
-			m_firmwareData = firmware;
-			m_firmwareLength = firmwareLength;
+			m_iap = iap;
+			m_firmware = firmware;
 			m_firmwareCrc16 = firmwareCrc16;
 			m_firmwareRequestId = requestId;
 			m_pendingFirmwareUpdate.store(true, std::memory_order_release);
@@ -278,12 +272,11 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	// Inbound event helpers (interface thread only)
 	// ---------------------------------------------------------------------------
-	void LinkService::PostEvent(
-		InboundEventType type, const void* header, size_t headerLength, const void* tail, size_t tailLength)
+	void LinkService::PostEvent(InboundEventType type, ByteSpan header, ByteSpan tail)
 	{
 		// The caller has already filled in the type; this just performs the scattered write
 		(void)type;
-		const ByteSpan fragments[2] = {AsBytes(header, headerLength), AsBytes(tail, tailLength)};
+		const ByteSpan fragments[2] = {header, tail};
 		m_inbound.WriteScattered(fragments);
 
 		// Wake a parked consumer. Skipped entirely while the dispatcher is keeping up, so the real-time
@@ -295,15 +288,15 @@ namespace Duet::Sbc
 		}
 	}
 
-	void LinkService::PostLog(LogLevel level, const char* text, size_t length)
+	void LinkService::PostLog(LogLevel level, std::string_view text)
 	{
 		LogEvent event{};
 		event.header.type = static_cast<uint16_t>(InboundEventType::Log);
 		event.level = static_cast<uint8_t>(level);
-		PostEvent(InboundEventType::Log, &event, sizeof(event), text, length);
+		PostEvent(InboundEventType::Log, AsBytes(event), AsBytes(text.data(), text.size()));
 	}
 
-	void LinkService::CompleteRequest(uint32_t requestId, RequestResult result, const char* error, size_t errorLength)
+	void LinkService::CompleteRequest(uint32_t requestId, RequestResult result, std::string_view error)
 	{
 		if (requestId == kNoRequestId)
 		{
@@ -313,7 +306,7 @@ namespace Duet::Sbc
 		event.header.type = static_cast<uint16_t>(InboundEventType::RequestCompleted);
 		event.requestId = requestId;
 		event.result = static_cast<uint8_t>(result);
-		PostEvent(InboundEventType::RequestCompleted, &event, sizeof(event), error, errorLength);
+		PostEvent(InboundEventType::RequestCompleted, AsBytes(event), AsBytes(error.data(), error.size()));
 	}
 
 	// ---------------------------------------------------------------------------
@@ -339,7 +332,7 @@ namespace Duet::Sbc
 			ConnectionEstablishedEvent event{};
 			event.header.type = static_cast<uint16_t>(InboundEventType::ConnectionEstablished);
 			event.protocolVersion = static_cast<uint16_t>(m_transport->ProtocolVersion());
-			PostEvent(InboundEventType::ConnectionEstablished, &event, sizeof(event));
+			PostEvent(InboundEventType::ConnectionEstablished, AsBytes(event));
 		}
 
 		while (!m_stop.load(std::memory_order_relaxed))
@@ -366,7 +359,7 @@ namespace Duet::Sbc
 
 					InboundEventHeader header{};
 					header.type = static_cast<uint16_t>(InboundEventType::ControllerReset);
-					PostEvent(InboundEventType::ControllerReset, &header, sizeof(header));
+					PostEvent(InboundEventType::ControllerReset, AsBytes(header));
 				}
 
 				// Then that the link is up, in that order: a reset belongs to the outage that is ending,
@@ -378,7 +371,7 @@ namespace Duet::Sbc
 					event.header.type = static_cast<uint16_t>(InboundEventType::ConnectionEstablished);
 					event.protocolVersion = static_cast<uint16_t>(m_transport->ProtocolVersion());
 					event.hadReset = hadReset ? 1 : 0;
-					PostEvent(InboundEventType::ConnectionEstablished, &event, sizeof(event));
+					PostEvent(InboundEventType::ConnectionEstablished, AsBytes(event));
 				}
 
 				// Process incoming packets from the previous transfer
@@ -469,8 +462,7 @@ namespace Duet::Sbc
 				m_pendingEmergencyStop.store(false, std::memory_order_release);
 				CompleteRequest(m_emergencyStopRequestId.exchange(kNoRequestId, std::memory_order_relaxed),
 								RequestResult::Success);
-				static constexpr char kMessage[] = "Emergency stop";
-				PostLog(LogLevel::Warning, kMessage, sizeof(kMessage) - 1);
+				PostLog(LogLevel::Warning, "Emergency stop");
 			}
 			// An e-stop drops everything that was queued behind it
 			return;
@@ -484,8 +476,7 @@ namespace Duet::Sbc
 				m_pendingReset.store(false, std::memory_order_release);
 				CompleteRequest(m_resetRequestId.exchange(kNoRequestId, std::memory_order_relaxed),
 								RequestResult::Success);
-				static constexpr char kMessage[] = "Resetting controller";
-				PostLog(LogLevel::Warning, kMessage, sizeof(kMessage) - 1);
+				PostLog(LogLevel::Warning, "Resetting controller");
 			}
 			return;
 		}
@@ -529,7 +520,7 @@ namespace Duet::Sbc
 				std::memcpy(&cmd, record, sizeof(cmd));
 				const char* text = reinterpret_cast<const char*>(record) + sizeof(MessageCommand);
 				const size_t textLength = length - sizeof(MessageCommand);
-				written = m_transport->WriteMessage(cmd.flags, std::string(text, textLength));
+				written = m_transport->WriteMessage(cmd.flags, std::string_view(text, textLength));
 				break;
 			}
 			case OutboundCommandType::CanMessage:
@@ -541,20 +532,17 @@ namespace Duet::Sbc
 				}
 				CanMessageCommand cmd{};
 				std::memcpy(&cmd, record, sizeof(cmd));
-				const uint8_t* payload = record + sizeof(CanMessageCommand);
-				const size_t payloadLength = length - sizeof(CanMessageCommand);
 				written = m_transport->WriteCanMessage(cmd.txToken,
 													 cmd.msgType,
 													 cmd.replyType,
 													 cmd.dstAddress,
 													 cmd.isResponse != 0,
-													 payload,
-													 payloadLength);
+													 bytes.subspan(sizeof(CanMessageCommand)));
 				break;
 			}
 			case OutboundCommandType::ScheduleMove:
 			{
-				written = m_transport->WriteScheduleMove(tail, tailLength);
+				written = m_transport->WriteScheduleMove(tailSpan);
 				break;
 			}
 			case OutboundCommandType::EnableCan:
@@ -644,7 +632,7 @@ namespace Duet::Sbc
 		OutboundSeqEvent event{};
 		event.header.type = static_cast<uint16_t>(type);
 		event.sequenceNumber = sequenceNumber;
-		PostEvent(type, &event, sizeof(event));
+		PostEvent(type, AsBytes(event));
 	}
 
 	// ---------------------------------------------------------------------------
@@ -652,8 +640,7 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	void LinkService::ProcessPacket(const proto::PacketHeader& packet)
 	{
-		const uint8_t* data = m_transport->PacketData();
-		const uint16_t dataLength = m_transport->PacketDataLength();
+		const ByteSpan data = m_transport->PacketData();
 
 		switch (static_cast<proto::FirmwareRequest>(packet.request))
 		{
@@ -665,42 +652,52 @@ namespace Duet::Sbc
 		}
 		case proto::FirmwareRequest::CodeBufferUpdate:
 		{
-			if (dataLength < sizeof(proto::CodeBufferUpdateHeader))
+			if (data.size() < sizeof(proto::CodeBufferUpdateHeader))
 			{
 				break;
 			}
 			proto::CodeBufferUpdateHeader header{};
-			std::memcpy(&header, data, sizeof(header));
+			std::memcpy(&header, data.data(), sizeof(header));
 
 			CodeBufferEvent event{};
 			event.header.type = static_cast<uint16_t>(InboundEventType::CodeBufferUpdate);
 			event.bufferSpace = header.bufferSpace;
-			PostEvent(InboundEventType::CodeBufferUpdate, &event, sizeof(event));
+			PostEvent(InboundEventType::CodeBufferUpdate, AsBytes(event));
 			break;
 		}
 		case proto::FirmwareRequest::Message:
 		{
-			if (dataLength < sizeof(proto::MessageHeader))
+			if (data.size() < sizeof(proto::MessageHeader))
 			{
 				break;
 			}
 			proto::MessageHeader header{};
-			std::memcpy(&header, data, sizeof(header));
+			std::memcpy(&header, data.data(), sizeof(header));
+			if (data.size() < sizeof(header) + header.length)
+			{
+				PostLog(LogLevel::Error, "Discarded a message that does not carry the text it claims");
+				break;
+			}
 
 			MessageEvent event{};
 			event.header.type = static_cast<uint16_t>(InboundEventType::Message);
 			event.flags = header.messageType;
-			PostEvent(InboundEventType::Message, &event, sizeof(event), data + sizeof(header), header.length);
+			PostEvent(InboundEventType::Message, AsBytes(event), data.subspan(sizeof(header), header.length));
 			break;
 		}
 		case proto::FirmwareRequest::CANResponse:
 		{
-			if (dataLength < sizeof(proto::CanResponseHeader))
+			if (data.size() < sizeof(proto::CanResponseHeader))
 			{
 				break;
 			}
 			proto::CanResponseHeader header{};
-			std::memcpy(&header, data, sizeof(header));
+			std::memcpy(&header, data.data(), sizeof(header));
+			if (data.size() < sizeof(header) + header.dataLength)
+			{
+				PostLog(LogLevel::Error, "Discarded a CAN response that does not carry the payload it claims");
+				break;
+			}
 
 			CanResponseEvent event{};
 			event.header.type = static_cast<uint16_t>(InboundEventType::CanResponse);
@@ -710,20 +707,20 @@ namespace Duet::Sbc
 			event.srcAddress = header.srcAddress;
 			event.flags = header.flags;
 			event.status = header.status;
-			PostEvent(InboundEventType::CanResponse, &event, sizeof(event), data + sizeof(header), header.dataLength);
+			PostEvent(InboundEventType::CanResponse, AsBytes(event), data.subspan(sizeof(header), header.dataLength));
 			break;
 		}
 		case proto::FirmwareRequest::CanMessageSent:
 		{
-			if (dataLength < sizeof(proto::CanMessageSentHeader))
+			if (data.size() < sizeof(proto::CanMessageSentHeader))
 			{
 				break;
 			}
 			proto::CanMessageSentHeader header{};
-			std::memcpy(&header, data, sizeof(header));
+			std::memcpy(&header, data.data(), sizeof(header));
 
 			const size_t entriesLength = header.count * sizeof(proto::CanMessageSentEntry);
-			if (dataLength < sizeof(header) + entriesLength)
+			if (data.size() < sizeof(header) + entriesLength)
 			{
 				break;
 			}
@@ -731,7 +728,7 @@ namespace Duet::Sbc
 			CanMessagesSentEvent event{};
 			event.header.type = static_cast<uint16_t>(InboundEventType::CanMessagesSent);
 			event.count = header.count;
-			PostEvent(InboundEventType::CanMessagesSent, &event, sizeof(event), data + sizeof(header), entriesLength);
+			PostEvent(InboundEventType::CanMessagesSent, AsBytes(event), data.subspan(sizeof(header), entriesLength));
 			break;
 		}
 		case proto::FirmwareRequest::MotionStopped:
@@ -739,16 +736,16 @@ namespace Duet::Sbc
 			// Every way of not acting on this is reported. A stop that is dropped here leaves the
 			// machine believing a move that was cut short ran to its end, which shows up much later
 			// as a homing offset and points at everything except the packet that went missing
-			if (dataLength < sizeof(proto::MotionStoppedHeader))
+			if (data.size() < sizeof(proto::MotionStoppedHeader))
 			{
 				PostLog(LogLevel::Error, "Discarded a truncated motion-stopped report");
 				break;
 			}
 			proto::MotionStoppedHeader header{};
-			std::memcpy(&header, data, sizeof(header));
+			std::memcpy(&header, data.data(), sizeof(header));
 
 			const size_t driversBytes = header.numDrivers * sizeof(proto::MotionStoppedDriver);
-			if (dataLength < sizeof(header) + driversBytes ||
+			if (data.size() < sizeof(header) + driversBytes ||
 				header.numDrivers > proto::MaxMotionStoppedDrivers)
 			{
 				PostLog(LogLevel::Error, "Discarded a motion-stopped report that does not carry the drivers it claims");
@@ -756,7 +753,7 @@ namespace Duet::Sbc
 			}
 
 			proto::MotionStoppedDriver drivers[proto::MaxMotionStoppedDrivers];
-			std::memcpy(drivers, data + sizeof(header), driversBytes);
+			std::memcpy(drivers, data.subspan(sizeof(header)).data(), driversBytes);
 			if (!m_onMotionStopped)
 			{
 				PostLog(LogLevel::Error, "A move was stopped by an endstop with nothing listening for it");
@@ -774,7 +771,7 @@ namespace Duet::Sbc
 			event.request = packet.request;
 			event.length = packet.length;
 			event.offset = static_cast<uint16_t>(m_transport->RxPointer());
-			PostEvent(InboundEventType::MalformedPacket, &event, sizeof(event), data, dataLength);
+			PostEvent(InboundEventType::MalformedPacket, AsBytes(event), data);
 			break;
 		}
 		}
@@ -785,42 +782,38 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	void LinkService::PerformFirmwareUpdate()
 	{
-		const uint8_t* iap = nullptr;
-		size_t iapLength = 0;
-		const uint8_t* firmware = nullptr;
-		size_t firmwareLength = 0;
+		ByteSpan iap;
+		ByteSpan firmware;
 		uint16_t crc16 = 0;
 		uint32_t requestId = 0;
 		{
 			const std::lock_guard<std::mutex> lock(m_firmwareMutex);
-			iap = m_iapData;
-			iapLength = m_iapLength;
-			firmware = m_firmwareData;
-			firmwareLength = m_firmwareLength;
+			iap = m_iap;
+			firmware = m_firmware;
 			crc16 = m_firmwareCrc16;
 			requestId = m_firmwareRequestId;
 		}
 
-		auto finish = [&](RequestResult result, const char* error)
+		auto finish = [&](RequestResult result, std::string_view error)
 		{
 			{
 				const std::lock_guard<std::mutex> lock(m_firmwareMutex);
-				m_iapData = m_firmwareData = nullptr;
-				m_iapLength = m_firmwareLength = 0;
+				m_iap = {};
+				m_firmware = {};
 				m_firmwareRequestId = kNoRequestId;
 				m_pendingFirmwareUpdate.store(false, std::memory_order_release);
 			}
-			CompleteRequest(requestId, result, error, error != nullptr ? std::strlen(error) : 0);
+			CompleteRequest(requestId, result, error);
 		};
 
 		try
 		{
 			// Send the IAP binary. Cancellation is safe at this stage.
-			PostLog(LogLevel::Info, "Sending IAP binary", 18);
-			for (size_t offset = 0; offset < iapLength;)
+			PostLog(LogLevel::Info, "Sending IAP binary");
+			for (size_t offset = 0; offset < iap.size();)
 			{
-				const size_t chunk = std::min(proto::IapSegmentSize, iapLength - offset);
-				if (!m_transport->WriteIapSegment(iap + offset, chunk))
+				const size_t chunk = std::min(proto::IapSegmentSize, iap.size() - offset);
+				if (!m_transport->WriteIapSegment(iap.subspan(offset, chunk)))
 				{
 					break;
 				}
@@ -845,22 +838,22 @@ namespace Duet::Sbc
 							   "Firmware update cancelled during retry. The board may need manual recovery.");
 						return;
 					}
-					PostLog(LogLevel::Error, "Firmware checksum verification failed", 36);
+					PostLog(LogLevel::Error, "Firmware checksum verification failed");
 				}
 
-				PostLog(LogLevel::Info, "Updating RepRapFirmware", 23);
-				for (size_t offset = 0; offset < firmwareLength;)
+				PostLog(LogLevel::Info, "Updating RepRapFirmware");
+				for (size_t offset = 0; offset < firmware.size();)
 				{
-					const size_t chunk = std::min(proto::FirmwareSegmentSize, firmwareLength - offset);
-					if (!m_transport->FlashFirmwareSegment(firmware + offset, chunk))
+					const size_t chunk = std::min(proto::FirmwareSegmentSize, firmware.size() - offset);
+					if (!m_transport->FlashFirmwareSegment(firmware.subspan(offset, chunk)))
 					{
 						break;
 					}
 					offset += chunk;
 				}
 
-				PostLog(LogLevel::Info, "Verifying checksum", 18);
-				verified = m_transport->VerifyFirmwareChecksum(static_cast<uint32_t>(firmwareLength), crc16);
+				PostLog(LogLevel::Info, "Verifying checksum");
+				verified = m_transport->VerifyFirmwareChecksum(static_cast<uint32_t>(firmware.size()), crc16);
 			} while (!verified && ++numRetries < 3);
 
 			if (!verified)
@@ -872,13 +865,13 @@ namespace Duet::Sbc
 
 			// Wait for the IAP binary to restart the controller
 			m_transport->WaitForIapReset();
-			PostLog(LogLevel::Info, "Firmware update successful", 26);
-			finish(RequestResult::Success, nullptr);
+			PostLog(LogLevel::Info, "Firmware update successful");
+			finish(RequestResult::Success, {});
 		}
 		catch (const std::exception& e)
 		{
 			const std::string message = std::string("Failed to update firmware: ") + e.what();
-			finish(RequestResult::Failed, message.c_str());
+			finish(RequestResult::Failed, message);
 			// Force a clean handshake; the controller state is unknown after a failed flash
 			m_transport->ResetConnection();
 		}

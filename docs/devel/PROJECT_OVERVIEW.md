@@ -26,7 +26,7 @@ against the reference tree in `lib/RepRapFirmware`.
 | 6 | Job lifecycle | [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) | 🟢 8 phases, 5 with tails | 2 × M, 6 × S | M291, M581, M452 (all WS7) |
 | 7 | M-code / motion migration | [MCODE_MIGRATION.md](MCODE_MIGRATION.md) | 🟡 ~58% of inventory | 7 × L, 14 × M, 5 × S | see §3 |
 | 8 | Synchronised actions | [MOTION_SYNCHRONISED_ACTIONS.md](MOTION_SYNCHRONISED_ACTIONS.md) | 🟡 stage 1 landed, verification 🔧 | 1 × M shared open, stage 2 (2 × L, 2 × M, 1 × S) | laser pixel data (§5) |
-| 9 | System emulation test bench | [SYSTEM_EMULATION.md](SYSTEM_EMULATION.md) | ⬜ Not started | 4 × L, 5 × M, 1 × S | |
+| 9 | System emulation test bench | [SYSTEM_EMULATION.md](SYSTEM_EMULATION.md) | 🟡 Stage 1 landed | 3 × L, 4 × M, 2 × S | |
 
 Workstream 7 is the umbrella the others were carved out of, and is most of what remains. Workstream 8
 is fully specified and independent; its groundwork and stage 1, deferral in the pipeline, are in,
@@ -194,13 +194,15 @@ decision D2.
 
 Three stages, each a usable rig on its own: a scriptable fake controller first, then the real
 DuetCANMaster firmware under Renode, then emulated expansion boards completing the chain. Stage 1
-already covers the job lifecycle (pause, resume, restore) against the real motion engine.
+is landed: the socket transport, the fake endpoint and the `SystemTests` in-process host exist, and
+the first scenarios cover boot, link recovery, motion and the pause/resume/cancel job lifecycle
+against the real motion engine - which already surfaced and fixed three pause-path races in
+`JobProcessor`.
 
 | Task | Size | Depends on |
 |---|---|---|
-| Stage 1: `SocketTransport` in DuetSbcInterface, C ABI and `Settings` plumbing | L | |
-| Stage 1: fake DuetCANMaster endpoint with capture, clock policies and injection | M | the socket transport |
-| Stage 1: `SystemTests` host running DCS in-process, plus its enabling seams | M | the fake endpoint |
+| Stage 1: remaining scenarios (deferred codes, event pause, `MotionStopped`, resend, stepped clock) | M | |
+| Stage 1: CI wiring for `SystemTests` and the host-built `libduet_sbc.so` | S | |
 | Stage 2: MB6HC Renode platform and link peripheral for DuetCANMaster | L | the stage 1 framing |
 | Stage 2: device-side socket transport in `DataTransfer` | M | the stage 1 framing |
 | Stage 2: Bosch M_CAN peripheral model | L | |

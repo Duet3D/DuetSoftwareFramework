@@ -120,9 +120,14 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     {
         VerifyLayouts();
 
+        NativeTransport transport = settings.Value.SbcTransport.Equals("Socket", StringComparison.OrdinalIgnoreCase)
+            ? NativeTransport.Socket
+            : NativeTransport.Spi;
+
         // The config carries raw UTF-8 pointers, so they must stay alive across the Create call
         IntPtr spiDevice = Marshal.StringToCoTaskMemUTF8(settings.Value.SpiDevice);
         IntPtr gpioChipDevice = Marshal.StringToCoTaskMemUTF8(settings.Value.GpioChipDevice);
+        IntPtr socketPath = Marshal.StringToCoTaskMemUTF8(settings.Value.SbcSocketPath);
         try
         {
             NativeConfig config = new()
@@ -149,14 +154,16 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
                 SbcConnectionTimeout = settings.Value.SbcConnectionTimeout,
                 SbcConnectionKeepAliveInterval = settings.Value.SbcConnectionKeepAliveInterval,
                 MaxSbcRetries = settings.Value.MaxSbcRetries,
-                UpdateOnly = settings.Value.UpdateOnly ? 1 : 0
+                UpdateOnly = settings.Value.UpdateOnly ? 1 : 0,
+                Transport = (int)transport,
+                SocketPath = socketPath
             };
 
             byte[] errorBuffer = new byte[ErrorBufferSize];
             _handle = NativeMethods.DuetSbc_Create(ref config, errorBuffer, errorBuffer.Length);
             if (_handle == IntPtr.Zero)
             {
-                throw new InvalidOperationException($"Failed to create native SPI interface: {ReadError(errorBuffer)}");
+                throw new InvalidOperationException($"Failed to create native link interface: {ReadError(errorBuffer)}");
             }
 
             Array.Clear(errorBuffer);
@@ -165,16 +172,17 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
                 string error = ReadError(errorBuffer);
                 NativeMethods.DuetSbc_Destroy(_handle);
                 _handle = IntPtr.Zero;
-                throw new InvalidOperationException($"Failed to connect to controller over SPI: {error}");
+                throw new InvalidOperationException($"Failed to connect to controller over {transport}: {error}");
             }
 
             ProtocolVersion = NativeMethods.DuetSbc_GetProtocolVersion(_handle);
-            logger.LogInformation("Connected to controller over SPI (protocol version {ProtocolVersion})", ProtocolVersion);
+            logger.LogInformation("Connected to controller over {Transport} (protocol version {ProtocolVersion})", transport, ProtocolVersion);
         }
         finally
         {
             Marshal.FreeCoTaskMem(spiDevice);
             Marshal.FreeCoTaskMem(gpioChipDevice);
+            Marshal.FreeCoTaskMem(socketPath);
         }
     }
 

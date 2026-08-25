@@ -51,6 +51,13 @@ extern "C"
 		int32_t maxSbcRetries;
 
 		int32_t updateOnly; // bool: tolerate a newer-than-supported protocol version so it can be flashed
+
+		// Which transport carries the link: 0 = SPI (the real controller over spidev), 1 = socket
+		// (the same transfer protocol over a Unix domain socket to a virtual controller; see
+		// DuetSpiProtocol/SocketLinkFormats.h). Mirrors duet::sbc::TransportKind.
+		int32_t transport;
+		// Socket transport only: path of the Unix domain socket the virtual controller listens on
+		const char* socketPath;
 	};
 
 	// Fill `config` with the default values.
@@ -274,6 +281,18 @@ extern "C"
 	};
 
 	void DuetSbc_GetClockStats(DuetSbcHandle* h, DuetSbcClockStats* stats);
+
+	// --- Test seam ---
+	//
+	// Pin the local time base the step-clock model is fitted against to a caller-controlled value,
+	// instead of CLOCK_MONOTONIC. With the master clock a test bench reports also frozen, the whole
+	// motion timeline stands still until the test advances both together - which is what makes move
+	// retirement deterministic on the virtual bench (docs/devel/SYSTEM_EMULATION.md, stage 1).
+	// Process-wide, like the clock it replaces. Never call this against a real controller: the model
+	// would fit real ticks against a clock that does not move.
+	void DuetSbc_PinLocalClock(int64_t ns);
+	// Restore CLOCK_MONOTONIC as the local time base.
+	void DuetSbc_UnpinLocalClock(void);
 
 	// Destroy the instance (stops the loop first).
 	void DuetSbc_Destroy(DuetSbcHandle* h);

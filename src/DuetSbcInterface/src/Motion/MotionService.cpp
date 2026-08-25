@@ -525,8 +525,8 @@ namespace Duet::Sbc
 			entries[i].driverNumber = drivers[i].driverNumber;
 		}
 
-		m_link->PostEventFromOtherThread(InboundEventType::MotionStopped, &event, sizeof(event),
-										 entries, numDrivers * sizeof(MotionStoppedDriverEntry));
+		m_link->PostEventFromOtherThread(InboundEventType::MotionStopped, AsBytes(event),
+										 AsBytes(entries, numDrivers * sizeof(MotionStoppedDriverEntry)));
 	}
 
 	void MotionService::PostMoveCompleted(unsigned int ring, uint32_t moveId)
@@ -538,7 +538,7 @@ namespace Duet::Sbc
 		// another ring's total would make that check fire on every move.
 		event.completedMoves = GetCompletedMoves(ring);
 		event.ring = static_cast<uint8_t>(ring);
-		m_link->PostEventFromOtherThread(InboundEventType::MoveCompleted, &event, sizeof(event));
+		m_link->PostEventFromOtherThread(InboundEventType::MoveCompleted, AsBytes(event));
 	}
 
 	void MotionService::PostMoveFailed(unsigned int ring, uint32_t moveId, MovementError error)
@@ -548,6 +548,6 @@ namespace Duet::Sbc
 		event.moveId = moveId;
 		event.ring = static_cast<uint8_t>(ring);
 		event.error = static_cast<uint8_t>(error);
-		m_link->PostEventFromOtherThread(InboundEventType::MoveFailed, &event, sizeof(event));
+		m_link->PostEventFromOtherThread(InboundEventType::MoveFailed, AsBytes(event));
 	}
 }
