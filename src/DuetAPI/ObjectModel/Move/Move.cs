@@ -89,6 +89,16 @@ public partial class Move : ModelObject, IStaticModelObject
     private bool _limitAxes = true;
 
     /// <summary>
+    /// Minimum allowed movement speed (in mm/min)
+    /// </summary>
+    public float MinSpeed
+    {
+        get => _minSpeed;
+        set => SetPropertyValue(ref _minSpeed, value);
+    }
+    private float _minSpeed = 30F;
+
+    /// <summary>
     /// Indicates if standard moves are forbidden if the corresponding axis is not homed
     /// </summary>
     public bool NoMovesBeforeHoming
