@@ -5,6 +5,7 @@ using DuetControlServer.Utility;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -425,7 +426,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                                 {
                                     e = ae.InnerException!;
                                 }
-                                await _eventLogger.LogOutputAsync(MessageType.Error, $"in job file (channel {file.Channel}) line {readCode?.LineNumber ?? file.LineNumber}: {e.Message}");
+                                await _eventLogger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(file.FilePath.Physical)} line {readCode?.LineNumber ?? file.LineNumber}: {e.Message}");
                                 _logger.LogError(e, "Error in job file (channel {Channel}) line {LineNumber}: {Message}", file.Channel, readCode?.LineNumber ?? file.LineNumber, e.Message);
                             }
                             Abort();
@@ -462,7 +463,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                         {
                             e = ae.InnerException!;
                         }
-                        await _eventLogger.LogOutputAsync(MessageType.Error, $"in job file (channel {file.Channel}) line {code.LineNumber ?? 0}: {e.Message}");
+                        await _eventLogger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(file.FilePath.Physical)} line {code.LineNumber ?? 0}: {e.Message}");
                         _logger.LogError(e, "Error in job file (channel {Channel}) line {LineNumber}: {Message}", file.Channel, code.LineNumber ?? 0, e.Message);
                     }
                 }

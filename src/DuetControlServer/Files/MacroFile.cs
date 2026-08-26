@@ -407,8 +407,8 @@ public sealed class MacroFile : CodeFile, IDisposable
                                 e = ae.InnerException!;
                             }
 
-                            await _model.HandleMacroErrorAsync(FilePath.Virtual, LineNumber, e.Message);
-                            await _eventLogger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(FilePath.Virtual)} line {LineNumber}: {e.Message}");
+                            await _model.HandleMacroErrorAsync(FilePath.Physical, LineNumber, e.Message);
+                            await _eventLogger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(FilePath.Physical)} line {LineNumber}: {e.Message}");
                             _logger.LogError(e, "Error while reading code from macro file {File}", FilePath.Virtual);
                         }
 
@@ -428,7 +428,7 @@ public sealed class MacroFile : CodeFile, IDisposable
                         Message? codeResult = await code.Task;
                         if (codeResult?.Type is MessageType.Error)
                         {
-                            await _model.HandleMacroErrorAsync(FilePath.Virtual, code.LineNumber ?? 0, codeResult.Content);
+                            await _model.HandleMacroErrorAsync(FilePath.Physical, code.LineNumber ?? 0, codeResult.Content);
                         }
                     }
                     catch (Exception e)
@@ -440,8 +440,8 @@ public sealed class MacroFile : CodeFile, IDisposable
                                 e = ae.InnerException!;
                             }
 
-                            await _model.HandleMacroErrorAsync(FilePath.Virtual, code.LineNumber ?? 0, e.Message);
-                            await _eventLogger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(FilePath.Virtual)} line {code.LineNumber ?? 0}: {e.Message}");
+                            await _model.HandleMacroErrorAsync(FilePath.Physical, code.LineNumber ?? 0, e.Message);
+                            await _eventLogger.LogOutputAsync(MessageType.Error, $"in file {Path.GetFileName(FilePath.Physical)} line {code.LineNumber ?? 0}: {e.Message}");
                             _logger.LogError(e, "Error while executing code {Code} from macro file {File}", code, FilePath.Virtual);
                         }
 
