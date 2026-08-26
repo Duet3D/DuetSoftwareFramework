@@ -162,9 +162,7 @@ internal static class JobControlBench
 
     /// <summary>Every scheduled move's total distance so far, in order</summary>
     public static float[] MoveDistances(this ScriptedCanMaster canMaster)
-        => canMaster.SbcPackets(SbcRequest.ScheduleMove)
-                    .Select(p => p.DecodeScheduleMove().Header.TotalDistance)
-                    .ToArray();
+        => canMaster.ScheduledMoves().Select(move => move.Header.TotalDistance).ToArray();
 
     /// <summary>
     /// The net steps scheduled per driver of board 1 so far. Steps are what the expansion board
@@ -172,10 +170,7 @@ internal static class JobControlBench
     /// much extruded filament) ends up
     /// </summary>
     public static int ScheduledSteps(this ScriptedCanMaster canMaster, byte driver)
-        => canMaster.SbcPackets(SbcRequest.ScheduleMove)
-                    .SelectMany(p => p.DecodeScheduleMove().Drivers)
-                    .Where(d => d.BoardAddress == 1 && d.DriverNumber == driver)
-                    .Sum(d => d.Steps);
+        => canMaster.ScheduledMoves().Steps(driver);
 }
 
 /// <summary>One running job control bench: the fake controller and the host started against it</summary>

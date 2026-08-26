@@ -151,6 +151,23 @@ internal struct EnableCanHeader
     public ushort Padding;
 }
 
+/// <summary>What a ScheduleMove packet's flags byte says about the move (MessageFormats.h, ScheduleMoveFlags)</summary>
+[Flags]
+internal enum ScheduleMoveFlags : byte
+{
+    /// <summary>The move was planned expecting the boards to apply late input shaping</summary>
+    UseInputShaping = 1 << 0,
+
+    /// <summary>At least one extruder in this move wants pressure advance applied</summary>
+    UsePressureAdvance = 1 << 1,
+
+    /// <summary>The move monitors endstops, so the controller sets up its driver stop list before sending it</summary>
+    CheckEndstops = 1 << 2,
+
+    /// <summary>The last packet of this move; the controller sends the accumulated CAN messages when it sees it</summary>
+    LastPacket = 1 << 3,
+}
+
 /// <summary>Schedule a move on the controller; ScheduleMoveDriver records follow</summary>
 [StructLayout(LayoutKind.Sequential, Pack = 1, Size = 56)]
 internal struct ScheduleMoveHeader
@@ -186,6 +203,19 @@ internal struct ScheduleMoveDriver
     public ushort StopOnHandle;
     public byte StopGroup;
     public byte StopAction;
+}
+
+/// <summary>Sentinels and limits of the ScheduleMove packet (MessageFormats.h)</summary>
+internal static class ScheduleMovePacket
+{
+    /// <summary>Value of <see cref="ScheduleMoveDriver.StopOnBoard"/> meaning "this driver watches no endstop"</summary>
+    public const byte NoEndstopBoard = 0xFF;
+
+    /// <summary>Value of <see cref="ScheduleMoveDriver.StopGroup"/> meaning "this driver belongs to no group"</summary>
+    public const byte NoStopGroup = 0xFF;
+
+    /// <summary>Most drivers one packet may carry; a move with more takes another packet</summary>
+    public const int MaxDrivers = 32;
 }
 
 /// <summary>Send a CAN message to the controller</summary>

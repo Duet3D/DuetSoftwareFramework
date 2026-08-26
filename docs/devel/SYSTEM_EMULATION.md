@@ -219,14 +219,19 @@ here, with hardware retaining only what involves real motion.
       timeouts from `Settings`, and the pinned local clock (`DuetSbc_PinLocalClock`)
 - [x] First scenarios: boot and keep-alive, CRC corruption retried without a resync, reconnect and
       reconfigure after a controller reboot, withheld readiness recovering, injected traffic
-      reaching the dispatcher, a commanded move decoded as its `ScheduleMove`,
+      reaching the dispatcher, `MotionStopped` closing a homing move,
       pause/resume/restore/cancel through the whole job lifecycle, and a pause interrupting a
       blocking `M116` with the fake playing the heater's board (its status reports are the only
       source of heater state and temperature, so the bench owns the whole heating loop)
+- [x] The `ScheduleMove` packets a commanded move produces, in `Scenarios/Motion`: which drivers a
+      move names and what each of them is told to turn, the velocity profile and the start time,
+      the flags, what an endstop or probing move tells the controller to stop on, and a move too
+      wide for one packet split under one move id. Everything but the profile runs twice, with
+      segmentation off and on, because cutting a move up must not change what the machine is told
+      to do; how it is cut up is its own set of scenarios
 - [ ] Scenarios still to write: deferred codes waking on retirement, event pause from injected CAN
-      traffic, `MotionStopped` closing a homing move, resend-request replay, non-`Ok` send status
-      surfacing, and the stepped clock paired with the pinned local time base for a fully
-      deterministic timeline
+      traffic, resend-request replay, non-`Ok` send status surfacing, and the stepped clock paired
+      with the pinned local time base for a fully deterministic timeline
 - [ ] CI wiring for `SystemTests` (the native library builds automatically as part of the test
       project, so a CI job needs only cmake, a host toolchain and `dotnet test`)
 
