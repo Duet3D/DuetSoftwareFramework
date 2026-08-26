@@ -85,6 +85,7 @@ public class DeferredPauseTests : BenchFixture
     /// A pause during an M98 R1 macro feedholds immediately, and the resume reruns the whole
     /// macro from its first line: one M98 call, two executions
     /// </summary>
+    /// TODO this might be an intermitant failure
     [Test]
     public async Task PauseDuringPausableMacroRerunsIt()
     {

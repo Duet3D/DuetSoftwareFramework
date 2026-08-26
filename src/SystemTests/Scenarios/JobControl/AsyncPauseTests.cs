@@ -32,14 +32,14 @@ public class AsyncPauseTests : BenchFixture
     }
 
     /// <summary>
-    /// The plain feedhold: the head stops mid-move rather than finishing it, the restore point
+    /// The plain pause: the head stops mid-move rather than finishing it, the restore point
     /// records the interrupted G1 and its unscaled feed rate, and after the resume nothing is
     /// skipped and nothing is doubled
     /// </summary>
     [Test]
-    public async Task FeedholdStopsMidMove()
+    public async Task PauseStopsMidMove()
     {
-        await using JobBench bench = await JobControlBench.StartAsync(prepareSd: sd =>
+        await using JobBench bench = await JobControlBench.StartAsync(configExtra: "M669 S100 T0.2", prepareSd: sd =>
             sd.WriteGCode("job.gcode", """
                 G90
                 G1 X190 F3000
@@ -49,7 +49,6 @@ public class AsyncPauseTests : BenchFixture
                 """));
 
         // 190 mm at 50 mm/s: one second in, the first move is mid-flight
-        // TODO there is a race condition that means the `WaitForStatusAsync(MachineStatus.Paused)` is never true
         await PauseMidJobAsync(bench, "0:/gcodes/job.gcode", TimeSpan.FromSeconds(1));
 
         (double pausedX, double pausedY) = await bench.Host.RestorePointAsync(1);
@@ -61,7 +60,7 @@ public class AsyncPauseTests : BenchFixture
                         "the interrupted code is a G1");
             Assert.That(await bench.Host.EvaluateAsync("state.restorePoints[1].feedRate"), Is.EqualTo(50.0).Within(0.01),
                         "the interrupted move's feed rate in mm/s");
-            Assert.That(await bench.Host.GlobalAsync("pauseRan"), Is.EqualTo(1), "the feedhold still ran pause.g");
+            Assert.That(await bench.Host.GlobalAsync("pauseRan"), Is.EqualTo(1), "ran pause.g");
         });
 
         await bench.Host.ExecuteCodeAsync("M24");
