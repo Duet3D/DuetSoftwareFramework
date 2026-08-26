@@ -197,7 +197,8 @@ DuetCANMaster firmware under Renode, then emulated expansion boards completing t
 is landed: the socket transport, the fake endpoint and the `SystemTests` in-process host exist, and
 the first scenarios cover boot, link recovery, motion and the pause/resume/cancel job lifecycle
 against the real motion engine - which already surfaced and fixed three pause-path races in
-`JobProcessor`.
+`JobProcessor`, the job that ended before the moves it had queued were made, and the dead
+full-model-update wait that hung everything awaiting it, `M26` and `M27` among them.
 
 | Task | Size | Depends on |
 |---|---|---|

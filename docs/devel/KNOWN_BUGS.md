@@ -12,6 +12,9 @@
 ### A job ended before the moves it had queued were made
 - [x] A movement code finishes when its move is queued, so `DoFilePrint` reached the end of a job file seconds before the machine reached the end of the job: `stop.g` ran, `state.status` fell to `idle`, and an `M25` from a console was refused with "Cannot pause print, because no file is being printed!" while the head was still moving. RepRapFirmware does not close the file until every move has completed, for both of those reasons (GCodes.cpp:706). `DoFilePrint` now waits for standstill when the file runs out of codes, unless the job is already pausing, cancelling or aborting, where the pause sequence does its own waiting.
 
+### Waiting for a full object model update never returned
+- [x] `ObjectModel.WaitForFullUpdateAsync` waited on an event nothing raised: `FullyUpdated`/`FullyUpdatedAsync` had no callers, because a finished full model update is what the SPI model updater used to signal and DuetControlServer now owns the object model outright. Everything that awaited it hung for ever, `M26` and `M27` among them. The infrastructure is gone - the condition variable, its lock and the four methods - and with it the two waits in `M26` and `M27`, whose `inputs[].motionSystem` is a local field nothing writes either, and the one before the plugins start. The simulated-time loop in `JobProcessor` now waits on `WaitForUpdateAsync`, which every write of the object model raises, and the `SyncObjectModel` command completes at once because a caller holding the read lock already sees every effect that has happened.
+
 ## Duet3Expansion
 
 ### Pressure Advance Race

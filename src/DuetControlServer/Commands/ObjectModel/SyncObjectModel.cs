@@ -1,19 +1,23 @@
 ﻿using System.Threading;
 using System.Threading.Tasks;
-using DuetControlServer.Model;
 
 namespace DuetControlServer.Commands;
 
 /// <summary>
 /// Implementation of the <see cref="DuetAPI.Commands.SyncObjectModel"/> command
 /// </summary>
-/// <param name="model">Object model</param>
-public sealed class SyncObjectModel(ObjectModel model) : DuetAPI.Commands.SyncObjectModel
+public sealed class SyncObjectModel : DuetAPI.Commands.SyncObjectModel
 {
     /// <summary>
-    /// Waits for the machine model to be fully updated from RepRapFirmware
+    /// Complete at once: DuetControlServer keeps the object model itself, so a caller that holds the
+    /// read lock already sees every effect that has happened, and there is no separate copy for this
+    /// to wait to catch up with
     /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public override Task ExecuteAsync(CancellationToken cancellationToken = default) => model.WaitForFullUpdateAsync(cancellationToken);
+    public override Task ExecuteAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
 }

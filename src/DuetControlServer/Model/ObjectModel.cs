@@ -36,20 +36,10 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     private readonly AsyncReaderWriterLock _readWriteLock = new();
 
     /// <summary>
-    /// Base lock for update conditions
-    /// </summary>
-    private readonly AsyncLock _updateLock = new();
-
-    /// <summary>
     /// Completion source that is pulsed whenever the machine model has been updated. Waiters race it against a
     /// timeout instead of cancelling a condition variable, so poll timeouts do not throw
     /// </summary>
     private TaskCompletionSource _updateTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-    /// <summary>
-    /// Condition variable to trigger when the machine model has been fully updated from RepRapFirmware
-    /// </summary>
-    private readonly AsyncConditionVariable _fullUpdateEvent;
 
     // Private fields
     private readonly IHostApplicationLifetime _lifetime;
@@ -64,8 +54,6 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     /// <param name="settings">Settings</param>
     public ObjectModel(IHostApplicationLifetime lifetime, ILogger<ObjectModel> logger, IOptions<Settings> settings)
     {
-        _fullUpdateEvent = new(_updateLock);
-
         _lifetime = lifetime;
         _logger = logger;
         _settings = settings;
@@ -474,54 +462,6 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     /// </summary>
     /// <returns>Asynchronous task</returns>
     public Task WaitForUpdateAsync() => WaitForUpdateAsync(_lifetime.ApplicationStopping);
-
-    /// <summary>
-    /// Wait for the model to be fully updated from RepRapFirmware
-    /// </summary>
-    public void WaitForFullUpdate()
-    {
-        using (_updateLock.Lock())
-        {
-            _fullUpdateEvent.Wait();
-        }
-    }
-
-    /// <summary>
-    /// Wait asynchronously for the model to be fully updated from RepRapFirmware
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    public async Task WaitForFullUpdateAsync(CancellationToken cancellationToken = default)
-    {
-        using (await _updateLock.LockAsync(cancellationToken))
-        {
-            await _fullUpdateEvent.WaitAsync(cancellationToken);
-        }
-    }
-
-    /// <summary>
-    /// Called in non-SPI mode to notify waiting tasks about a finished model update (synchronous version)
-    /// </summary>
-    internal void FullyUpdated()
-    {
-        using (_updateLock.Lock())
-        {
-            _fullUpdateEvent.NotifyAll();
-        }
-    }
-
-    /// <summary>
-    /// Called in non-SPI mode to notify waiting tasks about a finished model update
-    /// </summary>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    internal async Task FullyUpdatedAsync(CancellationToken cancellationToken = default)
-    {
-        using (await _updateLock.LockAsync(cancellationToken))
-        {
-            _fullUpdateEvent.NotifyAll();
-        }
-    }
 
     /// <summary>
     /// Indicates how many config files are being processed

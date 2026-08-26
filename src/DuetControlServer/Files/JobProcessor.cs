@@ -853,7 +853,7 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
                         int upTime = 0;
                         while (!_lifetime.ApplicationStopping.IsCancellationRequested)
                         {
-                            await _model.WaitForFullUpdateAsync(stoppingToken);
+                            await _model.WaitForUpdateAsync(stoppingToken);
                             using (await _model.AccessReadOnlyAsync(stoppingToken))
                             {
                                 if (_model.State.UpTime < upTime || _model.Job.LastDuration is not null)
