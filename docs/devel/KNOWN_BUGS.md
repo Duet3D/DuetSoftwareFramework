@@ -15,6 +15,11 @@
 ### Waiting for a full object model update never returned
 - [x] `ObjectModel.WaitForFullUpdateAsync` waited on an event nothing raised: `FullyUpdated`/`FullyUpdatedAsync` had no callers, because a finished full model update is what the SPI model updater used to signal and DuetControlServer now owns the object model outright. Everything that awaited it hung for ever, `M26` and `M27` among them. The infrastructure is gone - the condition variable, its lock and the four methods - and with it the two waits in `M26` and `M27`, whose `inputs[].motionSystem` is a local field nothing writes either, and the one before the plugins start. The simulated-time loop in `JobProcessor` now waits on `WaitForUpdateAsync`, which every write of the object model raises, and the `SyncObjectModel` command completes at once because a caller holding the read lock already sees every effect that has happened.
 
+## DuetSbcInterface
+
+### The permanent motion arena was never given back
+- [x] `MotionSystem::Init` reserved the 4 MB permanent arena and nothing ever released it, so the DDA ring each motion system allocated stayed allocated after the instance was destroyed. One instance per process is all DuetControlServer creates, so a machine never noticed; the `SystemTests` bench, which hosts DCS in-process once per scenario, ran out after about thirty scenarios and `MemoryArena::Allocate` aborted the whole test process. `Reserve`/`Release` now count their users - the bench compares one machine against another with two motion systems alive at once - the region is unmapped when the last of them goes, and `MotionSystem`'s destructor is what lets go. `MoveSegment`'s free list is reset at the same time: it is one static per process while the arena is not, so without that the next motion system would be handed recycled segments pointing into memory that had been unmapped.
+
 ## Duet3Expansion
 
 ### Pressure Advance Race

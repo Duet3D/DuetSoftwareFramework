@@ -12,6 +12,13 @@
 MoveSegment* MoveSegment::s_freeList = nullptr;
 unsigned int MoveSegment::s_numCreated = 0;
 
+// Forget the free list, because the memory it points into has gone
+void MoveSegment::ResetPool() noexcept
+{
+	s_freeList = nullptr;
+	s_numCreated = 0;
+}
+
 // Allocate a MoveSegment, from the freelist if possible, else create a new one
 MoveSegment* MoveSegment::Allocate(MoveSegment* pNext) noexcept
 {

@@ -212,6 +212,11 @@ class MoveSegment final
 	// Return the number of MoveSegment objects that have been created
 	static unsigned int NumCreated() noexcept { return s_numCreated; }
 
+	// Forget every recycled segment, for a teardown that unmaps the arena they were allocated from.
+	// The free list is one per process while the arena is not, so without this the next motion
+	// system would be handed segments pointing into a region that is no longer mapped.
+	static void ResetPool() noexcept;
+
   private:
 	static MoveSegment* s_freeList;	  // list of recycled segment objects
 	static unsigned int s_numCreated; // total number of segment objects created

@@ -6,6 +6,7 @@
 #include <cmath>
 
 #include <Platform/MemoryArena.h>
+#include <Motion/MoveSegment.h>
 #include <Motion/MoveTiming.h>
 #include <Motion/StepTimer.h>
 
@@ -31,11 +32,25 @@ MotionSystem::MotionSystem() noexcept
 	}
 }
 
+MotionSystem::~MotionSystem() noexcept
+{
+	if (m_reservedArena && MemoryArena::Release())
+	{
+		// The region has gone, and every segment on the free list was in it. Nothing else outlives
+		// the arena: the DDAs are the ring's and the ring is this system's
+		MoveSegment::ResetPool();
+	}
+}
+
 bool MotionSystem::Init() noexcept
 {
-	if (!MemoryArena::Reserve(permanentArenaBytes))
+	if (!m_reservedArena)
 	{
-		return false;
+		if (!MemoryArena::Reserve(permanentArenaBytes))
+		{
+			return false;
+		}
+		m_reservedArena = true;
 	}
 
 	StepTimer::Init();
