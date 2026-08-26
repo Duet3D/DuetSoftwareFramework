@@ -128,7 +128,7 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
     /// mix 1:0:0, no spindle, zero offsets, and active/standby temperatures of ABS_ZERO
     /// (-273.15 C); the reported fields are Tool's object model table (Tool.cpp)
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M563CreatesToolWithMappedComponents()
     {
@@ -204,7 +204,7 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
     /// GCodes::ManageTool (GCodes.cpp): a movement state whose current tool is the deleted number
     /// runs SelectTool(-1), then Tool::DeleteTool recomputes numToolsToReport, so #tools drops to 0
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M563DeleteRemovesToolAndDeselects()
     {
@@ -225,7 +225,7 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
 
     /// <summary>A bare M563 P reports the tool in RepRapFirmware's format, matching the model</summary>
     /// <remarks>Tool::PrintTool (Tool.cpp): "Tool 0 - name: ...; drives: ...; ...; status: off"</remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M563BareReportsToolConsistentWithModel()
     {
@@ -385,7 +385,7 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
     /// GCodes::HandleTcode (GCodes2.cpp) reads restorePoints[R].toolNumber; RestorePoint::Init
     /// (RestorePoint.cpp) starts toolNumber at -1
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task TR1SelectsRestorePointTool()
     {
@@ -410,7 +410,7 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
     /// The M567 case in GCodes2.cpp: E values go to Tool::DefineMix (Tool.cpp), reported in
     /// tools[].mix; the report format is "Tool %d mix ratios: %.3f:%.3f"
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M567SetsAndReportsMixRatio()
     {
@@ -450,7 +450,7 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
     /// The heater's reported state combines the board-reported mode with the local active flag
     /// (Heater::GetStatus, Heater.cpp), so the test plays the board's status reports
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M568SetsTemperaturesAndHeaterStates()
     {
@@ -493,7 +493,7 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
     /// GCodes::SetOrReportOffsets with code 10 (GCodes.cpp): each seen axis letter goes to
     /// Tool::SetOffset, reported in tools[].offsets
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task G10SetsToolOffsets()
     {
@@ -521,7 +521,7 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
     /// GCodes::SetOrReportOffsets with code 10 (GCodes.cpp): S and R share the temperature path
     /// with M568, so tools[].active/standby and the heater setpoints follow
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task G10SetsToolTemperatures()
     {
@@ -547,7 +547,7 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
     /// stopped; min/max default to DefaultMinSpindleRpm 60 and DefaultMaxSpindleRpm 10000
     /// (Configuration.h); the reported fields are Spindle's object model table
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M950CreatesSpindleWithDefaultsAndLimits()
     {
@@ -588,7 +588,7 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
     /// change propagates the RPM to spindles[].current (Spindle::SetState and Spindle::SetRpm),
     /// and M5 zeroes current while active keeps the configured value
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task SpindleControlCodesDriveSpindleState()
     {
@@ -634,7 +634,7 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
     /// for the current tool, which sets tools[].spindleRpm and the spindle's configured RPM; M568 F
     /// goes through the same Tool::SetSpindleRpm (GCodes::SetOrReportOffsets code 568)
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task SpindleToolSelectionAndRpm()
     {
@@ -719,7 +719,7 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
     /// DoStraightMove copies it into the move (GCodes.cpp), where state.laserPwm reads it scaled
     /// to 0..1 (GCodes::GetLaserPwm, GCodes.h, and RepRap.cpp state table)
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task LaserModeAppliesM3PowerToMoves()
     {

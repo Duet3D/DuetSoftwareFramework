@@ -79,7 +79,7 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
     /// only runs when nothing at all was seen. move.idle.timeout is reported in seconds
     /// (Move.cpp idle table, 0.001f * idleTimeout)
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M84SSetsIdleTimeoutWithoutDisabling()
     {
@@ -368,7 +368,7 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
     /// .interpolated come from Move::GetMicrostepping/GetMicrostepInterpolation (Move.cpp table).
     /// The bench config gives X 80 steps/mm and E 420 at the default x16
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M350SetsMicrosteppingAndScalesStepsPerMm()
     {

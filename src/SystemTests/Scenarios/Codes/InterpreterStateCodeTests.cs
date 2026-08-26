@@ -275,7 +275,7 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
     /// originalFeedRate and the current tool number; RestorePoint.cpp reports them as coords,
     /// feedRate and toolNumber
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task G60SavesRestorePoint()
     {
@@ -306,7 +306,7 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
     /// <summary>Extrusion starts out absolute, as after M82</summary>
     /// <remarks>RRF GCodeMachineState.cpp initialises drivesRelative to false, reported by
     /// GCodeBuffer.cpp inputs[].drivesRelative</remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task DrivesRelativeDefaultsToAbsolute()
     {
@@ -323,7 +323,7 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
     /// </summary>
     /// <remarks>RRF GCodes2.cpp case 82/83 writes gb.LatestMachineState().drivesRelative, reported
     /// by GCodeBuffer.cpp inputs[].drivesRelative</remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M82AndM83ToggleDrivesRelative()
     {

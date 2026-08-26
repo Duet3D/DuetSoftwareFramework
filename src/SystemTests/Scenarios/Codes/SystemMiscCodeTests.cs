@@ -96,7 +96,7 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
     /// same firmware describes itself in the object model as boards[0].firmwareName and
     /// boards[0].firmwareVersion (Platform.cpp objectModelTable)
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M115ReportsTheFirmwareVersion()
     {
@@ -118,7 +118,7 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
     /// RRF GCodes2.cpp case 118: without P the type is GenericMessage and platform.Message sends
     /// the text to every destination, including the channel the code came from
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M118EchoesTheMessage()
     {
@@ -136,7 +136,7 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
     /// RRF RepRap::Diagnostics (RepRap.cpp) opens with "=== Diagnostics ===";
     /// Move::Diagnostics contributes the "=== Move ===" section
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M122ReportsDiagnostics()
     {
@@ -190,39 +190,40 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
     }
 
     /// <summary>
-    /// M500 writes the calibrated settings to sys/config-override.g and M501 loads them back:
-    /// a workplace offset survives the round trip and overwrites a live change.
+    /// M500 P31 writes the Z probe values to sys/config-override.g and M501 loads them back: the
+    /// probe's trigger height survives the round trip and overwrites a live change.
     /// </summary>
     /// <remarks>
-    /// RRF GCodes::WriteConfigOverrideFile always writes the workplace coordinates
-    /// (GCodes::WriteWorkplaceCoordinates, GCodes3.cpp, "G10 L2 P%u" with %.2f per axis) and
-    /// GCodes2.cpp case 501 runs config-override.g as a macro, so the saved value replaces the
-    /// live one. The offset itself is move.axes[].workplaceOffsets[] (Move.cpp / GCodes)
+    /// RRF GCodes::WriteConfigOverrideFile calls Platform::WritePlatformParameters, which for P31
+    /// writes every probe through ZProbe::WriteParameters (ZProbe.cpp) as
+    /// "G31 K%u P%d [axis offsets] Z%.2f". GCodes2.cpp case 501 runs config-override.g as a macro,
+    /// so the saved value replaces the live one; the trigger height is
+    /// sensors.probes[].triggerHeight
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M500WritesConfigOverrideAndM501RestoresIt()
     {
-        await using JobBench bench = await JobControlBench.StartAsync();
-        await bench.Host.ExecuteCodeAsync("G10 L2 P1 X5");
-        Assert.That(await bench.Host.EvaluateAsync("move.axes[0].workplaceOffsets[0]"), Is.EqualTo(5.0).Within(1e-3),
-                    "G10 L2 P1 X5 sets move.axes[0].workplaceOffsets[0]");
+        await using JobBench bench = await JobControlBench.StartAsync(configExtra: "M558 K0 P8 C\"1.io1.in\"\n");
+        await bench.Host.ExecuteCodeAsync("G31 K0 Z1.25");
+        Assert.That(await bench.Host.EvaluateAsync("sensors.probes[0].triggerHeight"), Is.EqualTo(1.25).Within(1e-3),
+                    "G31 K0 Z sets sensors.probes[0].triggerHeight");
 
-        string reply = await bench.Host.ExecuteCodeAsync("M500");
+        string reply = await bench.Host.ExecuteCodeAsync("M500 P31");
         Assert.That(reply, Does.Not.Contain("Error"), "M500 writes config-override.g without an error (RRF WriteConfigOverrideFile)");
 
         string overridePath = Path.Combine(bench.Host.Sd.Root, "sys", "config-override.g");
         Assert.That(File.Exists(overridePath), Is.True, "M500 creates sys/config-override.g (RRF WriteConfigOverrideFile)");
-        Assert.That(await File.ReadAllTextAsync(overridePath), Does.Contain("G10 L2 P1 X5.00"),
-                    "M500 persists the workplace offset (RRF GCodes::WriteWorkplaceCoordinates)");
+        Assert.That(await File.ReadAllTextAsync(overridePath), Does.Match(@"G31 K0 .*Z1\.25"),
+                    "M500 P31 persists the probe's trigger height (RRF ZProbe::WriteParameters)");
 
-        await bench.Host.ExecuteCodeAsync("G10 L2 P1 X9");
-        Assert.That(await bench.Host.EvaluateAsync("move.axes[0].workplaceOffsets[0]"), Is.EqualTo(9.0).Within(1e-3),
-                    "the live offset moved before M501");
+        await bench.Host.ExecuteCodeAsync("G31 K0 Z3.5");
+        Assert.That(await bench.Host.EvaluateAsync("sensors.probes[0].triggerHeight"), Is.EqualTo(3.5).Within(1e-3),
+                    "the live trigger height moved before M501");
 
         await bench.Host.ExecuteCodeAsync("M501");
-        Assert.That(await bench.Host.EvaluateAsync("move.axes[0].workplaceOffsets[0]"), Is.EqualTo(5.0).Within(1e-3),
-                    "M501 restores move.axes[0].workplaceOffsets[0] from config-override.g (RRF GCodes2.cpp case 501)");
+        Assert.That(await bench.Host.EvaluateAsync("sensors.probes[0].triggerHeight"), Is.EqualTo(1.25).Within(1e-3),
+                    "M501 restores sensors.probes[0].triggerHeight from config-override.g (RRF GCodes2.cpp case 501)");
     }
 
     /// <summary>
@@ -301,7 +302,7 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
     /// "RepRap name: %s". The name is reported as network.name (Network.cpp objectModelTable,
     /// reprap.GetName()); RRF has no state.machineName
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M550SetsTheMachineName()
     {
@@ -341,7 +342,7 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
     /// network.interfaces[] (Network.cpp objectModelTable); rrf-differences.md documents no
     /// deviation for M552
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M552ReportsTheNetworkState()
     {
@@ -359,7 +360,7 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
     /// unused trigger replies "Trigger n is not configured". RRF does not report triggers in the
     /// object model, so the report is the observable
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M581ReportsAnUnconfiguredTrigger()
     {
@@ -379,7 +380,7 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
     /// (GCodes.cpp). RRF keeps no trigger state in the object model, so the macro's side effect is
     /// the assertion
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M581Dot1ExpressionTriggerRunsItsMacro()
     {

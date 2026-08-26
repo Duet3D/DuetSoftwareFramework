@@ -89,7 +89,7 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
     /// returns ABS_ZERO (-273.15). heat.heaters[].port and .frequency are a documented DSF
     /// addition (rrf-differences.md section 3, the object model must recreate the machine)
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M950CreatesHeaterBoundToSensor()
     {
@@ -135,7 +135,7 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
     /// and S below NEARLY_ABS_ZERO calls SwitchOff. heat.bedHeaters[] is Heat.cpp's obsolete
     /// bed heaters array, reporting the first heater of the slot
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M140AssignsAndDrivesBedHeater()
     {
@@ -183,7 +183,7 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
     /// RRF truth: GCodes2.cpp case 140 calls Heat::ClearBedHeaters for H-1, and the obsolete
     /// bedHeaters array reports HeaterCollection::GetFirstHeater, which is -1 for an empty slot
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M140HMinusOneClearsBedMapping()
     {
@@ -202,7 +202,7 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
     /// Heater::SetFunction with DefaultChamberTemperatureLimit (100); heat.chamberHeaters[] is
     /// Heat.cpp's obsolete chamber heaters array
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M141AssignsAndDrivesChamberHeater()
     {
@@ -240,7 +240,7 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
     /// Tool::SetToolHeaterActiveOrStandbyTemperature (Tool.cpp). The tool default monitor from
     /// M563 is DefaultHotEndTemperatureLimit (285, Heater.cpp SetFunction)
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M104SetsToolTemperaturesWithoutSelecting()
     {
@@ -283,7 +283,7 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
     /// the applicable tool when none is selected (GCodeState::m109ToolChange0) and a wait in
     /// GCodeState::m109WaitForTemperature until ToolHeatersAtSetTemperatures
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M109SelectsToolAndWaitsForTemperature()
     {
@@ -433,7 +433,7 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
     /// decimal place. The target is the active temperature for an active heater and 0.0 for one
     /// that is off (Heat.cpp GetTargetTemperature)
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M105ReportsTemperaturesConsistentWithModel()
     {
@@ -471,7 +471,7 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
     /// DefaultMinRetractionTemperature (90) from RRF3Common.h. The bench config allows cold
     /// extrusion (M302 P1 in JobControlBench.XyeConfig)
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M302ControlsColdExtrusion()
     {
@@ -513,7 +513,7 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
     /// objectModelTable (FOPDT.cpp) reports heatingRate, coolingRate, fanCoolingRate, coolingExp,
     /// deadTime, maxPwm, standardVoltage, and pid.used from usePid
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M307SetsHeaterProcessModel()
     {
@@ -561,7 +561,7 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
     /// (action as integer, condition via HeaterMonitor::GetTriggerName), and max/min are
     /// GetHighestTemperatureLimit and GetLowestTemperatureLimit over the monitors
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M143ConfiguresHeaterMonitors()
     {
@@ -604,7 +604,7 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
     /// maxHeatingFaultTime, T is maxTempExcursion, R is maxBadReadings; all three are in
     /// Heater::objectModelTable. The parameterless report quotes the same three values
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M570ConfiguresFaultDetection()
     {

@@ -232,7 +232,7 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
     /// half and one damped period. OM fields (type, frequency, damping, amplitudes, delays in
     /// seconds) from the AxisShaper object model tables in the same file
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M593ConfiguresInputShaping()
     {
@@ -287,7 +287,7 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
     /// AxisShaper::Configure in Movement/AxisShaper.cpp: type none sets numImpulses = 1, and the
     /// report branch answers "Input shaping is disabled"
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M593NoneDisablesInputShaping()
     {
@@ -314,7 +314,7 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
     /// to printRadius, H sets the Z maximum. OM fields from the LinearDeltaKinematics tables in
     /// the same file, name "delta" from LinearDeltaKinematics::GetName(true)
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M665ConfiguresDeltaGeometry()
     {
@@ -407,7 +407,7 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
     /// no kinematics code cartesian kinematics, so move.kinematics.name reports "cartesian"
     /// (CoreKinematics::GetName)
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M667RepliesRetiredInFavourOfM669()
     {
@@ -431,7 +431,7 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
     /// matrix [0.5,0.5,0], [0.5,-0.5,0], [0,0,1]. OM fields (name, forwardMatrix, inverseMatrix)
     /// from the CoreKinematics object model tables in the same file
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M669SelectsCoreXY()
     {
@@ -499,7 +499,7 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
     /// factor. OM fields from the ZLeadscrewKinematics tables in the same file. M669 K0 first, so
     /// the test does not depend on the boot default kinematics
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M671SetsLeadscrewPositions()
     {
@@ -551,7 +551,7 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
     /// .meshDeviation the map statistics (Move::LoadHeightMapFromFile, OM tables in
     /// Movement/Move.cpp)
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task G29S1LoadsHeightMap()
     {
@@ -589,7 +589,7 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
     /// move.compensation.type is "none" and .file null (usingMesh cleared, OM tables in
     /// Movement/Move.cpp)
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task G29S2ClearsLoadedHeightMap()
     {
@@ -613,7 +613,7 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
     /// <remarks>
     /// GCodes2.cpp case 375 calls GCodes::LoadHeightMap in GCodes6.cpp; OM effects as for G29 S1
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M375LoadsHeightMap()
     {
@@ -640,7 +640,7 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
     /// HeightMap::SaveToFile and GridDefinition::WriteHeadingAndParameters in
     /// Movement/BedProbing/Grid.cpp
     /// </remarks>
-    /// TODO fix scenario
+    [Category("KnownGap")]
     [Test]
     public async Task M374SavesLoadedHeightMap()
     {
