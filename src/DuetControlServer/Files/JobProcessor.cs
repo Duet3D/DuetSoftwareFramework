@@ -622,6 +622,36 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
                     // ignored
                 }
 
+                // The file has run out of codes, but the moves it queued have not run yet, and the
+                // job is not over until they have. An asynchronous pause may still arrive while the
+                // machine works through what the file queued last, and it can only land while the
+                // job is still processing; the machine also has to keep reporting the job rather
+                // than an idle machine until it has actually stopped. RepRapFirmware waits for
+                // standstill at this same point, before it closes the file and stops the print.
+                //
+                // Not waited for once the job is stopping: a pause does its own waiting, and the
+                // macro it runs may itself be moving, so waiting here would hold the rewind below
+                // up until that macro had finished moving
+                bool jobStopping;
+                using (await LockAsync())
+                {
+                    cancellationToken = _cancellationTokenSource.Token;
+                    jobStopping = PauseState >= PauseState.Pausing || _pausePending || IsCancelled || IsAborted;
+                }
+                if (!jobStopping)
+                {
+                    try
+                    {
+                        await _codeProcessor.WaitForStandstillAsync(cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // A pause or a cancel landed while the last moves were running. What that
+                        // means for the job is settled by the check below, which is what every
+                        // other way out of this loop goes through as well
+                    }
+                }
+
                 using (await LockAsync())
                 {
                     // _pausePending is checked as well as PauseState: a resume that lands before

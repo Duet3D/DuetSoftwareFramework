@@ -241,6 +241,15 @@ keeping from the deleted SPI path, because both are non-obvious and both were de
   when multiple motion systems land, `File` and `File2` run `DoFilePrint` concurrently and whichever
   drains first would clear it for both, so it has to be indexed by motion system alongside
   `_pausePosition`/`_pausePosition2`. That is a `// TODO` at the field, not a silent simplification.
+- **Running out of codes is not the end of the print.** A movement code finishes when its move is
+  *queued*, so a job file's last code completes seconds before the machine reaches the end of the
+  job. `DoFilePrint` therefore waits for standstill before it treats a drained read-ahead as a
+  finished print, which is where RepRapFirmware waits too and for the same two reasons
+  ([GCodes.cpp:706](../../lib/RepRapFirmware/src/GCodes/GCodes.cpp)): an asynchronous pause may
+  still arrive while the machine works through what the file queued last, and `state.status` has to
+  keep reporting the job until the job has really ended. The wait is skipped once the job is
+  pausing, cancelling or aborting - the pause sequence does its own waiting, and `pause.g` may
+  itself be moving, so waiting here would hold up the rewind that pause is waiting on.
 
 RRF also cancels temperature waits on the file channel when it pauses
 (`CancelWaitForTemperatures(true)`, and only for macros that can be restarted).
@@ -827,7 +836,8 @@ when the head is at or below the pause height, and only splits the move - travel
 - [x] Abort → heaters off, spindles stopped
 - [x] A job that simply runs out of codes goes through the same sequence, guarded so that a file
       ending in M0 does not run `stop.g` twice - and the guard applies only to a selected job, so
-      `M0` with no job still works every time
+      `M0` with no job still works every time. It waits for standstill first, because the last code
+      finishing only means the last move was queued - see §2.9
 - [x] `HeatManager.SwitchOffAllAsync`, which did not exist
 - [x] The G10 Z hop unwind
 - [x] `Cancelling` is observable while `cancel.g` runs
