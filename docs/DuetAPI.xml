@@ -10462,6 +10462,11 @@
             Limit axis positions by their minima and maxima
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.Move.MinSpeed">
+            <summary>
+            Minimum allowed movement speed (in mm/min)
+            </summary>
+        </member>
         <member name="P:DuetAPI.ObjectModel.Move.NoMovesBeforeHoming">
             <summary>
             Indicates if standard moves are forbidden if the corresponding axis is not homed
