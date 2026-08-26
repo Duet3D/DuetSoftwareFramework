@@ -61,7 +61,7 @@ public partial class MotionSystem : ModelObject, IStaticModelObject
         get => _printingAcceleration;
         set => SetPropertyValue(ref _printingAcceleration, value);
     }
-    private float _printingAcceleration = 10000F;
+    private float _printingAcceleration = Move.DefaultPrintingAcceleration;
 
     /// <summary>
     /// List of restore points
@@ -91,7 +91,7 @@ public partial class MotionSystem : ModelObject, IStaticModelObject
         get => _travelAcceleration;
         set => SetPropertyValue(ref _travelAcceleration, value);
     }
-    private float _travelAcceleration = 10000F;
+    private float _travelAcceleration = Move.DefaultTravelAcceleration;
 
     /// <summary>
     /// User coordinates of the motion system

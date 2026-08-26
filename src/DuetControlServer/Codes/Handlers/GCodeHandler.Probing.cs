@@ -621,8 +621,7 @@ internal sealed partial class GCodeHandler
             case 1:
             case 2:
             case 3:
-                // The height map codes do exactly these three things, and doing them twice would be
-                // two implementations to keep in step
+                // TODO this error is temporary. handle these cases
                 return new Message(MessageType.Error, sValue switch
                 {
                     1 => "Use M375 to load a height map",

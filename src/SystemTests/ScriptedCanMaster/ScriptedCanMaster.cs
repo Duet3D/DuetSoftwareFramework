@@ -7,6 +7,11 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DuetAPI.ObjectModel;
+using DuetControlServer.Link.Protocol.CanMessages;
+using DuetControlServer.Link.Protocol.Shared;
+using DuetControlServer.Motion;
+using DuetControlServer.Link;
 
 namespace SystemTests;
 
@@ -164,7 +169,7 @@ internal sealed class ScriptedCanMaster : IDisposable
     {
         DefaultCanHandler = static (fake, header, _) =>
         {
-            if (header.ReplyType == (ushort)DuetControlServer.Link.Protocol.Shared.CanMessageType.StandardReply)
+            if (header.ReplyType == (ushort)CanMessageType.StandardReply)
             {
                 fake.InjectStandardReply(header);
             }
@@ -173,17 +178,17 @@ internal sealed class ScriptedCanMaster : IDisposable
 
     /// <summary>Answer the given CAN request with a StandardReply</summary>
     public void InjectStandardReply(SendCanMessageHeader request,
-                                    DuetControlServer.Link.Protocol.Shared.CodeResult result = DuetControlServer.Link.Protocol.Shared.CodeResult.Ok,
+                                    CodeResult result = CodeResult.Ok,
                                     string text = "")
     {
-        DuetControlServer.Link.Protocol.CanMessages.CanMessageStandardReply reply = default;
+        CanMessageStandardReply reply = default;
         reply.ResultCode = result;
         reply.TextString = text;
         byte[] whole = new byte[64];
         MemoryMarshal.Write(whole, in reply);
         byte[] payload = whole.AsSpan(0, (int)reply.GetActualDataLength((uint)text.Length)).ToArray();
         InjectCanResponse(request.TxToken,
-                          (ushort)DuetControlServer.Link.Protocol.Shared.CanMessageType.StandardReply,
+                          (ushort)CanMessageType.StandardReply,
                           srcAddress: request.DstAddress == 127 ? (byte)0 : request.DstAddress,
                           payload);
     }
@@ -311,7 +316,7 @@ internal sealed class ScriptedCanMaster : IDisposable
     /// <summary>
     /// Forward a CAN message as an expansion board would send it: a reply when <paramref name="txToken"/>
     /// matches a request the SBC sent, unsolicited (status reports, input changes, events) when it
-    /// is <see cref="DuetControlServer.Link.LinkInterface.UnsolicitedTxToken"/>
+    /// is <see cref="LinkInterface.UnsolicitedTxToken"/>
     /// </summary>
     public void InjectCanResponse(ushort txToken, ushort msgType, byte srcAddress, byte[] payload,
                                   CanStatus status = CanStatus.Ok, byte flags = 0)
@@ -336,20 +341,55 @@ internal sealed class ScriptedCanMaster : IDisposable
     /// cold) on the bench
     /// </summary>
     public void InjectHeatersStatus(byte srcAddress, int heaterNumber,
-                                    DuetControlServer.Link.Protocol.Shared.HeaterMode mode,
+                                    HeaterMode mode,
                                     float currentTemperature, byte averagePwm = 128)
     {
-        DuetControlServer.Link.Protocol.CanMessages.CanMessageHeatersStatus report = default;
+        CanMessageHeatersStatus report = default;
         report.WhichHeaters = 1ul << heaterNumber;
         report.Reports[0].Mode = mode;
         report.Reports[0].AveragePwm = averagePwm;
         report.Reports[0].SetTemperature(currentTemperature);
 
         byte[] payload = new byte[report.GetActualDataLength(1)];
-        DuetControlServer.Link.Protocol.CanMessages.CanMessageSerializer.Serialize(in report, payload);
-        InjectCanResponse(DuetControlServer.Link.LinkInterface.UnsolicitedTxToken,
-                          (ushort)DuetControlServer.Link.Protocol.Shared.CanMessageType.HeatersStatusReport,
+        CanMessageSerializer.Serialize(in report, payload);
+        InjectCanResponse(LinkInterface.UnsolicitedTxToken,
+                          (ushort)CanMessageType.HeatersStatusReport,
                           srcAddress, payload);
+    }
+
+    /// <summary>
+    /// Broadcast a sensor temperatures report as an expansion board does, which is what feeds
+    /// sensors.analog[].lastReading
+    /// </summary>
+    public void InjectSensorReport(byte srcAddress, int sensorNumber, float temperature, DuetAPI.ObjectModel.TemperatureError error = DuetAPI.ObjectModel.TemperatureError.Ok)
+    {
+        CanMessageSensorTemperatures report = default;
+        report.WhichSensors = 1ul << sensorNumber;
+        report.TemperatureReports[0].ErrorCode = error;
+        report.TemperatureReports[0].SetTemperature(temperature);
+        byte[] payload = new byte[report.GetActualDataLength(1)];
+        CanMessageSerializer.Serialize(in report, payload);
+        InjectCanResponse(LinkInterface.UnsolicitedTxToken,
+                         (ushort)CanMessageType.SensorTemperaturesReport,
+                         srcAddress,
+                         payload);
+    }
+
+    /// <summary>
+    /// Report an input level change from board 1, exactly as an expansion board reports the input a
+    /// monitor watches. An active probe reads the top of the analog scale, which is what a closed
+    /// digital probe reports
+    /// </summary>
+    public void InjectInputChange(byte srcAddress, RemoteInputHandle handle, bool active)
+    {
+        CanMessageInputChangedV2 changed = default;
+        changed.AddEntry(handle.All, 0, active ? RemoteProbes.MaxReading : 0, active);
+        byte[] payload = new byte[Marshal.SizeOf<CanMessageInputChangedV2>()];
+        CanMessageSerializer.Serialize(in changed, payload);
+        InjectCanResponse(LinkInterface.UnsolicitedTxToken,
+                         (ushort)CanMessageType.InputStateChangedV2,
+                         srcAddress,
+                         payload);
     }
 
     /// <summary>Ask the SBC to resend the packet with the given id, exercising the retransmission path</summary>

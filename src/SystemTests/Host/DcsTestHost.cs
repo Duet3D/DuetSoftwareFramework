@@ -179,6 +179,15 @@ internal sealed class DcsTestHost : IAsyncDisposable
         throw new TimeoutException($"Machine status stayed {current}, expected {status}");
     }
 
+    /// <summary>Read part of the object model under its lock</summary>
+    public async Task<T> ReadModelAsync<T>(Func<ObjectModel, T> read)
+    {
+        using (await Model.AccessReadOnlyAsync(CancellationToken.None))
+        {
+            return read(Model);
+        }
+    }
+
     /// <summary>Run G-code as if entered on the given input, returning the reply text</summary>
     /// <remarks>
     /// Bounded so that a code the machine never finishes fails the test naming itself, rather than
