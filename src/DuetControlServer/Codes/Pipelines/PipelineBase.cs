@@ -377,29 +377,46 @@ public abstract class PipelineBase
     /// of the pause it ends up
     /// </remarks>
     public void CancelDeferredCodesAfter(uint firstPurgedMoveId)
-    {
-        lock (_deferredCodes)
-        {
-            foreach (DeferredCode deferred in _deferredCodes)
-            {
-                if ((int)(deferred.Code.DeferredAnchor - firstPurgedMoveId) >= 0)
-                {
-                    deferred.Cts.Cancel();
-                }
-            }
-        }
-    }
+        => Cancel(deferred => (int)(deferred.Code.DeferredAnchor - firstPurgedMoveId) >= 0);
 
     /// <summary>
     /// Cancel every deferred code on this pipeline
     /// </summary>
-    public void CancelAllDeferredCodes()
+    public void CancelAllDeferredCodes() => Cancel(_ => true);
+
+    /// <summary>
+    /// Cancel the deferred codes a predicate picks out
+    /// </summary>
+    /// <param name="shouldCancel">Which of them to cancel</param>
+    /// <remarks>
+    /// The set to cancel is taken under the lock and cancelled outside it. Cancelling runs the
+    /// waiting code's continuation on this thread, and what that code does as it unwinds is remove
+    /// itself from this list - so cancelling while iterating it would throw, part way through, out
+    /// of whatever asked for the cancellation. For the pause that is the sequence that puts the
+    /// machine down, which would be left half done with the job still holding the codes it was
+    /// waiting for.
+    /// <para>
+    /// A source already disposed belongs to a code that has just finished on another thread, which
+    /// is the outcome asked for here
+    /// </para>
+    /// </remarks>
+    private void Cancel(Func<DeferredCode, bool> shouldCancel)
     {
+        DeferredCode[] toCancel;
         lock (_deferredCodes)
         {
-            foreach (DeferredCode deferred in _deferredCodes)
+            toCancel = _deferredCodes.Where(shouldCancel).ToArray();
+        }
+
+        foreach (DeferredCode deferred in toCancel)
+        {
+            try
             {
                 deferred.Cts.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // The code finished as this was deciding to cancel it
             }
         }
     }
