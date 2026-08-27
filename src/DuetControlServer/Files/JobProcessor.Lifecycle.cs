@@ -108,13 +108,19 @@ internal partial class JobProcessor
             {
                 held = await _planner.StopEarlyAsync(plannedDeceleration: feedhold, _moveInterpreter, cancellationToken);
 
-                // Deferred codes anchored at or past the first purged move are dropped: the moves
-                // they were waiting for will never run, and the rewind re-reads their lines, so
-                // each fires exactly once. Codes anchored before it are owed, because committed
-                // moves always run to completion
-                if (held.MovesPurged > 0)
+                // Deferred codes anchored past the move the machine stops on are dropped: the moves
+                // they were waiting for will never run, and the rewind re-reads their lines, so each
+                // fires exactly once. Codes anchored at or before it are owed, because the moves the
+                // stop left standing all run to completion.
+                //
+                // The boundary is the last surviving move and not the purge count, because a stop
+                // that finds nothing to purge in the ring still discards what was on its way to it.
+                // Waiting on those anchors is a wait that never ends, and the standstill below is
+                // what would do the waiting - so a pause that dropped nothing from the ring would
+                // hang for as long as the machine was left on
+                if (held.Stopped)
                 {
-                    _codeProcessor.CancelDeferredCodesAfter(CodeChannel.File, held.FirstPurgedMoveId);
+                    _codeProcessor.CancelDeferredCodesAfter(CodeChannel.File, held.LastSurvivingMoveId + 1);
                 }
             }
 
@@ -369,7 +375,7 @@ internal partial class JobProcessor
             }
 
             await MoveBackToRestorePointAsync(cancellationToken);
-            await RestoreFeedRateAsync(cancellationToken);
+            await RestoreInterpreterStateAsync(cancellationToken);
 
             // The pause abandoned the macro the job was inside and rewound the file to the command
             // that started it, so that command is about to run again. RepRapFirmware's resuming3
@@ -601,6 +607,8 @@ internal partial class JobProcessor
                     rp.ProportionDone = point.ProportionDone;
                     rp.GCommandNumber = point.GCommandNumber;
                     rp.FeedRate = point.FeedRateMmPerSec;
+                    rp.AxesRelative = point.AxesRelative;
+                    rp.DrivesRelative = point.DrivesRelative;
                 }
                 _planner.PublishRestorePoints();
             }
@@ -802,24 +810,46 @@ internal partial class JobProcessor
     }
 
     /// <summary>
-    /// Put the job channel's feed rate back to what it was when the job paused
+    /// Put back the interpreter state the interrupted line was read with
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <remarks>
-    /// RepRapFirmware's <c>resuming3</c>. The fan speeds are deliberately <em>not</em> restored: a
-    /// tool change during the pause would have set them for the new tool, and putting the old ones
-    /// back would undo it. A machine that wants them back does it in <c>resume.g</c>
+    /// <para>
+    /// RepRapFirmware's <c>resuming3</c>, which restores the feed rate. The distance modes go with
+    /// it here because this port reads ahead and RepRapFirmware does not: a G90, G91, M82 or M83
+    /// further down the file may already have run by the time the stop lands, and rewinding the file
+    /// does not undo it, so the re-read line would be interpreted in a mode it was never written
+    /// for. Only what the stop actually named is put back - see <see cref="Motion.RestorePoint"/>.
+    /// </para>
+    /// <para>
+    /// The fan speeds are deliberately <em>not</em> restored: a tool change during the pause would
+    /// have set them for the new tool, and putting the old ones back would undo it. A machine that
+    /// wants them back does it in <c>resume.g</c>
+    /// </para>
     /// </remarks>
-    private async ValueTask RestoreFeedRateAsync(CancellationToken cancellationToken)
+    private async ValueTask RestoreInterpreterStateAsync(CancellationToken cancellationToken)
     {
         using (await _model.AccessReadWriteAsync(cancellationToken))
         {
             if (_model.Inputs[CodeChannel.File] is InputChannel input)
             {
                 float feedRateMmPerSec;
+                bool? axesRelative, drivesRelative;
                 using (_planner.Lock())
                 {
-                    feedRateMmPerSec = _planner.State.RestorePoints[Motion.RestorePoint.PauseNumber].FeedRate;
+                    Motion.RestorePoint rp = _planner.State.RestorePoints[Motion.RestorePoint.PauseNumber];
+                    feedRateMmPerSec = rp.FeedRate;
+                    axesRelative = rp.AxesRelative;
+                    drivesRelative = rp.DrivesRelative;
+                }
+
+                if (axesRelative is bool axesWereRelative)
+                {
+                    input.AxesRelative = axesWereRelative;
+                }
+                if (drivesRelative is bool drivesWereRelative)
+                {
+                    input.DrivesRelative = drivesWereRelative;
                 }
 
                 float unitScale = input.DistanceUnit == DistanceUnit.Inch ? MmPerInch : 1.0f;

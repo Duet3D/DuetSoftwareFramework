@@ -379,6 +379,8 @@ internal sealed partial class GCodeHandler(
                                     CodeLength = code.Length ?? 0,
                                     GCommandNumber = code.MajorNumber ?? -1,
                                     FeedRateMmPerSec = raw.OriginalFeedRateMmPerSec,
+                                    AxesRelative = input.AxesRelative,
+                                    DrivesRelative = input.DrivesRelative,
                                     FractionAtStart = fractionAtStart,
                                     SegmentCount = segments.Count
                                 };

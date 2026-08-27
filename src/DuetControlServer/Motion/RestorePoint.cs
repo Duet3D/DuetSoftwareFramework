@@ -91,6 +91,22 @@ internal sealed class RestorePoint
     public int GCommandNumber { get; set; } = -1;
 
     /// <summary>
+    /// The distance modes the interrupted line was read with, or null when the stop had no line to
+    /// name
+    /// </summary>
+    /// <remarks>
+    /// Restored with the modal G command and the feed rate, and needed for the same reason: the job
+    /// reads ahead of the machine, so a G90, G91, M82 or M83 further down the file may already have
+    /// run by the time the stop lands, and the rewind does not undo it. Null rather than a default,
+    /// because "the stop named no line" and "the line was read in absolute mode" are different
+    /// things and only the second may be put back
+    /// </remarks>
+    public bool? AxesRelative { get; set; }
+
+    /// <inheritdoc cref="AxesRelative"/>
+    public bool? DrivesRelative { get; set; }
+
+    /// <summary>
     /// X user coordinate at the start of an interrupted arc move
     /// </summary>
     public float InitialUserC0 { get; set; }

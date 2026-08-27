@@ -45,6 +45,25 @@ internal sealed class JobMoveOrigin
     public float FeedRateMmPerSec { get; init; }
 
     /// <summary>
+    /// Whether axis words meant distances rather than targets when the code was read (G91)
+    /// </summary>
+    /// <remarks>
+    /// Recorded with the feed rate and for the same reason, and needed for the same reason the
+    /// modal G command is: the job reads ahead of the machine, so by the time a stop lands the
+    /// interpreter may have executed a later G90 or G91 - a job whose last line is G90 does exactly
+    /// that - and the rewind puts the file position back without undoing it. The line would then be
+    /// re-read in the wrong mode, which turns a relative distance into an absolute target and sends
+    /// the machine somewhere the file never asked for. RepRapFirmware needs no equivalent because it
+    /// reads one code at a time and never runs past the point it may stop at
+    /// </remarks>
+    public bool AxesRelative { get; init; }
+
+    /// <summary>
+    /// Whether extrusion was relative when the code was read (M83), for the same reason
+    /// </summary>
+    public bool DrivesRelative { get; init; }
+
+    /// <summary>
     /// How much of the code was already made when this move was built, 0..1
     /// </summary>
     /// <remarks>
@@ -97,9 +116,11 @@ internal sealed class JobMoveOrigin
         // segment when the code is read again
         if (SegmentCount > 0 && segmentsMade >= SegmentCount)
         {
-            return new JobResumePoint(filePosition + CodeLength, 0.0f, GCommandNumber, FeedRateMmPerSec);
+            return new JobResumePoint(filePosition + CodeLength, 0.0f, GCommandNumber, FeedRateMmPerSec,
+                                      AxesRelative, DrivesRelative);
         }
-        return new JobResumePoint(filePosition, ProportionAt(segmentsMade), GCommandNumber, FeedRateMmPerSec);
+        return new JobResumePoint(filePosition, ProportionAt(segmentsMade), GCommandNumber, FeedRateMmPerSec,
+                                  AxesRelative, DrivesRelative);
     }
 
     /// <summary>
@@ -151,13 +172,15 @@ internal sealed class JobMoveOrigin
 /// <param name="ProportionDone">How much of the code at that position is already made, 0..1</param>
 /// <param name="GCommandNumber">The modal G command that code was read under, or -1</param>
 /// <param name="FeedRateMmPerSec">The feed rate it was read with, unscaled by M220</param>
+/// <param name="AxesRelative">Whether axis words were distances when it was read (G91)</param>
+/// <param name="DrivesRelative">Whether extrusion was relative when it was read (M83)</param>
 /// <remarks>
 /// The whole of what a stop tells the job file, in one value. It is produced by
 /// <see cref="MovePlanner.TakeJobResumePoint"/> and read by the rewind, the restore point and the
 /// modal state the resume puts back
 /// </remarks>
 internal readonly record struct JobResumePoint(long FilePosition, float ProportionDone, int GCommandNumber,
-                                               float FeedRateMmPerSec);
+                                               float FeedRateMmPerSec, bool AxesRelative, bool DrivesRelative);
 
 /// <summary>
 /// Remembers which job code each queued move came from, so a stop can say where to resume

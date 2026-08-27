@@ -240,6 +240,7 @@ internal sealed class MovementState
         rp.FeedRate = feedRate;
         rp.FilePosition = filePosition;
         rp.GCommandNumber = -1;
+        rp.AxesRelative = rp.DrivesRelative = null;
         rp.ToolNumber = toolNumber;
         rp.FanSpeed = VirtualFanSpeed;
 

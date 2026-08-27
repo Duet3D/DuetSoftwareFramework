@@ -684,6 +684,14 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
                         // Reassign the file being printed unless the print is aborted
                         if (!IsAborted && !IsCancelled)
                         {
+                            // Under the job's live token, not the one the pause cancelled.
+                            // StopReadingForPause replaces the source, and only the paths that had a
+                            // code in flight when the pause landed re-read it as they unwind - a
+                            // pause that lands with nothing in flight, which is any pause after the
+                            // file has been read to its end, leaves the cancelled one here. Every
+                            // code read after the resume would then be cancelled as it was executed,
+                            // and the job would end having skipped the rest of the file
+                            cancellationToken = _cancellationTokenSource.Token;
                             IsProcessing = true;
                             _codeProcessor.SetJobFile(file.Channel, file);
                             RestoreModalStateForResume(file);
