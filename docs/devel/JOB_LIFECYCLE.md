@@ -510,7 +510,13 @@ already reading rather than one it was about to start:
 - **the modal G command**, because that line may be a bare `X100 Y100 E5` whose G1 is several lines
   above the rewind point. Seeking throws the parser's `LastGCode` away, so the resume puts it back —
   RRF's `SetModalGCommand`;
-- **the feed rate the line was read with**, unscaled by M220, because the line need not name F.
+- **the feed rate the line was read with**, unscaled by M220, because the line need not name F;
+- **the distance modes the line was read with** - G90/G91 and M82/M83 - because this port reads the
+  job file ahead of the machine and RepRapFirmware does not. RRF takes one code at a time, gated by
+  the movement queue, so a mode set further down the file cannot have run by the time a stop lands.
+  Here it can: a job whose last line is `G90` has already executed it, and rewinding the file does
+  not undo it, so the re-read line means something the file never wrote. A relative distance read as
+  an absolute target sends the machine somewhere else entirely.
 
 `InitialUserC0` / `InitialUserC1` are the one part of RRF's set with no counterpart here yet. They
 exist so that a re-read *arc* reconstructs its centre from where the arc began rather than from where
@@ -532,9 +538,23 @@ maps them back to the file itself:
 
 | Reported | Used for |
 |---|---|
-| Drive endpoints where motion actually stops | `ResyncFromEngine`, and `RestorePoint.Coords` |
+| Drive endpoints where motion actually stops | `MoveBuilder.ResyncEndpoints`, and `RestorePoint.Coords` |
 | `MoveId` of the first purged move | The code to rewind to, and how much of it was made |
 | Number of moves purged | Diagnostics, and which of the two sources names the resume point |
+
+The endpoints are the ring's own, read after the purge — `m_addPointer->GetPrevious()`, which is the
+last move the stop left standing, and so where the machine will come to rest. RepRapFirmware fills
+its pause restore point from exactly that
+([DDARing.cpp:647](../../lib/RepRapFirmware/src/Movement/DDARing.cpp)). The motor position snapshot
+is the wrong source and cannot be made right by reading it later: it advances a segment at a time, so
+while the moves the stop could not recall are still running it reads somewhere the machine is passing
+through, and by the time the machine has stopped `pause.g` may have parked it somewhere else again.
+
+The stop also has to drop what DuetControlServer has already submitted for that ring but the motion
+thread has not taken up. Those moves are the rest of the same path, and the submission queue is
+drained into the ring in the same pass that acts on the stop, so leaving them would set the machine
+off again after it had come to rest. Nothing is owed by dropping them: the first purged move is
+earlier than anything still waiting, so the resume makes them again.
 
 `MoveParams` carries a `MoveId` and no file position, and it should stay that way. DCS already keeps
 side tables keyed on that id: `EndstopCorrection.NoteMoveId`
