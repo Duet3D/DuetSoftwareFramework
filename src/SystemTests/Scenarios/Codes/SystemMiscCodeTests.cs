@@ -107,7 +107,7 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
 
         Match version = Regex.Match(reply, @"FIRMWARE_VERSION: (\S+)");
         Assert.That(version.Success, Is.True, "M115 reports a version token after FIRMWARE_VERSION:");
-        Assert.That(await bench.Host.EvaluateRawAsync("boards[0].firmwareVersion"), Is.EqualTo(version.Groups[1].Value),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Boards[0].FirmwareVersion), Is.EqualTo(version.Groups[1].Value),
                     "M115's version matches boards[0].firmwareVersion (RRF Platform.cpp firmwareVersion)");
     }
 
@@ -162,7 +162,7 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
     public async Task M409ReturnsTheLiveModelValue()
     {
         await using JobBench bench = await JobControlBench.StartAsync();
-        string homed = await bench.Host.EvaluateRawAsync("move.axes[0].homed");
+        bool homed = await bench.Host.ReadModelAsync(model => model.Move.Axes[0].Homed);
 
         string reply = await bench.Host.ExecuteCodeAsync("M409 K\"move.axes[0].homed\"");
         using (JsonDocument document = JsonDocument.Parse(reply))
@@ -171,7 +171,7 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
             {
                 Assert.That(document.RootElement.GetProperty("key").GetString(), Is.EqualTo("move.axes[0].homed"),
                             "M409 echoes the queried key (RRF GCodes2.cpp case 409)");
-                Assert.That(document.RootElement.GetProperty("result").GetRawText(), Contains.Substring(homed),
+                Assert.That(document.RootElement.GetProperty("result").GetRawText(), Contains.Substring(homed ? "true" : "false"),
                             "M409's result is the live value of move.axes[0].homed");
             });
         }
@@ -183,7 +183,7 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
             {
                 Assert.That(document.RootElement.GetProperty("flags").GetString(), Is.EqualTo("v"),
                             "M409 echoes the F flags (RRF GCodes2.cpp case 409)");
-                Assert.That(document.RootElement.GetProperty("result").GetRawText(), Contains.Substring(homed),
+                Assert.That(document.RootElement.GetProperty("result").GetRawText(), Contains.Substring(homed ? "true" : "false"),
                             "M409 F\"v\" still returns the live value of move.axes[0].homed");
             });
         }
@@ -206,7 +206,7 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
     {
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: "M558 K0 P8 C\"1.io1.in\"\n");
         await bench.Host.ExecuteCodeAsync("G31 K0 Z1.25");
-        Assert.That(await bench.Host.EvaluateAsync("sensors.probes[0].triggerHeight"), Is.EqualTo(1.25).Within(1e-3),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!.TriggerHeight), Is.EqualTo(1.25).Within(1e-3),
                     "G31 K0 Z sets sensors.probes[0].triggerHeight");
 
         string reply = await bench.Host.ExecuteCodeAsync("M500 P31");
@@ -218,11 +218,11 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
                     "M500 P31 persists the probe's trigger height (RRF ZProbe::WriteParameters)");
 
         await bench.Host.ExecuteCodeAsync("G31 K0 Z3.5");
-        Assert.That(await bench.Host.EvaluateAsync("sensors.probes[0].triggerHeight"), Is.EqualTo(3.5).Within(1e-3),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!.TriggerHeight), Is.EqualTo(3.5).Within(1e-3),
                     "the live trigger height moved before M501");
 
         await bench.Host.ExecuteCodeAsync("M501");
-        Assert.That(await bench.Host.EvaluateAsync("sensors.probes[0].triggerHeight"), Is.EqualTo(1.25).Within(1e-3),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!.TriggerHeight), Is.EqualTo(1.25).Within(1e-3),
                     "M501 restores sensors.probes[0].triggerHeight from config-override.g (RRF GCodes2.cpp case 501)");
     }
 
@@ -251,7 +251,7 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
     public async Task M505SetsTheSystemDirectory()
     {
         await using JobBench bench = await JobControlBench.StartAsync();
-        string omSys = await bench.Host.EvaluateRawAsync("directories.system");
+        string omSys = await bench.Host.ReadModelAsync(model => model.Directories.System);
         Assert.That(omSys, Is.EqualTo("0:/sys/"), "directories.system defaults to 0:/sys/ (RRF RepRap.cpp directories table)");
         Assert.That((await bench.Host.ExecuteCodeAsync("M505")).Trim(), Is.EqualTo($"Sys file path is {omSys}"),
                     "M505 without P reports directories.system (RRF GCodes2.cpp case 505)");
@@ -260,7 +260,7 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M505 P\"0:/sys2\"");
         Assert.That(reply, Does.Not.Contain("Error"), "M505 P accepts an existing directory (RRF Platform::SetSysDir)");
 
-        omSys = await bench.Host.EvaluateRawAsync("directories.system");
+        omSys = await bench.Host.ReadModelAsync(model => model.Directories.System);
         Assert.That(omSys, Does.StartWith("0:/sys2"), "M505 P sets directories.system (RRF Platform::SetSysDir)");
         Assert.That((await bench.Host.ExecuteCodeAsync("M505")).Trim(), Is.EqualTo($"Sys file path is {omSys}"),
                     "M505's report follows directories.system after the change (RRF GCodes2.cpp case 505)");
@@ -278,7 +278,7 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
     public async Task M505Dot1SetsTheWebDirectory()
     {
         await using JobBench bench = await JobControlBench.StartAsync();
-        string omWeb = await bench.Host.EvaluateRawAsync("directories.web");
+        string omWeb = await bench.Host.ReadModelAsync(model => model.Directories.Web);
         Assert.That(omWeb, Is.EqualTo("0:/www/"), "directories.web defaults to 0:/www/ (RRF RepRap.cpp directories table)");
         Assert.That((await bench.Host.ExecuteCodeAsync("M505.1")).Trim(), Is.EqualTo($"HTTP file path is {omWeb}"),
                     "M505.1 without P reports directories.web (RRF GCodes2.cpp case 505)");
@@ -287,7 +287,7 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M505.1 P\"0:/www2\"");
         Assert.That(reply, Does.Not.Contain("Error"), "M505.1 P accepts an existing directory (RRF Platform::SetWebDir)");
 
-        omWeb = await bench.Host.EvaluateRawAsync("directories.web");
+        omWeb = await bench.Host.ReadModelAsync(model => model.Directories.Web);
         Assert.That(omWeb, Does.StartWith("0:/www2"), "M505.1 P sets directories.web (RRF Platform::SetWebDir)");
         Assert.That((await bench.Host.ExecuteCodeAsync("M505.1")).Trim(), Is.EqualTo($"HTTP file path is {omWeb}"),
                     "M505.1's report follows directories.web after the change (RRF GCodes2.cpp case 505)");
@@ -307,13 +307,13 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
     public async Task M550SetsTheMachineName()
     {
         await using JobBench bench = await JobControlBench.StartAsync();
-        string omName = await bench.Host.EvaluateRawAsync("network.name");
+        string omName = await bench.Host.ReadModelAsync(model => model.Network.Name);
         Assert.That((await bench.Host.ExecuteCodeAsync("M550")).Trim(), Is.EqualTo($"RepRap name: {omName}"),
                     "M550 without P reports network.name (RRF GCodes2.cpp case 550)");
 
         string reply = await bench.Host.ExecuteCodeAsync("M550 P\"Bench550\"");
         Assert.That(reply, Does.Not.Contain("Error"), "M550 P accepts a new machine name (RRF reprap.SetName)");
-        Assert.That(await bench.Host.EvaluateRawAsync("network.name"), Is.EqualTo("Bench550"),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Network.Name), Is.EqualTo("Bench550"),
                     "M550 P sets network.name (RRF Network.cpp name entry)");
     }
 
@@ -413,7 +413,7 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
                     "M586 without C reports no CORS site (RRF Network::ConfigureNetworkProtocol)");
 
         await bench.Host.ExecuteCodeAsync("M586 C\"example.com\"");
-        Assert.That(await bench.Host.EvaluateRawAsync("network.corsSite"), Is.EqualTo("example.com"),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Network.CorsSite), Is.EqualTo("example.com"),
                     "M586 C sets network.corsSite (RRF Network::SetCorsSite; OM Network.cpp corsSite)");
         Assert.That(await bench.Host.ExecuteCodeAsync("M586"), Does.Contain("CORS enabled for site 'example.com'"),
                     "M586's report names the configured site (RRF Network::ConfigureNetworkProtocol)");

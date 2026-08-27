@@ -26,8 +26,12 @@ public sealed class NativeLibraryLocator
     public void RegisterResolver()
     {
         string libraryPath = Locate();
-        NativeLibrary.SetDllImportResolver(typeof(DuetControlServer.Settings).Assembly,
-            (name, _, _) => name == "duet_sbc" ? NativeLibrary.Load(libraryPath) : IntPtr.Zero);
+        DllImportResolver resolver = (name, _, _) => name == "duet_sbc" ? NativeLibrary.Load(libraryPath) : IntPtr.Zero;
+
+        // Both assemblies: DuetControlServer for the engine it drives, and this one for the test
+        // seams the bench calls directly - see NativeTestClock
+        NativeLibrary.SetDllImportResolver(typeof(DuetControlServer.Settings).Assembly, resolver);
+        NativeLibrary.SetDllImportResolver(typeof(NativeLibraryLocator).Assembly, resolver);
     }
 
     private static string Locate()

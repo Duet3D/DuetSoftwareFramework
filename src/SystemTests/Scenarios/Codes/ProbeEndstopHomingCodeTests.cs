@@ -125,14 +125,14 @@ public class ProbeEndstopHomingCodeTests : SystemTests.Host.BenchFixture
     /// the value is waited for; a value that never arrives comes back for the caller to assert on,
     /// which fails naming the field rather than timing out
     /// </summary>
-    private static async Task<double> SettledValueAsync(DcsTestHost host, string expression, double expected,
+    private static async Task<double> SettledValueAsync(DcsTestHost host, Func<DuetControlServer.Model.ObjectModel, double?> read, double expected,
                                                         double tolerance = 1e-3, int timeoutMs = 5_000)
     {
         DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
         double value;
         do
         {
-            value = await host.EvaluateAsync(expression);
+            value = await host.ReadModelAsync(read) ?? double.NaN;
             if (Math.Abs(value - expected) <= tolerance)
             {
                 return value;
@@ -507,7 +507,7 @@ public class ProbeEndstopHomingCodeTests : SystemTests.Host.BenchFixture
         string reply = await home;
         Assert.That(reply.Trim(), Is.Empty, "G28 X completed without error");
         bool homed = await bench.Host.ReadModelAsync(model => model.Move.Axes[0].Homed);
-        double position = await bench.Host.EvaluateAsync("move.axes[0].machinePosition");
+        double position = await bench.Host.ReadModelAsync(model => model.Move.Axes[0].MachinePosition!.Value);
         Assert.Multiple(() =>
         {
             Assert.That(homed, Is.True,
@@ -534,7 +534,7 @@ public class ProbeEndstopHomingCodeTests : SystemTests.Host.BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("G28 Y");
         Assert.That(reply.Trim(), Is.Empty, "G28 Y completed without error");
         bool homed = await bench.Host.ReadModelAsync(model => model.Move.Axes[1].Homed);
-        double position = await bench.Host.EvaluateAsync("move.axes[1].machinePosition");
+        double position = await bench.Host.ReadModelAsync(model => model.Move.Axes[1].MachinePosition!.Value);
         Assert.Multiple(() =>
         {
             Assert.That(homed, Is.True,
@@ -577,7 +577,7 @@ public class ProbeEndstopHomingCodeTests : SystemTests.Host.BenchFixture
         Assert.That(reply.Trim(), Is.Empty, "G30 completed without error");
         bool homed = await bench.Host.ReadModelAsync(model => model.Move.Axes[2].Homed);
         const double diveHeight = 5.0, triggerHeight = 1.5;
-        double zPosition = await SettledValueAsync(bench.Host, "move.axes[2].machinePosition",
+        double zPosition = await SettledValueAsync(bench.Host, model => model.Move.Axes[2].MachinePosition,
                                                    diveHeight + triggerHeight, 0.01);
         float lastStopHeight = await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!.LastStopHeight);
         Assert.Multiple(() =>

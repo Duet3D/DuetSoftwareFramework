@@ -56,9 +56,9 @@ public class AsyncPauseTests : BenchFixture
         {
             Assert.That(pausedX, Is.InRange(1.0, 189.0), "the head stopped mid-move, not at either end");
             Assert.That(pausedY, Is.Zero, "still on the first move's line");
-            Assert.That(await bench.Host.EvaluateRawAsync("state.restorePoints[1].gCommandNumber"), Is.EqualTo("1"),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.MotionSystems[0].RestorePoints[1].GCommandNumber), Is.EqualTo(1),
                         "the interrupted code is a G1");
-            Assert.That(await bench.Host.EvaluateAsync("state.restorePoints[1].feedRate"), Is.EqualTo(50.0).Within(0.01),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.MotionSystems[0].RestorePoints[1].FeedRate), Is.EqualTo(50.0).Within(0.01),
                         "the interrupted move's feed rate in mm/s");
             Assert.That(await bench.Host.GlobalAsync("pauseRan"), Is.EqualTo(1), "ran pause.g");
         });
@@ -160,8 +160,8 @@ public class AsyncPauseTests : BenchFixture
 
         // The machine has stopped and nothing has moved it since, so this is the position the
         // restore point is meant to hold
-        double restX = await bench.Host.EvaluateAsync("move.axes[0].machinePosition");
-        double restY = await bench.Host.EvaluateAsync("move.axes[1].machinePosition");
+        double restX = await bench.Host.MachinePositionAsync(0);
+        double restY = await bench.Host.MachinePositionAsync(1);
         (double pausedX, double pausedY) = await bench.Host.RestorePointAsync(1);
         Assert.Multiple(() =>
         {
@@ -285,9 +285,9 @@ public class AsyncPauseTests : BenchFixture
         Assert.Multiple(async () =>
         {
             Assert.That(pausedY, Is.GreaterThan(10.5), "the pause landed on one of the bare modal lines");
-            Assert.That(await bench.Host.EvaluateRawAsync("state.restorePoints[1].gCommandNumber"), Is.EqualTo("1"),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.MotionSystems[0].RestorePoints[1].GCommandNumber), Is.EqualTo(1),
                         "the modal G command was recorded");
-            Assert.That(await bench.Host.EvaluateAsync("state.restorePoints[1].feedRate"), Is.EqualTo(100.0).Within(0.01),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.MotionSystems[0].RestorePoints[1].FeedRate), Is.EqualTo(100.0).Within(0.01),
                         "with the feed rate the line was read with");
         });
 
@@ -325,7 +325,7 @@ public class AsyncPauseTests : BenchFixture
         // The long edge runs at the scaled 25 mm/s, so 1.5 s in it is mid-flight
         await PauseMidJobAsync(bench, "0:/gcodes/job.gcode", TimeSpan.FromSeconds(1.5));
 
-        Assert.That(await bench.Host.EvaluateAsync("state.restorePoints[1].feedRate"), Is.EqualTo(50.0).Within(0.01),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.MotionSystems[0].RestorePoints[1].FeedRate), Is.EqualTo(50.0).Within(0.01),
                     "the recorded rate is the file's F3000, not the M220-scaled one");
 
         await bench.Host.ExecuteCodeAsync("M24");

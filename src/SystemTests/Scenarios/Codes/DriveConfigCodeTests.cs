@@ -36,28 +36,31 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
     {
         await using JobBench bench = await JobControlBench.StartAsync();
 
-        Assert.That(await bench.Host.EvaluateRawAsync("move.axes[0].homed"), Is.EqualTo("true"),
+        Axis axis0 = await bench.Host.ReadModelAsync(model => model.Move.Axes[0]);
+        Axis axis1 = await bench.Host.ReadModelAsync(model => model.Move.Axes[1]);
+
+        Assert.That(axis0.Homed, Is.True,
                     "the bench config's G92 marks X homed");
 
         await bench.Host.ExecuteCodeAsync("M18 X");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateRawAsync("move.axes[0].homed").Result, Is.EqualTo("false"),
+            Assert.That(axis0.Homed, Is.False,
                         "M18 X clears move.axes[0].homed (RRF GCodes2.cpp case 18, SetAxisNotHomed)");
-            Assert.That(bench.Host.EvaluateRawAsync("move.axes[1].homed").Result, Is.EqualTo("true"),
+            Assert.That(axis1.Homed, Is.True,
                         "M18 X leaves move.axes[1].homed alone, Y was not named");
         });
 
         await bench.Host.ExecuteCodeAsync("G92 X0");
-        Assert.That(await bench.Host.EvaluateRawAsync("move.axes[0].homed"), Is.EqualTo("true"),
+        Assert.That(axis0.Homed, Is.True,
                     "G92 X marks X homed again");
 
         await bench.Host.ExecuteCodeAsync("M84");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateRawAsync("move.axes[0].homed").Result, Is.EqualTo("false"),
+            Assert.That(axis0.Homed, Is.False,
                         "bare M84 clears move.axes[0].homed (RRF GCodes.cpp DisableDrives, SetAllAxesNotHomed)");
-            Assert.That(bench.Host.EvaluateRawAsync("move.axes[1].homed").Result, Is.EqualTo("false"),
+            Assert.That(axis1.Homed, Is.False,
                         "bare M84 clears move.axes[1].homed (RRF GCodes.cpp DisableDrives, SetAllAxesNotHomed)");
         });
 
@@ -65,7 +68,7 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
         Assert.Multiple(() =>
         {
             Assert.That(reply.Trim(), Is.Empty, "M17 succeeds silently (RRF GCodes2.cpp case 17)");
-            Assert.That(bench.Host.EvaluateRawAsync("move.axes[0].homed").Result, Is.EqualTo("false"),
+            Assert.That(axis0.Homed, Is.False,
                         "M17 does not mark an axis homed (RRF GCodes2.cpp case 17 only enables drivers)");
         });
     }
@@ -86,13 +89,13 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
         await using JobBench bench = await JobControlBench.StartAsync();
 
         await bench.Host.ExecuteCodeAsync("M84 S45");
-        Assert.Multiple(() =>
+        Assert.Multiple(async () =>
         {
-            Assert.That(bench.Host.EvaluateAsync("move.idle.timeout").Result, Is.EqualTo(45.0).Within(1e-3),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Idle.Timeout), Is.EqualTo(45.0).Within(1e-3),
                         "M84 S sets move.idle.timeout in seconds (RRF GCodes2.cpp case 84, SetIdleTimeout)");
-            Assert.That(bench.Host.EvaluateRawAsync("move.axes[0].homed").Result, Is.EqualTo("true"),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].Homed), Is.True,
                         "M84 S does not disable the motors, so X stays homed (RRF GCodes2.cpp case 84, seen branch)");
-            Assert.That(bench.Host.EvaluateRawAsync("move.axes[1].homed").Result, Is.EqualTo("true"),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[1].Homed), Is.True,
                         "M84 S does not disable the motors, so Y stays homed (RRF GCodes2.cpp case 84, seen branch)");
         });
     }
@@ -115,16 +118,16 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
         await bench.Host.ExecuteCodeAsync("M92 X123.5 Y96 E410");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateAsync("move.axes[0].stepsPerMm").Result, Is.EqualTo(123.5).Within(1e-3),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.Axes[0].StepsPerMm).Result, Is.EqualTo(123.5).Within(1e-3),
                         "M92 X sets move.axes[0].stepsPerMm (RRF GCodes2.cpp case 92)");
-            Assert.That(bench.Host.EvaluateAsync("move.axes[1].stepsPerMm").Result, Is.EqualTo(96.0).Within(1e-3),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.Axes[1].StepsPerMm).Result, Is.EqualTo(96.0).Within(1e-3),
                         "M92 Y sets move.axes[1].stepsPerMm (RRF GCodes2.cpp case 92)");
-            Assert.That(bench.Host.EvaluateAsync("move.extruders[0].stepsPerMm").Result, Is.EqualTo(410.0).Within(1e-3),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.Extruders[0].StepsPerMm).Result, Is.EqualTo(410.0).Within(1e-3),
                         "M92 E sets move.extruders[0].stepsPerMm (RRF GCodes2.cpp case 92)");
         });
 
         await bench.Host.ExecuteCodeAsync("M92 X100 S8");
-        Assert.That(await bench.Host.EvaluateAsync("move.axes[0].stepsPerMm"), Is.EqualTo(200.0).Within(1e-3),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].StepsPerMm), Is.EqualTo(200.0).Within(1e-3),
                     "M92 X100 S8 at x16 microstepping stores 200 steps/mm (RRF Move2.cpp SetDriveStepsPerMm scales by 16/8)");
     }
 
@@ -139,9 +142,9 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
         // TODO test multi driver axes
         await using JobBench bench = await JobControlBench.StartAsync();
 
-        double x = await bench.Host.EvaluateAsync("move.axes[0].stepsPerMm");
-        double y = await bench.Host.EvaluateAsync("move.axes[1].stepsPerMm");
-        double e = await bench.Host.EvaluateAsync("move.extruders[0].stepsPerMm");
+        double x = await bench.Host.ReadModelAsync(model => model.Move.Axes[0].StepsPerMm);
+        double y = await bench.Host.ReadModelAsync(model => model.Move.Axes[1].StepsPerMm);
+        double e = await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].StepsPerMm);
         string expected = string.Format(CultureInfo.InvariantCulture,
                                         "Steps/mm: X: {0:F3}, Y: {1:F3}, E: {2:F3}", x, y, e);
 
@@ -163,13 +166,13 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
         await using JobBench bench = await JobControlBench.StartAsync();
 
         await bench.Host.ExecuteCodeAsync("M201 X1250 Y1100 E3000");
-        Assert.Multiple(() =>
+        Assert.Multiple(async () =>
         {
-            Assert.That(bench.Host.EvaluateAsync("move.axes[0].acceleration").Result, Is.EqualTo(1250.0).Within(1e-2),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].Acceleration), Is.EqualTo(1250.0).Within(1e-2),
                         "M201 X sets move.axes[0].acceleration (mm/s^2, RRF Move2.cpp SetAcceleration)");
-            Assert.That(bench.Host.EvaluateAsync("move.axes[1].acceleration").Result, Is.EqualTo(1100.0).Within(1e-2),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[1].Acceleration), Is.EqualTo(1100.0).Within(1e-2),
                         "M201 Y sets move.axes[1].acceleration (mm/s^2, RRF Move2.cpp SetAcceleration)");
-            Assert.That(bench.Host.EvaluateAsync("move.extruders[0].acceleration").Result, Is.EqualTo(3000.0).Within(1e-2),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].Acceleration), Is.EqualTo(3000.0).Within(1e-2),
                         "M201 E sets move.extruders[0].acceleration (mm/s^2, RRF Move2.cpp SetAcceleration)");
         });
     }
@@ -190,19 +193,19 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
         // TODO test setting multiple extruders
         await using JobBench bench = await JobControlBench.StartAsync();
 
-        double acceleration = await bench.Host.EvaluateAsync("move.axes[0].acceleration");
+        double acceleration = await bench.Host.ReadModelAsync(model => model.Move.Axes[0].Acceleration);
         await bench.Host.ExecuteCodeAsync("M201.1 X55");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateAsync("move.axes[0].reducedAcceleration").Result, Is.EqualTo(55.0).Within(1e-2),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.Axes[0].ReducedAcceleration).Result, Is.EqualTo(55.0).Within(1e-2),
                         "M201.1 X sets move.axes[0].reducedAcceleration (mm/s^2, RRF GCodes2.cpp case 201 frac 1)");
-            Assert.That(bench.Host.EvaluateAsync("move.axes[0].acceleration").Result, Is.EqualTo(acceleration).Within(1e-2),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.Axes[0].Acceleration).Result, Is.EqualTo(acceleration).Within(1e-2),
                         "M201.1 leaves move.axes[0].acceleration alone (RRF Move2.cpp SetAcceleration reduced branch)");
         });
 
         // TODO possible RRF bug where it allows reducedAcceleration to be greater than normalAcceleration
         await bench.Host.ExecuteCodeAsync("M201.1 X800");
-        Assert.That(await bench.Host.EvaluateAsync("move.axes[0].reducedAcceleration"), Is.EqualTo(800).Within(1e-2),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].ReducedAcceleration), Is.EqualTo(800).Within(1e-2),
                     "M201.1 X800 stores 800 even above the normal acceleration (RRF Move2.cpp SetAcceleration does not clamp)");
     }
 
@@ -223,18 +226,18 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
         await bench.Host.ExecuteCodeAsync("M203 X9000 E4200");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateAsync("move.axes[0].speed").Result, Is.EqualTo(9000.0).Within(1e-2),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.Axes[0].Speed).Result, Is.EqualTo(9000.0).Within(1e-2),
                         "M203 X sets move.axes[0].speed (mm/min, RRF Move.cpp maxFeedrate)");
-            Assert.That(bench.Host.EvaluateAsync("move.extruders[0].speed").Result, Is.EqualTo(4200.0).Within(1e-2),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.Extruders[0].Speed).Result, Is.EqualTo(4200.0).Within(1e-2),
                         "M203 E sets move.extruders[0].speed (mm/min, RRF Move.cpp maxFeedrate)");
         });
 
         await bench.Host.ExecuteCodeAsync("M203 Y100 S1");
-        Assert.That(await bench.Host.EvaluateAsync("move.axes[1].speed"), Is.EqualTo(6000.0).Within(1e-2),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[1].Speed), Is.EqualTo(6000.0).Within(1e-2),
                     "M203 Y100 S1 is 100 mm/s, reported as 6000 mm/min in move.axes[1].speed (RRF GCodes2.cpp case 203 usingMmPerSec)");
 
         await bench.Host.ExecuteCodeAsync("M203 I10 S1");
-        Assert.That(bench.Host.EvaluateAsync("move.minimumMovementSpeed").Result, Is.EqualTo(10).Within(1e-2),
+        Assert.That(bench.Host.ReadModelAsync(model => model.Move.MinimumMovementSpeed).Result, Is.EqualTo(10).Within(1e-2),
                     "M203 I10 S1 sets the minimum movement speed to 10 mm/s");
 
 
@@ -243,11 +246,11 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
             await bench.Host.ExecuteCodeAsync($"M203 X900 Y200 E200 I{minSpeed}");
             Assert.Multiple(() =>
             {
-                Assert.That(bench.Host.EvaluateAsync("move.axes[0].speed").Result, Is.EqualTo(900.0).Within(1e-2),
+                Assert.That(bench.Host.ReadModelAsync(model => model.Move.Axes[0].Speed).Result, Is.EqualTo(900.0).Within(1e-2),
                             "M203 X sets move.axes[0].speed (mm/min, RRF Move.cpp maxFeedrate)");
-                Assert.That(bench.Host.EvaluateAsync("move.axes[1].speed").Result, Is.EqualTo(minSpeed).Within(1e-2),
+                Assert.That(bench.Host.ReadModelAsync(model => model.Move.Axes[1].Speed).Result, Is.EqualTo(minSpeed).Within(1e-2),
                             "Y max speed is clamped by the min speed");
-                Assert.That(bench.Host.EvaluateAsync("move.extruders[0].speed").Result, Is.EqualTo(minSpeed).Within(1e-2),
+                Assert.That(bench.Host.ReadModelAsync(model => model.Move.Extruders[0].Speed).Result, Is.EqualTo(minSpeed).Within(1e-2),
                             "E max speed is clamped by the min speed");
             });
         }
@@ -267,29 +270,31 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
         await using JobBench bench = await JobControlBench.StartAsync();
 
         // Default accelerations
-        Assert.Multiple(() =>
+#pragma warning disable CS0618
+        Assert.Multiple(async () =>
         {
-            Assert.That(bench.Host.EvaluateAsync("move.printingAcceleration").Result, Is.EqualTo(Move.DefaultPrintingAcceleration).Within(1e-2));
-            Assert.That(bench.Host.EvaluateAsync("move.travelAcceleration").Result, Is.EqualTo(Move.DefaultTravelAcceleration).Within(1e-2));
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.PrintingAcceleration), Is.EqualTo(Move.DefaultPrintingAcceleration).Within(1e-2));
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.TravelAcceleration), Is.EqualTo(Move.DefaultTravelAcceleration).Within(1e-2));
         });
 
         await bench.Host.ExecuteCodeAsync("M204 P900 T1600");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateAsync("move.printingAcceleration").Result, Is.EqualTo(900.0).Within(1e-2),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.PrintingAcceleration).Result, Is.EqualTo(900.0).Within(1e-2),
                         "M204 P sets move.printingAcceleration (mm/s^2, RRF GCodes5.cpp ConfigureAccelerations)");
-            Assert.That(bench.Host.EvaluateAsync("move.travelAcceleration").Result, Is.EqualTo(1600.0).Within(1e-2),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.TravelAcceleration).Result, Is.EqualTo(1600.0).Within(1e-2),
                         "M204 T sets move.travelAcceleration (mm/s^2, RRF GCodes5.cpp ConfigureAccelerations)");
         });
 
         await bench.Host.ExecuteCodeAsync("M204 S700");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateAsync("move.printingAcceleration").Result, Is.EqualTo(700.0).Within(1e-2),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.PrintingAcceleration).Result, Is.EqualTo(700.0).Within(1e-2),
                         "M204 S sets move.printingAcceleration too (RRF GCodes5.cpp ConfigureAccelerations)");
-            Assert.That(bench.Host.EvaluateAsync("move.travelAcceleration").Result, Is.EqualTo(700.0).Within(1e-2),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.TravelAcceleration).Result, Is.EqualTo(700.0).Within(1e-2),
                         "M204 S sets move.travelAcceleration too (RRF GCodes5.cpp ConfigureAccelerations)");
         });
+#pragma warning restore
     }
 
     /// <summary>
@@ -306,23 +311,26 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
     {
         await using JobBench bench = await JobControlBench.StartAsync();
 
+        Axis axis = await bench.Host.ReadModelAsync(model => model.Move.Axes[0]);
+        Extruder extruder = await bench.Host.ReadModelAsync(model => model.Move.Extruders[0]);
+
         await bench.Host.ExecuteCodeAsync("M566 X1200 E300");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateAsync("move.axes[0].jerk").Result, Is.EqualTo(1200.0).Within(1e-2),
+            Assert.That(axis.Jerk, Is.EqualTo(1200.0).Within(1e-2),
                         "M566 X sets move.axes[0].jerk (mm/min, RRF Move2.cpp SetInstantDv includingMax)");
-            Assert.That(bench.Host.EvaluateAsync("move.axes[0].printingJerk").Result, Is.EqualTo(1200.0).Within(1e-2),
+            Assert.That(axis.PrintingJerk, Is.EqualTo(1200.0).Within(1e-2),
                         "M566 X sets move.axes[0].printingJerk as well (RRF Move2.cpp SetInstantDv includingMax)");
-            Assert.That(bench.Host.EvaluateAsync("move.extruders[0].jerk").Result, Is.EqualTo(300.0).Within(1e-2),
+            Assert.That(extruder.Jerk, Is.EqualTo(300.0).Within(1e-2),
                         "M566 E sets move.extruders[0].jerk (mm/min, RRF Move2.cpp SetInstantDv)");
         });
 
         await bench.Host.ExecuteCodeAsync("M205 X5");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateAsync("move.axes[0].printingJerk").Result, Is.EqualTo(300.0).Within(1e-2),
+            Assert.That(axis.PrintingJerk, Is.EqualTo(300.0).Within(1e-2),
                         "M205 X5 is 5 mm/s, so move.axes[0].printingJerk becomes 300 mm/min (RRF GCodes2.cpp case 205)");
-            Assert.That(bench.Host.EvaluateAsync("move.axes[0].jerk").Result, Is.EqualTo(1200.0).Within(1e-2),
+            Assert.That(axis.Jerk, Is.EqualTo(1200.0).Within(1e-2),
                         "M205 leaves the machine limit move.axes[0].jerk alone (RRF Move2.cpp SetInstantDv, not includingMax)");
         });
     }
@@ -337,12 +345,15 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
     {
         await using JobBench bench = await JobControlBench.StartAsync();
 
+        Axis axis0 = await bench.Host.ReadModelAsync(model => model.Move.Axes[0]);
+        Axis axis1 = await bench.Host.ReadModelAsync(model => model.Move.Axes[1]);
+
         await bench.Host.ExecuteCodeAsync("M208 X-5:250");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateAsync("move.axes[0].min").Result, Is.EqualTo(-5.0).Within(1e-2),
+            Assert.That(axis0.Min, Is.EqualTo(-5.0).Within(1e-2),
                         "M208 X-5:250 sets move.axes[0].min (RRF Move2.cpp ConfigureAxisLimits, two values)");
-            Assert.That(bench.Host.EvaluateAsync("move.axes[0].max").Result, Is.EqualTo(250.0).Within(1e-2),
+            Assert.That(axis0.Max, Is.EqualTo(250.0).Within(1e-2),
                         "M208 X-5:250 sets move.axes[0].max (RRF Move2.cpp ConfigureAxisLimits, two values)");
         });
 
@@ -350,9 +361,9 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
         await bench.Host.ExecuteCodeAsync("M208 Y240");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateAsync("move.axes[1].min").Result, Is.EqualTo(-2.0).Within(1e-2),
+            Assert.That(axis1.Min, Is.EqualTo(-2.0).Within(1e-2),
                         "M208 Y-2 S1 sets move.axes[1].min (RRF Move2.cpp ConfigureAxisLimits, setMin)");
-            Assert.That(bench.Host.EvaluateAsync("move.axes[1].max").Result, Is.EqualTo(240.0).Within(1e-2),
+            Assert.That(axis1.Max, Is.EqualTo(240.0).Within(1e-2),
                         "M208 Y240 sets move.axes[1].max (RRF Move2.cpp ConfigureAxisLimits, single value)");
         });
     }
@@ -374,27 +385,30 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
     {
         await using JobBench bench = await JobControlBench.StartAsync();
 
+        Axis axis = await bench.Host.ReadModelAsync(model => model.Move.Axes[0]);
+        Extruder extruder = await bench.Host.ReadModelAsync(model => model.Move.Extruders[0]);
+
         await bench.Host.ExecuteCodeAsync("M350 X32 I0");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateAsync("move.axes[0].microstepping.value").Result, Is.EqualTo(32),
+            Assert.That(axis.Microstepping.Value, Is.EqualTo(32),
                         "M350 X32 sets move.axes[0].microstepping.value (RRF GCodes2.cpp case 350)");
-            Assert.That(bench.Host.EvaluateRawAsync("move.axes[0].microstepping.interpolated").Result, Is.EqualTo("false"),
+            Assert.That(axis.Microstepping.Interpolated, Is.False,
                         "M350 I0 clears move.axes[0].microstepping.interpolated (RRF GCodes2.cpp case 350)");
-            Assert.That(bench.Host.EvaluateAsync("move.axes[0].stepsPerMm").Result, Is.EqualTo(160.0).Within(1e-2),
+            Assert.That(axis.StepsPerMm, Is.EqualTo(160.0).Within(1e-2),
                         "M350 X32 from x16 doubles move.axes[0].stepsPerMm to 160 (RRF GCodes.cpp ChangeMicrostepping)");
-            Assert.That(bench.Host.EvaluateRawAsync("move.axes[0].homed").Result, Is.EqualTo("false"),
+            Assert.That(axis.Homed, Is.False,
                         "M350 marks the axis not homed (RRF GCodes2.cpp case 350, SetAxisNotHomed)");
         });
 
         await bench.Host.ExecuteCodeAsync("M350 E8 I1");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateAsync("move.extruders[0].microstepping.value").Result, Is.EqualTo(8),
+            Assert.That(extruder.Microstepping.Value, Is.EqualTo(8),
                         "M350 E8 sets move.extruders[0].microstepping.value (RRF GCodes2.cpp case 350)");
-            Assert.That(bench.Host.EvaluateRawAsync("move.extruders[0].microstepping.interpolated").Result, Is.EqualTo("true"),
+            Assert.That(extruder.Microstepping.Interpolated, Is.True,
                         "M350 I1 sets move.extruders[0].microstepping.interpolated (RRF GCodes2.cpp case 350)");
-            Assert.That(bench.Host.EvaluateAsync("move.extruders[0].stepsPerMm").Result, Is.EqualTo(210.0).Within(1e-2),
+            Assert.That(extruder.StepsPerMm, Is.EqualTo(210.0).Within(1e-2),
                         "M350 E8 from x16 halves move.extruders[0].stepsPerMm to 210 (RRF GCodes.cpp ChangeMicrostepping)");
         });
     }
@@ -412,36 +426,36 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
 
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateRawAsync("move.limitAxes").Result, Is.EqualTo("false"),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.LimitAxes).Result, Is.False,
                         "the bench config's M564 S0 cleared move.limitAxes");
-            Assert.That(bench.Host.EvaluateRawAsync("move.noMovesBeforeHoming").Result, Is.EqualTo("false"),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.NoMovesBeforeHoming).Result, Is.False,
                         "the bench config's M564 H0 cleared move.noMovesBeforeHoming");
         });
 
         await bench.Host.ExecuteCodeAsync("M564 S1");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateRawAsync("move.limitAxes").Result, Is.EqualTo("true"),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.LimitAxes).Result, Is.True,
                         "M564 S1 sets move.limitAxes (RRF GCodes2.cpp case 564)");
-            Assert.That(bench.Host.EvaluateRawAsync("move.noMovesBeforeHoming").Result, Is.EqualTo("false"),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.NoMovesBeforeHoming).Result, Is.False,
                         "M564 S1 leaves move.noMovesBeforeHoming alone, H was not given (RRF GCodes2.cpp case 564)");
         });
 
         await bench.Host.ExecuteCodeAsync("M564 H1");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateRawAsync("move.limitAxes").Result, Is.EqualTo("true"),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.LimitAxes).Result, Is.True,
                         "M564 H1 leaves move.limitAxes alone, S was not given (RRF GCodes2.cpp case 564)");
-            Assert.That(bench.Host.EvaluateRawAsync("move.noMovesBeforeHoming").Result, Is.EqualTo("true"),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.NoMovesBeforeHoming).Result, Is.True,
                         "M564 H1 sets move.noMovesBeforeHoming (RRF GCodes2.cpp case 564)");
         });
 
         await bench.Host.ExecuteCodeAsync("M564 S0 H0");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateRawAsync("move.limitAxes").Result, Is.EqualTo("false"),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.LimitAxes).Result, Is.False,
                         "M564 S0 clears move.limitAxes (RRF GCodes2.cpp case 564)");
-            Assert.That(bench.Host.EvaluateRawAsync("move.noMovesBeforeHoming").Result, Is.EqualTo("false"),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.NoMovesBeforeHoming).Result, Is.False,
                         "M564 H0 clears move.noMovesBeforeHoming (RRF GCodes2.cpp case 564)");
         });
     }
@@ -529,25 +543,33 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
     {
         await using JobBench bench = await JobControlBench.StartAsync();
 
+        Extruder extruder = await bench.Host.ReadModelAsync(model => model.Move.Extruders[0]);
+
         await bench.Host.ExecuteCodeAsync("M572 D0 S0.05");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateAsync("move.extruders[0].pressureAdvance").Result, Is.EqualTo(0.05).Within(1e-4),
+#pragma warning disable CS0618
+            Assert.That(extruder.PressureAdvance, Is.EqualTo(0.05).Within(1e-4),
                         "M572 S sets move.extruders[0].pressureAdvance in seconds (RRF ExtruderShaper GetK0Seconds)");
-            Assert.That(bench.Host.EvaluateAsync("move.extruders[0].pressAdv.k0").Result, Is.EqualTo(0.05).Within(1e-4),
+#pragma warning restore
+            Assert.That(extruder.PressAdv.K0, Is.EqualTo(0.05).Within(1e-4),
                         "M572 S sets move.extruders[0].pressAdv.k0 in seconds (RRF ExtruderShaper GetK0Seconds)");
-            Assert.That(bench.Host.EvaluateAsync("move.extruders[0].pressAdv.k1").Result, Is.EqualTo(0.05).Within(1e-4),
+            Assert.That(extruder.PressAdv.K1, Is.EqualTo(0.05).Within(1e-4),
                         "a single M572 S value copies k0 into move.extruders[0].pressAdv.k1 (RRF Move2.cpp ConfigurePressureAdvance)");
         });
 
         await bench.Host.ExecuteCodeAsync("M572 D0 S0.06:0.08 L2");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateAsync("move.extruders[0].pressAdv.k0").Result, Is.EqualTo(0.06).Within(1e-4),
+#pragma warning disable CS0618
+            Assert.That(extruder.PressureAdvance, Is.EqualTo(0.06).Within(1e-4),
+                        "M572 S sets move.extruders[0].pressureAdvance in seconds (RRF ExtruderShaper GetK0Seconds)");
+#pragma warning restore
+            Assert.That(extruder.PressAdv.K0, Is.EqualTo(0.06).Within(1e-4),
                         "M572 S0.06:0.08 sets move.extruders[0].pressAdv.k0 (RRF Move2.cpp ConfigurePressureAdvance)");
-            Assert.That(bench.Host.EvaluateAsync("move.extruders[0].pressAdv.k1").Result, Is.EqualTo(0.08).Within(1e-4),
+            Assert.That(extruder.PressAdv.K1, Is.EqualTo(0.08).Within(1e-4),
                         "M572 S0.06:0.08 sets move.extruders[0].pressAdv.k1 (RRF Move2.cpp ConfigurePressureAdvance)");
-            Assert.That(bench.Host.EvaluateAsync("move.extruders[0].pressAdv.d").Result, Is.EqualTo(2.0).Within(1e-3),
+            Assert.That(extruder.PressAdv.D, Is.EqualTo(2.0).Within(1e-3),
                         "M572 L sets move.extruders[0].pressAdv.d (RRF Move2.cpp ConfigurePressureAdvance dk)");
         });
     }
@@ -578,41 +600,44 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
 
         // await bench.Host.ExecuteCodeAsync("M569 P1.3 S1");
         await bench.Host.ExecuteCodeAsync("M584 U1.3");
+        Axis axisU = await bench.Host.ReadModelAsync(model => model.Move.Axes[2]);
+        Extruder extruder = await bench.Host.ReadModelAsync(model => model.Move.Extruders[0]);
+
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateAsync("#move.axes").Result, Is.EqualTo(3),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.Axes.Count).Result, Is.EqualTo(3),
                         "M584 U creates a third axis (RRF GCodes3.cpp DoDriveMapping, new axis branch)");
-            Assert.That(bench.Host.EvaluateRawAsync("move.axes[2].letter").Result, Is.EqualTo("U"),
+            Assert.That(axisU.Letter, Is.EqualTo('U'),
                         "the new axis is U (RRF GCodes3.cpp DoDriveMapping)");
-            Assert.That(bench.Host.EvaluateRawAsync("move.axes[2].drivers[0]").Result, Is.EqualTo("1.3"),
+            Assert.That(axisU.Drivers[0], Is.EqualTo(new DuetAPI.Utility.DriverId(1, 3)),
                         "M584 U1.3 sets move.axes[2].drivers[0] (RRF GCodes3.cpp DoDriveMapping, SetAxisDriversConfig)");
-            Assert.That(bench.Host.EvaluateRawAsync("move.axes[2].visible").Result, Is.EqualTo("true"),
+            Assert.That(axisU.Visible, Is.True,
                         "a new axis is visible by default (RRF GCodes3.cpp DoDriveMapping, numVisibleAxes = numTotalAxes)");
-            Assert.That(bench.Host.EvaluateRawAsync("move.extruders[0].driver").Result, Is.EqualTo("1.2"),
+            Assert.That(extruder.Driver, Is.EqualTo(new DuetAPI.Utility.DriverId(1, 2)),
                         "the extruder mapping from config.g is untouched (RRF Move.cpp extruders table, extruderDrivers)");
         });
 
         string conflict = await bench.Host.ExecuteCodeAsync("M584 V1.0");
         Assert.That(conflict, Does.Contain("1.0").And.Contain("already used"),
                     "M584 refuses a driver another axis owns, naming it (rrf-differences.md section 3.1)");
-        Assert.That(await bench.Host.EvaluateAsync("#move.axes"), Is.EqualTo(3),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Count), Is.EqualTo(3),
                     "the refused mapping creates no axis (rrf-differences.md section 3.1)");
 
         await bench.Host.ExecuteCodeAsync("M584 U");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateAsync("#move.axes").Result, Is.EqualTo(3),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.Axes.Count).Result, Is.EqualTo(3),
                         "M584 U keeps the axis in move.axes[], positions and indices do not move (rrf-differences.md section 3.1)");
-            Assert.That(bench.Host.EvaluateAsync("#move.axes[2].drivers").Result, Is.EqualTo(0),
+            Assert.That(axisU.Drivers.Count, Is.EqualTo(0),
                         "M584 U releases the drivers of U (rrf-differences.md section 3.1)");
         });
 
         await bench.Host.ExecuteCodeAsync("M584 U1.4:1.5");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateAsync("#move.axes[2].drivers").Result, Is.EqualTo(2));
-            Assert.That(bench.Host.EvaluateRawAsync("move.axes[2].drivers[0]").Result, Is.EqualTo("1.4"));
-            Assert.That(bench.Host.EvaluateRawAsync("move.axes[2].drivers[1]").Result, Is.EqualTo("1.5"));
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.Axes[2].Drivers.Count).Result, Is.EqualTo(2));
+            Assert.That(axisU.Drivers[0], Is.EqualTo(new DuetAPI.Utility.DriverId(1, 4)));
+            Assert.That(axisU.Drivers[1], Is.EqualTo(new DuetAPI.Utility.DriverId(1, 5)));
         });
     }
 
@@ -631,15 +656,15 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
         await bench.Host.ExecuteCodeAsync("M906 X850 E900 I40 T25");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateAsync("move.axes[0].current").Result, Is.EqualTo(850),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.Axes[0].Current).Result, Is.EqualTo(850),
                         "M906 X sets move.axes[0].current (mA, RRF Move.cpp GetMotorCurrent 906)");
-            Assert.That(bench.Host.EvaluateAsync("move.axes[1].current").Result, Is.EqualTo(800),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.Axes[1].Current).Result, Is.EqualTo(800),
                         "M906 leaves the unnamed Y axis current alone");
-            Assert.That(bench.Host.EvaluateAsync("move.extruders[0].current").Result, Is.EqualTo(900),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.Extruders[0].Current).Result, Is.EqualTo(900),
                         "M906 E sets move.extruders[0].current (mA, RRF Move.cpp GetMotorCurrent 906)");
-            Assert.That(bench.Host.EvaluateAsync("move.idle.factor").Result, Is.EqualTo(0.4).Within(1e-3),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.Idle.Factor).Result, Is.EqualTo(0.4).Within(1e-3),
                         "M906 I40 sets move.idle.factor to 0.4 (RRF GCodes2.cpp case 906, SetIdleCurrentFactor/100)");
-            Assert.That(bench.Host.EvaluateAsync("move.idle.timeout").Result, Is.EqualTo(25.0).Within(1e-3),
+            Assert.That(bench.Host.ReadModelAsync(model => model.Move.Idle.Timeout).Result, Is.EqualTo(25.0).Within(1e-3),
                         "M906 T sets move.idle.timeout in seconds (RRF GCodes2.cpp case 906, SetIdleTimeout)");
         });
     }
@@ -654,11 +679,11 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
     {
         await using JobBench bench = await JobControlBench.StartAsync();
 
-        int x = (int)await bench.Host.EvaluateAsync("move.axes[0].current");
-        int y = (int)await bench.Host.EvaluateAsync("move.axes[1].current");
-        int e = (int)await bench.Host.EvaluateAsync("move.extruders[0].current");
-        int factorPercent = (int)Math.Round(await bench.Host.EvaluateAsync("move.idle.factor") * 100.0);
-        double timeout = await bench.Host.EvaluateAsync("move.idle.timeout");
+        int x = await bench.Host.ReadModelAsync(model => model.Move.Axes[0].Current);
+        int y = await bench.Host.ReadModelAsync(model => model.Move.Axes[1].Current);
+        int e = await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].Current);
+        int factorPercent = (int)Math.Round(await bench.Host.ReadModelAsync(model => model.Move.Idle.Factor) * 100.0);
+        double timeout = await bench.Host.ReadModelAsync(model => model.Move.Idle.Timeout);
         string expected = string.Format(CultureInfo.InvariantCulture,
                                         "Motor current (mA) - X:{0}, Y:{1}, E:{2}, idle factor {3}%, timeout {4:F1} sec",
                                         x, y, e, factorPercent, timeout);
@@ -678,14 +703,17 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
     {
         await using JobBench bench = await JobControlBench.StartAsync();
 
+        Axis axis = await bench.Host.ReadModelAsync(model => model.Move.Axes[0]);
+        Extruder extruder = await bench.Host.ReadModelAsync(model => model.Move.Extruders[0]);
+
         await bench.Host.ExecuteCodeAsync("M913 X50 E75");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateAsync("move.axes[0].percentCurrent").Result, Is.EqualTo(50),
+            Assert.That(axis.PercentCurrent, Is.EqualTo(50),
                         "M913 X sets move.axes[0].percentCurrent (RRF Move.cpp GetMotorCurrent 913)");
-            Assert.That(bench.Host.EvaluateAsync("move.extruders[0].percentCurrent").Result, Is.EqualTo(75),
+            Assert.That(extruder.PercentCurrent, Is.EqualTo(75),
                         "M913 E sets move.extruders[0].percentCurrent (RRF Move.cpp GetMotorCurrent 913)");
-            Assert.That(bench.Host.EvaluateAsync("move.axes[0].current").Result, Is.EqualTo(800),
+            Assert.That(axis.Current, Is.EqualTo(800),
                         "M913 leaves move.axes[0].current at the configured mA (RRF GCodes2.cpp case 913)");
         });
     }
@@ -700,12 +728,15 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
     {
         await using JobBench bench = await JobControlBench.StartAsync();
 
+        Axis axis = await bench.Host.ReadModelAsync(model => model.Move.Axes[0]);
+        Extruder extruder = await bench.Host.ReadModelAsync(model => model.Move.Extruders[0]);
+
         await bench.Host.ExecuteCodeAsync("M917 X60 E70");
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.EvaluateAsync("move.axes[0].percentStstCurrent").Result, Is.EqualTo(60),
+            Assert.That(axis.PercentStstCurrent, Is.EqualTo(60),
                         "M917 X sets move.axes[0].percentStstCurrent (RRF Move.cpp GetMotorCurrent 917)");
-            Assert.That(bench.Host.EvaluateAsync("move.extruders[0].percentStstCurrent").Result, Is.EqualTo(70),
+            Assert.That(extruder.PercentStstCurrent, Is.EqualTo(70),
                         "M917 E sets move.extruders[0].percentStstCurrent (RRF Move.cpp GetMotorCurrent 917)");
         });
     }

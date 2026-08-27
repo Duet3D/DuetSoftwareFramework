@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
+using DuetAPI.ObjectModel;
 using NUnit.Framework;
 using SystemTests.Host;
 
@@ -94,20 +95,20 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
         await using DcsTestHost host = await StartXyzHostAsync(canMaster);
 
         await host.ExecuteCodeAsync("M556 S100 X2 Y1 Z0.5");
-        double tanXY = await host.EvaluateAsync("move.compensation.skew.tanXY");
-        double tanYZ = await host.EvaluateAsync("move.compensation.skew.tanYZ");
-        double tanXZ = await host.EvaluateAsync("move.compensation.skew.tanXZ");
-        string compensateXY = await host.EvaluateRawAsync("move.compensation.skew.compensateXY");
+        double tanXY = await host.ReadModelAsync(model => model.Move.Compensation.Skew.TanXY);
+        double tanYZ = await host.ReadModelAsync(model => model.Move.Compensation.Skew.TanYZ);
+        double tanXZ = await host.ReadModelAsync(model => model.Move.Compensation.Skew.TanXZ);
+        bool compensateXY = await host.ReadModelAsync(model => model.Move.Compensation.Skew.CompensateXY);
         Assert.Multiple(() =>
         {
             Assert.That(tanXY, Is.EqualTo(0.02).Within(1e-5), "M556 X sets move.compensation.skew.tanXY = X/S (RRF GCodes2.cpp case 556, Move::SetAxisCompensation)");
             Assert.That(tanYZ, Is.EqualTo(0.01).Within(1e-5), "M556 Y sets move.compensation.skew.tanYZ = Y/S (RRF tangents[1] is tanYZ)");
             Assert.That(tanXZ, Is.EqualTo(0.005).Within(1e-5), "M556 Z sets move.compensation.skew.tanXZ = Z/S (RRF tangents[2] is tanXZ)");
-            Assert.That(compensateXY, Is.EqualTo("true"), "move.compensation.skew.compensateXY defaults to true and M556 without P leaves it");
+            Assert.That(compensateXY, Is.True, "move.compensation.skew.compensateXY defaults to true and M556 without P leaves it");
         });
 
         await host.ExecuteCodeAsync("M556 P1");
-        Assert.That(await host.EvaluateRawAsync("move.compensation.skew.compensateXY"), Is.EqualTo("false"),
+        Assert.That(await host.ReadModelAsync(model => model.Move.Compensation.Skew.CompensateXY), Is.False,
                     "M556 P1 clears move.compensation.skew.compensateXY (RRF SetXYCompensation(P <= 0))");
 
         string report = await host.ExecuteCodeAsync("M556");
@@ -132,19 +133,19 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
         await using DcsTestHost host = await StartXyzHostAsync(canMaster);
 
         await host.ExecuteCodeAsync("M557 X20:180 Y20:180 S40");
-        string axis0 = await host.EvaluateRawAsync("move.compensation.probeGrid.axes[0]");
-        string axis1 = await host.EvaluateRawAsync("move.compensation.probeGrid.axes[1]");
-        double min0 = await host.EvaluateAsync("move.compensation.probeGrid.mins[0]");
-        double max0 = await host.EvaluateAsync("move.compensation.probeGrid.maxs[0]");
-        double min1 = await host.EvaluateAsync("move.compensation.probeGrid.mins[1]");
-        double max1 = await host.EvaluateAsync("move.compensation.probeGrid.maxs[1]");
-        double spacing0 = await host.EvaluateAsync("move.compensation.probeGrid.spacings[0]");
-        double spacing1 = await host.EvaluateAsync("move.compensation.probeGrid.spacings[1]");
-        double radius = await host.EvaluateAsync("move.compensation.probeGrid.radius");
+        char axis0 = await host.ReadModelAsync(model => model.Move.Compensation.ProbeGrid.Axes[0]);
+        char axis1 = await host.ReadModelAsync(model => model.Move.Compensation.ProbeGrid.Axes[1]);
+        double min0 = await host.ReadModelAsync(model => model.Move.Compensation.ProbeGrid.Mins[0]);
+        double max0 = await host.ReadModelAsync(model => model.Move.Compensation.ProbeGrid.Maxs[0]);
+        double min1 = await host.ReadModelAsync(model => model.Move.Compensation.ProbeGrid.Mins[1]);
+        double max1 = await host.ReadModelAsync(model => model.Move.Compensation.ProbeGrid.Maxs[1]);
+        double spacing0 = await host.ReadModelAsync(model => model.Move.Compensation.ProbeGrid.Spacings[0]);
+        double spacing1 = await host.ReadModelAsync(model => model.Move.Compensation.ProbeGrid.Spacings[1]);
+        double radius = await host.ReadModelAsync(model => model.Move.Compensation.ProbeGrid.Radius);
         Assert.Multiple(() =>
         {
-            Assert.That(axis0, Is.EqualTo("X"), "M557 sets move.compensation.probeGrid.axes[0] (RRF GCodes::DefineGrid)");
-            Assert.That(axis1, Is.EqualTo("Y"), "M557 sets move.compensation.probeGrid.axes[1]");
+            Assert.That(axis0, Is.EqualTo('X'), "M557 sets move.compensation.probeGrid.axes[0] (RRF GCodes::DefineGrid)");
+            Assert.That(axis1, Is.EqualTo('Y'), "M557 sets move.compensation.probeGrid.axes[1]");
             Assert.That(min0, Is.EqualTo(20), "M557 X range sets move.compensation.probeGrid.mins[0]");
             Assert.That(max0, Is.EqualTo(180), "M557 X range sets move.compensation.probeGrid.maxs[0]");
             Assert.That(min1, Is.EqualTo(20), "M557 Y range sets move.compensation.probeGrid.mins[1]");
@@ -159,7 +160,7 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
                     "bare M557 reports the grid in RRF's format (GridDefinition::PrintParameters)");
 
         await host.ExecuteCodeAsync("M557 X0:100 Y0:100 P5");
-        Assert.That(await host.EvaluateAsync("move.compensation.probeGrid.spacings[0]"), Is.EqualTo(100.0 / 4.0 * 0.9999).Within(1e-3),
+        Assert.That(await host.ReadModelAsync(model => model.Move.Compensation.ProbeGrid.Spacings[0]), Is.EqualTo(100.0 / 4.0 * 0.9999).Within(1e-3),
                     "M557 P derives move.compensation.probeGrid.spacings[0] as range/(P-1) * 0.9999 (RRF DefineGrid)");
     }
 
@@ -179,13 +180,13 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
         await using JobBench bench = await JobControlBench.StartAsync();
 
         await bench.Host.ExecuteCodeAsync("M376 H10");
-        Assert.That(await bench.Host.EvaluateAsync("move.compensation.fadeHeight"), Is.EqualTo(10).Within(1e-3),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Compensation.FadeHeight), Is.EqualTo(10).Within(1e-3),
                     "M376 H sets move.compensation.fadeHeight (RRF Move::SetTaperHeight)");
         Assert.That((await bench.Host.ExecuteCodeAsync("M376")).Trim(), Is.EqualTo("Bed compensation taper height is 10.0mm"),
                     "bare M376 reports the taper height in RRF's format (GCodes2.cpp case 376)");
 
         await bench.Host.ExecuteCodeAsync("M376 H0");
-        Assert.That(await bench.Host.EvaluateRawAsync("move.compensation.fadeHeight"), Is.EqualTo("null"),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Compensation.FadeHeight), Is.Null,
                     "M376 H0 disables the taper: move.compensation.fadeHeight reports null (RRF useTaper = h > 1.0)");
         Assert.That((await bench.Host.ExecuteCodeAsync("M376")).Trim(), Is.EqualTo("Bed compensation is not tapered"),
                     "bare M376 with the taper disabled reports so (GCodes2.cpp case 376)");
@@ -205,10 +206,10 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
         await using DcsTestHost host = await StartXyzHostAsync(canMaster);
 
         await host.ExecuteCodeAsync("M425 X0.5 Y0.25 S5");
-        double backlashX = await host.EvaluateAsync("move.axes[0].backlash");
-        double backlashY = await host.EvaluateAsync("move.axes[1].backlash");
-        double backlashZ = await host.EvaluateAsync("move.axes[2].backlash");
-        double factor = await host.EvaluateAsync("move.backlashFactor");
+        double backlashX = await host.ReadModelAsync(model => model.Move.Axes[0].Backlash);
+        double backlashY = await host.ReadModelAsync(model => model.Move.Axes[1].Backlash);
+        double backlashZ = await host.ReadModelAsync(model => model.Move.Axes[2].Backlash);
+        double factor = await host.ReadModelAsync(model => model.Move.BacklashFactor);
         Assert.Multiple(() =>
         {
             Assert.That(backlashX, Is.EqualTo(0.5).Within(1e-4), "M425 X sets move.axes[0].backlash (RRF Move::ConfigureBacklashCompensation)");
@@ -247,14 +248,14 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
         double k = Math.Exp(-zeta * Math.PI / sqrtOneMinusZetaSquared);
         double j = (1.0 + k) * (1.0 + k);
 
-        string type = await bench.Host.EvaluateRawAsync("move.shaping.type");
-        double reportedFrequency = await bench.Host.EvaluateAsync("move.shaping.frequency");
-        double damping = await bench.Host.EvaluateAsync("move.shaping.damping");
-        double amplitudeCount = await bench.Host.EvaluateAsync("#move.shaping.amplitudes");
-        double delayCount = await bench.Host.EvaluateAsync("#move.shaping.delays");
+        InputShapingType type = await bench.Host.ReadModelAsync(model => model.Move.Shaping.Type);
+        double reportedFrequency = await bench.Host.ReadModelAsync(model => model.Move.Shaping.Frequency);
+        double damping = await bench.Host.ReadModelAsync(model => model.Move.Shaping.Damping);
+        double amplitudeCount = await bench.Host.ReadModelAsync(model => model.Move.Shaping.Amplitudes.Count);
+        double delayCount = await bench.Host.ReadModelAsync(model => model.Move.Shaping.Delays.Count);
         Assert.Multiple(() =>
         {
-            Assert.That(type, Is.EqualTo("zvd"), "M593 P sets move.shaping.type (RRF AxisShaper::Configure)");
+            Assert.That(type, Is.EqualTo(InputShapingType.ZVD), "M593 P sets move.shaping.type (RRF AxisShaper::Configure)");
             Assert.That(reportedFrequency, Is.EqualTo(50).Within(1e-2), "M593 F sets move.shaping.frequency (Hz)");
             Assert.That(damping, Is.EqualTo(0.2).Within(1e-3), "M593 S sets move.shaping.damping (zeta)");
             Assert.That(amplitudeCount, Is.EqualTo(3), "a ZVD shaper has three impulses in move.shaping.amplitudes (RRF numImpulses)");
@@ -262,12 +263,12 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
         });
 
         // The counts guard the indexed reads: an element read on a shorter array cannot evaluate
-        double amplitude0 = await bench.Host.EvaluateAsync("move.shaping.amplitudes[0]");
-        double amplitude1 = await bench.Host.EvaluateAsync("move.shaping.amplitudes[1]");
-        double amplitude2 = await bench.Host.EvaluateAsync("move.shaping.amplitudes[2]");
-        double delay0 = await bench.Host.EvaluateAsync("move.shaping.delays[0]");
-        double delay1 = await bench.Host.EvaluateAsync("move.shaping.delays[1]");
-        double delay2 = await bench.Host.EvaluateAsync("move.shaping.delays[2]");
+        double amplitude0 = await bench.Host.ReadModelAsync(model => model.Move.Shaping.Amplitudes[0]);
+        double amplitude1 = await bench.Host.ReadModelAsync(model => model.Move.Shaping.Amplitudes[1]);
+        double amplitude2 = await bench.Host.ReadModelAsync(model => model.Move.Shaping.Amplitudes[2]);
+        double delay0 = await bench.Host.ReadModelAsync(model => model.Move.Shaping.Delays[0]);
+        double delay1 = await bench.Host.ReadModelAsync(model => model.Move.Shaping.Delays[1]);
+        double delay2 = await bench.Host.ReadModelAsync(model => model.Move.Shaping.Delays[2]);
         Assert.Multiple(() =>
         {
             Assert.That(amplitude0, Is.EqualTo(1.0 / j).Within(2e-3), "move.shaping.amplitudes[0] = 1/(1+k)^2 for zvd");
@@ -295,11 +296,11 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
 
         await bench.Host.ExecuteCodeAsync("M593 P\"zvd\" F50 S0.2");
         await bench.Host.ExecuteCodeAsync("M593 P\"none\"");
-        Assert.That(await bench.Host.EvaluateRawAsync("move.shaping.type"), Is.EqualTo("none"),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Shaping.Type), Is.EqualTo(InputShapingType.None),
                     "M593 P\"none\" sets move.shaping.type back to none (RRF AxisShaper::Configure)");
         Assert.That((await bench.Host.ExecuteCodeAsync("M593")).Trim(), Is.EqualTo("Input shaping is disabled"),
                     "bare M593 with shaping off reports so (AxisShaper::Configure)");
-        Assert.That(await bench.Host.EvaluateAsync("#move.shaping.amplitudes"), Is.EqualTo(1),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Shaping.Amplitudes.Count), Is.EqualTo(1),
                     "a disabled shaper is a single unit impulse (RRF numImpulses = 1)");
     }
 
@@ -321,28 +322,28 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
         using ScriptedCanMaster canMaster = new(SocketPath());
         await using DcsTestHost host = await StartXyzHostAsync(canMaster);
 
-        Assert.That(await host.EvaluateRawAsync("move.axes[2].homed"), Is.EqualTo("true"), "the config's G92 homed Z");
+        Assert.That(await host.ReadModelAsync(model => model.Move.Axes[2].Homed), Is.True, "the config's G92 homed Z");
 
         await host.ExecuteCodeAsync("M665 L300 R150 B120 H350 X0.5 Y-0.5 Z0.25");
-        string name = await host.EvaluateRawAsync("move.kinematics.name");
-        double towerCount = await host.EvaluateAsync("#move.kinematics.towers");
+        KinematicsName name = await host.ReadModelAsync(model => model.Move.Kinematics.Name);
+        double towerCount = await host.ReadModelAsync(model => ((DeltaKinematics)model.Move.Kinematics).Towers.Count);
         Assert.Multiple(() =>
         {
             Assert.That(name, Is.EqualTo("delta"), "M665 L switches move.kinematics.name to delta (RRF GCodes2.cpp case 665)");
             Assert.That(towerCount, Is.EqualTo(3), "a single L value gives three towers (RRF numTowers)");
         });
 
-        double deltaRadius = await host.EvaluateAsync("move.kinematics.deltaRadius");
-        double printRadius = await host.EvaluateAsync("move.kinematics.printRadius");
-        double homedHeight = await host.EvaluateAsync("move.kinematics.homedHeight");
-        double diagonal0 = await host.EvaluateAsync("move.kinematics.towers[0].diagonal");
-        double diagonal2 = await host.EvaluateAsync("move.kinematics.towers[2].diagonal");
-        double angle0 = await host.EvaluateAsync("move.kinematics.towers[0].angleCorrection");
-        double angle1 = await host.EvaluateAsync("move.kinematics.towers[1].angleCorrection");
-        double xMin = await host.EvaluateAsync("move.axes[0].min");
-        double xMax = await host.EvaluateAsync("move.axes[0].max");
-        double zMax = await host.EvaluateAsync("move.axes[2].max");
-        string zHomed = await host.EvaluateRawAsync("move.axes[2].homed");
+        double deltaRadius = await host.ReadModelAsync(model => ((DeltaKinematics)model.Move.Kinematics).DeltaRadius);
+        double printRadius = await host.ReadModelAsync(model => ((DeltaKinematics)model.Move.Kinematics).PrintRadius);
+        double homedHeight = await host.ReadModelAsync(model => ((DeltaKinematics)model.Move.Kinematics).HomedHeight);
+        double diagonal0 = await host.ReadModelAsync(model => ((DeltaKinematics)model.Move.Kinematics).Towers[0].Diagonal);
+        double diagonal2 = await host.ReadModelAsync(model => ((DeltaKinematics)model.Move.Kinematics).Towers[2].Diagonal);
+        double angle0 = await host.ReadModelAsync(model => ((DeltaKinematics)model.Move.Kinematics).Towers[0].AngleCorrection);
+        double angle1 = await host.ReadModelAsync(model => ((DeltaKinematics)model.Move.Kinematics).Towers[1].AngleCorrection);
+        double xMin = await host.ReadModelAsync(model => model.Move.Axes[0].Min);
+        double xMax = await host.ReadModelAsync(model => model.Move.Axes[0].Max);
+        double zMax = await host.ReadModelAsync(model => model.Move.Axes[2].Max);
+        bool zHomed = await host.ReadModelAsync(model => model.Move.Axes[2].Homed);
         Assert.Multiple(() =>
         {
             Assert.That(deltaRadius, Is.EqualTo(150).Within(1e-3), "M665 R sets move.kinematics.deltaRadius");
@@ -355,7 +356,7 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
             Assert.That(xMin, Is.EqualTo(-120).Within(1e-3), "M665 B sets move.axes[0].min to -printRadius (RRF LinearDeltaKinematics::Configure case 665)");
             Assert.That(xMax, Is.EqualTo(120).Within(1e-3), "M665 B sets move.axes[0].max to printRadius");
             Assert.That(zMax, Is.EqualTo(350).Within(1e-3), "M665 H sets move.axes[2].max to the homed height");
-            Assert.That(zHomed, Is.EqualTo("false"), "M665 clears the homed flags (RRF SetAllAxesNotHomed)");
+            Assert.That(zHomed, Is.False, "M665 clears the homed flags (RRF SetAllAxesNotHomed)");
         });
     }
 
@@ -375,15 +376,15 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
         await using DcsTestHost host = await StartXyzHostAsync(canMaster);
 
         await host.ExecuteCodeAsync("M665 L300 R150 B120 H350");
-        Assert.That(await host.EvaluateRawAsync("move.kinematics.name"), Is.EqualTo("delta"),
+        Assert.That(await host.ReadModelAsync(model => model.Move.Kinematics.Name), Is.EqualTo(KinematicsName.LinearDelta),
                     "M665 L switches to delta before M666 (RRF GCodes2.cpp case 665)");
 
         await host.ExecuteCodeAsync("M666 X0.15 Y-0.2 Z0.05 A1 B-0.5");
-        double adjustment0 = await host.EvaluateAsync("move.kinematics.towers[0].endstopAdjustment");
-        double adjustment1 = await host.EvaluateAsync("move.kinematics.towers[1].endstopAdjustment");
-        double adjustment2 = await host.EvaluateAsync("move.kinematics.towers[2].endstopAdjustment");
-        double xTilt = await host.EvaluateAsync("move.kinematics.xTilt");
-        double yTilt = await host.EvaluateAsync("move.kinematics.yTilt");
+        double adjustment0 = await host.ReadModelAsync(model => ((DeltaKinematics)model.Move.Kinematics).Towers[0].EndstopAdjustment);
+        double adjustment1 = await host.ReadModelAsync(model => ((DeltaKinematics)model.Move.Kinematics).Towers[1].EndstopAdjustment);
+        double adjustment2 = await host.ReadModelAsync(model => ((DeltaKinematics)model.Move.Kinematics).Towers[2].EndstopAdjustment);
+        double xTilt = await host.ReadModelAsync(model => ((DeltaKinematics)model.Move.Kinematics).XTilt);
+        double yTilt = await host.ReadModelAsync(model => ((DeltaKinematics)model.Move.Kinematics).YTilt);
         Assert.Multiple(() =>
         {
             Assert.That(adjustment0, Is.EqualTo(0.15).Within(1e-3), "M666 X sets move.kinematics.towers[0].endstopAdjustment (RRF LinearDeltaKinematics::Configure case 666)");
@@ -416,7 +417,7 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M667 S1");
         Assert.That(reply, Does.Contain("M667 is no longer supported - use M669 instead"),
                     "M667 answers with RRF's retirement error (GCodes2.cpp case 667)");
-        Assert.That(await bench.Host.EvaluateRawAsync("move.kinematics.name"), Is.EqualTo("cartesian"),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Kinematics.Name), Is.EqualTo(KinematicsName.Cartesian),
                     "a refused M667 leaves move.kinematics.name at RRF's cartesian boot default");
     }
 
@@ -439,12 +440,12 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
         await using DcsTestHost host = await StartXyzHostAsync(canMaster);
 
         await host.ExecuteCodeAsync("M669 K1");
-        string name = await host.EvaluateRawAsync("move.kinematics.name");
-        string xHomed = await host.EvaluateRawAsync("move.axes[0].homed");
+        KinematicsName name = await host.ReadModelAsync(model => model.Move.Kinematics.Name);
+        bool xHomed = await host.ReadModelAsync(model => model.Move.Axes[0].Homed);
         Assert.Multiple(() =>
         {
-            Assert.That(name, Is.EqualTo("coreXY"), "M669 K1 sets move.kinematics.name (RRF CoreKinematics::GetName)");
-            Assert.That(xHomed, Is.EqualTo("false"), "a kinematics change clears the homed flags (RRF GCodes2.cpp case 669)");
+            Assert.That(name, Is.EqualTo(KinematicsName.CoreXY), "M669 K1 sets move.kinematics.name (RRF CoreKinematics::GetName)");
+            Assert.That(xHomed, Is.False, "a kinematics change clears the homed flags (RRF GCodes2.cpp case 669)");
         });
 
         // The matrices are read from the live model: their rows are plain arrays that the meta
@@ -480,8 +481,8 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
             Assert.That(forward22, Is.EqualTo(1).Within(1e-3), "forwardMatrix[2][2] = 1");
         });
 
-        double inverseRows = await host.EvaluateAsync("#move.kinematics.inverseMatrix");
-        double forwardRows = await host.EvaluateAsync("#move.kinematics.forwardMatrix");
+        double inverseRows = await host.ReadModelAsync(model => ((CoreKinematics)model.Move.Kinematics).InverseMatrix.Count);
+        double forwardRows = await host.ReadModelAsync(model => ((CoreKinematics)model.Move.Kinematics).ForwardMatrix.Count);
         Assert.Multiple(() =>
         {
             Assert.That(inverseRows, Is.EqualTo(3), "move.kinematics.inverseMatrix has one row per axis (RRF CoreKinematics array table, count reprap.GetGCodes().GetTotalAxes())");
@@ -511,13 +512,13 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
         Assert.That(configureReply.Trim(), Is.Empty,
                     "cartesian kinematics accepts M671 silently (RRF ZLeadscrewKinematics::Configure)");
 
-        double screwX0 = await host.EvaluateAsync("move.kinematics.tiltCorrection.screwX[0]");
-        double screwX1 = await host.EvaluateAsync("move.kinematics.tiltCorrection.screwX[1]");
-        double screwY0 = await host.EvaluateAsync("move.kinematics.tiltCorrection.screwY[0]");
-        double screwY1 = await host.EvaluateAsync("move.kinematics.tiltCorrection.screwY[1]");
-        double maxCorrection = await host.EvaluateAsync("move.kinematics.tiltCorrection.maxCorrection");
-        double screwPitch = await host.EvaluateAsync("move.kinematics.tiltCorrection.screwPitch");
-        double correctionFactor = await host.EvaluateAsync("move.kinematics.tiltCorrection.correctionFactor");
+        double screwX0 = await host.ReadModelAsync(model => ((ZLeadscrewKinematics)model.Move.Kinematics).TiltCorrection.ScrewX[0]);
+        double screwX1 = await host.ReadModelAsync(model => ((ZLeadscrewKinematics)model.Move.Kinematics).TiltCorrection.ScrewX[1]);
+        double screwY0 = await host.ReadModelAsync(model => ((ZLeadscrewKinematics)model.Move.Kinematics).TiltCorrection.ScrewY[0]);
+        double screwY1 = await host.ReadModelAsync(model => ((ZLeadscrewKinematics)model.Move.Kinematics).TiltCorrection.ScrewY[1]);
+        double maxCorrection = await host.ReadModelAsync(model => ((ZLeadscrewKinematics)model.Move.Kinematics).TiltCorrection.MaxCorrection);
+        double screwPitch = await host.ReadModelAsync(model => ((ZLeadscrewKinematics)model.Move.Kinematics).TiltCorrection.ScrewPitch);
+        double correctionFactor = await host.ReadModelAsync(model => ((ZLeadscrewKinematics)model.Move.Kinematics).TiltCorrection.CorrectionFactor);
         Assert.Multiple(() =>
         {
             Assert.That(screwX0, Is.EqualTo(10).Within(1e-3), "M671 X sets move.kinematics.tiltCorrection.screwX[0] (RRF ZLeadscrewKinematics::Configure)");
@@ -530,9 +531,9 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
         });
 
         // The count guards the element read: an element read on a shorter array cannot evaluate
-        Assert.That(await host.EvaluateAsync("#move.kinematics.tiltCorrection.lastCorrections"), Is.EqualTo(2),
+        Assert.That(await host.ReadModelAsync(model => ((ZLeadscrewKinematics)model.Move.Kinematics).TiltCorrection.LastCorrections.Count), Is.EqualTo(2),
                     "M671 sizes move.kinematics.tiltCorrection.lastCorrections to the leadscrew count (RRF numLeadscrews)");
-        Assert.That(await host.EvaluateAsync("move.kinematics.tiltCorrection.lastCorrections[0]"), Is.EqualTo(0),
+        Assert.That(await host.ReadModelAsync(model => ((ZLeadscrewKinematics)model.Move.Kinematics).TiltCorrection.LastCorrections[0]), Is.EqualTo(0),
                     "configuring positions zeroes move.kinematics.tiltCorrection.lastCorrections");
 
         string report = await host.ExecuteCodeAsync("M671");
@@ -560,16 +561,16 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
 
         string loadReply = await host.ExecuteCodeAsync("G29 S1");
         Assert.That(loadReply.Trim(), Is.Empty, "G29 S1 loads the map silently with no probe configured (RRF GCodes::LoadHeightMap)");
-        Assert.That(await host.EvaluateRawAsync("move.compensation.type"), Is.EqualTo("mesh"),
+        Assert.That(await host.ReadModelAsync(model => model.Move.Compensation.Type), Is.EqualTo(MoveCompensationType.Mesh),
                     "G29 S1 sets move.compensation.type to mesh (RRF Move::GetCompensationTypeString)");
-        Assert.That(await host.EvaluateRawAsync("move.compensation.file"), Does.EndWith("heightmap.csv"),
+        Assert.That(await host.ReadModelAsync(model => model.Move.Compensation.File), Does.EndWith("heightmap.csv"),
                     "G29 S1 sets move.compensation.file to the loaded map");
 
-        double liveMin0 = await host.EvaluateAsync("move.compensation.liveGrid.mins[0]");
-        double liveMax0 = await host.EvaluateAsync("move.compensation.liveGrid.maxs[0]");
-        double liveSpacing0 = await host.EvaluateAsync("move.compensation.liveGrid.spacings[0]");
-        double meshMean = await host.EvaluateAsync("move.compensation.meshDeviation.mean");
-        double meshDeviation = await host.EvaluateAsync("move.compensation.meshDeviation.deviation");
+        double liveMin0 = await host.ReadModelAsync(model => model.Move.Compensation.LiveGrid!.Mins[0]);
+        double liveMax0 = await host.ReadModelAsync(model => model.Move.Compensation.LiveGrid!.Maxs[0]);
+        double liveSpacing0 = await host.ReadModelAsync(model => model.Move.Compensation.LiveGrid!.Spacings[0]);
+        double meshMean = await host.ReadModelAsync(model => model.Move.Compensation.MeshDeviation!.Mean);
+        double meshDeviation = await host.ReadModelAsync(model => model.Move.Compensation.MeshDeviation!.Deviation);
         Assert.Multiple(() =>
         {
             Assert.That(liveMin0, Is.EqualTo(20).Within(1e-3), "move.compensation.liveGrid.mins[0] comes from the file's grid");
@@ -597,13 +598,13 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
         await using DcsTestHost host = await StartXyzHostAsync(canMaster, withHeightMap: true);
 
         await host.ExecuteCodeAsync("M375");
-        Assert.That(await host.EvaluateRawAsync("move.compensation.type"), Is.EqualTo("mesh"),
+        Assert.That(await host.ReadModelAsync(model => model.Move.Compensation.Type), Is.EqualTo(MoveCompensationType.Mesh),
                     "M375 loads the map before G29 S2 clears it (RRF GCodes::LoadHeightMap)");
 
         await host.ExecuteCodeAsync("G29 S2");
-        Assert.That(await host.EvaluateRawAsync("move.compensation.type"), Is.EqualTo("none"),
+        Assert.That(await host.ReadModelAsync(model => model.Move.Compensation.Type), Is.EqualTo(MoveCompensationType.None),
                     "G29 S2 sets move.compensation.type back to none (RRF GCodes::ClearBedMapping)");
-        Assert.That(await host.EvaluateRawAsync("move.compensation.file"), Is.EqualTo("null"),
+        Assert.That(await host.ReadModelAsync(model => model.Move.Compensation.File), Is.Null,
                     "G29 S2 clears move.compensation.file");
     }
 
@@ -621,11 +622,11 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
         await using DcsTestHost host = await StartXyzHostAsync(canMaster, withHeightMap: true);
 
         string loadReply = await host.ExecuteCodeAsync("M375");
-        Assert.That(await host.EvaluateRawAsync("move.compensation.type"), Is.EqualTo("mesh"),
+        Assert.That(await host.ReadModelAsync(model => model.Move.Compensation.Type), Is.EqualTo(MoveCompensationType.Mesh),
                     "M375 sets move.compensation.type to mesh (RRF Move::GetCompensationTypeString)");
-        Assert.That(await host.EvaluateRawAsync("move.compensation.file"), Does.EndWith("heightmap.csv"),
+        Assert.That(await host.ReadModelAsync(model => model.Move.Compensation.File), Does.EndWith("heightmap.csv"),
                     "M375 sets move.compensation.file to the loaded map");
-        Assert.That(await host.EvaluateAsync("move.compensation.liveGrid.spacings[0]"), Is.EqualTo(40).Within(1e-3),
+        Assert.That(await host.ReadModelAsync(model => model.Move.Compensation.LiveGrid!.Spacings[0]), Is.EqualTo(40).Within(1e-3),
                     "move.compensation.liveGrid.spacings[0] comes from the file's grid");
         Assert.That(loadReply.Trim(), Is.Empty, "M375 loads the map silently with no probe configured (RRF GCodes::LoadHeightMap)");
     }
@@ -648,7 +649,7 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
         await using DcsTestHost host = await StartXyzHostAsync(canMaster, withHeightMap: true);
 
         await host.ExecuteCodeAsync("M375");
-        Assert.That(await host.EvaluateRawAsync("move.compensation.type"), Is.EqualTo("mesh"),
+        Assert.That(await host.ReadModelAsync(model => model.Move.Compensation.Type), Is.EqualTo(MoveCompensationType.Mesh),
                     "M375 loads the map M374 saves (RRF GCodes::LoadHeightMap)");
 
         string saveReply = await host.ExecuteCodeAsync("M374 P\"saved-map.csv\"");
@@ -683,14 +684,14 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
         await using DcsTestHost host = await StartXyzHostAsync(canMaster, withHeightMap: true);
 
         await host.ExecuteCodeAsync("M375");
-        Assert.That(await host.EvaluateRawAsync("move.compensation.type"), Is.EqualTo("mesh"),
+        Assert.That(await host.ReadModelAsync(model => model.Move.Compensation.Type), Is.EqualTo(MoveCompensationType.Mesh),
                     "M375 loads the map M561 clears (RRF GCodes::LoadHeightMap)");
 
         string clearReply = await host.ExecuteCodeAsync("M561");
         Assert.That(clearReply.Trim(), Is.Empty, "M561 answers silently (RRF GCodes2.cpp case 561)");
-        Assert.That(await host.EvaluateRawAsync("move.compensation.type"), Is.EqualTo("none"),
+        Assert.That(await host.ReadModelAsync(model => model.Move.Compensation.Type), Is.EqualTo(MoveCompensationType.None),
                     "M561 sets move.compensation.type back to none (RRF GCodes::ClearBedMapping)");
-        Assert.That(await host.EvaluateRawAsync("move.compensation.file"), Is.EqualTo("null"),
+        Assert.That(await host.ReadModelAsync(model => model.Move.Compensation.File), Is.Null,
                     "M561 clears move.compensation.file");
     }
 }

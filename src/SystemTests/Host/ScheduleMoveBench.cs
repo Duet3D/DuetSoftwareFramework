@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Motion.Native;
 using NUnit.Framework;
 
@@ -197,29 +198,30 @@ internal static class ScheduleMoveBench
     /// Wait until an object model expression reads the given text, evaluated through the interpreter
     /// </summary>
     /// <param name="host">The host to ask</param>
-    /// <param name="expression">The expression to evaluate, e.g. an endstop's triggered flag</param>
-    /// <param name="expected">The text it should read</param>
+    /// <param name="read">What to read out of the object model, e.g. an endstop's triggered flag</param>
+    /// <param name="expected">The value it should reach</param>
+    /// <param name="what">What is being waited for, for the timeout message</param>
     /// <param name="timeoutMs">How long to wait</param>
     /// <remarks>
     /// What a board reports arrives asynchronously, so a scenario that depends on the machine having
     /// taken it in has to wait for it rather than for a round trip of its own
     /// </remarks>
-    public static async Task WaitForExpressionAsync(this DcsTestHost host, string expression, string expected,
-                                                    int timeoutMs = 10_000)
+    public static async Task WaitForModelAsync<T>(this DcsTestHost host, Func<DuetControlServer.Model.ObjectModel, T> read, T expected,
+                                                  string what, int timeoutMs = 10_000)
     {
         DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-        string read;
+        T value;
         do
         {
-            read = await host.EvaluateRawAsync(expression);
-            if (read == expected)
+            value = await host.ReadModelAsync(read);
+            if (Equals(value, expected))
             {
                 return;
             }
             await Task.Delay(25);
         }
         while (DateTime.UtcNow < deadline);
-        throw new TimeoutException($"{expression} stayed \"{read}\", expected \"{expected}\"");
+        throw new TimeoutException($"{what} stayed \"{value}\", expected \"{expected}\"");
     }
 
     /// <summary>Wait until at least the given number of moves have been scheduled, and return them all</summary>

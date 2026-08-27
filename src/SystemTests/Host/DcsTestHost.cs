@@ -142,20 +142,18 @@ internal sealed class DcsTestHost : IAsyncDisposable
     public async Task WaitForConfigDoneAsync(int timeoutMs = 30_000)
     {
         DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-        string reply;
         do
         {
-            // exists() rather than reading the variable: the marker has not run yet for most of
-            // this poll, and asking for a variable that is not there logs a channel error per ask
-            reply = (await ExecuteCodeAsync("echo exists(global.configDone)")).Trim();
-            if (reply == "true")
+            // Whether the marker is there, rather than what it says: it has not run yet for most of
+            // this poll, and reading it through the interpreter would log a channel error per ask
+            if (await ReadModelAsync(model => model.Global.ContainsKey("configDone")))
             {
                 return;
             }
             await Task.Delay(50);
         }
         while (DateTime.UtcNow < deadline);
-        throw new TimeoutException($"config.g did not finish; the marker probe read \"{reply}\"");
+        throw new TimeoutException("config.g did not finish; its done marker was never set");
     }
 
     /// <summary>Wait until the machine reports the given status</summary>
@@ -180,7 +178,7 @@ internal sealed class DcsTestHost : IAsyncDisposable
     }
 
     /// <summary>Read part of the object model under its lock</summary>
-    public async Task<T> ReadModelAsync<T>(Func<ObjectModel, T> read)
+    public async Task<T> ReadModelAsync<T>(Func<DuetControlServer.Model.ObjectModel, T> read)
     {
         using (await Model.AccessReadOnlyAsync(CancellationToken.None))
         {

@@ -43,7 +43,7 @@ public class JobEdgeCaseTests : BenchFixture
             Assert.That(await bench.Host.ReadModelAsync(model => model.State.Status), Is.EqualTo(MachineStatus.Processing),
                         "the job is still running while the machine works through what it queued");
             Assert.That(await bench.Host.GlobalAsync("stopRan"), Is.Zero, "so stop.g has not run yet");
-            Assert.That(await bench.Host.EvaluateAsync("move.axes[0].machinePosition"), Is.LessThan(189.0),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].MachinePosition), Is.LessThan(189.0),
                         "and the head has not reached the end of the first move");
         });
 
@@ -132,7 +132,7 @@ public class JobEdgeCaseTests : BenchFixture
             Assert.That(await bench.Host.RestorePointAsync(3), Is.EqualTo((60.0, 80.0)), "G60 S3 wrote slot 3");
             Assert.That(await bench.Host.RestorePointAsync(1), Is.EqualTo((100.0, 120.0)),
                         "the pause wrote slot 1");
-            Assert.That(await bench.Host.EvaluateAsync("state.restorePoints[1].feedRate"), Is.EqualTo(100.0).Within(0.01),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.State.RestorePoints[1].FeedRate), Is.EqualTo(100.0).Within(0.01),
                         "with the job's feed rate in mm/s");
         });
 
@@ -177,9 +177,9 @@ public class JobEdgeCaseTests : BenchFixture
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.GlobalAsync("stopRan"), Is.EqualTo(1), "the job ended normally");
-            Assert.That(await bench.Host.EvaluateRawAsync("job.lastFileName"), Does.EndWith("job.gcode"),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Job.LastFileName), Does.EndWith("job.gcode"),
                         "as the last file printed");
-            Assert.That(await bench.Host.EvaluateRawAsync("job.lastFileCancelled"), Is.EqualTo("false"),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Job.LastFileCancelled), Is.False,
                         "not cancelled");
             Assert.That(bench.CanMaster.ScheduledSteps(driver: 0), Is.EqualTo(200 * 80),
                         "the final move completed in full");

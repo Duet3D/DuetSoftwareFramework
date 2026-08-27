@@ -58,11 +58,13 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: HeatConfig);
         await bench.Host.ExecuteCodeAsync("M308 S3 P\"1.temp3\" Y\"thermistor\" A\"probe temp\"");
 
-        Assert.Multiple(async () =>
+        AnalogSensor? sensor = await bench.Host.ReadModelAsync(model => model.Sensors.Analog[3]);
+        Assert.Multiple(() =>
         {
-            Assert.That(await bench.Host.EvaluateRawAsync("sensors.analog[3].name"), Is.EqualTo("probe temp"),
+            Assert.NotNull(sensor);
+            Assert.That(sensor!.Name, Is.EqualTo("probe temp"),
                         "M308 A sets sensors.analog[3].name (RRF TemperatureSensor.cpp sensorName)");
-            Assert.That(await bench.Host.EvaluateRawAsync("sensors.analog[3].type"), Is.EqualTo("thermistor"),
+            Assert.That(sensor!.Type, Is.EqualTo(AnalogSensorType.Thermistor),
                         "M308 Y sets sensors.analog[3].type (RRF Thermistor.h GetShortSensorType)");
         });
 
@@ -71,7 +73,7 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
             () => bench.Host.Model.Sensors.Analog.Count > 3
                   && bench.Host.Model.Sensors.Analog[3]?.LastReading is > 23.0f and < 24.0f,
             what: "the sensor report reaching sensors.analog[3].lastReading");
-        Assert.That(await bench.Host.EvaluateAsync("sensors.analog[3].lastReading"), Is.EqualTo(23.5).Within(0.01),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Analog[3]?.LastReading), Is.EqualTo(23.5).Within(0.01),
                     "sensors.analog[3].lastReading follows the board's report (RRF TemperatureSensor.cpp lastTemperature)");
     }
 
@@ -97,28 +99,30 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
         await bench.Host.ExecuteCodeAsync("M308 S3 P\"1.temp3\" Y\"thermistor\"");
         await bench.Host.ExecuteCodeAsync("M950 H3 C\"1.out3\" T3");
 
-        Assert.Multiple(async () =>
+        Heater? heater = await bench.Host.ReadModelAsync(model => model.Heat.Heaters[3]);
+        Assert.Multiple(() =>
         {
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[3].sensor"), Is.EqualTo(3),
+            Assert.NotNull(heater);
+            Assert.That(heater!.Sensor, Is.EqualTo(3),
                         "M950 T binds heat.heaters[3].sensor (RRF Heat.cpp ConfigureHeater)");
-            Assert.That(await bench.Host.EvaluateRawAsync("heat.heaters[3].state"), Is.EqualTo("off"),
+            Assert.That(heater!.State, Is.EqualTo(HeaterState.Off),
                         "a new heater starts off (RRF Heater.cpp GetStatus)");
-            Assert.That(await bench.Host.EvaluateRawAsync("heat.heaters[3].model.enabled"), Is.EqualTo("false"),
+            Assert.That(heater!.Model.Enabled, Is.False,
                         "M950 H alone leaves heat.heaters[3].model.enabled false until a function is assigned (RRF FOPDT.cpp)");
-            Assert.That(ReadHeater(bench.Host, 3)?.Monitors, Has.Count.EqualTo(3),
+            Assert.That(heater!.Monitors, Has.Count.EqualTo(3),
                         "a heater carries MaxMonitorsPerHeater monitor slots (RRF Heater.cpp objectModelTable monitors[])");
-            Assert.That(ReadHeater(bench.Host, 3)?.Monitors.Count > 0
-                            ? ReadHeater(bench.Host, 3)!.Monitors[0]?.Condition
+            Assert.That(heater!.Monitors.Count > 0
+                            ? heater!.Monitors[0]?.Condition
                             : null,
                         Is.EqualTo(HeaterMonitorCondition.Disabled),
                         "a new heater's monitors are all disabled (RRF HeaterMonitor.cpp GetTriggerName)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[3].max"), Is.EqualTo(2000).Within(0.01),
+            Assert.That(heater!.Max, Is.EqualTo(2000).Within(0.01),
                         "with no monitor heat.heaters[3].max is BadErrorTemperature (RRF Heater.cpp GetHighestTemperatureLimit)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[3].min"), Is.EqualTo(-273.15).Within(0.01),
+            Assert.That(heater!.Min, Is.EqualTo(-273.15).Within(0.01),
                         "with no monitor heat.heaters[3].min is ABS_ZERO (RRF Heater.cpp GetLowestTemperatureLimit)");
-            Assert.That(await bench.Host.EvaluateRawAsync("heat.heaters[3].port"), Is.EqualTo("1.out3"),
+            Assert.That(heater!.Port, Is.EqualTo("1.out3"),
                         "M950 C is kept in heat.heaters[3].port (DSF addition, rrf-differences.md section 3)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[3].frequency"), Is.EqualTo(250),
+            Assert.That(heater!.Frequency, Is.EqualTo(250),
                         "heat.heaters[3].frequency defaults to DefaultHeaterPwmFreq (DSF addition, rrf-differences.md section 3)");
         });
     }
@@ -140,29 +144,33 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
     public async Task M140AssignsAndDrivesBedHeater()
     {
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: HeatConfig);
+
+        Heater? heater = await bench.Host.ReadModelAsync(model => model.Heat.Heaters[3]);
         Assert.Multiple(async () =>
         {
-            Assert.That(await bench.Host.EvaluateRawAsync("heat.bedHeaters[0]"), Is.EqualTo("0"),
+#pragma warning disable CS0618
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.BedHeaters[0]), Is.EqualTo(0),
                         "M140 H0 sets heat.bedHeaters[0] (RRF Heat.cpp bedHeaters array)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[0].max"), Is.EqualTo(125).Within(0.01),
+#pragma warning restore
+            Assert.That(heater?.Max, Is.EqualTo(125).Within(0.01),
                         "assigning a bed sets the default monitor at DefaultBedTemperatureLimit (RRF Heater.cpp SetFunction)");
-            Assert.That(await bench.Host.EvaluateRawAsync("heat.heaters[0].model.enabled"), Is.EqualTo("true"),
+            Assert.That(heater?.Model.Enabled, Is.True,
                         "assigning a bed enables the default model (RRF Heater.cpp SetFunction)");
         });
 
         await bench.Host.ExecuteCodeAsync("M140 S60");
-        Assert.That(await bench.Host.EvaluateAsync("heat.heaters[0].active"), Is.EqualTo(60).Within(0.01),
+        Assert.That(heater?.Active, Is.EqualTo(60).Within(0.01),
                     "M140 S sets heat.heaters[0].active (RRF GCodes2.cpp case 140, SetActiveTemperature)");
 
         // The heater is commanded active; the board reporting a PID mode makes that visible
         bench.CanMaster.InjectHeatersStatus(srcAddress: 1, heaterNumber: 0, HeaterMode.Heating, currentTemperature: 25.0f);
         await bench.CanMaster.WaitUntilAsync(() => ReadHeater(bench.Host, 0) is { State: HeaterState.Active },
                                              what: "the bed heater reporting active");
-        Assert.That(await bench.Host.EvaluateRawAsync("heat.heaters[0].state"), Is.EqualTo("active"),
+        Assert.That(heater?.State, Is.EqualTo(HeaterState.Active),
                     "M140 S switches heat.heaters[0].state to active (RRF Heat.cpp SetActiveOrStandby)");
 
         await bench.Host.ExecuteCodeAsync("M140 R40");
-        Assert.That(await bench.Host.EvaluateAsync("heat.heaters[0].standby"), Is.EqualTo(40).Within(0.01),
+        Assert.That(heater?.Standby, Is.EqualTo(40).Within(0.01),
                     "M140 R sets heat.heaters[0].standby (RRF GCodes2.cpp case 140, SetStandbyTemperature)");
 
         await bench.Host.ExecuteCodeAsync("M140 S-274");
@@ -171,9 +179,9 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
                                              what: "the bed heater reporting off");
         Assert.Multiple(async () =>
         {
-            Assert.That(await bench.Host.EvaluateRawAsync("heat.heaters[0].state"), Is.EqualTo("off"),
+            Assert.That(heater?.State, Is.EqualTo(HeaterState.Off),
                         "M140 S below absolute zero switches the bed off (RRF GCodes2.cpp case 140, SwitchOff)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[0].active"), Is.EqualTo(60).Within(0.01),
+            Assert.That(heater?.Active, Is.EqualTo(60).Within(0.01),
                         "switching off leaves heat.heaters[0].active untouched (RRF Heater.cpp SwitchOff)");
         });
     }
@@ -189,8 +197,11 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
     {
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: HeatConfig);
         await bench.Host.ExecuteCodeAsync("M140 H-1");
-        Assert.That(await bench.Host.EvaluateRawAsync("heat.bedHeaters[0]"), Is.EqualTo("-1"),
+
+#pragma warning disable CS0618
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.BedHeaters[0]), Is.EqualTo(-1),
                     "M140 H-1 clears heat.bedHeaters[0] to -1 (RRF Heat.cpp ClearBedHeaters, HeaterCollection GetFirstHeater)");
+#pragma warning restore
     }
 
     /// <summary>
@@ -207,22 +218,26 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
     public async Task M141AssignsAndDrivesChamberHeater()
     {
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: HeatConfig);
+
+        Heater? heater = await bench.Host.ReadModelAsync(model => model.Heat.Heaters[2]);
         Assert.Multiple(async () =>
         {
-            Assert.That(await bench.Host.EvaluateRawAsync("heat.chamberHeaters[0]"), Is.EqualTo("2"),
+#pragma warning disable CS0618
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.ChamberHeaters[0]), Is.EqualTo(2),
                         "M141 H2 sets heat.chamberHeaters[0] (RRF Heat.cpp chamberHeaters array)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[2].max"), Is.EqualTo(100).Within(0.01),
+#pragma warning restore
+            Assert.That(heater?.Max, Is.EqualTo(100).Within(0.01),
                         "assigning a chamber sets the default monitor at DefaultChamberTemperatureLimit (RRF Heater.cpp SetFunction)");
         });
 
         await bench.Host.ExecuteCodeAsync("M141 S50");
-        Assert.That(await bench.Host.EvaluateAsync("heat.heaters[2].active"), Is.EqualTo(50).Within(0.01),
+        Assert.That(heater?.Active, Is.EqualTo(50).Within(0.01),
                     "M141 S sets heat.heaters[2].active (RRF GCodes2.cpp case 141, SetActiveTemperature)");
 
         bench.CanMaster.InjectHeatersStatus(srcAddress: 1, heaterNumber: 2, HeaterMode.Heating, currentTemperature: 25.0f);
         await bench.CanMaster.WaitUntilAsync(() => ReadHeater(bench.Host, 2) is { State: HeaterState.Active },
                                              what: "the chamber heater reporting active");
-        Assert.That(await bench.Host.EvaluateRawAsync("heat.heaters[2].state"), Is.EqualTo("active"),
+        Assert.That(heater?.State, Is.EqualTo(HeaterState.Active),
                     "M141 S switches heat.heaters[2].state to active (RRF Heat.cpp SetActiveOrStandby)");
     }
 
@@ -245,23 +260,27 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
     public async Task M104SetsToolTemperaturesWithoutSelecting()
     {
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: HeatConfig);
-        Assert.That(await bench.Host.EvaluateAsync("heat.heaters[1].max"), Is.EqualTo(285).Within(0.01),
+        
+        Heater? heater = await bench.Host.ReadModelAsync(model => model.Heat.Heaters[1]);
+        
+        Assert.That(heater!.Max, Is.EqualTo(285).Within(0.01),
                     "M563 assigns the tool function and the default monitor at DefaultHotEndTemperatureLimit (RRF Heater.cpp SetFunction)");
 
         await bench.Host.ExecuteCodeAsync("M104 S200");
+        Tool? tool = await bench.Host.ReadModelAsync(model => model.Tools[0]);
         Assert.Multiple(async () =>
         {
-            Assert.That(await bench.Host.EvaluateAsync("tools[0].active[0]"), Is.EqualTo(200).Within(0.01),
+            Assert.That(tool!.Active[0], Is.EqualTo(200).Within(0.01),
                         "a bare M104 S sets tools[0].active[0] of the default tool (RRF GCodes2.cpp case 104, SetToolHeaters)");
-            Assert.That(await bench.Host.EvaluateAsync("tools[0].standby[0]"), Is.EqualTo(200).Within(0.01),
+            Assert.That(tool!.Standby[0], Is.EqualTo(200).Within(0.01),
                         "M104 S sets tools[0].standby[0] as well (RRF GCodes.cpp SetToolHeaters)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[1].active"), Is.EqualTo(200).Within(0.01),
+            Assert.That(heater!.Active, Is.EqualTo(200).Within(0.01),
                         "M104 S reaches heat.heaters[1].active (RRF Tool.cpp SetToolHeaterActiveOrStandbyTemperature)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[1].standby"), Is.EqualTo(200).Within(0.01),
+            Assert.That(heater!.Standby, Is.EqualTo(200).Within(0.01),
                         "M104 S reaches heat.heaters[1].standby (RRF Tool.cpp SetToolHeaterActiveOrStandbyTemperature)");
-            Assert.That(await bench.Host.EvaluateRawAsync("state.currentTool"), Is.EqualTo("-1"),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(-1),
                         "M104 never selects a tool (RRF GCodes2.cpp case 104)");
-            Assert.That(await bench.Host.EvaluateRawAsync("tools[0].state"), Is.EqualTo("standby"),
+            Assert.That(tool!.State, Is.EqualTo(ToolState.Standby),
                         "M104 puts the unselected target tool on standby (RRF GCodes2.cpp case 104, Tool::Standby)");
         });
 
@@ -270,7 +289,7 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
         bench.CanMaster.InjectHeatersStatus(srcAddress: 1, heaterNumber: 1, HeaterMode.Heating, currentTemperature: 25.0f);
         await bench.CanMaster.WaitUntilAsync(() => ReadHeater(bench.Host, 1) is { State: HeaterState.Standby },
                                              what: "the tool heater reporting standby");
-        Assert.That(await bench.Host.EvaluateRawAsync("heat.heaters[1].state"), Is.EqualTo("standby"),
+        Assert.That(heater!.State, Is.EqualTo(HeaterState.Standby),
                     "M104 on an unselected tool leaves heat.heaters[1].state standby (RRF Heater.cpp GetStatus)");
     }
 
@@ -307,21 +326,23 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
         }
         string reply = await waitTask;
 
+        Heater? heater = await bench.Host.ReadModelAsync(model => model.Heat.Heaters[1]);
+        Tool? tool = await bench.Host.ReadModelAsync(model => model.Tools[0]);
         Assert.Multiple(async () =>
         {
             Assert.That(blocked, Is.True,
                         $"M109 blocks until the tool heater reaches temperature (RRF GCodes2.cpp case 109, m109WaitForTemperature); reply was: {reply}");
-            Assert.That(await bench.Host.EvaluateRawAsync("state.currentTool"), Is.EqualTo("0"),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(0),
                         "M109 with no tool selected selects the target tool (RRF GCodes2.cpp case 109, m109ToolChange0)");
-            Assert.That(await bench.Host.EvaluateRawAsync("tools[0].state"), Is.EqualTo("active"),
+            Assert.That(tool!.State, Is.EqualTo(ToolState.Active),
                         "the tool M109 selected is active (RRF MovementState::SelectTool)");
-            Assert.That(await bench.Host.EvaluateAsync("tools[0].active[0]"), Is.EqualTo(210).Within(0.01),
+            Assert.That(tool!.Active[0], Is.EqualTo(210).Within(0.01),
                         "M109 S sets tools[0].active[0] (RRF GCodes.cpp SetToolHeaters)");
-            Assert.That(await bench.Host.EvaluateAsync("tools[0].standby[0]"), Is.EqualTo(210).Within(0.01),
+            Assert.That(tool!.Standby[0], Is.EqualTo(210).Within(0.01),
                         "M109 S sets tools[0].standby[0] as well (RRF GCodes.cpp SetToolHeaters)");
-            Assert.That(await bench.Host.EvaluateRawAsync("heat.heaters[1].state"), Is.EqualTo("active"),
+            Assert.That(heater!.State, Is.EqualTo(HeaterState.Active),
                         "the selected tool's heater is active (RRF Heater.cpp GetStatus)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[1].current"), Is.EqualTo(210).Within(0.01),
+            Assert.That(heater!.Current, Is.EqualTo(210).Within(0.01),
                         "heat.heaters[1].current follows the board's report");
         });
     }
@@ -353,11 +374,13 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
         bench.CanMaster.InjectHeatersStatus(srcAddress: 1, heaterNumber: 0, HeaterMode.Stable, currentTemperature: 60.0f);
         await waitTask;
 
-        Assert.Multiple(async () =>
+        Heater? heater = await bench.Host.ReadModelAsync(model => model.Heat.Heaters[0]);
+
+        Assert.Multiple(() =>
         {
-            Assert.That(await bench.Host.EvaluateRawAsync("heat.heaters[0].state"), Is.EqualTo("active"),
+            Assert.That(heater!.State, Is.EqualTo(HeaterState.Active),
                         "M190 switches the bed active (RRF GCodes2.cpp case 190, SetActiveOrStandby)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[0].current"), Is.EqualTo(60).Within(0.01),
+            Assert.That(heater!.Current, Is.EqualTo(60).Within(0.01),
                         "heat.heaters[0].current follows the board's report");
         });
     }
@@ -389,7 +412,7 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
         bench.CanMaster.InjectHeatersStatus(srcAddress: 1, heaterNumber: 2, HeaterMode.Stable, currentTemperature: 50.0f);
         await waitTask;
 
-        Assert.That(await bench.Host.EvaluateRawAsync("heat.heaters[2].state"), Is.EqualTo("active"),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.Heaters[2]!.State), Is.EqualTo(HeaterState.Active),
                     "M191 switches the chamber active (RRF GCodes2.cpp case 191, SetActiveOrStandby)");
     }
 
@@ -419,7 +442,7 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
 
         bench.CanMaster.InjectHeatersStatus(srcAddress: 1, heaterNumber: 0, HeaterMode.Stable, currentTemperature: 60.0f);
         await waitTask;
-        Assert.That(await bench.Host.EvaluateAsync("heat.heaters[0].current"), Is.EqualTo(60).Within(0.01),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.Heaters[0]!.Current), Is.EqualTo(60).Within(0.01),
                     "the wait released at the reported target temperature");
     }
 
@@ -478,27 +501,27 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: HeatConfig);
         Assert.Multiple(async () =>
         {
-            Assert.That(await bench.Host.EvaluateAsync("heat.coldExtrudeTemperature"), Is.EqualTo(0).Within(0.01),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.ColdExtrudeTemperature), Is.EqualTo(0).Within(0.01),
                         "with M302 P1 heat.coldExtrudeTemperature reports 0 (RRF Heat.cpp objectModelTable)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.coldRetractTemperature"), Is.EqualTo(0).Within(0.01),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.ColdRetractTemperature), Is.EqualTo(0).Within(0.01),
                         "with M302 P1 heat.coldRetractTemperature reports 0 (RRF Heat.cpp objectModelTable)");
         });
 
         await bench.Host.ExecuteCodeAsync("M302 P0");
         Assert.Multiple(async () =>
         {
-            Assert.That(await bench.Host.EvaluateAsync("heat.coldExtrudeTemperature"), Is.EqualTo(160).Within(0.01),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.ColdExtrudeTemperature), Is.EqualTo(160).Within(0.01),
                         "M302 P0 restores heat.coldExtrudeTemperature to DefaultMinExtrusionTemperature (RRF GCodes2.cpp case 302)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.coldRetractTemperature"), Is.EqualTo(90).Within(0.01),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.ColdRetractTemperature), Is.EqualTo(90).Within(0.01),
                         "M302 P0 restores heat.coldRetractTemperature to DefaultMinRetractionTemperature (RRF GCodes2.cpp case 302)");
         });
 
         await bench.Host.ExecuteCodeAsync("M302 S120 R110");
         Assert.Multiple(async () =>
         {
-            Assert.That(await bench.Host.EvaluateAsync("heat.coldExtrudeTemperature"), Is.EqualTo(120).Within(0.01),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.ColdExtrudeTemperature), Is.EqualTo(120).Within(0.01),
                         "M302 S sets heat.coldExtrudeTemperature (RRF Heat.cpp SetExtrusionMinTemp)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.coldRetractTemperature"), Is.EqualTo(110).Within(0.01),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.ColdRetractTemperature), Is.EqualTo(110).Within(0.01),
                         "M302 R sets heat.coldRetractTemperature (RRF Heat.cpp SetRetractionMinTemp)");
         });
 
@@ -520,32 +543,33 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: HeatConfig);
         await bench.Host.ExecuteCodeAsync("M307 H0 R2.8 K0.35:0.11 E1.4 D6.5 S0.9 V23.5 B0");
 
+        DuetAPI.ObjectModel.HeaterModel heaterModel = await bench.Host.ReadModelAsync(model => model.Heat.Heaters[0]!.Model);
         Assert.Multiple(async () =>
         {
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[0].model.heatingRate"), Is.EqualTo(2.8).Within(0.001),
+            Assert.That(heaterModel!.HeatingRate, Is.EqualTo(2.8).Within(0.001),
                         "M307 R sets heat.heaters[0].model.heatingRate (RRF Heater.cpp SetOrReportModel)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[0].model.coolingRate"), Is.EqualTo(0.35).Within(0.001),
+            Assert.That(heaterModel!.CoolingRate, Is.EqualTo(0.35).Within(0.001),
                         "M307 K sets heat.heaters[0].model.coolingRate (RRF FOPDT.cpp basicCoolingRate)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[0].model.fanCoolingRate"), Is.EqualTo(0.11).Within(0.001),
+            Assert.That(heaterModel!.FanCoolingRate, Is.EqualTo(0.11).Within(0.001),
                         "M307 K's second value sets heat.heaters[0].model.fanCoolingRate (RRF FOPDT.cpp fanCoolingRate)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[0].model.coolingExp"), Is.EqualTo(1.4).Within(0.001),
+            Assert.That(heaterModel!.CoolingExp, Is.EqualTo(1.4).Within(0.001),
                         "M307 E sets heat.heaters[0].model.coolingExp (RRF FOPDT.cpp coolingRateExponent)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[0].model.deadTime"), Is.EqualTo(6.5).Within(0.001),
+            Assert.That(heaterModel!.DeadTime, Is.EqualTo(6.5).Within(0.001),
                         "M307 D sets heat.heaters[0].model.deadTime (RRF Heater.cpp SetOrReportModel)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[0].model.maxPwm"), Is.EqualTo(0.9).Within(0.001),
+            Assert.That(heaterModel!.MaxPwm, Is.EqualTo(0.9).Within(0.001),
                         "M307 S sets heat.heaters[0].model.maxPwm (RRF Heater.cpp SetOrReportModel)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[0].model.standardVoltage"), Is.EqualTo(23.5).Within(0.001),
+            Assert.That(heaterModel!.StandardVoltage, Is.EqualTo(23.5).Within(0.001),
                         "M307 V sets heat.heaters[0].model.standardVoltage (RRF Heater.cpp SetOrReportModel)");
-            Assert.That(await bench.Host.EvaluateRawAsync("heat.heaters[0].model.pid.used"), Is.EqualTo("true"),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.Heaters[0]!.Model.PID.Used), Is.True,
                         "M307 B0 keeps PID in use (RRF FOPDT.cpp pid.used)");
-            Assert.That(await bench.Host.EvaluateRawAsync("heat.heaters[0].model.enabled"), Is.EqualTo("true"),
+            Assert.That(heaterModel!.Enabled, Is.True,
                         "a configured model reports enabled (RRF FOPDT.cpp enabled)");
-            Assert.That(await bench.Host.EvaluateRawAsync("heat.heaters[0].model.inverted"), Is.EqualTo("false"),
+            Assert.That(heaterModel!.Inverted, Is.False,
                         "without I the model is not inverted (RRF FOPDT.cpp inverted)");
         });
 
         await bench.Host.ExecuteCodeAsync("M307 H0 B1");
-        Assert.That(await bench.Host.EvaluateRawAsync("heat.heaters[0].model.pid.used"), Is.EqualTo("false"),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.Heaters[0]!.Model.PID.Used), Is.False,
                     "M307 B1 switches to bang-bang, so heat.heaters[0].model.pid.used is false (RRF Heater.cpp SetOrReportModel)");
     }
 
@@ -583,7 +607,7 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
                         "M143 defaults to the GenerateFault action (RRF Heater.cpp ConfigureMonitor)");
             Assert.That(monitor0?.Sensor, Is.EqualTo(0),
                         "M143 defaults to the heater's own sensor (RRF Heater.cpp ConfigureMonitor)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[0].max"), Is.EqualTo(110).Within(0.01),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.Heaters[0]!.Max), Is.EqualTo(110).Within(0.01),
                         "heat.heaters[0].max reports the tooHigh monitor limit (RRF Heater.cpp GetHighestTemperatureLimit)");
             Assert.That(monitor1?.Limit, Is.EqualTo(5.0f).Within(0.01),
                         "M143 P1 S sets heat.heaters[0].monitors[1].limit (RRF Heater.cpp ConfigureMonitor)");
@@ -593,7 +617,7 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
                         "M143 A2 selects the TemporarySwitchOff action (RRF Heater.cpp ConfigureMonitor)");
             Assert.That(monitor1?.Sensor, Is.EqualTo(0),
                         "M143 T names the sensor the monitor watches (RRF Heater.cpp ConfigureMonitor)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[0].min"), Is.EqualTo(5).Within(0.01),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.Heaters[0]!.Min), Is.EqualTo(5).Within(0.01),
                         "heat.heaters[0].min reports the tooLow monitor limit (RRF Heater.cpp GetLowestTemperatureLimit)");
         });
     }
@@ -611,13 +635,14 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: HeatConfig);
         await bench.Host.ExecuteCodeAsync("M570 H0 P120 T15 R5");
 
+        Heater? heater = await bench.Host.ReadModelAsync(model => model.Heat.Heaters[0]);
         Assert.Multiple(async () =>
         {
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[0].maxHeatingFaultTime"), Is.EqualTo(120).Within(0.01),
+            Assert.That(heater!.MaxHeatingFaultTime, Is.EqualTo(120).Within(0.01),
                         "M570 P sets heat.heaters[0].maxHeatingFaultTime (RRF Heater.cpp ConfigureFaultDetectionParameters)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[0].maxTempExcursion"), Is.EqualTo(15).Within(0.01),
+            Assert.That(heater!.MaxTempExcursion, Is.EqualTo(15).Within(0.01),
                         "M570 T sets heat.heaters[0].maxTempExcursion (RRF Heater.cpp ConfigureFaultDetectionParameters)");
-            Assert.That(await bench.Host.EvaluateAsync("heat.heaters[0].maxBadReadings"), Is.EqualTo(5),
+            Assert.That(heater!.MaxBadReadings, Is.EqualTo(5),
                         "M570 R sets heat.heaters[0].maxBadReadings (RRF Heater.cpp ConfigureFaultDetectionParameters)");
         });
 
@@ -644,7 +669,7 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
         bench.CanMaster.InjectHeatersStatus(srcAddress: 1, heaterNumber: 0, HeaterMode.Fault, currentTemperature: 25.0f);
         await bench.CanMaster.WaitUntilAsync(() => ReadHeater(bench.Host, 0) is { State: HeaterState.Fault },
                                              what: "the fault report reaching the model");
-        Assert.That(await bench.Host.EvaluateRawAsync("heat.heaters[0].state"), Is.EqualTo("fault"),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.Heaters[0]!.State), Is.EqualTo(HeaterState.Fault),
                     "a fault report sets heat.heaters[0].state to fault (RRF Heater.cpp GetStatus)");
 
         string reply = await bench.Host.ExecuteCodeAsync("M562 P0");
@@ -655,7 +680,7 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
         bench.CanMaster.InjectHeatersStatus(srcAddress: 1, heaterNumber: 0, HeaterMode.Off, currentTemperature: 25.0f);
         await bench.CanMaster.WaitUntilAsync(() => ReadHeater(bench.Host, 0) is { State: HeaterState.Off },
                                              what: "the heater leaving the fault state");
-        Assert.That(await bench.Host.EvaluateRawAsync("heat.heaters[0].state"), Is.EqualTo("off"),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.Heaters[0]!.State), Is.EqualTo(HeaterState.Off),
                     "after M562 the heater's state follows the board's report again (RRF RemoteHeater.cpp ResetFault)");
     }
 }

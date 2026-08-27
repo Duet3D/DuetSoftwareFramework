@@ -121,7 +121,8 @@ public class ScheduleMoveEndstopTests : BenchFixture
 
         // The middle motor is already down when the homing move starts, which is a skewed gantry
         bench.CanMaster.InjectInputChange(ScheduleMoveBench.DriverBoard, RemoteEndstops.HandleFor(0, 1), active: true);
-        await bench.Host.WaitForExpressionAsync("sensors.endstops[0].triggered", "true");
+        await bench.Host.WaitForModelAsync(model => model.Sensors.Endstops[0]!.Triggered, true,
+                                           "sensors.endstops[0].triggered");
         Task<string> homing = bench.Host.ExecuteCodeAsync("G1 H1 X-250 F3000");
 
         ScheduledMove move = await WaitForArmedMoveAsync(bench, "the homing move arriving armed");

@@ -225,7 +225,7 @@ public class DeferredPauseTests : BenchFixture
             Assert.That(await bench.Host.GlobalAsync("tfreeRan"), Is.EqualTo(1), "tfree0.g ran once");
             Assert.That(await bench.Host.GlobalAsync("tpreRan"), Is.EqualTo(1), "tpre0.g ran once");
             Assert.That(await bench.Host.GlobalAsync("tpostRan"), Is.EqualTo(1), "tpost0.g ran once");
-            Assert.That(await bench.Host.EvaluateRawAsync("state.currentTool"), Is.EqualTo("0"),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(0),
                         "the job ends with tool 0 selected");
             Assert.That(await bench.Host.GlobalAsync("stopRan"), Is.EqualTo(1), "and finished normally");
             Assert.That(await bench.Host.RestorePointAsync(3), Is.EqualTo((10.0, 10.0)), "at its final position");

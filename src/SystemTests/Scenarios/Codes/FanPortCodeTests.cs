@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using DuetAPI.ObjectModel;
 using NUnit.Framework;
 using SystemTests.Host;
 
@@ -51,27 +52,28 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
     {
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: Fan0Config);
 
-        await Assert.MultipleAsync(async () =>
+        Fan? fan = await bench.Host.ReadModelAsync(model => model.Fans[0]);
+        Assert.Multiple(() =>
         {
-            Assert.That(await bench.Host.EvaluateAsync("fans[0].frequency"), Is.EqualTo(500),
+            Assert.That(fan!.Frequency, Is.EqualTo(500),
                         "M950 F0 Q500 sets fans[0].frequency (Hz, FansManager::ConfigureFanPort)");
-            Assert.That(await bench.Host.EvaluateAsync("fans[0].requestedValue"), Is.Zero,
+            Assert.That(fan!.RequestedValue, Is.Zero,
                         "a new fan starts with fans[0].requestedValue 0 (Fan.cpp constructor)");
-            Assert.That(await bench.Host.EvaluateAsync("fans[0].actualValue"), Is.EqualTo(-1),
+            Assert.That(fan!.ActualValue, Is.EqualTo(-1),
                         "fans[0].actualValue is -1 until the board reports a PWM (RemoteFan.cpp lastPwm)");
-            Assert.That(await bench.Host.EvaluateAsync("fans[0].rpm"), Is.EqualTo(-1),
+            Assert.That(fan!.Rpm, Is.EqualTo(-1),
                         "fans[0].rpm is -1 until the board reports a tacho reading (RemoteFan.cpp lastRpm)");
-            Assert.That(await bench.Host.EvaluateAsync("fans[0].min"), Is.EqualTo(0.1).Within(1e-3),
+            Assert.That(fan!.Min, Is.EqualTo(0.1).Within(1e-3),
                         "fans[0].min defaults to DefaultMinFanPwm 0.1 (Fan.cpp constructor, RRF3Common.h)");
-            Assert.That(await bench.Host.EvaluateAsync("fans[0].max"), Is.EqualTo(1.0).Within(1e-3),
+            Assert.That(fan!.Max, Is.EqualTo(1.0).Within(1e-3),
                         "fans[0].max defaults to 1.0 (Fan.cpp constructor)");
-            Assert.That(await bench.Host.EvaluateAsync("fans[0].blip"), Is.EqualTo(0.1).Within(1e-3),
+            Assert.That(fan!.Blip, Is.EqualTo(0.1).Within(1e-3),
                         "fans[0].blip defaults to 0.1 s (Fan.cpp constructor, DefaultFanBlipTime 100 ms)");
-            Assert.That(await bench.Host.EvaluateRawAsync("fans[0].name"), Is.Empty,
+            Assert.That(fan!.Name, Is.Empty,
                         "a new fan has no fans[0].name (Fan.cpp constructor)");
-            Assert.That(await bench.Host.EvaluateAsync("#fans[0].thermostatic.sensors"), Is.Zero,
+            Assert.That(fan!.Thermostatic.Sensors.Count, Is.Zero,
                         "a new fan monitors no sensors: fans[0].thermostatic.sensors is empty (Fan.cpp constructor)");
-            Assert.That(await bench.Host.EvaluateRawAsync("fans[0].port"), Is.EqualTo("1.out3"),
+            Assert.That(fan!.Port, Is.EqualTo("1.out3"),
                         "M950 F0 C records fans[0].port (DSF addition, rrf-differences.md section 3)");
         });
     }
@@ -88,7 +90,7 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: Fan0Config);
 
         await bench.Host.ExecuteCodeAsync("M950 F0 Q100");
-        Assert.That(await bench.Host.EvaluateAsync("fans[0].frequency"), Is.EqualTo(100),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]!.Frequency), Is.EqualTo(100),
                     "M950 F0 Q100 with no C changes fans[0].frequency (RemoteFan::SetFanParameters)");
     }
 
@@ -106,24 +108,33 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
     {
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: TwoFanConfig);
 
+        Fan? fan0 = await bench.Host.ReadModelAsync(model => model.Fans[0]);
+        Fan? fan1 = await bench.Host.ReadModelAsync(model => model.Fans[1]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.NotNull(fan0);
+            Assert.NotNull(fan1);
+        });
+
         await bench.Host.ExecuteCodeAsync("M106 P0 S0.5");
-        Assert.That(await bench.Host.EvaluateAsync("fans[0].requestedValue"), Is.EqualTo(0.5).Within(1e-3),
+        Assert.That(fan0!.RequestedValue, Is.EqualTo(0.5).Within(1e-3),
                     "M106 S0.5 sets fans[0].requestedValue as a fraction (GCodeBuffer::GetPwmValue)");
 
         await bench.Host.ExecuteCodeAsync("M106 P0 S128");
-        Assert.That(await bench.Host.EvaluateAsync("fans[0].requestedValue"), Is.EqualTo(128.0 / 255.0).Within(1e-3),
+        Assert.That(fan0!.RequestedValue, Is.EqualTo(128.0 / 255.0).Within(1e-3),
                     "M106 S128 sets fans[0].requestedValue to 128/255 (GCodeBuffer::GetPwmValue)");
 
         await bench.Host.ExecuteCodeAsync("M106 P0 S255");
-        Assert.That(await bench.Host.EvaluateAsync("fans[0].requestedValue"), Is.EqualTo(1.0).Within(1e-3),
+        Assert.That(fan0!.RequestedValue, Is.EqualTo(1.0).Within(1e-3),
                     "M106 S255 sets fans[0].requestedValue to 1 (GCodeBuffer::GetPwmValue)");
 
         await bench.Host.ExecuteCodeAsync("M106 P1 S0.75");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(await bench.Host.EvaluateAsync("fans[1].requestedValue"), Is.EqualTo(0.75).Within(1e-3),
+            Assert.That(fan1!.RequestedValue, Is.EqualTo(0.75).Within(1e-3),
                         "M106 P1 S0.75 sets fans[1].requestedValue (GCodes2.cpp case 106)");
-            Assert.That(await bench.Host.EvaluateAsync("fans[0].requestedValue"), Is.EqualTo(1.0).Within(1e-3),
+            Assert.That(fan0!.RequestedValue, Is.EqualTo(1.0).Within(1e-3),
                         "M106 P1 leaves fans[0].requestedValue alone (GCodes2.cpp case 106)");
         });
     }
@@ -144,9 +155,9 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
         await bench.Host.ExecuteCodeAsync("M107");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(await bench.Host.EvaluateAsync("fans[0].requestedValue"), Is.Zero,
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]!.RequestedValue), Is.Zero,
                         "bare M107 with no tool turns off fan 0: fans[0].requestedValue 0 (GCodes.cpp SetMappedFanSpeed)");
-            Assert.That(await bench.Host.EvaluateAsync("fans[1].requestedValue"), Is.EqualTo(0.75).Within(1e-3),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[1]!.RequestedValue), Is.EqualTo(0.75).Within(1e-3),
                         "bare M107 leaves fans[1].requestedValue alone (GCodes2.cpp case 107)");
         });
     }
@@ -168,9 +179,9 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
         await bench.Host.ExecuteCodeAsync("M107 P1");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(await bench.Host.EvaluateAsync("fans[0].requestedValue"), Is.Zero,
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]!.RequestedValue), Is.Zero,
                         "M107 P1 still turns off the mapped fan 0: fans[0].requestedValue 0 (GCodes2.cpp case 107 reads no P)");
-            Assert.That(await bench.Host.EvaluateAsync("fans[1].requestedValue"), Is.EqualTo(0.75).Within(1e-3),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[1]!.RequestedValue), Is.EqualTo(0.75).Within(1e-3),
                         "M107 P1 leaves fans[1].requestedValue alone (GCodes2.cpp case 107 reads no P)");
         });
     }
@@ -194,44 +205,47 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
         await using JobBench bench = await JobControlBench.StartAsync(
             configExtra: Fan0Config + "\nM308 S1 P\"1.temp0\" Y\"thermistor\"");
 
+        Fan? fan = await bench.Host.ReadModelAsync(model => model.Fans[0]);
+
         await bench.Host.ExecuteCodeAsync("M106 P0 H1 T45");
+        FanThermostaticControl thermostatic = fan!.Thermostatic;
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(await bench.Host.EvaluateAsync("#fans[0].thermostatic.sensors"), Is.EqualTo(1),
+            Assert.That(thermostatic!.Sensors.Count, Is.EqualTo(1),
                         "M106 H1 makes fans[0].thermostatic.sensors hold one sensor (Fan.cpp sensorsMonitored)");
-            Assert.That(await bench.Host.EvaluateAsync("fans[0].thermostatic.sensors[0]"), Is.EqualTo(1),
+            Assert.That(thermostatic!.Sensors[0], Is.EqualTo(1),
                         "M106 H1 monitors sensor 1 (Fan.cpp Fan::Configure)");
-            Assert.That(await bench.Host.EvaluateAsync("fans[0].thermostatic.lowTemperature"), Is.EqualTo(45).Within(1e-3),
+            Assert.That(thermostatic!.LowTemperature, Is.EqualTo(45).Within(1e-3),
                         "a single M106 T value pads to fans[0].thermostatic.lowTemperature (Fan.cpp GetFloatArray padding)");
-            Assert.That(await bench.Host.EvaluateAsync("fans[0].thermostatic.highTemperature"), Is.EqualTo(45).Within(1e-3),
+            Assert.That(thermostatic!.HighTemperature, Is.EqualTo(45).Within(1e-3),
                         "a single M106 T value pads to fans[0].thermostatic.highTemperature (Fan.cpp GetFloatArray padding)");
         });
 
         await bench.Host.ExecuteCodeAsync("M106 P0 H1 T40:70 B0.5 L0.25 X0.8 S0.5");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(await bench.Host.EvaluateAsync("fans[0].thermostatic.lowTemperature"), Is.EqualTo(40).Within(1e-3),
+            Assert.That(fan!.Thermostatic.LowTemperature, Is.EqualTo(40).Within(1e-3),
                         "M106 T40:70 sets fans[0].thermostatic.lowTemperature (Fan.cpp triggerTemperatures[0])");
-            Assert.That(await bench.Host.EvaluateAsync("fans[0].thermostatic.highTemperature"), Is.EqualTo(70).Within(1e-3),
+            Assert.That(fan!.Thermostatic.HighTemperature, Is.EqualTo(70).Within(1e-3),
                         "M106 T40:70 sets fans[0].thermostatic.highTemperature (Fan.cpp triggerTemperatures[1])");
-            Assert.That(await bench.Host.EvaluateAsync("fans[0].blip"), Is.EqualTo(0.5).Within(1e-3),
+            Assert.That(fan!.Blip, Is.EqualTo(0.5).Within(1e-3),
                         "M106 B0.5 sets fans[0].blip in seconds (Fan.cpp blipTime)");
-            Assert.That(await bench.Host.EvaluateAsync("fans[0].min"), Is.EqualTo(0.25).Within(1e-3),
+            Assert.That(fan!.Min, Is.EqualTo(0.25).Within(1e-3),
                         "M106 L0.25 sets fans[0].min (Fan.cpp minVal)");
-            Assert.That(await bench.Host.EvaluateAsync("fans[0].max"), Is.EqualTo(0.8).Within(1e-3),
+            Assert.That(fan!.Max, Is.EqualTo(0.8).Within(1e-3),
                         "M106 X0.8 sets fans[0].max (Fan.cpp maxVal)");
-            Assert.That(await bench.Host.EvaluateAsync("fans[0].requestedValue"), Is.EqualTo(0.5).Within(1e-3),
+            Assert.That(fan!.RequestedValue, Is.EqualTo(0.5).Within(1e-3),
                         "M106 S0.5 alongside H is acted on after it: fans[0].requestedValue 0.5 (Fan.cpp, S processed with other parameters)");
         });
 
         await bench.Host.ExecuteCodeAsync("M106 P0 H-1");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(await bench.Host.EvaluateAsync("#fans[0].thermostatic.sensors"), Is.Zero,
+            Assert.That(fan!.Thermostatic.Sensors.Count, Is.Zero,
                         "M106 H-1 clears fans[0].thermostatic.sensors (Fan.cpp sensorsMonitored.Clear)");
-            Assert.That(await bench.Host.EvaluateRawAsync("fans[0].thermostatic.lowTemperature"), Is.EqualTo("null"),
+            Assert.That(fan!.Thermostatic.LowTemperature, Is.Null,
                         "with no monitored sensors fans[0].thermostatic.lowTemperature reads null (Fan.cpp OBJECT_MODEL_FUNC_IF)");
-            Assert.That(await bench.Host.EvaluateRawAsync("fans[0].thermostatic.highTemperature"), Is.EqualTo("null"),
+            Assert.That(fan!.Thermostatic.HighTemperature, Is.Null,
                         "with no monitored sensors fans[0].thermostatic.highTemperature reads null (Fan.cpp OBJECT_MODEL_FUNC_IF)");
         });
     }
@@ -249,7 +263,7 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
             configExtra: Fan0Config + "\nM308 S1 P\"1.temp0\" Y\"thermistor\"");
 
         await bench.Host.ExecuteCodeAsync("M106 P0 H1 T45");
-        Assert.That(await bench.Host.EvaluateAsync("fans[0].requestedValue"), Is.EqualTo(1.0).Within(1e-3),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]!.RequestedValue), Is.EqualTo(1.0).Within(1e-3),
                     "M106 H without S defaults fans[0].requestedValue to full speed (Fan.cpp val = 1.0 for safety)");
     }
 
@@ -262,7 +276,7 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: Fan0Config);
 
         await bench.Host.ExecuteCodeAsync("M106 P0 C\"PartCooler\"");
-        Assert.That(await bench.Host.EvaluateRawAsync("fans[0].name"), Is.EqualTo("PartCooler"),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]!.Name), Is.EqualTo("PartCooler"),
                     "M106 C sets fans[0].name (Fan.cpp Fan::Configure, C parameter)");
     }
 
@@ -278,7 +292,7 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: Fan0Config);
 
         await bench.Host.ExecuteCodeAsync("M106 S100");
-        Assert.That(await bench.Host.EvaluateAsync("fans[0].requestedValue"), Is.EqualTo(100.0 / 255.0).Within(1e-3),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]!.RequestedValue), Is.EqualTo(100.0 / 255.0).Within(1e-3),
                     "bare M106 S100 with no tool drives fan 0: fans[0].requestedValue 100/255 (GCodes.cpp SetMappedFanSpeed)");
     }
 
@@ -298,15 +312,15 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
             configExtra: TwoFanConfig + $"\nM563 P0 D0 F{fanId}");
 
         await bench.Host.ExecuteCodeAsync("T0");
-        Assert.That(await bench.Host.EvaluateAsync("state.currentTool"), Is.Zero,
+        Assert.That(await bench.Host.ReadModelAsync(model => model.State.CurrentTool), Is.Zero,
                     "T0 selects tool 0: state.currentTool 0");
 
         await bench.Host.ExecuteCodeAsync("M106 S200");
-        Assert.That(await bench.Host.EvaluateAsync($"fans[{fanId}].requestedValue"), Is.EqualTo(200.0 / 255.0).Within(1e-3),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[fanId]!.RequestedValue), Is.EqualTo(200.0 / 255.0).Within(1e-3),
                     "bare M106 S200 with tool 0 selected drives its mapped fan (GCodes2.cpp case 106, Tool::SetFansPwm)");
 
         await bench.Host.ExecuteCodeAsync("M107");
-        Assert.That(await bench.Host.EvaluateAsync($"fans[{fanId}].requestedValue"), Is.Zero,
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[fanId]!.RequestedValue), Is.Zero,
                     "bare M107 turns the tool's mapped fan off (GCodes2.cpp case 107)");
     }
 
@@ -325,13 +339,14 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
     {
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: "M950 P0 C\"1.out4\"");
 
+        GpOutputPort? gpOutPort = await bench.Host.ReadModelAsync(model => model.State.GpOut[0]);
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(await bench.Host.EvaluateAsync("state.gpOut[0].freq"), Is.EqualTo(500),
+            Assert.That(gpOutPort!.Freq, Is.EqualTo(500),
                         "M950 P0 without Q defaults state.gpOut[0].freq to DefaultPinWritePwmFreq 500 (GpOutPort.cpp Configure)");
-            Assert.That(await bench.Host.EvaluateAsync("state.gpOut[0].pwm"), Is.Zero,
+            Assert.That(gpOutPort!.Pwm, Is.Zero,
                         "a new output starts with state.gpOut[0].pwm 0");
-            Assert.That(await bench.Host.EvaluateRawAsync("state.gpOut[0].port"), Is.EqualTo("1.out4"),
+            Assert.That(gpOutPort!.Port, Is.EqualTo("1.out4"),
                         "M950 P0 C records state.gpOut[0].port (DSF addition, rrf-differences.md section 3)");
         });
     }
@@ -347,20 +362,22 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
     {
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: "M950 P0 C\"1.out4\"");
 
+        GpOutputPort? gpOut = await bench.Host.ReadModelAsync(model => model.State.GpOut[0]);
+
         await bench.Host.ExecuteCodeAsync("M42 P0 S0.5");
-        Assert.That(await bench.Host.EvaluateAsync("state.gpOut[0].pwm"), Is.EqualTo(0.5).Within(1e-3),
+        Assert.That(gpOut!.Pwm, Is.EqualTo(0.5).Within(1e-3),
                     "M42 S0.5 sets state.gpOut[0].pwm as a fraction (GCodes2.cpp case 42, GetPwmValue)");
 
         await bench.Host.ExecuteCodeAsync("M42 P0 S255");
-        Assert.That(await bench.Host.EvaluateAsync("state.gpOut[0].pwm"), Is.EqualTo(1.0).Within(1e-3),
+        Assert.That(gpOut!.Pwm, Is.EqualTo(1.0).Within(1e-3),
                     "M42 S255 sets state.gpOut[0].pwm to 1 (GetPwmValue scales out of 255)");
 
         await bench.Host.ExecuteCodeAsync("M42 P0 S128");
-        Assert.That(await bench.Host.EvaluateAsync("state.gpOut[0].pwm"), Is.EqualTo(128.0 / 255.0).Within(1e-3),
+        Assert.That(gpOut!.Pwm, Is.EqualTo(128.0 / 255.0).Within(1e-3),
                     "M42 S128 sets state.gpOut[0].pwm to 128/255 (GetPwmValue)");
 
         await bench.Host.ExecuteCodeAsync("M42 P0 S-3");
-        Assert.That(await bench.Host.EvaluateAsync("state.gpOut[0].pwm"), Is.Zero,
+        Assert.That(gpOut!.Pwm, Is.Zero,
                     "M42 with a negative S constrains state.gpOut[0].pwm to 0 (GetPwmValue constrains 0..1)");
     }
 
@@ -373,7 +390,7 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: "M950 P0 C\"1.out4\"");
 
         await bench.Host.ExecuteCodeAsync("M950 P0 Q100");
-        Assert.That(await bench.Host.EvaluateAsync("state.gpOut[0].freq"), Is.EqualTo(100),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.State.GpOut[0]!.Freq), Is.EqualTo(100),
                     "M950 P0 Q100 with no C changes state.gpOut[0].freq (GpOutPort.cpp Configure, frequency-only form)");
     }
 
@@ -388,7 +405,7 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
     {
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: "M950 S0 C\"1.out5\"");
 
-        Assert.That(await bench.Host.EvaluateAsync("state.gpOut[0].freq"), Is.EqualTo(50),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.State.GpOut[0]!.Freq), Is.EqualTo(50),
                     "M950 S0 without Q defaults state.gpOut[0].freq to DefaultServoRefreshFrequency 50 (GpOutPort.cpp Configure)");
     }
 
@@ -409,20 +426,22 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
     {
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: "M950 S0 C\"1.out5\"");
 
+        GpOutputPort? gpOut = await bench.Host.ReadModelAsync(model => model.State.GpOut[0]);
+
         await bench.Host.ExecuteCodeAsync("M280 P0 S90");
-        Assert.That(await bench.Host.EvaluateAsync("state.gpOut[0].pwm"), Is.EqualTo(0.0736).Within(1e-3),
+        Assert.That(gpOut!.Pwm, Is.EqualTo(0.0736).Within(1e-3),
                     "M280 S90 converts the angle to 1472 us and state.gpOut[0].pwm 0.0736 at 50 Hz (GCodes2.cpp case 280)");
 
         await bench.Host.ExecuteCodeAsync("M280 P0 S1000");
-        Assert.That(await bench.Host.EvaluateAsync("state.gpOut[0].pwm"), Is.EqualTo(0.05).Within(1e-3),
+        Assert.That(gpOut!.Pwm, Is.EqualTo(0.05).Within(1e-3),
                     "M280 S1000 is a pulse width in us: state.gpOut[0].pwm 0.05 at 50 Hz (GCodes2.cpp case 280)");
 
         await bench.Host.ExecuteCodeAsync("M280 P0 S3000");
-        Assert.That(await bench.Host.EvaluateAsync("state.gpOut[0].pwm"), Is.EqualTo(0.12).Within(1e-3),
+        Assert.That(gpOut!.Pwm, Is.EqualTo(0.12).Within(1e-3),
                     "M280 S3000 clamps to MaxServoPulseWidth 2400 us: state.gpOut[0].pwm 0.12 (GCodes.h, GCodes2.cpp case 280)");
 
         await bench.Host.ExecuteCodeAsync("M280 P0 S-30");
-        Assert.That(await bench.Host.EvaluateAsync("state.gpOut[0].pwm"), Is.Zero,
+        Assert.That(gpOut!.Pwm, Is.Zero,
                     "M280 with a negative S disables the servo: state.gpOut[0].pwm 0 (GCodes2.cpp case 280)");
     }
 
@@ -444,25 +463,31 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
             configExtra: Fan0Config + "\nM563 P0 D0 F0",
             prepareSd: sd => sd.WriteGCode("job.gcode", "T0\nM106 S0.75\n" + JobControlBench.FillerMoves()));
 
+
         await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
         await bench.CanMaster.WaitUntilAsync(
             () => bench.Host.Model.Fans.Count > 0 && bench.Host.Model.Fans[0] is { RequestedValue: > 0.74f and < 0.76f },
             what: "the job's M106 S0.75 reaching fans[0]");
 
         await bench.Host.ExecuteCodeAsync("M25");
-        await bench.Host.WaitForStatusAsync(DuetAPI.ObjectModel.MachineStatus.Paused);
-        Assert.That(await bench.Host.EvaluateAsync("state.restorePoints[1].fanPwm"), Is.EqualTo(0.75).Within(1e-3),
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+
+        Fan? fan = await bench.Host.ReadModelAsync(model => model.Fans[0]);
+
+#pragma warning disable CS0618
+        Assert.That(await bench.Host.ReadModelAsync(model => model.State.RestorePoints[1].FanPwm), Is.EqualTo(0.75).Within(1e-3),
                     "the pause saves the mapped fan speed in state.restorePoints[1].fanPwm (GCodes.cpp DoPause, RestorePoint.cpp)");
+#pragma warning restore
 
         await bench.Host.ExecuteCodeAsync("M107");
-        Assert.That(await bench.Host.EvaluateAsync("fans[0].requestedValue"), Is.Zero,
+        Assert.That(fan!.RequestedValue, Is.Zero,
                     "M107 turns the mapped fan off before the restore: fans[0].requestedValue 0");
 
         await bench.Host.ExecuteCodeAsync("M106 R1");
-        Assert.That(await bench.Host.EvaluateAsync("fans[0].requestedValue"), Is.EqualTo(0.75).Within(1e-3),
+        Assert.That(fan!.RequestedValue, Is.EqualTo(0.75).Within(1e-3),
                     "M106 R1 restores the saved speed to the mapped fan: fans[0].requestedValue 0.75 (GCodes2.cpp case 106, R parameter)");
 
         await bench.Host.ExecuteCodeAsync("M0");
-        await bench.Host.WaitForStatusAsync(DuetAPI.ObjectModel.MachineStatus.Idle);
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
     }
 }

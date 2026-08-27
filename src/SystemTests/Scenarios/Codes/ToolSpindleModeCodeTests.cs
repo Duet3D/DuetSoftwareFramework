@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Threading.Tasks;
 using DuetControlServer.Heat;
 using DuetControlServer.Link.Protocol.Shared;
+using DuetAPI.ObjectModel;
 using NUnit.Framework;
 using SystemTests.Host;
 
@@ -65,58 +66,62 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
     }
 
     /// <summary>
-    /// Poll an object model expression until it reads the expected number, failing with the last
-    /// observed text on timeout. Used for values that settle after the code's reply
+    /// Poll an object model field until it reads the expected number, failing with the last reading
+    /// on timeout. Used for values that settle after the code's reply
     /// </summary>
-    private static async Task WaitForNumberAsync(DcsTestHost host, string expression, double expected, string what, int timeoutMs = 10_000)
+    private static async Task WaitForNumberAsync(DcsTestHost host,
+                                                 Func<DuetControlServer.Model.ObjectModel, double?> read,
+                                                 double expected, string what, int timeoutMs = 10_000)
     {
         DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-        string text;
+        double? value;
         do
         {
-            text = await host.EvaluateRawAsync(expression);
-            if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double value)
-                && Math.Abs(value - expected) < 1e-3)
+            value = await host.ReadModelAsync(read);
+            if (value is double reading && Math.Abs(reading - expected) < 1e-3)
             {
                 return;
             }
             await Task.Delay(25);
         }
         while (DateTime.UtcNow < deadline);
-        Assert.Fail($"{what}: {expression} reads '{text}', expected {expected}");
+        Assert.Fail($"{what}: reads '{value}', expected {expected}");
     }
 
     /// <summary>
-    /// Read a numeric object model expression, failing the test with the observed text when it
-    /// does not evaluate to a number (a missing field reads as an error message or null)
+    /// Read a numeric object model field, failing the test when the model leaves it null rather
+    /// than letting the assertion that wanted a number report something else
     /// </summary>
-    private static async Task<double> EvaluateNumberAsync(DcsTestHost host, string expression)
+    private static async Task<double> EvaluateNumberAsync(DcsTestHost host,
+                                                          Func<DuetControlServer.Model.ObjectModel, double?> read)
     {
-        string text = await host.EvaluateRawAsync(expression);
-        if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double value))
+        double? value = await host.ReadModelAsync(read);
+        if (value is not double reading)
         {
-            Assert.Fail($"{expression} did not evaluate to a number: '{text}'");
+            Assert.Fail("the object model leaves that field null, so it holds no number");
             return double.NaN;
         }
-        return value;
+        return reading;
     }
 
-    /// <summary>Poll an object model expression until it reads the expected text</summary>
-    private static async Task WaitForTextAsync(DcsTestHost host, string expression, string expected, string what, int timeoutMs = 10_000)
+    /// <summary>Poll an object model field until it reaches the expected value</summary>
+    private static async Task WaitForValueAsync<T>(DcsTestHost host,
+                                                   Func<DuetControlServer.Model.ObjectModel, T> read,
+                                                   T expected, string what, int timeoutMs = 10_000)
     {
         DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-        string text;
+        T value;
         do
         {
-            text = await host.EvaluateRawAsync(expression);
-            if (text == expected)
+            value = await host.ReadModelAsync(read);
+            if (Equals(value, expected))
             {
                 return;
             }
             await Task.Delay(25);
         }
         while (DateTime.UtcNow < deadline);
-        Assert.Fail($"{what}: {expression} reads '{text}', expected '{expected}'");
+        Assert.Fail($"{what}: reads '{value}', expected '{expected}'");
     }
 
     /// <summary>
@@ -135,22 +140,24 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: HeaterToolConfig);
         DcsTestHost host = bench.Host;
 
-        double toolCount = await host.EvaluateAsync("#tools");
-        double number = await host.EvaluateAsync("tools[0].number");
-        string name = await host.EvaluateRawAsync("tools[0].name");
-        double heaterCount = await host.EvaluateAsync("#tools[0].heaters");
-        double heater0 = await host.EvaluateAsync("tools[0].heaters[0]");
-        double extruderCount = await host.EvaluateAsync("#tools[0].extruders");
-        double extruder0 = await host.EvaluateAsync("tools[0].extruders[0]");
-        double fan0 = await host.EvaluateAsync("tools[0].fans[0]");
-        double mix0 = await host.EvaluateAsync("tools[0].mix[0]");
-        double spindle = await host.EvaluateAsync("tools[0].spindle");
-        double spindleRpm = await host.EvaluateAsync("tools[0].spindleRpm");
-        string state = await host.EvaluateRawAsync("tools[0].state");
-        double offsetX = await host.EvaluateAsync("tools[0].offsets[0]");
-        double offsetY = await host.EvaluateAsync("tools[0].offsets[1]");
-        double active0 = await host.EvaluateAsync("tools[0].active[0]");
-        double standby0 = await host.EvaluateAsync("tools[0].standby[0]");
+        Tool? tool = await host.ReadModelAsync(model => model.Tools[0]);
+
+        int toolCount = await host.ReadModelAsync(model => model.Tools.Count);
+        int number = tool!.Number;
+        string name = tool!.Name;
+        int heaterCount = tool!.Heaters.Count;
+        int heater0 = tool!.Heaters[0];
+        int extruderCount = tool!.Extruders.Count;
+        int extruder0 = tool!.Extruders[0];
+        int fan0 = tool!.Fans[0];
+        float mix0 = tool!.Mix[0];
+        int spindle = tool!.Spindle;
+        int spindleRpm = tool!.SpindleRpm;
+        ToolState state = tool!.State;
+        float offsetX = tool!.Offsets[0];
+        float offsetY = tool!.Offsets[1];
+        float active0 = tool!.Active[0];
+        float standby0 = tool!.Standby[0];
 
         Assert.Multiple(() =>
         {
@@ -165,7 +172,7 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
             Assert.That(mix0, Is.EqualTo(1).Within(1e-6), "a new tool's mix starts at 1 (RRF Tool::Create)");
             Assert.That(spindle, Is.EqualTo(-1), "no R parameter leaves tools[0].spindle at -1 (RRF Tool::Create)");
             Assert.That(spindleRpm, Is.EqualTo(0), "a new tool's spindleRpm is 0 (RRF Tool::Create)");
-            Assert.That(state, Is.EqualTo("off"), "a new tool's state is off (RRF Tool::Create ToolState::off)");
+            Assert.That(state, Is.EqualTo(ToolState.Off), "a new tool's state is off (RRF Tool::Create ToolState::off)");
             Assert.That(offsetX, Is.EqualTo(0), "a new tool's X offset is 0 (RRF Tool::Create)");
             Assert.That(offsetY, Is.EqualTo(0), "a new tool's Y offset is 0 (RRF Tool::Create)");
             Assert.That(active0, Is.EqualTo(-273.15).Within(0.1), "a new tool's active temperature is ABS_ZERO (RRF Tool::Create)");
@@ -190,12 +197,14 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
 
         await host.ExecuteCodeAsync("M563 P0 S\"Renamed\"");
 
+        Tool? tool = await host.ReadModelAsync(model => model.Tools[0]);
+
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateAsync("#tools"), Is.EqualTo(1), "the redefined tool still exists (RRF GCodes::ManageTool)");
-            Assert.That(await host.EvaluateRawAsync("tools[0].name"), Is.EqualTo("Renamed"), "M563 S renames tools[0].name (RRF GCodes::ManageTool)");
-            Assert.That(await host.EvaluateAsync("#tools[0].heaters"), Is.EqualTo(0), "a redefinition without H drops tools[0].heaters (RRF GCodes::ManageTool recreates the tool)");
-            Assert.That(await host.EvaluateAsync("#tools[0].extruders"), Is.EqualTo(0), "a redefinition without D drops tools[0].extruders (RRF GCodes::ManageTool recreates the tool)");
+            Assert.That(await host.ReadModelAsync(model => model.Tools.Count), Is.EqualTo(1), "the redefined tool still exists (RRF GCodes::ManageTool)");
+            Assert.That(tool!.Name, Is.EqualTo("Renamed"), "M563 S renames tools[0].name (RRF GCodes::ManageTool)");
+            Assert.That(tool!.Heaters.Count, Is.EqualTo(0), "a redefinition without H drops tools[0].heaters (RRF GCodes::ManageTool recreates the tool)");
+            Assert.That(tool!.Extruders.Count, Is.EqualTo(0), "a redefinition without D drops tools[0].extruders (RRF GCodes::ManageTool recreates the tool)");
         });
     }
 
@@ -212,14 +221,14 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
         DcsTestHost host = bench.Host;
 
         await host.ExecuteCodeAsync("T0");
-        Assert.That(await host.EvaluateAsync("state.currentTool"), Is.EqualTo(0), "T0 selects the tool before the deletion");
+        Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(0), "T0 selects the tool before the deletion");
 
         await host.ExecuteCodeAsync("M563 P0 D-1 H-1");
 
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateAsync("#tools"), Is.EqualTo(0), "M563 P0 D-1 H-1 removes the tool from tools[] (RRF Tool::DeleteTool)");
-            Assert.That(await host.EvaluateAsync("state.currentTool"), Is.EqualTo(-1), "deleting the current tool deselects it (RRF GCodes::ManageTool SelectTool(-1))");
+            Assert.That(await host.ReadModelAsync(model => model.Tools.Count), Is.EqualTo(0), "M563 P0 D-1 H-1 removes the tool from tools[] (RRF Tool::DeleteTool)");
+            Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(-1), "deleting the current tool deselects it (RRF GCodes::ManageTool SelectTool(-1))");
         });
     }
 
@@ -233,7 +242,7 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
         DcsTestHost host = bench.Host;
 
         string reply = (await host.ExecuteCodeAsync("M563 P0")).Trim();
-        string name = await host.EvaluateRawAsync("tools[0].name");
+        string name = await host.ReadModelAsync(model => model.Tools[0]!.Name);
 
         Assert.Multiple(() =>
         {
@@ -260,7 +269,7 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateAsync("state.currentTool"), Is.EqualTo(0), "T0 sets state.currentTool (RRF MovementState::SelectTool)");
+            Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(0), "T0 sets state.currentTool (RRF MovementState::SelectTool)");
             Assert.That(replySelected, Is.EqualTo("Tool 0 is selected"), "bare T reports the selected tool (RRF GCodes::HandleTcode)");
         });
     }
@@ -282,23 +291,23 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
         await host.ExecuteCodeAsync("T0");
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateAsync("state.currentTool"), Is.EqualTo(0), "T0 sets state.currentTool to 0 (RRF MovementState::SelectTool)");
-            Assert.That(await host.EvaluateRawAsync("tools[0].state"), Is.EqualTo("active"), "T0 activates tool 0 (RRF Tool::Activate)");
+            Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(0), "T0 sets state.currentTool to 0 (RRF MovementState::SelectTool)");
+            Assert.That(await host.ReadModelAsync(model => model.Tools[0]!.State), Is.EqualTo(ToolState.Active), "T0 activates tool 0 (RRF Tool::Activate)");
         });
 
         await host.ExecuteCodeAsync("T1");
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateAsync("state.currentTool"), Is.EqualTo(1), "T1 sets state.currentTool to 1 (RRF MovementState::SelectTool)");
-            Assert.That(await host.EvaluateRawAsync("tools[0].state"), Is.EqualTo("standby"), "the outgoing tool goes to standby (RRF Tool::Standby)");
-            Assert.That(await host.EvaluateRawAsync("tools[1].state"), Is.EqualTo("active"), "the incoming tool becomes active (RRF Tool::Activate)");
+            Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(1), "T1 sets state.currentTool to 1 (RRF MovementState::SelectTool)");
+            Assert.That(await host.ReadModelAsync(model => model.Tools[0]!.State), Is.EqualTo(ToolState.Standby), "the outgoing tool goes to standby (RRF Tool::Standby)");
+            Assert.That(await host.ReadModelAsync(model => model.Tools[1]!.State), Is.EqualTo(ToolState.Active), "the incoming tool becomes active (RRF Tool::Activate)");
         });
 
         await host.ExecuteCodeAsync("T-1");
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateAsync("state.currentTool"), Is.EqualTo(-1), "T-1 deselects the tool (RRF MovementState::SelectTool)");
-            Assert.That(await host.EvaluateRawAsync("tools[1].state"), Is.EqualTo("standby"), "a deselected tool goes to standby (RRF Tool::Standby)");
+            Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(-1), "T-1 deselects the tool (RRF MovementState::SelectTool)");
+            Assert.That(await host.ReadModelAsync(model => model.Tools[1]!.State), Is.EqualTo(ToolState.Standby), "a deselected tool goes to standby (RRF Tool::Standby)");
         });
     }
 
@@ -323,7 +332,7 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
             Assert.That(await host.GlobalAsync("tfree0At"), Is.EqualTo(0), "no tfree runs when no tool was selected (RRF toolChange0)");
             Assert.That(await host.GlobalAsync("tpre0At"), Is.EqualTo(1), "tpre0 runs first (RRF toolChange1)");
             Assert.That(await host.GlobalAsync("tpost0At"), Is.EqualTo(2), "tpost0 runs after tpre0 (RRF toolChange2)");
-            Assert.That(await host.EvaluateAsync("state.currentTool"), Is.EqualTo(0), "the change ends with tool 0 selected");
+            Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(0), "the change ends with tool 0 selected");
         });
 
         await host.ExecuteCodeAsync("T1");
@@ -333,7 +342,7 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
             Assert.That(await host.GlobalAsync("tfree0At"), Is.EqualTo(3), "tfree of the old tool runs first (RRF toolChange0)");
             Assert.That(await host.GlobalAsync("tpre1At"), Is.EqualTo(4), "tpre of the new tool runs second (RRF toolChange1)");
             Assert.That(await host.GlobalAsync("tpost1At"), Is.EqualTo(5), "tpost of the new tool runs last (RRF toolChange2)");
-            Assert.That(await host.EvaluateAsync("state.currentTool"), Is.EqualTo(1), "the change ends with tool 1 selected");
+            Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(1), "the change ends with tool 1 selected");
         });
 
         await host.ExecuteCodeAsync("T-1");
@@ -341,7 +350,7 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
         {
             Assert.That(await host.GlobalAsync("toolSeq"), Is.EqualTo(6), "T-1 runs one macro (RRF toolChange0..2, no new tool)");
             Assert.That(await host.GlobalAsync("tfree1At"), Is.EqualTo(6), "T-1 runs tfree of the old tool (RRF toolChange0)");
-            Assert.That(await host.EvaluateAsync("state.currentTool"), Is.EqualTo(-1), "T-1 deselects the tool");
+            Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(-1), "T-1 deselects the tool");
         });
     }
 
@@ -363,7 +372,7 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
         Assert.Multiple(async () =>
         {
             Assert.That(await host.GlobalAsync("toolSeq"), Is.EqualTo(0), "T0 P0 runs no tool change macro (RRF toolChangeParam)");
-            Assert.That(await host.EvaluateAsync("state.currentTool"), Is.EqualTo(0), "T0 P0 still selects the tool (RRF MovementState::SelectTool)");
+            Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(0), "T0 P0 still selects the tool (RRF MovementState::SelectTool)");
         });
 
         await host.ExecuteCodeAsync("T1 P1");
@@ -373,7 +382,7 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
             Assert.That(await host.GlobalAsync("tfree0At"), Is.EqualTo(1), "P1 keeps tfree of the old tool (RRF TFreeBit)");
             Assert.That(await host.GlobalAsync("tpre1At"), Is.EqualTo(0), "P1 suppresses tpre (RRF TPreBit)");
             Assert.That(await host.GlobalAsync("tpost1At"), Is.EqualTo(0), "P1 suppresses tpost (RRF TPostBit)");
-            Assert.That(await host.EvaluateAsync("state.currentTool"), Is.EqualTo(1), "T1 P1 still selects the tool");
+            Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(1), "T1 P1 still selects the tool");
         });
     }
 
@@ -393,14 +402,16 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
         DcsTestHost host = bench.Host;
 
         await host.ExecuteCodeAsync("T0");
-        Assert.That(await host.EvaluateAsync("state.currentTool"), Is.EqualTo(0), "T0 selected the tool");
+        Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(0), "T0 selected the tool");
 
         await host.ExecuteCodeAsync("T R1");
         Assert.Multiple(async () =>
         {
-            Assert.That(await EvaluateNumberAsync(host, "state.restorePoints[1].toolNumber"), Is.EqualTo(-1),
+#pragma warning disable CS0618
+            Assert.That(await EvaluateNumberAsync(host, model => model.State.RestorePoints[1].ToolNumber), Is.EqualTo(-1),
                         "no pause has recorded a tool (RRF RestorePoint::Init)");
-            Assert.That(await host.EvaluateAsync("state.currentTool"), Is.EqualTo(-1),
+#pragma warning restore
+            Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(-1),
                         "T R1 selects restorePoints[1].toolNumber, which is -1 (RRF GCodes::HandleTcode)");
         });
     }
@@ -424,15 +435,15 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateAsync("tools[0].mix[0]"), Is.EqualTo(1).Within(1e-6), "the initial mix is 1:0 (RRF Tool::Create)");
-            Assert.That(await host.EvaluateAsync("tools[0].mix[1]"), Is.EqualTo(0).Within(1e-6), "the initial mix is 1:0 (RRF Tool::Create)");
+            Assert.That(await host.ReadModelAsync(model => model.Tools[0]!.Mix[0]), Is.EqualTo(1).Within(1e-6), "the initial mix is 1:0 (RRF Tool::Create)");
+            Assert.That(await host.ReadModelAsync(model => model.Tools[0]!.Mix[1]), Is.EqualTo(0).Within(1e-6), "the initial mix is 1:0 (RRF Tool::Create)");
         });
 
         await host.ExecuteCodeAsync("M567 P0 E0.6:0.4");
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateAsync("tools[0].mix[0]"), Is.EqualTo(0.6).Within(1e-6), "M567 E sets tools[0].mix[0] (RRF Tool::DefineMix)");
-            Assert.That(await host.EvaluateAsync("tools[0].mix[1]"), Is.EqualTo(0.4).Within(1e-6), "M567 E sets tools[0].mix[1] (RRF Tool::DefineMix)");
+            Assert.That(await host.ReadModelAsync(model => model.Tools[0]!.Mix[0]), Is.EqualTo(0.6).Within(1e-6), "M567 E sets tools[0].mix[0] (RRF Tool::DefineMix)");
+            Assert.That(await host.ReadModelAsync(model => model.Tools[0]!.Mix[1]), Is.EqualTo(0.4).Within(1e-6), "M567 E sets tools[0].mix[1] (RRF Tool::DefineMix)");
         });
 
         string reply = (await host.ExecuteCodeAsync("M567 P0")).Trim();
@@ -460,24 +471,24 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
         await host.ExecuteCodeAsync("M568 P0 S210 R180");
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateAsync("tools[0].active[0]"), Is.EqualTo(210), "M568 S sets tools[0].active (RRF SetToolHeaterActiveTemperature)");
-            Assert.That(await host.EvaluateAsync("tools[0].standby[0]"), Is.EqualTo(180), "M568 R sets tools[0].standby (RRF SetToolHeaterStandbyTemperature)");
-            Assert.That(await host.EvaluateAsync("heat.heaters[0].active"), Is.EqualTo(210), "the tool temperature reaches the heater setpoint (RRF Heat::SetTemperature)");
-            Assert.That(await host.EvaluateAsync("heat.heaters[0].standby"), Is.EqualTo(180), "the tool temperature reaches the heater setpoint (RRF Heat::SetTemperature)");
+            Assert.That(await host.ReadModelAsync(model => model.Tools[0]!.Active[0]), Is.EqualTo(210), "M568 S sets tools[0].active (RRF SetToolHeaterActiveTemperature)");
+            Assert.That(await host.ReadModelAsync(model => model.Tools[0]!.Standby[0]), Is.EqualTo(180), "M568 R sets tools[0].standby (RRF SetToolHeaterStandbyTemperature)");
+            Assert.That(await host.ReadModelAsync(model => model.Heat.Heaters[0]!.Active), Is.EqualTo(210), "the tool temperature reaches the heater setpoint (RRF Heat::SetTemperature)");
+            Assert.That(await host.ReadModelAsync(model => model.Heat.Heaters[0]!.Standby), Is.EqualTo(180), "the tool temperature reaches the heater setpoint (RRF Heat::SetTemperature)");
         });
 
         await host.ExecuteCodeAsync("M568 P0 A2");
         bench.CanMaster.InjectHeatersStatus(srcAddress: 1, heaterNumber: 0, HeaterMode.Heating, currentTemperature: 30.0f);
-        await WaitForTextAsync(host, "heat.heaters[0].state", "active",
+        await WaitForValueAsync(host, model => model.Heat.Heaters[0]!.State, HeaterState.Active,
                                "M568 A2 puts the heater in active (RRF Tool::HeatersToActiveOrStandby, Heater::GetStatus)");
 
         await host.ExecuteCodeAsync("M568 P0 A1");
-        await WaitForTextAsync(host, "heat.heaters[0].state", "standby",
+        await WaitForValueAsync(host, model => model.Heat.Heaters[0]!.State, HeaterState.Standby,
                                "M568 A1 puts the heater in standby (RRF Tool::HeatersToActiveOrStandby, Heater::GetStatus)");
 
         await host.ExecuteCodeAsync("M568 P0 A0");
         bench.CanMaster.InjectHeatersStatus(srcAddress: 1, heaterNumber: 0, HeaterMode.Off, currentTemperature: 30.0f);
-        await WaitForTextAsync(host, "heat.heaters[0].state", "off",
+        await WaitForValueAsync(host, model => model.Heat.Heaters[0]!.State, HeaterState.Off,
                                "M568 A0 switches the heater off (RRF Tool::HeatersToOff, Heater::GetStatus)");
 
         string reply = (await host.ExecuteCodeAsync("M568 P0")).Trim();
@@ -503,8 +514,8 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
         await host.ExecuteCodeAsync("G10 P0 X5 Y-2");
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateAsync("tools[0].offsets[0]"), Is.EqualTo(5).Within(1e-6), "G10 X sets tools[0].offsets[0] (RRF Tool::SetOffset)");
-            Assert.That(await host.EvaluateAsync("tools[0].offsets[1]"), Is.EqualTo(-2).Within(1e-6), "G10 Y sets tools[0].offsets[1] (RRF Tool::SetOffset)");
+            Assert.That(await host.ReadModelAsync(model => model.Tools[0]!.Offsets[0]), Is.EqualTo(5).Within(1e-6), "G10 X sets tools[0].offsets[0] (RRF Tool::SetOffset)");
+            Assert.That(await host.ReadModelAsync(model => model.Tools[0]!.Offsets[1]), Is.EqualTo(-2).Within(1e-6), "G10 Y sets tools[0].offsets[1] (RRF Tool::SetOffset)");
         });
 
         string reply = (await host.ExecuteCodeAsync("G10 P0")).Trim();
@@ -531,10 +542,10 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
         await host.ExecuteCodeAsync("G10 P0 S200 R150");
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateAsync("tools[0].active[0]"), Is.EqualTo(200), "G10 S sets tools[0].active (RRF SetOrReportOffsets code 10)");
-            Assert.That(await host.EvaluateAsync("tools[0].standby[0]"), Is.EqualTo(150), "G10 R sets tools[0].standby (RRF SetOrReportOffsets code 10)");
-            Assert.That(await host.EvaluateAsync("heat.heaters[0].active"), Is.EqualTo(200), "the G10 temperature reaches the heater setpoint (RRF Heat::SetTemperature)");
-            Assert.That(await host.EvaluateAsync("heat.heaters[0].standby"), Is.EqualTo(150), "the G10 temperature reaches the heater setpoint (RRF Heat::SetTemperature)");
+            Assert.That(await host.ReadModelAsync(model => model.Tools[0]!.Active[0]), Is.EqualTo(200), "G10 S sets tools[0].active (RRF SetOrReportOffsets code 10)");
+            Assert.That(await host.ReadModelAsync(model => model.Tools[0]!.Standby[0]), Is.EqualTo(150), "G10 R sets tools[0].standby (RRF SetOrReportOffsets code 10)");
+            Assert.That(await host.ReadModelAsync(model => model.Heat.Heaters[0]!.Active), Is.EqualTo(200), "the G10 temperature reaches the heater setpoint (RRF Heat::SetTemperature)");
+            Assert.That(await host.ReadModelAsync(model => model.Heat.Heaters[0]!.Standby), Is.EqualTo(150), "the G10 temperature reaches the heater setpoint (RRF Heat::SetTemperature)");
         });
     }
 
@@ -555,20 +566,21 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
         DcsTestHost host = bench.Host;
 
         await host.ExecuteCodeAsync("M950 R0 C\"1.out6\"");
+        Spindle? spindle = await host.ReadModelAsync(model => model.Spindles[0]);
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateRawAsync("spindles[0].state"), Is.EqualTo("stopped"), "M950 R moves the spindle to stopped (RRF Spindle::Configure)");
-            Assert.That(await host.EvaluateAsync("spindles[0].active"), Is.EqualTo(0), "a new spindle's configured RPM is 0 (RRF Spindle constructor)");
-            Assert.That(await host.EvaluateAsync("spindles[0].current"), Is.EqualTo(0), "a new spindle's current RPM is 0 (RRF Spindle constructor)");
-            Assert.That(await host.EvaluateAsync("spindles[0].min"), Is.EqualTo(60), "spindles[0].min defaults to DefaultMinSpindleRpm (RRF Configuration.h)");
-            Assert.That(await host.EvaluateAsync("spindles[0].max"), Is.EqualTo(10000), "spindles[0].max defaults to DefaultMaxSpindleRpm (RRF Configuration.h)");
+            Assert.That(spindle!.State, Is.EqualTo(SpindleState.Stopped), "M950 R moves the spindle to stopped (RRF Spindle::Configure)");
+            Assert.That(spindle!.Active, Is.EqualTo(0), "a new spindle's configured RPM is 0 (RRF Spindle constructor)");
+            Assert.That(spindle!.Current, Is.EqualTo(0), "a new spindle's current RPM is 0 (RRF Spindle constructor)");
+            Assert.That(spindle!.Min, Is.EqualTo(60), "spindles[0].min defaults to DefaultMinSpindleRpm (RRF Configuration.h)");
+            Assert.That(spindle!.Max, Is.EqualTo(10000), "spindles[0].max defaults to DefaultMaxSpindleRpm (RRF Configuration.h)");
         });
 
         await host.ExecuteCodeAsync("M950 R0 L4000:12000");
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateAsync("spindles[0].min"), Is.EqualTo(4000), "M950 L with two values sets spindles[0].min (RRF Spindle::Configure)");
-            Assert.That(await host.EvaluateAsync("spindles[0].max"), Is.EqualTo(12000), "M950 L with two values sets spindles[0].max (RRF Spindle::Configure)");
+            Assert.That(await host.ReadModelAsync(model => model.Spindles[0]!.Min), Is.EqualTo(4000), "M950 L with two values sets spindles[0].min (RRF Spindle::Configure)");
+            Assert.That(await host.ReadModelAsync(model => model.Spindles[0]!.Max), Is.EqualTo(12000), "M950 L with two values sets spindles[0].max (RRF Spindle::Configure)");
         });
 
         string reply = (await host.ExecuteCodeAsync("M950 R0")).Trim();
@@ -596,27 +608,30 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
         DcsTestHost host = bench.Host;
 
         await host.ExecuteCodeAsync("M3 P0 S5000");
+        Spindle? spindle = await host.ReadModelAsync(model => model.Spindles[0]);
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateRawAsync("spindles[0].state"), Is.EqualTo("forward"), "M3 sets spindles[0].state to forward (RRF GCodes2.cpp M3 case)");
-            Assert.That(await host.EvaluateAsync("spindles[0].active"), Is.EqualTo(5000), "M3 S sets spindles[0].active (RRF Spindle::SetConfiguredRpm)");
-            Assert.That(await host.EvaluateAsync("spindles[0].current"), Is.EqualTo(5000), "the state change applies the RPM to spindles[0].current (RRF Spindle::SetRpm)");
+            Assert.That(spindle!.State, Is.EqualTo(SpindleState.Forward), "M3 sets spindles[0].state to forward (RRF GCodes2.cpp M3 case)");
+            Assert.That(spindle!.Active, Is.EqualTo(5000), "M3 S sets spindles[0].active (RRF Spindle::SetConfiguredRpm)");
+            Assert.That(spindle!.Current, Is.EqualTo(5000), "the state change applies the RPM to spindles[0].current (RRF Spindle::SetRpm)");
         });
 
         await host.ExecuteCodeAsync("M4 P0 S6000");
+        spindle = await host.ReadModelAsync(model => model.Spindles[0]);
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateRawAsync("spindles[0].state"), Is.EqualTo("reverse"), "M4 sets spindles[0].state to reverse (RRF GCodes2.cpp M4 case)");
-            Assert.That(await host.EvaluateAsync("spindles[0].active"), Is.EqualTo(6000), "M4 S sets spindles[0].active (RRF Spindle::SetConfiguredRpm)");
-            Assert.That(await host.EvaluateAsync("spindles[0].current"), Is.EqualTo(6000), "the state change applies the RPM to spindles[0].current (RRF Spindle::SetRpm)");
+            Assert.That(spindle!.State, Is.EqualTo(SpindleState.Reverse), "M4 sets spindles[0].state to reverse (RRF GCodes2.cpp M4 case)");
+            Assert.That(spindle!.Active, Is.EqualTo(6000), "M4 S sets spindles[0].active (RRF Spindle::SetConfiguredRpm)");
+            Assert.That(spindle!.Current, Is.EqualTo(6000), "the state change applies the RPM to spindles[0].current (RRF Spindle::SetRpm)");
         });
 
         await host.ExecuteCodeAsync("M5");
+        spindle = await host.ReadModelAsync(model => model.Spindles[0]);
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateRawAsync("spindles[0].state"), Is.EqualTo("stopped"), "M5 without P stops every configured spindle (RRF GCodes2.cpp M5 case)");
-            Assert.That(await host.EvaluateAsync("spindles[0].current"), Is.EqualTo(0), "a stopped spindle's current RPM is 0 (RRF Spindle::SetRpm)");
-            Assert.That(await host.EvaluateAsync("spindles[0].active"), Is.EqualTo(6000), "M5 keeps the configured RPM in spindles[0].active (RRF Spindle::SetState)");
+            Assert.That(spindle!.State, Is.EqualTo(SpindleState.Stopped), "M5 without P stops every configured spindle (RRF GCodes2.cpp M5 case)");
+            Assert.That(spindle!.Current, Is.EqualTo(0), "a stopped spindle's current RPM is 0 (RRF Spindle::SetRpm)");
+            Assert.That(spindle!.Active, Is.EqualTo(6000), "M5 keeps the configured RPM in spindles[0].active (RRF Spindle::SetState)");
         });
 
         string reply = (await host.ExecuteCodeAsync("M3 S5000")).Trim();
@@ -641,38 +656,39 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: SpindleCncConfig + "\nM563 P0 S\"Cutter\" R0\n");
         DcsTestHost host = bench.Host;
 
-        Assert.That(await host.EvaluateAsync("tools[0].spindle"), Is.EqualTo(0), "M563 R0 sets tools[0].spindle (RRF GCodes::ManageTool)");
+        Assert.That(await host.ReadModelAsync(model => model.Tools[0]!.Spindle), Is.EqualTo(0), "M563 R0 sets tools[0].spindle (RRF GCodes::ManageTool)");
 
         await host.ExecuteCodeAsync("T0");
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateRawAsync("spindles[0].state"), Is.EqualTo("stopped"), "selecting a spindle tool stops the spindle (RRF Tool::Activate)");
-            Assert.That(await host.EvaluateAsync("spindles[0].active"), Is.EqualTo(0), "selecting restores the tool's configured RPM, still 0 (RRF Tool::Activate)");
+            Assert.That(await host.ReadModelAsync(model => model.Spindles[0]!.State), Is.EqualTo(SpindleState.Stopped), "selecting a spindle tool stops the spindle (RRF Tool::Activate)");
+            Assert.That(await host.ReadModelAsync(model => model.Spindles[0]!.Active), Is.EqualTo(0), "selecting restores the tool's configured RPM, still 0 (RRF Tool::Activate)");
         });
 
         await host.ExecuteCodeAsync("M3 S5000");
+        Spindle? spindle = await host.ReadModelAsync(model => model.Spindles[0]);
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateAsync("tools[0].spindleRpm"), Is.EqualTo(5000), "M3 S on the current tool sets tools[0].spindleRpm (RRF Tool::SetSpindleRpm)");
-            Assert.That(await host.EvaluateAsync("spindles[0].active"), Is.EqualTo(5000), "the tool RPM reaches spindles[0].active (RRF Spindle::SetConfiguredRpm)");
-            Assert.That(await host.EvaluateRawAsync("spindles[0].state"), Is.EqualTo("forward"), "M3 runs the spindle forward (RRF GCodes2.cpp M3 case)");
-            Assert.That(await host.EvaluateAsync("spindles[0].current"), Is.EqualTo(5000), "the running spindle turns at the set RPM (RRF Spindle::SetRpm)");
+            Assert.That(await host.ReadModelAsync(model => model.Tools[0]!.SpindleRpm), Is.EqualTo(5000), "M3 S on the current tool sets tools[0].spindleRpm (RRF Tool::SetSpindleRpm)");
+            Assert.That(spindle!.Active, Is.EqualTo(5000), "the tool RPM reaches spindles[0].active (RRF Spindle::SetConfiguredRpm)");
+            Assert.That(spindle!.State, Is.EqualTo(SpindleState.Forward), "M3 runs the spindle forward (RRF GCodes2.cpp M3 case)");
+            Assert.That(spindle!.Current, Is.EqualTo(5000), "the running spindle turns at the set RPM (RRF Spindle::SetRpm)");
         });
 
         await host.ExecuteCodeAsync("M568 P0 F3000");
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateAsync("tools[0].spindleRpm"), Is.EqualTo(3000), "M568 F sets tools[0].spindleRpm (RRF SetOrReportOffsets code 568)");
-            Assert.That(await host.EvaluateAsync("spindles[0].active"), Is.EqualTo(3000), "M568 F on the current tool updates spindles[0].active (RRF Tool::SetSpindleRpm)");
-            Assert.That(await host.EvaluateAsync("spindles[0].current"), Is.EqualTo(3000), "the running spindle follows the new RPM (RRF Spindle::SetConfiguredRpm with updateCurrentRpm)");
+            Assert.That(await host.ReadModelAsync(model => model.Tools[0]!.SpindleRpm), Is.EqualTo(3000), "M568 F sets tools[0].spindleRpm (RRF SetOrReportOffsets code 568)");
+            Assert.That(await host.ReadModelAsync(model => model.Spindles[0]!.Active), Is.EqualTo(3000), "M568 F on the current tool updates spindles[0].active (RRF Tool::SetSpindleRpm)");
+            Assert.That(await host.ReadModelAsync(model => model.Spindles[0]!.Current), Is.EqualTo(3000), "the running spindle follows the new RPM (RRF Spindle::SetConfiguredRpm with updateCurrentRpm)");
         });
 
         await host.ExecuteCodeAsync("T-1");
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateRawAsync("spindles[0].state"), Is.EqualTo("stopped"), "deselecting a spindle tool stops the spindle (RRF Tool::Standby)");
-            Assert.That(await host.EvaluateAsync("spindles[0].current"), Is.EqualTo(0), "a stopped spindle's current RPM is 0 (RRF Spindle::SetRpm)");
-            Assert.That(await host.EvaluateAsync("tools[0].spindleRpm"), Is.EqualTo(3000), "the tool keeps its RPM for the next selection (RRF Tool::Standby)");
+            Assert.That(await host.ReadModelAsync(model => model.Spindles[0]!.State), Is.EqualTo(SpindleState.Stopped), "deselecting a spindle tool stops the spindle (RRF Tool::Standby)");
+            Assert.That(await host.ReadModelAsync(model => model.Spindles[0]!.Current), Is.EqualTo(0), "a stopped spindle's current RPM is 0 (RRF Spindle::SetRpm)");
+            Assert.That(await host.ReadModelAsync(model => model.Tools[0]!.SpindleRpm), Is.EqualTo(3000), "the tool keeps its RPM for the next selection (RRF Tool::Standby)");
         });
     }
 
@@ -693,19 +709,19 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateRawAsync("state.machineMode"), Is.EqualTo("FFF"), "the machine starts in FFF mode (RRF MachineType::fff default)");
+            Assert.That(await host.ReadModelAsync(model => model.State.MachineMode), Is.EqualTo(MachineMode.FFF), "the machine starts in FFF mode (RRF MachineType::fff default)");
             Assert.That((await host.ExecuteCodeAsync("M450")).Trim(), Is.EqualTo("PrinterMode:FFF"), "M450 reports the mode (RRF GCodes2.cpp M450 case)");
         });
 
         await host.ExecuteCodeAsync("M453");
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateRawAsync("state.machineMode"), Is.EqualTo("CNC"), "M453 sets state.machineMode to CNC (RRF GCodes2.cpp M453 case)");
+            Assert.That(await host.ReadModelAsync(model => model.State.MachineMode), Is.EqualTo(MachineMode.CNC), "M453 sets state.machineMode to CNC (RRF GCodes2.cpp M453 case)");
             Assert.That((await host.ExecuteCodeAsync("M450")).Trim(), Is.EqualTo("PrinterMode:CNC"), "M450 reports the new mode (RRF GCodes2.cpp M450 case)");
         });
 
         await host.ExecuteCodeAsync("M451");
-        Assert.That(await host.EvaluateRawAsync("state.machineMode"), Is.EqualTo("FFF"),
+        Assert.That(await host.ReadModelAsync(model => model.State.MachineMode), Is.EqualTo(MachineMode.FFF),
                     "M451 sets state.machineMode back to FFF (RRF GCodes2.cpp M451 case)");
     }
 
@@ -729,22 +745,22 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
         await host.ExecuteCodeAsync("M452 S1");
         Assert.Multiple(async () =>
         {
-            Assert.That(await host.EvaluateRawAsync("state.machineMode"), Is.EqualTo("Laser"), "M452 sets state.machineMode to Laser (RRF GCodes2.cpp M452 case)");
-            Assert.That(await EvaluateNumberAsync(host, "state.laserPwm"), Is.EqualTo(0).Within(1e-3), "laser mode starts with the beam off (RRF GCodes::GetLaserPwm)");
+            Assert.That(await host.ReadModelAsync(model => model.State.MachineMode), Is.EqualTo(MachineMode.Laser), "M452 sets state.machineMode to Laser (RRF GCodes2.cpp M452 case)");
+            Assert.That(await EvaluateNumberAsync(host, model => model.State.LaserPwm), Is.EqualTo(0).Within(1e-3), "laser mode starts with the beam off (RRF GCodes::GetLaserPwm)");
         });
 
         await host.ExecuteCodeAsync("M3 S255");
-        Assert.That(await EvaluateNumberAsync(host, "state.laserPwm"), Is.EqualTo(0).Within(1e-3),
+        Assert.That(await EvaluateNumberAsync(host, model => model.State.LaserPwm), Is.EqualTo(0).Within(1e-3),
                     "M3 S alone does not fire the beam; the power applies to moves (RRF M3 laser branch, DoStraightMove)");
 
         await host.ExecuteCodeAsync("G91");
         await host.ExecuteCodeAsync("G1 X1 F6000");
-        await WaitForNumberAsync(host, "state.laserPwm", 1.0,
+        await WaitForNumberAsync(host, model => model.State.LaserPwm, 1.0,
                                  "the move carries M3's sticky power, 255 of 255 (RRF DoStraightMove, GCodes::GetLaserPwm)");
 
         await host.ExecuteCodeAsync("M5");
         await host.ExecuteCodeAsync("G1 X1 F6000");
-        await WaitForNumberAsync(host, "state.laserPwm", 0.0,
+        await WaitForNumberAsync(host, model => model.State.LaserPwm, 0.0,
                                  "M5 clears the laser power for later moves (RRF M5 laser branch)");
     }
 }

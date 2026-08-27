@@ -41,7 +41,7 @@ public class CancelRestartTests : BenchFixture
         {
             Assert.That(await bench.Host.GlobalAsync("cancelRan"), Is.EqualTo(1), "cancel.g ran");
             Assert.That(await bench.Host.GlobalAsync("stopRan"), Is.Zero, "stop.g did not: cancel.g exists");
-            Assert.That(await bench.Host.EvaluateRawAsync("job.lastFileCancelled"), Is.EqualTo("true"),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Job.LastFileCancelled), Is.True,
                         "the job records itself as cancelled");
             Assert.That(await bench.Host.GlobalAsync("after25"), Is.Zero,
                         "nothing after the pause point ran: the file is closed");
@@ -71,7 +71,7 @@ public class CancelRestartTests : BenchFixture
         {
             Assert.That(await bench.Host.GlobalAsync("stopRan"), Is.EqualTo(1),
                         "stop.g ran as the fallback for the missing cancel.g");
-            Assert.That(await bench.Host.EvaluateRawAsync("job.lastFileCancelled"), Is.EqualTo("true"),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Job.LastFileCancelled), Is.True,
                         "the job still records itself as cancelled");
         });
     }

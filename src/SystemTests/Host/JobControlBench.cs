@@ -1,7 +1,9 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
+using NUnit.Framework;
 
 namespace SystemTests.Host;
 
@@ -140,22 +142,92 @@ internal static class JobControlBench
         return moves.Append("G90\n").ToString();
     }
 
-    /// <summary>Read an object model expression through the G-code interpreter, as its echoed text</summary>
-    public static async Task<string> EvaluateRawAsync(this DcsTestHost host, string expression)
-        => (await host.ExecuteCodeAsync($"echo {expression}")).Trim();
+    /// <summary>
+    /// Start a job control bench whose motion timeline the test drives, rather than one that runs
+    /// against the wall clock. The caller owns the timeline and must dispose it after the bench
+    /// </summary>
+    /// <param name="timeline">The timeline to run the controller's clock from</param>
+    /// <param name="configExtra">Extra configuration lines, e.g. per-scenario globals</param>
+    /// <param name="prepareSd">Populates the rest of the virtual SD card, typically the job file</param>
+    public static async Task<JobBench> StartSteppedAsync(SteppedTimeline timeline, string configExtra = "",
+                                                         Action<VirtualSd>? prepareSd = null)
+    {
+        ScriptedCanMaster canMaster = new(SocketPath(), timeline.Clock);
+        canMaster.AckCanRequestsWithStandardReplies();
+        DcsTestHost host;
+        try
+        {
+            host = await DcsTestHost.StartAsync(canMaster, sd =>
+            {
+                WriteSystemFiles(sd, configExtra);
+                prepareSd?.Invoke(sd);
+            });
+        }
+        catch
+        {
+            canMaster.Dispose();
+            throw;
+        }
 
-    /// <summary>Read a numeric object model expression through the G-code interpreter</summary>
-    public static async Task<double> EvaluateAsync(this DcsTestHost host, string expression)
-        => double.Parse(await host.EvaluateRawAsync(expression), System.Globalization.CultureInfo.InvariantCulture);
+        // config.g runs macros and waits on the machine, so it needs the timeline moving under it
+        await timeline.WhileRunningAsync(() => host.WaitForConfigDoneAsync());
+        return new JobBench(canMaster, host);
+    }
+
+    /// <summary>Where an axis has got to, in mm</summary>
+    public static Task<double> MachinePositionAsync(this DcsTestHost host, int axis)
+        => host.ReadModelAsync(model => (double)(model.Move.Axes[axis].MachinePosition ?? 0.0f));
+
+    /// <summary>
+    /// Run the machine until an axis reaches the given position, and stop the timeline there
+    /// </summary>
+    /// <remarks>
+    /// What a pause scenario names instead of a delay: the stop then lands at a position the test
+    /// chose rather than wherever the host happened to be when a timer expired
+    /// </remarks>
+    public static Task RunToPositionAsync(this JobBench bench, SteppedTimeline timeline, int axis, double position)
+        => timeline.RunUntilAsync(async () => await bench.Host.MachinePositionAsync(axis) >= position,
+                                  $"axis {axis} reaching {position}");
 
     /// <summary>Read one of the macro run counters</summary>
-    public static async Task<int> GlobalAsync(this DcsTestHost host, string name)
-        => (int)await host.EvaluateAsync($"global.{name}");
+    public static Task<int> GlobalAsync(this DcsTestHost host, string name)
+        => host.ReadModelAsync(model => GlobalValue(model, name).GetInt32());
 
-    /// <summary>The coordinates of a restore point, read through the interpreter</summary>
-    public static async Task<(double X, double Y)> RestorePointAsync(this DcsTestHost host, int slot)
-        => (await host.EvaluateAsync($"state.restorePoints[{slot}].coords[0]"),
-            await host.EvaluateAsync($"state.restorePoints[{slot}].coords[1]"));
+    /// <summary>Read a global a macro records a yes or no in</summary>
+    public static Task<bool> GlobalFlagAsync(this DcsTestHost host, string name)
+        => host.ReadModelAsync(model => GlobalValue(model, name).GetBoolean());
+
+    /// <summary>Read a global a macro records a name in</summary>
+    public static Task<string> GlobalTextAsync(this DcsTestHost host, string name)
+        => host.ReadModelAsync(model => GlobalValue(model, name).GetString() ?? string.Empty);
+
+    /// <summary>
+    /// One of the job file's global variables, as the object model holds it
+    /// </summary>
+    /// <remarks>
+    /// The globals are JSON rather than typed fields, so the caller says what it expects and this
+    /// fails naming the variable when it is not there at all - which is a different fault from the
+    /// variable holding the wrong thing, and the assertion should not have to tell them apart
+    /// </remarks>
+    private static JsonElement GlobalValue(DuetControlServer.Model.ObjectModel model, string name)
+        => model.Global.TryGetValue(name, out JsonElement? value) && value is JsonElement set
+            ? set
+            : throw new AssertionException($"global.{name} is not set");
+
+    /// <summary>
+    /// The coordinates of a restore point. Both axes come out of one read, so a move landing between
+    /// them cannot produce a pair the machine was never at
+    /// </summary>
+    public static Task<(double X, double Y)> RestorePointAsync(this DcsTestHost host, int slot)
+        => host.ReadModelAsync(model => ((double)Restore(model, slot).Coords[0],
+                                         (double)Restore(model, slot).Coords[1]));
+
+    /// <summary>
+    /// One restore point of the first motion system. Not <c>state.restorePoints</c>, which
+    /// DuetControlServer still publishes but marks obsolete in favour of this
+    /// </summary>
+    private static DuetAPI.ObjectModel.RestorePoint Restore(DuetControlServer.Model.ObjectModel model, int slot)
+        => model.Move.MotionSystems[0].RestorePoints[slot];
 
     /// <summary>
     /// Wait until the machine is paused with the pause restore point at the given coordinates.

@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
+using DuetAPI.ObjectModel;
 using NUnit.Framework;
 using SystemTests.Host;
 
@@ -84,29 +85,33 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
         await using JobBench bench = await JobControlBench.StartAsync();
         int http = await HttpInputIndexAsync(bench.Host);
 
-        Assert.That(await bench.Host.EvaluateAsync($"inputs[{http}].feedRate"), Is.EqualTo(3000.0).Within(1e-3),
+        InputChannel? httpChannel = await bench.Host.ReadModelAsync(model => model.Inputs[http]);
+        Axis axis0 = await bench.Host.ReadModelAsync(model => model.Move.Axes[0]);
+        Axis axis1 = await bench.Host.ReadModelAsync(model => model.Move.Axes[1]);
+
+        Assert.That(httpChannel?.FeedRate, Is.EqualTo(3000.0).Within(1e-3),
                     "the initial inputs[].feedRate is DefaultFeedRate, 3000 mm/min (RRF GCodeMachineState.cpp, Configuration.h)");
 
         await bench.Host.ExecuteCodeAsync("G1 X10 Y5 F1200");
         await bench.Host.ExecuteCodeAsync("M400");
-        await Assert.MultipleAsync(async () =>
+        Assert.Multiple(() =>
         {
-            Assert.That(await bench.Host.EvaluateAsync($"inputs[{http}].feedRate"), Is.EqualTo(1200.0).Within(1e-3),
+            Assert.That(httpChannel?.FeedRate, Is.EqualTo(1200.0).Within(1e-3),
                         "G1 F sets inputs[].feedRate to the raw F value (RRF GCodes.cpp LoadFeedrateFromGCode)");
-            Assert.That(await bench.Host.EvaluateAsync("move.axes[0].userPosition"), Is.EqualTo(10.0).Within(1e-3),
+            Assert.That(axis0.UserPosition, Is.EqualTo(10.0).Within(1e-3),
                         "G1 X10 sets move.axes[0].userPosition (RRF Move.cpp userPosition)");
-            Assert.That(await bench.Host.EvaluateAsync("move.axes[1].userPosition"), Is.EqualTo(5.0).Within(1e-3),
+            Assert.That(axis1.UserPosition, Is.EqualTo(5.0).Within(1e-3),
                         "G1 Y5 sets move.axes[1].userPosition (RRF Move.cpp userPosition)");
         });
         await WaitForMachinePositionAsync(bench, 0, 10.0);
 
         await bench.Host.ExecuteCodeAsync("G0 X20 F2400");
         await bench.Host.ExecuteCodeAsync("M400");
-        await Assert.MultipleAsync(async () =>
+        Assert.Multiple(() =>
         {
-            Assert.That(await bench.Host.EvaluateAsync($"inputs[{http}].feedRate"), Is.EqualTo(2400.0).Within(1e-3),
+            Assert.That(httpChannel?.FeedRate, Is.EqualTo(2400.0).Within(1e-3),
                         "G0 F sets inputs[].feedRate to the raw F value (RRF GCodes.cpp LoadFeedrateFromGCode)");
-            Assert.That(await bench.Host.EvaluateAsync("move.axes[0].userPosition"), Is.EqualTo(20.0).Within(1e-3),
+            Assert.That(axis0.UserPosition, Is.EqualTo(20.0).Within(1e-3),
                         "G0 X20 sets move.axes[0].userPosition (RRF Move.cpp userPosition)");
         });
     }
@@ -127,31 +132,34 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
         await using JobBench bench = await JobControlBench.StartAsync();
         int http = await HttpInputIndexAsync(bench.Host);
 
-        Assert.That(await bench.Host.EvaluateRawAsync($"inputs[{http}].distanceUnit"), Is.EqualTo("mm"),
+        InputChannel? httpChannel = await bench.Host.ReadModelAsync(model => model.Inputs[http]);
+        Axis axis = await bench.Host.ReadModelAsync(model => model.Move.Axes[0]);
+
+        Assert.That(httpChannel?.DistanceUnit, Is.EqualTo(DistanceUnit.MM),
                     "the initial inputs[].distanceUnit is mm (RRF GCodeBuffer.cpp GetDistanceUnits)");
 
         await bench.Host.ExecuteCodeAsync("G91");
         await bench.Host.ExecuteCodeAsync("G20");
-        Assert.That(await bench.Host.EvaluateRawAsync($"inputs[{http}].distanceUnit"), Is.EqualTo("in"),
+        Assert.That(httpChannel?.DistanceUnit, Is.EqualTo(DistanceUnit.Inch),
                     "G20 sets inputs[].distanceUnit to in (RRF GCodes2.cpp case 20, GCodeBuffer.cpp GetDistanceUnits)");
 
         await bench.Host.ExecuteCodeAsync("G1 X1 F60");
         await bench.Host.ExecuteCodeAsync("M400");
-        await Assert.MultipleAsync(async () =>
+        Assert.Multiple(() =>
         {
-            Assert.That(await bench.Host.EvaluateAsync("move.axes[0].userPosition"), Is.EqualTo(25.4).Within(1e-3),
+            Assert.That(axis.UserPosition, Is.EqualTo(25.4).Within(1e-3),
                         "a relative G1 X1 under G20 moves one inch and move.axes[0].userPosition reports millimetres (RRF Move.cpp userPosition)");
-            Assert.That(await bench.Host.EvaluateAsync($"inputs[{http}].feedRate"), Is.EqualTo(60.0).Within(1e-3),
+            Assert.That(httpChannel?.FeedRate, Is.EqualTo(60.0).Within(1e-3),
                         "inputs[].feedRate keeps the raw F value under G20 (RRF GCodes.cpp LoadFeedrateFromGCode, rrf-differences.md section 5)");
         });
 
         await bench.Host.ExecuteCodeAsync("G21");
-        Assert.That(await bench.Host.EvaluateRawAsync($"inputs[{http}].distanceUnit"), Is.EqualTo("mm"),
+        Assert.That(httpChannel?.DistanceUnit, Is.EqualTo(DistanceUnit.MM),
                     "G21 sets inputs[].distanceUnit back to mm (RRF GCodes2.cpp case 21)");
 
         await bench.Host.ExecuteCodeAsync("G1 X1 F600");
         await bench.Host.ExecuteCodeAsync("M400");
-        Assert.That(await bench.Host.EvaluateAsync("move.axes[0].userPosition"), Is.EqualTo(26.4).Within(1e-3),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].UserPosition), Is.EqualTo(26.4).Within(1e-3),
                     "a relative G1 X1 under G21 moves one millimetre (RRF Move.cpp userPosition)");
     }
 
@@ -166,27 +174,29 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
     {
         await using JobBench bench = await JobControlBench.StartAsync();
         int http = await HttpInputIndexAsync(bench.Host);
+        InputChannel? httpChannel = await bench.Host.ReadModelAsync(model => model.Inputs[http]);
+        Axis axis = await bench.Host.ReadModelAsync(model => model.Move.Axes[0]);
 
-        Assert.That(await bench.Host.EvaluateRawAsync($"inputs[{http}].axesRelative"), Is.EqualTo("false"),
+        Assert.That(httpChannel?.AxesRelative, Is.False,
                     "the initial inputs[].axesRelative is false (RRF GCodeMachineState.cpp constructor)");
 
         await bench.Host.ExecuteCodeAsync("G91");
-        Assert.That(await bench.Host.EvaluateRawAsync($"inputs[{http}].axesRelative"), Is.EqualTo("true"),
+        Assert.That(httpChannel?.AxesRelative, Is.True,
                     "G91 sets inputs[].axesRelative (RRF GCodes2.cpp case 91)");
 
         await bench.Host.ExecuteCodeAsync("G1 X5 F6000");
         await bench.Host.ExecuteCodeAsync("G1 X5 F6000");
         await bench.Host.ExecuteCodeAsync("M400");
-        Assert.That(await bench.Host.EvaluateAsync("move.axes[0].userPosition"), Is.EqualTo(10.0).Within(1e-3),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].UserPosition), Is.EqualTo(10.0).Within(1e-3),
                     "two relative G1 X5 moves accumulate to move.axes[0].userPosition 10 (RRF Move.cpp userPosition)");
 
         await bench.Host.ExecuteCodeAsync("G90");
-        Assert.That(await bench.Host.EvaluateRawAsync($"inputs[{http}].axesRelative"), Is.EqualTo("false"),
+        Assert.That(httpChannel?.AxesRelative, Is.False,
                     "G90 clears inputs[].axesRelative (RRF GCodes2.cpp case 90)");
 
         await bench.Host.ExecuteCodeAsync("G1 X3 F6000");
         await bench.Host.ExecuteCodeAsync("M400");
-        Assert.That(await bench.Host.EvaluateAsync("move.axes[0].userPosition"), Is.EqualTo(3.0).Within(1e-3),
+        Assert.That(axis.UserPosition, Is.EqualTo(3.0).Within(1e-3),
                     "an absolute G1 X3 moves to move.axes[0].userPosition 3 (RRF Move.cpp userPosition)");
     }
 
@@ -201,19 +211,22 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
     {
         await using JobBench bench = await JobControlBench.StartAsync();
 
+        Axis axis0 = await bench.Host.ReadModelAsync(model => model.Move.Axes[0]);
+        Axis axis1 = await bench.Host.ReadModelAsync(model => model.Move.Axes[1]);
+
         await bench.Host.ExecuteCodeAsync("G1 X10 F6000");
         await bench.Host.ExecuteCodeAsync("M400");
         await bench.Host.ExecuteCodeAsync("G92 X50");
 
-        await Assert.MultipleAsync(async () =>
+        Assert.Multiple(() =>
         {
-            Assert.That(await bench.Host.EvaluateAsync("move.axes[0].userPosition"), Is.EqualTo(50.0).Within(1e-3),
+            Assert.That(axis0.UserPosition, Is.EqualTo(50.0).Within(1e-3),
                         "G92 X50 sets move.axes[0].userPosition (RRF GCodes3.cpp SetPositions)");
-            Assert.That(await bench.Host.EvaluateAsync("move.axes[1].userPosition"), Is.EqualTo(0.0).Within(1e-3),
+            Assert.That(axis1.UserPosition, Is.EqualTo(0.0).Within(1e-3),
                         "G92 X50 leaves move.axes[1].userPosition alone (RRF GCodes3.cpp SetPositions)");
         });
         await WaitForMachinePositionAsync(bench, 0, 50.0);
-        Assert.That(await bench.Host.EvaluateAsync("move.axes[0].machinePosition"), Is.EqualTo(50.0).Within(1e-3),
+        Assert.That(axis0.MachinePosition, Is.EqualTo(50.0).Within(1e-3),
                     "with no offsets G92 X50 sets move.axes[0].machinePosition too (RRF Move.cpp machinePosition)");
     }
 
@@ -232,12 +245,14 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
     {
         await using JobBench bench = await JobControlBench.StartAsync();
         int http = await HttpInputIndexAsync(bench.Host);
+        InputChannel? httpChannel = await bench.Host.ReadModelAsync(model => model.Inputs[http]);
+        Axis axis0 = await bench.Host.ReadModelAsync(model => model.Move.Axes[0]);
 
-        Assert.That(await bench.Host.EvaluateRawAsync($"inputs[{http}].inverseTimeMode"), Is.EqualTo("false"),
+        Assert.That(httpChannel?.InverseTimeMode, Is.False,
                     "the initial inputs[].inverseTimeMode is false (RRF GCodeMachineState.cpp constructor)");
 
         await bench.Host.ExecuteCodeAsync("G93");
-        Assert.That(await bench.Host.EvaluateRawAsync($"inputs[{http}].inverseTimeMode"), Is.EqualTo("true"),
+        Assert.That(httpChannel?.InverseTimeMode, Is.True,
                     "G93 sets inputs[].inverseTimeMode (RRF GCodes2.cpp case 93)");
 
         string reply = await bench.Host.ExecuteCodeAsync("G1 X10");
@@ -247,21 +262,21 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
         // F60 asks for the whole move in one second; the stored feed rate must not pick it up
         await bench.Host.ExecuteCodeAsync("G1 X10 F60");
         await bench.Host.ExecuteCodeAsync("M400");
-        await Assert.MultipleAsync(async () =>
+        Assert.Multiple(() =>
         {
-            Assert.That(await bench.Host.EvaluateAsync("move.axes[0].userPosition"), Is.EqualTo(10.0).Within(1e-3),
+            Assert.That(axis0.UserPosition, Is.EqualTo(10.0).Within(1e-3),
                         "the inverse time G1 X10 reaches move.axes[0].userPosition 10 (RRF Move.cpp userPosition)");
-            Assert.That(await bench.Host.EvaluateAsync($"inputs[{http}].feedRate"), Is.EqualTo(3000.0).Within(1e-3),
+            Assert.That(httpChannel?.FeedRate, Is.EqualTo(3000.0).Within(1e-3),
                         "an inverse time F is a duration and leaves inputs[].feedRate alone (RRF GCodes.cpp LoadFeedrateFromGCode)");
         });
 
         await bench.Host.ExecuteCodeAsync("G94");
-        Assert.That(await bench.Host.EvaluateRawAsync($"inputs[{http}].inverseTimeMode"), Is.EqualTo("false"),
+        Assert.That(httpChannel?.InverseTimeMode, Is.False,
                     "G94 clears inputs[].inverseTimeMode (RRF GCodes2.cpp case 94)");
 
         await bench.Host.ExecuteCodeAsync("G1 X0 F6000");
         await bench.Host.ExecuteCodeAsync("M400");
-        Assert.That(await bench.Host.EvaluateAsync($"inputs[{http}].feedRate"), Is.EqualTo(6000.0).Within(1e-3),
+        Assert.That(httpChannel?.FeedRate, Is.EqualTo(6000.0).Within(1e-3),
                     "after G94 a G1 F updates inputs[].feedRate again (RRF GCodes.cpp LoadFeedrateFromGCode)");
     }
 
@@ -286,21 +301,26 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
 
         string reply = await bench.Host.ExecuteCodeAsync("G60 S2");
         Assert.That(reply.Trim(), Is.Empty, "G60 S2 executes without error (RRF GCodes3.cpp SavePosition)");
+#pragma warning disable CS0618
+        RestorePoint restorePoint = await bench.Host.ReadModelAsync(model => model.State.RestorePoints[2]);
+#pragma warning restore
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(await bench.Host.EvaluateAsync("state.restorePoints[2].coords[0]"), Is.EqualTo(12.0).Within(1e-3),
+            Assert.That(restorePoint!.Coords[0], Is.EqualTo(12.0).Within(1e-3),
                         "G60 S2 saves X into state.restorePoints[2].coords[0] (RRF RawMove.cpp MovementState::SavePosition)");
-            Assert.That(await bench.Host.EvaluateAsync("state.restorePoints[2].coords[1]"), Is.EqualTo(7.0).Within(1e-3),
+            Assert.That(restorePoint!.Coords[1], Is.EqualTo(7.0).Within(1e-3),
                         "G60 S2 saves Y into state.restorePoints[2].coords[1] (RRF RawMove.cpp MovementState::SavePosition)");
-            Assert.That(await bench.Host.EvaluateAsync("state.restorePoints[2].feedRate"), Is.EqualTo(1800.0).Within(1e-3),
+            Assert.That(restorePoint!.FeedRate, Is.EqualTo(1800.0).Within(1e-3),
                         "G60 S2 saves the raw feed rate into state.restorePoints[2].feedRate (RRF RestorePoint.cpp originalFeedRate)");
-            Assert.That(await bench.Host.EvaluateAsync("state.restorePoints[2].toolNumber"), Is.EqualTo(-1.0),
+            Assert.That(restorePoint!.ToolNumber, Is.EqualTo(-1.0),
                         "with no tool selected state.restorePoints[2].toolNumber is -1 (RRF RawMove.cpp MovementState::SavePosition)");
         });
 
         await bench.Host.ExecuteCodeAsync("G60");
-        Assert.That(await bench.Host.EvaluateAsync("state.restorePoints[0].coords[0]"), Is.EqualTo(12.0).Within(1e-3),
+#pragma warning disable CS0618
+        Assert.That(await bench.Host.ReadModelAsync(model => model.State.RestorePoints[0].Coords[0]), Is.EqualTo(12.0).Within(1e-3),
                     "G60 without S saves into state.restorePoints[0] (RRF GCodes3.cpp SavePosition, default S0)");
+#pragma warning restore
     }
 
     /// <summary>Extrusion starts out absolute, as after M82</summary>
@@ -313,7 +333,7 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
         await using JobBench bench = await JobControlBench.StartAsync();
         int http = await HttpInputIndexAsync(bench.Host);
 
-        Assert.That(await bench.Host.EvaluateRawAsync($"inputs[{http}].drivesRelative"), Is.EqualTo("false"),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Inputs[http]?.DrivesRelative), Is.False,
                     "the initial inputs[].drivesRelative is false (RRF GCodeMachineState.cpp constructor)");
     }
 
@@ -330,10 +350,11 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
         // Extrusion needs a selected tool; tool 0 drives extruder 0 and has no heater
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: "M563 P0 D0\n");
         int http = await HttpInputIndexAsync(bench.Host);
+        InputChannel? httpChannel = await bench.Host.ReadModelAsync(model => model.Inputs[http]);
         await bench.Host.ExecuteCodeAsync("T0");
 
         await bench.Host.ExecuteCodeAsync("M83");
-        Assert.That(await bench.Host.EvaluateRawAsync($"inputs[{http}].drivesRelative"), Is.EqualTo("true"),
+        Assert.That(httpChannel?.DrivesRelative, Is.True,
                     "M83 sets inputs[].drivesRelative (RRF GCodes2.cpp case 83)");
 
         // Two relative E1 moves extrude 2 mm at 420 steps/mm
@@ -344,7 +365,7 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
                     "M83 makes G1 E1 a 1 mm extrusion each time (RRF GCodes2.cpp case 83)");
 
         await bench.Host.ExecuteCodeAsync("M82");
-        Assert.That(await bench.Host.EvaluateRawAsync($"inputs[{http}].drivesRelative"), Is.EqualTo("false"),
+        Assert.That(httpChannel?.DrivesRelative, Is.False,
                     "M82 clears inputs[].drivesRelative (RRF GCodes2.cpp case 82)");
 
         // In absolute mode E2 is a target: one 2 mm extrusion, then a repeat that adds nothing
@@ -367,8 +388,8 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
         await bench.Host.ExecuteCodeAsync("G1 X10 Y5 F6000");
         await bench.Host.ExecuteCodeAsync("M400");
 
-        double x = await bench.Host.EvaluateAsync("move.axes[0].userPosition");
-        double y = await bench.Host.EvaluateAsync("move.axes[1].userPosition");
+        double x = await bench.Host.ReadModelAsync(model => model.Move.Axes[0].UserPosition!.Value);
+        double y = await bench.Host.ReadModelAsync(model => model.Move.Axes[1].UserPosition!.Value);
         string reply = await bench.Host.ExecuteCodeAsync("M114");
         Assert.Multiple(() =>
         {
@@ -411,32 +432,34 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
         await bench.Host.ExecuteCodeAsync("G20");
         await bench.Host.ExecuteCodeAsync("G1 F600");
         await bench.Host.ExecuteCodeAsync("G93");
+        InputChannel? input = await bench.Host.ReadModelAsync(model => model.Inputs[http]);
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(await bench.Host.EvaluateRawAsync($"inputs[{http}].axesRelative"), Is.EqualTo("true"),
+            Assert.That(input!.AxesRelative, Is.True,
                         "G91 after M120 changes inputs[].axesRelative");
-            Assert.That(await bench.Host.EvaluateRawAsync($"inputs[{http}].drivesRelative"), Is.EqualTo("true"),
+            Assert.That(input!.DrivesRelative, Is.True,
                         "M83 after M120 changes inputs[].drivesRelative");
-            Assert.That(await bench.Host.EvaluateRawAsync($"inputs[{http}].distanceUnit"), Is.EqualTo("in"),
+            Assert.That(input!.DistanceUnit, Is.EqualTo(DistanceUnit.Inch),
                         "G20 after M120 changes inputs[].distanceUnit");
-            Assert.That(await bench.Host.EvaluateAsync($"inputs[{http}].feedRate"), Is.EqualTo(600.0).Within(1e-3),
+            Assert.That(input!.FeedRate, Is.EqualTo(600.0).Within(1e-3),
                         "G1 F600 after M120 changes inputs[].feedRate");
-            Assert.That(await bench.Host.EvaluateRawAsync($"inputs[{http}].inverseTimeMode"), Is.EqualTo("true"),
+            Assert.That(input!.InverseTimeMode, Is.True,
                         "G93 after M120 changes inputs[].inverseTimeMode");
         });
 
         await bench.Host.ExecuteCodeAsync("M121");
+        input = await bench.Host.ReadModelAsync(model => model.Inputs[http]);
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(await bench.Host.EvaluateRawAsync($"inputs[{http}].axesRelative"), Is.EqualTo("false"),
+            Assert.That(input!.AxesRelative, Is.False,
                         "M121 restores inputs[].axesRelative (RRF GCodeMachineState.cpp CopyStateFrom)");
-            Assert.That(await bench.Host.EvaluateRawAsync($"inputs[{http}].drivesRelative"), Is.EqualTo("false"),
+            Assert.That(input!.DrivesRelative, Is.False,
                         "M121 restores inputs[].drivesRelative (RRF GCodeMachineState.cpp CopyStateFrom)");
-            Assert.That(await bench.Host.EvaluateRawAsync($"inputs[{http}].distanceUnit"), Is.EqualTo("mm"),
+            Assert.That(input!.DistanceUnit, Is.EqualTo(DistanceUnit.MM),
                         "M121 restores inputs[].distanceUnit (RRF GCodeMachineState.cpp CopyStateFrom)");
-            Assert.That(await bench.Host.EvaluateAsync($"inputs[{http}].feedRate"), Is.EqualTo(3000.0).Within(1e-3),
+            Assert.That(input!.FeedRate, Is.EqualTo(3000.0).Within(1e-3),
                         "M121 restores inputs[].feedRate (RRF GCodeMachineState.cpp CopyStateFrom)");
-            Assert.That(await bench.Host.EvaluateRawAsync($"inputs[{http}].inverseTimeMode"), Is.EqualTo("false"),
+            Assert.That(input!.InverseTimeMode, Is.False,
                         "M121 restores inputs[].inverseTimeMode (RRF GCodeMachineState.cpp CopyStateFrom)");
         });
     }
@@ -452,11 +475,11 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
     {
         await using JobBench bench = await JobControlBench.StartAsync();
 
-        Assert.That(await bench.Host.EvaluateAsync("move.speedFactor"), Is.EqualTo(1.0).Within(1e-3),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.SpeedFactor), Is.EqualTo(1.0).Within(1e-3),
                     "the initial move.speedFactor is 1.0 (RRF Move.cpp speedFactor)");
 
         await bench.Host.ExecuteCodeAsync("M220 S150");
-        Assert.That(await bench.Host.EvaluateAsync("move.speedFactor"), Is.EqualTo(1.5).Within(1e-3),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.SpeedFactor), Is.EqualTo(1.5).Within(1e-3),
                     "M220 S150 sets move.speedFactor to 1.5 (RRF GCodes2.cpp case 220)");
 
         string reply = await bench.Host.ExecuteCodeAsync("M220");
@@ -464,7 +487,7 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
                     "M220 reports the percentage consistent with move.speedFactor (RRF GCodes2.cpp case 220)");
 
         await bench.Host.ExecuteCodeAsync("M220 S100");
-        Assert.That(await bench.Host.EvaluateAsync("move.speedFactor"), Is.EqualTo(1.0).Within(1e-3),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.SpeedFactor), Is.EqualTo(1.0).Within(1e-3),
                     "M220 S100 restores move.speedFactor to 1.0 (RRF GCodes2.cpp case 220)");
     }
 
@@ -481,11 +504,11 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
     {
         await using JobBench bench = await JobControlBench.StartAsync();
 
-        Assert.That(await bench.Host.EvaluateAsync("move.extruders[0].factor"), Is.EqualTo(1.0).Within(1e-3),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].Factor), Is.EqualTo(1.0).Within(1e-3),
                     "the initial move.extruders[0].factor is 1.0 (RRF Move.cpp extruders factor)");
 
         await bench.Host.ExecuteCodeAsync("M221 S50 D0");
-        Assert.That(await bench.Host.EvaluateAsync("move.extruders[0].factor"), Is.EqualTo(0.5).Within(1e-3),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].Factor), Is.EqualTo(0.5).Within(1e-3),
                     "M221 S50 D0 sets move.extruders[0].factor to 0.5 (RRF GCodes2.cpp case 221)");
 
         string report = await bench.Host.ExecuteCodeAsync("M221 D0");
@@ -495,7 +518,7 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
         string noTool = await bench.Host.ExecuteCodeAsync("M221 S120");
         Assert.That(noTool, Does.Contain("No tool selected"),
                     "M221 without D needs a current tool (RRF GCodes2.cpp case 221)");
-        Assert.That(await bench.Host.EvaluateAsync("move.extruders[0].factor"), Is.EqualTo(0.5).Within(1e-3),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].Factor), Is.EqualTo(0.5).Within(1e-3),
                     "a refused M221 leaves move.extruders[0].factor alone (RRF GCodes2.cpp case 221)");
     }
 
@@ -518,23 +541,23 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
             sd => sd.WriteSys("config.g", XyzConfig + DcsTestHost.ConfigDoneMarker));
         await host.WaitForConfigDoneAsync();
 
-        Assert.That(await host.EvaluateAsync("move.axes[2].babystep"), Is.EqualTo(0.0).Within(1e-4),
+        Assert.That(await host.ReadModelAsync(model => model.Move.Axes[2].Babystep), Is.EqualTo(0.0).Within(1e-4),
                     "the initial move.axes[2].babystep is 0 (RRF Move.cpp babystep)");
 
         await host.ExecuteCodeAsync("M290 S0.05");
-        Assert.That(await host.EvaluateAsync("move.axes[2].babystep"), Is.EqualTo(0.05).Within(1e-4),
+        Assert.That(await host.ReadModelAsync(model => model.Move.Axes[2].Babystep), Is.EqualTo(0.05).Within(1e-4),
                     "M290 S babysteps Z, S being a synonym for Z (RRF GCodes2.cpp case 290)");
 
         await host.ExecuteCodeAsync("M290 S0.02");
-        Assert.That(await host.EvaluateAsync("move.axes[2].babystep"), Is.EqualTo(0.07).Within(1e-4),
+        Assert.That(await host.ReadModelAsync(model => model.Move.Axes[2].Babystep), Is.EqualTo(0.07).Within(1e-4),
                     "relative M290 amounts accumulate in move.axes[2].babystep (RRF GCodes2.cpp case 290)");
 
         await host.ExecuteCodeAsync("M290 X0.1");
-        Assert.That(await host.EvaluateAsync("move.axes[0].babystep"), Is.EqualTo(0.1).Within(1e-4),
+        Assert.That(await host.ReadModelAsync(model => model.Move.Axes[0].Babystep), Is.EqualTo(0.1).Within(1e-4),
                     "M290 X babysteps the X axis into move.axes[0].babystep (RRF GCodes2.cpp case 290)");
 
         await host.ExecuteCodeAsync("M290 R0 S0.01");
-        Assert.That(await host.EvaluateAsync("move.axes[2].babystep"), Is.EqualTo(0.01).Within(1e-4),
+        Assert.That(await host.ReadModelAsync(model => model.Move.Axes[2].Babystep), Is.EqualTo(0.01).Within(1e-4),
                     "M290 R0 sets move.axes[2].babystep absolutely (RRF GCodes2.cpp case 290)");
 
         string report = await host.ExecuteCodeAsync("M290");
@@ -565,10 +588,10 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
 
         Assert.That(bench.CanMaster.ScheduledSteps(0), Is.EqualTo(400),
                     "after M400 the whole 5 mm move has been sent, 5 mm at 80 steps/mm (RRF GCodes2.cpp case 400)");
-        Assert.That(await bench.Host.EvaluateAsync("move.axes[0].userPosition"), Is.EqualTo(5.0).Within(1e-3),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].UserPosition), Is.EqualTo(5.0).Within(1e-3),
                     "after M400 move.axes[0].userPosition is at the target (RRF Move.cpp userPosition)");
         await WaitForMachinePositionAsync(bench, 0, 5.0);
-        Assert.That(await bench.Host.EvaluateAsync("move.axes[0].machinePosition"), Is.EqualTo(5.0).Within(1e-3),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].MachinePosition), Is.EqualTo(5.0).Within(1e-3),
                     "after M400 move.axes[0].machinePosition settles at the target (RRF Move.cpp machinePosition)");
     }
 }
