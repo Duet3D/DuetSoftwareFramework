@@ -1,3 +1,7 @@
+FIRST, BEFORE REPLYING: read `private/MEMORY.md` in full and load every memory it lists that
+bears on the request. Those are local-only and gitignored, so none of them can be named here,
+and several set standing rules that apply whatever is asked. Then read on.
+
 - [Editable vendored projects](editable-vendored-projects.md) — lib/* and src/Duet3Expansion, DuetCANMaster, DuetSbcInterface are in scope for edits
 - [RRF reference clone](rrf-reference-clone.md) — lib/RepRapFirmware is reference-only, not part of the project
 - [Build command](build-command.md) — build everything with ./scripts/build.sh --all, no --local or --target
@@ -18,4 +22,3 @@
 - [System tests come first](system-tests-first-for-features.md) — write the scenarios for a feature before implementing it, covering inputs, object model, packets and board responses
 - [Pi hardware test workflow](pi-hardware-test-workflow.md) — deploy with build.sh --target, drive with CodeConsole, read journalctl debug logs
 - [Sensitive memories are private](sensitive-memories-are-private.md) — personal or sensitive details (IPs, keys, names, emails) belong in `private/`, never the committed half
-- Private, local-only memories live in `private/` and are indexed in `private/MEMORY.md`; they are gitignored, so never name one here. Read `private/MEMORY.md` in full at the start of every session, before the first response, and load every memory it lists that bears on the request; some of them set standing rules that apply regardless of what is asked.
