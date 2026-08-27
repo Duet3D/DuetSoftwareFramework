@@ -7,12 +7,62 @@ using SystemTests.Host;
 namespace SystemTests.Scenarios;
 
 /// <summary>
-/// The job control edge cases: a pause inside an open while block, G60 restore points beside the
-/// pause point, a pause during the final move of a job, and pausing with unhomed axes
+/// The job control edge cases: how long a job lasts, a pause inside an open while block, G60
+/// restore points beside the pause point, a pause during the final move of a job, and pausing with
+/// unhomed axes
 /// </summary>
 [TestFixture]
 public class JobEdgeCaseTests : BenchFixture
 {
+    /// <summary>
+    /// A job lasts as long as its motion, not as long as its reading. A movement code finishes once
+    /// its move is queued, so a job file of a few long moves is read to the end in milliseconds -
+    /// and if that ended the job, the machine would report itself idle with the head still moving,
+    /// <c>stop.g</c> would run against a machine that had not finished, and every pause commanded
+    /// from that point on would be refused for want of a job to pause
+    /// </summary>
+    [Test]
+    public async Task JobLastsAsLongAsItsMotion()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync(prepareSd: sd =>
+            sd.WriteGCode("job.gcode", """
+                G90
+                G1 X190 F3000
+                G1 X190 Y100 F6000
+                G60 S3
+                """));
+
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
+        await bench.CanMaster.WaitForSbcPacketAsync(SbcRequest.ScheduleMove);
+
+        // 190 mm at 50 mm/s and 100 mm at 100 mm/s is close to five seconds of motion; one second
+        // in, every code has been read and none of the motion has been made
+        await Task.Delay(TimeSpan.FromSeconds(1));
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await bench.Host.ReadModelAsync(model => model.State.Status), Is.EqualTo(MachineStatus.Processing),
+                        "the job is still running while the machine works through what it queued");
+            Assert.That(await bench.Host.GlobalAsync("stopRan"), Is.Zero, "so stop.g has not run yet");
+            Assert.That(await bench.Host.EvaluateAsync("move.axes[0].machinePosition"), Is.LessThan(189.0),
+                        "and the head has not reached the end of the first move");
+        });
+
+        // A pause is still possible, which is the point of staying in the job until the motion ends
+        Assert.That(await bench.Host.ExecuteCodeAsync("M25"), Does.Not.Contain("no file is being printed"),
+                    "the job is there to be paused");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+
+        await bench.Host.ExecuteCodeAsync("M24");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await bench.Host.GlobalAsync("stopRan"), Is.EqualTo(1),
+                        "the job ended once, after the machine had stopped");
+            Assert.That(await bench.Host.RestorePointAsync(3), Is.EqualTo((190.0, 100.0)),
+                        "having made all of its motion");
+        });
+    }
+
     /// <summary>
     /// Pausing inside an open while block: block state does not survive the seek, the job re-parses
     /// from the recorded position and the loop counts again, so the job runs more bodies in total
@@ -99,7 +149,8 @@ public class JobEdgeCaseTests : BenchFixture
     [Test]
     public async Task PauseDuringFinalMove()
     {
-        await using JobBench bench = await JobControlBench.StartAsync(prepareSd: sd =>
+        await using JobBench bench = await JobControlBench.StartAsync(
+            configExtra: JobControlBench.SegmentedMoves, prepareSd: sd =>
             sd.WriteGCode("job.gcode", """
                 G90
                 G1 X10 Y10 F6000

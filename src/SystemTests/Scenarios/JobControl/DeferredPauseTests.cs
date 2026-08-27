@@ -28,6 +28,59 @@ public class DeferredPauseTests : BenchFixture
         """;
 
     /// <summary>
+    /// Two pauses around a job that defers codes. A Deferred-class code is dispatched without being
+    /// awaited and its handler waits for the move it was anchored to, so a stop that leaves those
+    /// codes owed has to say what becomes of them. A stop that comes to rest without dropping any
+    /// queued move is the case that names no purge boundary, and the pause must still settle rather
+    /// than wait on codes whose anchors will never retire
+    /// </summary>
+    [Test]
+    public async Task PauseTwiceAroundDeferredCodes()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync(
+            configExtra: "M950 F0 C\"1.out3\" Q500\n" + JobControlBench.SegmentedMoves,
+            prepareSd: sd => sd.WriteGCode("job.gcode", """
+                G91
+                G1 X100 F6000
+                G1 X100
+                M106 S1
+                M106 S0.5
+                M106 S0.2
+                G1 X-100
+                G1 X-100
+                M107
+                G90
+                G60 S3
+                """));
+
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
+        await bench.CanMaster.WaitForSbcPacketAsync(SbcRequest.ScheduleMove);
+        await Task.Delay(TimeSpan.FromSeconds(1));
+
+        await bench.Host.ExecuteCodeAsync("M25");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+
+        await bench.Host.ExecuteCodeAsync("M24");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Processing);
+        await Task.Delay(TimeSpan.FromSeconds(1));
+
+        // The second stop is the one that hangs: it comes to rest with nothing left to purge, so
+        // there is no boundary to cancel the owed codes against
+        await bench.Host.ExecuteCodeAsync("M25");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+
+        await bench.Host.ExecuteCodeAsync("M24");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await bench.Host.GlobalAsync("stopRan"), Is.EqualTo(1), "the job finished normally");
+            Assert.That(await bench.Host.RestorePointAsync(3), Is.EqualTo((0.0, 0.0)),
+                        "the out and back moves netted out however the pauses fell");
+            Assert.That(bench.CanMaster.ScheduledSteps(driver: 0), Is.Zero, "and so did the steps");
+        });
+    }
+
+    /// <summary>
     /// A pause during a non-pausable macro defers: every move of the macro completes, a second
     /// M25 while the first is pending is refused with a warning, the pause fires after the macro
     /// as a synchronous pause, and the macro is not rerun on resume

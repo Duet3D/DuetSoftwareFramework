@@ -19,10 +19,8 @@ internal static class JobControlBench
     /// X and Y axes plus one extruder on board 1 (board 0 runs DuetCANMaster and has no drivers),
     /// free to move without homing and with cold extrusion allowed, as the test jobs extrude with
     /// no heater configured. M953 comes first: with the bus disabled the configuration's CAN
-    /// messages would be answered with BusError, as the real controller answers them. The closing
-    /// G92 also marks X and Y homed, which the pause macros require
+    /// messages would be answered with BusError, as the real controller answers them
     /// </summary>
-    /// TODO test with segmentation enabled
     public const string XyeConfig = """
         M953
         M569 P1.0 S1
@@ -37,8 +35,30 @@ internal static class JobControlBench
         M208 X0:200 Y0:200
         M302 P1
         M564 H0 S0
-        G92 X0 Y0
         """;
+
+    /// <summary>
+    /// What config.g ends with, after whatever the scenario configured of its own: the machine is
+    /// told where it is, which is also what marks X and Y homed, and the pause macros run only on a
+    /// machine that knows where it is. It comes last because configuring the geometry un-homes every
+    /// axis - M669 does so whether it changed the geometry or only the segmentation, which is what
+    /// RepRapFirmware does too (GCodes2.cpp case 669)
+    /// </summary>
+    private const string HomedAtOrigin = "G92 X0 Y0";
+
+    /// <summary>
+    /// M669 turning segmentation on: 100 segments per second of movement, and no segment shorter
+    /// than 0.2 mm. A stop is planned at a move boundary, and with segmentation off a whole G-code
+    /// is one move, so a scenario that means to stop part-way through a line has to have the line
+    /// cut up for there to be a boundary inside it to stop at
+    /// </summary>
+    public const string SegmentedMoves = "M669 S100 T0.2";
+
+    /// <summary>
+    /// One extruding tool, selected. Extruding with no tool selected is an error rather than a
+    /// move, so a scenario whose job extrudes configures this
+    /// </summary>
+    public const string OneTool = "M563 P0 D0 H-1\nT0";
 
     /// <summary>
     /// Globals the instrumented macros count their runs in, created by config.g so a scenario can
@@ -61,10 +81,11 @@ internal static class JobControlBench
     /// they ran
     /// </summary>
     /// <param name="sd">The virtual SD card to populate</param>
-    /// <param name="configExtra">Extra configuration lines appended before the done marker</param>
+    /// <param name="configExtra">Extra configuration lines, run before <see cref="HomedAtOrigin"/></param>
     public static void WriteSystemFiles(VirtualSd sd, string configExtra = "")
     {
-        sd.WriteSys("config.g", XyeConfig + "\n" + MarkerGlobals + "\n" + configExtra + DcsTestHost.ConfigDoneMarker);
+        sd.WriteSys("config.g", XyeConfig + "\n" + MarkerGlobals + "\n" + configExtra + "\n"
+                                + HomedAtOrigin + DcsTestHost.ConfigDoneMarker);
         sd.WriteSys("start.g", "set global.startRan = global.startRan + 1\n");
         sd.WriteSys("stop.g", "set global.stopRan = global.stopRan + 1\n");
         sd.WriteSys("pause.g", "set global.pauseRan = global.pauseRan + 1\nG90\nG1 X0 Y0 F6000\n");
@@ -171,6 +192,15 @@ internal static class JobControlBench
     /// </summary>
     public static int ScheduledSteps(this ScriptedCanMaster canMaster, byte driver)
         => canMaster.ScheduledMoves().Steps(driver);
+
+    /// <summary>
+    /// The net extrusion scheduled for one driver of board 1 so far, in microsteps. An extruder's
+    /// movement is carried as extrusion rather than as steps, because pressure advance is applied on
+    /// the board and the steps are not known here - so <see cref="ScheduledSteps"/> reads zero for
+    /// one however much filament it is asked for
+    /// </summary>
+    public static float ScheduledExtrusion(this ScriptedCanMaster canMaster, byte driver)
+        => canMaster.ScheduledMoves().Extrusion(driver);
 }
 
 /// <summary>One running job control bench: the fake controller and the host started against it</summary>
