@@ -481,12 +481,16 @@ internal static partial class NativeMethods
     /// <param name="sequence">Receives the number of completed feedholds</param>
     /// <param name="firstPurgedMoveId">Receives the id of the earliest move dropped</param>
     /// <param name="movesPurged">Receives how many moves were dropped</param>
+    /// <param name="lastSurvivingMoveId">Receives the id of the last move the stop left standing</param>
     /// <param name="stopped">Receives non-zero if the ring was brought to a planned stop</param>
+    /// <param name="restEndpoints">Receives where the machine will come to rest, in microsteps</param>
+    /// <param name="restEndpointCount">Capacity of <paramref name="restEndpoints"/></param>
     /// <returns>Non-zero on success</returns>
     [LibraryImport(LibraryName)]
     internal static partial int DuetSbc_MotionGetFeedholdResult(IntPtr handle, out uint sequence,
                                                                 out uint firstPurgedMoveId, out uint movesPurged,
-                                                                out int stopped);
+                                                                out uint lastSurvivingMoveId, out int stopped,
+                                                                Span<int> restEndpoints, int restEndpointCount);
 
     /// <summary>
     /// Store the ring state this side decides from its own bookkeeping

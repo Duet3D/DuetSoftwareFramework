@@ -61,6 +61,12 @@ internal sealed class MovePlanner(
     private readonly Lock _lock = new();
     private readonly byte[] _buffer = new byte[MoveParams.Length(MotionLimits.MaxAxesPlusExtruders)];
     private readonly int[] _resyncBuffer = new int[MotionLimits.MaxAxesPlusExtruders];
+
+    /// <summary>
+    /// Where the builder stood before the move being submitted advanced it, so that a submission the
+    /// engine will not take can be undone
+    /// </summary>
+    private readonly int[] _endPointsBeforeBuild = new int[MotionLimits.MaxAxesPlusExtruders];
     private uint _nextMoveId = 1;
     private readonly uint[] _lastSubmittedMoveId = new uint[MotionLimits.MaxRings];
 
@@ -333,6 +339,10 @@ internal sealed class MovePlanner(
 
             // TODO RRF has a bed levelling move check (`Move::MoveLoop()`). It doesn't make sense in this function but the functionality will need to be ported.
 
+            // Taken before the build, which advances the builder to the end of this move. If the
+            // engine will not take the move, this is where the builder has to go back to
+            Builder.EndPoints.CopyTo(_endPointsBeforeBuild);
+
             MoveBuildResult built = Builder.Build(move, _buffer);
             switch (built.Error)
             {
@@ -350,10 +360,15 @@ internal sealed class MovePlanner(
             if (!linkInterface.Native.SubmitMove(_buffer.AsSpan(0, built.Length)))
             {
                 // The builder has already advanced to the end of this move, so the submission cannot
-                // simply be dropped - the machine would be planned from a position it never reached.
-                // CanAddMove above makes this unlikely, but it is advisory, so put the builder back
-                logger.LogWarning("The motion engine refused move {MoveId} after accepting it; resynchronising", move.MoveId);
-                ResyncFromEngine();
+                // simply be dropped - the next move would be planned from a position the machine was
+                // never given. CanAddMove above makes this unlikely, but it is advisory, so the
+                // builder goes back to where the last move that did go out left it.
+                //
+                // Not the engine's position: that is where the machine has *got to*, which is a whole
+                // queue of moves behind the end of what has been planned. Resynchronising to it would
+                // plan the retry of this very move from somewhere the queue has long passed
+                logger.LogWarning("The motion engine refused move {MoveId} after accepting it; it will be retried", move.MoveId);
+                Builder.ResyncEndpoints(_endPointsBeforeBuild);
                 return MoveSubmitResult.Busy;
             }
 
@@ -501,12 +516,19 @@ internal sealed class MovePlanner(
     /// <param name="Stopped">Whether the engine was brought to a planned stop</param>
     /// <param name="FirstPurgedMoveId">Id of the earliest move that was dropped, if any were</param>
     /// <param name="MovesPurged">How many moves were dropped</param>
+    /// <param name="LastSurvivingMoveId">
+    /// Id of the last move the stop left standing, which is the one the machine comes to rest on.
+    /// This and not <paramref name="MovesPurged"/> is what says which of the work this side is owed
+    /// will never happen: a stop that purges nothing from the ring still discards whatever was on its
+    /// way to it, so the purge count can be zero while moves this side is waiting for are gone
+    /// </param>
     /// <remarks>
     /// Motion facts only. What they mean for the job file is
     /// <see cref="TakeJobResumePoint"/>'s to say, because the file is not something the engine or
     /// this call knows anything about
     /// </remarks>
-    public readonly record struct FeedholdOutcome(bool Stopped, uint FirstPurgedMoveId, uint MovesPurged);
+    public readonly record struct FeedholdOutcome(bool Stopped, uint FirstPurgedMoveId, uint MovesPurged,
+                                                 uint LastSurvivingMoveId);
 
     /// <summary>
     /// Stop the machine before the queue has run, and drop the moves after the stopping point
@@ -539,15 +561,15 @@ internal sealed class MovePlanner(
                                                            CancellationToken cancellationToken = default)
     {
         uint sequenceBefore;
-        if (!linkInterface.Native.TryGetFeedholdResult(out sequenceBefore, out _, out _, out _))
+        if (!linkInterface.Native.TryGetFeedholdResult(out sequenceBefore, out _, out _, out _, out _))
         {
-            return new FeedholdOutcome(false, 0, 0);
+            return new FeedholdOutcome(false, 0, 0, 0);
         }
 
         if (!linkInterface.Native.RequestStop(plannedDeceleration))
         {
             logger.LogWarning("The motion engine would not take a stop request; draining the queue instead");
-            return new FeedholdOutcome(false, 0, 0);
+            return new FeedholdOutcome(false, 0, 0, 0);
         }
 
         // As soon as the request is in, not when the answer comes back. The motion thread acts on it
@@ -561,12 +583,14 @@ internal sealed class MovePlanner(
         }
 
         // The motion thread acts on the request within one pass of its loop
-        uint firstPurgedMoveId = 0, movesPurged = 0;
+        uint firstPurgedMoveId = 0, movesPurged = 0, lastSurvivingMoveId = 0;
         bool stopped = false;
+        int[] restEndpoints = new int[MotionLimits.MaxAxesPlusExtruders];
         while (!cancellationToken.IsCancellationRequested)
         {
             if (linkInterface.Native.TryGetFeedholdResult(out uint sequence, out firstPurgedMoveId,
-                                                          out movesPurged, out stopped)
+                                                          out movesPurged, out lastSurvivingMoveId,
+                                                          out stopped, restEndpoints)
                 && sequence != sequenceBefore)
             {
                 break;
@@ -577,7 +601,7 @@ internal sealed class MovePlanner(
 
         if (!stopped)
         {
-            return new FeedholdOutcome(false, 0, 0);
+            return new FeedholdOutcome(false, 0, 0, 0);
         }
 
         // The read lock because putting the interpreter's position back reads the transform out of
@@ -587,10 +611,12 @@ internal sealed class MovePlanner(
         using (Lock())
         {
             // Both sides of the position ran ahead of the machine by everything that was dropped, so
-            // both are fiction. The engine's copy is what the drives were actually commanded to, and
-            // the interpreter's follows from it - under this lock, so that the next move built
-            // anywhere is measured from where the machine really is
-            ResyncFromEngine();
+            // both are fiction. What replaces them is where the machine will come to rest, which the
+            // stop reports from the ring: the moves it could not recall are still running, so the
+            // engine's commanded position is somewhere the machine is passing through rather than
+            // the place it stops. The interpreter's follows from it - under this lock, so that the
+            // next move built anywhere is measured from where the machine really ends up
+            Builder.ResyncEndpoints(restEndpoints);
             interpreter.SyncInterpreterToMachine();
 
             // A segmented move that was part-way through submitting has had its remaining segments
@@ -599,7 +625,7 @@ internal sealed class MovePlanner(
         }
 
         logger.LogInformation("Stopped the machine early, dropping {Count} queued move(s)", movesPurged);
-        return new FeedholdOutcome(true, firstPurgedMoveId, movesPurged);
+        return new FeedholdOutcome(true, firstPurgedMoveId, movesPurged, lastSurvivingMoveId);
     }
 
     /// <summary>
@@ -688,7 +714,10 @@ internal sealed class MovePlanner(
     /// </summary>
     /// <remarks>
     /// The fallback when this side's idea of where the machine is has become untrustworthy. The
-    /// snapshot is what the drives were last told, so it is authoritative
+    /// snapshot is what the drives were last told, so it is authoritative - but only at standstill.
+    /// It advances a segment at a time, so while a move is running it reads somewhere the machine is
+    /// passing through; a stop that has left moves running takes the resting endpoints the stop
+    /// itself reports instead, which is what <see cref="StopEarlyAsync"/> does
     /// </remarks>
     public void ResyncFromEngine()
     {

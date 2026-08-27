@@ -862,11 +862,23 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     /// <param name="sequence">Receives the number of completed feedholds</param>
     /// <param name="firstPurgedMoveId">Receives the id of the earliest move dropped</param>
     /// <param name="movesPurged">Receives how many moves were dropped</param>
+    /// <param name="lastSurvivingMoveId">
+    /// Receives the id of the last move the stop left standing, which is the one the machine comes to
+    /// rest on. Everything this side is holding beyond it has been cancelled
+    /// </param>
     /// <param name="stopped">Receives whether the ring was brought to a planned stop</param>
+    /// <param name="restEndpoints">
+    /// Receives where the machine will come to rest in microsteps, meaningful only when the ring was
+    /// stopped. This and not <see cref="GetMotorPositions"/> is what the planner resynchronises
+    /// against after a stop: the moves the stop could not recall carry the machine on past whatever
+    /// the positions snapshot reads at the time
+    /// </param>
     /// <returns>True if the engine answered</returns>
-    public bool TryGetFeedholdResult(out uint sequence, out uint firstPurgedMoveId, out uint movesPurged, out bool stopped)
+    public bool TryGetFeedholdResult(out uint sequence, out uint firstPurgedMoveId, out uint movesPurged,
+                                     out uint lastSurvivingMoveId, out bool stopped,
+                                     Span<int> restEndpoints = default)
     {
-        sequence = firstPurgedMoveId = movesPurged = 0;
+        sequence = firstPurgedMoveId = movesPurged = lastSurvivingMoveId = 0;
         stopped = false;
         if (_handle == IntPtr.Zero)
         {
@@ -874,7 +886,9 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
         }
 
         if (NativeMethods.DuetSbc_MotionGetFeedholdResult(_handle, out sequence, out firstPurgedMoveId,
-                                                          out movesPurged, out int stoppedFlag) == 0)
+                                                          out movesPurged, out lastSurvivingMoveId,
+                                                          out int stoppedFlag,
+                                                          restEndpoints, restEndpoints.Length) == 0)
         {
             return false;
         }

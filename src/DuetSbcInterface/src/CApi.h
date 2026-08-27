@@ -166,9 +166,15 @@ extern "C"
 	// What the last feedhold did. `sequence` counts completed feedholds, `stopped` is 1 if the ring
 	// was brought to a planned stop and 0 if there was nothing it could stop before, in which case
 	// the caller waits for the ring to drain as it did before. Returns 1 on success.
+	//
+	// `restEndpointsOut` receives where the machine will come to rest in microsteps, which is what
+	// the planner resynchronises against after a stop - the moves the stop could not recall carry
+	// the machine on past wherever DuetSbc_MotionGetMotorPositions reads at the time. Only
+	// meaningful when `stopped` is 1. Pass a null pointer and a count of 0 to skip it.
 	int32_t DuetSbc_MotionGetFeedholdResult(DuetSbcHandle* h, uint32_t* sequenceOut,
 											uint32_t* firstPurgedMoveIdOut, uint32_t* movesPurgedOut,
-											int32_t* stoppedOut);
+											uint32_t* lastSurvivingMoveIdOut, int32_t* stoppedOut,
+											int32_t* restEndpointsOut, int32_t restEndpointCount);
 
 	// Motor positions in microsteps and the step-clock time they were taken at. Returns how many
 	// were written. Reads a snapshot rather than the live state, so it never stalls the motion

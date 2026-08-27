@@ -205,6 +205,26 @@ namespace Duet::Sbc
 		}
 	}
 
+	void MotionService::DiscardSubmissionsFor(unsigned int ring)
+	{
+		while (const std::optional<ByteSpan> record = m_submissions.Peek())
+		{
+			if (!IsWellFormedSubmission(*record))
+			{
+				m_submissions.Consume();
+				continue;
+			}
+
+			const auto& params = *reinterpret_cast<const Motion::MoveParamsHeader *>(record->data());
+			const unsigned int recordRing = (params.ringNumber < numRings) ? params.ringNumber : 0;
+			if (recordRing != ring)
+			{
+				break;
+			}
+			m_submissions.Consume();
+		}
+	}
+
 	void MotionService::PublishPositions()
 	{
 		// Seqlock: readers see an odd sequence while the write is in progress and try again. This
@@ -355,6 +375,14 @@ namespace Duet::Sbc
 			m_rings[0].PauseMoves(outcome);
 		}
 
+		if (outcome.stopped)
+		{
+			// The moves already handed over are the rest of the path the purge has just cancelled.
+			// A stop that found nothing to purge keeps them: the ring is draining as it was and
+			// every move still in hand is one the machine is going to make
+			DiscardSubmissionsFor(0);
+		}
+
 		// Seqlock, as for the position snapshot: the reader is a managed thread that may stop for a
 		// garbage collection part-way through the read
 		const uint32_t sequence = m_feedholdSequence.load(std::memory_order_relaxed);
@@ -364,7 +392,13 @@ namespace Duet::Sbc
 		m_feedholdResult.sequence = sequence / 2 + 1;
 		m_feedholdResult.firstPurgedMoveId = outcome.firstPurgedMoveId;
 		m_feedholdResult.movesPurged = outcome.movesPurged;
+		m_feedholdResult.lastSurvivingMoveId = outcome.lastSurvivingMoveId;
 		m_feedholdResult.stopped = outcome.stopped;
+		for (size_t drive = 0; drive < maxAxesPlusExtruders; ++drive)
+		{
+			// Read after the purge, so the last move in the ring is the one the machine stops on
+			m_feedholdResult.restEndpoints[drive] = m_rings[0].GetLastEndpoint(drive);
+		}
 
 		std::atomic_thread_fence(std::memory_order_release);
 		m_feedholdSequence.store(sequence + 2, std::memory_order_release);

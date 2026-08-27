@@ -92,7 +92,7 @@ public class JobResumePointTests
         origin.SegmentsQueued = 3;
         planner.State.CurrentJobMove = origin;
 
-        JobResumePoint? point = planner.TakeJobResumePoint(new MovePlanner.FeedholdOutcome(true, 2, 2));
+        JobResumePoint? point = planner.TakeJobResumePoint(new MovePlanner.FeedholdOutcome(true, 2, 2, 1));
 
         Assert.Multiple(() =>
         {
@@ -113,7 +113,7 @@ public class JobResumePointTests
         origin.SegmentsQueued = 4;
         planner.State.CurrentJobMove = origin;
 
-        JobResumePoint? point = planner.TakeJobResumePoint(new MovePlanner.FeedholdOutcome(false, 0, 0));
+        JobResumePoint? point = planner.TakeJobResumePoint(new MovePlanner.FeedholdOutcome(false, 0, 0, 0));
 
         Assert.Multiple(() =>
         {
@@ -132,7 +132,7 @@ public class JobResumePointTests
         origin.SegmentsQueued = 4;
         planner.State.CurrentJobMove = origin;
 
-        JobResumePoint? point = planner.TakeJobResumePoint(new MovePlanner.FeedholdOutcome(true, 9, 3));
+        JobResumePoint? point = planner.TakeJobResumePoint(new MovePlanner.FeedholdOutcome(true, 9, 3, 8));
 
         Assert.That(point, Is.Null, "the resume rewinds to the last completed job code");
     }
@@ -148,7 +148,7 @@ public class JobResumePointTests
         planner.State.CurrentJobMove = origin;
         planner.JobMoves.Note(1, origin, 0);
 
-        Assert.That(planner.TakeJobResumePoint(new MovePlanner.FeedholdOutcome(false, 0, 0)), Is.Not.Null);
+        Assert.That(planner.TakeJobResumePoint(new MovePlanner.FeedholdOutcome(false, 0, 0, 0)), Is.Not.Null);
 
         Assert.Multiple(() =>
         {

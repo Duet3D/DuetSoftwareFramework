@@ -105,7 +105,25 @@ namespace Duet::Sbc
 			uint32_t sequence = 0;
 			uint32_t firstPurgedMoveId = 0;
 			uint32_t movesPurged = 0;
+
+			// Id of the last move the stop left standing, which is the one the machine comes to rest
+			// on. Everything the caller is holding beyond it has been cancelled - the moves purged
+			// from the ring and the ones discarded from the submission queue alike - so this and not
+			// the purge count is what says which of the caller's owed work will never happen
+			uint32_t lastSurvivingMoveId = 0;
 			bool stopped = false;
+
+			// Where the machine will come to rest, in microsteps: the endpoint of the last move
+			// left in the ring once the stop has purged the ones after it. Only meaningful when
+			// `stopped` is set.
+			//
+			// This and not the motor positions is what the planner has to resynchronise against. A
+			// stop cannot recall a move whose segments are already on their way to the boards, so
+			// those moves carry the machine on after the stop is planned, and the positions
+			// snapshot - which advances a segment at a time - is a place the machine is passing
+			// through rather than the place it will stop. RepRapFirmware takes the same endpoint
+			// from the same place for the same reason (DDARing::PauseMoves, DDARing.cpp:647).
+			int32_t restEndpoints[maxAxesPlusExtruders]{};
 		};
 		[[nodiscard]] FeedholdResult GetFeedholdResult() const;
 
@@ -199,6 +217,20 @@ namespace Duet::Sbc
 		void Run();
 		void SpinOnce();
 		void DrainSubmissions();
+
+		// Drop the moves DuetControlServer has submitted for a ring that the motion thread has not
+		// taken up yet. What a stop purges is the ring, and everything already handed over for that
+		// ring is the rest of the same path: DrainSubmissions runs after DrainFeedholds in the same
+		// pass, and would otherwise add them to the ring the purge has just emptied, so the machine
+		// would set off again after coming to rest. Nothing is lost by dropping them - a stop
+		// reports the earliest move it purged, which is earlier than anything still waiting here, so
+		// a resume from that boundary makes these moves again.
+		//
+		// Stops at the first record for another ring, because the queue is one FIFO for all of them
+		// and a record cannot be taken out of the middle. Only the first ring stops today, so that
+		// is the whole queue in practice; when M596 gives a second motion system its own stop, this
+		// needs the same revisiting as the rest of the feedhold path.
+		void DiscardSubmissionsFor(unsigned int ring);
 		void DrainForcedPositions();
 		void DrainFeedholds();
 		void PublishPositions();

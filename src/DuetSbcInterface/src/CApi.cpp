@@ -369,10 +369,11 @@ extern "C"
 
 	int32_t DuetSbc_MotionGetFeedholdResult(DuetSbcHandle* h, uint32_t* sequenceOut,
 											uint32_t* firstPurgedMoveIdOut, uint32_t* movesPurgedOut,
-											int32_t* stoppedOut)
+											uint32_t* lastSurvivingMoveIdOut, int32_t* stoppedOut,
+											int32_t* restEndpointsOut, int32_t restEndpointCount)
 	{
 		if (h == nullptr || sequenceOut == nullptr || firstPurgedMoveIdOut == nullptr
-			|| movesPurgedOut == nullptr || stoppedOut == nullptr)
+			|| movesPurgedOut == nullptr || lastSurvivingMoveIdOut == nullptr || stoppedOut == nullptr)
 		{
 			return 0;
 		}
@@ -381,7 +382,13 @@ extern "C"
 		*sequenceOut = result.sequence;
 		*firstPurgedMoveIdOut = result.firstPurgedMoveId;
 		*movesPurgedOut = result.movesPurged;
+		*lastSurvivingMoveIdOut = result.lastSurvivingMoveId;
 		*stoppedOut = result.stopped ? 1 : 0;
+		if (restEndpointsOut != nullptr && restEndpointCount > 0)
+		{
+			const size_t toCopy = std::min((size_t)restEndpointCount, maxAxesPlusExtruders);
+			std::memcpy(restEndpointsOut, result.restEndpoints, toCopy * sizeof(int32_t));
+		}
 		return 1;
 	}
 

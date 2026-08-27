@@ -92,9 +92,10 @@ class DDARing final
 	// What a stop did, for DuetControlServer to act on.
 	struct FeedholdOutcome
 	{
-		uint32_t firstPurgedMoveId; // id of the earliest move dropped, 0 if none was
-		uint32_t movesPurged;		// how many were dropped
-		bool stopped;				// true if the ring was brought to a planned stop
+		uint32_t firstPurgedMoveId;   // id of the earliest move dropped, 0 if none was
+		uint32_t movesPurged;		  // how many were dropped
+		uint32_t lastSurvivingMoveId; // id of the last move left in the ring, which the machine stops on
+		bool stopped;				  // true if the ring was brought to a planned stop
 	};
 
 	// How a stop chooses where to stop.

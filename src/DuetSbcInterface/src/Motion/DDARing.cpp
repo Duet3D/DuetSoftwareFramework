@@ -534,6 +534,10 @@ bool DDARing::PauseMoves(FeedholdOutcome& outcome) noexcept
 // choose where to stop.
 void DDARing::PurgeAfter(DDA* stopAfter, FeedholdOutcome& outcome) noexcept
 {
+	// The move the machine will finish on. Everything the caller has in hand beyond it is work the
+	// stop has cancelled, whether it was queued here or is still on its way
+	outcome.lastSurvivingMoveId = stopAfter->GetMoveId();
+
 	DDA* const savedAddPointer = m_addPointer;
 	for (DDA* dda = stopAfter->GetNext(); dda != savedAddPointer; )
 	{
