@@ -1,0 +1,37 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<IsPackable>false</IsPackable>
+		<IsPublishable>false</IsPublishable>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="nunit" Version="4.6.1" />
+		<PackageReference Include="NUnit3TestAdapter" Version="6.2.0">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\DuetAPI\DuetAPI.csproj" />
+		<ProjectReference Include="..\DuetControlServer\DuetControlServer.csproj" />
+	</ItemGroup>
+
+	<!-- The scenarios run the real libduet_sbc.so, so building this project keeps the native
+	     library current: a one-off CMake configure, then an incremental build that is a no-op when
+	     nothing changed. Host/NativeLibraryLocator.cs resolves the result at run time. Opt out
+	     with -p:BuildNativeLink=false, or pin a specific library by setting DUET_SBC_LIBRARY (which
+	     also skips this, because a pinned library must not be rebuilt underneath the pin). -->
+	<PropertyGroup>
+		<BuildNativeLink Condition="'$(BuildNativeLink)' == '' and '$(DUET_SBC_LIBRARY)' == ''">true</BuildNativeLink>
+		<NativeLinkDir>$(MSBuildThisFileDirectory)../DuetSbcInterface</NativeLinkDir>
+	</PropertyGroup>
+	<Target Name="BuildNativeLinkLibrary" BeforeTargets="Build" Condition="'$(BuildNativeLink)' == 'true'">
+		<Exec Command="cmake --preset native-debug" WorkingDirectory="$(NativeLinkDir)"
+		      Condition="!Exists('$(NativeLinkDir)/build/native-debug/CMakeCache.txt')" />
+		<Exec Command="cmake --build --preset native-debug --target duet_sbc_shared --parallel" WorkingDirectory="$(NativeLinkDir)" />
+	</Target>
+</Project>

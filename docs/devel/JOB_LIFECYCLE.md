@@ -191,7 +191,9 @@ What is missing against `GCodes::StopPrint` ([GCodes.cpp:4700](../../lib/RepRapF
 - on abort: heaters off, spindles stopped, laser off;
 - on normal completion: run `stop.g`, or switch all heaters off if there is none;
 - clearing the tool's un-undone G10 Z hop back into the user position;
-- `CancelWaitForTemperatures`, `buildObjects.Init()`, and clearing the job file's local variables;
+- `CancelWaitForTemperatures` and `buildObjects.Init()` (clearing the job file's local variables
+  needs no equivalent: they die with the `CodeFile` when the job is torn down, and must not go
+  earlier — see the rewind note under "Resuming needs no replan");
 - deleting `resurrect.g` on normal completion (out of scope — §5).
 
 `HandleResumePrintAsync` likewise says "resume.g is not run: macro execution is not wired up yet",
@@ -231,6 +233,23 @@ keeping from the deleted SPI path, because both are non-obvious and both were de
 - **Comments must not advance the position.** `DoFilePrint` already handles this
   (`!code.IsNonFirmwareComment`), and the reason is the same one: comments resolve internally and
   finish even while the job is paused.
+- **`PauseState` alone cannot tell the loop a pause is owed.** A resume that lands before
+  `DoFilePrint` has parked puts the state back to `NotPaused`, and the loop then reads its drained
+  read-ahead as "no more codes, the print finished" and ends the job in silence.
+  `JobProcessor._pausePending` is the flag that survives that window, set by `StopReadingForPause`
+  and cleared by the loop when it acts on it. It is one flag today because there is one job loop;
+  when multiple motion systems land, `File` and `File2` run `DoFilePrint` concurrently and whichever
+  drains first would clear it for both, so it has to be indexed by motion system alongside
+  `_pausePosition`/`_pausePosition2`. That is a `// TODO` at the field, not a silent simplification.
+- **Running out of codes is not the end of the print.** A movement code finishes when its move is
+  *queued*, so a job file's last code completes seconds before the machine reaches the end of the
+  job. `DoFilePrint` therefore waits for standstill before it treats a drained read-ahead as a
+  finished print, which is where RepRapFirmware waits too and for the same two reasons
+  ([GCodes.cpp:706](../../lib/RepRapFirmware/src/GCodes/GCodes.cpp)): an asynchronous pause may
+  still arrive while the machine works through what the file queued last, and `state.status` has to
+  keep reporting the job until the job has really ended. The wait is skipped once the job is
+  pausing, cancelling or aborting - the pause sequence does its own waiting, and `pause.g` may
+  itself be moving, so waiting here would hold up the rewind that pause is waiting on.
 
 RRF also cancels temperature waits on the file channel when it pauses
 (`CancelWaitForTemperatures(true)`, and only for macros that can be restarted).
@@ -630,6 +649,15 @@ to the recorded position and the codes are read again from there, so `MoveInterp
 the temperatures or the position. This is exactly RRF's resume path (`fgb->RestartFrom(filePos)`,
 GCodes4.cpp:723) and the feedhold inherits it unchanged.
 
+The rewind also constrains what the reader may throw away. The read-ahead can reach the end of the
+file while the machine is still executing its moves (any short job with deferred codes behind the
+moves sits in that state for its whole tail), and a pause in that window rewinds into codes whose
+enclosing blocks the reader has already left. `CodeFile.ReadCodeAsync` therefore leaves the open
+blocks standing when the file runs out, unless an enclosing `while` is about to loop, and the local
+variables they track stay resolvable until the `CodeFile` is disposed of. That is RepRapFirmware's
+lifetime too: `StopPrint` clears the job file's blocks, nothing does so at end of file. The
+`SystemTests` scenario `PauseAndResumeWithLocalVariables` pins both this and the resync above.
+
 What resume gains is that its restore-point coordinates describe a point the toolpath passes through
 mid-decel rather than the end of a line — under variant (a) still a real segment endpoint, which is
 what makes re-reading the line from there exact once the already-made fraction of it is taken off (see
@@ -808,7 +836,8 @@ when the head is at or below the pause height, and only splits the move - travel
 - [x] Abort → heaters off, spindles stopped
 - [x] A job that simply runs out of codes goes through the same sequence, guarded so that a file
       ending in M0 does not run `stop.g` twice - and the guard applies only to a selected job, so
-      `M0` with no job still works every time
+      `M0` with no job still works every time. It waits for standstill first, because the last code
+      finishing only means the last move was queued - see §2.9
 - [x] `HeatManager.SwitchOffAllAsync`, which did not exist
 - [x] The G10 Z hop unwind
 - [x] `Cancelling` is observable while `cancel.g` runs

@@ -142,6 +142,20 @@ public sealed class Settings
     public double MaxMessageAge { get; set; } = 60.0;
 
     /// <summary>
+    /// Transport that carries the link to the controller. "Spi" is the real controller over
+    /// <see cref="SpiDevice"/>; "Socket" speaks the same transfer protocol over the Unix domain
+    /// socket at <see cref="SbcSocketPath"/> to a virtual controller (the system test bench, see
+    /// docs/devel/SYSTEM_EMULATION.md)
+    /// </summary>
+    public string SbcTransport { get; set; } = "Spi";
+
+    /// <summary>
+    /// Path of the Unix domain socket the virtual controller listens on when
+    /// <see cref="SbcTransport"/> is "Socket"
+    /// </summary>
+    public string SbcSocketPath { get; set; } = "/run/dsf/sbc.sock";
+
+    /// <summary>
     /// SPI device that is connected to RepRapFirmware
     /// </summary>
     public string SpiDevice { get; set; } = "/dev/spidev0.0";

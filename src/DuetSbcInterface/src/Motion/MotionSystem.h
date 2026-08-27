@@ -33,6 +33,14 @@ namespace Duet::Sbc::Motion
 	  public:
 		MotionSystem() noexcept;
 
+		// Give up this system's share of the permanent arena. The DDA ring and the segments were
+		// allocated from it and are gone with it, which is why this is tied to the object's life
+		// rather than being something a caller has to remember
+		~MotionSystem() noexcept;
+
+		MotionSystem(const MotionSystem&) = delete;
+		MotionSystem& operator=(const MotionSystem&) = delete;
+
 		// Reserve the permanent arena and reset every drive. Call once before use.
 		bool Init() noexcept;
 
@@ -198,6 +206,10 @@ namespace Duet::Sbc::Motion
 		static void AddPrepareHiccup() noexcept;
 
 	  private:
+		// Whether Init reserved the arena, so that a system that never started does not give up a
+		// reservation it never took
+		bool m_reservedArena = false;
+
 		MachineConfig m_config;
 		uint32_t m_debugFlags[(unsigned int)Module::Num]{};
 		DriveTracker m_trackers[maxAxesPlusExtruders];

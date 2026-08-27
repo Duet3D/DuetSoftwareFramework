@@ -519,6 +519,18 @@ internal abstract class KinematicsEngine
         => disallowMovesBeforeHoming ? axesMoving : 0;
 
     /// <summary>
+    /// The axes a G92 naming the given axes lets the machine treat as homed
+    /// </summary>
+    /// <param name="g92Axes">Axes G92 assigned a position to, as a bitmap</param>
+    /// <returns>Axes that may be marked homed, which can be wider or narrower than the input</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>Kinematics::AxesAssumedHomed</c>. Where an axis maps to its own motor,
+    /// naming its position is knowing the motor's; where the geometry couples several motors, a
+    /// partial G92 pins none of them down, so the coupled geometries narrow the set
+    /// </remarks>
+    public virtual uint AxesAssumedHomed(uint g92Axes) => g92Axes;
+
+    /// <summary>
     /// Bring a target position within what the machine can reach
     /// </summary>
     /// <param name="finalCoords">Target position, adjusted in place if it is out of reach</param>

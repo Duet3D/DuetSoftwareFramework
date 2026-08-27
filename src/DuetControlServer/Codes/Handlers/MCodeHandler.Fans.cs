@@ -200,6 +200,7 @@ internal partial class MCodeHandler
     /// <remarks>Deprecated in favour of <c>M106 S0</c>, and identical to it</remarks>
     private async ValueTask<Message> HandleFanOffAsync(Commands.Code code, CancellationToken cancellationToken)
     {
+        // TODO RRF only turns off the fans associated with the current tool and ignores the P param
         foreach (int fanNumber in await FansAddressedAsync(code, cancellationToken))
         {
             if (await fanManager.SetSpeedAsync(fanNumber, 0.0f, cancellationToken) is string error)

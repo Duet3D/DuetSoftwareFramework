@@ -428,7 +428,7 @@ internal static class UpdateFromJson
     /// Update this instance from a given JSON element
     /// </summary>
     /// <remarks>This method is auto-generated</remarks>
-    /// <param name=""jsonElement"">Element to update this intance from</param>
+    /// <param name=""jsonElement"">Element to update this intance from</param>{(cls == "Move" ? "\n    /// <param name=\"last\">Whether this is the last update</param>" : string.Empty)}
     /// <exception cref=""JsonException"">Failed to deserialize data</exception>
     public {(isInherited ? "override " : isInheritedFrom ? "virtual " : "") + (isDynamic ? "IDynamicModelObject?" : "void")} {(useGeneratedUpdateFromJson ? "Generated" : "")}UpdateFromJson(JsonElement jsonElement{(cls == "Move" ? ", bool last" : string.Empty)})
     {{

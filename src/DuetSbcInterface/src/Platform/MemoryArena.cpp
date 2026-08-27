@@ -18,6 +18,10 @@ namespace
 	size_t arenaSize = 0;
 	size_t arenaUsed = 0;
 
+	// Motion systems holding the region. A bump allocator cannot hand any of it back, so the whole
+	// region is what is given back, and only once nobody is left to allocate from it
+	size_t arenaUsers = 0;
+
 	constexpr size_t defaultAlignment = alignof(std::max_align_t);
 
 	size_t AlignUp(size_t value, size_t alignment) noexcept
@@ -52,7 +56,8 @@ bool Duet::Sbc::MemoryArena::Reserve(size_t bytes) noexcept
 {
 	if (arenaBase != nullptr)
 	{
-		return true; // already reserved
+		++arenaUsers; // already reserved, so this caller shares it
+		return true;
 	}
 
 	void* const mem = mmap(nullptr, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -75,18 +80,28 @@ bool Duet::Sbc::MemoryArena::Reserve(size_t bytes) noexcept
 	arenaBase = static_cast<char*>(mem);
 	arenaSize = bytes;
 	arenaUsed = 0;
+	arenaUsers = 1;
 	return true;
 }
 
-void Duet::Sbc::MemoryArena::Release() noexcept
+bool Duet::Sbc::MemoryArena::Release() noexcept
 {
-	if (arenaBase != nullptr)
+	if (arenaBase == nullptr)
 	{
-		munmap(arenaBase, arenaSize);
-		arenaBase = nullptr;
-		arenaSize = 0;
-		arenaUsed = 0;
+		return false;
 	}
+	if (arenaUsers > 1)
+	{
+		--arenaUsers; // somebody else is still allocating from it
+		return false;
+	}
+
+	munmap(arenaBase, arenaSize);
+	arenaBase = nullptr;
+	arenaSize = 0;
+	arenaUsed = 0;
+	arenaUsers = 0;
+	return true;
 }
 
 void* Duet::Sbc::MemoryArena::Allocate(size_t count) noexcept

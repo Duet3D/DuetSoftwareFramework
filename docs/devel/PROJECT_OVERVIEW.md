@@ -26,6 +26,7 @@ against the reference tree in `lib/RepRapFirmware`.
 | 6 | Job lifecycle | [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) | 🟢 8 phases, 5 with tails | 2 × M, 6 × S | M291, M581, M452 (all WS7) |
 | 7 | M-code / motion migration | [MCODE_MIGRATION.md](MCODE_MIGRATION.md) | 🟡 ~58% of inventory | 7 × L, 14 × M, 5 × S | see §3 |
 | 8 | Synchronised actions | [MOTION_SYNCHRONISED_ACTIONS.md](MOTION_SYNCHRONISED_ACTIONS.md) | 🟡 stage 1 landed, verification 🔧 | 1 × M shared open, stage 2 (2 × L, 2 × M, 1 × S) | laser pixel data (§5) |
+| 9 | System emulation test bench | [SYSTEM_EMULATION.md](SYSTEM_EMULATION.md) | 🟡 Stage 1 landed | 3 × L, 4 × M, 2 × S | |
 
 Workstream 7 is the umbrella the others were carved out of, and is most of what remains. Workstream 8
 is fully specified and independent; its groundwork and stage 1, deferral in the pipeline, are in,
@@ -94,7 +95,7 @@ Five phases carry a named tail. None is large; three wait on a WS7 code.
 
 | Task | Size | Depends on |
 |---|---|---|
-| Phase 3 tail: temperature-wait cancellation, job-file local variables | S | |
+| Phase 3 tail: temperature-wait cancellation on stop | S | |
 | Phase 3 tail: laser off on abort | S | **M452** (WS7) |
 | Phase 4 tail: decide whether `M25.1` errors or stays an alias | S | decision, see §5 |
 | Phase 5 tail: do not pause during a tool change | S | tool-change state tracking |
@@ -189,6 +190,31 @@ M572's standstill is no longer a WS8 step: the board applies pressure advance at
 no stage makes a deferred push exact, and removing the wait is the plan's open
 decision D2.
 
+### WS9, system emulation test bench
+
+Three stages, each a usable rig on its own: a scriptable fake controller first, then the real
+DuetCANMaster firmware under Renode, then emulated expansion boards completing the chain. Stage 1
+is landed: the socket transport, the fake endpoint and the `SystemTests` in-process host exist, and
+the first scenarios cover boot, link recovery, motion and the pause/resume/cancel job lifecycle
+against the real motion engine - which already surfaced and fixed three pause-path races in
+`JobProcessor`, the job that ended before the moves it had queued were made, and the dead
+full-model-update wait that hung everything awaiting it, `M26` and `M27` among them.
+
+| Task | Size | Depends on |
+|---|---|---|
+| Stage 1: remaining scenarios (deferred codes, event pause, `MotionStopped`, resend, stepped clock) | M | |
+| Stage 1: CI wiring for `SystemTests` and the host-built `libduet_sbc.so` | S | |
+| Stage 2: MB6HC Renode platform and link peripheral for DuetCANMaster | L | the stage 1 framing |
+| Stage 2: device-side socket transport in `DataTransfer` | M | the stage 1 framing |
+| Stage 2: Bosch M_CAN peripheral model | L | |
+| Stage 2: stub Duet3Expansion machine and the NUnit control channel | M | the M_CAN model |
+| Stage 3: SAME51 EXP3HC Renode platform | L | the M_CAN model |
+| Stage 3: multi-board identities and `CANHub` wiring | S | the EXP3HC platform |
+| Stage 3: Robot Framework scenarios and CI wiring | M | |
+
+The SAMC21 tool-board platform is in the plan but deferred until the EXP3HC platform has proven the
+approach, so it is not counted here.
+
 ---
 
 ## 4. Dependencies and sequencing
@@ -217,6 +243,7 @@ graph TD
     RP["Restore-point tail<br/>WS7a · M"]
     WS8["WS8 Synchronised actions<br/>XL"]
     LASERSEG["Laser pixel segments"]
+    WS9["WS9 System emulation<br/>XL"]
 
     M291 --> E_E
     M291 --> J6
@@ -231,9 +258,11 @@ graph TD
     WS8 -.->|decision D2 settles M572| WS1
 ```
 
-`WS5 Phase C tail` has no incoming edge because nothing blocks it.
+`WS5 Phase C tail` has no incoming edge because nothing blocks it. `WS9` has no edges in either
+direction: no workstream blocks it, and while its stage 1 rig verifies WS6 and WS8 behaviour that is
+otherwise 🔧, it gates nothing.
 
-**Four tracks can run in parallel immediately:**
+**Five tracks can run in parallel immediately:**
 
 | Track | Contents | Why it is independent |
 |---|---|---|
@@ -241,6 +270,7 @@ graph TD
 | **B, unblocking codes** | M291, M581, M452, M596 | Four codes that between them release every blocked tail in WS5, WS6, and parts of WS7 |
 | **C, motion pipeline** | WS7a, plus WS4 phase 8 | Self-contained DCS work; arcs are the longest item |
 | **D, probing and levelling** | WS7b | Needs machine time; `G30 P` gates the other two |
+| **E, system emulation** | WS9 stage 1 | New code only: a transport, a fake endpoint and a test project. Its rig then verifies the 🔧 items the other tracks produce |
 
 **Start with these regardless of staffing:** the four WS7d audit findings and the `M114` / object
 model position publishing. All are S, all are live defects, and one of them (positions reporting

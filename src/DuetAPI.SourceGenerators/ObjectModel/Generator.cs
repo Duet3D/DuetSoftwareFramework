@@ -224,6 +224,7 @@ public partial class ObjectModel : IModelObjectAccessor
     /// </summary>
     /// <remarks>This method is auto-generated</remarks>
     /// <param name=""key"">Property name to update or null if the whole object model is supposed to be updated</param>
+    /// <param name=""reader"">Reader to update this intance from</param>
     /// <param name=""offset"">Index offset (collection keys only)</param>
     /// <param name=""last"">Whether this is the last update (collection keys only)</param>
     /// <returns>Whether the key could be updated</returns>

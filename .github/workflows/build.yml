@@ -223,6 +223,10 @@ jobs:
       # Duet/SBC over HTTP, is excluded by the script.
       - name: Run C# unit tests with coverage
         run: ./scripts/coverage.sh --results-dir test-results | tee coverage.log
+      
+      - name: Run C# system tests
+        working-directory: src/SystemTests
+        run: dotnet test
 
       # Surfaces the per-assembly table on the run's summary page so a coverage change is visible
       # without opening the log or downloading the artifact.

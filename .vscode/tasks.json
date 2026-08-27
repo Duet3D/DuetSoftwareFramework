@@ -512,13 +512,22 @@
         },
         {
             // The C# test suite (DCS, DuetAPI, DuetHttpClient). Runs natively for the host.
-            // Note: the HttpClient/Session tests talk to a real printer over HTTP and fail in the
-            // devcontainer unless one is reachable; append
-            //   --filter "FullyQualifiedName!~UnitTests.HttpClient"
-            // to skip them.
             "label": "[DSF] Run C# Unit Tests",
             "type": "shell",
             "command": "dotnet test ./src/UnitTests/UnitTests.csproj --nologo",
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": "test",
+            "runOptions": {
+                "instanceLimit": 1
+            }
+        },
+        {
+            // The C# test suite. Runs DCS & DuetSbcInterface natively for the host.
+            "label": "[DSF] Run C# System Tests",
+            "type": "shell",
+            "command": "dotnet test ./src/SystemTests/SystemTests.csproj --nologo",
             "problemMatcher": [
                 "$msCompile"
             ],

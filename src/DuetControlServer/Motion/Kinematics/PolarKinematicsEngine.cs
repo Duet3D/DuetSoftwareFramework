@@ -154,6 +154,15 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
 
 
     /// <inheritdoc />
+    /// <remarks>The radius motor and the turntable are pinned down only when X and Y are both named</remarks>
+    public override uint AxesAssumedHomed(uint g92Axes)
+    {
+        const uint xyAxes = (1u << RadiusDrive) | (1u << TurntableDrive);
+        return (g92Axes & xyAxes) == xyAxes ? g92Axes : g92Axes & ~xyAxes;
+    }
+
+
+    /// <inheritdoc />
     /// <remarks>
     /// The reachable region is an annulus, not a box: the arm cannot retract past its minimum radius
     /// nor extend past its maximum, and a point outside either is pulled onto the nearer circle rather

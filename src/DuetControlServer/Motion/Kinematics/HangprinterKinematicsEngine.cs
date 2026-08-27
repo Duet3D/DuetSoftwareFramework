@@ -109,6 +109,26 @@ internal sealed class HangprinterKinematicsEngine : KinematicsEngine
     }
 
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// Naming X, Y and Z pins every spool motor down, the anchors beyond the third included;
+    /// naming fewer pins none of them
+    /// </remarks>
+    public override uint AxesAssumedHomed(uint g92Axes)
+    {
+        const uint xyzAxes = 0b111;
+        if ((g92Axes & xyzAxes) != xyzAxes)
+        {
+            return g92Axes & ~xyzAxes;
+        }
+        for (int anchor = 3; anchor < NumAnchors; anchor++)
+        {
+            g92Axes |= 1u << anchor;
+        }
+        return g92Axes;
+    }
+
+
     /// <summary>
     /// Create a hangprinter geometry
     /// </summary>

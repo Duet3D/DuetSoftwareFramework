@@ -726,9 +726,6 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleSetFilePositionAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        // Wait for inputs[].motionSystem to be up-to-date
-        await model.WaitForFullUpdateAsync(cancellationToken);
-
         int motionSystem;
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
@@ -778,8 +775,6 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleReportPrintStatusAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        // Wait for inputs[].motionSystem to be up-to-date
-        await model.WaitForFullUpdateAsync(cancellationToken);
         int motionSystem;
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {

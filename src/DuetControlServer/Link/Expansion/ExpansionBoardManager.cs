@@ -446,7 +446,21 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
 
                     // The wire value is a PWM duty cycle in 0..255 and the object model carries a fraction
                     heater.AvgPwm = heaterReport.AveragePwm / 255.0f;
-                    heater.State = Enum.IsDefined((HeaterState)heaterReport.Mode) ? (HeaterState)heaterReport.Mode : HeaterState.Off;
+
+                    // The board reports a HeaterMode, which is not a HeaterState: the PID modes
+                    // (cooling, stable, heating) all mean "running", and whether running means
+                    // active or standby is what this side commanded, not something the board knows.
+                    // This is RepRapFirmware's Heater::GetStatus mapping, with the commanded
+                    // active/standby flag read from the state the M-code handlers set
+                    // TODO assess whether new HeaterStates are needed
+                    heater.State = heaterReport.Mode switch
+                    {
+                        HeaterMode.Fault => HeaterState.Fault,
+                        HeaterMode.Offline => HeaterState.Offline,
+                        HeaterMode.Off => HeaterState.Off,
+                        >= HeaterMode.Tuning0Settling => HeaterState.Tuning,
+                        _ => heater.State == HeaterState.Standby ? HeaterState.Standby : HeaterState.Active
+                    };
                 }
             }
         }

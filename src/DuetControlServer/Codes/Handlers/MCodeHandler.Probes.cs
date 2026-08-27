@@ -481,6 +481,7 @@ internal partial class MCodeHandler
                 return new Message(MessageType.Success, $"Z probe offset is {-probe.TriggerHeight:F2}mm");
             }
 
+            // TODO RRF hardcodes this to axis index 2
             probe.TriggerHeight = -offset;
             for (int axis = 0; axis < model.Move.Axes.Count && axis < probe.Offsets.Count; axis++)
             {

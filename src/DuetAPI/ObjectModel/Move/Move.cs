@@ -31,6 +31,16 @@ public partial class Move : ModelObject, IStaticModelObject
     public const float MinimumStepsPerMm = 0.01F;
 
     /// <summary>
+    /// Default acceleration for printing moves in mm/s
+    /// </summary>
+    public const float DefaultPrintingAcceleration = 10000F;
+
+    /// <summary>
+    /// Default acceleration for travel moves in mm/s
+    /// </summary>
+    public const float DefaultTravelAcceleration = 10000F;
+
+    /// <summary>
     /// Value of the M201 T parameter. Only present in builds that support S-curve acceleration
     /// </summary>
     public float? AccelerationTime
@@ -164,7 +174,7 @@ public partial class Move : ModelObject, IStaticModelObject
         get => _printingAcceleration;
         set => SetPropertyValue(ref _printingAcceleration, value);
     }
-    private float _printingAcceleration = 10000F;
+    private float _printingAcceleration = DefaultPrintingAcceleration;
 
     /// <summary>
     /// List of move queue items (DDA rings)
@@ -201,7 +211,7 @@ public partial class Move : ModelObject, IStaticModelObject
         get => _travelAcceleration;
         set => SetPropertyValue(ref _travelAcceleration, value);
     }
-    private float _travelAcceleration = 10000F;
+    private float _travelAcceleration = DefaultTravelAcceleration;
 
     /// <summary>
     /// Indicates if third-order S-curve acceleration is enabled.

@@ -669,9 +669,12 @@ unsigned int CanInterface::GetNumPendingMotionMessages() noexcept
 void CanInterface::SendCanRequest(CanMessageBuffer& buf, uint16_t txToken, CanMessageType replyType) noexcept
 {
 	bool noReplyPossible = false;
-	if (can0dev == nullptr)
+	if (can0dev == nullptr || !canEnabled)
 	{
-		// CAN was never enabled. Nothing reaches the bus and the SBC has no other way to find out
+		// CAN is not enabled (the device exists from Init(), but the SBC has not sent EnableCAN, or
+		// has disabled the bus again). Nothing reaches the bus and the SBC has no other way to find
+		// out, so the send is refused rather than quietly transmitted on a bus that is officially
+		// off. This is what makes a config.g that issues CAN-bound codes before M953 fail loudly.
 		reprap.GetSbcInterface().ReportCanMessageSent(txToken, CanStatus::BusError);
 		return;
 	}

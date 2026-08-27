@@ -329,6 +329,15 @@ internal partial class MCodeHandler
                                        "Maximum printing acceleration {0:F1}, maximum travel acceleration {1:F1} mm/sec^2",
                                        motionSystem.PrintingAcceleration, motionSystem.TravelAcceleration);
             }
+            else
+            {
+#pragma warning disable CS0618 // don't raise warning about setting obsolete field
+                // TODO this field used to show the value for the current motion system on the input channel
+                model.Move.PrintingAcceleration = motionSystem.PrintingAcceleration;
+                model.Move.TravelAcceleration = motionSystem.TravelAcceleration;
+#pragma warning restore
+            }
+
         }
 
         if (!seen)
@@ -1251,6 +1260,9 @@ internal partial class MCodeHandler
                 }
 
                 Extruder e = move.Extruders[extruder];
+#pragma warning disable CS0618
+                e.PressureAdvance = k0;
+#pragma warning restore
                 e.PressAdv.K0 = k0;
                 e.PressAdv.K1 = k1;
                 e.PressAdv.D = dk;
@@ -2020,7 +2032,7 @@ internal partial class MCodeHandler
 
                     Endstop endstop = GetOrCreateEndstop(axis);
                     endstop.HighEnd = position == EndstopPosition.HighEnd;
-                    endstop.Type = ToEndstopType((RrfEndstopType)inputType);
+                    endstop.Type = ToEndstopType((RrfEndstopType)inputType); // TODO use EndstopType
                     if (hasPort)
                     {
                         endstop.Port = port;
@@ -2130,6 +2142,7 @@ internal partial class MCodeHandler
     /// is spelled out rather than derived from the object model's own enum, which is ordered
     /// differently and has no equivalent of the retired first entry
     /// </remarks>
+    /// TODO standardise with EndstopType
     private enum RrfEndstopType
     {
         /// <summary>Retired: used to select an active-low input</summary>
@@ -2398,6 +2411,7 @@ internal partial class MCodeHandler
     /// <remarks>The caller must hold the object model write lock</remarks>
     private static MotionSystem GetOrCreateMotionSystem(Move move)
     {
+        // TODO handle multiple motion systems
         if (move.MotionSystems.Count == 0)
         {
             move.MotionSystems.Add(new MotionSystem());

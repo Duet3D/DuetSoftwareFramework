@@ -1,12 +1,17 @@
 ---
 name: comments-describe-present-code
 description: "Code comments must describe the code that is there, never what was removed or moved"
-metadata:
+metadata: 
+  node_type: memory
   type: feedback
+  originSessionId: b17b7d20-b083-4b46-9358-8238b3e5c4a0
+  modified: 2026-08-24T12:18:04.912Z
 ---
 
 Do not write comments narrating what changed: "this used to do X", "X was moved here", "the two
-that existed before disagreed", "no longer applied via Y". Applies to subagents too; the rule is
+that existed before disagreed", "no longer applied via Y". This includes refactor history in a new
+file's header ("class A carried everything; when B arrived, this class took the rest") - a class
+comment says what the class is, not how it came to exist. Applies to subagents too; the rule is
 §1 rule 10 of `docs/devel/MCODE_MIGRATION.md` so it is inherited rather than remembered.
 
 **Why:** The user's words: it is confusing. A reader of the current file has never seen X, cannot tell

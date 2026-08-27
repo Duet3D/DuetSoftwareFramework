@@ -120,6 +120,15 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
 
 
     /// <inheritdoc />
+    /// <remarks>All three tower motors are pinned down only when X, Y and Z are all named</remarks>
+    public override uint AxesAssumedHomed(uint g92Axes)
+    {
+        const uint xyzAxes = (1u << XAxis) | (1u << YAxis) | (1u << ZAxis);
+        return (g92Axes & xyzAxes) == xyzAxes ? g92Axes : g92Axes & ~xyzAxes;
+    }
+
+
+    /// <inheritdoc />
     /// <remarks>
     /// <para>
     /// A delta's reachable region is a cylinder of the print radius, capped by a surface the towers
