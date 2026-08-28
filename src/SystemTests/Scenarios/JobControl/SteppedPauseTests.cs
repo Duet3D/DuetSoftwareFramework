@@ -267,15 +267,17 @@ public class SteppedPauseTests : BenchFixture
 
     /// <summary>
     /// Where the job is stopped, once per point. Concentrated in the first two lines because that is
-    /// where the reader is still feeding the ring the last line of the file: the fault needs a job
-    /// code part-way through going out when the stop lands, and by the second half of the job there
-    /// is none. The later points are there to say that those stops are sound
+    /// where the reader is still feeding the ring the last line of the file, and a stop landing while
+    /// a job code is part-way out is one of the two ways the rewind goes wrong. The last two points
+    /// are the other way: by then the file's last line has been queued in full and let its record go,
+    /// while the moves it queued have yet to run, so a stop there has nothing left to name the line
+    /// with and the job ends short of where it was going
     /// </summary>
     private static readonly double[] PausePoints =
     [
         10, 20, 30, 40, 50, 60, 70, 80, 90, 100,
         110, 120, 130, 140, 150, 160, 170, 180,
-        210, 310
+        210, 310, 365, 380
     ];
 
     /// <summary>

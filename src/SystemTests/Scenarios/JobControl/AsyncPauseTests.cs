@@ -39,12 +39,14 @@ public class AsyncPauseTests : BenchFixture
     [Test]
     public async Task PauseStopsMidMove()
     {
+        const float feedrate = 50; // mm/s
+
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: JobControlBench.SegmentedMoves, prepareSd: sd =>
-            sd.WriteGCode("job.gcode", """
+            sd.WriteGCode("job.gcode", $"""
                 G90
-                G1 X190 F3000
-                G1 X190 Y100 F6000
-                G1 X10 Y100 F6000
+                G1 X190 F{feedrate * 60}
+                G1 X190 Y100 F{2 * feedrate * 50}
+                G1 X10 Y100 F{2 * feedrate * 50}
                 G60 S3
                 """));
 
@@ -58,7 +60,7 @@ public class AsyncPauseTests : BenchFixture
             Assert.That(pausedY, Is.Zero, "still on the first move's line");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.MotionSystems[0].RestorePoints[1].GCommandNumber), Is.EqualTo(1),
                         "the interrupted code is a G1");
-            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.MotionSystems[0].RestorePoints[1].FeedRate), Is.EqualTo(50.0).Within(0.01),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.MotionSystems[0].RestorePoints[1].FeedRate), Is.EqualTo(feedrate).Within(0.01),
                         "the interrupted move's feed rate in mm/s");
             Assert.That(await bench.Host.GlobalAsync("pauseRan"), Is.EqualTo(1), "ran pause.g");
         });
