@@ -13,6 +13,11 @@ machine in [GCodes4.cpp:558-760](../../lib/RepRapFirmware/src/GCodes/GCodes4.cpp
 that drive them in [GCodes2.cpp](../../lib/RepRapFirmware/src/GCodes/GCodes2.cpp) — M0/M1/M2 at :755,
 M24 at :1160, M226/M600/M601 at :1249, M25 at :1281.
 
+How the paths below are scheduled across the tasks and threads that run them, the races that
+scheduling still admits, and the plan to restructure it are in
+[JOB_CONTROL_CONCURRENCY.md](JOB_CONTROL_CONCURRENCY.md). This document stays the record of what
+the lifecycle does; that one is the record of how it is made safe to do it.
+
 The contract in MCODE_MIGRATION §1 applies unchanged: port the behaviour, keep the CAN branch and
 drop the local-hardware one, and leave a `// TODO` naming the missing piece rather than inventing a
 stand-in. **One deviation is approved**, and §1.8 is why it is written down at this length rather
