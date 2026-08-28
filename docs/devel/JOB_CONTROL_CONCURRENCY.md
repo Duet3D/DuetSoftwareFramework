@@ -5,9 +5,10 @@ ported in. This document is about how the code that does it is *scheduled*: whic
 take part, what state they share, where the windows between them are, and why the same loop has
 needed one race fix after another ([KNOWN_BUGS.md](KNOWN_BUGS.md) lists eight already fixed and
 the open ones below, and the stepped pause sweep in `SystemTests` still fails). Section 5 is the
-catalogue of the races that remain, each with the interleaving that produces it. Section 7 is the plan: one owner for the job state,
-one message to the file reader, one rule for the resume point, and the flags that exist only to
-cover ordering windows removed with the windows.
+catalogue of the races that remain, each with the interleaving that produces it. Section 7 is the
+replacement: a job actor written from scratch in place of `JobProcessor`, with one owner for the
+state, one message to the file reader, one rule for the resume point, and the flags that cover
+ordering windows deleted along with the windows.
 
 The code under discussion is [JobProcessor.cs](../../src/DuetControlServer/Files/JobProcessor.cs),
 [JobProcessor.Lifecycle.cs](../../src/DuetControlServer/Files/JobProcessor.Lifecycle.cs),
@@ -571,156 +572,429 @@ is that the structure has seven properties that generate new windows as fast as 
 
 ---
 
-## 7. The plan
+## 7. The replacement
 
-### 7.1 Design
+Every property in §6 is a property of the *structure*, not of a line of code: the state is a set of
+fields with many writers, the reader infers, the sequences borrow tasks and tokens, cancellation
+carries four meanings, the resume point is assembled across four transfers, and the motion thread is
+polled. None of them can be removed while
+[JobProcessor.cs](../../src/DuetControlServer/Files/JobProcessor.cs) and
+[JobProcessor.Lifecycle.cs](../../src/DuetControlServer/Files/JobProcessor.Lifecycle.cs) keep their
+shape, so the plan is to write the job actor from scratch, delete both files, and repoint their
+callers. The behaviour the new code produces is the behaviour [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md)
+records, unchanged (§7.14).
 
-**One job actor.** A `JobController` owns every field in §2's first eight rows and is the only
-code that changes them. It runs on its own task and processes commands from a
-`Channel<JobCommand>`: `Start`, `Pause(request)`, `Resume(options)`, `Cancel(reason)`, `Abort`,
-`ReaderStopped(position)`, `ReaderFinished`, `SequenceFinished`. Every command handler is a
-transition of one explicit state machine:
+### 7.1 The rules the design holds to
+
+1. **One task owns the job state.** A single `JobController` task performs every transition. No
+   other code writes job state and no caller holds a job lock. Readers take an immutable snapshot
+   from one volatile field, so a read cannot land inside a half-finished transition and cannot
+   block anything.
+2. **Every change is a declared transition.** A table of (phase, command) says what is accepted,
+   what is refused and with which message, and what is held until later. No state is reachable only
+   by an interleaving.
+3. **The reader is told, never infers.** `JobReader` has an input channel and an output event
+   stream. It does not read the job state, does not choose a rewind point and does not decide when
+   a job is over. The controller sends it a rewind point only once it holds one.
+4. **Cancellation means the run is over.** One `CancellationTokenSource` per job run, cancelled
+   once, when the run ends. Stopping the read-ahead is a gate on the `File` channel, not a token
+   cancel. Nothing is disposed while a code holds its token and no token is ever re-read.
+5. **Every move id terminates.** The engine reports every id it drops, so a wait on a move always
+   ends and "the machine has stopped" is a signal rather than a poll.
+
+### 7.2 The pieces
+
+| File | Type | Responsibility |
+|---|---|---|
+| `Files/Job/JobController.cs` | `JobController : BackgroundService` | The command loop, the transition table, the state snapshot, the streams |
+| `Files/Job/JobState.cs` | `record JobState`, `enum JobPhase` | The immutable state and the projections callers read |
+| `Files/Job/JobCommand.cs` | `abstract record JobCommand` and its cases | The commands, each carrying its reply completion |
+| `Files/Job/JobSequences.cs` | The sequence bodies | `start.g`, the pause, the resume, `stop.g`/`cancel.g`, the restore point |
+| `Files/Job/JobReader.cs` | `JobReader` | One read-ahead loop per stream, driven by commands, reporting events |
+| `Files/Job/JobStream.cs` | `record JobStream` | The per-motion-system part: the `CodeFile`, its reader, its rewind point |
+| `Motion/MotionEvents.cs` | `MotionEvents` | `FeedholdCompletedAsync`, `StandstillAsync`, raised from move events rather than timers |
+
+`JobMoveIndex` keeps its API and changes its lifetime rule (§7.7). `JobMonitor` keeps its clock and
+loses its own view of the job (§7.10). `MachineStatusService.Derive` switches on `JobPhase`, so
+`PauseState.cs` goes with `JobProcessor.cs` and `JobProcessor.Lifecycle.cs`.
+
+### 7.3 The state
+
+```csharp
+internal sealed record JobState
+{
+    public JobPhase Phase { get; init; }
+    public JobFile? File { get; init; }               // virtual and physical path, length, simulating
+    public ImmutableArray<JobStream> Streams { get; init; }
+    public PrintStoppedReason? StopReason { get; init; }
+    public PauseRequest? PendingPause { get; init; }  // held for a non-restartable macro
+    public JobFile? NextFile { get; init; }           // an M32 read from the job file
+    public JobSequence? Sequence { get; init; }       // the sequence in flight and its token
+}
+```
+
+`JobPhase` is `Idle`, `Selected`, `Starting`, `Running`, `Pausing`, `Paused`, `Resuming`,
+`Cancelling`, `Finishing`, `Aborting`. Everything the rest of DCS asks about the job is a function
+of this record: `IsProcessing` is `Phase is Starting or Running or Pausing or Resuming`, "a job is
+in the way" is `Phase is not (Idle or Selected)`, `state.status` is a switch over `Phase`, and the
+reason a run ended is `StopReason`, written once by the transition that ended it instead of being
+derived three times from three inputs (R11, R14).
+
+The controller publishes the new record into a `volatile JobState` field as the last act of each
+transition. Callers read `controller.State`: one field read, no lock, on the code hot path as well
+(`IsSimulating` is consulted for every M-code from the file). No combination is ever published that
+a single transition did not write, which is what removes the window in which the job looks like no
+job (R16).
+
+### 7.4 The transitions
+
+The loop dequeues one command at a time. A command either completes inside the loop (a validation,
+a refusal, a state change) or starts a *sequence*: a child task, owned by the controller, that runs
+the macros and the motion steps. The loop keeps dequeuing while a sequence runs, so `M112` never
+waits behind `pause.g`. A sequence writes no state; it posts `SequenceCompleted(outcome)` and the
+loop performs the settling transition. That discipline is what keeps single ownership while a pause
+takes seconds.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Selected: SelectFile
+    Selected --> Starting: Start
+    Starting --> Running: start.g done
+    Running --> Pausing: Pause
+    Pausing --> Paused: pause.g done
+    Pausing --> Running: pause failed before the stop
+    Paused --> Resuming: Resume
+    Resuming --> Running: resume.g done, readers told to Run
+    Resuming --> Paused: resume failed
+    Paused --> Cancelling: Cancel(UserCancelled)
+    Cancelling --> Finishing: cancel.g done
+    Running --> Finishing: readers Finished, or Cancel(NormalCompletion)
+    Running --> Aborting: Abort
+    Pausing --> Aborting: Abort
+    Paused --> Aborting: Abort
+    Resuming --> Aborting: Abort
+    Cancelling --> Aborting: Abort
+    Aborting --> Finishing: sequence unwound
+    Finishing --> Idle: stop.g done, teardown published
+```
+
+| Command | From | Effect | Refused elsewhere with |
+|---|---|---|---|
+| `SelectFile` | `Idle`, `Selected` | `Selected`; the file is parsed before the command is posted | "Cannot set file to print, because a file is already being printed!" |
+| `SelectFile` from the `File` channel (`M32` in a job file) | any running phase | Stored as `NextFile`, replied to at once, current run transitions to `Finishing` | |
+| `Start` (`M24` on a selected file, `M32`, `M37`) | `Selected` | `Starting`; sequence: `start.g`, the M26 restart state, then `Run` to each reader | "Cannot print, because no file is selected!" |
+| `Pause` asynchronous (`M25`, an event) | `Running` | `Pausing`; the pause sequence with the feedhold | "Cannot pause print, because no file is being printed!" |
+| `Pause` synchronous (`M226`, `M600`, `M601`, `M25` in the file) | `Running` | `Pausing`; the pause sequence without the feedhold | as above |
+| `Pause` while the `File` channel is in a non-restartable macro | `Running` | Held as `PendingPause`, replied to at once, armed on the reader's next boundary | |
+| `Resume` (`M24`) | `Paused` | `Resuming`; the resume sequence | ignored in `Pausing` and `Resuming`; refused in `Cancelling`, `Finishing`, `Aborting` (R8) |
+| `Cancel(UserCancelled)` (`M0`, `M1`, `M2`) | `Paused` | `Cancelling`; sequence `cancel.g`, then `Finishing` | "Pause the print before attempting to cancel it" |
+| `Cancel(NormalCompletion)` (`M0` in the job file, `M0` with no job) | `Running`, `Idle` | `Finishing`; sequence `stop.g` | |
+| `Abort` | any but `Idle` | `Aborting`: cancel the sequence, wait for it to unwind, then `Finishing` | |
+| `SetFilePosition` (`M26`) | `Selected`, `Paused` | The stream's file position | "Not printing a file" |
+| `Fork` (`M606 S1`) | `Running` | A second `JobStream`, its reader started by the same command | "No file is selected" |
+| `GetFilePosition` (`M27`, `JobMonitor`) | any | The stream's published position | |
+| `ReaderStopped(stream, position)` | `Pausing` | That stream is parked; the last one continues the sequence | |
+| `ReaderFinished(stream)` | `Running` | The last stream: `Finishing` with `NormalCompletion` | |
+| `ReaderFailed(stream, error)` | any | `Aborting` | |
+| `ReaderBoundary(stream)` | `Running` with a `PendingPause` | Re-checks the macro condition; starts the pause or re-arms | |
+| `SequenceCompleted(outcome)` | the phase that started it | The settling transition, or the failure transition | |
+
+Four consequences are worth naming, because each is a race in §5 with no expression here:
+
+- A sequence that fails is a transition the controller chooses from the outcome, not a `finally`
+  reading fields it did not write. A failed resume settles back to `Paused` and reports the error
+  (R19); a pause that fails before it stopped the machine settles back to `Running` (R17). Neither
+  can settle into a phase whose invariants it did not establish.
+- `Cancel` and `Abort` during `Pausing` are transitions of the same machine, so they are ordered
+  against the pause instead of racing it: `Abort` cancels the sequence and waits for it to unwind
+  before `Aborting` is published (R14).
+- `M32` from inside the job file stores `NextFile` and replies at once, so no handler waits for the
+  run it is part of to finish (R6). The chained print starts from `Idle` after the teardown, by the
+  same `SelectFile`/`Start` pair every other caller uses.
+- The pause held for a non-restartable macro is a field of the state written by the same transition
+  that decided to hold it, so the decision cannot be overtaken by the macro ending (R10). If the
+  job ends while a pause is held, the transition to `Finishing` drops it and says so, rather than
+  leaving it for the next job to find.
+
+### 7.5 The reader
+
+```csharp
+// input
+abstract record ReaderCommand
+{
+    sealed record Run(long FromPosition, JobModalState Modal) : ReaderCommand;
+    sealed record Freeze : ReaderCommand;                  // stop reading and dispatching
+    sealed record Rewind(long ToPosition) : ReaderCommand;  // discard what is held, then report
+    sealed record Close : ReaderCommand;
+}
+
+// output, posted to the controller
+abstract record ReaderEvent
+{
+    sealed record Stopped(int Stream, long Position) : ReaderEvent;
+    sealed record Finished(int Stream) : ReaderEvent;
+    sealed record Failed(int Stream, Exception Error) : ReaderEvent;
+    sealed record Boundary(int Stream) : ReaderEvent;       // only while the controller has armed it
+}
+```
+
+The reader owns its `CodeFile`, its code pool and its read-ahead window, and nothing else touches
+them. It publishes its position into a volatile field, which is what `M27` and `JobMonitor` read.
+
+`Freeze` and `Rewind` are separate because the rewind point is not known until the machine has
+stopped. `Freeze` stops the read-ahead and closes the dispatch gate on the `File` channel's job
+stack level (§7.8); `Rewind` discards what the gate holds, waits for the codes that are already
+running, sets the file position and reports `Stopped`. Because the controller sends `Rewind` only
+once it holds the point, the reader cannot park at the wrong position (R1); because a stream counts
+as parked only on `Stopped`, there is no second park and no lost notification (R7); and because
+each stream carries its own rewind point in `JobStream`, a forked job pauses correctly, which the
+single `_pausePending` flag cannot do today.
+
+### 7.6 The sequences
+
+The pause, with the feedhold skipped for a synchronous one:
+
+```mermaid
+sequenceDiagram
+    participant L as JobController loop
+    participant Q as Pause sequence (controller-owned task)
+    participant R as JobReader
+    participant M as MotionEvents / engine
+    L->>L: Running -> Pausing, publish
+    L->>Q: start
+    Q->>R: Freeze (closes the File job gate)
+    R-->>Q: frozen
+    Q->>M: RequestStop
+    M-->>Q: FeedholdCompletedAsync: outcome
+    Q->>Q: rewind point = JobMoveIndex[outcome.LastSurvivingMoveId]
+    Q->>R: Rewind(point)
+    R-->>Q: Stopped(position)
+    Q->>Q: abandon macros, flush, StandstillAsync
+    Q->>Q: SaveRestorePoint, run pause.g
+    Q->>L: SequenceCompleted(paused at, reply)
+    L->>L: Pausing -> Paused, publish, complete the M25
+```
+
+The resume sequence runs `resume.g`, the two restore moves and the interpreter state, and ends by
+sending `Run(position, modal)` to each reader, so there is no window in which the job has been
+resumed and the reader has not been told, and none in which the reader reads before the head is
+back. The stop sequence (`stop.g` or `cancel.g`, heaters and spindles off, `lastFileName`,
+`lastFileCancelled`, the file closed, the simulated time written) runs once per run with the reason
+the transition gave it, so the guard that is never cleared today (R5) has nothing to guard: `M0`
+with no job selected is the same sequence from `Idle`.
+
+The simulated time comes from `JobMonitor`, which is asked for the run's duration as a step of the
+stop sequence. `JobMonitor` stops deciding for itself when a job has ended, which is what makes the
+current wait circular (R15).
+
+### 7.7 The resume point
+
+The one number the engine reports that is always right is `LastSurvivingMoveId`: the last move it
+will make. `DDARing::PurgeAfter` sets it before it purges anything and reports `stopped` afterwards,
+so it is valid in the case that has no branch today, a stop that purges nothing from the ring while
+`DrainFeedholds` discards the submissions behind it. `JobMoveIndex` maps a move id to
+`(JobMoveOrigin, segment)`, and the rewind point is `origin.PointAt(segment + 1)`: the next segment
+of that line, or the next code when it was the last. When the surviving move is not a job move (a
+macro's, a tool change's) the point is the position the reader reports in `Stopped`, and the
+controller knows which case it is because the index says so rather than because a count was zero.
+
+The rule never asks what was dropped, only what survives, which is what makes it right in all four
+cases that are wrong today (R2). Two changes support it:
+
+- **The index is not cleared by a pause.** Its lifetime rule becomes its capacity, which is already
+  twice a ring (2000 entries), so a lookup of a surviving move id always hits. It is cleared when a
+  job is selected and when the link is invalidated, the two events after which a move id from the
+  previous run means nothing. Clearing on a pause is what discards the entries the *next* lookup
+  needs, and retiring an entry when its move completes would be worse: the surviving move has
+  usually completed by the time DCS reads the feedhold result.
+- **`CurrentJobMove` goes.** The record that today is handed over by reference identity, and
+  released when the last segment is *submitted*, is not part of the rule: the index entry carries
+  everything the resume point needs, for every submitted segment, whether or not the code that
+  submitted it has finished.
+
+### 7.8 Cancellation, the dispatch gate, and move ids that terminate
+
+- **One `CancellationTokenSource` per run.** Codes read from the file get its token. It is cancelled
+  once, in `Finishing`, and disposed after every stream has reported. There is no replacement, no
+  disposal under a live code and no re-read, so the sequence cannot cancel the token it is running
+  under (R4, R17) and no path can forget to refresh a local copy (R20).
+- **Sequences run under their own token**, linked to `ApplicationStopping` and the sequence's
+  source. A handler that dies while awaiting its reply does not affect the sequence it asked for, so
+  a pause requested from a dropped HTTP connection still finishes (R17).
+- **The dispatch gate** is a flag on the `File` channel's job stack level, closed by `Freeze` and
+  opened by `Run`. `PipelineStackItem` already reads its pending codes on a single task and already
+  drops a code whose token is cancelled before dispatch; the gate adds "hold instead of dispatch",
+  and `Rewind` drains what is held and completes those codes as cancelled. Read-ahead is in file
+  order, so everything held is at or after the rewind point; the position is an assertion, not a
+  filter, and no predicate-based cancellation API is needed.
+- **The purge generation is captured when a code enters its handler**, not when it starts building
+  its move. A code dispatched before the freeze then always sees the pre-purge value and aborts on
+  the change, and a code dispatched after it does not exist. Between them there is no code that can
+  queue a move onto a ring that has just been stopped (R3).
+- **Every move id terminates.** `DDARing::PurgeAfter` frees purged DDAs without reporting them and
+  `MotionService::DiscardSubmissionsFor` consumes discarded submissions silently, so today a waiter
+  on such an id is released only if a later id happens to complete. The engine knows exactly which
+  ids it drops: it reports them, as `MoveFailed` with a "purged" reason, from both paths.
+  `MotionTracker.MoveFailed` then fails that move's waiters instead of only logging, which is a
+  change of four lines beside the sweep `MoveCompleted` already performs. A deferred code anchored
+  to a purged move then fails instead of hanging the pause (R3), and "everything submitted has
+  reached an end" becomes derivable rather than polled.
+- **Standstill becomes a signal.** `MotionEvents` sits where both halves of the comparison are
+  known: the completed and failed ids from `MotionTracker`, the submitted id from `MovePlanner`. It
+  raises `StandstillAsync` when they meet and `FeedholdCompletedAsync` when the feedhold result is
+  published, replacing the 5 ms and 2 ms polls; the polls remain only as a watchdog behind the
+  signal, logged when they fire.
+
+### 7.9 Locks and lock order
+
+The controller has no lock, so the locks that remain are the object model, the planner and the file.
+Their order is written here and asserted in debug builds by a check in each `Lock()`:
 
 ```
-Idle -> Selected -> Starting -> Running -> Pausing -> Paused -> Resuming -> Running
-                                   |                      |
-                                   v                      v
-                               Finishing              Cancelling -> Finishing -> Idle
+object model  ->  planner  ->  file
 ```
 
-with `Aborting` reachable from any of the running states. The state is one immutable record
-(`JobState` plus the data the state carries: the rewind point, the reason, the pending deferred
-pause), swapped atomically. `state.status`, `IsReallyPrinting` and the M-code refusals read that
-record; there are no independent booleans to fall out of step with it.
+`JobMonitor` reads the reader's published position and the controller's snapshot *before* it takes
+the object model write lock, which removes the model-then-file order and R9 with it.
+`CodeFile.ReadCodeAsync` reads `MachineMode` once, before it takes the file lock, rather than under
+it for every code parsed, which removes the file-then-model order and one read lock acquisition per
+code with it. Nothing takes a job lock from inside a flush, because there is no job lock,
+and the reader's hot path costs no lock acquisition per code against three today (R20).
 
-M-code handlers and `EventProcessor` do not run the sequence. They post a command and await its
-completion (`TaskCompletionSource<Message>` inside the command), which gives them the reply to
-report. The sequence runs on the controller's task under the controller's own cancellation token,
-linked to `ApplicationStopping` and nothing else. A synchronous pause from the job file posts the
-same command and awaits it, after re-arming its own code so the wait is not cancelled by the
-read-ahead being stopped.
+### 7.10 The surface the rest of DCS sees
 
-**The reader is driven.** `JobReader` (today's `DoFilePrint`) has one input, a
-`Channel<ReaderCommand>` with `Run(fromPosition, modalState)`, `StopReading(rewindTo)` and `Close`,
-and one output, the events it posts back to the controller: `Stopped(position)` once it has
-cancelled its read-ahead and rewound, `Finished` when the file ran out and the last move retired,
-`Failed(error)`. It never reads `PauseState`; it never chooses a rewind position. The controller
-sends `StopReading` only after it holds the rewind point, so the early park of R1 cannot occur, and
-it counts the reader as stopped only when the reader says so, so the second park of R7 and the
-window of R16 cannot occur. A sequence that fails part-way (R17, R19) is a transition back to the
-state it started from, decided by the controller, not a `finally` guessing from the state it finds.
+```csharp
+internal interface IJobController
+{
+    JobState State { get; }                                     // snapshot, no lock
+    ValueTask<Message> SelectFileAsync(JobFile file, CancellationToken ct);
+    ValueTask<Message> StartAsync(CancellationToken ct);
+    ValueTask<Message> PauseAsync(PauseRequest request, CancellationToken ct);
+    ValueTask<Message> ResumeAsync(CancellationToken ct);
+    ValueTask<Message> CancelAsync(PrintStoppedReason reason, CancellationToken ct);
+    ValueTask AbortAsync();
+    ValueTask<Message> ForkAsync(CancellationToken ct);
+    ValueTask<long> GetFilePositionAsync(int stream, CancellationToken ct);
+    ValueTask<Message> SetFilePositionAsync(int stream, long position, CancellationToken ct);
+}
+```
 
-**The read-ahead is cancelled by file position, not by token.** The reader stops the codes it
-has started whose `FilePosition >= rewindTo` through the `File` channel's pipeline, which already
-knows every code's position; codes before the rewind point run to completion because their effects
-are owed. Deferred codes use the same rule they use today, by anchor. No cancellation source is
-replaced or disposed while codes hold its token; the job has one token for its whole run.
+Each method posts a command and awaits its reply, so a handler reads as one call with one result and
+the refusal messages live in the transition table rather than in five handlers. What leaves the
+surface: `Lock()` and `LockAsync()` in all four forms, and with them the thirteen call sites outside
+the class that take the job lock, most of them to read two fields; `Resume()`, `Cancel()` and
+`Abort()` as public mutators;
+`StartSecondJob()`, which exists only because `ForkAsync` cannot start the stream itself;
+`IsProcessing`, `IsCancelled`, `IsAborted`, `IsPaused`, `IsPausedOrChanging`, `IsReallyPrinting`,
+`PauseState`, `NumJobStreams`, `FileLength`, `IsPauseDeferred`, `TryDeferPause` and
+`CheckForDeferredPauseAsync`. The projections callers do use become properties of `JobState`.
 
-**The resume point comes from the move the machine finishes on.** The one number the engine
-reports that is always right is `LastSurvivingMoveId`. `JobMoveIndex` maps it to
-`(origin, segment)`, and the resume point is that origin at `segment + 1` (the next code if that is
-the last segment), or the last completed job code if the move was not the job's. That rule covers
-every branch of today's `TakeJobResumePoint`, including the one that has no branch (nothing purged
-from the ring, the submission queue discarded), because it never asks what was *dropped*, only what
-*survives*. For it to hold, the index keeps an origin until its moves have *retired*, not until they
-have been submitted; the tracker's `MoveCompleted` is where entries are released. `CurrentJobMove`
-and the reference-equality take go; `PurgeGeneration` stays, as the one thing that tells a
-part-way submission to stop, and it is raised *after* the resume point is taken so the record it
-reads is complete. The tracker is told the purge boundary too, so a wait on a purged or discarded
-move fails at once rather than waiting for an id that will never retire.
+The cut-over therefore touches: `MCodeHandler` (M0/M1/M2, M23, M26, M27, M32, M36, M37, M25,
+M226/M600/M601, M606, and the two `CodeExecutedAsync` hooks, which go), `GCodeHandler` (`IsSimulating`
+for G92), `CodeProcessor` (the abort path and its service-locator resolution), `LinkService` (abort
+on shutdown and on invalidation), `EventProcessor` (the autopause pre-check becomes one call),
+`JobMonitor`, `MachineStatusService`, `DiagnosticsProvider` through `IAsyncDiagnostics`, and the DI
+registration in `Files/Extensions.cs`. Nothing outside `DuetControlServer` references
+`JobProcessor`, so the API, DWC and the plugins are unaffected.
 
-**Signals, not polls, from the motion thread.** The native side already publishes the feedhold
-result and the completed-move count; the `LinkService` dispatcher already turns move completions
-into `MotionTracker` events. A `MotionEvents` object exposes `FeedholdResultAsync(sequence)` and
-`StandstillAsync()` as awaitable completions raised from those events, and `StopEarlyAsync`,
-`WaitForStandstillAsync` and the reader's end-of-job wait await them. `MachineStatusService`
-subscribes to the controller's state changes instead of polling the fields.
+### 7.11 How each race is answered
 
-**A lock order, written down and checked.** `JobController` → object model → planner → file.
-`JobMonitor` reads the file position before it takes the model write lock; `ReadCodeAsync` reads
-`MachineMode` before it takes the file lock; nothing takes the controller lock from inside a
-flush. A debug assertion in each `Lock()` records the order and throws on an inversion.
+| Race | Answered by |
+|---|---|
+| R1 reader parks before the rewind point exists | §7.5 the reader is told where to rewind and reports when it has |
+| R2 resume point from what was purged | §7.7 from `LastSurvivingMoveId`, with the index kept across a pause |
+| R3 codes dispatched after the stop | §7.8 the gate, the generation captured at dispatch, purged ids reported |
+| R4 macro unwind under a cancelled token | §7.8 one token per run, sequences on their own |
+| R5 `_stopped` never cleared | §7.6 one stop sequence per run, no guard flag |
+| R6 `M32` from the job file deadlocks | §7.4 stored as `NextFile`, replied to at once |
+| R7 `M2` leaves the reader parked | §7.4 and §7.5 `Cancelling` is a transition and the reader is told to close |
+| R8 `M24` during `Cancelling` | §7.4 not in the table |
+| R9 monitor and reader lock inversion | §7.9 one order, asserted in debug builds |
+| R10 deferred pause decided outside the lock | §7.4 the decision and the store are one transition |
+| R11 cancel reported as a normal end | §7.3 `StopReason` written once by the transition |
+| R12 `Resume()` hook starts a new job | §7.10 the hook and the method are gone |
+| R13 pause accepted during `stop.g` | §7.4 `Finishing` accepts no pause |
+| R14 abort during `Pausing` | §7.4 `Abort` cancels the sequence and waits for it |
+| R15 first simulation never finishes | §7.6 the duration is asked for, not waited for |
+| R16 the window where the job looks like no job | §7.3 one published record per transition |
+| R17 pause throwing before its second window | §7.4 and §7.8 the outcome decides, under the sequence's own token |
+| R18 deferred pause skips its flush | §7.6 one pause sequence whose steps are the same either way |
+| R19 failed resume resumes anyway | §7.4 the outcome settles back to `Paused` |
+| R20 the standing cost | §7.9 no hot-path lock, §7.8 no polls, §7.2 one copy of each rule |
 
-### 7.2 What it removes
+### 7.12 Scenarios first
 
-`_pausePending`, `_pausePosition`, `_pausePosition2`, `_pauseReason`, `_stopped`,
-`_pausedInMacro`, the six token re-reads, the three CTS replacements, `Resume()`, the
-`_resume`/`_finished` condition variables, `IsProcessing` as a stored field, the three-branch
-`TakeJobResumePoint`, `CurrentJobMove`, the `catch (OperationCanceledException)` around the
-deferred-pause check, and the `PauseState >= Pausing || _pausePending || IsCancelled || IsAborted`
-compound tests. `PauseState` survives as the projection of the controller's state that the object
-model and RepRapFirmware's refusals need.
-
-### 7.3 Scenarios first
-
-Per [system-tests-first](SYSTEM_EMULATION.md), each race in §5 gets a scenario before the code
-moves, so the rewrite is measured against the same sweep the current code fails:
+Per [system-tests-first](SYSTEM_EMULATION.md) the scenarios come before the code. They are written
+against the current tree, where they record the defect, and they are the acceptance test for the
+replacement. The stepped bench is what makes them deterministic: the same pause scenario against the
+wall clock stops somewhere different on every run, and a fix cannot be told from a scheduling
+accident.
 
 - The stepped sweep at every point in `SteppedPauseTests.PausePoints`, for the relative and the
-  absolute job, must report an empty `wrong` list. This is the acceptance test for R1 and R2.
-- A pause whose earliest purged move is a tool-change macro's, with job lines queued behind it:
-  the purged job lines are re-read on resume (R2, second case).
+  absolute job, reports an empty `wrong` list (R1, R2).
+- A pause whose earliest purged move is a tool-change macro's, with job lines queued behind it: the
+  purged job lines are re-read on resume (R2).
 - `M226` from a job file with an `M106` anchored to a move still in flight: `pause.g` runs, the
   restore point is written, the job resumes (R4).
-- `M25` landing while the reader is executing an `M106` between two moves: the pause returns
-  within the standstill time; no deferred code is left owed, and the head does not move again
-  before `pause.g` (R3).
+- `M25` landing while the reader is executing an `M106` between two moves: the pause returns within
+  the standstill time, no deferred code is left owed, and the head does not move again before
+  `pause.g` (R3).
 - `M0` from the console after a job has finished on its own: `stop.g` runs (R5).
-- `M32` from inside a job file, and inside `stop.g`: the second job starts, the first is torn
-  down, no hang (R6).
-- `M2` from DWC while paused: `cancel.g` runs, the job is torn down, `lastFileCancelled` is
-  written (R7).
-- `M0` while paused, with a `cancel.g` that takes longer than the teardown: `state.status` reads
-  `cancelling` until the macro ends, `M23` during it is refused, `M24` during it is ignored
-  (R7, R8, R12).
+- `M32` from inside a job file, and inside `stop.g`: the first job is torn down, the second starts,
+  nothing hangs (R6).
+- `M2` from DWC while paused: `cancel.g` runs, the job is torn down, `lastFileCancelled` is written
+  (R7).
+- `M0` while paused with a slow `cancel.g`: `state.status` reads `cancelling` until it ends, and
+  `M23` and `M24` during it are refused (R7, R8, R12).
 - `M23` from another channel at the instant `M24` reports success: refused, the job resumes once,
-  `state.status` never reads `idle` between (R16).
-- `M25` and a filament-out event while `stop.g` is moving after the last line: both refused with
-  "no file is being printed" and `stop.g` runs to its end (R13).
-- A read-ahead code failing while `pause.g` runs: `pause.g` completes before the abort's heater
-  switch-off (R14).
-- `M37` with the default `F1` on a fresh bench: the simulated time is written and a second job
-  can be selected (R15).
-- `M25` deferred into a non-restartable macro whose last code is followed by a segmented `G1`:
-  the restore point is where the machine stopped (R18).
+  and `state.status` never reads `idle` between (R16).
+- `M25` and a filament-out event while `stop.g` runs after the last line: both refused with "no file
+  is being printed", and `stop.g` runs to its end (R13).
+- A read-ahead code failing while `pause.g` runs: `pause.g` completes before the abort switches the
+  heaters off (R14).
+- `M37` with the default `F1` on a fresh bench: the simulated time is written and a second job can
+  be selected (R15).
+- `M25` deferred into a non-restartable macro whose last code is followed by a segmented `G1`: the
+  restore point is where the machine stopped (R18). With that macro as the file's last code: the
+  job ends and the reply says the pause was dropped (R10).
 - `M24` with a `resume.g` that fails: the job stays paused and reports the error (R19).
-- A job of 100 000 short lines with `JobMonitor` running: completes (R9). The bench needs a
-  deterministic way to force the two lock acquisitions to interleave; a hook that delays
-  `ReadCodeAsync` between its two locks is acceptable for that one scenario.
+- A job of 100 000 short lines with `JobMonitor` running: completes, with a bench hook that delays
+  `ReadCodeAsync` between its two lock acquisitions (R9).
+- `M606 S1` and then a pause: both streams stop, each rewinds to its own point, both resume.
 
-### 7.4 Phases
+### 7.13 Build order
 
-Each phase leaves the tree working and the sweep no worse. Statuses are updated here in the commit
-that moves them.
+Steps 1 to 3 are additions that stand on their own; step 4 is the cut-over and is one commit. Each
+step leaves the tree building and the bench no worse.
 
-- [ ] **Phase 1: the local fixes.** `DoFilePrint` parks on `_pausePending` alone, and
-      `PauseAsync` publishes the rewind point before anything can stop the reader (R1); the
-      cancelled token is replaced before `AbandonMacrosForPauseAsync` (R4); `_stopped` is cleared
-      in the teardown (R5); `CodeExecutedAsync` wakes the reader for `M2` as for `M0` (R7);
-      `ResumeAsync` refuses `Cancelling` (R8); the simulated-time wait is a completion `JobMonitor`
-      raises (R15); the end-of-file flush runs before the job file is cleared (R20). Each is small
-      and each lands with its scenario from §7.3. The sweep is the test for the first.
-- [ ] **Phase 2: the resume point from `LastSurvivingMoveId`.** `JobMoveIndex` entries live until
-      retirement; `TakeJobResumePoint` becomes one lookup; `CurrentJobMove` goes;
-      `_lastSubmittedMoveId` and the tracker learn the purge boundary so a purged anchor fails its
-      waiter. Closes R2 and the deferred-code half of R3.
-- [ ] **Phase 3: `JobController` and `JobReader`.** The state machine, the command channel, the
-      reader as a driven component with `Stopped`/`Finished` events, the sequences moved onto the
-      controller's task. Closes R6, R10, R11, R12, R13, R14, R16, R17, R18 and R19 by
-      construction; the flags of §7.2 go with it, and phase 1's local fixes are absorbed.
-- [ ] **Phase 4: cancellation by file position.** The job's single token; the read-ahead stopped
-      through the pipeline by position. Closes the `G1` half of R3 and the token re-reads.
-- [ ] **Phase 5: lock order and motion signals.** `JobMonitor` and `ReadCodeAsync` reordered;
-      the debug-time lock-order check; `MotionEvents` replacing the three polls;
-      `MachineStatusService` on state-change events; the lock taken once per read-ahead pass.
-      Closes R9 and the rest of R20.
-- [ ] **Phase 6: the documentation.** [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) §2.9 and §3.5 rewritten
-      against the controller; `gcode-flow.md` and `object-model.md` in the articles for what a
-      user can observe; [DCS_INTERNALS.md](DCS_INTERNALS.md) §3 gains the lock order.
+1. **The scenarios** of §7.12, tagged with the defect each shows. They fail on the current tree,
+   which is the record of what is being fixed.
+2. **The motion prerequisites**, each useful on its own: the engine reports purged and discarded
+   move ids instead of dropping them silently; `MotionEvents` raises the feedhold and standstill
+   completions the two polls stand in for; `JobMoveIndex` is cleared on job selection and link
+   invalidation rather than on a pause.
+3. **The dispatch gate** on the `File` channel's job stack level, and the purge generation captured
+   at handler entry, with their own scenarios. Nothing uses the gate yet.
+4. **The controller, the reader and the sequences**, written whole, and the cut-over: the DI
+   registration, the call sites listed in §7.10, and the deletion of `JobProcessor.cs`,
+   `JobProcessor.Lifecycle.cs` and `PauseState.cs`. The sequence bodies are ported step for step
+   from the current ones, which are the record of the RepRapFirmware behaviour; what changes is who
+   runs them, in what order, and under which token.
+5. **The removals** the cut-over makes dead: the duplicated queue-retry loop and the second set of
+   feed-rate constants, the deferral predicate spelled out in three places, and the two comments and
+   the stale `TODO` in R20's last entries.
+6. **The documentation**: [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) §2.9 and §3.5 rewritten against the
+   controller, the lock order added to [DCS_INTERNALS.md](DCS_INTERNALS.md) §3, and `gcode-flow.md`
+   and `object-model.md` in the articles checked against what the new `state.status` projection
+   publishes.
 
-### 7.5 What does not change
+Steps 1 to 3 can be worked in parallel with the writing of step 4, since they touch different files.
 
-The behaviour RepRapFirmware defines and JOB_LIFECYCLE.md ported: which macros run and on which
-channel, the feedhold, the two-move return to the restore point, the modal state a resumed line is
-read with, the fraction composition across two stops inside one line, the deferred pause, and every
-refusal message. The plan changes how the machine gets to those outcomes, not the outcomes.
+### 7.14 What does not change
+
+The behaviour RepRapFirmware defines and [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) ported: which macros
+run and on which channel, the feedhold, the two-move return to the restore point, the modal state a
+resumed line is read with, the fraction composition across two stops inside one line, the deferred
+pause, the simulation path, and every refusal message. This plan changes how the machine reaches
+those outcomes, not the outcomes.

@@ -27,7 +27,7 @@ against the reference tree in `lib/RepRapFirmware`.
 | 7 | M-code / motion migration | [MCODE_MIGRATION.md](MCODE_MIGRATION.md) | 🟡 ~58% of inventory | 7 × L, 14 × M, 5 × S | see §3 |
 | 8 | Synchronised actions | [MOTION_SYNCHRONISED_ACTIONS.md](MOTION_SYNCHRONISED_ACTIONS.md) | 🟡 stage 1 landed, verification 🔧 | 1 × M shared open, stage 2 (2 × L, 2 × M, 1 × S) | laser pixel data (§5) |
 | 9 | System emulation test bench | [SYSTEM_EMULATION.md](SYSTEM_EMULATION.md) | 🟡 Stage 1 landed | 3 × L, 4 × M, 2 × S | |
-| 10 | Job control concurrency | [JOB_CONTROL_CONCURRENCY.md](JOB_CONTROL_CONCURRENCY.md) | ⬜ 0 of 6 phases | 1 × L, 3 × M, 2 × S | the stepped sweep in WS9 |
+| 10 | Job control concurrency | [JOB_CONTROL_CONCURRENCY.md](JOB_CONTROL_CONCURRENCY.md) | ⬜ not started | 1 × L, 2 × M, 3 × S | the stepped sweep in WS9 |
 
 Workstream 7 is the umbrella the others were carved out of, and is most of what remains. Workstream 8
 is fully specified and independent; its groundwork and stage 1, deferral in the pipeline, are in,
@@ -224,18 +224,20 @@ approach, so it is not counted here.
 
 The pause, resume and stop paths of WS6 work, and the stepped pause sweep in `SystemTests` shows
 they do not work from every stopping point: the file reader, the pause sequence and the motion
-thread each act on the job's state in their own lock windows, and the plan replaces the flags that
-cover the windows between them with one owner of the state. The sweep is the acceptance test for
-every phase.
+thread each act on the job's state in their own lock windows. The twenty races catalogued in
+[JOB_CONTROL_CONCURRENCY.md](JOB_CONTROL_CONCURRENCY.md) §5 come from that structure rather than
+from any one line, so `JobProcessor` is replaced by a job actor written from scratch: one task owns
+the state, the reader is driven by commands, and the resume point comes from the move the engine
+says survives. The sweep is the acceptance test.
 
 | Task | Size | Depends on |
 |---|---|---|
-| Phase 1: the local fixes (the reader parks only once the rewind point is published, the cancelled token, `_stopped`, the `M2` wake-up, `M24` during cancelling, the simulated-time wait, the end-of-file flush) | S | the sweep scenarios |
-| Phase 2: the resume point derived from the last surviving move; index entries kept until retirement; purged anchors fail their waiters | M | |
-| Phase 3: `JobController` state machine and the reader as a driven component | L | phases 1 and 2 |
-| Phase 4: read-ahead cancelled by file position, one token per job | M | phase 3 |
-| Phase 5: lock order, motion-thread signals in place of polls | M | phase 3 |
-| Phase 6: JOB_LIFECYCLE §2.9/§3.5, the articles, DCS_INTERNALS lock order | S | phase 5 |
+| The scenarios of §7.12, written against the current tree | M | |
+| Motion prerequisites: purged and discarded move ids reported, feedhold and standstill as signals, the move index kept across a pause | M | |
+| The dispatch gate on the `File` channel's job level, and the purge generation captured at handler entry | S | |
+| `JobController`, `JobReader` and the sequences, written whole, and the cut-over that deletes `JobProcessor` | L | the three above |
+| The removals the cut-over makes dead | S | the cut-over |
+| JOB_LIFECYCLE §2.9/§3.5, the articles, DCS_INTERNALS lock order | S | the cut-over |
 
 ---
 
@@ -280,10 +282,12 @@ graph TD
     WS8 -.->|decision D2 settles M572| WS1
     WS9["WS9 stepped sweep"] --> WS10["WS10 Job control concurrency<br/>L"]
     WS10 -.->|reader and controller carry M596 state| M596
+    WS9["WS9 stepped sweep"] --> WS10["WS10 Job control concurrency<br/>L"]
+    WS10 -.->|reader and controller carry M596 state| M596
 ```
 
 `WS5 Phase C tail` has no incoming edge because nothing blocks it. `WS9` gates only `WS10`: its
-stepped pause sweep is the acceptance test for every phase of the concurrency work, and while its
+stepped pause sweep is the acceptance test for the concurrency work, and while its
 stage 1 rig also verifies WS6 and WS8 behaviour that is otherwise 🔧, it gates nothing else.
 
 **Five tracks can run in parallel immediately:**
