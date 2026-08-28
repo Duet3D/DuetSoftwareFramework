@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using bottlenoselabs.C2CS.Runtime;
 using static Tracy.PInvoke;
@@ -84,17 +85,53 @@ internal static unsafe class TracyProfiler
     /// <returns>Zone to pass back to <see cref="EndZone"/></returns>
     internal static TracyCZoneCtx BeginZone(IntPtr location)
     {
+        NameThread();
+        return TracyEmitZoneBegin((TracySourceLocationData*)location, 1);
+    }
+
+    /// <summary>
+    /// Tell Tracy what the calling thread is called, the first time that thread reports anything
+    /// </summary>
+    /// <remarks>
+    /// Without a name the timeline labels a thread by its OS id, and .NET thread pool threads are
+    /// unnamed, so this is what tells the rows apart from each other. Tracy copies the name, so the
+    /// unmanaged string does not have to outlive this call.
+    /// </remarks>
+    private static void NameThread()
+    {
         if (!_threadNamed)
         {
-            // Tracy copies the name, so the unmanaged string does not have to outlive this call.
-            // Without one the timeline labels every thread by its OS id, and .NET thread pool
-            // threads are unnamed, so this is what tells the zones apart from each other
             _threadNamed = true;
             using CString threadName = CString.FromString(Thread.CurrentThread.Name ?? $"Thread {Environment.CurrentManagedThreadId}");
             TracySetThreadName(threadName);
         }
+    }
 
-        return TracyEmitZoneBegin((TracySourceLocationData*)location, 1);
+    /// <summary>
+    /// Whether a Tracy GUI is capturing
+    /// </summary>
+    /// <remarks>
+    /// The client is built on demand, so it discards everything reported to it until a GUI connects.
+    /// Zones are cheap enough to emit regardless; this is for callers that would have to do work of
+    /// their own to produce what they report.
+    /// </remarks>
+    internal static bool Connected => TracyConnected() != 0;
+
+    /// <summary>
+    /// Report a message to Tracy
+    /// </summary>
+    /// <param name="text">Message to show</param>
+    /// <param name="colour">Colour to show it in, as 0xRRGGBB</param>
+    /// <remarks>
+    /// Tracy attributes the message to the thread that reported it and marks it on that thread's
+    /// timeline, so it lands among the zones that were open at the time. The client copies the text,
+    /// which is why the unmanaged string does not have to outlive this call.
+    /// </remarks>
+    internal static void Message(string text, uint colour)
+    {
+        NameThread();
+        using CString message = CString.FromString(text);
+        TracyEmitMessageC(message, (ulong)Encoding.UTF8.GetByteCount(text), colour, 0);
     }
 
     /// <summary>

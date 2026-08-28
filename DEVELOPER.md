@@ -214,7 +214,8 @@ listed in
 [src/DuetControlServer/Profiling/ProfiledCode.cs](src/DuetControlServer/Profiling/ProfiledCode.cs).
 Connecting the [Tracy](https://github.com/wolfpld/tracy) GUI to the running process then shows the
 call tree of the profiled code on a timeline, with the duration, count and distribution of every
-zone. Nothing in the profiled code is annotated: the zones are woven into the compiled assembly by
+zone and the log messages that came out alongside them. Nothing in the profiled code is annotated:
+the zones are woven into the compiled assembly by
 [src/DuetProfiling.Fody](src/DuetProfiling.Fody), and a normal build does not compile, reference or
 run any of it.
 
@@ -281,6 +282,14 @@ whatever profiled methods that continuation calls.
 For a profile that follows work across awaits, or of code no zone covers, use the sampling profiler
 instead: `dotnet-trace collect -p <pid> --profile cpu-sampling --format Chromium` and open the result
 in [Perfetto](https://ui.perfetto.dev).
+
+### Log messages
+
+A profiling build also registers a logging provider that puts DuetControlServer's log messages on
+the timeline, marked on the thread that logged them and so among the zones that were open at the
+time, coloured by level and collected in Tracy's message window. The filters that drive the console
+apply to it too, so the runtime log level (`M111 P-1 S"debug"`) decides what Tracy sees as well.
+Nothing is formatted while no GUI is connected.
 
 ### Notes
 

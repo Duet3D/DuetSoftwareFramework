@@ -79,6 +79,8 @@
 	-->
 	<PropertyGroup>
 		<Profiling Condition="'$(Profiling)' == ''">false</Profiling>
+		<!-- Program.cs is compiled either way, and is where the Tracy logging provider is registered -->
+		<DefineConstants Condition="'$(Profiling)' == 'true'">$(DefineConstants);PROFILING</DefineConstants>
 		<TracyClientArchitecture Condition="'$(TracyClientArchitecture)' == ''">$(RuntimeIdentifier)</TracyClientArchitecture>
 		<TracyClientArchitecture Condition="'$(TracyClientArchitecture)' == ''">$(NETCoreSdkPortableRuntimeIdentifier)</TracyClientArchitecture>
 		<TracyClientLibrary Condition="'$(TracyClientLibrary)' == ''">$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', '..', 'build', 'tracy', '$(TracyClientArchitecture)', 'TracyClient.so'))</TracyClientLibrary>

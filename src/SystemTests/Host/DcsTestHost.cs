@@ -96,7 +96,7 @@ internal sealed class DcsTestHost : IAsyncDisposable
         IHost host = new HostBuilder()
             // Into the captured log rather than the console: a passing test stays silent whatever
             // the runner streams, and a failing one prints the whole debug-level log (CapturedLog)
-            .ConfigureLogging(logging => logging.AddProvider(new CapturedLog()).SetMinimumLevel(LogLevel.Debug))
+            .ConfigureLogging(logging => logging.AddProvider(new CapturedLog()).SetMinimumLevel(LogLevel.Debug).AddTracyIfProfiling())
             .ConfigureServices(services => services
                 .AddSettings(configuration, updateOnly: false, logLevel: LogLevel.Debug,
                              configFile: new FileInfo(Path.Combine(tempRoot, "config.json")),

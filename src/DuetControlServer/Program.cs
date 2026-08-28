@@ -157,7 +157,10 @@ rootCommand.SetAction(async (parserResult) =>
                 })
                 .AddCommonLogFormatter()
                 .SetMinimumLevel(LogLevel.Trace)
-                .AddFilter((_, level) => level >= (capturedSettings?.LogLevel ?? logLevel));
+                .AddFilter((_, level) => level >= (capturedSettings?.LogLevel ?? logLevel))
+                // Onto the Tracy timeline as well, beside the zones that were running when they
+                // were logged. Does nothing unless this is a profiling build
+                .AddTracyIfProfiling();
             })
             .UseSystemd()
             .ConfigureAppConfiguration((hostingContext, config) =>
