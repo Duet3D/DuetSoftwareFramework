@@ -306,3 +306,6 @@ build/
 
 # Reference checkout of RepRapFirmware; not a submodule of this repo.
 lib/RepRapFirmware/
+
+# Schema Fody generates next to FodyWeavers.xml in a -p:Profiling=true build
+FodyWeavers.xsd

@@ -58,13 +58,65 @@
 		     switches, which would only slow the tool's build down. -->
 		<ProjectReference Include="..\DuetCanMessage.SourceGenerators\DuetCanMessage.SourceGenerators.csproj"
 		                  ReferenceOutputAssembly="false" Private="false"
-		                  GlobalPropertiesToRemove="$(CanMessageGeneratorHostProperties)" />
+		                  GlobalPropertiesToRemove="$(HostToolProperties)" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<InternalsVisibleTo Include="UnitTests" />
 		<InternalsVisibleTo Include="SystemTests" />
 	</ItemGroup>
+
+	<!--
+	  Profiling. -p:Profiling=true compiles Profiling/ and has Fody weave a Tracy zone around every
+	  method in the namespaces listed in Profiling/ProfiledCode.cs, turning a run of this assembly
+	  into a live timeline the Tracy GUI can connect to. It is a development switch: nothing here is
+	  compiled into a normal build, which is why the sources are excluded rather than #if'd out, and
+	  why the packages are only referenced when the switch is on. See DEVELOPER.md.
+
+	  The native client the binding calls into is not the one the package ships (that one needs a
+	  glibc newer than Raspberry Pi OS Bookworm has); scripts/build-tracy-client.sh builds it, and
+	  TracyClientLibrary is where that script leaves it.
+	-->
+	<PropertyGroup>
+		<Profiling Condition="'$(Profiling)' == ''">false</Profiling>
+		<TracyClientArchitecture Condition="'$(TracyClientArchitecture)' == ''">$(RuntimeIdentifier)</TracyClientArchitecture>
+		<TracyClientArchitecture Condition="'$(TracyClientArchitecture)' == ''">$(NETCoreSdkPortableRuntimeIdentifier)</TracyClientArchitecture>
+		<TracyClientLibrary Condition="'$(TracyClientLibrary)' == ''">$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', '..', 'build', 'tracy', '$(TracyClientArchitecture)', 'TracyClient.so'))</TracyClientLibrary>
+		<ProfilingWeaverAssembly>$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', 'DuetProfiling.Fody', 'bin', '$(Configuration)', 'netstandard2.0', 'DuetProfiling.Fody.dll'))</ProfilingWeaverAssembly>
+	</PropertyGroup>
+
+	<ItemGroup Condition="'$(Profiling)' != 'true'">
+		<Compile Remove="Profiling\**\*.cs" />
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(Profiling)' == 'true'">
+		<PackageReference Include="Fody" Version="6.9.2" PrivateAssets="all" />
+		<!-- ExcludeAssets="native": the managed binding is what is wanted, the TracyClient.so beside
+		     it in the package is linked against glibc 2.38 and loads on neither the devcontainer nor
+		     a Bookworm Pi, both of which are on 2.36 -->
+		<PackageReference Include="Tracy-CSharp" Version="0.13.1" ExcludeAssets="native" />
+		<!-- The weaver is a build-time tool like the CAN message generator below, and is referenced
+		     on the same terms: built, but neither linked against nor copied here. WeaverFiles is how
+		     Fody is pointed at a weaver that is a project in this repository rather than a package -->
+		<ProjectReference Include="..\DuetProfiling.Fody\DuetProfiling.Fody.csproj"
+		                  ReferenceOutputAssembly="false" Private="false"
+		                  GlobalPropertiesToRemove="$(HostToolProperties)" />
+		<WeaverFiles Include="$(ProfilingWeaverAssembly)" />
+		<None Include="$(TracyClientLibrary)" Link="TracyClient.so" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(TracyClientLibrary)')" />
+	</ItemGroup>
+
+	<Target Name="CheckProfilingConfiguration" BeforeTargets="CoreCompile" Condition="'$(Profiling)' == 'true'">
+		<!-- The switch exists to profile development builds. Nothing here has been exercised against
+		     the AOT toolchain, so combining the two would only produce a confusing failure later -->
+		<Error Condition="'$(AotPublish)' == 'true' OR '$(PublishAot)' == 'true'"
+		       Code="PROF001"
+		       Text="-p:Profiling=true cannot be combined with an AOT build. Build without --aot to profile." />
+		<!-- A warning rather than an error: the client can also come from TRACY_CLIENT_LIBRARY, which
+		     is only read at run time, and a build that cannot find it is still a usable build -->
+		<Warning Condition="!Exists('$(TracyClientLibrary)')"
+		         Code="PROF002"
+		         Text="No Tracy client at $(TracyClientLibrary). Build one with 'scripts/build-tracy-client.sh --arch $(TracyClientArchitecture)', or set TRACY_CLIENT_LIBRARY when running." />
+	</Target>
 
 	<!--
 	  The CAN message files under Link/Protocol are generated from the schema and checked in, so a build does
@@ -82,11 +134,12 @@
 		<!-- Exec commands are passed to the shell verbatim, so the path has to be separator-normalised
 		     here rather than left for MSBuild to fix up as it does for Include and Exists. -->
 		<CanMessageVerifyScript>$([MSBuild]::NormalizePath('$(CanMessageGeneratorDir)', 'verify-cpp-layout.sh'))</CanMessageVerifyScript>
-		<!-- Global properties that must not reach the generator: they describe what DCS is being built for,
-		     and the generator is built to run here. Both the ProjectReference and the GetTargetPath query
-		     below remove the same set, or MSBuild would treat them as two different builds of the project
-		     and the path returned would not be the one that was built. -->
-		<CanMessageGeneratorHostProperties>RuntimeIdentifier;SelfContained;PublishAot;AotPublish;PublishTrimmed;PublishReadyToRun;PublishSingleFile</CanMessageGeneratorHostProperties>
+		<!-- Global properties that must not reach a tool that runs during this build, the generator here
+		     and the profiling weaver above: they describe what DCS is being built for, and both tools are
+		     built to run on the machine doing the building. Every ProjectReference to one, and the
+		     GetTargetPath query below, remove the same set, or MSBuild would treat them as two different
+		     builds of the project and the path returned would not be the one that was built. -->
+		<HostToolProperties>RuntimeIdentifier;SelfContained;PublishAot;AotPublish;PublishTrimmed;PublishReadyToRun;PublishSingleFile</HostToolProperties>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -110,7 +163,7 @@
 		<MSBuild Projects="$(CanMessageGeneratorDir)DuetCanMessage.SourceGenerators.csproj"
 		         Targets="GetTargetPath"
 		         Properties="Configuration=$(Configuration)"
-		         RemoveProperties="$(CanMessageGeneratorHostProperties)">
+		         RemoveProperties="$(HostToolProperties)">
 			<Output TaskParameter="TargetOutputs" ItemName="CanMessageGeneratorAssembly" />
 		</MSBuild>
 		<!-- dotnet exec, not dotnet run: the assembly is already built by the ProjectReference, and

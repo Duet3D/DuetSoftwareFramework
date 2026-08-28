@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Read by Fody, which is only referenced by a build made with -p:Profiling=true. DuetProfiling is
+     the weaver in src/DuetProfiling.Fody; it weaves the Tracy zones described by the ProfileZone
+     attributes in Profiling/ProfiledCode.cs into the compiled assembly. -->
+<Weavers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="FodyWeavers.xsd">
+  <DuetProfiling />
+</Weavers>
