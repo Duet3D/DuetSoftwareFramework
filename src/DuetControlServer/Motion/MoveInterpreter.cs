@@ -61,7 +61,7 @@ internal sealed class MoveInterpreter(
     /// <summary>
     /// G-code feed rates are per minute; everything below the interpreter is per second
     /// </summary>
-    private const float SecondsPerMinute = 60.0f;
+    public const float SecondsPerMinute = 60.0f;
 
     /// <summary>
     /// How fast a G0 goes when it is a rapid rather than a travel move
@@ -101,7 +101,7 @@ internal sealed class MoveInterpreter(
     {
         MotionParameters parameters = Parameters;
         int numAxes = parameters.SharedAxisCount(model.Move);
-        float unitScale = input.DistanceUnit == DistanceUnit.Inch ? MmPerInch : 1.0f;
+        float unitScale = UnitScale(input);
         Tool? tool = currentTool();
 
         RawMove raw = new()
@@ -500,7 +500,7 @@ internal sealed class MoveInterpreter(
         // A move that names only rotational axes is measured in degrees, so G20 does not scale its
         // feed rate even though the same F would be inches per minute for a linear move
         bool convertInches = raw.LinearAxesMentioned || !raw.RotationalAxesMentioned;
-        float unitScale = convertInches && input.DistanceUnit == DistanceUnit.Inch ? MmPerInch : 1.0f;
+        float unitScale = convertInches ? UnitScale(input) : 1.0f;
         float converted = input.FeedRate * unitScale / SecondsPerMinute;
 
         raw.FeedRateMmPerSec = raw.ApplyM220M221 ? converted * model.Move.SpeedFactor : converted;
@@ -509,14 +509,33 @@ internal sealed class MoveInterpreter(
     /// <summary>
     /// The feed rate a channel is set to, in mm/sec
     /// </summary>
-    /// <param name="input">The channel</param>
+    /// <param name="input">The channel, or null for one that does not exist</param>
     /// <returns>The rate</returns>
     /// <remarks>
-    /// The same conversion a restore point is written with, so that what a pause saves and what a
-    /// resume puts back are the same quantity in both directions
+    /// One rule and one place: <c>inputs[].feedRate</c> is what the operator typed, per minute and
+    /// in whatever unit G20 or G21 left the channel in, and every move and every restore point wants
+    /// it per second in millimetres. <see cref="ModalFeedRateFromMmPerSec"/> is the inverse, so what
+    /// a pause saves and what a resume puts back are the same quantity in both directions
     /// </remarks>
-    private static float ModalFeedRateMmPerSec(InputChannel input)
-        => input.FeedRate * (input.DistanceUnit == DistanceUnit.Inch ? MmPerInch : 1.0f) / SecondsPerMinute;
+    public static float ModalFeedRateMmPerSec(InputChannel? input)
+        => (input?.FeedRate ?? 0.0f) * UnitScale(input) / SecondsPerMinute;
+
+    /// <summary>
+    /// A rate in mm/sec as the channel would report it
+    /// </summary>
+    /// <param name="input">The channel</param>
+    /// <param name="feedRateMmPerSec">The rate</param>
+    /// <returns>The rate in the channel's own units, per minute</returns>
+    public static float ModalFeedRateFromMmPerSec(InputChannel input, float feedRateMmPerSec)
+        => feedRateMmPerSec * SecondsPerMinute / UnitScale(input);
+
+    /// <summary>
+    /// What one of a channel's distance units is in millimetres
+    /// </summary>
+    /// <param name="input">The channel, or null for one that does not exist</param>
+    /// <returns>The scale</returns>
+    public static float UnitScale(InputChannel? input)
+        => input?.DistanceUnit == DistanceUnit.Inch ? MmPerInch : 1.0f;
 
     /// <summary>
     /// How much of the code about to be built has already been done, 0..1

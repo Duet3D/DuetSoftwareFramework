@@ -133,7 +133,7 @@ internal sealed partial class GCodeHandler
             }
         }
 
-        float unitScale = !rotationalOnly && input?.DistanceUnit == DistanceUnit.Inch ? MmPerInch : 1.0f;
-        return feedRate * unitScale / SecondsPerMinute;
+        float unitScale = rotationalOnly ? 1.0f : MoveInterpreter.UnitScale(input);
+        return feedRate * unitScale / MoveInterpreter.SecondsPerMinute;
     }
 }

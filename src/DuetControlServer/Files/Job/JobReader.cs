@@ -438,17 +438,21 @@ internal sealed class JobReader
         if (!_frozen && endOfFile)
         {
             // The moves the file queued last have still to be made, so this says only that the file
-            // ran out of codes: waiting for the machine is the controller's step
-            _codeProcessor.PurgeSyncRequestsFor(File);
+            // ran out of codes: waiting for the machine is the controller's step.
+            //
+            // The flush comes first, because PurgeSyncRequestsFor clears the channel's job file and
+            // a flush by file then finds no stack item and answers false without waiting for
+            // anything. That is what the flush is for: a plugin may have inserted codes at the end
+            // of the print file, and they are the job's as much as the file's own
             try
             {
-                // In case plugins inserted codes at the end of the file
                 await _codeProcessor.FlushAsync(File);
             }
             catch (OperationCanceledException)
             {
                 // Nothing left to flush
             }
+            _codeProcessor.PurgeSyncRequestsFor(File);
             await Post(new JobCommand.ReaderFinished(Index));
         }
 

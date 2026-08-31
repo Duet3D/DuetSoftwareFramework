@@ -142,9 +142,16 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// The job-control codes a job file can contain - M0, M1, M2, M25, M226, M600, M601, M32 - ask
     /// for something that cancels the read-ahead they are part of. Under the channel's token that
     /// would cancel their own reply, so from handler entry they run under
-    /// <c>ApplicationStopping</c>, as prioritised codes do
+    /// <c>ApplicationStopping</c>, as prioritised codes do. The handler has to pass the returned
+    /// token on as well: waiting for the job's answer on the token the request has just cancelled
+    /// is the same defect one call further down
     /// </remarks>
-    internal void DetachFromChannelCancellation() => CancellationToken = _lifetime.ApplicationStopping;
+    /// <returns>The token it now runs under, which the handler passes on in place of its own</returns>
+    internal CancellationToken DetachFromChannelCancellation()
+    {
+        CancellationToken = _lifetime.ApplicationStopping;
+        return CancellationToken;
+    }
 
     /// <summary>
     /// Used to reset the cancellation token of this code

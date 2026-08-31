@@ -55,20 +55,7 @@ internal sealed partial class GCodeHandler(
     MoveInterpreter moveInterpreter,
     ILogger<GCodeHandler> logger) : ICodeHandler
 {
-    /// <summary>
-    /// How long to wait before retrying a move the engine had no room for
-    /// </summary>
-    private static readonly TimeSpan RingFullRetryDelay = TimeSpan.FromMilliseconds(5);
 
-    /// <summary>
-    /// Millimetres per inch, for G20
-    /// </summary>
-    private const float MmPerInch = 25.4f;
-
-    /// <summary>
-    /// G-code feed rates are per minute; everything below the interpreter is per second
-    /// </summary>
-    private const float SecondsPerMinute = 60.0f;
 
     /// <summary>
     /// Process a G-code that should be interpreted by the control server
@@ -147,9 +134,7 @@ internal sealed partial class GCodeHandler(
 
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
-            InputChannel? input = model.Inputs[code.Channel];
-            float unitScale = input?.DistanceUnit == DistanceUnit.Inch ? MmPerInch : 1.0f;
-            float feedRateMmPerSec = (input?.FeedRate ?? 0.0f) * unitScale / SecondsPerMinute;
+            float feedRateMmPerSec = MoveInterpreter.ModalFeedRateMmPerSec(model.Inputs[code.Channel]);
 
             using (planner.Lock())
             {
@@ -493,7 +478,7 @@ internal sealed partial class GCodeHandler(
                     return new Message();
                 }
 
-                await Task.Delay(RingFullRetryDelay, cancellationToken);
+                await Task.Delay(MovePlanner.RingFullRetryDelay, cancellationToken);
             }
 
             return new Message();
@@ -537,8 +522,7 @@ internal sealed partial class GCodeHandler(
         // TODO validate this against RRF
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
-            InputChannel? input = model.Inputs[code.Channel];
-            float unitScale = input?.DistanceUnit == DistanceUnit.Inch ? MmPerInch : 1.0f;
+            float unitScale = MoveInterpreter.UnitScale(model.Inputs[code.Channel]);
 
             using (planner.Lock())
             {

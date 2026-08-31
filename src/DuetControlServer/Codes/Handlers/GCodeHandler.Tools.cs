@@ -59,7 +59,7 @@ internal sealed partial class GCodeHandler
             }
 
             InputChannel? input = model.Inputs[code.Channel];
-            float unitScale = input?.DistanceUnit == DistanceUnit.Inch ? MmPerInch : 1.0f;
+            float unitScale = MoveInterpreter.UnitScale(input);
 
             bool seen = false;
             using (planner.Lock())

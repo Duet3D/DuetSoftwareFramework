@@ -434,7 +434,7 @@ internal sealed partial class GCodeHandler
                     return false;
 
                 default:
-                    await Task.Delay(RingFullRetryDelay, cancellationToken);
+                    await Task.Delay(MovePlanner.RingFullRetryDelay, cancellationToken);
                     break;
             }
         }
@@ -767,10 +767,8 @@ internal sealed partial class GCodeHandler
     private async ValueTask MoveToPointAsync(int axis0, float coord0, int axis1, float coord1,
                                              ProbeSettings settings, CancellationToken cancellationToken)
     {
-        while (!cancellationToken.IsCancellationRequested)
+        await planner.QueueAndWaitAsync(async () =>
         {
-            MoveSubmitResult result;
-
             using (await model.AccessReadWriteAsync(cancellationToken))
             {
                 RawMove move = new()
@@ -790,16 +788,9 @@ internal sealed partial class GCodeHandler
                 // the nozzle clears the bed on the way across
                 move.Coords[settings.ZAxis] = ProbeStartHeight(settings, 0);
 
-                result = planner.QueueMove(move);
+                return planner.QueueMove(move);
             }
-
-            if (result is MoveSubmitResult.Queued or MoveSubmitResult.NoMovement or MoveSubmitResult.Rejected)
-            {
-                await planner.StandstillAsync(cancellationToken);
-                return;
-            }
-            await Task.Delay(RingFullRetryDelay, cancellationToken);
-        }
+        }, cancellationToken);
     }
 
     /// <summary>

@@ -404,7 +404,7 @@ internal partial class MCodeHandler(
             // under the shutdown token alone and its own reply survives
             if (code.IsFromFileChannel)
             {
-                code.DetachFromChannelCancellation();
+                cancellationToken = code.DetachFromChannelCancellation();
             }
 
             // How the job ended decides which macro runs, and the transition table decides which of
@@ -552,7 +552,7 @@ internal partial class MCodeHandler(
                 // cancellation behind in the same way M0 does
                 if (code.IsFromFileChannel && code.MajorNumber == 32)
                 {
-                    code.DetachFromChannelCancellation();
+                    cancellationToken = code.DetachFromChannelCancellation();
                 }
 
                 Message selected = await jobController.SelectFileAsync(fileName, physicalFile, simulating: false,
@@ -634,7 +634,7 @@ internal partial class MCodeHandler(
         // reply survives the read-ahead being dropped
         if (code.IsFromFileChannel)
         {
-            code.DetachFromChannelCancellation();
+            cancellationToken = code.DetachFromChannelCancellation();
         }
 
         return await jobController.PauseAsync(new Files.Job.PauseRequest(code.Channel, PrintPausedReason.User, Files.Job.PauseMacro.Pause,
@@ -675,7 +675,7 @@ internal partial class MCodeHandler(
             PrintPausedReason reason = filamentChange ? PrintPausedReason.FilamentChange : PrintPausedReason.GCode;
 
             // The freeze this asks for must not cancel its own reply
-            code.DetachFromChannelCancellation();
+            cancellationToken = code.DetachFromChannelCancellation();
 
             return await jobController.PauseAsync(new Files.Job.PauseRequest(code.Channel, reason, macro,
                                                                    Synchronous: true, ReportPosition: true),

@@ -344,6 +344,10 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
             // the run it is itself a code of
             if (state.Phase is JobPhase.Running or JobPhase.Finishing)
             {
+                if (state.Phase == JobPhase.Running)
+                {
+                    StopReading(state);
+                }
                 Publish(state with { NextFile = command.File });
                 command.Reply(new Message());
                 if (state.Phase == JobPhase.Running)
@@ -487,6 +491,15 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         // The finish a pause landed on top of is dropped: the reader reports Finished again once the
         // job resumes and runs out of codes a second time
         CancelSequence();
+
+        // The freeze is the loop's, not the sequence's. Nothing more may be read or dispatched from
+        // the moment the pause is accepted: a sequence is a task of its own, and the code that asked
+        // for the pause would otherwise complete in the window before it started and let the reader
+        // dispatch one more line - which the machine would then make, past the point being recorded
+        foreach (JobStream stream in _state.Streams)
+        {
+            stream.Reader.Freeze();
+        }
         Publish(_state with { Phase = JobPhase.Pausing, PendingPause = null });
 
         // A pause commanded from the job file itself is answered now rather than when the sequence
@@ -512,8 +525,10 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         {
             if (state.Phase == JobPhase.Running)
             {
-                // The job reaching its end. Answered at once, because the code that asked is one of
-                // the job's own and the teardown has to wait for it to complete
+                // The job reaching its end. Reading stops before the reply, so nothing more of the
+                // file is dispatched while the code that asked completes; the reply comes before the
+                // teardown, because the teardown has to wait for that code
+                StopReading(state);
                 command.Reply(new Message());
                 await EndRunAsync(PrintStoppedReason.NormalCompletion);
                 return;

@@ -70,21 +70,6 @@ internal sealed class JobSequences(
     /// </remarks>
     private const float ResumeFeedRateMmPerSec = 3000.0f / 60.0f;
 
-    /// <summary>
-    /// Millimetres per inch, for the channels working in G20
-    /// </summary>
-    private const float MmPerInch = 25.4f;
-
-    /// <summary>
-    /// Feed rates are given per minute and used per second
-    /// </summary>
-    private const float SecondsPerMinute = 60.0f;
-
-    /// <summary>
-    /// How long to wait before retrying a move the engine had no room for
-    /// </summary>
-    private static readonly TimeSpan RingFullRetryDelay = TimeSpan.FromMilliseconds(5);
-
     #region Selecting a file
 
     /// <summary>
@@ -207,16 +192,11 @@ internal sealed class JobSequences(
     public async Task<SequenceOutcome> PauseAsync(JobState state, PauseRequest request, long? boundaryPosition,
                                                   CancellationToken cancellationToken)
     {
-        // Nothing more is read and nothing more is dispatched. This comes first because it is what
-        // lets the steps below finish: a job code waiting on a temperature would otherwise hold the
-        // pause up for as long as the heater takes. Waiting for the codes already in flight comes
-        // after the stop, not here: one of them may be a deferred code parked on a move this pause
-        // is about to drop
-        foreach (JobStream stream in state.Streams)
-        {
-            stream.Reader.Freeze();
-        }
-
+        // The streams were frozen by the transition that started this sequence, so nothing more has
+        // been read or dispatched since the pause was accepted. Waiting for the codes already in
+        // flight comes after the stop rather than here: one of them may be a deferred code parked on
+        // a move this pause is about to drop.
+        //
         // The engine plans a deceleration at the first move it has not committed and drops the rest.
         // A synchronous pause asks for none: the job file has reached the pause point, so everything
         // queued ahead of it is what has to run and there is nothing to purge
@@ -310,9 +290,7 @@ internal sealed class JobSequences(
     {
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
-            InputChannel? input = model.Inputs[CodeChannel.File];
-            float unitScale = input?.DistanceUnit == DistanceUnit.Inch ? MmPerInch : 1.0f;
-            float feedRateMmPerSec = (input?.FeedRate ?? 0.0f) * unitScale / SecondsPerMinute;
+            float feedRateMmPerSec = MoveInterpreter.ModalFeedRateMmPerSec(model.Inputs[CodeChannel.File]);
 
             using (planner.Lock())
             {
@@ -510,9 +488,8 @@ internal sealed class JobSequences(
     /// <param name="cancellationToken">Cancellation token</param>
     private async ValueTask RestoreAxesAsync(AxisSelection selection, CancellationToken cancellationToken)
     {
-        while (!cancellationToken.IsCancellationRequested)
+        await planner.QueueAndWaitAsync(async () =>
         {
-            MoveSubmitResult result;
             using (await model.AccessReadWriteAsync(cancellationToken))
             {
                 using (planner.Lock())
@@ -555,25 +532,19 @@ internal sealed class JobSequences(
 
                     if (!anythingToDo)
                     {
-                        return;
+                        return null;
                     }
 
                     ToolTransform.Apply(toolManager.Current, model.Move, planner.State, move.Coords, numAxes);
-                    result = planner.QueueMove(move);
-                    if (result is MoveSubmitResult.Queued or MoveSubmitResult.NoMovement or MoveSubmitResult.Rejected)
+                    MoveSubmitResult result = planner.QueueMove(move);
+                    if (result.IsSettled())
                     {
                         planner.PublishCommittedPosition();
                     }
+                    return result;
                 }
             }
-
-            if (result is MoveSubmitResult.Queued or MoveSubmitResult.NoMovement or MoveSubmitResult.Rejected)
-            {
-                await planner.StandstillAsync(cancellationToken);
-                return;
-            }
-            await Task.Delay(RingFullRetryDelay, cancellationToken);
-        }
+        }, cancellationToken);
     }
 
     /// <summary>
@@ -619,11 +590,7 @@ internal sealed class JobSequences(
                     input.DrivesRelative = drivesWereRelative;
                 }
 
-                float unitScale = input.DistanceUnit == DistanceUnit.Inch ? MmPerInch : 1.0f;
-                if (unitScale != 0.0f)
-                {
-                    input.FeedRate = feedRateMmPerSec * SecondsPerMinute / unitScale;
-                }
+                input.FeedRate = MoveInterpreter.ModalFeedRateFromMmPerSec(input, feedRateMmPerSec);
             }
         }
     }

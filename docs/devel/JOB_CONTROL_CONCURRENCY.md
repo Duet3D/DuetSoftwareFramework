@@ -1236,14 +1236,18 @@ step leaves the tree building and the bench no worse.
      aborted job does everywhere else and as RepRapFirmware does: a file that depends on the machine
      working is the wrong thing to reach for when starting the job did not work. `lastFileAborted`
      is set, which is what §7.12's scenario asks for.
-4. **The removals** the cut-over makes dead, each into one shared helper: the queue-retry-standstill
-   loop written out in `RestoreAxesAsync`, the probe travel move, the second probing loop and
-   `SubmitMoveAsync`, with `RingFullRetryDelay` declared in two classes, becomes one `MovePlanner`
-   method the four sites call; the feed-rate conversion written out with its own `MmPerInch` and
-   `SecondsPerMinute` in `MoveInterpreter`, `GCodeHandler` (`G60`), `JobProcessor.Lifecycle` and
-   `MCodeHandler.Motion` becomes `MoveInterpreter.ModalFeedRateMmPerSec` and its inverse, used by
-   `G60`, the pause and the resume; the deferral predicate spelled out in three places; and the two
-   comments and the stale `TODO` in R20's last entries.
+4. **The removals** the cut-over makes dead, each into one shared helper. **Done:**
+   `MovePlanner.QueueAndWaitAsync` is the queue-retry-standstill loop the resume's two legs and the
+   probe travel move both used to write out, and `MovePlanner.RingFullRetryDelay` is the one
+   declaration of the interval the other two sites wait for;
+   `MoveInterpreter.ModalFeedRateMmPerSec`, its inverse `ModalFeedRateFromMmPerSec` and `UnitScale`
+   are the one feed-rate rule, used by `G60`, `G92`, the endstop and tool paths, the pause and the
+   resume, so `MmPerInch` and `SecondsPerMinute` are declared once; `MoveSubmitResult.IsSettled` is
+   the "the engine has said its last word" predicate the retry sites spelled out; and the
+   end-of-file flush now runs before `PurgeSyncRequestsFor` clears the channel's job file, so it
+   waits for the codes a plugin inserted instead of finding no stack item and returning false. The
+   duplicated ways of asking whether a job is in the way, and the three derivations of how a job
+   ended, went with `JobProcessor` in step 3.
 
 Steps 1 and 2 can be worked in parallel with the writing of step 3, since they touch different
 files.

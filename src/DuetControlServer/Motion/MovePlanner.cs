@@ -29,6 +29,24 @@ internal enum MoveSubmitResult
 }
 
 /// <summary>
+/// What a submission result means for the caller that made it
+/// </summary>
+internal static class MoveSubmitResults
+{
+    /// <summary>
+    /// Whether the engine has said its last word about the move
+    /// </summary>
+    /// <param name="result">The result</param>
+    /// <returns>True unless the caller is expected to offer the same move again</returns>
+    /// <remarks>
+    /// <see cref="MoveSubmitResult.Busy"/> alone is a retry: the ring is full, which is the normal
+    /// state when moves are commanded faster than the machine can run them. Everything else is an
+    /// answer, whether the move was taken, rounded away or refused
+    /// </remarks>
+    public static bool IsSettled(this MoveSubmitResult result) => result != MoveSubmitResult.Busy;
+}
+
+/// <summary>
 /// Where a G-code becomes a queued move
 /// </summary>
 /// <remarks>
@@ -364,6 +382,50 @@ internal sealed class MovePlanner(
             }
         }
         return false;
+    }
+
+    /// <summary>
+    /// How long to wait before offering the engine a move it had no room for again
+    /// </summary>
+    /// <remarks>
+    /// A full ring is the normal state when moves are commanded faster than the machine can run
+    /// them, so this is the back-pressure interval rather than an error path
+    /// </remarks>
+    public static readonly TimeSpan RingFullRetryDelay = TimeSpan.FromMilliseconds(5);
+
+    /// <summary>
+    /// Queue one move, retrying while the engine has no room, and wait for the machine to make it
+    /// </summary>
+    /// <param name="build">
+    /// Builds and queues the move under whatever locks it needs, or returns null when there is
+    /// nothing to do. Called again for each retry, because the state a move is built from may have
+    /// moved on while the ring was full
+    /// </param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>What became of the move, or null if there was nothing to do</returns>
+    /// <remarks>
+    /// The shape every caller that moves the machine by itself needs - the resume's two legs, a
+    /// probe travelling to the next point - as against the segmented submission of an ordinary
+    /// <c>G1</c>, which gives the ring up between segments and does not wait
+    /// </remarks>
+    public async ValueTask<MoveSubmitResult?> QueueAndWaitAsync(Func<ValueTask<MoveSubmitResult?>> build,
+                                                                CancellationToken cancellationToken = default)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            MoveSubmitResult? result = await build();
+            if (result is null)
+            {
+                return null;
+            }
+            if (result.Value.IsSettled())
+            {
+                await StandstillAsync(cancellationToken);
+                return result;
+            }
+            await Task.Delay(RingFullRetryDelay, cancellationToken);
+        }
+        return null;
     }
 
     /// <summary>
