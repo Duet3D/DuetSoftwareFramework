@@ -49,6 +49,7 @@ namespace DuetControlServer.Link;
 /// <param name="model">Object model</param>
 /// <param name="filePathResolver">File path resolver</param>
 /// <param name="motionTracker">Where what the native motion engine reports is recorded</param>
+/// <param name="planner">Holds the index of which job code each queued move came from</param>
 /// <param name="endstopCorrection">Applies the position an endstop actually fired at</param>
 /// <param name="lifetime">Host application lifetime</param>
 /// <param name="logger">Logger</param>
@@ -65,6 +66,7 @@ internal sealed class LinkService(
     Model.ObjectModel model,
     FilePathResolver filePathResolver,
     Motion.MotionTracker motionTracker,
+    Motion.MovePlanner planner,
     Motion.EndstopCorrection endstopCorrection,
     IHostApplicationLifetime lifetime,
     ILogger<LinkService> logger,
@@ -1022,6 +1024,13 @@ internal sealed class LinkService(
         // Forget what the motion engine reported. The moves it refers to are gone with the link, and
         // a stale endpoint reading applied to a move planned after the reconnect would be a jump
         motionTracker.Invalidate();
+
+        // The same for what each of those moves was going to tell the job file: a move id from
+        // before the link went down describes a queue the engine no longer has
+        using (planner.Lock())
+        {
+            planner.JobMoves.Clear();
+        }
 
         // Forget when each board was last heard from, so that the first sweep after the link returns
         // does not time out every board for a silence they had no way to break

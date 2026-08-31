@@ -1499,7 +1499,7 @@ internal partial class MCodeHandler(
         {
             // Changing the system folder under a running job would change which macros a queued
             // move's callbacks resolve to, so wait for the machine to stop first
-            if (await planner.WaitForStandstillAsync(cancellationToken))
+            if (await planner.StandstillAsync(cancellationToken))
             {
                 string physicalDirectory = await filePathResolver.ToPhysicalAsync(directory, web ? "www" : "sys", cancellationToken);
                 if (Directory.Exists(physicalDirectory))

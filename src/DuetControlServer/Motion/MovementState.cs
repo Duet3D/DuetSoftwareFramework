@@ -97,7 +97,7 @@ internal sealed class MovementState
     /// <para>
     /// It says one thing, and it is global because a purge is global: a macro's segmented move is as
     /// void as the job's. What it does not say is anything about the job file, which is
-    /// <see cref="CurrentJobMove"/>'s job
+    /// <see cref="JobMoveIndex"/>'s job
     /// </para>
     /// </remarks>
     public uint PurgeGeneration { get; private set; }
@@ -106,24 +106,6 @@ internal sealed class MovementState
     /// Note that a stop has dropped queued moves
     /// </summary>
     public void NotePurge() => PurgeGeneration++;
-
-    /// <summary>
-    /// The job-file code the interpreter is part-way through, if it is part-way through one
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// RepRapFirmware's <c>ms.raw</c> together with <c>ms.totalSegments</c> and
-    /// <c>ms.segmentsLeft</c>, which is what <c>DoAsynchronousPause</c> reads when it stops part-way
-    /// through a code. It is set when the code's move is built and cleared by whatever ends the code:
-    /// the submission once every segment has been queued, or the pause, which takes it.
-    /// </para>
-    /// <para>
-    /// Taking it is what fixes the segment count in it. A submission finding a record that is no
-    /// longer its own queues nothing more of that code, so what the pause read stays true however the
-    /// submission then unwinds
-    /// </para>
-    /// </remarks>
-    public JobMoveOrigin? CurrentJobMove { get; set; }
 
     /// <summary>
     /// The fraction of the first line M26 named that has already been made, 0..1
@@ -226,8 +208,8 @@ internal sealed class MovementState
     /// simulation - is a command that has already replaced the modal motion command, so a value saved
     /// here would be the wrong one. The same goes for the fraction of a move already done, which is
     /// zero for every caller that reaches a code boundary before saving. An asynchronous pause is the
-    /// one that does not, and it overwrites both from the move it stopped before - see
-    /// <c>JobProcessor.SaveRestorePointAsync</c>
+    /// one that does not, and it overwrites both from the move it stopped before - see the restore
+    /// point step of the pause sequence in <c>Files/Job/JobSequences.cs</c>
     /// </remarks>
     public void SavePosition(int restorePointNumber, int numAxes, float feedRate, int toolNumber, long? filePosition)
     {
@@ -265,7 +247,6 @@ internal sealed class MovementState
         EndstopsTriggered = 0;
         SegmentsLeft = 0;
         MoveFractionToSkip = 0.0f;
-        CurrentJobMove = null;
         RestartMoveFractionDone = 0.0f;
         RestartGCommandNumber = -1;
         VirtualFanSpeed = 0.0f;

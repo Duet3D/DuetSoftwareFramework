@@ -975,13 +975,16 @@ M596 work in [MOTION_SYNCHRONISED_ACTIONS.md](MOTION_SYNCHRONISED_ACTIONS.md), n
   `MovePlanner.LastSubmittedMoveId(ring)`, and `StandstillAsync` is the conjunction over rings,
   because move ids come from one counter and the two rings interleave them. It is meaningful after a
   `Freeze` or at the end of the file, not between the segments of one `G1`, which is where the
-  `M400`-style callers of `CodeProcessor.WaitForStandstillAsync` already stand today. Liveness: the
-  completion event of the last move can itself be dropped, and after the last move no later event
-  sweeps it, so the native side adds a per-ring "idle since sequence N" word to the position
-  snapshot it already publishes through a seqlock, read once per completion event and by a slow
-  watchdog that logs when it is the one that fires. The 5 ms poll and its `1 + 2 × MaxRings`
-  P/Invokes leave the reader's path and the pause; `MachineStatusService` derives `IsMoving` from
-  the same two numbers, on the managed side, with no P/Invoke.
+  `M400`-style callers of `CodeProcessor.WaitForStandstillAsync` already stand today. A stop rolls
+  `LastSubmittedMoveId` back to the survivor in the same lock window it resynchronises the builder
+  in, so the wait that follows one is a wait for the move the machine actually comes to rest on.
+  Liveness: the completion event of the last move can itself be dropped, and after the last move no
+  later event sweeps it, so the wait is raced against a 250 ms watchdog that reads the scheduled and
+  completed counters the engine already publishes through its seqlock and logs when it is the one
+  that fires. That is `IsMoving`, which `MachineStatusService` derives `state.status` from; no
+  per-ring "idle since sequence N" word is needed on the wire for it. What leaves the reader's path
+  and the pause is the 5 ms poll, which was `1 + 2 × MaxRings` P/Invokes every 5 ms for as long as
+  anything was waiting.
 - **The feedhold stays a poll, made once.** No inbound event carries the feedhold result and this
   plan adds none: `StopEarlyAsync` keeps its 2 ms poll of the seqlock inside one method and exposes
   it as `FeedholdCompletedAsync`. That is one poll per pause, on the sequence's task, against the
@@ -1187,12 +1190,15 @@ step leaves the tree building and the bench no worse.
    which is the record of what is being fixed. They are only a record if the bench gives the same
    answer twice, so steps 1 to 5 of [DETERMINISTIC_BENCH.md](DETERMINISTIC_BENCH.md) land first.
 2. **The motion prerequisites**, each useful on its own and each with its scenarios above:
-   `MotionTracker.FailAfter` called from `StopEarlyAsync`; `WaitForRetirementAsync` and the
-   per-ring idle word behind `StandstillAsync`, with the polls demoted to a logged watchdog;
-   `FeedholdCompletedAsync` as the name of the one remaining poll; the purge generation captured at
-   handler entry; `JobMoveIndex` noting macro moves under the invoking job code, cleared on job
-   selection and link invalidation, with `TakeJobResumePoint` switched to the §7.7 rule in the same
-   change, since its fallback branch depends on the clear it loses.
+   `MotionTracker.FailAfter` called from `StopEarlyAsync`; `WaitForRetirementAsync` behind
+   `StandstillAsync`, with the poll demoted to a logged watchdog; `FeedholdCompletedAsync` as the
+   name of the one remaining poll; the purge generation captured at handler entry;
+   `JobMoveIndex` noting macro moves under the invoking job code, cleared on job selection and link
+   invalidation, with `TakeJobResumePoint` replaced by the §7.7 rule in the same change, since its
+   fallback branch depends on the clear it loses. **Done.** `MovePlanner.JobRewindPointFor` is the
+   §7.7 rule and `MacroFile.InvokingJobCode` is what case 3 reads; `MovementState.CurrentJobMove`
+   went with them, the purge generation alone now telling a submission in flight that its path is
+   void.
 3. **The controller, the reader and the sequences**, written whole, and the cut-over: the DI
    registration, the call sites listed in §7.10, the dispatch barrier of §7.5 in
    `PipelineStackItem.cs` and its flag on `CodeFile`, the deletion of `JobProcessor.cs`,

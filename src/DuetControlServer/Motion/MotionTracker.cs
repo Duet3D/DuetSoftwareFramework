@@ -51,14 +51,26 @@ internal sealed class MotionTracker(ILogger<MotionTracker> logger)
 
         /// <summary>Waits pending on a move's retirement, each keyed by the move id it waits for</summary>
         public readonly List<Waiter> Waiters = [];
+
+        /// <summary>Lowest id the last sweep failed, one past the move the stop left standing</summary>
+        public uint FirstFailedMoveId;
+
+        /// <summary>Highest id the last sweep failed, the last one submitted when it ran</summary>
+        public uint LastFailedMoveId;
+
+        /// <summary>Whether the two above describe a sweep that has happened</summary>
+        public bool HaveFailedRange;
     }
 
     /// <summary>
     /// A wait pending on a move's retirement
     /// </summary>
     /// <param name="MoveId">Move id the wait is for</param>
-    /// <param name="Tcs">Completion source released when that move has retired</param>
-    private sealed record Waiter(uint MoveId, TaskCompletionSource Tcs);
+    /// <param name="Tcs">
+    /// Completion source released when that move has retired, with true if it ran and false if a
+    /// stop dropped it
+    /// </param>
+    private sealed record Waiter(uint MoveId, TaskCompletionSource<bool> Tcs);
 
     private readonly RingState[] _rings = CreateRings();
 
@@ -114,11 +126,77 @@ internal sealed class MotionTracker(ILogger<MotionTracker> logger)
                 if ((int)(waiter.MoveId - moveId) <= 0)
                 {
                     state.Waiters.RemoveAt(i);
-                    waiter.Tcs.TrySetResult();
+                    waiter.Tcs.TrySetResult(true);
                 }
             }
         }
     }
+
+    /// <summary>
+    /// Release every wait for a move a stop dropped
+    /// </summary>
+    /// <param name="ring">Ring that was stopped</param>
+    /// <param name="lastSurvivingMoveId">Id of the last move the stop left standing</param>
+    /// <param name="lastSubmittedMoveId">Id of the last move submitted when the stop ran</param>
+    /// <remarks>
+    /// <para>
+    /// Purged DDAs and discarded submissions are reported to nobody: the engine cannot send one
+    /// event per dropped id, because the inbound ring drops events when it fills and a purge of a
+    /// whole ring is the moment it would. So the boundary is applied here instead, in one sweep,
+    /// with the same signed-distance comparison <see cref="MoveCompleted"/> uses. Every id above
+    /// the survivor and at or below the last one submitted is one the machine will never make, so
+    /// a wait on it ends now rather than when some later move happens to complete.
+    /// </para>
+    /// <para>
+    /// The range is remembered as well as swept, because a wait may be registered after the stop:
+    /// the standstill wait asks for the last submitted id, and a deferred code chained behind
+    /// another reaches its own wait later still. Only the latest range is kept - a second stop
+    /// starts above the first one's survivor, and by the time it runs every wait the first swept
+    /// has been answered
+    /// </para>
+    /// </remarks>
+    public void FailAfter(int ring, uint lastSurvivingMoveId, uint lastSubmittedMoveId)
+    {
+        if (!IsValidRing(ring))
+        {
+            return;
+        }
+
+        lock (_lock)
+        {
+            RingState state = _rings[ring];
+            if ((int)(lastSubmittedMoveId - lastSurvivingMoveId) <= 0)
+            {
+                // The stop dropped nothing this side was holding an id for
+                return;
+            }
+
+            state.FirstFailedMoveId = lastSurvivingMoveId + 1;
+            state.LastFailedMoveId = lastSubmittedMoveId;
+            state.HaveFailedRange = true;
+
+            for (int i = state.Waiters.Count - 1; i >= 0; i--)
+            {
+                Waiter waiter = state.Waiters[i];
+                if (IsInFailedRange(state, waiter.MoveId))
+                {
+                    state.Waiters.RemoveAt(i);
+                    waiter.Tcs.TrySetResult(false);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether a move id falls in the range the last sweep failed
+    /// </summary>
+    /// <param name="state">Ring state, whose lock the caller holds</param>
+    /// <param name="moveId">Id to test</param>
+    /// <returns>True if the move was dropped by a stop</returns>
+    private static bool IsInFailedRange(RingState state, uint moveId)
+        => state.HaveFailedRange
+           && (int)(moveId - state.FirstFailedMoveId) >= 0
+           && (int)(moveId - state.LastFailedMoveId) <= 0;
 
     /// <summary>
     /// Whether the given move has been reported as completed
@@ -136,38 +214,45 @@ internal sealed class MotionTracker(ILogger<MotionTracker> logger)
         lock (_lock)
         {
             RingState state = _rings[ring];
-            return state.HaveCompletedMoves && (int)(moveId - state.LastCompletedMoveId) <= 0;
+            return (state.HaveCompletedMoves && (int)(moveId - state.LastCompletedMoveId) <= 0)
+                   || IsInFailedRange(state, moveId);
         }
     }
 
     /// <summary>
-    /// Wait until the given move has been reported as completed
+    /// Wait until the given move has retired, whether it ran or a stop dropped it
     /// </summary>
     /// <param name="ring">Ring the move was queued on</param>
     /// <param name="moveId">Id of the move to wait for</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Task completing when the move has retired</returns>
+    /// <returns>True once the move has completed, false if a stop dropped it</returns>
     /// <remarks>
     /// Move ids are handed out in submission order and skip zero on wrap, so whether a move has
     /// retired is a signed-distance comparison against the last reported id, and a wait for a move
-    /// that already retired completes immediately. <see cref="Invalidate"/> cancels every waiter:
-    /// the moves they were waiting for are gone with the link
+    /// that already retired completes immediately. Every id terminates: one the machine makes
+    /// completes, and one a stop dropped is failed by <see cref="FailAfter"/>, so nothing waits on
+    /// a move that will never be reported. <see cref="Invalidate"/> cancels every waiter: the moves
+    /// they were waiting for are gone with the link
     /// </remarks>
-    public Task WaitForMoveAsync(int ring, uint moveId, CancellationToken cancellationToken)
+    public Task<bool> WaitForRetirementAsync(int ring, uint moveId, CancellationToken cancellationToken)
     {
         if (!IsValidRing(ring))
         {
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
 
-        TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         Waiter waiter = new(moveId, tcs);
         lock (_lock)
         {
             RingState state = _rings[ring];
             if (state.HaveCompletedMoves && (int)(moveId - state.LastCompletedMoveId) <= 0)
             {
-                return Task.CompletedTask;
+                return Task.FromResult(true);
+            }
+            if (IsInFailedRange(state, moveId))
+            {
+                return Task.FromResult(false);
             }
             state.Waiters.Add(waiter);
         }
@@ -201,6 +286,26 @@ internal sealed class MotionTracker(ILogger<MotionTracker> logger)
     public void MoveFailed(int ring, uint moveId, NativeMovementError error)
     {
         logger.LogError("Move {MoveId} on ring {Ring} failed: {Error}", moveId, ring, error);
+        if (!IsValidRing(ring))
+        {
+            return;
+        }
+
+        // A move that will not be executed still has to end the waits on it. Only this id: the
+        // moves submitted before it are still the engine's to run and report
+        lock (_lock)
+        {
+            RingState state = _rings[ring];
+            for (int i = state.Waiters.Count - 1; i >= 0; i--)
+            {
+                Waiter waiter = state.Waiters[i];
+                if (waiter.MoveId == moveId)
+                {
+                    state.Waiters.RemoveAt(i);
+                    waiter.Tcs.TrySetResult(false);
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -252,6 +357,8 @@ internal sealed class MotionTracker(ILogger<MotionTracker> logger)
                 state.CompletedMoves = 0;
                 state.HaveCompletedMoves = false;
                 state.EndpointsPending = false;
+                state.HaveFailedRange = false;
+                state.FirstFailedMoveId = state.LastFailedMoveId = 0;
                 Array.Clear(state.Endpoints);
 
                 foreach (Waiter waiter in state.Waiters)

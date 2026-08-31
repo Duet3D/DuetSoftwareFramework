@@ -124,15 +124,10 @@ internal partial class JobProcessor
                 }
             }
 
-            Motion.JobResumePoint? resume;
+            Motion.MovePlanner.JobRewindPoint rewind = _planner.JobRewindPointFor(held);
+            Motion.JobResumePoint? resume = rewind.Point;
             using (await LockAsync(cancellationToken))
             {
-                // Where the job carries on from, taken once and before the read-ahead is cancelled:
-                // taking the record of the code that was going out is what fixes how much of it the
-                // machine will have made, and the cancellation would otherwise end that submission
-                // somewhere this has not looked
-                resume = _planner.TakeJobResumePoint(held);
-
                 // Cancel what the job has read ahead. This comes first because it is what lets the
                 // flush below finish: a job code waiting on a temperature would otherwise hold it up
                 // for as long as the heater takes.
@@ -802,7 +797,7 @@ internal partial class JobProcessor
 
             if (result is MoveSubmitResult.Queued or MoveSubmitResult.NoMovement or MoveSubmitResult.Rejected)
             {
-                await _planner.WaitForStandstillAsync(cancellationToken);
+                await _planner.StandstillAsync(cancellationToken);
                 return;
             }
             await Task.Delay(RingFullRetryDelay, cancellationToken);

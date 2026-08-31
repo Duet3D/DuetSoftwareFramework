@@ -246,7 +246,7 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
         Motion.MovePlanner planner = _planner ??= serviceProvider.GetRequiredService<Motion.MovePlanner>();
         while (true)
         {
-            if (!await planner.WaitForStandstillAsync(cancellationToken))
+            if (!await planner.StandstillAsync(cancellationToken))
             {
                 return false;
             }
@@ -325,14 +325,14 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     }
 
     /// <summary>
-    /// Wait until the given move has retired
+    /// Wait until the given move has retired, whether it ran or a stop dropped it
     /// </summary>
     /// <param name="ring">Ring the move was queued on</param>
     /// <param name="moveId">Id of the move to wait for</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Task completing when the move has retired</returns>
-    public Task WaitForMoveAsync(int ring, uint moveId, CancellationToken cancellationToken)
-        => (_motionTracker ??= serviceProvider.GetRequiredService<Motion.MotionTracker>()).WaitForMoveAsync(ring, moveId, cancellationToken);
+    /// <returns>True once the move has completed, false if a stop dropped it</returns>
+    public Task<bool> WaitForRetirementAsync(int ring, uint moveId, CancellationToken cancellationToken)
+        => (_motionTracker ??= serviceProvider.GetRequiredService<Motion.MotionTracker>()).WaitForRetirementAsync(ring, moveId, cancellationToken);
 
     /// <summary>
     /// Cancel every deferred code on a channel whose anchor is at or past the given move id

@@ -379,9 +379,14 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
                                 {
                                     await DeferredPredecessor;
                                 }
-                                if (DeferredAnchor != 0)
+                                if (DeferredAnchor != 0 &&
+                                    !await _codeProcessor.WaitForRetirementAsync(DeferredRing, DeferredAnchor, CancellationToken))
                                 {
-                                    await _codeProcessor.WaitForMoveAsync(DeferredRing, DeferredAnchor, CancellationToken);
+                                    // A stop dropped the move this code's effect belongs after, so
+                                    // the point in the path it was waiting for will never be
+                                    // reached. The rewind re-reads its line, which is what makes it
+                                    // fire exactly once
+                                    throw new OperationCanceledException();
                                 }
                             }
                             else if (!await _codeProcessor.FlushAsync(this, cancellationToken: CancellationToken))

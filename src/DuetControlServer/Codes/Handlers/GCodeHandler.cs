@@ -218,7 +218,7 @@ internal sealed partial class GCodeHandler(
         if (moveType != MoveType.Normal)
         {
             // TODO when multiple motion systems are implemented this will likely need to change to only wait for standstill on the active MS
-            await planner.WaitForStandstillAsync(cancellationToken);
+            await planner.StandstillAsync(cancellationToken);
         }
 
         // What each named axis watches, worked out once. A stall-homed axis also has to have its
@@ -267,12 +267,26 @@ internal sealed partial class GCodeHandler(
         SegmentedMove segments = default;
         List<int> armedAxes = [];
         int submitted = 0;
-        uint purgeGeneration = 0;
-        // Where a stop dropping this move would send the job back to, for a move that came from the
-        // job file itself. It is created with the move and cleared by whatever ends the code: this
-        // method, or the pause, which takes it
+        // Where a stop dropping this move would send the job back to. A code read from the job file
+        // names its own position; a code a macro the job invoked is running names the invocation,
+        // because that is the only position in the job file that means anything
         JobMoveOrigin? origin = null;
         bool isJobCode = JobMoveOrigin.IsJobFileCode(code);
+        JobMacroInvocation? macroInvocation = JobMoveOrigin.IsMacroCodeOfJob(code)
+                                              ? (code.File as Files.MacroFile)?.InvokingJobCode
+                                              : null;
+
+        // What the ring had been through when this code entered its handler. A stop that empties
+        // the ring at any point from here on invalidates what this code was asked to do, and this is
+        // what the submission loop notices it by. Read here rather than when the move is built, so
+        // that a code dispatched before a freeze always sees the pre-purge value: a code dispatched
+        // after one does not exist, so between the two there is no code that can queue a move onto a
+        // ring that has just been stopped
+        uint purgeGeneration;
+        using (planner.Lock())
+        {
+            purgeGeneration = planner.State.PurgeGeneration;
+        }
 
         try
         {
@@ -384,28 +398,38 @@ internal sealed partial class GCodeHandler(
                                     FractionAtStart = fractionAtStart,
                                     SegmentCount = segments.Count
                                 };
-                                state.CurrentJobMove = origin;
                             }
-
-                            // What the ring had been through when this move was measured. A stop
-                            // that empties the ring in one of the windows below invalidates the rest
-                            // of this move, and this is what the loop notices it by
-                            purgeGeneration = state.PurgeGeneration;
+                            else if (macroInvocation is JobMacroInvocation invocation)
+                            {
+                                // Under the invoking code, and with no fraction: a stop that comes
+                                // to rest here rewinds to the invocation and runs the macro whole,
+                                // which is RepRapFirmware's pausedInMacro
+                                origin = new JobMoveOrigin
+                                {
+                                    FilePosition = invocation.FilePosition,
+                                    CodeLength = invocation.CodeLength,
+                                    GCommandNumber = -1,
+                                    FeedRateMmPerSec = raw.OriginalFeedRateMmPerSec,
+                                    AxesRelative = input.AxesRelative,
+                                    DrivesRelative = input.DrivesRelative,
+                                    SegmentCount = segments.Count,
+                                    IsMacroInvocation = true
+                                };
+                            }
                         }
 
                         // As many segments as the engine will take. Stopping when it is full and picking
                         // up from the same place is what keeps a long segmented move from blocking
                         while (raw is not null && submitted < segments.Count)
                         {
-                            if (state.PurgeGeneration != purgeGeneration ||
-                                (origin is not null && !ReferenceEquals(state.CurrentJobMove, origin)))
+                            if (state.PurgeGeneration != purgeGeneration)
                             {
-                                // Either a stop emptied the ring while this move was part-way out, or
-                                // a pause took the record of this code. The segments still in hand
-                                // describe a path the machine has been told not to travel, and
-                                // queueing them now would start it moving again after it had come to
-                                // rest - or, where the queue is draining rather than emptied, would
-                                // move the boundary the pause has already recorded.
+                                // A stop emptied the ring while this move was part-way out. The
+                                // segments still in hand describe a path the machine has been told
+                                // not to travel, and queueing them now would start it moving again
+                                // after it had come to rest - or, where the queue is draining rather
+                                // than emptied, would move the boundary the pause has already
+                                // recorded.
                                 //
                                 // Cancelled rather than finished, because that is what it is: the
                                 // code did not do what it was asked to. DoFilePrint advances its own
@@ -444,10 +468,6 @@ internal sealed partial class GCodeHandler(
                             }
                             submitted++;
                             state.SegmentsLeft = segments.Count - submitted;
-                            if (origin is not null)
-                            {
-                                origin.SegmentsQueued = submitted;
-                            }
                         }
                     }
                 }
@@ -492,14 +512,6 @@ internal sealed partial class GCodeHandler(
                 {
                     MovementState state = planner.State;
                     state.SegmentsLeft = 0;
-
-                    // The record belongs to this submission until something else takes it. A pause
-                    // that did take it has put another value there, or none, and must not have this
-                    // one written over the top of it
-                    if (origin is not null && ReferenceEquals(state.CurrentJobMove, origin))
-                    {
-                        state.CurrentJobMove = null;
-                    }
 
                     if (submitted < segments.Count)
                     {

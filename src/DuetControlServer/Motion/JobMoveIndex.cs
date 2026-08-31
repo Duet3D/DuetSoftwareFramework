@@ -90,14 +90,17 @@ internal sealed class JobMoveOrigin
     public int SegmentCount { get; init; }
 
     /// <summary>
-    /// How many of them have been queued
+    /// Whether this describes the job code that invoked a macro rather than a move of the job's own
     /// </summary>
     /// <remarks>
-    /// Advanced as each segment goes out. A stop that purges nothing takes the boundary from here,
-    /// because everything queued was already committed and will run, so the first segment not queued
-    /// is the first the machine will not make
+    /// A move made by a macro the job invoked - a tool change, an <c>M98</c> - is noted under the
+    /// invoking code, because that is the only position in the job file that means anything: the
+    /// macro's own offsets are into the macro. A stop that comes to rest on such a move therefore
+    /// resumes by running the invocation again from its start, which is RepRapFirmware's
+    /// <c>pausedInMacro</c> and <c>macroRestarted</c>. Only the whole invocation can be replayed, so
+    /// the segment counting the rest of this record does is not meaningful for one of these
     /// </remarks>
-    public int SegmentsQueued { get; set; }
+    public bool IsMacroInvocation { get; init; }
 
     /// <summary>
     /// Where a resume would have to carry on from, having made this many of the segments
@@ -109,6 +112,13 @@ internal sealed class JobMoveOrigin
         if (FilePosition is not long filePosition)
         {
             return null;
+        }
+
+        if (IsMacroInvocation)
+        {
+            // The invocation runs again whole; nothing of it has been made that the job could skip
+            return new JobResumePoint(filePosition, 0.0f, GCommandNumber, FeedRateMmPerSec,
+                                      AxesRelative, DrivesRelative);
         }
 
         // Every segment queued means the whole code will be made, so what is left of it is the code
@@ -163,6 +173,42 @@ internal sealed class JobMoveOrigin
     /// </remarks>
     public static bool IsJobFileCode(DuetAPI.Commands.Code code)
         => code.Channel == CodeChannel.File && (code as Commands.Code)?.File is not Files.MacroFile;
+
+    /// <summary>
+    /// Whether a code is one a macro the job invoked is running
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <returns>True if its moves belong to the job code that started the macro</returns>
+    /// <remarks>
+    /// The other half of <see cref="IsJobFileCode"/>: such a move is the job's, but the position to
+    /// rewind to is the invocation's rather than the code's own. What supplies that position is
+    /// <see cref="Files.MacroFile.InvokingJobCode"/>
+    /// </remarks>
+    public static bool IsMacroCodeOfJob(DuetAPI.Commands.Code code)
+        => code.Channel == CodeChannel.File && (code as Commands.Code)?.File is Files.MacroFile;
+}
+
+/// <summary>
+/// Where in the job file the code that invoked a macro is
+/// </summary>
+/// <param name="FilePosition">Where in the job file the invoking code starts</param>
+/// <param name="CodeLength">How long it is, so the code after it can be named</param>
+/// <remarks>
+/// The whole of what a macro's moves need to say about the job file. The modal state is not part of
+/// it: the invocation is replayed in full, so the macro sets whatever it set the first time, and
+/// the invoking line names its own command rather than repeating a modal one
+/// </remarks>
+internal readonly record struct JobMacroInvocation(long FilePosition, long CodeLength)
+{
+    /// <summary>
+    /// The invocation a code describes, if it is one of the job file's own
+    /// </summary>
+    /// <param name="code">Code that started the macro</param>
+    /// <returns>The invocation, or null if the code did not come from the job file</returns>
+    public static JobMacroInvocation? From(DuetAPI.Commands.Code code)
+        => JobMoveOrigin.IsJobFileCode(code) && code.FilePosition is long filePosition
+           ? new JobMacroInvocation(filePosition, code.Length ?? 0)
+           : null;
 }
 
 /// <summary>
@@ -176,7 +222,7 @@ internal sealed class JobMoveOrigin
 /// <param name="DrivesRelative">Whether extrusion was relative when it was read (M83)</param>
 /// <remarks>
 /// The whole of what a stop tells the job file, in one value. It is produced by
-/// <see cref="MovePlanner.TakeJobResumePoint"/> and read by the rewind, the restore point and the
+/// <see cref="MovePlanner.JobRewindPointFor"/> and read by the rewind, the restore point and the
 /// modal state the resume puts back
 /// </remarks>
 internal readonly record struct JobResumePoint(long FilePosition, float ProportionDone, int GCommandNumber,
@@ -287,6 +333,14 @@ internal sealed class JobMoveIndex
     /// <summary>
     /// Forget everything, for when the moves it describes are gone
     /// </summary>
+    /// <remarks>
+    /// Called when a job is selected and when the link is invalidated, the two events after which a
+    /// move id from the previous run means nothing. Not by a pause: the entry a pause needs is the
+    /// one describing the move the engine says survives, and that move has usually completed by the
+    /// time this side reads the feedhold result, so clearing on a pause would discard exactly what
+    /// the next lookup wants. What bounds the index instead is <see cref="Capacity"/>, which is
+    /// twice a ring, so a lookup of a surviving move id always hits
+    /// </remarks>
     public void Clear()
     {
         _moves.Clear();

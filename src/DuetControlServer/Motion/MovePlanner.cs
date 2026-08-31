@@ -50,13 +50,22 @@ internal enum MoveSubmitResult
 /// <param name="logger">Logger</param>
 internal sealed class MovePlanner(
     LinkInterface linkInterface,
+    MotionTracker tracker,
     Model.ObjectModel model,
     ILogger<MovePlanner> logger)
 {
     /// <summary>
-    /// How often to re-check whether the rings have drained
+    /// How long the standstill wait gives the engine to report the move it is waiting for before it
+    /// falls back to the ring counters
     /// </summary>
-    private static readonly TimeSpan StandstillPollInterval = TimeSpan.FromMilliseconds(5);
+    /// <remarks>
+    /// The wait itself is event-driven: every submitted id terminates, because the moves the engine
+    /// makes are reported and the moves a stop drops are failed by
+    /// <see cref="MotionTracker.FailAfter"/>. What no report covers is the completion event of the
+    /// last move being dropped by the inbound ring, after which no later event sweeps it - so this
+    /// is the watchdog for that one case, and it says so when it is the one that fires
+    /// </remarks>
+    private static readonly TimeSpan StandstillWatchdogInterval = TimeSpan.FromMilliseconds(250);
 
     private readonly Lock _lock = new();
     private readonly byte[] _buffer = new byte[MoveParams.Length(MotionLimits.MaxAxesPlusExtruders)];
@@ -247,28 +256,13 @@ internal sealed class MovePlanner(
     }
 
     /// <summary>
-    /// Wait until every ring has run out the moves it was given
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>True if the machine reached standstill</returns>
-    /// <remarks>
-    /// The counterpart of RepRapFirmware's <c>LockAllMovementSystemsAndWaitForStandstill</c>. Codes
-    /// that change what a microstep means - steps per mm, microstepping, driver mapping, geometry -
-    /// must not take effect while a move planned under the old description is still running, because
-    /// the endpoints it was planned against would be executed under the new one.
-    /// <para>
-    /// Flushing the code pipeline is not enough on its own: that only guarantees the moves have been
-    /// submitted, not that they have been executed
-    /// </para>
-    /// </remarks>
-    /// <summary>
     /// Whether the engine still has moves to run
     /// </summary>
     /// <remarks>
     /// <para>
-    /// What <see cref="WaitForStandstillAsync"/> waits on, as a question rather than a wait. The
-    /// rings report what has been scheduled and what has completed, and a difference is motion still
-    /// to happen.
+    /// The watchdog of <see cref="StandstillAsync"/>, and what <c>state.status</c> is derived from.
+    /// The rings report what has been scheduled and what has completed, and a difference is motion
+    /// still to happen.
     /// </para>
     /// <para>
     /// A move that has been submitted but not yet taken up counts as motion, and has to. Submitting
@@ -300,16 +294,74 @@ internal sealed class MovePlanner(
         }
     }
 
-    public async ValueTask<bool> WaitForStandstillAsync(CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Wait until every ring has run out the moves it was given
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>True if the machine reached standstill</returns>
+    /// <remarks>
+    /// <para>
+    /// A wait on the last move submitted to each ring, because move ids come from one counter and
+    /// the rings interleave them: when the last id a ring was given has retired, everything before
+    /// it has too. Every id terminates - the engine reports the moves it makes and
+    /// <see cref="MotionTracker.FailAfter"/> fails the ones a stop dropped - so this is a wait
+    /// rather than a poll, and <see cref="StandstillWatchdogInterval"/> covers the one event that
+    /// nothing else can.
+    /// </para>
+    /// <para>
+    /// Meaningful after a stop or at the end of a file, not between the segments of one G1: a
+    /// segmented move submits its segments one at a time, so the last id at any instant is the last
+    /// segment queued rather than the last of the move.
+    /// </para>
+    /// <para>
+    /// The counterpart of RepRapFirmware's <c>LockAllMovementSystemsAndWaitForStandstill</c>. Codes
+    /// that change what a microstep means - steps per mm, microstepping, driver mapping, geometry -
+    /// must not take effect while a move planned under the old description is still running, because
+    /// the endpoints it was planned against would be executed under the new one. Flushing the code
+    /// pipeline is not enough on its own: that only guarantees the moves have been submitted, not
+    /// that they have been executed
+    /// </para>
+    /// </remarks>
+    public async ValueTask<bool> StandstillAsync(CancellationToken cancellationToken = default)
     {
+        Task<bool>[] waits = new Task<bool>[MotionLimits.MaxRings];
+        using (_lock.EnterScope())
+        {
+            for (int ring = 0; ring < MotionLimits.MaxRings; ring++)
+            {
+                // An unconfigured ring has been given no move, and a zero id means "no move", so
+                // its wait is already over
+                waits[ring] = _lastSubmittedMoveId[ring] == 0
+                              ? Task.FromResult(true)
+                              : tracker.WaitForRetirementAsync(ring, _lastSubmittedMoveId[ring], cancellationToken);
+            }
+        }
+
+        Task retired = Task.WhenAll(waits);
         while (!cancellationToken.IsCancellationRequested)
         {
-            if (!IsMoving)
+            Task finished = await Task.WhenAny(retired, Task.Delay(StandstillWatchdogInterval, cancellationToken));
+            if (finished == retired)
             {
-                return true;
+                try
+                {
+                    await retired;
+                }
+                catch (OperationCanceledException)
+                {
+                    // The link went down and took the moves with it, which is a standstill of a
+                    // kind: there is nothing left for the machine to run
+                }
+                return !cancellationToken.IsCancellationRequested;
             }
 
-            await Task.Delay(StandstillPollInterval, cancellationToken);
+            if (!IsMoving)
+            {
+                // The rings say the machine has stopped while a move this side is still waiting to
+                // hear about, which means its completion event was dropped
+                logger.LogWarning("Reached standstill without hearing about every move; a completion event was dropped");
+                return true;
+            }
         }
         return false;
     }
@@ -524,7 +576,7 @@ internal sealed class MovePlanner(
     /// </param>
     /// <remarks>
     /// Motion facts only. What they mean for the job file is
-    /// <see cref="TakeJobResumePoint"/>'s to say, because the file is not something the engine or
+    /// <see cref="JobRewindPointFor"/>'s to say, because the file is not something the engine or
     /// this call knows anything about
     /// </remarks>
     public readonly record struct FeedholdOutcome(bool Stopped, uint FirstPurgedMoveId, uint MovesPurged,
@@ -583,21 +635,9 @@ internal sealed class MovePlanner(
         }
 
         // The motion thread acts on the request within one pass of its loop
-        uint firstPurgedMoveId = 0, movesPurged = 0, lastSurvivingMoveId = 0;
-        bool stopped = false;
         int[] restEndpoints = new int[MotionLimits.MaxAxesPlusExtruders];
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            if (linkInterface.Native.TryGetFeedholdResult(out uint sequence, out firstPurgedMoveId,
-                                                          out movesPurged, out lastSurvivingMoveId,
-                                                          out stopped, restEndpoints)
-                && sequence != sequenceBefore)
-            {
-                break;
-            }
-            await Task.Delay(FeedholdPollInterval, cancellationToken);
-        }
-        cancellationToken.ThrowIfCancellationRequested();
+        (uint firstPurgedMoveId, uint movesPurged, uint lastSurvivingMoveId, bool stopped) =
+            await FeedholdCompletedAsync(sequenceBefore, restEndpoints, cancellationToken);
 
         if (!stopped)
         {
@@ -607,6 +647,7 @@ internal sealed class MovePlanner(
         // The read lock because putting the interpreter's position back reads the transform out of
         // the object model, and the planner lock because everything below is the state a move is
         // built from. This order everywhere: the object model first, the planner second
+        uint lastSubmittedMoveId;
         using (await model.AccessReadOnlyAsync(cancellationToken))
         using (Lock())
         {
@@ -622,55 +663,136 @@ internal sealed class MovePlanner(
             // A segmented move that was part-way through submitting has had its remaining segments
             // dropped with the rest, so the claim on the ring goes with them
             State.SegmentsLeft = 0;
+
+            // The last move this side gave the ring is now the last one the ring kept. Everything
+            // after it was dropped, so anchoring a deferred code to it or waiting for standstill on
+            // it would name a move the machine will never make
+            lastSubmittedMoveId = _lastSubmittedMoveId[StoppedRing];
+            _lastSubmittedMoveId[StoppedRing] = lastSurvivingMoveId;
         }
+
+        // Nothing reports a purged move, and nothing can: the inbound event ring drops events when
+        // it fills, which is exactly what a purge of a whole ring would make it do. The boundary is
+        // already on this side, so the waits above it are ended here in one sweep rather than left
+        // for a later move that may never come
+        tracker.FailAfter(StoppedRing, lastSurvivingMoveId, lastSubmittedMoveId);
 
         logger.LogInformation("Stopped the machine early, dropping {Count} queued move(s)", movesPurged);
         return new FeedholdOutcome(true, firstPurgedMoveId, movesPurged, lastSurvivingMoveId);
     }
 
     /// <summary>
-    /// Take where a resume would have to carry the job on from
+    /// The one ring a stop acts on
     /// </summary>
-    /// <param name="held">What the stop did, or the default if there was no stop</param>
-    /// <returns>The resume point, or null to resume from the last completed job code</returns>
+    /// <remarks>
+    /// The engine stops ring 0 only, which is what <c>DrainFeedholds</c> says, and
+    /// <see cref="FeedholdOutcome"/> carries one survivor. TODO stopping every ring and reporting a
+    /// survivor per ring is the M596 work in <c>docs/devel/MOTION_SYNCHRONISED_ACTIONS.md</c>
+    /// </remarks>
+    private const int StoppedRing = 0;
+
+    /// <summary>
+    /// Wait for the motion thread to act on a stop request and say what it did
+    /// </summary>
+    /// <param name="sequenceBefore">Feedhold count read before the request went in</param>
+    /// <param name="restEndpoints">Receives where the machine will come to rest, in microsteps</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>What the engine reported</returns>
+    /// <remarks>
+    /// The one poll left in the pause. No inbound event carries the feedhold result, so this asks
+    /// the seqlock the engine publishes it through until the count moves; it runs once per pause, on
+    /// the sequence's own task
+    /// </remarks>
+    private async ValueTask<(uint FirstPurgedMoveId, uint MovesPurged, uint LastSurvivingMoveId, bool Stopped)>
+        FeedholdCompletedAsync(uint sequenceBefore, int[] restEndpoints, CancellationToken cancellationToken)
+    {
+        uint firstPurgedMoveId = 0, movesPurged = 0, lastSurvivingMoveId = 0;
+        bool stopped = false;
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            if (linkInterface.Native.TryGetFeedholdResult(out uint sequence, out firstPurgedMoveId,
+                                                          out movesPurged, out lastSurvivingMoveId,
+                                                          out stopped, restEndpoints)
+                && sequence != sequenceBefore)
+            {
+                break;
+            }
+            await Task.Delay(FeedholdPollInterval, cancellationToken);
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        return (firstPurgedMoveId, movesPurged, lastSurvivingMoveId, stopped);
+    }
+
+    /// <summary>
+    /// Where a resume has to carry the job on from, and whether it re-runs a macro invocation
+    /// </summary>
+    /// <param name="Point">
+    /// The rewind point, or null when the stop says nothing about the job file and the reader's own
+    /// position is what the job carries on from
+    /// </param>
+    /// <param name="RestartMacro">
+    /// Whether the point is a macro invocation the job has to run again, which is
+    /// RepRapFirmware's <c>pausedInMacro</c> and what the resume sets
+    /// <c>firstCommandAfterRestart</c> from
+    /// </param>
+    internal readonly record struct JobRewindPoint(JobResumePoint? Point, bool RestartMacro);
+
+    /// <summary>
+    /// Work out where a resume would have to carry the job on from
+    /// </summary>
+    /// <param name="held">What the stop did</param>
+    /// <returns>The rewind point</returns>
     /// <remarks>
     /// <para>
-    /// RepRapFirmware's three branches of <c>DoAsynchronousPause</c> (GCodes.cpp:1086), each of which
-    /// fills in the file position and the proportion together and then calls <c>ClearMove</c>:
-    /// wherever moves were dropped the ring names the boundary, and where none were the code that was
-    /// still going out does, because everything queued was already committed and will run.
+    /// The rule asks only what the engine says <em>survives</em>, never what it dropped.
+    /// <c>DDARing::PurgeAfter</c> sets <c>lastSurvivingMoveId</c> before it purges anything and
+    /// reports <c>stopped</c> afterwards, so the id is valid even for a stop that purged nothing
+    /// from the ring while the submissions behind it were discarded - the case that has no branch
+    /// if the boundary is taken from the purge count instead.
     /// </para>
     /// <para>
-    /// Called once per pause, and before the job's read-ahead is cancelled. Taking the record is what
-    /// fixes the segment count in it: a submission that finds the record is no longer its own queues
-    /// nothing more, so what is read here stays true however that submission then unwinds
+    /// The four cases are §7.7 of <c>docs/devel/JOB_CONTROL_CONCURRENCY.md</c>, in order: the engine
+    /// did not stop, so every submitted move runs and the point is the segment after the last one
+    /// submitted; the survivor is one of the job's own moves, so the point is the segment after it;
+    /// the survivor belongs to a macro the job invoked, so the point is the invocation and the
+    /// resume runs the macro again; and the survivor is nobody's - a move from another channel - so
+    /// the stop says nothing about the file and the reader's position stands.
+    /// </para>
+    /// <para>
+    /// RepRapFirmware's three branches of <c>DoAsynchronousPause</c> (GCodes.cpp:1086) reach the
+    /// same places by filling in the file position and the proportion together
     /// </para>
     /// </remarks>
-    public JobResumePoint? TakeJobResumePoint(FeedholdOutcome held)
+    public JobRewindPoint JobRewindPointFor(FeedholdOutcome held)
     {
         using (Lock())
         {
-            JobMoveOrigin? current = State.CurrentJobMove;
-            State.CurrentJobMove = null;
-
-            JobResumePoint? resume;
-            if (held.MovesPurged > 0)
-            {
-                // The earliest dropped move names the boundary. When it cannot be named it was a
-                // macro's, so the job's own code had not started and the resume rewinds to the macro
-                // invocation, which is the last job code that completed
-                resume = JobMoves.TryGet(held.FirstPurgedMoveId, out JobMoveOrigin origin, out int segment)
-                    ? origin.PointAt(segment)
-                    : null;
-            }
-            else
-            {
-                resume = current?.PointAt(current.SegmentsQueued);
-            }
-
-            JobMoves.Clear();
-            return resume;
+            // The last move the machine will make. Where the engine could not act on the request
+            // that is everything submitted, because the submission in flight has already abandoned
+            // its remaining segments on the purge generation
+            return RewindPointAfter(held.Stopped ? held.LastSurvivingMoveId : _lastSubmittedMoveId[StoppedRing]);
         }
+    }
+
+    /// <summary>
+    /// Where the job carries on from, having made the given move and nothing after it
+    /// </summary>
+    /// <param name="lastMoveMade">Id of the last move the machine will make</param>
+    /// <returns>The rewind point</returns>
+    /// <remarks>The caller must hold <see cref="Lock"/></remarks>
+    internal JobRewindPoint RewindPointAfter(uint lastMoveMade)
+    {
+        if (!JobMoves.TryGet(lastMoveMade, out JobMoveOrigin origin, out int segment))
+        {
+            // The machine comes to rest on a move no job code produced
+            return default;
+        }
+
+        // A macro's move is noted under the code that invoked the macro, and that code is what the
+        // resume runs again, from its start
+        return origin.IsMacroInvocation
+            ? new JobRewindPoint(origin.PointAt(0), RestartMacro: true)
+            : new JobRewindPoint(origin.PointAt(segment + 1), RestartMacro: false);
     }
 
     /// <summary>

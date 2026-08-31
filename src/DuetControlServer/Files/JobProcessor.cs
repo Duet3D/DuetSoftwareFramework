@@ -381,7 +381,7 @@ internal partial class JobProcessor : BackgroundService, IAsyncDiagnostics
         {
             _planner.State.RestartMoveFractionDone = 0.0f;
             _planner.State.RestartGCommandNumber = -1;
-            _planner.State.CurrentJobMove = null;
+            _planner.JobMoves.Clear();
         }
 
         // Update the object model

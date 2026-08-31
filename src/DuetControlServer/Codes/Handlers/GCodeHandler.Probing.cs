@@ -76,7 +76,7 @@ internal sealed partial class GCodeHandler
 
         float heightOffset = code.GetFloat('H', 0.0f);
 
-        if (!await planner.WaitForStandstillAsync(cancellationToken))
+        if (!await planner.StandstillAsync(cancellationToken))
         {
             throw new OperationCanceledException();
         }
@@ -657,7 +657,7 @@ internal sealed partial class GCodeHandler
             return new Message(MessageType.Error, $"Z probe number out of range (0..{RemoteProbes.MaxProbes - 1})");
         }
 
-        if (!await planner.WaitForStandstillAsync(cancellationToken))
+        if (!await planner.StandstillAsync(cancellationToken))
         {
             throw new OperationCanceledException();
         }
@@ -795,7 +795,7 @@ internal sealed partial class GCodeHandler
 
             if (result is MoveSubmitResult.Queued or MoveSubmitResult.NoMovement or MoveSubmitResult.Rejected)
             {
-                await planner.WaitForStandstillAsync(cancellationToken);
+                await planner.StandstillAsync(cancellationToken);
                 return;
             }
             await Task.Delay(RingFullRetryDelay, cancellationToken);

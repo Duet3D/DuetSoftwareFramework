@@ -56,7 +56,7 @@ internal sealed partial class GCodeHandler
     /// </remarks>
     private async ValueTask WaitForSpecialMoveToFinishAsync(bool watchesSomething, CancellationToken cancellationToken)
     {
-        await planner.WaitForStandstillAsync(cancellationToken);
+        await planner.StandstillAsync(cancellationToken);
 
         // The rings draining is a weaker statement than it looks. The controller stops the drives and
         // reports it afterwards, over a link the engine knows nothing about, so a stop can still be
@@ -327,7 +327,7 @@ internal sealed partial class GCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleHomeAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (!await planner.WaitForStandstillAsync(cancellationToken))
+        if (!await planner.StandstillAsync(cancellationToken))
         {
             throw new OperationCanceledException();
         }

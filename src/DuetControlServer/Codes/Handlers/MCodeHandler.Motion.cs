@@ -47,7 +47,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// </para>
 /// <para>
 /// Codes that change what a microstep means - steps per mm, microstepping, driver mapping - wait for
-/// the machine to stop first. See <see cref="Motion.MovePlanner.WaitForStandstillAsync"/> for why
+/// the machine to stop first. See <see cref="Motion.MovePlanner.StandstillAsync"/> for why
 /// flushing the code pipeline is not sufficient on its own.
 /// </para>
 /// </remarks>

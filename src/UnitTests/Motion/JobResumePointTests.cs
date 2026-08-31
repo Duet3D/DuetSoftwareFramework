@@ -18,7 +18,7 @@ namespace UnitTests.Motion;
 public class JobResumePointTests
 {
     /// <summary>A planner with only the state a resume point is taken from</summary>
-    private static MovePlanner NewPlanner() => new(null!, null!, NullLogger<MovePlanner>.Instance);
+    private static MovePlanner NewPlanner() => new(null!, null!, null!, NullLogger<MovePlanner>.Instance);
 
     /// <summary>A job code the interpreter is part-way through</summary>
     private static JobMoveOrigin NewOrigin(int segmentCount = 10, float fractionAtStart = 0.0f)
@@ -81,90 +81,83 @@ public class JobResumePointTests
     }
 
     [Test]
-    public void AStopThatDroppedAMoveTakesTheCodeItCameFrom()
+    public void TheRewindPointIsTheSegmentAfterTheOneTheMachineStopsOn()
     {
+        // The rule reads what survives, never what was dropped: the machine comes to rest at the end
+        // of the surviving move, so what is left of the code is everything after it
         MovePlanner planner = NewPlanner();
         JobMoveOrigin origin = NewOrigin();
-        for (int segment = 0; segment < 3; segment++)
+        for (int segment = 0; segment < 5; segment++)
         {
             planner.JobMoves.Note((uint)(segment + 1), origin, segment);
         }
-        origin.SegmentsQueued = 3;
-        planner.State.CurrentJobMove = origin;
 
-        JobResumePoint? point = planner.TakeJobResumePoint(new MovePlanner.FeedholdOutcome(true, 2, 2, 1));
+        MovePlanner.JobRewindPoint rewind = planner.RewindPointAfter(3);
 
         Assert.Multiple(() =>
         {
-            Assert.That(point!.Value.FilePosition, Is.EqualTo(100L));
-            Assert.That(point!.Value.ProportionDone, Is.EqualTo(0.1f).Within(1e-4f),
-                        "the first dropped move is the boundary, not what the submission had queued");
+            Assert.That(rewind.Point!.Value.FilePosition, Is.EqualTo(100L));
+            Assert.That(rewind.Point!.Value.ProportionDone, Is.EqualTo(0.3f).Within(1e-4f),
+                        "three of the ten segments have been made");
+            Assert.That(rewind.RestartMacro, Is.False);
         });
     }
 
     [Test]
-    public void AStopThatPurgedNothingTakesWhatTheSubmissionHadQueued()
+    public void AMoveOfAMacroTheJobInvokedRewindsToTheInvocation()
     {
-        // Everything queued was already committed, so what the machine will make is every segment
-        // that went out. This is also what a stop the engine refuses leaves behind: the queue drains,
-        // the code that was going out ends where it ends, and the resume asks for the rest of it
+        // The macro's own offsets are into the macro, so the only position in the job file that
+        // means anything is the code that started it - and the whole macro runs again
         MovePlanner planner = NewPlanner();
-        JobMoveOrigin origin = NewOrigin();
-        origin.SegmentsQueued = 4;
-        planner.State.CurrentJobMove = origin;
+        JobMoveOrigin origin = new()
+        {
+            FilePosition = 100,
+            CodeLength = 20,
+            GCommandNumber = -1,
+            SegmentCount = 4,
+            IsMacroInvocation = true
+        };
+        planner.JobMoves.Note(7, origin, 3);
 
-        JobResumePoint? point = planner.TakeJobResumePoint(new MovePlanner.FeedholdOutcome(false, 0, 0, 0));
+        MovePlanner.JobRewindPoint rewind = planner.RewindPointAfter(7);
 
         Assert.Multiple(() =>
         {
-            Assert.That(point!.Value.FilePosition, Is.EqualTo(100L));
-            Assert.That(point!.Value.ProportionDone, Is.EqualTo(0.4f).Within(1e-4f));
+            Assert.That(rewind.Point!.Value.FilePosition, Is.EqualTo(100L),
+                        "the invocation, not the code after it, however many of its moves were made");
+            Assert.That(rewind.Point!.Value.ProportionDone, Is.Zero);
+            Assert.That(rewind.RestartMacro, Is.True);
         });
     }
 
     [Test]
-    public void APurgeWhoseEarliestMoveCannotBeNamedTakesNothing()
+    public void AMoveNoJobCodeProducedNamesNothing()
     {
-        // The earliest dropped move was a macro's, so the job's own code had not started. Its queued
-        // segments went with the purge, so what it had submitted says nothing about where to resume
+        // A move from another channel: the stop says nothing about the job file, and where the
+        // reader got to stands
         MovePlanner planner = NewPlanner();
-        JobMoveOrigin origin = NewOrigin();
-        origin.SegmentsQueued = 4;
-        planner.State.CurrentJobMove = origin;
+        planner.JobMoves.Note(1, NewOrigin(), 0);
 
-        JobResumePoint? point = planner.TakeJobResumePoint(new MovePlanner.FeedholdOutcome(true, 9, 3, 8));
-
-        Assert.That(point, Is.Null, "the resume rewinds to the last completed job code");
-    }
-
-    [Test]
-    public void NothingIsLeftForALaterPauseToFind()
-    {
-        // A pause sequence that goes no further than the stop has still taken the record, so a later
-        // pause that makes no stop of its own - every synchronous one - cannot adopt what it left
-        MovePlanner planner = NewPlanner();
-        JobMoveOrigin origin = NewOrigin();
-        origin.SegmentsQueued = 4;
-        planner.State.CurrentJobMove = origin;
-        planner.JobMoves.Note(1, origin, 0);
-
-        Assert.That(planner.TakeJobResumePoint(new MovePlanner.FeedholdOutcome(false, 0, 0, 0)), Is.Not.Null);
+        MovePlanner.JobRewindPoint rewind = planner.RewindPointAfter(9);
 
         Assert.Multiple(() =>
         {
-            Assert.That(planner.TakeJobResumePoint(default), Is.Null);
-            Assert.That(planner.State.CurrentJobMove, Is.Null);
-            Assert.That(planner.JobMoves.TryGet(1, out _, out _), Is.False,
-                        "the moves it described are no longer the pause's business either");
+            Assert.That(rewind.Point, Is.Null);
+            Assert.That(rewind.RestartMacro, Is.False);
         });
     }
 
     [Test]
-    public void APauseBetweenCodesTakesNothing()
+    public void TheIndexSurvivesAPauseSoTheNextLookupStillHits()
     {
+        // The entry a pause needs describes the move the engine says survives, and that move has
+        // usually completed by the time this side reads the feedhold result. Clearing on a pause
+        // would discard exactly what the next lookup wants
         MovePlanner planner = NewPlanner();
+        planner.JobMoves.Note(1, NewOrigin(), 0);
 
-        Assert.That(planner.TakeJobResumePoint(default), Is.Null);
+        Assert.That(planner.RewindPointAfter(1).Point, Is.Not.Null);
+        Assert.That(planner.RewindPointAfter(1).Point, Is.Not.Null, "a second pause finds it too");
     }
 
     [Test]
