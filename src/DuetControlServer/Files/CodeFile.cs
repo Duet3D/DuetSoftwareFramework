@@ -94,6 +94,13 @@ public class CodeFile(
     private readonly Stack<CodeBlock> _codeBlocks = new();
 
     /// <summary>
+    /// Blocks whose scope the read-ahead has left. The firmware may still be executing codes from inside them
+    /// and a pause can rewind into their scope, so their local variables must be kept until the file is closed
+    /// or until they are redeclared. Guarded by the lock on <see cref="_codeBlocks"/>
+    /// </summary>
+    private readonly List<CodeBlock> _closedBlocks = [];
+
+    /// <summary>
     /// Last ended code block
     /// </summary>
     private CodeBlock? _lastCodeBlock;
@@ -120,6 +127,66 @@ public class CodeFile(
     /// File position of the next code to actually run
     /// </summary>
     public long NextFilePosition { get; set; }
+
+    /// <summary>
+    /// Seek to a new file position and restore the code block state the read-ahead had at that position.
+    /// Blocks entered at or past it are dropped because their lines are read again after the seek, so blocks
+    /// left on the stack would be pushed twice and while loops would restart with bogus iteration counts;
+    /// their local variables are deleted so that their re-declaration succeeds. Already closed blocks whose
+    /// scope contains the target position are pushed back onto the stack, their local variables are still
+    /// alive because closed blocks defer the deletion. The caller must hold the lock of this file
+    /// </summary>
+    /// <param name="position">New file position</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public async Task RewindAsync(long position, CancellationToken cancellationToken = default)
+    {
+        Position = position;
+
+        List<Task> varDeletionTasks = [];
+        lock (_codeBlocks)
+        {
+            while (_codeBlocks.TryPeek(out CodeBlock? codeBlock) && codeBlock.FilePosition >= position)
+            {
+                _codeBlocks.Pop();
+                if (codeBlock.HasLocalVariables)
+                {
+                    varDeletionTasks.Add(DeleteLocalVariablesAsync(codeBlock, cancellationToken));
+                }
+                logger.LogDebug("Dropped {Keyword} block starting at byte {FilePosition} after seeking to byte {Position}", codeBlock.Keyword, codeBlock.FilePosition, position);
+            }
+
+            _closedBlocks.RemoveAll(codeBlock =>
+            {
+                if (codeBlock.FilePosition >= position)
+                {
+                    if (codeBlock.HasLocalVariables)
+                    {
+                        varDeletionTasks.Add(DeleteLocalVariablesAsync(codeBlock, cancellationToken));
+                    }
+                    logger.LogDebug("Dropped closed {Keyword} block starting at byte {FilePosition} after seeking to byte {Position}", codeBlock.Keyword, codeBlock.FilePosition, position);
+                    return true;
+                }
+                return false;
+            });
+
+            // Push closed blocks containing the target position back onto the stack, outermost first.
+            // They can only be nested inside each other and inside the surviving stack blocks
+            foreach (CodeBlock codeBlock in _closedBlocks.Where(codeBlock => codeBlock.EndPosition >= position).OrderBy(codeBlock => codeBlock.FilePosition).ToList())
+            {
+                _closedBlocks.Remove(codeBlock);
+                _codeBlocks.Push(codeBlock);
+                logger.LogDebug("Restored {Keyword} block starting at byte {FilePosition} after seeking to byte {Position}", codeBlock.Keyword, codeBlock.FilePosition, position);
+            }
+
+            // Variable declarations at or past the target position are read and executed again
+            foreach (CodeBlock codeBlock in _codeBlocks)
+            {
+                codeBlock.AllowVariableRedeclaration = true;
+            }
+        }
+        await Task.WhenAll(varDeletionTasks);
+    }
 
     /// <summary>
     /// Get the current number of iterations of the current loop
@@ -185,6 +252,10 @@ public class CodeFile(
         foreach (CodeBlock block in copyFrom._codeBlocks.Reverse())
         {
             _codeBlocks.Push(block with { });
+        }
+        foreach (CodeBlock block in copyFrom._closedBlocks)
+        {
+            _closedBlocks.Add(block with { });
         }
         _lastCodeBlock = (copyFrom._lastCodeBlock is not null) ? copyFrom._lastCodeBlock with { } : null;
 
@@ -337,7 +408,7 @@ public class CodeFile(
                                 await varDeletionTask;  // wait outside the code lock to avoid deadlocks
                                 break;
                             }
-                            await EndCodeBlockAsync(cancellationToken);
+                            await EndCodeBlockAsync(codeRead ? code.FilePosition ?? Length : Length, cancellationToken);
                         }
                         else
                         {
@@ -348,7 +419,7 @@ public class CodeFile(
                     else
                     {
                         // End of generic code block
-                        await EndCodeBlockAsync(cancellationToken);
+                        await EndCodeBlockAsync(codeRead ? code.FilePosition ?? Length : Length, cancellationToken);
                     }
                 }
                 else
@@ -536,6 +607,36 @@ public class CodeFile(
     }
 
     /// <summary>
+    /// Delete a still existing local variable that is about to be redeclared. This happens when a closed block
+    /// deferred the deletion (a loop iteration or a sibling scope reuses the name) and when a rewind makes the
+    /// file read a declaration again that was already executed
+    /// </summary>
+    /// <param name="varName">Name of the variable</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public async Task DeleteStaleVariableAsync(string varName, CancellationToken cancellationToken = default)
+    {
+        Task? deletionTask = null;
+        lock (_codeBlocks)
+        {
+            foreach (CodeBlock codeBlock in _closedBlocks.Concat(_codeBlocks.Where(codeBlock => codeBlock.AllowVariableRedeclaration)))
+            {
+                if (codeBlock.LocalVariables.Remove(varName))
+                {
+                    codeBlock.HasLocalVariables = codeBlock.LocalVariables.Count > 0;
+                    deletionTask = linkInterface.SetVariableAsync(Channel, false, varName, null, cancellationToken);
+                    break;
+                }
+            }
+        }
+
+        if (deletionTask is not null)
+        {
+            await deletionTask;
+        }
+    }
+
+    /// <summary>
     /// Delete local variables from a given code block asynchronously
     /// </summary>
     /// <param name="codeBlock">Code block</param>
@@ -556,12 +657,11 @@ public class CodeFile(
     /// <summary>
     /// Called to finish the current code block
     /// </summary>
+    /// <param name="endPosition">File position where the block ended</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    private async Task EndCodeBlockAsync(CancellationToken cancellationToken)
+    private async Task EndCodeBlockAsync(long endPosition, CancellationToken cancellationToken)
     {
-        Task? varDeletionTask = null;
-
         using (await LockAsync(cancellationToken))
         {
             CodeBlock? codeBlock;
@@ -585,17 +685,21 @@ public class CodeFile(
                     logger.LogDebug("End of generic block");
                 }
 
-                // Delete previously created local variables
-                varDeletionTask = DeleteLocalVariablesAsync(codeBlock, cancellationToken);
+                // Keep the block and its local variables instead of deleting them right away. The firmware may
+                // still be executing codes from inside it and a pause can rewind into its scope, in which case
+                // the variables must still exist. They are deleted when they are redeclared, and RRF cleans up
+                // the remaining ones automatically when the file is closed. Loop iterations re-close the same
+                // blocks, so only the latest instance per start position is kept
+                codeBlock.EndPosition = endPosition;
+                lock (_codeBlocks)
+                {
+                    _closedBlocks.RemoveAll(closedBlock => closedBlock.FilePosition == codeBlock.FilePosition);
+                    _closedBlocks.Add(codeBlock);
+                }
 
                 // End
                 _lastCodeBlock = codeBlock;
             }
-        }
-
-        if (varDeletionTask is not null)
-        {
-            await varDeletionTask;
         }
     }
 }

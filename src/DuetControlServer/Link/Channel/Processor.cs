@@ -138,13 +138,8 @@ public sealed class Processor
     /// <returns>New state</returns>
     public StackState Push(CodeFile? file = null)
     {
-        // Push a new element on the stack. Also record if the motion system was active in case it's changed
-        bool msActive;
-        using (_model.AccessReadOnly())
-        {
-            msActive = _model.Inputs[Channel]?.Active == true;
-        }
-        StackState state = new(_codeProcessor.Push(Channel, file), msActive);
+        // Push a new element on the stack
+        StackState state = new(_codeProcessor.Push(Channel, file));
 
         // Dequeue already suspended codes first so the correct order is maintained
         Queue<Code> alreadySuspendedCodes = new(CurrentState.SuspendedCodes.Count);
@@ -191,16 +186,8 @@ public sealed class Processor
         StackState oldState = Stack.Pop();
         CurrentState = Stack.Peek();
 
-        // Restore message box and motion system states
+        // Restore the message box state
         _isWaitingForAcknowledgment = CurrentState.WaitingForAcknowledgement;
-        using (_model.AccessReadWrite())
-        {
-            InputChannel? input = _model.Inputs[Channel];
-            if (input is not null)
-            {
-                input.Active = oldState.MotionSystemWasActive;
-            }
-        }
 
         // Invalidate obsolete lock requests and supended codes
         while (oldState.LockRequests.TryDequeue(out LockMovementRequest? lockRequest))
@@ -281,16 +268,8 @@ public sealed class Processor
         StackState oldState = Stack.Pop();
         CurrentState = Stack.Peek();
 
-        // Restore message box and motion system states
+        // Restore the message box state
         _isWaitingForAcknowledgment = CurrentState.WaitingForAcknowledgement;
-        using (await _model.AccessReadWriteAsync())
-        {
-            InputChannel? input = _model.Inputs[Channel];
-            if (input is not null)
-            {
-                input.Active = oldState.MotionSystemWasActive;
-            }
-        }
 
         // Invalidate obsolete lock requests and supended codes
         while (oldState.LockRequests.TryDequeue(out LockMovementRequest? lockRequest))
@@ -391,7 +370,6 @@ public sealed class Processor
                     Push();
                     CurrentState.WaitingForAcknowledgement = item.WaitingForAcknowledgement;
                 }
-                CurrentState.MotionSystemWasActive = !item.MotionSystemWasActive;
             }
         }
     }

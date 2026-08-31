@@ -264,6 +264,12 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
                     fullVarName = (code.Keyword == KeywordType.Global ? "global." : "var.") + varName;
                 }
 
+                // Delete a leftover local variable of the same name first, it may still exist because closed code blocks defer the deletion
+                if (code.Keyword == KeywordType.Var && code.File is not null)
+                {
+                    await code.File.DeleteStaleVariableAsync(varName, cancellationToken);
+                }
+
                 // Assign the variable
                 object? value = await linkInterface.SetVariableAsync(code.Channel, code.Keyword != KeywordType.Set, fullVarName, expression, cancellationToken);
                 _logger.LogDebug("Set variable {Variable} to {Value}", fullVarName, value);

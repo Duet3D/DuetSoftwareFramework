@@ -3,6 +3,7 @@ using DuetControlServer.Files;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -42,6 +43,8 @@ public sealed class ChannelProcessor
     {
         Channel = channel;
         Logger = logger;
+        _ownQueueNumber = (channel == CodeChannel.File2) ? 1 : 0;
+        _commandedQueues.Push((channel == CodeChannel.Queue2) ? 1 : 0);
 
         _pipelines = new Lazy<Pipelines.PipelineBase[]>(() => [
             ActivatorUtilities.CreateInstance<Pipelines.Start>(serviceProvider, this),
@@ -51,6 +54,69 @@ public sealed class ChannelProcessor
             ActivatorUtilities.CreateInstance<Pipelines.Firmware>(serviceProvider, this),
             ActivatorUtilities.CreateInstance<Pipelines.Executed>(serviceProvider, this)
         ]);
+    }
+
+    /// <summary>
+    /// Commanded motion system per stack level, mirroring RRF's per-machine-state commandedQueueNumber (M596).
+    /// Levels are pushed and popped together with the pipeline stack so an M596 inside a macro ends with it
+    /// </summary>
+    private readonly Stack<int> _commandedQueues = new();
+
+    /// <summary>
+    /// Fixed motion system of this channel, mirroring RRF's ownQueueNumber
+    /// </summary>
+    private readonly int _ownQueueNumber;
+
+    /// <summary>
+    /// Mirrors RRF's executeAllCommands flag, cleared only on the file channels while the input reader is forked
+    /// </summary>
+    public bool ExecuteAllCommands { get; set; } = true;
+
+    /// <summary>
+    /// Whether this channel is currently executing G/M/T-codes, mirroring RRF's GCodeMachineState.Executing().
+    /// Kept locally because the object model copy of inputs[].active lags behind executed M596 codes
+    /// </summary>
+    public bool IsExecuting
+    {
+        get
+        {
+            lock (_commandedQueues)
+            {
+                return ExecuteAllCommands || _commandedQueues.Peek() == _ownQueueNumber;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Update the commanded motion system of the current stack level after M596 was executed on this channel
+    /// </summary>
+    /// <param name="queueNumber">New commanded motion system number</param>
+    public void SetCommandedQueue(int queueNumber)
+    {
+        lock (_commandedQueues)
+        {
+            _commandedQueues.Pop();
+            _commandedQueues.Push(queueNumber);
+        }
+    }
+
+    /// <summary>
+    /// Copy the commanded motion systems from another channel when the file input reader is forked
+    /// </summary>
+    /// <param name="other">Channel processor to copy from</param>
+    public void CopyCommandedQueuesFrom(ChannelProcessor other)
+    {
+        lock (_commandedQueues)
+        {
+            lock (other._commandedQueues)
+            {
+                _commandedQueues.Clear();
+                foreach (int queueNumber in other._commandedQueues.Reverse())
+                {
+                    _commandedQueues.Push(queueNumber);
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -90,6 +156,11 @@ public sealed class ChannelProcessor
     /// <returns>New pipeline state of the firmware for the SPI connector</returns>
     public Pipelines.PipelineStackItem Push(CodeFile? file)
     {
+        lock (_commandedQueues)
+        {
+            _commandedQueues.Push(_commandedQueues.Peek());
+        }
+
         Pipelines.PipelineStackItem? newState = null;
         foreach (PipelineStage stage in StagesWithStack)
         {
@@ -110,6 +181,14 @@ public sealed class ChannelProcessor
     /// </summary>
     public void Pop()
     {
+        lock (_commandedQueues)
+        {
+            if (_commandedQueues.Count > 1)
+            {
+                _commandedQueues.Pop();
+            }
+        }
+
         foreach (PipelineStage stage in StagesWithStack)
         {
             _pipelines.Value[(int)stage].Pop();

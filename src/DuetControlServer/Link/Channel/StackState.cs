@@ -19,26 +19,10 @@ public sealed class StackState
     private readonly PipelineStackItem _pipelineStackItem;
 
     /// <summary>
-    /// Indicates if the motion system was active when this stack item was created
-    /// </summary>
-    public bool MotionSystemWasActive { get; set; }
-
-    /// <summary>
     /// Constructor of this class
     /// </summary>
     /// <param name="stackItem">Corresponding state of the firmware stage on the code pipeline</param>
     public StackState(PipelineStackItem stackItem) => _pipelineStackItem = stackItem;
-
-    /// <summary>
-    /// Constructor of this class
-    /// </summary>
-    /// <param name="stackItem">Corresponding state of the firmware stage on the code pipeline</param>
-    /// <param name="msActive">Whether the motion system is active or not</param>
-    public StackState(PipelineStackItem stackItem, bool msActive)
-    {
-        _pipelineStackItem = stackItem;
-        MotionSystemWasActive = msActive;
-    }
 
     /// <summary>
     /// Indicates if this state is waiting for a confirmation

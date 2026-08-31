@@ -84,6 +84,27 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     public void SetJobFile(CodeChannel channel, CodeFile? file) => Processors.Value[(int)channel].SetJobFile(file);
 
     /// <summary>
+    /// Update the commanded motion system of a code channel after M596 was executed on it
+    /// </summary>
+    /// <param name="channel">Code channel the M596 was executed on</param>
+    /// <param name="queueNumber">New commanded motion system number</param>
+    public void SetCommandedQueue(CodeChannel channel, int queueNumber) => Processors.Value[(int)channel].SetCommandedQueue(queueNumber);
+
+    /// <summary>
+    /// Update the executing states of the file channels when the file input reader is forked (M606 S1) or un-forked (end of job)
+    /// </summary>
+    /// <param name="forked">Whether the file input reader is forked</param>
+    public void SetFileStreamsForked(bool forked)
+    {
+        ChannelProcessor file = Processors.Value[(int)CodeChannel.File], file2 = Processors.Value[(int)CodeChannel.File2];
+        if (forked)
+        {
+            file2.CopyCommandedQueuesFrom(file);
+        }
+        file.ExecuteAllCommands = file2.ExecuteAllCommands = !forked;
+    }
+
+    /// <summary>
     /// Wait for all pending codes to finish
     /// </summary>
     /// <param name="channel">Code channel to wait for</param>
@@ -141,12 +162,9 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
             // Make sure the current code channel is executing G/M/T-codes.
             // This check is only needed with multiple motion systems where a channel
             // may be inactive because it belongs to a different motion system
-            using (await model.AccessReadOnlyAsync(cancellationToken))
+            if (!Processors.Value[(int)code.Channel].IsExecuting)
             {
-                if (model.Inputs[code.Channel]?.Active != true)
-                {
-                    return false;
-                }
+                return false;
             }
         }
 
@@ -332,6 +350,7 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
                 if (code.Channel != item.Channel && code.FilePosition == item.FilePosition)
                 {
                     _syncRequests[item].TrySetResult(true);
+                    _syncRequests.Remove(item);
                     return true;
                 }
             }

@@ -208,6 +208,12 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     private PrintPausedReason _pauseReason;
 
     /// <summary>
+    /// Set when a resume arrives while the file tasks may still be draining towards the pause, so it is not lost.
+    /// Each file task consumes its own flag instead of waiting for a resume that already happened
+    /// </summary>
+    private bool _resumePending, _resumePending2;
+
+    /// <summary>
     /// Get the current file position
     /// </summary>
     /// <param name="motionSystem">Motion system</param>
@@ -247,7 +253,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
         {
             using (await _file.LockAsync(cancellationToken))
             {
-                _file.Position = filePosition;
+                await _file.RewindAsync(filePosition, cancellationToken);
             }
         }
 
@@ -255,7 +261,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
         {
             using (await _file2.LockAsync(cancellationToken))
             {
-                _file2.Position = filePosition;
+                await _file2.RewindAsync(filePosition, cancellationToken);
             }
         }
         _codeProcessor.ResolveSyncRequestsAfter(filePosition);
@@ -354,11 +360,19 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// <returns>Asynchronous task</returns>
     private async Task DoFilePrint(CodeFile file)
     {
-        // Get the cancellation token
+        // Get the cancellation token and drop a stale pending resume from before this task started
         CancellationToken cancellationToken;
         using (await LockAsync())
         {
             cancellationToken = _cancellationTokenSource.Token;
+            if (file.Channel == CodeChannel.File)
+            {
+                _resumePending = false;
+            }
+            else
+            {
+                _resumePending2 = false;
+            }
         }
 
         // Use a code pool for print files
@@ -489,9 +503,39 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                     // ignored
                 }
 
+                // Codes complete when the firmware has queued them, so it may still be executing moves
+                // from this file that a pause can rewind into. Wait for them to finish before treating
+                // the job as complete, else a late pause notification would hit an already closed job
+                bool waitForMoves;
                 using (await LockAsync())
                 {
-                    if (IsPaused)
+                    waitForMoves = !IsPaused && !IsAborted && !file.IsClosed;
+                }
+                if (waitForMoves)
+                {
+                    try
+                    {
+                        Code waitCode = _codeFactory.Create();
+                        waitCode.Channel = file.Channel;
+                        waitCode.Type = CodeType.MCode;
+                        waitCode.MajorNumber = 400;
+                        await waitCode.ExecuteAsync();
+
+                        // A pause deferred behind that wait executes the moment it completes and its pause
+                        // notification trails the M400 reply on the link, so process past it before deciding
+                        await _model.WaitForFullUpdateAsync(_lifetime.ApplicationStopping);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // cancelled by a pause or abort arriving in the meantime, the checks below deal with it
+                    }
+                }
+
+                using (await LockAsync())
+                {
+                    // The pending flag catches a task that is still draining when a resume already cleared IsPaused,
+                    // else it would treat the job as finished without ever rewinding its file
+                    if (IsPaused || (file.Channel == CodeChannel.File ? _resumePending : _resumePending2))
                     {
                         // Adjust the file position for this motion system. Each MS may have advanced its file
                         // independently between sync points, so rewind to the firmware-reported pause offset
@@ -501,9 +545,26 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                         await SetFilePositionAsync(file.Channel == CodeChannel.File ? 0 : 1, newFilePosition);
                         _logger.LogInformation("Job on {Channel} has been paused at byte {Offset}, reason {PauseReason}", file.Channel, (msPausePosition == null) ? $"{newFilePosition} (no fpos from firmware)" : newFilePosition.ToString(), _pauseReason);
 
-                        // Wait for the print to be resumed
+                        // Wait for the print to be resumed unless that already happened while we were still draining
                         IsProcessing = false;
-                        await _resume.WaitAsync(_lifetime.ApplicationStopping);
+                        if (file.Channel == CodeChannel.File ? _resumePending : _resumePending2)
+                        {
+                            IsPaused = false;
+                        }
+                        else
+                        {
+                            await _resume.WaitAsync(_lifetime.ApplicationStopping);
+                        }
+
+                        // Consume the pending resume of this channel in both cases so it cannot trigger a bogus second pause later
+                        if (file.Channel == CodeChannel.File)
+                        {
+                            _resumePending = false;
+                        }
+                        else
+                        {
+                            _resumePending2 = false;
+                        }
 
                         // Reassign the file being printed unless the print is aborted
                         if (!IsAborted && !IsCancelled)
@@ -547,6 +608,9 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                 if (startingNewPrint)
                 {
                     _logger.LogInformation("Starting file print");
+
+                    // The file input reader always starts un-forked, mirroring RRF's ExecuteAll at the start of a print
+                    _codeProcessor.SetFileStreamsForked(false);
 
                     // Start the main job
                     Task fileTask = DoFilePrint(_file);
@@ -664,7 +728,8 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                     _file2?.Dispose();
                     _file = _file2 = null;
 
-                    // End
+                    // End, un-forking the file input reader like RRF does when a print stops
+                    _codeProcessor.SetFileStreamsForked(false);
                     IsProcessing = IsSimulating = IsPaused = false;
                 }
             } while (!stoppingToken.IsCancellationRequested);
@@ -690,6 +755,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
             _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.ApplicationStopping);
 
             IsPaused = true;
+            _resumePending = _resumePending2 = false;
             _pausePosition = filePosition;
             _pausePosition2 = filePosition2;
             _pauseReason = pauseReason;
@@ -701,10 +767,18 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// </summary>
     public void Resume()
     {
-        if (IsFileSelected && !IsProcessing)
+        if (IsFileSelected)
         {
-            IsPaused = false;
-            _resume.NotifyAll();
+            if (IsPaused)
+            {
+                // A file task may still be draining towards the pause and would wait forever after processing it
+                _resumePending = _resumePending2 = true;
+            }
+            if (!IsProcessing)
+            {
+                IsPaused = false;
+                _resume.NotifyAll();
+            }
         }
     }
 
