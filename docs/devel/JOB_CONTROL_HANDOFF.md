@@ -1,63 +1,71 @@
 # Job control concurrency: hand-over
 
-Where the review of the pause, resume, stop and restore workflow got to, and what to do next.
-Delete this note once step 1 of [JOB_CONTROL_CONCURRENCY.md](JOB_CONTROL_CONCURRENCY.md) §7.13 is
-under way and the covering documents carry the status.
+Where the pause, resume, stop and restore workflow got to, and what to do next. Delete this note
+once step 1 of [JOB_CONTROL_CONCURRENCY.md](JOB_CONTROL_CONCURRENCY.md) §7.13 is done and the
+covering documents carry the status.
 
-## 1. What exists
+## 1. What is in the tree
 
-The documents below were committed in `b9377772` (`plan: replace JobProcessor with a job actor`).
-The review of 2026-08-28 revised §7 of the plan and the three companion documents; those revisions
-are in the working tree and not committed. Commit named paths when the user asks.
+Steps 2, 3 and 4 of §7.13 are done. `JobProcessor.cs`, `JobProcessor.Lifecycle.cs` and
+`PauseState.cs` are gone; `src/DuetControlServer/Files/Job/` is the job actor.
 
 | Path | What it is |
 |---|---|
-| `docs/devel/JOB_CONTROL_CONCURRENCY.md` | The deliverable. §1 to §4 are how the code works today: every thread and task, the shared state with the lock orders actually taken, the sequences as they run, and what each flag was added for. §5 is the catalogue of nineteen races with their interleavings and the standing cost (R20), §6 the seven structural causes, §7 the replacement. |
-| `docs/devel/KNOWN_BUGS.md` | The confirmed open races as unticked entries: R1 to R9, R11, R13, R14, R15, R17. |
-| `docs/devel/PROJECT_OVERVIEW.md` | The WS10 row, its task table and the dependency graph edge. |
-| `docs/devel/JOB_LIFECYCLE.md` | A cross-reference to the concurrency document. |
-| `src/SystemTests/Scenarios/JobControl/SteppedPauseTests.cs` | Pause points 365 and 380 in the sweep (committed in `577fa1d1`); they target R2. |
+| `Files/Job/JobController.cs` | The command loop, the transition table, the published `JobState`, the sequence in flight and its token |
+| `Files/Job/JobState.cs` | `JobPhase`, `JobState`, `JobFile`, `JobStream`, and the `state.status` mapping |
+| `Files/Job/JobCommand.cs` | The commands, `PauseRequest`, `PauseMacro`, `SequenceOutcome`, `StreamRewind` |
+| `Files/Job/JobReader.cs` | One read-ahead loop per stream, the freeze, the drain, the rewind, the published position |
+| `Files/Job/JobSequences.cs` | `start.g`, the pause, the resume, `cancel.g`, `stop.g`, the teardown |
+| `Motion/MovePlanner.cs` | `JobRewindPointFor` (§7.7), `FeedholdCompletedAsync`, `StandstillAsync`, `QueueAndWaitAsync` |
+| `Motion/MotionTracker.cs` | `FailAfter` and `WaitForRetirementAsync`, so every move id terminates |
+| `Motion/JobMoveIndex.cs` | `IsMacroInvocation`, and the index kept across a pause |
 
-Evidence gathered for the catalogue: both `SteppedPauseTests` sweeps were run on this tree and fail
-at 6 of 22 and 3 of 22 points, travelling 445 to 800 mm for a 400 mm job. The bench log shows the R1
-ordering directly, `paused at byte 44 (no fpos from firmware), reason 0` logged before `Stopped the
-machine early`. The log was written to a session scratchpad and is gone; re-run the sweep to
-reproduce it.
+§7.13 records five departures from the letter of §7.5 and §7.10 and why each was made.
 
-## 2. The plan in one paragraph
+## 2. What is not done
 
-`JobProcessor.cs`, `JobProcessor.Lifecycle.cs` and `PauseState.cs` are replaced by a job actor
-written new: a `JobController` whose single task performs every transition of a declared state
-machine and publishes the state as an immutable snapshot, a `JobReader` driven by commands that
-never reads job state and owns the only token the read-ahead is cancelled with, sequences that run
-as child tasks of the controller under their own token, a rewind point derived from the move the
-engine says survives, and move ids that always terminate because the managed side fails every id
-above the survivor in one sweep. §7.11 maps each of the nineteen races to the part of the design
-that answers it.
+**Step 1, the scenarios of §7.12.** They are the acceptance test for the whole of §7 and they are
+blocked on steps 1 to 5 of [DETERMINISTIC_BENCH.md](DETERMINISTIC_BENCH.md), because a scenario that
+answers differently on each run records nothing. Nothing in `SystemTests` was added or changed by
+steps 2 to 4.
 
-## 3. Where to continue
+**The stepped pause sweep** in `SystemTests/Scenarios/JobControl/SteppedPauseTests.cs` is what R1 and
+R2 are ticked against in [KNOWN_BUGS.md](KNOWN_BUGS.md), and it has not been run on a bench whose
+results are a function of the scenario. Until it has, those ticks record the structure being gone
+rather than the behaviour being measured.
 
-1. Read §7 in full. §7.13 is the build order: scenarios, motion prerequisites, then the controller,
-   the cut-over and every document that names the deleted files in one commit, then the removals.
-2. Two corrections of undocumented deviations from RepRapFirmware are recorded in §7.14 (the feed
-   rate the pause saves, and `state.status` during `stop.g`); confirm both with the user before
-   step 3 lands. Ask before committing; permission is given per request.
-3. Start with §7.12: the scenarios go in first, against the current tree, where they fail. The
-   stepped sweep reporting an empty `wrong` list at every pause point is the acceptance test for
-   R1 and R2.
-4. Before writing the controller, confirm these facts still hold, since the design rests on them:
-   `DDARing::PurgeAfter` sets `lastSurvivingMoveId` before it purges and reports `stopped`
-   afterwards, so the id is valid when nothing was purged from the ring; `JobMoveIndex` is cleared
-   only by `MovePlanner.TakeJobResumePoint`, which is what the new lifetime rule changes; purged
-   DDAs and discarded submissions are reported to nobody, which is what `MotionTracker.FailAfter`
-   in step 2 of the build order answers on the managed side; `PipelineStackItem` drops a code whose
-   token is cancelled before dispatch, on every stage, which is what lets the reader's generation
-   token stop the read-ahead without a gate; the engine stops ring 0 only, which is why the forked
-   stream rewinds to its own last completed code.
-5. Keep §7.13, `KNOWN_BUGS.md` and `PROJECT_OVERVIEW.md` current in the same commit as each change.
+**Hardware.** None of this has been run on a real machine yet.
 
-## 4. Outside this work
+## 3. The three job-control scenarios that fail, and why
 
-`JOB_LIFECYCLE.md` carries over 100 em dashes and two passages describing earlier revisions of the
-plan (a withdrawn `M25.1`, and `MovementState.AbandonedJobMove`, a type no longer in the tree). Both
-break standing rules. The file was outside the review request and needs a pass of its own.
+All three fail identically on the commit before step 2, so none of them is a regression. Two of them
+encode a timing assumption the bench cannot honour, which is the same problem WS11 exists to fix:
+
+- `DeferredPauseTests.PauseDuringPlainMacroDefers` and `PauseDuringToolChange` expect the pause to
+  land while a macro is running. A movement code completes as soon as its move is *queued*, so a
+  macro of four slow moves finishes in about 13 ms while the machine spends eight seconds making
+  them; by the time the scenario's `M25` arrives the `File` channel is inside no macro, so there is
+  nothing to defer and the pause is an ordinary asynchronous one. The bench log shows the macro
+  finishing 1.5 seconds before the `M25`. What the scenarios need is a way to hold a macro open, not
+  a longer sleep.
+- `CancelRestartTests.RestartWithFractionAndModalCommand` expects a bare `X65` line to be read as a
+  move under `M26 C1`. `CodeParserBuffer.MayRepeatCode` is set from `state.machineMode`, and only
+  CNC and Laser repeat the last G command; the bench runs in FFF, so the line is not a move at all
+  and `M26 C` has nothing to apply. Either the scenario configures a mode that repeats codes, or the
+  behaviour it is asserting is one FFF does not have.
+
+## 4. Where to continue
+
+1. Land [DETERMINISTIC_BENCH.md](DETERMINISTIC_BENCH.md) steps 1 to 5, then write the scenarios of
+   §7.12. The stepped sweep reporting an empty `wrong` list at every pause point is the acceptance
+   test for R1 and R2.
+2. Run the whole thing on hardware. [pause-and-resume.md](../../src/Documentation/articles/pause-and-resume.md)
+   describes what it should do.
+3. Keep §7.13, [KNOWN_BUGS.md](KNOWN_BUGS.md) and [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) current
+   in the same commit as each change.
+
+## 5. Outside this work
+
+[JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) carries over 100 em dashes, and its §2 describes the tree as it
+stood before the port rather than as it stands. The sections §7.13 named are updated; the file needs
+a pass of its own.
