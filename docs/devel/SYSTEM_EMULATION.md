@@ -51,9 +51,12 @@ reported clock only when a test tells it to therefore makes the motion timeline 
 the central design lever of stage 1. One nuance the SBC side adds: its model extrapolates between
 samples at the nominal rate and is clamped never to run backwards
 ([StepTimer.cpp](../../src/DuetSbcInterface/src/Motion/StepTimer.cpp)), so freezing the master clock
-alone does not freeze the modelled one. Full determinism pairs the stepped clock with the pinned
-local time base (`DuetSbc_PinLocalClock` in [CApi.h](../../src/DuetSbcInterface/src/CApi.h)),
-advancing both together.
+alone does not freeze the modelled one, so the stepped clock is paired with the pinned local time
+base (`DuetSbc_PinLocalClock` in [CApi.h](../../src/DuetSbcInterface/src/CApi.h)) and both are
+advanced together. That is necessary and not sufficient: the software still makes its progress in
+real time between the steps, so the same scenario stops in different places between runs.
+[DETERMINISTIC_BENCH.md](DETERMINISTIC_BENCH.md) is the plan that closes it, by gating each advance
+on the system being quiet rather than on a sleep.
 
 **DuetCANMaster is a board that has already been emulated.** The
 [duet3-emulation](https://github.com/meeloo/duet3-emulation) project runs RepRapFirmware images on
@@ -196,7 +199,7 @@ as DuetCANMaster answers a send with no CAN device.
 ### What stage 1 unlocks
 
 The job lifecycle end to end against the real motion engine: select a file, print, `M25` with a real
-feedhold whose purge outcome the clock policy makes deterministic, the pause macros, the restore
+feedhold whose purge outcome the clock policy scripts, the pause macros, the restore
 point, `M24` with `MoveFractionToSkip` replay, `M226`/`M600`, deferred codes waking on retirement,
 event pauses from injected CAN traffic, and cancel/abort. Everything
 [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) marks 🔧 for hardware verification gets a first automated home
@@ -230,8 +233,9 @@ here, with hardware retaining only what involves real motion.
       segmentation off and on, because cutting a move up must not change what the machine is told
       to do; how it is cut up is its own set of scenarios
 - [ ] Scenarios still to write: deferred codes waking on retirement, event pause from injected CAN
-      traffic, resend-request replay, non-`Ok` send status surfacing, and the stepped clock paired
-      with the pinned local time base for a fully deterministic timeline
+      traffic, resend-request replay, and non-`Ok` send status surfacing
+- [ ] A timeline whose results are a function of the scenario alone, and a suite fast enough to run
+      while working: [DETERMINISTIC_BENCH.md](DETERMINISTIC_BENCH.md)
 - [ ] CI wiring for `SystemTests` (the native library builds automatically as part of the test
       project, so a CI job needs only cmake, a host toolchain and `dotnet test`)
 

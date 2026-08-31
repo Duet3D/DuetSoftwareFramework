@@ -27,7 +27,8 @@ against the reference tree in `lib/RepRapFirmware`.
 | 7 | M-code / motion migration | [MCODE_MIGRATION.md](MCODE_MIGRATION.md) | 🟡 ~58% of inventory | 7 × L, 14 × M, 5 × S | see §3 |
 | 8 | Synchronised actions | [MOTION_SYNCHRONISED_ACTIONS.md](MOTION_SYNCHRONISED_ACTIONS.md) | 🟡 stage 1 landed, verification 🔧 | 1 × M shared open, stage 2 (2 × L, 2 × M, 1 × S) | laser pixel data (§5) |
 | 9 | System emulation test bench | [SYSTEM_EMULATION.md](SYSTEM_EMULATION.md) | 🟡 Stage 1 landed | 3 × L, 4 × M, 2 × S | |
-| 10 | Job control concurrency | [JOB_CONTROL_CONCURRENCY.md](JOB_CONTROL_CONCURRENCY.md) | ⬜ not started | 1 × L, 2 × M, 3 × S | the stepped sweep in WS9 |
+| 10 | Job control concurrency | [JOB_CONTROL_CONCURRENCY.md](JOB_CONTROL_CONCURRENCY.md) | ⬜ not started | 1 × L, 2 × M, 1 × S | WS9 stage 1 (landed), WS11 steps 1 to 5 |
+| 11 | Deterministic test bench | [DETERMINISTIC_BENCH.md](DETERMINISTIC_BENCH.md) | ⬜ not started | 1 × L, 4 × M, 2 × S | WS9 stage 1 (landed) |
 
 Workstream 7 is the umbrella the others were carved out of, and is most of what remains. Workstream 8
 is fully specified and independent; its groundwork and stage 1, deferral in the pipeline, are in,
@@ -207,7 +208,7 @@ moves behind where it belonged.
 
 | Task | Size | Depends on |
 |---|---|---|
-| Stage 1: remaining scenarios (deferred codes, event pause, `MotionStopped`, resend, stepped clock) | M | |
+| Stage 1: remaining scenarios (deferred codes, event pause, `MotionStopped`, resend) | M | |
 | Stage 1: CI wiring for `SystemTests` and the host-built `libduet_sbc.so` | S | |
 | Stage 2: MB6HC Renode platform and link peripheral for DuetCANMaster | L | the stage 1 framing |
 | Stage 2: device-side socket transport in `DataTransfer` | M | the stage 1 framing |
@@ -224,20 +225,38 @@ approach, so it is not counted here.
 
 The pause, resume and stop paths of WS6 work, and the stepped pause sweep in `SystemTests` shows
 they do not work from every stopping point: the file reader, the pause sequence and the motion
-thread each act on the job's state in their own lock windows. The twenty races catalogued in
+thread each act on the job's state in their own lock windows. The nineteen races catalogued in
 [JOB_CONTROL_CONCURRENCY.md](JOB_CONTROL_CONCURRENCY.md) §5 come from that structure rather than
-from any one line, so `JobProcessor` is replaced by a job actor written from scratch: one task owns
-the state, the reader is driven by commands, and the resume point comes from the move the engine
-says survives. The sweep is the acceptance test.
+from any one line, so `JobProcessor` is replaced by a job actor written new: one task owns the
+state, the reader is driven by commands and owns the only token the read-ahead is cancelled with,
+and the resume point comes from the move the engine says survives. The sweep is the acceptance test.
 
 | Task | Size | Depends on |
 |---|---|---|
-| The scenarios of §7.12, written against the current tree | M | |
-| Motion prerequisites: purged and discarded move ids reported, feedhold and standstill as signals, the move index kept across a pause | M | |
-| The dispatch gate on the `File` channel's job level, and the purge generation captured at handler entry | S | |
-| `JobController`, `JobReader` and the sequences, written whole, and the cut-over that deletes `JobProcessor` | L | the three above |
-| The removals the cut-over makes dead | S | the cut-over |
-| JOB_LIFECYCLE §2.9/§3.5, the articles, DCS_INTERNALS lock order | S | the cut-over |
+| The scenarios of §7.12, written against the current tree | M | WS11 steps 1 to 5 |
+| Motion prerequisites: ids above the survivor failed by one sweep, standstill as a comparison, the purge generation captured at handler entry, the move index noting macro moves and kept across a pause | M | |
+| `JobController`, `JobReader` and the sequences, written whole, the dispatch barrier a boundary pause freezes at, the cut-over that deletes `JobProcessor`, and every document that names it, in one commit | L | the two above |
+| The removals the cut-over makes dead: the queue-retry loop and the feed-rate conversion into one helper each | S | the cut-over |
+
+### WS11, deterministic test bench
+
+The stage 1 bench runs the whole stack, but its results are not a function of the scenario and its
+suite is too slow to run while working: the stepped timeline buys progress with a millisecond of
+real time per step, so how far the software gets is a property of the host's scheduler. The same
+sweep, same binary, fails at different pause points on every run, and the two sweeps take a minute
+each. [DETERMINISTIC_BENCH.md](DETERMINISTIC_BENCH.md) replaces the sleep with a settle: one clock
+that everything reads, native threads pumped rather than run, and the timeline advanced only when
+nothing is runnable. The same change removes the dwell that is most of the runtime.
+
+| Task | Size | Depends on |
+|---|---|---|
+| `TimeProvider` through DuetControlServer and the bench, the pinned clock over the whole native side | M | |
+| `DuetSbc_StepMotion` and `DuetSbc_StepLink`, the fake controller pumped by the test | S | |
+| `Settle()` replacing the dwell, with quiescence on the managed side | M | the two above |
+| Every scenario onto the timeline, `FreeRunningClock` deleted, a bench profile that starts fewer services | M | the settle |
+| `scripts/test.sh`, sharding across processes, the per-test budget and the slow-count guard | S | the settle |
+| The single-threaded scheduler for DCS's tasks, then `IBenchGate` and the interleaving scenarios | L | the settle |
+| `StepTimer` state per handle, for in-process parallelism | M | |
 
 ---
 
@@ -280,15 +299,19 @@ graph TD
     WS8 --> LASERSEG
     M452 --> LASERSEG
     WS8 -.->|decision D2 settles M572| WS1
-    WS9["WS9 stepped sweep"] --> WS10["WS10 Job control concurrency<br/>L"]
-    WS10 -.->|reader and controller carry M596 state| M596
-    WS9["WS9 stepped sweep"] --> WS10["WS10 Job control concurrency<br/>L"]
+    WS9 --> WS11["WS11 Deterministic bench<br/>L"]
+    WS9 --> WS10["WS10 Job control concurrency<br/>L"]
+    WS11 -->|scenarios mean something| WS10
     WS10 -.->|reader and controller carry M596 state| M596
 ```
 
-`WS5 Phase C tail` has no incoming edge because nothing blocks it. `WS9` gates only `WS10`: its
-stepped pause sweep is the acceptance test for the concurrency work, and while its
-stage 1 rig also verifies WS6 and WS8 behaviour that is otherwise 🔧, it gates nothing else.
+`WS5 Phase C tail` has no incoming edge because nothing blocks it. `WS9` gates `WS10` and `WS11`:
+its stepped pause sweep, which stage 1 landed, is the acceptance test for the concurrency work, and
+while its rig also verifies WS6 and WS8 behaviour that is otherwise 🔧, it gates nothing else.
+`WS11` gates `WS10` for a narrower reason: the sweep fails at different pause points on every run
+today, so the concurrency work cannot be judged by it until the bench's results are a function of
+the scenario. Its first five tasks are what that needs; the scheduler and the gates are not on the
+critical path.
 
 **Five tracks can run in parallel immediately:**
 

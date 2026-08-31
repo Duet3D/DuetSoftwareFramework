@@ -38,8 +38,15 @@ internal static class NativeTestClock
 /// <para>
 /// Advancing is not free-wheeling: the engine still prepares moves a bounded time ahead and
 /// DuetControlServer still has to keep the ring fed, so the timeline is advanced in small steps
-/// with the threads given a chance to act on each. What that buys is not speed but repeatability -
-/// the machine's position is a function of how far the timeline was advanced and of nothing else
+/// with the threads given a chance to act on each.
+/// </para>
+/// <para>
+/// That chance is a millisecond of real time per step, which is not yet enough to make the
+/// machine's position a function of the timeline alone: how much the motion thread, the transfer
+/// loop and DuetControlServer get done in it is a property of the host's scheduler, so the same
+/// scenario still stops in different places between runs. Gating the advance on quiescence rather
+/// than on a sleep is what closes that, and is also what makes the bench fast enough to run
+/// constantly; see docs/devel/DETERMINISTIC_BENCH.md
 /// </para>
 /// </remarks>
 internal sealed class SteppedTimeline : IDisposable

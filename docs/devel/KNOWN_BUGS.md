@@ -50,8 +50,8 @@
 ### The job monitor and the file reader take the object model and file locks in opposite orders
 - [ ] `JobMonitor.PublishAsync` holds the object model write lock and takes the job file's lock inside it; `CodeFile.ReadCodeAsync` holds the file lock and takes the object model read lock inside it, once per code, on `CancellationToken.None`. The two meet once the timing lands and neither can proceed, with the object model held for writing by the task that cannot. JOB_CONTROL_CONCURRENCY.md R9.
 
-### The first simulation after start-up never finishes
-- [ ] `ExecuteAsync` waits for `job.lastDuration` before it tears a simulation down, and `JobMonitor` writes that field only once it sees `IsProcessing` false, which the teardown is what clears. With `M37 F1`, the default, the first simulation since boot waits for ever and no further job can be selected; later ones read the previous job's duration into the file. `M37SimulatesAFile` uses `F0` and does not reach the wait. JOB_CONTROL_CONCURRENCY.md R15.
+### A simulation before any job has finished never ends, and one after a finished job takes that job's duration
+- [ ] `ExecuteAsync` waits for `job.lastDuration` before it tears a simulation down, and `JobMonitor` writes that field only once it sees `IsProcessing` false, which the teardown is what clears. With `M37 F1`, the default, a simulation run before any job has finished waits for ever and no further job can be selected; one run after any finished job, simulated or not, reads that job's duration into the file. `M37SimulatesAFile` uses `F0` and does not reach the wait. JOB_CONTROL_CONCURRENCY.md R15.
 
 ### M0 with no job runs nothing after a job has ended
 - [ ] `StopAsync` returns early while `_stopped` is set, and only `SelectFileAsync` clears it. After any job has ended, `M0` from a console returns at the guard: no `stop.g`, no heaters off, against the comment on the guard that says it must work every time. JOB_CONTROL_CONCURRENCY.md R5.
