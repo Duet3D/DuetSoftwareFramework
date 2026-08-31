@@ -48,7 +48,7 @@ internal sealed partial class GCodeHandler(
     MovePlanner planner,
     BedCompensation bedCompensation,
     Files.MacroRunner macroRunner,
-    Files.JobProcessor jobProcessor,
+    Files.Job.JobController jobController,
     Link.LinkInterface linkInterface,
     EndstopCorrection endstopCorrection,
     Tools.ToolManager toolManager,
@@ -584,7 +584,7 @@ internal sealed partial class GCodeHandler(
                     // establishes what homing would have, wherever the geometry agrees the named
                     // axes pin their motors down. Not while simulating, as in RepRapFirmware: a
                     // simulated job must not leave the real machine believing it is homed
-                    if (!jobProcessor.IsSimulating)
+                    if (!jobController.State.IsSimulating)
                     {
                         uint g92Axes = 0;
                         foreach (int axis in axesIncluded)

@@ -1,6 +1,7 @@
 using DuetAPI;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
+using DuetControlServer.Files.Job;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Utility;
@@ -34,7 +35,7 @@ namespace DuetControlServer.Events;
 /// <param name="eventLogger">Event logger</param>
 /// <param name="logger">Logger</param>
 internal sealed class EventProcessor(EventQueue queue, MacroRunner macroRunner, EventLogger eventLogger,
-                                   JobProcessor jobProcessor, ILogger<EventProcessor> logger) : BackgroundService
+                                   Files.Job.JobController jobController, ILogger<EventProcessor> logger) : BackgroundService
 {
     /// <summary>
     /// Why a job would pause because of an event, or null if the event does not pause one
@@ -168,21 +169,12 @@ internal sealed class EventProcessor(EventQueue queue, MacroRunner macroRunner, 
     /// </remarks>
     private async Task PauseForEventAsync(EventType type, PrintPausedReason reason, CancellationToken cancellationToken)
     {
-        using (await jobProcessor.LockAsync(cancellationToken))
-        {
-            // A job that is already stopping is not paused a second time, which is RepRapFirmware's
-            // test in the processingEvent state
-            if (!jobProcessor.IsProcessing || jobProcessor.PauseState != PauseState.NotPaused)
-            {
-                return;
-            }
-        }
-
+        // Whether a job that is already stopping is paused a second time is the transition table's
+        // to decide, which is RepRapFirmware's test in the processingEvent state made in one place
         PauseMacro macro = type == EventType.DriverError ? PauseMacro.None : PauseMacro.Pause;
-        Message result = await jobProcessor.PauseAsync(CodeChannel.Autopause, reason, macro,
-                                                       synchronous: false, feedhold: true,
-                                                       reportPosition: false, pausingCode: null,
-                                                       cancellationToken);
+        Message result = await jobController.PauseAsync(new PauseRequest(CodeChannel.Autopause, reason, macro,
+                                                                         Synchronous: false, ReportPosition: false),
+                                                        cancellationToken);
         if (result.Type == MessageType.Error)
         {
             logger.LogWarning("Could not pause the job for event {Type}: {Message}", type, result.Content);

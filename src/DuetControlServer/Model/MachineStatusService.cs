@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
+using DuetControlServer.Files.Job;
 using DuetControlServer.Motion;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -35,12 +36,12 @@ namespace DuetControlServer.Model;
 /// </para>
 /// </remarks>
 /// <param name="model">Object model</param>
-/// <param name="jobProcessor">What the job is doing, which most of the states come from</param>
+/// <param name="jobController">What the job is doing, which most of the states come from</param>
 /// <param name="planner">Whether anything is still moving</param>
 /// <param name="logger">Logger</param>
 internal sealed class MachineStatusService(
     ObjectModel model,
-    JobProcessor jobProcessor,
+    Files.Job.JobController jobController,
     MovePlanner planner,
     ILogger<MachineStatusService> logger) : BackgroundService
 {
@@ -123,24 +124,11 @@ internal sealed class MachineStatusService(
             return MachineStatus.Starting;
         }
 
-        // Then the job. The transitions come before the settled states, because a job that is
-        // pausing is still processing and one that is resuming is still paused - so testing the
-        // settled state first would report the state the machine is leaving
-        switch (jobProcessor.PauseState)
+        // Then the job, which is one function of its phase: the mapping lives with the phase rather
+        // than here, so that a phase added later cannot be left without an answer
+        if (jobController.State.Status is MachineStatus jobStatus)
         {
-            case PauseState.Pausing:
-                return MachineStatus.Pausing;
-            case PauseState.Resuming:
-                return MachineStatus.Resuming;
-            case PauseState.Paused:
-                return MachineStatus.Paused;
-            case PauseState.Cancelling:
-                return MachineStatus.Cancelling;
-        }
-
-        if (jobProcessor.IsProcessing)
-        {
-            return jobProcessor.IsSimulating ? MachineStatus.Simulating : MachineStatus.Processing;
+            return jobStatus;
         }
 
         // TODO ChangingTool is the one remaining transition. A tool change is a macro like any other

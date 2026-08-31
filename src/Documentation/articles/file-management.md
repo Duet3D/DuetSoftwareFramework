@@ -6,7 +6,7 @@ maps those paths onto a directory on the Linux filesystem, parses G-code metadat
 interface, and runs print jobs and macros out of that tree.
 
 - Path mapping: `src/DuetControlServer/Files/FilePathResolver.cs`
-- Jobs and macros: `src/DuetControlServer/Files/JobProcessor.cs`, `Files/CodeFile.cs`,
+- Jobs and macros: `src/DuetControlServer/Files/Job/`, `Files/CodeFile.cs`,
   `Files/MacroFile.cs`, `Files/MacroRunner.cs`
 - File info: `src/DuetControlServer/Files/Parser/`
 - Directory keys: `src/DuetAPI/ObjectModel/Directories/`
@@ -50,15 +50,16 @@ conditions and indentation.
 
 ```mermaid
 flowchart TD
-    SEL["M23/M32 -> JobProcessor.SelectFileAsync()"] --> OPEN["FileFactory.Create() -> CodeFile"]
-    OPEN --> LOOP["JobProcessor.DoFilePrint()<br/>read a pool of codes"]
+    SEL["M23/M32 -> JobController.SelectFileAsync()"] --> OPEN["FileFactory.Create() -> CodeFile"]
+    OPEN --> LOOP["JobReader read-ahead loop<br/>read a pool of codes"]
     LOOP --> READ["CodeFile.ReadCodeAsync()<br/>lazy parse + flow control"]
     READ --> PIPE["Code.ExecuteAsync()<br/>-> code pipeline"]
     PIPE --> LOOP
 
-    LOOP -- "pause" --> PAUSE["save FilePosition<br/>await resume"]
-    PAUSE -- "resume" --> SEEK["seek to saved position"]
-    SEEK --> LOOP
+    LOOP -- "pause" --> PAUSE["JobReader.Freeze()<br/>the controller works out where to rewind to"]
+    PAUSE --> REW["JobReader.RewindAsync(point)"]
+    REW -- "resume" --> RUN["JobReader.RunAsync(point)"]
+    RUN --> LOOP
 
     READ -- "M98, or a code that runs a macro" --> MAC["MacroRunner + ChannelProcessor.Push()"]
     MAC --> MACLOOP["MacroFile.RunAsync()<br/>buffered async execution"]
@@ -66,16 +67,17 @@ flowchart TD
     POP --> LOOP
 ```
 
-`JobProcessor` (`Files/JobProcessor.cs`) owns the print lifecycle. `SelectFileAsync` opens the file on
-the [`File` channel](gcode-flow.md#code-channels); `DoFilePrint()` then reads codes and pushes them
-into the [pipeline](gcode-flow.md#the-five-stage-code-pipeline). File position advances by
-`FilePosition + Length` per code.
+`JobController` (`Files/Job/JobController.cs`) owns the print lifecycle. `SelectFileAsync` opens the
+file on the [`File` channel](gcode-flow.md#code-channels); a `JobReader` per stream then reads codes
+and pushes them into the [pipeline](gcode-flow.md#the-five-stage-code-pipeline). File position
+advances by `FilePosition + Length` per code and is published by the reader itself.
 
-On **pause**, the current position is saved and the loop waits on a resume signal; on **resume** it
-seeks back and continues. Which position is saved, and how a line the machine is half way through is
-finished rather than repeated, is [Pausing and resuming a job](pause-and-resume.md). Note that block
-state is not persisted across a pause - on resume the file seeks to the saved byte offset and
-re-parses any open blocks from there, so a `while` counter resets.
+On **pause**, the reader is frozen, the controller works out where the machine will come to rest and
+tells the reader to rewind there; on **resume** the reader is told to read on from that point. Which
+position that is, and how a line the machine is half way through is finished rather than repeated, is
+[Pausing and resuming a job](pause-and-resume.md). Note that block state is not persisted across a
+pause - on resume the file seeks to the saved byte offset and re-parses any open blocks from there,
+so a `while` counter resets.
 
 `M606 S1` **forks** the job (`ForkAsync`): the `CodeFile` state, including the block stack and parser
 buffer, is copied onto the [`File2` channel](gcode-flow.md#code-channels) so two motion systems can

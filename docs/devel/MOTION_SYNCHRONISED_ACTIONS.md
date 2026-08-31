@@ -790,11 +790,11 @@ The dispatch path, as implemented:
 
 ```mermaid
 flowchart TD
-    A["JobProcessor.DoFilePrint()<br/>reads code, sets CodeFlags.Asynchronous"] --> B["Code.ExecuteAsync()<br/>assigns CancellationToken, returns after start"]
+    A["JobReader read-ahead loop<br/>reads code, sets CodeFlags.Asynchronous"] --> B["Code.ExecuteAsync()<br/>assigns CancellationToken, returns after start"]
     B --> C["CodeProcessor.StartCodeAsync()"]
     C --> D["ChannelProcessor.WriteCodeAsync(code, Start)<br/>Start → Pre → ProcessInternally queue"]
     D --> W["PipelineStackItem.ProcessorTask<br/>(ProcessInternally worker loop)"]
-    W --> X{"code.CancellationToken<br/>cancelled?"}
+    W --> X{"code.CancellationToken cancelled,<br/>or its file held at the barrier?"}
     X -- yes --> CC["CodeProcessor.CancelCode()"]
     X -- no --> G{"CodeProcessor.ShouldDefer(code,<br/>chainPending: pipeline.LastDeferredCodeTask() != null)"}
     G -. "Channel == File · code.File != null · !IsPrioritized<br/>Code.ClassifyInternally() == Deferred<br/>anchor = MovePlanner.LastSubmittedMoveId(ring)<br/>live: anchor != 0 and !MotionTracker.HasRetired(ring, anchor)<br/>or defer on the chain alone" .-> G
@@ -834,11 +834,11 @@ And the pause, purge boundary and rewind point being one number:
 
 ```mermaid
 flowchart TD
-    PA["JobProcessor.PauseAsync()"] --> SE["MovePlanner.StopEarlyAsync()<br/>→ FeedholdOutcome { FirstPurgedMoveId }"]
+    PA["JobSequences.PauseAsync()"] --> SE["MovePlanner.StopEarlyAsync()<br/>→ FeedholdOutcome { LastSurvivingMoveId }<br/>→ MotionTracker.FailAfter(ring, survivor, lastSubmitted)"]
     SE --> CP["CodeProcessor.CancelDeferredCodesAfter(File, FirstPurgedMoveId)"]
     CP --> PBC["PipelineBase.CancelDeferredCodesAfter():<br/>entry.Cts.Cancel() where (int)(DeferredAnchor − boundary) ≥ 0"]
     PBC --> OCE["deferred wait throws OperationCanceledException<br/>→ CodeProcessor.CancelCode() → Executed"]
-    PA --> SR["StopReadingForPause()<br/>rewinds the job to the same boundary"]
+    PA --> SR["JobReader.Freeze() then RewindAsync()<br/>rewinds each stream to its own point"]
     SR --> AM["ChannelProcessor.AbandonMacrosForPauseAsync()"]
     AM --> DR["while LastDeferredCodeTask() != null: await<br/>owed codes fire as the machine decelerates"]
     DR --> POP["macro.Abort() and Pop()<br/>returns pausedInMacro"]

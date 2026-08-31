@@ -177,7 +177,7 @@ for what a readable rendering of that capture looks like.
 The `src/SystemTests` NUnit project (separate from `src/UnitTests`, which stays fast and
 link-free) builds the DCS generic host in-process with the real `NativeLink` and real
 `libduet_sbc.so`, pointed at the fake endpoint, with a per-test virtual SD tree
-(`Host/DcsTestHost.cs`). The enabling seams: `InternalsVisibleTo` for `JobProcessor` and friends,
+(`Host/DcsTestHost.cs`). The enabling seams: `InternalsVisibleTo` for `JobController` and friends,
 the configurable SD root (`Settings.BaseDirectory`), transfer timeouts taken from `Settings` so a
 debugger-paused test does not trip the reconnect path, and the pinned local clock described in §1.
 
@@ -240,12 +240,13 @@ here, with hardware retaining only what involves real motion.
       project, so a CI job needs only cmake, a host toolchain and `dotnet test`)
 
 The first scenario runs surfaced real DuetControlServer defects the unit tests could not see, all
-in the pause path: the file task read `PauseState` back at `NotPaused` as "the print finished", a
+in the pause path: the file task read the pause state back at "not paused" as "the print finished", a
 read-ahead code cancelled by the pause was turned into a job abort, the deferred-pause check ran on
 the token the pause had just cancelled and took the file task down with it, and the pause's
 cancellation of the read-ahead reached nothing at all because `Code.ExecuteAsync` overwrote the
 token the job loop had assigned - which both let purged moves keep executing while "pausing" and
-hung a pause behind a blocking `M116`. All are fixed in `JobProcessor` and the heating scenario
+hung a pause behind a blocking `M116`. All are answered by the job actor of
+[JOB_CONTROL_CONCURRENCY.md](JOB_CONTROL_CONCURRENCY.md) §7, and the heating scenario
 also exposed the heater-mode mapping defect fixed in `ExpansionBoardManager` (a board's
 `HeaterMode` was cast straight to a `HeaterState`).
 

@@ -35,7 +35,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="fileInfoParser">File info parser</param>
 /// <param name="filePathResolver">File path resolver</param>
 /// <param name="diagnosticsProvider">Diagnostics provider</param>
-/// <param name="jobProcessor">Job processor</param>
+/// <param name="jobController">Job controller</param>
 /// <param name="jobMonitor">How the job is getting on, which M73 tells what the slicer expects</param>
 /// <param name="linkInterface">Link interface</param>
 /// <param name="model">Object model</param>
@@ -68,7 +68,7 @@ internal partial class MCodeHandler(
     Model.ObjectModel model,
     MQTT mqtt,
     SbcTriggerService sbcTriggerService,
-    JobProcessor jobProcessor,
+    Files.Job.JobController jobController,
     JobMonitor jobMonitor,
     ILogger<MCodeHandler> logger,
     ILoggerFactory loggerFactory,
@@ -106,7 +106,7 @@ internal partial class MCodeHandler(
     /// </remarks>
     public async ValueTask<Message> ProcessAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (code.IsFromFileChannel && jobProcessor.IsSimulating && code.MajorNumber is not 0 and not 1 and not 2)
+        if (code.IsFromFileChannel && jobController.State.IsSimulating && code.MajorNumber is not 0 and not 1 and not 2)
         {
             // Ignore most M-codes from files in simulation mode...
             return new Message();
@@ -124,7 +124,7 @@ internal partial class MCodeHandler(
     public CodeClass? Classify(DuetAPI.Commands.Code code)
     {
         CodeClass? codeClass = Rows.Classify(code);
-        if (codeClass is not null && code.IsFromFileChannel && jobProcessor.IsSimulating &&
+        if (codeClass is not null && code.IsFromFileChannel && jobController.State.IsSimulating &&
             code.MajorNumber is not 0 and not 1 and not 2)
         {
             return CodeClass.Immediate;
@@ -400,44 +400,18 @@ internal partial class MCodeHandler(
                 return new Message();
             }
 
-            // How the job ended decides which macro runs. A stop from inside the job file is the job
-            // reaching its end; a stop from anywhere else is the operator cancelling one that has
-            // already been paused, which is the only state RepRapFirmware allows it from
-            PrintStoppedReason? reason = null;
-            using (await jobProcessor.LockAsync(cancellationToken))
-            {
-                if (jobProcessor.IsFileSelected)
-                {
-                    if (!code.IsFromFileChannel && !jobProcessor.IsPaused)
-                    {
-                        return new Message(MessageType.Error, "Pause the print before attempting to cancel it");
-                    }
-
-                    reason = code.IsFromFileChannel ? PrintStoppedReason.NormalCompletion
-                                                    : PrintStoppedReason.UserCancelled;
-
-                    // Invalidate the print file and make sure no more codes are read from it
-                    jobProcessor.Cancel();
-                }
-            }
-
-            // Cancelling the job cancels this code with it, so give it a fresh token to report on
+            // Stopping the job cancels the read-ahead this code is part of, so from here it runs
+            // under the shutdown token alone and its own reply survives
             if (code.IsFromFileChannel)
             {
-                code.ResetCancellationToken();
+                code.DetachFromChannelCancellation();
             }
 
-            if (reason is not null)
-            {
-                await jobProcessor.StopAsync(code.Channel, reason.Value, cancellationToken);
-            }
-            else
-            {
-                // No job to stop, so M0/M1/M2 is the machine being put down for the night. RRF runs
-                // stop.g here too, through the same state
-                await jobProcessor.StopAsync(code.Channel, PrintStoppedReason.NormalCompletion, cancellationToken);
-            }
-            return new Message();
+            // How the job ended decides which macro runs, and the transition table decides which of
+            // them this is: a stop from inside the job file is the job reaching its end, a stop from
+            // anywhere else is the operator cancelling one that has already been paused, and a stop
+            // with no job at all is the machine being put down for the night
+            return await jobController.StopAsync(code.Channel, cancellationToken);
         }
         throw new OperationCanceledException();
     }
@@ -574,20 +548,27 @@ internal partial class MCodeHandler(
                     return new Message(MessageType.Error, $"Could not find file {fileName}");
                 }
 
-                using (await jobProcessor.LockAsync(cancellationToken))
+                // M32 read from the job file ends the run it is part of, so it leaves the channel's
+                // cancellation behind in the same way M0 does
+                if (code.IsFromFileChannel && code.MajorNumber == 32)
                 {
-                    if (!code.IsFromFileChannel && (jobProcessor.IsProcessing || jobProcessor.IsPausedOrChanging))
-                    {
-                        return new Message(MessageType.Error, "Cannot set file to print, because a file is already being printed");
-                    }
-                    await jobProcessor.SelectFileAsync(fileName, physicalFile, false, cancellationToken);
+                    code.DetachFromChannelCancellation();
+                }
+
+                Message selected = await jobController.SelectFileAsync(fileName, physicalFile, simulating: false,
+                                                                       updateSimulatedTime: true, code.Channel,
+                                                                       cancellationToken);
+                if (selected.Type != MessageType.Success)
+                {
+                    return selected;
                 }
 
                 // M32 starts what it selected; M23 only selects. Starting goes through the same call
-                // M24 makes, so start.g runs for both of them
-                if (code.MajorNumber == 32)
+                // M24 makes, so start.g runs for both of them. M32 read from the job file selects for
+                // the run after this one, which is started by the teardown rather than from here
+                if (code.MajorNumber == 32 && !code.IsFromFileChannel)
                 {
-                    return await jobProcessor.ResumeAsync(code.Channel, runMacro: true, cancellationToken);
+                    return await jobController.StartOrResumeAsync(code.Channel, runMacro: true, cancellationToken);
                 }
             }
 
@@ -615,7 +596,7 @@ internal partial class MCodeHandler(
 
         // P0 skips resume.g, as it does in RepRapFirmware
         bool runMacro = code.GetInt('P', 1) != 0;
-        return await jobProcessor.ResumeAsync(code.Channel, runMacro, cancellationToken);
+        return await jobController.StartOrResumeAsync(code.Channel, runMacro, cancellationToken);
     }
 
     /// <summary>
@@ -632,18 +613,13 @@ internal partial class MCodeHandler(
     /// between <c>DoSynchronousPause</c> and <c>DoAsynchronousPause</c>.
     /// </para>
     /// <para>
-    /// TODO RepRapFirmware defers a pause requested while the job is inside a macro that cannot be
-    /// restarted, by stashing an M226 and injecting it once the job is back out - see
-    /// <c>deferredPauseCommandPending</c> and JOB_LIFECYCLE.md phase 5. Until that lands the pause
-    /// happens immediately, macro or no macro
+    /// A pause asked for while the job is inside a macro that cannot be restarted is held until the
+    /// job is back out of it, which the transition table decides rather than this handler:
+    /// RepRapFirmware's <c>deferredPauseCommandPending</c>
     /// </para>
     /// </remarks>
     private async ValueTask<Message> HandlePausePrintAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        // Rather than letting the queued moves run, the engine plans a deceleration at the first move it has not
-        // committed and drops the rest.
-        bool feedhold = true;
-
         if (!await codeProcessor.FlushAsync(code, syncFileStreams: true, cancellationToken: cancellationToken))
         {
             throw new OperationCanceledException();
@@ -654,22 +630,17 @@ internal partial class MCodeHandler(
             return new Message();
         }
 
-        // A job inside a macro that has not said it can be restarted must not be interrupted
-        // part-way: the macro would be abandoned with no way to put back what it had already
-        // done. RepRapFirmware stashes the request and injects it once the job is back out
-        if (!code.IsFromFileChannel && jobProcessor.IsProcessing &&
-            codeProcessor.IsDoingMacro(CodeChannel.File) && !codeProcessor.CanRestartMacros(CodeChannel.File))
+        // A pause the job file asked for cannot be cancelled by the freeze it asks for, so its own
+        // reply survives the read-ahead being dropped
+        if (code.IsFromFileChannel)
         {
-            return jobProcessor.TryDeferPause(PauseMacro.Pause)
-                    ? new Message()
-                    : new Message(MessageType.Warning, "Pausing is already pending");
+            code.DetachFromChannelCancellation();
         }
 
-        return await jobProcessor.PauseAsync(code.Channel, PrintPausedReason.User, PauseMacro.Pause,
-                                                synchronous: code.IsFromFileChannel, feedhold: feedhold,
-                                                reportPosition: true,
-                                                pausingCode: code.IsFromFileChannel ? code : null,
-                                                cancellationToken);
+        return await jobController.PauseAsync(new Files.Job.PauseRequest(code.Channel, PrintPausedReason.User, Files.Job.PauseMacro.Pause,
+                                                               Synchronous: code.IsFromFileChannel,
+                                                               ReportPosition: true),
+                                              cancellationToken);
     }
 
     /// <summary>
@@ -698,22 +669,17 @@ internal partial class MCodeHandler(
             }
 
             bool filamentChange = code.MajorNumber == 600;
-            PauseMacro macro = filamentChange ? PauseMacro.FilamentChange
-                               : code.GetInt('P', 1) == 0 ? PauseMacro.None
-                               : PauseMacro.Pause;
+            Files.Job.PauseMacro macro = filamentChange ? Files.Job.PauseMacro.FilamentChange
+                                         : code.GetInt('P', 1) == 0 ? Files.Job.PauseMacro.None
+                                         : Files.Job.PauseMacro.Pause;
             PrintPausedReason reason = filamentChange ? PrintPausedReason.FilamentChange : PrintPausedReason.GCode;
 
-            // Inside a macro that cannot be restarted, the pause waits until the job is back out of
-            // it, exactly as an M25 from elsewhere does
-            if (codeProcessor.IsDoingMacro(code.Channel) && !codeProcessor.CanRestartMacros(code.Channel))
-            {
-                jobProcessor.TryDeferPause(macro);
-                return new Message();
-            }
+            // The freeze this asks for must not cancel its own reply
+            code.DetachFromChannelCancellation();
 
-            return await jobProcessor.PauseAsync(code.Channel, reason, macro,
-                                                 synchronous: true, feedhold: false, reportPosition: true,
-                                                 pausingCode: code, cancellationToken);
+            return await jobController.PauseAsync(new Files.Job.PauseRequest(code.Channel, reason, macro,
+                                                                   Synchronous: true, ReportPosition: true),
+                                                  cancellationToken);
         }
         throw new OperationCanceledException();
     }
@@ -732,36 +698,31 @@ internal partial class MCodeHandler(
             motionSystem = model.Inputs[code.Channel]?.MotionSystem ?? 0;
         }
 
-        using (await jobProcessor.LockAsync(cancellationToken))
+        if (code.TryGetLong('S', out long newPosition))
         {
-            if (!jobProcessor.IsFileSelected)
+            Message result = await jobController.SetFilePositionAsync(motionSystem, newPosition, cancellationToken);
+            if (result.Type != MessageType.Success)
             {
-                return new Message(MessageType.Error, "Not printing a file");
+                return result;
             }
+        }
+        else if (!jobController.State.IsFileSelected)
+        {
+            return new Message(MessageType.Error, "Not printing a file");
+        }
 
-            if (code.TryGetLong('S', out long newPosition))
-            {
-                if (newPosition < 0L || newPosition > jobProcessor.FileLength)
-                {
-                    return new Message(MessageType.Error, "Position is out of range");
-                }
-
-                await jobProcessor.SetFilePositionAsync(motionSystem, newPosition, cancellationToken);
-            }
-
-            // How the line at that position is to be read when the job starts. P is how much of
-            // it the machine has already made - a job restarted by resurrect.g after a power
-            // failure is part-way through a line exactly as a resumed pause is - and C is the
-            // modal command it was read under, which the line itself may not name. They are held
-            // until M24 because that is what starts printing
-            //
-            // TODO M26 also takes the arc restart point in the selected plane's two axis words,
-            // which needs InitialUserC0 / InitialUserC1 and so waits for G2/G3
-            using (planner.Lock())
-            {
-                planner.State.RestartMoveFractionDone = code.GetFloatLimited('P', 0.0f, 1.0f, 0.0f);
-                planner.State.RestartGCommandNumber = code.GetInt('C', -1);
-            }
+        // How the line at that position is to be read when the job starts. P is how much of it the
+        // machine has already made - a job restarted by resurrect.g after a power failure is
+        // part-way through a line exactly as a resumed pause is - and C is the modal command it was
+        // read under, which the line itself may not name. They are held until M24 because that is
+        // what starts printing
+        //
+        // TODO M26 also takes the arc restart point in the selected plane's two axis words, which
+        // needs InitialUserC0 / InitialUserC1 and so waits for G2/G3
+        using (planner.Lock())
+        {
+            planner.State.RestartMoveFractionDone = code.GetFloatLimited('P', 0.0f, 1.0f, 0.0f);
+            planner.State.RestartGCommandNumber = code.GetInt('C', -1);
         }
 
         return new Message();
@@ -781,17 +742,15 @@ internal partial class MCodeHandler(
             motionSystem = model.Inputs[code.Channel]?.MotionSystem ?? 0;
         }
 
-        using (await jobProcessor.LockAsync(cancellationToken))
+        // A file that is only selected is not being printed, which is what RepRapFirmware reports:
+        // Pronterface polls this and takes "SD printing byte" as the job running
+        Files.Job.JobState state = jobController.State;
+        if (state.IsJobInProgress)
         {
-            // A file that is only selected is not being printed, which is what RepRapFirmware
-            // reports: Pronterface polls this and takes "SD printing byte" as the job running
-            if (jobProcessor.IsProcessing || jobProcessor.IsPausedOrChanging)
-            {
-                long filePosition = await jobProcessor.GetFilePositionAsync(motionSystem, cancellationToken);
-                return new Message(MessageType.Success, $"SD printing byte {filePosition}/{jobProcessor.FileLength}");
-            }
-            return new Message(MessageType.Success, "Not SD printing.");
+            return new Message(MessageType.Success,
+                               $"SD printing byte {jobController.GetFilePosition(motionSystem)}/{state.FileLength}");
         }
+        return new Message(MessageType.Success, "Not SD printing.");
     }
 
     /// <summary>
@@ -963,16 +922,14 @@ internal partial class MCodeHandler(
                     return new Message(MessageType.Error, $"GCode file \"{fileName}\" not found");
                 }
 
-                using (await jobProcessor.LockAsync(cancellationToken))
+                // F0 suppresses writing the simulated time back to the file; absent or F1 updates
+                // it, as in standalone mode
+                Message selected = await jobController.SelectFileAsync(fileName, physicalFile, simulating: true,
+                                                                      updateSimulatedTime: code.GetInt('F', 1) == 1,
+                                                                      code.Channel, cancellationToken);
+                if (selected.Type != MessageType.Success)
                 {
-                    if (!code.IsFromFileChannel && (jobProcessor.IsProcessing || jobProcessor.IsPausedOrChanging))
-                    {
-                        return new Message(MessageType.Error, "Cannot set file to simulate, because a file is already being printed");
-                    }
-
-                    await jobProcessor.SelectFileAsync(fileName, physicalFile, true, cancellationToken);
-                    // F0 suppresses writing the simulated time back to the file; absent or F1 updates it, as in standalone mode
-                    jobProcessor.UpdateSimulatedTime = code.GetInt('F', 1) == 1;
+                    return selected;
                 }
 
                 // Where the machine was before the simulation ran, so it can be put back afterwards.
@@ -980,7 +937,7 @@ internal partial class MCodeHandler(
                 await SaveSimulationRestorePointAsync(code, cancellationToken);
 
                 // Starting a simulation is starting a job, so it goes through the same call M24 makes
-                return await jobProcessor.ResumeAsync(code.Channel, runMacro: true, cancellationToken);
+                return await jobController.StartOrResumeAsync(code.Channel, runMacro: true, cancellationToken);
             }
 
             return new Message();
@@ -1704,14 +1661,12 @@ internal partial class MCodeHandler(
                 }
             }
 
-            // Try to fork the file and report an error if anything went wrong
-            using (await jobProcessor.LockAsync(cancellationToken))
+            // Try to fork the file and report an error if anything went wrong. The command starts
+            // the second stream itself, so nothing has to come back afterwards to do it
+            Message result = await jobController.ForkAsync(cancellationToken);
+            if (result.Type != MessageType.Success)
             {
-                Message result = await jobProcessor.ForkAsync(cancellationToken);
-                if (result.Type != MessageType.Success)
-                {
-                    return result;
-                }
+                return result;
             }
         }
 
@@ -2074,31 +2029,8 @@ internal partial class MCodeHandler(
             return;
         }
 
-        switch (code.MajorNumber)
-        {
-            // Stop or unconditional stop, sleep or conditional stop
-            // M24, M32 and M37 no longer appear here: starting and resuming a job is what
-            // JobProcessor.ResumeAsync does, and it has to happen before the code returns so that
-            // start.g and resume.g run inside it
-            case 0:
-            case 1:
-                using (await jobProcessor.LockAsync(cancellationToken))
-                {
-                    // Start reading from the job file, or finish the cancellation process
-                    jobProcessor.Resume();
-                }
-                break;
-
-            // Fork input reader
-            case 606:
-                if (code.TryGetInt('S', out int sParam) && sParam == 1)
-                {
-                    using (await jobProcessor.LockAsync(cancellationToken))
-                    {
-                        jobProcessor.StartSecondJob();
-                    }
-                }
-                break;
-        }
+        // Nothing is left to do here: every job transition happens inside the handler that asked
+        // for it, so that start.g, resume.g and stop.g run before the code returns
+        await ValueTask.CompletedTask;
     }
 }

@@ -41,7 +41,7 @@ namespace DuetControlServer.Link;
 /// <param name="eventLogger">Event logger</param>
 /// <param name="expansionBoardManager">Receiver for expansion board status reports</param>
 /// <param name="macroRunner">Runs macro files</param>
-/// <param name="jobProcessor">Job processor</param>
+/// <param name="jobController">Job controller</param>
 /// <param name="events">Events waiting to be dealt with</param>
 /// <param name="eventProcessor">Event processor, for the reconnect default action</param>
 /// <param name="nativeLink">Native SPI transfer loop</param>
@@ -58,7 +58,7 @@ internal sealed class LinkService(
     EventLogger eventLogger,
     Expansion.ExpansionBoardManager expansionBoardManager,
     MacroRunner macroRunner,
-    JobProcessor jobProcessor,
+    Files.Job.JobController jobController,
     Events.EventQueue events,
     Events.EventProcessor eventProcessor,
     NativeLink nativeLink,
@@ -149,10 +149,7 @@ internal sealed class LinkService(
     public override async Task StopAsync(CancellationToken stoppingToken)
     {
         // Cancel the file being printed
-        using (await jobProcessor.LockAsync(stoppingToken))
-        {
-            jobProcessor.Abort();
-        }
+        jobController.Abort();
 
         // Shut down the link subsystem
         linkInterface.Invalidate();
@@ -1001,10 +998,7 @@ internal sealed class LinkService(
         linkInterface.InvalidateCodes();
 
         // Cancel the file being printed (if any)
-        using (jobProcessor.Lock())
-        {
-            jobProcessor.Abort();
-        }
+        jobController.Abort();
     }
 
     /// <summary>

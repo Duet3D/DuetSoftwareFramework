@@ -24,12 +24,13 @@ public static partial class ServiceCollectionExtensions
         return services
             .AddSingleton<Parser.FileInfoParser>()
             .AddSingleton<FilePathResolver>()
-            .AddSingleton<JobProcessor>()
-            .AddSingleton<IAsyncDiagnostics, JobProcessor>(services => services.GetRequiredService<JobProcessor>())
+            .AddSingleton<Job.JobController>()
+            .AddSingleton<IAsyncDiagnostics, Job.JobController>(services => services.GetRequiredService<Job.JobController>())
+            .AddSingleton<Job.JobSequences>()
             .AddSingleton<FileFactory>()
             .AddSingleton<MacroRunner>()
             .AddSingleton<JobMonitor>()
-            .AddHostedService((provider) => provider.GetRequiredService<JobProcessor>())
+            .AddHostedService((provider) => provider.GetRequiredService<Job.JobController>())
             .AddHostedService((provider) => provider.GetRequiredService<JobMonitor>());
     }
 }

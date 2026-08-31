@@ -235,7 +235,7 @@ and the resume point comes from the move the engine says survives. The sweep is 
 |---|---|---|
 | The scenarios of §7.12, written against the current tree | M | WS11 steps 1 to 5 |
 | ~~Motion prerequisites: ids above the survivor failed by one sweep, standstill as a comparison, the purge generation captured at handler entry, the move index noting macro moves and kept across a pause~~ done | M | |
-| `JobController`, `JobReader` and the sequences, written whole, the dispatch barrier a boundary pause freezes at, the cut-over that deletes `JobProcessor`, and every document that names it, in one commit | L | the two above |
+| ~~`JobController`, `JobReader` and the sequences, written whole, the dispatch barrier a boundary pause freezes at, the cut-over that deletes `JobProcessor`, and every document that names it, in one commit~~ done; the stepped sweep is still owed as its acceptance test | L | the two above |
 | The removals the cut-over makes dead: the queue-retry loop and the feed-rate conversion into one helper each | S | the cut-over |
 
 ### WS11, deterministic test bench

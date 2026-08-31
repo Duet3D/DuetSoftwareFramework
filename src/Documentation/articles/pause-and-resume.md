@@ -32,18 +32,18 @@ still missing, is [JOB_LIFECYCLE.md](docs/devel/JOB_LIFECYCLE.md).
 flowchart LR
     subgraph DCS["DuetControlServer, managed"]
         direction TB
-        subgraph JOB["Job task"]
-            J1["DoFilePrint reads ahead"]
-            J2["rewind and wait on _resume"]
+        subgraph JOB["JobReader, one per stream"]
+            J1["read-ahead loop"]
+            J2["frozen, then rewound"]
         end
         subgraph CODE["Code task, one per code"]
             C1["SubmitMoveAsync builds once"]
             C2["queues segment by segment"]
         end
-        subgraph PAUSE["Pause task"]
-            P1["PauseAsync"]
+        subgraph PAUSE["Pause sequence, a task of JobController"]
+            P1["JobSequences.PauseAsync"]
         end
-        ST["MovementState and JobMoveIndex<br/>under the planner lock<br/>CurrentJobMove<br/>SegmentsLeft<br/>PurgeGeneration<br/>MoveFractionToSkip<br/>RestorePoints"]
+        ST["MovementState and JobMoveIndex<br/>under the planner lock<br/>SegmentsLeft<br/>PurgeGeneration<br/>MoveFractionToSkip<br/>RestorePoints"]
     end
     subgraph SBCI["DuetSbcInterface, native"]
         direction TB
@@ -53,22 +53,22 @@ flowchart LR
 
     J1 -- executes --> C1
     C1 --> C2
-    C2 -- writes the record --> ST
+    C2 -- notes each move's origin --> ST
     C2 -- queues moves, C ABI --> N2
     P1 -- DuetSbc_MotionRequestStop --> N1
     N1 --> N2
     N2 -. seqlock result, DuetSbc_MotionGetFeedholdResult .-> P1
-    P1 -- takes the record --> ST
-    P1 -- cancels the read-ahead --> J2
+    P1 -- reads the surviving move's origin --> ST
+    P1 -- freezes and rewinds --> J2
     ST -- fraction and modal G --> J2
     J2 -- carries on --> J1
 ```
 
 | Task | Where | Entered from | What it owns |
 |---|---|---|---|
-| `DoFilePrint` | DCS, `Files/JobProcessor.cs` | the job's background task | reading codes, the file position it falls back to, the seek and the wait |
-| `SubmitMoveAsync` | DCS, `Codes/Handlers/GCodeHandler.cs` | each `G0`/`G1` on the job channel | building the move once, queueing its segments, the record while the code is in flight |
-| `PauseAsync` | DCS, `Files/JobProcessor.Lifecycle.cs` | `M25`, `M226`/`M600`/`M601`, an event's default action | the stop, the take, the restore point, `pause.g` |
+| `JobReader` | DCS, `Files/Job/JobReader.cs` | one per job stream, started by the controller | reading codes, the file position it publishes, the rewind it is told to make |
+| `SubmitMoveAsync` | DCS, `Codes/Handlers/GCodeHandler.cs` | each `G0`/`G1` on the job channel | building the move once, queueing its segments, noting which job code each came from |
+| `JobSequences.PauseAsync` | DCS, `Files/Job/JobSequences.cs` | a task of `JobController`, started by the transition `M25`, `M226`/`M600`/`M601` or an event asked for | the stop, the rewind point, the restore point, `pause.g` |
 | `MotionService` loop | DuetSbcInterface, `src/Motion/MotionService.cpp` | the native motion thread | the DDA ring, and the only code allowed to free a queued move |
 
 The job reads far ahead of the machine, so at the instant a pause arrives the file is typically some
@@ -102,9 +102,11 @@ records anything.
 **A deferred pause** waits for the job to leave a macro that has not declared itself pausable
 (`M98 R1` from inside the macro, and `ChannelProcessor.CanRestartMacros`, which walks the channel's
 whole macro stack). Abandoning such a macro part-way would
-leave whatever it had already done with no way to put it back. The request is stashed and injected by
-`CheckForDeferredPauseAsync` as soon as the job is back out, which RepRapFirmware does at the same
-point.
+leave whatever it had already done with no way to put it back. The request is held by the controller
+and the reader arms a barrier on the job file's own stack level, so the code that would have followed
+the macro is cancelled where it would have been started and the pause lands at that boundary.
+RepRapFirmware makes the same check in `StartNextGCode`, before it starts the next command from the
+file.
 
 ---
 
@@ -126,32 +128,35 @@ half is a request, a poll, and what it makes of the answer.
 sequenceDiagram
     autonumber
     participant M as M25 handler, DCS
-    participant P as PauseAsync, DCS
+    participant L as JobController loop, DCS
+    participant P as Pause sequence, DCS
     participant PL as MovePlanner, DCS
     participant E as Motion thread, DuetSbcInterface
     participant S as SubmitMoveAsync, DCS
-    participant J as DoFilePrint, DCS
+    participant J as JobReader, DCS
 
-    M->>P: PauseAsync, synchronous false, feedhold true
-    P->>P: PauseState = Pausing
+    M->>L: PauseAsync, synchronous false
+    L->>L: Running -> Pausing, publish
+    L->>P: start the sequence
+    P->>J: Freeze: the generation is cancelled, nothing more is dispatched
     P->>PL: StopEarlyAsync, plannedDeceleration true
     PL->>E: DuetSbc_MotionRequestStop, the only call that crosses
     PL->>PL: State.NotePurge, under the planner lock
     E->>E: DrainFeedholds, then Feedhold on ring 0
-    E-->>PL: DuetSbc_MotionGetFeedholdResult, polled<br/>stopped, firstPurgedMoveId, movesPurged
-    PL->>PL: ResyncFromEngine, SyncInterpreterToMachine, SegmentsLeft = 0
+    E-->>PL: DuetSbc_MotionGetFeedholdResult, polled<br/>stopped, lastSurvivingMoveId, movesPurged
+    PL->>PL: ResyncFromEngine, SyncInterpreterToMachine, SegmentsLeft = 0<br/>MotionTracker.FailAfter, last submitted id rolled back
     PL-->>P: FeedholdOutcome
-    P->>PL: TakeJobResumePoint
-    PL-->>P: JobResumePoint, or null
-    P->>J: StopReadingForPause, with the resume file position
-    S->>S: record is no longer its own, throw OperationCanceledException
+    S->>S: the purge generation moved on, throw OperationCanceledException
     P->>P: AbandonMacrosForPauseAsync on File
-    P->>P: FlushAsync on File, flushAll
+    P->>J: Drain: every code the stream started has ended
+    P->>PL: JobRewindPointFor, from the surviving move
+    PL-->>P: JobResumePoint, or nothing
+    P->>J: RewindAsync to that point
     P->>PL: WaitForStandstillAsync
     P->>PL: SaveRestorePointAsync
-    J->>J: seek to the pause position, then await _resume
     P->>P: RunPauseMacroAsync runs pause.g
-    P->>P: PauseState = Paused
+    P->>L: SequenceCompleted
+    L->>L: Pausing -> Paused, publish, answer the M25
 ```
 
 Three parts of that order are load bearing:
@@ -163,8 +168,13 @@ Three parts of that order are load bearing:
 - **`NotePurge` runs when the stop is requested, not when it is answered.** `PurgeGeneration` says
   one thing to every channel: the ring was emptied, so anything you were part-way through is void.
   Bumping it early is what keeps a segmented move from feeding a ring that is about to be emptied.
-- **The take comes before the cancellation.** It fixes how much of the interrupted code went out;
-  `StopReadingForPause` would otherwise end that submission somewhere the pause had not looked.
+- **The freeze comes before the stop, and the drain after it.** Nothing may be dispatched onto a
+  ring that is about to be emptied, so the read-ahead is cancelled first; but a code the stream
+  already started may be a deferred one parked on a move the stop is about to drop, so waiting for
+  the codes in flight comes after the stop that releases them.
+- **The rewind point is read from what survives, never from what was purged.** The engine reports
+  the last move it will make, and `JobMoveIndex` says which job code that move came from - or, when
+  it came from a macro the job invoked, which job code invoked the macro.
 
 **If the engine refuses, or reports that it did not stop**, nothing is purged and the queue drains as
 it would have without the feedhold. The code that was going out is still truncated by the pause, and
@@ -184,27 +194,29 @@ G-code, and every segment of that code carries the same file position. Rewinding
 the line again plainly would ask for the whole line a second time.
 
 All of this bookkeeping is DuetControlServer's, in `Motion/JobMoveIndex.cs`, and it exists because
-the native side deliberately holds none of it. While a job movement code is in flight the interpreter
-holds one record of it, `MovementState.CurrentJobMove`: the file position, the code's length, the
-modal G command, the feed rate it was read with, the fraction the build started from, its segment
-count, and how many segments have gone to the ring. `JobMoveIndex` maps each queued move id, which is
-the only name the native side knows a move by, to that record and to the move's own place in it. The
-file position and the fraction are fields of one record, so they cannot come to describe different
-lines.
+the native side deliberately holds none of it. Each job movement code produces one `JobMoveOrigin`:
+the file position, the code's length, the modal G command, the feed rate it was read with, the
+fraction the build started from, and its segment count. `JobMoveIndex` maps each queued move id,
+which is the only name the native side knows a move by, to that record and to the move's own place in
+it. The file position and the fraction are fields of one record, so they cannot come to describe
+different lines. A move made by a macro the job invoked is noted under the code that invoked the
+macro, because the macro's own offsets are into the macro rather than into the job file.
 
-`MovePlanner.TakeJobResumePoint` reads it once, under the planner lock, and the id it looks up is the
-one the stop reported:
+`MovePlanner.JobRewindPointFor` reads it once, under the planner lock, and the id it looks up is the
+last move the machine will make - never one that was dropped:
 
 ```mermaid
 flowchart TD
-    A{"the stop purged moves"}
-    A -- yes --> B{"JobMoves.TryGet<br/>firstPurgedMoveId"}
-    A -- no --> C{"CurrentJobMove set"}
-    B -- found --> D["origin.PointAt(segment)<br/>the first move that was dropped"]
-    B -- not found --> E["null<br/>the earliest was a macro's move"]
-    C -- yes --> F["origin.PointAt(SegmentsQueued)<br/>everything queued was committed"]
-    C -- no --> G["null<br/>nothing was part-way, every synchronous pause"]
+    A{"the engine stopped"}
+    A -- yes --> B{"JobMoves.TryGet<br/>lastSurvivingMoveId"}
+    A -- no --> C{"JobMoves.TryGet<br/>lastSubmittedMoveId"}
+    B -- found, a job move --> D["origin.PointAt(segment + 1)<br/>the segment after the one it rests on"]
+    B -- found, a macro's move --> M["origin.PointAt(0) with macroRestarted<br/>the invocation runs again whole"]
+    B -- not found --> E["nothing<br/>the move was another channel's"]
+    C -- found --> F["origin.PointAt(segment + 1)<br/>everything submitted will run"]
+    C -- not found --> G["nothing<br/>the reader's own position stands"]
     D --> H["JobResumePoint<br/>file position, proportion, G, F"]
+    M --> H
     F --> H
     E --> I["null<br/>rewind to the last completed code, no fraction"]
     G --> I
@@ -281,23 +293,25 @@ the rewound position, so its counter starts again ([file management](file-manage
 sequenceDiagram
     autonumber
     participant M as M24 handler
-    participant R as ResumeAsync
+    participant L as JobController loop
+    participant R as Resume sequence
     participant MR as MacroRunner
     participant PL as MovePlanner
-    participant J as DoFilePrint
+    participant J as JobReader
     participant S as next job move
 
-    M->>R: ResumeAsync, runMacro unless M24 P0
-    R->>R: PauseState = Resuming
+    M->>L: StartOrResumeAsync, runMacro unless M24 P0
+    L->>L: Paused -> Resuming, publish
+    L->>R: start the sequence
     R->>MR: resume.g, only when every axis is homed
     R->>PL: MoveBackToRestorePointAsync
-    R->>PL: RestoreFeedRateAsync, the restore point's F
-    R->>R: PauseState = NotPaused, _resume.NotifyAll
-    J->>J: wakes at the position it seeked to before sleeping
-    J->>PL: RestoreModalStateForResume
-    PL->>PL: file.ModalGCommand = rp.GCommandNumber
-    PL->>PL: MoveFractionToSkip = rp.ProportionDone
-    J->>S: read the code at that position again
+    R->>PL: RestoreInterpreterStateAsync, the restore point's F and distance modes
+    R->>PL: MoveFractionToSkip = rp.ProportionDone
+    R->>L: SequenceCompleted
+    L->>L: Resuming -> Running, publish
+    L->>J: RunAsync with the stream's rewind point
+    J->>J: ModalGCommand = rp.GCommandNumber, FirstCommandAfterRestart
+    J->>S: read the code at the rewound position again
     S->>PL: BuildRawMove scales relative words and extrusion by 1 minus the fraction
     S->>PL: MoveFractionToSkip = 0, spent by this one move
 ```
@@ -326,25 +340,30 @@ and begins the job, which is also what `M32` does.
 ```mermaid
 stateDiagram-v2
     direction LR
-    NotPaused --> Pausing: PauseAsync accepted
-    Pausing --> Paused: the sequence ends, in a finally
-    Paused --> Resuming: ResumeAsync
-    Resuming --> NotPaused: in a finally, then _resume.NotifyAll
-    Paused --> Cancelling: StopAsync, user cancelled
-    Cancelling --> NotPaused: cancel.g has run
+    Running --> Pausing: Pause accepted
+    Pausing --> Paused: the sequence settles, whatever it did
+    Paused --> Resuming: StartOrResume
+    Resuming --> Running: resume.g done, the readers told to read
+    Resuming --> Paused: the resume failed
+    Paused --> Cancelling: Stop from a channel other than File
+    Cancelling --> Finishing: cancel.g has run
+    Finishing --> Idle: the teardown is published
 ```
 
-The order matters as much as the values, and it is RepRapFirmware's:
+The phase is one field, written only by the controller's own task, and every transition of it is a
+declared one. What it changes:
 
-| State | What it changes | Published as |
+| Phase | What it changes | Published as |
 |---|---|---|
-| `Pausing` | the job stops reading codes at once, and a second `M25` is refused with "Printing is already paused!" | `state.status` = `pausing` |
+| `Pausing` | the readers stop at once, and a second `M25` is refused with "Printing is already paused!" | `state.status` = `pausing` |
 | `Paused` | `M24` resumes, `M0`/`M1`/`M2` cancel | `paused` |
 | `Resuming` | a repeated `M24` is ignored rather than refused: the machine is already going where it was asked | `resuming` |
 | `Cancelling` | `cancel.g` is running after the file has already been closed | `cancelling` |
+| `Finishing` | `stop.g` runs, then the teardown; no pause is accepted | `busy`, as RepRapFirmware reports it |
 
-Both exits settle in a `finally`. If `pause.g` or `resume.g` is aborted part-way, the machine still
-reports the state it is actually in rather than reporting a transition for ever.
+A pause settles to `Paused` on every outcome. Its first steps cannot be cancelled by the caller, so by
+the time anything that can fail is reached the machine has been told to stop and has to say so; a
+resume that fails settles back to `Paused` and reports the error rather than resuming anyway.
 
 ---
 
@@ -390,10 +409,11 @@ one restore point and one interpreter state.
 
 | File | What is in it |
 |---|---|
-| `Files/JobProcessor.Lifecycle.cs` | `PauseAsync`, `ResumeAsync`, `StopAsync`, `SaveRestorePointAsync`, `MoveBackToRestorePointAsync`, `CheckForDeferredPauseAsync` |
-| `Files/JobProcessor.cs` | `DoFilePrint`, `StopReadingForPause`, `RestoreModalStateForResume`, the seek and the wait |
+| `Files/Job/JobController.cs` | the transition table: what each of M0, M23, M24, M25, M26, M32, M37, M226 and M606 does from the phase the job is in |
+| `Files/Job/JobSequences.cs` | `PauseAsync`, `ResumeAsync`, `StopAsync`, `SaveRestorePointAsync`, `MoveBackToRestorePointAsync` |
+| `Files/Job/JobReader.cs` | the read-ahead loop, the freeze, the rewind, the published file position |
 | `Codes/Handlers/MCodeHandler.cs` | `M25`, `M226`/`M600`/`M601`, `M24`, `M26` |
-| `Motion/MovePlanner.cs` | `StopEarlyAsync`, `TakeJobResumePoint`, `FeedholdOutcome` |
+| `Motion/MovePlanner.cs` | `StopEarlyAsync`, `JobRewindPointFor`, `FeedholdOutcome` |
 | `Motion/JobMoveIndex.cs` | `JobMoveOrigin` and its `PointAt`, `JobResumePoint`, the move id index |
 | `Motion/MovementState.cs` | `CurrentJobMove`, `SegmentsLeft`, `PurgeGeneration`, `MoveFractionToSkip`, `RestorePoints` |
 | `Motion/MoveInterpreter.cs` | the scaling of §4, and `SyncInterpreterToMachine` |

@@ -100,11 +100,7 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
 
         if (channel is CodeChannel.File or CodeChannel.File2)
         {
-            JobProcessor jobProcessor = serviceProvider.GetRequiredService<JobProcessor>();
-            using (await jobProcessor.LockAsync(cancellationToken))
-            {
-                jobProcessor.Abort();
-            }
+            await serviceProvider.GetRequiredService<Files.Job.JobController>().AbortAsync();
         }
     }
 

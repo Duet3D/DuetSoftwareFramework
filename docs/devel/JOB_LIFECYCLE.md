@@ -4,8 +4,9 @@ Tracking document for the last big hole in
 [MCODE_MIGRATION.md](MCODE_MIGRATION.md): §4's "No job lifecycle hooks", §7's item 9, §9's ⬜ half,
 §11.4 phase F item 29, and [EVENTS_MIGRATION.md](EVENTS_MIGRATION.md)'s phase E all name the same
 missing subsystem from different sides. This is that subsystem written down in one place: what
-RepRapFirmware does, what [JobProcessor.cs](../../src/DuetControlServer/Files/JobProcessor.cs) does
-today, what is missing, and the order to close it in.
+RepRapFirmware does, what DuetControlServer does today, what is missing, and the order to close it
+in. It records *what* the lifecycle has to do; how the code that does it is scheduled, and the job
+actor that now runs it, are [JOB_CONTROL_CONCURRENCY.md](JOB_CONTROL_CONCURRENCY.md).
 
 The reference is `GCodes::DoSynchronousPause` / `DoAsynchronousPause`
 ([GCodes.cpp:1000, :1064](../../lib/RepRapFirmware/src/GCodes/GCodes.cpp)), the pause/resume state
@@ -233,23 +234,21 @@ keeping from the deleted SPI path, because both are non-obvious and both were de
 - **A synchronous pause must not supply a file position.** The old `HandlePrintPaused` passed `null`
   for `PrintPausedReason.GCode` and `FilamentChange` with the comment "that would lead to an endless
   loop" — the file has already advanced past the `M226`, so rewinding to the position that produced
-  it would re-run it forever. `DoFilePrint`'s fallback to `currentFilePosition` is the right
-  behaviour for those two reasons and the wrong one for the rest.
-- **Comments must not advance the position.** `DoFilePrint` already handles this
+  it would re-run it forever. The reader's own published position - the end of the last code that
+  completed - is the right answer for those two reasons and the wrong one for the rest, which take
+  the point from the move the engine says survives.
+- **Comments must not advance the position.** `JobReader` handles this
   (`!code.IsNonFirmwareComment`), and the reason is the same one: comments resolve internally and
-  finish even while the job is paused.
-- **`PauseState` alone cannot tell the loop a pause is owed.** A resume that lands before
-  `DoFilePrint` has parked puts the state back to `NotPaused`, and the loop then reads its drained
-  read-ahead as "no more codes, the print finished" and ends the job in silence.
-  `JobProcessor._pausePending` is the flag that survives that window, set by `StopReadingForPause`
-  and cleared by the loop when it acts on it. It is one flag today because there is one job loop;
-  when multiple motion systems land, `File` and `File2` run `DoFilePrint` concurrently and whichever
-  drains first would clear it for both, so it has to be indexed by motion system alongside
-  `_pausePosition`/`_pausePosition2`. That is a `// TODO` at the field, not a silent simplification.
+  finish even while the job is frozen.
+- **The reader must be told where to go, never left to infer it.** A reader that decided for itself
+  what a drained read-ahead meant could read a resume that landed first as "no more codes, the print
+  finished" and end the job in silence. `JobReader` is frozen, then told where to rewind to once the
+  controller holds a point, and reports that it has; each stream carries its own point, so a forked
+  job rewinds each of them to its own.
 - **Running out of codes is not the end of the print.** A movement code finishes when its move is
   *queued*, so a job file's last code completes seconds before the machine reaches the end of the
-  job. `DoFilePrint` therefore waits for standstill before it treats a drained read-ahead as a
-  finished print, which is where RepRapFirmware waits too and for the same two reasons
+  job. The controller therefore waits for standstill before it treats a stream that ran out of codes
+  as a finished print, which is where RepRapFirmware waits too and for the same two reasons
   ([GCodes.cpp:706](../../lib/RepRapFirmware/src/GCodes/GCodes.cpp)): an asynchronous pause may
   still arrive while the machine works through what the file queued last, and `state.status` has to
   keep reporting the job until the job has really ended. The wait is skipped once the job is
@@ -295,16 +294,17 @@ become its own file.
 
 ## 3. The design
 
-### 3.1 One state, in `JobProcessor`
+### 3.1 One state, in the job controller
 
-Replace `IsPaused` with a `PauseState` enum matching RRF's, keeping `IsPaused` as
-`PauseState is Paused or Pausing or Resuming or Cancelling` for the existing readers, or updating
-them. `MachineStatusService.Derive` reads the new property and gains its three branches in RRF's
-order.
+One phase, `JobPhase`, written only by `JobController`'s own task and published as part of an
+immutable `JobState` snapshot. It covers RRF's `PauseState` and the machine states its `GCodes::Spin`
+is in at once, because everything here can await: `Idle`, `Selected`, `Starting`, `Running`,
+`Pausing`, `Paused`, `Resuming`, `Cancelling`, `Finishing`, `Aborting`. `state.status` is a function
+of it, so `MachineStatusService.Derive` asks the phase rather than testing conditions of its own.
 
-`IsCancelled` and `IsAborted` stay as they are — they describe how the *last* job ended, which is a
-different question from what the job is doing now, and `job.lastFileCancelled` / `lastFileAborted`
-are derived from them.
+How the last job ended is `StopReason`, written once by the transition that ended the run, and
+`job.lastFileCancelled` / `lastFileAborted` are derived from it. See
+[JOB_CONTROL_CONCURRENCY.md](JOB_CONTROL_CONCURRENCY.md) §7.3.
 
 ### 3.2 A restore point, captured where the pause is decided
 
@@ -320,10 +320,10 @@ user-numbered one and is cheap to add once the array exists.
 ### 3.3 The sequence as an async method, not a state machine
 
 RepRapFirmware's `pausing1 → pausing2 → resuming1 → resuming2 → resuming3` states exist because
-`GCodes::Spin` cannot block. `JobProcessor` runs on its own task and can `await`, so the equivalent
-is a straight-line async method — `PauseSequenceAsync`, `ResumeSequenceAsync`,
-`CancelSequenceAsync` — with the same steps in the same order and the same standstill waits between
-them. This is the same substitution `EventProcessor` already made for RRF's `AutoPause` channel
+`GCodes::Spin` cannot block. `JobController` performs its transitions on its own task and can
+`await`, so the equivalent is a straight-line async method - the sequences in `JobSequences` - with
+the same steps in the same order and the same standstill waits between them. The loop keeps
+dequeuing while a sequence runs, so nothing waits behind a macro. This is the same substitution `EventProcessor` already made for RRF's `AutoPause` channel
 polling, and it is recorded here so the next reader does not go looking for the missing states.
 
 The two things the state machine buys that an `await` does not, and how each is kept:
@@ -634,8 +634,8 @@ Those are RepRapFirmware's three branches of `DoAsynchronousPause`
 position and the proportion together and then calls `ClearMove`. The result is one nullable value
 carrying a file position, a fraction, a G command number and a feed rate, so a fraction that names no
 position cannot be expressed. Three things read it, and all three read that one value: the position
-`DoFilePrint` seeks to, the restore point's `ProportionDone`, `GCommandNumber` and `FeedRate`, and
-through the restore point the modal state `RestoreModalStateForResume` puts back.
+the reader is rewound to, the restore point's `ProportionDone`, `GCommandNumber` and `FeedRate`, and
+through the restore point the modal state the resume puts back.
 
 A code every segment of which reached the ring resumes at the code *after* it, not at its own start
 with all of it skipped. Everything queued is committed and will run, so nothing of that code is still
@@ -643,13 +643,12 @@ owed, and rewinding to it would ask the machine for a move of no length. RepRapF
 same place from the other side, with a proportion of one that skips every segment when the code is
 read again.
 
-Taking the record is also what fixes the segment count in it. A submission whose record has been
-taken queues no more segments of that code, so what the take read stays true; the take therefore
-comes before the read-ahead is cancelled rather than after, since the cancellation would otherwise
-end the submission somewhere the take had not looked. Between the stop and the take nothing can add
-to the index either, because `PurgeGeneration` is already raised and only a job move is ever
-recorded. A submission ended this way reports its code as cancelled rather than as done, which is
-what keeps `DoFilePrint`'s own position, the fallback in the two rows above that name nothing, at the
+The rule reads only what the engine says survives, so nothing has to be taken or fixed: the index
+entry of the surviving move carries the code and the move's place in it, whether or not the code that
+submitted it has finished. Between the stop and the lookup nothing can add an entry above the
+survivor either, because `PurgeGeneration` is already raised and a submission in flight abandons its
+remaining segments on it. Such a submission reports its code as cancelled rather than as done, which
+is what keeps the reader's own position, the fallback in the two rows above that name nothing, at the
 end of the last code that really completed.
 
 An interrupted code is truncated whether or not the engine stopped early, and the truncation is
@@ -885,8 +884,8 @@ when the head is at or below the pause height, and only splits the move - travel
       sequence that made no stop of its own
 - [x] The fraction composes over the whole code rather than over the part the build was given, so a
       second stop inside one code reports what the machine has made and not what the remainder had
-- [x] A submission the take ends reports its code as cancelled rather than as done, so the position
-      `DoFilePrint` falls back to stays the end of the last code that completed
+- [x] A submission the purge generation ends reports its code as cancelled rather than as done, so
+      the position the reader falls back to stays the end of the last code that completed
 - [x] Only the job file's own codes spend `MoveFractionToSkip`, by the same test that decides whether
       a move is recorded at all; a macro on the `File` channel does not
 - [x] Tests for the accounting: a stop inside a segmented code, a second stop inside the same code, a
@@ -1012,8 +1011,9 @@ off, which is what `PrintMonitor::Spin` does and why it has the flags it has.
 1. **The resume moves the head back in two moves.** `resuming1` and `resuming2` are kept as two, so
    Z is restored last coming down and first going up. Only the single-motion-system branch is
    ported, with a `// TODO` naming M596; §3.3.
-2. **`PauseState` lives on `JobProcessor`**, as RRF has it on `GCodes` and the restore points on
-   `MovementState`; §3.1.
+2. **The job's phase lives on `JobController`**, as RRF has `PauseState` on `GCodes` and the restore
+   points on `MovementState`. It is one field written by one task, and it covers the transitions RRF
+   spreads across `PauseState` and its machine states; §3.1.
 3. **Feedhold variant (a)** — stop at the first DDA boundary with enough deceleration distance, no
    truncation. A DDA is a segment, so that boundary is usually inside a G-code and the resume takes
    the already-made fraction of the line off it. (b) stays available later; §3.5.

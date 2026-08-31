@@ -180,6 +180,30 @@ public class CodeFile(
     private volatile bool _isClosed = false;
 
     /// <summary>
+    /// Whether the codes of this file are to be held at the dispatch barrier
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A pause that has to wait for a macro to finish arms this on the job file. The pipeline
+    /// consults it beside the cancellation check it already makes, so a code whose stack level is
+    /// this file is cancelled instead of being processed - which puts the barrier in the dispatch
+    /// path itself rather than in something that has to poll for the macro ending. The macro's own
+    /// codes are a child stack item and are not held, so the macro runs to its end.
+    /// </para>
+    /// <para>
+    /// RepRapFirmware makes the same check in <c>StartNextGCode</c>, before it starts the next
+    /// command from the file. Cancelling rather than holding is what keeps a flush of this level
+    /// from waiting on the barrier, and the codes it cancels are the ones the rewind re-reads
+    /// </para>
+    /// </remarks>
+    public bool HoldAtNextCode
+    {
+        get => _holdAtNextCode;
+        set => _holdAtNextCode = value;
+    }
+    private volatile bool _holdAtNextCode;
+
+    /// <summary>
     /// Close this file
     /// </summary>
     public void Close() => _isClosed = true;

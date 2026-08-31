@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Heat;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -24,19 +25,32 @@ namespace DuetControlServer.Files;
 /// <para>
 /// A single writer, like <see cref="Model.MachineStatusService"/> and for the same reason: these are
 /// derived values, and deriving them in the several places that change a condition is what makes
-/// writers race. <see cref="JobProcessor"/> holds the conditions; this is the projection
+/// writers race. <see cref="Job.JobController"/> holds the conditions; this is the projection.
+/// </para>
+/// <para>
+/// When a job starts and ends it is told, by the sequences that start and end it, rather than left
+/// to notice from a poll. A simulation can be over before a 200 ms poll has seen it begin, and a
+/// caller that waited for this to report a duration it had not started counting would wait for ever
 /// </para>
 /// </remarks>
 /// <param name="model">Object model</param>
-/// <param name="jobProcessor">What the job is doing</param>
 /// <param name="heatManager">Whether the machine is waiting for a heater, which is warm-up time</param>
+/// <param name="serviceProvider">
+/// Resolves the job controller, which is built after this and reads it back
+/// </param>
 /// <param name="logger">Logger</param>
 internal sealed class JobMonitor(
     Model.ObjectModel model,
-    JobProcessor jobProcessor,
     HeatManager heatManager,
+    IServiceProvider serviceProvider,
     ILogger<JobMonitor> logger) : BackgroundService
 {
+    /// <summary>
+    /// What the job is doing, resolved lazily because the controller is built after this
+    /// </summary>
+    private Job.JobController Controller => _controller ??= serviceProvider.GetRequiredService<Job.JobController>();
+    private Job.JobController? _controller;
+
     /// <summary>
     /// How often the job fields are brought up to date
     /// </summary>
@@ -135,29 +149,20 @@ internal sealed class JobMonitor(
     /// </summary>
     private async ValueTask UpdateAsync(CancellationToken cancellationToken)
     {
-        bool processing, paused, simulating;
-        using (await jobProcessor.LockAsync(cancellationToken))
+        if (!_running)
         {
-            processing = jobProcessor.IsProcessing || jobProcessor.PauseState != PauseState.NotPaused;
-            paused = jobProcessor.PauseState != PauseState.NotPaused;
-            simulating = jobProcessor.IsSimulating;
-        }
-
-        TimeSpan now = _clock.Elapsed;
-
-        if (!processing)
-        {
-            if (_running)
-            {
-                await FinishAsync(cancellationToken);
-            }
             return;
         }
 
-        if (!_running)
-        {
-            Start(now);
-        }
+        // Read before the write lock is taken, never under it: the reader publishes its position and
+        // the controller its state, so neither costs a lock, and taking the object model lock first
+        // is what keeps one lock order for the whole program
+        Job.JobState state = Controller.State;
+        bool paused = !state.IsReallyPrinting;
+        bool simulating = state.IsSimulating;
+        long filePosition = Controller.GetFilePosition(0);
+
+        TimeSpan now = _clock.Elapsed;
 
         // Time spent paused is not time spent printing. Whatever the job has been waiting for, the
         // rate it was getting through the file before it stopped is still the rate to estimate from
@@ -199,17 +204,18 @@ internal sealed class JobMonitor(
                     _heatingUp = false;
                 }
 
-                await TakeSnapshotIfDueAsync(now, simulating, cancellationToken);
+                    await TakeSnapshotIfDueAsync(now, simulating, filePosition, cancellationToken);
             }
         }
 
-        await PublishAsync(now, cancellationToken);
+        await PublishAsync(now, filePosition, cancellationToken);
     }
 
     /// <summary>
     /// Measure how fast the job is getting through the file and the filament, if enough has happened
     /// </summary>
-    private async ValueTask TakeSnapshotIfDueAsync(TimeSpan now, bool simulating, CancellationToken cancellationToken)
+    private async ValueTask TakeSnapshotIfDueAsync(TimeSpan now, bool simulating, long filePosition,
+                                                  CancellationToken cancellationToken)
     {
         TimeSpan nonPrintingTime = _totalWarmUpTime + _totalPauseTime;
         TimeSpan printedSinceSnapshot = (now - _lastSnapshotAt) - (nonPrintingTime - _lastSnapshotNonPrintingTime);
@@ -218,7 +224,7 @@ internal sealed class JobMonitor(
             return;
         }
 
-        float fraction = await FractionOfFilePrintedAsync(cancellationToken);
+        float fraction = FractionOfFilePrinted(filePosition);
         float filamentUsed = await RawExtrusionAsync(cancellationToken);
         float seconds = (float)printedSinceSnapshot.TotalSeconds;
 
@@ -233,7 +239,7 @@ internal sealed class JobMonitor(
     /// <summary>
     /// Write what the job has done and how long is left
     /// </summary>
-    private async ValueTask PublishAsync(TimeSpan now, CancellationToken cancellationToken)
+    private async ValueTask PublishAsync(TimeSpan now, long filePosition, CancellationToken cancellationToken)
     {
         float duration = (float)(now - _startedAt - PauseTimeAt(now)).TotalSeconds;
         float warmUp = (float)WarmUpTimeAt(now).TotalSeconds;
@@ -244,7 +250,7 @@ internal sealed class JobMonitor(
             model.Job.Duration = (int)MathF.Round(duration);
             model.Job.WarmUpDuration = (int)MathF.Round(warmUp);
             model.Job.PauseDuration = (int)MathF.Round(pauseDuration);
-            model.Job.FilePosition = await jobProcessor.GetFilePositionAsync(0, cancellationToken);
+            model.Job.FilePosition = filePosition;
 
             float fraction = FractionOfFilePrinted(model);
             model.Job.TimesLeft.File = AsReportedTime(FileBasedEstimate(fraction));
@@ -474,11 +480,10 @@ internal sealed class JobMonitor(
     /// <summary>
     /// How much of the job file has been read
     /// </summary>
-    private async ValueTask<float> FractionOfFilePrintedAsync(CancellationToken cancellationToken)
+    private float FractionOfFilePrinted(long filePosition)
     {
-        long position = await jobProcessor.GetFilePositionAsync(0, cancellationToken);
-        long length = jobProcessor.FileLength;
-        return length > 0 ? (float)position / length : 0.0f;
+        long length = Controller.State.FileLength;
+        return length > 0 ? (float)filePosition / length : 0.0f;
     }
 
     /// <summary>
@@ -516,8 +521,10 @@ internal sealed class JobMonitor(
     /// <summary>
     /// Start counting for a new job
     /// </summary>
-    private void Start(TimeSpan now)
+    /// <remarks>Called by the start sequence, before the first code of the job is read</remarks>
+    public void Start()
     {
+        TimeSpan now = _clock.Elapsed;
         _running = true;
         _startedAt = _lastSnapshotAt = now;
         _totalPauseTime = _totalWarmUpTime = _lastSnapshotNonPrintingTime = TimeSpan.Zero;
@@ -530,8 +537,20 @@ internal sealed class JobMonitor(
     /// <summary>
     /// Record what the job that has just ended did, and stop counting
     /// </summary>
-    private async ValueTask FinishAsync(CancellationToken cancellationToken)
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>How long the job took, in seconds</returns>
+    /// <remarks>
+    /// Called by the stop sequence, and the one writer of <c>job.lastFileName</c>. It answers with
+    /// the duration rather than leaving the caller to read it back out of the object model, which is
+    /// what a simulation's time is written from
+    /// </remarks>
+    public async ValueTask<int> FinishAsync(CancellationToken cancellationToken)
     {
+        if (!_running)
+        {
+            return 0;
+        }
+
         TimeSpan now = _clock.Elapsed;
         int duration = (int)MathF.Round((float)(now - _startedAt - PauseTimeAt(now)).TotalSeconds);
         int warmUp = (int)MathF.Round((float)WarmUpTimeAt(now).TotalSeconds);
@@ -551,5 +570,6 @@ internal sealed class JobMonitor(
             model.Job.FilePosition = null;
             model.Job.TimesLeft.File = model.Job.TimesLeft.Filament = model.Job.TimesLeft.Slicer = null;
         }
+        return duration;
     }
 }

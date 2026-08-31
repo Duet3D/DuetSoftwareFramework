@@ -153,7 +153,7 @@ paused or pausing, no second pause is added.
 | Macro runner | [MacroRunner.cs:72](src/DuetControlServer/Files/MacroRunner.cs#L72) | ✅ runs a macro on a channel, with parameters (§3.4) |
 | Variables (`var`, `set`, `global`, `param`) | `Codes/Meta/VariableSet.cs`, `VariableStore.cs` | ✅ phase A — they did not exist at all before it |
 | Message box | `state.messageBox` exists in the model | ⬜ `M291`/`M292` not ported |
-| Pause | `JobProcessor.Pause(...)` exists | ⬜ nothing calls it; `M25` and `pause.g` not ported |
+| Pause | `JobController.PauseAsync(...)` | ✅ `EventProcessor` posts the request; the transition table decides what a job already stopping does with it |
 | `M122` events line | — | ⬜ |
 
 Three of those are hard prerequisites and are tracked as phases in §5: **macro parameters**
@@ -371,9 +371,9 @@ rather than producing something that looks like an answer.
 |---|---|
 | `platform.MessageF(mt, ...)` | `eventLogger.LogOutput(messageType, text)` |
 | `SendSimpleAlert(...)` | `state.messageBox` — **blocked** on `M291`/`M292` (MCODE_MIGRATION §5.11) |
-| `DoAsynchronousPause(..., eventPausing1)` | `JobProcessor.Pause(...)` + `pause.g` — **blocked** on `M25` |
+| `DoAsynchronousPause(..., eventPausing1)` | `JobController.PauseAsync(...)` + `pause.g` |
 | `eventPausing2` (pause without `pause.g`) | same, minus the macro |
-| `IsReallyPrinting()` | `jobProcessor.IsProcessing && !IsSimulating` |
+| `IsReallyPrinting()` | `jobController.State.IsReallyPrinting` |
 
 Until those land, the pausing branch is a `// TODO` naming what it waits for, and the logging branch
 runs for every event. That is a *known* missing default, not an invented one (MCODE_MIGRATION §1.7):

@@ -1203,7 +1203,7 @@ step leaves the tree building and the bench no worse.
    registration, the call sites listed in §7.10, the dispatch barrier of §7.5 in
    `PipelineStackItem.cs` and its flag on `CodeFile`, the deletion of `JobProcessor.cs`,
    `JobProcessor.Lifecycle.cs` and `PauseState.cs`, and every document that names them, in the same
-   commit: [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) §2.9, §3.1, §3.5 and decision 2 of §6,
+   commit. **Done**, with five departures from the letter of §7.5 and §7.10 recorded below: [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) §2.9, §3.1, §3.5 and decision 2 of §6,
    [DCS_INTERNALS.md](DCS_INTERNALS.md) §1, §2 and the lock order in §3,
    [MOTION_SYNCHRONISED_ACTIONS.md](MOTION_SYNCHRONISED_ACTIONS.md) §4 and its `DoFilePrint` and
    `PauseAsync` diagrams, [SYSTEM_EMULATION.md](SYSTEM_EMULATION.md)'s `InternalsVisibleTo` note,
@@ -1212,6 +1212,30 @@ step leaves the tree building and the bench no worse.
    checked against the `state.status` mapping of §7.3. The sequence bodies are ported step for step
    from the current ones, which are the record of the RepRapFirmware behaviour; what changes is who
    runs them, in what order, and under which token.
+
+   - **The reader's input is methods, its output an event channel.** `Run`, `Freeze`, `Rewind` and
+     `Close` are calls the controller loop and its sequences make, which are the only two callers
+     and are serialised against each other; a command channel would need a second task inside the
+     reader to notice a freeze while the read-ahead is running, and the generation token is what
+     stops it either way. `Stopped`, `Finished` and `Failed` are events, because they arrive when
+     the controller is not asking.
+   - **The freeze is split from the drain.** `Freeze` cancels the generation and stops reading and
+     returns at once; `DrainAsync` is the wait for the codes in flight. They cannot be one step: a
+     code the stream already started may be a deferred one parked on a move the stop is about to
+     drop, so a freeze that waited would be waiting for the very thing it comes before. The pause
+     sequence freezes, stops, cancels the deferred codes the stop orphaned, abandons the macros,
+     and only then drains.
+   - **A pause the job file asked for is answered at once**, and reports where it stopped through
+     the log rather than as the code's reply. The sequence has to wait for that code to complete
+     before the stream has drained, so a reply held until the sequence settled would be a reply the
+     sequence is waiting for. `M0`, `M1`, `M2` and `M32` read from the job file are answered at once
+     for the same reason, which is the same rule §7.4 states for `M32`.
+   - **There is no `IJobController` interface.** Nothing needs a second implementation, and the
+     methods §7.10 lists are on `JobController` itself.
+   - **`start.g` failing ends the run with `PrintStoppedReason.Abort`, which runs no macro**, as an
+     aborted job does everywhere else and as RepRapFirmware does: a file that depends on the machine
+     working is the wrong thing to reach for when starting the job did not work. `lastFileAborted`
+     is set, which is what §7.12's scenario asks for.
 4. **The removals** the cut-over makes dead, each into one shared helper: the queue-retry-standstill
    loop written out in `RestoreAxesAsync`, the probe travel move, the second probing loop and
    `SubmitMoveAsync`, with `RingFullRetryDelay` declared in two classes, becomes one `MovePlanner`

@@ -68,7 +68,7 @@ flowchart TD
     IPC --> CMD["Command<br/>(Code / SimpleCode)"]
     IPC --> INTERCEPT["CodeInterception<br/>(plugin rewrites)"]
 
-    FILEJOB["Print job<br/>JobProcessor"] --> CODEFILE["CodeFile.ReadCodeAsync()"]
+    FILEJOB["Print job<br/>JobReader"] --> CODEFILE["CodeFile.ReadCodeAsync()"]
     MACRO["Macro file<br/>MacroRunner + MacroFile"] --> CODEFILE
 
     EVENT["Event macro<br/>EventProcessor, Autopause channel"] --> MACRO

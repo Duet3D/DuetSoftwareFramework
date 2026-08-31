@@ -28,7 +28,7 @@ flowchart TB
     Hosted --> Server[IPC.Server]
     Hosted --> LinkSvc[Link.LinkService]
     Hosted --> CodeProc[Codes.CodeProcessorService]
-    Hosted --> JobProc[Files.JobProcessor]
+    Hosted --> JobProc[Files.Job.JobController]
     Hosted --> ModelSvc[Model.UpdateService]
     Hosted --> Periodic[Model.PeriodicUpdateService]
     Hosted --> SbcTrig[Model.SbcTriggerService]
@@ -51,9 +51,16 @@ Drives one `ChannelProcessor` per `CodeChannel` (HTTP, Telnet, File, USB, Aux, T
 
 Listens on `/var/run/dsf/dcs.sock`, accepts connections, performs the JSON handshake, and creates the appropriate `Processor` (Command / Intercept / Subscribe / CodeStream / PluginService) for the connection's mode. Each connection runs as its own `Task`. See [IPC_PROTOCOL.md](IPC_PROTOCOL.md).
 
-### `Files.JobProcessor` ([Files/JobProcessor.cs](../../src/DuetControlServer/Files/JobProcessor.cs))
+### `Files.Job.JobController` ([Files/Job/JobController.cs](../../src/DuetControlServer/Files/Job/JobController.cs))
 
-Owns the active print job: opens / closes the file, parses metadata, advances `state.status`, writes pause / resume restore points. Separate from `CodeProcessor` because the job lifecycle has its own state machine, separate from the per-code lifecycle.
+Owns the active print job, as one task performing one declared transition at a time: it opens and
+closes the file, decides what each of M0, M23, M24, M25, M26, M32, M37, M226 and M606 is allowed to
+do from the phase the job is in, and publishes an immutable `JobState` that everything else reads
+without a lock. What takes time - `start.g`, the pause, the resume, `cancel.g`, `stop.g` - runs as a
+child task of the controller and reports back for it to settle, so `M112` never waits behind a
+macro. `JobReader` reads one stream of the file and is told where to go rather than inferring it.
+Separate from `CodeProcessor` because the job lifecycle is its own state machine, separate from the
+per-code one. See [JOB_CONTROL_CONCURRENCY.md](JOB_CONTROL_CONCURRENCY.md) §7.
 
 ### `Model.UpdateService` ([Model/UpdateService.cs](../../src/DuetControlServer/Model/UpdateService.cs))
 
@@ -85,6 +92,15 @@ DCS is heavily concurrent. Two locks dominate:
 
 - **Object Model lock** ([`LockManager`](../../src/DuetControlServer/IPC/LockManager.cs)) — async read/write lock around `Model.ObjectModel`. Reads are cheap (many at once); writes are serialised. The `LockWrapper` returned from `model.LockAsync` is `IAsyncDisposable` so `await using var l = await model.LockAsync()` is the idiom.
 - **Per-channel pipeline locks** — each pipeline stage owns the `Code` for its lifetime in that stage. The `ChannelProcessor` queues / dequeues with FIFO semantics.
+
+There is no job lock. The job is owned by one task and read as a snapshot, so nothing takes a lock to
+ask what a job is doing and nothing holds one across a macro. The pairs that remain are taken in one
+order everywhere — the object model first, then the planner or the file:
+
+```
+object model  ->  planner
+object model  ->  file
+```
 
 ```mermaid
 flowchart LR
