@@ -264,7 +264,7 @@ namespace DuetControlServer.Codes.Handlers
                     {
                         using (await code.File.LockAsync())
                         {
-                            code.File.AddLocalVariable(varName);
+                            code.File.AddLocalVariable(code, varName);
                         }
                     }
                     return new Message();
