@@ -279,7 +279,7 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
                 {
                     using (await code.File.LockAsync(cancellationToken))
                     {
-                        code.File.AddLocalVariable(varName);
+                        code.File.AddLocalVariable(code, varName);
                     }
                 }
                 return new Message();

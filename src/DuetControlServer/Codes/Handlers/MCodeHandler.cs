@@ -697,6 +697,16 @@ public class MCodeHandler(
                 }
                 break;
 
+            // Send/receive data
+            case 260:
+            case 261:
+                // The firmware declares the result variable itself and rejects a name that still exists, so drop a leftover from a closed block first
+                if (code.File is not null && code.TryGetString('V', out string? varName))
+                {
+                    await code.File.DeleteStaleVariableAsync(varName, cancellationToken);
+                }
+                break;
+
             // Query object model
             case 409:
                 {
@@ -1325,12 +1335,12 @@ public class MCodeHandler(
             // Send/receive data
             case 260:
             case 261:
-                if (code.File != null && code.TryGetString('V', out string? varName))
+                if (code.Result?.Type != MessageType.Error && code.File != null && code.TryGetString('V', out string? varName))
                 {
                     // These codes can create local variables, so keep track of them
                     using (await code.File.LockAsync(cancellationToken))
                     {
-                        code.File.AddLocalVariable(varName);
+                        code.File.AddLocalVariable(code, varName);
                     }
                 }
                 break;

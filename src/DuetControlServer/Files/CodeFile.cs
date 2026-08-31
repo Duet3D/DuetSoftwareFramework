@@ -587,22 +587,25 @@ public class CodeFile(
     /// <summary>
     /// Add a new local variable to the current code block
     /// </summary>
+    /// <param name="code">Code declaring the variable</param>
     /// <param name="varName">Name of the variable</param>
-    public void AddLocalVariable(string varName)
+    public void AddLocalVariable(Code code, string varName)
     {
         lock (_codeBlocks)
         {
-            if (_codeBlocks.TryPeek(out CodeBlock? codeBlock))
+            if (!_codeBlocks.TryPeek(out CodeBlock? codeBlock))
             {
-                if (!codeBlock.LocalVariables.Contains(varName))
-                {
-                    codeBlock.LocalVariables.Add(varName);
-                }
+                // Variables may be declared at file level, in which case they live until the file is closed.
+                // Such a block must use var semantics, else the next code at the same indentation ends it again
+                codeBlock = new CodeBlock(code, true, KeywordType.Var);
+                _codeBlocks.Push(codeBlock);
             }
-            else
+
+            if (!codeBlock.LocalVariables.Contains(varName))
             {
-                logger.LogWarning("Cannot add local variable because there is no open code block");
+                codeBlock.LocalVariables.Add(varName);
             }
+            codeBlock.HasLocalVariables = true;
         }
     }
 
