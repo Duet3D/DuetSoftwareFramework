@@ -297,7 +297,8 @@ public class MCodeHandler(
                                 return new Message(MessageType.Error, "Position is out of range");
                             }
 
-                            await jobProcessor.SetFilePositionAsync(motionSystem, newPosition, cancellationToken);
+                            // C carries the modal G0/G1/G2/G3 command of the move at that position, as written to resurrect.g
+                            await jobProcessor.SetFilePositionAsync(motionSystem, newPosition, code.GetInt('C', -1), cancellationToken);
                         }
                     }
 

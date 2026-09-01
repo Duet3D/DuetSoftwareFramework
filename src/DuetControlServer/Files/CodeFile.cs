@@ -129,6 +129,17 @@ public class CodeFile(
     public long NextFilePosition { get; set; }
 
     /// <summary>
+    /// Modal G0/G1/G2/G3 command that lines without a command letter repeat, or -1 if there is none.
+    /// Seeking resets it because the read-ahead state is invalidated, so a caller that seeks to a position
+    /// whose modal context it knows must restore it, else a Fanuc or LaserWeb style line is not recognised
+    /// </summary>
+    public int LastGCode
+    {
+        get => _parserBuffer.LastGCode;
+        set => _parserBuffer.LastGCode = value;
+    }
+
+    /// <summary>
     /// Seek to a new file position and restore the code block state the read-ahead had at that position.
     /// Blocks entered at or past it are dropped because their lines are read again after the seek, so blocks
     /// left on the stack would be pushed twice and while loops would restart with bogus iteration counts;

@@ -27,6 +27,11 @@ namespace DuetControlServer.Files;
 [DiagnosticsPriority(-1)]
 public class JobProcessor : BackgroundService, IAsyncDiagnostics
 {
+    /// <summary>
+    /// Index of the pause restore point in the object model, matching PauseRestorePointNumber in RepRapFirmware
+    /// </summary>
+    private const int PauseRestorePointIndex = 1;
+
     // Private fields
     private readonly CodeProcessor _codeProcessor;
     private readonly CodeFactory _codeFactory;
@@ -245,15 +250,17 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// </summary>
     /// <param name="motionSystem">Motion system</param>
     /// <param name="filePosition">New file position</param>
+    /// <param name="lastGCode">Modal G0/G1/G2/G3 command in effect at the new file position, or -1 if unknown</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>File position</returns>
-    public async Task SetFilePositionAsync(int motionSystem, long filePosition, CancellationToken cancellationToken = default)
+    public async Task SetFilePositionAsync(int motionSystem, long filePosition, int lastGCode = -1, CancellationToken cancellationToken = default)
     {
         if (_file is not null && motionSystem == 0)
         {
             using (await _file.LockAsync(cancellationToken))
             {
                 await _file.RewindAsync(filePosition, cancellationToken);
+                _file.LastGCode = lastGCode;
             }
         }
 
@@ -262,6 +269,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
             using (await _file2.LockAsync(cancellationToken))
             {
                 await _file2.RewindAsync(filePosition, cancellationToken);
+                _file2.LastGCode = lastGCode;
             }
         }
         _codeProcessor.ResolveSyncRequestsAfter(filePosition);
@@ -531,6 +539,37 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                     }
                 }
 
+                // A rewind invalidates the read-ahead state and with it the modal G0/G1/G2/G3 command that Fanuc and
+                // LaserWeb style files repeat, so pick up the one the firmware recorded with its pause restore point.
+                // The pause notification arrives before the object model carries that restore point, hence the update
+                // wait - which must not run under our own lock because the link task takes it to report a pause
+                bool isPausing;
+                using (await LockAsync())
+                {
+                    isPausing = IsPaused || (file.Channel == CodeChannel.File ? _resumePending : _resumePending2);
+                }
+
+                int pauseGCommandNumber = -1;
+                if (isPausing)
+                {
+                    try
+                    {
+                        await _model.WaitForFullUpdateAsync(_lifetime.ApplicationStopping);
+                        using (await _model.AccessReadOnlyAsync(_lifetime.ApplicationStopping))
+                        {
+                            int motionSystem = (file.Channel == CodeChannel.File) ? 0 : 1;
+                            if (motionSystem < _model.Move.MotionSystems.Count && _model.Move.MotionSystems[motionSystem].RestorePoints.Count > PauseRestorePointIndex)
+                            {
+                                pauseGCommandNumber = _model.Move.MotionSystems[motionSystem].RestorePoints[PauseRestorePointIndex].GCommandNumber;
+                            }
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // shutting down, the rewind below falls back to no modal command
+                    }
+                }
+
                 using (await LockAsync())
                 {
                     // The pending flag catches a task that is still draining when a resume already cleared IsPaused,
@@ -542,7 +581,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                         // for this channel (falling back to the last code we executed if RRF didn't supply one)
                         long? msPausePosition = (file.Channel == CodeChannel.File) ? _pausePosition : _pausePosition2;
                         long newFilePosition = msPausePosition ?? currentFilePosition;
-                        await SetFilePositionAsync(file.Channel == CodeChannel.File ? 0 : 1, newFilePosition);
+                        await SetFilePositionAsync(file.Channel == CodeChannel.File ? 0 : 1, newFilePosition, pauseGCommandNumber);
                         _logger.LogInformation("Job on {Channel} has been paused at byte {Offset}, reason {PauseReason}", file.Channel, (msPausePosition == null) ? $"{newFilePosition} (no fpos from firmware)" : newFilePosition.ToString(), _pauseReason);
 
                         // Wait for the print to be resumed unless that already happened while we were still draining
