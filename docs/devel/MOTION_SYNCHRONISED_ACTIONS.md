@@ -235,7 +235,10 @@ report, which DWC polls mid-print; the guard is `SetsAnyDrive`, relocated from t
 `M584` and `M593` are FlushAndStandstill only when setting; `M558` is FlushAndStandstill unless
 bare or naming only `K`, a report; `M563` is FlushAndStandstill only with `P`, without it a
 report; `M999` is FlushAndStandstill with `B` (§3); `G10` is FlushAndStandstill with an axis
-letter and Deferred without. Every fractional code a handler
+letter and Deferred without. `G4` is the one code that needs a
+standstill and cannot declare it: whether it waits depends on the channel asking rather than on the
+parameters, so its row is Immediate and its handler waits, as the special move inside `G0`/`G1` does
+(MCODE_MIGRATION.md §18). Every fractional code a handler
 implements is its own row (M36.1/.2, M201.1, M505.1, M569.1/.2/.4/.6/.7, M581.1, M586.4), the
 minor decided by the row's lambda as an argument, except M569, which keeps a switch over its valid
 minors because each maps to a different CAN message type. A minor of zero is the fraction-less

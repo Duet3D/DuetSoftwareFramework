@@ -24,7 +24,7 @@ against the reference tree in `lib/RepRapFirmware`.
 | 4 | Stall detection | [STALL_DETECTION.md](STALL_DETECTION.md) | 🟢 8 of 9 phases | 1 × S | |
 | 5 | Events migration | [EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) | 🟢 4 of 5 phases | 1 × M, 1 × S | M291 (WS7) |
 | 6 | Job lifecycle | [JOB_LIFECYCLE.md](JOB_LIFECYCLE.md) | 🟢 8 phases, 5 with tails | 2 × M, 6 × S | M291, M581, M452 (all WS7) |
-| 7 | M-code / motion migration | [MCODE_MIGRATION.md](MCODE_MIGRATION.md) | 🟡 ~58% of inventory | 7 × L, 14 × M, 5 × S | see §3 |
+| 7 | M-code / motion migration | [MCODE_MIGRATION.md](MCODE_MIGRATION.md) | 🟡 ~58% of inventory | 7 × L, 14 × M, 6 × S | see §3 |
 | 8 | Synchronised actions | [MOTION_SYNCHRONISED_ACTIONS.md](MOTION_SYNCHRONISED_ACTIONS.md) | 🟡 stage 1 landed, verification 🔧 | 1 × M shared open, stage 2 (2 × L, 2 × M, 1 × S) | laser pixel data (§5) |
 | 9 | System emulation test bench | [SYSTEM_EMULATION.md](SYSTEM_EMULATION.md) | 🟡 Stage 1 landed | 3 × L, 4 × M, 2 × S | |
 | 10 | Job control concurrency | [JOB_CONTROL_CONCURRENCY.md](JOB_CONTROL_CONCURRENCY.md) | ⬜ not started | 1 × L, 2 × M, 1 × S | WS9 stage 1 (landed), WS11 steps 1 to 5 |
@@ -72,7 +72,7 @@ Recorded so the remaining list is read against what it sits on rather than as a 
 | **Stall detection** (WS4) | `M574 S3`/`S4` work: stop groups, the three stop actions, per-driver stall attribution, the motor-stall Z probe, and inputs already active when a move starts. |
 | **Events migration** (WS5) | Variables and macro parameters; the event queue, processor, and all 13 event types; `M957`; the link-loss and reconnect events end to end. |
 | **Job lifecycle** (WS6) | Pause, resume, cancel, and stop; the restore points; `pause.g`, `resume.g`, `stop.g`, `cancel.g`, `start.g`; the feedhold (a controlled deceleration replacing RRF's search for a sufficiently slow junction); job progress and time estimates. |
-| **M-code migration** (WS7) | 109 of 187 in-scope M-codes fully ported. Motion, kinematics (all 7 geometries), compensation, probing, heat, fans, tools, and spindles are each essentially complete as subsystems. The G0/G1 audit's phases A to E, the endstop-correction move into DCS, and the kinematics ownership inversion have all landed. |
+| **M-code migration** (WS7) | 109 of 187 in-scope M-codes fully ported. Motion, kinematics (all 7 geometries), compensation, probing, heat, fans, tools, and spindles are each essentially complete as subsystems. The G0/G1 audit's phases A to E, the endstop-correction move into DCS, the kinematics ownership inversion and the `G4` dwell have all landed. |
 
 ---
 
@@ -150,6 +150,7 @@ currently zero.
 | Multi-motion-system: M595, M596, M597, M598, M599 | L | |
 | Network tail: M540, M553, M554, M555, M575, M587 to M589 | M | |
 | Miscellaneous tail: ~20 codes including M80/M81, M117, M150, M260/M261, M300, M905, M911/M916, M955/M956 | L | |
+| A simulated `G4` is skipped but nothing counts it, so `M37` estimates a dwelling file short ([§18](MCODE_MIGRATION.md#18-g4-the-dwell)) | S | a simulated time to accumulate into; DCS times a simulation by the wall clock |
 
 M596 is significant beyond its own row: three separate plans park a `// TODO` on it (the feedhold
 stops only ring 0, `RawMove.OwnedDrives` is never set, and synchronised actions belong to one ring).

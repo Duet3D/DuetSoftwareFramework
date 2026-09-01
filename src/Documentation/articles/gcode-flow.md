@@ -199,7 +199,8 @@ flowchart TD
 - **G-codes** are interpreted here in full: `G0`/`G1` become planned moves through
   [MoveInterpreter and MovePlanner](rrf-differences.md#5-interpreter-and-move-path), `G28` runs the
   machine's homing macros, `G29`/`G30`/`G31` probe and build the height map, `G10`/`G53`/`G92` move
-  the coordinate systems around.
+  the coordinate systems around, `G4` dwells after the machine has stopped, and only waits for it to
+  stop on a channel that commanded motion of its own.
 - **T-codes**: `TCodeHandler` selects a tool and runs `tfree`/`tpre`/`tpost` around the change.
 - **M-codes**: `MCodeHandler` is the largest of the four, split across a file per subsystem
   (`MCodeHandler.Motion.cs`, `.Heat.cs`, `.Fans.cs`, `.Tools.cs`, `.Probes.cs`, `.Spindles.cs`,

@@ -276,6 +276,30 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     }
 
     /// <summary>
+    /// Wait for the machine to come to a standstill on behalf of a code, and record that its
+    /// channel has waited
+    /// </summary>
+    /// <param name="channel">Channel the code came in on</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>True when the machine is at a standstill, false when cancelled</returns>
+    /// <remarks>
+    /// RepRapFirmware clears <c>GCodeBuffer::motionCommanded</c> inside
+    /// <c>LockCurrentMovementSystemAndWaitForStandstill</c>, once the wait is over rather than when
+    /// it starts, "so that we don't stop waiting when executing G4". This is the wait a
+    /// FlushAndStandstill code's class performs and the one G4 makes for itself, so it is the same
+    /// point
+    /// </remarks>
+    public async ValueTask<bool> WaitForStandstillAsync(CodeChannel channel, CancellationToken cancellationToken = default)
+    {
+        if (!await WaitForStandstillAsync(cancellationToken))
+        {
+            return false;
+        }
+        (_planner ??= serviceProvider.GetRequiredService<Motion.MovePlanner>()).MotionStopped(channel);
+        return true;
+    }
+
+    /// <summary>
     /// Decide whether a code defers, and name its anchor if it does
     /// </summary>
     /// <param name="code">Code about to be dispatched by the ProcessInternally worker</param>

@@ -379,7 +379,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
                             // The code changes what a queued move means, or needs the board's
                             // reply: nothing may be moving when the handler runs
                             if (!await _codeProcessor.FlushAsync(this, cancellationToken: CancellationToken) ||
-                                !await _codeProcessor.WaitForStandstillAsync(CancellationToken))
+                                !await _codeProcessor.WaitForStandstillAsync(Channel, CancellationToken))
                             {
                                 throw new OperationCanceledException();
                             }

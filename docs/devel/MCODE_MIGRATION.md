@@ -3376,3 +3376,65 @@ A fourth is a comment rather than behaviour: `MCodeHandler.HandleResumePrintAsyn
 not run *because macro execution is not wired up yet*. It is wired up; what M24 is missing is the
 restore-point state and the call. A reason that has been overtaken is worse than no reason, because
 it answers the question a reader came with.
+
+---
+
+## 18. `G4`: the dwell
+
+`GCodes::DoDwell` ([GCodes.cpp](../../lib/RepRapFirmware/src/GCodes/GCodes.cpp)) is four decisions,
+and three of them are ported whole. `S` is a dwell in seconds and `P` one in milliseconds; `S` is
+tested first, so `P` is never read when both are given; a dwell of zero or less is nothing to do and
+returns at once, which is also what a bare `G4` amounts to.
+
+### The wait is the handler's, not the code's class
+
+The fourth decision is the wait for the machine to stop, and RepRapFirmware only makes it when the
+stream asking to dwell has commanded motion since it last waited:
+
+> This is so that G4 can be used in a trigger or daemon macro file without pausing motion, when the
+> macro doesn't itself command any motion.
+
+That is a fact about the channel rather than about the code, so no `CodeClass` expresses it: the
+resolver rows [MOTION_SYNCHRONISED_ACTIONS.md](MOTION_SYNCHRONISED_ACTIONS.md) describes decide from
+the code's parameters, and the table they live in is static. `G4`'s row therefore declares
+`Immediate` and the handler waits, where the channel is known, which is the same place the
+special-move wait inside `G0`/`G1` is made for the same kind of reason. The wait itself is
+`CodeProcessor.WaitForStandstillAsync`, the one the `FlushAndStandstill` class performs.
+
+The flag it reads is RepRapFirmware's `GCodeBuffer::motionCommanded`, which lives on `MovePlanner`
+here because that is what owns both ends of it:
+
+| RepRapFirmware | DuetControlServer |
+|---|---|
+| `gb.MotionCommanded()` in `FinaliseMove` | `planner.MotionCommanded(code.Channel)` where `BuildRawMove` returns, which is where `FinaliseMove` ends |
+| `gb.MotionStopped()` in `LockCurrentMovementSystemAndWaitForStandstill` | `planner.MotionStopped(channel)` in `CodeProcessor.WaitForStandstillAsync(channel, …)` |
+| `gb.WasMotionCommanded()` | `planner.WasMotionCommanded(channel)` |
+
+The clear is at one point rather than nine because `CodeProcessor.WaitForStandstillAsync` is the
+wait every code that locks and waits goes through, whether its class asked for it or `G4` did. The
+`planner.StandstillAsync` waits that remain (`G28`, `G29`, `G30`, the special-move wait inside
+`G0`/`G1`) are all mid-sequence waits of a code whose class already waited first, so clearing there
+as well would clear nothing that is set. `G0`/`G1` is the one that could differ, and does not: its
+special-move wait is immediately followed by the move that sets the flag again.
+
+### What is not ported: the dwell a simulation does not spend
+
+RepRapFirmware adds the dwell to `simulationTime` and returns rather than waiting, for every channel
+but the daemon and triggers, and only while simulating a file. Neither of those channels is a file
+channel and `M37` always names a file here (`exitSimulationWhenFileComplete` is the flag it sets, and
+`M37 S` is unported), so the whole of that condition is `code.IsFromFileChannel`.
+
+The skip is ported; the accumulation is not, because there is nothing to accumulate into.
+DuetControlServer measures a simulation by the wall clock (`JobMonitor` times the run and
+`JobSequences` writes what it reports into the file) where RepRapFirmware sums the time each move
+and each dwell would take. So a simulated `G4` costs the estimate the whole of its dwell, and a file
+whose print time is mostly dwells will be estimated short. The `TODO` sits on the skip in
+`GCodeHandler.HandleDwellAsync`.
+
+### Tests
+
+`SystemTests/Scenarios/Codes/DwellCodeTests.cs`: the units and their precedence, every form that
+dwells for nothing (absent, zero, negative), the standstill wait on a channel that commanded motion
+and its absence on one that did not, both against a frozen timeline, so a wait that did not happen
+cannot pass as a machine that was quick, and a simulated file whose ten-minute dwell does not
+delay it.

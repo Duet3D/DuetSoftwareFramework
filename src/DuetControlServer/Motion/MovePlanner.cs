@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using DuetAPI;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link;
 using DuetControlServer.Link.Native;
@@ -96,6 +97,18 @@ internal sealed class MovePlanner(
     private readonly int[] _endPointsBeforeBuild = new int[MotionLimits.MaxAxesPlusExtruders];
     private uint _nextMoveId = 1;
     private readonly uint[] _lastSubmittedMoveId = new uint[MotionLimits.MaxRings];
+
+    /// <summary>
+    /// Whether each channel has commanded motion since it last waited for the machine to stop
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware keeps this per G-code stream, as <c>GCodeBuffer::motionCommanded</c>: set by
+    /// <c>GCodes::FinaliseMove</c> for every move the stream builds, cleared by
+    /// <c>LockCurrentMovementSystemAndWaitForStandstill</c> once the wait is over. Only <c>G4</c>
+    /// reads it, and what it buys is a dwell in a trigger or daemon macro that commands no motion
+    /// of its own: such a stream has nothing of its own to wait for, so it does not stop a print
+    /// </remarks>
+    private readonly bool[] _motionCommanded = new bool[Inputs.Total];
 
     /// <summary>
     /// The machine being planned for, as last read from the object model
@@ -927,6 +940,46 @@ internal sealed class MovePlanner(
         using (_lock.EnterScope())
         {
             return (ring >= 0 && ring < _lastSubmittedMoveId.Length) ? _lastSubmittedMoveId[ring] : 0;
+        }
+    }
+
+    /// <summary>
+    /// Record that a channel has commanded motion
+    /// </summary>
+    /// <param name="channel">Channel the move was built for</param>
+    /// <remarks>RepRapFirmware's <c>GCodeBuffer::MotionCommanded</c></remarks>
+    public void MotionCommanded(CodeChannel channel)
+    {
+        using (_lock.EnterScope())
+        {
+            _motionCommanded[(int)channel] = true;
+        }
+    }
+
+    /// <summary>
+    /// Record that a channel has waited for the machine to stop
+    /// </summary>
+    /// <param name="channel">Channel whose wait is over</param>
+    /// <remarks>RepRapFirmware's <c>GCodeBuffer::MotionStopped</c></remarks>
+    public void MotionStopped(CodeChannel channel)
+    {
+        using (_lock.EnterScope())
+        {
+            _motionCommanded[(int)channel] = false;
+        }
+    }
+
+    /// <summary>
+    /// Whether a channel has commanded motion since it last waited for the machine to stop
+    /// </summary>
+    /// <param name="channel">Channel to ask about</param>
+    /// <returns>True if this channel has moves of its own to wait for</returns>
+    /// <remarks>RepRapFirmware's <c>GCodeBuffer::WasMotionCommanded</c></remarks>
+    public bool WasMotionCommanded(CodeChannel channel)
+    {
+        using (_lock.EnterScope())
+        {
+            return _motionCommanded[(int)channel];
         }
     }
 

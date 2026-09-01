@@ -35,6 +35,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// </para>
 /// </remarks>
 /// <param name="model">Object model</param>
+/// <param name="codeProcessor">Code processor, for the standstill a dwell waits for</param>
 /// <param name="planner">Where G-codes become queued moves</param>
 /// <param name="bedCompensation">Height map correction</param>
 /// <param name="macroRunner">Runs the machine's own macro files</param>
@@ -45,6 +46,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="logger">Logger</param>
 internal sealed partial class GCodeHandler(
     Model.ObjectModel model,
+    CodeProcessor codeProcessor,
     MovePlanner planner,
     BedCompensation bedCompensation,
     Files.MacroRunner macroRunner,
@@ -78,6 +80,9 @@ internal sealed partial class GCodeHandler(
         // Rapid and coordinated moves. Immediate: they are the motion; a special move waits for
         // standstill inside the handler where its type is known
         { [0, 1], CodeClass.Immediate, (h, c, ct) => h.HandleMoveAsync(c, isCoordinated: c.MajorNumber == 1, ct) }, // it is the motion; a special move waits inside, where its type is known
+        // Dwell. Immediate: whether it waits for standstill is a fact about the channel asking
+        // rather than about the code, so the handler waits, where that is known
+        { 4, CodeClass.Immediate, (h, c, ct) => h.HandleDwellAsync(c, ct) },
         // Set tool offsets, or retract. The offsets are part of the transform every queued move was
         // planned against, so an axis letter is a barrier; without one the code sets tool
         // temperatures, which belong at the point in the path
@@ -113,6 +118,53 @@ internal sealed partial class GCodeHandler(
                 return new Message();
             } },
     };
+
+    /// <summary>
+    /// G4: dwell for a while
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>GCodes::DoDwell</c>. S is in seconds and P in milliseconds, S is the one
+    /// that counts where both are given, and a dwell of zero or less is nothing to do
+    /// </remarks>
+    private async ValueTask<Message> HandleDwellAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        // Wait for the queued moves to stop, but only where this channel has commanded motion since
+        // it last waited. That is what lets a G4 in a trigger or daemon macro dwell without stopping
+        // a print when the macro commands no motion of its own: such a channel has nothing of its
+        // own to wait for. The condition is about the channel rather than the code, which no
+        // CodeClass expresses, so the wait is here rather than declared in the table
+        if (planner.WasMotionCommanded(code.Channel) &&
+            !await codeProcessor.WaitForStandstillAsync(code.Channel, cancellationToken))
+        {
+            throw new OperationCanceledException();
+        }
+
+        int dwell = code.TryGetFloat('S', out float seconds) ? (int)(seconds * 1000.0)
+                    : code.TryGetInt('P', out int milliseconds) ? milliseconds
+                    : 0;
+        if (dwell <= 0)
+        {
+            return new Message();
+        }
+
+        // A simulated job does not spend the time it is measuring. RepRapFirmware adds the dwell to
+        // its simulated time instead of waiting, for every channel but the daemon and triggers -
+        // neither of which is a file channel, so the file test is the whole of that condition here:
+        // M37 always names a file, which is RepRapFirmware's exitSimulationWhenFileComplete.
+        // TODO add the dwell to the simulated time once DuetControlServer accumulates one. It
+        // measures a simulation by the wall clock today, so a skipped dwell is time no estimate
+        // carries; see docs/devel/MCODE_MIGRATION.md section 18
+        if (code.IsFromFileChannel && jobController.State.IsSimulating)
+        {
+            return new Message();
+        }
+
+        await Task.Delay(dwell, cancellationToken);
+        return new Message();
+    }
 
     /// <summary>
     /// G60: save the current position to a restore point
@@ -348,6 +400,11 @@ internal sealed partial class GCodeHandler(
                             {
                                 ArrayPool<float>.Shared.Return(positionBeforeMove);
                             }
+
+                            // This channel has now commanded motion, which is what decides
+                            // whether its next G4 has to wait for the machine to stop.
+                            // RepRapFirmware's FinaliseMove does it with gb.MotionCommanded()
+                            planner.MotionCommanded(code.Channel);
 
                             armedAxes = raw.ArmedAxes;
                             segments = SegmentedMove.From(raw, raw.InitialCoords,
