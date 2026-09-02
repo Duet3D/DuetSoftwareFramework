@@ -33,16 +33,48 @@ public sealed class InterpreterStateStack
     public const int MaxDepth = 10;
 
     /// <summary>
-    /// One saved level
+    /// One saved level: the interpreter modal state RepRapFirmware carries in a
+    /// <c>GCodeMachineState</c> frame and restores when the frame ends
     /// </summary>
-    private readonly record struct SavedState(
+    /// <remarks>
+    /// The same set is saved by M120 and by a macro frame (see <c>MacroRunner</c>). It mirrors the
+    /// fields the RepRapFirmware <c>GCodeMachineState</c> copy constructor stacks
+    /// </remarks>
+    public readonly record struct SavedState(
         float FeedRate,
         bool AxesRelative,
         bool DrivesRelative,
         bool Volumetric,
         DistanceUnit DistanceUnit,
         bool InverseTimeMode,
-        int SelectedPlane);
+        int SelectedPlane,
+        Compatibility Compatibility);
+
+    /// <summary>
+    /// Snapshot a channel's interpreter state
+    /// </summary>
+    /// <param name="input">The channel's interpreter state</param>
+    /// <returns>The saved state</returns>
+    public static SavedState Capture(InputChannel input)
+        => new(input.FeedRate, input.AxesRelative, input.DrivesRelative, input.Volumetric,
+               input.DistanceUnit, input.InverseTimeMode, input.SelectedPlane, input.Compatibility);
+
+    /// <summary>
+    /// Put a saved interpreter state back onto a channel
+    /// </summary>
+    /// <param name="input">The channel's interpreter state</param>
+    /// <param name="saved">The state to restore</param>
+    public static void Restore(InputChannel input, in SavedState saved)
+    {
+        input.FeedRate = saved.FeedRate;
+        input.AxesRelative = saved.AxesRelative;
+        input.DrivesRelative = saved.DrivesRelative;
+        input.Volumetric = saved.Volumetric;
+        input.DistanceUnit = saved.DistanceUnit;
+        input.InverseTimeMode = saved.InverseTimeMode;
+        input.SelectedPlane = saved.SelectedPlane;
+        input.Compatibility = saved.Compatibility;
+    }
 
     private readonly Stack<SavedState>[] _stacks = [.. Enumerable.Range(0, Inputs.Total).Select(_ => new Stack<SavedState>())];
 
@@ -61,8 +93,7 @@ public sealed class InterpreterStateStack
             return false;
         }
 
-        stack.Push(new SavedState(input.FeedRate, input.AxesRelative, input.DrivesRelative, input.Volumetric,
-                                  input.DistanceUnit, input.InverseTimeMode, input.SelectedPlane));
+        stack.Push(Capture(input));
         input.StackDepth = (byte)stack.Count;
         return true;
     }
@@ -82,13 +113,7 @@ public sealed class InterpreterStateStack
             return false;
         }
 
-        input.FeedRate = saved.FeedRate;
-        input.AxesRelative = saved.AxesRelative;
-        input.DrivesRelative = saved.DrivesRelative;
-        input.Volumetric = saved.Volumetric;
-        input.DistanceUnit = saved.DistanceUnit;
-        input.InverseTimeMode = saved.InverseTimeMode;
-        input.SelectedPlane = saved.SelectedPlane;
+        Restore(input, saved);
         input.StackDepth = (byte)stack.Count;
         return true;
     }

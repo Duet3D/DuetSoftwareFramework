@@ -614,11 +614,9 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
     /// This exercises the five DuetControlServer implements a code for today, all published on
     /// <c>inputs[]</c>. The remaining three - <c>selectedPlane</c>, <c>volumetric</c> and
     /// <c>compatibility</c> - have their <c>inputs[]</c> fields but no code sets them yet, so they
-    /// are added here when G17/G18/G19, M200 and M555 land. Tagged <c>KnownGap</c> because the macro
-    /// system does not yet save and restore this state across a frame; remove the tag with the fix
+    /// are added here when G17/G18/G19, M200 and M555 land.
     /// </para>
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task AMacroDoesNotLeakItsInterpreterStateToTheCaller()
     {

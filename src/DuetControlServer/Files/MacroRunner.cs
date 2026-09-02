@@ -1,5 +1,6 @@
 using DuetAPI;
 using DuetAPI.Commands;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Codes;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
@@ -112,6 +113,24 @@ public sealed class MacroRunner(
         // to the level whose file they belong to
         codeProcessor.Push(channel, macro);
         await PublishMacroRestartedAsync(channel, cancellationToken);
+
+        // A macro carries its own copy of the caller's interpreter state, as RepRapFirmware pushes a
+        // GCodeMachineState frame: the feed rate, relativity, units, plane and time mode a macro
+        // changes are restored when it ends rather than leaking to the caller. config.g and the
+        // files it calls are the exception - RepRapFirmware's CheckFinishedRunningConfigFile copies
+        // their state up so an M83 in config.g sticks - and are left to persist
+        InterpreterStateStack.SavedState? savedState = null;
+        if (!macro.IsConfig && !model.IsExecutingConfig)
+        {
+            using (await model.AccessReadWriteAsync(cancellationToken))
+            {
+                if (model.Inputs[channel] is InputChannel input)
+                {
+                    savedState = InterpreterStateStack.Capture(input);
+                }
+            }
+        }
+
         try
         {
             macro.Start(false);
@@ -124,6 +143,17 @@ public sealed class MacroRunner(
             // this line for the level and may have popped it already, in which case it is not this
             // runner's to pop and the level on top now belongs to someone else
             codeProcessor.PopIfCurrent(channel, macro);
+
+            if (savedState is InterpreterStateStack.SavedState saved)
+            {
+                using (await model.AccessReadWriteAsync(CancellationToken.None))
+                {
+                    if (model.Inputs[channel] is InputChannel input)
+                    {
+                        InterpreterStateStack.Restore(input, saved);
+                    }
+                }
+            }
             await PublishMacroRestartedAsync(channel, CancellationToken.None);
         }
         return true;

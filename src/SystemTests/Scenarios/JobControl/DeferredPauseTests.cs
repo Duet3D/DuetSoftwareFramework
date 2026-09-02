@@ -185,7 +185,6 @@ public class DeferredPauseTests : BenchFixture
     /// here tracks that yet, so this scenario pins down only what must hold either way
     /// </summary>
     [Test]
-    [Category("KnownGap")]
     public async Task PauseDuringToolChange()
     {
         await using JobBench bench = await JobControlBench.StartAsync(
@@ -198,8 +197,8 @@ public class DeferredPauseTests : BenchFixture
             prepareSd: sd =>
             {
                 sd.WriteSys("tfree0.g", "set global.tfreeRan = global.tfreeRan + 1\nG91\nG1 X100 F3000\nM400\n");
-                sd.WriteSys("tpre0.g", "set global.tpreRan = global.tpreRan + 1\nG91\nG1 X100 F3000\nM400\n");
-                sd.WriteSys("tpost0.g", "set global.tpostRan = global.tpostRan + 1\nG91\nG1 X100 F3000\nM400\n");
+                sd.WriteSys("tpre0.g", "set global.tpreRan = global.tpreRan + 1\nG91\nG1 X100 F6000\nM400\n");
+                sd.WriteSys("tpost0.g", "set global.tpostRan = global.tpostRan + 1\nG91\nG1 X100 F6000\nM400\n");
                 sd.WriteGCode("job.gcode", """
                     G90
                     G1 X10 Y10 F6000
@@ -209,6 +208,8 @@ public class DeferredPauseTests : BenchFixture
                     G60 S3
                     """);
             });
+
+        // config.g runs `T0`
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.GlobalAsync("tfreeRan"), Is.EqualTo(0), "tfree0.g hasn't run");

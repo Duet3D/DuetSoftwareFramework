@@ -469,6 +469,16 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     private int _numRunningConfigFiles = 0;
 
     /// <summary>
+    /// Whether config.g or a file it calls is running
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>runningConfigFile</c>. Its <c>CheckFinishedRunningConfigFile</c> uses it
+    /// to let modal state set in config.g and the files it calls persist rather than being restored
+    /// when each frame ends, which is what makes an <c>M83</c> in config.g stick
+    /// </remarks>
+    public bool IsExecutingConfig => Volatile.Read(ref _numRunningConfigFiles) > 0;
+
+    /// <summary>
     /// Flag asynchronously that a start-up file is being executed. Must be called WITHOUT locking this instance first!
     /// </summary>
     /// <param name="executing">Whether a start-up file is being executed or not</param>
