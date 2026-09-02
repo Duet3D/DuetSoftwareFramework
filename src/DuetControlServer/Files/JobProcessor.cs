@@ -144,6 +144,12 @@ namespace DuetControlServer.Files
         private static PrintPausedReason _pauseReason;
 
         /// <summary>
+        /// Set when a resume arrives while the file tasks may still be draining towards the pause, so it is not lost.
+        /// Each file task consumes its own flag instead of waiting for a resume that already happened
+        /// </summary>
+        private static bool _resumePending, _resumePending2;
+
+        /// <summary>
         /// Get the current file position
         /// </summary>
         /// <param name="motionSystem">Motion system</param>
@@ -211,6 +217,7 @@ namespace DuetControlServer.Files
                     if (code.Channel != item.Channel && code.FilePosition == item.FilePosition)
                     {
                         _syncRequests[item].TrySetResult(true);
+                        _syncRequests.Remove(item);
                         return true;
                     }
                 }
@@ -234,7 +241,7 @@ namespace DuetControlServer.Files
             {
                 using (await _file.LockAsync())
                 {
-                    _file.Position = filePosition;
+                    await _file.RewindAsync(filePosition);
                 }
             }
 
@@ -242,7 +249,7 @@ namespace DuetControlServer.Files
             {
                 using (await _file2.LockAsync())
                 {
-                    _file2.Position = filePosition;
+                    await _file2.RewindAsync(filePosition);
                 }
             }
 
@@ -350,11 +357,19 @@ namespace DuetControlServer.Files
         /// <returns>Asynchronous task</returns>
         private static async Task DoFilePrint(CodeFile file)
         {
-            // Get the cancellation token
+            // Get the cancellation token and drop a stale pending resume from before this task started
             CancellationToken cancellationToken;
             using (await LockAsync())
             {
                 cancellationToken = _cancellationTokenSource.Token;
+                if (file.Channel == CodeChannel.File)
+                {
+                    _resumePending = false;
+                }
+                else
+                {
+                    _resumePending2 = false;
+                }
             }
 
             // Use a code pool for print files
@@ -495,18 +510,67 @@ namespace DuetControlServer.Files
                         // ignored
                     }
 
+                    // Codes complete when the firmware has queued them, so it may still be executing moves
+                    // from this file that a pause can rewind into. Wait for them to finish before treating
+                    // the job as complete, else a late pause notification would hit an already closed job
+                    bool waitForMoves;
                     using (await LockAsync())
                     {
-                        if (IsPaused)
+                        waitForMoves = !IsPaused && !IsAborted && !file.IsClosed;
+                    }
+                    if (waitForMoves)
+                    {
+                        try
+                        {
+                            Code waitCode = new()
+                            {
+                                Channel = file.Channel,
+                                Type = CodeType.MCode,
+                                MajorNumber = 400
+                            };
+                            await waitCode.Execute();
+
+                            // A pause deferred behind that wait executes the moment it completes and its pause
+                            // notification trails the M400 reply, so process past it before deciding
+                            await Updater.WaitForFullUpdate(Program.CancellationToken);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            // cancelled by a pause or abort arriving in the meantime, the checks below deal with it
+                        }
+                    }
+
+                    using (await LockAsync())
+                    {
+                        // The pending flag catches a task that is still draining when a resume already cleared IsPaused,
+                        // else it would treat the job as finished without ever rewinding its file
+                        if (IsPaused || (file.Channel == CodeChannel.File ? _resumePending : _resumePending2))
                         {
                             // Adjust the file position
                             long newFilePosition = _pausePosition ?? currentFilePosition;
                             await SetFilePosition(file.Channel == CodeChannel.File ? 0 : 1, newFilePosition);
                             _logger.Info("Job on {0} has been paused at byte {1}, reason {2}", file.Channel, (_pausePosition == null) ? $"{newFilePosition} (no fpos from firmware)" : newFilePosition.ToString(), _pauseReason);
 
-                            // Wait for the print to be resumed
+                            // Wait for the print to be resumed unless that already happened while we were still draining
                             IsProcessing = false;
-                            await _resume.WaitAsync(Program.CancellationToken);
+                            if (file.Channel == CodeChannel.File ? _resumePending : _resumePending2)
+                            {
+                                IsPaused = false;
+                            }
+                            else
+                            {
+                                await _resume.WaitAsync(Program.CancellationToken);
+                            }
+
+                            // Consume the pending resume of this channel in both cases so it cannot trigger a bogus second pause later
+                            if (file.Channel == CodeChannel.File)
+                            {
+                                _resumePending = false;
+                            }
+                            else
+                            {
+                                _resumePending2 = false;
+                            }
                             IsProcessing = !IsAborted && !IsCancelled;
                         }
                         else
@@ -542,6 +606,9 @@ namespace DuetControlServer.Files
                 if (startingNewPrint)
                 {
                     _logger.Info("Starting file print");
+
+                    // The file input reader always starts un-forked, mirroring RRF's ExecuteAll at the start of a print
+                    Codes.Processor.SetFileStreamsForked(false);
 
                     // Start the main job
                     Task fileTask = DoFilePrint(_file);
@@ -659,7 +726,8 @@ namespace DuetControlServer.Files
                     _file2?.Dispose();
                     _file = _file2 = null;
 
-                    // End
+                    // End, un-forking the file input reader like RRF does when a print stops
+                    Codes.Processor.SetFileStreamsForked(false);
                     IsProcessing = IsSimulating = IsPaused = false;
                 }
             }
@@ -680,6 +748,7 @@ namespace DuetControlServer.Files
                 _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);
 
                 IsPaused = true;
+                _resumePending = _resumePending2 = false;
                 _pausePosition = filePosition;
                 _pauseReason = pauseReason;
             }
@@ -690,10 +759,18 @@ namespace DuetControlServer.Files
         /// </summary>
         public static void Resume()
         {
-            if (IsFileSelected && !IsProcessing)
+            if (IsFileSelected)
             {
-                IsPaused = false;
-                _resume.NotifyAll();
+                if (IsPaused)
+                {
+                    // A file task may still be draining towards the pause and would wait forever after processing it
+                    _resumePending = _resumePending2 = true;
+                }
+                if (!IsProcessing)
+                {
+                    IsPaused = false;
+                    _resume.NotifyAll();
+                }
             }
         }
 

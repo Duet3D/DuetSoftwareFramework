@@ -255,6 +255,12 @@ namespace DuetControlServer.Codes.Handlers
                         fullVarName = (code.Keyword == KeywordType.Global ? "global." : "var.") + varName;
                     }
 
+                    // Delete a leftover local variable of the same name first, it may still exist because closed code blocks defer the deletion
+                    if (code.Keyword == KeywordType.Var && code.File is not null)
+                    {
+                        await code.File.DeleteStaleVariableAsync(varName);
+                    }
+
                     // Assign the variable
                     object? varContent = await SPI.Interface.SetVariable(code.Channel, code.Keyword != KeywordType.Set, fullVarName, expression);
                     _logger.Debug("Set variable {0} to {1}", fullVarName, varContent);

@@ -982,6 +982,15 @@ namespace DuetControlServer.Codes.Handlers
                     }
                     throw new OperationCanceledException();
 
+                // Synchronise motion systems
+                case 598:
+                    // The file readers must rendezvous here like the firmware ones do, else read-ahead evaluates expressions and meta keywords out of order
+                    if (code.IsFromFileChannel && !await Processor.FlushAsync(code, syncFileStreams: true))
+                    {
+                        throw new OperationCanceledException();
+                    }
+                    break;
+
                 // Fork input reader
                 case 606:
                     if (await Processor.FlushAsync(code))
@@ -1264,9 +1273,11 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Select movement queue number
                 case 596:
-                    _logger.Debug("Requesting full model update after M596");
-                    await Updater.WaitForFullUpdate(code.CancellationToken);        // This changes inputs[].active, so sync the OM here
-                    _logger.Debug("Requested full model update after M596");
+                    // This changes the executing state of the channel; track it locally because the OM copy of inputs[].active lags behind
+                    if (code.Result?.Type != MessageType.Error && code.TryGetInt('P', out int commandedQueue))
+                    {
+                        Processor.SetCommandedQueue(code.Channel, commandedQueue);
+                    }
                     break;
 
                 // Fork input reader
@@ -1277,6 +1288,7 @@ namespace DuetControlServer.Codes.Handlers
                         await Updater.WaitForFullUpdate(code.CancellationToken);    // This changes inputs[].active, so sync the OM here
                         _logger.Debug("Requested full model update after M606 S1");
 
+                        Processor.SetFileStreamsForked(true);
                         SPI.Channel.Processor.StartCopiedMacros();
                         using (await JobProcessor.LockAsync())
                         {

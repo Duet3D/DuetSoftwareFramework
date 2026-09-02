@@ -68,6 +68,27 @@ namespace DuetControlServer.Codes
         internal static void SetJobFile(CodeChannel channel, CodeFile? file) => _processors[(int)channel].SetJobFile(file);
 
         /// <summary>
+        /// Update the commanded motion system of a code channel after M596 was executed on it
+        /// </summary>
+        /// <param name="channel">Code channel the M596 was executed on</param>
+        /// <param name="queueNumber">New commanded motion system number</param>
+        public static void SetCommandedQueue(CodeChannel channel, int queueNumber) => _processors[(int)channel].SetCommandedQueue(queueNumber);
+
+        /// <summary>
+        /// Update the executing states of the file channels when the file input reader is forked (M606 S1) or un-forked (end of job)
+        /// </summary>
+        /// <param name="forked">Whether the file input reader is forked</param>
+        public static void SetFileStreamsForked(bool forked)
+        {
+            ChannelProcessor file = _processors[(int)CodeChannel.File], file2 = _processors[(int)CodeChannel.File2];
+            if (forked)
+            {
+                file2.CopyCommandedQueuesFrom(file);
+            }
+            file.ExecuteAllCommands = file2.ExecuteAllCommands = !forked;
+        }
+
+        /// <summary>
         /// Wait for all pending codes to finish
         /// </summary>
         /// <param name="channel">Code channel to wait for</param>
@@ -115,12 +136,9 @@ namespace DuetControlServer.Codes
             else if (ifExecuting)
             {
                 // Make sure the current code channel is executing G/M/T-codes
-                using (await Model.Provider.AccessReadOnlyAsync(code.CancellationToken))
+                if (!_processors[(int)code.Channel].IsExecuting)
                 {
-                    if (Model.Provider.Get.Inputs[code.Channel]?.Active != true)
-                    {
-                        return false;
-                    }
+                    return false;
                 }
             }
 

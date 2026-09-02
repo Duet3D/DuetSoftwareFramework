@@ -90,13 +90,8 @@ namespace DuetControlServer.SPI.Channel
         /// <returns>New state</returns>
         public State Push(CodeFile? file = null)
         {
-            // Push a new element on the stack. Also record if the motion system was active in case it's changed
-            bool msActive;
-            using (Model.Provider.AccessReadOnly())
-            {
-                msActive = Model.Provider.Get.Inputs[Channel]?.Active == true;
-            }
-            State state = new(Codes.Processor.Push(Channel, file), msActive);
+            // Push a new element on the stack
+            State state = new(Codes.Processor.Push(Channel, file));
 
             // Dequeue already suspended codes first so the correct order is maintained
             Queue<Code> alreadySuspendedCodes = new(CurrentState.SuspendedCodes.Count);
@@ -143,15 +138,8 @@ namespace DuetControlServer.SPI.Channel
             State oldState = Stack.Pop();
             CurrentState = Stack.Peek();
 
-            // Restore message box and motion system states
+            // Restore the message box state
             _isWaitingForAcknowledgment = CurrentState.WaitingForAcknowledgement;
-            using (Model.Provider.AccessReadOnly())
-            {
-                if (Model.Provider.Get.Inputs[Channel] is not null)
-                {
-                    Model.Provider.Get.Inputs[Channel]!.Active = oldState.MotionSystemWasActive;
-                }
-            }
 
             // Invalidate obsolete lock requests and supended codes
             while (oldState.LockRequests.TryDequeue(out LockRequest? lockRequest))
@@ -332,7 +320,6 @@ namespace DuetControlServer.SPI.Channel
                         Push();
                         CurrentState.WaitingForAcknowledgement = item.WaitingForAcknowledgement;
                     }
-                    CurrentState.MotionSystemWasActive = !item.MotionSystemWasActive;
                 }
             }
         }
