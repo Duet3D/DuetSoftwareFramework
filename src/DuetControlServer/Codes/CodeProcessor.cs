@@ -64,10 +64,13 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     public void Push(CodeChannel channel, CodeFile? file = null) => Processors.Value[(int)channel].Push(file);
 
     /// <summary>
-    /// Pop the last state from the stack of a given channel processor
+    /// Pop the topmost state from the stack of a given channel processor if it is still the given
+    /// file's; see <see cref="ChannelProcessor.PopIfCurrent"/>
     /// </summary>
     /// <param name="channel">Code channel</param>
-    public void Pop(CodeChannel channel) => Processors.Value[(int)channel].Pop();
+    /// <param name="file">File whose level is to be popped</param>
+    /// <returns>True if the level was popped, false if another popper already took it</returns>
+    public bool PopIfCurrent(CodeChannel channel, CodeFile file) => Processors.Value[(int)channel].PopIfCurrent(file);
 
     /// <summary>
     /// How many stack levels a channel has pushed, counting the base level

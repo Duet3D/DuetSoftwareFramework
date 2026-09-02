@@ -34,6 +34,17 @@ public sealed class ChannelProcessor
     private readonly Lazy<Pipelines.PipelineBase[]> _pipelines;
 
     /// <summary>
+    /// Serializes every change of the stack of levels
+    /// </summary>
+    /// <remarks>
+    /// A level is pushed and popped across every stage as one operation, and two poppers race for
+    /// the same level: the macro runner that owns it pops it when the macro ends, and an unwind (a
+    /// pause abandoning macros, an abort) pops it as it walks the stack down. Held across the whole
+    /// check-and-pop, so exactly one of them takes each level
+    /// </remarks>
+    private readonly Lock _levelLock = new();
+
+    /// <summary>
     /// Constructor for the channel processor
     /// </summary>
     /// <param name="channel">Code channel</param>
@@ -82,20 +93,38 @@ public sealed class ChannelProcessor
     /// <param name="file">File the new state executes, if any</param>
     public void Push(CodeFile? file)
     {
-        foreach (PipelineStage stage in StagesWithStack)
+        lock (_levelLock)
         {
-            _pipelines.Value[(int)stage].Push(file);
+            foreach (PipelineStage stage in StagesWithStack)
+            {
+                _pipelines.Value[(int)stage].Push(file);
+            }
         }
     }
 
     /// <summary>
-    /// Pop the last state from the stack
+    /// Pop the topmost state from the stack if it is still the given file's
     /// </summary>
-    public void Pop()
+    /// <param name="file">File whose level is to be popped</param>
+    /// <returns>True if the level was popped, false if another popper already took it</returns>
+    /// <remarks>
+    /// The macro runner pops the level it pushed when the macro ends, and an unwind pops levels as
+    /// it walks the stack down; whichever asks second finds the file no longer on top and leaves
+    /// the stack alone, so an abandoned macro's runner does not pop the level beneath its own
+    /// </remarks>
+    public bool PopIfCurrent(CodeFile file)
     {
-        foreach (PipelineStage stage in StagesWithStack)
+        lock (_levelLock)
         {
-            _pipelines.Value[(int)stage].Pop();
+            if (!ReferenceEquals(CurrentFile, file))
+            {
+                return false;
+            }
+            foreach (PipelineStage stage in StagesWithStack)
+            {
+                _pipelines.Value[(int)stage].Pop();
+            }
+            return true;
         }
     }
 
@@ -219,7 +248,10 @@ public sealed class ChannelProcessor
             {
                 macro.Abort();
             }
-            Pop();
+
+            // The abort resolves the macro's finish, so its runner may pop the level between the
+            // abort and this line; whichever of the two gets there first takes it
+            PopIfCurrent(macro);
             abandonedMacro = true;
         }
         return abandonedMacro;
@@ -254,7 +286,10 @@ public sealed class ChannelProcessor
             {
                 macro.Abort();
             }
-            Pop();
+
+            // As in AbandonMacrosForPauseAsync: the aborted macro's runner races this loop for the
+            // level, and exactly one of them pops it
+            PopIfCurrent(macro);
         }
     }
 

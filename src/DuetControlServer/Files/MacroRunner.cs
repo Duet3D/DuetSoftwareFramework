@@ -119,8 +119,11 @@ public sealed class MacroRunner(
         }
         finally
         {
-            // Popping completes the level's code queues, so it has to happen however the macro ended
-            codeProcessor.Pop(channel);
+            // Popping completes the level's code queues, so it has to happen however the macro
+            // ended - but a pause that abandoned this macro, or an abort unwinding the stack, races
+            // this line for the level and may have popped it already, in which case it is not this
+            // runner's to pop and the level on top now belongs to someone else
+            codeProcessor.PopIfCurrent(channel, macro);
             await PublishMacroRestartedAsync(channel, CancellationToken.None);
         }
         return true;
