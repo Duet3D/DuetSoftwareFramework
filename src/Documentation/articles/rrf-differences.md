@@ -430,25 +430,18 @@ line for only the part of it that is left.
 
 ---
 
-## 9. Job chaining and the operator stop go through one state machine
+## 9. Job macro sequences do not overlap
 
 RepRapFirmware gives every G-code channel its own state machine, so its job macros can overlap: an
 `M0` sent from one console runs `stop.g` on that channel while an `M24` from another starts
 `start.g` on the file channel. DSF's job is one actor with one macro sequence in flight at a time
-(JOB_CONTROL_CONCURRENCY.md §7), and that changes two behaviours on purpose:
-
-- **A command that would start a job macro while one is running waits its turn.** `M24` or a second
-  `M0` arriving while an operator stop runs `stop.g` from idle is held and performed when the macro
-  ends, so the macros run one after the other and every caller is answered. RepRapFirmware would run
-  them concurrently on their two channels.
-- **`M32` from inside a job file tears the running job down through `stop.g` and the teardown
-  before starting the new one.** RepRapFirmware's `StartPrinting` swaps the file in place: no
-  `stop.g`, no print-monitor teardown, `start.g` only. Here the chained file starts from `Idle`
-  through the same transitions as any other job, so `job.lastFileName` and the duration fields are
-  written for the run that ended and `stop.g` keeps its contract of running at the end of every
-  print. `M23` from inside a job file is faithful to RepRapFirmware: it only stores the file, the
-  running job carries on, and the stored file waits as `fileToPrint` does for the `M24` that starts
-  it.
+(JOB_CONTROL_CONCURRENCY.md §7), so a command that would start a job macro while one is running
+waits its turn: `M24` or a second `M0` arriving while an operator stop runs `stop.g` from idle is
+held and performed when the macro ends, so the macros run one after the other and every caller is
+answered. RepRapFirmware would run them concurrently on their two channels. This is the one job
+behaviour the single-actor design forces; `M23`/`M32` chaining from inside a job file follows
+RepRapFirmware exactly (`M23` stores the file and the run carries on, as `fileToPrint` does; `M32`
+swaps the file in place and runs `start.g` only, with no `stop.g` and no teardown).
 
 ---
 

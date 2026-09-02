@@ -727,8 +727,8 @@ sequence itself skips it, and the canceller runs the teardown in its place.
 | Command | From | Effect | Refused elsewhere with |
 |---|---|---|---|
 | `SelectFile` (`M23`, `M32`, `M37 P`) from a channel other than `File` | `Idle`, `Selected` | `Selected`; the file is parsed before the command is posted | "Cannot set file to print, because a file is already being printed" (`M37`: "to simulate") |
-| `SelectFile` from the `File` channel, starting (`M32` in a job file or in `stop.g`) | `Running` | Stored as `NextFile` with the start flag, replied to at once, the run transitions to `Finishing` with `NormalCompletion`; the teardown chains into the stored file. A file already stored is closed and displaced | as above |
-| | `Finishing` | Stored as `NextFile` with the start flag, replied to at once | |
+| `SelectFile` from the `File` channel, starting (`M32` in a job file) | `Running` | Replied to at once; the run is closed with neither `stop.g` nor the teardown and `FinishAsync` chains straight into the stored file's `start.g`, as RepRapFirmware's `StartPrinting` does. A file already stored is closed and displaced | as above |
+| `M32` in `stop.g` | `Finishing` | Stored as `NextFile` with the start flag, replied to at once; chained by `FinishAsync` after the run's own teardown | |
 | `SelectFile` from the `File` channel, not starting (`M23`) | `Running`, `Finishing` | Stored as `NextFile` without the start flag and the run carries on; the teardown leaves the stored file `Selected`, waiting for `M24` as RepRapFirmware's `fileToPrint` does | as above |
 | `StartOrResume` (`M24`, `M32`, `M37`) | `Selected` | `Starting`; sequence: `JobMonitor.Start`, `start.g`, the M26 restart state, then `Run` to each reader | |
 | | `Paused` | `Resuming`; the resume sequence | |
@@ -1132,8 +1132,9 @@ Job control:
 - `M0` from the console with a file selected and not started, and with one running: refused with
   "Pause the print before attempting to cancel it" both times.
 - `M24` while a job is running: an empty reply, nothing restarted.
-- `M32` from inside a job file, and inside `stop.g`: the first job is torn down, the second starts,
-  nothing hangs (R6).
+- `M32` from inside a running job: no `stop.g` and no teardown run, `start.g` runs for the new
+  file and it prints, as RepRapFirmware's `StartPrinting` chains a print. `M32` from inside
+  `stop.g`: the first job's own teardown runs, then the second starts; nothing hangs (R6).
 - `M2` from DWC while paused: `cancel.g` runs, `stop.g` does not, the job is torn down,
   `lastFileCancelled` is written (R7, R11).
 - `M23` from DWC during a running job, and during a paused one: refused with "Cannot set file to

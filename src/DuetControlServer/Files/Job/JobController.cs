@@ -375,19 +375,21 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
                     return;
                 }
 
-                // M32 chains: the run it is part of has to be torn down first, so the file is
-                // started from Idle by the same pair of commands every other caller uses - and the
-                // handler is answered at once, so nothing waits for the run it is itself a code of
-                if (state.Phase == JobPhase.Running)
+                if (state.Phase == JobPhase.Finishing)
                 {
-                    StopReading(state);
+                    // M32 from inside stop.g: the run's own stop.g and teardown are already under
+                    // way, so the file is stored and FinishAsync chains it once they complete
+                    Publish(state with { NextFile = new NextSelection(command.File, Start: true) });
+                    command.Reply(new Message());
+                    return;
                 }
-                Publish(state with { NextFile = new NextSelection(command.File, Start: true) });
+
+                // M32 chaining from a running job. RepRapFirmware's StartPrinting swaps the file in
+                // place - no stop.g, no teardown, start.g only - which is the resume-after-power-fail
+                // path, so the run is closed without either and the next file started from there.
+                // The handler is answered at once, so nothing waits for the run it is a code of
                 command.Reply(new Message());
-                if (state.Phase == JobPhase.Running)
-                {
-                    await EndRunAsync(PrintStoppedReason.NormalCompletion);
-                }
+                await ChainToNextFileAsync(state, command.File);
                 return;
             }
 
@@ -955,6 +957,39 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
                 _logger.LogError(e, "The stop step of the run's end failed; tearing the run down anyway");
             }
             return await _sequences.TeardownAsync(_state, token);
+        });
+    }
+
+    /// <summary>
+    /// Close a running job in place and chain into the file an M32 in it chose
+    /// </summary>
+    /// <param name="state">State the run is chaining from</param>
+    /// <param name="next">The file to start once the run is closed</param>
+    /// <returns>Asynchronous task</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>StartPrinting</c>, which chains one print to another (the
+    /// resume-after-power-fail path) by swapping the file and running <c>start.g</c> only: no
+    /// <c>stop.g</c>, no print-monitor teardown, so <c>lastFileName</c> and the duration fields are
+    /// left for the chained run to overwrite. The close still runs on a sequence because it waits
+    /// for the codes in flight, one of which is the M32 that asked for the chain
+    /// </remarks>
+    private async ValueTask ChainToNextFileAsync(JobState state, JobFile next)
+    {
+        await DropPendingPauseAsync(state);
+        Publish(state with
+        {
+            Phase = JobPhase.Finishing,
+            StopReason = PrintStoppedReason.NormalCompletion,
+            PendingPause = null,
+            NextFile = new NextSelection(next, Start: true)
+        });
+        StopReading(_state);
+        _logger.LogInformation("Chaining to file {File}", next.File.FilePath.Virtual);
+
+        StartSequence(null, async token =>
+        {
+            await CloseStreamsAsync(_state);
+            return new SequenceOutcome(new Message(), Failed: false);
         });
     }
 
