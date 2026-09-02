@@ -594,4 +594,71 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].MachinePosition), Is.EqualTo(5.0).Within(1e-3),
                     "after M400 move.axes[0].machinePosition settles at the target (RRF Move.cpp machinePosition)");
     }
+
+    /// <summary>
+    /// A macro carries its own copy of the caller's interpreter state, so a modal code inside it does
+    /// not leak out: when the macro ends the caller's feed rate, relativity, units and time mode are
+    /// as they were before the M98
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware pushes a <c>GCodeMachineState</c> for every macro frame
+    /// (<c>GCodeMachineState.cpp</c> copy constructor) and pops it on return, so the modal state a
+    /// macro changes is discarded with the frame. The full set of modal fields the copy constructor
+    /// stacks is: <c>axesRelative</c> (G90/G91), <c>drivesRelative</c> (M82/M83), <c>usingInches</c>
+    /// (G20/G21), <c>inverseTimeMode</c> (G93/G94), <c>feedRate</c> (F), <c>selectedPlane</c>
+    /// (G17/G18/G19), <c>volumetricExtrusion</c> (M200, reset to off in the child) and
+    /// <c>compatibility</c> (M555).
+    /// </para>
+    /// <para>
+    /// This exercises the five DuetControlServer implements a code for today, all published on
+    /// <c>inputs[]</c>. The remaining three - <c>selectedPlane</c>, <c>volumetric</c> and
+    /// <c>compatibility</c> - have their <c>inputs[]</c> fields but no code sets them yet, so they
+    /// are added here when G17/G18/G19, M200 and M555 land. Tagged <c>KnownGap</c> because the macro
+    /// system does not yet save and restore this state across a frame; remove the tag with the fix
+    /// </para>
+    /// </remarks>
+    [Category("KnownGap")]
+    [Test]
+    public async Task AMacroDoesNotLeakItsInterpreterStateToTheCaller()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync(prepareSd: sd =>
+            // G94 before the F so the feed rate registers rather than being read as an inverse time,
+            // then each modal set to the opposite of what the caller holds
+            sd.WriteMacro("modal-state.g", """
+                G90
+                M82
+                G21
+                G94
+                G1 F6000
+                """));
+        int http = await HttpInputIndexAsync(bench.Host);
+        InputChannel? httpChannel = await bench.Host.ReadModelAsync(model => model.Inputs[http]);
+
+        // The caller's state: the feed rate first, while still in the default non-inverse-time mode,
+        // so F is stored rather than taken as a duration
+        await bench.Host.ExecuteCodeAsync("G1 F1000");
+        await bench.Host.ExecuteCodeAsync("G91");
+        await bench.Host.ExecuteCodeAsync("M83");
+        await bench.Host.ExecuteCodeAsync("G20");
+        await bench.Host.ExecuteCodeAsync("G93");
+        double callerFeedRate = httpChannel!.FeedRate;
+
+        // The macro changes every one of them; RRF discards those changes with the macro frame
+        await bench.Host.ExecuteCodeAsync("M98 P\"0:/macros/modal-state.g\"");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(httpChannel.AxesRelative, Is.True,
+                        "G90 in the macro does not clear the caller's G91 (RRF GCodeMachineState axesRelative)");
+            Assert.That(httpChannel.DrivesRelative, Is.True,
+                        "M82 in the macro does not clear the caller's M83 (RRF GCodeMachineState drivesRelative)");
+            Assert.That(httpChannel.DistanceUnit, Is.EqualTo(DistanceUnit.Inch),
+                        "G21 in the macro does not undo the caller's G20 (RRF GCodeMachineState usingInches)");
+            Assert.That(httpChannel.InverseTimeMode, Is.True,
+                        "G94 in the macro does not clear the caller's G93 (RRF GCodeMachineState inverseTimeMode)");
+            Assert.That(httpChannel.FeedRate, Is.EqualTo(callerFeedRate).Within(1e-3),
+                        "the F in the macro does not change the caller's feed rate (RRF GCodeMachineState feedRate)");
+        });
+    }
 }

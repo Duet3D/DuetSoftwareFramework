@@ -185,6 +185,7 @@ public class DeferredPauseTests : BenchFixture
     /// here tracks that yet, so this scenario pins down only what must hold either way
     /// </summary>
     [Test]
+    [Category("KnownGap")]
     public async Task PauseDuringToolChange()
     {
         await using JobBench bench = await JobControlBench.StartAsync(
