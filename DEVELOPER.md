@@ -14,11 +14,12 @@ No prior knowledge of VS Code, Docker, or DSF is assumed.
 6. [Open in Dev Container](#open-in-dev-container)
 7. [First Build](#first-build)
 8. [Build Using VS Code Tasks](#build-using-vs-code-tasks)
-9. [Deploy to a Remote DuetPi/SBC](#deploy-to-a-remote-duetpisbc)
-10. [Optional: Build with Make](#optional-build-with-make)
-11. [Profiling with Tracy](#profiling-with-tracy)
-12. [Working with Git in the Dev Container](#working-with-git-in-the-dev-container)
-13. [Troubleshooting](#troubleshooting)
+9. [Run the Tests](#run-the-tests)
+10. [Deploy to a Remote DuetPi/SBC](#deploy-to-a-remote-duetpisbc)
+11. [Optional: Build with Make](#optional-build-with-make)
+12. [Profiling with Tracy](#profiling-with-tracy)
+13. [Working with Git in the Dev Container](#working-with-git-in-the-dev-container)
+14. [Troubleshooting](#troubleshooting)
 
 ## Overview
 
@@ -176,6 +177,62 @@ Common tasks:
 - Build individual components (for example Build DuetControlServer)
 
 The Build All task produces binaries under the local build/ directory.
+
+## Run the Tests
+
+The unit tests run under coverage and print a per-assembly table:
+
+```bash
+./scripts/coverage.sh
+```
+
+The system tests start a real DuetControlServer against a scripted CAN controller, so they take
+minutes rather than seconds:
+
+```bash
+./scripts/system-tests.sh
+```
+
+They run the real `libduet_sbc.so`, which the project builds from `src/DuetSbcInterface` as part of
+the test build, so the submodule that native build needs has to be checked out. A clone made without
+`--recurse-submodules`, and every new git worktree, starts without it:
+
+```bash
+git submodule update --init lib/RRFLibraries
+```
+
+Each test is named on the console as it starts, with its position in the run and how long the run
+has been going:
+
+```
+[  42  03:17] SystemTests.Scenarios.DeferredPauseTests.PauseDuringToolChange
+  Passed PauseDuringToolChange [2 s]
+```
+
+A run that has stopped therefore looks different from a run that is merely slow: whatever was named
+last is the test that is stuck. Once the run is over the script lists the failed tests by name,
+below the stack traces and the DuetControlServer logs a failure dumps, where they can be read as a
+list.
+
+Scenarios in the `KnownGap` category assert behaviour that is not implemented yet, so they fail.
+The script leaves them out; `--all` puts them back, which is what CI runs. To narrow a run:
+
+```bash
+./scripts/system-tests.sh --filter 'FullyQualifiedName~JobControl'
+./scripts/system-tests.sh --help
+```
+
+Running the project directly works, but the progress needs the console logger asked for by name,
+because at its default verbosity it prints nothing until the run is over:
+
+```bash
+dotnet test src/SystemTests/SystemTests.csproj -tl:off \
+    --logger 'console;verbosity=normal' --filter 'TestCategory!=KnownGap'
+```
+
+`-tl:off` turns off MSBuild's terminal logger, which otherwise echoes the test output on top of that
+logger and prints every line twice. It turns itself on only when the output is a terminal, so
+without it the same command behaves differently piped and interactively.
 
 ## Deploy to a Remote DuetPi/SBC
 

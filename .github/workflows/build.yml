@@ -224,9 +224,12 @@ jobs:
       - name: Run C# unit tests with coverage
         run: ./scripts/coverage.sh --results-dir test-results | tee coverage.log
       
+      # The script names each test as it starts and lists the failed names once the run is over,
+      # which is what makes a failure findable in a log this long, and writes SystemTests.trx beside
+      # the unit test results for the upload below. --all runs the same set the bare 'dotnet test'
+      # this replaced ran, the KnownGap scenarios included, so this step still gates on what it did.
       - name: Run C# system tests
-        working-directory: src/SystemTests
-        run: dotnet test
+        run: ./scripts/system-tests.sh --all --results-dir test-results
 
       # Surfaces the per-assembly table on the run's summary page so a coverage change is visible
       # without opening the log or downloading the artifact.
