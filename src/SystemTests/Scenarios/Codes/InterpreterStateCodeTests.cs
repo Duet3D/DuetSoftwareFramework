@@ -44,19 +44,22 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
     /// The index of the HTTP channel in inputs[], found by name because ExecuteCodeAsync runs
     /// codes on that channel and the channel order is not part of the contract under test
     /// </summary>
-    private static async Task<int> HttpInputIndexAsync(DcsTestHost host)
+    private static Task<int> HttpInputIndexAsync(DcsTestHost host) => ChannelInputIndexAsync(host, CodeChannel.HTTP);
+
+    /// <summary>The index of a named channel in inputs[], so its interpreter state can be read</summary>
+    private static async Task<int> ChannelInputIndexAsync(DcsTestHost host, CodeChannel channel)
     {
         using (await host.Model.AccessReadOnlyAsync(CancellationToken.None))
         {
             for (int i = 0; i < host.Model.Inputs.Count; i++)
             {
-                if (host.Model.Inputs[i]?.Name == CodeChannel.HTTP)
+                if (host.Model.Inputs[i]?.Name == channel)
                 {
                     return i;
                 }
             }
         }
-        throw new AssertionException("inputs[] does not contain the HTTP channel");
+        throw new AssertionException($"inputs[] does not contain the {channel} channel");
     }
 
     /// <summary>Poll the live machine position of an axis until it reaches the expected value</summary>
@@ -593,6 +596,81 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
         await WaitForMachinePositionAsync(bench, 0, 5.0);
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].MachinePosition), Is.EqualTo(5.0).Within(1e-3),
                     "after M400 move.axes[0].machinePosition settles at the target (RRF Move.cpp machinePosition)");
+    }
+
+    /// <summary>
+    /// The startup files - config.g, config-override.g (M501) and dsf-config.g - and any macro they
+    /// call retain their interpreter state when they finish, rather than having it restored the way
+    /// an ordinary macro does, so an M83 or G91 in config.g is the machine's setting afterwards
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>CheckFinishedRunningConfigFile</c> copies config.g's state up rather than
+    /// discarding it with the frame, "so that M83 etc. in nested files don't get forgotten"
+    /// (GCodes.cpp). DuetControlServer keeps the same rule for all three startup files and the macros
+    /// they call: the restore <see cref="AMacroDoesNotLeakItsInterpreterStateToTheCaller"/> checks is
+    /// skipped while a startup file is running. State is retained on the channel the file ran on -
+    /// the Trigger channel for config.g at boot, and the invoking channel for M501 and dsf-config.g
+    /// </remarks>
+    [Test]
+    public async Task ConfigRetainsInterpreterState()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync(
+            // config.g sets the feed rate (before G93, so F is stored not read as a duration), the
+            // relativity and the time mode itself, and a sub-macro sets the rest; all must remain
+            configExtra: """
+                G1 F1234
+                G91
+                G93
+                M98 P"0:/macros/config-sub.g"
+                """,
+            prepareSd: sd =>
+            {
+                sd.WriteMacro("config-sub.g", "M83\nG20\n");
+                sd.WriteMacro("override-sub.g", "G91\nG20\n");
+                sd.WriteMacro("dsfconfig-sub.g", "M83\nG20\n");
+                sd.WriteSys("config-override.g", "G1 F2345\nM98 P\"0:/macros/override-sub.g\"\n");
+                sd.WriteSys("dsf-config.g", "G91\nM98 P\"0:/macros/dsfconfig-sub.g\"\n");
+            });
+
+        // config.g ran at boot on the Trigger channel; its state and its sub-macro's state stand
+        int trigger = await ChannelInputIndexAsync(bench.Host, CodeChannel.Trigger);
+        InputChannel triggerChannel = (await bench.Host.ReadModelAsync(model => model.Inputs[trigger]))!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(triggerChannel.AxesRelative, Is.True, "config.g's G91 is retained");
+            Assert.That(triggerChannel.InverseTimeMode, Is.True, "config.g's G93 is retained");
+            Assert.That(triggerChannel.FeedRate, Is.EqualTo(1234.0).Within(1e-3), "config.g's feed rate is retained");
+            Assert.That(triggerChannel.DrivesRelative, Is.True, "the M83 in config.g's sub-macro is retained");
+            Assert.That(triggerChannel.DistanceUnit, Is.EqualTo(DistanceUnit.Inch), "the G20 in config.g's sub-macro is retained");
+        });
+
+        int http = await HttpInputIndexAsync(bench.Host);
+        InputChannel httpChannel = (await bench.Host.ReadModelAsync(model => model.Inputs[http]))!;
+
+        // config-override.g via M501, on the HTTP channel: its feed rate and its sub-macro's state
+        // stand, unlike an ordinary M98 macro
+        await bench.Host.ExecuteCodeAsync("M501");
+        Assert.Multiple(() =>
+        {
+            Assert.That(httpChannel.FeedRate, Is.EqualTo(2345.0).Within(1e-3), "config-override.g's feed rate is retained");
+            Assert.That(httpChannel.AxesRelative, Is.True, "the G91 in config-override.g's sub-macro is retained");
+            Assert.That(httpChannel.DistanceUnit, Is.EqualTo(DistanceUnit.Inch), "the G20 in config-override.g's sub-macro is retained");
+        });
+
+        // Put the channel back to the defaults so what dsf-config.g leaves is unmistakably its own
+        await bench.Host.ExecuteCodeAsync("G90");
+        await bench.Host.ExecuteCodeAsync("M82");
+        await bench.Host.ExecuteCodeAsync("G21");
+
+        // dsf-config.g run as a macro on the HTTP channel; its filename is what marks it, so it and
+        // its sub-macro retain their state the same way
+        await bench.Host.ExecuteCodeAsync("M98 P\"dsf-config.g\"");
+        Assert.Multiple(() =>
+        {
+            Assert.That(httpChannel.AxesRelative, Is.True, "dsf-config.g's G91 is retained");
+            Assert.That(httpChannel.DrivesRelative, Is.True, "the M83 in dsf-config.g's sub-macro is retained");
+            Assert.That(httpChannel.DistanceUnit, Is.EqualTo(DistanceUnit.Inch), "the G20 in dsf-config.g's sub-macro is retained");
+        });
     }
 
     /// <summary>

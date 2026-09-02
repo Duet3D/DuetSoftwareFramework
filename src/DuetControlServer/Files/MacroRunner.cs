@@ -116,11 +116,13 @@ public sealed class MacroRunner(
 
         // A macro carries its own copy of the caller's interpreter state, as RepRapFirmware pushes a
         // GCodeMachineState frame: the feed rate, relativity, units, plane and time mode a macro
-        // changes are restored when it ends rather than leaking to the caller. config.g and the
-        // files it calls are the exception - RepRapFirmware's CheckFinishedRunningConfigFile copies
-        // their state up so an M83 in config.g sticks - and are left to persist
+        // changes are restored when it ends rather than leaking to the caller. The startup files -
+        // config.g, config-override.g (M501), dsf-config.g and anything they call - are the
+        // exception, so an M83 in config.g sticks. RepRapFirmware's CheckFinishedRunningConfigFile
+        // copies config.g's state up; the others keep the same rule here. IsExecutingConfig covers
+        // the sub-macros, whose own flags are not set but which run while the counter is up
         InterpreterStateStack.SavedState? savedState = null;
-        if (!macro.IsConfig && !model.IsExecutingConfig)
+        if (!macro.IsConfig && !macro.IsConfigOverride && !macro.IsDsfConfig && !model.IsExecutingConfig)
         {
             using (await model.AccessReadWriteAsync(cancellationToken))
             {
