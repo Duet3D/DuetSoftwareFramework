@@ -13,12 +13,13 @@ namespace DuetControlServer.Files
         /// </summary>
         /// <param name="startingCode">Code starting this block</param>
         /// <param name="processBlock">Whether instructions from this block may be processed</param>
-        public CodeBlock(Code startingCode, bool processBlock)
+        /// <param name="keyword">Keyword to assume instead of the one of the starting code</param>
+        public CodeBlock(Code startingCode, bool processBlock, KeywordType? keyword = null)
         {
             Indent = startingCode.Indent;
             FilePosition = startingCode.FilePosition;
             LineNumber = startingCode.LineNumber;
-            Keyword = startingCode.Keyword;
+            Keyword = keyword ?? startingCode.Keyword;
             ProcessBlock = processBlock;
         }
 
