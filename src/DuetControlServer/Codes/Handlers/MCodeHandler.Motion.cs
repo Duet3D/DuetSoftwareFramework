@@ -513,8 +513,12 @@ internal partial class MCodeHandler
             {
                 if (code.TryGetInt(axis.Letter, out int microstepping))
                 {
+                    uint previousMicrostepping = (uint)axis.Microstepping.Value;
                     axis.Microstepping.Value = microstepping;
                     axis.Microstepping.Interpolated = interpolate;
+
+                    // Re-quote the steps per mm at the new microstepping so the axis stays calibrated
+                    axis.StepsPerMm = ScaleForMicrostepping(axis.StepsPerMm, previousMicrostepping, microstepping);
 
                     // The position in microsteps no longer means what it did, and nothing has been
                     // measured since, so the axis is no longer known to be where it says it is
@@ -539,8 +543,10 @@ internal partial class MCodeHandler
                     }
 
                     Extruder extruder = move.Extruders[i];
+                    uint previousMicrostepping = (uint)extruder.Microstepping.Value;
                     extruder.Microstepping.Value = microstepping;
                     extruder.Microstepping.Interpolated = interpolate;
+                    extruder.StepsPerMm = ScaleForMicrostepping(extruder.StepsPerMm, previousMicrostepping, microstepping);
                     AddDriver(toUpdate, extruder.Driver, extruder.StepsPerMm, extruder.Microstepping);
                     seen = true;
                 }
@@ -828,15 +834,18 @@ internal partial class MCodeHandler
         {
             Move move = model.Move;
 
+            // An S parameter is a drive named as much as an axis letter is: it makes the code
+            // something other than a request to disable everything
+            bool named = false;
             if (code.TryGetFloat('S', out float idleTimeout))
             {
                 move.Idle.Timeout = MathF.Max(idleTimeout, 0.0f);
+                named = true;
             }
 
             ushort mode = enable ? DriverStateControl.DriverActive : DriverStateControl.DriverDisabled;
             ushort idlePercent = (ushort)Math.Clamp((int)MathF.Round(move.Idle.Factor * 100.0f), 0, 100);
 
-            bool named = false;
             foreach (Axis axis in move.Axes)
             {
                 if (code.HasParameter(axis.Letter))
