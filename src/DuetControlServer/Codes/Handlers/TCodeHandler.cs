@@ -55,9 +55,8 @@ public sealed class TCodeHandler(ToolManager toolManager, Model.ObjectModel mode
             : ToolChangeParameters.All;
 
         int toolNumber = code.MajorNumber.Value;
-        string? error = await toolManager.SelectAsync(code.Channel, toolNumber < 0 ? ToolManager.NoTool : toolNumber,
+        return await toolManager.SelectAsync(code.Channel, toolNumber < 0 ? ToolManager.NoTool : toolNumber,
                                                       parameters, code, cancellationToken);
-        return error is null ? new Message() : new Message(MessageType.Error, error);
     }
 
     /// <summary>

@@ -196,9 +196,9 @@ public class DeferredPauseTests : BenchFixture
                 """ + "\nT0\n",
             prepareSd: sd =>
             {
-                sd.WriteSys("tfree0.g", "set global.tfreeRan = global.tfreeRan + 1\nG90\nG1 X20 F3000\n");
-                sd.WriteSys("tpre0.g", "set global.tpreRan = global.tpreRan + 1\nG90\nG1 X40 F3000\n");
-                sd.WriteSys("tpost0.g", "set global.tpostRan = global.tpostRan + 1\nG90\nG1 X60 F3000\n");
+                sd.WriteSys("tfree0.g", "set global.tfreeRan = global.tfreeRan + 1\nG91\nG1 X100 F3000\nM400\n");
+                sd.WriteSys("tpre0.g", "set global.tpreRan = global.tpreRan + 1\nG91\nG1 X100 F3000\nM400\n");
+                sd.WriteSys("tpost0.g", "set global.tpostRan = global.tpostRan + 1\nG91\nG1 X100 F3000\nM400\n");
                 sd.WriteGCode("job.gcode", """
                     G90
                     G1 X10 Y10 F6000
@@ -208,6 +208,14 @@ public class DeferredPauseTests : BenchFixture
                     G60 S3
                     """);
             });
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await bench.Host.GlobalAsync("tfreeRan"), Is.EqualTo(0), "tfree0.g hasn't run");
+            Assert.That(await bench.Host.GlobalAsync("tpreRan"), Is.EqualTo(1), "tpre0.g ran once");
+            Assert.That(await bench.Host.GlobalAsync("tpostRan"), Is.EqualTo(1), "tpost0.g ran once");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(0),
+                        "the config ends with tool 0 selected");
+        });
 
         await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
         await bench.CanMaster.WaitForSbcPacketAsync(SbcRequest.ScheduleMove);
@@ -216,15 +224,23 @@ public class DeferredPauseTests : BenchFixture
         // Land the pause while the tool change macros' slow moves are being made
         await bench.Host.ExecuteCodeAsync("M25");
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
-        Assert.That(await bench.Host.GlobalAsync("pauseRan"), Is.EqualTo(1), "the deferred pause settled");
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await bench.Host.GlobalAsync("pauseRan"), Is.EqualTo(1), "the deferred pause settled");
+            Assert.That(await bench.Host.GlobalAsync("tfreeRan"), Is.EqualTo(1), "tfree0.g ran once");
+            Assert.That(await bench.Host.GlobalAsync("tpreRan"), Is.EqualTo(1), "tpre0.g ran once");
+            Assert.That(await bench.Host.GlobalAsync("tpostRan"), Is.EqualTo(1), "tpost0.g ran once");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(-1),
+                        "the pause after T-1");
+        });
 
         await bench.Host.ExecuteCodeAsync("M24");
         await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.GlobalAsync("tfreeRan"), Is.EqualTo(1), "tfree0.g ran once");
-            Assert.That(await bench.Host.GlobalAsync("tpreRan"), Is.EqualTo(1), "tpre0.g ran once");
-            Assert.That(await bench.Host.GlobalAsync("tpostRan"), Is.EqualTo(1), "tpost0.g ran once");
+            Assert.That(await bench.Host.GlobalAsync("tpreRan"), Is.EqualTo(2), "tpre0.g ran twice");
+            Assert.That(await bench.Host.GlobalAsync("tpostRan"), Is.EqualTo(2), "tpost0.g ran twice");
             Assert.That(await bench.Host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(0),
                         "the job ends with tool 0 selected");
             Assert.That(await bench.Host.GlobalAsync("stopRan"), Is.EqualTo(1), "and finished normally");

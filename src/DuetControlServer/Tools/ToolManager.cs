@@ -232,7 +232,7 @@ public sealed class ToolManager(Model.ObjectModel model, MacroRunner macroRunner
     /// to be able to move to a coordinate measured against the tool it is priming
     /// </para>
     /// </remarks>
-    public async ValueTask<string?> SelectAsync(DuetAPI.CodeChannel channel, int toolNumber,
+    public async ValueTask<Message> SelectAsync(DuetAPI.CodeChannel channel, int toolNumber,
                                                 ToolChangeParameters parameters, Commands.Code? startCode,
                                                 CancellationToken cancellationToken)
     {
@@ -242,13 +242,13 @@ public sealed class ToolManager(Model.ObjectModel model, MacroRunner macroRunner
             previous = model.State.CurrentTool;
             if (toolNumber != NoTool && Find(toolNumber) is null)
             {
-                return $"Tool {toolNumber} not found";
+                return new Message(MessageType.Error, $"Tool {toolNumber} not found");
             }
         }
 
         if (previous == toolNumber)
         {
-            return null;                        // already selected, so there is nothing to change
+            return new Message();                        // already selected, so there is nothing to change
         }
 
         if (previous != NoTool && parameters.HasFlag(ToolChangeParameters.RunFree))
@@ -298,7 +298,7 @@ public sealed class ToolManager(Model.ObjectModel model, MacroRunner macroRunner
         {
             await RunToolMacroAsync(channel, "tpost", toolNumber, startCode, cancellationToken);
         }
-        return null;
+        return new Message();
     }
 
     /// <summary>
