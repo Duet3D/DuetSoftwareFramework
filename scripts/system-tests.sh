@@ -9,7 +9,8 @@ set -uo pipefail
 # runner does report both facts already, but only spread through the run: each failure where it
 # happened, buried under its stack trace and the DuetControlServer log the fixture dumps, and each
 # duration on the line of the test it belongs to. Reading either back means scrolling through
-# everything else, so both are gathered from the TRX once the run is over.
+# everything else, so both are gathered from the TRX once the run is over, and each name is given
+# the source location the terminal can turn into a link.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -141,21 +142,67 @@ RESULTS="$(awk '
     }
 ' "$TRX")"
 
-SLOW="$(awk -F'\t' -v limit="$SLOW_SECONDS" '$2 > limit' <<< "$RESULTS" | sort -t$'\t' -k2,2rn -k3,3 | awk -F'\t' '{ printf "%8.1f s  %s\n", $2, $3 }')"
+# Neither the TRX nor the runner records where a test is written, so the location under each name
+# below is resolved from the sources instead: the namespace and class enclosing a declaration make
+# up the fully qualified name the TRX reports, and the line is the method carrying it. A path with a
+# line number is the form terminals linkify, so the summaries can be clicked into the test itself.
+LOCATIONS="$(find "$REPO_ROOT/src/SystemTests" -name '*.cs' -not -path '*/obj/*' -not -path '*/bin/*' -print0 |
+    xargs -0 awk -v prefix="$REPO_ROOT/" '
+    FNR == 1 { ns = ""; cls = "" }
+
+    /^[ \t]*namespace / { ns = $2; sub(/[;{].*/, "", ns); next }
+
+    # Nested types are not used here, so the innermost class seen is the one a declaration belongs to.
+    # The whole opening of the line has to match, or the word class in a comment would count as one.
+    /^[ \t]*((public|internal|private|protected|abstract|sealed|static|partial|file)[ \t]+)*(class|record|struct)[ \t]+[A-Za-z_]/ {
+        match($0, /(class|record|struct)[ \t]+[A-Za-z_][A-Za-z0-9_]*/)
+        cls = substr($0, RSTART, RLENGTH)
+        sub(/^(class|record|struct)[ \t]+/, "", cls)
+    }
+
+    # A member declaration opens with an access modifier and names itself just before its parameter
+    # list. That also catches constructors and helpers, which cost an unused entry and nothing else.
+    /^[ \t]*(public|protected|internal|private)[ \t]/ {
+        p = index($0, "(")
+        if (p == 0 || cls == "") next
+        head = substr($0, 1, p - 1)
+        # An assignment before the parenthesis means a field or a property, not a member being named
+        if (index(head, "=") > 0) next
+        if (!match(head, /[A-Za-z_][A-Za-z0-9_]*[ \t]*$/)) next
+        member = substr(head, RSTART, RLENGTH)
+        gsub(/[ \t]/, "", member)
+        key = (ns == "" ? "" : ns ".") cls "." member
+        if (!(key in loc)) { file = FILENAME; sub(prefix, "", file); loc[key] = file ":" FNR }
+    }
+
+    END { for (key in loc) printf "%s\t%s\n", key, loc[key] }
+')"
+
+# The name a result carries ends in the arguments of a TestCase, which the declaration it came from
+# does not, so the lookup is on the name with those cut off. A test the index has nothing for, such
+# as one generated at runtime, keeps an empty location and is printed without one.
+RESULTS="$(awk -F'\t' -v OFS='\t' '
+    NR == FNR { loc[$1] = $2; next }
+    { key = $3; sub(/\(.*/, "", key); print $0, (key in loc) ? loc[key] : "" }
+' <(printf '%s\n' "$LOCATIONS") <(printf '%s\n' "$RESULTS"))"
+
+SLOW="$(awk -F'\t' -v limit="$SLOW_SECONDS" '$2 > limit' <<< "$RESULTS" | sort -t$'\t' -k2,2rn -k3,3 |
+    awk -F'\t' '{ printf "%8.1f s  %s\n", $2, $3; if ($4 != "") printf "%11s%s\n", "", $4 }')"
 if [[ -n "$SLOW" ]]; then
     echo
     echo "=== Tests over ${SLOW_SECONDS}s ==="
     echo "$SLOW"
 fi
 
-FAILED="$(awk -F'\t' '$1 == "Failed" { print $3 }' <<< "$RESULTS" | sort)"
+FAILED="$(awk -F'\t' -v OFS='\t' '$1 == "Failed" { print $3, $4 }' <<< "$RESULTS" | sort)"
 echo
 if [[ -z "$FAILED" ]]; then
     echo "=== No failures ==="
 else
     echo "=== Failed tests ==="
-    while IFS= read -r NAME; do
+    while IFS=$'\t' read -r NAME LOCATION; do
         echo "  $NAME"
+        [[ -n "$LOCATION" ]] && echo "    $LOCATION"
     done <<< "$FAILED"
     echo
     echo "Rerun one of them with:"
