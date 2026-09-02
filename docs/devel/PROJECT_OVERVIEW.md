@@ -255,7 +255,7 @@ nothing is runnable. The same change removes the dwell that is most of the runti
 | `DuetSbc_StepMotion` and `DuetSbc_StepLink`, the fake controller pumped by the test | S | |
 | `Settle()` replacing the dwell, with quiescence on the managed side | M | the two above |
 | Every scenario onto the timeline, `FreeRunningClock` deleted, a bench profile that starts fewer services | M | the settle |
-| `scripts/test.sh`, sharding across processes, the per-test budget and the slow-count guard | S | the settle |
+| `scripts/test.sh`, sharding across processes, the per-test budget and the slow-count guard, growing out of the `scripts/system-tests.sh` that already runs and summarises the suite | S | the settle |
 | The single-threaded scheduler for DCS's tasks, then `IBenchGate` and the interleaving scenarios | L | the settle |
 | `StepTimer` state per handle, for in-process parallelism | M | |
 

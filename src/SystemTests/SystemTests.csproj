@@ -30,8 +30,18 @@
 		<NativeLinkDir>$(MSBuildThisFileDirectory)../DuetSbcInterface</NativeLinkDir>
 	</PropertyGroup>
 	<Target Name="BuildNativeLinkLibrary" BeforeTargets="Build" Condition="'$(BuildNativeLink)' == 'true'">
+		<!-- The native build takes RRFLibraries from the submodule, and says so as a CMake command it
+		     cannot find, which names neither the submodule nor the way to get it. A clone made
+		     without recursing, and every new git worktree, starts without it. -->
+		<Error Condition="!Exists('$(MSBuildThisFileDirectory)../../lib/RRFLibraries/RRFLibraries.cmake')"
+		       Text="lib/RRFLibraries is not checked out, so libduet_sbc.so cannot be built. Check it out with 'git submodule update --init lib/RRFLibraries'." />
+
+		<!-- cmake_install.cmake rather than CMakeCache.txt: the cache is written when the configure
+		     starts, so a configure that failed leaves one behind and every later build then skips
+		     straight to a build tree that was never generated. This file is written when the
+		     configure finishes, so a failed one is retried instead of being taken for a good tree. -->
 		<Exec Command="cmake --preset native-debug" WorkingDirectory="$(NativeLinkDir)"
-		      Condition="!Exists('$(NativeLinkDir)/build/native-debug/CMakeCache.txt')" />
+		      Condition="!Exists('$(NativeLinkDir)/build/native-debug/cmake_install.cmake')" />
 		<Exec Command="cmake --build --preset native-debug --target duet_sbc_shared --parallel" WorkingDirectory="$(NativeLinkDir)" />
 	</Target>
 </Project>
