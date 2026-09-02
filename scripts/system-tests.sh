@@ -141,14 +141,14 @@ RESULTS="$(awk '
     }
 ' "$TRX")"
 
-SLOW="$(awk -F'\t' -v limit="$SLOW_SECONDS" '$2 > limit { printf "%8.1f s  %s\n", $2, $3 }' <<< "$RESULTS" | sort -rn)"
+SLOW="$(awk -F'\t' -v limit="$SLOW_SECONDS" '$2 > limit' <<< "$RESULTS" | sort -t$'\t' -k2,2rn -k3,3 | awk -F'\t' '{ printf "%8.1f s  %s\n", $2, $3 }')"
 if [[ -n "$SLOW" ]]; then
     echo
     echo "=== Tests over ${SLOW_SECONDS}s ==="
     echo "$SLOW"
 fi
 
-FAILED="$(awk -F'\t' '$1 == "Failed" { print $3 }' <<< "$RESULTS")"
+FAILED="$(awk -F'\t' '$1 == "Failed" { print $3 }' <<< "$RESULTS" | sort)"
 echo
 if [[ -z "$FAILED" ]]; then
     echo "=== No failures ==="
