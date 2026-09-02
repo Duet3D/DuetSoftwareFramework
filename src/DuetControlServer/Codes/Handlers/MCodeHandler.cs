@@ -557,6 +557,7 @@ internal partial class MCodeHandler(
 
                 Message selected = await jobController.SelectFileAsync(fileName, physicalFile, simulating: false,
                                                                        updateSimulatedTime: true, code.Channel,
+                                                                       startsNextRun: code.MajorNumber == 32,
                                                                        cancellationToken);
                 if (selected.Type != MessageType.Success)
                 {
@@ -926,7 +927,8 @@ internal partial class MCodeHandler(
                 // it, as in standalone mode
                 Message selected = await jobController.SelectFileAsync(fileName, physicalFile, simulating: true,
                                                                       updateSimulatedTime: code.GetInt('F', 1) == 1,
-                                                                      code.Channel, cancellationToken);
+                                                                      code.Channel, startsNextRun: true,
+                                                                      cancellationToken);
                 if (selected.Type != MessageType.Success)
                 {
                     return selected;

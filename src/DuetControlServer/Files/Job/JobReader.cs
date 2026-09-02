@@ -157,6 +157,11 @@ internal sealed class JobReader
         _codeProcessor.SetJobFile(Channel, File);
 
         _frozen = _frozenAtBoundary = false;
+
+        // The source of the stretch before this one is spent - its codes were drained before the
+        // resume - and disposing it releases its registration on the run token, which would
+        // otherwise accumulate one per pause
+        _generation?.Dispose();
         _generation = CancellationTokenSource.CreateLinkedTokenSource(runToken);
         _readTask = ReadAheadAsync(_generation.Token);
     }

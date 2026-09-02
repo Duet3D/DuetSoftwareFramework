@@ -65,6 +65,17 @@ internal enum JobPhase
 internal sealed record JobFile(CodeFile File, GCodeFileInfo Info, bool IsSimulating, bool UpdateSimulatedTime);
 
 /// <summary>
+/// A file selected from the file channel while a run was still going, and what to do with it once
+/// that run is torn down
+/// </summary>
+/// <param name="File">The file</param>
+/// <param name="Start">
+/// True for M32, which chains straight into the file; false for M23, which only selects it and
+/// leaves the start to M24, as RepRapFirmware's <c>fileToPrint</c> does
+/// </param>
+internal sealed record NextSelection(JobFile File, bool Start);
+
+/// <summary>
 /// One stream of the job, and what the last pause worked out about it
 /// </summary>
 /// <param name="Index">Motion system this stream belongs to</param>
@@ -110,8 +121,8 @@ internal sealed record JobState
     /// <summary>A pause asked for while the job was inside a macro it cannot be interrupted in</summary>
     public PauseRequest? PendingPause { get; init; }
 
-    /// <summary>A file M32 selected from inside the job, to be started once this run is torn down</summary>
-    public JobFile? NextFile { get; init; }
+    /// <summary>A file selected from inside the job, taken up once this run is torn down</summary>
+    public NextSelection? NextFile { get; init; }
 
     /// <summary>
     /// Whether a job is live

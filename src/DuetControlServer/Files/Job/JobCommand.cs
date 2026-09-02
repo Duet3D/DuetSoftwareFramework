@@ -117,7 +117,12 @@ internal abstract record JobCommand
     public void Refuse(string content) => Completion.TrySetResult(new Message(MessageType.Error, content));
 
     /// <summary>Select a file to print or simulate (M23, M32, M37 P)</summary>
-    public sealed record SelectFile(JobFile File, CodeChannel Channel) : JobCommand;
+    /// <remarks>
+    /// <c>StartsNextRun</c> matters only on the file channels, where the select is stored until the
+    /// run it was read from is torn down: M32 chains straight into the stored file, M23 only
+    /// selects it. From every other channel starting is a separate <see cref="StartOrResume"/>
+    /// </remarks>
+    public sealed record SelectFile(JobFile File, CodeChannel Channel, bool StartsNextRun) : JobCommand;
 
     /// <summary>Start a selected job or resume a paused one (M24, M32, M37)</summary>
     public sealed record StartOrResume(CodeChannel Channel, bool RunMacro) : JobCommand;

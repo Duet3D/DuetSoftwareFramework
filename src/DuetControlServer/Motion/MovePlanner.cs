@@ -454,6 +454,15 @@ internal sealed class MovePlanner(
     {
         using (_lock.EnterScope())
         {
+            if (State.PurgePending)
+            {
+                // A stop is between its request and its report. A move accepted now may or may not
+                // be dropped by the engine, and either way the report cannot name it, so the stop
+                // would fail it as dropped or roll the submission record back over it. Busy makes
+                // the caller retry once the report is in
+                return MoveSubmitResult.Busy;
+            }
+
             if (!linkInterface.Native.CanAddMove(move.RingNumber))
             {
                 return MoveSubmitResult.Busy;
@@ -704,56 +713,69 @@ internal sealed class MovePlanner(
         // queueing segments the machine has just been told not to make. Nothing is lost if the
         // engine turns out not to have stopped: the submission gives up either way, and the pause
         // reads back how far it got
+        // The last submitted id is read under the same lock as the purge note. From here until
+        // PurgeSettled below, QueueMove answers Busy, so no move can slip in behind the snapshot to
+        // be swept by FailAfter as dropped or erased by the rollback while the engine runs it
+        uint lastSubmittedMoveId;
         using (Lock())
         {
             State.NotePurge();
-        }
-
-        // The motion thread acts on the request within one pass of its loop
-        int[] restEndpoints = new int[MotionLimits.MaxAxesPlusExtruders];
-        (uint firstPurgedMoveId, uint movesPurged, uint lastSurvivingMoveId, bool stopped) =
-            await FeedholdCompletedAsync(sequenceBefore, restEndpoints, cancellationToken);
-
-        if (!stopped)
-        {
-            return new FeedholdOutcome(false, 0, 0, 0);
-        }
-
-        // The read lock because putting the interpreter's position back reads the transform out of
-        // the object model, and the planner lock because everything below is the state a move is
-        // built from. This order everywhere: the object model first, the planner second
-        uint lastSubmittedMoveId;
-        using (await model.AccessReadOnlyAsync(cancellationToken))
-        using (Lock())
-        {
-            // Both sides of the position ran ahead of the machine by everything that was dropped, so
-            // both are fiction. What replaces them is where the machine will come to rest, which the
-            // stop reports from the ring: the moves it could not recall are still running, so the
-            // engine's commanded position is somewhere the machine is passing through rather than
-            // the place it stops. The interpreter's follows from it - under this lock, so that the
-            // next move built anywhere is measured from where the machine really ends up
-            Builder.ResyncEndpoints(restEndpoints);
-            interpreter.SyncInterpreterToMachine();
-
-            // A segmented move that was part-way through submitting has had its remaining segments
-            // dropped with the rest, so the claim on the ring goes with them
-            State.SegmentsLeft = 0;
-
-            // The last move this side gave the ring is now the last one the ring kept. Everything
-            // after it was dropped, so anchoring a deferred code to it or waiting for standstill on
-            // it would name a move the machine will never make
             lastSubmittedMoveId = _lastSubmittedMoveId[StoppedRing];
-            _lastSubmittedMoveId[StoppedRing] = lastSurvivingMoveId;
         }
 
-        // Nothing reports a purged move, and nothing can: the inbound event ring drops events when
-        // it fills, which is exactly what a purge of a whole ring would make it do. The boundary is
-        // already on this side, so the waits above it are ended here in one sweep rather than left
-        // for a later move that may never come
-        tracker.FailAfter(StoppedRing, lastSurvivingMoveId, lastSubmittedMoveId);
+        try
+        {
+            // The motion thread acts on the request within one pass of its loop
+            int[] restEndpoints = new int[MotionLimits.MaxAxesPlusExtruders];
+            (uint firstPurgedMoveId, uint movesPurged, uint lastSurvivingMoveId, bool stopped) =
+                await FeedholdCompletedAsync(sequenceBefore, restEndpoints, cancellationToken);
 
-        logger.LogInformation("Stopped the machine early, dropping {Count} queued move(s)", movesPurged);
-        return new FeedholdOutcome(true, firstPurgedMoveId, movesPurged, lastSurvivingMoveId);
+            if (!stopped)
+            {
+                return new FeedholdOutcome(false, 0, 0, 0);
+            }
+
+            // The read lock because putting the interpreter's position back reads the transform out of
+            // the object model, and the planner lock because everything below is the state a move is
+            // built from. This order everywhere: the object model first, the planner second
+            using (await model.AccessReadOnlyAsync(cancellationToken))
+            using (Lock())
+            {
+                // Both sides of the position ran ahead of the machine by everything that was dropped, so
+                // both are fiction. What replaces them is where the machine will come to rest, which the
+                // stop reports from the ring: the moves it could not recall are still running, so the
+                // engine's commanded position is somewhere the machine is passing through rather than
+                // the place it stops. The interpreter's follows from it - under this lock, so that the
+                // next move built anywhere is measured from where the machine really ends up
+                Builder.ResyncEndpoints(restEndpoints);
+                interpreter.SyncInterpreterToMachine();
+
+                // A segmented move that was part-way through submitting has had its remaining segments
+                // dropped with the rest, so the claim on the ring goes with them
+                State.SegmentsLeft = 0;
+
+                // The last move this side gave the ring is now the last one the ring kept. Everything
+                // after it was dropped, so anchoring a deferred code to it or waiting for standstill on
+                // it would name a move the machine will never make
+                _lastSubmittedMoveId[StoppedRing] = lastSurvivingMoveId;
+            }
+
+            // Nothing reports a purged move, and nothing can: the inbound event ring drops events when
+            // it fills, which is exactly what a purge of a whole ring would make it do. The boundary is
+            // already on this side, so the waits above it are ended here in one sweep rather than left
+            // for a later move that may never come
+            tracker.FailAfter(StoppedRing, lastSurvivingMoveId, lastSubmittedMoveId);
+
+            logger.LogInformation("Stopped the machine early, dropping {Count} queued move(s)", movesPurged);
+            return new FeedholdOutcome(true, firstPurgedMoveId, movesPurged, lastSurvivingMoveId);
+        }
+        finally
+        {
+            using (Lock())
+            {
+                State.PurgeSettled();
+            }
+        }
     }
 
     /// <summary>

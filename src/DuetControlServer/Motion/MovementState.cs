@@ -103,9 +103,29 @@ internal sealed class MovementState
     public uint PurgeGeneration { get; private set; }
 
     /// <summary>
+    /// Whether a stop has been requested and the engine has not yet reported what survived
+    /// </summary>
+    /// <remarks>
+    /// A move accepted in this window would race the purge: the engine may drop it or keep it, and
+    /// either way the stop's report cannot cover it, so <see cref="MovePlanner.QueueMove"/> answers
+    /// Busy until the report is in and the caller retries as it does for a full ring. Global like
+    /// <see cref="PurgeGeneration"/>, because the purge is
+    /// </remarks>
+    public bool PurgePending { get; private set; }
+
+    /// <summary>
     /// Note that a stop has dropped queued moves
     /// </summary>
-    public void NotePurge() => PurgeGeneration++;
+    public void NotePurge()
+    {
+        PurgeGeneration++;
+        PurgePending = true;
+    }
+
+    /// <summary>
+    /// The stop's report is in: moves may be accepted again
+    /// </summary>
+    public void PurgeSettled() => PurgePending = false;
 
     /// <summary>
     /// The fraction of the first line M26 named that has already been made, 0..1

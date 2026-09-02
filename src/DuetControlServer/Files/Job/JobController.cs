@@ -125,6 +125,18 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     private JobCommand? _sequenceRequest;
     private int _sequenceId;
 
+    /// <summary>
+    /// Commands that start a sequence of their own, held because one was already in flight
+    /// </summary>
+    /// <remarks>
+    /// An operator stop from Idle holds the sequence slot while <c>stop.g</c> runs without any
+    /// phase saying so, and the commands that would start the next job wait their turn here rather
+    /// than replace it: a replaced sequence would keep running with nothing to answer its caller.
+    /// <see cref="OnSequenceCompletedAsync"/> re-dispatches them, so each is decided against the
+    /// phase as it stands then
+    /// </remarks>
+    private readonly Queue<JobCommand> _deferredCommands = new();
+
     /// <inheritdoc/>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -150,6 +162,10 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         finally
         {
             _commands.Writer.TryComplete();
+            while (_deferredCommands.TryDequeue(out JobCommand? deferred))
+            {
+                deferred.Completion.TrySetCanceled(CancellationToken.None);
+            }
         }
     }
 
@@ -171,16 +187,21 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     /// <param name="simulating">Whether it is to be simulated rather than printed</param>
     /// <param name="updateSimulatedTime">Whether a completed simulation writes its time back</param>
     /// <param name="channel">Channel the selection was commanded from</param>
+    /// <param name="startsNextRun">
+    /// Whether the code goes on to start what it selected (M32, M37 P). Only read for a selection
+    /// from the file channels, where it decides what the teardown does with the stored file
+    /// </param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The message to report</returns>
     /// <remarks>The file is parsed and opened here, before the command is posted</remarks>
     public async ValueTask<Message> SelectFileAsync(string virtualFile, string physicalFile, bool simulating,
-                                                    bool updateSimulatedTime, CodeChannel channel,
+                                                    bool updateSimulatedTime, CodeChannel channel, bool startsNextRun,
                                                     CancellationToken cancellationToken)
     {
         GCodeFileInfo info = await _fileInfoParser.ParseAsync(physicalFile, true);
         CodeFile file = _fileFactory.Create(virtualFile, physicalFile, CodeChannel.File);
-        return await PostAsync(new JobCommand.SelectFile(new JobFile(file, info, simulating, updateSimulatedTime), channel),
+        return await PostAsync(new JobCommand.SelectFile(new JobFile(file, info, simulating, updateSimulatedTime),
+                                                         channel, startsNextRun),
                                cancellationToken);
     }
 
@@ -338,17 +359,30 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
 
         if (command.Channel is CodeChannel.File or CodeChannel.File2)
         {
-            // M32 from inside the job file, or from stop.g. The run it is part of has to be torn
-            // down first, so the file is stored and started from Idle by the same pair of commands
-            // every other caller uses - and the handler is answered at once, so nothing waits for
-            // the run it is itself a code of
+            // M23 or M32 from inside the job file, or from stop.g. The file is stored and taken up
+            // from Idle once the run is torn down; a file already stored is displaced, and closed
+            // here because nothing else holds it
             if (state.Phase is JobPhase.Running or JobPhase.Finishing)
             {
+                state.NextFile?.File.File.Dispose();
+
+                if (!command.StartsNextRun)
+                {
+                    // M23 only selects, and the run it was read from carries on: RepRapFirmware
+                    // queues the file the same way and leaves starting it to M24 or M32
+                    Publish(state with { NextFile = new NextSelection(command.File, Start: false) });
+                    command.Reply(new Message());
+                    return;
+                }
+
+                // M32 chains: the run it is part of has to be torn down first, so the file is
+                // started from Idle by the same pair of commands every other caller uses - and the
+                // handler is answered at once, so nothing waits for the run it is itself a code of
                 if (state.Phase == JobPhase.Running)
                 {
                     StopReading(state);
                 }
-                Publish(state with { NextFile = command.File });
+                Publish(state with { NextFile = new NextSelection(command.File, Start: true) });
                 command.Reply(new Message());
                 if (state.Phase == JobPhase.Running)
                 {
@@ -408,6 +442,12 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         switch (state.Phase)
         {
             case JobPhase.Selected:
+                if (_sequence is not null)
+                {
+                    // An operator stop is still running its macro from Idle; the start waits for it
+                    _deferredCommands.Enqueue(command);
+                    return ValueTask.CompletedTask;
+                }
                 Publish(state with { Phase = JobPhase.Starting, StopReason = null });
                 _runTokenSource = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.ApplicationStopping);
                 StartSequence(command, token => _sequences.StartAsync(_state, token));
@@ -551,7 +591,13 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
 
             case JobPhase.Idle:
                 // No job to stop, so this is the operator putting the machine down for the night.
-                // RepRapFirmware runs stop.g here too, and it must work every time it is given
+                // RepRapFirmware runs stop.g here too, and it must work every time it is given -
+                // including when another stop is already running its macro, so this one waits
+                if (_sequence is not null)
+                {
+                    _deferredCommands.Enqueue(command);
+                    return;
+                }
                 StartSequence(command, token => _sequences.StopAsync(command.Channel, PrintStoppedReason.NormalCompletion, token));
                 return;
 
@@ -750,18 +796,41 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         _sequenceRequest = null;
         _sequenceTokenSource = null;
 
+        await SettleSequenceAsync(request, command.Outcome);
+
+        // The settle may have freed the slot the held commands were waiting for. One that starts a
+        // sequence of its own puts the rest back on hold until that one settles in turn
+        while (_sequence is null && _deferredCommands.TryDequeue(out JobCommand? deferred))
+        {
+            try
+            {
+                await PerformAsync(deferred);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Failed to perform deferred job command {Command}", deferred.GetType().Name);
+                deferred.Completion.TrySetException(e);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Move the phase on to what the settled outcome says
+    /// </summary>
+    private async ValueTask SettleSequenceAsync(JobCommand? request, SequenceOutcome outcome)
+    {
         JobState state = _state;
         switch (state.Phase)
         {
             case JobPhase.Starting:
-                if (command.Outcome.Failed)
+                if (outcome.Failed)
                 {
-                    request?.Reply(command.Outcome.Reply);
+                    request?.Reply(outcome.Reply);
                     await EndRunAsync(PrintStoppedReason.Abort);
                     return;
                 }
                 await BeginRunningAsync(state);
-                request?.Reply(command.Outcome.Reply);
+                request?.Reply(outcome.Reply);
                 return;
 
             case JobPhase.Pausing:
@@ -771,53 +840,53 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
                 Publish(_state with
                 {
                     Phase = JobPhase.Paused,
-                    Streams = [.. WithRewinds(_state.Streams, command.Outcome.Rewinds)]
+                    Streams = [.. WithRewinds(_state.Streams, outcome.Rewinds)]
                 });
-                request?.Reply(command.Outcome.Reply);
+                request?.Reply(outcome.Reply);
                 return;
 
             case JobPhase.Resuming:
-                if (command.Outcome.Failed)
+                if (outcome.Failed)
                 {
                     Publish(_state with { Phase = JobPhase.Paused });
-                    request?.Reply(command.Outcome.Reply);
+                    request?.Reply(outcome.Reply);
                     return;
                 }
                 await BeginRunningAsync(_state);
-                request?.Reply(command.Outcome.Reply);
+                request?.Reply(outcome.Reply);
                 return;
 
             case JobPhase.Running:
                 // The wait for the last moves. A pause that landed while they ran replaced this
                 // sequence, so reaching here means the job really is over
-                request?.Reply(command.Outcome.Reply);
+                request?.Reply(outcome.Reply);
                 await EndRunAsync(PrintStoppedReason.NormalCompletion);
                 return;
 
             case JobPhase.Cancelling:
                 // cancel.g has replaced stop.g, so the finish has only the teardown left
-                request?.Reply(command.Outcome.Reply);
+                request?.Reply(outcome.Reply);
                 Publish(_state with { Phase = JobPhase.Finishing });
                 StartSequence(null, token => _sequences.TeardownAsync(_state, token));
                 return;
 
             case JobPhase.Aborting:
-                request?.Reply(command.Outcome.Reply);
+                request?.Reply(outcome.Reply);
                 await EndRunAsync(PrintStoppedReason.Abort);
                 return;
 
             case JobPhase.Finishing:
-                request?.Reply(command.Outcome.Reply);
+                request?.Reply(outcome.Reply);
                 await FinishAsync();
                 return;
 
             case JobPhase.Idle:
                 // The stop sequence of an M0 with no job
-                request?.Reply(command.Outcome.Reply);
+                request?.Reply(outcome.Reply);
                 return;
 
             default:
-                request?.Reply(command.Outcome.Reply);
+                request?.Reply(outcome.Reply);
                 return;
         }
     }
@@ -870,11 +939,22 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
 
         StartSequence(null, async token =>
         {
-            // The streams are closed on the sequence rather than in the loop: closing waits for the
-            // codes in flight, and one of them may be the very code that ended the run
-            await CloseStreamsAsync(_state);
-            SequenceOutcome outcome = await _sequences.StopAsync(CodeChannel.File, reason, token);
-            return outcome.Failed ? outcome : await _sequences.TeardownAsync(_state, token);
+            try
+            {
+                // The streams are closed on the sequence rather than in the loop: closing waits for
+                // the codes in flight, and one of them may be the very code that ended the run
+                await CloseStreamsAsync(_state);
+                await _sequences.StopAsync(CodeChannel.File, reason, token);
+            }
+            catch (Exception e) when (!token.IsCancellationRequested)
+            {
+                // The stop half failing - the link dropping mid-abort, say - must not cost the run
+                // its teardown: the object model has to say the job is over whatever state the
+                // machine is in. A cancelled sequence still propagates, because whoever cancelled
+                // it owns what follows
+                _logger.LogError(e, "The stop step of the run's end failed; tearing the run down anyway");
+            }
+            return await _sequences.TeardownAsync(_state, token);
         });
     }
 
@@ -891,15 +971,18 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         _runTokenSource?.Dispose();
         _runTokenSource = null;
 
-        JobFile? next = state.NextFile;
+        NextSelection? next = state.NextFile;
         Publish(new JobState());
 
         if (next is not null)
         {
-            // The chained print starts from Idle, by the same pair of transitions every other caller
-            // goes through
-            await AdoptAsync(next);
-            await OnStartOrResumeAsync(new JobCommand.StartOrResume(CodeChannel.File, RunMacro: true));
+            // The stored file is taken up from Idle, by the same transitions every other caller
+            // goes through: an M32 chains straight into it, an M23 leaves it selected for M24
+            await AdoptAsync(next.File);
+            if (next.Start)
+            {
+                await OnStartOrResumeAsync(new JobCommand.StartOrResume(CodeChannel.File, RunMacro: true));
+            }
         }
     }
 
@@ -914,6 +997,14 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     /// </remarks>
     private void StartSequence(JobCommand? request, Func<CancellationToken, Task<SequenceOutcome>> body)
     {
+        if (_sequence is not null)
+        {
+            // Enforced rather than assumed: a sequence that was silently replaced would keep
+            // running with nothing to answer its caller. Whoever starts one either waited for the
+            // settle, cancelled the predecessor, or deferred through _deferredCommands
+            throw new InvalidOperationException("A sequence is already in flight");
+        }
+
         CancellationTokenSource source = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.ApplicationStopping);
         _sequenceTokenSource = source;
         _sequenceRequest = request;

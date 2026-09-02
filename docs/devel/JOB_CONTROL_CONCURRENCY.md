@@ -678,7 +678,11 @@ source has no business in a record that every reader keeps.
 The loop dequeues one command at a time. A command either completes inside the loop (a validation,
 a refusal, a state change) or starts a *sequence*: a child task, owned by the controller, that runs
 the macros and the motion steps. The loop keeps dequeuing while a sequence runs, so `M112` never
-waits behind `pause.g`. A sequence writes no *job* state; it writes the planner, the object model
+waits behind `pause.g`. A command that would start a sequence while one is in flight is neither
+refused nor allowed to replace it: the loop holds it and re-dispatches it when the sequence
+settles, so an operator stop from `Idle` finishes its `stop.g` before an `M24` that arrived during
+it starts the next job, and every caller is answered. `StartSequence` enforces the single-sequence
+invariant by throwing. A sequence writes no *job* state; it writes the planner, the object model
 and the file position through the reader as its steps require, and posts `SequenceCompleted(outcome)`
 for the loop to perform the settling transition. That discipline is what keeps single ownership
 while a pause takes seconds.
@@ -716,12 +720,16 @@ in RepRapFirmware; then the teardown: `lastFileName`, `lastFileCancelled`, `last
 simulated time when the reason is `NormalCompletion` and `UpdateSimulatedTime` is set, the file
 closed, the run token cancelled and disposed, `Idle` published. `Abort` from `Finishing` cancels
 the stop sequence and goes to `Idle` through the teardown only; the stop macro never runs twice.
+The teardown runs even when the stop half fails (the link dropping mid-abort, say): the object
+model has to say the job is over whatever state the machine is in, so only a cancellation of the
+sequence itself skips it, and the canceller runs the teardown in its place.
 
 | Command | From | Effect | Refused elsewhere with |
 |---|---|---|---|
 | `SelectFile` (`M23`, `M32`, `M37 P`) from a channel other than `File` | `Idle`, `Selected` | `Selected`; the file is parsed before the command is posted | "Cannot set file to print, because a file is already being printed" (`M37`: "to simulate") |
-| `SelectFile` from the `File` channel (`M32` in a job file or in `stop.g`) | `Running` | Stored as `NextFile`, replied to at once, the run transitions to `Finishing` with `NormalCompletion` | as above |
-| | `Finishing` | Stored as `NextFile`, replied to at once | |
+| `SelectFile` from the `File` channel, starting (`M32` in a job file or in `stop.g`) | `Running` | Stored as `NextFile` with the start flag, replied to at once, the run transitions to `Finishing` with `NormalCompletion`; the teardown chains into the stored file. A file already stored is closed and displaced | as above |
+| | `Finishing` | Stored as `NextFile` with the start flag, replied to at once | |
+| `SelectFile` from the `File` channel, not starting (`M23`) | `Running`, `Finishing` | Stored as `NextFile` without the start flag and the run carries on; the teardown leaves the stored file `Selected`, waiting for `M24` as RepRapFirmware's `fileToPrint` does | as above |
 | `StartOrResume` (`M24`, `M32`, `M37`) | `Selected` | `Starting`; sequence: `JobMonitor.Start`, `start.g`, the M26 restart state, then `Run` to each reader | |
 | | `Paused` | `Resuming`; the resume sequence | |
 | | `Starting`, `Running`, `Pausing`, `Resuming` | Replied to with an empty message; RRF ignores a resume of a job that is already going where it was asked | |
@@ -1135,6 +1143,15 @@ Job control:
   `M23` and `M24` during it are refused (R7, R8, R12).
 - `M23` from another channel at the instant `M24` reports success: refused, the job resumes once,
   and `state.status` never reads `idle` between (R16).
+- `M23` inside a job file: the job runs on to its end and the lines after the `M23` still run, the
+  named file is `Selected` afterwards and an `M24` starts it; nothing is torn down at the `M23` and
+  its reply is not lost.
+- `M0` from one channel while Idle with a slow `stop.g`, then `M23` and `M24` from another channel
+  while it runs: `stop.g` completes and the `M0` is answered, only then does `start.g` run, and no
+  two job macros overlap.
+- The stop half of a run's end failing (a link invalidation mid-abort): the teardown still runs,
+  `job.duration`, `job.filePosition` and `job.timesLeft` are reset and `job.lastFileName` is
+  written.
 - `M25` and a filament-out event while `stop.g` runs after the last line: both refused with "no file
   is being printed", and `stop.g` runs to its end (R13).
 - A read-ahead code failing while `pause.g` runs: `pause.g` completes before the abort switches the
