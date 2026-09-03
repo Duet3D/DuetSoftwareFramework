@@ -783,15 +783,7 @@ public class USB : IDiagnostics, ILinkAdapter
     {
         // Attempt to serialize the code first
         Span<byte> span = stackalloc byte[_settings.MaxCodeBufferSize];
-        int codeLength;
-        try
-        {
-            codeLength = Protocol.Writer.WriteCode(span, code, ProtocolVersion);
-        }
-        catch (ArgumentException e)
-        {
-            throw new ArgumentException("Failed to serialize code (too long?)", e);
-        }
+        int codeLength = Protocol.Writer.WriteCode(span, code, ProtocolVersion);
 
         // See if the code fits into the buffer
         if (!CanWritePacket(codeLength))

@@ -55,13 +55,43 @@ public static class Writer
     }
     
     /// <summary>
+    /// Write a value to a memory span, skipping the write if it does not fit but still counting its size
+    /// </summary>
+    /// <param name="to">Destination</param>
+    /// <param name="offset">Write offset, incremented by the size of the value</param>
+    /// <param name="value">Value to write</param>
+    private static void WriteValue<T>(Span<byte> to, ref int offset, in T value) where T : struct
+    {
+        if (offset + Marshal.SizeOf<T>() <= to.Length)
+        {
+            MemoryMarshal.Write(to[offset..], in value);
+        }
+        offset += Marshal.SizeOf<T>();
+    }
+
+    /// <summary>
+    /// Write raw data to a memory span, skipping the write if it does not fit but still counting its size
+    /// </summary>
+    /// <param name="to">Destination</param>
+    /// <param name="offset">Write offset, incremented by the length of the data</param>
+    /// <param name="data">Data to write</param>
+    private static void WriteBytes(Span<byte> to, ref int offset, ReadOnlySpan<byte> data)
+    {
+        if (offset + data.Length <= to.Length)
+        {
+            data.CopyTo(to[offset..]);
+        }
+        offset += data.Length;
+    }
+
+    /// <summary>
     /// Write a parsed G/M/T code in binary format to a memory span
     /// </summary>
     /// <param name="to">Destination</param>
     /// <param name="code">Code to write</param>
     /// <param name="protocolVersion">Protocol version</param>
     /// <returns>Number of bytes written</returns>
-    /// <exception cref="ArgumentException">Unsupported data type</exception>
+    /// <exception cref="ArgumentException">Unsupported data type or code too long</exception>
     public static int WriteCode(Span<byte> to, DuetAPI.Commands.Code code, int protocolVersion)
     {
         int bytesWritten = 0;
@@ -98,15 +128,13 @@ public static class Writer
             header.Flags |= CodeFlags.HasExplicitLineNumber;
         }
 
-        MemoryMarshal.Write(to, in header);
-        bytesWritten += Marshal.SizeOf<CodeHeader>();
+        WriteValue(to, ref bytesWritten, in header);
 
         // Write line number
         if (protocolVersion >= 2)
         {
             int lineNumber = (int)(code.LineNumber ?? 0);
-            MemoryMarshal.Write(to[bytesWritten..], in lineNumber);
-            bytesWritten += sizeof(int);
+            WriteValue(to, ref bytesWritten, in lineNumber);
         }
 
         // Write parameters
@@ -132,11 +160,8 @@ public static class Writer
                 IntValue = commentLength,
                 Type = DataType.String
             };
-            MemoryMarshal.Write(to[bytesWritten..], in binaryParam);
-            bytesWritten += Marshal.SizeOf<CodeParameter>();
-
-            asUnicode.AsSpan(0, commentLength).CopyTo(to[bytesWritten..]);
-            bytesWritten += commentLength;
+            WriteValue(to, ref bytesWritten, in binaryParam);
+            WriteBytes(to, ref bytesWritten, asUnicode.AsSpan(0, commentLength));
             bytesWritten = AddPadding(to, bytesWritten);
         }
         else
@@ -223,8 +248,7 @@ else {              // Character parameters are not supported yet, they are wrap
                     throw new ArgumentException("Unsupported type", parameter.Type?.Name);
                 }
 
-                MemoryMarshal.Write(to[bytesWritten..], in binaryParam);
-                bytesWritten += Marshal.SizeOf<CodeParameter>();
+                WriteValue(to, ref bytesWritten, in binaryParam);
             }
 
             // Write extra parameters
@@ -235,8 +259,7 @@ else {              // Character parameters are not supported yet, they are wrap
                     foreach (int val in intArray)
                     {
                         int value = val;
-                        MemoryMarshal.Write(to[bytesWritten..], in value);
-                        bytesWritten += sizeof(int);
+                        WriteValue(to, ref bytesWritten, in value);
                     }
                 }
                 else if (parameter is uint[] uintArray)
@@ -244,8 +267,7 @@ else {              // Character parameters are not supported yet, they are wrap
                     foreach (uint val in uintArray)
                     {
                         uint value = val;
-                        MemoryMarshal.Write(to[bytesWritten..], in value);
-                        bytesWritten += sizeof(uint);
+                        WriteValue(to, ref bytesWritten, in value);
                     }
                 }
                 else if (parameter is DriverId[] driverIdArray)
@@ -253,8 +275,7 @@ else {              // Character parameters are not supported yet, they are wrap
                     foreach (DriverId val in driverIdArray)
                     {
                         uint value = val;
-                        MemoryMarshal.Write(to[bytesWritten..], in value);
-                        bytesWritten += sizeof(uint);
+                        WriteValue(to, ref bytesWritten, in value);
                     }
                 }
                 else if (parameter is float[] floatArray)
@@ -262,15 +283,12 @@ else {              // Character parameters are not supported yet, they are wrap
                     foreach (float val in floatArray)
                     {
                         float value = val;
-                        MemoryMarshal.Write(to[bytesWritten..], in value);
-                        bytesWritten += sizeof(float);
+                        WriteValue(to, ref bytesWritten, in value);
                     }
                 }
                 else if (parameter is string value)
                 {
-                    Span<byte> asUnicode = Encoding.UTF8.GetBytes(value);
-                    asUnicode.CopyTo(to[bytesWritten..]);
-                    bytesWritten += asUnicode.Length;
+                    WriteBytes(to, ref bytesWritten, Encoding.UTF8.GetBytes(value));
                     bytesWritten = AddPadding(to, bytesWritten);
                 }
                 else
@@ -280,6 +298,10 @@ else {              // Character parameters are not supported yet, they are wrap
             }
         }
 
+        if (bytesWritten > to.Length)
+        {
+            throw new ArgumentException($"Code too long for binary representation ({bytesWritten} bytes, {to.Length} max)");
+        }
         return bytesWritten;
     }
 
@@ -294,14 +316,7 @@ else {              // Character parameters are not supported yet, they are wrap
     public static int GetCodeSize(Code code, int bufferSize, int protocolVersion)
     {
         Span<byte> span = stackalloc byte[bufferSize];
-        try
-        {
-            return WriteCode(span, code, protocolVersion);
-        }
-        catch (ArgumentException e)
-        {
-            throw new ArgumentException("Failed to serialize code (too long?)", e);
-        }
+        return WriteCode(span, code, protocolVersion);
     }
 
     /// <summary>
@@ -921,7 +936,10 @@ else {              // Character parameters are not supported yet, they are wrap
         }
 
         int bytesTotal = bytesWritten + 4 - extraBytes;
-        to[bytesWritten..bytesTotal].Fill(0);
+        if (bytesTotal <= to.Length)
+        {
+            to[bytesWritten..bytesTotal].Fill(0);
+        }
         return bytesTotal;
     }
 }
