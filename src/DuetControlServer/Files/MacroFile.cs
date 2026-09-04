@@ -198,7 +198,14 @@ namespace DuetControlServer.Files
             _cts.Cancel();
 
             Close();
-            _logger.Info("Aborted macro file {0}", FileName);
+            if (Channel != CodeChannel.Daemon)
+            {
+                _logger.Info("Aborted macro file {0}", FileName);
+            }
+            else
+            {
+                _logger.Debug("Aborted macro file {0}", FileName);
+            }
         }
 
         /// <summary>

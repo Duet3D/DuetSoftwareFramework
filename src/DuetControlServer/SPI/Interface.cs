@@ -1185,7 +1185,14 @@ namespace DuetControlServer.SPI
         private static void HandleAbortFileRequest()
         {
             DataTransfer.ReadAbortFile(out CodeChannel channel, out bool abortAll);
-            _logger.Info("Received file abort request on channel {0} for {1}", channel, abortAll ? "all files" : "the last file");
+            if (channel != CodeChannel.Daemon)
+            {
+                _logger.Info("Received file abort request on channel {0} for {1}", channel, abortAll ? "all files" : "the last file");
+            }
+            else
+            {
+                _logger.Debug("Received file abort request on channel {0} for {1}", channel, abortAll ? "all files" : "the last file");
+            }
 
             if (channel < CodeChannel.Unknown)
             {

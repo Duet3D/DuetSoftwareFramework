@@ -50,7 +50,7 @@
   "MaxMachineModelLockTime": -1,
   "FileBufferSize": 32768,
   "FileInfoReadLimitHeader": 16384,
-  "FileInfoReadLimitFooter": 262144,
+  "FileInfoReadLimitFooter": 409600,
   "MaxLayerHeight": 0.9,
   "LayerHeightFilters": [
     {
@@ -82,6 +82,28 @@
     {
       "Pattern": "NUM_LAYERS\\D+(\\d+)",
       "Options": 17
+    },
+    {
+      "Pattern": "LAYER_COUNT\\D+(\\d+)",
+      "Options": 17
+    },
+    {
+      "Pattern": "total layer number\\D+(\\d+)",
+      "Options": 17
+    }
+  ],
+  "ObjectHeightFilters": [
+    {
+      "Pattern": "^\\s*max_z_height\\D+(?<mm>(\\d+\\.?\\d*))",
+      "Options": 17
+    },
+    {
+      "Pattern": "^\\s*MAXZ\\D+(?<mm>(\\d+\\.?\\d*))",
+      "Options": 17
+    },
+    {
+      "Pattern": "^\\s*Height\\D+(?<mm>(\\d+\\.?\\d*))",
+      "Options": 16
     }
   ],
   "FilamentFilters": [

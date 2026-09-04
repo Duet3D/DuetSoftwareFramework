@@ -124,6 +124,7 @@ namespace DuetControlServer.Files
                 {
                     gotNewInfo |= (partialFileInfo.SimulatedTime is null) && FindSimulatedTime(code.Comment, ref partialFileInfo);
                     gotNewInfo |= !gotNewInfo && (partialFileInfo.PrintTime is null) && FindPrintTime(code.Comment, ref partialFileInfo);
+                    gotNewInfo |= (partialFileInfo.Height == 0) && FindObjectHeight(code.Comment, ref partialFileInfo);
                     gotNewInfo |= (partialFileInfo.LayerHeight == 0) && FindLayerHeight(code.Comment, ref partialFileInfo);
                     gotNewInfo |= (partialFileInfo.NumLayers == 0) && FindNumLayers(code.Comment, ref partialFileInfo);
                     gotNewInfo |= FindFilamentUsed(code.Comment, ref partialFileInfo);
@@ -196,6 +197,7 @@ namespace DuetControlServer.Files
                         }
                         else if (!string.IsNullOrWhiteSpace(code.Comment))
                         {
+                            gotNewInfo |= FindObjectHeight(code.Comment, ref partialFileInfo);
                             gotNewInfo |= (partialFileInfo.SimulatedTime is null) && FindSimulatedTime(code.Comment, ref partialFileInfo);
                             gotNewInfo |= !gotNewInfo && (partialFileInfo.PrintTime is null) && FindPrintTime(code.Comment, ref partialFileInfo);
                             gotNewInfo |= (partialFileInfo.LayerHeight == 0) && FindLayerHeight(code.Comment, ref partialFileInfo);
@@ -329,6 +331,26 @@ namespace DuetControlServer.Files
                     (result.LayerHeight != 0) &&
                     (result.Filament.Count > 0) &&
                     (!string.IsNullOrEmpty(result.GeneratedBy));
+        }
+
+        /// <summary>
+        /// Try to find the object height
+        /// </summary>
+        /// <param name="line">Line</param>
+        /// <param name="fileInfo">File information</param>
+        /// <returns>Whether object height could be found</returns>
+        private static bool FindObjectHeight(string line, ref GCodeFileInfo fileInfo)
+        {
+            foreach (Regex item in Settings.ObjectHeightFilters)
+            {
+                Match match = item.Match(line);
+                if (match.Success && float.TryParse(match.Groups["mm"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out float height) && float.IsFinite(height) && height > 0)
+                {
+                    fileInfo.Height = height;
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>

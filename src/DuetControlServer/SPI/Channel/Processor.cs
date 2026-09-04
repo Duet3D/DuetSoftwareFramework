@@ -529,6 +529,12 @@ namespace DuetControlServer.SPI.Channel
             if (!abortAll)
             {
                 ResolvePendingReplies();
+
+                // RRF sends the empty reply for the M99 that requested this abort after the abort request if the SBC task had already flushed its replies
+                if (BufferedCodes.Count > 0 && BufferedCodes[0].Type == CodeType.MCode && BufferedCodes[0].MajorNumber == 99)
+                {
+                    _suppressEmptyReply = true;
+                }
             }
 
             // Clean up the stack

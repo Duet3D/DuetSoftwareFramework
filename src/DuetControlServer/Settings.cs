@@ -278,7 +278,7 @@ namespace DuetControlServer
         /// <summary>
         /// How many bytes to parse max at the end of a file to retrieve G-code file information (in bytes)
         /// </summary>
-        public static int FileInfoReadLimitFooter { get; set; } = 262144;
+        public static int FileInfoReadLimitFooter { get; set; } = 409600;
 
         /// <summary>
         /// Maximum allowed layer height. Used by the file info parser
@@ -306,7 +306,22 @@ namespace DuetControlServer
         /// </remarks>
         public static List<Regex> NumLayersFilters { get; set; } =
         [
-            new Regex(@"NUM_LAYERS\D+(\d+)", RegexFlags)
+            new Regex(@"NUM_LAYERS\D+(\d+)", RegexFlags),                              // PrusaSlicer
+            new Regex(@"LAYER_COUNT\D+(\d+)", RegexFlags),                             // Cura
+            new Regex(@"total layer number\D+(\d+)", RegexFlags)                       // OrcaSlicer
+        ];
+
+        /// <summary>
+        /// Regular expressions for finding the object height
+        /// </summary>
+        /// <remarks>
+        /// If the object height cannot be found, it is determined from the last G0/G1 Z move in the footer
+        /// </remarks>
+        public static List<Regex> ObjectHeightFilters { get; set; } =
+        [
+            new Regex(@"^\s*max_z_height\D+(?<mm>(\d+\.?\d*))", RegexFlags),           // OrcaSlicer
+            new Regex(@"^\s*MAXZ\D+(?<mm>(\d+\.?\d*))", RegexFlags),                   // Cura
+            new Regex(@"^\s*Height\D+(?<mm>(\d+\.?\d*))", RegexOptions.Singleline)     // Fusion 360, case-sensitive so PrusaSlicer's per-layer ;HEIGHT: is not matched
         ];
 
         /// <summary>
