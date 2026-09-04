@@ -16,7 +16,9 @@ CPUSchedulingPolicy=fifo
 CPUSchedulingPriority=20
 IOSchedulingClass=realtime
 IOSchedulingPriority=2
+# Both need the memory controller, which the Pi firmware disables unless cmdline.txt has cgroup_enable=memory
 MemorySwapMax=0
+MemoryMin=256M
 
 [Install]
 WantedBy=sysinit.target
