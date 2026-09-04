@@ -755,7 +755,14 @@ public sealed class LinkService(
     private void HandleAbortFileRequest()
     {
         linkAdapter.ReadAbortFile(out CodeChannel channel, out bool abortAll);
-        logger.LogInformation("Received file abort request on channel {Channel} for {FileType}", channel, abortAll ? "all files" : "the last file");
+        if (channel != CodeChannel.Daemon)
+        {
+            logger.LogInformation("Received file abort request on channel {Channel} for {FileType}", channel, abortAll ? "all files" : "the last file");
+        }
+        else
+        {
+            logger.LogDebug("Received file abort request on channel {Channel} for {FileType}", channel, abortAll ? "all files" : "the last file");
+        }
 
         if (channel < CodeChannel.Unknown)
         {

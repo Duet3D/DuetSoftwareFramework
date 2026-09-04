@@ -34,6 +34,7 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
     // Filters are configured as patterns, so they are compiled once here instead of on every parse
     private readonly List<Regex> _layerHeightFilters = Settings.CompileFilters(settings.Value.LayerHeightFilters);
     private readonly List<Regex> _numLayersFilters = Settings.CompileFilters(settings.Value.NumLayersFilters);
+    private readonly List<Regex> _objectHeightFilters = Settings.CompileFilters(settings.Value.ObjectHeightFilters);
     private readonly List<Regex> _filamentFilters = Settings.CompileFilters(settings.Value.FilamentFilters);
     private readonly List<Regex> _generatedByFilters = Settings.CompileFilters(settings.Value.GeneratedByFilters);
     private readonly List<Regex> _printTimeFilters = Settings.CompileFilters(settings.Value.PrintTimeFilters);
@@ -140,6 +141,7 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
             {
                 gotNewInfo |= (partialFileInfo.SimulatedTime is null) && FindSimulatedTime(code.Comment, ref partialFileInfo);
                 gotNewInfo |= !gotNewInfo && (partialFileInfo.PrintTime is null) && FindPrintTime(code.Comment, ref partialFileInfo);
+                gotNewInfo |= (partialFileInfo.Height == 0) && FindObjectHeight(code.Comment, ref partialFileInfo);
                 gotNewInfo |= (partialFileInfo.LayerHeight == 0) && FindLayerHeight(code.Comment, ref partialFileInfo);
                 gotNewInfo |= (partialFileInfo.NumLayers == 0) && FindNumLayers(code.Comment, ref partialFileInfo);
                 gotNewInfo |= FindFilamentUsed(code.Comment, ref partialFileInfo);
@@ -211,6 +213,7 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
                     }
                     else if (!string.IsNullOrWhiteSpace(code.Comment))
                     {
+                        gotNewInfo |= FindObjectHeight(code.Comment, ref partialFileInfo);
                         gotNewInfo |= (partialFileInfo.SimulatedTime is null) && FindSimulatedTime(code.Comment, ref partialFileInfo);
                         gotNewInfo |= !gotNewInfo && (partialFileInfo.PrintTime is null) && FindPrintTime(code.Comment, ref partialFileInfo);
                         gotNewInfo |= (partialFileInfo.LayerHeight == 0) && FindLayerHeight(code.Comment, ref partialFileInfo);
@@ -352,6 +355,26 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
                 (result.LayerHeight != 0) &&
                 (result.Filament.Count > 0) &&
                 (!string.IsNullOrEmpty(result.GeneratedBy));
+    }
+
+    /// <summary>
+    /// Try to find the object height
+    /// </summary>
+    /// <param name="line">Line</param>
+    /// <param name="fileInfo">File information</param>
+    /// <returns>Whether object height could be found</returns>
+    private bool FindObjectHeight(string line, ref GCodeFileInfo fileInfo)
+    {
+        foreach (Regex item in _objectHeightFilters)
+        {
+            Match match = item.Match(line);
+            if (match.Success && float.TryParse(match.Groups["mm"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out float height) && float.IsFinite(height) && height > 0)
+            {
+                fileInfo.Height = height;
+                return true;
+            }
+        }
+        return false;
     }
 
     /// <summary>

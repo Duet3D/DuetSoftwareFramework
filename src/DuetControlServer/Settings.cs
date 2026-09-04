@@ -303,7 +303,7 @@ public sealed class Settings
     /// <summary>
     /// How many bytes to parse max at the end of a file to retrieve G-code file information (in bytes)
     /// </summary>
-    public int FileInfoReadLimitFooter { get; set; } = 262144;
+    public int FileInfoReadLimitFooter { get; set; } = 409600;
 
     /// <summary>
     /// Maximum allowed layer height. Used by the file info parser
@@ -331,7 +331,22 @@ public sealed class Settings
     /// </remarks>
     public List<string> NumLayersFilters { get; set; } =
     [
-        @"NUM_LAYERS\D+(\d+)"
+        @"NUM_LAYERS\D+(\d+)",                               // PrusaSlicer
+        @"LAYER_COUNT\D+(\d+)",                              // Cura
+        @"total layer number\D+(\d+)"                        // OrcaSlicer
+    ];
+
+    /// <summary>
+    /// Regular expressions for finding the object height
+    /// </summary>
+    /// <remarks>
+    /// If the object height cannot be found, it is determined from the last G0/G1 Z move in the footer
+    /// </remarks>
+    public List<string> ObjectHeightFilters { get; set; } =
+    [
+        @"^\s*max_z_height\D+(?<mm>(\d+\.?\d*))",            // OrcaSlicer
+        @"^\s*MAXZ\D+(?<mm>(\d+\.?\d*))",                    // Cura
+        @"(?-i)^\s*Height\D+(?<mm>(\d+\.?\d*))"              // Fusion 360, case-sensitive so PrusaSlicer's per-layer ;HEIGHT: is not matched
     ];
 
     /// <summary>
@@ -557,6 +572,7 @@ public static class ServiceCollectionExtensions
             [nameof(Settings.FirmwareComments)] = settings.FirmwareComments,
             [nameof(Settings.LayerHeightFilters)] = settings.LayerHeightFilters,
             [nameof(Settings.NumLayersFilters)] = settings.NumLayersFilters,
+            [nameof(Settings.ObjectHeightFilters)] = settings.ObjectHeightFilters,
             [nameof(Settings.FilamentFilters)] = settings.FilamentFilters,
             [nameof(Settings.GeneratedByFilters)] = settings.GeneratedByFilters,
             [nameof(Settings.PrintTimeFilters)] = settings.PrintTimeFilters,

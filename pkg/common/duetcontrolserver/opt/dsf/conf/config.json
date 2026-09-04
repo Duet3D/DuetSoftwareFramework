@@ -53,7 +53,7 @@
   "FileBufferSize": 32768,
   "IpcJsonBufferSize": 1024,
   "FileInfoReadLimitHeader": 16384,
-  "FileInfoReadLimitFooter": 262144,
+  "FileInfoReadLimitFooter": 409600,
   "MaxLayerHeight": 0.9,
   "LayerHeightFilters": [
     "^\\s*layer_height\\D+(?<mm>(\\d+\\.?\\d*))",
@@ -64,7 +64,14 @@
     "sliceHeight\\D+(?<mm>(\\d+\\.?\\d*))"
   ],
   "NumLayersFilters": [
-    "NUM_LAYERS\\D+(\\d+)"
+    "NUM_LAYERS\\D+(\\d+)",
+    "LAYER_COUNT\\D+(\\d+)",
+    "total layer number\\D+(\\d+)"
+  ],
+  "ObjectHeightFilters": [
+    "^\\s*max_z_height\\D+(?<mm>(\\d+\\.?\\d*))",
+    "^\\s*MAXZ\\D+(?<mm>(\\d+\\.?\\d*))",
+    "(?-i)^\\s*Height\\D+(?<mm>(\\d+\\.?\\d*))"
   ],
   "FilamentFilters": [
     "filament used\\D+(((?<mm>\\d+\\.?\\d*)\\s*mm)(\\D+)?)+",

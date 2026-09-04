@@ -236,7 +236,14 @@ public sealed class MacroFile : CodeFile, IDisposable
         _cts.Cancel();
 
         Close();
-        _logger.LogInformation("Aborted macro file {File}", FilePath.Virtual);
+        if (Channel != CodeChannel.Daemon)
+        {
+            _logger.LogInformation("Aborted macro file {File}", FilePath.Virtual);
+        }
+        else
+        {
+            _logger.LogDebug("Aborted macro file {File}", FilePath.Virtual);
+        }
     }
 
     /// <summary>
