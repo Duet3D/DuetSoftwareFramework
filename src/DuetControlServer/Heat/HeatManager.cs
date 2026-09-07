@@ -37,8 +37,32 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
     /// <summary>
     /// Highest heater number a machine may have
     /// </summary>
-    /// <remarks>RepRapFirmware's <c>MaxHeaters</c> for a Duet 3 MB6HC</remarks>
-    public const int MaxHeaters = 32;
+    /// <remarks>CANlib's <c>MaxHeaters</c>, through the CAN message schema</remarks>
+    public const int MaxHeaters = CanLimits.MaxHeaters;
+
+    /// <summary>
+    /// Highest bed heater number a machine may have
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>MaxBedHeaters</c> for a Duet 3 MB6HC</remarks>
+    public const int MaxBedHeaters = 12;
+
+    /// <summary>
+    /// Highest chamber heater number a machine may have
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>MaxChamberHeaters</c> for a Duet 3 MB6HC</remarks>
+    public const int MaxChamberHeaters = 8;
+
+    /// <summary>
+    /// Most heaters one tool may collect
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>MaxHeatersPerTool</c> for a Duet 3 MB6HC</remarks>
+    public const int MaxHeatersPerTool = 20;
+
+    /// <summary>
+    /// Most output ports one heater may be driven through
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>MaxPortsPerHeater</c> for a Duet 3 MB6HC</remarks>
+    public const int MaxPortsPerHeater = 3;
 
     /// <summary>
     /// How close to the setpoint counts as having got there

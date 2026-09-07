@@ -1,4 +1,5 @@
 using DuetAPI.ObjectModel;
+using DuetControlServer.Link;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Motion.Native;
 
@@ -65,7 +66,7 @@ internal static class RemoteProbes
         board = 0;
         return probe.Type is not (ProbeType.None or ProbeType.ZMotorStall)
                && !string.IsNullOrWhiteSpace(probe.Port)
-               && RemoteEndstops.TrySplitPort(probe.Port, "Z probe port", out board, out _, out _);
+               && IoPorts.TrySplitPort(probe.Port, "Z probe port", out board, out _, out _);
     }
 
     /// <summary>

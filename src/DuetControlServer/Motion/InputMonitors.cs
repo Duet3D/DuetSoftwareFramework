@@ -62,7 +62,7 @@ internal static class InputMonitors
         string[] ports = RemoteEndstops.PortsOf(endstop);
         for (int switchIndex = 0; switchIndex < ports.Length; switchIndex++)
         {
-            if (RemoteEndstops.TrySplitPort(ports[switchIndex], "Endstop port", out byte board, out _, out _))
+            if (IoPorts.TrySplitPort(ports[switchIndex], "Endstop port", out byte board, out _, out _))
             {
                 monitors.Add(new Monitored(board, RemoteEndstops.HandleFor(axis, switchIndex)));
             }

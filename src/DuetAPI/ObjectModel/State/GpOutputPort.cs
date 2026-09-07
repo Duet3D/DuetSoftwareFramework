@@ -5,6 +5,17 @@
 /// </summary>
 public partial class GpOutputPort : ModelObject, IStaticModelObject
 {
+    /// <summary>PWM frequency of an output created by M950 P without Q (in Hz)</summary>
+    /// <remarks>RepRapFirmware's <c>DefaultPinWritePwmFreq</c></remarks>
+    public const int DefaultFrequency = 500;
+
+    /// <summary>Refresh frequency of a servo created by M950 S without Q (in Hz)</summary>
+    /// <remarks>
+    /// A servo is driven by the width of its pulse rather than the duty cycle, and RepRapFirmware's
+    /// <c>DefaultServoRefreshFrequency</c> is the rate those pulses are repeated at
+    /// </remarks>
+    public const int DefaultServoFrequency = 50;
+
     /// <summary>
     /// PWM frequency of this port (in Hz)
     /// </summary>

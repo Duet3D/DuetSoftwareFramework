@@ -64,6 +64,46 @@
     "MaxHeatersPerCanSlave": {
       "value": 6,
       "doc": "Most heaters any one expansion board may have"
+    },
+    "MaxSensors": {
+      "value": 56,
+      "doc": "Most sensors a machine may have, limited by the width of the sensor bitmap a message can carry"
+    },
+    "MaxHeaters": {
+      "value": 32,
+      "doc": "Most heaters a machine may have"
+    },
+    "MaxMonitorsPerHeater": {
+      "value": 3,
+      "doc": "Most monitors any one heater may have"
+    },
+    "MaxZProbes": {
+      "value": 8,
+      "doc": "Most Z probes a machine may have"
+    },
+    "MaxFans": {
+      "value": 32,
+      "doc": "Most fans a machine may have"
+    },
+    "MaxGpOutPorts": {
+      "value": 64,
+      "doc": "Most general-purpose output ports a machine may have, servos included"
+    },
+    "MaxGpInPorts": {
+      "value": 56,
+      "doc": "Most general-purpose input ports a machine may have, limited so that a trigger input bitmap fits the object model"
+    },
+    "MaxLedStrips": {
+      "value": 5,
+      "doc": "Most LED strips a machine may have"
+    },
+    "MaxSpindles": {
+      "value": 4,
+      "doc": "Most spindles a machine may have"
+    },
+    "MaxZProbeProgramBytes": {
+      "value": 8,
+      "doc": "Most bytes a Z probe program may run to"
     }
   },
 

@@ -18,6 +18,36 @@ public static class CanLimits
 
     /// <summary>Most heaters any one expansion board may have</summary>
     public const int MaxHeatersPerCanSlave = 6;
+
+    /// <summary>Most sensors a machine may have, limited by the width of the sensor bitmap a message can carry</summary>
+    public const int MaxSensors = 56;
+
+    /// <summary>Most heaters a machine may have</summary>
+    public const int MaxHeaters = 32;
+
+    /// <summary>Most monitors any one heater may have</summary>
+    public const int MaxMonitorsPerHeater = 3;
+
+    /// <summary>Most Z probes a machine may have</summary>
+    public const int MaxZProbes = 8;
+
+    /// <summary>Most fans a machine may have</summary>
+    public const int MaxFans = 32;
+
+    /// <summary>Most general-purpose output ports a machine may have, servos included</summary>
+    public const int MaxGpOutPorts = 64;
+
+    /// <summary>Most general-purpose input ports a machine may have, limited so that a trigger input bitmap fits the object model</summary>
+    public const int MaxGpInPorts = 56;
+
+    /// <summary>Most LED strips a machine may have</summary>
+    public const int MaxLedStrips = 5;
+
+    /// <summary>Most spindles a machine may have</summary>
+    public const int MaxSpindles = 4;
+
+    /// <summary>Most bytes a Z probe program may run to</summary>
+    public const int MaxZProbeProgramBytes = 8;
 }
 
 /// <summary>Helpers for the null-terminated text fields carried by some CAN messages</summary>

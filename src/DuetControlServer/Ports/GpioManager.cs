@@ -30,14 +30,14 @@ public sealed class GpioManager(Model.ObjectModel model, LinkInterface linkInter
     /// <summary>
     /// Highest general-purpose output number a machine may have
     /// </summary>
-    /// <remarks>RepRapFirmware's <c>MaxGpOutPorts</c></remarks>
-    public const int MaxGpOutPorts = 32;
+    /// <remarks>CANlib's <c>MaxGpOutPorts</c>, through the CAN message schema</remarks>
+    public const int MaxGpOutPorts = CanLimits.MaxGpOutPorts;
 
     /// <summary>
     /// Highest general-purpose input number a machine may have
     /// </summary>
-    /// <remarks>RepRapFirmware's <c>MaxGpInPorts</c></remarks>
-    public const int MaxGpInPorts = 32;
+    /// <remarks>CANlib's <c>MaxGpInPorts</c>, through the CAN message schema</remarks>
+    public const int MaxGpInPorts = CanLimits.MaxGpInPorts;
 
     /// <summary>
     /// The board that carries an output

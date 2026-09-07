@@ -31,8 +31,11 @@ public sealed class FanManager(Model.ObjectModel model, LinkInterface linkInterf
     /// <summary>
     /// Highest fan number a machine may have
     /// </summary>
-    /// <remarks>RepRapFirmware's <c>MaxFans</c> for a Duet 3 MB6HC</remarks>
-    public const int MaxFans = 20;
+    /// <remarks>
+    /// CANlib's <c>MaxFans</c>, through the CAN message schema. A fan number travels the bus inside a
+    /// bitmap, so what a board can be told about is what bounds this
+    /// </remarks>
+    public const int MaxFans = CanLimits.MaxFans;
 
     /// <summary>
     /// Find a fan by number

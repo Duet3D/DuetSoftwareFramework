@@ -88,7 +88,7 @@ internal partial class MCodeHandler
         string localPort;
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
-            if (!RemoteEndstops.TrySplitPort(port, "Spindle port", out board, out localPort, out string? error))
+            if (!IoPorts.TrySplitPort(port, "Spindle port", out board, out localPort, out string? error))
             {
                 return new Message(MessageType.Error, error);
             }

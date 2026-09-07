@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Ports;
 
 namespace DuetControlServer.Spindles;
@@ -30,8 +31,8 @@ public sealed class SpindleManager(Model.ObjectModel model, GpioManager gpioMana
     /// <summary>
     /// Highest spindle number a machine may have
     /// </summary>
-    /// <remarks>CANlib's <c>MaxSpindles</c>, which is the only thing it has to say about spindles</remarks>
-    public const int MaxSpindles = 4;
+    /// <remarks>CANlib's <c>MaxSpindles</c>, through the CAN message schema</remarks>
+    public const int MaxSpindles = CanLimits.MaxSpindles;
 
     /// <summary>
     /// The three outputs one spindle is driven through

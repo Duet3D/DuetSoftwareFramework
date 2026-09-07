@@ -427,6 +427,60 @@ internal sealed class ScriptedCanMaster : IDisposable
                     .Where(p => p.SbcRequest == request)
                     .ToArray();
 
+    /// <summary>Every CAN message of one type the machine has sent, oldest first</summary>
+    /// <typeparam name="T">The message, which names its own <c>CanMessageType</c></typeparam>
+    /// <returns>The messages, each with the CAN address of the board it was addressed to</returns>
+    /// <remarks>
+    /// What a code does to a device is the message it puts on the bus, not the value it writes to the
+    /// object model: the board is what drives the pin, so a code that updates the model and sends the
+    /// wrong message leaves a machine that reads correctly and behaves wrongly. Asserting on both is
+    /// what separates the two
+    /// </remarks>
+    public IReadOnlyList<(byte Board, T Message)> CanMessages<T>() where T : struct, ICanMessage<T>
+    {
+        List<(byte, T)> messages = [];
+        foreach (CapturedPacket packet in SbcPackets(SbcRequest.SendCANMessage))
+        {
+            (SendCanMessageHeader header, byte[] payload) = packet.DecodeCanMessage();
+            if (header.MsgType == (ushort)T.MessageType)
+            {
+                messages.Add((header.DstAddress, CanMessageSerializer.Deserialize<T>(payload)));
+            }
+        }
+        return messages;
+    }
+
+    /// <summary>The last CAN message of one type the machine sent, and the board it went to</summary>
+    /// <typeparam name="T">The message, which names its own <c>CanMessageType</c></typeparam>
+    /// <returns>The message and the CAN address it was addressed to</returns>
+    /// <exception cref="InvalidOperationException">No message of that type was sent</exception>
+    public (byte Board, T Message) LastCanMessage<T>() where T : struct, ICanMessage<T>
+    {
+        IReadOnlyList<(byte Board, T Message)> messages = CanMessages<T>();
+        return messages.Count > 0
+               ? messages[^1]
+               : throw new InvalidOperationException(
+                   $"No {typeof(T).Name} was sent\nCaptured exchanges:\n{DumpCapture()}");
+    }
+
+    /// <summary>Wait until a CAN message of one type (matching the given predicate) was sent</summary>
+    /// <typeparam name="T">The message, which names its own <c>CanMessageType</c></typeparam>
+    /// <param name="predicate">What the message has to say, or null for any of that type</param>
+    /// <param name="timeoutMs">How long to wait</param>
+    /// <returns>The message and the CAN address it was addressed to</returns>
+    public async Task<(byte Board, T Message)> WaitForCanMessageAsync<T>(Func<T, bool>? predicate = null,
+                                                                        int timeoutMs = 10_000)
+        where T : struct, ICanMessage<T>
+    {
+        (byte Board, T Message) found = default;
+        await WaitUntilAsync(
+            () => CanMessages<T>().Any(sent => predicate == null || predicate(sent.Message))
+                  && (found = CanMessages<T>().Last(sent => predicate == null || predicate(sent.Message))) is var _,
+            timeoutMs,
+            $"no {typeof(T).Name} was sent");
+        return found;
+    }
+
     /// <summary>Number of exchanges both sides completed successfully</summary>
     public int CompletedExchanges => Volatile.Read(ref _completedExchanges);
 

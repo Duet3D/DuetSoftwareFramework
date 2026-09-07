@@ -85,7 +85,7 @@ internal partial class MCodeHandler
                 return new Message(MessageType.Error, "Expansion boards do not support Z probe output ports");
             }
 
-            if (!RemoteEndstops.TrySplitPort(port, "Z probe port", out _, out _, out string? portError))
+            if (!IoPorts.TrySplitPort(port, "Z probe port", out _, out _, out string? portError))
             {
                 return new Message(MessageType.Error, portError);
             }
@@ -288,7 +288,7 @@ internal partial class MCodeHandler
     /// <returns>What the board said about it, empty if it accepted without comment</returns>
     private async ValueTask<Message> CreateProbeMonitorAsync(int probeNumber, string port, CancellationToken cancellationToken)
     {
-        if (!RemoteEndstops.TrySplitPort(port, "Z probe port", out byte board, out string localPort,
+        if (!IoPorts.TrySplitPort(port, "Z probe port", out byte board, out string localPort,
                                          out string? error))
         {
             return new Message(MessageType.Error, error);

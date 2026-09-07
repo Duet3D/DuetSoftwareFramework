@@ -56,50 +56,6 @@ internal static class RemoteEndstops
             : endstop.Port.Split(PortSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     /// <summary>
-    /// Split a port name into the board that carries it and the port on that board
-    /// </summary>
-    /// <param name="port">Port name, such as "1.io1.in"</param>
-    /// <param name="description">What is being addressed, for the message - "Endstop port", say</param>
-    /// <param name="board">Receives the CAN address</param>
-    /// <param name="localPort">Receives the port name as that board knows it</param>
-    /// <param name="error">Receives why the port cannot be used, or null if it can</param>
-    /// <returns>True if the name is a port this architecture can watch</returns>
-    /// <remarks>
-    /// <para>
-    /// The name is read by <see cref="IoPorts.RemoveBoardAddress"/>, which is the one place that
-    /// knows the grammar. What this adds is the policy: a port on board 0 cannot be used, because
-    /// that board runs DuetCANMaster and has no ports of its own, and a name with no address means
-    /// board 0 as it does in RepRapFirmware.
-    /// </para>
-    /// <para>
-    /// The policy is applied here rather than by the caller because a caller that has to remember a
-    /// second check is a caller that will one day forget it. The reason comes back with the refusal
-    /// for the same reason: a caller composing its own message would have to know which refusal it
-    /// was looking at, and "invalid port" for a port that is merely on the wrong board sends the
-    /// operator looking for a typo that is not there
-    /// </para>
-    /// </remarks>
-    public static bool TrySplitPort(string port, string description, out byte board, out string localPort,
-                                    [NotNullWhen(false)] out string? error)
-    {
-        board = IoPorts.RemoveBoardAddress(port, out localPort);
-        error = null;
-
-        if (CanAddresses.HasNoHardware(board))
-        {
-            error = CanAddresses.NoHardwareMessage($"{description} '{port}'");
-            return false;
-        }
-
-        if (localPort.Length == 0)
-        {
-            error = $"{description} '{port}' names a board but no pin on it";
-            return false;
-        }
-        return true;
-    }
-
-    /// <summary>
     /// The input handle a board reports its stalled drivers under
     /// </summary>
     /// <remarks>
@@ -155,7 +111,7 @@ internal static class RemoteEndstops
         Span<byte> boards = stackalloc byte[ports.Length];
         for (int i = 0; i < ports.Length; i++)
         {
-            if (!TrySplitPort(ports[i], "Endstop port", out boards[i], out _, out _))
+            if (!IoPorts.TrySplitPort(ports[i], "Endstop port", out boards[i], out _, out _))
             {
                 return false;
             }

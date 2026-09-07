@@ -8,6 +8,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Heat;
+using DuetControlServer.Link.Protocol.CanMessages;
+using DuetControlServer.Link.Protocol.Shared;
+using DuetControlServer.Motion.Native;
+using DuetControlServer.Tools;
 using DuetControlServer.Utility;
 using DuetSharedLibrary;
 using Microsoft.Extensions.Hosting;
@@ -79,6 +84,57 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
         SBC.Serial = GetSbcSerial();
         Network.Hostname = Environment.MachineName;
         Network.Name = Environment.MachineName;
+        SetLimits();
+    }
+
+    /// <summary>
+    /// Publish the limits the machine is built to, so a client sizing itself against them and the
+    /// codes enforcing them read the same numbers
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The values are constants rather than anything discovered at run time, which is why they are
+    /// set here and never again. Each comes from whatever owns it: a limit shared with the expansion
+    /// boards from the CAN message schema, because a bitmap on the bus is what bounds it and both
+    /// sides have to agree on the width; the rest from the subsystem that enforces them, or from
+    /// <see cref="MachineLimits"/> where nothing enforces one yet.
+    /// </para>
+    /// <para>
+    /// <c>drivers</c> and <c>volumes</c> stay null, which the object model reads as unknown rather
+    /// than as unlimited. Neither has a figure this side can state: every driver is on an expansion
+    /// board, so what bounds the total is how many boards are attached, and the volumes are whatever
+    /// the SBC has mounted when it is asked. RepRapFirmware takes both from main board hardware that
+    /// this architecture does not have
+    /// </para>
+    /// </remarks>
+    private void SetLimits()
+    {
+        Limits.Axes = MotionLimits.MaxAxes;
+        Limits.AxesPlusExtruders = MotionLimits.MaxAxesPlusExtruders;
+        Limits.BedHeaters = HeatManager.MaxBedHeaters;
+        Limits.Boards = CanId.MaxCanAddress + 1;
+        Limits.ChamberHeaters = HeatManager.MaxChamberHeaters;
+        Limits.DriversPerAxis = MotionLimits.MaxDriversPerAxis;
+        Limits.Extruders = MotionLimits.MaxExtruders;
+        Limits.ExtrudersPerTool = ToolManager.MaxExtrudersPerTool;
+        Limits.Fans = CanLimits.MaxFans;
+        Limits.GpInPorts = CanLimits.MaxGpInPorts;
+        Limits.GpOutPorts = CanLimits.MaxGpOutPorts;
+        Limits.Heaters = CanLimits.MaxHeaters;
+        Limits.HeatersPerTool = HeatManager.MaxHeatersPerTool;
+        Limits.LedStrips = CanLimits.MaxLedStrips;
+        Limits.MonitorsPerHeater = CanLimits.MaxMonitorsPerHeater;
+        Limits.PortsPerHeater = HeatManager.MaxPortsPerHeater;
+        Limits.ReportedAxes = MachineLimits.MaxReportedAxes;
+        Limits.RestorePoints = Motion.RestorePoint.NumVisible;
+        Limits.Sensors = CanLimits.MaxSensors;
+        Limits.Spindles = CanLimits.MaxSpindles;
+        Limits.Tools = ToolManager.MaxTools;
+        Limits.TrackedObjects = MachineLimits.MaxTrackedObjects;
+        Limits.Triggers = MachineLimits.MaxTriggers;
+        Limits.Workplaces = MachineLimits.NumWorkplaces;
+        Limits.ZProbeProgramBytes = CanLimits.MaxZProbeProgramBytes;
+        Limits.ZProbes = CanLimits.MaxZProbes;
     }
 
     /// <summary>

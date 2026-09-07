@@ -122,7 +122,16 @@ internal sealed class JobSequences(
     public async Task<SequenceOutcome> StartAsync(JobState state, CancellationToken cancellationToken)
     {
         jobMonitor.Start();
-        await macroRunner.TryRunAsync(CodeChannel.File, "start.g", cancellationToken: cancellationToken);
+
+        // RepRapFirmware's StartPrinting(fromStart): a fresh print runs start.g, but a restart from
+        // a file offset - M26 set a position, which is what resurrect.g does - does not, because
+        // resurrect.g has already done the machine's setup. It only reinstates the restart state.
+        // fromStart is whether M26 set a position, as GCodes2.cpp's M24 tests fileOffsetToPrint
+        bool fromStart = (state.Stream(0)?.Reader.Position ?? 0) == 0;
+        if (fromStart)
+        {
+            await macroRunner.TryRunAsync(CodeChannel.File, "start.g", cancellationToken: cancellationToken);
+        }
         await ApplyRestartStateAsync(state, cancellationToken);
         logger.LogInformation("Starting file print");
         return new SequenceOutcome(new Message(), Failed: false);

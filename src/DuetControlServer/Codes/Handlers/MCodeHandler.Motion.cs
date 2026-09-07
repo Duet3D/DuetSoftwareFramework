@@ -2254,7 +2254,7 @@ internal partial class MCodeHandler
         {
             // The switches of an axis need not share a board: a move carries the address of each one
             // separately, as RepRapFirmware's SwitchEndstop keeps a board number per port
-            if (!RemoteEndstops.TrySplitPort(switchPort, "Endstop port", out _, out _, out string? error))
+            if (!IoPorts.TrySplitPort(switchPort, "Endstop port", out _, out _, out string? error))
             {
                 return error;
             }
@@ -2295,7 +2295,7 @@ internal partial class MCodeHandler
         // driver's moves will name
         for (int switchIndex = 0; switchIndex < ports.Length; switchIndex++)
         {
-            if (!RemoteEndstops.TrySplitPort(ports[switchIndex], "Endstop port", out byte board,
+            if (!IoPorts.TrySplitPort(ports[switchIndex], "Endstop port", out byte board,
                                              out string localPort, out string? error))
             {
                 return new Message(MessageType.Error, error);

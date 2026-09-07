@@ -49,7 +49,7 @@ internal partial class MCodeHandler
             AnalogSensor? sensor = sensorNumber < model.Sensors.Analog.Count ? model.Sensors.Analog[sensorNumber] : null;
             if (port is not null)
             {
-                if (!RemoteEndstops.TrySplitPort(port, "Sensor port", out board, out _, out string? error))
+                if (!IoPorts.TrySplitPort(port, "Sensor port", out board, out _, out string? error))
                 {
                     return new Message(MessageType.Error, error);
                 }
@@ -66,7 +66,7 @@ internal partial class MCodeHandler
             {
                 return new Message(MessageType.Error, $"Sensor {sensorNumber} has no port; use P to give it one");
             }
-            else if (!RemoteEndstops.TrySplitPort(sensor.Port, "Sensor port", out board, out _, out string? error))
+            else if (!IoPorts.TrySplitPort(sensor.Port, "Sensor port", out board, out _, out string? error))
             {
                 return new Message(MessageType.Error, error);
             }
@@ -188,7 +188,7 @@ internal partial class MCodeHandler
         byte board;
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
-            if (!RemoteEndstops.TrySplitPort(port, "Heater port", out board, out _, out string? error))
+            if (!IoPorts.TrySplitPort(port, "Heater port", out board, out _, out string? error))
             {
                 return new Message(MessageType.Error, error);
             }
