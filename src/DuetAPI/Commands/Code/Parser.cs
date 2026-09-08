@@ -942,8 +942,6 @@ public partial class Code
             {
                 case 569:
                 case 915:
-                case 955:
-                case 956:
                     foreach (CodeParameter parameter in Parameters)
                     {
                         if (!parameter.IsExpression && char.ToUpperInvariant(parameter.Letter) == 'P')
