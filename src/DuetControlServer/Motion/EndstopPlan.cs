@@ -14,7 +14,13 @@ namespace DuetControlServer.Motion;
 /// Speed it will turn at. A stall is detected by comparing the back-EMF against what the commanded
 /// speed implies, so the driver cannot detect one until it has been told this
 /// </param>
-internal readonly record struct WatchedDriver(DuetAPI.Utility.DriverId Driver, float StepsPerSecond);
+/// <param name="UseEncoder">
+/// Whether the board should watch the driver's encoder position error rather than its StallGuard,
+/// which is what M574 S5 asks for. It travels per driver because it is the endstop that chose the
+/// mechanism and one move may watch drivers belonging to more than one endstop
+/// </param>
+internal readonly record struct WatchedDriver(DuetAPI.Utility.DriverId Driver, float StepsPerSecond,
+                                              bool UseEncoder = false);
 
 /// <summary>
 /// What one axis of a move watches, worked out once and read by both halves of arming it
@@ -156,8 +162,9 @@ internal static class EndstopPlanner
     private static IReadOnlyList<WatchedDriver> WatchedDrivers(Move move, KinematicsEngine geometry, int numAxes,
                                                                int axis, EndstopType kind,
                                                                IReadOnlyList<float> stepsPerMm, float feedRateMmPerSec)
-        => kind is EndstopType.MotorStallAny or EndstopType.MotorStallIndividual
-            ? DriversMoving(move, geometry, numAxes, axis, stepsPerMm, feedRateMmPerSec)
+        => kind is EndstopType.MotorStallAny or EndstopType.MotorStallIndividual or EndstopType.MotorStallEncoder
+            ? DriversMoving(move, geometry, numAxes, axis, stepsPerMm, feedRateMmPerSec,
+                            useEncoder: kind == EndstopType.MotorStallEncoder)
             : [];
 
     /// <summary>
@@ -169,6 +176,7 @@ internal static class EndstopPlanner
     /// <param name="axis">The axis</param>
     /// <param name="stepsPerMm">Microsteps per mm, by logical drive</param>
     /// <param name="feedRateMmPerSec">How fast the move will run</param>
+    /// <param name="useEncoder">Whether the stall is to be detected from the encoder position error</param>
     /// <returns>The drivers</returns>
     /// <remarks>
     /// Which drivers to watch is the geometry's answer, not the axis': stopping on a CoreXY's X stall
@@ -180,7 +188,7 @@ internal static class EndstopPlanner
     /// </remarks>
     public static IReadOnlyList<WatchedDriver> DriversMoving(Move move, KinematicsEngine geometry, int numAxes,
                                                              int axis, IReadOnlyList<float> stepsPerMm,
-                                                             float feedRateMmPerSec)
+                                                             float feedRateMmPerSec, bool useEncoder = false)
     {
         List<WatchedDriver> drivers = [];
         uint drives = geometry.GetControllingDrives(axis);
@@ -195,7 +203,7 @@ internal static class EndstopPlanner
             float stepsPerSecond = MathF.Abs(feedRateMmPerSec * stepsPerMm[drive]);
             foreach (DuetAPI.Utility.DriverId driver in move.Axes[drive].Drivers)
             {
-                drivers.Add(new WatchedDriver(driver, stepsPerSecond));
+                drivers.Add(new WatchedDriver(driver, stepsPerSecond, useEncoder));
             }
         }
         return drivers;

@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel;
 /// <summary>
 /// Information about an extruder drive
 /// </summary>
-public partial class Extruder : ModelObject, IStaticModelObject
+public partial class Extruder : ModelObject, IStaticModelObject, IPhaseSteppingDrive
 {
     // What an extruder may do before anything has configured it, as RepRapFirmware's Move::Init sets
     // it. Its constants are in mm/sec; speed and jerk are carried here in mm/min, so those are
@@ -143,6 +143,36 @@ public partial class Extruder : ModelObject, IStaticModelObject
         set => SetPropertyValue(ref _phaseStep, value);
     }
     private bool? _phaseStep;
+
+    /// <summary>
+    /// Velocity feedforward gain of the phase stepping control loop (M970.1 Kv)
+    /// </summary>
+    /// <remarks>
+    /// The expansion board applies the gain, so nothing on this side would otherwise remember what it
+    /// was asked for and a bare M970.1 could not report it. A DSF addition, per
+    /// rrf-differences.md section 3
+    /// </remarks>
+    public float PhaseStepKv
+    {
+        get => _phaseStepKv;
+        set => SetPropertyValue(ref _phaseStepKv, value);
+    }
+    private float _phaseStepKv;
+
+    /// <summary>
+    /// Acceleration feedforward gain of the phase stepping control loop (M970.2 Ka)
+    /// </summary>
+    /// <remarks>
+    /// The expansion board applies the gain, so nothing on this side would otherwise remember what it
+    /// was asked for and a bare M970.2 could not report it. A DSF addition, per
+    /// rrf-differences.md section 3
+    /// </remarks>
+    public float PhaseStepKa
+    {
+        get => _phaseStepKa;
+        set => SetPropertyValue(ref _phaseStepKa, value);
+    }
+    private float _phaseStepKa;
 
     /// <summary>
     /// Extruder position (in mm)

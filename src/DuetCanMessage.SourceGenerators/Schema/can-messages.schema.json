@@ -732,6 +732,11 @@
           "type": "string",
           "description": "Verbatim C++ declaration, for the few signatures the neutral language cannot express."
         },
+        "cppBody": {
+          "type": "array",
+          "description": "Verbatim C++ body for a method declared with cppSignature, one entry per line and without the enclosing braces. Without it such a method is a declaration only.",
+          "items": { "type": "string" }
+        },
         "emit": { "$ref": "#/$defs/emit" },
         "doc": { "$ref": "#/$defs/docText" }
       }

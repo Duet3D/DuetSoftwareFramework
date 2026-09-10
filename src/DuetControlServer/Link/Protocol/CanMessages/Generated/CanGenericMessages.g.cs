@@ -500,10 +500,17 @@ public struct CanMessageM569Point1 : ICanGenericMessage<CanMessageM569Point1>
         readonly get => CanGenericParser.GetString(Generic, ParamTable, 'Y');
         set => CanGenericWriter.SetString(ref Generic, ParamTable, 'Y', value);
     }
+
+    /// <summary>The 'B' parameter, or null if the message does not carry it: standstill position deadband, added in 3.7.0</summary>
+    public float? B
+    {
+        readonly get => CanGenericParser.GetFloat(Generic, ParamTable, 'B');
+        set => CanGenericWriter.SetFloat(ref Generic, ParamTable, 'B', value);
+    }
 }
 
 /// <summary>
-/// Read or write stepper driver register
+/// Read or write stepper driver register, or configure the sine table waveform correction
 ///
 /// Sent as <see cref="CanMessageType.M569P2" />.
 /// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
@@ -560,6 +567,163 @@ public struct CanMessageM569Point2 : ICanGenericMessage<CanMessageM569Point2>
     {
         readonly get => CanGenericParser.GetUInt(Generic, ParamTable, 'V');
         set => CanGenericWriter.SetUInt(ref Generic, ParamTable, 'V', value);
+    }
+
+    /// <summary>The 'S' parameter, or null if the message does not carry it: waveform correction harmonic, added in 3.7</summary>
+    public byte? S
+    {
+        readonly get => (byte?)CanGenericParser.GetUInt(Generic, ParamTable, 'S');
+        set => CanGenericWriter.SetUInt(ref Generic, ParamTable, 'S', value);
+    }
+
+    /// <summary>The 'J' parameter, or null if the message does not carry it: waveform correction magnitude in degrees, added in 3.7</summary>
+    public float? J
+    {
+        readonly get => CanGenericParser.GetFloat(Generic, ParamTable, 'J');
+        set => CanGenericWriter.SetFloat(ref Generic, ParamTable, 'J', value);
+    }
+
+    /// <summary>The 'O' parameter, or null if the message does not carry it: waveform correction phase in degrees, added in 3.7</summary>
+    public float? O
+    {
+        readonly get => CanGenericParser.GetFloat(Generic, ParamTable, 'O');
+        set => CanGenericWriter.SetFloat(ref Generic, ParamTable, 'O', value);
+    }
+}
+
+/// <summary>
+/// Set stepper driver step mode and phase stepping parameters
+///
+/// Sent as <see cref="CanMessageType.M970" />.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M970Params" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are.
+///
+/// Every parameter is optional, so each is a nullable property: it reads back null when the message
+/// is not carrying that parameter, and assigning null takes it back out. They may be set in any
+/// order, and taken from a G-code command with <see cref="FromCode" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM970 : ICanGenericMessage<CanMessageM970>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.M970;
+
+    /// <inheritdoc cref="ICanGenericMessage{TSelf}.ParamTable" />
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M970Params;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength() => CanGenericLayout.ActualDataLength(Generic.Data, Generic.ParamMap, ParamTable);
+
+    /// <inheritdoc cref="ICanGenericMessage{TSelf}.FromCode" />
+    public void FromCode(Code code) => CanGenericWriter.FromCode(ref Generic, ParamTable, code);
+
+    /// <inheritdoc cref="ICanGenericMessage{TSelf}.Clear" />
+    public void Clear() => Generic = default;
+
+    /// <summary>The 'P' parameter, or null if the message does not carry it.</summary>
+    public byte? P
+    {
+        readonly get => (byte?)CanGenericParser.GetUInt(Generic, ParamTable, 'P');
+        set => CanGenericWriter.SetDriverId(ref Generic, ParamTable, 'P', value);
+    }
+
+    /// <summary>The 'S' parameter, or null if the message does not carry it: step mode: 0 = step and direction, 1 = phase stepping</summary>
+    public byte? S
+    {
+        readonly get => (byte?)CanGenericParser.GetUInt(Generic, ParamTable, 'S');
+        set => CanGenericWriter.SetUInt(ref Generic, ParamTable, 'S', value);
+    }
+
+    /// <summary>The 'V' parameter, or null if the message does not carry it: velocity feedforward Kv</summary>
+    public float? V
+    {
+        readonly get => CanGenericParser.GetFloat(Generic, ParamTable, 'V');
+        set => CanGenericWriter.SetFloat(ref Generic, ParamTable, 'V', value);
+    }
+
+    /// <summary>The 'A' parameter, or null if the message does not carry it: acceleration feedforward Ka</summary>
+    public float? A
+    {
+        readonly get => CanGenericParser.GetFloat(Generic, ParamTable, 'A');
+        set => CanGenericWriter.SetFloat(ref Generic, ParamTable, 'A', value);
+    }
+}
+
+/// <summary>
+/// Configure the phase correction of a phase stepped driver
+///
+/// Sent as <see cref="CanMessageType.M970P3" />.
+/// Carries a <see cref="CanMessageGeneric" /> body: the parameters of
+/// <see cref="CanGenericTables.M970Point3Params" /> that are being sent, packed in table order, plus a
+/// bitmap saying which those are.
+///
+/// Every parameter is optional, so each is a nullable property: it reads back null when the message
+/// is not carrying that parameter, and assigning null takes it back out. They may be set in any
+/// order, and taken from a G-code command with <see cref="FromCode" />.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Pack = 1, Size = 64)]
+public struct CanMessageM970Point3 : ICanGenericMessage<CanMessageM970Point3>
+{
+    /// <summary>The generic message body, in the format the expansion board reads</summary>
+    [FieldOffset(0)] public CanMessageGeneric Generic;
+
+    /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
+    public static CanMessageType MessageType => CanMessageType.M970P3;
+
+    /// <inheritdoc cref="ICanGenericMessage{TSelf}.ParamTable" />
+    public static ImmutableArray<CanParamDescriptor> ParamTable => CanGenericTables.M970Point3Params;
+
+    /// <summary>
+    /// Number of payload bytes this message occupies: the parameters actually present, plus the
+    /// request ID and parameter map.
+    ///
+    /// The parameter map and the table are enough to work this out, because each present parameter's
+    /// size follows from its table entry and, for the variable-length ones, from the data itself.
+    /// </summary>
+    public readonly uint GetActualDataLength() => CanGenericLayout.ActualDataLength(Generic.Data, Generic.ParamMap, ParamTable);
+
+    /// <inheritdoc cref="ICanGenericMessage{TSelf}.FromCode" />
+    public void FromCode(Code code) => CanGenericWriter.FromCode(ref Generic, ParamTable, code);
+
+    /// <inheritdoc cref="ICanGenericMessage{TSelf}.Clear" />
+    public void Clear() => Generic = default;
+
+    /// <summary>The 'P' parameter, or null if the message does not carry it.</summary>
+    public byte? P
+    {
+        readonly get => (byte?)CanGenericParser.GetUInt(Generic, ParamTable, 'P');
+        set => CanGenericWriter.SetDriverId(ref Generic, ParamTable, 'P', value);
+    }
+
+    /// <summary>The 'S' parameter, or null if the message does not carry it: harmonic of the electrical cycle</summary>
+    public byte? S
+    {
+        readonly get => (byte?)CanGenericParser.GetUInt(Generic, ParamTable, 'S');
+        set => CanGenericWriter.SetUInt(ref Generic, ParamTable, 'S', value);
+    }
+
+    /// <summary>The 'J' parameter, or null if the message does not carry it: correction magnitude in degrees</summary>
+    public float? J
+    {
+        readonly get => CanGenericParser.GetFloat(Generic, ParamTable, 'J');
+        set => CanGenericWriter.SetFloat(ref Generic, ParamTable, 'J', value);
+    }
+
+    /// <summary>The 'O' parameter, or null if the message does not carry it: correction phase in degrees</summary>
+    public float? O
+    {
+        readonly get => CanGenericParser.GetFloat(Generic, ParamTable, 'O');
+        set => CanGenericWriter.SetFloat(ref Generic, ParamTable, 'O', value);
     }
 }
 
@@ -1353,6 +1517,20 @@ public struct CanMessageM955 : ICanGenericMessage<CanMessageM955>
     {
         readonly get => (ushort?)CanGenericParser.GetUInt(Generic, ParamTable, 'S');
         set => CanGenericWriter.SetUInt(ref Generic, ParamTable, 'S', value);
+    }
+
+    /// <summary>The 'Q' parameter, or null if the message does not carry it: SPI clock frequency</summary>
+    public uint? Q
+    {
+        readonly get => CanGenericParser.GetUInt(Generic, ParamTable, 'Q');
+        set => CanGenericWriter.SetUInt(ref Generic, ParamTable, 'Q', value);
+    }
+
+    /// <summary>The 'C' parameter, or null if the message does not carry it: pins to use when the accelerometer is connected via SPI</summary>
+    public string? C
+    {
+        readonly get => CanGenericParser.GetString(Generic, ParamTable, 'C');
+        set => CanGenericWriter.SetString(ref Generic, ParamTable, 'C', value);
     }
 }
 

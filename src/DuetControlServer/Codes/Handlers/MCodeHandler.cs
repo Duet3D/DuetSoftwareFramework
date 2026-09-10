@@ -378,7 +378,9 @@ internal partial class MCodeHandler(
         // Raise an event
         { 957, CodeClass.Immediate, (h, c, ct) => new ValueTask<Message>(h.HandleRaiseEvent(c)) },
         // Configure phase stepping
-        { 970, CodeClass.Immediate, (h, c, ct) => h.HandlePhaseSteppingAsync(c, ct) },
+        // A change of step mode or of a feedforward gain reaches a motor that may be moving, so it
+        // waits for standstill as RepRapFirmware's LockAllMovementSystemsAndWaitForStandstill does
+        { [970, (970, 1), (970, 2), (970, 3)], FlushAndStandstillWhenSettingDrives, (h, c, ct) => h.HandlePhaseSteppingAsync(c, ct) },
         // Update the firmware: everything is locked while it runs
         { 997, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleFirmwareUpdateAsync(c, ct) }, // TODO sometimes flushes
         // Reset the controller; M999 B resets a board, which must not happen with moves in its queue

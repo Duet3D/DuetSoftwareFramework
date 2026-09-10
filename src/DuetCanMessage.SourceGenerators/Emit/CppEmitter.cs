@@ -254,7 +254,27 @@ public sealed class CppEmitter(CanSchema schema)
             _writer.Doc(m.Doc, "// ");
             if (m.CppSignature is not null)
             {
-                _writer.Line(m.CppSignature + ";");
+                if (m.CppBody.Count == 0)
+                {
+                    _writer.Line(m.CppSignature + ";");
+                }
+                else if (m.CppBody.Count == 1)
+                {
+                    _writer.Line($"{m.CppSignature} {{ {m.CppBody[0]} }}");
+                }
+                else
+                {
+                    using (_writer.Block(m.CppSignature, "}"))
+                    {
+                        _writer.Outdent();
+                        _writer.Line("{");
+                        _writer.Indent();
+                        foreach (string line in m.CppBody)
+                        {
+                            _writer.Line(line);
+                        }
+                    }
+                }
                 continue;
             }
 

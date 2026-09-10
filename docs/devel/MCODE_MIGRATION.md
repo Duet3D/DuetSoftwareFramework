@@ -308,7 +308,7 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M205 / M566 | 3782 | Jerk (mm/s and mm/min forms), jerk policy | `move.axes[].jerk` / `.printingJerk`, `move.jerkPolicy` | yes | ✅ |
 | M208 | 2701 | Axis minima/maxima | `move.axes[].min` / `.max` | no | ✅ |
 | M220 | 2705 | Speed factor override | `move.speedFactor` | no | ✅ |
-| M221 | 2734 | Extrusion factor override | `move.extruders[].factor` | no | ✅ |
+| M221 | 2734 | Extrusion factor override | `move.extruders[].factor` | no | 🟡 the `F1` fast change is not ported, see §5.1 |
 | M350 | 2996 | Microstepping | `move.axes[].microstepping` → CAN `MultipleDrivesRequestStepsPerUnitAndMicrostepping` | yes | ✅ |
 | M400 | 3120 | Wait for moves to finish | — (flush and drain) | n/a | ✅ |
 | M569 | 3878 | Driver configuration (direction, mode, timings) | `boards[].drivers[]` → CAN generic `M569Params` (+ `.1`/`.2`/`.4`/`.6`/`.7`) | yes | ✅ |
@@ -317,7 +317,8 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M913 | 4378 | Motor current percentage | `move.axes[].percentCurrent` | no | ✅ |
 | M915 | 4539 | Stall detection | `boards[].drivers[]` → CAN generic `M915Params`, `CanMessageEnableStallEndstop` | no | ✅ |
 | M917 | 4380 | Standstill current percentage | `move.axes[].percentStstCurrent` → CAN `MultipleDrivesRequestStandstillCurrentFactor` | no | ✅ |
-| M970 | 4639 | Phase stepping mode | — | n/a | ✅ reports unsupported, see §8 |
+| M970 | 4639 | Phase stepping mode | `move.axes[].phaseStep`, `.phaseStepKv`, `.phaseStepKa` → CAN generic `M970Params` | yes | ✅ |
+| M970.3 | 4639 | Phase correction of one driver | — → CAN generic `M970Point3Params` | yes | ✅ |
 
 ### 5.2 Motion — kinematics and geometry
 
@@ -349,7 +350,7 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 | M557 | 3686 | Probe grid definition | `move.compensation.probeGrid` | no | ✅ |
 | M558 | 3690 | Z probe type/configuration | `sensors.probes[]` | no | ✅ `.1` and `.2` are refused — see §10 |
 | M561 | 3730 | Identity transform, disable height map | `move.compensation.type` | no | ✅ |
-| M574 | 3897 | Endstop configuration | `sensors.endstops[]` | no | ✅ |
+| M574 | 3897 | Endstop configuration | `sensors.endstops[]` → CAN `CanMessageEnableStallEndstop` | no | ✅ inc. `S5`, `K` |
 | M577 | 3919 | Wait for endstop trigger | `sensors.endstops[]` | no | ✅ |
 | M585 | 3960 | Probe tool | `sensors.probes[]`, tools | yes | ⬜ blocked: needs G30 P |
 | M672 | 4164 | Program Z probe | CAN to the probe's board | no | ⬜ blocked |
@@ -672,12 +673,28 @@ M906's `I` and `T` set `move.idle`, but nothing acts on idle current yet; that n
 
 ### Phase 2 (M17, M18/M84, M85, M569, M572, M592, M593, M913, M915, M917, M970)
 
-**M970 can never work here and now says so.** RepRapFirmware refuses phase stepping for any axis
-with a remote driver (`Move::SetStepMode` returns false the moment it sees one), because the mode
-drives the motor coils directly from the main board. Every driver is remote in this architecture, so
-the code reports that phase stepping is not supported on CAN-connected drivers rather than pretending
-to configure it. The mapping this document previously gave for it was wrong twice over: `M959Params`
-is the expansion board *connection timeout*, not phase stepping.
+**M221's fast extrusion factor change is not ported.** RepRapFirmware `3.7-dev` added `M221 F1`,
+which applies a new factor to the moves already in the ring rather than only to the ones built after
+it: `DDARing::ChangeExtrusionFactor` walks the uncommitted moves calling `DDA::AdjustExtrusion`,
+scaling each one's extruder direction vector and clamping the change to the extruder's instantaneous
+speed change. Everything else about M221 matches, the current tool's extruders and both report forms
+included. Porting the fast change means `AdjustExtrusion` and `ChangeExtrusionFactor` in
+`src/DuetSbcInterface/src/Motion`, a `DuetSbc_Motion*` entry point to reach them from a code handler,
+and a decision about which channels it applies to: RepRapFirmware passes `gb.IsFileChannel()` as the
+`immediate` argument, which makes a change from a job file rewrite the queued moves and one typed
+into DWC not, and the commit that added it (`e707b11e9`) is titled the other way round.
+
+**M970 is the board's to apply and this side's to map and record.** RepRapFirmware used to refuse
+phase stepping for any axis with a remote driver, because the mode drives the motor coils directly
+from the board that owns them. `3.7-dev` added it over CAN (`SetRemoteDriverStepMode` and
+`SetRemotePhaseStepParam`, both one `M970Params` message with a different parameter), so the code now
+sends the mode or the gain to each driver of every drive the axis letters and `E` name. `M970.3` is
+per driver rather than per axis, so `P` names one directly and it is repackaged the way `M569` is.
+
+`move.axes[].phaseStep` is RepRapFirmware's own field. `phaseStepKv` and `phaseStepKa` are not:
+RepRapFirmware keeps the gains in its `DriveMovement` and reports a bare `M970.1` from there, and
+nothing on this side would otherwise remember what a board was asked for, so they are held per
+rrf-differences.md section 3.
 
 **M569 is repackaged rather than reimplemented.** Every parameter of it belongs to the driver, so the
 code is turned straight into the CAN message its parameter table describes — the generated

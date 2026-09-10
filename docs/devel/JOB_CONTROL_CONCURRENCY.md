@@ -10,6 +10,12 @@ replacement: a job actor written new in place of `JobProcessor`, with one owner 
 state, one message to the file reader, one rule for the resume point, and the flags that cover
 ordering windows deleted along with the windows.
 
+The stop itself, the deceleration that lets a pause land sooner than the movement queue would drain,
+is compared against RepRapFirmware's own fast pause in
+[FAST_PAUSE_VS_RRF.md](FAST_PAUSE_VS_RRF.md). The two were written separately against the same
+problem and the algorithms differ; that document says where, so a change to either can be judged
+against the other.
+
 The code under discussion is [JobProcessor.cs](../../src/DuetControlServer/Files/JobProcessor.cs),
 [JobProcessor.Lifecycle.cs](../../src/DuetControlServer/Files/JobProcessor.Lifecycle.cs),
 [MovePlanner.cs](../../src/DuetControlServer/Motion/MovePlanner.cs) (`StopEarlyAsync`,

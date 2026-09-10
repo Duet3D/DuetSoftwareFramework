@@ -44,7 +44,8 @@ public class CanMessages
         {
             RequestId = 0xABC,
             ResultCode = CodeResult.ErrorNotSupported,
-            FragmentNumber = 0x42,
+            FragmentNumber = 0x12,
+            NumWords = 3,
             MoreFollows = true,
             Extra = 0x9A
         };
@@ -52,15 +53,39 @@ public class CanMessages
         // Property round-trips
         Assert.That(reply.RequestId, Is.EqualTo(0xABC));
         Assert.That(reply.ResultCode, Is.EqualTo(CodeResult.ErrorNotSupported));
-        Assert.That(reply.FragmentNumber, Is.EqualTo(0x42));
+        Assert.That(reply.FragmentNumber, Is.EqualTo(0x12));
+        Assert.That(reply.NumWords, Is.EqualTo(3));
         Assert.That(reply.MoreFollows, Is.True);
         Assert.That(reply.Extra, Is.EqualTo(0x9A));
 
-        // Bit layout: requestId:12, resultCode:4, fragmentNumber:7, moreFollows:1, extra:8
+        // Bit layout: requestId:12, resultCode:4, fragmentNumber:5, numWords:2, moreFollows:1, extra:8
         Span<byte> bytes = stackalloc byte[Unsafe.SizeOf<CanMessageStandardReply>()];
         MemoryMarshal.Write(bytes, in reply);
-        uint expected = 0xABCu | ((uint)CodeResult.ErrorNotSupported << 12) | (0x42u << 16) | (1u << 23) | (0x9Au << 24);
+        uint expected = 0xABCu | ((uint)CodeResult.ErrorNotSupported << 12) | (0x12u << 16) | (3u << 21)
+                        | (1u << 23) | (0x9Au << 24);
         Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(bytes), Is.EqualTo(expected));
+    }
+
+    /// <summary>
+    /// The data words a reply carries ahead of its text move where the text starts, which is what
+    /// GetActualDataLength(0) reports and how a reader finds the text at all
+    /// </summary>
+    /// <remarks>
+    /// CANlib's CanMessageStandardReply, which gained up to three 32-bit words at 3.7. A reader that
+    /// assumed the old fixed four-byte header would take the words for text
+    /// </remarks>
+    [Test]
+    public void StandardReplyDataWordsMoveTheText()
+    {
+        CanMessageStandardReply reply = new();
+        Assert.That(reply.GetActualDataLength(0), Is.EqualTo(4), "no data words leaves the bare header");
+        Assert.That(reply.GetMaxTextLength(), Is.EqualTo(60), "and the whole field for text");
+
+        reply.NumWords = 2;
+        Assert.That(reply.GetActualDataLength(0), Is.EqualTo(4 + (2 * 4)),
+                    "two data words push the text eight bytes further in");
+        Assert.That(reply.GetMaxTextLength(), Is.EqualTo(60 - (2 * 4)),
+                    "and take that much room from it");
     }
 
     [Test]

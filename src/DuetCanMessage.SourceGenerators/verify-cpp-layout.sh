@@ -28,7 +28,11 @@ trap 'rm -rf "$WORK"' EXIT
 
 CXX="${CXX:-g++}"
 INCLUDES=(-I "$ROOT/lib/CANlib/src" -I "$ROOT/lib/RRFLibraries/src" -I "$ROOT/lib/CoreN2G/src")
-FLAGS=(-std=c++17 -w)
+# CoreN2G's McuType.h picks the processor from the part number the ARM build defines and stops with
+# "unsupported processor" when none is. Nothing about a message layout depends on which it is - CANlib's
+# headers name an MCU only in a comment and in the two CanUserAreaData flash offsets, both computed for
+# every part - so the probe names one to get itself compiled.
+FLAGS=(-std=c++17 -w -D__SAME54P20A__)
 
 # CANlib targets ARM, where float16_t is __fp16. Which spelling of a 16-bit float the host compiler
 # accepts depends on the host: an AArch64 g++ has __fp16 as a keyword and (before g++ 13) rejects

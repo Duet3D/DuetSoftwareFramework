@@ -90,6 +90,10 @@ public class CanGenericTableLayout
         Assert.That(Marshal.OffsetOf<CanMessageM569Point1>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM569Point1.Generic");
         Assert.That(Unsafe.SizeOf<CanMessageM569Point2>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM569Point2");
         Assert.That(Marshal.OffsetOf<CanMessageM569Point2>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM569Point2.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageM970>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM970");
+        Assert.That(Marshal.OffsetOf<CanMessageM970>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM970.Generic");
+        Assert.That(Unsafe.SizeOf<CanMessageM970Point3>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM970Point3");
+        Assert.That(Marshal.OffsetOf<CanMessageM970Point3>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM970Point3.Generic");
         Assert.That(Unsafe.SizeOf<CanMessageM569Point4>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM569Point4");
         Assert.That(Marshal.OffsetOf<CanMessageM569Point4>("Generic").ToInt32(), Is.Zero, "offset of CanMessageM569Point4.Generic");
         Assert.That(Unsafe.SizeOf<CanMessageM569Point6>(), Is.EqualTo(Unsafe.SizeOf<CanMessageGeneric>()), "size of CanMessageM569Point6");
@@ -135,6 +139,10 @@ public class CanGenericTableLayout
         Assert.That(CanMessageM569Point1.ParamTable, Is.EqualTo(CanGenericTables.M569Point1Params), "parameter table of CanMessageM569Point1");
         Assert.That(CanMessageM569Point2.MessageType, Is.EqualTo(CanMessageType.M569P2), "message type of CanMessageM569Point2");
         Assert.That(CanMessageM569Point2.ParamTable, Is.EqualTo(CanGenericTables.M569Point2Params), "parameter table of CanMessageM569Point2");
+        Assert.That(CanMessageM970.MessageType, Is.EqualTo(CanMessageType.M970), "message type of CanMessageM970");
+        Assert.That(CanMessageM970.ParamTable, Is.EqualTo(CanGenericTables.M970Params), "parameter table of CanMessageM970");
+        Assert.That(CanMessageM970Point3.MessageType, Is.EqualTo(CanMessageType.M970P3), "message type of CanMessageM970Point3");
+        Assert.That(CanMessageM970Point3.ParamTable, Is.EqualTo(CanGenericTables.M970Point3Params), "parameter table of CanMessageM970Point3");
         Assert.That(CanMessageM569Point4.MessageType, Is.EqualTo(CanMessageType.M569P4), "message type of CanMessageM569Point4");
         Assert.That(CanMessageM569Point4.ParamTable, Is.EqualTo(CanGenericTables.M569Point4Params), "parameter table of CanMessageM569Point4");
         Assert.That(CanMessageM569Point6.MessageType, Is.EqualTo(CanMessageType.M569P6), "message type of CanMessageM569Point6");
@@ -226,7 +234,7 @@ public class CanGenericTableLayout
     public void M569Point1Params_Entries()
     {
         ImmutableArray<CanParamDescriptor> table = CanGenericTables.M569Point1Params;
-        Assert.That(table.Length, Is.EqualTo(13), "number of entries in M569Point1Params");
+        Assert.That(table.Length, Is.EqualTo(14), "number of entries in M569Point1Params");
         Assert.That(table[0], Is.EqualTo(new CanParamDescriptor('P', CanParamType.LocalDriver, 0)), "M569Point1Params[0]");
         Assert.That(table[1], Is.EqualTo(new CanParamDescriptor('T', CanParamType.UInt8, 0)), "M569Point1Params[1]");
         Assert.That(table[2], Is.EqualTo(new CanParamDescriptor('E', CanParamType.FloatArray, 2)), "M569Point1Params[2]");
@@ -240,16 +248,42 @@ public class CanGenericTableLayout
         Assert.That(table[10], Is.EqualTo(new CanParamDescriptor('A', CanParamType.Float, 0)), "M569Point1Params[10]");
         Assert.That(table[11], Is.EqualTo(new CanParamDescriptor('Q', CanParamType.Float, 0)), "M569Point1Params[11]");
         Assert.That(table[12], Is.EqualTo(new CanParamDescriptor('Y', CanParamType.ReducedString, 0)), "M569Point1Params[12]");
+        Assert.That(table[13], Is.EqualTo(new CanParamDescriptor('B', CanParamType.Float, 0)), "M569Point1Params[13]");
     }
 
     [Test]
     public void M569Point2Params_Entries()
     {
         ImmutableArray<CanParamDescriptor> table = CanGenericTables.M569Point2Params;
-        Assert.That(table.Length, Is.EqualTo(3), "number of entries in M569Point2Params");
+        Assert.That(table.Length, Is.EqualTo(6), "number of entries in M569Point2Params");
         Assert.That(table[0], Is.EqualTo(new CanParamDescriptor('P', CanParamType.LocalDriver, 0)), "M569Point2Params[0]");
         Assert.That(table[1], Is.EqualTo(new CanParamDescriptor('R', CanParamType.UInt8, 0)), "M569Point2Params[1]");
         Assert.That(table[2], Is.EqualTo(new CanParamDescriptor('V', CanParamType.UInt32, 0)), "M569Point2Params[2]");
+        Assert.That(table[3], Is.EqualTo(new CanParamDescriptor('S', CanParamType.UInt8, 0)), "M569Point2Params[3]");
+        Assert.That(table[4], Is.EqualTo(new CanParamDescriptor('J', CanParamType.Float, 0)), "M569Point2Params[4]");
+        Assert.That(table[5], Is.EqualTo(new CanParamDescriptor('O', CanParamType.Float, 0)), "M569Point2Params[5]");
+    }
+
+    [Test]
+    public void M970Params_Entries()
+    {
+        ImmutableArray<CanParamDescriptor> table = CanGenericTables.M970Params;
+        Assert.That(table.Length, Is.EqualTo(4), "number of entries in M970Params");
+        Assert.That(table[0], Is.EqualTo(new CanParamDescriptor('P', CanParamType.LocalDriver, 0)), "M970Params[0]");
+        Assert.That(table[1], Is.EqualTo(new CanParamDescriptor('S', CanParamType.UInt8, 0)), "M970Params[1]");
+        Assert.That(table[2], Is.EqualTo(new CanParamDescriptor('V', CanParamType.Float, 0)), "M970Params[2]");
+        Assert.That(table[3], Is.EqualTo(new CanParamDescriptor('A', CanParamType.Float, 0)), "M970Params[3]");
+    }
+
+    [Test]
+    public void M970Point3Params_Entries()
+    {
+        ImmutableArray<CanParamDescriptor> table = CanGenericTables.M970Point3Params;
+        Assert.That(table.Length, Is.EqualTo(4), "number of entries in M970Point3Params");
+        Assert.That(table[0], Is.EqualTo(new CanParamDescriptor('P', CanParamType.LocalDriver, 0)), "M970Point3Params[0]");
+        Assert.That(table[1], Is.EqualTo(new CanParamDescriptor('S', CanParamType.UInt8, 0)), "M970Point3Params[1]");
+        Assert.That(table[2], Is.EqualTo(new CanParamDescriptor('J', CanParamType.Float, 0)), "M970Point3Params[2]");
+        Assert.That(table[3], Is.EqualTo(new CanParamDescriptor('O', CanParamType.Float, 0)), "M970Point3Params[3]");
     }
 
     [Test]
@@ -372,11 +406,13 @@ public class CanGenericTableLayout
     public void M955Params_Entries()
     {
         ImmutableArray<CanParamDescriptor> table = CanGenericTables.M955Params;
-        Assert.That(table.Length, Is.EqualTo(4), "number of entries in M955Params");
+        Assert.That(table.Length, Is.EqualTo(6), "number of entries in M955Params");
         Assert.That(table[0], Is.EqualTo(new CanParamDescriptor('P', CanParamType.LocalDriver, 0)), "M955Params[0]");
         Assert.That(table[1], Is.EqualTo(new CanParamDescriptor('I', CanParamType.UInt8, 0)), "M955Params[1]");
         Assert.That(table[2], Is.EqualTo(new CanParamDescriptor('R', CanParamType.UInt8, 0)), "M955Params[2]");
         Assert.That(table[3], Is.EqualTo(new CanParamDescriptor('S', CanParamType.UInt16, 0)), "M955Params[3]");
+        Assert.That(table[4], Is.EqualTo(new CanParamDescriptor('Q', CanParamType.UInt32, 0)), "M955Params[4]");
+        Assert.That(table[5], Is.EqualTo(new CanParamDescriptor('C', CanParamType.ReducedString, 0)), "M955Params[5]");
     }
 
     [Test]

@@ -1188,23 +1188,260 @@ internal partial class MCodeHandler
         }
     }
 
+    /// <summary>M970.1 sets the velocity feedforward gain</summary>
+    private const int KvSubCommand = 1;
+
+    /// <summary>M970.2 sets the acceleration feedforward gain</summary>
+    private const int KaSubCommand = 2;
+
+    /// <summary>M970.3 configures the phase correction of one driver</summary>
+    private const int PhaseCorrectionSubCommand = 3;
+
     /// <summary>
-    /// M970: configure phase stepping
+    /// How a drive's steps are produced
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>StepMode</c> (PhaseStep.h), which M970 takes as its value</remarks>
+    private enum StepMode
+    {
+        /// <summary>A step pulse and a direction level, which is how a stepper is normally driven</summary>
+        StepDir = 0,
+
+        /// <summary>The coil currents are driven directly to the phase the position calls for</summary>
+        Phase = 1,
+
+        /// <summary>Not a mode: the first value M970 refuses, as RepRapFirmware's enum does</summary>
+        Unknown = 2
+    }
+
+    /// <summary>
+    /// M970, M970.1, M970.2 and M970.3: configure phase stepping
     /// </summary>
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
     /// <remarks>
-    /// Phase stepping drives the motor coils directly from the main board and cannot be done over
-    /// CAN, which RepRapFirmware enforces by refusing the mode for any axis with a remote driver.
-    /// Every driver is remote here, so there is nothing this can ever do
+    /// <para>
+    /// GCodes::ConfigureStepMode (GCodes3.cpp). A bare M970 sets the step mode of the drives its axis
+    /// letters and E name, .1 and .2 set the velocity and acceleration feedforward gains of the same
+    /// drives, and .3 configures the correction of one driver that P names rather than of an axis.
+    /// </para>
+    /// <para>
+    /// Every driver is on an expansion board here, so all four forms are the board's to apply and this
+    /// side is the mapping and the record: what the code asked for goes to each driver of the drive
+    /// and into <c>move.axes[]</c> or <c>move.extruders[]</c>, which is where a bare form reports from
+    /// </para>
     /// </remarks>
-    private ValueTask<Message> HandlePhaseSteppingAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandlePhaseSteppingAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        _ = code;
-        _ = cancellationToken;
-        return ValueTask.FromResult(new Message(MessageType.Error,
-            "Phase stepping is not supported on CAN-connected drivers"));
+        if (code.MinorNumber == PhaseCorrectionSubCommand)
+        {
+            return await ConfigurePhaseCorrectionAsync(code, cancellationToken);
+        }
+
+        // Which drives the code names, and what each is being asked for, read once under the lock
+        List<(IReadOnlyList<DriverId> Drivers, float Value)> targets = [];
+        string? report = null;
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            Move move = model.Move;
+
+            for (int axis = 0; axis < move.Axes.Count; axis++)
+            {
+                if (code.TryGetFloat(move.Axes[axis].Letter, out float value))
+                {
+                    if (ApplyPhaseStepping(move.Axes[axis], code.MinorNumber, value) is string error)
+                    {
+                        return new Message(MessageType.Error, error);
+                    }
+                    targets.Add((move.Axes[axis].Drivers, value));
+                }
+            }
+
+            if (code.TryGetFloatArray('E', out float[]? extruderValues) && extruderValues.Length > 0)
+            {
+                for (int i = 0; i < move.Extruders.Count && i < extruderValues.Length; i++)
+                {
+                    Extruder extruder = move.Extruders[i];
+                    if (extruder.Driver is null)
+                    {
+                        return new Message(MessageType.Error, "Extruder doesn't have a driver mapped");
+                    }
+                    if (ApplyPhaseStepping(extruder, code.MinorNumber, extruderValues[i]) is string error)
+                    {
+                        return new Message(MessageType.Error, error);
+                    }
+                    targets.Add(([extruder.Driver!], extruderValues[i]));
+                }
+            }
+
+            if (targets.Count == 0)
+            {
+                report = ReportPhaseStepping(move, code.MinorNumber);
+            }
+        }
+
+        if (report is not null)
+        {
+            return new Message(MessageType.Success, report);
+        }
+
+        // The parameter letter the board reads it as: the step mode is S, and the two gains are the
+        // V and A of the same M970 message rather than sub-codes of their own
+        char letter = code.MinorNumber switch
+        {
+            KvSubCommand => 'V',
+            KaSubCommand => 'A',
+            _ => 'S'
+        };
+
+        foreach ((IReadOnlyList<DriverId> drivers, float value) in targets)
+        {
+            foreach (DriverId driver in drivers)
+            {
+                if (await SendPhaseSteppingAsync(driver, letter, value, cancellationToken) is Message error)
+                {
+                    return error;
+                }
+            }
+        }
+        return new Message();
+    }
+
+    /// <summary>
+    /// Write what M970 asked of one drive into the object model
+    /// </summary>
+    /// <param name="drive">The axis or extruder</param>
+    /// <param name="minorNumber">Which form of M970 this is</param>
+    /// <param name="value">The value it was given</param>
+    /// <returns>Why the value was refused, or null if it was taken</returns>
+    /// <remarks>The caller must hold the object model write lock</remarks>
+    private static string? ApplyPhaseStepping(IPhaseSteppingDrive drive, int minorNumber, float value)
+    {
+        switch (minorNumber)
+        {
+            case KvSubCommand:
+            case KaSubCommand:
+                if (value < 0.0f || float.IsInfinity(value) || float.IsNaN(value))
+                {
+                    return string.Create(CultureInfo.InvariantCulture,
+                                         $"Invalid K{(minorNumber == KvSubCommand ? 'v' : 'a')} {value:F1}");
+                }
+                if (minorNumber == KvSubCommand)
+                {
+                    drive.PhaseStepKv = value;
+                }
+                else
+                {
+                    drive.PhaseStepKa = value;
+                }
+                return null;
+
+            default:
+                int mode = (int)value;
+                if (mode < 0 || mode >= (int)StepMode.Unknown)
+                {
+                    return $"Unknown mode {mode}";
+                }
+                drive.PhaseStep = mode == (int)StepMode.Phase;
+                return null;
+        }
+    }
+
+    /// <summary>
+    /// What a bare M970, M970.1 or M970.2 reports
+    /// </summary>
+    /// <param name="move">The move subsystem</param>
+    /// <param name="minorNumber">Which form of M970 this is</param>
+    /// <returns>The report</returns>
+    /// <remarks>The caller must hold the object model lock</remarks>
+    private static string ReportPhaseStepping(Move move, int minorNumber)
+        => minorNumber switch
+        {
+            KvSubCommand or KaSubCommand => ReportPerDrive(
+                move, $"Axis phase step K{(minorNumber == KvSubCommand ? 'v' : 'a')} - ",
+                axis => Gain(axis, minorNumber).ToString("F1", CultureInfo.InvariantCulture),
+                extruder => Gain(extruder, minorNumber).ToString("F1", CultureInfo.InvariantCulture),
+                axisSeparator: ":", extruderHeader: "E", firstExtruderSeparator: ":"),
+            _ => ReportPerDrive(
+                move, "Axis step mode - ",
+                axis => StepModeOf(axis).ToString(CultureInfo.InvariantCulture),
+                extruder => StepModeOf(extruder).ToString(CultureInfo.InvariantCulture),
+                axisSeparator: ":", extruderHeader: "E", firstExtruderSeparator: ":")
+        };
+
+    /// <summary>The feedforward gain M970.1 or M970.2 reports for one drive</summary>
+    private static float Gain(IPhaseSteppingDrive drive, int minorNumber)
+        => minorNumber == KvSubCommand ? drive.PhaseStepKv : drive.PhaseStepKa;
+
+    /// <summary>The step mode number a bare M970 reports for one drive</summary>
+    private static int StepModeOf(IPhaseSteppingDrive drive)
+        => drive.PhaseStep == true ? (int)StepMode.Phase : (int)StepMode.StepDir;
+
+    /// <summary>
+    /// M970.3: configure the phase correction of one driver
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// The correction belongs to the driver rather than to the axis, which is why P names one directly
+    /// and nothing is recorded on this side: it is a property of the motor, and the board that drives
+    /// it is what holds it
+    /// </remarks>
+    private async ValueTask<Message> ConfigurePhaseCorrectionAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        if (!code.TryGetDriverId('P', out DriverId? driver))
+        {
+            return new Message(MessageType.Error, "Missing P parameter");
+        }
+        if (CanAddresses.HasNoHardware(driver.Board))
+        {
+            return new Message(MessageType.Error, CanAddresses.NoHardwareMessage($"Driver {driver}"));
+        }
+
+        return (await SendDriverConfigAsync<CanMessageM970Point3>(driver, code, cancellationToken)).ToMessage();
+    }
+
+    /// <summary>
+    /// Ask a board for one phase stepping setting on one of its drivers
+    /// </summary>
+    /// <param name="driver">The driver</param>
+    /// <param name="letter">Parameter the board reads the value as</param>
+    /// <param name="value">The value</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>An error if the board refused it, else null</returns>
+    /// <remarks>
+    /// CanInterface::SetRemoteDriverStepMode and SetRemotePhaseStepParam (CanInterface.cpp), which are
+    /// one message with a different parameter rather than two
+    /// </remarks>
+    private async ValueTask<Message?> SendPhaseSteppingAsync(DriverId driver, char letter, float value,
+                                                             CancellationToken cancellationToken)
+    {
+        if (CanAddresses.HasNoHardware(driver.Board))
+        {
+            return new Message(MessageType.Error, CanAddresses.NoHardwareMessage($"Driver {driver}"));
+        }
+
+        CanMessageM970 message = default;
+        message.P = (byte)driver.Port;
+        if (letter == 'S')
+        {
+            message.S = (byte)value;
+        }
+        else if (letter == 'V')
+        {
+            message.V = value;
+        }
+        else
+        {
+            message.A = value;
+        }
+
+        CanResponse response = await linkInterface.SendCanMessageAsync((byte)driver.Board, in message,
+                                                                       CanMessageType.StandardReply,
+                                                                       cancellationToken: cancellationToken);
+        Message reply = response.ToMessage();
+        return reply.Type == MessageType.Error ? reply : null;
     }
 
     /// <summary>
@@ -1576,32 +1813,60 @@ internal partial class MCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleExtrusionFactorAsync(Commands.Code code, CancellationToken cancellationToken)
     {
+        bool seenExtruder = code.TryGetInt('D', out int extruderNumber);
+
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
-            if (!code.TryGetInt('D', out int extruderNumber))
-            {
-                return new Message(MessageType.Error, "No tool selected");
-            }
-            if (extruderNumber < 0 || extruderNumber >= model.Move.Extruders.Count)
+            if (seenExtruder && (extruderNumber < 0 || extruderNumber >= model.Move.Extruders.Count))
             {
                 return new Message(MessageType.Error, $"Invalid extruder number '{extruderNumber}'");
             }
 
-            Extruder extruder = model.Move.Extruders[extruderNumber];
-            if (!code.TryGetFloat('S', out float percentage))
+            // Without D the code addresses whichever extruders the current tool collects, which is what
+            // makes a slicer's bare M221 apply to the tool that is printing
+            Tool? tool = toolManager.Current;
+            if (!seenExtruder && tool is null)
+            {
+                return new Message(MessageType.Error, "No tool selected");
+            }
+
+            IEnumerable<int> addressed = seenExtruder ? [extruderNumber] : tool!.Extruders;
+
+            if (code.TryGetFloat('S', out float percentage))
+            {
+                // A factor below the minimum is dropped rather than refused, as RepRapFirmware does:
+                // the code has already been accepted by the time the value is read
+                float factor = percentage * 0.01f;
+                if (factor >= MinOverrideFactor)
+                {
+                    foreach (int number in addressed)
+                    {
+                        if (number >= 0 && number < model.Move.Extruders.Count)
+                        {
+                            model.Move.Extruders[number].Factor = factor;
+                        }
+                    }
+                }
+                return new Message();
+            }
+
+            if (seenExtruder)
             {
                 return new Message(MessageType.Success,
                                    string.Format(CultureInfo.InvariantCulture, "Extrusion factor for extruder {0}: {1:F1}%",
-                                                 extruderNumber, extruder.Factor * 100.0f));
+                                                 extruderNumber, model.Move.Extruders[extruderNumber].Factor * 100.0f));
             }
 
-            float factor = percentage * 0.01f;
-            if (factor >= MinOverrideFactor)
+            StringBuilder report = new("Extrusion factor(s) for current tool:");
+            foreach (int number in addressed)
             {
-                extruder.Factor = factor;
+                if (number >= 0 && number < model.Move.Extruders.Count)
+                {
+                    report.Append(CultureInfo.InvariantCulture, $" {model.Move.Extruders[number].Factor * 100.0f:F1}%");
+                }
             }
+            return new Message(MessageType.Success, report.ToString());
         }
-        return new Message();
     }
 
     /// <summary>
@@ -1970,6 +2235,20 @@ internal partial class MCodeHandler
             return new Message(MessageType.Error, "Invalid endstop input type");
         }
 
+        // K names the Z probe that stands in for the endstop. It is read whether or not S asked for
+        // one, as RepRapFirmware does, so that a number out of range is refused rather than reaching
+        // sensors.endstops[].probe and pointing at a probe that does not exist
+        int probeNumber = 0;
+        if (code.HasParameter('K'))
+        {
+            probeNumber = code.GetInt('K');
+            if (probeNumber < 0 || probeNumber >= RemoteProbes.MaxProbes)
+            {
+                return new Message(MessageType.Error,
+                                   $"Z probe number must be between 0 and {RemoteProbes.MaxProbes - 1}");
+            }
+        }
+
         List<(int Axis, EndstopPosition Position)> configured = [];
 
         // Kept per axis rather than in one list, because an axis whose monitors cannot all be created
@@ -2042,6 +2321,7 @@ internal partial class MCodeHandler
                     Endstop endstop = GetOrCreateEndstop(axis);
                     endstop.HighEnd = position == EndstopPosition.HighEnd;
                     endstop.Type = ToEndstopType((RrfEndstopType)inputType); // TODO use EndstopType
+                    endstop.Probe = endstop.Type == EndstopType.ZProbeAsEndstop ? probeNumber : null;
                     if (hasPort)
                     {
                         endstop.Port = port;
@@ -2167,7 +2447,10 @@ internal partial class MCodeHandler
         MotorStallAny = 3,
 
         /// <summary>Each driver of the axis stalling individually</summary>
-        MotorStallIndividual = 4
+        MotorStallIndividual = 4,
+
+        /// <summary>A driver's encoder reporting a position error rather than its StallGuard</summary>
+        MotorStallEncoder = 5
     }
 
     /// <summary>
@@ -2181,6 +2464,7 @@ internal partial class MCodeHandler
         RrfEndstopType.ZProbeAsEndstop => EndstopType.ZProbeAsEndstop,
         RrfEndstopType.MotorStallAny => EndstopType.MotorStallAny,
         RrfEndstopType.MotorStallIndividual => EndstopType.MotorStallIndividual,
+        RrfEndstopType.MotorStallEncoder => EndstopType.MotorStallEncoder,
         _ => EndstopType.Unknown
     };
 

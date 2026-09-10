@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Link.Protocol.CanMessages;
 using NUnit.Framework;
 using SystemTests.Host;
 
@@ -14,10 +15,11 @@ namespace SystemTests.Scenarios.Codes;
 /// behaviour is RepRapFirmware's (lib/RepRapFirmware), except where
 /// src/Documentation/articles/rrf-differences.md documents a deliberate deviation, which is then the
 /// behaviour asserted and cited.
-/// M569.2 and M569.6 are omitted: M569.2 reads or writes a driver register and its whole result is
-/// the register value in the board's reply, and M569.6 runs a closed-loop tuning move whose outcome
-/// is judged by the driver; the fake controller answers every request with an empty StandardReply
-/// and cannot script either
+/// M569.6 is omitted: it runs a closed-loop tuning move whose outcome is judged by the driver, and the
+/// fake controller answers every request with an empty StandardReply, so it cannot script one. The
+/// register form of M569.2 is omitted for the same reason - its whole result is the register value the
+/// board replies with - but the waveform correction form added at 3.7 sets rather than reads, so what
+/// it puts on the bus is assertable
 /// </summary>
 [TestFixture]
 public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
@@ -527,6 +529,36 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
     }
 
     /// <summary>
+    /// M569.2 carries the sine table waveform correction to the driver's board
+    /// </summary>
+    /// <remarks>
+    /// RRF CANlib's M569Point2Params gained S, J and O at 3.7 ("Added CAN support for M569.2 waveform
+    /// correction"), alongside the R and V that read and write a driver register. Every parameter of
+    /// M569 belongs to the driver, so the code is repackaged into the message its table describes and
+    /// answered by the board that owns it; nothing is mirrored on this side
+    /// </remarks>
+    [Test]
+    public async Task M569Point2CarriesWaveformCorrection()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync();
+
+        string reply = await bench.Host.ExecuteCodeAsync("M569.2 P1.0 S3 J1.25 O45");
+        Assert.That(reply.Trim(), Is.Empty, "M569.2 was accepted by the driver's board");
+
+        (byte board, CanMessageM569Point2 sent) = bench.CanMaster.LastCanMessage<CanMessageM569Point2>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(board, Is.EqualTo(1), "the message goes to the board named by P");
+            Assert.That(sent.P, Is.EqualTo(0), "P is the driver on that board");
+            Assert.That(sent.S, Is.EqualTo(3), "S is the harmonic being corrected");
+            Assert.That(sent.J, Is.EqualTo(1.25f).Within(1e-3), "J is the magnitude in degrees");
+            Assert.That(sent.O, Is.EqualTo(45.0f).Within(1e-3), "O is the phase in degrees");
+            Assert.That(sent.R, Is.Null, "and no register access, which this form did not ask for");
+            Assert.That(sent.V, Is.Null);
+        });
+    }
+
+    /// <summary>
     /// M572 sets the pressure advance. A single S value is the classic coefficient; two values with
     /// L set the second coefficient and its transition
     /// </summary>
@@ -790,19 +822,125 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
         });
     }
 
-    /// <summary>M970 is refused: every driver is CAN-connected and phase stepping cannot cross the bus</summary>
+    /// <summary>
+    /// M970 puts a drive into phase stepping mode, records it and tells the driver's board
+    /// </summary>
     /// <remarks>
-    /// rrf-differences.md section 1: RRF refuses phase stepping for any remote driver because the
-    /// mode drives the coils from the main board (GCodes3.cpp GCodes::ConfigureStepMode via
-    /// Move::SetStepMode), and every driver here is remote, so the code answers the refusal outright
+    /// RRF GCodes3.cpp GCodes::ConfigureStepMode and Move::SetStepMode, which for a remote driver is
+    /// CanInterface::SetRemoteDriverStepMode: an M970 generic message carrying the driver as P and the
+    /// mode as S. Mode 0 is step and direction, 1 is phase stepping, and StepMode::unknown is 2, so
+    /// that is the first value refused. move.axes[].phaseStep is the object model's report of it
+    /// (RRF Move.cpp object model table)
     /// </remarks>
     [Test]
-    public async Task M970RefusesPhaseStepping()
+    public async Task M970SetsStepModeOnTheDriversBoard()
     {
         await using JobBench bench = await JobControlBench.StartAsync();
 
-        string reply = await bench.Host.ExecuteCodeAsync("M970 X2");
-        Assert.That(reply, Does.Contain("Phase stepping is not supported on CAN-connected drivers"),
-                    "M970 is refused for CAN-connected drivers (rrf-differences.md section 1)");
+        string reply = await bench.Host.ExecuteCodeAsync("M970 X1");
+        Assert.That(reply.Trim(), Is.Empty, "M970 X1 was accepted");
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].PhaseStep), Is.True,
+                    "M970 X1 sets move.axes[0].phaseStep (RRF Move.cpp object model table)");
+
+        (byte board, CanMessageM970 sent) = bench.CanMaster.LastCanMessage<CanMessageM970>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(board, Is.EqualTo(1), "the message goes to the board carrying the axis' driver");
+            Assert.That(sent.P, Is.EqualTo(0), "P is the driver on that board, not the axis");
+            Assert.That(sent.S, Is.EqualTo(1), "S is the step mode (CanInterface::SetRemoteDriverStepMode)");
+            Assert.That(sent.V, Is.Null, "and nothing else: the gains are a separate code");
+            Assert.That(sent.A, Is.Null);
+        });
+
+        await bench.Host.ExecuteCodeAsync("M970 X0");
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].PhaseStep), Is.False,
+                        "M970 X0 puts the drive back to step and direction");
+            Assert.That(bench.CanMaster.LastCanMessage<CanMessageM970>().Message.S, Is.Zero,
+                        "and the board is told so");
+        });
+
+        Assert.That(await bench.Host.ExecuteCodeAsync("M970 X2"), Does.Contain("Unknown mode 2"),
+                    "StepMode::unknown is 2, so that is the first mode M970 refuses (RRF GCodes3.cpp)");
+    }
+
+    /// <summary>
+    /// M970.1 and M970.2 set the feedforward gains of the phase stepping loop, and the bare forms
+    /// report what each drive holds
+    /// </summary>
+    /// <remarks>
+    /// RRF Move::ConfigurePhaseStepping, which for a remote driver is
+    /// CanInterface::SetRemotePhaseStepParam: the same M970 message as the step mode, carrying V for
+    /// Kv and A for Ka rather than S. RepRapFirmware keeps the gains in its own DriveMovement and has
+    /// no object model field for them; nothing on this side would otherwise remember what a board was
+    /// asked for, so move.axes[].phaseStepKv and .phaseStepKa hold them per
+    /// rrf-differences.md section 3
+    /// </remarks>
+    [Test]
+    public async Task M970MinorsSetTheFeedforwardGains()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync();
+
+        await bench.Host.ExecuteCodeAsync("M970.1 X1.5");
+        (byte board, CanMessageM970 kv) = bench.CanMaster.LastCanMessage<CanMessageM970>();
+        Assert.Multiple(async () =>
+        {
+            Assert.That(board, Is.EqualTo(1));
+            Assert.That(kv.P, Is.EqualTo(0), "P is the driver");
+            Assert.That(kv.V, Is.EqualTo(1.5f).Within(1e-3), "M970.1 travels as V (SetRemotePhaseStepParam)");
+            Assert.That(kv.S, Is.Null, "and carries no step mode, which it did not change");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].PhaseStepKv),
+                        Is.EqualTo(1.5).Within(1e-3), "move.axes[0].phaseStepKv records it");
+        });
+
+        await bench.Host.ExecuteCodeAsync("M970.2 X0.25");
+        (_, CanMessageM970 ka) = bench.CanMaster.LastCanMessage<CanMessageM970>();
+        Assert.Multiple(async () =>
+        {
+            Assert.That(ka.A, Is.EqualTo(0.25f).Within(1e-3), "M970.2 travels as A (SetRemotePhaseStepParam)");
+            Assert.That(ka.V, Is.Null, "and leaves Kv alone");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].PhaseStepKa),
+                        Is.EqualTo(0.25).Within(1e-3), "move.axes[0].phaseStepKa records it");
+        });
+
+        Assert.That(await bench.Host.ExecuteCodeAsync("M970.1"), Does.Contain("Axis phase step Kv - X:1.5"),
+                    "a bare M970.1 reports the gains (RRF GCodes3.cpp ConfigureStepMode report branch)");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M970"), Does.Contain("Axis step mode - "),
+                    "and a bare M970 reports the step modes");
+
+        Assert.That(await bench.Host.ExecuteCodeAsync("M970.1 X-1"), Does.Contain("Invalid Kv"),
+                    "a negative gain is refused (RRF GetLimitedFValue against 0)");
+    }
+
+    /// <summary>
+    /// M970.3 configures the phase correction of one driver, which P names directly
+    /// </summary>
+    /// <remarks>
+    /// RRF GCodes3.cpp ConfigureStepMode, correction sub-command: the correction is a property of the
+    /// driver rather than of the axis, so a remote one is the M970.3 message built straight from the
+    /// command. Nothing is recorded on this side for the same reason M569 records nothing: the
+    /// driver's configuration belongs to the board that owns it
+    /// </remarks>
+    [Test]
+    public async Task M970Point3ConfiguresPhaseCorrection()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync();
+
+        string reply = await bench.Host.ExecuteCodeAsync("M970.3 P1.0 S2 J0.5 O30");
+        Assert.That(reply.Trim(), Is.Empty, "M970.3 was accepted by the driver's board");
+
+        (byte board, CanMessageM970Point3 sent) = bench.CanMaster.LastCanMessage<CanMessageM970Point3>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(board, Is.EqualTo(1), "the message goes to the board named by P");
+            Assert.That(sent.P, Is.EqualTo(0), "P is the driver on that board");
+            Assert.That(sent.S, Is.EqualTo(2), "S is the harmonic");
+            Assert.That(sent.J, Is.EqualTo(0.5f).Within(1e-3), "J is the magnitude in degrees");
+            Assert.That(sent.O, Is.EqualTo(30.0f).Within(1e-3), "O is the phase in degrees");
+        });
+
+        Assert.That(await bench.Host.ExecuteCodeAsync("M970.3 S2"), Does.Contain("Missing P parameter"),
+                    "the correction has no axis to fall back on, so P is required (RRF gb.MustSee('P'))");
     }
 }

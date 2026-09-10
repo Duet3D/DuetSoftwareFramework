@@ -235,6 +235,12 @@ public enum CanMessageType : ushort
     /// <summary>for M959, added in RRF 3.7</summary>
     SetConnectionTimeout = 6071,
 
+    /// <summary>set step mode and phase stepping parameters, added in RRF 3.7</summary>
+    M970 = 6072,
+
+    /// <summary>configure phase stepping waveform correction, added in RRF 3.7</summary>
+    M970P3 = 6073,
+
     // Responses, broadcasts etc. sent by expansion boards
     /// <summary>The standard reply to a request: a result code, some text, and sometimes 8 bits of extra data.</summary>
     StandardReply = 4510,

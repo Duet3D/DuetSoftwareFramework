@@ -1648,7 +1648,7 @@ public struct CanMessageCreateInputMonitorV1 : ICanMessage<CanMessageCreateInput
     /// <summary>Handle the main board will use to refer to this input</summary>
     [FieldOffset(2)] public RemoteInputHandle Handle;
 
-    /// <summary>Analog threshold, or zero if digital</summary>
+    /// <summary>Analog threshold, or zero if digital. Negative means the reading falls to the threshold on trigger instead of rising to it</summary>
     [FieldOffset(4)] public int Threshold;
 
     /// <summary>Shortest interval in milliseconds between reports of a change to this input</summary>
@@ -1721,7 +1721,7 @@ public struct CanMessageChangeInputMonitorV1 : ICanMessage<CanMessageChangeInput
     /// <summary>Delete this handle</summary>
     public const byte ActionDelete = unchecked((byte)(2));
 
-    /// <summary>Change the threshold to param and set standard mode</summary>
+    /// <summary>Change the threshold to param (a signed value, see CanMessageCreateInputMonitorV1) and set standard mode</summary>
     public const byte ActionChangeThreshold = unchecked((byte)(3));
 
     /// <summary>Change the minimum interval to param and set standard mode</summary>
@@ -1735,6 +1735,18 @@ public struct CanMessageChangeInputMonitorV1 : ICanMessage<CanMessageChangeInput
 
     /// <summary>Select touch mode and set the sensitivity to param, only for scanning Z probes</summary>
     public const byte ActionSelectTouchMode = unchecked((byte)(7));
+
+    /// <summary>Tare an analog input in the mode given by param; the baseline comes back as a standard reply data word</summary>
+    public const byte ActionTare = unchecked((byte)(8));
+
+    /// <summary>value of param, with action actionTare: latch the baseline and hold it until the next tare, used while a probing move is in progress</summary>
+    public const uint ParamTareAndHold = unchecked((uint)(0));
+
+    /// <summary>value of param, with action actionTare: latch the baseline and let it track slow drift afterwards</summary>
+    public const uint ParamTareAndTrack = unchecked((uint)(1));
+
+    /// <summary>value of param, with action actionTare: resume tracking from the held baseline without latching, used when a probing move ends with the nozzle possibly still loaded</summary>
+    public const uint ParamTrackOnly = unchecked((uint)(2));
 
     /// <summary>value of param, with action actionSetDriveLevel, that asks for the drive level to be calibrated and reported</summary>
     public const uint ParamAutoCalibrateDriveLevelAndReport = unchecked((uint)(0xFFFFFFFF));
@@ -2452,13 +2464,19 @@ public struct CanMessageEnableStallEndstop : ICanMessage<CanMessageEnableStallEn
     /// <summary>If driverNumber is this then we disable all stall endstops on this board</summary>
     public const ushort DisableAll = unchecked((ushort)(0xFFFF));
 
-    /// <summary>Backing storage for the bitfields requestId:12, zero:4</summary>
+    /// <summary>Detect a stall using the driver's StallGuard feature</summary>
+    public const ushort TypeMotorLoad = unchecked((ushort)(0));
+
+    /// <summary>Detect a stall from the encoder position error</summary>
+    public const ushort TypeEncoder = unchecked((ushort)(1));
+
+    /// <summary>Backing storage for the bitfields requestId:12, endstopType:4</summary>
     [FieldOffset(0)] private ushort _bits0;
 
     /// <summary>The number of the driver we want to enable a stall endstop for</summary>
     [FieldOffset(2)] public ushort DriverNumber;
 
-    /// <summary>The speed we will use for the homing move; not relevant if driverNumber == disableAll</summary>
+    /// <summary>The speed we will use for the homing move; not relevant if driverNumber == disableAll or endstopType is typeEncoder</summary>
     [FieldOffset(4)] public float Speed;
 
     /// <summary>
@@ -2472,10 +2490,10 @@ public struct CanMessageEnableStallEndstop : ICanMessage<CanMessageEnableStallEn
     }
 
     /// <summary>
-    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// Which detection mechanism to use, one of the type constants. Firmware that predates this field always sends zero, which is typeMotorLoad
     /// (4-bit field, bits 12-15 of the message)
     /// </summary>
-    public byte Zero
+    public byte EndstopType
     {
         readonly get => (byte)((((uint)_bits0) >> 12) & 0xFU);
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
@@ -2485,7 +2503,7 @@ public struct CanMessageEnableStallEndstop : ICanMessage<CanMessageEnableStallEn
     public void SetRequestId(ushort rid)
     {
         RequestId = (ushort)(rid);
-        Zero = 0;
+        EndstopType = 0;
     }
 }
 
@@ -2826,9 +2844,11 @@ public struct CanMessageFirmwareUpdateResponse : ICanMessage<CanMessageFirmwareU
 }
 
 /// <summary>
-/// The standard reply used by many calls. It carries a GCodeResult, some text, and in some cases 8 bits of
-/// additional information. It can be split into multiple fragments so that the text is not constrained to 60 characters.
-/// The layout of requestId and resultCode is common to more than one reply type.
+/// The standard reply used by many calls. It carries a GCodeResult, some text, and in some cases 8 bits
+/// and/or up to three 32-bit words of additional information. It can be split into multiple fragments so
+/// that the text is not constrained to 60 characters. The data words are carried in fragment 0 only, ahead
+/// of the text, so the text does not start at a fixed offset and GetActualDataLength(0) is what says where
+/// it does start. The layout of requestId and resultCode is common to more than one reply type.
 ///
 /// Mirrors CanMessageStandardReply in CANlib's CanMessageFormats.h. This layout is 64 bytes.
 /// </summary>
@@ -2838,17 +2858,17 @@ public struct CanMessageStandardReply : ICanMessage<CanMessageStandardReply>
     /// <inheritdoc cref="ICanMessage{TSelf}.MessageType" />
     public static CanMessageType MessageType => CanMessageType.StandardReply;
 
-    /// <summary>how much text one fragment can carry</summary>
-    public const uint MaxTextLength = unchecked((uint)(60));
+    /// <summary>how many 32-bit data words one reply can carry ahead of its text</summary>
+    public const uint MaxNumWords = unchecked((uint)(3));
 
-    /// <summary>Backing storage for the bitfields requestId:12, resultCode:4, fragmentNumber:7, moreFollows:1, extra:8</summary>
+    /// <summary>Backing storage for the bitfields requestId:12, resultCode:4, fragmentNumber:5, numWords:2, moreFollows:1, extra:8</summary>
     [FieldOffset(0)] private uint _bits0;
 
-    /// <summary>The reply text, which is not null terminated if it fills the field</summary>
+    /// <summary>The numWords data words followed by the reply text, which is not null terminated if it fills the field</summary>
     [FieldOffset(4)] public CharArray60 Text;
 
     /// <summary>
-    /// The reply text, which is not null terminated if it fills the field
+    /// The numWords data words followed by the reply text, which is not null terminated if it fills the field
     /// (decoded up to the first null byte; setting it truncates to the field size and zero-fills the rest)
     /// </summary>
     public string TextString
@@ -2879,12 +2899,22 @@ public struct CanMessageStandardReply : ICanMessage<CanMessageStandardReply>
 
     /// <summary>
     /// The fragment number of this message
-    /// (7-bit field, bits 16-22 of the message)
+    /// (5-bit field, bits 16-20 of the message)
     /// </summary>
     public byte FragmentNumber
     {
-        readonly get => (byte)((((uint)_bits0) >> 16) & 0x7FU);
-        set => _bits0 = (uint)((((uint)_bits0) & ~(0x7FU << 16)) | ((unchecked((uint)value) & 0x7FU) << 16));
+        readonly get => (byte)((((uint)_bits0) >> 16) & 0x1FU);
+        set => _bits0 = (uint)((((uint)_bits0) & ~(0x1FU << 16)) | ((unchecked((uint)value) & 0x1FU) << 16));
+    }
+
+    /// <summary>
+    /// Number of 32-bit data words preceding the text, fragment 0 only
+    /// (2-bit field, bits 21-22 of the message)
+    /// </summary>
+    public byte NumWords
+    {
+        readonly get => (byte)((((uint)_bits0) >> 21) & 0x3U);
+        set => _bits0 = (uint)((((uint)_bits0) & ~(0x3U << 21)) | ((unchecked((uint)value) & 0x3U) << 21));
     }
 
     /// <summary>
@@ -2907,16 +2937,19 @@ public struct CanMessageStandardReply : ICanMessage<CanMessageStandardReply>
         set => _bits0 = (uint)((((uint)_bits0) & ~(0xFFU << 24)) | ((unchecked((uint)value) & 0xFFU) << 24));
     }
 
-    /// <summary>How much of a message of the given length is text, stopping at the first null</summary>
-    public readonly uint GetTextLength(uint dataLength) => (uint)(CanText.Strnlen(Text, (int)((dataLength < 4 + 60) ? dataLength - 4 : 60)));
+    /// <summary>How much text this reply can carry, which is what the data words leave of the field</summary>
+    public readonly uint GetMaxTextLength() => (uint)(60 - NumWords * 4);
 
-    /// <summary>Length of the message when textLength characters of text are sent</summary>
-    public readonly uint GetActualDataLength(uint textLength) => (uint)(textLength + 4);
+    /// <summary>Length of the message when textLength characters of text are sent, the data words included</summary>
+    public readonly uint GetActualDataLength(uint textLength) => (uint)(textLength + (NumWords + 1) * 4);
 
     /// <summary>Set the request ID of this message and clear its reserved fields</summary>
     public void SetRequestId(ushort rid)
     {
         RequestId = (ushort)(rid);
+        FragmentNumber = 0;
+        NumWords = 0;
+        MoreFollows = false;
         Extra = 0;
     }
 }

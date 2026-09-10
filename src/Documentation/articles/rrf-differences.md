@@ -231,6 +231,7 @@ That adds fields RepRapFirmware does not keep, does not report, or both:
 | `boards[].drivers[].config` — direction, mode, timings, thresholds | M569 forwarded everything over CAN and stored nothing. The object model already said this was wrong: `DriverConfig` is documented as "Configured (M569) settings of a driver" |
 | `boards[].drivers[].config.stallDetection` | M915 had no home at all |
 | `move.extruders[].pressAdv.K1` and `.D` | The CAN message carries only the first coefficient, so the second and its transition speed are held here alone — which is exactly what the rule is for |
+| `move.axes[].phaseStepKv` and `.phaseStepKa`, and the same on `move.extruders[]` | M970.1 and M970.2 send the phase stepping feedforward gains to the board that applies them. RepRapFirmware keeps its own copy in `DriveMovement` and answers a bare M970.1 from it; here the board is the only other place they exist, so without these a restart would lose them and the bare form would have nothing to report |
 
 Three further differences follow from the same rule.
 

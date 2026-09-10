@@ -99,7 +99,7 @@ int main()
 	CheckEntry("M569Params", 10, M569Params[10], 'U', 0x11, 0);
 
 	// M569Point1Params
-	CheckLength("M569Point1Params", M569Point1Params, 13);
+	CheckLength("M569Point1Params", M569Point1Params, 14);
 	CheckEntry("M569Point1Params", 0, M569Point1Params[0], 'P', 0x41, 0);
 	CheckEntry("M569Point1Params", 1, M569Point1Params[1], 'T', 0x01, 0);
 	CheckEntry("M569Point1Params", 2, M569Point1Params[2], 'E', 0xa4, 2);
@@ -113,12 +113,30 @@ int main()
 	CheckEntry("M569Point1Params", 10, M569Point1Params[10], 'A', 0x24, 0);
 	CheckEntry("M569Point1Params", 11, M569Point1Params[11], 'Q', 0x24, 0);
 	CheckEntry("M569Point1Params", 12, M569Point1Params[12], 'Y', 0x20, 0);
+	CheckEntry("M569Point1Params", 13, M569Point1Params[13], 'B', 0x24, 0);
 
 	// M569Point2Params
-	CheckLength("M569Point2Params", M569Point2Params, 3);
+	CheckLength("M569Point2Params", M569Point2Params, 6);
 	CheckEntry("M569Point2Params", 0, M569Point2Params[0], 'P', 0x41, 0);
 	CheckEntry("M569Point2Params", 1, M569Point2Params[1], 'R', 0x01, 0);
 	CheckEntry("M569Point2Params", 2, M569Point2Params[2], 'V', 0x04, 0);
+	CheckEntry("M569Point2Params", 3, M569Point2Params[3], 'S', 0x01, 0);
+	CheckEntry("M569Point2Params", 4, M569Point2Params[4], 'J', 0x24, 0);
+	CheckEntry("M569Point2Params", 5, M569Point2Params[5], 'O', 0x24, 0);
+
+	// M970Params
+	CheckLength("M970Params", M970Params, 4);
+	CheckEntry("M970Params", 0, M970Params[0], 'P', 0x41, 0);
+	CheckEntry("M970Params", 1, M970Params[1], 'S', 0x01, 0);
+	CheckEntry("M970Params", 2, M970Params[2], 'V', 0x24, 0);
+	CheckEntry("M970Params", 3, M970Params[3], 'A', 0x24, 0);
+
+	// M970Point3Params
+	CheckLength("M970Point3Params", M970Point3Params, 4);
+	CheckEntry("M970Point3Params", 0, M970Point3Params[0], 'P', 0x41, 0);
+	CheckEntry("M970Point3Params", 1, M970Point3Params[1], 'S', 0x01, 0);
+	CheckEntry("M970Point3Params", 2, M970Point3Params[2], 'J', 0x24, 0);
+	CheckEntry("M970Point3Params", 3, M970Point3Params[3], 'O', 0x24, 0);
 
 	// M569Point4Params
 	CheckLength("M569Point4Params", M569Point4Params, 3);
@@ -197,11 +215,13 @@ int main()
 	CheckEntry("ConfigureFilamentMonitorParams", 6, ConfigureFilamentMonitorParams[6], 'C', 0x20, 0);
 
 	// M955Params
-	CheckLength("M955Params", M955Params, 4);
+	CheckLength("M955Params", M955Params, 6);
 	CheckEntry("M955Params", 0, M955Params[0], 'P', 0x41, 0);
 	CheckEntry("M955Params", 1, M955Params[1], 'I', 0x01, 0);
 	CheckEntry("M955Params", 2, M955Params[2], 'R', 0x01, 0);
 	CheckEntry("M955Params", 3, M955Params[3], 'S', 0x02, 0);
+	CheckEntry("M955Params", 4, M955Params[4], 'Q', 0x04, 0);
+	CheckEntry("M955Params", 5, M955Params[5], 'C', 0x20, 0);
 
 	// M122P1Params
 	CheckLength("M122P1Params", M122P1Params, 5);

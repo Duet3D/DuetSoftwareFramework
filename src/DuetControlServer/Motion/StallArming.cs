@@ -47,7 +47,13 @@ internal static class StallArming
             CanMessageEnableStallEndstop message = new()
             {
                 DriverNumber = (ushort)watched.Driver.Port,
-                Speed = watched.StepsPerSecond
+                Speed = watched.StepsPerSecond,
+
+                // Which mechanism detects the stall. A board old enough not to know the field reads
+                // the bits it occupies as zero, which is the StallGuard it would have used anyway
+                EndstopType = watched.UseEncoder
+                              ? (byte)CanMessageEnableStallEndstop.TypeEncoder
+                              : (byte)CanMessageEnableStallEndstop.TypeMotorLoad
             };
 
             byte board = (byte)watched.Driver.Board;

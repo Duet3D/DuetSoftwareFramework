@@ -1011,7 +1011,7 @@
           ]
         },
         { "kind": "field", "name": "handle", "type": "RemoteInputHandle", "doc": "Handle the main board will use to refer to this input" },
-        { "kind": "field", "name": "threshold", "type": "i32", "doc": "Analog threshold, or zero if digital" },
+        { "kind": "field", "name": "threshold", "type": "i32", "doc": "Analog threshold, or zero if digital. Negative means the reading falls to the threshold on trigger instead of rising to it" },
         { "kind": "field", "name": "minInterval", "type": "u16", "doc": "Shortest interval in milliseconds between reports of a change to this input" },
         { "kind": "array", "name": "pinName", "type": "char", "length": "54", "doc": "Null terminated" }
       ],
@@ -1039,11 +1039,15 @@
         { "name": "actionDontMonitor", "type": "u8", "value": "0", "doc": "Stop sending status change messages" },
         { "name": "actionDoMonitor", "type": "u8", "value": "1", "doc": "Send status change messages" },
         { "name": "actionDelete", "type": "u8", "value": "2", "doc": "Delete this handle" },
-        { "name": "actionChangeThreshold", "type": "u8", "value": "3", "doc": "Change the threshold to param and set standard mode" },
+        { "name": "actionChangeThreshold", "type": "u8", "value": "3", "doc": "Change the threshold to param (a signed value, see CanMessageCreateInputMonitorV1) and set standard mode" },
         { "name": "actionChangeMinInterval", "type": "u8", "value": "4", "doc": "Change the minimum interval to param and set standard mode" },
         { "name": "actionReturnPinName", "type": "u8", "value": "5", "doc": "Return the pin name" },
         { "name": "actionSetDriveLevel", "type": "u8", "value": "6", "doc": "Set the drive level to param, only for scanning Z probes" },
         { "name": "actionSelectTouchMode", "type": "u8", "value": "7", "doc": "Select touch mode and set the sensitivity to param, only for scanning Z probes" },
+        { "name": "actionTare", "type": "u8", "value": "8", "doc": "Tare an analog input in the mode given by param; the baseline comes back as a standard reply data word" },
+        { "name": "paramTareAndHold", "type": "u32", "value": "0", "doc": "value of param, with action actionTare: latch the baseline and hold it until the next tare, used while a probing move is in progress" },
+        { "name": "paramTareAndTrack", "type": "u32", "value": "1", "doc": "value of param, with action actionTare: latch the baseline and let it track slow drift afterwards" },
+        { "name": "paramTrackOnly", "type": "u32", "value": "2", "doc": "value of param, with action actionTare: resume tracking from the held baseline without latching, used when a probing move ends with the nozzle possibly still loaded" },
         { "name": "paramAutoCalibrateDriveLevelAndReport", "type": "u32", "value": "0xFFFFFFFF", "doc": "value of param, with action actionSetDriveLevel, that asks for the drive level to be calibrated and reported" },
         { "name": "paramReportDriveLevel", "type": "u32", "value": "0xFFFFFFFE", "doc": "value of param, with action actionSetDriveLevel, that asks for the current drive level to be reported" },
         { "name": "paramDriveLevelMask", "type": "u32", "value": "0x1F", "doc": "Bottom 5 bits are the drive level" },
@@ -1310,19 +1314,22 @@
       "doc": "Enable a stall endstop, or clear all stall endstops",
       "messageType": "enableStallEndstop",
       "requestIdField": "requestId",
+      "setRequestIdAlsoClears": [ "endstopType" ],
       "constants": [
-        { "name": "disableAll", "type": "u16", "value": "0xFFFF", "doc": "If driverNumber is this then we disable all stall endstops on this board" }
+        { "name": "disableAll", "type": "u16", "value": "0xFFFF", "doc": "If driverNumber is this then we disable all stall endstops on this board" },
+        { "name": "typeMotorLoad", "type": "u16", "value": "0", "doc": "Detect a stall using the driver's StallGuard feature" },
+        { "name": "typeEncoder", "type": "u16", "value": "1", "doc": "Detect a stall from the encoder position error" }
       ],
       "members": [
         {
           "kind": "bitfield", "storage": "u16",
           "fields": [
             { "name": "requestId", "width": 12, "doc": "Identifies this request, so that the reply can be matched to it" },
-            { "name": "zero", "width": 4, "reserved": true }
+            { "name": "endstopType", "width": 4, "doc": "Which detection mechanism to use, one of the type constants. Firmware that predates this field always sends zero, which is typeMotorLoad" }
           ]
         },
         { "kind": "field", "name": "driverNumber", "type": "u16", "doc": "The number of the driver we want to enable a stall endstop for" },
-        { "kind": "field", "name": "speed", "type": "f32", "doc": "The speed we will use for the homing move; not relevant if driverNumber == disableAll" }
+        { "kind": "field", "name": "speed", "type": "f32", "doc": "The speed we will use for the homing move; not relevant if driverNumber == disableAll or endstopType is typeEncoder" }
       ]
     },
 
@@ -1451,15 +1458,17 @@
     {
       "name": "CanMessageStandardReply",
       "doc": [
-        "The standard reply used by many calls. It carries a GCodeResult, some text, and in some cases 8 bits of",
-        "additional information. It can be split into multiple fragments so that the text is not constrained to 60 characters.",
-        "The layout of requestId and resultCode is common to more than one reply type."
+        "The standard reply used by many calls. It carries a GCodeResult, some text, and in some cases 8 bits",
+        "and/or up to three 32-bit words of additional information. It can be split into multiple fragments so",
+        "that the text is not constrained to 60 characters. The data words are carried in fragment 0 only, ahead",
+        "of the text, so the text does not start at a fixed offset and GetActualDataLength(0) is what says where",
+        "it does start. The layout of requestId and resultCode is common to more than one reply type."
       ],
       "messageType": "standardReply",
       "requestIdField": "requestId",
-      "setRequestIdAlsoClears": ["extra"],
+      "setRequestIdAlsoClears": ["fragmentNumber", "numWords", "moreFollows", "extra"],
       "constants": [
-        { "name": "MaxTextLength", "type": "usize", "value": "60", "doc": "how much text one fragment can carry" }
+        { "name": "MaxNumWords", "type": "usize", "value": "3", "doc": "how many 32-bit data words one reply can carry ahead of its text" }
       ],
       "members": [
         {
@@ -1467,25 +1476,74 @@
           "fields": [
             { "name": "requestId", "width": 12, "doc": "The request ID of the message we are replying to" },
             { "name": "resultCode", "width": 4, "enum": "GCodeResult", "doc": "Normally a GCodeResult" },
-            { "name": "fragmentNumber", "width": 7, "doc": "The fragment number of this message" },
+            { "name": "fragmentNumber", "width": 5, "doc": "The fragment number of this message" },
+            { "name": "numWords", "width": 2, "doc": "Number of 32-bit data words preceding the text, fragment 0 only" },
             { "name": "moreFollows", "width": 1, "bool": true, "doc": "Set if this is not the last fragment of the reply" },
             { "name": "extra", "width": 8, "doc": "Normally unused, but occasionally carries extra data" }
           ]
         },
-        { "kind": "array", "name": "text", "type": "char", "length": "60", "doc": "The reply text, which is not null terminated if it fills the field" }
+        { "kind": "array", "name": "text", "type": "char", "length": "60", "doc": "The numWords data words followed by the reply text, which is not null terminated if it fills the field" }
       ],
       "methods": [
+        {
+          "name": "GetMaxTextLength", "returnType": "usize",
+          "doc": "How much text this reply can carry, which is what the data words leave of the field",
+          "body": [ { "return": "sizeof(text) - numWords * sizeof(u32)" } ]
+        },
+        {
+          "name": "GetText", "returnType": "void",
+          "const": false,
+          "doc": "The text, which starts after the data words",
+          "cppSignature": "char *GetText() noexcept",
+          "cppBody": [ "return text + numWords * sizeof(uint32_t);" ],
+          "emit": ["cpp"]
+        },
+        {
+          "name": "GetText", "returnType": "void",
+          "doc": "The text, which starts after the data words",
+          "cppSignature": "const char *GetText() const noexcept",
+          "cppBody": [ "return text + numWords * sizeof(uint32_t);" ],
+          "emit": ["cpp"]
+        },
+        {
+          "name": "GetWord", "returnType": "void",
+          "doc": "One of the data words. Packed struct, so copy the word out rather than cast to uint32_t*",
+          "cppSignature": "uint32_t GetWord(size_t index) const noexcept",
+          "cppBody": [
+            "uint32_t word;",
+            "memcpy(&word, text + index * sizeof(uint32_t), sizeof(word));",
+            "return word;"
+          ],
+          "emit": ["cpp"]
+        },
+        {
+          "name": "SetWords", "returnType": "void",
+          "const": false,
+          "doc": "Put data words ahead of the text, which is what shortens the room left for it",
+          "cppSignature": "void SetWords(const uint32_t *words, size_t count) noexcept",
+          "cppBody": [
+            "numWords = count;",
+            "memcpy(text, words, count * sizeof(uint32_t));"
+          ],
+          "emit": ["cpp"]
+        },
         {
           "name": "GetTextLength", "returnType": "usize",
           "doc": "How much of a message of the given length is text, stopping at the first null",
           "params": [ { "name": "dataLength", "type": "usize" } ],
-          "body": [ { "return": "strnlen(text, (dataLength < sizeof(u32) + sizeof(text)) ? dataLength - sizeof(u32) : sizeof(text))" } ]
+          "cppSignature": "size_t GetTextLength(size_t dataLength) const noexcept",
+          "cppBody": [
+            "// can't use min<> here because it hasn't been moved to RRFLibraries yet",
+            "const size_t headerLength = (numWords + 1) * sizeof(uint32_t);",
+            "return (dataLength <= headerLength) ? 0 : Strnlen(GetText(), (dataLength < headerLength + GetMaxTextLength()) ? dataLength - headerLength : GetMaxTextLength());"
+          ],
+          "emit": ["cpp"]
         },
         {
           "name": "GetActualDataLength", "returnType": "usize",
-          "doc": "Length of the message when textLength characters of text are sent",
+          "doc": "Length of the message when textLength characters of text are sent, the data words included",
           "params": [ { "name": "textLength", "type": "usize" } ],
-          "body": [ { "return": "textLength + sizeof(u32)" } ]
+          "body": [ { "return": "textLength + (numWords + 1) * sizeof(u32)" } ]
         }
       ]
     },
@@ -2389,6 +2447,8 @@
       { "name": "heaterModelV3", "value": 6069, "doc": "added in RRF 3.7" },
       { "name": "setPressureAdvanceV2", "value": 6070, "doc": "M572: set the pressure advance of several drivers at once, with the full set of coefficients." },
       { "name": "setConnectionTimeout", "value": 6071, "doc": "for M959, added in RRF 3.7" },
+      { "name": "m970", "value": 6072, "doc": "set step mode and phase stepping parameters, added in RRF 3.7" },
+      { "name": "m970p3", "value": 6073, "doc": "configure phase stepping waveform correction, added in RRF 3.7" },
       { "section": "Responses, broadcasts etc. sent by expansion boards" },
       { "name": "standardReply", "value": 4510, "doc": "The standard reply to a request: a result code, some text, and sometimes 8 bits of extra data." },
       { "name": "boardStatusReportV0", "value": 4511, "doc": "Board health report using full precision MinCurMax values." },
@@ -2838,17 +2898,43 @@
         { "letter": "V", "type": "float", "doc": "velocity feedforward term added in 3.5beta2" },
         { "letter": "A", "type": "float", "doc": "acceleration feedforward term added in 3.5beta4" },
         { "letter": "Q", "type": "float", "doc": "torque constant in Nm per A added in 3.5 post beta4" },
-        { "letter": "Y", "type": "reducedString", "doc": "magnetic encoder type, added at 3.6.2" }
+        { "letter": "Y", "type": "reducedString", "doc": "magnetic encoder type, added at 3.6.2" },
+        { "letter": "B", "type": "float", "doc": "standstill position deadband, added in 3.7.0" }
       ]
     },
     {
       "name": "M569Point2Params",
-      "doc": "Read or write stepper driver register",
+      "doc": "Read or write stepper driver register, or configure the sine table waveform correction",
       "messageType": "m569p2",
       "params": [
         { "letter": "P", "type": "localDriver" },
         { "letter": "R", "type": "uint8" },
-        { "letter": "V", "type": "uint32" }
+        { "letter": "V", "type": "uint32" },
+        { "letter": "S", "type": "uint8", "doc": "waveform correction harmonic, added in 3.7" },
+        { "letter": "J", "type": "float", "doc": "waveform correction magnitude in degrees, added in 3.7" },
+        { "letter": "O", "type": "float", "doc": "waveform correction phase in degrees, added in 3.7" }
+      ]
+    },
+    {
+      "name": "M970Params",
+      "doc": "Set stepper driver step mode and phase stepping parameters",
+      "messageType": "m970",
+      "params": [
+        { "letter": "P", "type": "localDriver" },
+        { "letter": "S", "type": "uint8", "doc": "step mode: 0 = step and direction, 1 = phase stepping" },
+        { "letter": "V", "type": "float", "doc": "velocity feedforward Kv" },
+        { "letter": "A", "type": "float", "doc": "acceleration feedforward Ka" }
+      ]
+    },
+    {
+      "name": "M970Point3Params",
+      "doc": "Configure the phase correction of a phase stepped driver",
+      "messageType": "m970p3",
+      "params": [
+        { "letter": "P", "type": "localDriver" },
+        { "letter": "S", "type": "uint8", "doc": "harmonic of the electrical cycle" },
+        { "letter": "J", "type": "float", "doc": "correction magnitude in degrees" },
+        { "letter": "O", "type": "float", "doc": "correction phase in degrees" }
       ]
     },
     {
@@ -2975,7 +3061,9 @@
         { "letter": "P", "type": "localDriver", "doc": "accelerometer number" },
         { "letter": "I", "type": "uint8", "doc": "orientation" },
         { "letter": "R", "type": "uint8", "doc": "resolution (bits)" },
-        { "letter": "S", "type": "uint16", "doc": "sampling rate" }
+        { "letter": "S", "type": "uint16", "doc": "sampling rate" },
+        { "letter": "Q", "type": "uint32", "doc": "SPI clock frequency" },
+        { "letter": "C", "type": "reducedString", "doc": "pins to use when the accelerometer is connected via SPI" }
       ]
     },
     {

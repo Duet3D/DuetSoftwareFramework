@@ -105,15 +105,39 @@ constexpr ParamDescriptor M569Point1Params[] =
 	{ 'A', ParamDescriptor::float_p, 0 },        // acceleration feedforward term added in 3.5beta4
 	{ 'Q', ParamDescriptor::float_p, 0 },        // torque constant in Nm per A added in 3.5 post beta4
 	{ 'Y', ParamDescriptor::reducedString, 0 },  // magnetic encoder type, added at 3.6.2
+	{ 'B', ParamDescriptor::float_p, 0 },        // standstill position deadband, added in 3.7.0
 	{ 0, ParamDescriptor::none, 0 }
 };
 
-// Read or write stepper driver register
+// Read or write stepper driver register, or configure the sine table waveform correction
 constexpr ParamDescriptor M569Point2Params[] =
 {
 	{ 'P', ParamDescriptor::localDriver, 0 },
 	{ 'R', ParamDescriptor::uint8, 0 },
 	{ 'V', ParamDescriptor::uint32, 0 },
+	{ 'S', ParamDescriptor::uint8, 0 },        // waveform correction harmonic, added in 3.7
+	{ 'J', ParamDescriptor::float_p, 0 },      // waveform correction magnitude in degrees, added in 3.7
+	{ 'O', ParamDescriptor::float_p, 0 },      // waveform correction phase in degrees, added in 3.7
+	{ 0, ParamDescriptor::none, 0 }
+};
+
+// Set stepper driver step mode and phase stepping parameters
+constexpr ParamDescriptor M970Params[] =
+{
+	{ 'P', ParamDescriptor::localDriver, 0 },
+	{ 'S', ParamDescriptor::uint8, 0 },        // step mode: 0 = step and direction, 1 = phase stepping
+	{ 'V', ParamDescriptor::float_p, 0 },      // velocity feedforward Kv
+	{ 'A', ParamDescriptor::float_p, 0 },      // acceleration feedforward Ka
+	{ 0, ParamDescriptor::none, 0 }
+};
+
+// Configure the phase correction of a phase stepped driver
+constexpr ParamDescriptor M970Point3Params[] =
+{
+	{ 'P', ParamDescriptor::localDriver, 0 },
+	{ 'S', ParamDescriptor::uint8, 0 },        // harmonic of the electrical cycle
+	{ 'J', ParamDescriptor::float_p, 0 },      // correction magnitude in degrees
+	{ 'O', ParamDescriptor::float_p, 0 },      // correction phase in degrees
 	{ 0, ParamDescriptor::none, 0 }
 };
 
@@ -226,10 +250,12 @@ constexpr ParamDescriptor ConfigureFilamentMonitorParams[] =
 // Accelerometer settings
 constexpr ParamDescriptor M955Params[] =
 {
-	{ 'P', ParamDescriptor::localDriver, 0 },  // accelerometer number
-	{ 'I', ParamDescriptor::uint8, 0 },        // orientation
-	{ 'R', ParamDescriptor::uint8, 0 },        // resolution (bits)
-	{ 'S', ParamDescriptor::uint16, 0 },       // sampling rate
+	{ 'P', ParamDescriptor::localDriver, 0 },    // accelerometer number
+	{ 'I', ParamDescriptor::uint8, 0 },          // orientation
+	{ 'R', ParamDescriptor::uint8, 0 },          // resolution (bits)
+	{ 'S', ParamDescriptor::uint16, 0 },         // sampling rate
+	{ 'Q', ParamDescriptor::uint32, 0 },         // SPI clock frequency
+	{ 'C', ParamDescriptor::reducedString, 0 },  // pins to use when the accelerometer is connected via SPI
 	{ 0, ParamDescriptor::none, 0 }
 };
 

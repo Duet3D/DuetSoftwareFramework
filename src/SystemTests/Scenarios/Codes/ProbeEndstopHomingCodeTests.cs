@@ -191,6 +191,63 @@ public class ProbeEndstopHomingCodeTests : SystemTests.Host.BenchFixture
     }
 
     /// <summary>
+    /// M574 S5 asks for a stall detected from the encoder position error rather than from StallGuard
+    /// </summary>
+    /// <remarks>
+    /// RRF truth: EndstopsManager::HandleM574 (EndstopsManager.cpp) creates a StallDetectionEndstop
+    /// with useEncoder for EndStopType::motorStallEncoder, which GetEndstopType reports back as that
+    /// type. The mechanism travels to the board in CanMessageEnableStallEndstop's endstopType field
+    /// (CANlib), and a board too old to know the field reads those bits as zero, which is the
+    /// StallGuard it would have used anyway
+    /// </remarks>
+    [Test]
+    public async Task M574ConfiguresEncoderStallEndstop()
+    {
+        await using JobBench bench = await StartBenchAsync();
+
+        string reply = await bench.Host.ExecuteCodeAsync("M574 X1 S5");
+        Assert.That(reply.Trim(), Is.Empty, "M574 X1 S5 was accepted");
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Endstops[0]!.Type),
+                    Is.EqualTo(EndstopType.MotorStallEncoder),
+                    "M574 S5 sets sensors.endstops[0].type to motorStallEncoder "
+                    + "(RRF StallDetectionEndstop::GetEndstopType)");
+
+        Assert.That(await bench.Host.ExecuteCodeAsync("M574 X1 S6"), Does.Contain("Invalid endstop input type"),
+                    "S6 names no mechanism, so it is refused rather than stored");
+    }
+
+    /// <summary>
+    /// M574 K names the Z probe that stands in for the endstop, and a number out of range is refused
+    /// </summary>
+    /// <remarks>
+    /// RRF truth: EndstopsManager::HandleM574 reads K with GetLimitedUIValue against MaxZProbes, which
+    /// is issue #1275: it used to take any number, and sensors.endstops[].probe would then point at a
+    /// probe that does not exist. K is read whether or not S asked for a probe endstop, as RRF does
+    /// </remarks>
+    [Test]
+    public async Task M574RangeChecksTheProbeNumber()
+    {
+        await using JobBench bench = await StartBenchAsync();
+
+        await bench.Host.ExecuteCodeAsync("M558 P8 C\"1.io3.in\"");
+        string reply = await bench.Host.ExecuteCodeAsync("M574 X1 S2 K0");
+        Assert.That(reply.Trim(), Is.Empty, "M574 S2 K0 was accepted");
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Endstops[0]!.Type),
+                        Is.EqualTo(EndstopType.ZProbeAsEndstop), "M574 S2 makes the probe stand in for the endstop");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Endstops[0]!.Probe), Is.Zero,
+                        "M574 K records sensors.endstops[0].probe");
+        });
+
+        Assert.That(await bench.Host.ExecuteCodeAsync("M574 X1 S2 K99"),
+                    Does.Contain("Z probe number must be between 0 and"),
+                    "a K past the last probe is refused (RRF issue #1275, GetLimitedUIValue against MaxZProbes)");
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Endstops[0]!.Probe), Is.Zero,
+                    "and the endstop still names the probe it was given");
+    }
+
+    /// <summary>
     /// M574 Y2 makes a high-end endstop and M574 Y0 removes it again, leaving the slot empty
     /// </summary>
     /// <remarks>

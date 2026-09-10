@@ -409,8 +409,8 @@ void SbcInterface::EnqueueCanTextReply(uint16_t txToken, CanRequestId requestId,
 		msg.fragmentNumber = fragment;
 
 		size_t thisLength = textLength - offset;
-		thisLength = std::min(thisLength, CanMessageStandardReply::MaxTextLength);
-		memcpy(msg.text, text + offset, thisLength);
+		thisLength = std::min(thisLength, msg.GetMaxTextLength());
+		memcpy(msg.GetText(), text + offset, thisLength);
 		offset += thisLength;
 		msg.moreFollows = (offset < textLength) ? 1 : 0;
 

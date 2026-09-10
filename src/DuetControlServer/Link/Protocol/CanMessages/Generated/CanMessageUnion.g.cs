@@ -93,9 +93,11 @@ public struct CanMessage
     [FieldOffset(0)] public CanMessageSetHeaterTemperatureV1 SetTemp;
 
     /// <summary>
-    /// The standard reply used by many calls. It carries a GCodeResult, some text, and in some cases 8 bits of
-    /// additional information. It can be split into multiple fragments so that the text is not constrained to 60 characters.
-    /// The layout of requestId and resultCode is common to more than one reply type.
+    /// The standard reply used by many calls. It carries a GCodeResult, some text, and in some cases 8 bits
+    /// and/or up to three 32-bit words of additional information. It can be split into multiple fragments so
+    /// that the text is not constrained to 60 characters. The data words are carried in fragment 0 only, ahead
+    /// of the text, so the text does not start at a fixed offset and GetActualDataLength(0) is what says where
+    /// it does start. The layout of requestId and resultCode is common to more than one reply type.
     ///
     /// Mirrors CanMessageStandardReply in CANlib's CanMessageFormats.h. This layout is 64 bytes.
     /// </summary>

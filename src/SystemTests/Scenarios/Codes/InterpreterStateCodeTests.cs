@@ -523,6 +523,32 @@ public class InterpreterStateCodeTests : SystemTests.Host.BenchFixture
                     "M221 without D needs a current tool (RRF GCodes2.cpp case 221)");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].Factor), Is.EqualTo(0.5).Within(1e-3),
                     "a refused M221 leaves move.extruders[0].factor alone (RRF GCodes2.cpp case 221)");
+
+        Assert.That(await bench.Host.ExecuteCodeAsync("M221 S120 D9"), Does.Contain("Invalid extruder number"),
+                    "a D past the last extruder is refused (RRF GetLimitedUIValue against numExtruders)");
+    }
+
+    /// <summary>
+    /// M221 with no D addresses every extruder the current tool collects, and reports them together
+    /// </summary>
+    /// <remarks>
+    /// RRF GCodes2.cpp case 221: without D the factor goes through the current tool's
+    /// IterateExtruders, and the report is "Extrusion factor(s) for current tool:" followed by one
+    /// percentage per extruder. Only a machine with no tool at all answers "No tool selected"
+    /// </remarks>
+    [Test]
+    public async Task M221WithoutDAddressesTheToolsExtruders()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync(configExtra: "M563 P0 D0");
+
+        await bench.Host.ExecuteCodeAsync("T0");
+        await bench.Host.ExecuteCodeAsync("M221 S75");
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].Factor), Is.EqualTo(0.75).Within(1e-3),
+                    "M221 S75 with a tool selected reaches the tool's extruder (RRF Tool::IterateExtruders)");
+
+        string report = await bench.Host.ExecuteCodeAsync("M221");
+        Assert.That(report, Does.Contain("Extrusion factor(s) for current tool: 75.0%"),
+                    "and a bare M221 reports them together (RRF GCodes2.cpp case 221)");
     }
 
     /// <summary>

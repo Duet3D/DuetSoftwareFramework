@@ -640,7 +640,7 @@ struct __attribute__((packed)) CanMessageCreateInputMonitorV1
 	         zero : 4;
 	// Handle the main board will use to refer to this input
 	RemoteInputHandle handle;
-	// Analog threshold, or zero if digital
+	// Analog threshold, or zero if digital. Negative means the reading falls to the threshold on trigger instead of rising to it
 	int32_t threshold;
 	// Shortest interval in milliseconds between reports of a change to this input
 	uint16_t minInterval;
@@ -680,7 +680,7 @@ struct __attribute__((packed)) CanMessageChangeInputMonitorV1
 	static constexpr uint8_t actionDoMonitor = 1;
 	// Delete this handle
 	static constexpr uint8_t actionDelete = 2;
-	// Change the threshold to param and set standard mode
+	// Change the threshold to param (a signed value, see CanMessageCreateInputMonitorV1) and set standard mode
 	static constexpr uint8_t actionChangeThreshold = 3;
 	// Change the minimum interval to param and set standard mode
 	static constexpr uint8_t actionChangeMinInterval = 4;
@@ -690,6 +690,14 @@ struct __attribute__((packed)) CanMessageChangeInputMonitorV1
 	static constexpr uint8_t actionSetDriveLevel = 6;
 	// Select touch mode and set the sensitivity to param, only for scanning Z probes
 	static constexpr uint8_t actionSelectTouchMode = 7;
+	// Tare an analog input in the mode given by param; the baseline comes back as a standard reply data word
+	static constexpr uint8_t actionTare = 8;
+	// value of param, with action actionTare: latch the baseline and hold it until the next tare, used while a probing move is in progress
+	static constexpr uint32_t paramTareAndHold = 0;
+	// value of param, with action actionTare: latch the baseline and let it track slow drift afterwards
+	static constexpr uint32_t paramTareAndTrack = 1;
+	// value of param, with action actionTare: resume tracking from the held baseline without latching, used when a probing move ends with the nozzle possibly still loaded
+	static constexpr uint32_t paramTrackOnly = 2;
 	// value of param, with action actionSetDriveLevel, that asks for the drive level to be calibrated and reported
 	static constexpr uint32_t paramAutoCalibrateDriveLevelAndReport = 0xFFFFFFFF;
 	// value of param, with action actionSetDriveLevel, that asks for the current drive level to be reported
@@ -969,20 +977,24 @@ struct __attribute__((packed)) CanMessageEnableStallEndstop
 	static constexpr CanMessageType messageType = CanMessageType::enableStallEndstop;
 
 	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
-	         zero : 4;
+	         endstopType : 4;		// Which detection mechanism to use, one of the type constants. Firmware that predates this field always sends zero, which is typeMotorLoad
 	// The number of the driver we want to enable a stall endstop for
 	uint16_t driverNumber;
-	// The speed we will use for the homing move; not relevant if driverNumber == disableAll
+	// The speed we will use for the homing move; not relevant if driverNumber == disableAll or endstopType is typeEncoder
 	float speed;
 
 	// If driverNumber is this then we disable all stall endstops on this board
 	static constexpr uint16_t disableAll = 0xFFFF;
+	// Detect a stall using the driver's StallGuard feature
+	static constexpr uint16_t typeMotorLoad = 0;
+	// Detect a stall from the encoder position error
+	static constexpr uint16_t typeEncoder = 1;
 
 	// Set the request ID of this message and clear its reserved fields
 	void SetRequestId(CanRequestId rid) noexcept
 	{
 		requestId = rid;
-		zero = 0;
+		endstopType = 0;
 	}
 };
 static_assert(sizeof(CanMessageEnableStallEndstop) == 8);
@@ -1086,32 +1098,62 @@ struct __attribute__((packed)) CanMessageFirmwareUpdateResponse
 };
 static_assert(sizeof(CanMessageFirmwareUpdateResponse) == 64);
 
-// The standard reply used by many calls. It carries a GCodeResult, some text, and in some cases 8 bits of
-// additional information. It can be split into multiple fragments so that the text is not constrained to 60 characters.
-// The layout of requestId and resultCode is common to more than one reply type.
+// The standard reply used by many calls. It carries a GCodeResult, some text, and in some cases 8 bits
+// and/or up to three 32-bit words of additional information. It can be split into multiple fragments so
+// that the text is not constrained to 60 characters. The data words are carried in fragment 0 only, ahead
+// of the text, so the text does not start at a fixed offset and GetActualDataLength(0) is what says where
+// it does start. The layout of requestId and resultCode is common to more than one reply type.
 struct __attribute__((packed)) CanMessageStandardReply
 {
 	static constexpr CanMessageType messageType = CanMessageType::standardReply;
 
 	uint32_t requestId : 12,		// The request ID of the message we are replying to
 	         resultCode : 4,		// Normally a GCodeResult
-	         fragmentNumber : 7,		// The fragment number of this message
+	         fragmentNumber : 5,		// The fragment number of this message
+	         numWords : 2,		// Number of 32-bit data words preceding the text, fragment 0 only
 	         moreFollows : 1,		// Set if this is not the last fragment of the reply
 	         extra : 8;		// Normally unused, but occasionally carries extra data
-	// The reply text, which is not null terminated if it fills the field
+	// The numWords data words followed by the reply text, which is not null terminated if it fills the field
 	char text[60];
 
-	// how much text one fragment can carry
-	static constexpr size_t MaxTextLength = 60;
+	// how many 32-bit data words one reply can carry ahead of its text
+	static constexpr size_t MaxNumWords = 3;
 
+	// How much text this reply can carry, which is what the data words leave of the field
+	size_t GetMaxTextLength() const noexcept { return sizeof(text) - numWords * sizeof(uint32_t); }
+	// The text, which starts after the data words
+	char *GetText() noexcept { return text + numWords * sizeof(uint32_t); }
+	// The text, which starts after the data words
+	const char *GetText() const noexcept { return text + numWords * sizeof(uint32_t); }
+	// One of the data words. Packed struct, so copy the word out rather than cast to uint32_t*
+	uint32_t GetWord(size_t index) const noexcept
+	{
+		uint32_t word;
+		memcpy(&word, text + index * sizeof(uint32_t), sizeof(word));
+		return word;
+	}
+	// Put data words ahead of the text, which is what shortens the room left for it
+	void SetWords(const uint32_t *words, size_t count) noexcept
+	{
+		numWords = count;
+		memcpy(text, words, count * sizeof(uint32_t));
+	}
 	// How much of a message of the given length is text, stopping at the first null
-	size_t GetTextLength(size_t dataLength) const noexcept { return Strnlen(text, (dataLength < sizeof(uint32_t) + sizeof(text)) ? dataLength - sizeof(uint32_t) : sizeof(text)); }
-	// Length of the message when textLength characters of text are sent
-	size_t GetActualDataLength(size_t textLength) const noexcept { return textLength + sizeof(uint32_t); }
+	size_t GetTextLength(size_t dataLength) const noexcept
+	{
+		// can't use min<> here because it hasn't been moved to RRFLibraries yet
+		const size_t headerLength = (numWords + 1) * sizeof(uint32_t);
+		return (dataLength <= headerLength) ? 0 : Strnlen(GetText(), (dataLength < headerLength + GetMaxTextLength()) ? dataLength - headerLength : GetMaxTextLength());
+	}
+	// Length of the message when textLength characters of text are sent, the data words included
+	size_t GetActualDataLength(size_t textLength) const noexcept { return textLength + (numWords + 1) * sizeof(uint32_t); }
 	// Set the request ID of this message and clear its reserved fields
 	void SetRequestId(CanRequestId rid) noexcept
 	{
 		requestId = rid;
+		fragmentNumber = 0;
+		numWords = 0;
+		moreFollows = false;
 		extra = 0;
 	}
 };

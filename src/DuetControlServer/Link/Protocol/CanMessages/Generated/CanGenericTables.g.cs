@@ -190,10 +190,11 @@ public static class CanGenericTables
         new('A', CanParamType.Float, 0),                                 // acceleration feedforward term added in 3.5beta4
         new('Q', CanParamType.Float, 0),                                 // torque constant in Nm per A added in 3.5 post beta4
         new('Y', CanParamType.ReducedString, 0),                         // magnetic encoder type, added at 3.6.2
+        new('B', CanParamType.Float, 0),                                 // standstill position deadband, added in 3.7.0
     ];
 
     /// <summary>
-    /// Read or write stepper driver register
+    /// Read or write stepper driver register, or configure the sine table waveform correction
     /// Sent as <see cref="CanMessageType.M569P2" />.
     /// </summary>
     public static ImmutableArray<CanParamDescriptor> M569Point2Params { get; } =
@@ -201,6 +202,33 @@ public static class CanGenericTables
         new('P', CanParamType.LocalDriver, 0),
         new('R', CanParamType.UInt8, 0),
         new('V', CanParamType.UInt32, 0),
+        new('S', CanParamType.UInt8, 0),                                 // waveform correction harmonic, added in 3.7
+        new('J', CanParamType.Float, 0),                                 // waveform correction magnitude in degrees, added in 3.7
+        new('O', CanParamType.Float, 0),                                 // waveform correction phase in degrees, added in 3.7
+    ];
+
+    /// <summary>
+    /// Set stepper driver step mode and phase stepping parameters
+    /// Sent as <see cref="CanMessageType.M970" />.
+    /// </summary>
+    public static ImmutableArray<CanParamDescriptor> M970Params { get; } =
+    [
+        new('P', CanParamType.LocalDriver, 0),
+        new('S', CanParamType.UInt8, 0),                                 // step mode: 0 = step and direction, 1 = phase stepping
+        new('V', CanParamType.Float, 0),                                 // velocity feedforward Kv
+        new('A', CanParamType.Float, 0),                                 // acceleration feedforward Ka
+    ];
+
+    /// <summary>
+    /// Configure the phase correction of a phase stepped driver
+    /// Sent as <see cref="CanMessageType.M970P3" />.
+    /// </summary>
+    public static ImmutableArray<CanParamDescriptor> M970Point3Params { get; } =
+    [
+        new('P', CanParamType.LocalDriver, 0),
+        new('S', CanParamType.UInt8, 0),                                 // harmonic of the electrical cycle
+        new('J', CanParamType.Float, 0),                                 // correction magnitude in degrees
+        new('O', CanParamType.Float, 0),                                 // correction phase in degrees
     ];
 
     /// <summary>
@@ -339,6 +367,8 @@ public static class CanGenericTables
         new('I', CanParamType.UInt8, 0),                                 // orientation
         new('R', CanParamType.UInt8, 0),                                 // resolution (bits)
         new('S', CanParamType.UInt16, 0),                                // sampling rate
+        new('Q', CanParamType.UInt32, 0),                                // SPI clock frequency
+        new('C', CanParamType.ReducedString, 0),                         // pins to use when the accelerometer is connected via SPI
     ];
 
     /// <summary>

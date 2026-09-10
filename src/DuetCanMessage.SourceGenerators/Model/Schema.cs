@@ -152,6 +152,14 @@ public sealed class MethodDef : IEmittable
     public string? CppSignature;
 
     /// <summary>
+    /// Verbatim C++ body for a method declared with <see cref="CppSignature"/>, one entry per line and
+    /// without the enclosing braces. A signature the neutral language cannot express usually cannot have
+    /// its body written in it either, and CANlib defines these inline, so a generated header that only
+    /// declared them would no longer be a drop-in replacement.
+    /// </summary>
+    public List<string> CppBody = [];
+
+    /// <summary>
     /// True for a constructor: it has no return type, is named after its struct and may carry a member
     /// initialiser list. C# structs cannot reproduce a zero-initialising parameterless constructor
     /// (<c>default</c> and array allocation bypass it), so constructors are emitted for C++ only.
@@ -1068,6 +1076,10 @@ public sealed class CanSchema
             Constexpr = Bool(o, "constexpr") ?? false,
             CppSignature = Str(o, "cppSignature")
         };
+        if (o["cppBody"] is JsonArray cppBody)
+        {
+            m.CppBody = [.. cppBody.Select(n => n!.GetValue<string>())];
+        }
         if (o["emit"] is JsonArray emit)
         {
             m.Emit = [.. emit.Select(n => ParseLanguage(n!.GetValue<string>()))];
