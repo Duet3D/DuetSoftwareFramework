@@ -234,7 +234,7 @@ static void HandleInputStateChanged(CanMessageBuffer& buf, CanMessageType id) no
 #endif
 }
 
-void CommandProcessor::ForwardMessageToSbc(CanMessageBuffer& buf) noexcept
+bool CommandProcessor::ForwardMessageToSbc(CanMessageBuffer& buf) noexcept
 {
 #  if HAS_SBC_INTERFACE
 	SbcInterface& sbc = reprap.GetSbcInterface();
@@ -264,10 +264,7 @@ void CommandProcessor::ForwardMessageToSbc(CanMessageBuffer& buf) noexcept
 	header.status = (uint8_t)CanStatus::Ok;
 	header.padding = 0;
 	header.padding2 = 0;
-	if (!sbc.EnqueueCanResponse(header, reinterpret_cast<const char*>(&buf.msg)))
-	{
-		// TODO handle this error
-	}
+	const bool queued = sbc.EnqueueCanResponse(header, reinterpret_cast<const char*>(&buf.msg));
 
 	if (mapping != nullptr)
 	{
@@ -276,8 +273,10 @@ void CommandProcessor::ForwardMessageToSbc(CanMessageBuffer& buf) noexcept
 			CanInterface::ReleasePendingRequest(mapping);
 		}
 	}
+	return queued;
 #  else
 	(void)buf;
+	return false;
 #  endif
 }
 
@@ -299,7 +298,11 @@ void CommandProcessor::ProcessReceivedMessage(CanMessageBuffer& buf) noexcept
 		}
 
 		{
-			const bool forwardToSbc = true;
+			// Forward broadcasts, status reports and responses (including standard replies) to the SBC.
+			// This happens before the local handling below because some of that handling replies to the
+			// sender out of this same buffer, which overwrites the message we have to forward.
+			ForwardMessageToSbc(buf);
+
 			// Handle messages received in normal operation mode
 			switch (id)
 			{
@@ -309,7 +312,7 @@ void CommandProcessor::ProcessReceivedMessage(CanMessageBuffer& buf) noexcept
 				// rather than at the SBC. That is the whole point of doing it in this task: the round
 				// trip to the SBC and back would let the axis overrun the endstop.
 				//
-				// The message is still forwarded below, because the object model has to see the input
+				// The message is forwarded as well, because the object model has to see the input
 				// change whether or not anything was moving
 				HandleInputStateChanged(buf, id);
 				break;
@@ -330,12 +333,6 @@ void CommandProcessor::ProcessReceivedMessage(CanMessageBuffer& buf) noexcept
 
 			default:
 				break;
-			}
-
-			// Forward broadcasts, status reports and responses (including standard replies) to the SBC
-			if (forwardToSbc)
-			{
-				ForwardMessageToSbc(buf);
 			}
 		}
 	}

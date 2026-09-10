@@ -690,7 +690,7 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
                     bool wasRunning = false;
                     using (await model.AccessReadWriteAsync(stoppingToken))
                     {
-                        if (address < model.Boards.Count && model.Boards[address] is Board board && board.State == BoardState.Running)
+                        if (FindBoard(address) is Board board && board.State == BoardState.Running)
                         {
                             board.State = BoardState.TimedOut;
                             wasRunning = true;
@@ -726,7 +726,15 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
     /// </remarks>
     public void Invalidate() => Array.Clear(_lastSeen);
 
-    private Board GetOrCreateBoard(byte address)
+    /// <summary>
+    /// Find the board at a CAN address, or null if none has been heard from
+    /// </summary>
+    /// <param name="address">CAN address of the board</param>
+    /// <remarks>
+    /// <c>boards[]</c> is in the order the boards were discovered rather than by CAN address, so the
+    /// address is a field to match on and not an index
+    /// </remarks>
+    private Board? FindBoard(byte address)
     {
         foreach (Board existing in model.Boards)
         {
@@ -734,6 +742,15 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
             {
                 return existing;
             }
+        }
+        return null;
+    }
+
+    private Board GetOrCreateBoard(byte address)
+    {
+        if (FindBoard(address) is Board existing)
+        {
+            return existing;
         }
 
         Board board = new() { CanAddress = address, State = BoardState.Unknown };

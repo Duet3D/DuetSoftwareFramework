@@ -18,13 +18,18 @@
 #  include <Movement/StepTimer.h>
 
 #  include <CAN/CanException.h>
+#  include <CAN/CommandProcessor.h>
 
 ReadWriteLock ExpansionManager::boardsLock;
 
 ExpansionBoardData::ExpansionBoardData() noexcept
 	: typeName(nullptr)
 	, whenLastStatusReportReceived(0)
+	, whenBoardStarted(0)
 	, state(BoardState::Unknown)
+	, numDrivers(0)
+	, announcedV1(false)
+	, usesUf2Binary(false)
 {
 }
 
@@ -33,6 +38,7 @@ ExpansionManager::ExpansionManager() noexcept
 	, m_numBoardsFlashing(0)
 	, m_lastIndexSearched(0)
 	, m_lastAddressFound(0)
+	, m_replayNextAddress(NoReplayPending)
 {
 	// The boards table array is initialised by its constructor. Note, boards[0] is not used.
 }
@@ -82,16 +88,24 @@ void ExpansionManager::ProcessAnnouncement(CanMessageBuffer& buf, bool isNewForm
 			const WriteLocker lock(boardsLock);
 
 			board.whenLastStatusReportReceived = millis();
+			board.announcedV1 = isNewFormat;
 			String<StringLength100> boardTypeAndFirmwareVersion;
 			if (isNewFormat)
 			{
 				boardTypeAndFirmwareVersion.copy(buf.msg.announceV1.boardTypeAndFirmwareVersion,
 												 CanMessageAnnounceV1::GetMaxTextLength(buf.dataLength));
+				board.numDrivers = buf.msg.announceV1.numDrivers;
+				board.usesUf2Binary = buf.msg.announceV1.usesUf2Binary;
+				// The boards are synchronised to our clock, so rebasing the age it reported onto ours
+				// keeps it correct however long ago this was
+				board.whenBoardStarted = millis() - buf.msg.announceV1.timeSinceStarted;
 			}
 			else
 			{
 				boardTypeAndFirmwareVersion.copy(buf.msg.announceV0.boardTypeAndFirmwareVersion,
 												 CanMessageAnnounceV0::GetMaxTextLength(buf.dataLength));
+				board.numDrivers = buf.msg.announceV0.numDrivers;
+				board.whenBoardStarted = millis() - buf.msg.announceV0.timeSinceStarted;
 			}
 			UpdateBoardState(src, BoardState::Unknown);
 			if (board.typeName == nullptr || strcmp(board.typeName, boardTypeAndFirmwareVersion.c_str()) != 0)
@@ -127,7 +141,8 @@ void ExpansionManager::ProcessAnnouncement(CanMessageBuffer& buf, bool isNewForm
 			UpdateBoardState(src, BoardState::Running);
 		}
 
-		// Tell the sending board that we don't need any more announcements from it
+		// Tell the sending board that we don't need any more announcements from it. This overwrites the
+		// announcement in buf, so the caller must be done with it - see CommandProcessor::ProcessReceivedMessage
 		buf.SetupRequestMessageNoRid<CanMessageAcknowledgeAnnounce>(CanInterface::GetCanAddress(), src);
 		CanInterface::SendMessageNoReplyNoFree(buf);
 	}
@@ -162,6 +177,72 @@ void ExpansionManager::ProcessBoardStatusReport(const CanMessageBuffer& buf) noe
 			StepTimer::ProcessMovementDelayRequest(msg.movementDelay);
 		}
 	}
+}
+
+// Arrange for the SBC to be told about every board we have already heard from
+//
+// A board announces itself until it is acknowledged and then goes quiet, so an announcement made while the SBC was not
+// listening is the only one it will ever make. That is the normal case rather than an edge case: the boards and this
+// firmware are running within a second of power being applied, and the SBC takes far longer than that to boot. It is
+// also what a restart of DuetControlServer leaves behind, because that clears its boards[] and the boards have no
+// reason to announce again. Replaying what the announcement left here is what fills those entries in.
+void ExpansionManager::BeginReplayToSbc() noexcept
+{
+	m_replayNextAddress = 0;
+}
+
+// Send as much of the replay as the SBC has room for, in the form it decodes announcements in. A machine can carry more
+// boards than the response queue holds entries, so this is called until it has nothing left to send.
+void ExpansionManager::ContinueReplayToSbc() noexcept
+{
+	if (m_replayNextAddress == NoReplayPending)
+	{
+		return;
+	}
+
+	const ReadLocker lock(boardsLock);
+
+	while (m_replayNextAddress <= CanId::MaxCanAddress)
+	{
+		const auto addr = (CanAddress)m_replayNextAddress;
+		const ExpansionBoardData& board = m_boards[addr];
+		if (board.state != BoardState::Running || board.typeName == nullptr)
+		{
+			++m_replayNextAddress;
+			continue;
+		}
+
+		// Sent from the board's own address, so that the SBC applies it to the board it describes
+		CanMessageBuffer buf;
+		if (board.announcedV1)
+		{
+			const auto msg = buf.SetupRequestMessageNoRid<CanMessageAnnounceV1>(addr, CanInterface::GetCanAddress());
+			msg->timeSinceStarted = millis() - board.whenBoardStarted;
+			msg->numDrivers = board.numDrivers;
+			msg->usesUf2Binary = board.usesUf2Binary;
+			msg->isReconnect = 0;
+			msg->wasShutDown = 0;
+			memcpy(msg->uniqueId, board.uniqueId.GetRaw(), sizeof(msg->uniqueId));
+			SafeStrncpy(msg->boardTypeAndFirmwareVersion, board.typeName, ARRAY_SIZE(msg->boardTypeAndFirmwareVersion));
+			buf.dataLength = msg->GetActualDataLength();
+		}
+		else
+		{
+			const auto msg = buf.SetupRequestMessageNoRid<CanMessageAnnounceV0>(addr, CanInterface::GetCanAddress());
+			msg->timeSinceStarted = millis() - board.whenBoardStarted;
+			msg->numDrivers = board.numDrivers;
+			SafeStrncpy(msg->boardTypeAndFirmwareVersion, board.typeName, ARRAY_SIZE(msg->boardTypeAndFirmwareVersion));
+			buf.dataLength = msg->GetActualDataLength();
+		}
+
+		if (!CommandProcessor::ForwardMessageToSbc(buf))
+		{
+			return;					// no room left; this board goes in the next transfer
+		}
+		++m_replayNextAddress;
+	}
+
+	m_replayNextAddress = NoReplayPending;
 }
 
 // Return a pointer to the expansion board, if it is present

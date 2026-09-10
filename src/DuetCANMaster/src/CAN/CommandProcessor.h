@@ -18,8 +18,8 @@ namespace CommandProcessor
 {
 	void ProcessReceivedMessage(
 		CanMessageBuffer& buf) noexcept; // Process a received broadcast or request message and free the message buffer
-	void ForwardMessageToSbc(
-		CanMessageBuffer& buf) noexcept; // Forward a received CAN message to the SBC, collating multi-fragment replies
+	bool ForwardMessageToSbc(CanMessageBuffer& buf) noexcept; // Forward a received CAN message to the SBC, collating
+															  // multi-fragment replies. False if its queue was full
 	void AppendBadMotionStats(const StringRef& reply) noexcept; // Append diagnostics relating to bad motion messages
 } // namespace CommandProcessor
 

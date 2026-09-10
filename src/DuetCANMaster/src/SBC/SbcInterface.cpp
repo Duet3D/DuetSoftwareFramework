@@ -28,6 +28,7 @@
 #  if SUPPORT_CAN_EXPANSION
 #	include <CAN/CanInterface.h>
 #	include <CAN/CanMotion.h>
+#	include <CAN/ExpansionManager.h>
 #	include <CanMessageBuffer.h>
 
 #	include <algorithm>
@@ -294,7 +295,15 @@ static void SendUsbInitMessage(SerialCDC* dev) noexcept
 				reprap.GetPlatform().MessageF(NetworkInfoMessage,
 											  "Connection to SBC established over %s!\n",
 											  m_transfer.GetTransportType() == SbcTransportType::Usb ? "USB" : "SPI");
+
+				// The SBC starts with no record of the expansion boards and the boards only announce
+				// themselves until they are acknowledged, so this is where it is told what we know
+				reprap.GetExpansion().BeginReplayToSbc();
 			}
+
+			// A machine can carry more boards than the response queue holds, so the replay is topped up
+			// here for as many transfers as it takes
+			reprap.GetExpansion().ContinueReplayToSbc();
 
 			// Handle exchanged data and kick off the next transfer
 			ExchangeData();
@@ -842,6 +851,14 @@ void SbcInterface::InvalidateResources() noexcept
 	{
 		const MutexLocker lock(m_gcodeReplyMutex);
 		m_gcodeReply.ReleaseAll();
+	}
+
+	// The queued CAN responses describe a connection that is gone, and the SBC discards what it knew
+	// along with it. Status reports are periodic and the announcements are replayed on reconnect, so
+	// delivering these late would only apply readings older than the ones about to arrive.
+	{
+		const TaskCriticalSectionLocker lock;
+		m_canResponseTail = m_canResponseHead;
 	}
 
 	// TODO Turn off all the heaters
