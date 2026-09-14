@@ -430,6 +430,7 @@ $postinst_failed && exit 1
 
 # --- Start services if requested ---
 if $START_SERVICES; then
+    sleep 1
     if $LOCAL; then
         echo "=== Starting DSF services ==="
         sudo systemctl start $SERVICES || true
