@@ -35,6 +35,42 @@ public readonly record struct CanResponse(CanStatus Status, CanMessageType Respo
                request.Extra, request.ResultCode);
 
     /// <summary>
+    /// Whether this stands in for a reply that never came, rather than carrying one
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>GCodeResult::canResponseTimeout</c>, which its callers branch on: a
+    /// diagnostics fetch that loses the board part way through has to stop asking for the rest, and
+    /// must not print a header for a report it is not going to get
+    /// </remarks>
+    public bool TimedOut { get; init; }
+
+    /// <summary>
+    /// The answer a request stands in with when the board never gave one
+    /// </summary>
+    /// <param name="request">The request that went unanswered</param>
+    /// <returns>A reply carrying RepRapFirmware's wording for a CAN timeout</returns>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>CanInterface::SendRequestAndGetStandardReply</c> ends
+    /// <c>reply.lcatf("CAN response timeout: board %u, req type %u, RID %u", …)</c> and returns
+    /// <c>canResponseTimeout</c>, which is reported rather than thrown: a board that does not answer
+    /// is something the operator is told about, not a fault in the code that asked. Throwing loses
+    /// that, and loses it twice over - the caller gets an exception message about an operation rather
+    /// than about a board, and every code after it in a macro is abandoned.
+    /// </para>
+    /// <para>
+    /// The request id is DuetCANMaster's to allocate - this side sends the all-ones placeholder and
+    /// never learns what it became - so the transmission token stands in for it. It identifies the
+    /// same request in this program's logs, which is what a reader of this line needs it for
+    /// </para>
+    /// </remarks>
+    internal static CanResponse FromTimeout(CanRequest request)
+        => new(CanStatus.Ok, CanMessageType.StandardReply, request.DstAddress, request.DstAddress,
+               Encoding.ASCII.GetBytes($"CAN response timeout: board {request.DstAddress}, "
+                                       + $"req type {(ushort)request.MessageType}, RID {request.TxToken}"),
+               Extra: 0, ResultCode: null) { TimedOut = true };
+
+    /// <summary>
     /// Text the board sent with the reply, empty if it said nothing
     /// </summary>
     /// <remarks>

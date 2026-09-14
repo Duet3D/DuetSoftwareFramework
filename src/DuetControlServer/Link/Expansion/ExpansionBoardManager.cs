@@ -735,7 +735,7 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
     /// <c>boards[]</c> is in the order the boards were discovered rather than by CAN address, so the
     /// address is a field to match on and not an index
     /// </remarks>
-    private Board? FindBoard(byte address)
+    public Board? FindBoard(byte address)
     {
         foreach (Board existing in model.Boards)
         {
@@ -747,7 +747,20 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
         return null;
     }
 
-    private Board GetOrCreateBoard(byte address)
+    /// <summary>
+    /// The board at a CAN address, creating the entry if nothing has been heard from it yet
+    /// </summary>
+    /// <param name="address">CAN address of the board</param>
+    /// <returns>The board</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>boards[]</c> is one entry per address, always present and
+    /// <c>state == unknown</c> until the board announces itself, so a command may record something
+    /// about a board that is not there yet. Here the collection holds only what has been discovered,
+    /// and this is what stands in for that: the entry is created in the same unknown state, which is
+    /// what keeps it out of the reports that enumerate boards. The caller must hold the object model
+    /// write lock
+    /// </remarks>
+    public Board GetOrCreateBoard(byte address)
     {
         if (FindBoard(address) is Board existing)
         {

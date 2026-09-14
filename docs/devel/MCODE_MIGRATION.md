@@ -548,11 +548,11 @@ frame in `testcases/fans/m106-fan-invert-and-frequency.yaml` and turned one diff
 | M80 | 1588 | ATX power on | `state.atxPower` | ⬜ |
 | M81 | 1592 | ATX power off | `state.atxPower` | ⬜ |
 | M110 | 1933 | Set line number | — | ⬜ |
-| M111 | 1937 | Debug level | → CAN generic `M111Params` | 🟡 sets DSF log levels; nothing is sent to a board |
+| M111 | 1937 | Debug level | → CAN generic `M111Params` | 🟡 `B` forwards to the board; the main board's own module list is an open decision |
 | M112 | 1941 | Emergency stop | → CAN `CanMessageEmergencyStop` | ✅ |
 | M115 | 1949 | Firmware version / board type | `boards[]` → CAN `CanMessageReturnInfo` | 🟡 `B>0` works; `B0` is a TODO stub |
 | M117 | 2084 | Display message | `state.displayMessage` | ⬜ |
-| M122 | 2227 | Diagnostics | `boards[]` → CAN generic `M122P1Params` | 🟡 DSF diagnostics for board 0; `B>0` reports that it is not supported |
+| M122 | 2227 | Diagnostics | `boards[]` → CAN generic `M122P1Params` | 🟡 DSF diagnostics for board 0, `B>0` fetched from the board; `P` is an open decision |
 | M150 | 2427 | Set LED colours | `ledStrips[]` → CAN generic `M150Params` | ⬜ |
 | M260 | 2778 | I2C send / Modbus write | — | ⬜ only local-variable bookkeeping exists |
 | M261 | 2782 | I2C receive / Modbus read | — | ⬜ only local-variable bookkeeping exists |
@@ -565,7 +565,7 @@ frame in `testcases/fans/m106-fan-invert-and-frequency.yaml` and turned one diff
 | M581 | 3948 | Configure external trigger | `sensors.gpIn[]` | 🟡 the `M581.1` expression form only; the plain form can drop a trigger and nothing runs `trigger<n>.g` |
 | M582 | 3952 | Check external trigger | `sensors.gpIn[]` | ⬜ |
 | M594 | 4002 | Height following mode | — | ⬜ |
-| M655 | 4046 | CAN configuration | → CAN generic `M655Params` | ⬜ |
+| M655 | 4046 | Custom CAN request | → CAN generic `M655Params` | ✅ |
 | M905 | 4373 | Set RTC date and time | — | ⬜ |
 | M911 | 4472 | Auto-save on power loss | `state.powerFailScript` | ⬜ |
 | M912 | 4522 | MCU temperature calibration | `boards[].mcuTemp` | ⬜ |
@@ -576,16 +576,86 @@ frame in `testcases/fans/m106-fan-invert-and-frequency.yaml` and turned one diff
 | M951 | 4594 | Height control | — | ⬜ |
 | M952 | 4600 | Change expansion board CAN address | → CAN `CanMessageSetAddressAndNormalTiming` | ✅ |
 | M953 | 4604 | CAN fast data rate | → CAN `CanMessageSetAddressAndNormalTiming` | ✅ |
-| M954 | 4610 | Configure as expansion board | — | ⛔ DSF is always the main board |
+| M954 | 4610 | Configure as expansion board | — | ⛔ DSF is always the main board, but the refusal should be an error |
 | M955 | 4619 | Configure accelerometer | `boards[].accelerometer` → CAN generic `M955Params` | ⬜ |
 | M956 | 4623 | Start accelerometer collection | → CAN `CanMessageStartAccelerometer` | ⬜ |
 | M957 | 4628 | Raise event | Event queue — [EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) | ✅ |
-| M959 | 4633 | Expansion board connection timeout | → CAN generic `M959Params` | ⬜ |
+| M959 | 4633 | Expansion board connection timeout | `boards[].timeout` → CAN generic `M959Params` | ✅ |
 | M997 | 4645 | Firmware update | → CAN `CanMessageUpdateYourFirmware` | ✅ |
 | M998 | 4650 | Request resend | — | ⬜ throws `NotSupportedException`, so it answers "Command is not supported" |
 | M999 | 4663 | Reset | → CAN `CanMessageReset` | ✅ |
 | M750-M756 | 4345 | 3D scanner extension | — | ⛔ withdrawn in RRF |
 | M408 | — | Legacy status report | — | ⛔ withdrawn in RRF 3.7 |
+
+#### The codes that address the bus, or a board across it
+
+[DuetRegressionTesting](../../lib/DuetRegressionTesting)'s `testcases/can/` folder is eighteen cases
+covering M111, M115, M122, M655, M952, M953, M954, M959 and M999 where each addresses the CAN bus or
+a board on it.
+[CanBusCodeTests](../../src/SystemTests/Scenarios/Codes/CanBusCodeTests.cs) mirrors them, and all of
+it is ported except the two decisions at the end of this section. What the work amounted to:
+
+* **The parameter guards.** `M952` read B with `GetUInt('B', 0)`, so a missing B was
+  indistinguishable from board 0: the code addressed DuetCANMaster, which answers nothing, and
+  reported the CAN response timeout instead of the mistake. B was not range-checked at all, so
+  `M952 B200` cast 200 to a byte and addressed whatever that truncates to. `TryGetBoardAddress` is
+  now the one place a B is read, ported from `CanInterface::CheckCanAddress`, and M954 and M959 use
+  it too.
+* **A bare M953 reports the bus timing**, as `CanInterface::EnableCan`'s else branch does. The
+  timing it reports is `LinkInterface.CurrentCanTiming`, the last timing this side asked for:
+  RepRapFirmware reads it back out of the CAN peripheral, which here belongs to DuetCANMaster and
+  answers no query for it. M953 also enables the bus, which RepRapFirmware does not - there it is a
+  TODO in the same function - and that stays: DuetCANMaster has to be told to bring the bus up, and
+  config.g leads with M953 for that reason.
+* **`M999 B<n>`, `M122 B<n>`, `M111 B<n>` and M655** all reach the board. M122's report does not fit
+  one reply, so it is fetched a part at a time: each request names the part and the board answers
+  with that part's text and, in the reply's extra byte, the number of the last part there is. An
+  empty part is skipped rather than taken for the end.
+* **M959** keeps `boards[].timeout` on this side as well as sending it, and writes this side's copy
+  *first*, which is what `ExpansionManager::ConfigureConnectionTimeout` does. That is not a detail:
+  no firmware handles `setConnectionTimeout` yet, so the send times out on real hardware and the
+  copy is all there is. The regression case is marked `known_bad` for the same reason.
+* **M954 stays refused**, because this program is always the main board (§1.4) and has nothing to
+  become an expansion board of, but it is an error naming the missing A rather than a warning that
+  the code is unsupported. The two say different things to a client that branches on severity.
+
+`boards[]` is worth one note. RepRapFirmware's is one entry per address, always present and
+`state == unknown` until the board announces itself, so a command may record something about a board
+that is not there yet. Here the collection holds only what has been discovered, so M959 creates the
+entry in that same unknown state through `ExpansionBoardManager.GetOrCreateBoard`, and the bare M959
+listing filters `unknown` out exactly as RepRapFirmware's does.
+
+Twelve of the eighteen pass on the bench, up from three. Of the six that do not, three are the
+decisions below and the rest are these:
+
+* **`m122-diagnostics-1hcl` differs inside the noise it scrubs.** The report comes back whole and in
+  order; what still differs is the free-stack figures inside the `Tasks:` line. `m122-diagnostics-6hc`
+  passes with the same scrub list, so this is the case's patterns rather than anything DSF does.
+* **`m999-restart-expansion-*` produce the right answer and the suite records none of it.**
+  `M999 B1` answers `Board 1 resetting` in 31 ms, on the `rr_gcode`/`rr_reply` path the suite itself
+  uses, and the board reboots and rejoins. The case still reads as an empty reply, in isolation as
+  well as in a full run, so this is how the harness collects a reply for a code it has listed under
+  `no_reply`. Worth noting while looking at it: the reconnection that follows is appended as
+  `Error: Expansion board 1 reconnected`, and a board coming back is not an error.
+
+Four of the cases that used to fail were one bug, and it was not in the CAN layer at all: the closing
+fragment of a long reply was being discarded by the SPI packet decoder, which lost
+`m111-debug-on-expansion`, both `m122-diagnostics-*`, and `m953` - the last of those because
+`M952 B0`, the query that asks the controller what the bus is actually running at, is itself a reply
+long enough to end unaligned. See [SPI_LINK.md](SPI_LINK.md) §3.
+
+Two of the eighteen are not ported, and both are the same question rather than a gap. Neither has a
+scenario, because a test for something decided against is noise:
+
+* **M111's module listing** is RepRapFirmware's own subsystem list - Platform, Network, Gcodes, Move
+  and the rest - and its `F` parameter sizes an ISR debug buffer. Neither exists here. On this
+  architecture the main board *is* DSF, so what M111 without a B should report is a decision about
+  which of this program's subsystems are separately debuggable, not a port. `M111 P-1 S"<level>"`,
+  the DSF log-level control, is what it does today, and `M111 B<n>` reaches the board.
+* **M122 P1 and P105** are the same shape: P1 checks MCU temperature, VIN, the 12V rail and the
+  drivers against ranges, and P105 prints the sizes of the firmware's internal objects. Every reading
+  P1 wants now lives on an expansion board, and P105's objects are RepRapFirmware's. Both need a
+  decision about what they mean when the main board is a Linux process before they can be written.
 
 ---
 

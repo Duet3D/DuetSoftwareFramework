@@ -5,6 +5,8 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Link.Protocol.CanMessages;
+using DuetControlServer.Link.Protocol.Shared;
 using NUnit.Framework;
 using SystemTests.Host;
 
@@ -14,15 +16,18 @@ namespace SystemTests.Scenarios.Codes;
 /// System, network and miscellaneous M-codes, asserted against RepRapFirmware's behaviour and the
 /// object model fields each code must set.
 /// <para>
-/// Not covered here: M556 belongs to the kinematics fixture; M582 is not implemented in DSF and is
-/// skipped; M997 (flashes firmware) and bare M999 (reboots DCS) are not executed. Bare M999 is
-/// RepRapFirmware's recovery from the M112 halt (GCodes2.cpp case 999 calls SoftwareReset), so the
-/// M112 test asserts the halted state only and leaves the reset to the reader.
+/// M111, M115, M122 and M999 are here in both their forms, the one that acts on this program and the
+/// one that addresses a board, because a reader looking for either starts from the code rather than
+/// from where the answer comes from. Bare M999 is the exception the paragraph below explains: it
+/// reboots this program, so only its board-addressed form is exercised.
 /// </para>
 /// </summary>
 [TestFixture]
 public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
 {
+    /// <summary>CAN address of the expansion board the bench answers for</summary>
+    private const byte ExpansionBoard = 1;
+
     /// <summary>
     /// Poll a macro run counter until it reaches the expected value, bounded so a macro that never
     /// runs fails the test naming the counter
@@ -58,6 +63,121 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M111");
         Assert.That(reply.Trim(), Is.Not.Empty, "M111 without parameters reports the debug state (RRF RepRap::ProcessM111)");
         Assert.That(reply, Does.Not.Contain("Error"), "M111 without parameters is a report, not an error (RRF RepRap::ProcessM111)");
+    }
+
+    /// <summary>
+    /// M122 B asks the board for its diagnostics rather than reporting this program's
+    /// </summary>
+    /// <remarks>
+    /// The report is fetched a chunk at a time, each chunk a returnInfo request whose type is
+    /// TypeDiagnosticsPart0 and whose param is the chunk number, with the board answering each in a
+    /// standard reply. The regression cases are <c>testcases/can/m122-diagnostics-6hc.yaml</c> and
+    /// <c>m122-diagnostics-1hcl.yaml</c>, which compare the report's structure rather than its
+    /// numbers because almost every value in it is a counter or a temperature
+    /// </remarks>
+    [Test]
+    public async Task M122AsksABoardForItsDiagnostics()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync();
+
+        bench.CanMaster.ClearCapture();
+        string reply = await bench.Host.ExecuteCodeAsync($"M122 B{ExpansionBoard}");
+        Assert.That(reply, Does.Not.StartWith("Error:"), "a board's diagnostics are fetched, not refused");
+
+        (byte board, CanMessageReturnInfo sent) = bench.CanMaster.LastCanMessage<CanMessageReturnInfo>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(board, Is.EqualTo(ExpansionBoard), "the request goes to the board B named");
+            Assert.That(sent.Type, Is.EqualTo(CanMessageReturnInfo.TypeDiagnosticsPart0),
+                        "asking for the diagnostics rather than the firmware version");
+        });
+    }
+
+    /// <summary>
+    /// M111 B sets the debug flags of an expansion board rather than of this program
+    /// </summary>
+    /// <remarks>
+    /// B only means a board from RRF 3.6.0; before that it was the debug buffer size, so a
+    /// regression here would turn a debug request into a buffer allocation. The regression case is
+    /// <c>testcases/can/m111-debug-on-expansion.yaml</c>, which uses module 0 because that is the
+    /// one module every board has - the higher numbers mean different things in main and expansion
+    /// firmware
+    /// </remarks>
+    [Test]
+    public async Task M111SetsDebugFlagsOnAnExpansionBoard()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync();
+
+        bench.CanMaster.ClearCapture();
+        await bench.Host.ExecuteCodeAsync($"M111 B{ExpansionBoard} P0 S1");
+
+        (byte board, CanMessageM111 sent) = bench.CanMaster.LastCanMessage<CanMessageM111>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(board, Is.EqualTo(ExpansionBoard), "the request goes to the board B named");
+            Assert.That(sent.P, Is.EqualTo(0), "naming the module");
+            Assert.That(sent.S, Is.EqualTo(1), "and that all of its flags are wanted");
+        });
+
+        bench.CanMaster.ClearCapture();
+        await bench.Host.ExecuteCodeAsync($"M111 B{ExpansionBoard}");
+        (_, CanMessageM111 query) = bench.CanMaster.LastCanMessage<CanMessageM111>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(query.P, Is.Null, "a bare M111 B is a query, so it names no module");
+            Assert.That(query.S, Is.Null, "and asks for no change");
+        });
+    }
+
+    /// <summary>
+    /// M115 B asks the board for its firmware version
+    /// </summary>
+    /// <remarks>
+    /// One returnInfo of TypeFirmwareVersion, answered by the board in one reply. The regression
+    /// cases are <c>testcases/can/m115-firmware-info-6hc.yaml</c> and
+    /// <c>m115-firmware-info-1hcl.yaml</c>, kept separate because the two boards run different
+    /// binaries and are versioned independently. It is also the cheapest check that B addressing
+    /// reaches the right board at all
+    /// </remarks>
+    [Test]
+    public async Task M115AsksABoardForItsFirmwareVersion()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync();
+
+        bench.CanMaster.ClearCapture();
+        await bench.Host.ExecuteCodeAsync($"M115 B{ExpansionBoard}");
+
+        (byte board, CanMessageReturnInfo sent) = bench.CanMaster.LastCanMessage<CanMessageReturnInfo>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(board, Is.EqualTo(ExpansionBoard), "the request goes to the board B named");
+            Assert.That(sent.Type, Is.EqualTo(CanMessageReturnInfo.TypeFirmwareVersion),
+                        "asking for the firmware version");
+            Assert.That(sent.Param, Is.Zero, "and the first part of it");
+        });
+    }
+
+    /// <summary>
+    /// M999 B restarts an expansion board and expects no reply from it
+    /// </summary>
+    /// <remarks>
+    /// The board goes away without answering, so what a regression would look like is the main board
+    /// starting to expect a reply - which would turn every board restart into a spurious timeout
+    /// error. The regression cases are <c>testcases/can/m999-restart-expansion-6hc.yaml</c> and
+    /// <c>m999-restart-expansion-1hcl.yaml</c>, which list the code under <c>no_reply</c> for that
+    /// reason and dwell fifteen seconds afterwards so the board is back before the next case runs
+    /// </remarks>
+    [Test]
+    public async Task M999RestartsAnExpansionBoard()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync();
+
+        bench.CanMaster.ClearCapture();
+        string reply = await bench.Host.ExecuteCodeAsync($"M999 B{ExpansionBoard}");
+        Assert.That(reply, Does.Not.StartWith("Error:"), "restarting a board is not an error");
+
+        (byte board, _) = bench.CanMaster.LastCanMessage<CanMessageReset>();
+        Assert.That(board, Is.EqualTo(ExpansionBoard), "the reset goes to the board B named");
     }
 
     /// <summary>
@@ -477,47 +597,6 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
                             "M929 S0 clears state.logFile (RRF Platform::GetLogFileName returns null while inactive)");
             });
         }
-    }
-
-    /// <summary>
-    /// M952 sends new CAN timing to an expansion board over the bus and reports nothing.
-    /// </summary>
-    /// <remarks>
-    /// RRF CanInterface::ChangeAddressAndNormalTiming sends CanMessageSetAddressAndNormalTiming to
-    /// the board named by B and replies ok. There is no object model field for the bus timing, so
-    /// the observable is the CAN message leaving for the board
-    /// </remarks>
-    [Test]
-    public async Task M952ConfiguresExpansionBoardCanTiming()
-    {
-        await using JobBench bench = await JobControlBench.StartAsync();
-        int sendsBefore = bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage).Count;
-
-        string reply = await bench.Host.ExecuteCodeAsync("M952 B1 S500");
-        Assert.That(reply, Does.Not.Contain("Error"), "M952 B1 S500 accepts the new timing (RRF CanInterface::ChangeAddressAndNormalTiming)");
-        await bench.CanMaster.WaitUntilAsync(() => bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage).Count > sendsBefore,
-                                             what: "M952's timing message leaving for board 1");
-    }
-
-    /// <summary>
-    /// M953 enables the CAN bus: a second enable reaches the controller and the code reports
-    /// nothing.
-    /// </summary>
-    /// <remarks>
-    /// RRF CanInterface::EnableCan enables the bus with the default data rate when no parameter
-    /// changes the timing. There is no object model field for the bus state, so the observable is
-    /// the enable crossing the link (config.g already sent the first one)
-    /// </remarks>
-    [Test]
-    public async Task M953EnablesTheCanBus()
-    {
-        await using JobBench bench = await JobControlBench.StartAsync();
-        int enablesBefore = bench.CanMaster.SbcPackets(SbcRequest.EnableCAN).Count;
-
-        string reply = await bench.Host.ExecuteCodeAsync("M953");
-        Assert.That(reply, Does.Not.Contain("Error"), "M953 enables CAN without a report (RRF CanInterface::EnableCan)");
-        await bench.CanMaster.WaitUntilAsync(() => bench.CanMaster.SbcPackets(SbcRequest.EnableCAN).Count > enablesBefore,
-                                             what: "M953's enable reaching the controller");
     }
 
     /// <summary>

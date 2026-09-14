@@ -17,6 +17,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -369,12 +370,16 @@ internal partial class MCodeHandler(
         { 915, CodeClass.Immediate, (h, c, ct) => h.HandleStallDetectionAsync(c, ct) },
         // Start/stop event logging to SD card
         { 929, CodeClass.Flush, (h, c, ct) => h.HandleEventLoggingAsync(c, ct) }, // log entries are written as codes complete; start and stop order with them
+        // Send a custom request to a CAN-connected board
+        { 655, CodeClass.Immediate, (h, c, ct) => h.HandleCustomCanRequestAsync(c, ct) },
         // Create a heater, fan or other I/O device
         { 950, CodeClass.Immediate, (h, c, ct) => h.HandleCreateDeviceAsync(c, ct) }, // open decision (§5.1): reassigning a live driver or port argues a standstill
         // Configure CAN: it changes the bus the moves travel on
         { 952, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleConfigureCanAsync(c, ct) },
         // Enable CAN
         { 953, CodeClass.Immediate, (h, c, ct) => h.HandleEnableCanAsync(c, ct) },
+        // How long a board may be silent before it is taken to have gone away
+        { 959, CodeClass.Immediate, (h, c, ct) => h.HandleConnectionTimeoutAsync(c, ct) },
         // Raise an event
         { 957, CodeClass.Immediate, (h, c, ct) => new ValueTask<Message>(h.HandleRaiseEvent(c)) },
         // Configure phase stepping
@@ -1124,6 +1129,23 @@ internal partial class MCodeHandler(
     /// </remarks>
     private async ValueTask<Message> HandleDebugLevelAsync(Commands.Code code, CancellationToken cancellationToken)
     {
+        // B names a board, and has done since RRF 3.6.0 - before that it was the debug buffer size,
+        // so reading it as anything else here would turn a debug request into an allocation
+        if (code.HasParameter('B'))
+        {
+            if (!TryGetBoardAddress(code, out byte board, out string? error, allowMainBoard: true))
+            {
+                return new Message(MessageType.Error, error);
+            }
+            if (board != CanId.MasterAddress)
+            {
+                // The module list is the board's own, so the board is what composes the reply
+                CanResponse response = await linkInterface.SendCodeAsync<CanMessageM111>(board, code,
+                                                                                         cancellationToken: cancellationToken);
+                return response.ToMessage();
+            }
+        }
+
         if (code.TryGetInt('P', out int pParam) && pParam == -1)
         {
             bool seen = false;
@@ -1264,6 +1286,32 @@ internal partial class MCodeHandler(
     }
 
     /// <summary>
+    /// Restart an expansion board, as M999 B does
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>What the board said before it went</returns>
+    /// <remarks>
+    /// ExpansionManager::ResetRemote (ExpansionManager.cpp), which sends a CanMessageReset and reads
+    /// the standard reply the board sends before it resets. The board then goes away for several
+    /// seconds while it boots, rejoins the bus and announces itself; nothing here waits for that,
+    /// because the announcement path is what brings it back
+    /// </remarks>
+    private async ValueTask<Message> ResetBoardAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        if (!TryGetBoardAddress(code, out byte board, out string? error))
+        {
+            return new Message(MessageType.Error, error);
+        }
+
+        CanMessageReset request = default;
+        CanResponse response = await linkInterface.SendCanMessageAsync(board, in request,
+                                                                       CanMessageType.StandardReply,
+                                                                       cancellationToken: cancellationToken);
+        return response.ToMessage();
+    }
+
+    /// <summary>
     /// M122 "DSF": report this program's diagnostics without waiting for the firmware
     /// </summary>
     /// <param name="code">The code</param>
@@ -1276,11 +1324,67 @@ internal partial class MCodeHandler(
         int board = code.GetInt('B', CanId.MasterAddress);
         if (board != CanId.MasterAddress)
         {
-            return new Message(MessageType.Error, $"Diagnostics for expansion board {board} are not supported yet");
+            return await ReportBoardDiagnosticsAsync(code, cancellationToken);
         }
 
         string diagnostics = await diagnosticsProvider.PrintAsync();
         return new Message(MessageType.Success, diagnostics);
+    }
+
+    /// <summary>
+    /// Fetch an expansion board's diagnostic report, as M122 B does
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The report, or why it could not be fetched</returns>
+    /// <remarks>
+    /// CanInterface::RemoteDiagnostics (CanInterface.cpp). The report does not fit one CAN reply, so
+    /// the board sends it a part at a time: each request names the part and the board answers with
+    /// that part's text and, in the reply's extra byte, the number of the last part there is. A board
+    /// may return an empty part, which is skipped rather than taken for the end
+    /// </remarks>
+    private async ValueTask<Message> ReportBoardDiagnosticsAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        if (!TryGetBoardAddress(code, out byte board, out string? error))
+        {
+            return new Message(MessageType.Error, error);
+        }
+
+        StringBuilder report = new();
+        byte part = 0, lastPart;
+        do
+        {
+            CanMessageReturnInfo request = new()
+            {
+                Type = (byte)(CanMessageReturnInfo.TypeDiagnosticsPart0 + part),
+                Param = 0
+            };
+            CanResponse response = await linkInterface.SendCanMessageAsync(board, request,
+                                                                           CanMessageType.StandardReply,
+                                                                           cancellationToken: cancellationToken);
+            Message reply = response.ToMessage();
+            if (response.TimedOut || reply.Type == MessageType.Error)
+            {
+                // Said before the header, as RemoteDiagnostics does: a board that cannot be reached
+                // has no report to introduce
+                return reply;
+            }
+
+            if (part == 0)
+            {
+                report.AppendLine(string.Create(CultureInfo.InvariantCulture, $"Diagnostics for board {board}:"));
+            }
+            if (!string.IsNullOrEmpty(reply.Content))
+            {
+                report.AppendLine(reply.Content);
+            }
+
+            lastPart = response.Extra;
+            part++;
+        }
+        while (part <= lastPart);
+
+        return new Message(MessageType.Success, report.ToString().TrimEnd());
     }
 
     /// <summary>
@@ -1733,7 +1837,14 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleConfigureCanAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        uint oldAddress = code.GetUInt('B', 0);
+        // B is required and is the only address this code may name without also being told to change
+        // it. Address 0 is allowed here where it is refused everywhere else, because M952 is about
+        // the bus rather than about a board's ports (CanInterface.cpp ChangeAddressAndNormalTiming,
+        // which makes the same exception)
+        if (!TryGetBoardAddress(code, out byte oldAddress, out string? addressError, allowMainBoard: true))
+        {
+            return new Message(MessageType.Error, addressError);
+        }
 
         CanTiming timing = new();
         bool changeTiming = false;
@@ -1755,13 +1866,18 @@ internal partial class MCodeHandler(
 
         if (changeTiming)
         {
-            code.TryGetUIntLimited('A', 1, 127, out uint? newAddress);
+            if (code.TryGetInt('A', out int requestedAddress)
+                && (requestedAddress < 1 || requestedAddress > CanId.MaxCanAddress))
+            {
+                return new Message(MessageType.Error, "CAN address out of range");
+            }
+            byte? newAddress = code.TryGetInt('A', out int address) ? (byte)address : null;
 
-            await linkInterface.ConfigCanAsync((byte)oldAddress, (byte?)newAddress, timing, cancellationToken);
+            await linkInterface.ConfigCanAsync(oldAddress, newAddress, timing, cancellationToken);
         }
         else
         {
-            CanResponse response = await linkInterface.ReportCanConfigAsync((byte)oldAddress, cancellationToken);
+            CanResponse response = await linkInterface.ReportCanConfigAsync(oldAddress, cancellationToken);
             return response.ToMessage();
         }
         return new Message();
@@ -1829,12 +1945,26 @@ internal partial class MCodeHandler(
 
         if (changeTiming)
         {
-            await linkInterface.ConfigCanAsync(0, null, timing, cancellationToken);
+            await linkInterface.ConfigCanAsync(CanId.MasterAddress, null, timing, cancellationToken);
         }
 
+        // The enable is this program's own: RepRapFirmware leaves it as a TODO in the same function,
+        // because there the bus is already up. Here DuetCANMaster has to be told to bring it up, and
+        // config.g leads with M953 for that reason
         await linkInterface.EnableCanAsync(true, cancellationToken);
 
-        return new Message();
+        if (changeTiming)
+        {
+            return new Message();
+        }
+
+        // A code that asked for nothing is a query, as CanInterface::EnableCan's else branch is, and
+        // the answer comes from the peripheral rather than from anything this side remembers.
+        // RepRapFirmware reads it with can0dev->GetLocalCanTiming; the peripheral belongs to
+        // DuetCANMaster here, which answers the same query addressed to board 0 - a
+        // setAddressAndNormalTiming with doSetTiming clear, which is what ReportCanConfigAsync sends
+        CanResponse timingReport = await linkInterface.ReportCanConfigAsync(CanId.MasterAddress, cancellationToken);
+        return timingReport.ToMessage();
     }
 
     /// <summary>
@@ -2015,6 +2145,12 @@ internal partial class MCodeHandler(
             }
             throw new OperationCanceledException();
         }
+
+        if (code.HasParameter('B'))
+        {
+            return await ResetBoardAsync(code, cancellationToken);
+        }
+
         // TODO this used to fallthrough to RRF
         return new Message(MessageType.Warning, "Not implemented");
     }

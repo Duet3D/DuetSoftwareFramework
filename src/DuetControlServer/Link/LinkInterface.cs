@@ -110,6 +110,7 @@ public sealed partial class LinkInterface(
         }
     }
 
+    
     /// <summary>
     /// Set the CAN address and bit timing of an expansion board, which it saves in non-volatile memory
     /// </summary>
@@ -290,6 +291,15 @@ public sealed partial class LinkInterface(
             {
                 await request.Task.WaitAsync(cancellationToken);
             }
+        }
+        catch (TimeoutException)
+        {
+            // A board that does not answer is reported, not thrown: see CanResponse.FromTimeout
+            lock (CanRequests)
+            {
+                CanRequests.Remove(request);
+            }
+            return CanResponse.FromTimeout(request);
         }
         catch
         {

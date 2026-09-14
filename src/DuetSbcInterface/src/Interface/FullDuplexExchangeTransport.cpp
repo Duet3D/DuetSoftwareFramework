@@ -350,8 +350,14 @@ namespace Duet::Sbc
 		proto::PacketHeader header{};
 		std::memcpy(&header, m_rxBuffer.data() + m_rxPointer, sizeof(header));
 
+		// Bounded against the payload the packet declares, not against its padded length. Padding
+		// exists to align the packet that follows, so the last packet of a transfer does not need
+		// any: the controller pads at the start of each header it writes and then sets the block's
+		// dataLength from the unpadded end of the last payload. Requiring the padding here therefore
+		// discarded any transfer whose final packet was not a multiple of four bytes long - a
+		// standard reply's closing fragment, among others, which lost the whole reply it completed
 		const size_t payloadStart = m_rxPointer + sizeof(header);
-		if (payloadStart + proto::AddPadding(header.length) > m_rxHeader.dataLength)
+		if (payloadStart + header.length > m_rxHeader.dataLength)
 		{
 			if (m_logCallback)
 			{
@@ -365,6 +371,8 @@ namespace Duet::Sbc
 		m_lastPacket = header;
 		m_packetData = m_rxBuffer.data() + payloadStart;
 		m_packetDataLength = header.length;
+
+		// Past the end of the block when the last packet was unpadded, which is what ends the loop
 		m_rxPointer = payloadStart + proto::AddPadding(header.length);
 
 		packet = m_lastPacket;

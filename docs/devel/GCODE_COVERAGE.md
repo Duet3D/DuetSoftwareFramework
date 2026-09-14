@@ -18,7 +18,7 @@ How to read the table:
   (G10, G38.x) get one row per form.
 * **Regression tested** means the command is covered by regression tests in https://github.com/Duet3D/DuetRegressionTesting.
 * **System tested** means the command is covered by a system test in [src/SystemTests](../../src/SystemTests).
-* **Fully implemented** means every documented parameter behaves as RRF 3.7 does.
+* **Fully implemented** means every documented parameter behaves as RRF 3.7 does. DSF passes all the regression tests and system tests for this gcode.
 * **Notes** is free text for anything the other columns cannot carry, such as the reason a command
   is only partly implemented or a link to the plan covering it.
 
@@ -114,17 +114,17 @@ checked that command yet, which is not the same as ⛔.
 | `M108` | none | Cancel Heating | | | | |
 | `M109` | S R T | Set Extruder Temperature and Wait | | | | |
 | `M110` | N | Set the current line number used for checksum and line number checking | | | | |
-| `M111` | P S D B F O | Set Debug Level | | | | |
+| `M111` | P S D B F O | Set Debug Level | ✅ | ✅ | 🟡 | `B` reaches the board and its module listing comes back. The main board has no such modules and no ISR debug buffer, so what `P`, `S`, `D` and `F` should mean here is an open decision |
 | `M112` | none | Emergency Stop | | | | |
 | `M114` | none | Get Current Position | | | | |
-| `M115` | B P | Get Firmware Version and Capabilities | | | | |
+| `M115` | B P | Get Firmware Version and Capabilities | ✅ | ✅ | 🟡 | `B` reports the board's firmware. Without `B` the reply is still a stub |
 | `M116` | P H C S | Wait for temperature to be reached | | | | |
 | `M117` | none | Display a message on the attached display or in the web interface | | | | |
 | `M118` | P S L T Q R D | Send Message to Specific Target | | | | |
 | `M119` | none | Get Endstop Status | | | | |
 | `M120` | none | Push machine state (feed rate, extruder positions, axis and extruder relative flags) onto a stack | | | | |
 | `M121` | none | Pop the last machine state pushed onto the stack | | | | |
-| `M122` | P B | Report diagnostic information about the main board or an expansion board | | | | |
+| `M122` | P B | Report diagnostic information about the main board or an expansion board | ✅ | ✅ | 🟡 | Diagnositc is different to RRF & `P` param ignored |
 | `M140` | P H S R | Set Bed Temperature (Fast) or Configure Bed Heater | | | | |
 | `M141` | P H S R | Set Chamber Temperature (Fast) or Configure Chamber Heater | | | | |
 | `M143` | H S P T A C | Maximum heater temperature | | | | |
@@ -253,7 +253,7 @@ checked that command yet, which is not the same as ⛔.
 | `M606` | S | Fork the job file reader so each motion system runs its own copy of the job | | | | |
 | `M650` | none | Set the peel move parameters sent by nanoDLP | | | | |
 | `M651` | none | Run the peel move macro requested by nanoDLP | | | | |
-| `M655` | B C A P R E | Send request to custom CAN-connected expansion board | | | | |
+| `M655` | B C A P R E | Send request to custom CAN-connected expansion board | ✅ | ✅ | ✅ | No Duet board implements a custom feature, so what is asserted is the encoding and the refusal that comes back |
 | `M665` | L R B H X Y Z | Set delta configuration | | | | |
 | `M666` | X Y Z A B | Set delta endstop adjustment | | | | |
 | `M669` | K X Y Z U V S T P D A B C R F H | Set kinematics type and kinematics parameters | | | | |
@@ -285,20 +285,20 @@ checked that command yet, which is not the same as ⛔.
 | `M929` | P S | Start/stop event logging to SD card | | | | |
 | `M950` | H F J P S R D E C Q T B L K U | Create heater, fan, spindle, LED strip or GPIO/servo pin | 🟡 | 🟡 | 🟡 | the F form is complete |
 | `M951` | H P I D F Z | Set height following mode parameters | | | | |
-| `M952` | B S T J | Set board CAN address and/or base data rate | | | | |
-| `M953` | S R T J C | Enable CAN and set fast data rate | | | | |
-| `M954` | A | Configure as CAN expansion board and enable CAN | | | | |
+| `M952` | B S T J | Set board CAN address and/or base data rate | ✅ | ✅ | ✅ | |
+| `M953` | S R T J C | Enable CAN and set fast data rate | ✅ | ✅ | 🟡 | |
+| `M954` | A | Configure as CAN expansion board and enable CAN | ✅ | ⛔ | ⛔ | Refused on purpose. DSF is always the main board, so there is nothing for it to become an expansion board of |
 | `M955` | P C I S R Q | Configure Accelerometer | | | | |
 | `M956` | P S X F | Collect accelerometer data and write to file | | | | |
 | `M957` | E D B P S | Raise an event as if it had been reported by the firmware, for testing event handling | | | | |
-| `M959` | B T | Configure CAN expansion board behaviour | | | | |
+| `M959` | B T | Configure CAN expansion board behaviour | ✅ | ✅ | ✅ | The send times out against current firmware, which handles no `setConnectionTimeout`; the readback answers from `boards[].timeout`, written first, as RepRapFirmware does |
 | `M970` | X Y Z E | Enable/disable phase stepping | | | | |
 | `M970.1` | X Y Z E | Configure phase stepping velocity constant | | | | |
 | `M970.2` | X Y Z E | Configure phase stepping acceleration constant | | | | |
 | `M970.3` | P S J O | Configure phase stepping waveform correction | | | | |
 | `M997` | S B P F V | Perform in-application firmware update | | | | |
 | `M998` | P | Request a resend of a line that failed its checksum or line number check | | | | |
-| `M999` | B P | Restart the firmware, optionally into the bootloader | | | | |
+| `M999` | B P | Restart the firmware, optionally into the bootloader | ✅ | ✅ | 🟡 | `B` restarts the board and answers `Board n resetting`; the regression cases read it as empty, which is how the harness collects a reply for a code it lists under `no_reply`. `P` (bootloader) is not implemented |
 | `T` | nnn R P T | Select a tool, running the tool change macros unless suppressed | | | | |
 
 ## Commands on the wiki page that RRF 3.7 does not support
