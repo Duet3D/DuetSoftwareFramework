@@ -5,6 +5,10 @@ This directory contains developer plans & implementation reasoning documents for
 Start at [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) for the planning view: what is done, what is
 left, roughly how big each piece is, and what blocks what.
 
+For the list of commands DSF has to cover:
+- [GCODE_COVERAGE.md](GCODE_COVERAGE.md) - every GCode command documented for RRF 3.7, with
+  columns for tracking regression tests, system tests and completeness.
+
 For documentation about the using DSF:
 - [Duet Wiki](https://docs.duet3d.com)
 
