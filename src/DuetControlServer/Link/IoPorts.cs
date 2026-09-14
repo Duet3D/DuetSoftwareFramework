@@ -16,6 +16,37 @@ namespace DuetControlServer.Link;
 public static class IoPorts
 {
     /// <summary>
+    /// The port name that means "no port", which is how M950 asks for a device to be deleted
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>NoPinName</c> (RepRapFirmware.h)</remarks>
+    public const string NoPortName = "nil";
+
+    /// <summary>
+    /// Separator between the ports of a device that is driven through more than one pin
+    /// </summary>
+    /// <remarks>
+    /// A fan's output and its tacho input, a spindle's three outputs and an axis' switch per driver
+    /// are all spelled this way, which is RepRapFirmware's <c>IoPort::AssignPorts</c> taking a list
+    /// </remarks>
+    public const char PortSeparator = '+';
+
+    /// <summary>
+    /// Whether a port name asks for the device to be deleted rather than naming a pin
+    /// </summary>
+    /// <param name="port">Port name as the operator wrote it</param>
+    /// <returns>True if the name is <see cref="NoPortName"/></returns>
+    /// <remarks>
+    /// The address is taken off first and the comparison ignores case, which is what
+    /// <c>FansManager::ConfigureFanPort</c> and its counterparts do (FansManager.cpp): the name is
+    /// reduced before it is tested, so <c>C"1.nil"</c> deletes as <c>C"nil"</c> does
+    /// </remarks>
+    public static bool IsNoPort(string port)
+    {
+        RemoveBoardAddress(port, out string localPort);
+        return localPort.Equals(NoPortName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// Take the board address off a port name, and say which board it named
     /// </summary>
     /// <param name="portName">Port name as the operator wrote it</param>

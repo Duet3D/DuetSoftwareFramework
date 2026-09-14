@@ -21,11 +21,6 @@ namespace DuetControlServer.Motion;
 internal static class RemoteEndstops
 {
     /// <summary>
-    /// Separator between the ports of an axis that has one switch per driver
-    /// </summary>
-    public const char PortSeparator = '+';
-
-    /// <summary>
     /// The input handle an axis' endstop switch is monitored under
     /// </summary>
     /// <param name="axis">Axis number</param>
@@ -53,7 +48,7 @@ internal static class RemoteEndstops
     public static string[] PortsOf(Endstop endstop)
         => string.IsNullOrWhiteSpace(endstop.Port)
             ? []
-            : endstop.Port.Split(PortSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            : endstop.Port.Split(IoPorts.PortSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     /// <summary>
     /// The input handle a board reports its stalled drivers under

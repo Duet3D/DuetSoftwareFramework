@@ -182,8 +182,27 @@ public static partial class CanGenericWriter
     /// Set or, if <paramref name="value"/> is null, remove a string parameter, null-terminated on the wire.
     /// </summary>
     /// <remarks>
-    /// A reduced string is written as given: only <see cref="FromCode"/> strips the board address off one,
-    /// because that is part of reading a port name off a command, not of packing a string.
+    /// <para>
+    /// A reduced string has the board address taken off it first, because a board addresses its own
+    /// ports and has no reader for an address: <c>C"1.out3"</c> arriving at board 1 is looked up as
+    /// the pin literally called "1.out3" and refused as an unknown pin name. CANlib marks the
+    /// parameters that carry a port name with this type, so the rule belongs to the type rather than
+    /// to any one caller - which is also where RepRapFirmware puts it, in
+    /// <c>CanMessageGenericConstructor::AddParam</c>'s <c>reducedString</c> case.
+    /// </para>
+    /// <para>
+    /// RepRapFirmware can leave its hand-built messages out of this because its callers reduce the
+    /// name as they read it and carry the local name from then on. Here the object model keeps the
+    /// addressed name - <c>fans[].port</c> has to say which board drives the fan for the machine to
+    /// be rebuildable from it - so a message built from the object model is built from an addressed
+    /// name, and the last place that can take the address off is this one.
+    /// </para>
+    /// <para>
+    /// The type is also used for a few values that are not ports, the sensor type of M308 and the
+    /// encoder type of M569.1 among them. Nothing is taken off those, because an address is digits
+    /// followed by a dot and a type name does not start with one. RepRapFirmware relies on the same
+    /// thing and says so at the same place.
+    /// </para>
     /// </remarks>
     /// <exception cref="CanGenericParamException">The letter is not in the table, or the entry is not a string.</exception>
     public static void SetString(ref CanMessageGeneric message, ImmutableArray<CanParamDescriptor> table, char letter, string? value)
@@ -198,6 +217,11 @@ public static partial class CanGenericWriter
         if (descriptor.Type is not (CanParamType.String or CanParamType.ReducedString))
         {
             throw WrongType(letter, descriptor, "a string");
+        }
+
+        if (descriptor.Type == CanParamType.ReducedString)
+        {
+            IoPorts.RemoveBoardAddress(value, out value);
         }
 
         int length = Encoding.UTF8.GetByteCount(value);

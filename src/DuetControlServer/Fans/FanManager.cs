@@ -68,6 +68,25 @@ public sealed class FanManager(Model.ObjectModel model, LinkInterface linkInterf
     }
 
     /// <summary>
+    /// Take a fan out of the object model
+    /// </summary>
+    /// <param name="fanNumber">The number</param>
+    /// <remarks>
+    /// The slot is emptied rather than removed, because the collection is indexed by fan number and
+    /// closing the gap would renumber every fan above it. RepRapFirmware does the same:
+    /// <c>DeleteObject(fans[fanNum])</c> leaves a null in an array of fixed length (FansManager.cpp).
+    /// Releasing the port on the board is the caller's, because a board that cannot be reached must
+    /// not keep a fan alive here. The caller must hold the object model write lock
+    /// </remarks>
+    public void Delete(int fanNumber)
+    {
+        if (fanNumber >= 0 && fanNumber < model.Fans.Count)
+        {
+            model.Fans[fanNumber] = null;
+        }
+    }
+
+    /// <summary>
     /// The board that carries a fan
     /// </summary>
     /// <param name="fanNumber">The fan</param>

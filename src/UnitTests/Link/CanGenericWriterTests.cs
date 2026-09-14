@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Linq;
 using DuetControlServer.Link.Protocol.CanMessages;
 using NUnit.Framework;
 
@@ -291,5 +292,60 @@ public class CanGenericWriterTests
         Assert.Throws<CanGenericParamException>(() => CanGenericWriter.SetString(ref overflow, CanGenericTables.M655Params, 'A', new string('x', 60)));
         Assert.That(CanGenericParser.GetString(overflow, CanGenericTables.M655Params, 'A'), Is.EqualTo("short"),
             "a replacement that does not fit must leave the value it was replacing in place");
+    }
+
+    [TestCase("1.out3", "out3")]
+    [TestCase("out3", "out3", TestName = "APortWithNoAddressIsAlreadyLocal")]
+    [TestCase("!1.out3", "!out3", TestName = "TheInversionStaysAndTheAddressGoes")]
+    [TestCase("^2.io1.in", "^io1.in", TestName = "SoDoesThePullup")]
+    [TestCase("1.out3+^io1.in", "out3+^io1.in", TestName = "OneAddressInFrontOfAPairComesOffTheWhole")]
+    [TestCase("nil", "nil", TestName = "TheDeleteNameIsNotAnAddress")]
+    public void AReducedStringLosesItsBoardAddress(string port, string expected)
+    {
+        // A board addresses its own ports and has no reader for an address, so C"1.out3" arriving at
+        // board 1 is looked up as a pin literally called "1.out3" and refused as unknown. CANlib marks
+        // the parameters that carry a port name with this type, which is why the rule lives here and
+        // not in whichever handler happened to build the message - the fan and output forms of M950
+        // built theirs by hand and sent the address for as long as it did
+        ImmutableArray<CanParamDescriptor> table = CanGenericTables.M950FanParams;
+        CanMessageGeneric message = default;
+        CanGenericWriter.SetString(ref message, table, 'C', port);
+        Assert.That(CanGenericParser.GetString(message, table, 'C'), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void APlainStringKeepsEveryCharacterItWasGiven()
+    {
+        // Only a reduced string is a port name. M118's message carries text an operator wrote, and
+        // something that happens to look like an address in it is part of what they wrote
+        ImmutableArray<CanParamDescriptor> table = CanGenericTables.M950FanParams;
+        Assert.That(table.Any(entry => entry.Letter == 'C' && entry.Type == CanParamType.ReducedString), Is.True,
+                    "M950 F's C is the reduced-string case this pair of tests is about");
+
+        CanMessageGeneric message = default;
+        CanGenericWriter.SetString(ref message, CanGenericTables.M655Params, 'A', "1.out3");
+        Assert.That(CanGenericParser.GetString(message, CanGenericTables.M655Params, 'A'), Is.EqualTo("1.out3"),
+                    "a plain string parameter is written as given");
+    }
+
+    [Test]
+    public void ATypeNameThatIsNotAPortSurvivesUnchanged()
+    {
+        // The reduced-string type is also used for the sensor type of M308 and the encoder type of
+        // M569.1. Nothing comes off those, because an address is digits followed by a dot and no type
+        // name starts with one - which is the same thing RepRapFirmware relies on, and says so at
+        // CanMessageGenericConstructor.cpp's reducedString case
+        ImmutableArray<CanParamDescriptor> table = CanGenericTables.M308V1Params;
+        CanMessageGeneric message = default;
+        CanGenericWriter.SetString(ref message, table, 'Y', "thermistor");
+        CanGenericWriter.SetString(ref message, table, 'P', "1.temp0");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(CanGenericParser.GetString(message, table, 'Y'), Is.EqualTo("thermistor"),
+                        "the sensor type is not a port and keeps every character");
+            Assert.That(CanGenericParser.GetString(message, table, 'P'), Is.EqualTo("temp0"),
+                        "the port beside it still loses its address");
+        });
     }
 }

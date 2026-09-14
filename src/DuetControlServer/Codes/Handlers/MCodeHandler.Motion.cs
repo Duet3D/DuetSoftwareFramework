@@ -2523,7 +2523,7 @@ internal partial class MCodeHandler
     /// <returns>The reason the ports were refused, or null if they are usable</returns>
     private static string? ValidateEndstopPorts(string port, Axis axis)
     {
-        string[] ports = port.Split(RemoteEndstops.PortSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        string[] ports = port.Split(IoPorts.PortSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (ports.Length == 0)
         {
             return null;                        // clearing the port is how an endstop is given up

@@ -112,4 +112,23 @@ public class IoPortsTests
         Assert.That(IoPorts.TrySplitPort("3.", "Endstop port", out _, out _, out string? error), Is.False);
         Assert.That(error, Does.Contain("no pin"));
     }
+
+    [TestCase("nil")]
+    [TestCase("NIL", TestName = "TheNoPortNameIsCaseInsensitive")]
+    [TestCase("1.nil", TestName = "TheNoPortNameIsReadAfterTheAddressComesOff")]
+    public void TheNoPortNameAsksForADelete(string port)
+    {
+        // This is what M950 C"nil" means, and it is read the same way for a fan, a heater, an output
+        // or a spindle. RepRapFirmware reduces the name before it tests it (FansManager.cpp), which
+        // is why an address in front of it makes no difference
+        Assert.That(IoPorts.IsNoPort(port), Is.True);
+    }
+
+    [TestCase("1.out3")]
+    [TestCase("nil.in", TestName = "ANameThatMerelyStartsWithItIsAPin")]
+    [TestCase("", TestName = "EmptyIsNotADelete")]
+    public void AnythingThatNamesAPinIsNotADelete(string port)
+    {
+        Assert.That(IoPorts.IsNoPort(port), Is.False);
+    }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Fans;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
 using NUnit.Framework;
@@ -99,7 +100,9 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
         {
             Assert.That(board, Is.EqualTo(Board), "the M950 goes to the board named by the port");
             Assert.That(sent.F, Is.EqualTo(0), "F is the fan number, which is what the board will know it by");
-            Assert.That(sent.C, Is.EqualTo("1.out3"), "C is the port, address and all (RemoteFan::ConfigurePort)");
+            Assert.That(sent.C, Is.EqualTo("out3"),
+                        "C is the pin as the board knows it, with the address taken off: a board addresses its "
+                        + "own ports and has no reader for one (CanMessageGenericConstructor.cpp, reducedString)");
             Assert.That(sent.Q, Is.EqualTo(500), "Q is the frequency the code asked for");
             Assert.That(sent.K, Is.EqualTo(2.0f).Within(1e-3),
                         "K is stated even though the code omitted it: RepRapFirmware passes "
@@ -562,6 +565,573 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
     }
 
     /// <summary>
+    /// M950 says which device it creates by the letter it carries, so a code with none of them and a
+    /// code with two are both refused, and neither creates anything or reaches a board
+    /// </summary>
+    /// <remarks>
+    /// Platform::ConfigurePort (Platform.cpp) counts the device letters and takes anything but
+    /// exactly one as a malformed line. The regression case is
+    /// <c>testcases/fans/error-missing-parameters-fans.yaml</c>, whose reference records both
+    /// rejections with an empty object-model delta and no CAN traffic: a guard that stopped firing
+    /// would mean a malformed config.g line being acted on rather than refused
+    /// </remarks>
+    [Test]
+    public async Task M950WithoutExactlyOneDeviceLetterIsRefused()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync();
+
+        bench.CanMaster.ClearCapture();
+
+        string none = await bench.Host.ExecuteCodeAsync("M950");
+        string two = await bench.Host.ExecuteCodeAsync("M950 F0 P0");
+        await Assert.MultipleAsync(async () =>
+        {
+            Assert.That(none, Does.StartWith("Error:"),
+                        "M950 naming no device is an error (Platform.cpp ConfigurePort)");
+            Assert.That(two, Does.StartWith("Error:"),
+                        "M950 naming two devices is the same rejection as naming none (Platform.cpp ConfigurePort)");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans.Count), Is.Zero,
+                        "neither code added anything to fans[]");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.State.GpOut.Count), Is.Zero,
+                        "nor to state.gpOut[]");
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(bench.CanMaster.CanMessages<CanMessageM950Fan>(), Is.Empty,
+                        "and no board was told to claim a fan port");
+            Assert.That(bench.CanMaster.CanMessages<CanMessageM950Gpio>(), Is.Empty,
+                        "nor an output port");
+        });
+    }
+
+    /// <summary>
+    /// M950 refuses a fan number past the limit before it looks at the port, so a typo claims no pin
+    /// </summary>
+    /// <remarks>
+    /// FansManager::ConfigureFanPort (FansManager.cpp) reads F with GetLimitedUIValue against
+    /// MaxFans, which throws before C is read. The regression case
+    /// <c>testcases/fans/error-missing-parameters-fans.yaml</c> records the rejection with no CAN
+    /// traffic: the pin named by a refused line stays free for whatever asks for it next
+    /// </remarks>
+    [Test]
+    public async Task M950RefusesAFanNumberPastTheLimit()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync();
+
+        bench.CanMaster.ClearCapture();
+        string reply = await bench.Host.ExecuteCodeAsync($"M950 F{FanManager.MaxFans} C\"1.out3\"");
+        await Assert.MultipleAsync(async () =>
+        {
+            Assert.That(reply, Does.StartWith("Error:"),
+                        "a fan number at MaxFans is refused (FansManager.cpp ConfigureFanPort, GetLimitedUIValue)");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans.Count), Is.Zero,
+                        "and fans[] is left as it was");
+            Assert.That(bench.CanMaster.CanMessages<CanMessageM950Fan>(), Is.Empty,
+                        "and no board was asked to claim the port the refused line named");
+        });
+    }
+
+    /// <summary>
+    /// M106 R refuses a restore point number past the ones a client can see, and drives no fan
+    /// </summary>
+    /// <remarks>
+    /// GCodes2.cpp case 106 reads R with GetLimitedUIValue against NumVisibleRestorePoints, which is
+    /// 6. The regression case is <c>testcases/fans/error-missing-parameters-fans.yaml</c>
+    /// </remarks>
+    [Test]
+    public async Task M106RefusesARestorePointPastTheLimit()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync(configExtra: Fan0Config);
+
+        bench.CanMaster.ClearCapture();
+        string reply = await bench.Host.ExecuteCodeAsync($"M106 R{DuetControlServer.Motion.RestorePoint.NumVisible}");
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply, Does.StartWith("Error:"),
+                        "a restore point number at NumVisibleRestorePoints is refused (GCodes2.cpp case 106)");
+            Assert.That(bench.CanMaster.CanMessages<CanMessageSetFanSpeed>(), Is.Empty,
+                        "and the refusal drove no fan");
+        });
+    }
+
+    /// <summary>
+    /// M106 against a fan no M950 has created is an error, whether the number is one a machine could
+    /// have or one past MaxFans
+    /// </summary>
+    /// <remarks>
+    /// M106 reads P with TryGetUIValue and does not range-check it, so both numbers take the same
+    /// FindFan path rather than a parameter guard (GCodes2.cpp case 106, FansManager::ConfigureFan).
+    /// The regression case is <c>testcases/fans/m106-error-unknown-fan.yaml</c>: an unconfigured fan
+    /// accepted silently would hide a typo in a config.g until someone noticed the part cooling
+    /// never came on
+    /// </remarks>
+    [Test]
+    public async Task M106AgainstAFanThatDoesNotExistIsRefused()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync();
+
+        string legal = await bench.Host.ExecuteCodeAsync("M106 P9 S0.5");
+        string past = await bench.Host.ExecuteCodeAsync($"M106 P{FanManager.MaxFans * 2} S0.5");
+        await Assert.MultipleAsync(async () =>
+        {
+            Assert.That(legal, Does.StartWith("Error:"),
+                        "a fan number no M950 has created is refused (FansManager.cpp ConfigureFan, FindFan)");
+            Assert.That(past, Does.StartWith("Error:"),
+                        "a fan number past MaxFans takes the same path, because M106 does not range-check P "
+                        + "(GCodes2.cpp case 106)");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans.Count), Is.Zero,
+                        "and neither code added anything to fans[]");
+            Assert.That(bench.CanMaster.CanMessages<CanMessageSetFanSpeed>(), Is.Empty,
+                        "nor put a speed on the bus for a fan no board has been told about");
+        });
+    }
+
+    /// <summary>
+    /// I and F are the RRF2 spelling of inversion and PWM frequency, and RepRapFirmware 3 neither
+    /// honours nor rejects them: the code falls through to the report branch and changes nothing
+    /// </summary>
+    /// <remarks>
+    /// Fan::Configure (Fan.cpp) does not read I or F, so <c>seen</c> stays false and the line is
+    /// answered as a bare query. The regression case
+    /// <c>testcases/fans/m106-fan-invert-and-frequency.yaml</c> reads the fan back afterwards for
+    /// exactly this reason: without the readback "accepted silently" and "applied" look the same.
+    /// The RRF3 spelling is the '!' and Q of M950, which
+    /// <see cref="M950AssignsAFanAnInvertedPort"/> covers
+    /// </remarks>
+    [Test]
+    public async Task M106IgnoresTheObsoleteInvertAndFrequencyParameters()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync(configExtra: Fan0Config);
+
+        bench.CanMaster.ClearCapture();
+
+        string inverted = await bench.Host.ExecuteCodeAsync("M106 P0 I1 F25000");
+        await bench.Host.ExecuteCodeAsync("M106 P0 I0");
+
+        Fan? fan = await bench.Host.ReadModelAsync(model => model.Fans[0]);
+        Assert.Multiple(() =>
+        {
+            Assert.That(inverted, Does.Not.StartWith("Error:"),
+                        "I and F are not rejected either: Fan::Configure does not know them, so the line is "
+                        + "answered as a query (Fan.cpp)");
+            Assert.That(fan!.Frequency, Is.EqualTo(500),
+                        "F25000 left fans[0].frequency at what M950 Q set: the RRF2 frequency parameter does nothing");
+            Assert.That(fan!.Port, Is.EqualTo("1.out3"),
+                        "and I1 left fans[0].port un-inverted");
+            Assert.That(fan!.RequestedValue, Is.Zero, "neither code was a speed");
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(bench.CanMaster.CanMessages<CanMessageFanParameters>(), Is.Empty,
+                        "nothing was configured, so no parameters message went out (Fan.cpp, seen stays false)");
+            Assert.That(bench.CanMaster.CanMessages<CanMessageSetFanSpeed>(), Is.Empty,
+                        "nor a speed");
+            Assert.That(bench.CanMaster.CanMessages<CanMessageM950Fan>(), Is.Empty,
+                        "nor a port assignment: the board still drives the pin the way M950 set it up");
+        });
+    }
+
+    /// <summary>
+    /// The RRF3 spelling of an inverted fan output is a '!' in front of the M950 port name, and the
+    /// modifier belongs to the pin rather than to the board address
+    /// </summary>
+    /// <remarks>
+    /// IoPort::RemoveBoardAddress reads the modifiers before the address, so <c>!1.out3</c> is board
+    /// 1's <c>!out3</c>. The regression case
+    /// <c>testcases/fans/m106-fan-invert-and-frequency.yaml</c> pairs it with Q25000, the usual
+    /// frequency for a 4-wire PWM fan, so that the frequency has to be carried rather than being
+    /// right by accident
+    /// </remarks>
+    [Test]
+    public async Task M950AssignsAFanAnInvertedPort()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync(configExtra: Fan0Config);
+
+        await bench.Host.ExecuteCodeAsync("M950 F0 C\"!1.out3\" Q25000");
+        Fan? fan = await bench.Host.ReadModelAsync(model => model.Fans[0]);
+        Assert.Multiple(() =>
+        {
+            Assert.That(fan!.Frequency, Is.EqualTo(25000),
+                        "M950 Q25000 sets fans[0].frequency (FansManager.cpp ConfigureFanPort)");
+            Assert.That(fan!.Port, Is.EqualTo("!1.out3"),
+                        "fans[0].port keeps the '!' that says the output is inverted (DSF addition, "
+                        + "rrf-differences.md section 3)");
+        });
+
+        (byte board, CanMessageM950Fan sent) = bench.CanMaster.LastCanMessage<CanMessageM950Fan>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(board, Is.EqualTo(Board),
+                        "the address in front of the pin still says which board claims it, modifier or not "
+                        + "(IoPort::RemoveBoardAddress)");
+            Assert.That(sent.F, Is.EqualTo(0));
+            Assert.That(sent.C, Is.EqualTo("!out3"),
+                        "and the '!' travels with the port while the address does not: whether a pin is inverted "
+                        + "is the board's business, and which board carries it is not");
+            Assert.That(sent.Q, Is.EqualTo(25000), "carrying the new frequency");
+        });
+    }
+
+    /// <summary>
+    /// The three parameters that shape a fan's PWM rather than set it - L a minimum, X a maximum and
+    /// B a starting blip - are carried to the board, and the speeds that follow go out as asked
+    /// rather than clamped on this side
+    /// </summary>
+    /// <remarks>
+    /// LocalFan::InternalRefresh applies the floor and the ceiling on whichever board owns the fan,
+    /// so what crosses CAN is the raw request plus a fanParameters message carrying the limits. The
+    /// regression case <c>testcases/fans/m106-fan-pwm-limits.yaml</c> records exactly that: 0.05
+    /// below a 20% floor and 1.0 above an 80% ceiling both reach the board unchanged
+    /// </remarks>
+    [Test]
+    public async Task M106CarriesThePwmLimitsAndLeavesTheClampingToTheBoard()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync(configExtra: Fan0Config);
+
+        await bench.Host.ExecuteCodeAsync("M106 P0 L0.2 X0.8 B0.2");
+        Fan? fan = await bench.Host.ReadModelAsync(model => model.Fans[0]);
+        Assert.Multiple(() =>
+        {
+            Assert.That(fan!.Min, Is.EqualTo(0.2).Within(1e-3), "M106 L0.2 sets fans[0].min (Fan.cpp minVal)");
+            Assert.That(fan!.Max, Is.EqualTo(0.8).Within(1e-3), "M106 X0.8 sets fans[0].max (Fan.cpp maxVal)");
+            Assert.That(fan!.Blip, Is.EqualTo(0.2).Within(1e-3), "M106 B0.2 sets fans[0].blip in seconds (Fan.cpp blipTime)");
+        });
+
+        (byte board, CanMessageFanParameters limits) = bench.CanMaster.LastCanMessage<CanMessageFanParameters>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(board, Is.EqualTo(Board), "the limits go to the board that applies them");
+            Assert.That(limits.FanNumber, Is.EqualTo(0));
+            Assert.That(limits.MinVal, Is.EqualTo(0.2).Within(1e-3), "L");
+            Assert.That(limits.MaxVal, Is.EqualTo(0.8).Within(1e-3), "X");
+            Assert.That(limits.BlipTime, Is.EqualTo(200), "and B0.2 as 200 ms");
+        });
+
+        bench.CanMaster.ClearCapture();
+        await bench.Host.ExecuteCodeAsync("M106 P0 S0.05");
+        await bench.Host.ExecuteCodeAsync("M106 P0 S1.0");
+
+        await Assert.MultipleAsync(async () =>
+        {
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]!.RequestedValue), Is.EqualTo(1.0).Within(1e-3),
+                        "fans[0].requestedValue is what was asked for, not what the fan will run at");
+            Assert.That(bench.CanMaster.CanMessages<CanMessageSetFanSpeed>()
+                             .Select(sent => (sent.Board, sent.Message.FanNumber, Pwm: MathF.Round(sent.Message.Pwm, 3))),
+                        Is.EqualTo(new (byte, ushort, float)[]
+                        {
+                            (Board, 0, 0.05f),
+                            (Board, 0, 1.0f)
+                        }),
+                        "both speeds reach the board as the raw request: the 20% floor and the 80% ceiling are "
+                        + "applied where the PWM is generated (LocalFan::InternalRefresh)");
+            Assert.That(bench.CanMaster.CanMessages<CanMessageFanParameters>(), Is.Empty,
+                        "and a bare S sends no parameters message, because Fan::Configure acts on S only "
+                        + "alongside another parameter (Fan.cpp)");
+        });
+    }
+
+    /// <summary>
+    /// M106 R restores the speed a G60 restore point saved, and only when the code names no fan
+    /// </summary>
+    /// <remarks>
+    /// GCodes2.cpp case 106 guards R with <c>gb.Seen('R') &amp;&amp; !seenFanNum</c>, so
+    /// <c>M106 P0 R3</c> is silently ignored: Fan::Configure does not read R either. The regression
+    /// case is <c>testcases/fans/m106-fan-name-and-restore.yaml</c>. R restoring nothing would mean a
+    /// resumed print restarting with the fan off, since that is what resume.g uses it for
+    /// </remarks>
+    [Test]
+    public async Task M106RRestoresTheSpeedARestorePointSaved()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync(configExtra: Fan0Config);
+
+        // No tool is selected, so the mapped fan is fan 0 and the speed is recorded in the movement
+        // state's virtual fan speed, which is what G60 copies into the restore point
+        await bench.Host.ExecuteCodeAsync("M106 S0.4");
+        await bench.Host.ExecuteCodeAsync("G60 S3");
+        await bench.Host.ExecuteCodeAsync("M106 S0");
+
+        Fan? fan = await bench.Host.ReadModelAsync(model => model.Fans[0]);
+#pragma warning disable CS0618
+        Assert.That(await bench.Host.ReadModelAsync(model => model.State.RestorePoints[3].FanPwm), Is.EqualTo(0.4).Within(1e-3),
+                    "G60 S3 saves the mapped fan speed in state.restorePoints[3].fanPwm (GCodes.cpp SavePosition, "
+                    + "RestorePoint.cpp)");
+#pragma warning restore
+        Assert.That(fan!.RequestedValue, Is.Zero, "and M106 S0 turned the fan off, so the restore has something to undo");
+
+        await bench.Host.ExecuteCodeAsync("M106 R3");
+        Assert.That(fan!.RequestedValue, Is.EqualTo(0.4).Within(1e-3),
+                    "M106 R3 puts the saved speed back on the mapped fan: fans[0].requestedValue 0.4 "
+                    + "(GCodes2.cpp case 106, R parameter)");
+
+        (byte board, CanMessageSetFanSpeed restored) = bench.CanMaster.LastCanMessage<CanMessageSetFanSpeed>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(board, Is.EqualTo(Board));
+            Assert.That(restored.FanNumber, Is.EqualTo(0), "the restore reaches the mapped fan");
+            Assert.That(restored.Pwm, Is.EqualTo(0.4f).Within(1e-3),
+                        "carrying the saved speed, so the fan spins back up rather than the object model alone "
+                        + "saying it did");
+        });
+
+        bench.CanMaster.ClearCapture();
+        await bench.Host.ExecuteCodeAsync("M106 P0 S0");
+        await bench.Host.ExecuteCodeAsync("M106 P0 R3");
+        Assert.Multiple(() =>
+        {
+            Assert.That(fan!.RequestedValue, Is.Zero,
+                        "M106 P0 R3 is ignored: R is read only when no fan was named (GCodes2.cpp case 106)");
+            Assert.That(bench.CanMaster.CanMessages<CanMessageSetFanSpeed>(), Has.Count.EqualTo(1),
+                        "so the only speed that followed was the M106 P0 S0, and the ignored R drove nothing");
+        });
+    }
+
+    /// <summary>
+    /// M950 F with a tacho input as the second half of C claims both ports on the same board, and K
+    /// sets how many pulses a revolution makes
+    /// </summary>
+    /// <remarks>
+    /// The CAN address at the front of the string applies to the second port too, which is the part
+    /// most likely to break, and '^' enables the tacho input's pullup so a disconnected input sits
+    /// high rather than floating. The regression case is
+    /// <c>testcases/fans/m950-fan-with-tacho.yaml</c>. fans[0].rpm stays -1 here because the bench's
+    /// board never sends a fan report, which is the same reason
+    /// <see cref="M950CreatesFanWithRrfDefaults"/> gives (RemoteFan.cpp lastRpm)
+    /// </remarks>
+    [Test]
+    public async Task M950CreatesAFanWithATachoInput()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync(
+            configExtra: "M950 F0 C\"1.out3+^io1.in\" Q100 K4");
+
+        Fan? fan = await bench.Host.ReadModelAsync(model => model.Fans[0]);
+        Assert.Multiple(() =>
+        {
+            Assert.That(fan!.Port, Is.EqualTo("1.out3+^io1.in"),
+                        "fans[0].port holds the pin pair as it was written, pullup and all (DSF addition, "
+                        + "rrf-differences.md section 3)");
+            Assert.That(fan!.Frequency, Is.EqualTo(100), "M950 Q100 sets fans[0].frequency");
+            Assert.That(fan!.TachoPpr, Is.EqualTo(4.0).Within(1e-3),
+                        "M950 K4 sets fans[0].tachoPpr rather than leaving it at DefaultFanTachoPulsesPerRev "
+                        + "(FansManager.cpp ConfigureFanPort)");
+            Assert.That(fan!.Rpm, Is.EqualTo(-1),
+                        "fans[0].rpm is -1 until the board reports a tacho reading (RemoteFan.cpp lastRpm)");
+        });
+
+        (byte board, CanMessageM950Fan sent) = bench.CanMaster.LastCanMessage<CanMessageM950Fan>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(board, Is.EqualTo(Board),
+                        "one address at the front of the string, and both pins belong to that board");
+            Assert.That(sent.F, Is.EqualTo(0));
+            Assert.That(sent.C, Is.EqualTo("out3+^io1.in"),
+                        "both pins go to the board under the names it knows them by, the one address in front of "
+                        + "the pair having said which board that is");
+            Assert.That(sent.Q, Is.EqualTo(100));
+            Assert.That(sent.K, Is.EqualTo(4.0f).Within(1e-3),
+                        "and K is stated, because the board scales the pulses it counts by its copy to reach the "
+                        + "RPM it reports back");
+        });
+    }
+
+    /// <summary>
+    /// M950 F C"nil" deletes a fan: it disappears from the object model and the board releases the
+    /// pin, so the next M950 that wants it can have it
+    /// </summary>
+    /// <remarks>
+    /// FansManager::ConfigureFanPort (FansManager.cpp) reads "nil" as a request to delete, and
+    /// reporting a fan that is not there is an error rather than a description of the fan that used
+    /// to be. The regression case is <c>testcases/fans/m950-fan-delete.yaml</c>: a delete that leaves
+    /// the pin claimed makes the next M950 that wants it fail for a reason that has nothing to do
+    /// with the line that hits it
+    /// </remarks>
+    [Test]
+    public async Task M950DeletesAFanWithCNil()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync(configExtra: Fan0Config);
+
+        string deleted = await bench.Host.ExecuteCodeAsync("M950 F0 C\"nil\"");
+        await Assert.MultipleAsync(async () =>
+        {
+            Assert.That(deleted, Does.Not.StartWith("Error:"), "C\"nil\" is a delete, not a bad port name");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]), Is.Null,
+                        "the fan leaves fans[] (FansManager.cpp ConfigureFanPort)");
+        });
+
+        (byte board, CanMessageM950Fan released) = bench.CanMaster.LastCanMessage<CanMessageM950Fan>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(board, Is.EqualTo(Board), "the release goes to the board that holds the pin");
+            Assert.That(released.F, Is.EqualTo(0));
+            Assert.That(released.C, Is.EqualTo("nil"),
+                        "and says \"nil\", which is what frees the pin there rather than only here");
+        });
+
+        Assert.That(await bench.Host.ExecuteCodeAsync("M950 F0"), Does.StartWith("Error:"),
+                    "reporting a fan that has been deleted is an error, not a description of the fan that used "
+                    + "to be there (FansManager.cpp ConfigureFanPort)");
+
+        string reused = await bench.Host.ExecuteCodeAsync("M950 F1 C\"1.out3\"");
+        await Assert.MultipleAsync(async () =>
+        {
+            Assert.That(reused, Does.Not.StartWith("Error:"),
+                        "the pin really is free again: this only succeeds if the delete released it");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[1]), Is.Not.Null,
+                        "and fans[1] now holds the fan that took the pin over");
+        });
+    }
+
+    /// <summary>
+    /// M106 with a fan number and nothing to act on reports the fan's whole configuration: its name,
+    /// its speed, its limits and its blip time
+    /// </summary>
+    /// <remarks>
+    /// Fan::Configure (Fan.cpp) reports when no parameter was seen and there is no R and no S, and
+    /// the format is its. The regression case is <c>testcases/fans/m106-report-fan.yaml</c>, whose
+    /// body only reads: a field quietly dropping out of the report is the regression it catches
+    /// </remarks>
+    [Test]
+    public async Task M106ReportsTheFanConfiguration()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync(
+            configExtra: Fan0Config + "\nM106 P0 L0.15 X0.9 B0.2 C\"drt test fan\"");
+
+        bench.CanMaster.ClearCapture();
+
+        string report = await bench.Host.ExecuteCodeAsync("M106 P0");
+        Assert.Multiple(() =>
+        {
+            Assert.That(report.Trim(), Is.EqualTo("Fan 0 (drt test fan), speed 0%, min: 15%, max: 90%, blip: 0.20"),
+                        "M106 P0 reports the fan's configuration in RepRapFirmware's format (Fan.cpp Fan::Configure, "
+                        + "report branch)");
+            Assert.That(bench.CanMaster.CanMessages<CanMessageFanParameters>(), Is.Empty,
+                        "a report changes nothing, so nothing goes to the board");
+            Assert.That(bench.CanMaster.CanMessages<CanMessageSetFanSpeed>(), Is.Empty);
+        });
+    }
+
+    /// <summary>
+    /// A thermostatic fan reports the sensors it watches and the temperatures it switches between,
+    /// in place of the speed a manual fan reports
+    /// </summary>
+    /// <remarks>
+    /// Fan::Configure (Fan.cpp) prints the speed only while sensorsMonitored is empty, and appends
+    /// the trigger temperatures, the sensor list and the PWM the fan is actually running at
+    /// otherwise. That last figure is the board's, so it reads "unknown" until the board reports one
+    /// (RemoteFan.cpp lastPwm), which on this bench is never. The regression case is
+    /// <c>testcases/fans/m106-thermostatic-fan.yaml</c>
+    /// </remarks>
+    [Test]
+    public async Task M106ReportsAThermostaticFansTriggerTemperatures()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync(
+            configExtra: Fan0Config + "\nM308 S1 P\"1.temp0\" Y\"thermistor\"\nM106 P0 H1 T45 X0.7");
+
+        string report = await bench.Host.ExecuteCodeAsync("M106 P0");
+        Assert.That(report.Trim(),
+                    Is.EqualTo("Fan 0, min: 10%, max: 70%, blip: 0.10, temperature: 45.0:45.0C, sensors: 1, "
+                               + "current speed: unknown"),
+                    "a thermostatic fan reports its sensors and trigger temperatures instead of a requested speed "
+                    + "(Fan.cpp Fan::Configure, report branch)");
+    }
+
+    /// <summary>
+    /// An M106 with nothing to act on and no fan to report answers with nothing
+    /// </summary>
+    /// <remarks>
+    /// A bare M106 never reaches Fan::Configure - GCodes2.cpp case 106 calls it only when P was seen
+    /// - and has no S or R to act on either, so the reply is empty. The regression cases are
+    /// <c>testcases/fans/m106-report-fan.yaml</c>, where the blank reply is the assertion, and
+    /// <c>testcases/fans/m106-fan-name-and-restore.yaml</c> for the R form
+    /// </remarks>
+    [Test]
+    public async Task M106WithNothingToActOnRepliesWithNothing()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync(configExtra: Fan0Config);
+
+        Assert.Multiple(async () =>
+        {
+            Assert.That((await bench.Host.ExecuteCodeAsync("M106")).Trim(), Is.Empty,
+                        "a bare M106 is a no-op rather than a report of fan 0: with no P, case 106 never calls "
+                        + "ConfigureFan (GCodes2.cpp)");
+            Assert.That((await bench.Host.ExecuteCodeAsync("M106 P0 R3")).Trim(), Is.Empty,
+                        "and an M106 whose only other parameter is an R it will not read reports nothing either, "
+                        + "because Fan::Configure reports only when there is no R (Fan.cpp)");
+        });
+    }
+
+    /// <summary>
+    /// M950 F with no other parameter asks the board which pins the fan drives, rather than
+    /// describing them from the object model
+    /// </summary>
+    /// <remarks>
+    /// RemoteFan::ReportPortDetails (RemoteFan.cpp) sends a bare M950 naming the fan and answers
+    /// with whatever comes back. The board is asked because it holds the pin table and a pin usually
+    /// has more than one name: the reference for <c>testcases/fans/m950-fan-with-tacho.yaml</c>
+    /// records <c>tacho pin 1.(io1.in,serial1.rx)</c>, which nothing on this side could reconstruct
+    /// from the <c>1.out3+^io1.in</c> the code was given. The bench's board acknowledges without
+    /// composing a report, so what this asserts is the query, which is the part that belongs here
+    /// </remarks>
+    [Test]
+    public async Task M950AsksTheBoardToReportTheFanPort()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync(configExtra: "M950 F0 C\"1.out3\" Q100");
+
+        bench.CanMaster.ClearCapture();
+        await bench.Host.ExecuteCodeAsync("M950 F0");
+
+        (byte board, CanMessageM950Fan query) = bench.CanMaster.LastCanMessage<CanMessageM950Fan>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(board, Is.EqualTo(Board), "the query goes to the board that drives the fan");
+            Assert.That(query.F, Is.EqualTo(0), "naming the fan it is about");
+            Assert.That(query.C, Is.Null,
+                        "and nothing else: a C would reassign the port rather than ask about it "
+                        + "(FansManager.cpp ConfigureFanPort branches on C)");
+            Assert.That(query.Q, Is.Null, "nor a Q, which would change the frequency");
+            Assert.That(query.K, Is.Null, "nor a K");
+        });
+    }
+
+    /// <summary>
+    /// A fan report for a fan the machine does not have is ignored, rather than creating one
+    /// </summary>
+    /// <remarks>
+    /// FansManager::ProcessRemoteFanRpms (FansManager.cpp) looks the number up and does nothing when
+    /// it is not there, and Heat::ProcessRemoteHeatersReport and Heat::ProcessRemoteSensorsReport
+    /// read their reports the same way. A report says what a board is doing, not what the machine
+    /// has. Creating an entry instead resurrects a device that was just deleted, because a board goes
+    /// on reporting one for as long as it still holds it: found on the bench, where
+    /// <c>M950 F0 C"nil"</c> put <c>fans[0]</c> back within a report interval as a fan with no port
+    /// that nothing could drive
+    /// </remarks>
+    [Test]
+    public async Task AFanReportDoesNotCreateTheFanItReportsOn()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync(configExtra: Fan0Config);
+
+        await bench.Host.ExecuteCodeAsync("M950 F0 C\"nil\"");
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]), Is.Null,
+                    "the fan is gone before the board reports anything");
+
+        // The board still holds the fan it was told to release until it acts on the message, so it
+        // goes on reporting it. That report is what used to put the entry back
+        bench.CanMaster.InjectFansReport(Board, fanNumber: 0, actualPwm: 0, rpm: -1);
+        bench.CanMaster.InjectFansReport(Board, fanNumber: 3, actualPwm: 0.5f, rpm: 1200);
+        await bench.CanMaster.WaitUntilAsync(() => bench.CanMaster.CompletedExchanges > 0,
+                                             what: "the reports to be carried over the link");
+
+        await Assert.MultipleAsync(async () =>
+        {
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]), Is.Null,
+                        "a report for the fan that was deleted does not bring it back");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans.Count), Is.LessThanOrEqualTo(1),
+                        "and a report for a fan that was never created adds nothing to fans[]");
+        });
+    }
+
+    /// <summary>
     /// M950 P creates a general-purpose output at the default M42 frequency, off, with its port
     /// recorded
     /// </summary>
@@ -591,7 +1161,7 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
         {
             Assert.That(board, Is.EqualTo(Board));
             Assert.That(sent.P, Is.EqualTo(0), "P is the port number the board will know it by");
-            Assert.That(sent.C, Is.EqualTo("1.out4"), "C is the port");
+            Assert.That(sent.C, Is.EqualTo("out4"), "C is the pin as the board knows it, address taken off");
             Assert.That(sent.Q, Is.EqualTo(500),
                         "Q states DefaultPinWritePwmFreq rather than leaving the board to default it "
                         + "(GpOutPort.cpp Configure resolves the frequency before it sends anything)");
@@ -690,7 +1260,7 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
                         "and the servo number travels as P: the board reads P as the port number, so the number "
                         + "in an M950 S cannot be passed through as written");
             Assert.That(sent.Q, Is.EqualTo(50), "Q states DefaultServoRefreshFrequency");
-            Assert.That(sent.C, Is.EqualTo("1.out5"));
+            Assert.That(sent.C, Is.EqualTo("out5"), "with the address taken off, as every port name on the bus is");
         });
     }
 

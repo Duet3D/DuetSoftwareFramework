@@ -4,6 +4,7 @@ using System.Linq;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Link;
 using DuetControlServer.Motion;
 using DuetControlServer.Motion.Kinematics;
 using DuetControlServer.Motion.Native;
@@ -61,7 +62,7 @@ public class EndstopArmingTests
             sensors.Endstops.Add(new Endstop
             {
                 Type = EndstopType.InputPin,
-                Port = string.Join(RemoteEndstops.PortSeparator, ports),
+                Port = string.Join(IoPorts.PortSeparator, ports),
                 HighEnd = false
             });
         }

@@ -416,8 +416,7 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
             foreach (int sensor in SetBits(report.WhichSensors, CanSensorReportArray11.Length))
             {
                 CanSensorReport sensorReport = report.TemperatureReports[slot++];
-                AnalogSensor? analogSensor = GetOrCreate(model.Sensors.Analog, sensor, () => new AnalogSensor());
-                if (analogSensor is not null)
+                if (Find(model.Sensors.Analog, sensor) is AnalogSensor analogSensor)
                 {
                     analogSensor.LastReading = sensorReport.GetTemperature();
                     analogSensor.State = (TemperatureError)sensorReport.ErrorCode;
@@ -439,8 +438,7 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
             foreach (int heaterNumber in SetBits(report.WhichHeaters, CanHeaterReportArray9.Length))
             {
                 CanHeaterReport heaterReport = report.Reports[slot++];
-                Heater? heater = GetOrCreate(model.Heat.Heaters, heaterNumber, () => new Heater());
-                if (heater is not null)
+                if (Find(model.Heat.Heaters, heaterNumber) is Heater heater)
                 {
                     heater.Current = heaterReport.GetTemperature();
 
@@ -479,8 +477,7 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
             foreach (int fanNumber in SetBits(report.WhichFans, FanReportArray14.Length))
             {
                 FanReport fanReport = report.FanReports[slot++];
-                Fan? fan = GetOrCreate(model.Fans, fanNumber, () => new Fan());
-                if (fan is not null)
+                if (Find(model.Fans, fanNumber) is Fan fan)
                 {
                     fan.ActualValue = fanReport.ActualPwm / 65535.0f;
 
@@ -608,6 +605,10 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
     {
         if (handle.Type == RemoteInputHandle.TypeGpIn)
         {
+            // The only one of these reports that still creates what it reports on, because nothing
+            // else does: M950 J is not ported, so a general-purpose input has no other way into
+            // sensors.gpIn[]. TODO make this a Find like the others when M950 J lands, so that a
+            // deleted input cannot come back the way a deleted fan used to
             GpInputPort? port = GetOrCreate(model.Sensors.GpIn, handle.Major, () => new GpInputPort());
             if (port is not null)
             {
@@ -772,6 +773,26 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
     /// object model has an entry for it means the configuration is ahead of us rather than wrong.
     /// The gaps are left null, which is what an unconfigured slot means in these collections
     /// </remarks>
+    /// <summary>
+    /// The object model entry a report is about, or null if the machine has no such device
+    /// </summary>
+    /// <typeparam name="T">Kind of device</typeparam>
+    /// <param name="collection">Where that kind lives in the object model</param>
+    /// <param name="index">Number the board reported</param>
+    /// <returns>The entry, or null</returns>
+    /// <remarks>
+    /// A report says what a board is doing, not what the machine has: the M-code that created the
+    /// device is what says that. RepRapFirmware reads its reports the same way and skips what it
+    /// cannot find - <c>FansManager::ProcessRemoteFanRpms</c>, <c>Heat::ProcessRemoteHeatersReport</c>
+    /// and <c>Heat::ProcessRemoteSensorsReport</c> all look the number up and do nothing when it is
+    /// not there. Creating an entry instead resurrects a device that was just deleted, because a
+    /// board goes on reporting one for as long as it still holds it: <c>M950 F0 C"nil"</c> put
+    /// <c>fans[0]</c> back within one report interval, as a fan with no port that nothing could drive
+    /// </remarks>
+    private static T? Find<T>(StaticModelCollection<T?> collection, int index)
+        where T : ModelObject, IStaticModelObject, new()
+        => index >= 0 && index < collection.Count ? collection[index] : null;
+
     private static T? GetOrCreate<T>(StaticModelCollection<T?> collection, int index, Func<T> create)
         where T : ModelObject, IStaticModelObject, new()
     {

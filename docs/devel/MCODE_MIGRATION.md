@@ -244,7 +244,7 @@ three columns sum to the row count, which is the arithmetic that catches a misco
 | Blocker | Blocks | Note |
 |---|---|---|
 | **Heat subsystem: nearly done** | M108, M144, M303 tuning, M305, M309 feedforward | [HeatManager](src/DuetControlServer/Heat/HeatManager.cs) holds sensors, heaters, setpoints, waiting, monitors, the process model and the fault codes. M303 is the one with real work left: tuning runs for minutes on the board and reports back through `CanMessageHeaterTuningReport`, so it needs a state machine rather than a handler |
-| **Fan subsystem: done** | — | [FanManager](src/DuetControlServer/Fans/FanManager.cs) creates fans, sets speeds and configures thermostatic control |
+| **Fan subsystem: done** | — | [FanManager](src/DuetControlServer/Fans/FanManager.cs) creates, deletes, drives and configures fans, including thermostatic control |
 | **Tool subsystem: nearly done** | Firmware retraction, M701-M703 | [ToolManager](src/DuetControlServer/Tools/ToolManager.cs) holds definition, selection, offsets, axis mapping, mixing and — through M568 and the Heat subsystem — the active and standby temperatures. What is left is firmware retraction (M207, `G10` without P, `G11`), which is a synthesised move rather than a message, and the filament codes |
 | **Spindle subsystem: done** | Laser | [SpindleManager](src/DuetControlServer/Spindles/SpindleManager.cs) builds a spindle out of three general-purpose outputs, which is what RepRapFirmware's three `IoPort`s are - CANlib has no spindle message at all, only a `MaxSpindles` constant. The GPIO layer it needed is [GpioManager](src/DuetControlServer/Ports/GpioManager.cs). `state.machineMode` exists now, so what is left is the laser itself: M452's port and power parameters, `M3` in laser mode, and a power field on the move |
 | **Endstops and probes: done** | M585, M672, M558.1/.2 | The input-monitor CAN messages (`CanMessageCreateInputMonitorV1`, `CanMessageChangeInputMonitorV1`, `CanMessageInputChangedV2`) are wired to `sensors.endstops[]` / `sensors.probes[]`, and §10 covers the whole path. What is left needs `G30 P` — see §10's "What is left in phase 5" |
@@ -400,7 +400,57 @@ RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 |---|---|---|---|---|
 | M106 | 1755 | Set fan speed and parameters | `fans[]` → CAN `CanMessageSetFanSpeed` / `CanMessageFanParameters` | ✅ |
 | M107 | 1815 | Fan off (deprecated) | `fans[].requestedValue` | ✅ |
-| M950 (fan) | 4589 | Create fan | `fans[]` → CAN generic `M950FanParams` | ✅ |
+| M950 (fan) | 4589 | Create, delete and report a fan | `fans[]` → CAN generic `M950FanParams` | ✅ |
+
+Every case in [DuetRegressionTesting](../../lib/DuetRegressionTesting)'s `testcases/fans/` has a
+scenario in [FanPortCodeTests](../../src/SystemTests/Scenarios/Codes/FanPortCodeTests.cs) asserting
+the object model, the CAN traffic and the reply severity against the same reference. Twelve of the
+thirteen pass on the bench against the `dsf` profile. The thirteenth,
+`error-missing-parameters-fans`, differs only in wording: where RepRapFirmware says
+`parameter 'F' too high`, this says `Fan number must be between 0 and 31`, which names the limit the
+operator has to satisfy. Both are errors and the case is accepted as it stands. Five things are
+worth knowing about the shape the rest took.
+
+1. **A C parameter always destroys the fan that held the number first.** `FansManager::ConfigureFanPort`
+   (FansManager.cpp) calls `DeleteObject(fans[fanNum])` before it reads the pin name, so creating,
+   reassigning and deleting differ only in what follows the release; `C"nil"` is the case where
+   nothing does. The release itself is `~RemoteFan` (RemoteFan.cpp) sending the board an M950 naming
+   the fan and `nil`, and it deliberately ignores what the board says back: a destructor cannot fail,
+   so a board that is unreachable must not be able to keep a fan alive on this side. Reassigning a
+   fan from one pin to another therefore puts two messages on the bus, which is what the reference
+   for `testcases/fans/m106-fan-invert-and-frequency.yaml` records.
+2. **A fan that does not exist is an error, not a description of nothing.** `M950 F<n>` and
+   `M106 P<n>` both say so, because a client that branches on severity has no other way to tell a fan
+   it can drive from one it cannot.
+3. **M106 reports only when there is nothing to act on.** `Fan::Configure` (Fan.cpp) reports when no
+   parameter it knows was seen *and* there is no R and no S, and `GCodes2.cpp` case 106 calls it only
+   when P was seen. So `M106 P0 I1` reads as a query, because I and F are the RRF2 spelling and
+   nothing here knows them, while a bare `M106`, `M106 S0.4` and `M106 P0 R3` all reply blank.
+4. **A board's report says what the board is doing, not what the machine has.** The fan, heater and
+   sensor report handlers in
+   [ExpansionBoardManager](../../src/DuetControlServer/Link/Expansion/ExpansionBoardManager.cs) used
+   to create the entry they reported on, so any number a board mentioned appeared in `fans[]`,
+   `heat.heaters[]` or `sensors.analog[]`. A board goes on reporting a device until it acts on the
+   message that released it, so `M950 F0 C"nil"` put `fans[0]` back within one report interval, as a
+   fan with no port that nothing could drive and that a second delete could not shift. Found on the
+   bench, where `m950-fan-delete`'s CAN traffic was byte-identical to the reference while its object
+   model was not. All three now look the number up and do nothing when it is absent, as
+   `FansManager::ProcessRemoteFanRpms`, `Heat::ProcessRemoteHeatersReport` and
+   `Heat::ProcessRemoteSensorsReport` do. `sensors.gpIn[]` still creates, because M950 J is not
+   ported and nothing else would populate it; there is a TODO on it.
+5. **The percentages in a report are computed in single precision.** Read literally, Fan.cpp's
+   `(int)(maxVal * 100.0)` widens the float to a double and `X0.7` truncates to 69%. The boards
+   report 70%, because they are built with single-precision constants and the product rounds to
+   exactly 70 in float. `MCodeHandler.AsPercent` stays in float for that reason; 0.7, 0.9 and 0.45
+   are the values where it matters.
+
+`M950 F<n>` with no other parameter is forwarded to the board, as `RemoteFan::ReportPortDetails`
+does, rather than composed from `fans[]`. Composing it locally was tried first and does not work: the
+board holds the pin table and a pin usually has more than one name, so the reference for
+`testcases/fans/m950-fan-with-tacho.yaml` reads `tacho pin 1.(io1.in,serial1.rx)` where this side
+could only have said `io1.in`. Forwarding also keeps the CAN traffic aligned with the reference,
+which a locally answered query silently breaks: the two missing query/reply pairs shifted every later
+frame in `testcases/fans/m106-fan-invert-and-frequency.yaml` and turned one difference into eleven.
 
 ### 5.7 Tools and filament — the tool subsystem exists (§16); the filament codes do not
 
@@ -896,6 +946,40 @@ One thing worth keeping in view: the local board is `CanId.MasterAddress` here w
 answers `CanInterface::GetCanAddress()`. The two are the same number for the only process that runs
 this, and the difference would only matter if DCS were ever not the main board — which §1.4 says it
 always is.
+
+#### And a third divergence, on the writing side
+
+Consolidating the readers left one gap, and it took the same shape one layer down. `FromCode` took the
+board address off any `ReducedString` parameter, because that is what CANlib marks a port name with;
+the generated message properties — `message.C = port` — did not. So the same message carried the
+address or not depending on how it had been built, and the two forms of M950 that build theirs by
+hand rather than from the code, F (fans) and P/S (general-purpose outputs and servos), sent
+`C"1.out3"` where every other path sent `C"out3"`.
+
+That is not cosmetic. `IoPort::Allocate` on an expansion board
+([Duet3Expansion/src/Hardware/IoPorts.cpp](../../src/Duet3Expansion/src/Hardware/IoPorts.cpp)) reads
+the modifiers and then looks the rest up in its pin table; it has no expansion-number handling,
+because a board addresses its own ports. `1.out3` is therefore looked up as a pin literally called
+`1.out3` and refused with "Unknown pin name". No system test saw it, because the bench's controller
+acknowledges every CAN request without parsing it, and the regression references — which do come from
+hardware — record `{"C": "out3"}` throughout.
+
+✅ **The rule now belongs to the parameter type**, in
+[CanGenericWriter.SetString](src/DuetControlServer/Link/Protocol/CanMessages/CanGenericWriter.cs),
+which is where RepRapFirmware puts it too: `CanMessageGenericConstructor::AddParam`'s `reducedString`
+case strips the address for every such parameter and notes that the sensor names sharing the type are
+safe because they do not start with digits followed by a dot. `FromCode` no longer has a case of its
+own. What RepRapFirmware does not need is the hand-built path, because its callers reduce the name as
+they read the code and carry the local name from then on; here `fans[].port` keeps the addressed name
+on purpose, so that the object model says which board drives the fan, and the last place that can take
+the address off is the writer.
+
+Impact, checked message by message: `M950FanParams` and `M950GpioParams` were affected through the
+hand-built path. `M950HeaterParams`, `M308V1Params` and the `M569.1`/`M569.7` tables reach the wire
+through `FromCode` and were already right, as were `CanMessageCreateInputMonitorV1` for endstops and
+probes and the spindle's use of `M950GpioParams`, all of which pass an already-split local name.
+`M955Params`, `M655Params` and `M950LedParams` carry a port and are not ported yet; they inherit the
+rule when they are.
 
 ### What M500 saves, and what it does not
 

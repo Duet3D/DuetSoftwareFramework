@@ -42,7 +42,7 @@ internal partial class MCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleCreateDeviceAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        char[] chars = {'D', 'E', 'R', 'J', 'F', 'H', 'P', 'S'};
+        const string chars = "DEFHJPSR";
         uint seen = 0;
         foreach (char c in chars)
         {
@@ -84,8 +84,15 @@ internal partial class MCodeHandler
     }
 
     /// <summary>
-    /// M950 F: create a fan
+    /// M950 F: create, reassign, delete or report a fan
     /// </summary>
+    /// <remarks>
+    /// FansManager::ConfigureFanPort (FansManager.cpp). A C parameter always destroys the fan that
+    /// held that number first, whether the code goes on to create another or names
+    /// <see cref="IoPorts.NoPortName"/> to delete it, so the two paths differ only in what follows
+    /// the release. Without a C it is a change to the parameters of a fan that exists already, or a
+    /// request to report it
+    /// </remarks>
     private async ValueTask<Message> HandleCreateFanAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (!code.TryGetInt('F', out int fanNumber) || fanNumber < 0 || fanNumber >= FanManager.MaxFans)
@@ -95,11 +102,17 @@ internal partial class MCodeHandler
 
         if (!code.TryGetString('C', out string? port))
         {
-            // Without a port this is either a change to the parameters of a fan that exists already
-            // or a request to report it
             return code.HasParameter('Q') || code.HasParameter('K')
                    ? await SetFanParametersAsync(code, fanNumber, cancellationToken)
                    : await ReportFanAsync(fanNumber, cancellationToken);
+        }
+
+        // A port cannot belong to two fans, so whatever held this number lets go of its pins before
+        // anything else claims them
+        await DeleteFanAsync(fanNumber, cancellationToken);
+        if (IoPorts.IsNoPort(port))
+        {
+            return new Message();
         }
 
         byte board;
@@ -127,6 +140,40 @@ internal partial class MCodeHandler
         }
 
         return await SendM950FanAsync(fanNumber, port, createFrequency, createPulsesPerRev, board, cancellationToken);
+    }
+
+    /// <summary>
+    /// Take a fan out of the object model and tell its board to let go of the pins
+    /// </summary>
+    /// <param name="fanNumber">The fan, which may not exist</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <remarks>
+    /// RepRapFirmware's <c>~RemoteFan</c> (RemoteFan.cpp), which sends the board an M950 naming the
+    /// fan and <see cref="IoPorts.NoPortName"/>. What the board says to that is deliberately not
+    /// read: a destructor cannot fail, so a board that is unreachable or has already forgotten the
+    /// fan must not be able to keep it alive here. The pin would then be claimed on a board nothing
+    /// on this side knows about, which is the state a delete exists to avoid
+    /// </remarks>
+    private async ValueTask DeleteFanAsync(int fanNumber, CancellationToken cancellationToken)
+    {
+        byte board;
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (fanManager.Find(fanNumber) is null)
+            {
+                return;
+            }
+
+            bool onABoard = fanManager.TryGetBoard(fanNumber, out board);
+            fanManager.Delete(fanNumber);
+            if (!onABoard)
+            {
+                return;
+            }
+        }
+
+        await SendM950FanAsync(fanNumber, IoPorts.NoPortName, frequency: null, pulsesPerRev: null, board,
+                               cancellationToken);
     }
 
     /// <summary>
@@ -209,17 +256,38 @@ internal partial class MCodeHandler
     }
 
     /// <summary>
-    /// Report one fan, as M950 F with no C does
+    /// Report the pins one fan is driven through, as M950 F with no C does
     /// </summary>
+    /// <remarks>
+    /// RemoteFan::ReportPortDetails (RemoteFan.cpp) sends the board a bare M950 naming the fan and
+    /// answers with what comes back, and this does the same. The board is asked rather than
+    /// <c>fans[].port</c> read because the board holds the pin table: a pin usually has more than one
+    /// name, and only the board that drives it knows them. <c>1.io1.in</c> is reported as
+    /// <c>1.(io1.in,serial1.rx)</c>, which nothing on this side could reconstruct.
+    ///
+    /// A fan that does not exist is an error rather than a description of nothing, because a client
+    /// that branches on severity has no other way to tell a fan it can drive from one it cannot
+    /// (FansManager.cpp ConfigureFanPort)
+    /// </remarks>
     private async ValueTask<Message> ReportFanAsync(int fanNumber, CancellationToken cancellationToken)
     {
+        byte board;
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            return fanManager.Find(fanNumber) is not Fan fan
-                ? new Message(MessageType.Success, $"Fan {fanNumber} is not configured")
-                : new Message(MessageType.Success, string.Create(CultureInfo.InvariantCulture,
-                    $"Fan {fanNumber} frequency {fan.Frequency:F0}Hz, speed {fan.ActualValue * 100.0f:F0}%"));
+            if (fanManager.Find(fanNumber) is null)
+            {
+                return new Message(MessageType.Error, $"Fan {fanNumber} not found");
+            }
+            if (!fanManager.TryGetBoard(fanNumber, out board))
+            {
+                return new Message(MessageType.Error, $"Fan {fanNumber} is not on an expansion board");
+            }
         }
+
+        // No C, Q or K, which is what makes this a query rather than a change: RemoteFan sends the
+        // fan number alone and the board fills in the reply
+        return await SendM950FanAsync(fanNumber, port: null, frequency: null, pulsesPerRev: null, board,
+                                      cancellationToken);
     }
 
     /// <summary>
@@ -242,13 +310,13 @@ internal partial class MCodeHandler
         // which may be several fans or none, so a configuration parameter would have no fan to land on
         bool seenFanNumber = code.TryGetInt('P', out int fanNumber);
         bool configured = false;
+        Message reply = new();
         if (seenFanNumber)
         {
-            Message? configError;
-            (configured, configError) = await ConfigureFanAsync(code, fanNumber, cancellationToken);
-            if (configError is not null)
+            (configured, reply) = await ConfigureFanAsync(code, fanNumber, cancellationToken);
+            if (reply.Type == MessageType.Error)
             {
-                return configError;
+                return reply;
             }
         }
 
@@ -270,10 +338,11 @@ internal partial class MCodeHandler
             {
                 return error;
             }
-            return new Message();
         }
 
-        // R puts back the speed a restore point saved, and only for the mapped fans
+        // R puts back the speed a restore point saved, and only for the mapped fans: Fan::Configure
+        // does not read R either, so an R alongside a fan number is carried by a code that nothing
+        // acts on
         if (!seenFanNumber && code.TryGetInt('R', out int restorePointNumber))
         {
             if (restorePointNumber < 0 || restorePointNumber >= Motion.RestorePoint.NumVisible)
@@ -287,15 +356,10 @@ internal partial class MCodeHandler
             {
                 saved = planner.State.RestorePoints[restorePointNumber].FanSpeed;
             }
-            return await SetMappedFanSpeedAsync(saved, cancellationToken) ?? new Message();
+            return await SetMappedFanSpeedAsync(saved, cancellationToken) ?? reply;
         }
 
-        if (configured)
-        {
-            return new Message();
-        }
-        return await ReportFanSpeedsAsync(seenFanNumber ? [fanNumber] : await MappedFansAsync(cancellationToken),
-                                          cancellationToken);
+        return reply;
     }
 
     /// <summary>
@@ -304,23 +368,27 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="fanNumber">The fan it named</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Whether any parameter was seen, and an error if one was refused</returns>
+    /// <returns>Whether any parameter was seen, and what to reply: an error, the report, or nothing</returns>
     /// <remarks>
     /// Fan::Configure (Fan.cpp). S is acted on here rather than as a speed of its own, but only
     /// alongside another parameter and after H, because H on its own defaults the fan to full speed
     /// and an S given with it has to win. L is clamped to the maximum and X to the minimum, and both
     /// read as a fan speed does. What the fan ends up at is then sent to the board in one message,
-    /// as RepRapFirmware's UpdateFanConfiguration does
+    /// as RepRapFirmware's UpdateFanConfiguration does.
+    ///
+    /// A code that changed nothing reports the fan instead, and only when there is no R and no S for
+    /// the caller to act on - so an M106 that carries only a parameter this firmware has no use for
+    /// reads as a query, and one that is about to set a speed says nothing
     /// </remarks>
-    private async ValueTask<(bool Seen, Message? Error)> ConfigureFanAsync(Commands.Code code, int fanNumber,
-                                                                          CancellationToken cancellationToken)
+    private async ValueTask<(bool Seen, Message Reply)> ConfigureFanAsync(Commands.Code code, int fanNumber,
+                                                                         CancellationToken cancellationToken)
     {
         bool seen = false;
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             if (fanManager.Find(fanNumber) is not Fan fan)
             {
-                return (false, new Message(MessageType.Error, $"Fan {fanNumber} not found"));
+                return (false, new Message(MessageType.Error, $"Fan number {fanNumber} not found"));
             }
 
             // Two temperatures: the fan is off below the first and full on above the second, which is
@@ -398,10 +466,83 @@ internal partial class MCodeHandler
             {
                 fan.RequestedValue = GetPwmValue(speed);
             }
+
+            if (!seen)
+            {
+                return (false, code.HasParameter('R') || code.HasParameter('S')
+                               ? new Message()
+                               : new Message(MessageType.Success, FanConfigurationReport(fanNumber, fan)));
+            }
         }
 
-        return seen ? (true, await SendFanParametersAsync(fanNumber, cancellationToken)) : (false, null);
+        return (true, await SendFanParametersAsync(fanNumber, cancellationToken) ?? new Message());
     }
+
+    /// <summary>
+    /// What one fan is configured to do, in the wording M106 reports it with
+    /// </summary>
+    /// <param name="fanNumber">The fan</param>
+    /// <param name="fan">Its object model entry</param>
+    /// <returns>The report</returns>
+    /// <remarks>
+    /// Fan::Configure's report branch (Fan.cpp). A thermostatic fan reports the sensors it watches,
+    /// the temperatures it switches between and the PWM the board has it at, in place of the
+    /// requested speed a manual fan reports: a requested speed says nothing about a fan the board is
+    /// driving from a temperature. That running PWM is the board's to report, so it reads "unknown"
+    /// until one has arrived (RemoteFan.cpp lastPwm). The caller must hold the object model lock
+    /// </remarks>
+    private static string FanConfigurationReport(int fanNumber, Fan fan)
+    {
+        StringBuilder builder = new();
+        builder.Append(CultureInfo.InvariantCulture, $"Fan {fanNumber}");
+        if (!string.IsNullOrEmpty(fan.Name))
+        {
+            builder.Append(CultureInfo.InvariantCulture, $" ({fan.Name})");
+        }
+
+        bool thermostatic = fan.Thermostatic.Sensors.Count > 0;
+        if (!thermostatic)
+        {
+            builder.Append(CultureInfo.InvariantCulture, $", speed {AsPercent(fan.RequestedValue)}%");
+        }
+        builder.Append(CultureInfo.InvariantCulture,
+                       $", min: {AsPercent(fan.Min)}%, max: {AsPercent(fan.Max)}%, blip: {fan.Blip:F2}");
+
+        if (thermostatic)
+        {
+            builder.Append(CultureInfo.InvariantCulture,
+                           $", temperature: {fan.Thermostatic.LowTemperature ?? Fan.DefaultTriggerTemperature:F1}"
+                           + $":{fan.Thermostatic.HighTemperature ?? Fan.DefaultTriggerTemperature:F1}C, sensors:");
+            foreach (int sensor in fan.Thermostatic.Sensors)
+            {
+                builder.Append(CultureInfo.InvariantCulture, $" {sensor}");
+            }
+            builder.Append(", current speed: ");
+            builder.Append(fan.ActualValue >= 0.0f
+                           ? string.Create(CultureInfo.InvariantCulture, $"{AsPercent(fan.ActualValue)}%:")
+                           : "unknown");
+        }
+        return builder.ToString();
+    }
+
+    /// <summary>
+    /// A 0 to 1 fan value as the whole percent a report prints
+    /// </summary>
+    /// <param name="value">The value</param>
+    /// <returns>The percentage, truncated</returns>
+    /// <remarks>
+    /// Truncated rather than rounded, because RepRapFirmware's reports cast the percentage to an
+    /// integer (Fan.cpp) and a fan reported at 80% by one and 79% by the other is a difference an
+    /// operator has no way to explain.
+    ///
+    /// The multiplication is deliberately single precision. Read literally, Fan.cpp's
+    /// <c>(int)(maxVal * 100.0)</c> widens the float to a double, and X0.7 would then truncate to
+    /// 69% because 0.7f is 0.69999998808. The boards report 70%, because they are built with
+    /// single-precision constants and the whole expression stays in float, where the same product
+    /// rounds to exactly 70. Widening here would put this side one percent below the reference on
+    /// the values that land just under a float boundary: 0.7, 0.9 and 0.45 among them
+    /// </remarks>
+    private static int AsPercent(float value) => (int)(value * 100.0f);
 
     /// <summary>
     /// M107: switch a fan off
@@ -493,34 +634,6 @@ internal partial class MCodeHandler
             fans.AddRange(mapped.Where(fanNumber => fanManager.Find(fanNumber) is not null));
         }
         return fans;
-    }
-
-    /// <summary>
-    /// Report what fans are running at
-    /// </summary>
-    private async ValueTask<Message> ReportFanSpeedsAsync(IReadOnlyList<int> fans, CancellationToken cancellationToken)
-    {
-        StringBuilder builder = new();
-        using (await model.AccessReadOnlyAsync(cancellationToken))
-        {
-            foreach (int fanNumber in fans)
-            {
-                if (fanManager.Find(fanNumber) is Fan fan)
-                {
-                    builder.Append(CultureInfo.InvariantCulture,
-                                   $"Fan {fanNumber} speed {fan.ActualValue * 100.0f:F0}%, requested "
-                                   + $"{fan.RequestedValue * 100.0f:F0}%");
-                    if (fan.Rpm >= 0)
-                    {
-                        builder.Append(CultureInfo.InvariantCulture, $", {fan.Rpm} RPM");
-                    }
-                    builder.AppendLine();
-                }
-            }
-        }
-        return builder.Length == 0
-            ? new Message(MessageType.Success, "No fans are configured")
-            : new Message(MessageType.Success, builder.ToString().TrimEnd());
     }
 
     /// <summary>

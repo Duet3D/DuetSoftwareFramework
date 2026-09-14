@@ -108,19 +108,12 @@ public static partial class CanGenericWriter
                 break;
             }
 
-            case CanParamType.String:
+            case CanParamType.String or CanParamType.ReducedString:
+                // A reduced string has its board address taken off by SetString, which is where that
+                // rule lives for every writer rather than for the one that happens to start from a
+                // code
                 SetString(ref message, table, letter, Text(letter, parameter));
                 break;
-
-            case CanParamType.ReducedString:
-            {
-                // Expansion boards address their own ports, so the board number has to come off
-                // first. Which board it named is not needed here - the message is already on its way
-                // to one - but the grammar is shared with everything else that reads a port name
-                IoPorts.RemoveBoardAddress(Text(letter, parameter), out string localPort);
-                SetString(ref message, table, letter, localPort);
-                break;
-            }
 
             case CanParamType.UInt8Array or CanParamType.UInt16Array or CanParamType.UInt32Array:
                 SetUIntArray(ref message, table, letter, UIntArray(letter, parameter, descriptor));

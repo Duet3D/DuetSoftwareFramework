@@ -43,8 +43,8 @@ internal partial class MCodeHandler
         // The ports have to exist before the spindle can be built from them, so each is created as a
         // general-purpose output first. RepRapFirmware assigns them with IoPort::AssignPorts, which
         // is the same operation spelled differently
-        string[] names = ports.Split(RemoteEndstops.PortSeparator, System.StringSplitOptions.RemoveEmptyEntries
-                                                                   | System.StringSplitOptions.TrimEntries);
+        string[] names = ports.Split(IoPorts.PortSeparator, System.StringSplitOptions.RemoveEmptyEntries
+                                                            | System.StringSplitOptions.TrimEntries);
         if (names.Length == 0)
         {
             return new Message(MessageType.Error, "A spindle needs at least a PWM port");

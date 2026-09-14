@@ -358,6 +358,33 @@ internal sealed class ScriptedCanMaster : IDisposable
     }
 
     /// <summary>
+    /// Broadcast a fans report as an expansion board does, which is what feeds fans[].actualValue
+    /// and fans[].rpm
+    /// </summary>
+    /// <param name="srcAddress">CAN address of the board reporting</param>
+    /// <param name="fanNumber">Fan the report is about</param>
+    /// <param name="actualPwm">PWM the board has the fan at, 0 to 1</param>
+    /// <param name="rpm">Tacho reading, or -1 where the fan has no tacho</param>
+    /// <remarks>
+    /// A board reports the fans it holds, which is not the same set as the fans the machine has
+    /// configured: it goes on reporting one until it acts on the message that released it. That gap
+    /// is why a report must not create what it reports on
+    /// </remarks>
+    public void InjectFansReport(byte srcAddress, int fanNumber, float actualPwm, short rpm)
+    {
+        CanMessageFansReport report = default;
+        report.WhichFans = 1ul << fanNumber;
+        report.FanReports[0].ActualPwm = (ushort)Math.Clamp(actualPwm * 65535.0f, 0.0f, 65535.0f);
+        report.FanReports[0].Rpm = rpm;
+
+        byte[] payload = new byte[report.GetActualDataLength(1)];
+        CanMessageSerializer.Serialize(in report, payload);
+        InjectCanResponse(LinkInterface.UnsolicitedTxToken,
+                          (ushort)CanMessageType.FansReport,
+                          srcAddress, payload);
+    }
+
+    /// <summary>
     /// Broadcast a sensor temperatures report as an expansion board does, which is what feeds
     /// sensors.analog[].lastReading
     /// </summary>
@@ -408,6 +435,22 @@ internal sealed class ScriptedCanMaster : IDisposable
     #endregion
 
     #region Observation
+    /// <summary>Throw away everything captured so far, so the observations start again from empty</summary>
+    /// <remarks>
+    /// For a scenario that has to assert a code sent <em>nothing</em>: the configuration a bench
+    /// starts from puts messages on the bus of its own, so "no fan speed was sent" cannot be
+    /// <c>CanMessages&lt;T&gt;()</c> being empty unless what came before is discarded first. Every
+    /// observation reads the same capture, so this clears the packet and transfer views along with
+    /// the CAN messages, and a failure after it dumps only the exchanges that followed
+    /// </remarks>
+    public void ClearCapture()
+    {
+        lock (_lock)
+        {
+            _transfers.Clear();
+        }
+    }
+
     /// <summary>Snapshot of every transfer captured so far, both directions, in order</summary>
     public IReadOnlyList<CapturedTransfer> Transfers
     {
