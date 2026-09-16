@@ -14281,6 +14281,11 @@
             Motor stall detection stops individual drives when triggered
             </summary>
         </member>
+        <member name="F:DuetAPI.ObjectModel.EndstopType.MotorStallEncoder">
+            <summary>
+            Encoder position error stops all the drives when triggered
+            </summary>
+        </member>
         <member name="F:DuetAPI.ObjectModel.EndstopType.Unknown">
             <summary>
             Unknown type
