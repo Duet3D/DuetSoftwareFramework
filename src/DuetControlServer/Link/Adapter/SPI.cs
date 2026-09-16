@@ -32,9 +32,7 @@ public class SPI : IDiagnostics, ILinkAdapter
 
     // General transfer variables
     private readonly InputGpioPin _transferReadyPin;
-    private readonly ManualResetEventSlim _transferReadyEvent = new(false);
     private bool _expectedTfrRdyPinValue;
-    private volatile bool _lastPinValueFromCallback;
     private readonly SpiDevice _spiDevice;
     private bool _waitingForFirstTransfer = true, _connected, _hadTimeout, _resetting, _updating;
     private ushort _lastTransferNumber;
@@ -102,13 +100,6 @@ public class SPI : IDiagnostics, ILinkAdapter
         // Initialize transfer ready pin via the kernel GPIO character device (v1/v2 uAPI, no libgpiod)
         int transferReadyPin = settings.Value.TransferReadyPin;
         _transferReadyPin = new InputGpioPin(settings.Value.GpioChipDevice, transferReadyPin, $"dcs-trp-{transferReadyPin}");
-        _lastPinValueFromCallback = _transferReadyPin.Value;
-        _transferReadyPin.PinChanged += (value, sequenceNumber) =>
-        {
-            _lastPinValueFromCallback = value;
-            _transferReadyEvent.Set();
-        };
-        _transferReadyPin.StartMonitoring();
 
         // Open the SPI device directly through the spidev character device
         _spiDevice = new SpiDevice(settings.Value.SpiDevice, settings.Value.SpiFrequency, settings.Value.SpiTransferMode);
@@ -1524,15 +1515,9 @@ public class SPI : IDiagnostics, ILinkAdapter
             _expectedTfrRdyPinValue = true;
         }
 
-        // Flush pending events by consuming them until the event stays reset
-        while (_transferReadyEvent.Wait(0))
-        {
-            _transferReadyEvent.Reset();
-        }
-        
-        // Check if the pin is already at the expected value
-        bool currentValue = _transferReadyPin.Read();
-        if (currentValue != _expectedTfrRdyPinValue)
+        // Value only advances by consuming edge events, so drain the queue before comparing
+        _transferReadyPin.FlushEvents();
+        if (_transferReadyPin.Value != _expectedTfrRdyPinValue)
         {
             // Determine how long to wait for the pin level transition
             int timeout;
@@ -1546,7 +1531,7 @@ public class SPI : IDiagnostics, ILinkAdapter
                 timeout = _updating ? Consts.IapTimeout : (inTransfer ? _settings.SbcTransferTimeout : _settings.SbcConnectionTimeout);
             }
 
-            // Wait for the expected pin level, ignoring glitches
+            // Wait for the expected pin level
             Stopwatch stopwatch = Stopwatch.StartNew();
             int glitchesAtStart = _numTfrPinGlitches;
             try
@@ -1559,32 +1544,11 @@ public class SPI : IDiagnostics, ILinkAdapter
                         throw new OperationCanceledException();
                     }
 
-                    // Wait for any pin change event
-                    if (_transferReadyEvent.Wait(timeToWait))
+                    if (_transferReadyPin.WaitForEvent(timeToWait) == _expectedTfrRdyPinValue)
                     {
-                        _transferReadyEvent.Reset();
-                        
-                        // Use the pin value captured in the callback
-                        currentValue = _lastPinValueFromCallback;
-
-                        // Check if this is the transition we're waiting for
-                        if (currentValue == _expectedTfrRdyPinValue)
-                        {
-                            // Verify by reading again to ensure it's stable
-                            bool verifyValue = _transferReadyPin.Read();
-                            if (verifyValue == _expectedTfrRdyPinValue)
-                            {
-                                break;
-                            }
-                            // Pin changed again between callback and now, count as glitch
-                            _numTfrPinGlitches++;
-                        }
-                        else
-                        {
-                            // This was a transition in the wrong direction, ignore it
-                            // Don't count as glitch since this is expected with both edges registered
-                        }
+                        break;
                     }
+                    _numTfrPinGlitches++;
                 } while (true);
             }
             catch (OperationCanceledException)

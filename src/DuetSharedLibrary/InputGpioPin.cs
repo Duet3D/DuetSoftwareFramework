@@ -2,14 +2,15 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading;
 
 namespace DuetSharedLibrary;
 
 /// <summary>
 /// Event-based reader for a single GPIO input line via the Linux GPIO character device.
 /// Prefers the v2 chardev uAPI (kernel 5.10+) for per-edge sequence numbers and falls back to the
-/// legacy v1 uAPI on older kernels. This talks to /dev/gpiochipN directly and needs no libgpiod
+/// legacy v1 uAPI on older kernels. This talks to /dev/gpiochipN directly and needs no libgpiod.
+/// The caller consumes the kernel's edge event queue itself via <see cref="FlushEvents"/> and
+/// <see cref="WaitForEvent"/>, so the level always reflects the edge sequence and no second thread is involved
 /// </summary>
 public sealed class InputGpioPin : IDisposable
 {
@@ -37,21 +38,9 @@ public sealed class InputGpioPin : IDisposable
     public int MissedEdges { get; private set; }
 
     /// <summary>
-    /// Pin level as of the last observed edge or read
+    /// Pin level as of the last consumed edge event, or of the initial read before any edge was seen
     /// </summary>
     public bool Value { get; private set; }
-
-    /// <summary>
-    /// Delegate invoked on every observed edge
-    /// </summary>
-    /// <param name="value">New pin level</param>
-    /// <param name="sequenceNumber">Sequence number of the edge (see <see cref="SequenceNumber"/>)</param>
-    public delegate void PinChangedDelegate(bool value, uint sequenceNumber);
-
-    /// <summary>
-    /// Raised on every observed edge while monitoring
-    /// </summary>
-    public event PinChangedDelegate? PinChanged;
 
     /// <summary>
     /// Open a GPIO line for both-edge event monitoring
@@ -83,7 +72,7 @@ public sealed class InputGpioPin : IDisposable
             {
                 RequestLineV1(consumerLabel);
             }
-            Value = Read();
+            Value = ReadLevel();
         }
         catch
         {
@@ -158,11 +147,12 @@ public sealed class InputGpioPin : IDisposable
     }
 
     /// <summary>
-    /// Read the current level of the line directly from the kernel
+    /// Read the current level of the line directly from the kernel. Only used before the first edge is consumed,
+    /// afterwards the level is tracked from the edge events alone so it cannot disagree with the event sequence
     /// </summary>
     /// <returns>True if the line is high</returns>
     /// <exception cref="IOException">Value could not be read</exception>
-    public unsafe bool Read()
+    private unsafe bool ReadLevel()
     {
         if (_useV2)
         {
@@ -171,93 +161,108 @@ public sealed class InputGpioPin : IDisposable
             {
                 throw new IOException($"Error {Marshal.GetLastWin32Error()}. Cannot read GPIO line {_offset} (v2)");
             }
-            Value = (values.bits & 1UL) != 0;
+            return (values.bits & 1UL) != 0;
         }
-        else
+
+        gpiohandle_data data = new();
+        if (Interop.ioctl(_reqFd, Interop.GPIOHANDLE_GET_LINE_VALUES_IOCTL, new IntPtr(&data)) < 0)
         {
-            gpiohandle_data data = new();
-            if (Interop.ioctl(_reqFd, Interop.GPIOHANDLE_GET_LINE_VALUES_IOCTL, new IntPtr(&data)) < 0)
-            {
-                throw new IOException($"Error {Marshal.GetLastWin32Error()}. Cannot read GPIO line {_offset} (v1)");
-            }
-            Value = data.values[0] != 0;
+            throw new IOException($"Error {Marshal.GetLastWin32Error()}. Cannot read GPIO line {_offset} (v1)");
         }
+        return data.values[0] != 0;
+    }
+
+    /// <summary>
+    /// Consume every edge event the kernel has queued so far without blocking
+    /// </summary>
+    /// <exception cref="IOException">Generic IO error</exception>
+    public void FlushEvents()
+    {
+        while (PollEvent(0))
+        {
+            ReadEvent();
+        }
+    }
+
+    /// <summary>
+    /// Block until the next edge event arrives and consume it
+    /// </summary>
+    /// <param name="timeout">Timeout in ms</param>
+    /// <returns>Pin level after the edge</returns>
+    /// <exception cref="IOException">Generic IO error</exception>
+    /// <exception cref="OperationCanceledException">Timeout occurred</exception>
+    public bool WaitForEvent(int timeout)
+    {
+        if (!PollEvent(timeout))
+        {
+            throw new OperationCanceledException("Timeout while waiting for event");
+        }
+        ReadEvent();
         return Value;
     }
 
     /// <summary>
-    /// Start a background thread that blocks on edge events and raises <see cref="PinChanged"/>
+    /// Wait for the event fd to become readable
     /// </summary>
-    /// <param name="cancellationToken">Cancellation token to stop monitoring</param>
-    public void StartMonitoring(CancellationToken cancellationToken = default)
+    /// <param name="timeout">Timeout in ms, 0 to check without blocking</param>
+    /// <returns>True if an event is pending, false on timeout</returns>
+    private unsafe bool PollEvent(int timeout)
     {
-        if (_reqFd < 0)
+        PollFd pollData = new() { Fd = _reqFd, Events = (short)PollFlags.POLLIN };
+        while (true)
         {
-            throw new IOException("GPIO line is not configured");
-        }
+            pollData.REvents = 0;
+            int result = Interop.poll(new IntPtr(&pollData), 1, timeout);
+            if (result >= 0)
+            {
+                return result > 0;
+            }
 
-        Thread thread = new(() => MonitorLoop(cancellationToken)) { Name = "GpioMonitor", IsBackground = true, Priority = ThreadPriority.AboveNormal };
-        thread.Start();
+            int errno = Marshal.GetLastWin32Error();
+            if (errno != 4)     // EINTR is benign
+            {
+                throw new IOException($"Error {errno}. Failed to poll for GPIO events");
+            }
+        }
     }
 
     private static readonly int _sizeofV2Event = Marshal.SizeOf<gpio_v2_line_event>();
     private static readonly int _sizeofV1Event = Marshal.SizeOf<gpioevent_data>();
 
-    private unsafe void MonitorLoop(CancellationToken cancellationToken)
+    /// <summary>
+    /// Read one pending edge event and update <see cref="Value"/>, <see cref="SequenceNumber"/> and <see cref="MissedEdges"/>
+    /// </summary>
+    private unsafe void ReadEvent()
     {
-        PollFd pollData = new() { Fd = _reqFd, Events = (short)PollFlags.POLLIN };
-        gpio_v2_line_event eventV2 = new();
-        gpioevent_data eventV1 = new();
-
-        while (!cancellationToken.IsCancellationRequested)
+        if (_useV2)
         {
-            // Block in the kernel until an edge arrives; the 1s timeout only lets the loop notice cancellation
-            pollData.REvents = 0;
-            int ready = Interop.poll(new IntPtr(&pollData), 1, 1000);
-            if (ready < 0)
+            gpio_v2_line_event eventV2 = new();
+            if (Interop.read(_reqFd, new IntPtr(&eventV2), _sizeofV2Event) != _sizeofV2Event)
             {
-                int errno = Marshal.GetLastWin32Error();
-                if (errno == 4)     // EINTR is benign
-                {
-                    continue;
-                }
-                throw new IOException($"Error {errno}. Failed to poll for GPIO events");
-            }
-            if (ready == 0)
-            {
-                continue;
+                throw new IOException("GPIO event read returned invalid size (v2)");
             }
 
-            if (_useV2)
+            // line_seqno increments by 1 per edge on this line, so a larger gap means dropped edges
+            if (_haveSeqno && eventV2.line_seqno > _lastSeqno + 1)
             {
-                if (Interop.read(_reqFd, new IntPtr(&eventV2), _sizeofV2Event) != _sizeofV2Event)
-                {
-                    throw new IOException("GPIO event read returned invalid size (v2)");
-                }
-
-                // line_seqno increments by 1 per edge on this line, so a larger gap means dropped edges
-                if (_haveSeqno && eventV2.line_seqno > _lastSeqno + 1)
-                {
-                    MissedEdges += (int)(eventV2.line_seqno - _lastSeqno - 1);
-                }
-                _lastSeqno = eventV2.line_seqno;
-                _haveSeqno = true;
-
-                Value = eventV2.id == (uint)GpioV2LineEvent.GPIO_V2_LINE_EVENT_RISING_EDGE;
+                MissedEdges += (int)(eventV2.line_seqno - _lastSeqno - 1);
             }
-            else
-            {
-                if (Interop.read(_reqFd, new IntPtr(&eventV1), _sizeofV1Event) != _sizeofV1Event)
-                {
-                    throw new IOException("GPIO event read returned invalid size (v1)");
-                }
+            _lastSeqno = eventV2.line_seqno;
+            _haveSeqno = true;
 
-                // The v1 uAPI carries no sequence number, so count the edges we observe
-                _lastSeqno++;
-                Value = eventV1.id == (uint)GpioEvent.GPIOEVENT_EVENT_RISING_EDGE;
+            Value = eventV2.id == (uint)GpioV2LineEvent.GPIO_V2_LINE_EVENT_RISING_EDGE;
+        }
+        else
+        {
+            gpioevent_data eventV1 = new();
+            if (Interop.read(_reqFd, new IntPtr(&eventV1), _sizeofV1Event) != _sizeofV1Event)
+            {
+                throw new IOException("GPIO event read returned invalid size (v1)");
             }
 
-            PinChanged?.Invoke(Value, _lastSeqno);
+            // The v1 uAPI carries no sequence number, so count the edges we observe
+            _lastSeqno++;
+            Value = eventV1.id == (uint)GpioEvent.GPIOEVENT_EVENT_RISING_EDGE;
         }
     }
 

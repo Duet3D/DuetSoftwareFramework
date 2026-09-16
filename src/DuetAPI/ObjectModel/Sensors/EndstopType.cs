@@ -30,6 +30,11 @@ public enum EndstopType
     MotorStallIndividual,
 
     /// <summary>
+    /// Encoder position error stops all the drives when triggered
+    /// </summary>
+    MotorStallEncoder,
+
+    /// <summary>
     /// Unknown type
     /// </summary>
     Unknown
