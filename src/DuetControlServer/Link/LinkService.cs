@@ -610,8 +610,9 @@ public sealed class LinkService(
         linkAdapter.ReadObjectModel(out ReadOnlySpan<byte> json);
         lock (linkInterface.ModelQueryRequests)
         {
-            if (linkInterface.ModelQueryRequests.TryDequeue(out ModelQueryRequest? query))
+            if (linkInterface.ModelQueryRequests.TryPeek(out ModelQueryRequest? query) && query.QuerySent)
             {
+                linkInterface.ModelQueryRequests.Dequeue();
                 if (json.IsEmpty)
                 {
                     query.Tcs.SetException(new ArgumentException("Object model response was too big"));

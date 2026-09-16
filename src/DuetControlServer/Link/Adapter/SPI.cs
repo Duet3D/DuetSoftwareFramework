@@ -34,7 +34,7 @@ public class SPI : IDiagnostics, ILinkAdapter
     private readonly InputGpioPin _transferReadyPin;
     private bool _expectedTfrRdyPinValue;
     private readonly SpiDevice _spiDevice;
-    private bool _waitingForFirstTransfer = true, _connected, _hadTimeout, _resetting, _updating;
+    private bool _waitingForFirstTransfer = true, _connected, _hadTimeout, _hadReset, _resetting, _updating;
     private ushort _lastTransferNumber;
 
     private enum TransferPhase { Header, HeaderChecksum, Data, DataChecksum }
@@ -296,6 +296,9 @@ public class SPI : IDiagnostics, ILinkAdapter
                 {
                     _eventLogger.LogOutput(MessageType.Success, "Connection to Duet established");
                     _hadTimeout = _resetting = false;
+
+                    // RRF may have dropped pending requests without the sequence numbers showing it
+                    _hadReset = true;
                 }
                 else if (!_connected)
                 {
@@ -344,7 +347,12 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// Check if the controller has been reset
     /// </summary>
     /// <returns>Whether the controller has been reset</returns>
-    public bool HadReset() => _connected && ((ushort)(_lastTransferNumber + 1) != _rxHeader.SequenceNumber);
+    public bool HadReset()
+    {
+        bool result = _hadReset || (_connected && (ushort)(_lastTransferNumber + 1) != _rxHeader.SequenceNumber);
+        _hadReset = false;
+        return result;
+    }
 
     #region Read functions
     /// <summary>
