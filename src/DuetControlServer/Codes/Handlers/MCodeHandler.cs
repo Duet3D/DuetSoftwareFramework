@@ -449,7 +449,9 @@ internal partial class MCodeHandler(
         }
 
         // Check if JSON file lists were requested
-        int startAt = Math.Max(code.GetInt('R', 0), 0), type = code.GetInt('S', 0), maxItems = code.GetInt('C', -1);
+        int startAt = Math.Max(code.GetInt('R', defaultValue: 0), 0),
+            type = code.GetInt('S', defaultValue: 0),
+            maxItems = code.GetInt('C', defaultValue: -1);
         if (type == 2)
         {
             string json = FileLists.GetFiles(virtualDirectory, physicalDirectory, startAt, true, maxSize, maxItems, code.ExplicitLineNumber);
@@ -523,7 +525,7 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleInitializeSDCardAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (code.GetInt('P', 0) == 0)
+        if (code.GetInt('P', defaultValue: 0) == 0)
         {
             // M21 (P0) will always work because it's always mounted
             return new Message();
@@ -603,7 +605,7 @@ internal partial class MCodeHandler(
         }
 
         // P0 skips resume.g, as it does in RepRapFirmware
-        bool runMacro = code.GetInt('P', 1) != 0;
+        bool runMacro = code.GetInt('P', defaultValue: 1) != 0;
         return await jobController.StartOrResumeAsync(code.Channel, runMacro, cancellationToken);
     }
 
@@ -678,7 +680,7 @@ internal partial class MCodeHandler(
 
             bool filamentChange = code.MajorNumber == 600;
             Files.Job.PauseMacro macro = filamentChange ? Files.Job.PauseMacro.FilamentChange
-                                         : code.GetInt('P', 1) == 0 ? Files.Job.PauseMacro.None
+                                         : code.GetInt('P', defaultValue: 1) == 0 ? Files.Job.PauseMacro.None
                                          : Files.Job.PauseMacro.Pause;
             PrintPausedReason reason = filamentChange ? PrintPausedReason.FilamentChange : PrintPausedReason.GCode;
 
@@ -723,14 +725,15 @@ internal partial class MCodeHandler(
         // machine has already made - a job restarted by resurrect.g after a power failure is
         // part-way through a line exactly as a resumed pause is - and C is the modal command it was
         // read under, which the line itself may not name. They are held until M24 because that is
-        // what starts printing
+        // what starts printing. A P outside 0..1 is pulled into range rather than refused, as
+        // RepRapFirmware reads it with constrain<float> (GCodes2.cpp case 26)
         //
         // TODO M26 also takes the arc restart point in the selected plane's two axis words, which
         // needs InitialUserC0 / InitialUserC1 and so waits for G2/G3
         using (planner.Lock())
         {
-            planner.State.RestartMoveFractionDone = code.GetFloatLimited('P', 0.0f, 1.0f, 0.0f);
-            planner.State.RestartGCommandNumber = code.GetInt('C', -1);
+            planner.State.RestartMoveFractionDone = Math.Clamp(code.GetFloat('P', defaultValue: 0.0f), 0.0f, 1.0f);
+            planner.State.RestartGCommandNumber = code.GetInt('C', defaultValue: -1);
         }
 
         return new Message();
@@ -891,7 +894,8 @@ internal partial class MCodeHandler(
                     return new Message(MessageType.Success, json);
                 }
             }
-            catch (Exception e) when (e is not MissingParameterException and not InvalidParameterTypeException)
+            catch (Exception e) when (e is not MissingParameterException and not InvalidParameterTypeException
+                                      and not GCodeException)
             {
                 logger.LogDebug(e, "Failed to return file information");
                 return new Message(MessageType.Success, ((code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber},\"err\":1,\"fileName:" : "{\"err\":1,\"fileName:") + JsonSerializer.Serialize(virtualFilename, CommonContext.Default.String) + "}");
@@ -933,7 +937,7 @@ internal partial class MCodeHandler(
                 // F0 suppresses writing the simulated time back to the file; absent or F1 updates
                 // it, as in standalone mode
                 Message selected = await jobController.SelectFileAsync(fileName, physicalFile, simulating: true,
-                                                                      updateSimulatedTime: code.GetInt('F', 1) == 1,
+                                                                      updateSimulatedTime: code.GetInt('F', defaultValue: 1) == 1,
                                                                       code.Channel, startsNextRun: true,
                                                                       cancellationToken);
                 if (selected.Type != MessageType.Success)
@@ -1032,8 +1036,8 @@ internal partial class MCodeHandler(
     {
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            int index = code.GetInt('P', 0);
-            if (code.GetInt('S', 0) == 2)
+            int index = code.GetInt('P', defaultValue: 0);
+            if (code.GetInt('S', defaultValue: 0) == 2)
             {
                 if (index < 0 || index >= model.Volumes.Count)
                 {
@@ -1133,10 +1137,7 @@ internal partial class MCodeHandler(
         // so reading it as anything else here would turn a debug request into an allocation
         if (code.HasParameter('B'))
         {
-            if (!TryGetBoardAddress(code, out byte board, out string? error, allowMainBoard: true))
-            {
-                return new Message(MessageType.Error, error);
-            }
+            byte board = GetBoardAddress(code, allowMainBoard: true);
             if (board != CanId.MasterAddress)
             {
                 // The module list is the board's own, so the board is what composes the reply
@@ -1241,7 +1242,7 @@ internal partial class MCodeHandler(
     {
         // Like M122, M115 is about the program rather than about attached hardware, so board 0 is a
         // real answer here rather than the mistake it is everywhere else
-        int board = code.GetInt('B', CanId.MasterAddress);
+        byte board = GetBoardAddress(code, allowMainBoard: true, defaultAddress: CanId.MasterAddress);
         if (board == CanId.MasterAddress)
         {
             // TODO reply with DSF firmware info
@@ -1299,10 +1300,7 @@ internal partial class MCodeHandler(
     /// </remarks>
     private async ValueTask<Message> ResetBoardAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (!TryGetBoardAddress(code, out byte board, out string? error))
-        {
-            return new Message(MessageType.Error, error);
-        }
+        byte board = GetBoardAddress(code);
 
         CanMessageReset request = default;
         CanResponse response = await linkInterface.SendCanMessageAsync(board, in request,
@@ -1321,7 +1319,7 @@ internal partial class MCodeHandler(
     {
         // M122 is one of the codes board 0 does answer for: DuetCANMaster and this program are what
         // there is to report on, whatever hardware is or is not attached to it
-        int board = code.GetInt('B', CanId.MasterAddress);
+        byte board = GetBoardAddress(code, defaultAddress: CanId.MasterAddress);
         if (board != CanId.MasterAddress)
         {
             return await ReportBoardDiagnosticsAsync(code, cancellationToken);
@@ -1345,10 +1343,7 @@ internal partial class MCodeHandler(
     /// </remarks>
     private async ValueTask<Message> ReportBoardDiagnosticsAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (!TryGetBoardAddress(code, out byte board, out string? error))
-        {
-            return new Message(MessageType.Error, error);
-        }
+        byte board = GetBoardAddress(code);
 
         StringBuilder report = new();
         byte part = 0, lastPart;
@@ -1452,7 +1447,7 @@ internal partial class MCodeHandler(
             string source = await filePathResolver.ToPhysicalAsync(from, cancellationToken: cancellationToken), destination = await filePathResolver.ToPhysicalAsync(to, cancellationToken: cancellationToken);
             if (File.Exists(source))
             {
-                if (File.Exists(destination) && code.GetBool('D', false))
+                if (File.Exists(destination) && code.GetBool('D', defaultValue: false))
                 {
                     File.Delete(destination);
                 }
@@ -1460,7 +1455,7 @@ internal partial class MCodeHandler(
             }
             else if (Directory.Exists(source))
             {
-                if (Directory.Exists(destination) && code.GetBool('D', false))
+                if (Directory.Exists(destination) && code.GetBool('D', defaultValue: false))
                 {
                     // This could be recursive but at the moment we mimic RRF's behaviour
                     Directory.Delete(destination);
@@ -1820,7 +1815,7 @@ internal partial class MCodeHandler(
                 }
             }
 
-            await eventLogger.StartAsync(code.GetString('P', defaultLogFile), logLevel);
+            await eventLogger.StartAsync(code.GetString('P', defaultValue: defaultLogFile), logLevel);
         }
         else
         {
@@ -1841,24 +1836,21 @@ internal partial class MCodeHandler(
         // it. Address 0 is allowed here where it is refused everywhere else, because M952 is about
         // the bus rather than about a board's ports (CanInterface.cpp ChangeAddressAndNormalTiming,
         // which makes the same exception)
-        if (!TryGetBoardAddress(code, out byte oldAddress, out string? addressError, allowMainBoard: true))
-        {
-            return new Message(MessageType.Error, addressError);
-        }
+        byte oldAddress = GetBoardAddress(code, allowMainBoard: true);
 
         CanTiming timing = new();
         bool changeTiming = false;
-        if (code.TryGetUIntLimited('S', 15, 5000, out uint speed)) // TODO set these as constants somewhere
+        if (code.TryGetUInt('S', out uint speed, min: 15, max: 5000)) // TODO set these as constants somewhere
         {
             changeTiming = true;
             timing.SetDefaults(speed * 1000);
 
-            if (code.TryGetFloatLimited('T', 0.5f, 0.95f, out float normalSamplePoint))
+            if (code.TryGetFloat('T', out float normalSamplePoint, min: 0.5f, max: 0.95f))
             {
                 timing.SetNormalSamplePoint(normalSamplePoint);
             }
 
-            if (code.TryGetFloatLimited('J', 0.05f, 0.5f, out float normalJumpWidth))
+            if (code.TryGetFloat('J', out float normalJumpWidth, min: 0.05f, max: 0.5f))
             {
                 timing.SetNormalJumpWidth(normalJumpWidth);
             }
@@ -1866,13 +1858,7 @@ internal partial class MCodeHandler(
 
         if (changeTiming)
         {
-            if (code.TryGetInt('A', out int requestedAddress)
-                && (requestedAddress < 1 || requestedAddress > CanId.MaxCanAddress))
-            {
-                return new Message(MessageType.Error, "CAN address out of range");
-            }
-            byte? newAddress = code.TryGetInt('A', out int address) ? (byte)address : null;
-
+            byte? newAddress = code.TryGetInt('A', out int address) ? CanAddresses.CheckAddressIsValid(address) : null;
             await linkInterface.ConfigCanAsync(oldAddress, newAddress, timing, cancellationToken);
         }
         else
@@ -1895,7 +1881,7 @@ internal partial class MCodeHandler(
         uint DefaultCanBitRate = CanTiming.DefaultCanBitRate / 1000;
         CanTiming timing = new();
 
-        if (code.TryGetUIntLimited('S', 15, 5000, out uint speed))
+        if (code.TryGetUInt('S', out uint speed, min: 15, max: 5000))
         {
             if (speed != DefaultCanBitRate && speed != DefaultCanBitRate / 2 && speed != DefaultCanBitRate / 4)
             {
@@ -1910,19 +1896,19 @@ internal partial class MCodeHandler(
         }
         timing.SetDefaults(speed * 1000);
 
-        if (code.TryGetFloatLimited('T', 0.5f, 0.95f, out float normalSamplePoint))
+        if (code.TryGetFloat('T', out float normalSamplePoint, min: 0.5f, max: 0.95f))
         {
             changeTiming = true;
             timing.SetNormalSamplePoint(normalSamplePoint);
         }
 
-        if (code.TryGetFloatLimited('J', 0.05f, 0.5f, out float normalJumpWidth))
+        if (code.TryGetFloat('J', out float normalJumpWidth, min: 0.05f, max: 0.5f))
         {
             changeTiming = true;
             timing.SetNormalJumpWidth(normalJumpWidth);
         }
 
-        if (code.TryGetUIntLimited('R', 0, 8, out uint bitRateMultiplier))
+        if (code.TryGetUInt('R', out uint bitRateMultiplier, min: 0, max: 8))
         {
             changeTiming = true;
             if (bitRateMultiplier == 0 || bitRateMultiplier == 5 || bitRateMultiplier == 7)
@@ -1932,12 +1918,12 @@ internal partial class MCodeHandler(
 
             timing.EnableBrs((byte)bitRateMultiplier);
 
-            if (code.TryGetFloatLimited('U', 0.5f, 0.95f, out float dataSamplePoint))
+            if (code.TryGetFloat('U', out float dataSamplePoint, min: 0.5f, max: 0.95f))
             {
                 timing.SetDataSamplePoint(dataSamplePoint);
             }
 
-            if (code.TryGetFloatLimited('K', 0.05f, 0.5f, out float dataJumpWidth))
+            if (code.TryGetFloat('K', out float dataJumpWidth, min: 0.05f, max: 0.5f))
             {
                 timing.SetDataJumpWidth(dataJumpWidth);
             }
@@ -1989,15 +1975,15 @@ internal partial class MCodeHandler(
             return new Message(MessageType.Error, "Invalid event type");
         }
 
-        if (!code.TryGetUIntLimited('D', 0, 255, out uint deviceNumber))
+        if (!code.TryGetUInt('D', out uint deviceNumber, min: 0, max: 255))
         {
             return new Message(MessageType.Error, "Missing device number");
         }
-        uint param = code.GetUInt('P', 0);
-        uint boardAddress = code.GetUInt('B', CanId.MasterAddress);
+        uint param = code.GetUInt('P', defaultValue: 0);
+        byte boardAddress = GetBoardAddress(code, defaultAddress: CanId.MasterAddress);
         code.TryGetString('S', out string? text);
 
-        Events.MachineEvent machineEvent = new(eventType, (ushort)param, (byte)boardAddress, (byte)deviceNumber, text ?? string.Empty);
+        Events.MachineEvent machineEvent = new(eventType, (ushort)param, boardAddress, (byte)deviceNumber, text ?? string.Empty);
         return events.Raise(machineEvent)
             ? new Message()
             : new Message(MessageType.Warning, "a similar event is already queued");
@@ -2011,7 +1997,7 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleFirmwareUpdateAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (code.GetIntArray('S', [0]).Contains(0) && code.GetInt('B', 0) == 0)
+        if (code.GetIntArray('S', defaultValue: [0]).Contains(0) && code.GetInt('B', defaultValue: 0) == 0)
         {
             // Get the IAP and Firmware files
             string? iapFile, firmwareFile;

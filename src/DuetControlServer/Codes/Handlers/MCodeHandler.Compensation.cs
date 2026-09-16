@@ -270,7 +270,7 @@ internal partial class MCodeHandler
     /// <returns>The result</returns>
     private async ValueTask<Message> HandleSaveHeightMapAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        string fileName = code.GetString('P', DefaultHeightMapFile);
+        string fileName = code.GetString('P', defaultValue: DefaultHeightMapFile);
         string physicalFile = await filePathResolver.ToPhysicalAsync(fileName, FileDirectory.System, cancellationToken);
 
         await using StreamWriter writer = new(physicalFile);
@@ -295,7 +295,7 @@ internal partial class MCodeHandler
     {
         await bedCompensation.ClearAsync(cancellationToken);
 
-        string fileName = code.GetString('P', DefaultHeightMapFile);
+        string fileName = code.GetString('P', defaultValue: DefaultHeightMapFile);
         string physicalFile = await filePathResolver.ToPhysicalAsync(fileName, FileDirectory.System, cancellationToken);
         if (!File.Exists(physicalFile))
         {

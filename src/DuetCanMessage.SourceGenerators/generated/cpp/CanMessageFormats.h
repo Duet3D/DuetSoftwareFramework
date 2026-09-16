@@ -287,7 +287,11 @@ template<class T> struct __attribute__((packed)) CanMessageMultipleDrivesRequest
 	// The values, one per set bit of driversToUpdate in ascending driver number order
 	T values[MaxLinearDriversPerCanSlave];
 
-	// Length of the message when values for numDrivers drivers are sent
+	// Length of the message when values for numDrivers drivers are sent.
+	// TODO: every RepRapFirmware and Duet3Expansion call site passes the number of set bits of driversToUpdate,
+	// which the message already carries, so numDrivers can be dropped and the count taken from the bitmap as
+	// DuetControlServer now does. CANlib's own header and those call sites have to change in step, because
+	// RepRapFirmware is built against the same header.
 	static constexpr size_t GetActualDataLength(size_t numDrivers) noexcept { return sizeof(uint16_t) * 2 + numDrivers * sizeof(T); }
 	// How many drivers' values fit in one 64-byte message
 	static constexpr size_t MaxDrivesPerMessage() noexcept { return (64 - 2 * sizeof(uint16_t)) / sizeof(T); }

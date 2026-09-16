@@ -46,8 +46,8 @@ public class MQTT(EventLogger logger, IHostApplicationLifetime lifetime)
             _clientOptionsBuilder = _clientOptionsBuilder
                 .WithWillTopic(code.GetString('T'))
                 .WithWillPayload(willMessage)
-                .WithWillQualityOfServiceLevel((MQTTnet.Protocol.MqttQualityOfServiceLevel)code.GetInt('Q', 0))
-                .WithWillRetain(code.GetBool('R', false));
+                .WithWillQualityOfServiceLevel((MQTTnet.Protocol.MqttQualityOfServiceLevel)code.GetInt('Q', defaultValue: 0))
+                .WithWillRetain(code.GetBool('R', defaultValue: false));
         }
 
         // Optional subscription
@@ -109,7 +109,7 @@ public class MQTT(EventLogger logger, IHostApplicationLifetime lifetime)
             try
             {
                 var options = _clientOptionsBuilder
-                    .WithTcpServer(code.GetString('H'), code.GetInt('R', 1883))
+                    .WithTcpServer(code.GetString('H'), code.GetInt('R', defaultValue: 1883))
                     .Build();
 
                 _factory ??= new();
@@ -164,8 +164,8 @@ public class MQTT(EventLogger logger, IHostApplicationLifetime lifetime)
             var messageBuilder = new MqttApplicationMessageBuilder()
                 .WithTopic(code.GetString('T'))
                 .WithPayload(code.GetString('S'))
-                .WithQualityOfServiceLevel((MQTTnet.Protocol.MqttQualityOfServiceLevel)code.GetInt('Q', 0))
-                .WithRetainFlag(code.GetBool('R', false));
+                .WithQualityOfServiceLevel((MQTTnet.Protocol.MqttQualityOfServiceLevel)code.GetInt('Q', defaultValue: 0))
+                .WithRetainFlag(code.GetBool('R', defaultValue: false));
             await _client.PublishAsync(messageBuilder.Build(), code.CancellationToken);
         }
         catch (Exception e)

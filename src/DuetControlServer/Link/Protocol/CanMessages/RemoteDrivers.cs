@@ -22,7 +22,8 @@ namespace DuetControlServer.Link.Protocol.CanMessages;
 /// <para>
 /// Values are packed in ascending order of local driver number rather than at the driver's own index:
 /// the receiving board walks the bitmap and takes the next value for each bit it finds, so the n'th
-/// value belongs to the n'th set bit.
+/// value belongs to the n'th set bit. Only those values are transmitted, the message working its own
+/// length out from the bitmap, so the bitmap has to be set before the message is sent.
 /// </para>
 /// </remarks>
 internal static class RemoteDrivers
@@ -72,7 +73,7 @@ internal static class RemoteDrivers
                 message.Values[i].Set(ordered[i].StepsPerMm, microstepping);
             }
 
-            await SendAsync(linkInterface, board, message, replies, cancellationToken);
+            replies.Add(await linkInterface.SendCanRequestAsync(board, in message, cancellationToken));
         }
         return replies;
     }
@@ -99,7 +100,7 @@ internal static class RemoteDrivers
                 message.Values[i] = ordered[i];
             }
 
-            await SendAsync(linkInterface, board, message, replies, cancellationToken);
+            replies.Add(await linkInterface.SendCanRequestAsync(board, in message, cancellationToken));
         }
         return replies;
     }
@@ -127,7 +128,7 @@ internal static class RemoteDrivers
                 message.Values[i].Set(ordered[i].Mode, ordered[i].IdlePercent);
             }
 
-            await SendAsync(linkInterface, board, message, replies, cancellationToken);
+            replies.Add(await linkInterface.SendCanRequestAsync(board, in message, cancellationToken));
         }
         return replies;
     }
@@ -155,7 +156,7 @@ internal static class RemoteDrivers
                 message.Values[i] = ordered[i];
             }
 
-            await SendAsync(linkInterface, board, message, replies, cancellationToken);
+            replies.Add(await linkInterface.SendCanRequestAsync(board, in message, cancellationToken));
         }
         return replies;
     }
@@ -182,27 +183,9 @@ internal static class RemoteDrivers
                 message.Values[i] = ordered[i];
             }
 
-            await SendAsync(linkInterface, board, message, replies, cancellationToken);
+            replies.Add(await linkInterface.SendCanRequestAsync(board, in message, cancellationToken));
         }
         return replies;
-    }
-
-    /// <summary>
-    /// Send one message and collect anything the board said about it
-    /// </summary>
-    /// <typeparam name="TMessage">Type of the CAN message</typeparam>
-    /// <param name="linkInterface">Link interface</param>
-    /// <param name="board">CAN address to send to</param>
-    /// <param name="message">The message</param>
-    /// <param name="replies">Where to add what the board made of it</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    private static async ValueTask SendAsync<TMessage>(LinkInterface linkInterface, byte board, TMessage message, List<Message> replies,
-                                                       CancellationToken cancellationToken)
-        where TMessage : struct, ICanMessage<TMessage>
-    {
-        CanResponse response = await linkInterface.SendCanMessageAsync(board, in message, CanMessageType.StandardReply,
-                                                                       cancellationToken: cancellationToken);
-        replies.Add(response.ToMessage());
     }
 
     /// <summary>

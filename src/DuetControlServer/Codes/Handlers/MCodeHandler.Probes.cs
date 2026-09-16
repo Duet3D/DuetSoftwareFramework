@@ -48,7 +48,7 @@ internal partial class MCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleProbeConfigAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        int probeNumber = code.GetInt('K', 0);
+        int probeNumber = code.GetInt('K', defaultValue: 0);
         if (probeNumber is < 0 || probeNumber >= RemoteProbes.MaxProbes)
         {
             return new Message(MessageType.Error, $"Z probe number out of range (0..{RemoteProbes.MaxProbes - 1})");
@@ -425,7 +425,7 @@ internal partial class MCodeHandler
     private async ValueTask<Message> MoveProbeAsync(Commands.Code code, string macro, bool deploying,
                                                      CancellationToken cancellationToken)
     {
-        int probeNumber = code.GetInt('P', 0);
+        int probeNumber = code.GetInt('P', defaultValue: 0);
         if (probeNumber < 0 || probeNumber >= RemoteProbes.MaxProbes)
         {
             return new Message(MessageType.Error, $"Z probe number out of range (0..{RemoteProbes.MaxProbes - 1})");
@@ -517,7 +517,7 @@ internal partial class MCodeHandler
     private async ValueTask<Message> HandleWaitForInputAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         // S defaults to 1, so M577 with no S waits for the inputs to become active
-        bool activeHigh = code.GetInt('S', 1) >= 1;
+        bool activeHigh = code.GetInt('S', defaultValue: 1) >= 1;
         bool seenPorts = code.TryGetIntArray('P', out int[]? ports);
 
         List<int> axes = [];

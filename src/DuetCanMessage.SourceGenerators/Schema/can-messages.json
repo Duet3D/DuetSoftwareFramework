@@ -624,10 +624,21 @@
       ],
       "methods": [
         {
-          "name": "GetActualDataLength", "returnType": "usize", "static": true,
-          "doc": "Length of the message when values for numDrivers drivers are sent",
+          "name": "GetActualDataLength", "returnType": "usize", "static": true, "emit": ["cpp"],
+          "doc": [
+            "Length of the message when values for numDrivers drivers are sent.",
+            "TODO: every RepRapFirmware and Duet3Expansion call site passes the number of set bits of driversToUpdate,",
+            "which the message already carries, so numDrivers can be dropped and the count taken from the bitmap as",
+            "DuetControlServer now does. CANlib's own header and those call sites have to change in step, because",
+            "RepRapFirmware is built against the same header."
+          ],
           "params": [ { "name": "numDrivers", "type": "usize" } ],
           "body": [ { "return": "sizeof(u16) * 2 + numDrivers * sizeof(T)" } ]
+        },
+        {
+          "name": "GetActualDataLength", "returnType": "usize", "emit": ["csharp"],
+          "doc": "Length of the message when a value is sent for each driver named by driversToUpdate",
+          "body": [ { "return": "sizeof(u16) * 2 + (popcount(driversToUpdate) * sizeof(T))" } ]
         },
         {
           "name": "MaxDrivesPerMessage", "returnType": "usize", "static": true,

@@ -4635,8 +4635,8 @@ public struct CanMessageMultipleDrivesRequestUint16 : ICanMessageBody<CanMessage
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
-    /// <summary>Length of the message when values for numDrivers drivers are sent</summary>
-    public static uint GetActualDataLength(uint numDrivers) => (uint)(2 * 2 + numDrivers * 2);
+    /// <summary>Length of the message when a value is sent for each driver named by driversToUpdate</summary>
+    public readonly uint GetActualDataLength() => (uint)(2 * 2 + (BitOperations.PopCount(DriversToUpdate) * 2));
 
     /// <summary>How many drivers' values fit in one 64-byte message</summary>
     public static uint MaxDrivesPerMessage() => (uint)((64 - 2 * 2) / 2);
@@ -4693,8 +4693,8 @@ public struct CanMessageMultipleDrivesRequestMotorCurrents : ICanMessage<CanMess
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
-    /// <summary>Length of the message when values for numDrivers drivers are sent</summary>
-    public static uint GetActualDataLength(uint numDrivers) => (uint)(2 * 2 + numDrivers * 4);
+    /// <summary>Length of the message when a value is sent for each driver named by driversToUpdate</summary>
+    public readonly uint GetActualDataLength() => (uint)(2 * 2 + (BitOperations.PopCount(DriversToUpdate) * 4));
 
     /// <summary>How many drivers' values fit in one 64-byte message</summary>
     public static uint MaxDrivesPerMessage() => (uint)((64 - 2 * 2) / 4);
@@ -4751,8 +4751,8 @@ public struct CanMessageMultipleDrivesRequestStandstillCurrentFactor : ICanMessa
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
-    /// <summary>Length of the message when values for numDrivers drivers are sent</summary>
-    public static uint GetActualDataLength(uint numDrivers) => (uint)(2 * 2 + numDrivers * 4);
+    /// <summary>Length of the message when a value is sent for each driver named by driversToUpdate</summary>
+    public readonly uint GetActualDataLength() => (uint)(2 * 2 + (BitOperations.PopCount(DriversToUpdate) * 4));
 
     /// <summary>How many drivers' values fit in one 64-byte message</summary>
     public static uint MaxDrivesPerMessage() => (uint)((64 - 2 * 2) / 4);
@@ -4809,8 +4809,8 @@ public struct CanMessageMultipleDrivesRequestPressureAdvanceV1 : ICanMessage<Can
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
-    /// <summary>Length of the message when values for numDrivers drivers are sent</summary>
-    public static uint GetActualDataLength(uint numDrivers) => (uint)(2 * 2 + numDrivers * 4);
+    /// <summary>Length of the message when a value is sent for each driver named by driversToUpdate</summary>
+    public readonly uint GetActualDataLength() => (uint)(2 * 2 + (BitOperations.PopCount(DriversToUpdate) * 4));
 
     /// <summary>How many drivers' values fit in one 64-byte message</summary>
     public static uint MaxDrivesPerMessage() => (uint)((64 - 2 * 2) / 4);
@@ -4867,8 +4867,8 @@ public struct CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping : ICan
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
-    /// <summary>Length of the message when values for numDrivers drivers are sent</summary>
-    public static uint GetActualDataLength(uint numDrivers) => (uint)(2 * 2 + numDrivers * 6);
+    /// <summary>Length of the message when a value is sent for each driver named by driversToUpdate</summary>
+    public readonly uint GetActualDataLength() => (uint)(2 * 2 + (BitOperations.PopCount(DriversToUpdate) * 6));
 
     /// <summary>How many drivers' values fit in one 64-byte message</summary>
     public static uint MaxDrivesPerMessage() => (uint)((64 - 2 * 2) / 6);
@@ -4925,8 +4925,8 @@ public struct CanMessageMultipleDrivesRequestDriverStateControl : ICanMessage<Ca
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
-    /// <summary>Length of the message when values for numDrivers drivers are sent</summary>
-    public static uint GetActualDataLength(uint numDrivers) => (uint)(2 * 2 + numDrivers * 2);
+    /// <summary>Length of the message when a value is sent for each driver named by driversToUpdate</summary>
+    public readonly uint GetActualDataLength() => (uint)(2 * 2 + (BitOperations.PopCount(DriversToUpdate) * 2));
 
     /// <summary>How many drivers' values fit in one 64-byte message</summary>
     public static uint MaxDrivesPerMessage() => (uint)((64 - 2 * 2) / 2);
@@ -4983,8 +4983,8 @@ public struct CanMessageMultipleDrivesRequestShortPressureAdvanceParameters : IC
         set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFU << 12)) | ((unchecked((uint)value) & 0xFU) << 12));
     }
 
-    /// <summary>Length of the message when values for numDrivers drivers are sent</summary>
-    public static uint GetActualDataLength(uint numDrivers) => (uint)(2 * 2 + numDrivers * 6);
+    /// <summary>Length of the message when a value is sent for each driver named by driversToUpdate</summary>
+    public readonly uint GetActualDataLength() => (uint)(2 * 2 + (BitOperations.PopCount(DriversToUpdate) * 6));
 
     /// <summary>How many drivers' values fit in one 64-byte message</summary>
     public static uint MaxDrivesPerMessage() => (uint)((64 - 2 * 2) / 6);

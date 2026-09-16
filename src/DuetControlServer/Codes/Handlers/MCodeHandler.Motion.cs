@@ -119,9 +119,15 @@ internal partial class MCodeHandler
 
             foreach (Axis axis in move.Axes)
             {
-                if (code.TryGetFloat(axis.Letter, out float value))
+                // Steps per millimetre is what every later move is planned against, so zero is
+                // refused rather than stored (RRF GCodes2.cpp case 92, GetPositiveFValue). The
+                // refusal leaves the code where it stands, with the axes read before it stored and
+                // the boards not told: the firmware stores each drive as it reads it and sends the
+                // remote update only once the whole line has been read
+                if (code.HasParameter(axis.Letter))
                 {
-                    axis.StepsPerMm = ScaleForMicrostepping(value, quotedAtMicrostepping, axis.Microstepping.Value);
+                    axis.StepsPerMm = ScaleForMicrostepping(code.GetPositiveFloat(axis.Letter),
+                                                            quotedAtMicrostepping, axis.Microstepping.Value);
                     AddDrivers(toUpdate, axis.Drivers, axis.StepsPerMm, axis.Microstepping);
                     seen = true;
                 }
@@ -155,6 +161,7 @@ internal partial class MCodeHandler
         {
             return MotionConfigRejected;
         }
+
         return await UpdateRemoteDriversAsync(toUpdate, cancellationToken);
     }
 
@@ -234,7 +241,7 @@ internal partial class MCodeHandler
     private async ValueTask<Message> HandleMaxFeedratesAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         // Values are in mm/min unless S1 says they are in mm/sec
-        bool mmPerSec = code.GetInt('S', 0) == 1;
+        bool mmPerSec = code.GetInt('S', defaultValue: 0) == 1;
         float toMmPerMin = mmPerSec ? SecondsPerMinute : 1.0f;
 
         bool seen = false;
@@ -436,7 +443,7 @@ internal partial class MCodeHandler
     private async ValueTask<Message> HandleAxisLimitsAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         // A lone value is the maximum unless S1 says it is the minimum. Two values are min:max
-        bool setMin = code.GetInt('S', 0) == 1;
+        bool setMin = code.GetInt('S', defaultValue: 0) == 1;
         bool seen = false;
         string? report = null;
 
@@ -500,7 +507,7 @@ internal partial class MCodeHandler
     /// <returns>The result</returns>
     private async ValueTask<Message> HandleMicrosteppingAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        bool interpolate = code.GetInt('I', 0) > 0;
+        bool interpolate = code.GetInt('I', defaultValue: 0) > 0;
         List<RemoteDrivers.DriverValue<(float, int, bool)>> toUpdate = [];
         bool seen = false;
         string? report = null;
@@ -570,6 +577,7 @@ internal partial class MCodeHandler
         {
             return MotionConfigRejected;
         }
+
         return await UpdateRemoteDriversAsync(toUpdate, cancellationToken);
     }
 
@@ -769,14 +777,19 @@ internal partial class MCodeHandler
 
             if (which == 906)
             {
-                if (code.TryGetFloatLimited('I', 0.0f, 100.0f, out float idleFactor))
+                if (code.TryGetFloat('I', out float idleFactor, min: 0.0f, max: 100.0f))
                 {
                     move.Idle.Factor = idleFactor / 100.0f;
                     seen = true;
                 }
-                if (code.TryGetFloat('T', out float idleTimeout))
+                // Zero would disable the motors the moment the machine stops, so the time-out is read
+                // the same way the current is (RRF GCodes2.cpp case 906, GetPositiveFValue). The
+                // refusal leaves the code where it stands, before the currents read ahead of it have
+                // been sent: this side collects them under the object model lock and sends once it
+                // is released, where the firmware sends each as it reads it
+                if (code.HasParameter('T'))
                 {
-                    move.Idle.Timeout = MathF.Max(idleTimeout, 0.0f);
+                    move.Idle.Timeout = code.GetPositiveFloat('T');
                     seen = true;
                 }
             }
@@ -932,16 +945,9 @@ internal partial class MCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleDriverConfigAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (!code.TryGetDriverId('P', out DriverId? driver))
-        {
-            return new Message(MessageType.Error, "Missing P parameter");
-        }
+        DriverId driver = code.GetDriverId('P');
 
-        if (CanAddresses.HasNoHardware(driver.Board))
-        {
-            // Nothing there would answer, and the code would sit out its timeout before saying so
-            return new Message(MessageType.Error, CanAddresses.NoHardwareMessage($"Driver {driver}"));
-        }
+        CanAddresses.CheckAddressHasHardware(driver.Board, $"Driver {driver}");
 
         CanResponse response;
         response = code.MinorNumber switch
@@ -1097,10 +1103,7 @@ internal partial class MCodeHandler
             {
                 foreach (DriverId driver in named)
                 {
-                    if (CanAddresses.HasNoHardware(driver.Board))
-                    {
-                        return new Message(MessageType.Error, CanAddresses.NoHardwareMessage($"Driver {driver}"));
-                    }
+                    CanAddresses.CheckAddressHasHardware(driver.Board, $"Driver {driver}");
                     drivers.Add(driver);
                 }
             }
@@ -1390,14 +1393,8 @@ internal partial class MCodeHandler
     /// </remarks>
     private async ValueTask<Message> ConfigurePhaseCorrectionAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (!code.TryGetDriverId('P', out DriverId? driver))
-        {
-            return new Message(MessageType.Error, "Missing P parameter");
-        }
-        if (CanAddresses.HasNoHardware(driver.Board))
-        {
-            return new Message(MessageType.Error, CanAddresses.NoHardwareMessage($"Driver {driver}"));
-        }
+        DriverId driver = code.GetDriverId('P');
+        CanAddresses.CheckAddressHasHardware(driver.Board, $"Driver {driver}");
 
         return (await SendDriverConfigAsync<CanMessageM970Point3>(driver, code, cancellationToken)).ToMessage();
     }
@@ -1551,7 +1548,7 @@ internal partial class MCodeHandler
     {
         if (!code.TryGetInt('D', out int extruderNumber))
         {
-            return new Message(MessageType.Error, "Missing D parameter");
+            throw new MissingParameterException('D');
         }
 
         using (await model.AccessReadWriteAsync(cancellationToken))
@@ -1617,6 +1614,19 @@ internal partial class MCodeHandler
         {
             InputShaping shaping = model.Move.Shaping;
 
+            // F and S are read before P, as RepRapFirmware reads them (AxisShaper.cpp Configure):
+            // a frequency or damping outside its limits refuses the code before the type it was
+            // written alongside has been stored
+            if (code.TryGetFloat('F', out float frequency, min: MinShapingFrequency, max: MaxShapingFrequency))
+            {
+                shaping.Frequency = frequency;
+                seen = true;
+            }
+            if (code.TryGetFloat('S', out float damping, min: 0.0f, max: 0.99f))
+            {
+                shaping.Damping = damping;
+                seen = true;
+            }
             if (code.TryGetString('P', out string? typeName))
             {
                 if (!Enum.TryParse(typeName, true, out InputShapingType type))
@@ -1624,16 +1634,6 @@ internal partial class MCodeHandler
                     return new Message(MessageType.Error, $"Unknown input shaper type '{typeName}'");
                 }
                 shaping.Type = type;
-                seen = true;
-            }
-            if (code.TryGetFloatLimited('F', MinShapingFrequency, MaxShapingFrequency, out float frequency))
-            {
-                shaping.Frequency = frequency;
-                seen = true;
-            }
-            if (code.TryGetFloatLimited('S', 0.0f, 0.99f, out float damping))
-            {
-                shaping.Damping = damping;
                 seen = true;
             }
 
@@ -1882,7 +1882,7 @@ internal partial class MCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleBabysteppingAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        bool absolute = code.GetInt('R', 1) == 0;
+        bool absolute = code.GetInt('R', defaultValue: 1) == 0;
         bool seen = false;
         string? report = null;
 
@@ -1954,7 +1954,7 @@ internal partial class MCodeHandler
                 }
             }
 
-            if (code.TryGetIntLimited('S', 1, 100, out int factor))
+            if (code.TryGetInt('S', out int factor, min: 1, max: 100))
             {
                 move.BacklashFactor = factor;
                 seen = true;
@@ -2229,7 +2229,7 @@ internal partial class MCodeHandler
     private async ValueTask<Message> HandleEndstopConfigAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         // S defaults to a switch on an input pin, which is what almost every endstop is
-        int inputType = code.GetInt('S', (int)RrfEndstopType.InputPin);
+        int inputType = code.GetInt('S', defaultValue: (int)RrfEndstopType.InputPin);
         if (!Enum.IsDefined((RrfEndstopType)inputType))
         {
             return new Message(MessageType.Error, "Invalid endstop input type");

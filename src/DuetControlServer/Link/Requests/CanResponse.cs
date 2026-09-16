@@ -65,7 +65,7 @@ public readonly record struct CanResponse(CanStatus Status, CanMessageType Respo
     /// </para>
     /// </remarks>
     internal static CanResponse FromTimeout(CanRequest request)
-        => new(CanStatus.Ok, CanMessageType.StandardReply, request.DstAddress, request.DstAddress,
+        => new(CanStatus.Timeout, CanMessageType.StandardReply, request.DstAddress, request.DstAddress,
                Encoding.ASCII.GetBytes($"CAN response timeout: board {request.DstAddress}, "
                                        + $"req type {(ushort)request.MessageType}, RID {request.TxToken}"),
                Extra: 0, ResultCode: null) { TimedOut = true };

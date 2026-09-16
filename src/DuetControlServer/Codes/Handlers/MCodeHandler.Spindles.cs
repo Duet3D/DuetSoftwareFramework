@@ -188,9 +188,8 @@ internal partial class MCodeHandler
     /// </summary>
     private async ValueTask<Message> HandleSpindleOffAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (code.HasParameter('P'))
+        if (code.TryGetInt('P', out int spindleNumber))
         {
-            int spindleNumber = code.GetInt('P', 0);
             string? error = await spindleManager.StopAsync(spindleNumber, cancellationToken);
             return error is null ? new Message() : new Message(MessageType.Error, error);
         }

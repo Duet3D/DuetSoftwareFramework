@@ -182,6 +182,76 @@ public partial class Code : Command<Message?>
     public bool HasParameter(char letter) => Parameters.Any(p => p.Letter == letter);
 
     /// <summary>
+    /// Insist a parameter is there at all
+    /// </summary>
+    /// <param name="letter">Letter of the parameter that has to be there</param>
+    /// <exception cref="MissingParameterException">Parameter not found</exception>
+    /// <remarks>
+    /// RepRapFirmware's GCodeBuffer::MustSee, which throws where the guard stands: a handler that
+    /// has to have the parameter has nothing to do without it, so there is no result for it to go on
+    /// and build
+    /// </remarks>
+    public void MustSee(char letter)
+    {
+        if (!HasParameter(letter))
+        {
+            throw new MissingParameterException(letter);
+        }
+    }
+
+    /// <summary>
+    /// Find a parameter that has to carry a value, refusing a letter written with nothing after it
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <returns>The parameter, or null if the letter is not in the code at all</returns>
+    /// <exception cref="GCodeException">The letter carries no value</exception>
+    /// <remarks>
+    /// A letter with no number after it is a parse error rather than a missing parameter: the letter
+    /// was given, so the code means to set something, and there is nothing to set it to. The refusal
+    /// quotes the column, because it is about one value in the line rather than about the command.
+    /// A letter that is not there at all is the caller's to answer, because only the caller knows
+    /// whether it had a default to fall back on
+    /// </remarks>
+    private CodeParameter? FindValuedParameter(char letter)
+    {
+        CodeParameter? parameter = GetParameter(letter);
+        return (parameter is not null && parameter.IsNull)
+            ? throw new GCodeException($"expected number after '{letter}'", parameter.Column)
+            : parameter;
+    }
+
+    /// <summary>
+    /// Find a parameter that has to be there and has to carry a value
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <returns>The parameter</returns>
+    /// <exception cref="MissingParameterException">Parameter not found</exception>
+    /// <exception cref="GCodeException">The letter carries no value</exception>
+    private CodeParameter GetValuedParameter(char letter)
+        => FindValuedParameter(letter) ?? throw new MissingParameterException(letter);
+
+    /// <summary>
+    /// Try to find a parameter that has to carry a value, skipping one that is still an expression
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="parameter">Parameter if found, else null</param>
+    /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="GCodeException">The letter carries no value</exception>
+    private bool TryGetValuedParameter(char letter, [NotNullWhen(true)] out CodeParameter? parameter)
+    {
+        if (TryGetParameter(letter, out parameter))
+        {
+            if (parameter.IsNull)
+            {
+                throw new GCodeException($"expected number after '{letter}'", parameter.Column);
+            }
+            return true;
+        }
+        return false;
+    }
+
+
+    /// <summary>
     /// Retrieve the parameter whose letter equals c
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
@@ -217,29 +287,104 @@ public partial class Code : Command<Message?>
     }
 
     /// <summary>
-    /// Get a float parameter value
+    /// Refuse a float value that falls outside the limits it was read under
     /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <returns>Parameter value</returns>
-    /// <exception cref="MissingParameterException">Parameter not found</exception>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public float GetFloat(char letter)
+    /// <param name="value">Value that was read</param>
+    /// <param name="min">Lowest value that is allowed, or null for no lower limit</param>
+    /// <param name="max">Highest value that is allowed, or null for no upper limit</param>
+    /// <param name="parameter">Parameter the value came from</param>
+    /// <returns>The value, which lies within the limits</returns>
+    /// <exception cref="GCodeException">Value is outside the limits</exception>
+    /// <remarks>
+    /// RepRapFirmware's GCodeBuffer::GetLimitedFValue (GCodeBuffer.cpp:553). Both ends are
+    /// inclusive, and the refusal quotes the column, because it is about one value in the line
+    /// rather than about the command
+    /// </remarks>
+    private static float CheckLimits(float value, float? min, float? max, CodeParameter parameter)
     {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (float)param : throw new MissingParameterException(letter);
+        // TODO exception wording matches RRF for now but should give the min/max values to be more useful after feature parity is reached
+        if (min is float lowest && value < lowest)
+        {
+            throw new GCodeException($"parameter '{parameter.Letter}' too low", parameter.Column);
+        }
+        if (max is float highest && value > highest)
+        {
+            throw new GCodeException($"parameter '{parameter.Letter}' too high", parameter.Column);
+        }
+        return value;
+    }
+
+    /// <summary>
+    /// Refuse an integer value that falls outside the limits it was read under
+    /// </summary>
+    /// <param name="value">Value that was read</param>
+    /// <param name="min">Lowest value that is allowed, or null for no lower limit</param>
+    /// <param name="max">Highest value that is allowed, or null for no upper limit</param>
+    /// <param name="letter">Letter of the parameter the value came from</param>
+    /// <returns>The value, which lies within the limits</returns>
+    /// <exception cref="GCodeException">Value is outside the limits</exception>
+    /// <remarks>
+    /// RepRapFirmware's GCodeBuffer::GetLimitedIValue (GCodeBuffer.cpp:592) and
+    /// ::GetLimitedUIValue (GCodeBuffer.cpp:614), which name the parameter but quote no column
+    /// where the float form quotes one. Both ends are inclusive; RepRapFirmware's unsigned form
+    /// writes its upper limit as one past the last value it allows, so a call ported from it passes
+    /// <c>maxValuePlusOne - 1</c> here. The signed and unsigned forms share one check because every
+    /// value either of them can carry fits in a long
+    /// </remarks>
+    private static long CheckLimits(long value, long? min, long? max, char letter)
+    {
+        if (min is long lowest && value < lowest)
+        {
+            throw new GCodeException($"parameter '{letter}' too low");
+        }
+        if (max is long highest && value > highest)
+        {
+            throw new GCodeException($"parameter '{letter}' too high");
+        }
+        return value;
     }
 
     /// <summary>
     /// Get a float parameter value
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="defaultValue">Default value to return if no parameter could be found</param>
+    /// <param name="defaultValue">Value to return if the letter is not in the code, or null to require it</param>
+    /// <param name="min">Lowest value the parameter may have, or null for no lower limit</param>
+    /// <param name="max">Highest value the parameter may have, or null for no upper limit</param>
     /// <returns>Parameter value</returns>
+    /// <exception cref="MissingParameterException">Parameter not found and no default was given</exception>
+    /// <exception cref="GCodeException">The letter carries no value, or one outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public float GetFloat(char letter, float defaultValue)
+    /// <remarks>
+    /// The limits are about what the line said, so a default is returned as it stands: it comes from
+    /// the caller rather than from the code, and there is nothing to refuse it to
+    /// </remarks>
+    public float GetFloat(char letter, float? defaultValue = null, float? min = null, float? max = null)
     {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (float)param : defaultValue;
+        CodeParameter? parameter = FindValuedParameter(letter);
+        return (parameter is not null)
+            ? CheckLimits((float)parameter, min, max, parameter)
+            : defaultValue ?? throw new MissingParameterException(letter);
+    }
+
+    /// <summary>
+    /// Get a float parameter value that has to be greater than zero
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <returns>Parameter value</returns>
+    /// <exception cref="MissingParameterException">Parameter not found</exception>
+    /// <exception cref="GCodeException">The letter carries no value, or one that is not greater than zero</exception>
+    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+    /// <remarks>
+    /// RepRapFirmware's GCodeBuffer::GetPositiveFValue. The values read through it are the ones a
+    /// zero would make meaningless rather than merely unusual - steps per millimetre, a timeout -
+    /// which is why it is refused where it stands instead of being stored
+    /// </remarks>
+    public float GetPositiveFloat(char letter)
+    {
+        CodeParameter parameter = GetValuedParameter(letter);
+        float value = (float)parameter;
+        return (value > 0.0f) ? value : throw new GCodeException("value must be greater than zero", parameter.Column);
     }
 
     /// <summary>
@@ -247,17 +392,17 @@ public partial class Code : Command<Message?>
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
     /// <param name="parameter">Parameter if found, else default</param>
+    /// <param name="min">Lowest value the parameter may have, or null for no lower limit</param>
+    /// <param name="max">Highest value the parameter may have, or null for no upper limit</param>
     /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="GCodeException">The letter carries no value, or one outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetFloat(char letter, out float parameter)
+    public bool TryGetFloat(char letter, out float parameter, float? min = null, float? max = null)
     {
-        foreach (CodeParameter param in Parameters)
+        if (TryGetValuedParameter(letter, out CodeParameter? param))
         {
-            if (param.Letter == letter && !param.IsExpression)
-            {
-                parameter = (float)param;
-                return true;
-            }
+            parameter = CheckLimits((float)param, min, max, param);
+            return true;
         }
         parameter = default;
         return false;
@@ -268,17 +413,17 @@ public partial class Code : Command<Message?>
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
     /// <param name="parameter">Parameter if found, else null</param>
+    /// <param name="min">Lowest value the parameter may have, or null for no lower limit</param>
+    /// <param name="max">Highest value the parameter may have, or null for no upper limit</param>
     /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="GCodeException">The letter carries no value, or one outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetFloat(char letter, out float? parameter)
+    public bool TryGetFloat(char letter, [NotNullWhen(true)] out float? parameter, float? min = null, float? max = null)
     {
-        foreach (CodeParameter param in Parameters)
+        if (TryGetValuedParameter(letter, out CodeParameter? param))
         {
-            if (param.Letter == letter && !param.IsExpression)
-            {
-                parameter = (float)param;
-                return true;
-            }
+            parameter = CheckLimits((float)param, min, max, param);
+            return true;
         }
         parameter = null;
         return false;
@@ -288,26 +433,23 @@ public partial class Code : Command<Message?>
     /// Get an integer parameter value
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="defaultValue">Value to return if the letter is not in the code, or null to require it</param>
+    /// <param name="min">Lowest value the parameter may have, or null for no lower limit</param>
+    /// <param name="max">Highest value the parameter may have, or null for no upper limit</param>
     /// <returns>Parameter value</returns>
-    /// <exception cref="MissingParameterException">Parameter not found</exception>
+    /// <exception cref="MissingParameterException">Parameter not found and no default was given</exception>
+    /// <exception cref="GCodeException">The letter carries no value, or one outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public int GetInt(char letter)
+    /// <remarks>
+    /// The limits are about what the line said, so a default is returned as it stands: it comes from
+    /// the caller rather than from the code, and there is nothing to refuse it to
+    /// </remarks>
+    public int GetInt(char letter, int? defaultValue = null, int? min = null, int? max = null)
     {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (int)param : throw new MissingParameterException(letter);
-    }
-
-    /// <summary>
-    /// Get an integer parameter value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="defaultValue">Default value to return if no parameter could be found</param>
-    /// <returns>Parameter value</returns>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public int GetInt(char letter, int defaultValue)
-    {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (int)param : defaultValue;
+        CodeParameter? parameter = FindValuedParameter(letter);
+        return (parameter is not null)
+            ? (int)CheckLimits((int)parameter, min, max, letter)
+            : defaultValue ?? throw new MissingParameterException(letter);
     }
 
     /// <summary>
@@ -315,17 +457,17 @@ public partial class Code : Command<Message?>
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
     /// <param name="parameter">Parameter if found, else default</param>
+    /// <param name="min">Lowest value the parameter may have, or null for no lower limit</param>
+    /// <param name="max">Highest value the parameter may have, or null for no upper limit</param>
     /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="GCodeException">The letter carries no value, or one outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetInt(char letter, out int parameter)
+    public bool TryGetInt(char letter, out int parameter, int? min = null, int? max = null)
     {
-        foreach (CodeParameter param in Parameters)
+        if (TryGetValuedParameter(letter, out CodeParameter? param))
         {
-            if (param.Letter == letter && !param.IsExpression)
-            {
-                parameter = (int)param;
-                return true;
-            }
+            parameter = (int)CheckLimits((int)param, min, max, letter);
+            return true;
         }
         parameter = default;
         return false;
@@ -336,17 +478,17 @@ public partial class Code : Command<Message?>
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
     /// <param name="parameter">Parameter if found, else null</param>
+    /// <param name="min">Lowest value the parameter may have, or null for no lower limit</param>
+    /// <param name="max">Highest value the parameter may have, or null for no upper limit</param>
     /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="GCodeException">The letter carries no value, or one outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetInt(char letter, out int? parameter)
+    public bool TryGetInt(char letter, [NotNullWhen(true)] out int? parameter, int? min = null, int? max = null)
     {
-        foreach (CodeParameter param in Parameters)
+        if (TryGetValuedParameter(letter, out CodeParameter? param))
         {
-            if (param.Letter == letter && !param.IsExpression)
-            {
-                parameter = (int?)param;
-                return true;
-            }
+            parameter = (int)CheckLimits((int)param, min, max, letter);
+            return true;
         }
         parameter = null;
         return false;
@@ -356,26 +498,23 @@ public partial class Code : Command<Message?>
     /// Get an unsigned integer parameter value
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="defaultValue">Value to return if the letter is not in the code, or null to require it</param>
+    /// <param name="min">Lowest value the parameter may have, or null for no lower limit</param>
+    /// <param name="max">Highest value the parameter may have, or null for no upper limit</param>
     /// <returns>Parameter value</returns>
-    /// <exception cref="MissingParameterException">Parameter not found</exception>
+    /// <exception cref="MissingParameterException">Parameter not found and no default was given</exception>
+    /// <exception cref="GCodeException">The letter carries no value, or one outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public uint GetUInt(char letter)
+    /// <remarks>
+    /// The limits are about what the line said, so a default is returned as it stands: it comes from
+    /// the caller rather than from the code, and there is nothing to refuse it to
+    /// </remarks>
+    public uint GetUInt(char letter, uint? defaultValue = null, uint? min = null, uint? max = null)
     {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (uint)param : throw new MissingParameterException(letter);
-    }
-
-    /// <summary>
-    /// Get an unsigned integer parameter value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="defaultValue">Default value to return if no parameter could be found</param>
-    /// <returns>Parameter value</returns>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public uint GetUInt(char letter, uint defaultValue)
-    {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (uint)param : defaultValue;
+        CodeParameter? parameter = FindValuedParameter(letter);
+        return (parameter is not null)
+            ? (uint)CheckLimits((uint)parameter, min, max, letter)
+            : defaultValue ?? throw new MissingParameterException(letter);
     }
 
     /// <summary>
@@ -383,17 +522,17 @@ public partial class Code : Command<Message?>
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
     /// <param name="parameter">Parameter if found, else default</param>
+    /// <param name="min">Lowest value the parameter may have, or null for no lower limit</param>
+    /// <param name="max">Highest value the parameter may have, or null for no upper limit</param>
     /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="GCodeException">The letter carries no value, or one outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetUInt(char letter, out uint parameter)
+    public bool TryGetUInt(char letter, out uint parameter, uint? min = null, uint? max = null)
     {
-        foreach (CodeParameter param in Parameters)
+        if (TryGetValuedParameter(letter, out CodeParameter? param))
         {
-            if (param.Letter == letter && !param.IsExpression)
-            {
-                parameter = (uint)param;
-                return true;
-            }
+            parameter = (uint)CheckLimits((uint)param, min, max, letter);
+            return true;
         }
         parameter = default;
         return false;
@@ -404,17 +543,17 @@ public partial class Code : Command<Message?>
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
     /// <param name="parameter">Parameter if found, else null</param>
+    /// <param name="min">Lowest value the parameter may have, or null for no lower limit</param>
+    /// <param name="max">Highest value the parameter may have, or null for no upper limit</param>
     /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="GCodeException">The letter carries no value, or one outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetUInt(char letter, out uint? parameter)
+    public bool TryGetUInt(char letter, [NotNullWhen(true)] out uint? parameter, uint? min = null, uint? max = null)
     {
-        foreach (CodeParameter param in Parameters)
+        if (TryGetValuedParameter(letter, out CodeParameter? param))
         {
-            if (param.Letter == letter && !param.IsExpression)
-            {
-                parameter = (uint)param;
-                return true;
-            }
+            parameter = (uint)CheckLimits((uint)param, min, max, letter);
+            return true;
         }
         parameter = null;
         return false;
@@ -424,26 +563,23 @@ public partial class Code : Command<Message?>
     /// Get a long parameter value
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="defaultValue">Value to return if the letter is not in the code, or null to require it</param>
+    /// <param name="min">Lowest value the parameter may have, or null for no lower limit</param>
+    /// <param name="max">Highest value the parameter may have, or null for no upper limit</param>
     /// <returns>Parameter value</returns>
-    /// <exception cref="MissingParameterException">Parameter not found</exception>
+    /// <exception cref="MissingParameterException">Parameter not found and no default was given</exception>
+    /// <exception cref="GCodeException">The letter carries no value, or one outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public long GetLong(char letter)
+    /// <remarks>
+    /// The limits are about what the line said, so a default is returned as it stands: it comes from
+    /// the caller rather than from the code, and there is nothing to refuse it to
+    /// </remarks>
+    public long GetLong(char letter, long? defaultValue = null, long? min = null, long? max = null)
     {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (long)param : throw new MissingParameterException(letter);
-    }
-
-    /// <summary>
-    /// Get a long parameter value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="defaultValue">Default value to return if no parameter could be found</param>
-    /// <returns>Parameter value</returns>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public long GetLong(char letter, long defaultValue)
-    {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (long)param : defaultValue;
+        CodeParameter? parameter = FindValuedParameter(letter);
+        return (parameter is not null)
+            ? CheckLimits((long)parameter, min, max, letter)
+            : defaultValue ?? throw new MissingParameterException(letter);
     }
 
     /// <summary>
@@ -451,17 +587,17 @@ public partial class Code : Command<Message?>
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
     /// <param name="parameter">Parameter if found, else default</param>
+    /// <param name="min">Lowest value the parameter may have, or null for no lower limit</param>
+    /// <param name="max">Highest value the parameter may have, or null for no upper limit</param>
     /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="GCodeException">The letter carries no value, or one outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetLong(char letter, out long parameter)
+    public bool TryGetLong(char letter, out long parameter, long? min = null, long? max = null)
     {
-        foreach (CodeParameter param in Parameters)
+        if (TryGetValuedParameter(letter, out CodeParameter? param))
         {
-            if (param.Letter == letter && !param.IsExpression)
-            {
-                parameter = (long)param;
-                return true;
-            }
+            parameter = CheckLimits((long)param, min, max, letter);
+            return true;
         }
         parameter = default;
         return false;
@@ -472,260 +608,16 @@ public partial class Code : Command<Message?>
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
     /// <param name="parameter">Parameter if found, else null</param>
+    /// <param name="min">Lowest value the parameter may have, or null for no lower limit</param>
+    /// <param name="max">Highest value the parameter may have, or null for no upper limit</param>
     /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="GCodeException">The letter carries no value, or one outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetLong(char letter, out long? parameter)
+    public bool TryGetLong(char letter, [NotNullWhen(true)] out long? parameter, long? min = null, long? max = null)
     {
-        foreach (CodeParameter param in Parameters)
+        if (TryGetValuedParameter(letter, out CodeParameter? param))
         {
-            if (param.Letter == letter && !param.IsExpression)
-            {
-                parameter = (long)param;
-                return true;
-            }
-        }
-        parameter = null;
-        return false;
-    }
-
-    /// <summary>
-    /// Get a float parameter value clamped between a minimum and maximum value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="min">Minimum value to clamp the parameter to</param>
-    /// <param name="max">Maximum value to clamp the parameter to</param>
-    /// <returns>Parameter value clamped between min and max</returns>
-    /// <exception cref="MissingParameterException">Parameter not found</exception>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public float GetFloatLimited(char letter, float min, float max) => MathCompat.Clamp(GetFloat(letter), min, max);
-
-    /// <summary>
-    /// Get a float parameter value clamped between a minimum and maximum value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="min">Minimum value to clamp the parameter to</param>
-    /// <param name="max">Maximum value to clamp the parameter to</param>
-    /// <param name="defaultValue">Default value to return if no parameter could be found</param>
-    /// <returns>Parameter value clamped between min and max</returns>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public float GetFloatLimited(char letter, float min, float max, float defaultValue) => MathCompat.Clamp(GetFloat(letter, defaultValue), min, max);
-
-    /// <summary>
-    /// Try to get a float parameter value by letter clamped between a minimum and maximum value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="min">Minimum value to clamp the parameter to</param>
-    /// <param name="max">Maximum value to clamp the parameter to</param>
-    /// <param name="parameter">Parameter clamped between min and max if found, else default</param>
-    /// <returns>True if the requested parameter could be found</returns>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetFloatLimited(char letter, float min, float max, out float parameter)
-    {
-        if (TryGetFloat(letter, out parameter))
-        {
-            parameter = MathCompat.Clamp(parameter, min, max);
-            return true;
-        }
-        return false;
-    }
-
-    /// <summary>
-    /// Try to get a float parameter value by letter clamped between a minimum and maximum value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="min">Minimum value to clamp the parameter to</param>
-    /// <param name="max">Maximum value to clamp the parameter to</param>
-    /// <param name="parameter">Parameter clamped between min and max if found, else null</param>
-    /// <returns>True if the requested parameter could be found</returns>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetFloatLimited(char letter, float min, float max, out float? parameter)
-    {
-        if (TryGetFloat(letter, out float value))
-        {
-            parameter = MathCompat.Clamp(value, min, max);
-            return true;
-        }
-        parameter = null;
-        return false;
-    }
-
-    /// <summary>
-    /// Get an integer parameter value clamped between a minimum and maximum value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="min">Minimum value to clamp the parameter to</param>
-    /// <param name="max">Maximum value to clamp the parameter to</param>
-    /// <returns>Parameter value clamped between min and max</returns>
-    /// <exception cref="MissingParameterException">Parameter not found</exception>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public int GetIntLimited(char letter, int min, int max) => MathCompat.Clamp(GetInt(letter), min, max);
-
-    /// <summary>
-    /// Get an integer parameter value clamped between a minimum and maximum value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="min">Minimum value to clamp the parameter to</param>
-    /// <param name="max">Maximum value to clamp the parameter to</param>
-    /// <param name="defaultValue">Default value to return if no parameter could be found</param>
-    /// <returns>Parameter value clamped between min and max</returns>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public int GetIntLimited(char letter, int min, int max, int defaultValue) => MathCompat.Clamp(GetInt(letter, defaultValue), min, max);
-
-    /// <summary>
-    /// Try to get an integer parameter value by letter clamped between a minimum and maximum value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="min">Minimum value to clamp the parameter to</param>
-    /// <param name="max">Maximum value to clamp the parameter to</param>
-    /// <param name="parameter">Parameter clamped between min and max if found, else default</param>
-    /// <returns>True if the requested parameter could be found</returns>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetIntLimited(char letter, int min, int max, out int parameter)
-    {
-        if (TryGetInt(letter, out parameter))
-        {
-            parameter = MathCompat.Clamp(parameter, min, max);
-            return true;
-        }
-        return false;
-    }
-
-    /// <summary>
-    /// Try to get an integer parameter value by letter clamped between a minimum and maximum value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="min">Minimum value to clamp the parameter to</param>
-    /// <param name="max">Maximum value to clamp the parameter to</param>
-    /// <param name="parameter">Parameter clamped between min and max if found, else null</param>
-    /// <returns>True if the requested parameter could be found</returns>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetIntLimited(char letter, int min, int max, out int? parameter)
-    {
-        if (TryGetInt(letter, out int value))
-        {
-            parameter = MathCompat.Clamp(value, min, max);
-            return true;
-        }
-        parameter = null;
-        return false;
-    }
-
-    /// <summary>
-    /// Get an unsigned integer parameter value clamped between a minimum and maximum value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="min">Minimum value to clamp the parameter to</param>
-    /// <param name="max">Maximum value to clamp the parameter to</param>
-    /// <returns>Parameter value clamped between min and max</returns>
-    /// <exception cref="MissingParameterException">Parameter not found</exception>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public uint GetUIntLimited(char letter, uint min, uint max) => MathCompat.Clamp(GetUInt(letter), min, max);
-
-    /// <summary>
-    /// Get an unsigned integer parameter value clamped between a minimum and maximum value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="min">Minimum value to clamp the parameter to</param>
-    /// <param name="max">Maximum value to clamp the parameter to</param>
-    /// <param name="defaultValue">Default value to return if no parameter could be found</param>
-    /// <returns>Parameter value clamped between min and max</returns>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public uint GetUIntLimited(char letter, uint min, uint max, uint defaultValue) => MathCompat.Clamp(GetUInt(letter, defaultValue), min, max);
-
-    /// <summary>
-    /// Try to get an unsigned integer parameter value by letter clamped between a minimum and maximum value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="min">Minimum value to clamp the parameter to</param>
-    /// <param name="max">Maximum value to clamp the parameter to</param>
-    /// <param name="parameter">Parameter clamped between min and max if found, else default</param>
-    /// <returns>True if the requested parameter could be found</returns>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetUIntLimited(char letter, uint min, uint max, out uint parameter)
-    {
-        if (TryGetUInt(letter, out parameter))
-        {
-            parameter = MathCompat.Clamp(parameter, min, max);
-            return true;
-        }
-        return false;
-    }
-
-    /// <summary>
-    /// Try to get an unsigned integer parameter value by letter clamped between a minimum and maximum value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="min">Minimum value to clamp the parameter to</param>
-    /// <param name="max">Maximum value to clamp the parameter to</param>
-    /// <param name="parameter">Parameter clamped between min and max if found, else null</param>
-    /// <returns>True if the requested parameter could be found</returns>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetUIntLimited(char letter, uint min, uint max, out uint? parameter)
-    {
-        if (TryGetUInt(letter, out uint value))
-        {
-            parameter = MathCompat.Clamp(value, min, max);
-            return true;
-        }
-        parameter = null;
-        return false;
-    }
-
-    /// <summary>
-    /// Get a long parameter value clamped between a minimum and maximum value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="min">Minimum value to clamp the parameter to</param>
-    /// <param name="max">Maximum value to clamp the parameter to</param>
-    /// <returns>Parameter value clamped between min and max</returns>
-    /// <exception cref="MissingParameterException">Parameter not found</exception>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public long GetLongLimited(char letter, long min, long max) => MathCompat.Clamp(GetLong(letter), min, max);
-
-    /// <summary>
-    /// Get a long parameter value clamped between a minimum and maximum value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="min">Minimum value to clamp the parameter to</param>
-    /// <param name="max">Maximum value to clamp the parameter to</param>
-    /// <param name="defaultValue">Default value to return if no parameter could be found</param>
-    /// <returns>Parameter value clamped between min and max</returns>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public long GetLongLimited(char letter, long min, long max, long defaultValue) => MathCompat.Clamp(GetLong(letter, defaultValue), min, max);
-
-    /// <summary>
-    /// Try to get a long parameter value by letter clamped between a minimum and maximum value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="min">Minimum value to clamp the parameter to</param>
-    /// <param name="max">Maximum value to clamp the parameter to</param>
-    /// <param name="parameter">Parameter clamped between min and max if found, else default</param>
-    /// <returns>True if the requested parameter could be found</returns>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetLongLimited(char letter, long min, long max, out long parameter)
-    {
-        if (TryGetLong(letter, out parameter))
-        {
-            parameter = MathCompat.Clamp(parameter, min, max);
-            return true;
-        }
-        return false;
-    }
-
-    /// <summary>
-    /// Try to get a long parameter value by letter clamped between a minimum and maximum value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="min">Minimum value to clamp the parameter to</param>
-    /// <param name="max">Maximum value to clamp the parameter to</param>
-    /// <param name="parameter">Parameter clamped between min and max if found, else null</param>
-    /// <returns>True if the requested parameter could be found</returns>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetLongLimited(char letter, long min, long max, out long? parameter)
-    {
-        if (TryGetLong(letter, out long value))
-        {
-            parameter = MathCompat.Clamp(value, min, max);
+            parameter = CheckLimits((long)param, min, max, letter);
             return true;
         }
         parameter = null;
@@ -736,65 +628,54 @@ public partial class Code : Command<Message?>
     /// Get a boolean parameter value
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="defaultValue">Value to return if the letter is not in the code, or null to require it</param>
     /// <returns>Parameter value</returns>
-    /// <exception cref="MissingParameterException">Parameter not found</exception>
+    /// <exception cref="MissingParameterException">Parameter not found and no default was given</exception>
+    /// <exception cref="GCodeException">The letter carries no value</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool GetBool(char letter)
+    /// <remarks>
+    /// There are no limits to give, because the two values a boolean can hold are both inside any
+    /// range that would admit either of them
+    /// </remarks>
+    public bool GetBool(char letter, bool? defaultValue = null)
     {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (bool)param : throw new MissingParameterException(letter);
+        CodeParameter? parameter = FindValuedParameter(letter);
+        return (parameter is not null) ? (bool)parameter : defaultValue ?? throw new MissingParameterException(letter);
     }
 
     /// <summary>
-    /// Get a boolean parameter value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="defaultValue">Default value to return if no parameter could be found</param>
-    /// <returns>Parameter value</returns>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool GetBool(char letter, bool defaultValue)
-    {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (bool)param : defaultValue;
-    }
-
-    /// <summary>
-    /// Try to get a long parameter value by letter
+    /// Try to get a boolean parameter value by letter
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
     /// <param name="parameter">Parameter if found, else default</param>
     /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="GCodeException">The letter carries no value</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
     public bool TryGetBool(char letter, out bool parameter)
     {
-        foreach (CodeParameter param in Parameters)
+        if (TryGetValuedParameter(letter, out CodeParameter? param))
         {
-            if (param.Letter == letter && !param.IsExpression)
-            {
-                parameter = (bool)param;
-                return true;
-            }
+            parameter = (bool)param;
+            return true;
         }
         parameter = default;
         return false;
     }
 
     /// <summary>
-    /// Try to get a long parameter value by letter
+    /// Try to get a boolean parameter value by letter
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
     /// <param name="parameter">Parameter if found, else null</param>
     /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="GCodeException">The letter carries no value</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
     public bool TryGetBool(char letter, [NotNullWhen(true)] out bool? parameter)
     {
-        foreach (CodeParameter param in Parameters)
+        if (TryGetValuedParameter(letter, out CodeParameter? param))
         {
-            if (param.Letter == letter && !param.IsExpression)
-            {
-                parameter = (bool)param;
-                return true;
-            }
+            parameter = (bool)param;
+            return true;
         }
         parameter = null;
         return false;
@@ -953,29 +834,94 @@ public partial class Code : Command<Message?>
     }
 
     /// <summary>
-    /// Get a float array parameter value
+    /// Refuse a float array whose values do not all fall inside the limits they were read under
     /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <returns>Parameter value</returns>
-    /// <exception cref="MissingParameterException">Parameter not found</exception>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public float[] GetFloatArray(char letter)
+    /// <param name="values">Values that were read</param>
+    /// <param name="min">Lowest value that is allowed, or null for no lower limit</param>
+    /// <param name="max">Highest value that is allowed, or null for no upper limit</param>
+    /// <param name="parameter">Parameter the values came from</param>
+    /// <returns>The values, which all lie within the limits</returns>
+    /// <exception cref="GCodeException">A value is outside the limits</exception>
+    /// <remarks>
+    /// Every item is held to the same limits, and the first one outside them refuses the code. The
+    /// refusal names the parameter rather than the item, because the whole list stands or falls
+    /// together: a code that meant to set four drives and named an impossible value for the third
+    /// asked for something the machine cannot do, not for three quarters of it
+    /// </remarks>
+    private static float[] CheckLimits(float[] values, float? min, float? max, CodeParameter parameter)
     {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (float[])param : throw new MissingParameterException(letter);
+        foreach (float value in values)
+        {
+            CheckLimits(value, min, max, parameter);
+        }
+        return values;
+    }
+
+    /// <summary>
+    /// Refuse an integer array whose values do not all fall inside the limits they were read under
+    /// </summary>
+    /// <param name="values">Values that were read</param>
+    /// <param name="min">Lowest value that is allowed, or null for no lower limit</param>
+    /// <param name="max">Highest value that is allowed, or null for no upper limit</param>
+    /// <param name="letter">Letter of the parameter the values came from</param>
+    /// <returns>The values, which all lie within the limits</returns>
+    /// <exception cref="GCodeException">A value is outside the limits</exception>
+    /// <remarks>
+    /// The array counterpart of the scalar check, refusing on the first item outside the limits and
+    /// naming the parameter rather than the item, for the reason the float form gives. There is one
+    /// of these per array type because an int[] is not a long[], where the scalar forms share a
+    /// single check through the widening every value has
+    /// </remarks>
+    private static int[] CheckLimits(int[] values, long? min, long? max, char letter)
+    {
+        foreach (int value in values)
+        {
+            CheckLimits(value, min, max, letter);
+        }
+        return values;
+    }
+
+    /// <inheritdoc cref="CheckLimits(int[], long?, long?, char)" />
+    private static uint[] CheckLimits(uint[] values, long? min, long? max, char letter)
+    {
+        foreach (uint value in values)
+        {
+            CheckLimits(value, min, max, letter);
+        }
+        return values;
+    }
+
+    /// <inheritdoc cref="CheckLimits(int[], long?, long?, char)" />
+    private static long[] CheckLimits(long[] values, long? min, long? max, char letter)
+    {
+        foreach (long value in values)
+        {
+            CheckLimits(value, min, max, letter);
+        }
+        return values;
     }
 
     /// <summary>
     /// Get a float array parameter value
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="defaultValue">Default value to return if no parameter could be found</param>
+    /// <param name="defaultValue">Value to return if the letter is not in the code, or null to require it</param>
+    /// <param name="min">Lowest value each item may have, or null for no lower limit</param>
+    /// <param name="max">Highest value each item may have, or null for no upper limit</param>
     /// <returns>Parameter value</returns>
+    /// <exception cref="MissingParameterException">Parameter not found and no default was given</exception>
+    /// <exception cref="GCodeException">The letter carries no value, or one item is outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public float[] GetFloatArray(char letter, float[] defaultValue)
+    /// <remarks>
+    /// The limits are about what the line said, so a default is returned as it stands: it comes from
+    /// the caller rather than from the code, and there is nothing to refuse it to
+    /// </remarks>
+    public float[] GetFloatArray(char letter, float[]? defaultValue = null, float? min = null, float? max = null)
     {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (float[])param : defaultValue;
+        CodeParameter? parameter = FindValuedParameter(letter);
+        return (parameter is not null)
+            ? CheckLimits((float[])parameter, min, max, parameter)
+            : defaultValue ?? throw new MissingParameterException(letter);
     }
 
     /// <summary>
@@ -983,17 +929,18 @@ public partial class Code : Command<Message?>
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
     /// <param name="parameter">Parameter if found, else null</param>
+    /// <param name="min">Lowest value each item may have, or null for no lower limit</param>
+    /// <param name="max">Highest value each item may have, or null for no upper limit</param>
     /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="GCodeException">The letter carries no value, or one item is outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetFloatArray(char letter, [NotNullWhen(true)] out float[]? parameter)
+    public bool TryGetFloatArray(char letter, [NotNullWhen(true)] out float[]? parameter,
+                                 float? min = null, float? max = null)
     {
-        foreach (CodeParameter param in Parameters)
+        if (TryGetValuedParameter(letter, out CodeParameter? param))
         {
-            if (param.Letter == letter && !param.IsExpression)
-            {
-                parameter = (float[])param;
-                return true;
-            }
+            parameter = CheckLimits((float[])param, min, max, param);
+            return true;
         }
         parameter = null;
         return false;
@@ -1003,26 +950,24 @@ public partial class Code : Command<Message?>
     /// Get an integer array parameter value
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="defaultValue">Value to return if the letter is not in the code, or null to require it</param>
+    /// <param name="min">Lowest value each item may have, or null for no lower limit</param>
+    /// <param name="max">Highest value each item may have, or null for no upper limit</param>
     /// <returns>Parameter value</returns>
-    /// <exception cref="MissingParameterException">Parameter not found</exception>
+    /// <exception cref="MissingParameterException">Parameter not found and no default was given</exception>
+    /// <exception cref="GCodeException">The letter carries no value, or one item is outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public int[] GetIntArray(char letter)
+    /// <remarks>
+    /// The arrays RepRapFirmware reads with <c>GetUnsignedArray(..., false)</c>, which will not pad
+    /// what it was given: the letter alone carries nothing to use, so it cannot stand for "all of
+    /// them". A default supplied by the caller is a different thing and is returned as it stands
+    /// </remarks>
+    public int[] GetIntArray(char letter, int[]? defaultValue = null, int? min = null, int? max = null)
     {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (int[])param : throw new MissingParameterException(letter);
-    }
-
-    /// <summary>
-    /// Get an integer array parameter value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="defaultValue">Default value to return if no parameter could be found</param>
-    /// <returns>Parameter value</returns>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public int[] GetIntArray(char letter, int[] defaultValue)
-    {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (int[])param : defaultValue;
+        CodeParameter? parameter = FindValuedParameter(letter);
+        return (parameter is not null)
+            ? CheckLimits((int[])parameter, min, max, letter)
+            : defaultValue ?? throw new MissingParameterException(letter);
     }
 
     /// <summary>
@@ -1030,17 +975,18 @@ public partial class Code : Command<Message?>
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
     /// <param name="parameter">Parameter if found, else null</param>
+    /// <param name="min">Lowest value each item may have, or null for no lower limit</param>
+    /// <param name="max">Highest value each item may have, or null for no upper limit</param>
     /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="GCodeException">The letter carries no value, or one item is outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetIntArray(char letter, [NotNullWhen(true)] out int[]? parameter)
+    public bool TryGetIntArray(char letter, [NotNullWhen(true)] out int[]? parameter,
+                               int? min = null, int? max = null)
     {
-        foreach (CodeParameter param in Parameters)
+        if (TryGetValuedParameter(letter, out CodeParameter? param))
         {
-            if (param.Letter == letter && !param.IsExpression)
-            {
-                parameter = (int[])param;
-                return true;
-            }
+            parameter = CheckLimits((int[])param, min, max, letter);
+            return true;
         }
         parameter = null;
         return false;
@@ -1050,26 +996,23 @@ public partial class Code : Command<Message?>
     /// Get an unsigned integer array parameter value
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="defaultValue">Value to return if the letter is not in the code, or null to require it</param>
+    /// <param name="min">Lowest value each item may have, or null for no lower limit</param>
+    /// <param name="max">Highest value each item may have, or null for no upper limit</param>
     /// <returns>Parameter value</returns>
-    /// <exception cref="MissingParameterException">Parameter not found</exception>
+    /// <exception cref="MissingParameterException">Parameter not found and no default was given</exception>
+    /// <exception cref="GCodeException">The letter carries no value, or one item is outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public uint[] GetUIntArray(char letter)
+    /// <remarks>
+    /// The limits are about what the line said, so a default is returned as it stands: it comes from
+    /// the caller rather than from the code, and there is nothing to refuse it to
+    /// </remarks>
+    public uint[] GetUIntArray(char letter, uint[]? defaultValue = null, uint? min = null, uint? max = null)
     {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (uint[])param : throw new MissingParameterException(letter);
-    }
-
-    /// <summary>
-    /// Get an unsigned integer array parameter value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="defaultValue">Default value to return if no parameter could be found</param>
-    /// <returns>Parameter value</returns>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public uint[] GetUIntArray(char letter, uint[] defaultValue)
-    {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (uint[])param : defaultValue;
+        CodeParameter? parameter = FindValuedParameter(letter);
+        return (parameter is not null)
+            ? CheckLimits((uint[])parameter, min, max, letter)
+            : defaultValue ?? throw new MissingParameterException(letter);
     }
 
     /// <summary>
@@ -1077,17 +1020,18 @@ public partial class Code : Command<Message?>
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
     /// <param name="parameter">Parameter if found, else null</param>
+    /// <param name="min">Lowest value each item may have, or null for no lower limit</param>
+    /// <param name="max">Highest value each item may have, or null for no upper limit</param>
     /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="GCodeException">The letter carries no value, or one item is outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetUIntArray(char letter, [NotNullWhen(true)] out uint[]? parameter)
+    public bool TryGetUIntArray(char letter, [NotNullWhen(true)] out uint[]? parameter,
+                                uint? min = null, uint? max = null)
     {
-        foreach (CodeParameter param in Parameters)
+        if (TryGetValuedParameter(letter, out CodeParameter? param))
         {
-            if (param.Letter == letter && !param.IsExpression)
-            {
-                parameter = (uint[])param;
-                return true;
-            }
+            parameter = CheckLimits((uint[])param, min, max, letter);
+            return true;
         }
         parameter = null;
         return false;
@@ -1097,26 +1041,23 @@ public partial class Code : Command<Message?>
     /// Get a long array parameter value
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="defaultValue">Value to return if the letter is not in the code, or null to require it</param>
+    /// <param name="min">Lowest value each item may have, or null for no lower limit</param>
+    /// <param name="max">Highest value each item may have, or null for no upper limit</param>
     /// <returns>Parameter value</returns>
-    /// <exception cref="MissingParameterException">Parameter not found</exception>
+    /// <exception cref="MissingParameterException">Parameter not found and no default was given</exception>
+    /// <exception cref="GCodeException">The letter carries no value, or one item is outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public long[] GetLongArray(char letter)
+    /// <remarks>
+    /// The limits are about what the line said, so a default is returned as it stands: it comes from
+    /// the caller rather than from the code, and there is nothing to refuse it to
+    /// </remarks>
+    public long[] GetLongArray(char letter, long[]? defaultValue = null, long? min = null, long? max = null)
     {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (long[])param : throw new MissingParameterException(letter);
-    }
-
-    /// <summary>
-    /// Get a long array parameter value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="defaultValue">Default value to return if no parameter could be found</param>
-    /// <returns>Parameter value</returns>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public long[] GetLongArray(char letter, long[] defaultValue)
-    {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (long[])param : defaultValue;
+        CodeParameter? parameter = FindValuedParameter(letter);
+        return (parameter is not null)
+            ? CheckLimits((long[])parameter, min, max, letter)
+            : defaultValue ?? throw new MissingParameterException(letter);
     }
 
     /// <summary>
@@ -1124,17 +1065,18 @@ public partial class Code : Command<Message?>
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
     /// <param name="parameter">Parameter if found, else null</param>
+    /// <param name="min">Lowest value each item may have, or null for no lower limit</param>
+    /// <param name="max">Highest value each item may have, or null for no upper limit</param>
     /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="GCodeException">The letter carries no value, or one item is outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetLongArray(char letter, [NotNullWhen(true)] out long[]? parameter)
+    public bool TryGetLongArray(char letter, [NotNullWhen(true)] out long[]? parameter,
+                                long? min = null, long? max = null)
     {
-        foreach (CodeParameter param in Parameters)
+        if (TryGetValuedParameter(letter, out CodeParameter? param))
         {
-            if (param.Letter == letter && !param.IsExpression)
-            {
-                parameter = (long[])param;
-                return true;
-            }
+            parameter = CheckLimits((long[])param, min, max, letter);
+            return true;
         }
         parameter = null;
         return false;
@@ -1144,44 +1086,35 @@ public partial class Code : Command<Message?>
     /// Get a driver ID array parameter value
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="defaultValue">Value to return if the letter is not in the code, or null to require it</param>
     /// <returns>Parameter value</returns>
-    /// <exception cref="MissingParameterException">Parameter not found</exception>
+    /// <exception cref="MissingParameterException">Parameter not found and no default was given</exception>
+    /// <exception cref="GCodeException">The letter carries no value</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public DriverId[] GetDriverIdArray(char letter)
+    /// <remarks>
+    /// There are no limits to give, because a driver ID is a board and a port rather than a
+    /// magnitude: which of two drivers is the greater is not a question a code asks
+    /// </remarks>
+    public DriverId[] GetDriverIdArray(char letter, DriverId[]? defaultValue = null)
     {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (DriverId[])param : throw new MissingParameterException(letter);
+        CodeParameter? parameter = FindValuedParameter(letter);
+        return (parameter is not null) ? (DriverId[])parameter : defaultValue ?? throw new MissingParameterException(letter);
     }
 
     /// <summary>
-    /// Get a driver ID array parameter value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="defaultValue">Default value to return if no parameter could be found</param>
-    /// <returns>Parameter value</returns>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public DriverId[] GetDriverIdArray(char letter, DriverId[] defaultValue)
-    {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (DriverId[])param : defaultValue;
-    }
-
-    /// <summary>
-    /// Try to get a long array parameter value by letter
+    /// Try to get a driver ID array parameter value by letter
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
     /// <param name="parameter">Parameter if found, else null</param>
     /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="GCodeException">The letter carries no value</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
     public bool TryGetDriverIdArray(char letter, [NotNullWhen(true)] out DriverId[]? parameter)
     {
-        foreach (CodeParameter param in Parameters)
+        if (TryGetValuedParameter(letter, out CodeParameter? param))
         {
-            if (param.Letter == letter && !param.IsExpression)
-            {
-                parameter = (DriverId[])param;
-                return true;
-            }
+            parameter = (DriverId[])param;
+            return true;
         }
         parameter = null;
         return false;

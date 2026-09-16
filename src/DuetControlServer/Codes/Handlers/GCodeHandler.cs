@@ -178,7 +178,7 @@ internal sealed partial class GCodeHandler(
     /// </remarks>
     private async ValueTask<Message> HandleSavePositionAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        int restorePointNumber = code.GetInt('S', 0);
+        int restorePointNumber = code.GetInt('S', defaultValue: 0);
         if (restorePointNumber < 0 || restorePointNumber >= Motion.RestorePoint.NumVisible)
         {
             return new Message(MessageType.Error, $"S parameter must be between 0 and {Motion.RestorePoint.NumVisible - 1}");
@@ -222,7 +222,7 @@ internal sealed partial class GCodeHandler(
     /// </remarks>
     private static bool TryGetMoveType(Commands.Code code, out MoveType moveType, out Message? error)
     {
-        int value = code.GetInt('H', 0);
+        int value = code.GetInt('H', defaultValue: 0);
         if (!Enum.IsDefined(typeof(MoveType), value))
         {
             moveType = MoveType.Normal;

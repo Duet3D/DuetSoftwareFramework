@@ -55,6 +55,17 @@ public partial class Axis : ModelObject, IStaticModelObject, IPhaseSteppingDrive
     /// <summary>Microsteps per mm of an axis until M92 says otherwise</summary>
     public const float DefaultStepsPerMm = 80F;
 
+    /// <summary>
+    /// Percentage of the motor current a drive holds at standstill until M917 says otherwise
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>DefaultStandstillCurrentPercent</c> for the Duet 3 main board
+    /// (Config/Pins_Duet3_MB6HC.h), applied to every drive in Move::Init whatever board its driver is
+    /// on. It is high enough for accurate slow motion, which is what separates it from M906's idle
+    /// factor
+    /// </remarks>
+    public const int DefaultStandstillCurrentPercent = 71;
+
     /// <summary>Microsteps per mm of a Z axis until M92 says otherwise</summary>
     /// <remarks>
     /// Ten times the other axes', because a Z is usually a leadscrew and a belt's figure would move
@@ -214,7 +225,7 @@ public partial class Axis : ModelObject, IStaticModelObject, IPhaseSteppingDrive
         get => _percentStstCurrent;
         set => SetPropertyValue(ref _percentStstCurrent, value);
     }
-    private int? _percentStstCurrent;
+    private int? _percentStstCurrent = DefaultStandstillCurrentPercent;
 
     /// <summary>
     /// Whether or not the axis is currently using phase stepping
@@ -224,7 +235,7 @@ public partial class Axis : ModelObject, IStaticModelObject, IPhaseSteppingDrive
         get => _phaseStep;
         set => SetPropertyValue(ref _phaseStep, value);
     }
-    private bool? _phaseStep;
+    private bool? _phaseStep = false;
 
     /// <summary>
     /// Velocity feedforward gain of the phase stepping control loop (M970.1 Kv)

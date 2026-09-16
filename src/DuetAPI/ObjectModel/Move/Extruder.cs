@@ -132,7 +132,7 @@ public partial class Extruder : ModelObject, IStaticModelObject, IPhaseSteppingD
         get => _percentStstCurrent;
         set => SetPropertyValue(ref _percentStstCurrent, value);
     }
-    private int? _percentStstCurrent;
+    private int? _percentStstCurrent = Axis.DefaultStandstillCurrentPercent;
 
     /// <summary>
     /// Whether or not the extruder is currently using phase stepping
@@ -142,7 +142,7 @@ public partial class Extruder : ModelObject, IStaticModelObject, IPhaseSteppingD
         get => _phaseStep;
         set => SetPropertyValue(ref _phaseStep, value);
     }
-    private bool? _phaseStep;
+    private bool? _phaseStep = false;
 
     /// <summary>
     /// Velocity feedforward gain of the phase stepping control loop (M970.1 Kv)

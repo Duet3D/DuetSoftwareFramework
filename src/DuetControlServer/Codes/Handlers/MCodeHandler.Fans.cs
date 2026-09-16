@@ -95,15 +95,19 @@ internal partial class MCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleCreateFanAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (!code.TryGetInt('F', out int fanNumber) || fanNumber < 0 || fanNumber >= FanManager.MaxFans)
-        {
-            return new Message(MessageType.Error, $"Fan number must be between 0 and {FanManager.MaxFans - 1}");
-        }
+        int fanNumber = code.GetInt('F', min: 0, max: FanManager.MaxFans - 1);
+
+        // Q and K are read before anything is touched, so a K outside the range a tacho can be read
+        // over refuses the code while the fan that holds the number is still whole and still on its
+        // pins (RRF FansManager::ConfigureFanPort, which reads both ahead of the C it may delete on)
+        bool seenFrequency = code.TryGetFloat('Q', out float frequency);
+        bool seenPulsesPerRev = code.TryGetFloat('K', out float pulsesPerRev, min: Fan.MinTachoPpr, max: Fan.MaxTachoPpr);
 
         if (!code.TryGetString('C', out string? port))
         {
-            return code.HasParameter('Q') || code.HasParameter('K')
-                   ? await SetFanParametersAsync(code, fanNumber, cancellationToken)
+            return (seenFrequency || seenPulsesPerRev)
+                   ? await SetFanParametersAsync(fanNumber, seenFrequency, frequency, seenPulsesPerRev, pulsesPerRev,
+                                                 cancellationToken)
                    : await ReportFanAsync(fanNumber, cancellationToken);
         }
 
@@ -127,11 +131,11 @@ internal partial class MCodeHandler
             // A new fan starts at the defaults, so Q and K only have to overwrite what they were given
             Fan fan = fanManager.Create(fanNumber);
             fan.Port = port;
-            if (code.TryGetFloat('Q', out float frequency))
+            if (seenFrequency)
             {
                 fan.Frequency = frequency;
             }
-            if (code.TryGetFloatLimited('K', Fan.MinTachoPpr, Fan.MaxTachoPpr, out float pulsesPerRev))
+            if (seenPulsesPerRev)
             {
                 fan.TachoPpr = pulsesPerRev;
             }
@@ -179,15 +183,24 @@ internal partial class MCodeHandler
     /// <summary>
     /// M950 F with Q or K and no C: change the parameters of a fan that exists already
     /// </summary>
+    /// <param name="fanNumber">The fan the code named</param>
+    /// <param name="seenFrequency">Whether the code carried a Q</param>
+    /// <param name="frequency">The frequency Q asked for, if it did</param>
+    /// <param name="seenPulsesPerRev">Whether the code carried a K</param>
+    /// <param name="pulsesPerRev">The tacho pulses per revolution K asked for, if it did</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
     /// <remarks>
     /// FansManager::ConfigureFanPort (FansManager.cpp) falls through to RemoteFan::SetFanParameters
-    /// when no pin name is given, which sends the board the same M950 carrying only what changed
+    /// when no pin name is given, which sends the board the same M950 carrying only what changed.
+    /// The values arrive already read, as they do there, so both paths read the code once
     /// </remarks>
-    private async ValueTask<Message> SetFanParametersAsync(Commands.Code code, int fanNumber,
+    private async ValueTask<Message> SetFanParametersAsync(int fanNumber, bool seenFrequency, float frequency,
+                                                           bool seenPulsesPerRev, float pulsesPerRev,
                                                            CancellationToken cancellationToken)
     {
         byte board;
-        float? frequency = null, pulsesPerRev = null;
+        float? sentFrequency = null, sentPulsesPerRev = null;
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             if (fanManager.Find(fanNumber) is not Fan fan)
@@ -199,20 +212,20 @@ internal partial class MCodeHandler
                 return new Message(MessageType.Error, $"Fan {fanNumber} is not on an expansion board");
             }
 
-            if (code.TryGetFloat('Q', out float seenFrequency))
+            if (seenFrequency)
             {
-                frequency = seenFrequency;
-                fan.Frequency = seenFrequency;
+                sentFrequency = frequency;
+                fan.Frequency = frequency;
             }
-            if (code.TryGetFloatLimited('K', Fan.MinTachoPpr, Fan.MaxTachoPpr, out float seenPulsesPerRev))
+            if (seenPulsesPerRev)
             {
-                pulsesPerRev = seenPulsesPerRev;
-                fan.TachoPpr = seenPulsesPerRev;
+                sentPulsesPerRev = pulsesPerRev;
+                fan.TachoPpr = pulsesPerRev;
             }
         }
 
         // TODO RRF only updates OM if CAN message is successful
-        return await SendM950FanAsync(fanNumber, port: null, frequency, pulsesPerRev, board, cancellationToken);
+        return await SendM950FanAsync(fanNumber, port: null, sentFrequency, sentPulsesPerRev, board, cancellationToken);
     }
 
     /// <summary>
@@ -343,14 +356,8 @@ internal partial class MCodeHandler
         // R puts back the speed a restore point saved, and only for the mapped fans: Fan::Configure
         // does not read R either, so an R alongside a fan number is carried by a code that nothing
         // acts on
-        if (!seenFanNumber && code.TryGetInt('R', out int restorePointNumber))
+        if (!seenFanNumber && code.TryGetInt('R', out int restorePointNumber, min: 0, max: Motion.RestorePoint.NumVisible - 1))
         {
-            if (restorePointNumber < 0 || restorePointNumber >= Motion.RestorePoint.NumVisible)
-            {
-                return new Message(MessageType.Error,
-                                   $"Restore point number must be between 0 and {Motion.RestorePoint.NumVisible - 1}");
-            }
-
             float saved;
             using (planner.Lock())
             {

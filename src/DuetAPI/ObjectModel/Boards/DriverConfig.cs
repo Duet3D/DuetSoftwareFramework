@@ -13,6 +13,11 @@ namespace DuetAPI.ObjectModel;
 public partial class DriverConfig : ModelObject, IStaticModelObject
 {
     /// <summary>
+    /// Default driver mode
+    /// </summary>
+    public const DriverMode DefaultDriverMode = DriverMode.SpreadCycle;
+
+    /// <summary>
     /// Blanking time of the driver (M569 B)
     /// </summary>
     public int? BlankingTime
@@ -70,12 +75,13 @@ public partial class DriverConfig : ModelObject, IStaticModelObject
     /// <summary>
     /// Configured driver mode (only available for smart drivers)
     /// </summary>
+    /// TODO expansion boards that do not support smart drivers should set this to null but RRF 3.7.0-rc.1 applies a default
     public DriverMode? Mode
     {
         get => _mode;
         set => SetPropertyValue(ref _mode, value);
     }
-    private DriverMode? _mode;
+    private DriverMode? _mode = DefaultDriverMode;
 
     /// <summary>
     /// Off time of the driver (M569 F)

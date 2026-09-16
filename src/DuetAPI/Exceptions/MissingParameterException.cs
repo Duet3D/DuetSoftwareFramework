@@ -6,7 +6,7 @@ namespace DuetAPI;
 /// Exception to be called when a parameter is required but not found
 /// </summary>
 /// <param name="letter">Letter of the parameter that could not be found</param>
-public class MissingParameterException(char letter) : ArgumentException($"Missing {letter} parameter")
+public class MissingParameterException(char letter) : ArgumentException($"missing parameter '{letter}'")
 {
     /// <summary>
     /// Letter that was not found

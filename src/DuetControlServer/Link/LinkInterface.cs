@@ -186,6 +186,35 @@ public sealed partial class LinkInterface(
     }
 
     /// <summary>
+    /// Send a request to an expansion board and report back what it made of it
+    /// </summary>
+    /// <typeparam name="TReq">Type of the CAN message body</typeparam>
+    /// <param name="dstAddress">CAN address of the board the request is for</param>
+    /// <param name="message">CAN message body to send</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>What the board said about the request</returns>
+    /// <remarks>
+    /// This is the shape a request takes: it expects the standard reply, and what the caller wants
+    /// back is the board's answer as a <see cref="Message"/> rather than the transport's own
+    /// <see cref="CanResponse"/>. The firmware sends its requests the same way (CanInterface.cpp
+    /// SendRequestAndGetStandardReply). Reach for
+    /// <see cref="SendCanMessageAsync{TReq}(byte, in TReq, CanMessageType, bool, CancellationToken)"/>
+    /// instead when the reply type differs or the caller needs what only a
+    /// <see cref="CanResponse"/> carries, such as <see cref="CanResponse.Accepted"/>.
+    /// </remarks>
+    public Task<Message> SendCanRequestAsync<TReq>(byte dstAddress, in TReq message, CancellationToken cancellationToken = default)
+        where TReq : struct, ICanMessage<TReq>
+    {
+        // An async method cannot take an `in` parameter, so the await happens in a local function and
+        // the message reaches the send by reference as it does everywhere else
+        Task<CanResponse> response = SendCanMessageAsync(dstAddress, in message, CanMessageType.StandardReply,
+                                                         cancellationToken: cancellationToken);
+        return AwaitReplyAsync(response);
+
+        static async Task<Message> AwaitReplyAsync(Task<CanResponse> response) => (await response).ToMessage();
+    }
+
+    /// <summary>
     /// Repackage a G-code as the generic CAN message its parameter table describes, and send it
     /// </summary>
     /// <typeparam name="TReq">Type of the CAN message body</typeparam>

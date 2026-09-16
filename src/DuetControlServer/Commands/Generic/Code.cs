@@ -221,6 +221,17 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     internal int DeferredRing { get; set; }
 
     /// <summary>
+    /// Column of this code to quote in front of its error, or -1 for an error about no one place in it
+    /// </summary>
+    /// <remarks>
+    /// Taken from the <see cref="GCodeException.Column"/> of the refusal a guard threw, which is
+    /// where the value stood. RepRapFirmware quotes the column for exactly these - a value out of
+    /// range, a value that was not a number - and for nothing else, because a rule about the whole
+    /// command has no one character to point at (GCodeException::GetMessage)
+    /// </remarks>
+    internal int ErrorColumn { get; set; } = CodeParameter.NoColumn;
+
+    /// <summary>
     /// Id of the anchor: the last move submitted on the channel's ring when this code was read.
     /// The code's effect belongs after the end of that move
     /// </summary>
@@ -429,6 +440,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         }
         catch (Exception e) when (e is GCodeException or MissingParameterException or InvalidParameterTypeException)
         {
+            ErrorColumn = (e as GCodeException)?.Column ?? CodeParameter.NoColumn;
             Result = new(MessageType.Error, e.Message);
             return true;
         }
@@ -568,5 +580,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         File = null;
         _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         BinarySize = 0;
+        ErrorColumn = DuetAPI.Commands.CodeParameter.NoColumn;
     }
 }

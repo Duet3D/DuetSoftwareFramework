@@ -2,6 +2,7 @@
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.IPC;
+using DuetControlServer.Link.Protocol.Shared;
 using Microsoft.Extensions.Hosting;
 using Nito.AsyncEx;
 using System;
@@ -109,7 +110,8 @@ public sealed class SimpleCode(Codes.CodeFactory codeFactory, Model.ObjectModel 
                 }
                 // M108, M112, M122, M292, and M999 (B0) always go to an idle channel so we (hopefully) get a low-latency response
                 else if (code.Type == CodeType.MCode &&
-                    (code.MajorNumber is 108 or 112 or 122 or 292 || (code.MajorNumber == 999 && code.GetInt('B', 0) == 0)))
+                    (code.MajorNumber is 108 or 112 or 122 or 292
+                     || (code.MajorNumber == 999 && code.GetInt('B', defaultValue: CanId.MasterAddress) == CanId.MasterAddress)))
                 {
                     code.Flags |= CodeFlags.IsPrioritized;
                     priorityCodes.Add(code);

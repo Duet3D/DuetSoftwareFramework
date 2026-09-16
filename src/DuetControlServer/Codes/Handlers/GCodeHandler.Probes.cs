@@ -27,7 +27,7 @@ internal sealed partial class GCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleProbeParametersAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        int probeNumber = code.GetInt('K', 0);
+        int probeNumber = code.GetInt('K', defaultValue: 0);
         if (probeNumber < 0 || probeNumber >= RemoteProbes.MaxProbes)
         {
             return new Message(MessageType.Error, $"Z probe number out of range (0..{RemoteProbes.MaxProbes - 1})");

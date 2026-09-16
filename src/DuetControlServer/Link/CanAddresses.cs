@@ -1,3 +1,4 @@
+using DuetAPI;
 using DuetControlServer.Link.Protocol.Shared;
 
 namespace DuetControlServer.Link;
@@ -15,11 +16,47 @@ namespace DuetControlServer.Link;
 internal static class CanAddresses
 {
     /// <summary>
+    /// Check if address is within valid range and convert to byte
+    /// </summary>
+    /// <param name="address"></param>
+    /// <param name="allowMainboard"></param>
+    /// <returns></returns>
+    /// <exception cref="GCodeException"></exception>
+    public static byte CheckAddressIsValid(int address, bool allowMainboard = false)
+    {
+        if (address == CanId.MasterAddress && allowMainboard)
+        {
+            return (byte)address;
+        }
+
+        if (address <= CanId.MasterAddress || address > CanId.MaxCanAddress)
+        {
+            throw new GCodeException("CAN address out of range");
+        }
+
+        return (byte)address;
+    }
+
+    /// <summary>
     /// Whether an address names a board that has no drivers or ports
     /// </summary>
     /// <param name="address">CAN address</param>
     /// <returns>True if nothing can be attached there</returns>
     public static bool HasNoHardware(int address) => address == CanId.MasterAddress;
+
+    /// <summary>
+    /// Checks if the CAN address has hardware and throws an exception if not.
+    /// </summary>
+    /// <param name="address"></param>
+    /// <param name="what"></param>
+    /// <exception cref="GCodeException"></exception>
+    public static void CheckAddressHasHardware(int address, string what)
+    {
+        if (HasNoHardware(address))
+        {
+            throw new GCodeException(NoHardwareMessage(what));
+        }
+    }
 
     /// <summary>
     /// Why something cannot be on the main board

@@ -2,12 +2,13 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
 using DuetAPI.ObjectModel;
-using DuetControlServer.Link;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
+using DuetControlServer.Link;
+using DuetAPI;
 
 namespace DuetControlServer.Codes.Handlers;
 
@@ -26,39 +27,21 @@ internal partial class MCodeHandler
     /// Read the board a code is addressed to, refusing an address no board can have
     /// </summary>
     /// <param name="code">The code</param>
-    /// <param name="board">Receives the address</param>
-    /// <param name="error">Receives why it cannot be used, or null if it can</param>
-    /// <param name="allowMainBoard">Whether address 0 is a legal answer</param>
-    /// <returns>True if the code named a board that could exist</returns>
+    /// <param name="allowMainBoard">Whether address <see cref="CanId.MasterAddress"> is a legal answer</param>
+    /// <param name="defaultAddress">Default address to use if B param not provided</param>
+    /// <returns>B parameter of code</returns>
+    /// <exception cref="GCodeException">The address is outside the valid range</exception>
+    /// <exception cref="MissingParameterException">The code does not say which board</exception>
     /// <remarks>
     /// RepRapFirmware's <c>CanInterface::CheckCanAddress</c>, which refuses 0 and anything past
     /// <see cref="CanId.MaxCanAddress"/> with this wording. A CAN address is seven bits, so an
     /// address past the maximum does not merely fail to find a board: truncated onto the wire it
     /// finds a different one, which is why this is a refusal rather than a warning
     /// </remarks>
-    private static bool TryGetBoardAddress(Commands.Code code, out byte board, [NotNullWhen(false)] out string? error,
-                                           bool allowMainBoard = false)
+    private static byte GetBoardAddress(Commands.Code code, bool allowMainBoard = false, int? defaultAddress = null)
     {
-        board = CanId.MasterAddress;
-        error = null;
-
-        if (!code.TryGetInt('B', out int address))
-        {
-            error = "missing parameter 'B'";
-            return false;
-        }
-        if (address == CanId.MasterAddress && allowMainBoard)
-        {
-            return true;
-        }
-        if (address < 1 || address > CanId.MaxCanAddress)
-        {
-            error = "CAN address out of range";
-            return false;
-        }
-
-        board = (byte)address;
-        return true;
+        int address = code.GetInt('B', defaultValue: defaultAddress);
+        return CanAddresses.CheckAddressIsValid(address, allowMainBoard);
     }
 
     /// <summary>
@@ -77,12 +60,9 @@ internal partial class MCodeHandler
     private async ValueTask<Message> HandleCustomCanRequestAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         byte board;
-        if (code.TryGetInt('B', out int _))
+        if (code.HasParameter('B'))
         {
-            if (!TryGetBoardAddress(code, out board, out string? error))
-            {
-                return new Message(MessageType.Error, error);
-            }
+            board = GetBoardAddress(code);
         }
         else if (code.TryGetString('C', out string? port))
         {
@@ -125,15 +105,7 @@ internal partial class MCodeHandler
             return await ReportConnectionTimeoutsAsync(cancellationToken);
         }
 
-        if (!TryGetBoardAddress(code, out byte board, out string? error))
-        {
-            // B is limited to 1..MaxCanAddress rather than 0..: the main board has no connection to
-            // itself to time out
-            return new Message(MessageType.Error,
-                               error == "CAN address out of range" && code.GetInt('B', 1) < 1
-                               ? "parameter 'B' too low"
-                               : error);
-        }
+        byte board = GetBoardAddress(code);
 
         if (!code.TryGetInt('T', out int timeout))
         {

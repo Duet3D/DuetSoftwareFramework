@@ -57,14 +57,14 @@ internal sealed partial class GCodeHandler
             return new Message(MessageType.Error, "G30 P is not supported yet - use G30 without P");
         }
 
-        int probeNumber = code.GetInt('K', 0);
+        int probeNumber = code.GetInt('K', defaultValue: 0);
         if (probeNumber < 0 || probeNumber >= RemoteProbes.MaxProbes)
         {
             return new Message(MessageType.Error, $"Z probe number out of range (0..{RemoteProbes.MaxProbes - 1})");
         }
 
         // S-4 or lower means the same as no S at all, as in RepRapFirmware
-        int sValue = code.GetInt('S', -4);
+        int sValue = code.GetInt('S', defaultValue: -4);
         if (sValue >= 0)
         {
             sValue = -4;
@@ -74,7 +74,7 @@ internal sealed partial class GCodeHandler
             return new Message(MessageType.Error, "G30 S-2 needs a tool, and tools are not supported yet");
         }
 
-        float heightOffset = code.GetFloat('H', 0.0f);
+        float heightOffset = code.GetFloat('H', defaultValue: 0.0f);
 
         if (!await planner.StandstillAsync(cancellationToken))
         {
@@ -651,7 +651,7 @@ internal sealed partial class GCodeHandler
     /// </remarks>
     private async ValueTask<Message> ProbeGridAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        int probeNumber = code.GetInt('K', 0);
+        int probeNumber = code.GetInt('K', defaultValue: 0);
         if (probeNumber < 0 || probeNumber >= RemoteProbes.MaxProbes)
         {
             return new Message(MessageType.Error, $"Z probe number out of range (0..{RemoteProbes.MaxProbes - 1})");

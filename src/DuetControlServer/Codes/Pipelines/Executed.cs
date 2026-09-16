@@ -11,6 +11,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
+using System.Globalization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -107,10 +108,17 @@ public sealed class Executed : PipelineBase
             // Check if the result came from a DSF-only source
             if (!code.Flags.HasFlag(CodeFlags.IsPostProcessed))
             {
-                // RepRapFirmware generally prefixes error messages with the code itself, mimic this behavior if DSF resolved this code
-                if (code.Result.Type == MessageType.Error)
+                // RepRapFirmware prefixes an error or a warning with the code itself, and nothing else
+                // (GCodes2.cpp HandleResult, the GCodeResult::error and ::warning arm). Mimic that if
+                // DSF resolved this code
+                if (code.Result.Type is MessageType.Error or MessageType.Warning)
                 {
-                    code.Result.Content = code.ToShortString() + ": " + code.Result.Content;
+                    // A refused value is quoted by where it stood, ahead of the code, and one higher
+                    // than it is held because the column a person counts starts at one
+                    string column = (code.ErrorColumn != DuetAPI.Commands.CodeParameter.NoColumn)
+                        ? string.Create(CultureInfo.InvariantCulture, $" at column {code.ErrorColumn + 1}: ")
+                        : string.Empty;
+                    code.Result.Content = column + code.ToShortString() + ": " + code.Result.Content;
                 }
 
                 // Messages from RRF and replies to file print codes are logged somewhere else,

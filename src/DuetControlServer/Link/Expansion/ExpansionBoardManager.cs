@@ -257,6 +257,9 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
                 while (board.Drivers.Count < numDrivers.Value)
                 {
                     board.Drivers.Add(new Driver());
+                    // TODO RRF 3.7.0-rc.1 applies a default driver mode but for boards that don't have smart drivers
+                    // this is misleading. Currently there is no way for a board to inform RRF/DSF that it has non smart
+                    // drivers
                 }
             }
         }
