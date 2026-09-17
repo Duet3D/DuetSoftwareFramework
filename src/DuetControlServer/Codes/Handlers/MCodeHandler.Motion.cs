@@ -1546,10 +1546,7 @@ internal partial class MCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleNonlinearExtrusionAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (!code.TryGetInt('D', out int extruderNumber))
-        {
-            throw new MissingParameterException('D');
-        }
+        int extruderNumber = code.GetInt('D');
 
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
