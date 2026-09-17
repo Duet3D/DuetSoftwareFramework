@@ -18,9 +18,10 @@ namespace DuetControlServer.Link;
 /// <param name="isResponse">Is the CAN message a response to an expansion board</param>
 /// <param name="requestPayload">Serialized CAN message payload to send</param>
 /// <remarks>
-/// If no reply is expected then the task is completed immediately after the request is sent over SPI.
-/// If a reply is expected then the task is completed once the (possibly fragmented) reply has been
-/// fully received, or if the request times out or the connection is lost.
+/// If no reply is expected then the task is completed once the controller reports what became of the
+/// message. If a reply is expected then the task is completed once the (possibly fragmented) reply has
+/// been fully received. Either kind is failed by a send the controller could not make, and by the
+/// request timing out or the connection being lost.
 /// </remarks>
 public class CanRequest(CanMessageType messageType, CanMessageType replyType, ushort txToken, byte dstAddress, bool isResponse, byte[] requestPayload)
 {
@@ -53,11 +54,6 @@ public class CanRequest(CanMessageType messageType, CanMessageType replyType, us
     /// Serialized CAN message payload to send
     /// </summary>
     public byte[] RequestPayload { get; } = requestPayload;
-
-    /// <summary>
-    /// Whether this request has already been written to the firmware
-    /// </summary>
-    public bool Sent { get; set; }
 
     /// <summary>
     /// Whether a reply is expected for this request

@@ -771,7 +771,6 @@ Each phase is independently useful and independently testable.
       log the rest (§4.1.1)
 - [x] Native: a sequence number on every command, `OutboundDelivered(seq)` after a successful transfer
       and `OutboundDropped(seq)` on a drop (§4.1.2 hop 1)
-- [x] DCS: a CAN message expecting no reply resolves on delivery rather than at queue time
 - [x] Correct the stale C# `Consts.ProtocolVersion`, which disagreed with the transfer engine's copy
 - [x] Protocol: `FirmwareRequest::CanMessageSent`, batched `{txToken, status}` entries (hop 2). No
       version bump: nothing has been released against this protocol yet
@@ -781,9 +780,15 @@ Each phase is independently useful and independently testable.
       fourth. `SendMessage` names the message it dropped by id, and only an in-flight id-to-token
       table can turn that into an outcome for a particular request
 - [x] DCS: resolve fire-and-forget CAN requests on the ack rather than at queue time, bound by
-      `CanRequestTimeout`; fail reply-expecting requests early on a non-`Ok` ack or a hop-1 drop
-- [ ] Test: send with CAN disabled and with a full tx buffer; expect the code to fail, not to succeed
-      or to hang for 2 s. Pull the link mid-transfer; expect the staged commands to report dropped
+      `CanRequestTimeout`; fail reply-expecting requests early on a non-`Ok` ack. This is the single
+      route for both kinds: delivery over SPI resolves neither, because reaching the controller is not
+      reaching the bus
+- [x] Controller: report an outcome for a `setAddressAndNormalTiming` addressed to the master, which
+      is answered locally and so never passes through `SendCanRequest`
+- [x] Test: a send the controller refuses fails its code, and one it accepts completes it
+      (`CanBusCodeTests.M952FailsWhenTheControllerCannotSendTheMessage` and its companion)
+- [ ] Test: send with a full tx buffer. Pull the link mid-transfer; expect the staged commands to
+      report dropped
 - [ ] Schema: `controller_disconnect` = 128, `controller_reconnect` = 129, `"emit": ["csharp"]`,
       priorities 0 and 1; teach `compare-enums.py` to skip C++-excluded values; regenerate
 - [x] Raise `controller_disconnect` from both `HandleConnectionLost` and `HandleControllerReset`,

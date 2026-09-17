@@ -324,6 +324,48 @@ public class CanBusCodeTests : SystemTests.Host.BenchFixture
     }
 
     /// <summary>
+    /// A CAN message that expects no reply fails its code when the controller says it could not send
+    /// it, rather than reporting success.
+    /// </summary>
+    /// <remarks>
+    /// The outcome of a send is the controller's <c>CanMessageSent</c> answer for the token, which is
+    /// the only thing that knows whether the message reached the CAN peripheral. Resolving such a
+    /// request earlier - when the transfer carrying it completes - reports success for a message the
+    /// controller went on to refuse, because the refusal arrives in a later transfer. M952 B1 S500 is
+    /// a <c>setAddressAndNormalTiming</c> sent with no reply expected, so it is the code that shows it
+    /// </remarks>
+    [Test]
+    public async Task M952FailsWhenTheControllerCannotSendTheMessage()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync();
+
+        bench.CanMaster.ScriptCanSendStatus(CanStatus.BusError);
+        Assert.That(async () => await bench.Host.ExecuteCodeAsync($"M952 B{Board} S500"),
+                    Throws.Exception.With.Message.Contains("BusError"),
+                    "a send the controller refused fails the code (LinkInterface.CompleteCanMessageSent)");
+    }
+
+    /// <summary>
+    /// A CAN message that expects no reply completes once the controller has accepted it, and reports
+    /// nothing.
+    /// </summary>
+    /// <remarks>
+    /// The companion to <see cref="M952FailsWhenTheControllerCannotSendTheMessage"/>: the same code on
+    /// the same path must still finish normally when the controller answers <c>Ok</c>, so that routing
+    /// the outcome through the acknowledgement does not leave a fire-and-forget message hanging until
+    /// its timeout
+    /// </remarks>
+    [Test]
+    public async Task M952CompletesOnTheControllerAcknowledgement()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync();
+
+        bench.CanMaster.ScriptCanSendStatus(CanStatus.Ok);
+        string reply = await bench.Host.ExecuteCodeAsync($"M952 B{Board} S500", timeoutMs: 5_000);
+        Assert.That(reply, Does.Not.Contain("Error"), "an accepted send completes the code without a reply from the bus");
+    }
+
+    /// <summary>
     /// M953 enables the CAN bus: a second enable reaches the controller and the code reports
     /// nothing.
     /// </summary>

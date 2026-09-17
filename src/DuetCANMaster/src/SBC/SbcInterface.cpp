@@ -629,6 +629,11 @@ void SbcInterface::ExchangeData() noexcept
 						// Forward the timing report back to the SBC as a CAN response tagged with the request's txToken
 						EnqueueCanTextReply(txToken, (CanRequestId)timingMsg->requestId, reply.c_str());
 					}
+
+					// This message never reaches the bus, so SendCanRequest never reports it. The SBC
+					// resolves every message it sends on this outcome, so one that is missing leaves
+					// the code that sent it waiting out its timeout
+					ReportCanMessageSent(txToken, CanStatus::Ok);
 					break;
 				}
 			}

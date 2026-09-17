@@ -274,69 +274,37 @@ public sealed partial class LinkInterface(
 
         try
         {
-            // Hand the message to the native loop, which stages it into the next transfer. The reply
-            // (if any) arrives as a CanResponse event and is matched back to this request by its token
-            uint sequenceNumber = nativeLink.QueueCanMessage(request.TxToken, (ushort)request.MessageType, (ushort)request.ReplyType,
+            // Hand the message to the native loop, which stages it into the next transfer. Both kinds
+            // of request are then resolved by what the controller reports for the token: the
+            // acknowledgement completes one that expects no reply and fails either kind, and a reply
+            // that is expected arrives afterwards as a CanResponse event. Reaching the controller is
+            // not reaching the bus, so delivery of the transfer is not an outcome either one can be
+            // resolved on
+            nativeLink.QueueCanMessage(request.TxToken, (ushort)request.MessageType, (ushort)request.ReplyType,
                 request.DstAddress, request.IsResponse, request.RequestPayload);
-            request.Sent = true;
 
-            // A request expecting no reply has no CanResponse event to resolve it, so what completes it
-            // is the transfer that carried it reaching the controller. Taking the message out of the
-            // ring is a memcpy, and a request resolved on that is one the caller believes was sent when
-            // the link may drop before it ever is
-            if (!request.ExpectsReply)
-            {
-                try
-                {
-                    await nativeLink.WaitForDeliveryAsync(sequenceNumber, cancellationToken);
-                }
-                finally
-                {
-                    lock (CanRequests)
-                    {
-                        CanRequests.Remove(request);
-                    }
-                }
-                request.SetResult();
-            }
+            // The controller reports every send and the link cancels what is outstanding when it
+            // drops, so this bounds the cases neither covers: the acknowledgement ring or the response
+            // ring overflowing while the link stays up
+            await request.Task.WaitAsync(TimeSpan.FromMilliseconds(settings.Value.CanRequestTimeout), cancellationToken);
         }
-        catch
+        catch (TimeoutException) when (request.ExpectsReply)
         {
-            lock (CanRequests)
-            {
-                CanRequests.Remove(request);
-            }
-            throw;
-        }
-
-        try
-        {
-            if (request.ExpectsReply)
-            {
-                // If no reply is received within the timeout, the request will be canceled and an exception will be thrown
-                await request.Task.WaitAsync(TimeSpan.FromMilliseconds(settings.Value.CanRequestTimeout), cancellationToken);
-            }
-            else
-            {
-                await request.Task.WaitAsync(cancellationToken);
-            }
+            // A board that does not answer is reported, not thrown: see CanResponse.FromTimeout
+            return CanResponse.FromTimeout(request);
         }
         catch (TimeoutException)
         {
-            // A board that does not answer is reported, not thrown: see CanResponse.FromTimeout
-            lock (CanRequests)
-            {
-                CanRequests.Remove(request);
-            }
-            return CanResponse.FromTimeout(request);
+            // Nothing is waiting on a board here - the controller never said what became of the
+            // message at all, which is a fault in the link rather than in the machine it addresses
+            throw new IOException($"Controller did not report what became of CAN message type {messageType} to board {dstAddress}");
         }
-        catch
+        finally
         {
             lock (CanRequests)
             {
                 CanRequests.Remove(request);
             }
-            throw;
         }
         return CanResponse.FromRequest(request);
     }
