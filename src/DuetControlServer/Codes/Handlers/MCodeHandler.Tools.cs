@@ -253,9 +253,9 @@ internal partial class MCodeHandler
                 tool.SpindleRpm = spindleRpm;
                 seen = true;
             }
-            if (code.TryGetInt('A', out int requested))
+            if (code.TryGetEnum('A', out ToolState requested))
             {
-                tool.State = (ToolState)requested;
+                tool.State = requested;
                 seen = true;
             }
 

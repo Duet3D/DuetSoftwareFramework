@@ -2227,12 +2227,11 @@ internal partial class MCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleEndstopConfigAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        // S defaults to a switch on an input pin, which is what almost every endstop is
-        int inputType = code.GetInt('S', defaultValue: (int)RrfEndstopType.InputPin);
-        if (!Enum.IsDefined((RrfEndstopType)inputType))
-        {
-            return new Message(MessageType.Error, "Invalid endstop input type");
-        }
+        // S defaults to a switch on an input pin, which is what almost every endstop is. The wording
+        // is RepRapFirmware's own (EndstopsManager::HandleM574), which names what was wrong rather
+        // than which end of the range it fell off
+        RrfEndstopType endstopType = code.GetEnum<RrfEndstopType>('S', RrfEndstopType.InputPin,
+                                                                  errorString: _ => "Invalid endstop input type");
 
         // K names the Z probe that stands in for the endstop. It is read whether or not S asked for
         // one, as RepRapFirmware does, so that a number out of range is refused rather than reaching
@@ -2261,13 +2260,10 @@ internal partial class MCodeHandler
 
             for (int axis = 0; axis < move.Axes.Count; axis++)
             {
-                if (code.TryGetInt(move.Axes[axis].Letter, out int position))
+                if (code.TryGetEnum(move.Axes[axis].Letter, out EndstopPosition position,
+                                    errorString: _ => "Invalid endstop position"))
                 {
-                    if (!Enum.IsDefined((EndstopPosition)position))
-                    {
-                        return new Message(MessageType.Error, "Invalid endstop position");
-                    }
-                    configured.Add((axis, (EndstopPosition)position));
+                    configured.Add((axis, position));
                 }
             }
 
@@ -2288,7 +2284,7 @@ internal partial class MCodeHandler
             {
                 // A port can only be named for one axis at a time, because it names one input
                 bool hasPort = code.TryGetString('P', out string? port);
-                if (hasPort && (configured.Count > 1 || inputType != (int)RrfEndstopType.InputPin))
+                if (hasPort && (configured.Count > 1 || endstopType != RrfEndstopType.InputPin))
                 {
                     return new Message(MessageType.Error, "Invalid use of P parameter");
                 }
@@ -2319,7 +2315,7 @@ internal partial class MCodeHandler
 
                     Endstop endstop = GetOrCreateEndstop(axis);
                     endstop.HighEnd = position == EndstopPosition.HighEnd;
-                    endstop.Type = ToEndstopType((RrfEndstopType)inputType); // TODO use EndstopType
+                    endstop.Type = ToEndstopType(endstopType); // TODO use EndstopType
                     endstop.Probe = endstop.Type == EndstopType.ZProbeAsEndstop ? probeNumber : null;
                     if (hasPort)
                     {

@@ -16,7 +16,6 @@ using DuetControlServer.Motion.Kinematics;
 using Microsoft.Extensions.Logging;
 using DuetAPI;
 using static DuetControlServer.Motion.AxisIndices;
-using System.Diagnostics.CodeAnalysis;
 
 namespace DuetControlServer.Codes.Handlers;
 
@@ -208,35 +207,6 @@ internal sealed partial class GCodeHandler(
     public ValueTask CodeExecutedAsync(Commands.Code code, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
     /// <summary>
-    /// Read what kind of move a G0 or G1 asked for
-    /// </summary>
-    /// <param name="code">The code</param>
-    /// <param name="moveType">Receives the kind of move</param>
-    /// <param name="error">Receives why the H parameter cannot be used, if it cannot</param>
-    /// <returns>True if the move can be built</returns>
-    /// <remarks>
-    /// The value is checked rather than cast, because every later decision branches on it and an
-    /// unrecognised one would fall through those branches as though it were something else - an H7
-    /// would arm no endstop and yet still bypass the user coordinate system, which is not a
-    /// combination anything below here is written for. RepRapFirmware refuses the same values, in
-    /// <c>gb.TryGetLimitedUIValue('H', moveType, dummy, 5)</c>, and reports it the same way
-    /// </remarks>
-    private static bool TryGetMoveType(Commands.Code code, out MoveType moveType, [NotNullWhen(false)] out Message? error)
-    {
-        int value = code.GetInt('H', defaultValue: 0);
-        if (!Enum.IsDefined(typeof(MoveType), value))
-        {
-            moveType = MoveType.Normal;
-            error = new Message(MessageType.Error, value < 0 ? "parameter 'H' too low" : "parameter 'H' too high");
-            return false;
-        }
-
-        moveType = (MoveType)value;
-        error = null;
-        return true;
-    }
-
-    /// <summary>
     /// Turn a G0 or G1 into a queued move
     /// </summary>
     /// <param name="code">The code</param>
@@ -245,10 +215,12 @@ internal sealed partial class GCodeHandler(
     /// <returns>The result</returns>
     private async ValueTask<Message> HandleMoveAsync(Commands.Code code, bool isCoordinated, CancellationToken cancellationToken)
     {
-        if (!TryGetMoveType(code, out MoveType moveType, out Message? typeError))
-        {
-            return typeError;
-        }
+        // Read as a member rather than cast, because every later decision branches on it and an
+        // unrecognised one would fall through those branches as though it were something else: an H7
+        // would arm no endstop and yet still bypass the user coordinate system, which is not a
+        // combination anything below here is written for. RepRapFirmware refuses the same values with
+        // gb.TryGetLimitedUIValue('H', moveType, dummy, 5), and reports it the same way
+        MoveType moveType = code.GetEnum<MoveType>('H', MoveType.Normal);
 
         // A special move is planned against the motor positions rather than the axis positions, so
         // the machine has to have settled before it is built - as in RepRapFirmware, which locks and

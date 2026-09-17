@@ -54,14 +54,12 @@ internal partial class MCodeHandler
             return new Message(MessageType.Error, $"Z probe number out of range (0..{RemoteProbes.MaxProbes - 1})");
         }
 
-        bool seenType = code.TryGetInt('P', out int typeNumber);
+        // RepRapFirmware's refusal names the value rather than the limit it fell outside
+        // (EndstopsManager::HandleM558). A probe with no P is ProbeType.None, which is what an
+        // unread member defaults to
+        bool seenType = code.TryGetEnum('P', out ProbeType type,
+                                        errorString: value => $"Invalid Z probe type {value}");
         bool seenPort = code.TryGetString('C', out string? port);
-        if (seenType && !Enum.IsDefined((ProbeType)typeNumber))
-        {
-            return new Message(MessageType.Error, $"Invalid Z probe type {typeNumber}");
-        }
-
-        ProbeType type = seenType ? (ProbeType)typeNumber : ProbeType.None;
         if (seenType && ProbeTypeRefusal(type) is string typeError)
         {
             return new Message(MessageType.Error, typeError);

@@ -512,10 +512,8 @@ internal partial class MCodeHandler
 
                 HeaterMonitor monitor = heater.Monitors[index];
                 monitor.Limit = limit;
-                monitor.Sensor = code.TryGetInt('T', out int sensor) ? sensor : heater.Sensor;
-                monitor.Action = code.TryGetInt('A', out int action)
-                                 ? (HeaterMonitorAction)action
-                                 : HeaterMonitorAction.GenerateFault;
+                monitor.Sensor = code.GetInt('T', defaultValue: heater.Sensor);
+                monitor.Action = code.GetEnum<HeaterMonitorAction>('A', HeaterMonitorAction.GenerateFault);
                 monitor.Condition = code.TryGetInt('C', out int condition)
                                     ? (HeaterMonitorCondition)condition
                                     : HeaterMonitorCondition.TooHigh;

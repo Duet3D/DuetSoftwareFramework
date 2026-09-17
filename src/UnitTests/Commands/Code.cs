@@ -3,6 +3,7 @@ using DuetAPI.Commands;
 using DuetAPI.Utility;
 using NUnit.Framework;
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -1168,19 +1169,24 @@ public class Code
     }
 
     /// <summary>Read a value the way <c>GetFloat</c> and its siblings do</summary>
-    private delegate T Getter<T>(char letter, T? defaultValue, T? min, T? max) where T : struct;
+    private delegate T Getter<T, TRefusal>(char letter, T? defaultValue, T? min, T? max,
+                                          Func<TRefusal, string>? errorString = null) where T : struct;
 
     /// <summary>Read a value into a plain out parameter, as the first Try shape does</summary>
-    private delegate bool ValueTryGetter<T>(char letter, out T parameter, T? min, T? max) where T : struct;
+    private delegate bool ValueTryGetter<T, TRefusal>(char letter, out T parameter, T? min, T? max,
+                                                      Func<TRefusal, string>? errorString = null) where T : struct;
 
     /// <summary>Read a value into a nullable out parameter, as the second Try shape does</summary>
-    private delegate bool NullableTryGetter<T>(char letter, out T? parameter, T? min, T? max) where T : struct;
+    private delegate bool NullableTryGetter<T, TRefusal>(char letter, out T? parameter, T? min, T? max,
+                                                         Func<TRefusal, string>? errorString = null) where T : struct;
 
     /// <summary>Read an array the way <c>GetFloatArray</c> and its siblings do</summary>
-    private delegate T[] ArrayGetter<T>(char letter, T[]? defaultValue, T? min, T? max) where T : struct;
+    private delegate T[] ArrayGetter<T, TRefusal>(char letter, T[]? defaultValue, T? min, T? max,
+                                                  Func<TRefusal, string>? errorString = null) where T : struct;
 
     /// <summary>Read an array into an out parameter, as the array Try shape does</summary>
-    private delegate bool ArrayTryGetter<T>(char letter, out T[]? parameter, T? min, T? max) where T : struct;
+    private delegate bool ArrayTryGetter<T, TRefusal>(char letter, out T[]? parameter, T? min, T? max,
+                                                      Func<TRefusal, string>? errorString = null) where T : struct;
 
     /// <summary>
     /// Hold one numeric type's three accessors to every parameter each of them takes
@@ -1206,8 +1212,10 @@ public class Code
     /// reaching the parser's "expected number". The defaulting and Try forms used to answer it as a
     /// failed conversion instead, which named a CLR type in a reply an operator reads
     /// </remarks>
-    private static void AssertNumericAccessors<T>(string what, Getter<T> get, ValueTryGetter<T> tryGetValue,
-                                                  NullableTryGetter<T> tryGetNullable, char present, char absent,
+    private static void AssertNumericAccessors<T, TRefusal>(string what, Getter<T, TRefusal> get,
+                                                            ValueTryGetter<T, TRefusal> tryGetValue,
+                                                            NullableTryGetter<T, TRefusal> tryGetNullable,
+                                                            char present, char absent,
                                                   T value, T below, T above, T fallback, char bare) where T : struct
     {
         string tooLow = $"parameter '{present}' too low", tooHigh = $"parameter '{present}' too high";
@@ -1291,7 +1299,8 @@ public class Code
     /// at the first item or only at the last would fail here. <paramref name="bare" /> is held to the
     /// same refusal the scalar accessors give, which the array accessors used to disagree over
     /// </remarks>
-    private static void AssertArrayAccessors<T>(string what, ArrayGetter<T> get, ArrayTryGetter<T> tryGet,
+    private static void AssertArrayAccessors<T, TRefusal>(string what, ArrayGetter<T, TRefusal> get,
+                                                          ArrayTryGetter<T, TRefusal> tryGet,
                                                 char present, char absent, T[] values, T below, T above,
                                                 T[] fallback, char bare) where T : struct
     {
@@ -1349,7 +1358,7 @@ public class Code
     public void GetAndTryGetFloatCoverDefaultMinAndMax()
     {
         DuetAPI.Commands.Code code = new("M906 X50 K");
-        AssertNumericAccessors<float>("float", code.GetFloat, code.TryGetFloat, code.TryGetFloat,
+        AssertNumericAccessors<float, float>("float", code.GetFloat, code.TryGetFloat, code.TryGetFloat,
                                       present: 'X', absent: 'Z', value: 50.0f, below: 10.0f, above: 100.0f,
                                       fallback: 7.5f, bare: 'K');
     }
@@ -1358,7 +1367,7 @@ public class Code
     public void GetAndTryGetIntCoverDefaultMinAndMax()
     {
         DuetAPI.Commands.Code code = new("M906 X50 K");
-        AssertNumericAccessors<int>("int", code.GetInt, code.TryGetInt, code.TryGetInt,
+        AssertNumericAccessors<int, long>("int", code.GetInt, code.TryGetInt, code.TryGetInt,
                                     present: 'X', absent: 'Z', value: 50, below: 10, above: 100, fallback: -7, bare: 'K');
     }
 
@@ -1366,7 +1375,7 @@ public class Code
     public void GetAndTryGetUIntCoverDefaultMinAndMax()
     {
         DuetAPI.Commands.Code code = new("M906 X50 K");
-        AssertNumericAccessors<uint>("uint", code.GetUInt, code.TryGetUInt, code.TryGetUInt,
+        AssertNumericAccessors<uint, long>("uint", code.GetUInt, code.TryGetUInt, code.TryGetUInt,
                                      present: 'X', absent: 'Z', value: 50u, below: 10u, above: 100u, fallback: 7u, bare: 'K');
     }
 
@@ -1374,7 +1383,7 @@ public class Code
     public void GetAndTryGetLongCoverDefaultMinAndMax()
     {
         DuetAPI.Commands.Code code = new("M906 X50 K");
-        AssertNumericAccessors<long>("long", code.GetLong, code.TryGetLong, code.TryGetLong,
+        AssertNumericAccessors<long, long>("long", code.GetLong, code.TryGetLong, code.TryGetLong,
                                      present: 'X', absent: 'Z', value: 50L, below: 10L, above: 100L, fallback: -7L, bare: 'K');
     }
 
@@ -1382,7 +1391,7 @@ public class Code
     public void GetAndTryGetFloatArrayCoverDefaultMinAndMax()
     {
         DuetAPI.Commands.Code code = new("M906 E10:50:100 K");
-        AssertArrayAccessors<float>("float[]", code.GetFloatArray, code.TryGetFloatArray,
+        AssertArrayAccessors<float, float>("float[]", code.GetFloatArray, code.TryGetFloatArray,
                                     present: 'E', absent: 'Z', values: [10.0f, 50.0f, 100.0f],
                                     below: 0.0f, above: 200.0f, fallback: [7.5f], bare: 'K');
     }
@@ -1391,7 +1400,7 @@ public class Code
     public void GetAndTryGetIntArrayCoverDefaultMinAndMax()
     {
         DuetAPI.Commands.Code code = new("M906 E10:50:100 K");
-        AssertArrayAccessors<int>("int[]", code.GetIntArray, code.TryGetIntArray,
+        AssertArrayAccessors<int, long>("int[]", code.GetIntArray, code.TryGetIntArray,
                                   present: 'E', absent: 'Z', values: [10, 50, 100],
                                   below: 0, above: 200, fallback: [-7], bare: 'K');
     }
@@ -1400,7 +1409,7 @@ public class Code
     public void GetAndTryGetUIntArrayCoverDefaultMinAndMax()
     {
         DuetAPI.Commands.Code code = new("M906 E10:50:100 K");
-        AssertArrayAccessors<uint>("uint[]", code.GetUIntArray, code.TryGetUIntArray,
+        AssertArrayAccessors<uint, long>("uint[]", code.GetUIntArray, code.TryGetUIntArray,
                                    present: 'E', absent: 'Z', values: [10u, 50u, 100u],
                                    below: 0u, above: 200u, fallback: [7u], bare: 'K');
     }
@@ -1409,7 +1418,7 @@ public class Code
     public void GetAndTryGetLongArrayCoverDefaultMinAndMax()
     {
         DuetAPI.Commands.Code code = new("M906 E10:50:100 K");
-        AssertArrayAccessors<long>("long[]", code.GetLongArray, code.TryGetLongArray,
+        AssertArrayAccessors<long, long>("long[]", code.GetLongArray, code.TryGetLongArray,
                                    present: 'E', absent: 'Z', values: [10L, 50L, 100L],
                                    below: 0L, above: 200L, fallback: [-7L], bare: 'K');
     }
@@ -1607,6 +1616,143 @@ public class Code
             Assert.That(longArray, Is.Null);
             Assert.That(driverIdArray, Is.Null);
         });
+    }
+
+    /// <summary>
+    /// A contiguous enumeration, as every one a G-code parameter selects from is
+    /// </summary>
+    private enum Shade
+    {
+        Off = 0,
+        Dim = 1,
+        Bright = 2
+    }
+
+    /// <summary>
+    /// An enumeration that does not start at zero, to hold the refusal to naming the right end
+    /// </summary>
+    private enum Offset
+    {
+        Below = -1,
+        Level = 0,
+        Above = 1
+    }
+
+    /// <summary>
+    /// GetEnum and TryGetEnum read a parameter as one of an enumeration's members, and refuse a
+    /// value that names none of them the way every other limited read refuses one
+    /// </summary>
+    /// <remarks>
+    /// The enumeration is the limits, so the wording is RepRapFirmware's for
+    /// <c>GCodeBuffer::GetLimitedUIValue</c>: "too low" below the lowest member and "too high" above
+    /// the highest. A default is returned as it stands, as it is for the numeric accessors, because
+    /// it comes from the caller rather than from the line
+    /// </remarks>
+    [Test]
+    public void EnumAccessors()
+    {
+        foreach (DuetAPI.Commands.Code code in Parse("M1 S1 T3 U-2 V"))
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.That(code.GetEnum<Shade>('S'), Is.EqualTo(Shade.Dim), "a value names its member");
+                Assert.That(code.GetEnum<Shade>('Q', Shade.Bright), Is.EqualTo(Shade.Bright),
+                            "the default answers an absent letter");
+                Assert.That(code.GetEnum<Shade>('S', Shade.Bright), Is.EqualTo(Shade.Dim),
+                            "and stands aside for a letter that is there");
+                Assert.That(Assert.Throws<MissingParameterException>(() => code.GetEnum<Shade>('Q'))!.Letter,
+                            Is.EqualTo('Q'), "with no default the letter has to be there");
+
+                Assert.That(Assert.Throws<GCodeException>(() => code.GetEnum<Shade>('T'))!.Message,
+                            Is.EqualTo("parameter 'T' too high"), "a value above every member is too high");
+                Assert.That(Assert.Throws<GCodeException>(() => code.GetEnum<Shade>('U'))!.Message,
+                            Is.EqualTo("parameter 'U' too low"), "and one below every member is too low");
+
+                Assert.That(code.GetEnum<Shade>('Q', (Shade)9), Is.EqualTo((Shade)9),
+                            "the limits are about the line, so they do not reach the default");
+
+                // An enumeration whose lowest member is negative moves the line between the two
+                Assert.That(Assert.Throws<GCodeException>(() => code.GetEnum<Offset>('U'))!.Message,
+                            Is.EqualTo("parameter 'U' too low"), "-2 is below Offset.Below");
+                Assert.That(code.GetEnum<Offset>('S'), Is.EqualTo(Offset.Above), "and 1 is a member of it");
+                Assert.That(Assert.Throws<GCodeException>(() => code.GetEnum<Offset>('T'))!.Message,
+                            Is.EqualTo("parameter 'T' too high"), "while 3 is above Offset.Above");
+
+                Assert.That(Assert.Throws<GCodeException>(() => code.GetEnum<Shade>('V'))!.Message,
+                            Is.EqualTo("expected number after 'V'"),
+                            "a letter written with nothing after it is a parse error, not a missing parameter");
+            });
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(code.TryGetEnum('S', out Shade seen), Is.True);
+                Assert.That(seen, Is.EqualTo(Shade.Dim), "the Try form writes the member it read");
+
+                Assert.That(code.TryGetEnum('Q', out Shade absent), Is.False);
+                Assert.That(absent, Is.EqualTo(default(Shade)), "and leaves an absent letter at the default");
+
+                Assert.That(code.TryGetEnum('S', out Shade? nullableSeen), Is.True);
+                Assert.That(nullableSeen, Is.EqualTo(Shade.Dim));
+                Assert.That(code.TryGetEnum('Q', out Shade? nullableAbsent), Is.False);
+                Assert.That(nullableAbsent, Is.Null, "the nullable form says nothing was there rather than zero");
+
+                Assert.That(Assert.Throws<GCodeException>(() => code.TryGetEnum('T', out Shade _))!.Message,
+                            Is.EqualTo("parameter 'T' too high"),
+                            "the Try form is about whether the letter is there, not about whether its value is usable");
+            });
+        }
+    }
+
+    /// <summary>
+    /// Every accessor that refuses a value builds the refusal from the value it would not take
+    /// </summary>
+    /// <remarks>
+    /// "too low" and "too high" describe a limit, and some codes refuse by naming what was wrong
+    /// instead: RepRapFirmware's M574 answers an unknown endstop type with "Invalid endstop input
+    /// type", and its M558 names the probe type it would not take - "Invalid Z probe type 4". The
+    /// second is why this is a function of the value rather than a string: a handler that had to name
+    /// the value would otherwise have to read it itself before asking for it
+    /// </remarks>
+    [Test]
+    public void OverriddenRefusals()
+    {
+        foreach (DuetAPI.Commands.Code code in Parse("M1 S9 T-9 U1.5 V1:9"))
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.That(Assert.Throws<GCodeException>(
+                                () => code.GetInt('S', min: 0, max: 4, errorString: value => $"Invalid mode {value}"))!.Message,
+                            Is.EqualTo("Invalid mode 9"), "the refusal replaces \"too high\" and names the value");
+                Assert.That(Assert.Throws<GCodeException>(
+                                () => code.GetInt('T', min: 0, max: 4, errorString: value => $"Invalid mode {value}"))!.Message,
+                            Is.EqualTo("Invalid mode -9"),
+                            "and \"too low\", since a code that refuses by name refuses both ends alike");
+                Assert.That(code.GetInt('S', min: 0, max: 9, errorString: _ => "Invalid mode"), Is.EqualTo(9),
+                            "a value inside the limits never builds one");
+
+                Assert.That(Assert.Throws<GCodeException>(
+                                () => code.GetFloat('U', min: 0.0f, max: 1.0f, errorString: value => $"Invalid ratio {value}"))!.Message,
+                            Is.EqualTo($"Invalid ratio {1.5f}"),
+                            "the float accessors hand over a float, formatted by whoever builds the refusal");
+                Assert.That(Assert.Throws<GCodeException>(
+                                () => code.GetIntArray('V', min: 0, max: 4, errorString: value => $"Invalid list entry {value}"))!.Message,
+                            Is.EqualTo("Invalid list entry 9"),
+                            "and the array ones hand over the first item outside the limits, not the whole array");
+
+                Assert.That(Assert.Throws<GCodeException>(
+                                () => code.GetEnum<Shade>('S', errorString: value => $"Invalid shade {value}"))!.Message,
+                            Is.EqualTo("Invalid shade 9"), "GetEnum names the value that matched no member");
+                Assert.That(Assert.Throws<GCodeException>(
+                                () => code.TryGetEnum('S', out Shade _, errorString: value => $"Invalid shade {value}"))!.Message,
+                            Is.EqualTo("Invalid shade 9"), "as does the Try form");
+
+                Assert.That(Assert.Throws<MissingParameterException>(
+                                () => code.GetInt('Q', min: 0, max: 4, errorString: _ => "Invalid mode"))!.Letter,
+                            Is.EqualTo('Q'),
+                            "an absent letter is a missing parameter rather than a refused value, so the refusal "
+                            + "never stands in for the letter itself");
+            });
+        }
     }
 
     public static IEnumerable<DuetAPI.Commands.Code> Parse(string code)
