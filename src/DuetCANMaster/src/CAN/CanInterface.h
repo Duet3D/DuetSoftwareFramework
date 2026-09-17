@@ -45,6 +45,7 @@ namespace CanInterface
 	void SendResponseNoFree(CanMessageBuffer& buf) noexcept;
 	void SendBroadcastNoFree(CanMessageBuffer& buf) noexcept;
 	void SendMessageNoReplyNoFree(CanMessageBuffer& buf) noexcept;
+	void SendEmergencyStopNoFree(CanMessageBuffer& buf) noexcept; // one message of an emergency stop sweep
 	void Diagnostics(const StringRef& reply) noexcept;
 	CanMessageBuffer* AllocateBuffer() THROWS(CanException);
 	void CheckCanAddress(uint32_t address) THROWS(CanException);

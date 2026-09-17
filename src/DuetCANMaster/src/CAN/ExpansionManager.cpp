@@ -345,13 +345,15 @@ void ExpansionManager::EmergencyStop() noexcept
 	buf.SetupBroadcastMessage<CanMessageEmergencyStop>(CanInterface::GetCanAddress());
 	CanInterface::SendBroadcastNoFree(buf);
 
-	// Send an individual message to each known expansion board to ensure that they all acknowledged
+	// Send an individual message to each known expansion board to ensure that they all acknowledged.
+	// These share one transmit buffer, so each waits for the one before it: a short send timeout is
+	// what keeps a bus that has stopped acknowledging from holding the stop up once per board
 	for (CanAddress addr = 1; addr <= CanId::MaxCanAddress; ++addr)
 	{
 		if (m_boards[addr].state == BoardState::Running)
 		{
 			buf.SetupRequestMessageNoRid<CanMessageEmergencyStop>(CanInterface::GetCanAddress(), addr);
-			CanInterface::SendMessageNoReplyNoFree(buf);
+			CanInterface::SendEmergencyStopNoFree(buf);
 		}
 	}
 

@@ -45,6 +45,14 @@ constexpr uint32_t maxTimeSyncSendWait = 2;								 // milliseconds
 constexpr uint32_t maxResponseSendWait = CanInterface::UsualSendTimeout; // milliseconds
 constexpr uint32_t maxRequestSendWait = CanInterface::UsualSendTimeout;	 // milliseconds
 
+// How long an emergency stop waits for the transmit buffer, in milliseconds. Every known board is sent
+// one of these in turn through the same buffer, so the usual send timeout would make a bus where
+// nothing acknowledges hold up the stop for that timeout per board. The broadcast has already gone out
+// by then and these are the backstop for boards that missed it, so a wait long enough to cover normal
+// arbitration is all they need: a frame this size takes well under a millisecond at the default bit
+// rate.
+constexpr uint32_t maxEmergencyStopSendWait = 5;
+
 // Define how often we send time sync messages. This value and the time interval between sending broadcast status
 // messages (currently 250ms) should be relatively prime. The reason is that if we try to send a time sync message just
 // after a board has started broadcasting a status message, the time sync message will get delayed until the broadcast
@@ -894,6 +902,16 @@ void CanInterface::SendMessageNoReplyNoFree(CanMessageBuffer& buf) noexcept
 	if (can0dev != nullptr)
 	{
 		SendCanMessage(txBufferIndexBroadcast, maxResponseSendWait, buf);
+	}
+}
+
+// Send one message of an emergency stop sweep, which cannot afford to wait out the usual send timeout
+// once per board. See maxEmergencyStopSendWait.
+void CanInterface::SendEmergencyStopNoFree(CanMessageBuffer& buf) noexcept
+{
+	if (can0dev != nullptr)
+	{
+		SendCanMessage(txBufferIndexBroadcast, maxEmergencyStopSendWait, buf);
 	}
 }
 
