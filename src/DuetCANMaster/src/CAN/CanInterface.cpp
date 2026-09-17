@@ -145,6 +145,21 @@ static CanDevice* _ecv_null can0dev = nullptr;
 static unsigned int txTimeouts[can0Config.numTxBuffers + 1] = {0};
 static uint32_t lastCancelledId = 0;
 
+// One mutex per transmit buffer. CanDevice::SendMessage requires the caller to serialise a buffer or
+// FIFO that several tasks send on, because it reads the buffer's put index and its current occupant,
+// then writes the message and sets TXBAR: a task preempted anywhere in that sequence has a second one
+// load the same hardware buffer, and one of the two messages is lost or sent with the other's payload.
+// The broadcast buffer is shared today, between ExpansionManager's announcement acknowledgement on a
+// CAN receiver task and its emergency stop on the SBC task. Locking per buffer rather than per device
+// is what keeps the time sync task, which has a buffer to itself, from ever waiting on any of it.
+static Mutex txBufferMutexes[can0Config.numTxBuffers + 1];
+
+// Mutex names have to live in global storage, and RTOSIface keeps the pointer rather than the text
+static const char* const txBufferMutexNames[] = {
+	"CanTxFifo", "CanTx0", "CanTx1", "CanTx2", "CanTx3", "CanTx4"};
+
+static_assert(ARRAY_SIZE(txBufferMutexNames) == ARRAY_SIZE(txBufferMutexes)); // one name per buffer
+
 #  if HAS_SBC_INTERFACE
 
 // The SBC-originated message each dedicated transmit buffer holds, so that a message cancelled to make
@@ -330,6 +345,11 @@ void CanInterface::Init() noexcept
 {
 	CanMessageBuffer::Init(numCanBuffers);
 	pendingMotionBuffers = nullptr;
+
+	for (size_t i = 0; i < ARRAY_SIZE(txBufferMutexes); ++i)
+	{
+		txBufferMutexes[i].Create(txBufferMutexNames[i]);
+	}
 
 #  if HAS_SBC_INTERFACE
 	// Zero would claim every buffer for token 0, which is a token the SBC really issues
@@ -527,6 +547,7 @@ static void SendCanMessage(CanDevice::TxBufferNumber whichBuffer,
 						   CanMessageBuffer& buffer,
 						   uint16_t txToken = noTxToken) noexcept
 {
+	const MutexLocker lock(txBufferMutexes[(unsigned int)whichBuffer]);
 	const uint32_t cancelledId = can0dev->SendMessage(whichBuffer, timeout, &buffer);
 	if (cancelledId != 0)
 	{
