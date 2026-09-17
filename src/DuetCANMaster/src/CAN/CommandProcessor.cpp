@@ -241,17 +241,15 @@ bool CommandProcessor::ForwardMessageToSbc(CanMessageBuffer& buf) noexcept
 	const CanMessageType msgType = buf.id.MsgType();
 	const CanAddress src = buf.id.Src();
 
-	// If this is a response to a request we forwarded on behalf of the SBC, recover the SBC's txToken
-	CanInterface::CanRequestMapping* _ecv_null mapping = nullptr;
+	// If this is a response to a request we forwarded on behalf of the SBC, recover the SBC's txToken.
+	// A standard reply may be split across fragments, so the request stays in flight until the last one
+	// arrives; every other reply type is a single message and ends its request.
 	uint16_t txToken = SbcProtocol::UnsolicitedTxToken;
 	if (buf.id.IsResponse())
 	{
 		const auto rid = (CanRequestId)(buf.msg.generic.requestId);
-		mapping = CanInterface::FindPendingRequest(src, rid);
-		if (mapping != nullptr)
-		{
-			txToken = mapping->txToken;
-		}
+		const bool isFinalReply = (msgType != CanMessageType::standardReply || !buf.msg.standardReply.moreFollows);
+		txToken = CanInterface::MatchPendingRequest(src, rid, isFinalReply);
 	}
 
 	// Single-frame message (broadcast, unsolicited, or non-standard reply): forward the raw payload
@@ -264,16 +262,7 @@ bool CommandProcessor::ForwardMessageToSbc(CanMessageBuffer& buf) noexcept
 	header.status = (uint8_t)CanStatus::Ok;
 	header.padding = 0;
 	header.padding2 = 0;
-	const bool queued = sbc.EnqueueCanResponse(header, reinterpret_cast<const char*>(&buf.msg));
-
-	if (mapping != nullptr)
-	{
-		if (msgType != CanMessageType::standardReply || !buf.msg.standardReply.moreFollows)
-		{
-			CanInterface::ReleasePendingRequest(mapping);
-		}
-	}
-	return queued;
+	return sbc.EnqueueCanResponse(header, reinterpret_cast<const char*>(&buf.msg));
 #  else
 	(void)buf;
 	return false;

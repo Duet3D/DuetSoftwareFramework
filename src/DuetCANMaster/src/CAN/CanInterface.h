@@ -92,10 +92,9 @@ namespace CanInterface
 	// 'txToken' is the SBC's token to return in any response; 'replyType' is the reply the SBC expects (0xFFFF means
 	// none).
 	void SendCanRequest(CanMessageBuffer& buf, uint16_t txToken, CanMessageType replyType) noexcept;
-	CanRequestMapping* _ecv_null FindPendingRequest(
-		CanAddress src, CanRequestId rid) noexcept; // Find an in-flight request matching a received response
-	void ReleasePendingRequest(
-		CanRequestMapping* mapping) noexcept; // Free a pending request slot and any reassembly buffer
+	// Match a received response to the in-flight request waiting for it, freeing the slot if this is the
+	// last reply it will get. Returns the SBC's token, or UnsolicitedTxToken if nothing matches.
+	uint16_t MatchPendingRequest(CanAddress src, CanRequestId rid, bool isFinalReply) noexcept;
 	void ReleasePendingRequestForToken(
 		uint16_t txToken) noexcept; // Free the slot held for a request whose message was never sent
 	void CheckPendingRequestTimeouts() noexcept; // Expire requests whose reply never came, reporting each to the SBC

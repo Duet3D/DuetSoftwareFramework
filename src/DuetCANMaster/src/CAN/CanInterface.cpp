@@ -863,25 +863,28 @@ void CanInterface::SendCanRequest(CanMessageBuffer& buf, uint16_t txToken, CanMe
 	reprap.GetPlatform().OnProcessingCanMessage();
 }
 
-// Find an in-flight SBC-originated request matching a received response. Returns nullptr if there is no match.
-CanInterface::CanRequestMapping* CanInterface::FindPendingRequest(CanAddress src, CanRequestId rid) noexcept
+// Match a received response to the in-flight SBC request waiting for it, freeing the slot if this is
+// the last reply that request will get. Returns the SBC's token for it, or UnsolicitedTxToken if
+// nothing matches.
+//
+// Matching and releasing happen under one lock because the caller must not hold a pointer into the
+// table: between a lookup and a release the slot can be expired and handed to a different request, and
+// the release would then land on that one instead, leaving its reply with no token to come back under.
+uint16_t CanInterface::MatchPendingRequest(CanAddress src, CanRequestId rid, bool isFinalReply) noexcept
 {
 	const TaskCriticalSectionLocker lock;
 	for (CanRequestMapping& m : pendingRequests)
 	{
 		if (m.active && m.board == src && m.rid == rid)
 		{
-			return &m;
+			if (isFinalReply)
+			{
+				m.active = false;
+			}
+			return m.txToken;
 		}
 	}
-	return nullptr;
-}
-
-// Free a pending request slot and release any reassembly buffer it holds
-void CanInterface::ReleasePendingRequest(CanRequestMapping* mapping) noexcept
-{
-	const TaskCriticalSectionLocker lock;
-	mapping->active = false;
+	return SbcProtocol::UnsolicitedTxToken;
 }
 
 // Expire in-flight requests whose reply never came, and tell the SBC that each one timed out.
