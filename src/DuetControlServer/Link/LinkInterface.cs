@@ -139,7 +139,7 @@ public sealed partial class LinkInterface(
     /// <param name="dstAddress">CAN address of the board</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>The board's reply</returns>
-    public Task<CanResponse> ReportCanConfigAsync(byte dstAddress, CancellationToken cancellationToken = default)
+    public Task<Message> ReportCanConfigAsync(byte dstAddress, CancellationToken cancellationToken = default)
     {
         CanMessageSetAddressAndNormalTiming message = new()
         {
@@ -147,7 +147,7 @@ public sealed partial class LinkInterface(
             DoSetTiming = CanMessageSetAddressAndNormalTiming.DoSetTimingNo
         };
 
-        return SendCanMessageAsync(dstAddress, message, CanMessageType.StandardReply, cancellationToken: cancellationToken);
+        return SendCanRequestAsync(dstAddress, in message, cancellationToken);
     }
 
     /// <summary>
@@ -200,7 +200,8 @@ public sealed partial class LinkInterface(
     /// SendRequestAndGetStandardReply). Reach for
     /// <see cref="SendCanMessageAsync{TReq}(byte, in TReq, CanMessageType, bool, CancellationToken)"/>
     /// instead when the reply type differs or the caller needs what only a
-    /// <see cref="CanResponse"/> carries, such as <see cref="CanResponse.Accepted"/>.
+    /// <see cref="CanResponse"/> carries, such as <see cref="CanResponse.Extra"/> or the payload of a
+    /// typed reply.
     /// </remarks>
     public Task<Message> SendCanRequestAsync<TReq>(byte dstAddress, in TReq message, CancellationToken cancellationToken = default)
         where TReq : struct, ICanMessage<TReq>
@@ -233,7 +234,8 @@ public sealed partial class LinkInterface(
     /// <para>
     /// The reply comes back as a <see cref="CanResponse"/> rather than a message, because what the
     /// board said and how a code should report it are different questions and only the handler knows
-    /// the second
+    /// the second. A handler whose answer is simply the board's wants
+    /// <see cref="SendCodeRequestAsync{TReq}(byte, Code, CancellationToken)"/> instead
     /// </para>
     /// </remarks>
     public Task<CanResponse> SendCodeAsync<TReq>(byte dstAddress, Code code,
@@ -244,6 +246,30 @@ public sealed partial class LinkInterface(
         TReq message = default;
         message.FromCode(code);
         return SendCanMessageAsync(dstAddress, in message, replyType, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
+    /// Repackage a G-code as the generic CAN message its parameter table describes, send it, and
+    /// report back what the board made of it
+    /// </summary>
+    /// <typeparam name="TReq">Type of the CAN message body</typeparam>
+    /// <param name="dstAddress">CAN address of the board that will act on it</param>
+    /// <param name="code">The code whose parameters the message carries</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>What the board said about the code</returns>
+    /// <remarks>
+    /// <see cref="SendCanRequestAsync{TReq}(byte, in TReq, CancellationToken)"/> for a code that is
+    /// repackaged rather than built. This is the shape of a code the board answers for outright: the
+    /// board holds what the code configures, so its reply is the code's result and there is nothing
+    /// on this side to add to it
+    /// </remarks>
+    public Task<Message> SendCodeRequestAsync<TReq>(byte dstAddress, Code code,
+                                                    CancellationToken cancellationToken = default)
+        where TReq : struct, ICanGenericMessage<TReq>
+    {
+        TReq message = default;
+        message.FromCode(code);
+        return SendCanRequestAsync(dstAddress, in message, cancellationToken);
     }
 
     /// <summary>

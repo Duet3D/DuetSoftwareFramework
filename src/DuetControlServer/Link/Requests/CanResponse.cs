@@ -1,3 +1,4 @@
+using DuetAPI;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
@@ -70,6 +71,17 @@ public readonly record struct CanResponse(CanMessageType ResponseType, byte SrcA
     public string Text => ResponseType == CanMessageType.StandardReply ? Encoding.ASCII.GetString(Payload).TrimEnd('\0') : string.Empty;
 
     /// <summary>
+    /// Whether the board did what it was asked
+    /// </summary>
+    /// <remarks>
+    /// The one test code should branch on. <see cref="Severity"/> answers a different question - how
+    /// to report the reply - and has three answers because reporting needs three; asking it whether
+    /// the request was carried out means picking two of its three values and picking them again at
+    /// the next call site
+    /// </remarks>
+    public bool Succeeded => ResultCode.Succeeded();
+
+    /// <summary>
     /// How this reply should be reported: what the board made of the request, or an error if it never
     /// answered
     /// </summary>
@@ -136,6 +148,40 @@ public readonly record struct CanResponse(CanMessageType ResponseType, byte SrcA
 /// </summary>
 public static class CanReplies
 {
+    /// <summary>
+    /// Whether the board did what it was asked, once its reply is a message
+    /// </summary>
+    /// <param name="reply">What the board said</param>
+    /// <returns>True if the request was carried out</returns>
+    /// <remarks>
+    /// <see cref="CanResponse.Succeeded"/> read off the message the reply became, for the handlers
+    /// that have only the message by the time they judge it: one that collected several boards'
+    /// replies, or one whose refusal is its own rather than a board's. A warning still means it was
+    /// done, so this is not <c>Type == Success</c>
+    /// </remarks>
+    public static bool Succeeded(this Message reply) => reply.Type != MessageType.Error;
+
+    /// <summary>
+    /// Pass a reply on, or refuse the code it came from if the board would not do what it was asked
+    /// </summary>
+    /// <param name="reply">What the board said</param>
+    /// <returns>The same reply, when the board did it</returns>
+    /// <exception cref="GCodeException">The board refused</exception>
+    /// <remarks>
+    /// For the callers that arm something before a move: an endstop, a probe or a stall detector that
+    /// was refused must stop the move being built, because the move would otherwise run its full
+    /// commanded length with nothing to stop it. Everywhere else a refusal is returned rather than
+    /// thrown, which stops the code without abandoning the file it came from
+    /// </remarks>
+    public static Message OrRefuse(this Message reply)
+    {
+        if (!reply.Succeeded())
+        {
+            throw new GCodeException(reply.Content);
+        }
+        return reply;
+    }
+
     /// <summary>
     /// Combine what several boards said into the one message the code they came from returns
     /// </summary>

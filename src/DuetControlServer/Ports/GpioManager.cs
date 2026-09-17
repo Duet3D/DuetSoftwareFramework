@@ -90,13 +90,13 @@ public sealed class GpioManager(Model.ObjectModel model, LinkInterface linkInter
     /// <param name="pwm">Duty cycle, 0 to 1</param>
     /// <param name="isServo">Whether the value is a servo position rather than a duty cycle</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>An error if the output could not be driven, else null</returns>
+    /// <returns>What the board said, or a refusal if the output could not be driven at all</returns>
     /// <remarks>
     /// A servo and a plain output are the same pin driven two ways, which is why one message carries
     /// both: RepRapFirmware distinguishes them so that a servo's pulse width is interpreted against
     /// its own range rather than as a fraction of full scale
     /// </remarks>
-    public async ValueTask<string?> WriteAsync(int portNumber, float pwm, bool isServo,
+    public async ValueTask<Message> WriteAsync(int portNumber, float pwm, bool isServo,
                                                CancellationToken cancellationToken)
     {
         byte board;
@@ -104,7 +104,7 @@ public sealed class GpioManager(Model.ObjectModel model, LinkInterface linkInter
         {
             if (!TryGetBoard(portNumber, out board))
             {
-                return $"Output {portNumber} is not configured";
+                return new Message(MessageType.Error, $"Output {portNumber} is not configured");
             }
             model.State.GpOut[portNumber]!.Pwm = pwm;
         }
@@ -115,10 +115,6 @@ public sealed class GpioManager(Model.ObjectModel model, LinkInterface linkInter
             Pwm = pwm,
             IsServo = isServo
         };
-        CanResponse response = await linkInterface.SendCanMessageAsync(board, in message,
-                                                                       CanMessageType.StandardReply,
-                                                                       cancellationToken: cancellationToken);
-        Message reply = response.ToMessage();
-        return reply.Type == MessageType.Error ? reply.Content : null;
+        return await linkInterface.SendCanRequestAsync(board, in message, cancellationToken);
     }
 }

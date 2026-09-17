@@ -119,10 +119,7 @@ internal partial class MCodeHandler
         message.S = isServo is bool servo ? (byte)(servo ? 1 : 0) : null;
         message.C = port;
 
-        CanResponse response = await linkInterface.SendCanMessageAsync(board, in message,
-                                                                       CanMessageType.StandardReply,
-                                                                       cancellationToken: cancellationToken);
-        return response.ToMessage();
+        return await linkInterface.SendCanRequestAsync(board, in message, cancellationToken);
     }
 
     /// <summary>
@@ -179,9 +176,7 @@ internal partial class MCodeHandler
             return await ReportOutputAsync(portNumber, cancellationToken);
         }
 
-        string? error = await gpioManager.WriteAsync(portNumber, GetPwmValue(value), isServo: false,
-                                                     cancellationToken);
-        return error is null ? new Message() : new Message(MessageType.Error, error);
+        return await gpioManager.WriteAsync(portNumber, GetPwmValue(value), isServo: false, cancellationToken);
     }
 
     /// <summary>
@@ -236,8 +231,7 @@ internal partial class MCodeHandler
 
         // What the port is driven to is the fraction of each refresh period the pulse takes up, which
         // is why the servo's own refresh frequency has to be known on this side
-        string? error = await gpioManager.WriteAsync(portNumber, pulseWidth * MicrosecondsToSeconds * frequency,
-                                                     isServo: true, cancellationToken);
-        return error is null ? new Message() : new Message(MessageType.Error, error);
+        return await gpioManager.WriteAsync(portNumber, pulseWidth * MicrosecondsToSeconds * frequency,
+                                            isServo: true, cancellationToken);
     }
 }

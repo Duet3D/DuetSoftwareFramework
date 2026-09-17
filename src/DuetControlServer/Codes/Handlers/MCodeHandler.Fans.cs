@@ -262,10 +262,7 @@ internal partial class MCodeHandler
         message.C = port;
         message.K = pulsesPerRev;
 
-        CanResponse response = await linkInterface.SendCanMessageAsync(board, in message,
-                                                                       CanMessageType.StandardReply,
-                                                                       cancellationToken: cancellationToken);
-        return response.ToMessage();
+        return await linkInterface.SendCanRequestAsync(board, in message, cancellationToken);
     }
 
     /// <summary>
@@ -327,7 +324,7 @@ internal partial class MCodeHandler
         if (seenFanNumber)
         {
             (configured, reply) = await ConfigureFanAsync(code, fanNumber, cancellationToken);
-            if (reply.Type == MessageType.Error)
+            if (!reply.Succeeded())
             {
                 return reply;
             }
@@ -342,14 +339,16 @@ internal partial class MCodeHandler
             {
                 // TODO handle fan feed forward
                 await RecordVirtualFanSpeedAsync(fanNumber, pwm, cancellationToken);
-                if (await fanManager.SetSpeedAsync(fanNumber, pwm, cancellationToken) is string error)
-                {
-                    return new Message(MessageType.Error, error);
-                }
+                reply = await fanManager.SetSpeedAsync(fanNumber, pwm, cancellationToken);
             }
-            else if (await SetMappedFanSpeedAsync(pwm, cancellationToken) is Message error)
+            else
             {
-                return error;
+                reply = await SetMappedFanSpeedAsync(pwm, cancellationToken);
+            }
+
+            if (!reply.Succeeded())
+            {
+                return reply;
             }
         }
 
@@ -363,7 +362,7 @@ internal partial class MCodeHandler
             {
                 saved = planner.State.RestorePoints[restorePointNumber].FanSpeed;
             }
-            return await SetMappedFanSpeedAsync(saved, cancellationToken) ?? reply;
+            return new[] { reply, await SetMappedFanSpeedAsync(saved, cancellationToken) }.ToMessage();
         }
 
         return reply;
@@ -482,7 +481,7 @@ internal partial class MCodeHandler
             }
         }
 
-        return (true, await SendFanParametersAsync(fanNumber, cancellationToken) ?? new Message());
+        return (true, await SendFanParametersAsync(fanNumber, cancellationToken));
     }
 
     /// <summary>
@@ -562,7 +561,7 @@ internal partial class MCodeHandler
     private async ValueTask<Message> HandleFanOffAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         _ = code;
-        return await SetMappedFanSpeedAsync(0.0f, cancellationToken) ?? new Message();
+        return await SetMappedFanSpeedAsync(0.0f, cancellationToken);
     }
 
     /// <summary>
@@ -570,12 +569,13 @@ internal partial class MCodeHandler
     /// </summary>
     /// <param name="pwm">Speed to set, 0..1</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>An error if a fan refused the speed, else null</returns>
+    /// <returns>What the fans said, or the refusal of the first that would not take the speed</returns>
     /// <remarks>
     /// RepRapFirmware's <c>GCodes::SetMappedFanSpeed</c>. The speed is recorded as the one the
-    /// operator asked for whether or not a fan took it, because that is what a restore point saves
+    /// operator asked for whether or not a fan took it, because that is what a restore point saves.
+    /// A fan that refuses stops the rest, as RepRapFirmware's loop does
     /// </remarks>
-    private async ValueTask<Message?> SetMappedFanSpeedAsync(float pwm, CancellationToken cancellationToken)
+    private async ValueTask<Message> SetMappedFanSpeedAsync(float pwm, CancellationToken cancellationToken)
     {
         List<int> fans = await MappedFansAsync(cancellationToken);
 
@@ -584,14 +584,17 @@ internal partial class MCodeHandler
             planner.State.VirtualFanSpeed = pwm;
         }
 
+        List<Message> replies = [];
         foreach (int fanNumber in fans)
         {
-            if (await fanManager.SetSpeedAsync(fanNumber, pwm, cancellationToken) is string error)
+            Message reply = await fanManager.SetSpeedAsync(fanNumber, pwm, cancellationToken);
+            if (!reply.Succeeded())
             {
-                return new Message(MessageType.Error, error);
+                return reply;
             }
+            replies.Add(reply);
         }
-        return null;
+        return replies.ToMessage();
     }
 
     /// <summary>
@@ -664,14 +667,14 @@ internal partial class MCodeHandler
     /// </summary>
     /// <param name="fanNumber">The fan</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>An error if the board refused them, else null</returns>
+    /// <returns>What the board said about them</returns>
     /// <remarks>
     /// RepRapFirmware's <c>RemoteFan::UpdateFanConfiguration</c>, which sends the fan's whole state
     /// rather than what the code changed. Thermostatic control belongs to the board because the board
     /// is what reads the sensors: a rule applied from this side would be applied at the speed of the
     /// CAN bus, and a fan that cools a stepper has to react faster than that
     /// </remarks>
-    private async ValueTask<Message?> SendFanParametersAsync(int fanNumber, CancellationToken cancellationToken)
+    private async ValueTask<Message> SendFanParametersAsync(int fanNumber, CancellationToken cancellationToken)
     {
         byte board;
         CanMessageFanParameters message = new() { FanNumber = (ushort)fanNumber };
@@ -705,10 +708,6 @@ internal partial class MCodeHandler
             message.BlipTime = (ushort)(fan.Blip * 1000.0f);
         }
 
-        CanResponse response = await linkInterface.SendCanMessageAsync(board, in message,
-                                                                       CanMessageType.StandardReply,
-                                                                       cancellationToken: cancellationToken);
-        Message reply = response.ToMessage();
-        return reply.Type == MessageType.Error ? reply : null;
+        return await linkInterface.SendCanRequestAsync(board, in message, cancellationToken);
     }
 }

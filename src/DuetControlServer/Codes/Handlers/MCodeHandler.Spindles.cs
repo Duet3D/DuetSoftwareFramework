@@ -51,15 +51,21 @@ internal partial class MCodeHandler
         }
 
         int[] portNumbers = [-1, -1, -1];
+        List<Message> replies = [];
         for (int index = 0; index < names.Length && index < 3; index++)
         {
             // Numbered above the ports a machine addresses directly, so that creating a spindle does
             // not consume output numbers M42 might be using
             int portNumber = SpindleManager.PortNumberFor(spindleNumber, index);
-            if (await CreateSpindlePortAsync(portNumber, names[index], code, cancellationToken) is Message error)
+
+            // A port that was refused stops the rest: the spindle is the three ports driven together,
+            // so one missing leaves nothing that can be built
+            Message reply = await CreateSpindlePortAsync(portNumber, names[index], code, cancellationToken);
+            if (!reply.Succeeded())
             {
-                return error;
+                return reply;
             }
+            replies.Add(reply);
             portNumbers[index] = portNumber;
         }
 
@@ -74,15 +80,15 @@ internal partial class MCodeHandler
             spindle.MaxPwm = code.TryGetFloat('P', out float maxPwm) ? maxPwm : 1.0f;
             spindle.IdlePwm = code.TryGetFloat('V', out float idlePwm) ? idlePwm : 0.0f;
         }
-        return new Message();
+        return replies.ToMessage();
     }
 
     /// <summary>
     /// Create one of the outputs a spindle is driven through
     /// </summary>
-    /// <returns>An error if the port could not be created, else null</returns>
-    private async ValueTask<Message?> CreateSpindlePortAsync(int portNumber, string port, Commands.Code code,
-                                                             CancellationToken cancellationToken)
+    /// <returns>What the board said about the port</returns>
+    private async ValueTask<Message> CreateSpindlePortAsync(int portNumber, string port, Commands.Code code,
+                                                            CancellationToken cancellationToken)
     {
         byte board;
         string localPort;
@@ -105,16 +111,7 @@ internal partial class MCodeHandler
             CanGenericWriter.SetUInt(ref message.Generic, CanMessageM950Gpio.ParamTable, 'Q', (uint)frequency);
         }
 
-        CanResponse response = await linkInterface.SendCanMessageAsync(board, in message,
-                                                                       CanMessageType.StandardReply,
-                                                                       cancellationToken: cancellationToken);
-        Message reply = response.ToMessage();
-        if (reply.Type == MessageType.Error)
-        {
-            return reply;
-        }
-
-        return null;
+        return await linkInterface.SendCanRequestAsync(board, in message, cancellationToken);
     }
 
     /// <summary>
@@ -179,8 +176,7 @@ internal partial class MCodeHandler
             }
         }
 
-        string? error = await spindleManager.SetSpeedAsync(spindleNumber, rpm, reverse, cancellationToken);
-        return error is null ? new Message() : new Message(MessageType.Error, error);
+        return await spindleManager.SetSpeedAsync(spindleNumber, rpm, reverse, cancellationToken);
     }
 
     /// <summary>
@@ -190,8 +186,7 @@ internal partial class MCodeHandler
     {
         if (code.TryGetInt('P', out int spindleNumber))
         {
-            string? error = await spindleManager.StopAsync(spindleNumber, cancellationToken);
-            return error is null ? new Message() : new Message(MessageType.Error, error);
+            return await spindleManager.StopAsync(spindleNumber, cancellationToken);
         }
 
         await spindleManager.StopAllAsync(cancellationToken);

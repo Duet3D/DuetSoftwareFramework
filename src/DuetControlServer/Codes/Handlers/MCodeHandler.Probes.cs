@@ -160,7 +160,7 @@ internal partial class MCodeHandler
         Message monitorReply = monitorPort is not null
             ? await CreateProbeMonitorAsync(probeNumber, monitorPort, cancellationToken)
             : new Message();
-        if (monitorReply.Type == MessageType.Error)
+        if (!monitorReply.Succeeded())
         {
             return monitorReply;
         }
@@ -322,7 +322,7 @@ internal partial class MCodeHandler
         CanResponse response = await linkInterface.SendCanMessageAsync(board, in message, CanMessageType.StandardReply,
                                                                       cancellationToken: cancellationToken);
         Message reply = response.ToMessage();
-        if (reply.Type != MessageType.Error)
+        if (response.Succeeded)
         {
             // As for an endstop: the board reports changes from here on, so a probe already reading
             // above its threshold when it was configured would read as clear until it moved. A

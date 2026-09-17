@@ -95,19 +95,10 @@ internal static class ProbeArming
     public static async ValueTask<Message> StartAsync(ProbeMonitor monitor, LinkInterface link,
                                                       CancellationToken cancellationToken)
     {
-        Message thresholdReply = await SetThresholdAsync(monitor, link, cancellationToken);
-        if (thresholdReply.Type == MessageType.Error)
-        {
-            throw new GCodeException(thresholdReply.Content);
-        }
-
-        Message intervalReply = await ChangeAsync(monitor, CanMessageChangeInputMonitorV1.ActionChangeMinInterval,
-                                                  ActiveReportInterval, link, cancellationToken);
-        if (intervalReply.Type == MessageType.Error)
-        {
-            throw new GCodeException(intervalReply.Content);
-        }
-        return intervalReply;
+        Message thresholdReply = (await SetThresholdAsync(monitor, link, cancellationToken)).OrRefuse();
+        Message intervalReply = (await ChangeAsync(monitor, CanMessageChangeInputMonitorV1.ActionChangeMinInterval,
+                                                   ActiveReportInterval, link, cancellationToken)).OrRefuse();
+        return new[] { thresholdReply, intervalReply }.ToMessage();
     }
 
     /// <summary>
@@ -154,7 +145,7 @@ internal static class ProbeArming
         {
             Message reply = await ChangeAsync(monitor, CanMessageChangeInputMonitorV1.ActionChangeMinInterval,
                                               InactiveReportInterval, link, cancellationToken);
-            if (reply.Type == MessageType.Error)
+            if (!reply.Succeeded())
             {
                 logger.LogWarning("Probe {Probe} was left reporting at the probing rate: {Reply}",
                                   monitor.ProbeNumber, reply.Content);
@@ -185,8 +176,6 @@ internal static class ProbeArming
             Action = action
         };
 
-        CanResponse response = await link.SendCanMessageAsync(monitor.Board, in message, CanMessageType.StandardReply,
-                                                              cancellationToken: cancellationToken);
-        return response.ToMessage();
+        return await link.SendCanRequestAsync(monitor.Board, in message, cancellationToken);
     }
 }

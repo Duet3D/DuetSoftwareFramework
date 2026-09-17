@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Link;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Ports;
 
@@ -118,13 +119,15 @@ public sealed class SpindleManager(Model.ObjectModel model, GpioManager gpioMana
     /// <param name="rpm">Requested speed</param>
     /// <param name="reverse">Whether to turn counter-clockwise</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>An error if it could not be started, else null</returns>
+    /// <returns>What the boards said, or a refusal if the spindle could not be started at all</returns>
     /// <remarks>
     /// The direction is set before the speed, so that a spindle which is already turning never has
-    /// its direction reversed while under power. RepRapFirmware orders it the same way
+    /// its direction reversed while under power. RepRapFirmware orders it the same way. A port that
+    /// is refused stops the rest: a spindle that is turning the wrong way must not then be given a
+    /// speed
     /// </remarks>
-    public async ValueTask<string?> SetSpeedAsync(int spindleNumber, int rpm, bool reverse,
-                                                   CancellationToken cancellationToken)
+    public async ValueTask<Message> SetSpeedAsync(int spindleNumber, int rpm, bool reverse,
+                                                  CancellationToken cancellationToken)
     {
         SpindlePorts ports;
         float pwm;
@@ -132,16 +135,17 @@ public sealed class SpindleManager(Model.ObjectModel model, GpioManager gpioMana
         {
             if (Find(spindleNumber) is not Spindle spindle)
             {
-                return $"Spindle {spindleNumber} is not configured";
+                return new Message(MessageType.Error, $"Spindle {spindleNumber} is not configured");
             }
             if (PortsFor(spindle, spindleNumber) is not SpindlePorts found)
             {
-                return $"Spindle {spindleNumber} has no ports";
+                return new Message(MessageType.Error, $"Spindle {spindleNumber} has no ports");
             }
             ports = found;
             if (reverse && spindle.CanReverse != true)
             {
-                return $"Spindle {spindleNumber} cannot reverse; it has no direction port";
+                return new Message(MessageType.Error,
+                                   $"Spindle {spindleNumber} cannot reverse; it has no direction port");
             }
 
             pwm = PwmForRpm(spindle, rpm);
@@ -151,31 +155,42 @@ public sealed class SpindleManager(Model.ObjectModel model, GpioManager gpioMana
                             : reverse ? SpindleState.Reverse : SpindleState.Forward;
         }
 
-        if (ports.Direction >= 0
-            && await gpioManager.WriteAsync(ports.Direction, reverse ? 1.0f : 0.0f, isServo: false,
-                                            cancellationToken) is string directionError)
+        List<Message> replies = [];
+        if (ports.Direction >= 0)
         {
-            return directionError;
+            Message direction = await gpioManager.WriteAsync(ports.Direction, reverse ? 1.0f : 0.0f,
+                                                             isServo: false, cancellationToken);
+            if (!direction.Succeeded())
+            {
+                return direction;
+            }
+            replies.Add(direction);
         }
 
-        if (await gpioManager.WriteAsync(ports.Pwm, pwm, isServo: false, cancellationToken) is string pwmError)
+        Message speed = await gpioManager.WriteAsync(ports.Pwm, pwm, isServo: false, cancellationToken);
+        if (!speed.Succeeded())
         {
-            return pwmError;
+            return speed;
         }
+        replies.Add(speed);
 
-        if (ports.OnOff >= 0
-            && await gpioManager.WriteAsync(ports.OnOff, rpm == 0 ? 0.0f : 1.0f, isServo: false,
-                                            cancellationToken) is string onOffError)
+        if (ports.OnOff >= 0)
         {
-            return onOffError;
+            Message onOff = await gpioManager.WriteAsync(ports.OnOff, rpm == 0 ? 0.0f : 1.0f, isServo: false,
+                                                         cancellationToken);
+            if (!onOff.Succeeded())
+            {
+                return onOff;
+            }
+            replies.Add(onOff);
         }
-        return null;
+        return replies.ToMessage();
     }
 
     /// <summary>
     /// Stop a spindle
     /// </summary>
-    public ValueTask<string?> StopAsync(int spindleNumber, CancellationToken cancellationToken)
+    public ValueTask<Message> StopAsync(int spindleNumber, CancellationToken cancellationToken)
         => SetSpeedAsync(spindleNumber, 0, reverse: false, cancellationToken);
 
     /// <summary>

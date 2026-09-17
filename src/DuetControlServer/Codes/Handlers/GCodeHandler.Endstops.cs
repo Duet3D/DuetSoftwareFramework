@@ -120,7 +120,7 @@ internal sealed partial class GCodeHandler
     private float HomingSpeed(Commands.Code code, int numAxes)
     {
         InputChannel? input = model.Inputs[code.Channel];
-        float feedRate = code.TryGetFloat('F', out float f) ? f : input?.FeedRate ?? 0.0f;
+        float feedRate = code.GetFloat('F', defaultValue: input?.FeedRate ?? 0.0f, min: 0.0f);
 
         bool rotationalOnly = true;
         for (int axis = 0; axis < numAxes; axis++)

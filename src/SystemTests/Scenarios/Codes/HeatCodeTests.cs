@@ -683,4 +683,24 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
         Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.Heaters[0]!.State), Is.EqualTo(HeaterState.Off),
                     "after M562 the heater's state follows the board's report again (RRF RemoteHeater.cpp ResetFault)");
     }
+
+    /// <summary>
+    /// A board that takes a setpoint but warns about it has its warning reported, not dropped
+    /// </summary>
+    /// <remarks>
+    /// The setpoint reaches the board as CanMessageSetHeaterTemperature and comes back with a result
+    /// code (RemoteHeater::SetTemperature). A warning means the heater is heating and the board had
+    /// something to say, which is exactly the case a code that reports only errors says nothing about
+    /// </remarks>
+    [Test]
+    public async Task M140ReportsABoardWarningAboutTheSetpoint()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync(configExtra: HeatConfig);
+        bench.CanMaster.ReportWith<CanMessageSetHeaterTemperatureV1>("heater 0 is still tuning",
+                                                                     CodeResult.Warning);
+
+        string reply = (await bench.Host.ExecuteCodeAsync("M140 S60")).TrimEnd();
+        Assert.That(reply, Is.EqualTo("Warning: M140: heater 0 is still tuning"),
+                    "the board took the setpoint and warned about it, and the warning is the code's result");
+    }
 }

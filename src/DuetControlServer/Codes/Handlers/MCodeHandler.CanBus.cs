@@ -80,9 +80,7 @@ internal partial class MCodeHandler
             return new Message(MessageType.Error, "Not implemented on main board");
         }
 
-        CanResponse response = await linkInterface.SendCodeAsync<CanMessageM655>(board, code,
-                                                                                 cancellationToken: cancellationToken);
-        return response.ToMessage();
+        return await linkInterface.SendCodeRequestAsync<CanMessageM655>(board, code, cancellationToken);
     }
 
     /// <summary>
@@ -131,9 +129,7 @@ internal partial class MCodeHandler
             expansionBoardManager.GetOrCreateBoard(board).Timeout = timeout;
         }
 
-        CanResponse response = await linkInterface.SendCodeAsync<CanMessageM959>(board, code,
-                                                                                 cancellationToken: cancellationToken);
-        return response.ToMessage();
+        return await linkInterface.SendCodeRequestAsync<CanMessageM959>(board, code, cancellationToken);
     }
 
     /// <summary>

@@ -57,23 +57,16 @@ internal static class StallArming
             };
 
             byte board = (byte)watched.Driver.Board;
-            CanResponse response = await link.SendCanMessageAsync(
-                board, in message, CanMessageType.StandardReply, cancellationToken: cancellationToken);
+            Message reply = await link.SendCanRequestAsync(board, in message, cancellationToken);
 
             // Recorded before the reply is judged: a board that refused one driver may already have
             // armed another, and the release has to reach it either way
             state.ArmedBoards.Add(board);
 
-            Message reply = response.ToMessage();
-            if (reply.Type == MessageType.Error)
-            {
-                throw new GCodeException(reply.Content);
-            }
-
             // The driver was armed but the board may still have had something to say about it, which
             // the caller carries back rather than dropping: a warning here is the only sign the user
             // gets that the stall threshold may not be what they asked for
-            replies.Add(reply);
+            replies.Add(reply.OrRefuse());
         }
         return replies.ToMessage();
     }
@@ -109,7 +102,7 @@ internal static class StallArming
 
                 // There is nobody left to answer; a board that would not disarm is still worth a line
                 // in the log, because the next move naming the stall handle is what will notice
-                if (response.Severity != MessageType.Success)
+                if (!response.Succeeded)
                 {
                     logger.LogWarning("Board {Board} did not disable its stall endstops: {Reply}", board,
                                       response.ToMessage().Content);

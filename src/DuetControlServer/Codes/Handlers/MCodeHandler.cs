@@ -1141,9 +1141,7 @@ internal partial class MCodeHandler(
             if (board != CanId.MasterAddress)
             {
                 // The module list is the board's own, so the board is what composes the reply
-                CanResponse response = await linkInterface.SendCodeAsync<CanMessageM111>(board, code,
-                                                                                         cancellationToken: cancellationToken);
-                return response.ToMessage();
+                return await linkInterface.SendCodeRequestAsync<CanMessageM111>(board, code, cancellationToken);
             }
         }
 
@@ -1256,9 +1254,9 @@ internal partial class MCodeHandler(
                 Type = CanMessageReturnInfo.TypeFirmwareVersion,
                 Param = 0
             };
-            CanResponse response = await linkInterface.SendCanMessageAsync((byte)board, msg, CanMessageType.StandardReply, cancellationToken: cancellationToken);
-            logger.LogDebug("Received firmware version for board {Board}: {Payload}", board, response.Text);
-            return response.ToMessage();
+            Message reply = await linkInterface.SendCanRequestAsync((byte)board, in msg, cancellationToken);
+            logger.LogDebug("Received firmware version for board {Board}: {Payload}", board, reply.Content);
+            return reply;
         }
         else
         {
@@ -1303,10 +1301,7 @@ internal partial class MCodeHandler(
         byte board = GetBoardAddress(code);
 
         CanMessageReset request = default;
-        CanResponse response = await linkInterface.SendCanMessageAsync(board, in request,
-                                                                       CanMessageType.StandardReply,
-                                                                       cancellationToken: cancellationToken);
-        return response.ToMessage();
+        return await linkInterface.SendCanRequestAsync(board, in request, cancellationToken);
     }
 
     /// <summary>
@@ -1354,11 +1349,11 @@ internal partial class MCodeHandler(
                 Type = (byte)(CanMessageReturnInfo.TypeDiagnosticsPart0 + part),
                 Param = 0
             };
-            CanResponse response = await linkInterface.SendCanMessageAsync(board, request,
+            CanResponse response = await linkInterface.SendCanMessageAsync(board, in request,
                                                                            CanMessageType.StandardReply,
                                                                            cancellationToken: cancellationToken);
             Message reply = response.ToMessage();
-            if (reply.Type == MessageType.Error)
+            if (!response.Succeeded)
             {
                 // Said before the header, as RemoteDiagnostics does: a board that cannot be reached
                 // has no report to introduce. One test covers both that and a board that refused,
@@ -1865,8 +1860,7 @@ internal partial class MCodeHandler(
         }
         else
         {
-            CanResponse response = await linkInterface.ReportCanConfigAsync(oldAddress, cancellationToken);
-            return response.ToMessage();
+            return await linkInterface.ReportCanConfigAsync(oldAddress, cancellationToken);
         }
         return new Message();
     }
@@ -1951,8 +1945,7 @@ internal partial class MCodeHandler(
         // RepRapFirmware reads it with can0dev->GetLocalCanTiming; the peripheral belongs to
         // DuetCANMaster here, which answers the same query addressed to board 0 - a
         // setAddressAndNormalTiming with doSetTiming clear, which is what ReportCanConfigAsync sends
-        CanResponse timingReport = await linkInterface.ReportCanConfigAsync(CanId.MasterAddress, cancellationToken);
-        return timingReport.ToMessage();
+        return await linkInterface.ReportCanConfigAsync(CanId.MasterAddress, cancellationToken);
     }
 
     /// <summary>

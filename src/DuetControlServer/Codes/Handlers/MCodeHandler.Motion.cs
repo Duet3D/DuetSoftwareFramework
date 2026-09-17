@@ -949,8 +949,7 @@ internal partial class MCodeHandler
 
         CanAddresses.CheckAddressHasHardware(driver.Board, $"Driver {driver}");
 
-        CanResponse response;
-        response = code.MinorNumber switch
+        Message reply = code.MinorNumber switch
         {
             <= 0 => await SendDriverConfigAsync<CanMessageM569>(driver, code, cancellationToken),
             1 => await SendDriverConfigAsync<CanMessageM569Point1>(driver, code, cancellationToken),
@@ -965,7 +964,7 @@ internal partial class MCodeHandler
         {
             await RecordDriverConfigAsync(driver, code, cancellationToken);
         }
-        return response.ToMessage();
+        return reply;
     }
 
     /// <summary>
@@ -1078,10 +1077,10 @@ internal partial class MCodeHandler
     /// A <see cref="DriverId"/> is a board and a port on it, and only the board half addresses a
     /// message, so this is where that is said once rather than at each of the M569 sub-codes
     /// </remarks>
-    private ValueTask<CanResponse> SendDriverConfigAsync<TMessage>(DriverId driver, Commands.Code code,
-                                                                   CancellationToken cancellationToken)
+    private ValueTask<Message> SendDriverConfigAsync<TMessage>(DriverId driver, Commands.Code code,
+                                                               CancellationToken cancellationToken)
         where TMessage : struct, ICanGenericMessage<TMessage>
-        => new(linkInterface.SendCodeAsync<TMessage>((byte)driver.Board, code, cancellationToken: cancellationToken));
+        => new(linkInterface.SendCodeRequestAsync<TMessage>((byte)driver.Board, code, cancellationToken));
 
     /// <summary>
     /// M915: configure stall detection
@@ -1091,7 +1090,10 @@ internal partial class MCodeHandler
     /// <returns>The result</returns>
     /// <remarks>
     /// The drivers may be named directly with P or by the axes they belong to, and either way they
-    /// have to be grouped by the board that carries them before the message can go out
+    /// have to be grouped by the board that carries them before the message can go out. Every board
+    /// is told whether or not an earlier one refused, as RepRapFirmware's loop over the boards does:
+    /// the drivers are independent of each other, and stopping part way would leave the rest watching
+    /// for nothing with no line saying so. What each board said is collected and reported together
     /// </remarks>
     private async ValueTask<Message> HandleStallDetectionAsync(Commands.Code code, CancellationToken cancellationToken)
     {
@@ -1144,9 +1146,7 @@ internal partial class MCodeHandler
             }
             message.d = bitmap;
 
-            CanResponse response = await linkInterface.SendCanMessageAsync((byte)board.Key, in message, CanMessageType.StandardReply,
-                                                                           cancellationToken: cancellationToken);
-            replies.Add(response.ToMessage());
+            replies.Add(await linkInterface.SendCanRequestAsync((byte)board.Key, in message, cancellationToken));
         }
 
         await RecordStallDetectionAsync(drivers, code, cancellationToken);
@@ -1297,17 +1297,23 @@ internal partial class MCodeHandler
             _ => 'S'
         };
 
+        // A driver that refused stops the rest, as RepRapFirmware's Move::SetStepMode does: the mode
+        // was already written to this side's model for every drive the code named, and carrying on
+        // would widen the gap between what it says and what the machine is doing
+        List<Message> replies = [];
         foreach ((IReadOnlyList<DriverId> drivers, float value) in targets)
         {
             foreach (DriverId driver in drivers)
             {
-                if (await SendPhaseSteppingAsync(driver, letter, value, cancellationToken) is Message error)
+                Message reply = await SendPhaseSteppingAsync(driver, letter, value, cancellationToken);
+                if (!reply.Succeeded())
                 {
-                    return error;
+                    return reply;
                 }
+                replies.Add(reply);
             }
         }
-        return new Message();
+        return replies.ToMessage();
     }
 
     /// <summary>
@@ -1396,7 +1402,7 @@ internal partial class MCodeHandler
         DriverId driver = code.GetDriverId('P');
         CanAddresses.CheckAddressHasHardware(driver.Board, $"Driver {driver}");
 
-        return (await SendDriverConfigAsync<CanMessageM970Point3>(driver, code, cancellationToken)).ToMessage();
+        return await SendDriverConfigAsync<CanMessageM970Point3>(driver, code, cancellationToken);
     }
 
     /// <summary>
@@ -1406,13 +1412,13 @@ internal partial class MCodeHandler
     /// <param name="letter">Parameter the board reads the value as</param>
     /// <param name="value">The value</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>An error if the board refused it, else null</returns>
+    /// <returns>What the board said about it</returns>
     /// <remarks>
     /// CanInterface::SetRemoteDriverStepMode and SetRemotePhaseStepParam (CanInterface.cpp), which are
     /// one message with a different parameter rather than two
     /// </remarks>
-    private async ValueTask<Message?> SendPhaseSteppingAsync(DriverId driver, char letter, float value,
-                                                             CancellationToken cancellationToken)
+    private async ValueTask<Message> SendPhaseSteppingAsync(DriverId driver, char letter, float value,
+                                                            CancellationToken cancellationToken)
     {
         if (CanAddresses.HasNoHardware(driver.Board))
         {
@@ -1434,11 +1440,7 @@ internal partial class MCodeHandler
             message.A = value;
         }
 
-        CanResponse response = await linkInterface.SendCanMessageAsync((byte)driver.Board, in message,
-                                                                       CanMessageType.StandardReply,
-                                                                       cancellationToken: cancellationToken);
-        Message reply = response.ToMessage();
-        return reply.Type == MessageType.Error ? reply : null;
+        return await linkInterface.SendCanRequestAsync((byte)driver.Board, in message, cancellationToken);
     }
 
     /// <summary>
@@ -2349,6 +2351,10 @@ internal partial class MCodeHandler
                                          linkInterface, logger, cancellationToken);
 
         // Tell the boards to watch the ports. Done outside the model lock because it goes over CAN
+        // Each axis is set up in turn and a refusal stops only that axis: an axis' endstop is
+        // independent of its neighbours', so leaving the rest unconfigured would cost a homing move
+        // an endstop for a reason that has nothing to do with it. What every axis said is reported
+        // together
         List<Message> replies = [];
         foreach ((int axis, EndstopPosition position) in configured)
         {
@@ -2360,7 +2366,7 @@ internal partial class MCodeHandler
             Message reply = await CreateEndstopMonitorAsync(axis, cancellationToken);
             replies.Add(reply);
 
-            if (reply.Type == MessageType.Error)
+            if (!reply.Succeeded())
             {
                 // An axis that could not be set up whole must not be left holding pins for the part
                 // of it that worked - a switch-per-driver endstop whose second switch was refused
@@ -2593,7 +2599,7 @@ internal partial class MCodeHandler
             CanResponse response = await linkInterface.SendCanMessageAsync(board, in message, CanMessageType.StandardReply,
                                                                           cancellationToken: cancellationToken);
             Message reply = response.ToMessage();
-            if (reply.Type == MessageType.Error)
+            if (!response.Succeeded)
             {
                 return reply;                   // the switch is not being watched, so stop here
             }

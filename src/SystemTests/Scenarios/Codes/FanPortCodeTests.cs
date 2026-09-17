@@ -1368,4 +1368,60 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
         await bench.Host.ExecuteCodeAsync("M0");
         await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
     }
+
+    /// <summary>
+    /// A board that takes a fan speed but warns about it has its warning reported, not dropped
+    /// </summary>
+    /// <remarks>
+    /// GCodeResult::warning means the board did what it was asked and had something to say about it,
+    /// and RepRapFirmware reports both halves (GCodes2.cpp HandleResult). A warning is the only sign
+    /// the user gets that a fan is not doing quite what the code asked, so a handler that returns
+    /// nothing unless the reply was an error loses it outright
+    /// </remarks>
+    [Test]
+    public async Task M106ReportsABoardWarningAboutTheSpeed()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync(configExtra: Fan0Config);
+        bench.CanMaster.ReportWith<CanMessageSetFanSpeed>("fan 0 is thermostatic, speed ignored",
+                                                          CodeResult.Warning);
+
+        string reply = (await bench.Host.ExecuteCodeAsync("M106 P0 S0.5")).TrimEnd();
+        Assert.That(reply, Is.EqualTo("Warning: M106: fan 0 is thermostatic, speed ignored"),
+                    "the board took the speed and warned about it, and the warning is the code's result");
+    }
+
+    /// <summary>
+    /// A board that takes a fan's configuration but warns about it has its warning reported
+    /// </summary>
+    /// <remarks>RemoteFan::UpdateFanConfiguration's reply, which carries a result code like any other</remarks>
+    [Test]
+    public async Task M106ReportsABoardWarningAboutTheConfiguration()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync(configExtra: Fan0Config);
+        bench.CanMaster.ReportWith<CanMessageFanParameters>("minimum PWM raised to the board's floor",
+                                                            CodeResult.Warning);
+
+        string reply = (await bench.Host.ExecuteCodeAsync("M106 P0 L0.25")).TrimEnd();
+        Assert.That(reply, Is.EqualTo("Warning: M106: minimum PWM raised to the board's floor"),
+                    "M106's configuration form carries the board's warning back the same way");
+    }
+
+    /// <summary>
+    /// A board that drives an output but warns about it has its warning reported
+    /// </summary>
+    /// <remarks>
+    /// The same reply path as a fan speed: CanInterface::WriteGpio answers with a result code, and
+    /// M42 is the code that has to carry it
+    /// </remarks>
+    [Test]
+    public async Task M42ReportsABoardWarningAboutTheOutput()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync(configExtra: "M950 P0 C\"1.out4\"");
+        bench.CanMaster.ReportWith<CanMessageWriteGpio>("output 0 is already driven by a fan",
+                                                        CodeResult.Warning);
+
+        string reply = (await bench.Host.ExecuteCodeAsync("M42 P0 S0.5")).TrimEnd();
+        Assert.That(reply, Is.EqualTo("Warning: M42: output 0 is already driven by a fan"),
+                    "the board drove the output and warned about it, and the warning is the code's result");
+    }
 }

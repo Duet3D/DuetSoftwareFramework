@@ -124,7 +124,7 @@ internal partial class MCodeHandler
 
         // The board is what reads the sensor, so it is what has to be told how. The parameter table
         // is the message, which is what makes this a repackaging rather than a reimplementation
-        return (await linkInterface.SendCodeAsync<CanMessageM308V1>(board, code, cancellationToken: cancellationToken)).ToMessage();
+        return await linkInterface.SendCodeRequestAsync<CanMessageM308V1>(board, code, cancellationToken);
     }
 
     /// <summary>
@@ -222,7 +222,7 @@ internal partial class MCodeHandler
             }
         }
 
-        return (await linkInterface.SendCodeAsync<CanMessageM950Heater>(board, code, cancellationToken: cancellationToken)).ToMessage();
+        return await linkInterface.SendCodeRequestAsync<CanMessageM950Heater>(board, code, cancellationToken);
     }
 
     /// <summary>
@@ -288,29 +288,31 @@ internal partial class MCodeHandler
             }
         }
 
-        List<Message> errors = [];
+        // Every heater the code named is told, whether or not an earlier one refused. RepRapFirmware's
+        // SetToolHeaters (GCodes.cpp) walks the whole tool without testing anything, and stopping half
+        // way here would leave the rest of a tool's heaters at whatever they were while the object
+        // model said otherwise. What every heater said is reported together
+        List<Message> replies = [];
         foreach (int heaterNumber in heaters)
         {
             float target = hasActive ? active : standby;
             byte command = hasActive && active <= 0.0f
                 ? CanMessageSetHeaterTemperatureV1.CommandOff
                 : CanMessageSetHeaterTemperatureV1.CommandOn;
-            if (await heatManager.SetTemperatureAsync(heaterNumber, target, command, cancellationToken) is string error)
-            {
-                errors.Add(new Message(MessageType.Error, error));
-            }
+            replies.Add(await heatManager.SetTemperatureAsync(heaterNumber, target, command, cancellationToken));
         }
 
-        if (errors.Count > 0)
+        Message reply = replies.ToMessage();
+        if (!reply.Succeeded())
         {
-            return errors[0];
+            return reply;
         }
 
         if (wait && !await heatManager.WaitForTemperaturesAsync(heaters, cancellationToken))
         {
             throw new System.OperationCanceledException();
         }
-        return new Message();
+        return reply;
     }
 
     /// <summary>
@@ -536,10 +538,7 @@ internal partial class MCodeHandler
             }
         }
 
-        CanResponse response = await linkInterface.SendCanMessageAsync(board, in message,
-                                                                       CanMessageType.StandardReply,
-                                                                       cancellationToken: cancellationToken);
-        return response.ToMessage();
+        return await linkInterface.SendCanRequestAsync(board, in message, cancellationToken);
     }
 
     /// <summary>
@@ -601,10 +600,7 @@ internal partial class MCodeHandler
             message.MaxBadTemperatureCount = (uint)heater.MaxBadReadings;
         }
 
-        CanResponse response = await linkInterface.SendCanMessageAsync(board, in message,
-                                                                       CanMessageType.StandardReply,
-                                                                       cancellationToken: cancellationToken);
-        return response.ToMessage();
+        return await linkInterface.SendCanRequestAsync(board, in message, cancellationToken);
     }
 
     /// <summary>
@@ -636,16 +632,19 @@ internal partial class MCodeHandler
             }
         }
 
+        List<Message> replies = [];
         foreach (int heaterNumber in heaters)
         {
-            if (await heatManager.SetTemperatureAsync(heaterNumber, 0.0f,
-                                                      CanMessageSetHeaterTemperatureV1.CommandResetFault,
-                                                      cancellationToken) is string error)
+            Message reply = await heatManager.SetTemperatureAsync(heaterNumber, 0.0f,
+                                                                  CanMessageSetHeaterTemperatureV1.CommandResetFault,
+                                                                  cancellationToken);
+            if (!reply.Succeeded())
             {
-                return new Message(MessageType.Error, error);
+                return reply;
             }
+            replies.Add(reply);
         }
-        return new Message();
+        return replies.ToMessage();
     }
 
     /// <summary>
@@ -724,9 +723,6 @@ internal partial class MCodeHandler
             message.MaxPwm = heaterModel.MaxPwm;
         }
 
-        CanResponse response = await linkInterface.SendCanMessageAsync(board, in message,
-                                                                       CanMessageType.StandardReply,
-                                                                       cancellationToken: cancellationToken);
-        return response.ToMessage();
+        return await linkInterface.SendCanRequestAsync(board, in message, cancellationToken);
     }
 }

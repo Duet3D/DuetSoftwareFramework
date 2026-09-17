@@ -29,6 +29,7 @@ against the reference tree in `lib/RepRapFirmware`.
 | 9 | System emulation test bench | [SYSTEM_EMULATION.md](SYSTEM_EMULATION.md) | 🟡 Stage 1 landed | 3 × L, 4 × M, 2 × S | |
 | 10 | Job control concurrency | [JOB_CONTROL_CONCURRENCY.md](JOB_CONTROL_CONCURRENCY.md) | ⬜ not started | 1 × L, 2 × M, 1 × S | WS9 stage 1 (landed), WS11 steps 1 to 5 |
 | 11 | Deterministic test bench | [DETERMINISTIC_BENCH.md](DETERMINISTIC_BENCH.md) | ⬜ not started | 1 × L, 4 × M, 2 × S | WS9 stage 1 (landed) |
+| 12 | CAN reply handling | [CAN_REPLY_HANDLING.md](CAN_REPLY_HANDLING.md) | ✅ **Complete** | | |
 
 Workstream 7 is the umbrella the others were carved out of, and is most of what remains. Workstream 8
 is fully specified and independent; its groundwork and stage 1, deferral in the pipeline, are in,
@@ -73,6 +74,7 @@ Recorded so the remaining list is read against what it sits on rather than as a 
 | **Events migration** (WS5) | Variables and macro parameters; the event queue, processor, and all 13 event types; `M957`; the link-loss and reconnect events end to end. |
 | **Job lifecycle** (WS6) | Pause, resume, cancel, and stop; the restore points; `pause.g`, `resume.g`, `stop.g`, `cancel.g`, `start.g`; the feedhold (a controlled deceleration replacing RRF's search for a sufficiently slow junction); job progress and time estimates. |
 | **M-code migration** (WS7) | 109 of 187 in-scope M-codes fully ported. Motion, kinematics (all 7 geometries), compensation, probing, heat, fans, tools, and spindles are each essentially complete as subsystems. The G0/G1 audit's phases A to E, the endstop-correction move into DCS, the kinematics ownership inversion and the `G4` dwell have all landed. |
+| **CAN reply handling** (WS12) | Every handler judges a board's reply the same way: one predicate, three send shapes, and the six sites that discarded a warning fixed. |
 
 ---
 

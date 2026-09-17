@@ -156,7 +156,12 @@ internal static class InputMonitors
                 CanResponse response = await link.SendCanMessageAsync(monitor.Board, in message,
                                                                       CanMessageType.StandardReply,
                                                                       cancellationToken: cancellationToken);
-                if (response.Severity == MessageType.Warning)
+                if (!response.Succeeded)
+                {
+                    logger.LogWarning("Board {Board} did not release the pin behind handle {Handle}: {Reply}",
+                                      monitor.Board, monitor.Handle.All, response.ToMessage().Content);
+                }
+                else if (response.Severity == MessageType.Warning)
                 {
                     // A board answers a handle it does not have with a warning, and this is sent from
                     // what DSF believes rather than from what the board confirmed - a board that
@@ -165,11 +170,6 @@ internal static class InputMonitors
                     // the next M950 in either case, so it is not the user's problem
                     logger.LogDebug("Board {Board} had nothing to release behind handle {Handle}: {Reply}",
                                     monitor.Board, monitor.Handle.All, response.ToMessage().Content);
-                }
-                else if (response.Severity != MessageType.Success)
-                {
-                    logger.LogWarning("Board {Board} did not release the pin behind handle {Handle}: {Reply}",
-                                      monitor.Board, monitor.Handle.All, response.ToMessage().Content);
                 }
             }
             catch (Exception e) when (e is not OperationCanceledException)

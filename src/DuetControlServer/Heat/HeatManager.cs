@@ -122,7 +122,7 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
     /// a heater told to reach 200C is not heating until it is also told to switch on, and RRF's
     /// <c>CommandNone</c> is what changes one without the other
     /// </remarks>
-    public async ValueTask<string?> SetTemperatureAsync(int heaterNumber, float setPoint, byte command,
+    public async ValueTask<Message> SetTemperatureAsync(int heaterNumber, float setPoint, byte command,
                                                         CancellationToken cancellationToken)
     {
         byte board;
@@ -131,11 +131,12 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
             Heater? heater = Find(heaterNumber);
             if (heater is null)
             {
-                return $"Heater {heaterNumber} not found";
+                return new Message(MessageType.Error, $"Heater {heaterNumber} not found");
             }
             if (!TryGetBoard(heater, out board))
             {
-                return $"Heater {heaterNumber} has no sensor, so nothing knows how hot it is";
+                return new Message(MessageType.Error,
+                                   $"Heater {heaterNumber} has no sensor, so nothing knows how hot it is");
             }
         }
 
@@ -146,11 +147,7 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
             Function = command
         };
 
-        CanResponse response = await linkInterface.SendCanMessageAsync(board, in message,
-                                                                       CanMessageType.StandardReply,
-                                                                       cancellationToken: cancellationToken);
-        Message reply = response.ToMessage();
-        return reply.Type == MessageType.Error ? reply.Content : null;
+        return await linkInterface.SendCanRequestAsync(board, in message, cancellationToken);
     }
 
     /// <summary>
@@ -387,10 +384,11 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
             byte command = state == ToolState.Off
                 ? CanMessageSetHeaterTemperatureV1.CommandOff
                 : CanMessageSetHeaterTemperatureV1.CommandOn;
-            if (await SetTemperatureAsync(heaterNumber, target, command, cancellationToken) is string error)
+            Message reply = await SetTemperatureAsync(heaterNumber, target, command, cancellationToken);
+            if (!reply.Succeeded())
             {
                 logger.LogWarning("Could not set heater {Heater} for tool {Tool}: {Error}",
-                                  heaterNumber, tool.Number, error);
+                                  heaterNumber, tool.Number, reply.Content);
             }
         }
     }
@@ -429,10 +427,12 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
 
         foreach (int heaterNumber in heaterNumbers)
         {
-            if (await SetTemperatureAsync(heaterNumber, 0.0f, CanMessageSetHeaterTemperatureV1.CommandOff,
-                                          cancellationToken) is string error)
+            Message reply = await SetTemperatureAsync(heaterNumber, 0.0f,
+                                                      CanMessageSetHeaterTemperatureV1.CommandOff,
+                                                      cancellationToken);
+            if (!reply.Succeeded())
             {
-                logger.LogWarning("Could not switch heater {Heater} off: {Error}", heaterNumber, error);
+                logger.LogWarning("Could not switch heater {Heater} off: {Error}", heaterNumber, reply.Content);
             }
         }
     }

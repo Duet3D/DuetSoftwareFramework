@@ -115,19 +115,24 @@ public sealed class FanManager(Model.ObjectModel model, LinkInterface linkInterf
     /// <param name="fanNumber">The fan</param>
     /// <param name="pwm">Requested PWM, 0 to 1</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>An error if the fan could not be driven, else null</returns>
-    public async ValueTask<string?> SetSpeedAsync(int fanNumber, float pwm, CancellationToken cancellationToken)
+    /// <returns>What the board said, or a refusal if the fan could not be driven at all</returns>
+    /// <remarks>
+    /// An empty success means the fan is running at the speed and there is nothing to report. A
+    /// warning means it is running and the board had something to say about it, which the caller
+    /// carries back: it is the only sign the user gets
+    /// </remarks>
+    public async ValueTask<Message> SetSpeedAsync(int fanNumber, float pwm, CancellationToken cancellationToken)
     {
         byte board;
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             if (Find(fanNumber) is not Fan fan)
             {
-                return $"Fan {fanNumber} not found";
+                return new Message(MessageType.Error, $"Fan {fanNumber} not found");
             }
             if (!TryGetBoard(fanNumber, out board))
             {
-                return $"Fan {fanNumber} is not on an expansion board";
+                return new Message(MessageType.Error, $"Fan {fanNumber} is not on an expansion board");
             }
             fan.RequestedValue = pwm;
         }
@@ -137,10 +142,6 @@ public sealed class FanManager(Model.ObjectModel model, LinkInterface linkInterf
             FanNumber = (ushort)fanNumber,
             Pwm = pwm
         };
-        CanResponse response = await linkInterface.SendCanMessageAsync(board, in message,
-                                                                       CanMessageType.StandardReply,
-                                                                       cancellationToken: cancellationToken);
-        Message reply = response.ToMessage();
-        return reply.Type == MessageType.Error ? reply.Content : null;
+        return await linkInterface.SendCanRequestAsync(board, in message, cancellationToken);
     }
 }

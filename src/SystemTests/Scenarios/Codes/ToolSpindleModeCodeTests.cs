@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using System.Threading.Tasks;
 using DuetControlServer.Heat;
+using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetAPI.ObjectModel;
 using NUnit.Framework;
@@ -762,5 +763,30 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
         await host.ExecuteCodeAsync("G1 X1 F6000");
         await WaitForNumberAsync(host, model => model.State.LaserPwm, 0.0,
                                  "M5 clears the laser power for later moves (RRF M5 laser branch)");
+    }
+
+    /// <summary>
+    /// A board that creates a spindle's port but warns about it has its warning reported
+    /// </summary>
+    /// <remarks>
+    /// A spindle is three general-purpose outputs driven together, so each port is created with the
+    /// same M950 message a plain output is, and each reply carries a result code. The spindle is
+    /// built either way when the board only warned
+    /// </remarks>
+    [Test]
+    public async Task M950RReportsABoardWarningAboutTheSpindlePort()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync();
+        bench.CanMaster.ReportWith<CanMessageM950Gpio>("out6 is shared with a fan", CodeResult.Warning);
+
+        string reply = (await bench.Host.ExecuteCodeAsync("M950 R0 C\"1.out6\"")).TrimEnd();
+        Assert.Multiple(async () =>
+        {
+            Assert.That(reply, Is.EqualTo("Warning: M950: out6 is shared with a fan"),
+                        "the board took the port and warned about it, and the warning is the code's result");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Spindles[0]!.State),
+                        Is.EqualTo(SpindleState.Stopped),
+                        "a warning is not a refusal, so the spindle is still created");
+        });
     }
 }

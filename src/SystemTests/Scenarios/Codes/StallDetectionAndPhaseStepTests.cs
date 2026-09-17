@@ -409,4 +409,28 @@ public class StallDetectionAndPhaseStepTests : BenchFixture
         Assert.That((await bench.Host.ExecuteCodeAsync("M914")).TrimEnd(),
                     Is.EqualTo("Warning: M914: Command is not supported"));
     }
+
+    /// <summary>
+    /// A board that takes a phase stepping value but warns about it has its warning reported
+    /// </summary>
+    /// <remarks>
+    /// CanInterface::SetRemoteDriverStepMode answers with a result code, and M970 is what carries it.
+    /// A warning means the drive took the mode, so the object model keeps what the code wrote
+    /// </remarks>
+    [Test]
+    public async Task M970ReportsABoardWarningAboutTheStepMode()
+    {
+        await using JobBench bench = await DriversBench.StartAsync(
+            prepareController: canMaster => canMaster.ReportWith<CanMessageM970>(
+                "phase stepping is untuned on this driver", CodeResult.Warning));
+
+        string reply = (await bench.Host.ExecuteCodeAsync("M970 E1")).TrimEnd();
+        Assert.Multiple(async () =>
+        {
+            Assert.That(reply, Is.EqualTo("Warning: M970: phase stepping is untuned on this driver"),
+                        "the board took the mode and warned about it, and the warning is the code's result");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].PhaseStep), Is.True,
+                        "a warning is not a refusal, so the drive keeps the mode the code set");
+        });
+    }
 }

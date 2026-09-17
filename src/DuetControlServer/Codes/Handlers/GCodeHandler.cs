@@ -16,6 +16,7 @@ using DuetControlServer.Motion.Kinematics;
 using Microsoft.Extensions.Logging;
 using DuetAPI;
 using static DuetControlServer.Motion.AxisIndices;
+using System.Diagnostics.CodeAnalysis;
 
 namespace DuetControlServer.Codes.Handlers;
 
@@ -220,7 +221,7 @@ internal sealed partial class GCodeHandler(
     /// combination anything below here is written for. RepRapFirmware refuses the same values, in
     /// <c>gb.TryGetLimitedUIValue('H', moveType, dummy, 5)</c>, and reports it the same way
     /// </remarks>
-    private static bool TryGetMoveType(Commands.Code code, out MoveType moveType, out Message? error)
+    private static bool TryGetMoveType(Commands.Code code, out MoveType moveType, [NotNullWhen(false)] out Message? error)
     {
         int value = code.GetInt('H', defaultValue: 0);
         if (!Enum.IsDefined(typeof(MoveType), value))
@@ -246,7 +247,7 @@ internal sealed partial class GCodeHandler(
     {
         if (!TryGetMoveType(code, out MoveType moveType, out Message? typeError))
         {
-            return typeError!;
+            return typeError;
         }
 
         // A special move is planned against the motor positions rather than the axis positions, so

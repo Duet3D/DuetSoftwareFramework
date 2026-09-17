@@ -15,7 +15,7 @@ public static class CodeResultExtensions
     /// <remarks>
     /// The same test as <c>Succeeded()</c> in CANlib's GCodeResult.h: a warning still means it was done.
     /// </remarks>
-    public static bool Succeeded(this CodeResult result) => result is CodeResult.Ok or CodeResult.Warning;
+    public static bool Succeeded(this CodeResult result) => result < CodeResult.Error;
 
     /// <summary>
     /// How a reply carrying this result code should be reported
