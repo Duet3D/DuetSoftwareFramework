@@ -482,14 +482,14 @@ void CanInterface::CheckCanAddress(uint32_t address) THROWS(CanException)
 
 uint16_t CanInterface::GetTimeStampCounter() noexcept
 {
-	return can0dev->ReadTimeStampCounter();
+	return (can0dev != nullptr) ? can0dev->ReadTimeStampCounter() : 0;
 }
 
 #  if !SAME70
 
 uint16_t CanInterface::GetTimeStampPeriod() noexcept
 {
-	return can0dev->GetTimeStampPeriod();
+	return (can0dev != nullptr) ? can0dev->GetTimeStampPeriod() : 0;
 }
 
 #  endif
@@ -558,6 +558,13 @@ static void SendCanMessage(CanDevice::TxBufferNumber whichBuffer,
 						   CanMessageBuffer& buffer,
 						   uint16_t txToken = noTxToken) noexcept
 {
+	// Shutdown() destroys the device on an emergency stop, and a task that was about to send is not
+	// necessarily stopped by then
+	if (can0dev == nullptr)
+	{
+		return;
+	}
+
 	const MutexLocker lock(txBufferMutexes[(unsigned int)whichBuffer]);
 	const uint32_t cancelledId = can0dev->SendMessage(whichBuffer, timeout, &buffer);
 	if (cancelledId != 0)
@@ -953,29 +960,20 @@ void CanInterface::SendResponseNoFree(CanMessageBuffer& buf) noexcept
 // Send a broadcast message and free the buffer
 void CanInterface::SendBroadcastNoFree(CanMessageBuffer& buf) noexcept
 {
-	if (can0dev != nullptr)
-	{
-		SendCanMessage(txBufferIndexBroadcast, maxResponseSendWait, buf);
-	}
+	SendCanMessage(txBufferIndexBroadcast, maxResponseSendWait, buf);
 }
 
 // Send a request message with no reply expected, and don't free the buffer. Used to send emergency stop messages.
 void CanInterface::SendMessageNoReplyNoFree(CanMessageBuffer& buf) noexcept
 {
-	if (can0dev != nullptr)
-	{
-		SendCanMessage(txBufferIndexBroadcast, maxResponseSendWait, buf);
-	}
+	SendCanMessage(txBufferIndexBroadcast, maxResponseSendWait, buf);
 }
 
 // Send one message of an emergency stop sweep, which cannot afford to wait out the usual send timeout
 // once per board. See maxEmergencyStopSendWait.
 void CanInterface::SendEmergencyStopNoFree(CanMessageBuffer& buf) noexcept
 {
-	if (can0dev != nullptr)
-	{
-		SendCanMessage(txBufferIndexBroadcast, maxEmergencyStopSendWait, buf);
-	}
+	SendCanMessage(txBufferIndexBroadcast, maxEmergencyStopSendWait, buf);
 }
 
 #  if DUAL_CAN
@@ -1128,6 +1126,13 @@ void CanInterface::EnableCan(bool enable) noexcept
 // This is used when the SBC forwards a setAddressAndNormalTiming message addressed to the master (oldAddress 0).
 void CanInterface::ConfigLocalCanTiming(const CanTiming& timing, bool doSetTiming, const StringRef& reply) noexcept
 {
+	if (can0dev == nullptr)
+	{
+		// The SBC can still address the master after an emergency stop has destroyed the device
+		reply.copy("CAN is shut down");
+		return;
+	}
+
 	if (doSetTiming)
 	{
 		{
@@ -1147,6 +1152,12 @@ void CanInterface::ConfigLocalCanTiming(const CanTiming& timing, bool doSetTimin
 
 void CanInterface::ReportCanTiming(const StringRef& reply) noexcept
 {
+	if (can0dev == nullptr)
+	{
+		reply.copy("CAN is shut down");
+		return;
+	}
+
 	CanTiming timing{};
 	can0dev->GetLocalCanTiming(timing);
 	reply.printf("CAN arbitration speed %.1fkbps, sample point %.2f, jump width %.2f, ",
