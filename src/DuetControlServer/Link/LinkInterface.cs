@@ -307,9 +307,9 @@ public sealed partial class LinkInterface(
                 CanRequests.Remove(request);
             }
         }
-        return request.Status switch
+        return request.ResultCode switch
         {
-            Protocol.FirmwareRequests.CanStatus.Timeout => CanResponse.FromTimeout(request),
+            CodeResult.CanResponseTimeout => CanResponse.FromTimeout(request),
             _ => CanResponse.FromRequest(request)
         };
     }
@@ -447,13 +447,10 @@ public sealed partial class LinkInterface(
     /// <param name="txToken">Token the message was queued with</param>
     /// <param name="status">Outcome the controller reported</param>
     /// <remarks>
+    /// <para>
     /// A message expecting no reply is complete here: this is the furthest anything can say it got.
     /// One expecting a reply is only failed here - a reply it can no longer receive is one it would
     /// otherwise wait out the whole timeout for.
-    /// <para>
-    /// <see cref="Protocol.FirmwareRequests.CanStatus.Timeout"/> is the one status that is not a fault
-    /// in the sending: the controller gave the board its time and the board did not answer, which is
-    /// reported rather than thrown for the reasons <see cref="CanResponse.FromTimeout"/> gives
     /// </para>
     /// </remarks>
     internal void CompleteCanMessageSent(ushort txToken, Protocol.FirmwareRequests.CanStatus status)
@@ -477,17 +474,30 @@ public sealed partial class LinkInterface(
             CanRequests.Remove(request);
         }
 
-        if (status == Protocol.FirmwareRequests.CanStatus.Ok)
+        switch (status)
         {
-            request.SetResult();
-        }
-        else if (status == Protocol.FirmwareRequests.CanStatus.Timeout && request.ExpectsReply)
-        {
-            request.SetResult(status, CanMessageType.StandardReply, request.DstAddress);
-        }
-        else
-        {
-            request.SetException(new IOException($"Controller could not send CAN message: {status}"));
+            case Protocol.FirmwareRequests.CanStatus.Ok:
+                // Only reached by a message expecting no reply; one that expects a reply returned above
+                request.SetResult();
+                break;
+
+            case Protocol.FirmwareRequests.CanStatus.ResponseTimeout:
+            case Protocol.FirmwareRequests.CanStatus.DispatchTimeout:
+                /* 
+                TODO revisit this in the future, we might make this throw a GCodeException so that the code ends early.
+                The ultimate goal would be for a Code to be atomic so if it fails in anyway, the machine state is rolled
+                back to before the code ran. This means reverting any OM changes and possibling sending new CAN messages
+                to expansion boards.
+
+                It may also be useful in the future to clarify to the user whether the CAN message was dispatched or not
+                but to keep RRF parity that is not done yet.
+                 */
+                request.SetTimedOut();
+                break;
+
+            default:
+                request.SetException(new IOException($"Controller could not send CAN message: {status}"));
+                break;
         }
     }
 

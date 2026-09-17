@@ -1,5 +1,4 @@
 using DuetControlServer.Link.Protocol.CanMessages;
-using DuetControlServer.Link.Protocol.FirmwareRequests;
 using DuetControlServer.Link.Protocol.Shared;
 using System;
 using System.Collections.Generic;
@@ -20,8 +19,8 @@ namespace DuetControlServer.Link;
 /// <remarks>
 /// If no reply is expected then the task is completed once the controller reports what became of the
 /// message. If a reply is expected then the task is completed once the (possibly fragmented) reply has
-/// been fully received. Either kind is failed by a send the controller could not make, and by the
-/// request timing out or the connection being lost.
+/// been fully received, or once the controller reports that the board never answered. Either kind is
+/// failed by a send the controller could not make, and by the connection being lost.
 /// </remarks>
 public class CanRequest(CanMessageType messageType, CanMessageType replyType, ushort txToken, byte dstAddress, bool isResponse, byte[] requestPayload)
 {
@@ -72,11 +71,6 @@ public class CanRequest(CanMessageType messageType, CanMessageType replyType, us
     public CanMessageType ResponseType { get; private set; } = CanMessageType.NoReply;
 
     /// <summary>
-    /// Status of the received reply
-    /// </summary>
-    public CanStatus Status { get; private set; }
-
-    /// <summary>
     /// Reassembled payload of the reply (concatenated content of all fragments)
     /// </summary>
     public byte[] ResponsePayload { get; private set; } = [];
@@ -88,13 +82,15 @@ public class CanRequest(CanMessageType messageType, CanMessageType replyType, us
     public byte Extra { get; private set; }
 
     /// <summary>
-    /// Result code the board reported, or null if the reply type carries none
+    /// What became of the request: what the board answered, or why it got no answer
     /// </summary>
     /// <remarks>
-    /// Taken from the first fragment. Every fragment of a reply repeats it, but only the first one is
-    /// guaranteed to have arrived when a later fragment is being added
+    /// Taken from the first fragment of a reply. Every fragment repeats it, but only the first one is
+    /// guaranteed to have arrived when a later fragment is being added. A request that the controller
+    /// expired instead carries <see cref="CodeResult.CanResponseTimeout"/>, which is the same value
+    /// RepRapFirmware returns for it, so that one field answers the question either way
     /// </remarks>
-    public CodeResult? ResultCode { get; private set; }
+    public CodeResult ResultCode { get; private set; } = CodeResult.Ok;
 
     /// <summary>
     /// Received reply fragments, keyed by fragment number to handle out-of-order delivery
@@ -131,12 +127,10 @@ public class CanRequest(CanMessageType messageType, CanMessageType replyType, us
     /// <summary>
     /// Store the reply metadata, assemble the buffered fragments and complete the task
     /// </summary>
-    /// <param name="status">Status of the reply</param>
     /// <param name="responseType">Actual type of the reply</param>
     /// <param name="srcAddress">Source address of the replying board</param>
-    public void SetResult(CanStatus status, CanMessageType responseType, byte srcAddress)
+    public void SetResult(CanMessageType responseType, byte srcAddress)
     {
-        Status = status;
         ResponseType = responseType;
         SrcAddress = srcAddress;
 
@@ -154,6 +148,20 @@ public class CanRequest(CanMessageType messageType, CanMessageType replyType, us
     /// Complete a request for which no reply is expected
     /// </summary>
     public void SetResult() => _tcs.TrySetResult();
+
+    /// <summary>
+    /// Complete a request whose board was given its time and did not answer
+    /// </summary>
+    /// <remarks>
+    /// Not a failure of the request: a board that does not answer is something the operator is told
+    /// about, so this resolves the request and <see cref="CanResponse.FromTimeout"/> turns it into the
+    /// reply the caller sees.
+    /// </remarks>
+    public void SetTimedOut()
+    {
+        ResultCode = CodeResult.CanResponseTimeout;
+        _tcs.TrySetResult();
+    }
 
     /// <summary>
     /// Set the task to canceled

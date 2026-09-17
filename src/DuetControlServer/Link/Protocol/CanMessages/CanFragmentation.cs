@@ -9,9 +9,9 @@ namespace DuetControlServer.Link.Protocol.CanMessages;
 /// <param name="number">Zero-based index of this fragment</param>
 /// <param name="moreFollows">Whether further fragments are expected after this one</param>
 /// <param name="extra">The reply's <c>extra</c> byte, which a few requests answer in rather than in the text</param>
-/// <param name="resultCode">Result code the board reported, if this reply type carries one</param>
+/// <param name="resultCode">Result code the board reported</param>
 /// <param name="content">Reassembly-relevant content of this fragment</param>
-public readonly ref struct CanFragment(int number, bool moreFollows, byte extra, CodeResult? resultCode, ReadOnlySpan<byte> content)
+public readonly ref struct CanFragment(int number, bool moreFollows, byte extra, CodeResult resultCode, ReadOnlySpan<byte> content)
 {
     /// <summary>
     /// Zero-based index of this fragment
@@ -29,9 +29,9 @@ public readonly ref struct CanFragment(int number, bool moreFollows, byte extra,
     public byte Extra { get; } = extra;
 
     /// <summary>
-    /// Result code the board reported, or null if this reply type does not carry one
+    /// Result code the board reported
     /// </summary>
-    public CodeResult? ResultCode { get; } = resultCode;
+    public CodeResult ResultCode { get; } = resultCode;
 
     /// <summary>
     /// Reassembly-relevant content of this fragment
@@ -88,12 +88,13 @@ public static class CanFragmentation
                 return Unfragmented(CanMessageSerializer.Deserialize<CanMessageReadInputsReplyV1>(payload).ResultCode, payload);
 
             default:
-                // A reply type with no result code of its own: whether it worked is only what the
-                // transport says about it
-                return Unfragmented(null, payload);
+                // A reply type with no result code of its own. A board with something to report would
+                // have answered with a standard reply instead, so one of these arriving at all is the
+                // board saying it did what was asked - which is what RepRapFirmware's ok means
+                return Unfragmented(CodeResult.Ok, payload);
         }
     }
 
-    private static CanFragment Unfragmented(CodeResult? resultCode, ReadOnlySpan<byte> payload)
+    private static CanFragment Unfragmented(CodeResult resultCode, ReadOnlySpan<byte> payload)
         => new(0, false, 0, resultCode, payload);
 }

@@ -676,12 +676,11 @@ internal sealed class LinkService(
         ushort txToken = response.TxToken;
         CanMessageType msgType = (CanMessageType)response.MsgType;
         byte srcAddress = response.SrcAddress;
-        CanStatus status = (CanStatus)response.Status;
 
         // Messages that are not a reply to one of our requests carry the reserved token
         if (txToken == LinkInterface.UnsolicitedTxToken)
         {
-            HandleUnsolicitedCanMessage(msgType, srcAddress, response.Flags, status, payload);
+            HandleUnsolicitedCanMessage(msgType, srcAddress, response.Flags, payload);
             return;
         }
 
@@ -704,21 +703,16 @@ internal sealed class LinkService(
                 return;
             }
 
-            // Propagate transport-level failures immediately
-            if (status != CanStatus.Ok)
-            {
-                request.SetResult(status, msgType, srcAddress);
-                linkInterface.CanRequests.Remove(request);
-                return;
-            }
-
-            // Reassemble the (possibly fragmented) reply
+            // Reassemble the (possibly fragmented) reply. A forwarded message is only ever one the
+            // controller took off the bus, so there is no transport outcome to read here: a request the
+            // controller could not send, or gave up waiting on, is answered on the acknowledgement ring
+            // instead and never reaches this point
             CanFragment fragment = CanFragmentation.Parse(request.ReplyType, payload);
             logger.LogDebug("Received CAN response fragment {FragmentNumber} of type {MsgType} from address {SrcAddress} ({Length} bytes, result {ResultCode}, more follows: {MoreFollows})", fragment.Number, msgType, srcAddress, fragment.Content.Length, fragment.ResultCode, fragment.MoreFollows);
             request.AddFragment(in fragment);
             if (!fragment.MoreFollows)
             {
-                request.SetResult(status, msgType, srcAddress);
+                request.SetResult(msgType, srcAddress);
                 linkInterface.CanRequests.Remove(request);
             }
         }
@@ -730,9 +724,8 @@ internal sealed class LinkService(
     /// <param name="msgType">Type of the received CAN message</param>
     /// <param name="srcAddress">Source address of the sending board</param>
     /// <param name="flags">Flags of the CAN message</param>
-    /// <param name="status">Status of the CAN message</param>
     /// <param name="payload">CAN payload</param>
-    private void HandleUnsolicitedCanMessage(CanMessageType msgType, byte srcAddress, byte flags, CanStatus status, byte[] payload)
+    private void HandleUnsolicitedCanMessage(CanMessageType msgType, byte srcAddress, byte flags, byte[] payload)
     {
         logger.LogTrace("Received unsolicited CAN message of type {MsgType} from address {SrcAddress} ({Length} bytes)", msgType, srcAddress, payload.Length);
 

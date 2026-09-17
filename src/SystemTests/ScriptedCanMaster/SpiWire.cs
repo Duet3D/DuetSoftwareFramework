@@ -77,10 +77,11 @@ internal enum FirmwareRequest : ushort
 internal enum CanStatus : byte
 {
     Ok = 0,
-    Timeout = 1,
+    ResponseTimeout = 1,
     BusError = 2,
     NoBuffer = 3,
     Overflow = 4,
+    DispatchTimeout = 5,
 }
 
 /// <summary>Frame types of the socket framing (SocketLinkFormats.h)</summary>

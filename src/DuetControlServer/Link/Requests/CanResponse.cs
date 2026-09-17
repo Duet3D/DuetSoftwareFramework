@@ -1,5 +1,4 @@
 using DuetAPI.ObjectModel;
-using DuetControlServer.Link.Protocol.FirmwareRequests;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
 using System;
@@ -11,38 +10,29 @@ namespace DuetControlServer.Link;
 /// <summary>
 /// Result of a CAN request, exposing the reassembled reply.
 /// </summary>
-/// <param name="Status">Status of the reply as the HAT saw it</param>
 /// <param name="ResponseType">Actual type of the reply (<see cref="CanMessageType.NoReply"/> if none was expected)</param>
 /// <param name="SrcAddress">Source address of the replying board</param>
 /// <param name="DstAddress">Address the request was sent to</param>
 /// <param name="Payload">Reassembled payload of the reply</param>
 /// <param name="Extra">The reply's <c>extra</c> byte, which a few requests answer in rather than in the text</param>
-/// <param name="ResultCode">Result code the board reported, or null if the reply type carries none</param>
+/// <param name="ResultCode">What became of the request: what the board answered, or why it got no answer</param>
 /// <remarks>
-/// Whether the board did what it was asked is <see cref="Status"/> and <see cref="ResultCode"/>, not
-/// whether it sent any text: a board that refuses a request may say why, but it may equally say nothing,
-/// and a board that carried one out may still have something to report.
+/// <para>
+/// Whether the board did what it was asked is <see cref="ResultCode"/>, not whether it sent any text: a
+/// board that refuses a request may say why, but it may equally say nothing, and a board that carried
+/// one out may still have something to report.
+/// </para>
 /// </remarks>
-public readonly record struct CanResponse(CanStatus Status, CanMessageType ResponseType, byte SrcAddress, byte DstAddress,
-                                          byte[] Payload, byte Extra, CodeResult? ResultCode)
+public readonly record struct CanResponse(CanMessageType ResponseType, byte SrcAddress, byte DstAddress,
+                                          byte[] Payload, byte Extra, CodeResult ResultCode)
 {
     /// <summary>
     /// Create a response from a completed request
     /// </summary>
     /// <param name="request">Completed CAN request</param>
     internal static CanResponse FromRequest(CanRequest request)
-        => new(request.Status, request.ResponseType, request.SrcAddress, request.DstAddress, request.ResponsePayload,
+        => new(request.ResponseType, request.SrcAddress, request.DstAddress, request.ResponsePayload,
                request.Extra, request.ResultCode);
-
-    /// <summary>
-    /// Whether this stands in for a reply that never came, rather than carrying one
-    /// </summary>
-    /// <remarks>
-    /// RepRapFirmware's <c>GCodeResult::canResponseTimeout</c>, which its callers branch on: a
-    /// diagnostics fetch that loses the board part way through has to stop asking for the rest, and
-    /// must not print a header for a report it is not going to get
-    /// </remarks>
-    public bool TimedOut { get; init; }
 
     /// <summary>
     /// The answer a request stands in with when the board never gave one
@@ -65,10 +55,10 @@ public readonly record struct CanResponse(CanStatus Status, CanMessageType Respo
     /// </para>
     /// </remarks>
     internal static CanResponse FromTimeout(CanRequest request)
-        => new(CanStatus.Timeout, CanMessageType.StandardReply, request.DstAddress, request.DstAddress,
+        => new(CanMessageType.StandardReply, request.DstAddress, request.DstAddress,
                Encoding.ASCII.GetBytes($"CAN response timeout: board {request.DstAddress}, "
                                        + $"req type {(ushort)request.MessageType}, RID {request.TxToken}"),
-               Extra: 0, ResultCode: null) { TimedOut = true };
+               Extra: 0, CodeResult.CanResponseTimeout);
 
     /// <summary>
     /// Text the board sent with the reply, empty if it said nothing
@@ -83,8 +73,7 @@ public readonly record struct CanResponse(CanStatus Status, CanMessageType Respo
     /// How this reply should be reported: what the board made of the request, or an error if it never
     /// answered
     /// </summary>
-    public MessageType Severity => Status != CanStatus.Ok ? MessageType.Error
-        : ResultCode?.ToMessageType() ?? MessageType.Success;
+    public MessageType Severity => ResultCode.ToMessageType();
 
     /// <summary>
     /// The reply as a message to pass back to whoever sent the request
@@ -132,8 +121,12 @@ public readonly record struct CanResponse(CanStatus Status, CanMessageType Respo
     /// <summary>
     /// What the board said, or why it did not say it
     /// </summary>
-    private string Description => Status != CanStatus.Ok ? $"Board {DstAddress} did not answer ({Status})"
-        : !string.IsNullOrWhiteSpace(Text) ? Text
+    /// <remarks>
+    /// The text comes first because an unanswered request carries RepRapFirmware's own wording for why
+    /// (see <see cref="FromTimeout"/>), and that names the board, the request type and the id. Testing
+    /// the result code ahead of it would replace all of that with the name of an enumeration value
+    /// </remarks>
+    private string Description => !string.IsNullOrWhiteSpace(Text) ? Text
         : Severity == MessageType.Error ? $"Board {DstAddress} rejected the request ({ResultCode})"
         : string.Empty;
 }

@@ -1358,10 +1358,12 @@ internal partial class MCodeHandler(
                                                                            CanMessageType.StandardReply,
                                                                            cancellationToken: cancellationToken);
             Message reply = response.ToMessage();
-            if (response.TimedOut || reply.Type == MessageType.Error)
+            if (reply.Type == MessageType.Error)
             {
                 // Said before the header, as RemoteDiagnostics does: a board that cannot be reached
-                // has no report to introduce
+                // has no report to introduce. One test covers both that and a board that refused,
+                // because a request the board never answered carries CanResponseTimeout and reads as
+                // an error like any other result code that is not ok
                 return reply;
             }
 

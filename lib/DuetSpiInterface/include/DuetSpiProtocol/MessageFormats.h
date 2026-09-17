@@ -104,11 +104,12 @@ enum class FirmwareRequest : uint16_t {
 
 // Status of a forwarded CAN message (FirmwareRequests/CanStatus.cs)
 enum class CanStatus : uint8_t {
-    Ok = 0,       // Reply received without error
-    Timeout = 1,  // No reply received within the timeout period
-    BusError = 2, // Transmit failed or the request was malformed
-    NoBuffer = 3, // The HAT could not allocate a CAN buffer for the request
-    Overflow = 4, // Reply larger than the SBC could handle
+    Ok = 0,              // Reply received without error
+    ResponseTimeout = 1, // The frame reached the bus and the board did not reply in time
+    BusError = 2,        // Refused before transmission: the bus is disabled, or the request was malformed
+    NoBuffer = 3,        // The controller had no buffer for the request or for its reply
+    Overflow = 4,        // Reply larger than the SBC could handle
+    DispatchTimeout = 5, // The frame was handed to the CAN peripheral and no node on the bus ever acknowledged it
 };
 
 // ---------------------------------------------------------------------------

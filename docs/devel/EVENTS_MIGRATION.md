@@ -583,17 +583,67 @@ acknowledged to the SBC keyed by the `txToken` the SBC already puts in every `Se
 | `can0dev == nullptr`, or CAN never enabled | `BusError`, before anything is transmitted |
 | Request id placeholder not `0xFFF` | `BusError`, plus a `WarningMessage` on the controller's console |
 | No free pending-request slot | `NoBuffer`. The message is still sent, but its reply can never be matched back, so the request fails now rather than waiting out `CanRequestTimeout` |
-| `CanDevice::SendMessage` cancelled an older message to make room | `BusError` against the **cancelled** message's own token, via the per-buffer id-to-token record. The message being sent is unaffected |
+| `CanDevice::SendMessage` cancelled an older message to make room | `DispatchTimeout` against the **cancelled** message's own token, via the per-buffer id-to-token record. The message being sent is unaffected |
 
-A fifth outcome is not a failure of the send at all: a request that reaches the bus and goes
-unanswered for `UsualResponseTimeout` is expired by `CheckPendingRequestTimeouts`, once per transfer,
-and reported as `Timeout`. DCS turns that one into a `CanResponse.FromTimeout` rather than an
-exception, because a board that does not answer is something the operator is told about.
+A reply the controller cannot hand on to the SBC is answered the same way, against the token that was
+waiting for it: `NoBuffer` when the response ring is full, `Overflow` when the payload is longer than a
+slot will hold. Either way the reply is gone, so the request fails at once instead of waiting out a
+timeout for something that is not coming.
+
+Two further outcomes are not failures of the send: they are how a request that was accepted runs out of
+time. `CheckPendingRequestTimeouts` expires a request that has gone unanswered for
+`UsualResponseTimeout`, once per transfer, and has to say which of the two happened.
+
+| Outcome | Reported as |
+|---|---|
+| The frame reached the bus and the board did not reply | `ResponseTimeout` |
+| The frame is still sitting in its transmit buffer, acknowledged by nobody | `DispatchTimeout` |
+
+The test is evidence rather than inference: the transmit buffer must still be held for this request
+*and* its transmission request must still be pending. A buffer whose owner has moved on cannot answer
+for the message any more, because its frame either went out or was cancelled to make room, so the
+request falls through to `ResponseTimeout`. The cancellation path reports `DispatchTimeout` for the same
+reason the sweep does: it is the same physical fact, and which of the two notices it depends only on
+whether later traffic needed the buffer first.
+
+`DispatchTimeout` says nothing about the board the message was addressed to. A CAN frame is
+acknowledged by any receiving node rather than by the addressed one, so on a machine with other boards
+present an absent board still gives `ResponseTimeout`; what `DispatchTimeout` reports is that nothing on
+the bus is listening at all.
+
+DCS does not report that distinction. Both timeouts resolve to the same result code and the same text,
+which is RepRapFirmware's, because RepRapFirmware cannot tell them apart: its
+`SendRequestAndGetCustomReply` hands the frame to the peripheral without ever checking whether it was
+transmitted, waits out `UsualResponseTimeout`, and returns `canResponseTimeout` either way. Keeping the
+two apart on the wire is what makes surfacing them later a change to one switch arm rather than to the
+transmit path, and `CompleteCanMessageSent` carries the `TODO` that says so. Until then the distinction
+exists in the controller and on the link, and nowhere an operator can see.
 
 **Protocol.** A new firmware→SBC request, `CanMessageSent = 7`, carrying a count and that many
 `{ uint16 txToken; uint8 status; uint8 padding; }` entries — one packet per transfer rather than one
 per message, because the controller can batch everything it sent since the last transfer. `status`
-reuses `CanStatus` (`Ok`, `BusError`, `NoBuffer`), which already names all four failures above.
+reuses `CanStatus` (`Ok`, `ResponseTimeout`, `BusError`, `NoBuffer`, `Overflow`, `DispatchTimeout`),
+which names every outcome above.
+
+`CanStatus` goes no further than `LinkInterface.CompleteCanMessageSent`. Above the link layer what
+became of a request is a `CodeResult`, as it is in RepRapFirmware, and the line between the two is
+whether the request was given its time:
+
+- `Ok` completes a message that expected no reply. One that expects a reply stays outstanding, because
+  the controller accepting it is not an answer.
+- `ResponseTimeout` and `DispatchTimeout` both mean the request ran its full deadline and nothing came
+  back. Both convert to `CodeResult.CanResponseTimeout` and are **reported**, because a request that
+  was given its chance and got no answer is something the operator is told about rather than a fault in
+  the code that asked.
+- `BusError`, `NoBuffer` and `Overflow` mean the controller cannot complete the request at all: it
+  refused it, it had nowhere to register the reply, or the reply was lost on the way to the SBC. None
+  of those is an answer a `CodeResult` can express, so they **fail** the request.
+
+RepRapFirmware reports `noCanBuffer` where this throws, which is a deliberate difference: a request
+whose reply can never be matched has not been attempted in any sense the caller can act on.
+`CanResponse` therefore carries one result code and no transport status, and `CanStatus` appears in
+only four files — its own definition, the native event struct, the one decode site in `LinkService`,
+and `LinkInterface` where it is converted.
 
 The alternative is to reuse `CANResponse` with a zero-length payload and a new `CanStatus::Sent`. It
 is less code — the response ring, the resend path and DCS's `HandleCanResponse` matcher all exist —
@@ -622,7 +672,8 @@ for. Without that, a cancellation can only be reported as an unattributed counte
 - Give the ack the same `CanRequestTimeout` bound a reply gets, so a lost ack fails the code instead
   of hanging it, and keep `Invalidate()` cancelling whatever is still outstanding. That bound is a
   backstop, not the deadline a board is judged against: the controller expires a request that goes
-  unanswered for `UsualResponseTimeout` and reports `Timeout` for it, so `CanRequestTimeout` sits above
+  unanswered for `UsualResponseTimeout` and reports `ResponseTimeout` or `DispatchTimeout` for it, so
+  `CanRequestTimeout` sits above
   the two put together and only catches an outcome lost while the link stays up.
 - A **reply-expecting** request must not be completed by its ack — it is still waiting for the reply.
   But a non-`Ok` ack should fail it immediately rather than after 2 s, which is the second thing this
@@ -786,16 +837,26 @@ Each phase is independently useful and independently testable.
 - [x] Controller: map a CAN id cancelled to make room back to the token that sent it, which is the
       fourth. `SendMessage` names the message it dropped by id, so each dedicated transmit buffer
       records the token and id of the message loaded into it; a cancellation whose id still matches
-      fails that token with `BusError` and frees the pending-request slot it was holding. The FIFO is
-      not tracked, because one entry cannot say which of the messages in it was dropped
+      fails that token with `DispatchTimeout` and frees the pending-request slot it was holding. The
+      FIFO is not tracked, because one entry cannot say which of the messages in it was dropped
 - [x] DCS: resolve fire-and-forget CAN requests on the ack rather than at queue time, bound by
-      `CanRequestTimeout`; fail reply-expecting requests early on a non-`Ok` ack. This is the single
-      route for both kinds: delivery over SPI resolves neither, because reaching the controller is not
-      reaching the bus
+      `CanRequestTimeout`; resolve or fail reply-expecting requests early on a non-`Ok` ack rather than
+      letting them wait out that bound. This is the single route for both kinds: delivery over SPI
+      resolves neither, because reaching the controller is not reaching the bus
+- [x] Controller: expire a request that goes unanswered for `UsualResponseTimeout` and report it,
+      instead of dropping the mapping silently and leaving DCS to guess. `ResponseTimeout` when the
+      frame reached the bus, `DispatchTimeout` when it is still sitting in its transmit buffer
+      acknowledged by nobody (§4.1.2 hop 2)
+- [x] DCS: collapse the transport status into the result code. `CanResponse` carries a `CodeResult` and
+      nothing else, both timeouts convert to `CodeResult.CanResponseTimeout`, and `CanStatus` stops at
+      the link layer
 - [x] Controller: report an outcome for a `setAddressAndNormalTiming` addressed to the master, which
       is answered locally and so never passes through `SendCanRequest`
 - [x] Test: a send the controller refuses fails its code, and one it accepts completes it
-      (`CanBusCodeTests.M952FailsWhenTheControllerCannotSendTheMessage` and its companion)
+      (`CanBusCodeTests.M952FailsWhenTheControllerCannotSendTheMessage` and its companion); a reply it
+      could not forward fails the code at once; and either timeout is reported in RepRapFirmware's
+      wording rather than thrown (`M952ReportsABoardThatDoesNotAnswer` and
+      `M952FailsWhenNothingOnTheBusAcknowledgedTheMessage`)
 - [ ] Test: send with a full tx buffer. Pull the link mid-transfer; expect the staged commands to
       report dropped
 - [ ] Schema: `controller_disconnect` = 128, `controller_reconnect` = 129, `"emit": ["csharp"]`,

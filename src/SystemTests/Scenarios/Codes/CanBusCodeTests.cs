@@ -366,6 +366,30 @@ public class CanBusCodeTests : SystemTests.Host.BenchFixture
     }
 
     /// <summary>
+    /// A message that never got onto the wire reported as a timeout.
+    /// </summary>
+    /// <remarks>
+    /// The other half of <see cref="M952ReportsABoardThatDoesNotAnswer"/>.
+    /// 
+    /// The behaviour may change in the future.
+    /// </remarks>
+    [Test]
+    public async Task M952FailsWhenNothingOnTheBusAcknowledgedTheMessage()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync();
+
+        bench.CanMaster.ScriptCanSendStatus(CanStatus.DispatchTimeout);
+        string reply = await bench.Host.ExecuteCodeAsync($"M952 B{Board}", timeoutMs: 5_000);
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply, Does.StartWith("Error:"),
+                        "a board that did not answer is reported as an error, not thrown (CanResponse.FromTimeout)");
+            Assert.That(reply, Does.Contain($"CAN response timeout: board {Board}"),
+                        "and says so in RepRapFirmware's wording, which names the board rather than a result code");
+        });
+    }
+
+    /// <summary>
     /// A reply the controller could not forward fails its code straight away, rather than leaving it
     /// to wait out a timeout for something that is not coming.
     /// </summary>
@@ -402,10 +426,15 @@ public class CanBusCodeTests : SystemTests.Host.BenchFixture
     {
         await using JobBench bench = await JobControlBench.StartAsync();
 
-        bench.CanMaster.ScriptCanSendStatus(CanStatus.Timeout);
+        bench.CanMaster.ScriptCanSendStatus(CanStatus.ResponseTimeout);
         string reply = await bench.Host.ExecuteCodeAsync($"M952 B{Board}", timeoutMs: 5_000);
-        Assert.That(reply, Does.StartWith("Error:"),
-                    "a board that did not answer is reported as an error, not thrown (CanResponse.FromTimeout)");
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply, Does.StartWith("Error:"),
+                        "a board that did not answer is reported as an error, not thrown (CanResponse.FromTimeout)");
+            Assert.That(reply, Does.Contain($"CAN response timeout: board {Board}"),
+                        "and says so in RepRapFirmware's wording, which names the board rather than a result code");
+        });
     }
 
     /// <summary>

@@ -94,6 +94,10 @@ struct CanRequestMapping
 	CanRequestId rid;	  // the request ID we allocated
 	uint16_t txToken;	  // the SBC's token to return in the response
 	uint32_t whenStarted; // millis() when the request was sent, used to expire it
+
+	// The transmit buffer the message went into, so that expiring the request can tell a board that did
+	// not reply from a frame that never left the buffer
+	CanDevice::TxBufferNumber txBuffer;
 };
 
 constexpr size_t numPendingCanRequests = 32;
@@ -528,7 +532,10 @@ static void TakeOverTxBuffer(CanDevice::TxBufferNumber whichBuffer,
 	TxBufferOwner& owner = txBufferOwners[(unsigned int)whichBuffer];
 	if (cancelledId != 0 && owner.txToken != noTxToken && owner.canId == cancelledId)
 	{
-		reprap.GetSbcInterface().ReportCanMessageSent(owner.txToken, CanStatus::BusError);
+		// The same fact the expiry sweep reports: this frame was handed to the peripheral and never got
+		// onto the wire. Which of the two notices it depends only on whether later traffic needed the
+		// buffer first, so they must not say different things about it
+		reprap.GetSbcInterface().ReportCanMessageSent(owner.txToken, CanStatus::DispatchTimeout);
 
 		// The reply it was waiting for can never arrive, so the slot holding it is dead
 		CanInterface::ReleasePendingRequestForToken(owner.txToken);
@@ -802,6 +809,19 @@ void CanInterface::SendCanRequest(CanMessageBuffer& buf, uint16_t txToken, CanMe
 		return;
 	}
 
+	// Each buffer holds a single message. Before sending, all the buffers and the next message in the
+	// fifo are checked and the highest priority message is sent
+	CanDevice::TxBufferNumber txBuffer{};
+	switch (buf.id.MsgType())
+	{
+	case CanMessageType::movementLinearShaped:
+		txBuffer = txBufferIndexMotion;
+		break;
+	default:
+		txBuffer = txBufferIndexRequest;
+		break;
+	} // TODO: choose a different buffer for urgent requests
+
 	if (replyType != CanMessageType::unusedMessageType)
 	{
 		// A reply is expected. The SBC must have set the request ID field to all-ones as a placeholder; verify that
@@ -841,6 +861,7 @@ void CanInterface::SendCanRequest(CanMessageBuffer& buf, uint16_t txToken, CanMe
 				slot->rid = rid;
 				slot->txToken = txToken;
 				slot->whenStarted = now;
+				slot->txBuffer = txBuffer;
 			}
 			else
 			{
@@ -858,18 +879,6 @@ void CanInterface::SendCanRequest(CanMessageBuffer& buf, uint16_t txToken, CanMe
 
 	// Non-blocking send
 	// Technically this is blocking on the send itself but it doesn't block waiting for the response
-	// Each buffer can hold a single message, before sending a CAN message, all the buffers and the next message in the
-	// fifo are checked and the highest priority message is sent
-	CanDevice::TxBufferNumber txBuffer{};
-	switch (buf.id.MsgType())
-	{
-	case CanMessageType::movementLinearShaped:
-		txBuffer = txBufferIndexMotion;
-		break;
-	default:
-		txBuffer = txBufferIndexRequest;
-		break;
-	} // TODO: choose a different buffer for urgent requests
 	const auto timeout = maxRequestSendWait; // TODO make this configurable per request type
 	SendCanMessage(txBuffer, timeout, buf, txToken);
 
@@ -903,7 +912,24 @@ uint16_t CanInterface::MatchPendingRequest(CanAddress src, CanRequestId rid, boo
 	return SbcProtocol::UnsolicitedTxToken;
 }
 
-// Expire in-flight requests whose reply never came, and tell the SBC that each one timed out.
+#  if HAS_SBC_INTERFACE
+
+// Whether this request's frame is still sitting in its transmit buffer, never acknowledged by any node
+// and so never transmitted.
+//
+// Evidence, not inference: the buffer must still be held for this request and its transmission request
+// must still be pending. A buffer whose owner has moved on cannot answer for this message any more,
+// because its frame either went out or was cancelled to make room, and the cancellation reports itself.
+// The FIFO is never an owner, so a request sent through it always falls through to the safe answer.
+static bool NeverDispatched(const CanRequestMapping& m) noexcept
+{
+	const TxBufferOwner& owner = txBufferOwners[(unsigned int)m.txBuffer];
+	return owner.txToken == m.txToken && !can0dev->IsSpaceAvailable(m.txBuffer, 0);
+}
+
+#  endif
+
+// Expire in-flight requests whose reply never came, and tell the SBC how each one ran out of time.
 //
 // A board gets UsualResponseTimeout to answer, which is what RepRapFirmware gives it. Past that the
 // reply can no longer be matched to anything, so the slot is dead and so is the request waiting on it.
@@ -912,7 +938,18 @@ uint16_t CanInterface::MatchPendingRequest(CanAddress src, CanRequestId rid, boo
 void CanInterface::CheckPendingRequestTimeouts() noexcept
 {
 #  if HAS_SBC_INTERFACE
-	uint16_t expired[numPendingCanRequests];
+	if (can0dev == nullptr)
+	{
+		return;
+	}
+
+	struct ExpiredRequest
+	{
+		uint16_t txToken;
+		CanStatus status;
+	};
+
+	ExpiredRequest expired[numPendingCanRequests];
 	size_t numExpired = 0;
 
 	{
@@ -923,7 +960,10 @@ void CanInterface::CheckPendingRequestTimeouts() noexcept
 			if (m.active && now - m.whenStarted >= UsualResponseTimeout)
 			{
 				m.active = false;
-				expired[numExpired++] = m.txToken;
+				expired[numExpired].txToken = m.txToken;
+				expired[numExpired].status = NeverDispatched(m) ? CanStatus::DispatchTimeout
+															   : CanStatus::ResponseTimeout;
+				++numExpired;
 			}
 		}
 	}
@@ -931,7 +971,7 @@ void CanInterface::CheckPendingRequestTimeouts() noexcept
 	// Reported outside the critical section: queueing an outcome wakes the SBC task
 	for (size_t i = 0; i < numExpired; ++i)
 	{
-		reprap.GetSbcInterface().ReportCanMessageSent(expired[i], CanStatus::Timeout);
+		reprap.GetSbcInterface().ReportCanMessageSent(expired[i].txToken, expired[i].status);
 	}
 #  endif
 }

@@ -147,7 +147,9 @@ public class CanMessages
 
         Assert.That(fragment.Number, Is.EqualTo(0));
         Assert.That(fragment.MoreFollows, Is.False);
-        Assert.That(fragment.ResultCode, Is.Null, "a reply type with no result code of its own must not invent one");
+        Assert.That(fragment.ResultCode, Is.EqualTo(CodeResult.Ok),
+                    "a reply type with no result code of its own reads as ok: a board with something to report "
+                    + "would have answered with a standard reply instead");
         Assert.That(fragment.Content.ToArray(), Is.EqualTo(payload));
     }
 
@@ -166,10 +168,10 @@ public class CanMessages
             request.AddFragment(in fragment);
         }
 
-        request.SetResult(CanStatus.Ok, CanMessageType.StandardReply, srcAddress: 7);
+        request.SetResult(CanMessageType.StandardReply, srcAddress: 7);
 
         Assert.That(request.Task.IsCompletedSuccessfully, Is.True);
-        Assert.That(request.Status, Is.EqualTo(CanStatus.Ok));
+        Assert.That(request.ResultCode, Is.EqualTo(CodeResult.Ok));
         Assert.That(request.SrcAddress, Is.EqualTo(7));
         Assert.That(Encoding.UTF8.GetString(request.ResponsePayload), Is.EqualTo("Hello World"));
     }
@@ -180,7 +182,7 @@ public class CanMessages
         CanRequest request = new(CanMessageType.Reset, CanMessageType.StandardReply, txToken: 1, dstAddress: 0, isResponse: false, requestPayload: []);
         request.AddFragment(new CanFragment(0, true, 1, CodeResult.Ok, "ab"u8));
         request.AddFragment(new CanFragment(0, false, 2, CodeResult.Error, "XY"u8));  // duplicate fragment number -- ignored
-        request.SetResult(CanStatus.Ok, CanMessageType.StandardReply, srcAddress: 0);
+        request.SetResult(CanMessageType.StandardReply, srcAddress: 0);
 
         Assert.That(Encoding.UTF8.GetString(request.ResponsePayload), Is.EqualTo("ab"));
         Assert.That(request.Extra, Is.EqualTo(1), "the duplicate must not overwrite the answer either");
@@ -202,7 +204,7 @@ public class CanMessages
 
         // A later fragment carries no answer, so it must not clear the one the first fragment gave
         request.AddFragment(new CanFragment(1, false, 0, CodeResult.Ok, "text"u8));
-        request.SetResult(CanStatus.Ok, CanMessageType.StandardReply, srcAddress: 0);
+        request.SetResult(CanMessageType.StandardReply, srcAddress: 0);
         Assert.That(request.Extra, Is.EqualTo(1));
     }
 
@@ -239,18 +241,26 @@ public class CanMessages
     [Test]
     public void AReplyThatNeverArrivedSaysWhichBoardDidNotAnswer()
     {
-        CanResponse response = new(CanStatus.Timeout, CanMessageType.StandardReply, SrcAddress: 0, DstAddress: 21,
-                                   Payload: [], Extra: 0, ResultCode: null);
+        // Built the way the link builds it, because the wording is the point: RepRapFirmware names the
+        // board, the request type and the request id, and a reply assembled by hand would assert
+        // nothing about whether that text survives as far as the caller
+        CanRequest request = new(CanMessageType.ReturnInfo, CanMessageType.StandardReply, txToken: 7,
+                                 dstAddress: 21, isResponse: false, requestPayload: []);
+        request.SetTimedOut();
+        CanResponse response = CanResponse.FromTimeout(request);
 
+        Assert.That(response.ResultCode, Is.EqualTo(CodeResult.CanResponseTimeout));
         Assert.That(response.Severity, Is.EqualTo(MessageType.Error));
-        Assert.That(response.ToMessage().Content, Does.Contain("21").And.Contain("Timeout"));
+        Assert.That(response.ToMessage().Content,
+                    Is.EqualTo("CAN response timeout: board 21, req type 6024, RID 7"),
+                    "RepRapFirmware's wording reaches the caller rather than being replaced by the name of a result code");
     }
 
     [Test]
     public void ARequestExpectingNoReplyHasNothingToReport()
     {
-        CanResponse response = new(CanStatus.Ok, CanMessageType.NoReply, SrcAddress: 0, DstAddress: 21,
-                                   Payload: [], Extra: 0, ResultCode: null);
+        CanResponse response = new(CanMessageType.NoReply, SrcAddress: 0, DstAddress: 21,
+                                   Payload: [], Extra: 0, CodeResult.Ok);
 
         Assert.That(response.Severity, Is.EqualTo(MessageType.Success));
         Assert.That(response.Text, Is.Empty);
@@ -263,7 +273,7 @@ public class CanMessages
         CanMessageHeaterModelReport report = new() { HeaterNumber = 3, ResultCode = CodeResult.Ok };
         byte[] payload = new byte[Unsafe.SizeOf<CanMessageHeaterModelReport>()];
         CanMessageSerializer.Serialize(in report, payload);
-        CanResponse response = new(CanStatus.Ok, CanMessageType.HeaterModelReport, SrcAddress: 21, DstAddress: 21,
+        CanResponse response = new(CanMessageType.HeaterModelReport, SrcAddress: 21, DstAddress: 21,
                                    payload, Extra: 0, CodeResult.Ok);
 
         Assert.That(response.AsCanMessage<CanMessageHeaterModelReport>().HeaterNumber, Is.EqualTo(3));
@@ -303,7 +313,7 @@ public class CanMessages
 
     /// <summary>A standard reply from board 21, as the link would hand it over once reassembled</summary>
     private static CanResponse Reply(CodeResult resultCode, string text)
-        => new(CanStatus.Ok, CanMessageType.StandardReply, SrcAddress: 21, DstAddress: 21,
+        => new(CanMessageType.StandardReply, SrcAddress: 21, DstAddress: 21,
                Encoding.ASCII.GetBytes(text), Extra: 0, resultCode);
 
     private static byte[] BuildStandardReplyFragment(string text, byte fragmentNumber, bool moreFollows, byte extra = 0,

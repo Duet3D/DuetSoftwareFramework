@@ -88,7 +88,7 @@ Recorded so the remaining list is read against what it sits on rather than as a 
 
 | Task | Size | Depends on |
 |---|---|---|
-| Phase C tail: event numbering in the schema, deleting `DuetCANMaster`'s dead event queue, mapping a dropped CAN message back to its sender, example macros | M 🔧 | |
+| Phase C tail: event numbering in the schema, deleting `DuetCANMaster`'s dead event queue, example macros | M 🔧 | mapping a dropped CAN message back to its sender is done |
 | Phase E: message box on a pausing event | S | **M291** (WS7) |
 
 ### WS6, job lifecycle
