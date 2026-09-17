@@ -307,9 +307,11 @@ public sealed partial class LinkInterface(
                 CanRequests.Remove(request);
             }
         }
-        return request.Status == Protocol.FirmwareRequests.CanStatus.Timeout
-            ? CanResponse.FromTimeout(request)
-            : CanResponse.FromRequest(request);
+        return request.Status switch
+        {
+            Protocol.FirmwareRequests.CanStatus.Timeout => CanResponse.FromTimeout(request),
+            _ => CanResponse.FromRequest(request)
+        };
     }
 
     /// <summary>
