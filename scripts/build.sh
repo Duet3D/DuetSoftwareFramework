@@ -433,10 +433,10 @@ if $START_SERVICES; then
     sleep 1
     if $LOCAL; then
         echo "=== Starting DSF services ==="
-        sudo systemctl start $SERVICES || true
+        sudo systemctl restart $SERVICES || true
     else
         echo "=== Starting DSF services on $SSH_USER@$TARGET ==="
-        ssh "${SSH_USER}@${TARGET}" "systemctl start $SERVICES || true"
+        ssh "${SSH_USER}@${TARGET}" "systemctl restart $SERVICES || true"
     fi
 fi
 
