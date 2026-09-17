@@ -84,9 +84,20 @@ constexpr float maxSamplePoint = 0.95;
 constexpr float minJumpWidth = 0.05;
 constexpr float maxJumpWidth = 0.5;
 
-// In-flight SBC-originated CAN requests, so that responses can be matched back to the SBC's txToken
+// An in-flight SBC-originated CAN request, so that a response can be matched back to the SBC's txToken.
+// Written by the SBC task, read and cleared by the CAN receiver tasks, always under the same lock: see
+// CanInterface::MatchPendingRequest for why nothing may hold a pointer to one of these.
+struct CanRequestMapping
+{
+	bool active;
+	CanAddress board;	  // the expansion board we sent to and expect the reply from
+	CanRequestId rid;	  // the request ID we allocated
+	uint16_t txToken;	  // the SBC's token to return in the response
+	uint32_t whenStarted; // millis() when the request was sent, used to expire it
+};
+
 constexpr size_t numPendingCanRequests = 32;
-static CanInterface::CanRequestMapping pendingRequests[numPendingCanRequests];
+static CanRequestMapping pendingRequests[numPendingCanRequests];
 
 static uint32_t longestWaitTime = 0;
 static uint16_t longestWaitMessageType = 0;
@@ -822,9 +833,7 @@ void CanInterface::SendCanRequest(CanMessageBuffer& buf, uint16_t txToken, CanMe
 				slot->board = dest;
 				slot->rid = rid;
 				slot->txToken = txToken;
-				slot->replyType = replyType;
 				slot->whenStarted = now;
-				slot->fragmentsReceived = 0;
 			}
 			else
 			{

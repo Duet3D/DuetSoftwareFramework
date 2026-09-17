@@ -75,19 +75,6 @@ namespace CanInterface
 		THROWS(CanException);
 	GCodeResult HandleM111(uint32_t boardAddress, const StringRef& reply) THROWS(CanException);
 
-	// SBC bridging: in-flight SBC-originated CAN request, so that a response can be matched back to the SBC's txToken
-	// and multi-fragment replies reassembled. Written by the SBC task, read/cleared by the CAN receiver tasks.
-	struct CanRequestMapping
-	{
-		bool active;
-		CanAddress board;		   // the expansion board we sent to and expect the reply from
-		CanRequestId rid;		   // the request ID we allocated
-		uint16_t txToken;		   // the SBC's token to return in the response
-		CanMessageType replyType;  // the CanMessageType the SBC expects (CanMessageType::unusedMessageType means none)
-		uint32_t whenStarted;	   // millis() when the request was sent, used for silent expiry
-		uint8_t fragmentsReceived; // number of reply fragments collated so far
-	};
-
 	// Send a CAN request that originated from the SBC. 'buf' has already been populated by the SBC interface.
 	// 'txToken' is the SBC's token to return in any response; 'replyType' is the reply the SBC expects (0xFFFF means
 	// none).
