@@ -574,17 +574,16 @@ sweep instead of at staging time.
 #### Hop 2: acceptance by the CAN controller
 
 The controller's `CanInterface::SendCanRequest`
-([CanInterface.cpp:669](src/DuetCANMaster/src/CAN/CanInterface.cpp#L669)) has four of them:
+([CanInterface.cpp:669](src/DuetCANMaster/src/CAN/CanInterface.cpp#L669)) has four of them, and each is
+acknowledged to the SBC keyed by the `txToken` the SBC already puts in every `SendCanMessageHeader`
+([MessageFormats.h:247](lib/DuetSpiInterface/include/DuetSpiProtocol/MessageFormats.h#L247)):
 
-| Failure | Today |
+| Failure | Reported as |
 |---|---|
-| `can0dev == nullptr` (CAN never enabled) | `return` — nothing sent, nothing said |
-| Request id placeholder not `0xFFF` | `WarningMessage` on the controller's console only |
-| No free pending-request slot | Sent, but no reply can ever be forwarded. A `TODO` says the SBC should be told; it is not, so the code waits out `CanRequestTimeout` |
-| `CanDevice::SendMessage` cancelled an older message to make room | Counted in `txTimeouts` / `lastCancelledId`, never reported |
-
-The fix is an acknowledgement from the controller, keyed by the `txToken` the SBC already puts in
-every `SendCanMessageHeader` ([MessageFormats.h:247](lib/DuetSpiInterface/include/DuetSpiProtocol/MessageFormats.h#L247)).
+| `can0dev == nullptr`, or CAN never enabled | `BusError`, before anything is transmitted |
+| Request id placeholder not `0xFFF` | `BusError`, plus a `WarningMessage` on the controller's console |
+| No free pending-request slot | `NoBuffer`. The message is still sent, but its reply can never be matched back, so the request fails now rather than waiting out `CanRequestTimeout` |
+| `CanDevice::SendMessage` cancelled an older message to make room | `BusError` against the **cancelled** message's own token, via the per-buffer id-to-token record. The message being sent is unaffected |
 
 **Protocol.** A new firmware→SBC request, `CanMessageSent = 7`, carrying a count and that many
 `{ uint16 txToken; uint8 status; uint8 padding; }` entries — one packet per transfer rather than one
@@ -776,9 +775,11 @@ Each phase is independently useful and independently testable.
       version bump: nothing has been released against this protocol yet
 - [x] Controller: acknowledge every SBC-originated CAN message from `SendCanRequest`, including three
       of the four paths that failed silently
-- [ ] Controller: map a CAN id cancelled to make room back to the token that sent it, which is the
-      fourth. `SendMessage` names the message it dropped by id, and only an in-flight id-to-token
-      table can turn that into an outcome for a particular request
+- [x] Controller: map a CAN id cancelled to make room back to the token that sent it, which is the
+      fourth. `SendMessage` names the message it dropped by id, so each dedicated transmit buffer
+      records the token and id of the message loaded into it; a cancellation whose id still matches
+      fails that token with `BusError` and frees the pending-request slot it was holding. The FIFO is
+      not tracked, because one entry cannot say which of the messages in it was dropped
 - [x] DCS: resolve fire-and-forget CAN requests on the ack rather than at queue time, bound by
       `CanRequestTimeout`; fail reply-expecting requests early on a non-`Ok` ack. This is the single
       route for both kinds: delivery over SPI resolves neither, because reaching the controller is not

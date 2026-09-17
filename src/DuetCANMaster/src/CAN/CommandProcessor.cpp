@@ -243,7 +243,7 @@ bool CommandProcessor::ForwardMessageToSbc(CanMessageBuffer& buf) noexcept
 
 	// If this is a response to a request we forwarded on behalf of the SBC, recover the SBC's txToken
 	CanInterface::CanRequestMapping* _ecv_null mapping = nullptr;
-	uint16_t txToken = 0xFFFF; // TODO synchronise this default value with DSF
+	uint16_t txToken = SbcProtocol::UnsolicitedTxToken;
 	if (buf.id.IsResponse())
 	{
 		const auto rid = (CanRequestId)(buf.msg.generic.requestId);

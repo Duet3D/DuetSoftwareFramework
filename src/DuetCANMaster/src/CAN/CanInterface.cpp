@@ -137,6 +137,23 @@ static CanDevice* _ecv_null can0dev = nullptr;
 static unsigned int txTimeouts[can0Config.numTxBuffers + 1] = {0};
 static uint32_t lastCancelledId = 0;
 
+#  if HAS_SBC_INTERFACE
+
+// The SBC-originated message each dedicated transmit buffer holds, so that a message cancelled to make
+// room can be reported to whoever is waiting on it. CanDevice::SendMessage names what it cancelled by
+// CAN id, which is the only handle the peripheral has on it; these say which id belongs to which
+// request. The FIFO is deliberately not tracked: it holds many messages at once, so one entry could
+// not say which of them was dropped.
+struct TxBufferOwner
+{
+	uint16_t txToken; // the SBC's token for the message loaded here, or UnsolicitedTxToken for none
+	uint32_t canId;	  // the CAN id it was sent with, to confirm a cancellation refers to it
+};
+
+static TxBufferOwner txBufferOwners[can0Config.numTxBuffers + 1];
+
+#  endif
+
 #  if DUAL_CAN
 
 constexpr CanDevice::Config can1Config = {.dataSize = 8,
@@ -306,6 +323,15 @@ void CanInterface::Init() noexcept
 	CanMessageBuffer::Init(numCanBuffers);
 	pendingMotionBuffers = nullptr;
 
+#  if HAS_SBC_INTERFACE
+	// Zero would claim every buffer for token 0, which is a token the SBC really issues
+	for (TxBufferOwner& owner : txBufferOwners)
+	{
+		owner.txToken = SbcProtocol::UnsolicitedTxToken;
+		owner.canId = 0;
+	}
+#  endif
+
 #  if SAME70
 	SetPinFunction(APIN_CAN1_TX, CAN1TXPinPeriphMode);
 	SetPinFunction(APIN_CAN1_RX, CAN1RXPinPeriphMode);
@@ -441,8 +467,57 @@ uint32_t CanInterface::Convert16bitReceivedTimeStampTo32bits(uint16_t ts) noexce
 	return (delay < MillisToStepClocks(10)) ? now - (uint32_t)delay : now;
 }
 
-// Send a message on the CAN FD channel and record any errors
-static void SendCanMessage(CanDevice::TxBufferNumber whichBuffer, uint32_t timeout, CanMessageBuffer& buffer) noexcept
+#  if HAS_SBC_INTERFACE
+
+// The token to record for a message no SBC request is waiting on
+constexpr uint16_t noTxToken = SbcProtocol::UnsolicitedTxToken;
+
+// Fail the SBC request whose message was cancelled to make room, and record who owns the buffer now.
+// The id confirms the record still describes what was cancelled: without it a stale entry would fail a
+// request whose message did reach the bus.
+static void TakeOverTxBuffer(CanDevice::TxBufferNumber whichBuffer,
+							 uint32_t cancelledId,
+							 const CanMessageBuffer& buffer,
+							 uint16_t txToken) noexcept
+{
+	// The FIFO holds many messages at once, so one entry could not say which of them was dropped
+	if (whichBuffer == CanDevice::TxBufferNumber::fifo)
+	{
+		return;
+	}
+
+	TxBufferOwner& owner = txBufferOwners[(unsigned int)whichBuffer];
+	if (cancelledId != 0 && owner.txToken != noTxToken && owner.canId == cancelledId)
+	{
+		reprap.GetSbcInterface().ReportCanMessageSent(owner.txToken, CanStatus::BusError);
+
+		// The reply it was waiting for can never arrive, so the slot holding it is dead
+		CanInterface::ReleasePendingRequestForToken(owner.txToken);
+	}
+
+	owner.txToken = txToken;
+	owner.canId = buffer.id.GetWholeId();
+}
+
+#  else
+
+constexpr uint16_t noTxToken = 0xFFFF;
+
+static void TakeOverTxBuffer(CanDevice::TxBufferNumber, uint32_t, const CanMessageBuffer&, uint16_t) noexcept {}
+
+#  endif
+
+// Send a message on the CAN FD channel and record any errors.
+//
+// 'txToken' is the SBC request this message belongs to, or noTxToken for a message nobody is waiting
+// on. A transmit buffer that is still occupied when the timeout expires has its message cancelled to
+// make room for this one, so the message that is actually lost is the previous occupant, not this one.
+// Reporting it needs the buffer's recorded owner: SendMessage names what it cancelled by CAN id, which
+// on its own says nothing about which request sent it.
+static void SendCanMessage(CanDevice::TxBufferNumber whichBuffer,
+						   uint32_t timeout,
+						   CanMessageBuffer& buffer,
+						   uint16_t txToken = noTxToken) noexcept
 {
 	const uint32_t cancelledId = can0dev->SendMessage(whichBuffer, timeout, &buffer);
 	if (cancelledId != 0)
@@ -450,6 +525,7 @@ static void SendCanMessage(CanDevice::TxBufferNumber whichBuffer, uint32_t timeo
 		++txTimeouts[(unsigned int)whichBuffer];
 		lastCancelledId = cancelledId;
 	}
+	TakeOverTxBuffer(whichBuffer, cancelledId, buffer, txToken);
 }
 
 // This task picks up motion messages and sends them
@@ -753,7 +829,7 @@ void CanInterface::SendCanRequest(CanMessageBuffer& buf, uint16_t txToken, CanMe
 		break;
 	} // TODO: choose a different buffer for urgent requests
 	const auto timeout = maxRequestSendWait; // TODO make this configurable per request type
-	SendCanMessage(txBuffer, timeout, buf);
+	SendCanMessage(txBuffer, timeout, buf, txToken);
 
 	// Accepted by the CAN controller, which is as much as this can say: SendMessage returns once the
 	// peripheral has taken the message, not once it is on the wire
@@ -780,6 +856,21 @@ void CanInterface::ReleasePendingRequest(CanRequestMapping* mapping) noexcept
 {
 	const TaskCriticalSectionLocker lock;
 	mapping->active = false;
+}
+
+// Free the slot held for an SBC request whose message never reached the bus. The token is the only
+// handle the transmit side has on a request, which is why this searches by it rather than by RID.
+void CanInterface::ReleasePendingRequestForToken(uint16_t txToken) noexcept
+{
+	const TaskCriticalSectionLocker lock;
+	for (CanRequestMapping& m : pendingRequests)
+	{
+		if (m.active && m.txToken == txToken)
+		{
+			m.active = false;
+			break;
+		}
+	}
 }
 
 // Send a response to an expansion board and free the buffer

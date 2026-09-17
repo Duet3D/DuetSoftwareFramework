@@ -95,6 +95,8 @@ namespace CanInterface
 		CanAddress src, CanRequestId rid) noexcept; // Find an in-flight request matching a received response
 	void ReleasePendingRequest(
 		CanRequestMapping* mapping) noexcept; // Free a pending request slot and any reassembly buffer
+	void ReleasePendingRequestForToken(
+		uint16_t txToken) noexcept; // Free the slot held for a request whose message was never sent
 
 	// Motor control functions
 	void SendMotion(CanMessageBuffer* buf) noexcept;

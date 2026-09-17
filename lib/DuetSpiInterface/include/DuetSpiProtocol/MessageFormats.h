@@ -261,6 +261,12 @@ namespace SendCanMessageFlags {
 inline constexpr uint8_t IsResponse = 1u << 0;
 } // namespace SendCanMessageFlags
 
+// The txToken value that stands for "no request of the SBC's". The SBC never issues it, so the
+// controller can put it on a message the SBC is not waiting for - a broadcast or a board's own
+// announcement forwarded as a CanResponse - and use it internally to mean that a transmit buffer
+// holds nothing whose outcome anyone wants reported.
+inline constexpr uint16_t UnsolicitedTxToken = 0xFFFF;
+
 // Send a CAN message to the controller (SbcRequests/SendCanMessageHeader.cs).
 // The 'flags' byte carries isResponse in bit 0.
 struct SendCanMessageHeader {
@@ -342,7 +348,7 @@ struct CanMessageSentEntry {
 inline constexpr size_t MaxCanMessagesSentPerTransfer = 64;
 
 struct CanResponseHeader {
-    uint16_t txToken;    // Token mapping the response back to its request (0 if unsolicited)
+    uint16_t txToken;    // Token mapping the response back to its request (UnsolicitedTxToken if none)
     uint16_t msgType;    // CanMessageType of the received message
     uint16_t dataLength; // CAN payload bytes that follow (<= 64)
     uint8_t srcAddress;  // 0..126
