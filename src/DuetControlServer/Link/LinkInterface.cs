@@ -290,7 +290,8 @@ public sealed partial class LinkInterface(
         }
         catch (TimeoutException) when (request.ExpectsReply)
         {
-            // A board that does not answer is reported, not thrown: see CanResponse.FromTimeout
+            // A board that does not answer is reported, not thrown: see CanResponse.FromTimeout. The
+            // controller normally says so first and this only covers an outcome lost on the way
             return CanResponse.FromTimeout(request);
         }
         catch (TimeoutException)
@@ -306,7 +307,9 @@ public sealed partial class LinkInterface(
                 CanRequests.Remove(request);
             }
         }
-        return CanResponse.FromRequest(request);
+        return request.Status == Protocol.FirmwareRequests.CanStatus.Timeout
+            ? CanResponse.FromTimeout(request)
+            : CanResponse.FromRequest(request);
     }
 
     /// <summary>
@@ -444,7 +447,12 @@ public sealed partial class LinkInterface(
     /// <remarks>
     /// A message expecting no reply is complete here: this is the furthest anything can say it got.
     /// One expecting a reply is only failed here - a reply it can no longer receive is one it would
-    /// otherwise wait out the whole timeout for
+    /// otherwise wait out the whole timeout for.
+    /// <para>
+    /// <see cref="Protocol.FirmwareRequests.CanStatus.Timeout"/> is the one status that is not a fault
+    /// in the sending: the controller gave the board its time and the board did not answer, which is
+    /// reported rather than thrown for the reasons <see cref="CanResponse.FromTimeout"/> gives
+    /// </para>
     /// </remarks>
     internal void CompleteCanMessageSent(ushort txToken, Protocol.FirmwareRequests.CanStatus status)
     {
@@ -470,6 +478,10 @@ public sealed partial class LinkInterface(
         if (status == Protocol.FirmwareRequests.CanStatus.Ok)
         {
             request.SetResult();
+        }
+        else if (status == Protocol.FirmwareRequests.CanStatus.Timeout && request.ExpectsReply)
+        {
+            request.SetResult(status, CanMessageType.StandardReply, request.DstAddress);
         }
         else
         {

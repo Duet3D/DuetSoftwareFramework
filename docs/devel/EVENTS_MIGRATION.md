@@ -524,7 +524,7 @@ does not reach:
 | Outbound work | Reported today? |
 |---|---|
 | Commands carrying a request id (enable CAN, e-stop, reset, firmware update) | ✅ `CompleteRequest(id, RequestResult::Cancelled)` → `TrySetCanceled()` ([NativeLink.cs:448](src/DuetControlServer/Link/Native/NativeLink.cs#L448)); `Cancelled` is documented as exactly this case ([LinkEvents.h:76](src/DuetSbcInterface/src/SBC/LinkEvents.h#L76)) |
-| CAN requests expecting a reply | ✅ cancelled by `LinkInterface.Invalidate()`, and by the 2 s `CanRequestTimeout` |
+| CAN requests expecting a reply | ✅ cancelled by `LinkInterface.Invalidate()`, and backstopped by `CanRequestTimeout` |
 | Scheduled moves | ✅ no `MoveCompleted` arrives; `motionTracker.Invalidate()` discards the moves they refer to |
 | **Fire-and-forget CAN messages** | ✅ resolved when the controller says the CAN peripheral took the message, and failed when it says why it could not |
 
@@ -585,6 +585,11 @@ acknowledged to the SBC keyed by the `txToken` the SBC already puts in every `Se
 | No free pending-request slot | `NoBuffer`. The message is still sent, but its reply can never be matched back, so the request fails now rather than waiting out `CanRequestTimeout` |
 | `CanDevice::SendMessage` cancelled an older message to make room | `BusError` against the **cancelled** message's own token, via the per-buffer id-to-token record. The message being sent is unaffected |
 
+A fifth outcome is not a failure of the send at all: a request that reaches the bus and goes
+unanswered for `UsualResponseTimeout` is expired by `CheckPendingRequestTimeouts`, once per transfer,
+and reported as `Timeout`. DCS turns that one into a `CanResponse.FromTimeout` rather than an
+exception, because a board that does not answer is something the operator is told about.
+
 **Protocol.** A new firmware→SBC request, `CanMessageSent = 7`, carrying a count and that many
 `{ uint16 txToken; uint8 status; uint8 padding; }` entries — one packet per transfer rather than one
 per message, because the controller can batch everything it sent since the last transfer. `status`
@@ -615,7 +620,10 @@ for. Without that, a cancellation can only be reported as an unattributed counte
   its token comes back in a `CanMessageSent`. Hop 1 alone is not enough for a CAN message — reaching
   the controller is not reaching the bus — but a hop-1 *drop* fails it immediately.
 - Give the ack the same `CanRequestTimeout` bound a reply gets, so a lost ack fails the code instead
-  of hanging it, and keep `Invalidate()` cancelling whatever is still outstanding.
+  of hanging it, and keep `Invalidate()` cancelling whatever is still outstanding. That bound is a
+  backstop, not the deadline a board is judged against: the controller expires a request that goes
+  unanswered for `UsualResponseTimeout` and reports `Timeout` for it, so `CanRequestTimeout` sits above
+  the two put together and only catches an outcome lost while the link stays up.
 - A **reply-expecting** request must not be completed by its ack — it is still waiting for the reply.
   But a non-`Ok` ack should fail it immediately rather than after 2 s, which is the second thing this
   buys: `NoBuffer` on a request whose reply can never be forwarded is exactly the controller's
@@ -677,11 +685,11 @@ use and is not part of recovery.
 
 While the link is down, a code that needs the controller cannot succeed:
 
-- Codes that expect a CAN reply fail after `CanRequestTimeout` (2 s,
-  [LinkInterface.cs:286](src/DuetControlServer/Link/LinkInterface.cs#L286)).
-- Fire-and-forget CAN messages are staged and, once §4.1.1 lands, **dropped** at the reconnect rather
-  than replayed — and once §4.1.2 lands, the code that sent one is told so rather than being left to
-  believe it worked.
+- Codes that expect a CAN reply fail when `Invalidate()` cancels what is outstanding, or at
+  `CanRequestTimeout` if the link is up but the outcome was lost
+  ([LinkInterface.cs](src/DuetControlServer/Link/LinkInterface.cs)).
+- Fire-and-forget CAN messages are staged and **dropped** at the reconnect rather than replayed, and
+  the code that sent one is told so rather than being left to believe it worked.
 
 `controller-disconnect.g` is therefore for SBC-side work: logging, `M291`-style notification once it
 exists, plugin or webhook calls, tidying job state. The documentation for it has to say so, because a

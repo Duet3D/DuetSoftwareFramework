@@ -808,12 +808,9 @@ void CanInterface::SendCanRequest(CanMessageBuffer& buf, uint16_t txToken, CanMe
 			CanRequestMapping* slot = nullptr;
 			for (CanRequestMapping& m : pendingRequests)
 			{
-				// Silent expiry of stale entries that never got a reply
-				if (m.active && now - m.whenStarted >= UsualResponseTimeout)
-				{
-					m.active = false;
-				}
-				if (slot == nullptr && !m.active)
+				// Entries are freed by CheckPendingRequestTimeouts, so a slot that is still active here
+				// belongs to a request that is genuinely in flight
+				if (!m.active)
 				{
 					slot = &m;
 					break;
@@ -885,6 +882,39 @@ void CanInterface::ReleasePendingRequest(CanRequestMapping* mapping) noexcept
 {
 	const TaskCriticalSectionLocker lock;
 	mapping->active = false;
+}
+
+// Expire in-flight requests whose reply never came, and tell the SBC that each one timed out.
+//
+// A board gets UsualResponseTimeout to answer, which is what RepRapFirmware gives it. Past that the
+// reply can no longer be matched to anything, so the slot is dead and so is the request waiting on it.
+// Saying so is what lets the SBC report the timeout when it happens rather than waiting out a deadline
+// of its own, and what keeps the two from competing over which of them decides a board is silent.
+void CanInterface::CheckPendingRequestTimeouts() noexcept
+{
+#  if HAS_SBC_INTERFACE
+	uint16_t expired[numPendingCanRequests];
+	size_t numExpired = 0;
+
+	{
+		const TaskCriticalSectionLocker lock;
+		const uint32_t now = millis();
+		for (CanRequestMapping& m : pendingRequests)
+		{
+			if (m.active && now - m.whenStarted >= UsualResponseTimeout)
+			{
+				m.active = false;
+				expired[numExpired++] = m.txToken;
+			}
+		}
+	}
+
+	// Reported outside the critical section: queueing an outcome wakes the SBC task
+	for (size_t i = 0; i < numExpired; ++i)
+	{
+		reprap.GetSbcInterface().ReportCanMessageSent(expired[i], CanStatus::Timeout);
+	}
+#  endif
 }
 
 // Free the slot held for an SBC request whose message never reached the bus. The token is the only

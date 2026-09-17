@@ -263,9 +263,17 @@ public sealed class Settings
     public int MaxSbcRetries { get; set; } = 3;
 
     /// <summary>
-    /// Timeout for CAN requests that expect a reply (in ms).
+    /// Backstop for a CAN request the controller never answers for (in ms).
     /// </summary>
-    public int CanRequestTimeout { get; set; } = 2000;
+    /// <remarks>
+    /// Not the deadline a board is judged against: the controller gives a board
+    /// <c>CanInterface::UsualResponseTimeout</c> (1 s) to reply and reports the timeout itself, and a
+    /// link that drops cancels everything outstanding. What is left for this to catch is an outcome
+    /// lost while the link stays up, which the controller's acknowledgement and response rings both do
+    /// when they overflow. It therefore has to sit above the controller's deadline plus a transfer, so
+    /// that the controller is the one that decides a board is silent
+    /// </remarks>
+    public int CanRequestTimeout { get; set; } = 1500;
 
     /// <summary>
     /// How long a board may go without reporting before it is presumed gone (in ms).

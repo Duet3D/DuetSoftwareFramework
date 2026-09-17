@@ -366,6 +366,28 @@ public class CanBusCodeTests : SystemTests.Host.BenchFixture
     }
 
     /// <summary>
+    /// A board that does not answer is reported to the code, not thrown at it.
+    /// </summary>
+    /// <remarks>
+    /// The controller gives a board <c>CanInterface::UsualResponseTimeout</c> to reply and expires the
+    /// request itself, reporting <c>Timeout</c>. That is the one acknowledgement status which is not a
+    /// fault in the sending, so it has to resolve the request rather than fail it: RepRapFirmware
+    /// returns <c>canResponseTimeout</c> from <c>SendRequestAndGetStandardReply</c> and reports it, and
+    /// throwing would abandon every code after this one in a macro. M952 B1 with no timing expects a
+    /// standard reply, so it is the code that shows it
+    /// </remarks>
+    [Test]
+    public async Task M952ReportsABoardThatDoesNotAnswer()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync();
+
+        bench.CanMaster.ScriptCanSendStatus(CanStatus.Timeout);
+        string reply = await bench.Host.ExecuteCodeAsync($"M952 B{Board}", timeoutMs: 5_000);
+        Assert.That(reply, Does.StartWith("Error:"),
+                    "a board that did not answer is reported as an error, not thrown (CanResponse.FromTimeout)");
+    }
+
+    /// <summary>
     /// M953 enables the CAN bus: a second enable reaches the controller and the code reports
     /// nothing.
     /// </summary>

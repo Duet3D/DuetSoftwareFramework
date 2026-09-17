@@ -98,6 +98,7 @@ namespace CanInterface
 		CanRequestMapping* mapping) noexcept; // Free a pending request slot and any reassembly buffer
 	void ReleasePendingRequestForToken(
 		uint16_t txToken) noexcept; // Free the slot held for a request whose message was never sent
+	void CheckPendingRequestTimeouts() noexcept; // Expire requests whose reply never came, reporting each to the SBC
 
 	// Motor control functions
 	void SendMotion(CanMessageBuffer* buf) noexcept;

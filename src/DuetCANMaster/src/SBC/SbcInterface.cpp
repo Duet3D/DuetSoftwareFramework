@@ -521,6 +521,12 @@ bool SbcInterface::ProcessCanMessagesSent() noexcept
 
 void SbcInterface::ExchangeData() noexcept
 {
+#  if SUPPORT_CAN_EXPANSION
+	// Retire any CAN request whose board has run out of time to answer. Done here rather than on a
+	// timer of its own because this runs once per transfer, which is both often enough to report a
+	// timeout promptly and the task that carries the report
+	CanInterface::CheckPendingRequestTimeouts();
+#  endif
 
 // Process incoming packets
 #  if 0
