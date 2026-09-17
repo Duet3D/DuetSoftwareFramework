@@ -172,47 +172,48 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
     }
 
     /// <summary>
-    /// M950 K is clamped to the range a tacho can be read over, and the board is told the clamped
-    /// figure rather than what the operator wrote
+    /// M950 K outside the range a tacho can be read over is refused, and the fan that holds the
+    /// number is left as it was
     /// </summary>
     /// <remarks>
     /// FansManager::ConfigureFanPort (FansManager.cpp) reads K with GetLimitedFValue between
-    /// MinFanPulsesPerRev 0.5 and MaxFanPulsesPerRev 200 (CANlib RRF3Common.h). RepRapFirmware
-    /// refuses a value outside them where DSF clamps, which is what every other limited parameter
-    /// does here, but either way the board and fans[0].tachoPpr have to end up holding the same
-    /// number: the board scales the pulses it counts by its copy to reach the RPM it reports back
+    /// MinFanPulsesPerRev 0.5 and MaxFanPulsesPerRev 200 (CANlib RRF3Common.h), which throws rather
+    /// than clamping: the board scales the pulses it counts by its copy to reach the RPM it reports
+    /// back, so a figure nobody wrote would be reported as a speed nobody asked for. K is read
+    /// ahead of the C that deletes the old fan, so the refusal costs the machine nothing
     /// </remarks>
     [Test]
-    public async Task M950ClampsTachoPulsesPerRev()
+    public async Task M950RefusesTachoPulsesPerRevOutsideItsRange()
     {
         await using JobBench bench = await JobControlBench.StartAsync();
 
-        await bench.Host.ExecuteCodeAsync("M950 F0 C\"1.out3\" K0.1");
-        Assert.Multiple(async () =>
+        await bench.Host.ExecuteCodeAsync("M950 F0 C\"1.out3\" K4");
+        bench.CanMaster.ClearCapture();
+
+        string tooLow = (await bench.Host.ExecuteCodeAsync("M950 F0 C\"1.out4\" K0.1")).TrimEnd();
+        string tooHigh = (await bench.Host.ExecuteCodeAsync("M950 F0 K1000")).TrimEnd();
+        Assert.Multiple(() =>
         {
-            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]!.TachoPpr),
-                        Is.EqualTo(Fan.MinTachoPpr).Within(1e-3),
-                        "M950 K below the minimum clamps fans[0].tachoPpr (CANlib MinFanPulsesPerRev)");
-            Assert.That(SentTachoPpr(bench), Is.EqualTo(Fan.MinTachoPpr).Within(1e-3),
-                        "and the M950 the board is sent carries the clamped value, not the 0.1 that was written");
+            Assert.That(tooLow, Is.EqualTo("Error:  at column 20: M950: parameter 'K' too low"),
+                        "K below the minimum is refused where it stood (CANlib MinFanPulsesPerRev)");
+            Assert.That(tooHigh, Is.EqualTo("Error:  at column 10: M950: parameter 'K' too high"),
+                        "and K above the maximum too (CANlib MaxFanPulsesPerRev)");
         });
 
-        await bench.Host.ExecuteCodeAsync("M950 F0 K1000");
         Assert.Multiple(async () =>
         {
-            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]!.TachoPpr),
-                        Is.EqualTo(Fan.MaxTachoPpr).Within(1e-3),
-                        "M950 K above the maximum clamps fans[0].tachoPpr (CANlib MaxFanPulsesPerRev)");
-            Assert.That(SentTachoPpr(bench), Is.EqualTo(Fan.MaxTachoPpr).Within(1e-3),
-                        "and the frequency-only form clamps what it sends too");
-        });
-
-        await bench.Host.ExecuteCodeAsync("M950 F0 K4");
-        Assert.Multiple(async () =>
-        {
+            Assert.That(bench.CanMaster.CanMessages<CanMessageM950Fan>(), Is.Empty,
+                        "neither refusal reaches a board, so the fan keeps the port it was given");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]!.TachoPpr), Is.EqualTo(4).Within(1e-3),
+                        "and fans[0].tachoPpr still holds what the last code that was taken asked for");
+        });
+
+        await bench.Host.ExecuteCodeAsync("M950 F0 K8");
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]!.TachoPpr), Is.EqualTo(8).Within(1e-3),
                         "a value inside the range is stored as written");
-            Assert.That(SentTachoPpr(bench), Is.EqualTo(4).Within(1e-3), "and sent as written");
+            Assert.That(SentTachoPpr(bench), Is.EqualTo(8).Within(1e-3), "and sent as written");
         });
     }
 

@@ -84,9 +84,10 @@ internal static class JobControlBench
     /// </summary>
     /// <param name="sd">The virtual SD card to populate</param>
     /// <param name="configExtra">Extra configuration lines, run before <see cref="HomedAtOrigin"/></param>
-    public static void WriteSystemFiles(VirtualSd sd, string configExtra = "")
+    /// <param name="machineConfig">The machine configuration to boot from, <see cref="XyeConfig"/> by default</param>
+    public static void WriteSystemFiles(VirtualSd sd, string configExtra = "", string? machineConfig = null)
     {
-        sd.WriteSys("config.g", XyeConfig + "\n" + MarkerGlobals + "\n" + configExtra + "\n"
+        sd.WriteSys("config.g", (machineConfig ?? XyeConfig) + "\n" + MarkerGlobals + "\n" + configExtra + "\n"
                                 + HomedAtOrigin + DcsTestHost.ConfigDoneMarker);
         sd.WriteSys("start.g", "set global.startRan = global.startRan + 1\n");
         sd.WriteSys("stop.g", "set global.stopRan = global.stopRan + 1\n");
@@ -102,16 +103,21 @@ internal static class JobControlBench
     /// </summary>
     /// <param name="configExtra">Extra configuration lines, e.g. per-scenario globals</param>
     /// <param name="prepareSd">Populates the rest of the virtual SD card, typically the job file</param>
-    public static async Task<JobBench> StartAsync(string configExtra = "", Action<VirtualSd>? prepareSd = null)
+    /// <param name="machineConfig">The machine configuration to boot from, <see cref="XyeConfig"/> by default</param>
+    /// <param name="prepareController">Scripts the fake controller before the host connects to it</param>
+    public static async Task<JobBench> StartAsync(string configExtra = "", Action<VirtualSd>? prepareSd = null,
+                                                  string? machineConfig = null,
+                                                  Action<ScriptedCanMaster>? prepareController = null)
     {
         ScriptedCanMaster canMaster = new(SocketPath());
         canMaster.AckCanRequestsWithStandardReplies();
+        prepareController?.Invoke(canMaster);
         DcsTestHost host;
         try
         {
             host = await DcsTestHost.StartAsync(canMaster, sd =>
             {
-                WriteSystemFiles(sd, configExtra);
+                WriteSystemFiles(sd, configExtra, machineConfig);
                 prepareSd?.Invoke(sd);
             });
         }

@@ -176,21 +176,79 @@ internal sealed class ScriptedCanMaster : IDisposable
         };
     }
 
-    /// <summary>Answer the given CAN request with a StandardReply</summary>
+    /// <summary>
+    /// Answer every request of one message type with the text a board would report, instead of the
+    /// empty success <see cref="AckCanRequestsWithStandardReplies"/> answers with
+    /// </summary>
+    /// <typeparam name="TMessage">The CAN message being answered</typeparam>
+    /// <param name="text">What the board says, given the request it is answering</param>
+    /// <param name="result">The result code the board answers with</param>
+    public void ReportWith<TMessage>(Func<TMessage, string> text, CodeResult result = CodeResult.Ok)
+        where TMessage : struct, ICanMessage<TMessage>
+        => OnCanMessage((ushort)TMessage.MessageType, (fake, header, payload) =>
+            fake.InjectStandardReply(header, result, text(CanMessageSerializer.Deserialize<TMessage>(payload))));
+
+    /// <summary>
+    /// Answer every request of one message type with a fixed text, whatever it asked
+    /// </summary>
+    /// <typeparam name="TMessage">The CAN message being answered</typeparam>
+    /// <param name="text">What the board says</param>
+    /// <param name="result">The result code the board answers with</param>
+    public void ReportWith<TMessage>(string text, CodeResult result = CodeResult.Ok)
+        where TMessage : struct, ICanMessage<TMessage>
+        => ReportWith<TMessage>(_ => text, result);
+
+    /// <summary>
+    /// Leave every request of one message type unanswered, as a board that does not know the command
+    /// at all does
+    /// </summary>
+    /// <typeparam name="TMessage">The CAN message to ignore</typeparam>
+    /// <remarks>
+    /// Which is what the regression rig's second MB6HC does with M970: it runs RepRapFirmware in
+    /// expansion mode and its CommandProcessor has no case for the message, so the request sits out
+    /// its timeout. The machine has to carry on and say so
+    /// </remarks>
+    public void NeverAnswer<TMessage>()
+        where TMessage : struct, ICanMessage<TMessage>
+        => OnCanMessage((ushort)TMessage.MessageType, static (_, _, _) => { });
+
+    /// <summary>How many bytes of reply text one StandardReply frame carries</summary>
+    private const int StandardReplyTextLength = 60;
+
+    /// <summary>
+    /// Answer the given CAN request with a StandardReply, fragmented as a board fragments it
+    /// </summary>
+    /// <remarks>
+    /// One frame carries 60 bytes of text, so a longer reply - a driver report, a closed loop
+    /// configuration - goes out as several, each numbered and all but the last saying more follows.
+    /// The HAT no longer reassembles them, so a fake that sent a long reply in one frame would be
+    /// testing a transport neither end has
+    /// </remarks>
     public void InjectStandardReply(SendCanMessageHeader request,
                                     CodeResult result = CodeResult.Ok,
                                     string text = "")
     {
-        CanMessageStandardReply reply = default;
-        reply.ResultCode = result;
-        reply.TextString = text;
-        byte[] whole = new byte[64];
-        MemoryMarshal.Write(whole, in reply);
-        byte[] payload = whole.AsSpan(0, (int)reply.GetActualDataLength((uint)text.Length)).ToArray();
-        InjectCanResponse(request.TxToken,
-                          (ushort)CanMessageType.StandardReply,
-                          srcAddress: request.DstAddress == 127 ? (byte)0 : request.DstAddress,
-                          payload);
+        byte[] utf8 = Encoding.UTF8.GetBytes(text);
+        int fragments = Math.Max(1, (utf8.Length + StandardReplyTextLength - 1) / StandardReplyTextLength);
+        for (int fragment = 0; fragment < fragments; fragment++)
+        {
+            int offset = fragment * StandardReplyTextLength;
+            int length = Math.Min(StandardReplyTextLength, utf8.Length - offset);
+
+            CanMessageStandardReply reply = default;
+            reply.ResultCode = result;
+            reply.FragmentNumber = (byte)fragment;
+            reply.MoreFollows = fragment < fragments - 1;
+            byte[] whole = new byte[64];
+            MemoryMarshal.Write(whole, in reply);
+            utf8.AsSpan(offset, length).CopyTo(whole.AsSpan((int)reply.GetActualDataLength(0)));
+
+            byte[] payload = whole.AsSpan(0, (int)reply.GetActualDataLength((uint)length)).ToArray();
+            InjectCanResponse(request.TxToken,
+                              (ushort)CanMessageType.StandardReply,
+                              srcAddress: request.DstAddress == CanId.BroadcastAddress ? CanId.MasterAddress : request.DstAddress,
+                              payload);
+        }
     }
 
     /// <summary>Answer the next CAN send with the given status instead of <see cref="CanStatus.Ok"/></summary>
@@ -480,18 +538,33 @@ internal sealed class ScriptedCanMaster : IDisposable
     /// what separates the two
     /// </remarks>
     public IReadOnlyList<(byte Board, T Message)> CanMessages<T>() where T : struct, ICanMessage<T>
+        => [.. CanPayloads<T>().Select(sent => (sent.Board, CanMessageSerializer.Deserialize<T>(sent.Payload)))];
+
+    /// <summary>
+    /// Every CAN message of one type the machine has sent, as bytes on the wire
+    /// </summary>
+    /// <typeparam name="T">The message, which names its own <c>CanMessageType</c></typeparam>
+    /// <returns>The board each went to and the payload exactly as long as it was transmitted</returns>
+    /// <remarks>
+    /// For the messages whose length is part of what they say. A per-driver request carries one value
+    /// per set bit of its bitmap and stops, so a sender that transmitted the whole struct would be
+    /// sending values for drivers it never named - which the deserialized view cannot show, because
+    /// the missing bytes read back as zeroes
+    /// </remarks>
+    public IReadOnlyList<(byte Board, byte[] Payload)> CanPayloads<T>() where T : struct, ICanMessage<T>
     {
-        List<(byte, T)> messages = [];
+        List<(byte, byte[])> payloads = [];
         foreach (CapturedPacket packet in SbcPackets(SbcRequest.SendCANMessage))
         {
             (SendCanMessageHeader header, byte[] payload) = packet.DecodeCanMessage();
             if (header.MsgType == (ushort)T.MessageType)
             {
-                messages.Add((header.DstAddress, CanMessageSerializer.Deserialize<T>(payload)));
+                payloads.Add((header.DstAddress, payload));
             }
         }
-        return messages;
+        return payloads;
     }
+
 
     /// <summary>The last CAN message of one type the machine sent, and the board it went to</summary>
     /// <typeparam name="T">The message, which names its own <c>CanMessageType</c></typeparam>
