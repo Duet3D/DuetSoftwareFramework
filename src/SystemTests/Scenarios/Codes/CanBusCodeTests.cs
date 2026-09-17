@@ -366,6 +366,27 @@ public class CanBusCodeTests : SystemTests.Host.BenchFixture
     }
 
     /// <summary>
+    /// A reply the controller could not forward fails its code straight away, rather than leaving it
+    /// to wait out a timeout for something that is not coming.
+    /// </summary>
+    /// <remarks>
+    /// The controller's response ring is finite, and a reply it cannot take is lost: the message
+    /// buffer is about to be reused and the bus has moved on. It answers the waiting token with
+    /// <c>NoBuffer</c> for exactly that case, which is the same status it answers a request it could
+    /// not register a reply mapping for, and either way the reply can never arrive
+    /// </remarks>
+    [Test]
+    public async Task M952FailsWhenTheReplyCannotBeForwarded()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync();
+
+        bench.CanMaster.ScriptCanSendStatus(CanStatus.NoBuffer);
+        Assert.That(async () => await bench.Host.ExecuteCodeAsync($"M952 B{Board}"),
+                    Throws.Exception.With.Message.Contains("NoBuffer"),
+                    "a reply that can never be forwarded fails the code now, not at the timeout");
+    }
+
+    /// <summary>
     /// A board that does not answer is reported to the code, not thrown at it.
     /// </summary>
     /// <remarks>

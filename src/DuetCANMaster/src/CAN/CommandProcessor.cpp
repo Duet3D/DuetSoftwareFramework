@@ -262,7 +262,16 @@ bool CommandProcessor::ForwardMessageToSbc(CanMessageBuffer& buf) noexcept
 	header.status = (uint8_t)CanStatus::Ok;
 	header.padding = 0;
 	header.padding2 = 0;
-	return sbc.EnqueueCanResponse(header, reinterpret_cast<const char*>(&buf.msg));
+	const CanStatus queued = sbc.EnqueueCanResponse(header, reinterpret_cast<const char*>(&buf.msg));
+	if (queued != CanStatus::Ok && txToken != SbcProtocol::UnsolicitedTxToken)
+	{
+		// The reply is gone and the request waiting for it can never be completed, so it is failed now
+		// rather than left to wait out a timeout for something that is not coming. Any fragments still
+		// to arrive belong to a request that no longer exists, so the mapping goes with it
+		sbc.ReportCanMessageSent(txToken, queued);
+		CanInterface::ReleasePendingRequestForToken(txToken);
+	}
+	return queued == CanStatus::Ok;
 #  else
 	(void)buf;
 	return false;
@@ -290,7 +299,16 @@ void CommandProcessor::ProcessReceivedMessage(CanMessageBuffer& buf) noexcept
 			// Forward broadcasts, status reports and responses (including standard replies) to the SBC.
 			// This happens before the local handling below because some of that handling replies to the
 			// sender out of this same buffer, which overwrites the message we have to forward.
-			ForwardMessageToSbc(buf);
+			//
+			// There is nowhere to put a message the SBC cannot take: the buffer is about to be reused
+			// and the bus has moved on, so this is where the reply is lost and where saying so is the
+			// only record of it
+			if (!ForwardMessageToSbc(buf))
+			{
+#  if HAS_SBC_INTERFACE
+				reprap.GetSbcInterface().NoteCanResponseDropped();
+#  endif
+			}
 
 			// Handle messages received in normal operation mode
 			switch (id)

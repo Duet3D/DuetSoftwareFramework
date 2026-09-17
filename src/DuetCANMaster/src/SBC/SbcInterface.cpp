@@ -333,18 +333,30 @@ static void SendUsbInitMessage(SerialCDC* dev) noexcept
 
 // Queue a CAN response to be forwarded to the SBC. Called from the CAN receiver tasks. Returns false if the queue is
 // full.
-bool SbcInterface::EnqueueCanResponse(const CANResponseHeader& header, const char* _ecv_null data) noexcept
+CanStatus SbcInterface::EnqueueCanResponse(const CANResponseHeader& header, const char* _ecv_null data) noexcept
 {
 	const TaskCriticalSectionLocker lock;
+
+	// A slot holds a whole CAN frame, so this cannot happen for a message off the bus. Refusing rather
+	// than queueing the header alone keeps a length that does not describe the payload off the link
+	if (header.dataLength > sizeof(m_canResponseRing[0].payload))
+	{
+		++m_canResponsesTooLong;
+		return CanStatus::Overflow;
+	}
+
+	// Not counted as a drop here: a full ring is back-pressure, and the board-announcement replay
+	// answers it by trying the same message again next transfer. Only a caller that abandons the
+	// message knows it was lost, and NoteCanResponseDropped is how it says so
 	const size_t next = (m_canResponseHead + 1) % NumCanResponseBuffers;
 	if (next == m_canResponseTail)
 	{
-		return false; // queue full
+		return CanStatus::NoBuffer;
 	}
 
 	CanResponseBuffer& item = m_canResponseRing[m_canResponseHead];
 	item.header = header;
-	if (data != nullptr && header.dataLength <= sizeof(item.payload))
+	if (data != nullptr)
 	{
 		memcpy(item.payload, data, header.dataLength);
 	}
@@ -352,7 +364,7 @@ bool SbcInterface::EnqueueCanResponse(const CANResponseHeader& header, const cha
 
 	// const bool timeCritical = header.msgType <= CanMessageType::inputStateChangedV2;
 	EventOccurred(true);
-	return true;
+	return CanStatus::Ok;
 }
 
 bool SbcInterface::ReportMotionStopped(uint32_t whenTriggered, uint32_t moveId,
@@ -432,7 +444,12 @@ void SbcInterface::EnqueueCanTextReply(uint16_t txToken, CanRequestId requestId,
 		header.status = (uint8_t)CanStatus::Ok;
 		header.padding = 0;
 		header.padding2 = 0;
-		(void)EnqueueCanResponse(header, reinterpret_cast<const char*>(&msg));
+		// A dropped fragment truncates the report silently, so the request is failed instead
+		if (EnqueueCanResponse(header, reinterpret_cast<const char*>(&msg)) != CanStatus::Ok)
+		{
+			ReportCanMessageSent(txToken, CanStatus::NoBuffer);
+			return;
+		}
 
 		++fragment;
 	} while (offset < textLength);
@@ -899,6 +916,9 @@ void SbcInterface::Diagnostics(const StringRef& reply) noexcept
 	// a stop that is never reported here is one it can never correct - and nothing else says whether
 	// the report was made
 	reply.lcatf("Motion stops reported: %" PRIu32 ", dropped: %" PRIu32, m_motionStoppedReports, m_motionStoppedDropped);
+	reply.lcatf("CAN replies dropped: %" PRIu32 " no buffer, %" PRIu32 " too long",
+				m_canResponsesDropped,
+				m_canResponsesTooLong);
 #  ifdef TRACK_FILE_CODES
 	reply.lcatf("File codes read/handled: %d/%d, file macros open/closing: %d %d",
 				(int)fileCodesRead,

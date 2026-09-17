@@ -58,7 +58,15 @@ class SbcInterface
 	void HandleGCodeReply(MessageType mt, const char* reply) noexcept;	  // accessed by Platform
 	void HandleGCodeReply(MessageType mt, OutputBuffer* buffer) noexcept; // accessed by Platform
 
-	bool EnqueueCanResponse(const CANResponseHeader& header, const char* _ecv_null data) noexcept;
+	// Queue a CAN message for forwarding to the SBC. Returns CanStatus::Ok if it was queued, or why it
+	// could not be: NoBuffer when the ring is full, Overflow when the payload is longer than a slot.
+	CanStatus EnqueueCanResponse(const CANResponseHeader& header, const char* _ecv_null data) noexcept;
+
+	// Record that a reply EnqueueCanResponse refused has been given up on rather than retried
+	void NoteCanResponseDropped() noexcept
+	{
+		++m_canResponsesDropped;
+	}
 
 	// Record what became of a CAN message the SBC asked to be sent. Called from whichever task dealt
 	// with it, so that every outcome is reported by the code that produced it rather than inferred
@@ -130,6 +138,10 @@ class SbcInterface
 	// Reported in M122. A stop the SBC never hears about is one it cannot correct, and the failure
 	// looks the same from the SBC whether this board never sent it or the SBC never acted on it
 	uint32_t m_motionStoppedReports = 0, m_motionStoppedDropped = 0;
+
+	// A reply that never reaches the SBC is one the code that asked for it waits out a timeout for, and
+	// nothing else says it happened
+	uint32_t m_canResponsesDropped = 0, m_canResponsesTooLong = 0;
 
 	bool ProcessMotionStopped() noexcept; // Write queued motion-stopped reports into the current transfer
 
