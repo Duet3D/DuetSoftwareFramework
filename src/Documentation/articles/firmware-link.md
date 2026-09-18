@@ -29,7 +29,7 @@ because there is no second interpreter.
 ```mermaid
 flowchart TD
     HANDLERS["Code handlers, MovePlanner<br/>(gcode-flow.md)"] --> LI["LinkInterface<br/>CAN requests, messages, e-stop"]
-    LI --> NL["NativeLink<br/>P/Invoke into libduet_sbc.so"]
+    LI --> NL["NativeLink<br/>P/Invoke into libduet_realtime_core.so"]
     MP["MovePlanner"] --> NL
     NL --> RING["outbound ring<br/>sequence-numbered commands"]
     RING --> XFER["SbcTransfer<br/>SPI master, TfrRdy-gated"]

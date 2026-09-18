@@ -509,7 +509,7 @@ decision, and it runs under the planner lock:
 2. **Map each stopped driver to a logical drive** through `MotionParameters.DriveForDriver`. A driver
    belongs to exactly one drive; a report that maps to none, or to a drive this move did not arm, is
    refused and logged rather than acted on.
-3. **Ask where it was**, via `DuetSbc_MotionGetPositionAt(drive, whenTriggered)`.
+3. **Ask where it was**, via `DuetRT_MotionGetPositionAt(drive, whenTriggered)`.
    [MotionService::GetPositionAt](src/DuetRealtimeCore/src/SBC/MotionService.cpp) converts the
    timestamp into the movement timebase and evaluates the drive's segment chain at that instant. It
    reads the tracker as the motion thread last left it and does not advance it - advancing retires

@@ -83,7 +83,7 @@ public class LinkEventsLayout
     public void TheClockStatsFieldsLandWhereTheNativeOnesDo()
     {
         // The one record the runtime is handed a pointer to rather than a copy of, so what has to
-        // match is where DuetSbc_GetClockStats writes. It is declared Pack = 1 here and unpacked
+        // match is where DuetRT_GetClockStats writes. It is declared Pack = 1 here and unpacked
         // natively: the offsets agree because every field after the leading double is 4 bytes wide,
         // but the native struct is 32 bytes to the 28 here, its double asking for a tail it does not
         // fill. Nothing is written into that tail, which is why the difference is survivable

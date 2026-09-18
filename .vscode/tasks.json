@@ -282,7 +282,7 @@
             "runOptions": {
                 "instanceLimit": 1
             },
-            // DCS P/Invokes into libduet_sbc.so and will not start without it
+            // DCS P/Invokes into libduet_realtime_core.so and will not start without it
             "dependsOn": [
                 "[DSF] Make Build Directory",
                 "[DSF] Build DuetRealtimeCore"
@@ -476,7 +476,7 @@
             }
         },
         {
-            // Native SPI transfer loop (libduet_sbc.so). Cross-compiled for aarch64. The
+            // Native SPI transfer loop (libduet_realtime_core.so). Cross-compiled for aarch64. The
             // devcontainer's glibc matches Raspberry Pi OS Bookworm's, so no sysroot is involved.
             "label": "[DSF] Build DuetRealtimeCore",
             "type": "shell",
@@ -558,7 +558,7 @@
             // latency without the .NET runtime. Statically linked, so it needs no sysroot.
             "label": "[DSF] Build and Deploy Jitter Harness to",
             "type": "shell",
-            "command": "cmake --preset arm64 && cmake --build --preset arm64 --target sbc_jitter_test -j && scp build/arm64/harness/sbc_jitter_test ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp}:~/",
+            "command": "cmake --preset arm64 && cmake --build --preset arm64 --target realtime_core_jitter_test -j && scp build/arm64/harness/realtime_core_jitter_test ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp}:~/",
             "options": {
                 "cwd": "${workspaceFolder}/src/DuetRealtimeCore"
             },

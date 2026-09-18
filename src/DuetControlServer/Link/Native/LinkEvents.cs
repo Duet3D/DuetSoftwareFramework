@@ -84,7 +84,7 @@ internal enum InboundEventType : ushort
 }
 
 /// <summary>
-/// How well the native step-clock model is tracking the controller. Mirrors <c>DuetSbcClockStats</c>
+/// How well the native step-clock model is tracking the controller. Mirrors <c>DuetRTClockStats</c>
 /// </summary>
 /// <remarks>
 /// Move start times are expressed in the modelled clock, so how well it tracks is how well moves
@@ -113,7 +113,7 @@ public struct NativeClockStats
 }
 
 /// <summary>
-/// What one DDA ring has done. Mirrors <c>DuetSbcRingStats</c>
+/// What one DDA ring has done. Mirrors <c>DuetRTRingStats</c>
 /// </summary>
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
 public struct NativeRingStats
@@ -149,7 +149,7 @@ public struct NativeRingStatsArray
 }
 
 /// <summary>
-/// What the native motion engine has done. Mirrors <c>DuetSbcMotionStats</c>
+/// What the native motion engine has done. Mirrors <c>DuetRTMotionStats</c>
 /// </summary>
 /// <remarks>
 /// Counters rather than formatted text: this side owns the wording of M122, as it does for every
@@ -159,7 +159,7 @@ public struct NativeRingStatsArray
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
 public struct NativeMotionStats
 {
-    /// <summary>Movement systems the engine builds. Must match the native <c>DUET_SBC_MAX_RINGS</c></summary>
+    /// <summary>Movement systems the engine builds. Must match the native <c>DUET_REALTIME_CORE_MAX_RINGS</c></summary>
     public const int MaxRings = 2;
 
     /// <summary>MoveSegments allocated since startup</summary>

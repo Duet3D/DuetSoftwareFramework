@@ -11,7 +11,7 @@ namespace UnitTests.Motion;
 /// The serialised form of <see cref="MachineConfig"/> against the native struct it is copied into
 /// </summary>
 /// <remarks>
-/// <c>DuetSbc_MotionConfigure</c> memcpys these bytes straight into a C++ <c>MachineConfig</c> and
+/// <c>DuetRT_MotionConfigure</c> memcpys these bytes straight into a C++ <c>MachineConfig</c> and
 /// refuses anything that is not exactly the right length, so a mismatch here is not a subtle bug: at
 /// best the configuration is rejected and no move is ever scheduled, at worst every field after the
 /// mismatch is read from the wrong offset. The numbers below are the ones

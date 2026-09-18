@@ -1,6 +1,6 @@
 # System emulation: a staged virtual test bench
 
-The whole stack, DuetControlServer and libduet_sbc on the host with DuetCANMaster and Duet3Expansion
+The whole stack, DuetControlServer and libduet_realtime_core on the host with DuetCANMaster and Duet3Expansion
 as firmware, running and testable with no hardware on the bench. The work is staged so that each
 stage is a usable test rig on its own: stage 1 replaces the controller with a scriptable fake and
 already covers the job lifecycle end to end; stage 2 puts the real DuetCANMaster firmware into the
@@ -52,7 +52,7 @@ the central design lever of stage 1. One nuance the SBC side adds: its model ext
 samples at the nominal rate and is clamped never to run backwards
 ([StepTimer.cpp](../../src/DuetRealtimeCore/src/Motion/StepTimer.cpp)), so freezing the master clock
 alone does not freeze the modelled one, so the stepped clock is paired with the pinned local time
-base (`DuetSbc_PinLocalClock` in [CApi.h](../../src/DuetRealtimeCore/src/CApi.h)) and both are
+base (`DuetRT_PinLocalClock` in [CApi.h](../../src/DuetRealtimeCore/src/CApi.h)) and both are
 advanced together. That is necessary and not sufficient: the software still makes its progress in
 real time between the steps, so the same scenario stops in different places between runs.
 [DETERMINISTIC_BENCH.md](DETERMINISTIC_BENCH.md) is the plan that closes it, by gating each advance
@@ -118,12 +118,12 @@ is to exercise the real protocol logic, version checks and resync included.
 
 ## 3. Stage 1: fake DuetCANMaster endpoint
 
-**Goal:** DuetControlServer and libduet_sbc run unmodified on the host, connected to a scriptable
+**Goal:** DuetControlServer and libduet_realtime_core run unmodified on the host, connected to a scriptable
 fake controller. Every transfer in both directions is captured for assertions; every response the
 protocol expects has a default the fake gives unprompted, and tests override or inject at will.
 
 The real components in the loop are everything above the link: the whole of DCS, and the whole of
-libduet_sbc including the motion engine, so `DDARing`, the feedhold, and `ScheduleMove` packet
+libduet_realtime_core including the motion engine, so `DDARing`, the feedhold, and `ScheduleMove` packet
 generation are genuine. What the fake replaces is only what real hardware does with those packets.
 
 ### The socket transport
@@ -176,7 +176,7 @@ for what a readable rendering of that capture looks like.
 
 The `src/SystemTests` NUnit project (separate from `src/UnitTests`, which stays fast and
 link-free) builds the DCS generic host in-process with the real `NativeLink` and real
-`libduet_sbc.so`, pointed at the fake endpoint, with a per-test virtual SD tree
+`libduet_realtime_core.so`, pointed at the fake endpoint, with a per-test virtual SD tree
 (`Host/DcsTestHost.cs`). The enabling seams: `InternalsVisibleTo` for `JobController` and friends,
 the configurable SD root (`Settings.BaseDirectory`), transfer timeouts taken from `Settings` so a
 debugger-paused test does not trip the reconnect path, and the pinned local clock described in §1.
@@ -187,12 +187,12 @@ Running the bench is one command:
 cd src/SystemTests && dotnet test
 ```
 
-Building the test project also builds the host `libduet_sbc.so` (a CMake configure on first use,
+Building the test project also builds the host `libduet_realtime_core.so` (a CMake configure on first use,
 then an incremental build that is a no-op when the native sources are unchanged), so the library
 can never be stale relative to the C++ it was built from. `Host/NativeLibraryLocator.cs` resolves
 the freshest host build from the CMake tree at run time - no copy step is involved. Opt out of the
 native build with `-p:BuildNativeLink=false`, or pin a specific library by setting
-`DUET_SBC_LIBRARY`, which skips the build too so nothing rebuilds underneath the pin. Test configs enable the CAN
+`DUET_REALTIME_CORE_LIBRARY`, which skips the build too so nothing rebuilds underneath the pin. Test configs enable the CAN
 bus first: a config code that sends CAN traffic before `M953` is answered with `BusError`, exactly
 as DuetCANMaster answers a send with no CAN device.
 
@@ -219,7 +219,7 @@ here, with hardware retaining only what involves real motion.
 - [x] Total capture with typed decoding for assertions and a dumpable exchange log
 - [x] `SystemTests` project hosting DCS in-process against the fake
 - [x] The enabling seams: `InternalsVisibleTo`, the configurable SD root (`BaseDirectory`),
-      timeouts from `Settings`, and the pinned local clock (`DuetSbc_PinLocalClock`)
+      timeouts from `Settings`, and the pinned local clock (`DuetRT_PinLocalClock`)
 - [x] First scenarios: boot and keep-alive, CRC corruption retried without a resync, reconnect and
       reconfigure after a controller reboot, withheld readiness recovering, injected traffic
       reaching the dispatcher, `MotionStopped` closing a homing move,

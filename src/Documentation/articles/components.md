@@ -26,7 +26,7 @@ Command-line options, return codes, and the link/IPC details are documented in t
 
 ### DuetRealtimeCore
 
-`src/DuetRealtimeCore/` - a native shared library (`libduet_sbc.so`) loaded into the DCS process,
+`src/DuetRealtimeCore/` - a native shared library (`libduet_realtime_core.so`) loaded into the DCS process,
 built from C++ ported from RepRapFirmware. It holds the work that has to keep real time or has to
 evaluate a motion profile:
 

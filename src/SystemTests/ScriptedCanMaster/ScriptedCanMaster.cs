@@ -18,7 +18,7 @@ namespace SystemTests;
 /// <summary>
 /// The scriptable fake DuetCANMaster endpoint of the system test bench: the controller side of the
 /// framed exchange defined in <c>DuetSpiProtocol/SocketLinkFormats.h</c>, served over a Unix domain
-/// socket. DuetControlServer and libduet_sbc run unmodified against it via the socket transport.
+/// socket. DuetControlServer and libduet_realtime_core run unmodified against it via the socket transport.
 /// </summary>
 /// <remarks>
 /// <para>

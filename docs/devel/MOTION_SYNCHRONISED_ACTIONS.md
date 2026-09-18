@@ -511,7 +511,7 @@ sequenceDiagram
     participant C as DuetCANMaster
     participant B as Expansion board
     H->>H: M106 read, validated, object model written, frames built
-    H->>L: DuetSbc_MotionSubmitAction {anchor = B, frames, txToken}
+    H->>L: DuetRT_MotionSubmitAction {anchor = B, frames, txToken}
     H-->>H: code completes "ok"
     Note over L: move B prepared: due = moveStartTime + clocksNeeded
     L->>C: frames stamped whenToExecute = due, emitted with move B's dispatch
@@ -568,7 +568,7 @@ Wire growth, against CAN-FD DLC quantisation (0-8, 12, 16, 20, 24, 32, 48, 64):
 
 ### 7.3 DuetRealtimeCore
 
-- `DuetSbc_MotionSubmitAction(handle, ring, anchorMoveId, header, payload, length)`: a lock-free
+- `DuetRT_MotionSubmitAction(handle, ring, anchorMoveId, header, payload, length)`: a lock-free
   submission ring beside `SubmitMove`, drained by `MotionService::SpinOnce` into a per-ring action
   list ordered by anchor id.
 - **Resolution at the anchor's `DDA::Prepare`**: due = `m_afterPrepare.moveStartTime +
@@ -584,7 +584,7 @@ Wire growth, against CAN-FD DLC quantisation (0-8, 12, 16, 20, 24, 32, 48, 64):
   dropped from the list in the same operation. Nothing needs to reach the boards on a pause or stop:
   every action already sent has a committed anchor, committed moves always run (§4), so every parked
   command is owed and fires at its tick before the machine reaches standstill.
-- **M400 term**: `DuetSbc_MotionActionsPending(ring)` = the list is non-empty, or the last emitted
+- **M400 term**: `DuetRT_MotionActionsPending(ring)` = the list is non-empty, or the last emitted
   due time has not yet passed `GetMovementTimerTicks()`. The check lives here because only the
   native side has the movement-timebase clock.
 - Discarded whole on link loss or controller reset, with the move ring.
@@ -666,7 +666,7 @@ sequenceDiagram
     participant B as Expansion board
     P->>H: dispatch M106, not awaited
     H->>H: validated, object model written, frames built
-    H->>L: DuetSbc_MotionSubmitAction {anchor = B, frames, txToken}
+    H->>L: DuetRT_MotionSubmitAction {anchor = B, frames, txToken}
     Note over H: deferred: awaits the txToken's completion source
     P->>P: reads the next code: moves overtake the deferred code
     Note over L: move B prepared: frames stamped and emitted per §7.3
@@ -713,7 +713,7 @@ implementation A disappears.
   practice). `WaitForStandstillAsync` reads this predicate, so every FlushAndStandstill code and
   M400 wait for deferred codes, and §5.5's term falls out for free: a deferred code resolves when the
   board's reply arrives, which is after the effect executed, so M400 returning means every deferred
-  effect has happened. §7.3's `DuetSbc_MotionActionsPending` is not needed.
+  effect has happened. §7.3's `DuetRT_MotionActionsPending` is not needed.
 
 ### 8.3 Completion is out of order
 
@@ -887,7 +887,7 @@ sequenceDiagram
     Note over PB: DeferCode() as in stage 1, through the same gate,<br/>for the row now classed CodeClass.DeferAction
     PB->>H: the DeferAction arm has no predecessor or anchor await,<br/>handler.ProcessAsync(code) dispatches at parse time
     H->>H: validate, write object model, build ALL frames<br/>(M106: SetFanSpeed + HeaterFeedForwardV1), allocate txToken
-    H->>SI: DuetSbc_MotionSubmitAction(ring, anchorMoveId, frames, txToken)
+    H->>SI: DuetRT_MotionSubmitAction(ring, anchorMoveId, frames, txToken)
     Note over H: awaits the txToken's completion source
     SI->>SI: MotionService::SpinOnce drains into the<br/>per-ring action list, ordered by anchor id
     Note over SI: anchor's DDA::Prepare, ~50 ms before it runs:<br/>due = moveStartTime + clocksNeeded,<br/>whenToExecute patched at the generated offset
@@ -915,7 +915,7 @@ sequenceDiagram
 | Expressions | evaluated at parse, frozen into the queued code | evaluated at parse, frozen into the frames | as B |
 | Endstop-terminated anchors | correct by construction (retirement follows the stop) | excluded by the FlushAndStandstill rule (§5.3) | as B |
 | Local effects (M117, M300) | same mechanism as everything else | need A's release hook anyway | the deferred handler awaits the anchor's `MoveCompletedEvent` (§8.1) |
-| M400 and drain waits | queue empty and Queue channel idle (§6) | `DuetSbc_MotionActionsPending` (§7.3) | free from the standstill predicate, but every drain wait must pick a predicate (§8.2) |
+| M400 and drain waits | queue empty and Queue channel idle (§6) | `DuetRT_MotionActionsPending` (§7.3) | free from the standstill predicate, but every drain wait must pick a predicate (§8.2) |
 | Purge | one list, in-process | SBC list plus the estop broadcast plus the CANMaster expiry field | B's, plus cancellation of deferred codes (§8.4) |
 | Codebases touched, one-time | DuetControlServer | schema, DuetControlServer, DuetRealtimeCore, Duet3Expansion, DuetCANMaster (one field) | B's set; the additions over B are DuetControlServer only |
 | Per new deferred code | DuetControlServer only | DuetControlServer only; plus a schema field if the message type lacks `whenToExecute` | as B |

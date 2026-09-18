@@ -55,9 +55,9 @@ flowchart LR
     C1 --> C2
     C2 -- notes each move's origin --> ST
     C2 -- queues moves, C ABI --> N2
-    P1 -- DuetSbc_MotionRequestStop --> N1
+    P1 -- DuetRT_MotionRequestStop --> N1
     N1 --> N2
-    N2 -. seqlock result, DuetSbc_MotionGetFeedholdResult .-> P1
+    N2 -. seqlock result, DuetRT_MotionGetFeedholdResult .-> P1
     P1 -- reads the surviving move's origin --> ST
     P1 -- freezes and rewinds --> J2
     ST -- fraction and modal G --> J2
@@ -140,10 +140,10 @@ sequenceDiagram
     L->>P: start the sequence
     P->>J: Freeze: the generation is cancelled, nothing more is dispatched
     P->>PL: StopEarlyAsync, plannedDeceleration true
-    PL->>E: DuetSbc_MotionRequestStop, the only call that crosses
+    PL->>E: DuetRT_MotionRequestStop, the only call that crosses
     PL->>PL: State.NotePurge, under the planner lock
     E->>E: DrainFeedholds, then Feedhold on ring 0
-    E-->>PL: DuetSbc_MotionGetFeedholdResult, polled<br/>stopped, lastSurvivingMoveId, movesPurged
+    E-->>PL: DuetRT_MotionGetFeedholdResult, polled<br/>stopped, lastSurvivingMoveId, movesPurged
     PL->>PL: ResyncFromEngine, SyncInterpreterToMachine, SegmentsLeft = 0<br/>MotionTracker.FailAfter, last submitted id rolled back
     PL-->>P: FeedholdOutcome
     S->>S: the purge generation moved on, throw OperationCanceledException
@@ -427,4 +427,4 @@ one restore point and one interpreter state.
 | `src/Motion/MotionService.cpp` | `DrainFeedholds`, collapsing requests and publishing the result through the seqlock |
 | `src/Motion/DDARing.cpp` | `Feedhold`, the planned deceleration; `PauseMoves`, RepRapFirmware's search kept as the reference |
 | `src/Motion/DDA.cpp`, `DDA.h` | `IsRestartableBoundary`, `SetSpeedsForFeedhold` |
-| `src/CApi.cpp` | `DuetSbc_MotionRequestStop` and `DuetSbc_MotionGetFeedholdResult`, the C ABI both sides meet at |
+| `src/CApi.cpp` | `DuetRT_MotionRequestStop` and `DuetRT_MotionGetFeedholdResult`, the C ABI both sides meet at |

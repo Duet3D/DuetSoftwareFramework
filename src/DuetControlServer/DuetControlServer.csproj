@@ -4,7 +4,7 @@
 		<TargetFramework>net10.0</TargetFramework>
 		<PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
 		<BuildTime>$([System.DateTime]::Now)</BuildTime>
-		<!-- Required by the source-generated P/Invokes into libduet_sbc.so (see Link/Native) -->
+		<!-- Required by the source-generated P/Invokes into libduet_realtime_core.so (see Link/Native) -->
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
 		<PublishAot Condition="'$(AotPublish)' == 'true'">true</PublishAot>

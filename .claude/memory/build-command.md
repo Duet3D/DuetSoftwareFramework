@@ -6,7 +6,7 @@ metadata:
 ---
 
 Build the project with `./scripts/build.sh --all` from the repo root. It builds every dotnet project *and*
-cross-compiles the native `libduet_sbc.so` for aarch64 through CMake, then collates everything into
+cross-compiles the native `libduet_realtime_core.so` for aarch64 through CMake, then collates everything into
 `build/dotnet/`. It ends with "Build complete. No deployment target specified." and deploys nothing.
 
 **Why it matters:** `dotnet build src/DuetControlServer/DuetControlServer.csproj` misses the native

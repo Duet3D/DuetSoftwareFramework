@@ -1,4 +1,4 @@
-// MachineConfig crosses the CApi boundary as raw bytes: DuetSbc_MotionConfigure memcpys whatever
+// MachineConfig crosses the CApi boundary as raw bytes: DuetRT_MotionConfigure memcpys whatever
 // DuetControlServer hands it straight into the struct. Unlike the other boundary structs it is not
 // packed, because driveStepsPerMm and its neighbours are read while preparing moves and a misaligned
 // float array is not worth the twenty bytes saved.

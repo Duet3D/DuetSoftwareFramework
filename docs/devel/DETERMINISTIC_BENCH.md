@@ -1,7 +1,7 @@
 # The system test bench: deterministic, and fast enough to run constantly
 
 The stage 1 bench of [SYSTEM_EMULATION.md](SYSTEM_EMULATION.md) runs the whole of
-DuetControlServer and the real `libduet_sbc` against a scripted controller, which is what makes the
+DuetControlServer and the real `libduet_realtime_core` against a scripted controller, which is what makes the
 job lifecycle testable at all. Two properties it is documented as having, it does not have: the
 same scenario does not produce the same result twice, and the scenarios are slow enough that nobody
 runs them while working. Both come from the same line of code, and both are fixed by the same
@@ -16,7 +16,7 @@ test for the job control rewrite and therefore have to mean something.
 ## 1. What the bench claims, and what it does
 
 [SteppedTimeline](../../src/SystemTests/ScriptedCanMaster/SteppedTimeline.cs) owns the motion
-timeline: it pins the SBC's local clock through `DuetSbc_PinLocalClock` and advances the master step
+timeline: it pins the SBC's local clock through `DuetRT_PinLocalClock` and advances the master step
 clock the fake controller reports, so the machine moves only while the test is asking it to. Its own
 doc comment says what that is for: "the machine's position is a function of how far the timeline was
 advanced and of nothing else".
@@ -91,7 +91,7 @@ In the order it matters:
 4. **Host startup per test.** Every test builds and starts the whole DI host, IPC server included,
    then runs `config.g` and waits for its marker.
 5. **Runner overhead.** `dotnet test` costs seconds before a test runs, and the project rebuilds
-   `libduet_sbc` on every invocation.
+   `libduet_realtime_core` on every invocation.
 
 ## 5. Two properties, priced separately
 
@@ -122,9 +122,9 @@ On the native side the pinned local clock already exists. Extend it to cover `Li
 
 ### 6.2 The native threads are pumped, not run
 
-`MotionService::SpinOnce` is already separate from `Run`, so `DuetSbc_StepMotion()` plus a start mode
+`MotionService::SpinOnce` is already separate from `Run`, so `DuetRT_StepMotion()` plus a start mode
 that creates no thread is a small change. Split `LinkService::Execute` the same way into a
-`TransferOnce` behind `DuetSbc_StepLink()`. The bench then owns every actor in the process.
+`TransferOnce` behind `DuetRT_StepLink()`. The bench then owns every actor in the process.
 
 Each pump reports whether it did anything: `SpinOnce` whether it prepared, drained or retired
 anything, the link whether it moved a transfer, the fake controller whether it had anything to send.
@@ -180,7 +180,7 @@ mean exactly what they say.
 
 Nothing sets `[Parallelizable]`, so the suite is serial. In-process parallelism is blocked by native
 global state rather than by the clock pin alone: `StepTimer` is entirely static, so two
-`DuetSbcHandle`s in one process share one clock model, even though `DuetSbc_Create` is otherwise
+`DuetRTHandle`s in one process share one clock model, even though `DuetRT_Create` is otherwise
 handle-based.
 
 Two routes, in order:
@@ -228,7 +228,7 @@ are pumped.
 
 1. `TimeProvider` through DuetControlServer, the pinned clock over the whole native side, and the
    bench's own polls on the same provider. No behaviour change, no test changes.
-2. `DuetSbc_StepMotion` and `DuetSbc_StepLink`, and the fake controller pumped by the test.
+2. `DuetRT_StepMotion` and `DuetRT_StepLink`, and the fake controller pumped by the test.
 3. `Settle()` replacing the dwell, with quiescence on the managed side. **Determinism and most of the
    speed arrive here.**
 4. Every scenario onto the timeline; `FreeRunningClock` deleted. A bench profile that starts only the

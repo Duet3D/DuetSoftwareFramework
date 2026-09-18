@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 namespace DuetControlServer.Link.Native;
 
 /// <summary>
-/// Configuration passed to the native interface. Mirrors <c>DuetSbcConfig</c> in
+/// Configuration passed to the native interface. Mirrors <c>DuetRTConfig</c> in
 /// <c>DuetRealtimeCore/src/CApi.h</c>
 /// </summary>
 /// <remarks>
@@ -90,14 +90,14 @@ internal enum NativeTransport
 }
 
 /// <summary>
-/// P/Invoke declarations for <c>libduet_sbc.so</c>, the native SPI transfer loop
+/// P/Invoke declarations for <c>libduet_realtime_core.so</c>, the native SPI transfer loop
 /// </summary>
 /// <remarks>
 /// <para>
 /// Threading rules imposed by the native side:
 /// the <c>Queue*</c>/<c>Request*</c> entry points are safe to call from any thread concurrently,
-/// but <see cref="DuetSbc_PeekEvent"/>, <see cref="DuetSbc_ConsumeEvent"/> and
-/// <see cref="DuetSbc_WaitForEvent"/> form a single-consumer API and must only ever be used by the
+/// but <see cref="DuetRT_PeekEvent"/>, <see cref="DuetRT_ConsumeEvent"/> and
+/// <see cref="DuetRT_WaitForEvent"/> form a single-consumer API and must only ever be used by the
 /// dispatcher thread owned by <see cref="LinkService"/>.
 /// </para>
 /// <para>
@@ -110,14 +110,14 @@ internal static partial class NativeMethods
     /// <summary>
     /// Name of the native library. Resolved from the application directory at runtime
     /// </summary>
-    internal const string LibraryName = "duet_sbc";
+    internal const string LibraryName = "duet_realtime_core";
 
     /// <summary>
     /// Fill the given config with the native defaults
     /// </summary>
     /// <param name="config">Config to populate</param>
     [LibraryImport(LibraryName)]
-    internal static partial void DuetSbc_DefaultConfig(out NativeConfig config);
+    internal static partial void DuetRT_DefaultConfig(out NativeConfig config);
 
     /// <summary>
     /// Create an interface instance
@@ -127,7 +127,7 @@ internal static partial class NativeMethods
     /// <param name="errorBufLen">Size of <paramref name="errorBuf"/></param>
     /// <returns>Handle, or <see cref="IntPtr.Zero"/> on failure</returns>
     [LibraryImport(LibraryName)]
-    internal static partial IntPtr DuetSbc_Create(ref NativeConfig config, byte[]? errorBuf, int errorBufLen);
+    internal static partial IntPtr DuetRT_Create(ref NativeConfig config, byte[]? errorBuf, int errorBufLen);
 
     /// <summary>
     /// Connect to the firmware. Blocks until the first transfer succeeds
@@ -137,21 +137,21 @@ internal static partial class NativeMethods
     /// <param name="errorBufLen">Size of <paramref name="errorBuf"/></param>
     /// <returns>Zero on success</returns>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_Connect(IntPtr handle, byte[]? errorBuf, int errorBufLen);
+    internal static partial int DuetRT_Connect(IntPtr handle, byte[]? errorBuf, int errorBufLen);
 
     /// <summary>
     /// Start the transfer loop on its own real-time thread
     /// </summary>
     /// <param name="handle">Interface handle</param>
     [LibraryImport(LibraryName)]
-    internal static partial void DuetSbc_Start(IntPtr handle);
+    internal static partial void DuetRT_Start(IntPtr handle);
 
     /// <summary>
     /// Stop the transfer loop and join its thread
     /// </summary>
     /// <param name="handle">Interface handle</param>
     [LibraryImport(LibraryName)]
-    internal static partial void DuetSbc_Stop(IntPtr handle);
+    internal static partial void DuetRT_Stop(IntPtr handle);
 
     /// <summary>
     /// Queue a message for transmission
@@ -162,7 +162,7 @@ internal static partial class NativeMethods
     /// <param name="length">Length of <paramref name="message"/> in bytes</param>
     /// <returns>Zero on success, non-zero if the outbound ring is full</returns>
     [LibraryImport(LibraryName)]
-    internal static partial long DuetSbc_QueueMessage(IntPtr handle, uint flags, ReadOnlySpan<byte> message, int length);
+    internal static partial long DuetRT_QueueMessage(IntPtr handle, uint flags, ReadOnlySpan<byte> message, int length);
 
     /// <summary>
     /// Queue a CAN message for transmission
@@ -177,7 +177,7 @@ internal static partial class NativeMethods
     /// <param name="length">Length of <paramref name="payload"/></param>
     /// <returns>Zero on success, non-zero if the outbound ring is full</returns>
     [LibraryImport(LibraryName)]
-    internal static partial long DuetSbc_QueueCanMessage(IntPtr handle, ushort txToken, ushort msgType,
+    internal static partial long DuetRT_QueueCanMessage(IntPtr handle, ushort txToken, ushort msgType,
         ushort replyType, byte dstAddress, int isResponse, ReadOnlySpan<byte> payload, int length);
 
     /// <summary>
@@ -188,7 +188,7 @@ internal static partial class NativeMethods
     /// <param name="requestId">Request id to report completion against, or 0 for fire-and-forget</param>
     /// <returns>Zero on success, non-zero if the outbound ring is full</returns>
     [LibraryImport(LibraryName)]
-    internal static partial long DuetSbc_QueueEnableCan(IntPtr handle, int enable, uint requestId);
+    internal static partial long DuetRT_QueueEnableCan(IntPtr handle, int enable, uint requestId);
 
     /// <summary>
     /// Request an immediate emergency stop
@@ -196,7 +196,7 @@ internal static partial class NativeMethods
     /// <param name="handle">Interface handle</param>
     /// <param name="requestId">Request id to report completion against</param>
     [LibraryImport(LibraryName)]
-    internal static partial void DuetSbc_RequestEmergencyStop(IntPtr handle, uint requestId);
+    internal static partial void DuetRT_RequestEmergencyStop(IntPtr handle, uint requestId);
 
     /// <summary>
     /// Request a firmware reset
@@ -204,7 +204,7 @@ internal static partial class NativeMethods
     /// <param name="handle">Interface handle</param>
     /// <param name="requestId">Request id to report completion against</param>
     [LibraryImport(LibraryName)]
-    internal static partial void DuetSbc_RequestReset(IntPtr handle, uint requestId);
+    internal static partial void DuetRT_RequestReset(IntPtr handle, uint requestId);
 
     /// <summary>
     /// Stage a firmware update. Both buffers must stay pinned until the completion event arrives
@@ -218,7 +218,7 @@ internal static partial class NativeMethods
     /// <param name="requestId">Request id to report completion against</param>
     /// <returns>Zero on success, non-zero if an update is already running</returns>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_RequestFirmwareUpdate(IntPtr handle, IntPtr iap, int iapLength,
+    internal static partial int DuetRT_RequestFirmwareUpdate(IntPtr handle, IntPtr iap, int iapLength,
         IntPtr firmware, int firmwareLength, ushort firmwareCrc16, uint requestId);
 
     /// <summary>
@@ -226,7 +226,7 @@ internal static partial class NativeMethods
     /// </summary>
     /// <param name="handle">Interface handle</param>
     [LibraryImport(LibraryName)]
-    internal static partial void DuetSbc_RequestTransfer(IntPtr handle);
+    internal static partial void DuetRT_RequestTransfer(IntPtr handle);
 
     /// <summary>
     /// Point at the next inbound event record without copying it
@@ -236,14 +236,14 @@ internal static partial class NativeMethods
     /// <param name="length">Receives the record length in bytes</param>
     /// <returns>1 if an event is available, 0 otherwise</returns>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_PeekEvent(IntPtr handle, out IntPtr data, out int length);
+    internal static partial int DuetRT_PeekEvent(IntPtr handle, out IntPtr data, out int length);
 
     /// <summary>
-    /// Release the event most recently returned by <see cref="DuetSbc_PeekEvent"/>
+    /// Release the event most recently returned by <see cref="DuetRT_PeekEvent"/>
     /// </summary>
     /// <param name="handle">Interface handle</param>
     [LibraryImport(LibraryName)]
-    internal static partial void DuetSbc_ConsumeEvent(IntPtr handle);
+    internal static partial void DuetRT_ConsumeEvent(IntPtr handle);
 
     /// <summary>
     /// Block until an inbound event is available, the timeout elapses, or the loop stops
@@ -252,7 +252,7 @@ internal static partial class NativeMethods
     /// <param name="timeoutMs">Maximum time to wait in ms</param>
     /// <returns>1 if an event is probably available, 0 on timeout</returns>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_WaitForEvent(IntPtr handle, int timeoutMs);
+    internal static partial int DuetRT_WaitForEvent(IntPtr handle, int timeoutMs);
 
     /// <summary>
     /// Get the negotiated protocol version
@@ -260,7 +260,7 @@ internal static partial class NativeMethods
     /// <param name="handle">Interface handle</param>
     /// <returns>Protocol version</returns>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_GetProtocolVersion(IntPtr handle);
+    internal static partial int DuetRT_GetProtocolVersion(IntPtr handle);
 
     /// <summary>
     /// Get and reset the maximum TfrRdy pin wait time
@@ -268,7 +268,7 @@ internal static partial class NativeMethods
     /// <param name="handle">Interface handle</param>
     /// <returns>Time in ms</returns>
     [LibraryImport(LibraryName)]
-    internal static partial double DuetSbc_GetMaxPinWaitMs(IntPtr handle);
+    internal static partial double DuetRT_GetMaxPinWaitMs(IntPtr handle);
 
     /// <summary>
     /// Get and reset the maximum time between two full transfers
@@ -276,7 +276,7 @@ internal static partial class NativeMethods
     /// <param name="handle">Interface handle</param>
     /// <returns>Time in ms</returns>
     [LibraryImport(LibraryName)]
-    internal static partial double DuetSbc_GetMaxFullTransferDelayMs(IntPtr handle);
+    internal static partial double DuetRT_GetMaxFullTransferDelayMs(IntPtr handle);
 
     /// <summary>
     /// Get the number of observed TfrRdy pin glitches
@@ -284,7 +284,7 @@ internal static partial class NativeMethods
     /// <param name="handle">Interface handle</param>
     /// <returns>Glitch count</returns>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_GetTfrPinGlitches(IntPtr handle);
+    internal static partial int DuetRT_GetTfrPinGlitches(IntPtr handle);
 
     /// <summary>
     /// Get the number of missed GPIO edges
@@ -292,7 +292,7 @@ internal static partial class NativeMethods
     /// <param name="handle">Interface handle</param>
     /// <returns>Missed edge count</returns>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_GetMissedEdges(IntPtr handle);
+    internal static partial int DuetRT_GetMissedEdges(IntPtr handle);
 
     /// <summary>
     /// Get the number of connection resyncs performed after an error
@@ -300,7 +300,7 @@ internal static partial class NativeMethods
     /// <param name="handle">Interface handle</param>
     /// <returns>Resync count</returns>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_GetResyncCount(IntPtr handle);
+    internal static partial int DuetRT_GetResyncCount(IntPtr handle);
 
     /// <summary>
     /// Get the number of events dropped because the inbound ring was full
@@ -308,7 +308,7 @@ internal static partial class NativeMethods
     /// <param name="handle">Interface handle</param>
     /// <returns>Dropped event count</returns>
     [LibraryImport(LibraryName)]
-    internal static partial ulong DuetSbc_GetDroppedEvents(IntPtr handle);
+    internal static partial ulong DuetRT_GetDroppedEvents(IntPtr handle);
 
     /// <summary>
     /// The current step-clock reading, in the controller's ticks
@@ -320,7 +320,7 @@ internal static partial class NativeMethods
     /// the controller sends every transfer. Move start times are in that timebase
     /// </remarks>
     [LibraryImport(LibraryName)]
-    internal static partial uint DuetSbc_GetStepClockTicks(IntPtr handle);
+    internal static partial uint DuetRT_GetStepClockTicks(IntPtr handle);
 
     /// <summary>
     /// How far the movement timebase lags the raw step clock, in ticks
@@ -333,7 +333,7 @@ internal static partial class NativeMethods
     /// and it grows whenever a board reports that it could not keep up
     /// </remarks>
     [LibraryImport(LibraryName)]
-    internal static partial uint DuetSbc_GetMovementDelay(IntPtr handle);
+    internal static partial uint DuetRT_GetMovementDelay(IntPtr handle);
 
     /// <summary>
     /// How well the step-clock model is tracking the controller
@@ -341,7 +341,7 @@ internal static partial class NativeMethods
     /// <param name="handle">Interface handle</param>
     /// <param name="stats">Receives the statistics</param>
     [LibraryImport(LibraryName)]
-    internal static partial void DuetSbc_GetClockStats(IntPtr handle, out NativeClockStats stats);
+    internal static partial void DuetRT_GetClockStats(IntPtr handle, out NativeClockStats stats);
 
     /// <summary>
     /// What the motion engine has done since the counters were last reset
@@ -349,7 +349,7 @@ internal static partial class NativeMethods
     /// <param name="handle">Interface handle</param>
     /// <param name="stats">Receives the statistics</param>
     [LibraryImport(LibraryName)]
-    internal static partial void DuetSbc_MotionGetStats(IntPtr handle, out NativeMotionStats stats);
+    internal static partial void DuetRT_MotionGetStats(IntPtr handle, out NativeMotionStats stats);
 
     /// <summary>
     /// Zero the motion engine's error and underrun counters
@@ -360,7 +360,7 @@ internal static partial class NativeMethods
     /// is what the native side used to do by reporting and zeroing in one call
     /// </remarks>
     [LibraryImport(LibraryName)]
-    internal static partial void DuetSbc_MotionResetStats(IntPtr handle);
+    internal static partial void DuetRT_MotionResetStats(IntPtr handle);
 
     /// <summary>
     /// Push the machine description down to the motion engine
@@ -371,7 +371,7 @@ internal static partial class NativeMethods
     /// <returns>1 on success, 0 if the length did not match</returns>
     /// <remarks>Safe only while no move is in flight</remarks>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_MotionConfigure(IntPtr handle, ReadOnlySpan<byte> config, int length);
+    internal static partial int DuetRT_MotionConfigure(IntPtr handle, ReadOnlySpan<byte> config, int length);
 
     /// <summary>
     /// Start the motion thread
@@ -384,14 +384,14 @@ internal static partial class NativeMethods
     /// late move preparation only costs a hiccup that every board slips by together
     /// </remarks>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_MotionStart(IntPtr handle, int rtPriority);
+    internal static partial int DuetRT_MotionStart(IntPtr handle, int rtPriority);
 
     /// <summary>
     /// Stop the motion thread
     /// </summary>
     /// <param name="handle">Interface handle</param>
     [LibraryImport(LibraryName)]
-    internal static partial void DuetSbc_MotionStop(IntPtr handle);
+    internal static partial void DuetRT_MotionStop(IntPtr handle);
 
     /// <summary>
     /// Whether the given ring has room for another move
@@ -401,7 +401,7 @@ internal static partial class NativeMethods
     /// <returns>1 if there is room</returns>
     /// <remarks>Advisory: the ring may retire a move and make room a moment later</remarks>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_MotionCanAddMove(IntPtr handle, int ring);
+    internal static partial int DuetRT_MotionCanAddMove(IntPtr handle, int ring);
 
     /// <summary>
     /// Queue a move
@@ -411,7 +411,7 @@ internal static partial class NativeMethods
     /// <param name="length">Length of <paramref name="moveParams"/> in bytes</param>
     /// <returns>1 if queued, 0 if the caller must retry</returns>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_MotionSubmitMove(IntPtr handle, ReadOnlySpan<byte> moveParams, int length);
+    internal static partial int DuetRT_MotionSubmitMove(IntPtr handle, ReadOnlySpan<byte> moveParams, int length);
 
     /// <summary>
     /// Read the motor positions the motion engine last published
@@ -426,9 +426,9 @@ internal static partial class NativeMethods
     /// motion thread and the values never tear
     /// </remarks>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_MotionGetMotorPositions(IntPtr handle, Span<int> steps, int count, out uint whenTicks);
+    internal static partial int DuetRT_MotionGetMotorPositions(IntPtr handle, Span<int> steps, int count, out uint whenTicks);
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_MotionGetLivePositions(IntPtr handle, Span<int> steps, int count, out uint whenTicks);
+    internal static partial int DuetRT_MotionGetLivePositions(IntPtr handle, Span<int> steps, int count, out uint whenTicks);
 
     /// <summary>
     /// Where one drive was at a given step-clock time, and where it was when its move began
@@ -446,7 +446,7 @@ internal static partial class NativeMethods
     /// overshoot needs the position at the moment the switch fired, not the one the stop report caught
     /// </remarks>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_MotionGetPositionAt(IntPtr handle, int drive, uint whenTicks,
+    internal static partial int DuetRT_MotionGetPositionAt(IntPtr handle, int drive, uint whenTicks,
                                                             out int position, out int positionAtMoveStart,
                                                             out int usedTimestamp);
 
@@ -459,7 +459,7 @@ internal static partial class NativeMethods
     /// <param name="count">Number of entries in <paramref name="positions"/></param>
     /// <returns>Non-zero if the engine took it, zero if its queue was full</returns>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_MotionSetMotorPositions(IntPtr handle, uint driveMask, ReadOnlySpan<int> positions, int count);
+    internal static partial int DuetRT_MotionSetMotorPositions(IntPtr handle, uint driveMask, ReadOnlySpan<int> positions, int count);
 
     /// <summary>
     /// Ask the engine to stop early and drop the moves after it
@@ -469,10 +469,10 @@ internal static partial class NativeMethods
     /// <returns>Non-zero if the request was queued, zero if its queue was full</returns>
     /// <remarks>
     /// The answer does not come back from this call: dropping a move frees its segments and only the
-    /// motion thread may do that. <see cref="DuetSbc_MotionGetFeedholdResult"/> reports what happened
+    /// motion thread may do that. <see cref="DuetRT_MotionGetFeedholdResult"/> reports what happened
     /// </remarks>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_MotionRequestStop(IntPtr handle, int kind);
+    internal static partial int DuetRT_MotionRequestStop(IntPtr handle, int kind);
 
     /// <summary>
     /// What the last feedhold did
@@ -487,7 +487,7 @@ internal static partial class NativeMethods
     /// <param name="restEndpointCount">Capacity of <paramref name="restEndpoints"/></param>
     /// <returns>Non-zero on success</returns>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_MotionGetFeedholdResult(IntPtr handle, out uint sequence,
+    internal static partial int DuetRT_MotionGetFeedholdResult(IntPtr handle, out uint sequence,
                                                                 out uint firstPurgedMoveId, out uint movesPurged,
                                                                 out uint lastSurvivingMoveId, out int stopped,
                                                                 Span<int> restEndpoints, int restEndpointCount);
@@ -500,7 +500,7 @@ internal static partial class NativeMethods
     /// <param name="shouldStartMove">Whether queued moves should start executing</param>
     /// <param name="waitingForEmpty">Whether this side is waiting for the ring to drain</param>
     [LibraryImport(LibraryName)]
-    internal static partial void DuetSbc_MotionSetRingState(IntPtr handle, int ring, int shouldStartMove, int waitingForEmpty);
+    internal static partial void DuetRT_MotionSetRingState(IntPtr handle, int ring, int shouldStartMove, int waitingForEmpty);
 
     /// <summary>
     /// Number of moves the given ring has been given
@@ -509,7 +509,7 @@ internal static partial class NativeMethods
     /// <param name="ring">Ring number</param>
     /// <returns>Scheduled move count</returns>
     [LibraryImport(LibraryName)]
-    internal static partial uint DuetSbc_MotionGetScheduledMoves(IntPtr handle, int ring);
+    internal static partial uint DuetRT_MotionGetScheduledMoves(IntPtr handle, int ring);
 
     /// <summary>
     /// Number of moves the given ring has finished
@@ -518,7 +518,7 @@ internal static partial class NativeMethods
     /// <param name="ring">Ring number</param>
     /// <returns>Completed move count</returns>
     [LibraryImport(LibraryName)]
-    internal static partial uint DuetSbc_MotionGetCompletedMoves(IntPtr handle, int ring);
+    internal static partial uint DuetRT_MotionGetCompletedMoves(IntPtr handle, int ring);
 
     /// <summary>
     /// Submissions refused because the queue was full
@@ -527,7 +527,7 @@ internal static partial class NativeMethods
     /// <returns>Dropped submission count</returns>
     /// <remarks>Non-zero means a retry was skipped: a move was lost</remarks>
     [LibraryImport(LibraryName)]
-    internal static partial uint DuetSbc_MotionGetSubmissionsDropped(IntPtr handle);
+    internal static partial uint DuetRT_MotionGetSubmissionsDropped(IntPtr handle);
 
     /// <summary>
     /// Forced positions the motion thread has adopted
@@ -538,7 +538,7 @@ internal static partial class NativeMethods
     /// Lagging behind what this side has sent means a position was queued but has not taken effect
     /// </remarks>
     [LibraryImport(LibraryName)]
-    internal static partial uint DuetSbc_MotionGetForcedPositionsApplied(IntPtr handle);
+    internal static partial uint DuetRT_MotionGetForcedPositionsApplied(IntPtr handle);
 
     /// <summary>
     /// Whether a submitted move has not yet been taken up by the motion thread
@@ -550,12 +550,12 @@ internal static partial class NativeMethods
     /// submission queue, so the rings alone report a machine as idle while a move is on its way to it
     /// </remarks>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_MotionHasPendingSubmissions(IntPtr handle);
+    internal static partial int DuetRT_MotionHasPendingSubmissions(IntPtr handle);
 
     /// <summary>
     /// Stop the loop and destroy the instance
     /// </summary>
     /// <param name="handle">Interface handle</param>
     [LibraryImport(LibraryName)]
-    internal static partial void DuetSbc_Destroy(IntPtr handle);
+    internal static partial void DuetRT_Destroy(IntPtr handle);
 }

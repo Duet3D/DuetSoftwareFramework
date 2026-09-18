@@ -79,9 +79,9 @@ jobs:
       - name: Mark workspace as a safe git directory
         run: git config --global --add safe.directory '*'
 
-      # libduet_sbc.so compiles RRFLibraries for its host, so DuetRealtimeCore needs that submodule
-      # and DuetControlServer needs it too because it builds libduet_sbc.so in turn. Nothing else in
-      # the matrix touches lib/, so the clone is skipped for the other projects.
+      # libduet_realtime_core.so compiles RRFLibraries for its host, so DuetRealtimeCore needs
+      # that submodule and DuetControlServer needs it too because it builds the library in turn.
+      # Nothing else in the matrix touches lib/, so the clone is skipped for the other projects.
       - name: Check out RRFLibraries
         run: |
           git config --global url."https://github.com/".insteadOf "git@github.com:"

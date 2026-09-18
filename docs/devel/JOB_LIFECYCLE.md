@@ -146,7 +146,7 @@ feed rate and proportion-done of the first move that will not.
 
 The native side has the input for this: `DDA::CanPauseAfter()` exists and `MoveFlags.CanPauseAfter`
 is already set from `RawMove.CanPauseAfter`. What is missing is the ring operation and a C entry
-point for it — there is no `DuetSbc_MotionPauseMoves` in
+point for it — there is no `DuetRT_MotionPauseMoves` in
 [NativeLink.cs](../../src/DuetControlServer/Link/Native/NativeLink.cs).
 
 Without it, the only pause available is "stop feeding the ring and let it drain", which is RRF's
@@ -896,7 +896,7 @@ when the head is at or below the pause height, and only splits the move - travel
       DDA, free the rest
 - [x] Honour the `canPauseAfter` exclusions when choosing the boundary — arcs, retractions, endstop,
       probing and `G1 H` moves, through `DDA::IsRestartableBoundary`
-- [x] `DuetSbc_MotionRequestStop` and `DuetSbc_MotionGetFeedholdResult` — a request carrying which
+- [x] `DuetRT_MotionRequestStop` and `DuetRT_MotionGetFeedholdResult` — a request carrying which
       kind of stop it is, and a seqlock-published result, because freeing a move frees its segments
       and only the motion thread may do that, so the answer cannot come back from the call that asks
 - [x] `MovePlanner.StopEarlyAsync`, resyncing from the engine and dropping `SegmentsLeft`

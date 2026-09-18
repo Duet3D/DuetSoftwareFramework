@@ -138,7 +138,7 @@ These rules come from the architecture already established on this branch — se
 
 11. **A green `dotnet build` is not a green build.** Build the whole project with
     `./scripts/build.sh --all` from the repo root. It builds every dotnet project *and*
-    cross-compiles the native `libduet_sbc.so` for aarch64 through CMake, which is the half a
+    cross-compiles the native `libduet_realtime_core.so` for aarch64 through CMake, which is the half a
     per-project `dotnet build` cannot see at all.
 
     Building the native side the obvious way is worse than not building it, because it looks like it
@@ -799,7 +799,7 @@ it: `DDARing::ChangeExtrusionFactor` walks the uncommitted moves calling `DDA::A
 scaling each one's extruder direction vector and clamping the change to the extruder's instantaneous
 speed change. Everything else about M221 matches, the current tool's extruders and both report forms
 included. Porting the fast change means `AdjustExtrusion` and `ChangeExtrusionFactor` in
-`src/DuetRealtimeCore/src/Motion`, a `DuetSbc_Motion*` entry point to reach them from a code handler,
+`src/DuetRealtimeCore/src/Motion`, a `DuetRT_Motion*` entry point to reach them from a code handler,
 and a decision about which channels it applies to: RepRapFirmware passes `gb.IsFileChannel()` as the
 `immediate` argument, which makes a change from a job file rewrite the queued moves and one typed
 into DWC not, and the commit that added it (`e707b11e9`) is titled the other way round.
@@ -1327,7 +1327,7 @@ a window where the trackers and the boards disagree.
 > decision and the CAN message move to DCS.
 
 The cost is worth knowing: this is the **only** native-originated CAN message. Every other one goes
-DCS → `DuetSbc_QueueCanMessage` → link, and that invariant is why DuetRealtimeCore had no CANlib
+DCS → `DuetRT_QueueCanMessage` → link, and that invariant is why DuetRealtimeCore had no CANlib
 dependency before this work.
 
 **The correction has to reach the DDA, not just the tracker.** `MotionService::OnMoveRetired` reports
@@ -2408,7 +2408,7 @@ board          controller                        DuetRealtimeCore              D
 
 - **It restores the layering.** §10 already records the cost of the current shape: this is the
   **only** native-originated CAN message, and every other one goes DCS →
-  `DuetSbc_QueueCanMessage` → link. One exception to an otherwise clean invariant is worth removing.
+  `DuetRT_QueueCanMessage` → link. One exception to an otherwise clean invariant is worth removing.
 - **CANlib leaves DuetRealtimeCore.** [CMakeLists.txt:54](src/DuetRealtimeCore/src/CMakeLists.txt#L54)
   says the dependency exists for this message, and the only includes are `CanMessageFormats.h` and
   `Duet3Common.h` in `MotionService.cpp`. Going with it: the `Compat/CoreN2G/CoreTypes.h` shim, and
@@ -2471,9 +2471,9 @@ schedule message. What goes is the *semantic* knowledge: the ring scan, `IsCheck
 | Direction | Now | After |
 |---|---|---|
 | Stop reported | `SbcInterface` callback → `MotionService::HandleMotionStopped` | same callback, forwarded as a new `InboundEventType.MotionStopped` |
-| Position at trigger | internal to `HandleMotionStopped` | `DuetSbc_MotionGetPositionAt(drive, whenTicks, out position, out usedTimestamp)` |
-| Position adopted | `DriveTracker::SetMotorPosition` + `DDA::SetDriveCoordinate` | existing `DuetSbc_MotionSetMotorPositions` |
-| Revert sent | native `QueueCanMessage` | DCS `DuetSbc_QueueCanMessage`, as every other CAN message |
+| Position at trigger | internal to `HandleMotionStopped` | `DuetRT_MotionGetPositionAt(drive, whenTicks, out position, out usedTimestamp)` |
+| Position adopted | `DriveTracker::SetMotorPosition` + `DDA::SetDriveCoordinate` | existing `DuetRT_MotionSetMotorPositions` |
+| Revert sent | native `QueueCanMessage` | DCS `DuetRT_QueueCanMessage`, as every other CAN message |
 | Outcome to DCS | `InboundEventType.MotionEndpoints` (13) | no longer needed for endstop moves - DCS already knows |
 
 `MotionStopped` stays a one-way firmware → SBC notification. Nothing becomes a request/response pair;
@@ -2481,7 +2481,7 @@ what is added is exported functions DCS calls afterwards.
 
 ### 12.6 The plan
 
-**Step 1 ✅ expose the position query.** `DuetSbc_MotionGetPositionAt` over `Motion::DriveTracker`,
+**Step 1 ✅ expose the position query.** `DuetRT_MotionGetPositionAt` over `Motion::DriveTracker`,
 returning both the position and whether the trigger timestamp was usable. Independent of everything
 else and testable on its own against a known segment chain.
 
@@ -2819,7 +2819,7 @@ The move was not finishing before its stop arrived; it was finishing before it *
 `An endstop stop for move #2 arrived after the move had been concluded` was emitted seconds after the
 move was concluded, on a move whose endstop triggered part way along it.
 
-`DuetSbc_MotionSubmitMove` writes the move into a lock-free queue and returns. The ring's
+`DuetRT_MotionSubmitMove` writes the move into a lock-free queue and returns. The ring's
 `m_scheduledMoves` is incremented by `DDARing::AddMove`, which runs on the **motion thread** in
 `DrainSubmissions` - up to a tick later. `WaitForStandstillAsync` compared scheduled against completed
 and did so *before* its first delay, so a caller that submitted a move and immediately waited for it

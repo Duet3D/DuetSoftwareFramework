@@ -16,10 +16,10 @@ namespace SystemTests;
 /// </remarks>
 internal static class NativeTestClock
 {
-    [DllImport("duet_sbc", EntryPoint = "DuetSbc_PinLocalClock")]
+    [DllImport("duet_realtime_core", EntryPoint = "DuetRT_PinLocalClock")]
     internal static extern void Pin(long ns);
 
-    [DllImport("duet_sbc", EntryPoint = "DuetSbc_UnpinLocalClock")]
+    [DllImport("duet_realtime_core", EntryPoint = "DuetRT_UnpinLocalClock")]
     internal static extern void Unpin();
 }
 

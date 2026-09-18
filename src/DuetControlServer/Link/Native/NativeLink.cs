@@ -13,7 +13,7 @@ using Microsoft.Extensions.Options;
 namespace DuetControlServer.Link.Native;
 
 /// <summary>
-/// Managed wrapper around <c>libduet_sbc.so</c>, the native SPI transfer loop
+/// Managed wrapper around <c>libduet_realtime_core.so</c>, the native SPI transfer loop
 /// </summary>
 /// <remarks>
 /// <para>
@@ -160,22 +160,22 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
             };
 
             byte[] errorBuffer = new byte[ErrorBufferSize];
-            _handle = NativeMethods.DuetSbc_Create(ref config, errorBuffer, errorBuffer.Length);
+            _handle = NativeMethods.DuetRT_Create(ref config, errorBuffer, errorBuffer.Length);
             if (_handle == IntPtr.Zero)
             {
                 throw new InvalidOperationException($"Failed to create native link interface: {ReadError(errorBuffer)}");
             }
 
             Array.Clear(errorBuffer);
-            if (NativeMethods.DuetSbc_Connect(_handle, errorBuffer, errorBuffer.Length) != 0)
+            if (NativeMethods.DuetRT_Connect(_handle, errorBuffer, errorBuffer.Length) != 0)
             {
                 string error = ReadError(errorBuffer);
-                NativeMethods.DuetSbc_Destroy(_handle);
+                NativeMethods.DuetRT_Destroy(_handle);
                 _handle = IntPtr.Zero;
                 throw new InvalidOperationException($"Failed to connect to controller over {transport}: {error}");
             }
 
-            ProtocolVersion = NativeMethods.DuetSbc_GetProtocolVersion(_handle);
+            ProtocolVersion = NativeMethods.DuetRT_GetProtocolVersion(_handle);
             logger.LogInformation("Connected to controller over {Transport} (protocol version {ProtocolVersion})", transport, ProtocolVersion);
         }
         finally
@@ -192,7 +192,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     public void Start()
     {
         ThrowIfDisposed();
-        NativeMethods.DuetSbc_Start(_handle);
+        NativeMethods.DuetRT_Start(_handle);
         _started = true;
     }
 
@@ -203,7 +203,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     {
         if (_handle != IntPtr.Zero && _started)
         {
-            NativeMethods.DuetSbc_Stop(_handle);
+            NativeMethods.DuetRT_Stop(_handle);
             _started = false;
         }
 
@@ -251,7 +251,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     {
         ThrowIfDisposed();
         byte[] encoded = Encoding.UTF8.GetBytes(message);
-        if (NativeMethods.DuetSbc_QueueMessage(_handle, (uint)flags, encoded, encoded.Length) < 0)
+        if (NativeMethods.DuetRT_QueueMessage(_handle, (uint)flags, encoded, encoded.Length) < 0)
         {
             // The transfer loop is not draining the ring, so the message would be silently lost
             throw new InvalidOperationException("Failed to queue message: native outbound buffer is full");
@@ -272,7 +272,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     public uint QueueCanMessage(ushort txToken, ushort msgType, ushort replyType, byte dstAddress, bool isResponse, ReadOnlySpan<byte> payload)
     {
         ThrowIfDisposed();
-        long sequenceNumber = NativeMethods.DuetSbc_QueueCanMessage(_handle, txToken, msgType, replyType, dstAddress, isResponse ? 1 : 0, payload, payload.Length);
+        long sequenceNumber = NativeMethods.DuetRT_QueueCanMessage(_handle, txToken, msgType, replyType, dstAddress, isResponse ? 1 : 0, payload, payload.Length);
         if (sequenceNumber < 0)
         {
             throw new InvalidOperationException("Failed to queue CAN message: native outbound buffer is full");
@@ -287,7 +287,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     {
         if (_handle != IntPtr.Zero)
         {
-            NativeMethods.DuetSbc_RequestTransfer(_handle);
+            NativeMethods.DuetRT_RequestTransfer(_handle);
         }
     }
 
@@ -319,7 +319,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
         ThrowIfDisposed();
         TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         uint requestId = RegisterRequest(tcs);
-        NativeMethods.DuetSbc_RequestEmergencyStop(_handle, requestId);
+        NativeMethods.DuetRT_RequestEmergencyStop(_handle, requestId);
         await AwaitRequestAsync(requestId, tcs, cancellationToken);
     }
 
@@ -333,7 +333,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
         ThrowIfDisposed();
         TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         uint requestId = RegisterRequest(tcs);
-        NativeMethods.DuetSbc_RequestReset(_handle, requestId);
+        NativeMethods.DuetRT_RequestReset(_handle, requestId);
         await AwaitRequestAsync(requestId, tcs, cancellationToken);
     }
 
@@ -348,7 +348,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
         ThrowIfDisposed();
         TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         uint requestId = RegisterRequest(tcs);
-        if (NativeMethods.DuetSbc_QueueEnableCan(_handle, enable ? 1 : 0, requestId) < 0)
+        if (NativeMethods.DuetRT_QueueEnableCan(_handle, enable ? 1 : 0, requestId) < 0)
         {
             _pendingRequests.TryRemove(requestId, out _);
             throw new InvalidOperationException("Failed to queue CAN enable request: native outbound buffer is full");
@@ -386,7 +386,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
 
         try
         {
-            if (NativeMethods.DuetSbc_RequestFirmwareUpdate(_handle, iapHandle.AddrOfPinnedObject(), iap.Length,
+            if (NativeMethods.DuetRT_RequestFirmwareUpdate(_handle, iapHandle.AddrOfPinnedObject(), iap.Length,
                     firmwareHandle.AddrOfPinnedObject(), firmware.Length, firmwareCrc16, requestId) != 0)
             {
                 _pendingRequests.TryRemove(requestId, out _);
@@ -566,7 +566,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     /// <returns>True if an event is probably available</returns>
     internal bool WaitForEvent(int timeoutMs)
     {
-        return _handle != IntPtr.Zero && NativeMethods.DuetSbc_WaitForEvent(_handle, timeoutMs) != 0;
+        return _handle != IntPtr.Zero && NativeMethods.DuetRT_WaitForEvent(_handle, timeoutMs) != 0;
     }
 
     /// <summary>
@@ -580,7 +580,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     /// <returns>True if an event was available</returns>
     internal unsafe bool TryReadEvent(out ReadOnlySpan<byte> record)
     {
-        if (_handle != IntPtr.Zero && NativeMethods.DuetSbc_PeekEvent(_handle, out IntPtr data, out int length) != 0)
+        if (_handle != IntPtr.Zero && NativeMethods.DuetRT_PeekEvent(_handle, out IntPtr data, out int length) != 0)
         {
             record = new ReadOnlySpan<byte>(data.ToPointer(), length);
             return true;
@@ -596,7 +596,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     {
         if (_handle != IntPtr.Zero)
         {
-            NativeMethods.DuetSbc_ConsumeEvent(_handle);
+            NativeMethods.DuetRT_ConsumeEvent(_handle);
         }
     }
     #endregion
@@ -606,33 +606,33 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     /// Get and reset the maximum time between two full transfers
     /// </summary>
     /// <returns>Time in ms</returns>
-    public double GetMaxFullTransferDelay() => _handle != IntPtr.Zero ? NativeMethods.DuetSbc_GetMaxFullTransferDelayMs(_handle) : 0;
+    public double GetMaxFullTransferDelay() => _handle != IntPtr.Zero ? NativeMethods.DuetRT_GetMaxFullTransferDelayMs(_handle) : 0;
 
     /// <summary>
     /// Get and reset the maximum TfrRdy pin wait time
     /// </summary>
     /// <returns>Time in ms</returns>
-    public double GetMaxPinWaitDuration() => _handle != IntPtr.Zero ? NativeMethods.DuetSbc_GetMaxPinWaitMs(_handle) : 0;
+    public double GetMaxPinWaitDuration() => _handle != IntPtr.Zero ? NativeMethods.DuetRT_GetMaxPinWaitMs(_handle) : 0;
 
     /// <summary>
     /// Number of observed TfrRdy pin glitches
     /// </summary>
-    public int TfrPinGlitches => _handle != IntPtr.Zero ? NativeMethods.DuetSbc_GetTfrPinGlitches(_handle) : 0;
+    public int TfrPinGlitches => _handle != IntPtr.Zero ? NativeMethods.DuetRT_GetTfrPinGlitches(_handle) : 0;
 
     /// <summary>
     /// Number of missed GPIO edges
     /// </summary>
-    public int MissedEdges => _handle != IntPtr.Zero ? NativeMethods.DuetSbc_GetMissedEdges(_handle) : 0;
+    public int MissedEdges => _handle != IntPtr.Zero ? NativeMethods.DuetRT_GetMissedEdges(_handle) : 0;
 
     /// <summary>
     /// Number of connection resyncs performed after an error
     /// </summary>
-    public int ResyncCount => _handle != IntPtr.Zero ? NativeMethods.DuetSbc_GetResyncCount(_handle) : 0;
+    public int ResyncCount => _handle != IntPtr.Zero ? NativeMethods.DuetRT_GetResyncCount(_handle) : 0;
 
     /// <summary>
     /// Number of events dropped because the inbound ring was full
     /// </summary>
-    public ulong DroppedEvents => _handle != IntPtr.Zero ? NativeMethods.DuetSbc_GetDroppedEvents(_handle) : 0;
+    public ulong DroppedEvents => _handle != IntPtr.Zero ? NativeMethods.DuetRT_GetDroppedEvents(_handle) : 0;
 
     /// <summary>
     /// The controller's step clock, as the native side models it
@@ -641,7 +641,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     /// The SBC has no step clock of its own. Move start times are in this timebase, so a model that
     /// has drifted schedules moves that arrive late
     /// </remarks>
-    public uint StepClockTicks => _handle != IntPtr.Zero ? NativeMethods.DuetSbc_GetStepClockTicks(_handle) : 0;
+    public uint StepClockTicks => _handle != IntPtr.Zero ? NativeMethods.DuetRT_GetStepClockTicks(_handle) : 0;
 
     /// <summary>
     /// How far the movement timebase lags the raw step clock, in ticks
@@ -662,7 +662,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
 
         try
         {
-            return NativeMethods.DuetSbc_GetMovementDelay(_handle);
+            return NativeMethods.DuetRT_GetMovementDelay(_handle);
         }
         catch (EntryPointNotFoundException)
         {
@@ -680,7 +680,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
         {
             return default;
         }
-        NativeMethods.DuetSbc_GetClockStats(_handle, out NativeClockStats stats);
+        NativeMethods.DuetRT_GetClockStats(_handle, out NativeClockStats stats);
         return stats;
     }
 
@@ -694,7 +694,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
         {
             return default;
         }
-        NativeMethods.DuetSbc_MotionGetStats(_handle, out NativeMotionStats stats);
+        NativeMethods.DuetRT_MotionGetStats(_handle, out NativeMotionStats stats);
         return stats;
     }
 
@@ -705,7 +705,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     {
         if (_handle != IntPtr.Zero)
         {
-            NativeMethods.DuetSbc_MotionResetStats(_handle);
+            NativeMethods.DuetRT_MotionResetStats(_handle);
         }
     }
 
@@ -716,7 +716,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     /// <returns>True if it was accepted</returns>
     /// <remarks>Safe only while no move is in flight</remarks>
     public bool ConfigureMotion(ReadOnlySpan<byte> config)
-        => _handle != IntPtr.Zero && NativeMethods.DuetSbc_MotionConfigure(_handle, config, config.Length) != 0;
+        => _handle != IntPtr.Zero && NativeMethods.DuetRT_MotionConfigure(_handle, config, config.Length) != 0;
 
     /// <summary>
     /// Start the native motion thread
@@ -724,7 +724,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     /// <param name="rtPriority">SCHED_FIFO priority, or 0 for the default scheduler</param>
     /// <returns>True if it started</returns>
     public bool StartMotion(int rtPriority)
-        => _handle != IntPtr.Zero && NativeMethods.DuetSbc_MotionStart(_handle, rtPriority) != 0;
+        => _handle != IntPtr.Zero && NativeMethods.DuetRT_MotionStart(_handle, rtPriority) != 0;
 
     /// <summary>
     /// Stop the native motion thread
@@ -733,7 +733,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     {
         if (_handle != IntPtr.Zero)
         {
-            NativeMethods.DuetSbc_MotionStop(_handle);
+            NativeMethods.DuetRT_MotionStop(_handle);
         }
     }
 
@@ -743,7 +743,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     /// <param name="ring">Ring number</param>
     /// <returns>True if there is room</returns>
     public bool CanAddMove(int ring)
-        => _handle != IntPtr.Zero && NativeMethods.DuetSbc_MotionCanAddMove(_handle, ring) != 0;
+        => _handle != IntPtr.Zero && NativeMethods.DuetRT_MotionCanAddMove(_handle, ring) != 0;
 
     /// <summary>
     /// Queue a move
@@ -751,7 +751,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     /// <param name="moveParams">A MoveParamsHeader followed by its two arrays</param>
     /// <returns>True if queued, false if the caller must retry</returns>
     public bool SubmitMove(ReadOnlySpan<byte> moveParams)
-        => _handle != IntPtr.Zero && NativeMethods.DuetSbc_MotionSubmitMove(_handle, moveParams, moveParams.Length) != 0;
+        => _handle != IntPtr.Zero && NativeMethods.DuetRT_MotionSubmitMove(_handle, moveParams, moveParams.Length) != 0;
 
     /// <summary>
     /// Read the motor positions the motion engine last published
@@ -766,7 +766,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
             whenTicks = 0;
             return 0;
         }
-        return NativeMethods.DuetSbc_MotionGetMotorPositions(_handle, steps, steps.Length, out whenTicks);
+        return NativeMethods.DuetRT_MotionGetMotorPositions(_handle, steps, steps.Length, out whenTicks);
     }
 
     /// <summary>
@@ -788,7 +788,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
             whenTicks = 0;
             return 0;
         }
-        return NativeMethods.DuetSbc_MotionGetLivePositions(_handle, steps, steps.Length, out whenTicks);
+        return NativeMethods.DuetRT_MotionGetLivePositions(_handle, steps, steps.Length, out whenTicks);
     }
 
     /// <summary>
@@ -819,7 +819,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
             return false;
         }
 
-        int ok = NativeMethods.DuetSbc_MotionGetPositionAt(_handle, drive, whenTicks, out position,
+        int ok = NativeMethods.DuetRT_MotionGetPositionAt(_handle, drive, whenTicks, out position,
                                                            out positionAtMoveStart, out int usedTimestampFlag);
         usedTimestamp = usedTimestampFlag != 0;
         return ok != 0;
@@ -839,7 +839,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     /// </remarks>
     public bool SetMotorPositions(uint driveMask, ReadOnlySpan<int> positions)
         => _handle != IntPtr.Zero
-           && NativeMethods.DuetSbc_MotionSetMotorPositions(_handle, driveMask, positions, positions.Length) != 0;
+           && NativeMethods.DuetRT_MotionSetMotorPositions(_handle, driveMask, positions, positions.Length) != 0;
 
     /// <summary>
     /// Ask the motion engine to stop early and drop the moves after it
@@ -854,7 +854,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     /// acted, because dropping a move frees its segments and only that thread may do it
     /// </remarks>
     public bool RequestStop(bool plannedDeceleration)
-        => _handle != IntPtr.Zero && NativeMethods.DuetSbc_MotionRequestStop(_handle, plannedDeceleration ? 1 : 0) != 0;
+        => _handle != IntPtr.Zero && NativeMethods.DuetRT_MotionRequestStop(_handle, plannedDeceleration ? 1 : 0) != 0;
 
     /// <summary>
     /// What the last feedhold did
@@ -885,7 +885,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
             return false;
         }
 
-        if (NativeMethods.DuetSbc_MotionGetFeedholdResult(_handle, out sequence, out firstPurgedMoveId,
+        if (NativeMethods.DuetRT_MotionGetFeedholdResult(_handle, out sequence, out firstPurgedMoveId,
                                                           out movesPurged, out lastSurvivingMoveId,
                                                           out int stoppedFlag,
                                                           restEndpoints, restEndpoints.Length) == 0)
@@ -906,7 +906,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     {
         if (_handle != IntPtr.Zero)
         {
-            NativeMethods.DuetSbc_MotionSetRingState(_handle, ring, shouldStartMove ? 1 : 0, waitingForEmpty ? 1 : 0);
+            NativeMethods.DuetRT_MotionSetRingState(_handle, ring, shouldStartMove ? 1 : 0, waitingForEmpty ? 1 : 0);
         }
     }
 
@@ -915,19 +915,19 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     /// </summary>
     /// <param name="ring">Ring number</param>
     /// <returns>Scheduled move count</returns>
-    public uint GetScheduledMoves(int ring) => _handle != IntPtr.Zero ? NativeMethods.DuetSbc_MotionGetScheduledMoves(_handle, ring) : 0;
+    public uint GetScheduledMoves(int ring) => _handle != IntPtr.Zero ? NativeMethods.DuetRT_MotionGetScheduledMoves(_handle, ring) : 0;
 
     /// <summary>
     /// Number of moves the given ring has finished
     /// </summary>
     /// <param name="ring">Ring number</param>
     /// <returns>Completed move count</returns>
-    public uint GetCompletedMoves(int ring) => _handle != IntPtr.Zero ? NativeMethods.DuetSbc_MotionGetCompletedMoves(_handle, ring) : 0;
+    public uint GetCompletedMoves(int ring) => _handle != IntPtr.Zero ? NativeMethods.DuetRT_MotionGetCompletedMoves(_handle, ring) : 0;
 
     /// <summary>
     /// Submissions refused because the queue was full. Non-zero means a move was lost
     /// </summary>
-    public uint SubmissionsDropped => _handle != IntPtr.Zero ? NativeMethods.DuetSbc_MotionGetSubmissionsDropped(_handle) : 0;
+    public uint SubmissionsDropped => _handle != IntPtr.Zero ? NativeMethods.DuetRT_MotionGetSubmissionsDropped(_handle) : 0;
 
     /// <summary>
     /// Whether a submitted move has not yet been taken up by the engine's motion thread
@@ -939,7 +939,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     /// its way to it, so anything waiting for the machine to stop has to ask this as well
     /// </remarks>
     public bool HasPendingSubmissions
-        => _handle != IntPtr.Zero && NativeMethods.DuetSbc_MotionHasPendingSubmissions(_handle) != 0;
+        => _handle != IntPtr.Zero && NativeMethods.DuetRT_MotionHasPendingSubmissions(_handle) != 0;
 
     /// <summary>
     /// Forced positions the engine has adopted
@@ -967,7 +967,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
 
         try
         {
-            return NativeMethods.DuetSbc_MotionGetForcedPositionsApplied(_handle);
+            return NativeMethods.DuetRT_MotionGetForcedPositionsApplied(_handle);
         }
         catch (EntryPointNotFoundException)
         {
@@ -990,7 +990,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
         Stop();
         if (_handle != IntPtr.Zero)
         {
-            NativeMethods.DuetSbc_Destroy(_handle);
+            NativeMethods.DuetRT_Destroy(_handle);
             _handle = IntPtr.Zero;
         }
     }
