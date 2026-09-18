@@ -1856,13 +1856,9 @@ internal partial class MCodeHandler(
         if (changeTiming)
         {
             byte? newAddress = code.TryGetInt('A', out int address) ? CanAddresses.CheckAddressIsValid(address) : null;
-            await linkInterface.ConfigCanAsync(oldAddress, newAddress, timing, cancellationToken);
+            return await linkInterface.ConfigCanAsync(oldAddress, newAddress, timing, cancellationToken);
         }
-        else
-        {
-            return await linkInterface.ReportCanConfigAsync(oldAddress, cancellationToken);
-        }
-        return new Message();
+        return await linkInterface.ReportCanConfigAsync(oldAddress, cancellationToken);
     }
 
     /// <summary>
@@ -1925,9 +1921,10 @@ internal partial class MCodeHandler(
             }
         }
 
+        Message timingReply = new();
         if (changeTiming)
         {
-            await linkInterface.ConfigCanAsync(CanId.MasterAddress, null, timing, cancellationToken);
+            timingReply = await linkInterface.ConfigCanAsync(CanId.MasterAddress, null, timing, cancellationToken);
         }
 
         // The enable is this program's own: RepRapFirmware leaves it as a TODO in the same function,
@@ -1937,7 +1934,7 @@ internal partial class MCodeHandler(
 
         if (changeTiming)
         {
-            return new Message();
+            return timingReply;
         }
 
         // A code that asked for nothing is a query, as CanInterface::EnableCan's else branch is, and

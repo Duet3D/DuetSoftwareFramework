@@ -241,14 +241,24 @@ internal sealed partial class GCodeHandler
             float target = settings.ZMin - settings.DiveHeights[0] + settings.TriggerHeight;
             try
             {
+                // A board that refuses to arm throws, so what comes back here is whatever it had to
+                // say while arming anyway - the only sign the user gets that the probe may not be
+                // watching for what they asked. It goes out as it is said rather than being collected,
+                // as RepRapFirmware's RemoteZProbe::SetProbing does: a tap repeats until two readings
+                // agree and a grid repeats the taps at every point, so holding it back would mean
+                // saying nothing until the whole bed had been probed
                 if (stallDrivers.Count > 0)
                 {
-                    await StallArming.ArmAsync(stallDrivers, arming, linkInterface, cancellationToken);
+                    await eventLogger.LogOutputAsync(
+                        await StallArming.ArmAsync(stallDrivers, arming, linkInterface, cancellationToken),
+                        cancellationToken);
                 }
 
                 if (armProbe)
                 {
-                    await ProbeArming.StartAsync(probeMonitor, linkInterface, cancellationToken);
+                    await eventLogger.LogOutputAsync(
+                        await ProbeArming.StartAsync(probeMonitor, linkInterface, cancellationToken),
+                        cancellationToken);
                 }
 
                 if (!await MoveToZAsync(settings.ZAxis, target, settings.Speeds[tapIndex],

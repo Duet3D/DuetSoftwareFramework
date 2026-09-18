@@ -1,6 +1,8 @@
 using DuetAPI.ObjectModel;
+using DuetControlServer.Link;
 using DuetControlServer.Motion;
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using System.Threading;
@@ -33,7 +35,7 @@ internal sealed partial class GCodeHandler
             return new Message(MessageType.Error, $"Z probe number out of range (0..{RemoteProbes.MaxProbes - 1})");
         }
 
-        string? report = null;
+        List<Message> reports = [];
         ProbeArming.ProbeMonitor thresholdMonitor = default;
         bool sendThreshold = false;
         using (await model.AccessReadWriteAsync(cancellationToken))
@@ -116,7 +118,7 @@ internal sealed partial class GCodeHandler
 
             if (!seen)
             {
-                report = DescribeProbeParameters(probeNumber, probe, model.Move);
+                reports.Add(new Message(MessageType.Success, DescribeProbeParameters(probeNumber, probe, model.Move)));
             }
         }
 
@@ -126,14 +128,10 @@ internal sealed partial class GCodeHandler
             // HandleG31: the object model now says one thing and the board is doing another, and the
             // G31 that caused it is the only place that can be noticed. A board that took it and
             // still had something to say is passed on for the same reason
-            Message reply = await ProbeArming.SetThresholdAsync(thresholdMonitor, linkInterface, cancellationToken);
-            if (reply.Type != MessageType.Success || !string.IsNullOrEmpty(reply.Content))
-            {
-                return reply;
-            }
+            reports.Add(await ProbeArming.SetThresholdAsync(thresholdMonitor, linkInterface, cancellationToken));
         }
 
-        return report is null ? new Message() : new Message(MessageType.Success, report);
+        return reports.ToMessage();
     }
 
     /// <summary>

@@ -43,6 +43,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="endstopCorrection">Undoes the overshoot of a move an endstop cut short</param>
 /// <param name="toolManager">The selected tool, whose offsets and axis mapping the transform needs</param>
 /// <param name="moveInterpreter">Turns a movement code into the move the engine is asked to run</param>
+/// <param name="eventLogger">Writes out what a board said while a code was still running</param>
 /// <param name="logger">Logger</param>
 internal sealed partial class GCodeHandler(
     Model.ObjectModel model,
@@ -55,6 +56,7 @@ internal sealed partial class GCodeHandler(
     EndstopCorrection endstopCorrection,
     Tools.ToolManager toolManager,
     MoveInterpreter moveInterpreter,
+    Utility.EventLogger eventLogger,
     ILogger<GCodeHandler> logger) : ICodeHandler
 {
 

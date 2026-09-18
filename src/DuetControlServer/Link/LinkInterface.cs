@@ -118,8 +118,12 @@ public sealed partial class LinkInterface(
     /// <param name="newAddress">Address to give it, or null to leave the address alone</param>
     /// <param name="timing">Arbitration phase bit timing to give it</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>The board's reply</returns>
-    public Task<CanResponse> ConfigCanAsync(byte dstAddress, byte? newAddress, CanTiming timing, CancellationToken cancellationToken = default)
+    /// <returns>Success except on a timeout</returns>
+    /// <remarks>
+    /// Sent with <see cref="CanMessageType.NoReply"/>, because a board that has just been given a new
+    /// address cannot answer on the one the request went to.
+    /// </remarks>
+    public async Task<Message> ConfigCanAsync(byte dstAddress, byte? newAddress, CanTiming timing, CancellationToken cancellationToken = default)
     {
         CanMessageSetAddressAndNormalTiming message = new()
         {
@@ -130,7 +134,7 @@ public sealed partial class LinkInterface(
             NormalTiming = timing
         };
 
-        return SendCanMessageAsync(dstAddress, in message, cancellationToken: cancellationToken);
+        return (await SendCanMessageAsync(dstAddress, in message, cancellationToken: cancellationToken)).ToMessage();
     }
 
     /// <summary>

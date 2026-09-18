@@ -6,6 +6,7 @@ using DuetAPI.ObjectModel;
 using DuetControlServer.Link;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Ports;
+using Microsoft.Extensions.Logging;
 
 namespace DuetControlServer.Spindles;
 
@@ -27,7 +28,8 @@ namespace DuetControlServer.Spindles;
 /// </remarks>
 /// <param name="model">Object model</param>
 /// <param name="gpioManager">The outputs a spindle is driven through</param>
-public sealed class SpindleManager(Model.ObjectModel model, GpioManager gpioManager)
+public sealed class SpindleManager(Model.ObjectModel model, GpioManager gpioManager,
+                                   ILogger<SpindleManager> logger)
 {
     /// <summary>
     /// Highest spindle number a machine may have
@@ -196,7 +198,14 @@ public sealed class SpindleManager(Model.ObjectModel model, GpioManager gpioMana
     /// <summary>
     /// Stop every spindle
     /// </summary>
-    /// <remarks>What a bare M5 does, and what stopping a job has to do</remarks>
+    /// <remarks>
+    /// What a bare M5 does, and what stopping a job has to do. Every spindle is told whether or not
+    /// an earlier one refused, as RepRapFirmware's loop over the spindles does (GCodes2.cpp case 5):
+    /// a spindle left turning because the one before it would not stop is the worse outcome. A
+    /// refusal is logged rather than returned, because a job that is stopping has nobody left to
+    /// report it to, and a spindle that would not stop is exactly what somebody wants to find in the
+    /// log afterwards
+    /// </remarks>
     public async ValueTask StopAllAsync(CancellationToken cancellationToken)
     {
         List<int> spindles = [];
@@ -213,7 +222,11 @@ public sealed class SpindleManager(Model.ObjectModel model, GpioManager gpioMana
 
         foreach (int spindleNumber in spindles)
         {
-            await StopAsync(spindleNumber, cancellationToken);
+            Message reply = await StopAsync(spindleNumber, cancellationToken);
+            if (!reply.Succeeded())
+            {
+                logger.LogWarning("Could not stop spindle {Spindle}: {Error}", spindleNumber, reply.Content);
+            }
         }
     }
 
