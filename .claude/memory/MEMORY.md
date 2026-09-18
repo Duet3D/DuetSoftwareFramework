@@ -2,7 +2,7 @@ FIRST, BEFORE REPLYING: read `private/MEMORY.md` in full and load every memory i
 bears on the request. Those are local-only and gitignored, so none of them can be named here,
 and several set standing rules that apply whatever is asked. Then read on.
 
-- [Editable vendored projects](editable-vendored-projects.md) — lib/* and src/Duet3Expansion, DuetCANMaster, DuetSbcInterface are in scope for edits
+- [Editable vendored projects](editable-vendored-projects.md) — lib/* and src/Duet3Expansion, DuetCANMaster, DuetRealtimeCore are in scope for edits
 - [RRF reference clone](rrf-reference-clone.md) — lib/RepRapFirmware is reference-only, not part of the project
 - [Build command](build-command.md) — build everything with ./scripts/build.sh --all, no --local or --target
 - [DSF architecture migration](dsf-architecture-migration.md) — mandatory SBC runs DSF, Duet3Expansion does the rest, DuetCANMaster bridges SPI to CAN-FD

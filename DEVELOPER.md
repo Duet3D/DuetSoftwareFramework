@@ -193,7 +193,7 @@ minutes rather than seconds:
 ./scripts/system-tests.sh
 ```
 
-They run the real `libduet_sbc.so`, which the project builds from `src/DuetSbcInterface` as part of
+They run the real `libduet_sbc.so`, which the project builds from `src/DuetRealtimeCore` as part of
 the test build, so the submodule that native build needs has to be checked out. A clone made without
 `--recurse-submodules`, and every new git worktree, starts without it:
 

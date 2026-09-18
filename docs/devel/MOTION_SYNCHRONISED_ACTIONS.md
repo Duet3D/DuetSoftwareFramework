@@ -182,7 +182,7 @@ Both implementations anchor on the same facts about the tree:
   currently has no reader.
 - **A pause purges provisional moves only.** `DDARing::Feedhold` plans a deceleration among the
   *uncommitted* DDAs and `PurgeAfter` reports `FirstPurgedMoveId`
-  ([DDARing.cpp](../../src/DuetSbcInterface/src/Motion/DDARing.cpp)); committed moves (segments
+  ([DDARing.cpp](../../src/DuetRealtimeCore/src/Motion/DDARing.cpp)); committed moves (segments
   generated and dispatched, up to `usualMinimumPreparedTime` = 50 ms ahead) always run to
   completion. Nothing is ever recalled from a board. The rewind point is computed from
   `FirstPurgedMoveId` (`MovePlanner.TakeJobResumePoint`).
@@ -501,13 +501,13 @@ retirement follows the actual stop.
 
 **Run the code now; give its CAN messages a `whenToExecute`; the board executes them at that tick.**
 The mechanism moves already use, extended to effects. Touches the schema, DuetControlServer,
-DuetSbcInterface, Duet3Expansion, and one field DuetCANMaster honors without parsing. This is
+DuetRealtimeCore, Duet3Expansion, and one field DuetCANMaster honors without parsing. This is
 stage 2's transport (§8.6), with §7.2's completion-at-submission replaced by §8's deferred code.
 
 ```mermaid
 sequenceDiagram
     participant H as Handler (DCS)
-    participant L as Action list (DuetSbcInterface)
+    participant L as Action list (DuetRealtimeCore)
     participant C as DuetCANMaster
     participant B as Expansion board
     H->>H: M106 read, validated, object model written, frames built
@@ -566,7 +566,7 @@ Wire growth, against CAN-FD DLC quantisation (0-8, 12, 16, 20, 24, 32, 48, 64):
   applied on the anchor's `MoveCompletedEvent`, which is implementation A's release hook: a reduced
   form of the queue exists inside implementation B regardless.
 
-### 7.3 DuetSbcInterface
+### 7.3 DuetRealtimeCore
 
 - `DuetSbc_MotionSubmitAction(handle, ring, anchorMoveId, header, payload, length)`: a lock-free
   submission ring beside `SubmitMove`, drained by `MotionService::SpinOnce` into a per-ring action
@@ -662,7 +662,7 @@ implementation; §8.6 stages its delivery so the transport arrives after the pip
 sequenceDiagram
     participant P as ProcessInternally worker
     participant H as Handler (deferred)
-    participant L as Action list (DuetSbcInterface)
+    participant L as Action list (DuetRealtimeCore)
     participant B as Expansion board
     P->>H: dispatch M106, not awaited
     H->>H: validated, object model written, frames built
@@ -881,7 +881,7 @@ waiting, on the reply token:
 sequenceDiagram
     participant PB as PipelineBase (deferred set)
     participant H as Handler (DeferAction row)
-    participant SI as DuetSbcInterface
+    participant SI as DuetRealtimeCore
     participant CM as DuetCANMaster
     participant XB as Duet3Expansion
     Note over PB: DeferCode() as in stage 1, through the same gate,<br/>for the row now classed CodeClass.DeferAction
@@ -917,7 +917,7 @@ sequenceDiagram
 | Local effects (M117, M300) | same mechanism as everything else | need A's release hook anyway | the deferred handler awaits the anchor's `MoveCompletedEvent` (§8.1) |
 | M400 and drain waits | queue empty and Queue channel idle (§6) | `DuetSbc_MotionActionsPending` (§7.3) | free from the standstill predicate, but every drain wait must pick a predicate (§8.2) |
 | Purge | one list, in-process | SBC list plus the estop broadcast plus the CANMaster expiry field | B's, plus cancellation of deferred codes (§8.4) |
-| Codebases touched, one-time | DuetControlServer | schema, DuetControlServer, DuetSbcInterface, Duet3Expansion, DuetCANMaster (one field) | B's set; the additions over B are DuetControlServer only |
+| Codebases touched, one-time | DuetControlServer | schema, DuetControlServer, DuetRealtimeCore, Duet3Expansion, DuetCANMaster (one field) | B's set; the additions over B are DuetControlServer only |
 | Per new deferred code | DuetControlServer only | DuetControlServer only; plus a schema field if the message type lacks `whenToExecute` | as B |
 | Multi-board simultaneity | no (N sends, serialised) | yes: same tick on every board; a broadcast "all fans off at T" is one frame | as B |
 | Headroom | anything content with ~10 ms | per-segment effects (laser pixels, M42-triggered hardware), effects that must not jitter | as B |
@@ -1074,7 +1074,7 @@ right point in the path.
      does not have.
 5. **Stage 2** (§8.6, exactness per message type):
    - the schema change and offset table (§7.1); the parked ring (§7.4); `SubmitAction` and
-     resolution in DuetSbcInterface (§7.3); the CANMaster expiry field (§7.5);
+     resolution in DuetRealtimeCore (§7.3); the CANMaster expiry field (§7.5);
    - the `DeferAction` class with the is-deferred helper and its guard test (§8.6);
    - promote codes, each a class flip and a handler rewrite, M106 and M107 together first: mixed
      wake sources reorder same-anchor effects, so codes addressing the same output promote as one

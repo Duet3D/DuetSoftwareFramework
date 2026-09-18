@@ -10,8 +10,8 @@ cross-compiles the native `libduet_sbc.so` for aarch64 through CMake, then colla
 `build/dotnet/`. It ends with "Build complete. No deployment target specified." and deploys nothing.
 
 **Why it matters:** `dotnet build src/DuetControlServer/DuetControlServer.csproj` misses the native
-half entirely, and running `make` inside `src/DuetSbcInterface/build/native` compiles for the host
-rather than the aarch64 target the deployed library needs, so a change to `DuetSbcInterface` can
+half entirely, and running `make` inside `src/DuetRealtimeCore/build/native` compiles for the host
+rather than the aarch64 target the deployed library needs, so a change to `DuetRealtimeCore` can
 look green under both and still be untested against the real toolchain.
 
 **Do not pass `--local` or `--target`** unless deployment is actually wanted: `--local` tries to stop

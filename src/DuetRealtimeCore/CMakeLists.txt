@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(DuetSbcInterface LANGUAGES CXX)
+project(DuetRealtimeCore LANGUAGES CXX)
 
 # Standalone SBC-side replica of the DuetControlServer SPI interface, used to measure SPI transfer
 # jitter without the .NET runtime. Builds:

@@ -46,7 +46,7 @@ public sealed class NativeLibraryLocator
 
         // Walk up from the test assembly to the repository root
         DirectoryInfo? dir = new(AppContext.BaseDirectory);
-        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "src", "DuetSbcInterface")))
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "src", "DuetRealtimeCore")))
         {
             dir = dir.Parent;
         }
@@ -55,7 +55,7 @@ public sealed class NativeLibraryLocator
             throw new InvalidOperationException("Cannot find the repository root above " + AppContext.BaseDirectory);
         }
 
-        string buildTree = Path.Combine(dir.FullName, "src", "DuetSbcInterface", "build");
+        string buildTree = Path.Combine(dir.FullName, "src", "DuetRealtimeCore", "build");
         string[] candidates =
         [
             Path.Combine(buildTree, "native-debug", "src", "libduet_sbc.so"),
@@ -64,6 +64,6 @@ public sealed class NativeLibraryLocator
         string? newest = candidates.Where(File.Exists).OrderByDescending(File.GetLastWriteTimeUtc).FirstOrDefault();
         return newest ?? throw new InvalidOperationException(
             "libduet_sbc.so has not been built for the host. Build it with:\n" +
-            "  cd src/DuetSbcInterface && cmake --preset native-debug && cmake --build --preset native-debug --target duet_sbc_shared");
+            "  cd src/DuetRealtimeCore && cmake --preset native-debug && cmake --build --preset native-debug --target duet_sbc_shared");
     }
 }

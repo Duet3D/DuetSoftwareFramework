@@ -66,7 +66,7 @@ WarningsAsErrors: ''
 # Anchored to this project's own sources. A bare 'src/.*' would also match the shared
 # wire-protocol headers under lib/DuetSpiInterface/, which DuetCANMaster compiles against --
 # fixing headers there would silently change a project that is out of scope.
-HeaderFilterRegex: '/src/DuetSbcInterface/.*'
+HeaderFilterRegex: '/src/DuetRealtimeCore/.*'
 
 FormatStyle: file
 

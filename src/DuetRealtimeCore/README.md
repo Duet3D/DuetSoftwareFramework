@@ -1,4 +1,4 @@
-# DuetSbcInterface — C++ SBC-side SPI replica & jitter test
+# DuetRealtimeCore — C++ SBC-side SPI replica & jitter test
 
 The C++ implementation of the **SBC side** of the RepRapFirmware SPI protocol. It is the transport
 DuetControlServer uses: the managed SPI adapter and its transfer loop have been replaced by this
@@ -72,7 +72,7 @@ Bookworm and everything it builds is deployable as-is. Both aarch64 presets addi
 **statically link** the test binary, so it runs on any Pi OS release:
 
 ```sh
-cd src/DuetSbcInterface
+cd src/DuetRealtimeCore
 cmake --preset arm64
 cmake --build --preset arm64 -j
 
@@ -108,7 +108,7 @@ never reaches for this on its own — pass `--sysroot <dir>` or `--fetch-sysroot
 
 ```sh
 sudo apt install -y build-essential cmake linux-libc-dev   # one-time
-cd src/DuetSbcInterface
+cd src/DuetRealtimeCore
 cmake --preset native
 cmake --build --preset native -j
 ```

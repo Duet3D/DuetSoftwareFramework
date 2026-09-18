@@ -5,7 +5,7 @@
  *      Author: Christian
  *
  * The wire format itself now lives in lib/DuetSpiInterface, shared with the SBC side
- * (DuetSbcInterface and, via P/Invoke, DuetControlServer). This header only adds the
+ * (DuetRealtimeCore and, via P/Invoke, DuetControlServer). This header only adds the
  * firmware-side spellings of those definitions plus the constants and structures that
  * are local to RepRapFirmware and never cross the SPI link.
  *

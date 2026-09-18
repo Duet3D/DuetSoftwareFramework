@@ -6,7 +6,7 @@ using DuetControlServer.Link.Protocol.CanMessages;
 namespace DuetControlServer.Motion.Native;
 
 /// <summary>
-/// Managed mirror of <c>DuetSbcInterface/src/Motion/MoveParams.h</c>: the move as this side hands it
+/// Managed mirror of <c>DuetRealtimeCore/src/Motion/MoveParams.h</c>: the move as this side hands it
 /// down to the native motion engine
 /// </summary>
 /// <remarks>

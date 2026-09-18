@@ -34,7 +34,7 @@ namespace SystemTests;
 /// timeline scriptable.
 /// </para>
 /// <para>
-/// The C++ loopback peer in <c>src/DuetSbcInterface/tests/SocketTransportTests.cpp</c> is the
+/// The C++ loopback peer in <c>src/DuetRealtimeCore/tests/SocketTransportTests.cpp</c> is the
 /// executable specification of the exchange this class implements.
 /// </para>
 /// </remarks>

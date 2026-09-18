@@ -79,7 +79,7 @@ jobs:
       - name: Mark workspace as a safe git directory
         run: git config --global --add safe.directory '*'
 
-      # libduet_sbc.so compiles RRFLibraries for its host, so DuetSbcInterface needs that submodule
+      # libduet_sbc.so compiles RRFLibraries for its host, so DuetRealtimeCore needs that submodule
       # and DuetControlServer needs it too because it builds libduet_sbc.so in turn. Nothing else in
       # the matrix touches lib/, so the clone is skipped for the other projects.
       - name: Check out RRFLibraries
@@ -243,12 +243,12 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # The DuetSbcInterface tests are host-side and only get built when not cross-compiling, so
+      # The DuetRealtimeCore tests are host-side and only get built when not cross-compiling, so
       # they run through the native preset rather than the arm64 one the deployable .so uses.
       # The whole preset is built rather than named targets, so a test added later is run here
       # without this step having to be edited.
-      - name: Build and run DuetSbcInterface tests
-        working-directory: src/DuetSbcInterface
+      - name: Build and run DuetRealtimeCore tests
+        working-directory: src/DuetRealtimeCore
         run: |
           cmake --preset native
           cmake --build --preset native -j"$(nproc)"

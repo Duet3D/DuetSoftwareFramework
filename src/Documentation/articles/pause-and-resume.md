@@ -10,13 +10,13 @@ tasks that run at once, in two programs, and a pause has to interrupt three of t
 | Program | Runs on | What it contributes to a pause |
 |---|---|---|
 | [DuetControlServer](src/DuetControlServer), DCS below | the SBC, managed C# | Everything that knows what a file is: which kind of pause this is, where to rewind to, how much of the interrupted line is owed, the restore point, the macros |
-| [DuetSbcInterface](src/DuetSbcInterface) | the SBC, native C++ | Everything that knows what a move is: the DDA ring, the deceleration it plans, which queued moves it frees, and the ids it reports back |
+| [DuetRealtimeCore](src/DuetRealtimeCore) | the SBC, native C++ | Everything that knows what a move is: the DDA ring, the deceleration it plans, which queued moves it frees, and the ids it reports back |
 
 They meet at one C ABI call and one result published beside it, and neither side reaches across.
 `MoveParams` carries a move id and no file position, so the native side is told nothing about files;
 a stop reports the id of the earliest move it dropped, and DuetControlServer is what turns that back
 into a place in the job file. Anything below that names a `.cs` file is DuetControlServer, and
-anything that names a `.cpp` file is DuetSbcInterface; §10 is the full map.
+anything that names a `.cpp` file is DuetRealtimeCore; §10 is the full map.
 
 Related reading: [File management](file-management.md#print-jobs) covers the job loop and the seek
 this hangs off; [G-Code flow](gcode-flow.md) covers the pipeline whose codes a pause cancels;
@@ -45,7 +45,7 @@ flowchart LR
         end
         ST["MovementState and JobMoveIndex<br/>under the planner lock<br/>SegmentsLeft<br/>PurgeGeneration<br/>MoveFractionToSkip<br/>RestorePoints"]
     end
-    subgraph SBCI["DuetSbcInterface, native"]
+    subgraph SBCI["DuetRealtimeCore, native"]
         direction TB
         N1["MotionService loop<br/>DrainFeedholds"]
         N2["DDARing ring 0<br/>Feedhold, PauseMoves"]
@@ -69,7 +69,7 @@ flowchart LR
 | `JobReader` | DCS, `Files/Job/JobReader.cs` | one per job stream, started by the controller | reading codes, the file position it publishes, the rewind it is told to make |
 | `SubmitMoveAsync` | DCS, `Codes/Handlers/GCodeHandler.cs` | each `G0`/`G1` on the job channel | building the move once, queueing its segments, noting which job code each came from |
 | `JobSequences.PauseAsync` | DCS, `Files/Job/JobSequences.cs` | a task of `JobController`, started by the transition `M25`, `M226`/`M600`/`M601` or an event asked for | the stop, the rewind point, the restore point, `pause.g` |
-| `MotionService` loop | DuetSbcInterface, `src/Motion/MotionService.cpp` | the native motion thread | the DDA ring, and the only code allowed to free a queued move |
+| `MotionService` loop | DuetRealtimeCore, `src/Motion/MotionService.cpp` | the native motion thread | the DDA ring, and the only code allowed to free a queued move |
 
 The job reads far ahead of the machine, so at the instant a pause arrives the file is typically some
 lines past the move the head is making, and one of those lines is usually part-way into the queue.
@@ -119,7 +119,7 @@ stop at and, during a print at speed, finds none, so the whole queue runs. Here 
 takes the earliest boundary far enough away to decelerate by, forces the end speed there to zero,
 re-plans backwards to the last move it has already committed, and frees the rest.
 
-The stop itself is entirely DuetSbcInterface: `DDARing::Feedhold` chooses the boundary and re-plans,
+The stop itself is entirely DuetRealtimeCore: `DDARing::Feedhold` chooses the boundary and re-plans,
 `DDARing::PauseMoves` is RepRapFirmware's search kept beside it as the reference behaviour, and
 `MotionService::DrainFeedholds` is what runs either of them on the motion thread. DuetControlServer's
 half is a request, a poll, and what it makes of the answer.
@@ -131,7 +131,7 @@ sequenceDiagram
     participant L as JobController loop, DCS
     participant P as Pause sequence, DCS
     participant PL as MovePlanner, DCS
-    participant E as Motion thread, DuetSbcInterface
+    participant E as Motion thread, DuetRealtimeCore
     participant S as SubmitMoveAsync, DCS
     participant J as JobReader, DCS
 
@@ -420,7 +420,7 @@ one restore point and one interpreter state.
 | `Codes/Handlers/GCodeHandler.cs` | `SubmitMoveAsync`: the record's creation, the per-segment checks, the unwind |
 | `Link/Native/NativeLink.cs` | `RequestStop` and `TryGetFeedholdResult`, the managed side of the two calls |
 
-**DuetSbcInterface**, `src/DuetSbcInterface`, everything that knows what a move is:
+**DuetRealtimeCore**, `src/DuetRealtimeCore`, everything that knows what a move is:
 
 | File | What is in it |
 |---|---|

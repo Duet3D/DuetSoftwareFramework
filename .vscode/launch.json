@@ -6,7 +6,7 @@
     "compounds": [
         {
             // This doesn't work because C# breakpoints trigger the cppdbg to stop
-            "name": "[DSF] Attach Remote DuetControlServer + DuetSbcInterface",
+            "name": "[DSF] Attach Remote DuetControlServer + DuetRealtimeCore",
             "configurations": [
                 "[DSF] Attach Native (lib*.so)",
                 "[DSF] Attach Remote DuetControlServer",

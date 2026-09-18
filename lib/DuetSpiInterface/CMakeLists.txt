@@ -1,5 +1,5 @@
 # Shared SPI wire-protocol definitions: message formats and constants that must stay in sync between
-# the SBC side (DuetSbcInterface / DuetControlServer) and the device side (DuetCANMaster).
+# the SBC side (DuetRealtimeCore / DuetControlServer) and the device side (DuetCANMaster).
 # See README.md for how each side consumes it.
 #
 # Header-only: the protocol is pure declarations, and each side brings its own CRC implementation

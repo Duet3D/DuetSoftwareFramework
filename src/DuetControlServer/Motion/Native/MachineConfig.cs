@@ -8,7 +8,7 @@ namespace DuetControlServer.Motion.Native;
 /// Limits this build shares with the native motion engine
 /// </summary>
 /// <remarks>
-/// These mirror the constants in <c>DuetSbcInterface/src/Compat/RepRapFirmware.h</c> and
+/// These mirror the constants in <c>DuetRealtimeCore/src/Compat/RepRapFirmware.h</c> and
 /// <c>Motion/MachineConfig.h</c>. They size the fixed arrays in <see cref="MachineConfig"/>, so the two
 /// sides must agree on them or the struct is a different length on each side
 /// </remarks>
@@ -197,7 +197,7 @@ internal struct UIntPerAxis
 }
 
 /// <summary>
-/// Managed mirror of <c>DuetSbcInterface/src/Motion/MachineConfig.h</c>: the machine description the
+/// Managed mirror of <c>DuetRealtimeCore/src/Motion/MachineConfig.h</c>: the machine description the
 /// native motion engine needs
 /// </summary>
 /// <remarks>

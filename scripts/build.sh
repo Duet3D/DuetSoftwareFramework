@@ -20,12 +20,12 @@ declare -A PROJECT_SRC=(
     [CustomHttpEndpoint]="src/CustomHttpEndpoint"
     [ModelObserver]="src/ModelObserver"
     [PluginManager]="src/PluginManager"
-    [DuetSbcInterface]="src/DuetSbcInterface"
+    [DuetRealtimeCore]="src/DuetRealtimeCore"
 )
 
-# DuetSbcInterface is native (CMake), not a dotnet project: it builds libduet_sbc.so, the SPI
+# DuetRealtimeCore is native (CMake), not a dotnet project: it builds libduet_sbc.so, the SPI
 # transfer loop that DuetControlServer P/Invokes into. It is built separately below.
-SBC_SRC_DIR="$REPO_ROOT/src/DuetSbcInterface"
+SBC_SRC_DIR="$REPO_ROOT/src/DuetRealtimeCore"
 SBC_LIB_NAME="libduet_sbc.so"
 DEFAULT_SYSROOT="$SBC_SRC_DIR/pi-sysroot"
 
@@ -36,7 +36,7 @@ declare -A PROJECT_POSTINST=(
     [DuetWebServer]="pkg/deb/duetwebserver/DEBIAN/postinst"
 )
 
-ALL_PROJECTS=(DuetControlServer DuetSbcInterface DuetPiManagementPlugin DuetPluginService DuetWebServer CodeConsole CodeLogger CodeStream CustomHttpEndpoint ModelObserver PluginManager)
+ALL_PROJECTS=(DuetControlServer DuetRealtimeCore DuetPiManagementPlugin DuetPluginService DuetWebServer CodeConsole CodeLogger CodeStream CustomHttpEndpoint ModelObserver PluginManager)
 
 SSH_USER="root"
 TARGET=""
@@ -86,7 +86,7 @@ Notes:
   published in one go (MSBuild parallelises it); otherwise the selected projects are published
   concurrently.
 
-  DuetSbcInterface is the native SPI transfer loop (libduet_sbc.so) that DuetControlServer
+  DuetRealtimeCore is the native SPI transfer loop (libduet_sbc.so) that DuetControlServer
   P/Invokes into. DCS cannot run without it, so selecting DuetControlServer builds it too.
 
   Because a shared library links glibc dynamically, the .so must not need a newer glibc than the
@@ -99,7 +99,7 @@ Examples:
   $(basename "$0") -t 192.168.4.27 DuetControlServer DuetWebServer
   $(basename "$0") --all --local
   $(basename "$0") --skip-build --target 192.168.4.27 DuetControlServer
-  $(basename "$0") -t 192.168.4.27 --fetch-sysroot DuetSbcInterface
+  $(basename "$0") -t 192.168.4.27 --fetch-sysroot DuetRealtimeCore
 EOF
 }
 
@@ -169,9 +169,9 @@ done
 
 # DuetControlServer P/Invokes into libduet_sbc.so and will not start without it, so building or
 # deploying DCS always implies the native interface too.
-if [[ " ${SELECTED[*]} " == *" DuetControlServer "* && " ${SELECTED[*]} " != *" DuetSbcInterface "* ]]; then
-    echo "=== DuetControlServer selected: including DuetSbcInterface (libduet_sbc.so) ==="
-    SELECTED+=(DuetSbcInterface)
+if [[ " ${SELECTED[*]} " == *" DuetControlServer "* && " ${SELECTED[*]} " != *" DuetRealtimeCore "* ]]; then
+    echo "=== DuetControlServer selected: including DuetRealtimeCore (libduet_sbc.so) ==="
+    SELECTED+=(DuetRealtimeCore)
 fi
 
 # --- Native SPI interface (libduet_sbc.so) ---
@@ -201,10 +201,10 @@ resolve_sysroot() {
 }
 
 build_sbc_interface() {
-    echo "=== Building DuetSbcInterface (libduet_sbc.so) ==="
+    echo "=== Building DuetRealtimeCore (libduet_sbc.so) ==="
 
     # The .so is loaded by the managed binaries, so it has to be built for --arch as well. Each arch
-    # maps onto a cross-compiling preset in src/DuetSbcInterface/CMakePresets.json, except when the
+    # maps onto a cross-compiling preset in src/DuetRealtimeCore/CMakePresets.json, except when the
     # host already is that architecture, in which case there is nothing to cross-compile.
     local preset cmake_args=() cross_preset host_arch native=false
     host_arch="$(uname -m)"
@@ -303,7 +303,7 @@ collect_output() {
     echo "=== Collecting publish output into $BUILD_DIR ==="
     local project publish_dir
     for project in "${SELECTED[@]}"; do
-        [[ "$project" == "DuetSbcInterface" ]] && continue
+        [[ "$project" == "DuetRealtimeCore" ]] && continue
         publish_dir="$(project_publish_dir "$project")"
         cp -a "$publish_dir/." "$BUILD_DIR/"
         echo "    $project <- $publish_dir"
@@ -313,13 +313,13 @@ collect_output() {
 if ! $SKIP_BUILD; then
     mkdir -p "$BUILD_DIR"
 
-    if [[ " ${SELECTED[*]} " == *" DuetSbcInterface "* ]]; then
+    if [[ " ${SELECTED[*]} " == *" DuetRealtimeCore "* ]]; then
         build_sbc_interface
     fi
 
     DOTNET_PROJECTS=()
     for project in "${SELECTED[@]}"; do
-        [[ "$project" == "DuetSbcInterface" ]] || DOTNET_PROJECTS+=("$project")
+        [[ "$project" == "DuetRealtimeCore" ]] || DOTNET_PROJECTS+=("$project")
     done
 
     if $ALL; then

@@ -180,12 +180,12 @@ controller's copy should be deleted once §5's phase C lands — see §7.
 why the ordering in §4.1 matters.
 
 `SbcInterface::Execute` checks for a connection-state change *after* `PerformFullTransfer()`
-returns ([SbcInterface.cpp:398](src/DuetSbcInterface/src/SBC/SbcInterface.cpp#L398)), but
+returns ([SbcInterface.cpp:398](src/DuetRealtimeCore/src/SBC/SbcInterface.cpp#L398)), but
 `PerformFullTransfer` reconnects internally and only returns once a transfer has **succeeded**
-([SbcTransfer.cpp:237](src/DuetSbcInterface/src/SBC/SbcTransfer.cpp#L237)), at which point
+([SbcTransfer.cpp:237](src/DuetRealtimeCore/src/SBC/SbcTransfer.cpp#L237)), at which point
 `m_connected` is true again. `m_wasConnected` is only ever assigned `true`, so:
 
-- `InboundEventType::ConnectionLost` ([:412](src/DuetSbcInterface/src/SBC/SbcInterface.cpp#L412)) is
+- `InboundEventType::ConnectionLost` ([:412](src/DuetRealtimeCore/src/SBC/SbcInterface.cpp#L412)) is
   **unreachable** while the loop runs. `LinkService.HandleConnectionLost` → `Invalidate()` never runs
   during an outage: the object model keeps its pre-failure boards, `state.status` never becomes
   `disconnected`, the job is not aborted and pending codes are left hanging. The only symptom is one
@@ -482,21 +482,21 @@ Both events need §2.2 fixed first. The fix is to report the transition **where 
 than after `PerformFullTransfer` returns:
 
 - In `PrepareReconnect()`, at the point it sets `m_hadTimeout` on a live connection
-  ([SbcTransfer.cpp:285](src/DuetSbcInterface/src/SBC/SbcTransfer.cpp#L285)), post `ConnectionLost`
+  ([SbcTransfer.cpp:285](src/DuetRealtimeCore/src/SBC/SbcTransfer.cpp#L285)), post `ConnectionLost`
   with the reason text that is currently only logged.
 - On the transfer that succeeds after `m_hadTimeout`
-  ([SbcTransfer.cpp:211](src/DuetSbcInterface/src/SBC/SbcTransfer.cpp#L211)), post
+  ([SbcTransfer.cpp:211](src/DuetRealtimeCore/src/SBC/SbcTransfer.cpp#L211)), post
   `ConnectionEstablished`, and carry whether the controller had reset (`HadReset()`) so the managed
   side can tell "the same controller resumed" from "a rebooted controller".
 - Delete the now-dead transition check at
-  [SbcInterface.cpp:398-417](src/DuetSbcInterface/src/SBC/SbcInterface.cpp#L398-L417), or reduce it to
+  [SbcInterface.cpp:398-417](src/DuetRealtimeCore/src/SBC/SbcInterface.cpp#L398-L417), or reduce it to
   the startup post it still performs correctly.
 
 Both posts must remain on the interface thread's event ring, not a callback, so the transfer loop is
 never blocked by managed work.
 
 **Ordering matters.** `HadReset()` is evaluated at the top of the *next* loop iteration
-([SbcInterface.cpp:347](src/DuetSbcInterface/src/SBC/SbcInterface.cpp#L347)), so posting
+([SbcInterface.cpp:347](src/DuetRealtimeCore/src/SBC/SbcInterface.cpp#L347)), so posting
 `ConnectionEstablished` from inside `PerformFullTransfer` would put it *before* the `ControllerReset`
 it belongs after, and §4.5's sequence would run backwards. `ConnectionLost` has to be posted from the
 transfer engine because that is where the outage is observed; `ConnectionEstablished` must stay behind
@@ -523,7 +523,7 @@ does not reach:
 
 | Outbound work | Reported today? |
 |---|---|
-| Commands carrying a request id (enable CAN, e-stop, reset, firmware update) | ✅ `CompleteRequest(id, RequestResult::Cancelled)` → `TrySetCanceled()` ([NativeLink.cs:448](src/DuetControlServer/Link/Native/NativeLink.cs#L448)); `Cancelled` is documented as exactly this case ([LinkEvents.h:76](src/DuetSbcInterface/src/SBC/LinkEvents.h#L76)) |
+| Commands carrying a request id (enable CAN, e-stop, reset, firmware update) | ✅ `CompleteRequest(id, RequestResult::Cancelled)` → `TrySetCanceled()` ([NativeLink.cs:448](src/DuetControlServer/Link/Native/NativeLink.cs#L448)); `Cancelled` is documented as exactly this case ([LinkEvents.h:76](src/DuetRealtimeCore/src/SBC/LinkEvents.h#L76)) |
 | CAN requests expecting a reply | ✅ cancelled by `LinkInterface.Invalidate()`, and backstopped by `CanRequestTimeout` |
 | Scheduled moves | ✅ no `MoveCompleted` arrives; `motionTracker.Invalidate()` discards the moves they refer to |
 | **Fire-and-forget CAN messages** | ✅ resolved when the controller says the CAN peripheral took the message, and failed when it says why it could not |
@@ -549,7 +549,7 @@ in different places:
 #### Hop 1: delivery over SPI, for every command
 
 Today a command is consumed from `m_outbound` when it is written into the TX buffer
-([SbcInterface.cpp:578](src/DuetSbcInterface/src/SBC/SbcInterface.cpp#L578)) — before the transfer
+([SbcInterface.cpp:578](src/DuetRealtimeCore/src/SBC/SbcInterface.cpp#L578)) — before the transfer
 carrying it has happened, let alone succeeded. Commands with a request id are completed on their own
 terms (`EnableCan` reports `Success` at staging time, which is the same overstatement); the rest —
 `Message`, `CanMessage`, `ScheduleMove` — report nothing at all.

@@ -27,7 +27,7 @@
 	     also skips this, because a pinned library must not be rebuilt underneath the pin). -->
 	<PropertyGroup>
 		<BuildNativeLink Condition="'$(BuildNativeLink)' == '' and '$(DUET_SBC_LIBRARY)' == ''">true</BuildNativeLink>
-		<NativeLinkDir>$(MSBuildThisFileDirectory)../DuetSbcInterface</NativeLinkDir>
+		<NativeLinkDir>$(MSBuildThisFileDirectory)../DuetRealtimeCore</NativeLinkDir>
 	</PropertyGroup>
 	<Target Name="BuildNativeLinkLibrary" BeforeTargets="Build" Condition="'$(BuildNativeLink)' == 'true'">
 		<!-- The native build takes RRFLibraries from the submodule, and says so as a CMake command it

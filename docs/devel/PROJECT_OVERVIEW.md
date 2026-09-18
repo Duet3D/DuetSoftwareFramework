@@ -187,7 +187,7 @@ type. The shared groundwork lands first.
 | S1 | Convert the deferred codes | M 🔧 | ✅ every code with a Deferred row is deferred (12 of the 16; M117/M144/M150/M300 wait on their handlers). Hardware verification outstanding |
 | S2 | Schema: `whenToExecute`, the offset table, the drop broadcast | M | Regenerates both sides |
 | S2 | Parked-command ring in `Duet3Expansion` | M | No behaviour change until something sends a future time |
-| S2 | `SubmitAction` and anchor resolution in `DuetSbcInterface` | L | The mechanical core |
+| S2 | `SubmitAction` and anchor resolution in `DuetRealtimeCore` | L | The mechanical core |
 | S2 | The CANMaster reply-timeout field | S | |
 | S2 | Promote the codes to timestamped dispatch | L 🔧 | Each a handler and table-row change; M106 first |
 

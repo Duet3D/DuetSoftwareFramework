@@ -3,10 +3,10 @@
 The link is what connects DuetControlServer to the hardware. It has two halves that are easy to
 confuse, because "the link" is used for both:
 
-- **DCS to the native side.** [DuetSbcInterface](components.md#duetsbcinterface) is a shared library
+- **DCS to the native side.** [DuetRealtimeCore](components.md#duetrealtimecore) is a shared library
   loaded into the DCS process. DCS calls exported functions to submit moves and queue messages, and
   reads a ring buffer of events coming back. No serialisation, no sockets - a P/Invoke and a memcpy.
-- **The native side to the controller.** DuetSbcInterface's own thread runs an SPI transfer loop
+- **The native side to the controller.** DuetRealtimeCore's own thread runs an SPI transfer loop
   against DuetCANMaster on the Duet 3 mainboard. That is the wire, and it is SPI only: the USB
   transport is gone.
 
@@ -21,7 +21,7 @@ because there is no second interpreter.
 - Event dispatch and request handlers: `src/DuetControlServer/Link/LinkService.cs`
 - Higher-level API (CAN requests, messages, emergency stop):
   `src/DuetControlServer/Link/LinkInterface.cs`
-- Native transfer engine: `src/DuetSbcInterface/src/SBC/SbcInterface.cpp`, `SBC/SbcTransfer.cpp`
+- Native transfer engine: `src/DuetRealtimeCore/src/SBC/SbcInterface.cpp`, `SBC/SbcTransfer.cpp`
 - Wire format, shared by both builds: `lib/DuetSpiInterface/include/DuetSpiProtocol/MessageFormats.h`
 
 ## Layering
@@ -43,7 +43,7 @@ Two rules shape this picture and are worth stating outright:
 
 - **Every CAN message originates in DCS.** The native side builds no messages of its own; it stages
   what it is handed. That invariant held with one exception - the endstop wind-back - until that was
-  moved up to DCS as well, taking the CANlib dependency out of DuetSbcInterface with it.
+  moved up to DCS as well, taking the CANlib dependency out of DuetRealtimeCore with it.
 - **The transfer loop must never block on managed work.** Everything inbound is posted to a ring and
   dispatched on a managed thread, so a slow object-model write cannot stall an SPI transfer.
 

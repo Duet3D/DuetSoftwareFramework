@@ -1,7 +1,7 @@
-# Cleaning up the DuetSbcInterface motion engine
+# Cleaning up the DuetRealtimeCore motion engine
 
 Plan for removing the RepRapFirmware compatibility scaffolding from
-[`src/DuetSbcInterface`](src/DuetSbcInterface) and leaving behind code that reads as this project's
+[`src/DuetRealtimeCore`](src/DuetRealtimeCore) and leaving behind code that reads as this project's
 own — while keeping the feature switches that still mark real, intended work.
 
 Baseline for everything below: commit `7fd2169`, `cmake --preset native` configures and builds clean
@@ -23,7 +23,7 @@ it was so the reasoning stays readable:
 `src/Movement/` was imported from RepRapFirmware and much of what surrounds it — `src/Compat/`, the
 `CanMotion` namespace, the `reprap` global — exists so the import can be re-*merged* against a future
 RRF release rather than diffed against it.
-[`Compat/RepRapFirmware.h`](src/DuetSbcInterface/src/Compat/RepRapFirmware.h) states it outright:
+[`Compat/RepRapFirmware.h`](src/DuetRealtimeCore/src/Compat/RepRapFirmware.h) states it outright:
 *"will be re-synced against it, so they keep their original `#include` lines"*.
 
 **The textual merge is already gone** — the whole-tree rename to `m_`-prefixed members ended it, and
@@ -481,7 +481,7 @@ Fix as encountered; these are the known ones:
 
 ### 6.1 Turn linting on
 
-[`src/CMakeLists.txt`](src/DuetSbcInterface/src/CMakeLists.txt) is what let this accumulate:
+[`src/CMakeLists.txt`](src/DuetRealtimeCore/src/CMakeLists.txt) is what let this accumulate:
 
 ```cmake
 set_target_properties(duet_motion PROPERTIES CXX_CLANG_TIDY "")     # no linting at all

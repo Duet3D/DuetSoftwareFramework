@@ -109,7 +109,7 @@ header / response / packet is listed.
   - `lib/DuetSpiInterface/include/DuetSpiProtocol/MessageFormats.h` — the wire
     structs (`SpiTransferHeader`, `PacketHeader`, and the per-request payload
     headers), both request enums, `ScheduleMoveFlags` and `CanStatus`. This one
-    header is shared by DuetCANMaster and DuetSbcInterface, so it is the only
+    header is shared by DuetCANMaster and DuetRealtimeCore, so it is the only
     place a layout is defined
   - `src/DuetControlServer/Link/Protocol/Shared/Consts.cs` — format codes and
     transfer responses

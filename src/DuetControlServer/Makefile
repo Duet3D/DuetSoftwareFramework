@@ -6,7 +6,7 @@ include ../../Makefile.components
 # ---------------------------------------------------------------------------
 # Native SPI interface (libduet_sbc.so)
 #
-# The SPI transfer loop lives in C++ (../DuetSbcInterface) so it can run on a pinned real-time
+# The SPI transfer loop lives in C++ (../DuetRealtimeCore) so it can run on a pinned real-time
 # thread; DuetControlServer P/Invokes into it via Link/Native. The .so therefore has to be built for
 # the same architecture as the managed output and shipped alongside it.
 #
@@ -15,10 +15,10 @@ include ../../Makefile.components
 # targets the same glibc 2.36 as Raspberry Pi OS Bookworm, so a cross-built .so loads on the Pi as-is
 # and no sysroot is involved. To target an older release, pass one:
 #
-#     make DUET_SBC_SYSROOT=/path/to/pi-sysroot   (see src/DuetSbcInterface/scripts/fetch-pi-sysroot.sh)
+#     make DUET_SBC_SYSROOT=/path/to/pi-sysroot   (see src/DuetRealtimeCore/scripts/fetch-pi-sysroot.sh)
 # ---------------------------------------------------------------------------
 
-SBC_SRC_DIR := ../DuetSbcInterface
+SBC_SRC_DIR := ../DuetRealtimeCore
 SBC_BUILD_DIR := $(SBC_SRC_DIR)/build-$(ARCH)
 SBC_LIB := $(SBC_BUILD_DIR)/src/libduet_sbc.so
 

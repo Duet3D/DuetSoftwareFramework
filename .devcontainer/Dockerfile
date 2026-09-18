@@ -51,7 +51,7 @@ RUN ln -s arm-linux-gnueabihf-ld /usr/bin/armv7-linux-gnueabihf-ld \
 	&& ln -s arm-linux-gnueabihf-ld.bfd /usr/bin/armv7-linux-gnueabihf-ld.bfd \
 	&& ln -s arm-linux-gnueabihf-objcopy /usr/bin/armv7-linux-gnueabihf-objcopy
 
-# Debian only ships versioned names for these. DuetSbcInterface's CMakeLists looks for unsuffixed
+# Debian only ships versioned names for these. DuetRealtimeCore's CMakeLists looks for unsuffixed
 # `clang-tidy` (find_program NAMES clang-tidy), so without these the default presets fail to build.
 RUN ln -s clang-tidy-19 /usr/bin/clang-tidy \
 	&& ln -s clang-format-19 /usr/bin/clang-format \

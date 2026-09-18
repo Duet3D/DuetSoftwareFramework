@@ -5,7 +5,7 @@ namespace DuetControlServer.Link.Native;
 
 /// <summary>
 /// Managed mirror of the ring-buffer record formats defined in
-/// <c>DuetSbcInterface/src/SBC/LinkEvents.h</c>.
+/// <c>DuetRealtimeCore/src/SBC/LinkEvents.h</c>.
 /// </summary>
 /// <remarks>
 /// These structs are read straight out of the native ring with <see cref="MemoryMarshal"/>, so their

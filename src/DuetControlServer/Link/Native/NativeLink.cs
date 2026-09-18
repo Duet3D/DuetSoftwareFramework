@@ -17,7 +17,7 @@ namespace DuetControlServer.Link.Native;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The SPI protocol lives in C++ (see <c>src/DuetSbcInterface</c>) so its transfer loop can run pinned
+/// The SPI protocol lives in C++ (see <c>src/DuetRealtimeCore</c>) so its transfer loop can run pinned
 /// and <c>SCHED_FIFO</c> without a managed runtime scheduling work onto that thread. This class is the
 /// only place that talks to it. Work crosses the boundary through lock-free ring buffers rather than
 /// callbacks, so the real-time thread never executes managed code and a GC pause can never stall a

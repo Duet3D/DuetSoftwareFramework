@@ -68,8 +68,8 @@ Four actors make progress on real time rather than on the timeline:
 
 | Actor | Where |
 |---|---|
-| The native motion thread: `SpinOnce` and a 1 ms real sleep | [MotionService.cpp:118](../../src/DuetSbcInterface/src/Motion/MotionService.cpp#L118) |
-| The native link thread, and the fake controller answering it over a real socket | [LinkService.cpp:103](../../src/DuetSbcInterface/src/Interface/LinkService.cpp#L103) |
+| The native motion thread: `SpinOnce` and a 1 ms real sleep | [MotionService.cpp:118](../../src/DuetRealtimeCore/src/Motion/MotionService.cpp#L118) |
+| The native link thread, and the fake controller answering it over a real socket | [LinkService.cpp:103](../../src/DuetRealtimeCore/src/Interface/LinkService.cpp#L103) |
 | DCS's live position loop, `Thread.Sleep(LivePositionInterval)` | [MotionService.cs:189](../../src/DuetControlServer/Motion/MotionService.cs#L189) |
 | Roughly thirty `Task.Delay` and `PeriodicTimer` sites, of which `MovePlanner`'s standstill and feedhold polls, `MachineStatusService`, `JobMonitor`, the ring-full retries and `HeatManager` are on the job path | across `DuetControlServer` |
 

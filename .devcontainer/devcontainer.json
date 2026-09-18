@@ -24,7 +24,7 @@
       "settings": {
         "cmake.sourceDirectory": [
           "${workspaceFolder}/src/DuetCANMaster",
-          "${workspaceFolder}/src/DuetSbcInterface"
+          "${workspaceFolder}/src/DuetRealtimeCore"
         ]
       }
     }
