@@ -27,8 +27,16 @@ RESULTS_DIR="$REPO_ROOT/test-results"
 KNOWN_GAP=KnownGap
 LONG_RUNNING=LongRunning
 # Scenarios in the KnownGap category document behaviour that is not implemented yet, so they are
-# expected to fail. Pass --all to run them as well.
-FILTER="TestCategory!=$KNOWN_GAP"
+# expected to fail and are left out unless they are what the run is about. The LongRunning ones do
+# pass, and cost the most time of anything in the suite, so leaving those out is offered as well.
+# Either skip composes the filter the run is given, and a skip that was asked for narrows a named
+# filter as well. Leaving the KnownGap scenarios out is only the default for a run that named no
+# filter of its own, since a filter says which tests the run is about.
+SKIP_KNOWN_GAPS=1
+SKIP_KNOWN_GAPS_GIVEN=0
+SKIP_LONG_RUNNING=0
+SKIP_LONG_RUNNING_GIVEN=0
+FILTER=""
 FILTER_GIVEN=0
 # A scenario starts a DuetControlServer and drives it, so a second is normal and ten is not. Tests
 # over this are listed after the run, slowest first, because the suite is long enough that the ones
@@ -47,13 +55,18 @@ Run the system tests, then list the slow tests and the failed ones by name.
 Options:
   -c, --configuration <cfg>  Build configuration (default: $BUILD_TYPE)
   -o, --results-dir <dir>    Where to write results (default: $RESULTS_DIR)
-      --filter <expr>        Test filter (default: $FILTER)
-      --all                  Include the $KNOWN_GAP scenarios, which are expected to fail
+      --filter <expr>        Test filter, in place of the one the skips below compose. A skip that
+                             was asked for narrows it further
+      --skip-known-gaps      Leave out the $KNOWN_GAP scenarios, which are expected to fail. On by
+                             default for a run that named no filter
+      --skip-long-running    Leave out the $LONG_RUNNING scenarios, the slowest in the suite
+      --all                  Run every scenario, the $KNOWN_GAP and $LONG_RUNNING ones included
       --no-build             Skip the build and run the assembly as it stands
       --slow <seconds>       List tests slower than this afterwards (default: $SLOW_SECONDS)
       --tag-known-gaps       Write the $KNOWN_GAP category into the sources to match the run: add it
-                             to the tests that failed, remove it from the ones that passed. Implies
-                             --all, since a test that did not run says nothing about its category
+                             to the tests that failed, remove it from the ones that passed. Runs the
+                             $KNOWN_GAP scenarios, since a test that did not run says nothing about
+                             which category it belongs in
       --tag-long-running     Write the $LONG_RUNNING category into the sources to match the run: add
                              it to the tests over the slow threshold, remove it from the ones under
   -h, --help                 Show this help
@@ -68,8 +81,10 @@ came in under the threshold.
 
 Examples:
   $(basename "$0")
+  $(basename "$0") --skip-long-running
   $(basename "$0") --all
   $(basename "$0") --filter 'FullyQualifiedName~JobControl'
+  $(basename "$0") --filter 'FullyQualifiedName~JobControl' --skip-long-running
   $(basename "$0") --all --tag-long-running --slow 20
   $(basename "$0") -- -p:Profiling=true
 EOF
@@ -81,7 +96,10 @@ while [[ $# -gt 0 ]]; do
         -c|--configuration)   BUILD_TYPE="$2"; shift 2 ;;
         -o|--results-dir)     RESULTS_DIR="$2"; shift 2 ;;
         --filter)             FILTER="$2"; FILTER_GIVEN=1; shift 2 ;;
-        --all)                FILTER=""; FILTER_GIVEN=1; shift ;;
+        --skip-known-gaps)    SKIP_KNOWN_GAPS=1; SKIP_KNOWN_GAPS_GIVEN=1; shift ;;
+        --skip-long-running)  SKIP_LONG_RUNNING=1; SKIP_LONG_RUNNING_GIVEN=1; shift ;;
+        --all)                SKIP_KNOWN_GAPS=0; SKIP_KNOWN_GAPS_GIVEN=1
+                              SKIP_LONG_RUNNING=0; SKIP_LONG_RUNNING_GIVEN=1; shift ;;
         --no-build)           EXTRA_ARGS+=(--no-build); shift ;;
         --slow)               SLOW_SECONDS="$2"; shift 2 ;;
         --tag-known-gaps)     TAG_KNOWN_GAPS=1; shift ;;
@@ -92,11 +110,34 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# The default filter leaves the KnownGap scenarios out, and a category cannot be taken off a test
-# that never ran. Asking to tag them is therefore asking to run them, unless a filter was named.
-if [[ $TAG_KNOWN_GAPS -eq 1 && $FILTER_GIVEN -eq 0 ]]; then
-    FILTER=""
+# The KnownGap scenarios are left out by default, and a category cannot be taken off a test that
+# never ran. Asking to tag them is therefore asking to run them, unless the run was told otherwise.
+if [[ $TAG_KNOWN_GAPS -eq 1 && $FILTER_GIVEN -eq 0 && $SKIP_KNOWN_GAPS_GIVEN -eq 0 ]]; then
+    SKIP_KNOWN_GAPS=0
     echo "--tag-known-gaps runs the $KNOWN_GAP scenarios as well, so the category can be taken off the ones that pass"
+fi
+
+# One more category for the run to leave out
+SKIPS=""
+skip_category() {
+    SKIPS="${SKIPS:+$SKIPS&}TestCategory!=$1"
+}
+
+# A skip that was asked for narrows the filter whether or not one was named, while the default skip
+# applies only to a run that named none: a filter states which tests the run is about, and a skip it
+# did not ask for has no say in that.
+if [[ $SKIP_KNOWN_GAPS -eq 1 && ( $FILTER_GIVEN -eq 0 || $SKIP_KNOWN_GAPS_GIVEN -eq 1 ) ]]; then
+    skip_category "$KNOWN_GAP"
+fi
+if [[ $SKIP_LONG_RUNNING -eq 1 && ( $FILTER_GIVEN -eq 0 || $SKIP_LONG_RUNNING_GIVEN -eq 1 ) ]]; then
+    skip_category "$LONG_RUNNING"
+fi
+
+# The skips are the whole filter for a run that named none, and narrow the named one otherwise. That
+# one is parenthesised on the way in because it may be a disjunction, which the conjunction joining
+# the two would otherwise bind tighter than.
+if [[ -n "$SKIPS" ]]; then
+    FILTER="${FILTER:+($FILTER)&}$SKIPS"
 fi
 
 if [[ -n "$FILTER" ]]; then
