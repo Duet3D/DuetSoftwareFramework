@@ -5738,6 +5738,11 @@
             Field-oriented control (direct)
             </summary>
         </member>
+        <member name="F:DuetAPI.ObjectModel.DriverMode.AssistedOpen">
+            <summary>
+            Assisted open loop
+            </summary>
+        </member>
         <member name="F:DuetAPI.ObjectModel.DriverMode.Unknown">
             <summary>
             Driver mode is unknown
