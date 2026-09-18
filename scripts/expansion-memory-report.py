@@ -162,7 +162,12 @@ def build_rows(boards):
     for board in boards:
         usage = measure(board)
         if usage is None:
-            rows.append([board["board"], board["mcu"], "not built", "", "", "", "", ""])
+            # One "not built" cell in place of the first region's figures, then blanks, so the
+            # row still lines up with the header however many regions are reported.
+            rows.append(
+                [board["board"], board["mcu"], "not built"]
+                + [""] * (len(headers()) - 3)
+            )
             continue
 
         row = [board["board"], board["mcu"]]
