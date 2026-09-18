@@ -1314,7 +1314,8 @@ internal partial class MCodeHandler(
     {
         // M122 is one of the codes board 0 does answer for: DuetCANMaster and this program are what
         // there is to report on, whatever hardware is or is not attached to it
-        byte board = GetBoardAddress(code, defaultAddress: CanId.MasterAddress);
+        // TODO we may want a way to differentiate between DCS and DuetCANMaster in the future but more likely we will just append the DuetCANMaster report to the DCS report.
+        byte board = GetBoardAddress(code, allowMainBoard: true, defaultAddress: CanId.MasterAddress);
         if (board != CanId.MasterAddress)
         {
             return await ReportBoardDiagnosticsAsync(code, cancellationToken);
