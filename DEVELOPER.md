@@ -214,8 +214,9 @@ last is the test that is stuck. Once the run is over the script lists the failed
 below the stack traces and the DuetControlServer logs a failure dumps, where they can be read as a
 list.
 
-Scenarios in the `KnownGap` category assert behaviour that is not implemented yet, so they fail.
-The script leaves them out; `--all` puts them back, which is what CI runs. To narrow a run:
+Scenarios in the `KnownGap` category assert behaviour the source does not produce yet, because it is
+unimplemented or implemented incorrectly, so they fail until it is fixed and the category is taken
+off. The script leaves them out, as CI does; `--all` puts them back. To narrow a run:
 
 ```bash
 ./scripts/system-tests.sh --filter 'FullyQualifiedName~JobControl'

@@ -13,8 +13,8 @@ set -uo pipefail
 # the source location the terminal can turn into a link.
 #
 # Two categories in the sources say what a run is expected to look like: KnownGap marks a scenario
-# whose behaviour is not implemented yet, so it fails on purpose, and LongRunning marks one that
-# costs far more than a scenario normally does. The summaries report both against what the run
+# the source does not satisfy yet, because the behaviour is unimplemented or implemented
+# incorrectly, and LongRunning marks one that costs far more than a scenario normally does. The summaries report both against what the run
 # actually did, and --tag-known-gaps and --tag-long-running write the difference back into the
 # sources instead of reporting it.
 
@@ -26,9 +26,10 @@ BUILD_TYPE=Debug
 RESULTS_DIR="$REPO_ROOT/test-results"
 KNOWN_GAP=KnownGap
 LONG_RUNNING=LongRunning
-# Scenarios in the KnownGap category document behaviour that is not implemented yet, so they are
-# expected to fail and are left out unless they are what the run is about. The LongRunning ones do
-# pass, and cost the most time of anything in the suite, so leaving those out is offered as well.
+# Scenarios in the KnownGap category state behaviour the source does not produce yet, so they fail
+# until it is fixed and the category is taken off, and are left out unless they are what the run is
+# about. The LongRunning ones do pass, and cost the most time of anything in the suite, so leaving
+# those out is offered as well.
 # Either skip composes the filter the run is given, and a skip that was asked for narrows a named
 # filter as well. Leaving the KnownGap scenarios out is only the default for a run that named no
 # filter of its own, since a filter says which tests the run is about.
@@ -57,8 +58,8 @@ Options:
   -o, --results-dir <dir>    Where to write results (default: $RESULTS_DIR)
       --filter <expr>        Test filter, in place of the one the skips below compose. A skip that
                              was asked for narrows it further
-      --skip-known-gaps      Leave out the $KNOWN_GAP scenarios, which are expected to fail. On by
-                             default for a run that named no filter
+      --skip-known-gaps      Leave out the $KNOWN_GAP scenarios, which fail until the source they
+                             describe is fixed. On by default for a run that named no filter
       --skip-long-running    Leave out the $LONG_RUNNING scenarios, the slowest in the suite
       --all                  Run every scenario, the $KNOWN_GAP and $LONG_RUNNING ones included
       --no-build             Skip the build and run the assembly as it stands
