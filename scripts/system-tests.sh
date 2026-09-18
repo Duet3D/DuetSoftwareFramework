@@ -145,6 +145,11 @@ if [[ -n "$FILTER" ]]; then
 fi
 
 mkdir -p "$RESULTS_DIR"
+# The trx logger resolves its file name inside the results directory, so it is given the name alone
+# and the directory is made absolute here. A relative one passed to both would be taken twice, once
+# by the runner and once by this script, leaving the results a directory deeper than the summaries
+# below look for them and reporting a run that wrote none.
+RESULTS_DIR="$(cd "$RESULTS_DIR" && pwd)"
 TRX="$RESULTS_DIR/SystemTests.trx"
 rm -f "$TRX"
 
@@ -156,7 +161,7 @@ echo "=== Running system tests ($BUILD_TYPE${FILTER:+, $FILTER}) ==="
 dotnet test "$PROJECT" -c "$BUILD_TYPE" \
     -tl:off \
     --logger "console;verbosity=normal" \
-    --logger "trx;LogFileName=$TRX" \
+    --logger "trx;LogFileName=$(basename "$TRX")" \
     --results-directory "$RESULTS_DIR" \
     "${EXTRA_ARGS[@]}"
 STATUS=$?
