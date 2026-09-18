@@ -23,4 +23,4 @@ and several set standing rules that apply whatever is asked. Then read on.
 - [Pi hardware test workflow](pi-hardware-test-workflow.md) — deploy with build.sh --target, drive with CodeConsole, read journalctl debug logs
 - [Regression suite workflow](regression-suite-workflow.md) — the harness runs on the host at :8765, drive it over its HTTP API
 - [Sensitive memories are private](sensitive-memories-are-private.md) — personal or sensitive details (IPs, keys, names, emails) belong in `private/`, never the committed half
-- [No full system test suite](no-full-system-test-suite.md) — filter SystemTests to the affected fixtures; never run the whole suite
+- [No full system test suite](no-full-system-test-suite.md) — run system tests via ./scripts/system-tests.sh with a --filter for the affected fixtures; never the whole suite

@@ -18,5 +18,7 @@ look green under both and still be untested against the real toolchain.
 systemd services and rsync into `/opt/dsf/bin`, neither of which exists in the devcontainer, so the
 run fails at the end after a successful build.
 
-Tests are separate: `dotnet test src/UnitTests/UnitTests.csproj` for the managed side, and `ctest`
-in the native build directory. See [[mcode-migration-plan]].
+Tests are separate: `dotnet test src/UnitTests/UnitTests.csproj` for the managed side, `ctest`
+in the native build directory, and `./scripts/system-tests.sh` for the system tests, which builds
+them itself and is always given a `--filter` ([[no-full-system-test-suite]]). See
+[[mcode-migration-plan]].
