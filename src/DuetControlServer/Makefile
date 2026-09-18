@@ -4,9 +4,9 @@ TARGET=DuetControlServer
 include ../../Makefile.components
 
 # ---------------------------------------------------------------------------
-# Native SPI interface (libduet_sbc.so)
+# Native SPI interface (libduet_realtime_core.so)
 #
-# The SPI transfer loop lives in C++ (../DuetSbcInterface) so it can run on a pinned real-time
+# The SPI transfer loop lives in C++ (../DuetRealtimeCore) so it can run on a pinned real-time
 # thread; DuetControlServer P/Invokes into it via Link/Native. The .so therefore has to be built for
 # the same architecture as the managed output and shipped alongside it.
 #
@@ -15,49 +15,49 @@ include ../../Makefile.components
 # targets the same glibc 2.36 as Raspberry Pi OS Bookworm, so a cross-built .so loads on the Pi as-is
 # and no sysroot is involved. To target an older release, pass one:
 #
-#     make DUET_SBC_SYSROOT=/path/to/pi-sysroot   (see src/DuetSbcInterface/scripts/fetch-pi-sysroot.sh)
+#     make DUET_REALTIME_CORE_SYSROOT=/path/to/pi-sysroot   (see src/DuetRealtimeCore/scripts/fetch-pi-sysroot.sh)
 # ---------------------------------------------------------------------------
 
-SBC_SRC_DIR := ../DuetSbcInterface
-SBC_BUILD_DIR := $(SBC_SRC_DIR)/build-$(ARCH)
-SBC_LIB := $(SBC_BUILD_DIR)/src/libduet_sbc.so
+REALTIME_CORE_SRC_DIR := ../DuetRealtimeCore
+REALTIME_CORE_BUILD_DIR := $(REALTIME_CORE_SRC_DIR)/build-$(ARCH)
+REALTIME_CORE_LIB := $(REALTIME_CORE_BUILD_DIR)/src/libduet_realtime_core.so
 
 # Map the package architecture onto a CMake toolchain file. An empty value means "build natively".
 ifeq ($(ARCH),$(filter $(ARCH),armhf armhfp armv7h armv7hl))
-    SBC_TOOLCHAIN := $(SBC_SRC_DIR)/cmake/arm-linux-gnueabihf.cmake
+    REALTIME_CORE_TOOLCHAIN := $(REALTIME_CORE_SRC_DIR)/cmake/arm-linux-gnueabihf.cmake
 else ifeq ($(ARCH),$(filter $(ARCH),arm64 aarch64))
-    SBC_TOOLCHAIN := $(SBC_SRC_DIR)/cmake/aarch64-linux-gnu.cmake
+    REALTIME_CORE_TOOLCHAIN := $(REALTIME_CORE_SRC_DIR)/cmake/aarch64-linux-gnu.cmake
 else
-    SBC_TOOLCHAIN :=
+    REALTIME_CORE_TOOLCHAIN :=
 endif
 
-SBC_CMAKE_ARGS := -DCMAKE_BUILD_TYPE=Release
-ifneq ($(SBC_TOOLCHAIN),)
-    SBC_CMAKE_ARGS += -DCMAKE_TOOLCHAIN_FILE=$(abspath $(SBC_TOOLCHAIN))
+REALTIME_CORE_CMAKE_ARGS := -DCMAKE_BUILD_TYPE=Release
+ifneq ($(REALTIME_CORE_TOOLCHAIN),)
+    REALTIME_CORE_CMAKE_ARGS += -DCMAKE_TOOLCHAIN_FILE=$(abspath $(REALTIME_CORE_TOOLCHAIN))
 endif
-ifneq ($(DUET_SBC_SYSROOT),)
-    SBC_CMAKE_ARGS += -DDUET_SBC_SYSROOT=$(abspath $(DUET_SBC_SYSROOT))
+ifneq ($(DUET_REALTIME_CORE_SYSROOT),)
+    REALTIME_CORE_CMAKE_ARGS += -DDUET_REALTIME_CORE_SYSROOT=$(abspath $(DUET_REALTIME_CORE_SYSROOT))
 endif
 
 .PHONY: native-lib
 
-$(SBC_LIB):
-	$(ECHO_PREFIX)$(TARGET_TITLE) cmake libduet_sbc "" Release $(ARCH)
-	$(CMD_PREFIX) cmake -S $(SBC_SRC_DIR) -B $(SBC_BUILD_DIR) $(SBC_CMAKE_ARGS)
-	$(CMD_PREFIX) cmake --build $(SBC_BUILD_DIR) --target duet_sbc_shared -j
+$(REALTIME_CORE_LIB):
+	$(ECHO_PREFIX)$(TARGET_TITLE) cmake libduet_realtime_core "" Release $(ARCH)
+	$(CMD_PREFIX) cmake -S $(REALTIME_CORE_SRC_DIR) -B $(REALTIME_CORE_BUILD_DIR) $(REALTIME_CORE_CMAKE_ARGS)
+	$(CMD_PREFIX) cmake --build $(REALTIME_CORE_BUILD_DIR) --target duet_realtime_core_shared -j
 
-native-lib: $(SBC_LIB)
+native-lib: $(REALTIME_CORE_LIB)
 
 # Both the build and publish outputs need the .so next to the assemblies so the default P/Invoke
 # probing (application directory) resolves it without a custom DllImportResolver.
 build: native-lib
-	$(CMD_PREFIX) cp $(SBC_LIB) bin/$(CONFIG)/netcoreapp$(RUNTIME)/$(DOTNET_ARCH)/
+	$(CMD_PREFIX) cp $(REALTIME_CORE_LIB) bin/$(CONFIG)/netcoreapp$(RUNTIME)/$(DOTNET_ARCH)/
 
 publish: native-lib
-	$(CMD_PREFIX) cp $(SBC_LIB) $(DESTDIR)
+	$(CMD_PREFIX) cp $(REALTIME_CORE_LIB) $(DESTDIR)
 
 clean: clean-native-lib
 
 .PHONY: clean-native-lib
 clean-native-lib:
-	$(CMD_PREFIX) rm -rf $(SBC_BUILD_DIR)
+	$(CMD_PREFIX) rm -rf $(REALTIME_CORE_BUILD_DIR)

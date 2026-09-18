@@ -1,6 +1,6 @@
 // C ABI wrapping the SBC interface so it can be consumed from C# via P/Invoke (or any other
 // language). Kept intentionally small and free of C++ types on the boundary. Built into
-// libduet_sbc.so.
+// libduet_realtime_core.so.
 //
 // The design point is that the caller's threads and the SPI interface thread never block each other:
 // work is exchanged through lock-free ring buffers, so the interface thread can hold SCHED_FIFO on an
@@ -23,11 +23,11 @@ extern "C"
 {
 #endif
 
-	using DuetSbcHandle = struct DuetSbcHandle;
+	using DuetRTHandle = struct DuetRTHandle;
 
 	// Configuration passed across the ABI. Mirrors duet::sbc::Config. Any string may be null to use the
 	// built-in default.
-	using DuetSbcConfig = struct
+	using DuetRTConfig = struct
 	{
 		const char* spiDevice;
 		uint32_t spiFrequency;
@@ -61,73 +61,73 @@ extern "C"
 	};
 
 	// Fill `config` with the default values.
-	void DuetSbc_DefaultConfig(DuetSbcConfig* config);
+	void DuetRT_DefaultConfig(DuetRTConfig* config);
 
 	// Create an interface instance. Returns null on failure and writes an error message into
-	// errorBuf (if non-null). The instance must be freed with DuetSbc_Destroy.
-	DuetSbcHandle* DuetSbc_Create(const DuetSbcConfig* config, char* errorBuf, int32_t errorBufLen);
+	// errorBuf (if non-null). The instance must be freed with DuetRT_Destroy.
+	DuetRTHandle* DuetRT_Create(const DuetRTConfig* config, char* errorBuf, int32_t errorBufLen);
 
 	// Connect to the firmware (blocking). Returns 0 on success, non-zero on failure (message in errorBuf).
-	int32_t DuetSbc_Connect(DuetSbcHandle* h, char* errorBuf, int32_t errorBufLen);
+	int32_t DuetRT_Connect(DuetRTHandle* h, char* errorBuf, int32_t errorBufLen);
 
 	// Start / stop the transfer loop.
-	void DuetSbc_Start(DuetSbcHandle* h);
-	void DuetSbc_Stop(DuetSbcHandle* h);
+	void DuetRT_Start(DuetRTHandle* h);
+	void DuetRT_Stop(DuetRTHandle* h);
 
 	// --- Outbound: queue work for the transfer loop (any thread) ---
 
 	// These return 0 on success and non-zero if the outbound ring is full (i.e. the message was NOT
 	// queued and the caller must surface that rather than lose it).
 	// The Queue* calls return the sequence number the command was given, or -1 if it was refused
-	int64_t DuetSbc_QueueMessage(DuetSbcHandle* h, uint32_t flags, const char* message, int32_t length);
-	int64_t DuetSbc_QueueCanMessage(DuetSbcHandle* h,
-									uint16_t txToken,
-									uint16_t msgType,
-									uint16_t replyType,
-									uint8_t dstAddress,
-									int32_t isResponse,
-									const uint8_t* payload,
-									int32_t length);
+	int64_t DuetRT_QueueMessage(DuetRTHandle* h, uint32_t flags, const char* message, int32_t length);
+	int64_t DuetRT_QueueCanMessage(DuetRTHandle* h,
+								   uint16_t txToken,
+								   uint16_t msgType,
+								   uint16_t replyType,
+								   uint8_t dstAddress,
+								   int32_t isResponse,
+								   const uint8_t* payload,
+								   int32_t length);
 	// requestId may be 0 for fire-and-forget; otherwise the outcome arrives as a RequestCompleted event.
-	int64_t DuetSbc_QueueEnableCan(DuetSbcHandle* h, int32_t enable, uint32_t requestId);
-	void DuetSbc_RequestEmergencyStop(DuetSbcHandle* h, uint32_t requestId);
-	void DuetSbc_RequestReset(DuetSbcHandle* h, uint32_t requestId);
+	int64_t DuetRT_QueueEnableCan(DuetRTHandle* h, int32_t enable, uint32_t requestId);
+	void DuetRT_RequestEmergencyStop(DuetRTHandle* h, uint32_t requestId);
+	void DuetRT_RequestReset(DuetRTHandle* h, uint32_t requestId);
 
 	// Stage a firmware update. `iap` and `firmware` must remain valid and pinned until the matching
 	// RequestCompleted event arrives. Returns 0 on success, non-zero if an update is already running.
-	int32_t DuetSbc_RequestFirmwareUpdate(DuetSbcHandle* h,
-										  const uint8_t* iap,
-										  int32_t iapLength,
-										  const uint8_t* firmware,
-										  int32_t firmwareLength,
-										  uint16_t firmwareCrc16,
-										  uint32_t requestId);
+	int32_t DuetRT_RequestFirmwareUpdate(DuetRTHandle* h,
+										 const uint8_t* iap,
+										 int32_t iapLength,
+										 const uint8_t* firmware,
+										 int32_t firmwareLength,
+										 uint16_t firmwareCrc16,
+										 uint32_t requestId);
 
 	// Ask for a transfer without new data (e.g. to flush a queued request promptly).
-	void DuetSbc_RequestTransfer(DuetSbcHandle* h);
+	void DuetRT_RequestTransfer(DuetRTHandle* h);
 
 	// --- Inbound: drain events (single consumer thread only) ---
 
 	// Point `data`/`length` at the next event record without copying it. Returns 1 if an event is
-	// available, 0 otherwise. The pointer stays valid until the next DuetSbc_ConsumeEvent call.
-	int32_t DuetSbc_PeekEvent(DuetSbcHandle* h, const uint8_t** data, int32_t* length);
+	// available, 0 otherwise. The pointer stays valid until the next DuetRT_ConsumeEvent call.
+	int32_t DuetRT_PeekEvent(DuetRTHandle* h, const uint8_t** data, int32_t* length);
 
-	// Release the event most recently returned by DuetSbc_PeekEvent.
-	void DuetSbc_ConsumeEvent(DuetSbcHandle* h);
+	// Release the event most recently returned by DuetRT_PeekEvent.
+	void DuetRT_ConsumeEvent(DuetRTHandle* h);
 
 	// Block until an event is available, the timeout elapses, or the loop is stopped.
 	// Returns 1 if an event is (probably) available, 0 on timeout.
-	int32_t DuetSbc_WaitForEvent(DuetSbcHandle* h, int32_t timeoutMs);
+	int32_t DuetRT_WaitForEvent(DuetRTHandle* h, int32_t timeoutMs);
 
 	// --- Diagnostics ---
-	int32_t DuetSbc_GetProtocolVersion(DuetSbcHandle* h);
-	double DuetSbc_GetMaxPinWaitMs(DuetSbcHandle* h);
-	double DuetSbc_GetMaxFullTransferDelayMs(DuetSbcHandle* h);
-	int32_t DuetSbc_GetTfrPinGlitches(DuetSbcHandle* h);
-	int32_t DuetSbc_GetMissedEdges(DuetSbcHandle* h);
-	int32_t DuetSbc_GetResyncCount(DuetSbcHandle* h);
+	int32_t DuetRT_GetProtocolVersion(DuetRTHandle* h);
+	double DuetRT_GetMaxPinWaitMs(DuetRTHandle* h);
+	double DuetRT_GetMaxFullTransferDelayMs(DuetRTHandle* h);
+	int32_t DuetRT_GetTfrPinGlitches(DuetRTHandle* h);
+	int32_t DuetRT_GetMissedEdges(DuetRTHandle* h);
+	int32_t DuetRT_GetResyncCount(DuetRTHandle* h);
 	// Events dropped because the inbound ring was full (i.e. the consumer could not keep up).
-	uint64_t DuetSbc_GetDroppedEvents(DuetSbcHandle* h);
+	uint64_t DuetRT_GetDroppedEvents(DuetRTHandle* h);
 
 	// --- Motion ---
 	//
@@ -138,30 +138,30 @@ extern "C"
 	// Machine description, pushed down from DuetControlServer. Mirrors Motion::MachineConfig; the
 	// managed side builds the bytes and this copies them, so the struct is not repeated here.
 	// Safe only while no move is in flight.
-	int32_t DuetSbc_MotionConfigure(DuetSbcHandle* h, const void* config, int32_t length);
+	int32_t DuetRT_MotionConfigure(DuetRTHandle* h, const void* config, int32_t length);
 
 	// Start and stop the motion thread. `rtPriority` is a SCHED_FIFO priority, or 0 for the default
 	// scheduler; it must be below the interface thread's, so that a late transfer never waits on a
 	// move being prepared.
-	int32_t DuetSbc_MotionStart(DuetSbcHandle* h, int32_t rtPriority);
-	void DuetSbc_MotionStop(DuetSbcHandle* h);
+	int32_t DuetRT_MotionStart(DuetRTHandle* h, int32_t rtPriority);
+	void DuetRT_MotionStop(DuetRTHandle* h);
 
 	// 1 if the ring has room for another move. Advisory: it may have room again a moment later.
-	int32_t DuetSbc_MotionCanAddMove(DuetSbcHandle* h, int32_t ring);
+	int32_t DuetRT_MotionCanAddMove(DuetRTHandle* h, int32_t ring);
 
 	// Queue a move. `moveParams` is a MoveParamsHeader followed by its two arrays; see
 	// Motion/MoveParams.h and its C# mirror. Returns 1 if queued, 0 if the caller must retry.
-	int32_t DuetSbc_MotionSubmitMove(DuetSbcHandle* h, const void* moveParams, int32_t length);
+	int32_t DuetRT_MotionSubmitMove(DuetRTHandle* h, const void* moveParams, int32_t length);
 
 	// Ask the ring to stop early and drop the moves after it. Returns 1 if the request was queued,
 	// 0 if the queue was full and it was not.
 	//
 	// The answer does not come back from this call. Dropping a move frees its segments, which only
-	// the motion thread may do, so the request is queued and DuetSbc_MotionGetFeedholdResult reports
+	// the motion thread may do, so the request is queued and DuetRT_MotionGetFeedholdResult reports
 	// what happened once it has acted. Read the sequence first and wait for it to change.
 	// `kind` is 0 for RepRapFirmware's search for a junction that is already slow enough to stop at,
 	// and 1 for the feedhold that plans a deceleration of its own.
-	int32_t DuetSbc_MotionRequestStop(DuetSbcHandle* h, int32_t kind);
+	int32_t DuetRT_MotionRequestStop(DuetRTHandle* h, int32_t kind);
 
 	// What the last feedhold did. `sequence` counts completed feedholds, `stopped` is 1 if the ring
 	// was brought to a planned stop and 0 if there was nothing it could stop before, in which case
@@ -169,21 +169,25 @@ extern "C"
 	//
 	// `restEndpointsOut` receives where the machine will come to rest in microsteps, which is what
 	// the planner resynchronises against after a stop - the moves the stop could not recall carry
-	// the machine on past wherever DuetSbc_MotionGetMotorPositions reads at the time. Only
+	// the machine on past wherever DuetRT_MotionGetMotorPositions reads at the time. Only
 	// meaningful when `stopped` is 1. Pass a null pointer and a count of 0 to skip it.
-	int32_t DuetSbc_MotionGetFeedholdResult(DuetSbcHandle* h, uint32_t* sequenceOut,
-											uint32_t* firstPurgedMoveIdOut, uint32_t* movesPurgedOut,
-											uint32_t* lastSurvivingMoveIdOut, int32_t* stoppedOut,
-											int32_t* restEndpointsOut, int32_t restEndpointCount);
+	int32_t DuetRT_MotionGetFeedholdResult(DuetRTHandle* h,
+										   uint32_t* sequenceOut,
+										   uint32_t* firstPurgedMoveIdOut,
+										   uint32_t* movesPurgedOut,
+										   uint32_t* lastSurvivingMoveIdOut,
+										   int32_t* stoppedOut,
+										   int32_t* restEndpointsOut,
+										   int32_t restEndpointCount);
 
 	// Motor positions in microsteps and the step-clock time they were taken at. Returns how many
 	// were written. Reads a snapshot rather than the live state, so it never stalls the motion
 	// thread and never tears.
-	int32_t DuetSbc_MotionGetMotorPositions(DuetSbcHandle* h, int32_t* stepsOut, int32_t count, uint32_t* whenTicks);
+	int32_t DuetRT_MotionGetMotorPositions(DuetRTHandle* h, int32_t* stepsOut, int32_t count, uint32_t* whenTicks);
 
 	// Where the drives are now, interpolated within the segment each is running. GetMotorPositions
 	// reports the commanded position instead, which is what the planner resynchronises against.
-	int32_t DuetSbc_MotionGetLivePositions(DuetSbcHandle* h, int32_t* stepsOut, int32_t count, uint32_t* whenTicks);
+	int32_t DuetRT_MotionGetLivePositions(DuetRTHandle* h, int32_t* stepsOut, int32_t count, uint32_t* whenTicks);
 
 	// Where one drive was at a given step-clock time, and where it was when its current move began.
 	// This is what undoing an endstop overshoot needs: the position at the instant the switch fired
@@ -196,9 +200,12 @@ extern "C"
 	// the caller has to be able to tell.
 	//
 	// Returns 1 on success, 0 if `drive` is out of range.
-	int32_t DuetSbc_MotionGetPositionAt(DuetSbcHandle* h, int32_t drive, uint32_t whenTicks,
-										int32_t* positionOut, int32_t* positionAtMoveStartOut,
-										int32_t* usedTimestampOut);
+	int32_t DuetRT_MotionGetPositionAt(DuetRTHandle* h,
+									   int32_t drive,
+									   uint32_t whenTicks,
+									   int32_t* positionOut,
+									   int32_t* positionAtMoveStartOut,
+									   int32_t* usedTimestampOut);
 
 	// Force motor positions, after homing or a move that stopped early. The endpoint each ring
 	// measures its next move from follows, because a move is scheduled as the difference between two
@@ -207,29 +214,32 @@ extern "C"
 	// Queued for the motion thread, which takes it up before any move submitted after this call.
 	// Returns 1 if it was taken, 0 if the queue was full and the caller must retry - a dropped
 	// position is a machine that thinks it is somewhere it is not.
-	int32_t DuetSbc_MotionSetMotorPositions(DuetSbcHandle* h, uint32_t driveMask, const int32_t* positions, int32_t count);
+	int32_t DuetRT_MotionSetMotorPositions(DuetRTHandle* h,
+										   uint32_t driveMask,
+										   const int32_t* positions,
+										   int32_t count);
 
 	// State DCS decides from its own bookkeeping each cycle, stored for the motion thread to read.
-	void DuetSbc_MotionSetRingState(DuetSbcHandle* h, int32_t ring, int32_t shouldStartMove, int32_t waitingForEmpty);
+	void DuetRT_MotionSetRingState(DuetRTHandle* h, int32_t ring, int32_t shouldStartMove, int32_t waitingForEmpty);
 
-	uint32_t DuetSbc_MotionGetScheduledMoves(DuetSbcHandle* h, int32_t ring);
-	uint32_t DuetSbc_MotionGetCompletedMoves(DuetSbcHandle* h, int32_t ring);
+	uint32_t DuetRT_MotionGetScheduledMoves(DuetRTHandle* h, int32_t ring);
+	uint32_t DuetRT_MotionGetCompletedMoves(DuetRTHandle* h, int32_t ring);
 	// Submissions refused because the queue was full. Non-zero means DCS ignored a retry.
-	uint32_t DuetSbc_MotionGetSubmissionsDropped(DuetSbcHandle* h);
+	uint32_t DuetRT_MotionGetSubmissionsDropped(DuetRTHandle* h);
 
 	// 1 while a submitted move has not yet been taken up by the motion thread. A ring's scheduled
 	// count only rises once it has, so asking the rings alone whether the machine has stopped is
 	// answered "yes" about a move that has not started. Anything waiting for standstill must check
 	// both.
-	int32_t DuetSbc_MotionHasPendingSubmissions(DuetSbcHandle* h);
+	int32_t DuetRT_MotionHasPendingSubmissions(DuetRTHandle* h);
 
 	// Forced positions the motion thread has adopted. Compared against what the caller believes it
 	// has sent, this is the difference between a position that was queued and one that took effect.
-	uint32_t DuetSbc_MotionGetForcedPositionsApplied(DuetSbcHandle* h);
+	uint32_t DuetRT_MotionGetForcedPositionsApplied(DuetRTHandle* h);
 
 	// Everything M122 reports about the motion engine. Counters rather than text: the caller owns
 	// the wording of the report, as it does for the step clock stats below.
-	using DuetSbcRingStats = struct
+	using DuetRTRingStats = struct
 	{
 		uint32_t scheduledMoves;
 		uint32_t completedMoves;
@@ -239,23 +249,23 @@ extern "C"
 	};
 
 	// Movement systems the engine builds. Must match Motion::maxRings.
-	#define DUET_SBC_MAX_RINGS 2
+#define DUET_REALTIME_CORE_MAX_RINGS 2
 
-	using DuetSbcMotionStats = struct
+	using DuetRTMotionStats = struct
 	{
 		uint32_t segmentsCreated;		 // MoveSegments allocated since startup
 		uint32_t movementDelayTicks;	 // how far the movement timebase lags the raw step clock
 		uint32_t submissionsDropped;	 // moves refused because the submission queue was full
 		uint32_t forcedPositionsApplied; // positions the motion thread has adopted
 		uint32_t droppedSchedulePackets; // ScheduleMove packets the link refused: motion was lost
-		DuetSbcRingStats rings[DUET_SBC_MAX_RINGS];
+		DuetRTRingStats rings[DUET_REALTIME_CORE_MAX_RINGS];
 	};
 
-	void DuetSbc_MotionGetStats(DuetSbcHandle* h, DuetSbcMotionStats* stats);
+	void DuetRT_MotionGetStats(DuetRTHandle* h, DuetRTMotionStats* stats);
 
 	// Zero the error and underrun counters. Separate from reading them, so that reporting twice does
 	// not show zeros the second time.
-	void DuetSbc_MotionResetStats(DuetSbcHandle* h);
+	void DuetRT_MotionResetStats(DuetRTHandle* h);
 
 	// --- Step clock ---
 	//
@@ -265,18 +275,18 @@ extern "C"
 	// than the preparation margin arrives late.
 
 	// The current step-clock reading, in the controller's ticks.
-	uint32_t DuetSbc_GetStepClockTicks(DuetSbcHandle* h);
+	uint32_t DuetRT_GetStepClockTicks(DuetRTHandle* h);
 
 	// How far the movement timebase lags the raw step clock, in ticks. Moves are scheduled in the
 	// movement timebase and an endstop's trigger timestamp is a reading of the raw one, so this is
 	// the difference between the two clocks the endstop correction has to reconcile. It only grows,
 	// and it grows whenever any board reports that it could not keep up.
-	uint32_t DuetSbc_GetMovementDelay(DuetSbcHandle* h);
+	uint32_t DuetRT_GetMovementDelay(DuetRTHandle* h);
 
 	// How the model is tracking. Mirrors StepTimer::ClockStats; see LinkEvents.cs's counterpart for
 	// the managed shape. `synced` is 0 until the fit has enough samples to be trusted, during which
 	// the model still works but is anchored to the last sample at the nominal rate.
-	using DuetSbcClockStats = struct
+	using DuetRTClockStats = struct
 	{
 		double driftPpm;			 // fitted rate minus nominal, in parts per million
 		uint32_t numSamples;		 // samples in the current fit
@@ -286,7 +296,7 @@ extern "C"
 		int32_t synced;
 	};
 
-	void DuetSbc_GetClockStats(DuetSbcHandle* h, DuetSbcClockStats* stats);
+	void DuetRT_GetClockStats(DuetRTHandle* h, DuetRTClockStats* stats);
 
 	// --- Test seam ---
 	//
@@ -296,12 +306,12 @@ extern "C"
 	// retirement deterministic on the virtual bench (docs/devel/SYSTEM_EMULATION.md, stage 1).
 	// Process-wide, like the clock it replaces. Never call this against a real controller: the model
 	// would fit real ticks against a clock that does not move.
-	void DuetSbc_PinLocalClock(int64_t ns);
+	void DuetRT_PinLocalClock(int64_t ns);
 	// Restore CLOCK_MONOTONIC as the local time base.
-	void DuetSbc_UnpinLocalClock(void);
+	void DuetRT_UnpinLocalClock(void);
 
 	// Destroy the instance (stops the loop first).
-	void DuetSbc_Destroy(DuetSbcHandle* h);
+	void DuetRT_Destroy(DuetRTHandle* h);
 
 #ifdef __cplusplus
 }

@@ -24,8 +24,8 @@ public static partial class ServiceCollectionExtensions
     /// Add the link transport to the service collection
     /// </summary>
     /// <remarks>
-    /// The SPI protocol lives in native code (<c>src/DuetSbcInterface</c>, built as
-    /// <c>libduet_sbc.so</c>) so its transfer loop can run on a pinned real-time thread.
+    /// The SPI protocol lives in native code (<c>src/DuetRealtimeCore</c>, built as
+    /// <c>libduet_realtime_core.so</c>) so its transfer loop can run on a pinned real-time thread.
     /// <see cref="Native.NativeLink"/> is the managed side of that boundary
     /// </remarks>
     /// <param name="services">Service collection</param>

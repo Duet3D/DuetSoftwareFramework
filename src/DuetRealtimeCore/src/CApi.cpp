@@ -17,12 +17,12 @@
 using Duet::Sbc::Config;
 using Duet::Sbc::LinkService;
 
-struct DuetSbcHandle
+struct DuetRTHandle
 {
 	Config config;
 	LinkService interface;
 	Duet::Sbc::MotionService motion;
-	explicit DuetSbcHandle(const Config& cfg)
+	explicit DuetRTHandle(const Config& cfg)
 		: config(cfg)
 		, interface(cfg, Duet::Sbc::CreateTransport(cfg))
 		, motion(interface)
@@ -43,7 +43,7 @@ namespace
 		}
 	}
 
-	Config FromC(const DuetSbcConfig* c)
+	Config FromC(const DuetRTConfig* c)
 	{
 		Config cfg;
 		if (c == nullptr)
@@ -83,7 +83,7 @@ namespace
 extern "C"
 {
 
-	void DuetSbc_DefaultConfig(DuetSbcConfig* config)
+	void DuetRT_DefaultConfig(DuetRTConfig* config)
 	{
 		if (config == nullptr)
 		{
@@ -111,11 +111,11 @@ extern "C"
 		config->transport = static_cast<int32_t>(def.transport);
 	}
 
-	DuetSbcHandle* DuetSbc_Create(const DuetSbcConfig* config, char* errorBuf, int32_t errorBufLen)
+	DuetRTHandle* DuetRT_Create(const DuetRTConfig* config, char* errorBuf, int32_t errorBufLen)
 	{
 		try
 		{
-			return new DuetSbcHandle(FromC(config));
+			return new DuetRTHandle(FromC(config));
 		}
 		catch (const std::exception& e)
 		{
@@ -129,7 +129,7 @@ extern "C"
 		}
 	}
 
-	int32_t DuetSbc_Connect(DuetSbcHandle* h, char* errorBuf, int32_t errorBufLen)
+	int32_t DuetRT_Connect(DuetRTHandle* h, char* errorBuf, int32_t errorBufLen)
 	{
 		if (h == nullptr)
 			return -1;
@@ -150,13 +150,13 @@ extern "C"
 		}
 	}
 
-	void DuetSbc_Start(DuetSbcHandle* h)
+	void DuetRT_Start(DuetRTHandle* h)
 	{
 		if (h != nullptr)
 			h->interface.Start();
 	}
 
-	void DuetSbc_Stop(DuetSbcHandle* h)
+	void DuetRT_Stop(DuetRTHandle* h)
 	{
 		if (h != nullptr)
 			h->interface.Stop();
@@ -164,7 +164,7 @@ extern "C"
 
 	// --- Outbound ---
 
-	int64_t DuetSbc_QueueMessage(DuetSbcHandle* h, uint32_t flags, const char* message, int32_t length)
+	int64_t DuetRT_QueueMessage(DuetRTHandle* h, uint32_t flags, const char* message, int32_t length)
 	{
 		if (h == nullptr)
 			return -1;
@@ -175,14 +175,14 @@ extern "C"
 		return (seq != 0) ? static_cast<int64_t>(seq) : -1;
 	}
 
-	int64_t DuetSbc_QueueCanMessage(DuetSbcHandle* h,
-									uint16_t txToken,
-									uint16_t msgType,
-									uint16_t replyType,
-									uint8_t dstAddress,
-									int32_t isResponse,
-									const uint8_t* payload,
-									int32_t length)
+	int64_t DuetRT_QueueCanMessage(DuetRTHandle* h,
+								   uint16_t txToken,
+								   uint16_t msgType,
+								   uint16_t replyType,
+								   uint8_t dstAddress,
+								   int32_t isResponse,
+								   const uint8_t* payload,
+								   int32_t length)
 	{
 		if (h == nullptr)
 			return -1;
@@ -198,7 +198,7 @@ extern "C"
 		return (seq != 0) ? static_cast<int64_t>(seq) : -1;
 	}
 
-	int64_t DuetSbc_QueueEnableCan(DuetSbcHandle* h, int32_t enable, uint32_t requestId)
+	int64_t DuetRT_QueueEnableCan(DuetRTHandle* h, int32_t enable, uint32_t requestId)
 	{
 		if (h == nullptr)
 			return -1;
@@ -206,25 +206,25 @@ extern "C"
 		return (seq != 0) ? static_cast<int64_t>(seq) : -1;
 	}
 
-	void DuetSbc_RequestEmergencyStop(DuetSbcHandle* h, uint32_t requestId)
+	void DuetRT_RequestEmergencyStop(DuetRTHandle* h, uint32_t requestId)
 	{
 		if (h != nullptr)
 			h->interface.RequestEmergencyStop(requestId);
 	}
 
-	void DuetSbc_RequestReset(DuetSbcHandle* h, uint32_t requestId)
+	void DuetRT_RequestReset(DuetRTHandle* h, uint32_t requestId)
 	{
 		if (h != nullptr)
 			h->interface.RequestReset(requestId);
 	}
 
-	int32_t DuetSbc_RequestFirmwareUpdate(DuetSbcHandle* h,
-										  const uint8_t* iap,
-										  int32_t iapLength,
-										  const uint8_t* firmware,
-										  int32_t firmwareLength,
-										  uint16_t firmwareCrc16,
-										  uint32_t requestId)
+	int32_t DuetRT_RequestFirmwareUpdate(DuetRTHandle* h,
+										 const uint8_t* iap,
+										 int32_t iapLength,
+										 const uint8_t* firmware,
+										 int32_t firmwareLength,
+										 uint16_t firmwareCrc16,
+										 uint32_t requestId)
 	{
 		if (h == nullptr || iapLength <= 0 || firmwareLength <= 0)
 			return -1;
@@ -236,7 +236,7 @@ extern "C"
 				   : -1;
 	}
 
-	void DuetSbc_RequestTransfer(DuetSbcHandle* h)
+	void DuetRT_RequestTransfer(DuetRTHandle* h)
 	{
 		if (h != nullptr)
 			h->interface.RequestTransfer();
@@ -244,7 +244,7 @@ extern "C"
 
 	// --- Inbound ---
 
-	int32_t DuetSbc_PeekEvent(DuetSbcHandle* h, const uint8_t** data, int32_t* length)
+	int32_t DuetRT_PeekEvent(DuetRTHandle* h, const uint8_t** data, int32_t* length)
 	{
 		if (h == nullptr || data == nullptr || length == nullptr)
 			return 0;
@@ -258,13 +258,13 @@ extern "C"
 		return 1;
 	}
 
-	void DuetSbc_ConsumeEvent(DuetSbcHandle* h)
+	void DuetRT_ConsumeEvent(DuetRTHandle* h)
 	{
 		if (h != nullptr)
 			h->interface.Inbound().Consume();
 	}
 
-	int32_t DuetSbc_WaitForEvent(DuetSbcHandle* h, int32_t timeoutMs)
+	int32_t DuetRT_WaitForEvent(DuetRTHandle* h, int32_t timeoutMs)
 	{
 		if (h == nullptr)
 			return 0;
@@ -273,44 +273,44 @@ extern "C"
 
 	// --- Diagnostics ---
 
-	int32_t DuetSbc_GetProtocolVersion(DuetSbcHandle* h)
+	int32_t DuetRT_GetProtocolVersion(DuetRTHandle* h)
 	{
 		return h != nullptr ? h->interface.Transfer().ProtocolVersion() : 0;
 	}
 
-	double DuetSbc_GetMaxPinWaitMs(DuetSbcHandle* h)
+	double DuetRT_GetMaxPinWaitMs(DuetRTHandle* h)
 	{
 		return h != nullptr ? h->interface.Transfer().MaxPinWaitDurationMs() : 0.0;
 	}
 
-	double DuetSbc_GetMaxFullTransferDelayMs(DuetSbcHandle* h)
+	double DuetRT_GetMaxFullTransferDelayMs(DuetRTHandle* h)
 	{
 		return h != nullptr ? h->interface.Transfer().MaxFullTransferDelayMs() : 0.0;
 	}
 
-	int32_t DuetSbc_GetTfrPinGlitches(DuetSbcHandle* h)
+	int32_t DuetRT_GetTfrPinGlitches(DuetRTHandle* h)
 	{
 		const auto* spi = (h != nullptr) ? dynamic_cast<const Duet::Sbc::SpiTransfer*>(&h->interface.Transfer()) : nullptr;
 		return (spi != nullptr) ? spi->TfrPinGlitches() : 0;
 	}
 
-	int32_t DuetSbc_GetMissedEdges(DuetSbcHandle* h)
+	int32_t DuetRT_GetMissedEdges(DuetRTHandle* h)
 	{
 		const auto* spi = (h != nullptr) ? dynamic_cast<const Duet::Sbc::SpiTransfer*>(&h->interface.Transfer()) : nullptr;
 		return (spi != nullptr) ? spi->MissedEdges() : 0;
 	}
 
-	int32_t DuetSbc_GetResyncCount(DuetSbcHandle* h)
+	int32_t DuetRT_GetResyncCount(DuetRTHandle* h)
 	{
 		return h != nullptr ? h->interface.Transfer().ResyncCount() : 0;
 	}
 
-	uint64_t DuetSbc_GetDroppedEvents(DuetSbcHandle* h)
+	uint64_t DuetRT_GetDroppedEvents(DuetRTHandle* h)
 	{
 		return h != nullptr ? h->interface.Inbound().DroppedRecords() : 0;
 	}
 
-	int32_t DuetSbc_MotionConfigure(DuetSbcHandle* h, const void* config, int32_t length)
+	int32_t DuetRT_MotionConfigure(DuetRTHandle* h, const void* config, int32_t length)
 	{
 		if (h == nullptr || config == nullptr || length != (int32_t)sizeof(Duet::Sbc::Motion::MachineConfig))
 		{
@@ -322,7 +322,7 @@ extern "C"
 		return 1;
 	}
 
-	int32_t DuetSbc_MotionStart(DuetSbcHandle* h, int32_t rtPriority)
+	int32_t DuetRT_MotionStart(DuetRTHandle* h, int32_t rtPriority)
 	{
 		if (h == nullptr || !h->motion.Init())
 		{
@@ -332,7 +332,7 @@ extern "C"
 		return 1;
 	}
 
-	void DuetSbc_MotionStop(DuetSbcHandle* h)
+	void DuetRT_MotionStop(DuetRTHandle* h)
 	{
 		if (h != nullptr)
 		{
@@ -340,7 +340,7 @@ extern "C"
 		}
 	}
 
-	int32_t DuetSbc_MotionCanAddMove(DuetSbcHandle* h, int32_t ring)
+	int32_t DuetRT_MotionCanAddMove(DuetRTHandle* h, int32_t ring)
 	{
 		return (h != nullptr && ring >= 0 && h->motion.CanAddMove((unsigned int)ring)) ? 1 : 0;
 	}
@@ -349,7 +349,7 @@ extern "C"
 	// exist: each one is turned into a span here, once, and everything inside the library carries
 	// the bound with the pointer from then on.
 
-	int32_t DuetSbc_MotionSubmitMove(DuetSbcHandle* h, const void* moveParams, int32_t length)
+	int32_t DuetRT_MotionSubmitMove(DuetRTHandle* h, const void* moveParams, int32_t length)
 	{
 		if (h == nullptr || moveParams == nullptr || length <= 0)
 		{
@@ -358,7 +358,7 @@ extern "C"
 		return h->motion.SubmitMove({static_cast<const uint8_t*>(moveParams), (size_t)length}) ? 1 : 0;
 	}
 
-	int32_t DuetSbc_MotionRequestStop(DuetSbcHandle* h, int32_t kind)
+	int32_t DuetRT_MotionRequestStop(DuetRTHandle* h, int32_t kind)
 	{
 		if (h == nullptr || kind < 0 || kind > 1)
 		{
@@ -367,10 +367,14 @@ extern "C"
 		return h->motion.RequestStop(static_cast<DDARing::StopKind>(kind)) ? 1 : 0;
 	}
 
-	int32_t DuetSbc_MotionGetFeedholdResult(DuetSbcHandle* h, uint32_t* sequenceOut,
-											uint32_t* firstPurgedMoveIdOut, uint32_t* movesPurgedOut,
-											uint32_t* lastSurvivingMoveIdOut, int32_t* stoppedOut,
-											int32_t* restEndpointsOut, int32_t restEndpointCount)
+	int32_t DuetRT_MotionGetFeedholdResult(DuetRTHandle* h,
+										   uint32_t* sequenceOut,
+										   uint32_t* firstPurgedMoveIdOut,
+										   uint32_t* movesPurgedOut,
+										   uint32_t* lastSurvivingMoveIdOut,
+										   int32_t* stoppedOut,
+										   int32_t* restEndpointsOut,
+										   int32_t restEndpointCount)
 	{
 		if (h == nullptr || sequenceOut == nullptr || firstPurgedMoveIdOut == nullptr
 			|| movesPurgedOut == nullptr || lastSurvivingMoveIdOut == nullptr || stoppedOut == nullptr)
@@ -392,7 +396,7 @@ extern "C"
 		return 1;
 	}
 
-	int32_t DuetSbc_MotionGetMotorPositions(DuetSbcHandle* h, int32_t* stepsOut, int32_t count, uint32_t* whenTicks)
+	int32_t DuetRT_MotionGetMotorPositions(DuetRTHandle* h, int32_t* stepsOut, int32_t count, uint32_t* whenTicks)
 	{
 		if (h == nullptr || stepsOut == nullptr || count <= 0)
 		{
@@ -401,7 +405,7 @@ extern "C"
 		return (int32_t)h->motion.GetMotorPositions({stepsOut, (size_t)count}, whenTicks);
 	}
 
-	int32_t DuetSbc_MotionGetLivePositions(DuetSbcHandle* h, int32_t* stepsOut, int32_t count, uint32_t* whenTicks)
+	int32_t DuetRT_MotionGetLivePositions(DuetRTHandle* h, int32_t* stepsOut, int32_t count, uint32_t* whenTicks)
 	{
 		if (h == nullptr || stepsOut == nullptr || count <= 0)
 		{
@@ -410,9 +414,12 @@ extern "C"
 		return (int32_t)h->motion.GetLivePositions({stepsOut, (size_t)count}, whenTicks);
 	}
 
-	int32_t DuetSbc_MotionGetPositionAt(DuetSbcHandle* h, int32_t drive, uint32_t whenTicks,
-										int32_t* positionOut, int32_t* positionAtMoveStartOut,
-										int32_t* usedTimestampOut)
+	int32_t DuetRT_MotionGetPositionAt(DuetRTHandle* h,
+									   int32_t drive,
+									   uint32_t whenTicks,
+									   int32_t* positionOut,
+									   int32_t* positionAtMoveStartOut,
+									   int32_t* usedTimestampOut)
 	{
 		if (h == nullptr || drive < 0 || positionOut == nullptr || positionAtMoveStartOut == nullptr
 			|| usedTimestampOut == nullptr)
@@ -429,7 +436,7 @@ extern "C"
 		return 1;
 	}
 
-	int32_t DuetSbc_MotionSetMotorPositions(DuetSbcHandle* h, uint32_t driveMask, const int32_t* positions, int32_t count)
+	int32_t DuetRT_MotionSetMotorPositions(DuetRTHandle* h, uint32_t driveMask, const int32_t* positions, int32_t count)
 	{
 		if (h == nullptr || positions == nullptr || count <= 0)
 		{
@@ -438,7 +445,7 @@ extern "C"
 		return h->motion.SetMotorPositions(driveMask, {positions, (size_t)count}) ? 1 : 0;
 	}
 
-	void DuetSbc_MotionSetRingState(DuetSbcHandle* h, int32_t ring, int32_t shouldStartMove, int32_t waitingForEmpty)
+	void DuetRT_MotionSetRingState(DuetRTHandle* h, int32_t ring, int32_t shouldStartMove, int32_t waitingForEmpty)
 	{
 		if (h != nullptr && ring >= 0)
 		{
@@ -446,35 +453,35 @@ extern "C"
 		}
 	}
 
-	uint32_t DuetSbc_MotionGetScheduledMoves(DuetSbcHandle* h, int32_t ring)
+	uint32_t DuetRT_MotionGetScheduledMoves(DuetRTHandle* h, int32_t ring)
 	{
 		return (h != nullptr && ring >= 0) ? h->motion.GetScheduledMoves((unsigned int)ring) : 0;
 	}
 
-	uint32_t DuetSbc_MotionGetCompletedMoves(DuetSbcHandle* h, int32_t ring)
+	uint32_t DuetRT_MotionGetCompletedMoves(DuetRTHandle* h, int32_t ring)
 	{
 		return (h != nullptr && ring >= 0) ? h->motion.GetCompletedMoves((unsigned int)ring) : 0;
 	}
 
-	uint32_t DuetSbc_MotionGetSubmissionsDropped(DuetSbcHandle* h)
+	uint32_t DuetRT_MotionGetSubmissionsDropped(DuetRTHandle* h)
 	{
 		return (h != nullptr) ? h->motion.GetSubmissionsDropped() : 0;
 	}
 
-	uint32_t DuetSbc_MotionGetForcedPositionsApplied(DuetSbcHandle* h)
+	uint32_t DuetRT_MotionGetForcedPositionsApplied(DuetRTHandle* h)
 	{
 		return (h != nullptr) ? h->motion.GetForcedPositionsApplied() : 0;
 	}
 
-	int32_t DuetSbc_MotionHasPendingSubmissions(DuetSbcHandle* h)
+	int32_t DuetRT_MotionHasPendingSubmissions(DuetRTHandle* h)
 	{
 		return (h != nullptr && h->motion.HasPendingSubmissions()) ? 1 : 0;
 	}
 
-	static_assert(DUET_SBC_MAX_RINGS == Duet::Sbc::Motion::maxRings,
-				  "DUET_SBC_MAX_RINGS must match the number of rings the engine builds");
+	static_assert(DUET_REALTIME_CORE_MAX_RINGS == Duet::Sbc::Motion::maxRings,
+				  "DUET_REALTIME_CORE_MAX_RINGS must match the number of rings the engine builds");
 
-	void DuetSbc_MotionGetStats(DuetSbcHandle* h, DuetSbcMotionStats* stats)
+	void DuetRT_MotionGetStats(DuetRTHandle* h, DuetRTMotionStats* stats)
 	{
 		if (stats == nullptr)
 		{
@@ -483,7 +490,7 @@ extern "C"
 
 		// Zeroed rather than left alone when there is no handle, so a caller that reports before the
 		// link is up sees nothing happening instead of whatever the stack held
-		*stats = DuetSbcMotionStats{};
+		*stats = DuetRTMotionStats{};
 		if (h == nullptr)
 		{
 			return;
@@ -495,7 +502,7 @@ extern "C"
 		stats->submissionsDropped = source.submissionsDropped;
 		stats->forcedPositionsApplied = source.forcedPositionsApplied;
 		stats->droppedSchedulePackets = source.droppedSchedulePackets;
-		for (unsigned int i = 0; i < DUET_SBC_MAX_RINGS; ++i)
+		for (unsigned int i = 0; i < DUET_REALTIME_CORE_MAX_RINGS; ++i)
 		{
 			stats->rings[i].scheduledMoves = source.rings[i].scheduledMoves;
 			stats->rings[i].completedMoves = source.rings[i].completedMoves;
@@ -505,7 +512,7 @@ extern "C"
 		}
 	}
 
-	void DuetSbc_MotionResetStats(DuetSbcHandle* h)
+	void DuetRT_MotionResetStats(DuetRTHandle* h)
 	{
 		if (h != nullptr)
 		{
@@ -513,13 +520,13 @@ extern "C"
 		}
 	}
 
-	uint32_t DuetSbc_GetStepClockTicks(DuetSbcHandle* h)
+	uint32_t DuetRT_GetStepClockTicks(DuetRTHandle* h)
 	{
 		(void)h;					// the model is process-wide, like the clock it tracks
 		return StepTimer::GetTimerTicks();
 	}
 
-	uint32_t DuetSbc_GetMovementDelay(DuetSbcHandle* h)
+	uint32_t DuetRT_GetMovementDelay(DuetRTHandle* h)
 	{
 		(void)h;					// as above
 		return StepTimer::GetMovementDelay();
@@ -533,18 +540,18 @@ extern "C"
 		return pinnedLocalClockNs.load(std::memory_order_relaxed);
 	}
 
-	void DuetSbc_PinLocalClock(int64_t ns)
+	void DuetRT_PinLocalClock(int64_t ns)
 	{
 		pinnedLocalClockNs.store(ns, std::memory_order_relaxed);
 		StepTimer::SetLocalClockSource(ReadPinnedLocalClock);
 	}
 
-	void DuetSbc_UnpinLocalClock(void)
+	void DuetRT_UnpinLocalClock(void)
 	{
 		StepTimer::SetLocalClockSource(nullptr);
 	}
 
-	void DuetSbc_GetClockStats(DuetSbcHandle* h, DuetSbcClockStats* stats)
+	void DuetRT_GetClockStats(DuetRTHandle* h, DuetRTClockStats* stats)
 	{
 		(void)h;
 		if (stats == nullptr)
@@ -560,7 +567,7 @@ extern "C"
 		stats->synced = source.synced ? 1 : 0;
 	}
 
-	void DuetSbc_Destroy(DuetSbcHandle* h)
+	void DuetRT_Destroy(DuetRTHandle* h)
 	{
 		delete h;
 	}

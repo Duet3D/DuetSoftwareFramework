@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pull a minimal aarch64 sysroot from a running Pi so the cross toolchain can link against the Pi's
 # actual glibc (Bookworm 2.36). This is only needed for a glibc-matched *dynamic* build -- most
-# importantly the P/Invoke shared library (libduet_sbc.so). The standalone jitter-test binary is
+# importantly the P/Invoke shared library (libduet_realtime_core.so). The standalone jitter-test binary is
 # linked statically and does NOT need a sysroot.
 #
 # Usage:

@@ -1,6 +1,6 @@
 # System emulation: a staged virtual test bench
 
-The whole stack, DuetControlServer and libduet_sbc on the host with DuetCANMaster and Duet3Expansion
+The whole stack, DuetControlServer and libduet_realtime_core on the host with DuetCANMaster and Duet3Expansion
 as firmware, running and testable with no hardware on the bench. The work is staged so that each
 stage is a usable test rig on its own: stage 1 replaces the controller with a scriptable fake and
 already covers the job lifecycle end to end; stage 2 puts the real DuetCANMaster firmware into the
@@ -16,7 +16,7 @@ Out of scope at every stage: electromechanical fidelity. TMC driver internals, c
 and analog physics are only as real as the peripheral models, so tests assert firmware logic, never
 physics. Host-side real-time behaviour (transfer jitter, step timing observed from the host) is also
 out of scope; the harness in
-[src/DuetSbcInterface/harness](../../src/DuetSbcInterface/harness/main.cpp) and the Pi workflow
+[src/DuetRealtimeCore/harness](../../src/DuetRealtimeCore/harness/main.cpp) and the Pi workflow
 remain the tools for that.
 
 ---
@@ -24,19 +24,19 @@ remain the tools for that.
 ## 1. What exists today
 
 **The transport seam carries two transports.**
-[Transport.h](../../src/DuetSbcInterface/src/Interface/Transport.h) is the contract `LinkService`
+[Transport.h](../../src/DuetRealtimeCore/src/Interface/Transport.h) is the contract `LinkService`
 drives; it never names SPI, and
-[TransportFactory.cpp](../../src/DuetSbcInterface/src/Interface/TransportFactory.cpp) is the one
+[TransportFactory.cpp](../../src/DuetRealtimeCore/src/Interface/TransportFactory.cpp) is the one
 place a concrete transport is chosen. `TransportKind` in
-[Configuration.h](../../src/DuetSbcInterface/src/Config/Configuration.h) selects `Spi` or `Socket`.
+[Configuration.h](../../src/DuetRealtimeCore/src/Config/Configuration.h) selects `Spi` or `Socket`.
 The contract's header names the three things a transport must answer: the framing is a fixed-size
 full-duplex lockstep exchange, flow control is out of band (a pin on SPI), and firmware update
 bypasses the protocol once IAP runs. What is common to the lockstep transports - the packet
 buffers, CRC bookkeeping and the retry/recovery skeleton - lives in
-[FullDuplexExchangeTransport](../../src/DuetSbcInterface/src/Interface/FullDuplexExchangeTransport.h), which
+[FullDuplexExchangeTransport](../../src/DuetRealtimeCore/src/Interface/FullDuplexExchangeTransport.h), which
 `SpiTransfer` and `SocketTransport` both derive from. The only SPI leak past the seam is the
 `dynamic_cast<const SpiTransfer*>` pin diagnostics in
-[CApi.cpp](../../src/DuetSbcInterface/src/CApi.cpp), which report zero for any other transport.
+[CApi.cpp](../../src/DuetRealtimeCore/src/CApi.cpp), which report zero for any other transport.
 
 **The device side has a second-transport precedent.** `SbcTransportType { spi, Usb }` in
 [SbcMessageFormats.h](../../src/DuetCANMaster/src/SBC/SbcMessageFormats.h) and
@@ -50,9 +50,9 @@ outcomes, follows from the clock the controller reports. A fake controller that 
 reported clock only when a test tells it to therefore makes the motion timeline scriptable. This is
 the central design lever of stage 1. One nuance the SBC side adds: its model extrapolates between
 samples at the nominal rate and is clamped never to run backwards
-([StepTimer.cpp](../../src/DuetSbcInterface/src/Motion/StepTimer.cpp)), so freezing the master clock
+([StepTimer.cpp](../../src/DuetRealtimeCore/src/Motion/StepTimer.cpp)), so freezing the master clock
 alone does not freeze the modelled one, so the stepped clock is paired with the pinned local time
-base (`DuetSbc_PinLocalClock` in [CApi.h](../../src/DuetSbcInterface/src/CApi.h)) and both are
+base (`DuetRT_PinLocalClock` in [CApi.h](../../src/DuetRealtimeCore/src/CApi.h)) and both are
 advanced together. That is necessary and not sufficient: the software still makes its progress in
 real time between the steps, so the same scenario stops in different places between runs.
 [DETERMINISTIC_BENCH.md](DETERMINISTIC_BENCH.md) is the plan that closes it, by gating each advance
@@ -80,7 +80,7 @@ model serves every machine on the bus.
 the `SystemTests` host below are implemented; the framing they speak is defined in
 [SocketLinkFormats.h](../../lib/DuetSpiInterface/include/DuetSpiProtocol/SocketLinkFormats.h) and
 its executable specification is the loopback peer in
-[SocketTransportTests.cpp](../../src/DuetSbcInterface/tests/SocketTransportTests.cpp). No Renode
+[SocketTransportTests.cpp](../../src/DuetRealtimeCore/tests/SocketTransportTests.cpp). No Renode
 emulation infrastructure exists yet; stages 2 and 3 are unstarted.
 
 ---
@@ -118,24 +118,24 @@ is to exercise the real protocol logic, version checks and resync included.
 
 ## 3. Stage 1: fake DuetCANMaster endpoint
 
-**Goal:** DuetControlServer and libduet_sbc run unmodified on the host, connected to a scriptable
+**Goal:** DuetControlServer and libduet_realtime_core run unmodified on the host, connected to a scriptable
 fake controller. Every transfer in both directions is captured for assertions; every response the
 protocol expects has a default the fake gives unprompted, and tests override or inject at will.
 
 The real components in the loop are everything above the link: the whole of DCS, and the whole of
-libduet_sbc including the motion engine, so `DDARing`, the feedhold, and `ScheduleMove` packet
+libduet_realtime_core including the motion engine, so `DDARing`, the feedhold, and `ScheduleMove` packet
 generation are genuine. What the fake replaces is only what real hardware does with those packets.
 
 ### The socket transport
 
 - New `TransportKind::Socket` and a `SocketTransport` implementing
-  [Transport.h](../../src/DuetSbcInterface/src/Interface/Transport.h), reusing `TransferTimeout` /
+  [Transport.h](../../src/DuetRealtimeCore/src/Interface/Transport.h), reusing `TransferTimeout` /
   `TransferError` so the loop's recovery paths run unchanged.
 - Transport selection and endpoint address added to `Config`, to `NativeConfig` in
   [NativeMethods.cs](../../src/DuetControlServer/Link/Native/NativeMethods.cs), and to the DCS
   `Settings`, alongside the existing SPI device settings rather than replacing them.
 - The `dynamic_cast<const SpiTransfer*>` diagnostics in
-  [CApi.cpp](../../src/DuetSbcInterface/src/CApi.cpp) guarded by transport kind; pin diagnostics
+  [CApi.cpp](../../src/DuetRealtimeCore/src/CApi.cpp) guarded by transport kind; pin diagnostics
   report zero on a transport with no pins, as `MaxPinWaitDurationMs` already documents.
 
 ### The fake endpoint
@@ -176,7 +176,7 @@ for what a readable rendering of that capture looks like.
 
 The `src/SystemTests` NUnit project (separate from `src/UnitTests`, which stays fast and
 link-free) builds the DCS generic host in-process with the real `NativeLink` and real
-`libduet_sbc.so`, pointed at the fake endpoint, with a per-test virtual SD tree
+`libduet_realtime_core.so`, pointed at the fake endpoint, with a per-test virtual SD tree
 (`Host/DcsTestHost.cs`). The enabling seams: `InternalsVisibleTo` for `JobController` and friends,
 the configurable SD root (`Settings.BaseDirectory`), transfer timeouts taken from `Settings` so a
 debugger-paused test does not trip the reconnect path, and the pinned local clock described in §1.
@@ -187,12 +187,12 @@ Running the bench is one command:
 cd src/SystemTests && dotnet test
 ```
 
-Building the test project also builds the host `libduet_sbc.so` (a CMake configure on first use,
+Building the test project also builds the host `libduet_realtime_core.so` (a CMake configure on first use,
 then an incremental build that is a no-op when the native sources are unchanged), so the library
 can never be stale relative to the C++ it was built from. `Host/NativeLibraryLocator.cs` resolves
 the freshest host build from the CMake tree at run time - no copy step is involved. Opt out of the
 native build with `-p:BuildNativeLink=false`, or pin a specific library by setting
-`DUET_SBC_LIBRARY`, which skips the build too so nothing rebuilds underneath the pin. Test configs enable the CAN
+`DUET_REALTIME_CORE_LIBRARY`, which skips the build too so nothing rebuilds underneath the pin. Test configs enable the CAN
 bus first: a config code that sends CAN traffic before `M953` is answered with `BusError`, exactly
 as DuetCANMaster answers a send with no CAN device.
 
@@ -219,7 +219,7 @@ here, with hardware retaining only what involves real motion.
 - [x] Total capture with typed decoding for assertions and a dumpable exchange log
 - [x] `SystemTests` project hosting DCS in-process against the fake
 - [x] The enabling seams: `InternalsVisibleTo`, the configurable SD root (`BaseDirectory`),
-      timeouts from `Settings`, and the pinned local clock (`DuetSbc_PinLocalClock`)
+      timeouts from `Settings`, and the pinned local clock (`DuetRT_PinLocalClock`)
 - [x] First scenarios: boot and keep-alive, CRC corruption retried without a resync, reconnect and
       reconfigure after a controller reboot, withheld readiness recovering, injected traffic
       reaching the dispatcher, `MotionStopped` closing a homing move,

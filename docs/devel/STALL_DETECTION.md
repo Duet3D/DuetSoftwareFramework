@@ -145,7 +145,7 @@ is the reason `S4` exists.
 [`TryGetStallStopInput`](src/DuetControlServer/Motion/RemoteEndstops.cs#L193) fills `boards[]` from
 the drivers of every *controlling* drive of the axis, but the native builder hands those boards out
 to the drivers of each drive - by index for an ordinary move, and round-robin across the move's
-drivers for a `stopAll` one ([DDA.cpp:864](src/DuetSbcInterface/src/Movement/DDA.cpp#L864)). That
+drivers for a `stopAll` one ([DDA.cpp:864](src/DuetRealtimeCore/src/Movement/DDA.cpp#L864)). That
 round-robin is right for switches, where any port of the endstop stopping everything is the whole
 point, and wrong for stalls, where a driver can only ever be stopped by *its own* stall.
 
@@ -191,7 +191,7 @@ on a probe. Phase 9 closes it.
 
 ## 5. Design decisions
 
-§5.2 changes the SPI wire format between DuetSbcInterface and DuetCANMaster, so it wants agreeing
+§5.2 changes the SPI wire format between DuetRealtimeCore and DuetCANMaster, so it wants agreeing
 before Phase 4 is written. §5.1, §5.3 and §5.4 are done and are kept here because every phase after
 them reads the shapes they describe.
 
@@ -418,7 +418,7 @@ Two things the phase needed that this document had not predicted, both kept:
 
 | | |
 |---|---|
-| Touches | [MoveParams.h](src/DuetSbcInterface/src/Motion/MoveParams.h) `StopInputForSwitch`, [DDA.cpp](src/DuetSbcInterface/src/Movement/DDA.cpp), [RemoteEndstops.cs](src/DuetControlServer/Motion/RemoteEndstops.cs), [MoveParams.cs](src/DuetControlServer/Motion/Native/MoveParams.cs) |
+| Touches | [MoveParams.h](src/DuetRealtimeCore/src/Motion/MoveParams.h) `StopInputForSwitch`, [DDA.cpp](src/DuetRealtimeCore/src/Movement/DDA.cpp), [RemoteEndstops.cs](src/DuetControlServer/Motion/RemoteEndstops.cs), [MoveParams.cs](src/DuetControlServer/Motion/Native/MoveParams.cs) |
 | Wire format | unchanged |
 | Behaviour | a stall watch now always names the board carrying the driver. It was already right whenever the plan's driver order happened to match the drive's; it is now right unconditionally |
 | Tests | `MoveParamsLayoutTests` gains `TestStallWatchesTheDriversOwnBoard`; `RemoteEndstopsTests` says a stall entry names no board. 9 ctest suites and 897 NUnit tests passing |
@@ -439,7 +439,7 @@ become a motor that never stops the moment Phase 3 lands - which is why this goe
 
 | | |
 |---|---|
-| Touches | new [StopRules.h](lib/DuetSpiInterface/include/DuetSpiProtocol/StopRules.h), [CommandProcessor.cpp](src/DuetCANMaster/src/CAN/CommandProcessor.cpp), [CanMotion.cpp](src/DuetCANMaster/src/CAN/CanMotion.cpp) and [CanMotion.h](src/DuetCANMaster/src/CAN/CanMotion.h), [SbcMessageFormats.h](src/DuetCANMaster/src/SBC/SbcMessageFormats.h), [MoveParams.h](src/DuetSbcInterface/src/Motion/MoveParams.h) |
+| Touches | new [StopRules.h](lib/DuetSpiInterface/include/DuetSpiProtocol/StopRules.h), [CommandProcessor.cpp](src/DuetCANMaster/src/CAN/CommandProcessor.cpp), [CanMotion.cpp](src/DuetCANMaster/src/CAN/CanMotion.cpp) and [CanMotion.h](src/DuetCANMaster/src/CAN/CanMotion.h), [SbcMessageFormats.h](src/DuetCANMaster/src/SBC/SbcMessageFormats.h), [MoveParams.h](src/DuetRealtimeCore/src/Motion/MoveParams.h) |
 | Wire format | unchanged - the reading is already on the CAN bus and already in the buffer |
 | Fixes | the false "Y homed" of §4.1 |
 | Tests | new `stop_rules_tests`, 10 native suites and 897 NUnit tests passing; both firmware variants link |
@@ -463,7 +463,7 @@ axis that never stalled.
 
 | | |
 |---|---|
-| Touches | [StopRules.h](lib/DuetSpiInterface/include/DuetSpiProtocol/StopRules.h), [MessageFormats.h](lib/DuetSpiInterface/include/DuetSpiProtocol/MessageFormats.h), [MoveParams.h](src/DuetSbcInterface/src/Motion/MoveParams.h), [ScheduleMoveBuilder](src/DuetSbcInterface/src/Motion/ScheduleMoveBuilder.cpp), [DDA.cpp](src/DuetSbcInterface/src/Movement/DDA.cpp), [CanMotion.cpp](src/DuetCANMaster/src/CAN/CanMotion.cpp), [EndstopKinds.cs](src/DuetControlServer/Motion/EndstopKinds.cs), [EndstopArming.cs](src/DuetControlServer/Motion/EndstopArming.cs), [MoveParams.cs](src/DuetControlServer/Motion/Native/MoveParams.cs) |
+| Touches | [StopRules.h](lib/DuetSpiInterface/include/DuetSpiProtocol/StopRules.h), [MessageFormats.h](lib/DuetSpiInterface/include/DuetSpiProtocol/MessageFormats.h), [MoveParams.h](src/DuetRealtimeCore/src/Motion/MoveParams.h), [ScheduleMoveBuilder](src/DuetRealtimeCore/src/Motion/ScheduleMoveBuilder.cpp), [DDA.cpp](src/DuetRealtimeCore/src/Movement/DDA.cpp), [CanMotion.cpp](src/DuetCANMaster/src/CAN/CanMotion.cpp), [EndstopKinds.cs](src/DuetControlServer/Motion/EndstopKinds.cs), [EndstopArming.cs](src/DuetControlServer/Motion/EndstopArming.cs), [MoveParams.cs](src/DuetControlServer/Motion/Native/MoveParams.cs) |
 | Wire format | `ScheduleMoveDriver` gains `stopGroup` and `stopAction` in its padding and stays 16 bytes; `ScheduleMoveFlags::StopAllDrivers` is deleted; `MoveStopInput` goes from 12 to 14 |
 | Tests | `stop_rules_tests` for the three actions and the escalation; `MoveParamsLayoutTests` and `MoveParamsLayout` for the layouts; `EndstopArmingTests` for the action each kind asks for |
 
@@ -509,7 +509,7 @@ id is read at the top of the function Phase 4 rewrites, so either half alone doe
 
 | | |
 |---|---|
-| Touches | [MessageFormats.h](lib/DuetSpiInterface/include/DuetSpiProtocol/MessageFormats.h), [LinkEvents.h](src/DuetSbcInterface/src/SBC/LinkEvents.h) and its C# mirror, [SbcInterface](src/DuetCANMaster/src/SBC/SbcInterface.cpp), [MotionService](src/DuetSbcInterface/src/SBC/MotionService.cpp), [LinkService.cs](src/DuetControlServer/Link/LinkService.cs), [EndstopCorrection.cs](src/DuetControlServer/Motion/EndstopCorrection.cs) |
+| Touches | [MessageFormats.h](lib/DuetSpiInterface/include/DuetSpiProtocol/MessageFormats.h), [LinkEvents.h](src/DuetRealtimeCore/src/SBC/LinkEvents.h) and its C# mirror, [SbcInterface](src/DuetCANMaster/src/SBC/SbcInterface.cpp), [MotionService](src/DuetRealtimeCore/src/SBC/MotionService.cpp), [LinkService.cs](src/DuetControlServer/Link/LinkService.cs), [EndstopCorrection.cs](src/DuetControlServer/Motion/EndstopCorrection.cs) |
 | Wire format | `MotionStoppedHeader` gains `moveId`, 8 bytes to 12; `MotionStoppedEvent` follows, 12 to 16 |
 | Tests | `LinkEventsLayout` for the record size. The guard itself is not covered - see §7 on why `EndstopCorrection` is not |
 
@@ -533,7 +533,7 @@ separately from the too-late ones.
 ### Phase 6 — a group is the coupling set, not the drive ✅
 
 `stopGroup` is filled with the logical drive, derived in
-[DDA.cpp](src/DuetSbcInterface/src/Movement/DDA.cpp) from the drive being emitted, and a coupled axis
+[DDA.cpp](src/DuetRealtimeCore/src/Movement/DDA.cpp) from the drive being emitted, and a coupled axis
 is given `StopAction::all` instead. That makes two axes with disjoint couplings impossible to home
 together, and [EndstopArming](src/DuetControlServer/Motion/EndstopArming.cs) refuses the move:
 
@@ -555,7 +555,7 @@ already returns exactly those sets - `{X,Y}` for X and `{U,V}` for U on the conf
 
 | | |
 |---|---|
-| Touches | [EndstopArming.cs](src/DuetControlServer/Motion/EndstopArming.cs), [MoveParams.h](src/DuetSbcInterface/src/Motion/MoveParams.h) and [MoveParams.cs](src/DuetControlServer/Motion/Native/MoveParams.cs), [DDA.cpp](src/DuetSbcInterface/src/Movement/DDA.cpp) and [DDA.h](src/DuetSbcInterface/src/Movement/DDA.h), [MoveBuilder.cs](src/DuetControlServer/Motion/MoveBuilder.cs), [RawMove.cs](src/DuetControlServer/Motion/RawMove.cs) |
+| Touches | [EndstopArming.cs](src/DuetControlServer/Motion/EndstopArming.cs), [MoveParams.h](src/DuetRealtimeCore/src/Motion/MoveParams.h) and [MoveParams.cs](src/DuetControlServer/Motion/Native/MoveParams.cs), [DDA.cpp](src/DuetRealtimeCore/src/Movement/DDA.cpp) and [DDA.h](src/DuetRealtimeCore/src/Movement/DDA.h), [MoveBuilder.cs](src/DuetControlServer/Motion/MoveBuilder.cs), [RawMove.cs](src/DuetControlServer/Motion/RawMove.cs) |
 | Wire format | unchanged. `MoveStopInput` carries the group in the byte Phase 4 left as padding, so it stays 14 |
 | Tests | `EndstopArmingTests` gains the CoreXYUV pair - `X + U` armed as two groups, `X + Y` refused - and the CoreXY cases move to the new rule |
 
@@ -766,7 +766,7 @@ they exist once, in `CanMotion.cpp`, and hardware commissioning is what covers t
 
 ### 7.3 Where the test lives ✅ Phase 3
 
-`src/DuetSbcInterface/tests`, target `stop_rules_tests`, because it is the only host-side C++ suite
+`src/DuetRealtimeCore/tests`, target `stop_rules_tests`, because it is the only host-side C++ suite
 in the tree and standing up a second one under DuetCANMaster would mean a host build of a project
 that is otherwise cross-compiled only. The suite tests a controller rule from an SBC-side directory,
 which is odd enough that its file header says so. If a `src/DuetCANMaster/tests` is wanted later that

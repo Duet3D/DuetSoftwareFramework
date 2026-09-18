@@ -14,12 +14,12 @@ compiles for bare-metal ARM and for 64-bit Linux.
 Checksums are **not** here. CRC16 and CRC32 are standard algorithms rather than negotiated formats,
 and each side brings its own implementation tuned for its environment: the firmware uses
 `DuetCANMaster/src/Storage/CRC32.cpp` (slicing-by-4 on SAME70, DMAC hardware CRC on SAME5x), the SBC
-side `DuetSbcInterface/src/Storage/Crc.cpp`, and DCS `Utility/{CRC16,CRC32}.cs`. All three must produce
+side `DuetRealtimeCore/src/Storage/Crc.cpp`, and DCS `Utility/{CRC16,CRC32}.cs`. All three must produce
 identical values.
 
 ## Consumers
 
-**`src/DuetSbcInterface`** (and, through its C ABI, DuetControlServer) links the `duet_spi_protocol`
+**`src/DuetRealtimeCore`** (and, through its C ABI, DuetControlServer) links the `duet_spi_protocol`
 INTERFACE target, which just adds the include directory:
 
 ```cmake

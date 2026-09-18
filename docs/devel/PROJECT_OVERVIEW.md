@@ -187,7 +187,7 @@ type. The shared groundwork lands first.
 | S1 | Convert the deferred codes | M 🔧 | ✅ every code with a Deferred row is deferred (12 of the 16; M117/M144/M150/M300 wait on their handlers). Hardware verification outstanding |
 | S2 | Schema: `whenToExecute`, the offset table, the drop broadcast | M | Regenerates both sides |
 | S2 | Parked-command ring in `Duet3Expansion` | M | No behaviour change until something sends a future time |
-| S2 | `SubmitAction` and anchor resolution in `DuetSbcInterface` | L | The mechanical core |
+| S2 | `SubmitAction` and anchor resolution in `DuetRealtimeCore` | L | The mechanical core |
 | S2 | The CANMaster reply-timeout field | S | |
 | S2 | Promote the codes to timestamped dispatch | L 🔧 | Each a handler and table-row change; M106 first |
 
@@ -212,7 +212,7 @@ moves behind where it belonged.
 | Task | Size | Depends on |
 |---|---|---|
 | Stage 1: remaining scenarios (deferred codes, event pause, `MotionStopped`, resend) | M | |
-| Stage 1: CI wiring for `SystemTests` and the host-built `libduet_sbc.so` | S | |
+| Stage 1: CI wiring for `SystemTests` and the host-built `libduet_realtime_core.so` | S | |
 | Stage 2: MB6HC Renode platform and link peripheral for DuetCANMaster | L | the stage 1 framing |
 | Stage 2: device-side socket transport in `DataTransfer` | M | the stage 1 framing |
 | Stage 2: Bosch M_CAN peripheral model | L | |
@@ -254,7 +254,7 @@ nothing is runnable. The same change removes the dwell that is most of the runti
 | Task | Size | Depends on |
 |---|---|---|
 | `TimeProvider` through DuetControlServer and the bench, the pinned clock over the whole native side | M | |
-| `DuetSbc_StepMotion` and `DuetSbc_StepLink`, the fake controller pumped by the test | S | |
+| `DuetRT_StepMotion` and `DuetRT_StepLink`, the fake controller pumped by the test | S | |
 | `Settle()` replacing the dwell, with quiescence on the managed side | M | the two above |
 | Every scenario onto the timeline, `FreeRunningClock` deleted, a bench profile that starts fewer services | M | the settle |
 | `scripts/test.sh`, sharding across processes, the per-test budget and the slow-count guard, growing out of the `scripts/system-tests.sh` that already runs and summarises the suite | S | the settle |

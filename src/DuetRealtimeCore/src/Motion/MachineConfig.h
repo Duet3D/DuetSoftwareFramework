@@ -98,7 +98,7 @@ namespace Duet::Sbc::Motion
 	// ---------------------------------------------------------------------------------------------
 	// Layout guarantees.
 	//
-	// DuetSbc_MotionConfigure memcpys the managed side's bytes straight into a MachineConfig, so this
+	// DuetRT_MotionConfigure memcpys the managed side's bytes straight into a MachineConfig, so this
 	// struct is as much an ABI as LinkEvents.h and MoveParams.h are. It is not packed, because
 	// driveStepsPerMm and its neighbours are read on the move-preparation path and misaligned float
 	// arrays are not worth the few bytes saved.

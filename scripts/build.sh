@@ -20,14 +20,14 @@ declare -A PROJECT_SRC=(
     [CustomHttpEndpoint]="src/CustomHttpEndpoint"
     [ModelObserver]="src/ModelObserver"
     [PluginManager]="src/PluginManager"
-    [DuetSbcInterface]="src/DuetSbcInterface"
+    [DuetRealtimeCore]="src/DuetRealtimeCore"
 )
 
-# DuetSbcInterface is native (CMake), not a dotnet project: it builds libduet_sbc.so, the SPI
+# DuetRealtimeCore is native (CMake), not a dotnet project: it builds libduet_realtime_core.so, the SPI
 # transfer loop that DuetControlServer P/Invokes into. It is built separately below.
-SBC_SRC_DIR="$REPO_ROOT/src/DuetSbcInterface"
-SBC_LIB_NAME="libduet_sbc.so"
-DEFAULT_SYSROOT="$SBC_SRC_DIR/pi-sysroot"
+REALTIME_CORE_SRC_DIR="$REPO_ROOT/src/DuetRealtimeCore"
+REALTIME_CORE_LIB_NAME="libduet_realtime_core.so"
+DEFAULT_SYSROOT="$REALTIME_CORE_SRC_DIR/pi-sysroot"
 
 declare -A PROJECT_POSTINST=(
     [DuetControlServer]="pkg/deb/duetcontrolserver/DEBIAN/postinst"
@@ -36,7 +36,7 @@ declare -A PROJECT_POSTINST=(
     [DuetWebServer]="pkg/deb/duetwebserver/DEBIAN/postinst"
 )
 
-ALL_PROJECTS=(DuetControlServer DuetSbcInterface DuetPiManagementPlugin DuetPluginService DuetWebServer CodeConsole CodeLogger CodeStream CustomHttpEndpoint ModelObserver PluginManager)
+ALL_PROJECTS=(DuetControlServer DuetRealtimeCore DuetPiManagementPlugin DuetPluginService DuetWebServer CodeConsole CodeLogger CodeStream CustomHttpEndpoint ModelObserver PluginManager)
 
 SSH_USER="root"
 TARGET=""
@@ -66,12 +66,12 @@ Options:
   -l, --local          Deploy locally to /opt/dsf/bin instead of a remote target
       --skip-build     Skip the build step; only sync binaries and run postinst scripts
       --start-services  Start DSF services after deployment
-      --sysroot <dir>  Sysroot to cross-link libduet_sbc.so against. Only needed to
+      --sysroot <dir>  Sysroot to cross-link libduet_realtime_core.so against. Only needed to
                        target a glibc older than the container's 2.36; off by default
       --fetch-sysroot  Fetch a sysroot from the deploy target and build against it
       --aot            Build ahead of time binaries. Defaults to "false"
       --arch           Architecture to build for. Defaults to "$ARCH"
-      --build-type     Defaults to "Debug". Also selects the CMake preset libduet_sbc.so
+      --build-type     Defaults to "Debug". Also selects the CMake preset libduet_realtime_core.so
                        is built with, so Debug builds it unoptimised and steppable
   -p, --publish-args   msbuild properties
   -o, --dest-dir       Defaults to "$DEFAULT_BUILD_DIR unless --aot then "$DEFAULT_AOT_BUILD_DIR/<arch>/" 
@@ -86,7 +86,7 @@ Notes:
   published in one go (MSBuild parallelises it); otherwise the selected projects are published
   concurrently.
 
-  DuetSbcInterface is the native SPI transfer loop (libduet_sbc.so) that DuetControlServer
+  DuetRealtimeCore is the native SPI transfer loop (libduet_realtime_core.so) that DuetControlServer
   P/Invokes into. DCS cannot run without it, so selecting DuetControlServer builds it too.
 
   Because a shared library links glibc dynamically, the .so must not need a newer glibc than the
@@ -99,7 +99,7 @@ Examples:
   $(basename "$0") -t 192.168.4.27 DuetControlServer DuetWebServer
   $(basename "$0") --all --local
   $(basename "$0") --skip-build --target 192.168.4.27 DuetControlServer
-  $(basename "$0") -t 192.168.4.27 --fetch-sysroot DuetSbcInterface
+  $(basename "$0") -t 192.168.4.27 --fetch-sysroot DuetRealtimeCore
 EOF
 }
 
@@ -167,14 +167,14 @@ for project in "${SELECTED[@]}"; do
     fi
 done
 
-# DuetControlServer P/Invokes into libduet_sbc.so and will not start without it, so building or
+# DuetControlServer P/Invokes into libduet_realtime_core.so and will not start without it, so building or
 # deploying DCS always implies the native interface too.
-if [[ " ${SELECTED[*]} " == *" DuetControlServer "* && " ${SELECTED[*]} " != *" DuetSbcInterface "* ]]; then
-    echo "=== DuetControlServer selected: including DuetSbcInterface (libduet_sbc.so) ==="
-    SELECTED+=(DuetSbcInterface)
+if [[ " ${SELECTED[*]} " == *" DuetControlServer "* && " ${SELECTED[*]} " != *" DuetRealtimeCore "* ]]; then
+    echo "=== DuetControlServer selected: including DuetRealtimeCore (libduet_realtime_core.so) ==="
+    SELECTED+=(DuetRealtimeCore)
 fi
 
-# --- Native SPI interface (libduet_sbc.so) ---
+# --- Native SPI interface (libduet_realtime_core.so) ---
 # Cross-compiled here rather than on the Pi so a deploy needs no toolchain on the target. The
 # devcontainer is Debian Bookworm, so its cross toolchain targets the same glibc 2.36 as Raspberry
 # Pi OS Bookworm and a plain cross build produces a .so that loads on the Pi. A sysroot is only
@@ -195,16 +195,16 @@ resolve_sysroot() {
             exit 1
         fi
         echo "=== Fetching sysroot from ${SSH_USER}@${TARGET} (--fetch-sysroot) ==="
-        "$SBC_SRC_DIR/scripts/fetch-pi-sysroot.sh" "${SSH_USER}@${TARGET}" "$DEFAULT_SYSROOT"
+        "$REALTIME_CORE_SRC_DIR/scripts/fetch-pi-sysroot.sh" "${SSH_USER}@${TARGET}" "$DEFAULT_SYSROOT"
         SYSROOT="$DEFAULT_SYSROOT"
     fi
 }
 
 build_sbc_interface() {
-    echo "=== Building DuetSbcInterface (libduet_sbc.so) ==="
+    echo "=== Building DuetRealtimeCore (libduet_realtime_core.so) ==="
 
     # The .so is loaded by the managed binaries, so it has to be built for --arch as well. Each arch
-    # maps onto a cross-compiling preset in src/DuetSbcInterface/CMakePresets.json, except when the
+    # maps onto a cross-compiling preset in src/DuetRealtimeCore/CMakePresets.json, except when the
     # host already is that architecture, in which case there is nothing to cross-compile.
     local preset cmake_args=() cross_preset host_arch native=false
     host_arch="$(uname -m)"
@@ -221,7 +221,7 @@ build_sbc_interface() {
         echo "    Host is $host_arch; building natively"
         preset=native
     elif [[ -z "$cross_preset" ]]; then
-        echo "Error: cannot build $SBC_LIB_NAME for $ARCH on $host_arch; no cross toolchain" >&2
+        echo "Error: cannot build $REALTIME_CORE_LIB_NAME for $ARCH on $host_arch; no cross toolchain" >&2
         exit 1
     else
         resolve_sysroot
@@ -229,7 +229,7 @@ build_sbc_interface() {
             echo "    Linking against sysroot: $SYSROOT"
             preset="$cross_preset-sysroot"
             # The preset defaults to pi-sysroot/; --sysroot may point somewhere else.
-            cmake_args+=("-DDUET_SBC_SYSROOT=$SYSROOT")
+            cmake_args+=("-DDUET_REALTIME_CORE_SYSROOT=$SYSROOT")
         else
             preset="$cross_preset"
             echo "    Cross-compiling against the container's $cross_preset libraries (glibc 2.36)"
@@ -244,19 +244,19 @@ build_sbc_interface() {
         echo "    Build type is $BUILD_TYPE; using the unoptimised preset"
     fi
 
-    local build_dir="$SBC_SRC_DIR/build/$preset"
+    local build_dir="$REALTIME_CORE_SRC_DIR/build/$preset"
 
     # --preset must be run from the project directory (that is where CMakePresets.json lives). Only
     # the shared library is built here; the harness and the tests are not part of a deployment.
-    (cd "$SBC_SRC_DIR" \
+    (cd "$REALTIME_CORE_SRC_DIR" \
         && cmake --preset "$preset" "${cmake_args[@]}" \
-        && cmake --build --preset "$preset" --target duet_sbc_shared -j"$(nproc)")
+        && cmake --build --preset "$preset" --target duet_realtime_core_shared -j"$(nproc)")
 
-    verify_elf_arch "$build_dir/src/$SBC_LIB_NAME" "$ARCH" "$build_dir"
+    verify_elf_arch "$build_dir/src/$REALTIME_CORE_LIB_NAME" "$ARCH" "$build_dir"
 
     # Land it next to the managed assemblies so default P/Invoke probing resolves it
-    cp "$build_dir/src/$SBC_LIB_NAME" "$BUILD_DIR/"
-    echo "=== $SBC_LIB_NAME -> $BUILD_DIR/ ==="
+    cp "$build_dir/src/$REALTIME_CORE_LIB_NAME" "$BUILD_DIR/"
+    echo "=== $REALTIME_CORE_LIB_NAME -> $BUILD_DIR/ ==="
 }
 
 # --- Build ---
@@ -303,7 +303,7 @@ collect_output() {
     echo "=== Collecting publish output into $BUILD_DIR ==="
     local project publish_dir
     for project in "${SELECTED[@]}"; do
-        [[ "$project" == "DuetSbcInterface" ]] && continue
+        [[ "$project" == "DuetRealtimeCore" ]] && continue
         publish_dir="$(project_publish_dir "$project")"
         cp -a "$publish_dir/." "$BUILD_DIR/"
         echo "    $project <- $publish_dir"
@@ -313,13 +313,13 @@ collect_output() {
 if ! $SKIP_BUILD; then
     mkdir -p "$BUILD_DIR"
 
-    if [[ " ${SELECTED[*]} " == *" DuetSbcInterface "* ]]; then
+    if [[ " ${SELECTED[*]} " == *" DuetRealtimeCore "* ]]; then
         build_sbc_interface
     fi
 
     DOTNET_PROJECTS=()
     for project in "${SELECTED[@]}"; do
-        [[ "$project" == "DuetSbcInterface" ]] || DOTNET_PROJECTS+=("$project")
+        [[ "$project" == "DuetRealtimeCore" ]] || DOTNET_PROJECTS+=("$project")
     done
 
     if $ALL; then

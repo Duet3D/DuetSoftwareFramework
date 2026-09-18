@@ -35,7 +35,7 @@ namespace
 		{
 			// Nothing reserved the arena. Every caller is a static-lifetime motion object, so this
 			// is a startup ordering bug rather than something to paper over with a fallback malloc.
-			std::fprintf(stderr, "duet_sbc: motion arena used before it was reserved\n");
+			std::fprintf(stderr, "duet_realtime_core: motion arena used before it was reserved\n");
 			std::abort();
 		}
 
@@ -43,7 +43,7 @@ namespace
 		if (offset + count > arenaSize)
 		{
 			std::fprintf(
-				stderr, "duet_sbc: permanent arena exhausted (%zu bytes, wanted %zu more)\n", arenaSize, count);
+				stderr, "duet_realtime_core: permanent arena exhausted (%zu bytes, wanted %zu more)\n", arenaSize, count);
 			std::abort();
 		}
 

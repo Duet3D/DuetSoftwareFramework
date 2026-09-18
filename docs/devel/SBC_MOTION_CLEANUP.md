@@ -1,7 +1,7 @@
-# Cleaning up the DuetSbcInterface motion engine
+# Cleaning up the DuetRealtimeCore motion engine
 
 Plan for removing the RepRapFirmware compatibility scaffolding from
-[`src/DuetSbcInterface`](src/DuetSbcInterface) and leaving behind code that reads as this project's
+[`src/DuetRealtimeCore`](src/DuetRealtimeCore) and leaving behind code that reads as this project's
 own — while keeping the feature switches that still mark real, intended work.
 
 Baseline for everything below: commit `7fd2169`, `cmake --preset native` configures and builds clean
@@ -23,7 +23,7 @@ it was so the reasoning stays readable:
 `src/Movement/` was imported from RepRapFirmware and much of what surrounds it — `src/Compat/`, the
 `CanMotion` namespace, the `reprap` global — exists so the import can be re-*merged* against a future
 RRF release rather than diffed against it.
-[`Compat/RepRapFirmware.h`](src/DuetSbcInterface/src/Compat/RepRapFirmware.h) states it outright:
+[`Compat/RepRapFirmware.h`](src/DuetRealtimeCore/src/Compat/RepRapFirmware.h) states it outright:
 *"will be re-synced against it, so they keep their original `#include` lines"*.
 
 **The textual merge is already gone** — the whole-tree rename to `m_`-prefixed members ended it, and
@@ -282,8 +282,8 @@ that does not exist.
 ### 3.7 Statics that are statics because they reach a global
 
 `MotionService::Configure` and `GetPositionAt` are `static` only because they call `reprap.GetMove()`
-rather than touching `this`. That reaches the ABI: `DuetSbc_MotionConfigure(h, ...)` takes a handle and
-ignores it, so two `DuetSbcHandle`s would silently share one motion system. §3.2's ownership change
+rather than touching `this`. That reaches the ABI: `DuetRT_MotionConfigure(h, ...)` takes a handle and
+ignores it, so two `DuetRTHandle`s would silently share one motion system. §3.2's ownership change
 makes both instance methods and the handle meaningful. The C ABI signatures do not change.
 
 ### 3.8 Misleading members
@@ -303,7 +303,7 @@ The engine keeps a good set of counters and **not one of them can be read**: `DD
 exposes either. The goal is M122 in DCS reporting them, so this is what the reshaping in §3.8 is for.
 
 **Native exposes counters, DCS formats the text.** That is not a departure — it is the pattern already
-working next door: `CApi.h` exposes `DuetSbcClockStats`, and
+working next door: `CApi.h` exposes `DuetRTClockStats`, and
 [`LinkInterface.cs`](src/DuetControlServer/Link/LinkInterface.cs)'s `PrintDiagnostics` reads it through
 `Native.GetClockStats()` and renders "Step clock: synchronised, N samples, drift …". Marshalling a
 `StringRef` across the ABI so that native can format a string DCS then has to parse would be the
@@ -320,7 +320,7 @@ So:
    an explicit `ResetStats()`. Same for `StepTimer::Diagnostics` (its `GetClockStats()` already exists
    and is already exposed — only the `StringRef` variant goes). Splitting the reset out is the point:
    the current "report and zero" is why a second M122 would show zeros.
-2. **CApi**: one `DuetSbc_GetMotionStats(h, DuetSbcMotionStats*)` plus `DuetSbc_ResetMotionStats(h)`,
+2. **CApi**: one `DuetRT_GetMotionStats(h, DuetRTMotionStats*)` plus `DuetRT_ResetMotionStats(h)`,
    mirroring how the clock stats are done.
 3. **DCS**: a `IDiagnostics` provider formatting RRF's shape — `=== Move ===` then `=== DDARing n ===`
    per ring — so the output stays recognisable to anyone reading an M122 from a Duet.
@@ -481,7 +481,7 @@ Fix as encountered; these are the known ones:
 
 ### 6.1 Turn linting on
 
-[`src/CMakeLists.txt`](src/DuetSbcInterface/src/CMakeLists.txt) is what let this accumulate:
+[`src/CMakeLists.txt`](src/DuetRealtimeCore/src/CMakeLists.txt) is what let this accumulate:
 
 ```cmake
 set_target_properties(duet_motion PROPERTIES CXX_CLANG_TIDY "")     # no linting at all
@@ -492,12 +492,12 @@ target_compile_options(duet_motion INTERFACE -Wno-unused-parameter) # and for ev
 Both are justified by "imported upstream source is linted by its own project" and "renaming them would
 be churn in files that get re-synced against upstream" — the premise §1 retires.
 
-- Turn `CXX_CLANG_TIDY` on for `duet_motion` with the same `.clang-tidy` as `duet_sbc`. Expect a
+- Turn `CXX_CLANG_TIDY` on for `duet_motion` with the same `.clang-tidy` as `duet_realtime_core`. Expect a
   substantial first-run backlog; fix it rather than suppressing it.
 - Drop both `-Wno-unused-parameter` lines. The remaining unused parameters are the no-op
   `operator delete` pairs that go with arena allocation — name them `/*unused*/` in those two headers
   rather than disabling the warning for everyone who includes `duet_motion`.
-- Once `Compat/` is gone, the explicit `DUET_MOTION_SOURCES` list can go back to the glob `duet_sbc`
+- Once `Compat/` is gone, the explicit `DUET_MOTION_SOURCES` list can go back to the glob `duet_realtime_core`
   uses: the "unported tree" it was protecting against no longer exists. Keep the two libraries separate
   — the engine's independence from the link is what the offline tests rely on.
 
@@ -567,7 +567,7 @@ All settled. Recorded here because each one changes what an earlier section says
 | --- | --- | --- | --- |
 | **D1** | eCv annotations (`_ecv_null`, `pre(...)`) | **Drop them.** Keep the information they carried, not the annotation | §5.2 |
 | **D2** | `useInputShaping` on `MoveProfile` or separate? | Moot — keeping `SUPPORT_S_CURVE` means keeping `PrepParams`, so it stays there | §3.4 |
-| **D3** | Debug flags: delete or wire? | **Wire.** M122 does not subsume them — they are a different mechanism, reaching DCS through the log sink. Keep the flag word, add `DuetSbc_SetDebugFlags`, drive from M111 later | §3.9 |
+| **D3** | Debug flags: delete or wire? | **Wire.** M122 does not subsume them — they are a different mechanism, reaching DCS through the log sink. Keep the flag word, add `DuetRT_SetDebugFlags`, drive from M111 later | §3.9 |
 | **D4** | `DDARing::Init` sizing | Fix the comment; the fixed arena is the deliberate choice | §3.5 |
 | **D5** | `DDARing::Diagnostics` | **Keep and reshape** into `GetStats()`/`ResetStats()`, reported by M122 | §3.8, §3.9 |
 | **D6** | `SimulationMode` values | **Keep all four.** The ordering is load-bearing (`>=`/`<` comparisons); fix the misleading comment instead | §5.2 |

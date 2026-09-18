@@ -146,7 +146,7 @@ feed rate and proportion-done of the first move that will not.
 
 The native side has the input for this: `DDA::CanPauseAfter()` exists and `MoveFlags.CanPauseAfter`
 is already set from `RawMove.CanPauseAfter`. What is missing is the ring operation and a C entry
-point for it — there is no `DuetSbc_MotionPauseMoves` in
+point for it — there is no `DuetRT_MotionPauseMoves` in
 [NativeLink.cs](../../src/DuetControlServer/Link/Native/NativeLink.cs).
 
 Without it, the only pause available is "stop feeding the ring and let it drain", which is RRF's
@@ -411,7 +411,7 @@ planner produce the deceleration ramp that gets there.
 
 The earliest point at which this is possible is the **first uncommitted DDA**. A committed move has
 had its segments generated and dispatched to the expansion boards
-([DDARing.cpp:29-31](../../src/DuetSbcInterface/src/Motion/DDARing.cpp)), which fixes both its
+([DDARing.cpp:29-31](../../src/DuetRealtimeCore/src/Motion/DDARing.cpp)), which fixes both its
 profile and — because the next move's start speed is the committed move's end speed — the speed the
 hold has to start from. Moves are committed `MoveTiming::usualMinimumPreparedTime` ahead, which is
 50 ms, so a feedhold costs at most 50 ms of already-dispatched motion plus one deceleration ramp,
@@ -420,7 +420,7 @@ against RRF's "however long the rest of the ring takes".
 The mechanism needs less new code than it sounds like, because **the ring already decelerates to zero
 constantly**. A newly added DDA is created with its end speed at zero and only has it raised when a
 successor arrives and `DoLookahead` propagates backwards
-([DDARing.cpp:24-27](../../src/DuetSbcInterface/src/Motion/DDARing.cpp)). Every trailing edge of every
+([DDARing.cpp:24-27](../../src/DuetRealtimeCore/src/Motion/DDARing.cpp)). Every trailing edge of every
 print is already this operation. A feedhold is therefore:
 
 1. take the first uncommitted DDA;
@@ -891,12 +891,12 @@ when the head is at or below the pause height, and only splits the move - travel
 - [x] Tests for the accounting: a stop inside a segmented code, a second stop inside the same code, a
       stop the engine refuses, a purge whose earliest move is a macro's, and a synchronous pause
       following an aborted pause sequence
-- [x] `DDARing::Feedhold` in `src/DuetSbcInterface`: pick the stopping point at or after the first
+- [x] `DDARing::Feedhold` in `src/DuetRealtimeCore`: pick the stopping point at or after the first
       uncommitted DDA, force its end speed to zero, re-run the backward pass to the last committed
       DDA, free the rest
 - [x] Honour the `canPauseAfter` exclusions when choosing the boundary — arcs, retractions, endstop,
       probing and `G1 H` moves, through `DDA::IsRestartableBoundary`
-- [x] `DuetSbc_MotionRequestStop` and `DuetSbc_MotionGetFeedholdResult` — a request carrying which
+- [x] `DuetRT_MotionRequestStop` and `DuetRT_MotionGetFeedholdResult` — a request carrying which
       kind of stop it is, and a seqlock-published result, because freeing a move frees its segments
       and only the motion thread may do that, so the answer cannot come back from the call that asks
 - [x] `MovePlanner.StopEarlyAsync`, resyncing from the engine and dropping `SegmentsLeft`

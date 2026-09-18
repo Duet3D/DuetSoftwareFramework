@@ -46,7 +46,7 @@ flowchart TB
     subgraph sbc["Linux SBC"]
         DWS["DuetWebServer<br/>(ASP.NET Core, HTTP/WS)"]
         DCS["DuetControlServer (DCS)<br/>G-code, object model, motion decisions"]
-        SBCI["DuetSbcInterface<br/>native library: motion planning, SPI transfers"]
+        SBCI["DuetRealtimeCore<br/>native library: motion planning, SPI transfers"]
         DPS["DuetPluginService<br/>(root + non-root)"]
         PLUGINPROC["Plugin processes"]
     end
@@ -73,7 +73,7 @@ flowchart TB
   the Linux filesystem ([file management](file-management.md)), exposes the [IPC socket](ipc.md) for
   every other process, and composes the [CAN messages](can-messages.md) that configure and drive the
   hardware.
-- **DuetSbcInterface** is a native shared library (`libduet_sbc.so`) loaded into the DCS process. It
+- **DuetRealtimeCore** is a native shared library (`libduet_realtime_core.so`) loaded into the DCS process. It
   owns the real-time half of the SBC's work: the motion planner and DDA ring that turn a move into a
   velocity profile, the model of the controller's step clock, and the SPI transfer loop itself. DCS
   calls into it and receives events back; see [Firmware link](firmware-link.md).
@@ -98,8 +98,8 @@ flowchart TB
 | DuetWebServer | DCS | IPC Unix socket (`DuetAPIClient`) |
 | CLI tools, plugins | DCS | IPC Unix socket (`DuetAPIClient`) |
 | DCS | DuetPluginService | IPC Unix socket |
-| DCS | DuetSbcInterface | P/Invoke into `libduet_sbc.so`, plus a ring buffer of inbound events |
-| DuetSbcInterface | DuetCANMaster | SPI master + GPIO `TfrRdy` |
+| DCS | DuetRealtimeCore | P/Invoke into `libduet_realtime_core.so`, plus a ring buffer of inbound events |
+| DuetRealtimeCore | DuetCANMaster | SPI master + GPIO `TfrRdy` |
 | DuetCANMaster | Duet3Expansion | CAN-FD |
 
 USB is no longer a transport option: the link is SPI only.

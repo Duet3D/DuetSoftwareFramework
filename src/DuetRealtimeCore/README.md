@@ -1,4 +1,4 @@
-# DuetSbcInterface — C++ SBC-side SPI replica & jitter test
+# DuetRealtimeCore — C++ SBC-side SPI replica & jitter test
 
 The C++ implementation of the **SBC side** of the RepRapFirmware SPI protocol. It is the transport
 DuetControlServer uses: the managed SPI adapter and its transfer loop have been replaced by this
@@ -24,7 +24,7 @@ each header sitting next to the `.cpp` that implements it, with `src/` itself as
 A module includes its own headers as `"Foo.h"` and another module's as `<Module/Foo.h>`.
 
 ```
-src/                 duet_sbc(.a/.so)
+src/                 duet_realtime_core(.a/.so)
   CApi.h/.cpp        C ABI for P/Invoke from DuetControlServer
   Config/            build-time defaults, the runtime Config struct, and the machine's fixed limits
   Hardware/          spidev and GPIO chardev wrappers - OS device access, no protocol
@@ -37,7 +37,7 @@ src/                 duet_sbc(.a/.so)
   Motion/            duet_motion(.a): the DDA ring, lookahead, segments, and the engine's thread
   Platform/          logging, the motion arena, thread helpers, and the lock-free ring buffer
   Storage/           CRC16/CRC32
-harness/             sbc_jitter_test — standalone latency/jitter test program
+harness/             realtime_core_jitter_test — standalone latency/jitter test program
 tests/               host-side unit tests (no hardware required)
 scripts/             fetch-pi-sysroot.sh
 cmake/               cross-compilation toolchain files
@@ -72,22 +72,22 @@ Bookworm and everything it builds is deployable as-is. Both aarch64 presets addi
 **statically link** the test binary, so it runs on any Pi OS release:
 
 ```sh
-cd src/DuetSbcInterface
+cd src/DuetRealtimeCore
 cmake --preset arm64
 cmake --build --preset arm64 -j
 
 # copy the (static, self-contained) binary to the Pi
-scp build/arm64/harness/sbc_jitter_test pi@raspberrypi:~/
+scp build/arm64/harness/realtime_core_jitter_test pi@raspberrypi:~/
 ```
 
-`file build/arm64/harness/sbc_jitter_test` should report `ARM aarch64 ... statically linked`.
+`file build/arm64/harness/realtime_core_jitter_test` should report `ARM aarch64 ... statically linked`.
 
-`libduet_sbc.so` cannot be statically self-contained, so it links glibc dynamically and its
+`libduet_realtime_core.so` cannot be statically self-contained, so it links glibc dynamically and its
 requirements have to be satisfiable on the target. Under `arm64` the highest version it asks for is
 `GLIBC_2.17`, comfortably below Bookworm's 2.36, so it loads on the Pi unchanged. Check with:
 
 ```sh
-aarch64-linux-gnu-objdump -p build/arm64/src/libduet_sbc.so | grep -o 'GLIBC_[0-9.]*' | sort -uV
+aarch64-linux-gnu-objdump -p build/arm64/src/libduet_realtime_core.so | grep -o 'GLIBC_[0-9.]*' | sort -uV
 ```
 
 #### Targeting an older Pi OS release
@@ -101,14 +101,14 @@ cmake --preset arm64-sysroot
 cmake --build --preset arm64-sysroot -j
 ```
 
-Use `-DDUET_SBC_SYSROOT=<dir>` to point it at a sysroot kept somewhere else. `scripts/build.sh`
+Use `-DDUET_REALTIME_CORE_SYSROOT=<dir>` to point it at a sysroot kept somewhere else. `scripts/build.sh`
 never reaches for this on its own — pass `--sysroot <dir>` or `--fetch-sysroot`.
 
 ### Build natively on the Pi
 
 ```sh
 sudo apt install -y build-essential cmake linux-libc-dev   # one-time
-cd src/DuetSbcInterface
+cd src/DuetRealtimeCore
 cmake --preset native
 cmake --build --preset native -j
 ```
@@ -118,7 +118,7 @@ cmake --build --preset native -j
 Every source is run through `clang-tidy` as it is compiled, and any check left enabled in
 `.clang-tidy` fails the build (`--warnings-as-errors=*`). Install it with `sudo apt install -y
 clang-tidy` (already present in the devcontainer); if it is missing, CMake warns at configure time
-and builds without linting. Pass `-DDUET_SBC_CLANG_TIDY=OFF` for a plain, roughly 3x faster build.
+and builds without linting. Pass `-DDUET_REALTIME_CORE_CLANG_TIDY=OFF` for a plain, roughly 3x faster build.
 
 This applies to every preset, sysroot builds included. A cross build needs two things the plain
 `clang-tidy` command line does not carry, both of which CMake works out at configure time by asking
@@ -128,17 +128,17 @@ libstdc++ inside the Pi sysroot, where GCC never looks for it).
 
 ### Artifacts
 
-- `harness/sbc_jitter_test` — the test program (static under the cross preset)
-- `src/libduet_sbc.so` — shared library exposing the C ABI (for DCS P/Invoke)
-- `src/libduet_sbc.a` — static library
+- `harness/realtime_core_jitter_test` — the test program (static under the cross preset)
+- `src/libduet_realtime_core.so` — shared library exposing the C ABI (for DCS P/Invoke)
+- `src/libduet_realtime_core.a` — static library
 
 > **P/Invoke `.so` note:** a shared library must link glibc dynamically, so the cross-built
-> `libduet_sbc.so` needs the target's glibc to be no older than what it was linked against. The
+> `libduet_realtime_core.so` needs the target's glibc to be no older than what it was linked against. The
 > container and Raspberry Pi OS Bookworm both ship glibc 2.36, so the `arm64` build deploys as-is.
 > Only for an older Pi OS release do you need a sysroot:
 > ```sh
 > scripts/fetch-pi-sysroot.sh pi@raspberrypi
-> cmake --preset arm64-sysroot -DDUET_SBC_STATIC=OFF
+> cmake --preset arm64-sysroot -DDUET_REALTIME_CORE_STATIC=OFF
 > cmake --build --preset arm64-sysroot
 > ```
 > The standalone jitter test never needs this — it is statically linked.
@@ -150,7 +150,7 @@ GPIO access require privileges (`CAP_SYS_NICE` for SCHED_FIFO, and access to the
 nodes), so run under `sudo` or grant the capabilities.
 
 ```sh
-sudo ./build/native/harness/sbc_jitter_test \
+sudo ./build/native/harness/realtime_core_jitter_test \
     --spi-dev /dev/spidev0.0 --spi-hz 8000000 \
     --gpiochip /dev/gpiochip0 --tfr-pin 25 --dap-pin 24 \
     --core 3 --rate 1000
@@ -199,7 +199,7 @@ The transfer path sleeps when idle (0% CPU) and wakes with minimal latency — i
 Recommended low-jitter invocation on a Pi with core 3 isolated (`isolcpus=3`), producer on core 2:
 
 ```sh
-sudo ./sbc_jitter_test --core 3 --producer-core 2 --out-pin 23
+sudo ./realtime_core_jitter_test --core 3 --producer-core 2 --out-pin 23
 ```
 
 If a 25 ms tail persists even with a pinned real-time producer on an isolated core, the cause is below
@@ -213,7 +213,7 @@ the C# fixes: `--no-rt` (drop SCHED_FIFO), `--no-isolate` (drop core pinning), `
 ## Using it from DuetControlServer
 
 DCS **does** use this library: it is the only SPI transport. The managed SPI adapter it replaced
-(`DuetControlServer/Link/Adapter/SPI.cs`) has been removed, and `libduet_sbc.so` is built and shipped
+(`DuetControlServer/Link/Adapter/SPI.cs`) has been removed, and `libduet_realtime_core.so` is built and shipped
 alongside DuetControlServer by its `Makefile` (see [Packaging](#packaging)).
 
 The managed side lives in [`DuetControlServer/Link/Native`](../DuetControlServer/Link/Native):
@@ -261,7 +261,7 @@ make ARCH=arm64 CONFIG=Release publish
 > **glibc:** a `.so` must link glibc dynamically, so a cross-built one must not need a newer glibc
 > than the target has. The devcontainer is Debian Bookworm and targets the same glibc 2.36 as
 > Raspberry Pi OS Bookworm, so no sysroot is needed. To target an older release, pass one:
-> `make ARCH=arm64 DUET_SBC_SYSROOT=/path/to/pi-sysroot publish`
+> `make ARCH=arm64 DUET_REALTIME_CORE_SYSROOT=/path/to/pi-sysroot publish`
 > (see `scripts/fetch-pi-sysroot.sh`).
 
 ## Sharing with DuetCANMaster

@@ -15,7 +15,7 @@
 # RepRapFirmware's and keep its algorithms; the rest is written here, for the parts of the firmware
 # that have no counterpart on an SBC.
 #
-# It is a separate library from duet_sbc so that the engine's independence from the interface is
+# It is a separate library from duet_realtime_core so that the engine's independence from the interface is
 # structural rather than a convention: nothing in it may refer back to the transfer loop, and the
 # offline tests rely on that.
 set(DUET_MOTION_SOURCES
@@ -31,10 +31,10 @@ set(DUET_MOTION_SOURCES
     Platform/MemoryArena.cpp
 )
 
-file(GLOB_RECURSE DUET_SBC_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
-list(REMOVE_ITEM DUET_SBC_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/CApi.cpp")
+file(GLOB_RECURSE DUET_REALTIME_CORE_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
+list(REMOVE_ITEM DUET_REALTIME_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/CApi.cpp")
 foreach(_src IN LISTS DUET_MOTION_SOURCES)
-    list(REMOVE_ITEM DUET_SBC_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/${_src}")
+    list(REMOVE_ITEM DUET_REALTIME_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/${_src}")
 endforeach()
 
 add_library(duet_motion STATIC ${DUET_MOTION_SOURCES})
@@ -54,18 +54,18 @@ target_compile_options(duet_motion PRIVATE
 set_target_properties(duet_motion PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # Static library used by the standalone harness.
-add_library(duet_sbc STATIC ${DUET_SBC_SOURCES})
-target_include_directories(duet_sbc PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+add_library(duet_realtime_core STATIC ${DUET_REALTIME_CORE_SOURCES})
+target_include_directories(duet_realtime_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 # duet_motion for the ScheduleMoveSink the interface implements, and for the motion engine the CApi
 # exposes. The dependency is one-way: the engine never refers back to the interface.
-target_link_libraries(duet_sbc PUBLIC duet_spi_protocol duet_motion Threads::Threads)
-set_target_properties(duet_sbc PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_link_libraries(duet_realtime_core PUBLIC duet_spi_protocol duet_motion Threads::Threads)
+set_target_properties(duet_realtime_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # Shared library exposing the C ABI, for P/Invoke from DuetControlServer.
-add_library(duet_sbc_shared SHARED CApi.cpp)
-target_include_directories(duet_sbc_shared PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(duet_sbc_shared PUBLIC duet_spi_protocol duet_sbc Threads::Threads)
-set_target_properties(duet_sbc_shared PROPERTIES
-    OUTPUT_NAME duet_sbc
+add_library(duet_realtime_core_shared SHARED CApi.cpp)
+target_include_directories(duet_realtime_core_shared PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(duet_realtime_core_shared PUBLIC duet_spi_protocol duet_realtime_core Threads::Threads)
+set_target_properties(duet_realtime_core_shared PROPERTIES
+    OUTPUT_NAME duet_realtime_core
     POSITION_INDEPENDENT_CODE ON
 )

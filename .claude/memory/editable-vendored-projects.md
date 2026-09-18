@@ -1,11 +1,11 @@
 ---
 name: editable-vendored-projects
-description: The lib/ subprojects and src/Duet3Expansion, src/DuetCANMaster, src/DuetSbcInterface are in scope for edits, not read-only vendored code
+description: The lib/ subprojects and src/Duet3Expansion, src/DuetCANMaster, src/DuetRealtimeCore are in scope for edits, not read-only vendored code
 metadata:
   type: project
 ---
 
-Everything under [lib/](lib/) (CANlib, CoreN2G, DuetSpiInterface, FreeRTOS, LibMbedTls, LibTinyusb, Qfplib-M0-full, RRFLibraries, plus the .cmake files) may be modified, as may [src/Duet3Expansion/](src/Duet3Expansion/), [src/DuetCANMaster/](src/DuetCANMaster/), and [src/DuetSbcInterface/](src/DuetSbcInterface/).
+Everything under [lib/](lib/) (CANlib, CoreN2G, DuetSpiInterface, FreeRTOS, LibMbedTls, LibTinyusb, Qfplib-M0-full, RRFLibraries, plus the .cmake files) may be modified, as may [src/Duet3Expansion/](src/Duet3Expansion/), [src/DuetCANMaster/](src/DuetCANMaster/), and [src/DuetRealtimeCore/](src/DuetRealtimeCore/).
 
 Exception: [lib/RepRapFirmware/](lib/RepRapFirmware/) is a read-only reference checkout, not part of the project — see [[rrf-reference-clone]].
 

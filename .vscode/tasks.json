@@ -34,7 +34,7 @@
             "options": [
                 "All",
                 "DuetControlServer",
-                "DuetSbcInterface",
+                "DuetRealtimeCore",
                 "DuetPiManagementPlugin",
                 "DuetPluginService",
                 "DuetWebServer",
@@ -282,10 +282,10 @@
             "runOptions": {
                 "instanceLimit": 1
             },
-            // DCS P/Invokes into libduet_sbc.so and will not start without it
+            // DCS P/Invokes into libduet_realtime_core.so and will not start without it
             "dependsOn": [
                 "[DSF] Make Build Directory",
-                "[DSF] Build DuetSbcInterface"
+                "[DSF] Build DuetRealtimeCore"
             ],
             "dependsOrder": "sequence",
         },
@@ -365,7 +365,7 @@
                 "[DSF] Build CodeLogger",
                 "[DSF] Build CodeStream",
                 "[DSF] Build CustomHttpEndpoint",
-                "[DSF] Build DuetSbcInterface",
+                "[DSF] Build DuetRealtimeCore",
                 "[DSF] Build DuetControlServer",
                 "[DSF] Build DuetPiManagementPlugin",
                 "[DSF] Build DuetPluginService",
@@ -476,11 +476,11 @@
             }
         },
         {
-            // Native SPI transfer loop (libduet_sbc.so). Cross-compiled for aarch64. The
+            // Native SPI transfer loop (libduet_realtime_core.so). Cross-compiled for aarch64. The
             // devcontainer's glibc matches Raspberry Pi OS Bookworm's, so no sysroot is involved.
-            "label": "[DSF] Build DuetSbcInterface",
+            "label": "[DSF] Build DuetRealtimeCore",
             "type": "shell",
-            "command": "./scripts/build.sh DuetSbcInterface",
+            "command": "./scripts/build.sh DuetRealtimeCore",
             "problemMatcher": [
                 "$gcc"
             ],
@@ -489,9 +489,9 @@
             }
         },
         {
-            "label": "[DSF] Build and Deploy DuetSbcInterface to",
+            "label": "[DSF] Build and Deploy DuetRealtimeCore to",
             "type": "shell",
-            "command": "./scripts/build.sh --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services DuetSbcInterface",
+            "command": "./scripts/build.sh --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services DuetRealtimeCore",
             "problemMatcher": [
                 "$gcc"
             ],
@@ -504,7 +504,7 @@
             // against a glibc older than the container's 2.36.
             "label": "[DSF] Fetch Pi Sysroot",
             "type": "shell",
-            "command": "./src/DuetSbcInterface/scripts/fetch-pi-sysroot.sh ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp} ./src/DuetSbcInterface/pi-sysroot",
+            "command": "./src/DuetRealtimeCore/scripts/fetch-pi-sysroot.sh ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp} ./src/DuetRealtimeCore/pi-sysroot",
             "problemMatcher": [],
             "runOptions": {
                 "instanceLimit": 1
@@ -524,7 +524,7 @@
             }
         },
         {
-            // The C# test suite. Runs DCS & DuetSbcInterface natively for the host.
+            // The C# test suite. Runs DCS & DuetRealtimeCore natively for the host.
             "label": "[DSF] Run C# System Tests",
             "type": "shell",
             "command": "dotnet test ./src/SystemTests/SystemTests.csproj --nologo",
@@ -543,7 +543,7 @@
             "type": "shell",
             "command": "cmake --preset native && cmake --build --preset native -j && ctest --test-dir build/native --output-on-failure",
             "options": {
-                "cwd": "${workspaceFolder}/src/DuetSbcInterface"
+                "cwd": "${workspaceFolder}/src/DuetRealtimeCore"
             },
             "problemMatcher": [
                 "$gcc"
@@ -558,9 +558,9 @@
             // latency without the .NET runtime. Statically linked, so it needs no sysroot.
             "label": "[DSF] Build and Deploy Jitter Harness to",
             "type": "shell",
-            "command": "cmake --preset arm64 && cmake --build --preset arm64 --target sbc_jitter_test -j && scp build/arm64/harness/sbc_jitter_test ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp}:~/",
+            "command": "cmake --preset arm64 && cmake --build --preset arm64 --target realtime_core_jitter_test -j && scp build/arm64/harness/realtime_core_jitter_test ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp}:~/",
             "options": {
-                "cwd": "${workspaceFolder}/src/DuetSbcInterface"
+                "cwd": "${workspaceFolder}/src/DuetRealtimeCore"
             },
             "problemMatcher": [
                 "$gcc"
@@ -852,11 +852,11 @@
             "detail": "Reformat first-party sources. Skips src/libc and src/libcpp (vendored newlib/GCC runtime)."
         },
         {
-            "label": "[Style] Format DuetSbcInterface",
+            "label": "[Style] Format DuetRealtimeCore",
             "type": "shell",
             "command": "clang-format -i --style=file $(find src harness tests -name '*.cpp' -o -name '*.h')",
             "options": {
-                "cwd": "${workspaceFolder}/src/DuetSbcInterface"
+                "cwd": "${workspaceFolder}/src/DuetRealtimeCore"
             },
             "problemMatcher": [],
             "group": "build",
@@ -865,7 +865,7 @@
         {
             "label": "[Style] Check Formatting (both projects)",
             "type": "shell",
-            "command": "cd ${workspaceFolder}/src/DuetCANMaster && clang-format --dry-run --Werror --style=file $(find src -name '*.cpp' -o -name '*.h' | grep -vE '^src/(libc|libcpp)/') && cd ${workspaceFolder}/src/DuetSbcInterface && clang-format --dry-run --Werror --style=file $(find src harness tests -name '*.cpp' -o -name '*.h') && echo 'Formatting OK'",
+            "command": "cd ${workspaceFolder}/src/DuetCANMaster && clang-format --dry-run --Werror --style=file $(find src -name '*.cpp' -o -name '*.h' | grep -vE '^src/(libc|libcpp)/') && cd ${workspaceFolder}/src/DuetRealtimeCore && clang-format --dry-run --Werror --style=file $(find src harness tests -name '*.cpp' -o -name '*.h') && echo 'Formatting OK'",
             "problemMatcher": [
                 "$gcc"
             ],
@@ -893,11 +893,11 @@
             "detail": "Configure CMake into build/compile-commands, keep the chosen board's firmware TUs, and rewrite them so clang can parse the bare-metal ARM flags. Writes src/DuetCANMaster/compile_commands.json."
         },
         {
-            "label": "[Style] Generate Compile DB - DuetSbcInterface",
+            "label": "[Style] Generate Compile DB - DuetRealtimeCore",
             "type": "shell",
             "command": "cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
             "options": {
-                "cwd": "${workspaceFolder}/src/DuetSbcInterface"
+                "cwd": "${workspaceFolder}/src/DuetRealtimeCore"
             },
             "problemMatcher": [
                 "$gcc"
@@ -922,11 +922,11 @@
             "detail": "Regenerates the compile DB for the chosen board, then lints src/ (minus libc, libcpp and ExceptionHandlers). Report only. Do not add -fix: see STYLE.md, per-file fixing corrupts shared headers."
         },
         {
-            "label": "[Style] Tidy DuetSbcInterface",
+            "label": "[Style] Tidy DuetRealtimeCore",
             "type": "shell",
-            "command": "test -f build/compile_commands.json || { echo 'No build/compile_commands.json - run [Style] Generate Compile DB - DuetSbcInterface first' >&2; exit 1; }; run-clang-tidy -p build -j $(nproc) -quiet '^.*/src/DuetSbcInterface/(src|harness|tests)/.*\\.cpp$' 2>&1 | awk -f ${workspaceFolder}/scripts/tidy-report.awk",
+            "command": "test -f build/compile_commands.json || { echo 'No build/compile_commands.json - run [Style] Generate Compile DB - DuetRealtimeCore first' >&2; exit 1; }; run-clang-tidy -p build -j $(nproc) -quiet '^.*/src/DuetRealtimeCore/(src|harness|tests)/.*\\.cpp$' 2>&1 | awk -f ${workspaceFolder}/scripts/tidy-report.awk",
             "options": {
-                "cwd": "${workspaceFolder}/src/DuetSbcInterface"
+                "cwd": "${workspaceFolder}/src/DuetRealtimeCore"
             },
             "problemMatcher": [
                 "$gcc"

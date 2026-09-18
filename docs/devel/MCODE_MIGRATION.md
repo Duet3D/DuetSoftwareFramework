@@ -138,11 +138,11 @@ These rules come from the architecture already established on this branch — se
 
 11. **A green `dotnet build` is not a green build.** Build the whole project with
     `./scripts/build.sh --all` from the repo root. It builds every dotnet project *and*
-    cross-compiles the native `libduet_sbc.so` for aarch64 through CMake, which is the half a
+    cross-compiles the native `libduet_realtime_core.so` for aarch64 through CMake, which is the half a
     per-project `dotnet build` cannot see at all.
 
     Building the native side the obvious way is worse than not building it, because it looks like it
-    worked: `make` inside `src/DuetSbcInterface/build/native` compiles for the **host**, so a change
+    worked: `make` inside `src/DuetRealtimeCore/build/native` compiles for the **host**, so a change
     that breaks the aarch64 cross-build passes cleanly and the failure surfaces on the machine. The
     motion engine, the DDA ring and the drive trackers all live on that side, so anything touching
     §10 to §12's subject matter is exactly what this catches.
@@ -799,7 +799,7 @@ it: `DDARing::ChangeExtrusionFactor` walks the uncommitted moves calling `DDA::A
 scaling each one's extruder direction vector and clamping the change to the extruder's instantaneous
 speed change. Everything else about M221 matches, the current tool's extruders and both report forms
 included. Porting the fast change means `AdjustExtrusion` and `ChangeExtrusionFactor` in
-`src/DuetSbcInterface/src/Motion`, a `DuetSbc_Motion*` entry point to reach them from a code handler,
+`src/DuetRealtimeCore/src/Motion`, a `DuetRT_Motion*` entry point to reach them from a code handler,
 and a decision about which channels it applies to: RepRapFirmware passes `gb.IsFileChannel()` as the
 `immediate` argument, which makes a change from a job file rewrite the queued moves and one typed
 into DWC not, and the commit that added it (`e707b11e9`) is titled the other way round.
@@ -1216,7 +1216,7 @@ the whole shape.
 
 RepRapFirmware does all of this on one board: it generates the steps, so it knows when an endstop
 fired and where every drive was at that instant. Here the drives are on CAN-connected expansion
-boards, DuetSbcInterface plans the motion, DuetCANMaster bridges SPI to CAN, and no single component
+boards, DuetRealtimeCore plans the motion, DuetCANMaster bridges SPI to CAN, and no single component
 knows all of it. What follows is what that forces.
 
 ### The stop is decided on the controller
@@ -1283,9 +1283,9 @@ neighbour's endstop.
 | Stage | Where it lives |
 |---|---|
 | DCS plans the move | `RawMove.StopOnInput[drive]` |
-| DCS → DuetSbcInterface | `MoveParams` third trailing array, `stopOnInput[numDrives]` |
+| DCS → DuetRealtimeCore | `MoveParams` third trailing array, `stopOnInput[numDrives]` |
 | Held while queued | `DDA::m_stopOnInput[]` |
-| DuetSbcInterface → DuetCANMaster | `ScheduleMoveDriver::stopOnBoard` and `stopOnHandle` |
+| DuetRealtimeCore → DuetCANMaster | `ScheduleMoveDriver::stopOnBoard` and `stopOnHandle` |
 
 `Motion::kNoStopInput` and `SbcProtocol::NoEndstopBoard` are the sentinels; every non-endstop move
 carries them.
@@ -1294,11 +1294,11 @@ carries them.
 
 The controller stops the drives but cannot say where they should *end up*: it never generated the
 steps and does not know how far each had travelled. Undoing the overshoot needs the position at the
-instant the endstop fired, which only DuetSbcInterface can answer - it planned the motion and
+instant the endstop fired, which only DuetRealtimeCore can answer - it planned the motion and
 evaluates the same segment chain anyway to report live positions (`Motion::DriveTracker`).
 
 ```
-board          controller                        DuetSbcInterface
+board          controller                        DuetRealtimeCore
   |                |                                    |
   |-- InputChanged->|                                   |
   |                 |-- stop matching drivers           |
@@ -1327,7 +1327,7 @@ a window where the trackers and the boards disagree.
 > decision and the CAN message move to DCS.
 
 The cost is worth knowing: this is the **only** native-originated CAN message. Every other one goes
-DCS → `DuetSbc_QueueCanMessage` → link, and that invariant is why DuetSbcInterface had no CANlib
+DCS → `DuetRT_QueueCanMessage` → link, and that invariant is why DuetRealtimeCore had no CANlib
 dependency before this work.
 
 **The correction has to reach the DDA, not just the tracker.** `MotionService::OnMoveRetired` reports
@@ -1347,7 +1347,7 @@ RepRapFirmware, had no callers, and are gone. `GetUrgentMessage` now only sends 
 
 ### Building CANlib for the SBC
 
-DuetSbcInterface needs the CAN message definitions so both ends of the link describe a message with
+DuetRealtimeCore needs the CAN message definitions so both ends of the link describe a message with
 the same declaration. `lib/CANlib/CANlib.cmake` gained an `MCU HOST` variant mirroring the one in
 `RRFLibraries.cmake`. Two things were not obvious:
 
@@ -2368,7 +2368,7 @@ which hardware found; §12.9 is what was missing and what it cost.
 ### 12.1 What it looks like today
 
 ```
-board          controller                        DuetSbcInterface              DCS
+board          controller                        DuetRealtimeCore              DCS
   |                |                                    |                       |
   |-- InputChanged->|                                   |                       |
   |                 |-- stop matching drivers           |                       |
@@ -2382,7 +2382,7 @@ board          controller                        DuetSbcInterface              D
 ```
 
 `MotionStopped` never reaches DCS. It is handled entirely inside
-[MotionService::HandleMotionStopped](src/DuetSbcInterface/src/SBC/MotionService.cpp#L256), which
+[MotionService::HandleMotionStopped](src/DuetRealtimeCore/src/SBC/MotionService.cpp#L256), which
 works out where each drive was when the endstop fired, corrects the tracker and the DDA, and emits
 the revert itself. DCS only learns the outcome afterwards, as a `MotionEndpoints` event.
 
@@ -2392,7 +2392,7 @@ Split *computing* the position from *deciding what to do about it*. The computat
 because that is where the segment chain is; the decision and the CAN message move to DCS.
 
 ```
-board          controller                        DuetSbcInterface              DCS
+board          controller                        DuetRealtimeCore              DCS
   |                |                                    |                       |
   |-- InputChanged->|                                   |                       |
   |                 |-- stop matching drivers           |                       |
@@ -2408,8 +2408,8 @@ board          controller                        DuetSbcInterface              D
 
 - **It restores the layering.** §10 already records the cost of the current shape: this is the
   **only** native-originated CAN message, and every other one goes DCS →
-  `DuetSbc_QueueCanMessage` → link. One exception to an otherwise clean invariant is worth removing.
-- **CANlib leaves DuetSbcInterface.** [CMakeLists.txt:54](src/DuetSbcInterface/src/CMakeLists.txt#L54)
+  `DuetRT_QueueCanMessage` → link. One exception to an otherwise clean invariant is worth removing.
+- **CANlib leaves DuetRealtimeCore.** [CMakeLists.txt:54](src/DuetRealtimeCore/src/CMakeLists.txt#L54)
   says the dependency exists for this message, and the only includes are `CanMessageFormats.h` and
   `Duet3Common.h` in `MotionService.cpp`. Going with it: the `Compat/CoreN2G/CoreTypes.h` shim, and
   the `-fsingle-precision-constant` and float16 friction §10's "Building CANlib for the SBC" records.
@@ -2461,7 +2461,7 @@ correctness problem per above, but the window in which `move.axes[].machinePosit
 overshoot gets wider, and the budget is worth knowing: `BasicDriverPositionRevertMillis` is 40 ms and
 `TotalDriverPositionRevertMillis` allows 10 ms on top for message transit.
 
-**Endstops do not leave DuetSbcInterface.** The stop *identity* still passes through - `MoveParams`
+**Endstops do not leave DuetRealtimeCore.** The stop *identity* still passes through - `MoveParams`
 → `DDA::m_stopOnInput[]` → `ScheduleMoveDriver` - because `ScheduleMoveBuilder` is what builds the
 schedule message. What goes is the *semantic* knowledge: the ring scan, `IsCheckingEndstops` in
 `MotionService`, `NoteDriverStopped`, and the revert construction.
@@ -2471,9 +2471,9 @@ schedule message. What goes is the *semantic* knowledge: the ring scan, `IsCheck
 | Direction | Now | After |
 |---|---|---|
 | Stop reported | `SbcInterface` callback → `MotionService::HandleMotionStopped` | same callback, forwarded as a new `InboundEventType.MotionStopped` |
-| Position at trigger | internal to `HandleMotionStopped` | `DuetSbc_MotionGetPositionAt(drive, whenTicks, out position, out usedTimestamp)` |
-| Position adopted | `DriveTracker::SetMotorPosition` + `DDA::SetDriveCoordinate` | existing `DuetSbc_MotionSetMotorPositions` |
-| Revert sent | native `QueueCanMessage` | DCS `DuetSbc_QueueCanMessage`, as every other CAN message |
+| Position at trigger | internal to `HandleMotionStopped` | `DuetRT_MotionGetPositionAt(drive, whenTicks, out position, out usedTimestamp)` |
+| Position adopted | `DriveTracker::SetMotorPosition` + `DDA::SetDriveCoordinate` | existing `DuetRT_MotionSetMotorPositions` |
+| Revert sent | native `QueueCanMessage` | DCS `DuetRT_QueueCanMessage`, as every other CAN message |
 | Outcome to DCS | `InboundEventType.MotionEndpoints` (13) | no longer needed for endstop moves - DCS already knows |
 
 `MotionStopped` stays a one-way firmware → SBC notification. Nothing becomes a request/response pair;
@@ -2481,7 +2481,7 @@ what is added is exported functions DCS calls afterwards.
 
 ### 12.6 The plan
 
-**Step 1 ✅ expose the position query.** `DuetSbc_MotionGetPositionAt` over `Motion::DriveTracker`,
+**Step 1 ✅ expose the position query.** `DuetRT_MotionGetPositionAt` over `Motion::DriveTracker`,
 returning both the position and whether the trigger timestamp was usable. Independent of everything
 else and testable on its own against a known segment chain.
 
@@ -2506,7 +2506,7 @@ that exists today and that this step is the right place to close.
 `DDA::SetDriveCoordinate`, `NoteDriverStopped`, `IsCheckingEndstops` in `MotionService`, and the
 `MotionEndpoints` event if nothing else needs it.
 
-**Step 6 ✅ drop CANlib.** Remove it from `src/DuetSbcInterface/src/CMakeLists.txt` along with the
+**Step 6 ✅ drop CANlib.** Remove it from `src/DuetRealtimeCore/src/CMakeLists.txt` along with the
 `Compat/CoreN2G/CoreTypes.h` shim, and delete the `MCU HOST` variant from `lib/CANlib/CANlib.cmake`
 if nothing else uses it. `MaxLinearDriversPerCanSlave` and `BasicDriverPositionRevertMillis` move to
 DCS with the message.
@@ -2819,7 +2819,7 @@ The move was not finishing before its stop arrived; it was finishing before it *
 `An endstop stop for move #2 arrived after the move had been concluded` was emitted seconds after the
 move was concluded, on a move whose endstop triggered part way along it.
 
-`DuetSbc_MotionSubmitMove` writes the move into a lock-free queue and returns. The ring's
+`DuetRT_MotionSubmitMove` writes the move into a lock-free queue and returns. The ring's
 `m_scheduledMoves` is incremented by `DDARing::AddMove`, which runs on the **motion thread** in
 `DrainSubmissions` - up to a tick later. `WaitForStandstillAsync` compared scheduled against completed
 and did so *before* its first delay, so a caller that submitted a move and immediately waited for it

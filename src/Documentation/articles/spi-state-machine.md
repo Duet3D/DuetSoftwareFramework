@@ -4,10 +4,10 @@ This article documents the two state machines that drive one *full transfer* acr
 and what each side does when the other side desynchronises. It is the detailed companion to the
 [wire format section](firmware-link.md#the-wire-format) of the firmware link article.
 
-- **SBC side** - `src/DuetSbcInterface/src/SBC/SbcTransfer.cpp` (DuetSbcInterface, SPI master)
+- **SBC side** - `src/DuetRealtimeCore/src/SBC/SbcTransfer.cpp` (DuetRealtimeCore, SPI master)
 - **Controller side** - `src/DuetCANMaster/src/SBC/DataTransfer.cpp` (DuetCANMaster, SPI slave)
 
-Throughout this article *the SBC* means DuetSbcInterface - the native library loaded into
+Throughout this article *the SBC* means DuetRealtimeCore - the native library loaded into
 DuetControlServer, which owns the transfer loop - and *the controller* means DuetCANMaster. The two
 sides were once DuetControlServer itself and RepRapFirmware, and the C++ master is a port of the C#
 one that preceded it, so the shapes below are unchanged even though both endpoints have moved.
@@ -115,7 +115,7 @@ Two consequences, and they are not symmetric:
   header field is read
   - see [Finding 1](#finding-1-fixed-a-stray-response-was-accepted-as-a-header).
 
-## SBC side (DuetSbcInterface)
+## SBC side (DuetRealtimeCore)
 
 ```mermaid
 stateDiagram-v2
@@ -245,7 +245,7 @@ wanted a 24-byte header, and both are gone.
 
 ```mermaid
 sequenceDiagram
-    participant SBC as DuetSbcInterface
+    participant SBC as DuetRealtimeCore
     participant CTRL as DuetCANMaster
 
     Note over CTRL: StartNextTransfer arms header DMA<br/>state = ExchangingHeader
@@ -384,7 +384,7 @@ Once out of phase, the old code could not recover:
 
 ```mermaid
 sequenceDiagram
-    participant SBC as DuetSbcInterface
+    participant SBC as DuetRealtimeCore
     participant CTRL as DuetCANMaster
 
     Note over SBC,CTRL: header, response and data all exchanged cleanly

@@ -10,7 +10,7 @@ using SystemTests.Host;
 namespace SystemTests.Scenarios;
 
 /// <summary>
-/// The link itself, end to end: DuetControlServer and libduet_sbc against the fake controller.
+/// The link itself, end to end: DuetControlServer and libduet_realtime_core against the fake controller.
 /// Connection, configuration traffic, scripted failures, and recovery
 /// </summary>
 [TestFixture]

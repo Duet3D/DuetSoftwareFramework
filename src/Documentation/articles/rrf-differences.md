@@ -28,7 +28,7 @@ four programs across three boards:
 | Program | Runs on | What it is for |
 |---|---|---|
 | [DuetControlServer](src/DuetControlServer) | the SBC, managed | Interprets G-code, owns the object model, decides what a move means |
-| [DuetSbcInterface](src/DuetSbcInterface) | the SBC, native | Plans motion, holds the segment chain and the DDA ring |
+| [DuetRealtimeCore](src/DuetRealtimeCore) | the SBC, native | Plans motion, holds the segment chain and the DDA ring |
 | [DuetCANMaster](src/DuetCANMaster) | the Duet 3 main board | Bridges SPI to CAN, and is close enough to the bus to stop a move in time |
 | [Duet3Expansion](src/Duet3Expansion) | each expansion board | Owns the pins and the drivers |
 

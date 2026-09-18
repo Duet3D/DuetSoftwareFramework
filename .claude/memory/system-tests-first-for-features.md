@@ -12,7 +12,7 @@ When a new feature is added, write its high-level system tests first, before the
 
 - every user input edge case the feature can be given
 - every object model change the feature is expected to make
-- the outgoing DuetSbcInterface packets the feature is expected to produce, validated field by field
+- the outgoing DuetRealtimeCore packets the feature is expected to produce, validated field by field
 - every response Duet3Expansion can send back, including the failure and refusal cases
 - anything else the feature makes possible that a scenario can drive
 

@@ -10,7 +10,7 @@ interrupt. Here the work is split four ways and no component can see the whole o
 | Program | Runs on | What it is for |
 |---|---|---|
 | [DuetControlServer](src/DuetControlServer) | the SBC, managed | Interprets G-code, decides what a move means and what its outcome was |
-| [DuetSbcInterface](src/DuetSbcInterface) | the SBC, native | Plans motion, holds the segment chain, and can say where a drive was at any instant |
+| [DuetRealtimeCore](src/DuetRealtimeCore) | the SBC, native | Plans motion, holds the segment chain, and can say where a drive was at any instant |
 | [DuetCANMaster](src/DuetCANMaster) | the Duet main board | Bridges SPI to CAN, and is the only thing close enough to the bus to stop a move in time |
 | [Duet3Expansion](src/Duet3Expansion) | each expansion board | Owns the pins and the drivers: sees the switch, generates the steps |
 
@@ -32,7 +32,7 @@ collects the decisions here that were departures rather than ports.
 flowchart TB
     subgraph Pi["Raspberry Pi"]
         DCS["DuetControlServer<br/>what a move means, and what became of it"]
-        SBCI["DuetSbcInterface<br/>plans the motion, holds the segment chain"]
+        SBCI["DuetRealtimeCore<br/>plans the motion, holds the segment chain"]
     end
     subgraph Main["Duet 3 main board"]
         CM["DuetCANMaster<br/>bridges SPI to CAN, decides the stop"]
@@ -326,8 +326,8 @@ array is `stopOnInput[numDrives]` - the stop identity travels **with the move, p
 driver rather than per move is what lets one move home several axes at once, each stopping on its own
 endstop, and what stops a driver that watches nothing from being stopped by its neighbour's endstop.
 
-**DuetSbcInterface** holds it in `DDA::m_stopOnInput[]` while the move is queued. When
-[DDA::Prepare](src/DuetSbcInterface/src/Movement/DDA.cpp) emits each driver's movement it calls
+**DuetRealtimeCore** holds it in `DDA::m_stopOnInput[]` while the move is queued. When
+[DDA::Prepare](src/DuetRealtimeCore/src/Movement/DDA.cpp) emits each driver's movement it calls
 `StopInputForSwitch`, which rebuilds the board-and-handle pair for that driver: with one switch every
 driver gets `boards[0]` and the handle unchanged; with a switch per driver, switch *i* gets
 `boards[i]` and the handle's minor field replaced by *i*. Which switch a driver gets is counted
@@ -387,7 +387,7 @@ sequenceDiagram
     autonumber
     participant EXP as Duet3Expansion
     participant CM as DuetCANMaster
-    participant SBCI as DuetSbcInterface
+    participant SBCI as DuetRealtimeCore
     participant DCS as DuetControlServer
 
     EXP->>EXP: pin interrupt, stamp whenStateChanged from its own step clock
@@ -486,7 +486,7 @@ independent consumers of one message rather than one path feeding the other.
 The controller queues a `MotionStopped` SPI packet carrying the trigger time, the id of the move it
 stopped and the drivers it stopped
 ([SbcInterface::ReportMotionStopped](src/DuetCANMaster/src/SBC/SbcInterface.cpp)), ahead of ordinary
-status traffic. **DuetSbcInterface** forwards it unchanged to DCS as an
+status traffic. **DuetRealtimeCore** forwards it unchanged to DCS as an
 `InboundEventType::MotionStopped` event - raw rather than a conclusion, because this side knows where
 the drives were but only DCS knows what the move was for.
 
@@ -496,7 +496,7 @@ the drives were but only DCS knows what the move was for.
 
 The controller stopped the drives but cannot say where they should *end up*: it never generated the
 steps. Undoing the overshoot needs the position at the instant the endstop fired, which only
-DuetSbcInterface can answer - it planned the motion and holds the segment chain.
+DuetRealtimeCore can answer - it planned the motion and holds the segment chain.
 
 [EndstopCorrection.Apply](src/DuetControlServer/Motion/EndstopCorrection.cs) is the whole of the
 decision, and it runs under the planner lock:
@@ -509,8 +509,8 @@ decision, and it runs under the planner lock:
 2. **Map each stopped driver to a logical drive** through `MotionParameters.DriveForDriver`. A driver
    belongs to exactly one drive; a report that maps to none, or to a drive this move did not arm, is
    refused and logged rather than acted on.
-3. **Ask where it was**, via `DuetSbc_MotionGetPositionAt(drive, whenTriggered)`.
-   [MotionService::GetPositionAt](src/DuetSbcInterface/src/SBC/MotionService.cpp) converts the
+3. **Ask where it was**, via `DuetRT_MotionGetPositionAt(drive, whenTriggered)`.
+   [MotionService::GetPositionAt](src/DuetRealtimeCore/src/SBC/MotionService.cpp) converts the
    timestamp into the movement timebase and evaluates the drive's segment chain at that instant. It
    reads the tracker as the motion thread last left it and does not advance it - advancing retires
    and releases segments, and the segment freelist is not thread-safe.
@@ -658,7 +658,7 @@ Most of the subtlety in this path is time, so it is worth stating plainly which 
 |---|---|---|
 | Board step clock | Each expansion board | What `whenStateChanged` is stamped from. Converted to master time before it goes on the wire |
 | Controller step clock | DuetCANMaster | The reference. Boards are synchronised to it by `CanMessageTimeSync`; it widens the 16-bit timestamps boards send |
-| The SBC's model of it | DuetSbcInterface | The SBC has no such counter. `StepTimer` fits a linear model onto `CLOCK_MONOTONIC`, disciplined by a reading in **every SPI transfer header** - the header rather than a packet, because a packet is reached after however long the packets ahead of it took, and that variation is what a linear fit cannot remove |
+| The SBC's model of it | DuetRealtimeCore | The SBC has no such counter. `StepTimer` fits a linear model onto `CLOCK_MONOTONIC`, disciplined by a reading in **every SPI transfer header** - the header rather than a packet, because a packet is reached after however long the packets ahead of it took, and that variation is what a linear fit cannot remove |
 | The movement timebase | Shared | The raw step clock less `movementDelay`. Moves are scheduled and segments timed in this; it only ever grows, and it grows whenever any board reports it could not keep up |
 
 The last two are where mistakes hide. A trigger timestamp is a reading of the **raw** clock; a

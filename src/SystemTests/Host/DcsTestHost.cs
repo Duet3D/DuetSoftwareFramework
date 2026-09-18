@@ -27,7 +27,7 @@ namespace SystemTests.Host;
 
 /// <summary>
 /// DuetControlServer hosted in-process for a system test: the same service registrations as
-/// Program.cs, the real <c>NativeLink</c> and <c>libduet_sbc.so</c>, pointed over the socket
+/// Program.cs, the real <c>NativeLink</c> and <c>libduet_realtime_core.so</c>, pointed over the socket
 /// transport at a <see cref="ScriptedCanMaster"/>, with a per-test virtual SD tree
 /// </summary>
 internal sealed class DcsTestHost : IAsyncDisposable

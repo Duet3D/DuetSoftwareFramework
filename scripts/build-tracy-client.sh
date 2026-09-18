@@ -66,9 +66,9 @@ fi
 : "${DEST_DIR:=$REPO_ROOT/build/tracy/$ARCH}"
 BUILD_DIR="$REPO_ROOT/build/tracy/$ARCH/cmake"
 
-# The toolchain files live with libduet_sbc.so and carry the reasoning about glibc versions and
+# The toolchain files live with libduet_realtime_core.so and carry the reasoning about glibc versions and
 # sysroots; the same cross compilers produce a client the deployed DuetControlServer can load.
-TOOLCHAIN_DIR="$REPO_ROOT/src/DuetSbcInterface/cmake"
+TOOLCHAIN_DIR="$REPO_ROOT/src/DuetRealtimeCore/cmake"
 declare -A TOOLCHAIN=(
     [linux-arm64]="$TOOLCHAIN_DIR/aarch64-linux-gnu.cmake"
     [linux-arm]="$TOOLCHAIN_DIR/arm-linux-gnueabihf.cmake"

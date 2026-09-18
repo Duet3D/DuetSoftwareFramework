@@ -13,7 +13,7 @@ namespace DuetControlServer.Motion;
 /// <para>
 /// The engine keeps these counters and cannot format them: it runs on a real-time thread that must
 /// not build strings, and the wording of a reply belongs on this side in any case. So the native
-/// side reports numbers through <c>DuetSbc_MotionGetStats</c> and this renders them.
+/// side reports numbers through <c>DuetRT_MotionGetStats</c> and this renders them.
 /// </para>
 /// <para>
 /// The shape follows RepRapFirmware's <c>Move::Diagnostics</c> - an <c>=== Move ===</c> block and one

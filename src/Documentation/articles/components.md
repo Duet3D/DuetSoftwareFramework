@@ -16,7 +16,7 @@ boards. They are grouped together because between them they are the machine.
 - runs the [G-code pipeline](gcode-flow.md) (intake, interception, internal processing),
 - interprets every G/M/T-code itself, including motion, heaters, tools and probing,
 - decides what each move means and hands it to the motion planner in
-  [DuetSbcInterface](#duetsbcinterface),
+  [DuetRealtimeCore](#duetrealtimecore),
 - composes the [CAN messages](can-messages.md) that configure and drive the expansion boards,
 - maps virtual SD paths to the Linux filesystem and parses G-code [file info](file-management.md),
 - hosts the [IPC server](ipc.md) that every other process connects to.
@@ -24,9 +24,9 @@ boards. They are grouped together because between them they are the machine.
 Command-line options, return codes, and the link/IPC details are documented in the repository
 `README.md`. The bulk of this documentation set describes DCS internals.
 
-### DuetSbcInterface
+### DuetRealtimeCore
 
-`src/DuetSbcInterface/` - a native shared library (`libduet_sbc.so`) loaded into the DCS process,
+`src/DuetRealtimeCore/` - a native shared library (`libduet_realtime_core.so`) loaded into the DCS process,
 built from C++ ported from RepRapFirmware. It holds the work that has to keep real time or has to
 evaluate a motion profile:
 
@@ -158,7 +158,7 @@ flowchart LR
     AUTH --> DWS
     DWS -->|"CommandConnection<br/>(IPC socket)"| DCS["DuetControlServer"]
     DCS -->|"G-code pipeline"| PIPE["see gcode-flow.md"]
-    PIPE -->|"a move, or a CAN message"| SBCI["DuetSbcInterface"]
+    PIPE -->|"a move, or a CAN message"| SBCI["DuetRealtimeCore"]
     SBCI -->|"SPI"| CM["DuetCANMaster"]
     CM -->|"CAN"| EXP["Duet3Expansion"]
     PIPE -->|"reply"| DCS --> DWS --> BROWSER

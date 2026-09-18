@@ -5,7 +5,7 @@ drain on its own, and both call it a fast pause or feed hold. They arrived at it
 two algorithms are not the same. This records where they differ and why, so that a change to either
 can be judged against the other rather than assumed to be a port of it.
 
-DSF's is `DDARing::Feedhold` in `src/DuetSbcInterface/src/Motion/DDARing.cpp`, reached from
+DSF's is `DDARing::Feedhold` in `src/DuetRealtimeCore/src/Motion/DDARing.cpp`, reached from
 `StopKind::PlannedDeceleration`. RepRapFirmware's is `DDARing::PauseMoves` with
 `DDARing::MakeDeceleratingChain` and the four `DDA::TurnInto*` helpers, added in `b9c868bef`
 ("Implemented fast pause (feed hold)") on `3.7-dev`.
@@ -86,7 +86,7 @@ first move that `IsProvisional()`, and RepRapFirmware skips while `IsCommitted()
 They differ in `DDA::CanPauseAfter`. RepRapFirmware removed the `&& !next->IsCommitted()` condition
 in the same commit, with its comment about not being able to cancel moves already sent to CAN
 expansion boards, because the skip loop above it has already dealt with them. DSF's `CanPauseAfter`
-in `src/DuetSbcInterface/src/Motion/DDA.h` still carries both the condition and that comment. It is
+in `src/DuetRealtimeCore/src/Motion/DDA.h` still carries both the condition and that comment. It is
 only consulted by `StopKind::AtExistingJunction`, which is the faithful port of the old algorithm, so
 removing it there would make that port diverge from the RepRapFirmware release it was ported from
 rather than converge on the new one. It is worth revisiting when `AtExistingJunction` is next

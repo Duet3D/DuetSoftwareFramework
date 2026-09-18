@@ -27,7 +27,7 @@ internal interface IControllerClock
 /// The SBC-side model extrapolates at the nominal rate between the samples it receives and is
 /// clamped never to run backwards, so with only the master clock frozen its reading still creeps
 /// forward in real time. Full determinism pairs this clock with the pinned local clock seam
-/// (<c>DuetSbc_PinLocalClock</c>), advancing both together
+/// (<c>DuetRT_PinLocalClock</c>), advancing both together
 /// </remarks>
 internal sealed class SteppedClock : IControllerClock
 {

@@ -66,7 +66,7 @@ WarningsAsErrors: ''
 # Anchored to this project's own sources. A bare 'src/.*' would also match the shared
 # wire-protocol headers under lib/DuetSpiInterface/, which DuetCANMaster compiles against --
 # fixing headers there would silently change a project that is out of scope.
-HeaderFilterRegex: '/src/DuetSbcInterface/.*'
+HeaderFilterRegex: '/src/DuetRealtimeCore/.*'
 
 FormatStyle: file
 
@@ -90,7 +90,7 @@ CheckOptions:
   # DuetControlServer/Link/Native/NativeMethods.cs. Renaming these would not fail the
   # build -- it would fail at runtime when P/Invoke cannot resolve the entry point.
   - key: readability-identifier-naming.FunctionIgnoredRegexp
-    value: '^DuetSbc_.*'
+    value: '^DuetRT_.*'
   - key: readability-identifier-naming.NamespaceCase
     value: CamelCase
   - key: readability-identifier-naming.EnumCase

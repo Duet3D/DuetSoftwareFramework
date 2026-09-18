@@ -27,7 +27,7 @@ namespace DuetControlServer.Link;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The SPI protocol itself lives in C++ (<c>src/DuetSbcInterface</c>): it owns the transfer state
+/// The SPI protocol itself lives in C++ (<c>src/DuetRealtimeCore</c>): it owns the transfer state
 /// machine and runs it on a pinned, real-time thread. This service starts that loop and then runs a
 /// single normal-priority dispatcher thread which drains the native inbound ring and hands each event
 /// to the same handlers DCS has always used.
