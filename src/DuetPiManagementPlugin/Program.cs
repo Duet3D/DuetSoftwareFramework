@@ -301,7 +301,7 @@ namespace DuetPiManagementPlugin
                         case 540:
                             try
                             {
-                                int index = code.GetInt('I', 0);
+                                int index = code.GetInt('I', defaultValue: 0);
                                 if (code.TryGetString('P', out string? address))
                                 {
                                     Message setResult = await Interface.SetMACAddress(index, address);
@@ -386,7 +386,7 @@ namespace DuetPiManagementPlugin
                                 bool hasPParam = code.TryGetString('P', out string? pParam), hasSParam = code.TryGetInt('S', out int? sParam);
                                 if (hasPParam || hasSParam)
                                 {
-                                    int index = code.GetInt('I', 0);
+                                    int index = code.GetInt('I', defaultValue: 0);
                                     try
                                     {
                                         Message manageResult = await Interface.SetConfigAsync(index, pParam, sParam);
@@ -401,7 +401,7 @@ namespace DuetPiManagementPlugin
                                 else
                                 {
                                     StringBuilder builder = new();
-                                    await Interface.Report(builder, null, code.GetInt('I', -1));
+                                    await Interface.Report(builder, null, code.GetInt('I', defaultValue: -1));
                                     await Connection.ResolveCodeAsync(MessageType.Success, builder.ToString().TrimEnd(), CancellationToken);
                                 }
                             }
@@ -411,7 +411,7 @@ namespace DuetPiManagementPlugin
                         case 553:
                             try
                             {
-                                int index = code.GetInt('I', 0);
+                                int index = code.GetInt('I', defaultValue: 0);
                                 string result = await Interface.ManageNetmask(index, code.GetIPAddress('P'));
                                 await Connection.ResolveCodeAsync(MessageType.Success, result, CancellationToken);
                             }
@@ -426,7 +426,7 @@ namespace DuetPiManagementPlugin
                         case 554:
                             try
                             {
-                                int index = code.GetInt('I', 0);
+                                int index = code.GetInt('I', defaultValue: 0);
                                 _ = code.TryGetIPAddress('P', out IPAddress? gateway);
                                 _ = code.TryGetIPAddress('S', out IPAddress? dnsServer);
                                 string result = await Interface.ManageGateway(index, gateway, dnsServer);
@@ -451,7 +451,7 @@ namespace DuetPiManagementPlugin
                                 else if (code.TryGetInt('P', out int protocol))
                                 {
                                     code.TryGetBool('S', out bool? enabled);
-                                    Message result = await Network.Protocols.Manager.ConfigureProtocols(protocol, enabled, code.GetBool('T', false), code.GetInt('R', 0));
+                                    Message result = await Network.Protocols.Manager.ConfigureProtocols(protocol, enabled, code.GetBool('T', defaultValue: false), code.GetInt('R', defaultValue: 0));
                                     if (string.IsNullOrWhiteSpace(result.Content) && (protocol == 4 || code.HasParameter('C')))
                                     {
                                         // Let DSF/RRF process M586 P4 (MQTT) or the combined C parameter
@@ -536,7 +536,7 @@ namespace DuetPiManagementPlugin
                                 }
                                 else if (code.MinorNumber == 2)
                                 {
-                                    Message scanResult = WifiScan.GetResult(code.GetBool('F', false));
+                                    Message scanResult = WifiScan.GetResult(code.GetBool('F', defaultValue: false));
                                     await Connection.ResolveCodeAsync(scanResult, CancellationToken);
                                 }
                                 else
@@ -571,7 +571,7 @@ namespace DuetPiManagementPlugin
                             try
                             {
                                 // Set up hostapd configuration
-                                Message configResult = await AccessPoint.Configure(code.GetString('S'), code.GetString('P'), code.GetIPAddress('I', IPAddress.Any), code.GetInt('C', 6));
+                                Message configResult = await AccessPoint.Configure(code.GetString('S'), code.GetString('P'), code.GetIPAddress('I', defaultValue: IPAddress.Any), code.GetInt('C', defaultValue: 6));
                                 await Connection.ResolveCodeAsync(configResult, CancellationToken);
                             }
                             catch (Exception e)
@@ -667,7 +667,7 @@ namespace DuetPiManagementPlugin
 
                         // Perform update
                         case 997:
-                            if (code.GetInt('S', 0) == 2)
+                            if (code.GetInt('S', defaultValue: 0) == 2)
                             {
                                 // Check if we need to change the package feed
                                 if (code.TryGetString('F', out string? packageFeed))
@@ -764,9 +764,9 @@ namespace DuetPiManagementPlugin
 
                         // Reboot or shut down SBC
                         case 999:
-                            if (code.GetInt('B', 0) == -1)
+                            if (code.GetInt('B', defaultValue: 0) == -1)
                             {
-                                string rebootResult = await Command.ExecuteAsync("systemctl", (code.GetString('P', string.Empty) == "OFF") ? "poweroff" : "reboot");
+                                string rebootResult = await Command.ExecuteAsync("systemctl", (code.GetString('P', defaultValue: string.Empty) == "OFF") ? "poweroff" : "reboot");
                                 await Connection.ResolveCodeAsync(MessageType.Success, rebootResult);
                             }
                             else
@@ -781,7 +781,8 @@ namespace DuetPiManagementPlugin
                             break;
                     }
                 }
-                catch (Exception e) when (e is MissingParameterException or InvalidParameterTypeException)
+                catch (Exception e) when (e is MissingParameterException or InvalidParameterTypeException
+                                          or GCodeException)
                 {
                     await Connection.ResolveCodeAsync(MessageType.Error, $"{code.ToShortString()}: {e.Message}");
                 }

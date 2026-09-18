@@ -139,7 +139,7 @@ public sealed class ModelObserver(IOptionsMonitor<Settings> settings, ILogger<Mo
 
                         // Wait for more updates
                         using JsonDocument jsonPatch = await subscribeConnection.GetObjectModelPatchAsync(cancellationToken);
-                        model.UpdateFromJson(jsonPatch.RootElement, false);
+                        model.UpdateFromJson(jsonPatch.RootElement);
 
                         // Increment sequence numbers
                         if (jsonPatch.RootElement.TryGetProperty("messages", out JsonElement messagesElement))

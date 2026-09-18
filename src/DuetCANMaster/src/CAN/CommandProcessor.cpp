@@ -10,9 +10,9 @@
 #if SUPPORT_CAN_EXPANSION
 
 #  include "CanInterface.h"
+#  include "CanMotion.h"
 #  include "ExpansionManager.h"
 #  include <CanMessageBuffer.h>
-#  include <Platform/Event.h>
 #  include <Platform/OutputMemory.h>
 #  include <Platform/Platform.h>
 #  include <Platform/RepRap.h>
@@ -154,24 +154,102 @@ static void HandleFirmwareBlockRequest(CanMessageBuffer& buf) noexcept
 
 // Forward a received CAN message to the SBC. If it is a response to a request we sent on behalf of the SBC, map the
 // request ID back to the SBC's txToken and collate multi-fragment standard replies into a single response.
-void CommandProcessor::ForwardMessageToSbc(CanMessageBuffer& buf) noexcept
+// Stop whatever the move said this trigger stops, and tell the SBC what was stopped.
+//
+// The two message versions differ in the size of their per-handle entries, so each is read as
+// itself; reading one as the other shifts every handle. Both carry a reading, which for a stall is
+// the bitmap of the reporting board's stalled drivers and is the only thing that says which motor
+// stalled. Only V2 carries the trigger timestamp, which is what lets the SBC undo the overshoot; a
+// V1 board can only be stopped where the message found it
+static void HandleInputStateChanged(CanMessageBuffer& buf, CanMessageType id) noexcept
+{
+#if HAS_SBC_INTERFACE
+	const CanAddress src = buf.id.Src();
+	SbcProtocol::MotionStoppedDriver stopped[SbcProtocol::MaxMotionStoppedDrivers];
+	size_t numStopped = 0;
+	// V1 carries no trigger timestamp; zero tells the SBC to correct from where the message
+	// found the drives instead, which keeps the overshoot V2 exists to remove
+	uint32_t whenTriggered = 0;
+	uint32_t moveId = 0;
+
+	if (id == CanMessageType::inputStateChangedV2)
+	{
+		const CanMessageInputChangedV2& msg = buf.msg.inputChangedV2;
+		for (unsigned int i = 0; i < msg.numHandles && i < ARRAY_SIZE(msg.results); ++i)
+		{
+			// Bit i of states is the level of the i'th handle. Remembered whichever way it went, so
+			// that a move armed on an input that is already active is stopped before it starts
+			const bool active = (msg.states & (1u << i)) != 0;
+			CanMotion::NoteInputState(src, msg.results[i].handle.asU16(), active);
+
+			// Only a handle that went active stops anything; a release is just as much a change, and
+			// stopping on one would end the move the moment the axis backed off the endstop
+			if (!active)
+			{
+				continue;
+			}
+
+			const size_t added = CanMotion::StopDriversWatchingInput(
+				src, msg.results[i].handle.asU16(), (uint32_t)msg.GetEntryReading(i),
+				std::span{stopped + numStopped, ARRAY_SIZE(stopped) - numStopped}, moveId);
+			if (added != 0)
+			{
+				// The board reports its own low 16 bits. Widened here rather than on the SBC,
+				// because this is the side whose clock they are comparable with: the SBC's is a
+				// model fitted to this one, and the boards are synchronised to this one
+				whenTriggered = CanInterface::Convert16bitReceivedTimeStampTo32bits(msg.GetWhen(i));
+				numStopped += added;
+			}
+		}
+	}
+	else
+	{
+		const CanMessageInputChangedV1& msg = buf.msg.inputChangedV1;
+		for (unsigned int i = 0; i < msg.numHandles && i < ARRAY_SIZE(msg.results); ++i)
+		{
+			const bool active = (msg.states & (1u << i)) != 0;
+			CanMotion::NoteInputState(src, msg.results[i].handle.asU16(), active);
+			if (!active)
+			{
+				continue;
+			}
+
+			numStopped += CanMotion::StopDriversWatchingInput(
+				src, msg.results[i].handle.asU16(), (uint32_t)msg.GetEntryReading(i),
+				std::span{stopped + numStopped, ARRAY_SIZE(stopped) - numStopped}, moveId);
+		}
+	}
+
+	if (numStopped != 0)
+	{
+		// The stop messages are built but not sent from this task; the async sender does that
+		CanInterface::WakeAsyncSender();
+
+		// The SBC works out where the drives should have ended up and sends the revert itself
+		reprap.GetSbcInterface().ReportMotionStopped(whenTriggered, moveId, std::span{stopped, numStopped});
+	}
+#else
+	(void)buf;
+	(void)id;
+#endif
+}
+
+bool CommandProcessor::ForwardMessageToSbc(CanMessageBuffer& buf) noexcept
 {
 #  if HAS_SBC_INTERFACE
 	SbcInterface& sbc = reprap.GetSbcInterface();
 	const CanMessageType msgType = buf.id.MsgType();
 	const CanAddress src = buf.id.Src();
 
-	// If this is a response to a request we forwarded on behalf of the SBC, recover the SBC's txToken
-	CanInterface::CanRequestMapping* _ecv_null mapping = nullptr;
-	uint16_t txToken = 0xFFFF; // TODO synchronise this default value with DSF
+	// If this is a response to a request we forwarded on behalf of the SBC, recover the SBC's txToken.
+	// A standard reply may be split across fragments, so the request stays in flight until the last one
+	// arrives; every other reply type is a single message and ends its request.
+	uint16_t txToken = SbcProtocol::UnsolicitedTxToken;
 	if (buf.id.IsResponse())
 	{
 		const auto rid = (CanRequestId)(buf.msg.generic.requestId);
-		mapping = CanInterface::FindPendingRequest(src, rid);
-		if (mapping != nullptr)
-		{
-			txToken = mapping->txToken;
-		}
+		const bool isFinalReply = (msgType != CanMessageType::standardReply || !buf.msg.standardReply.moreFollows);
+		txToken = CanInterface::MatchPendingRequest(src, rid, isFinalReply);
 	}
 
 	// Single-frame message (broadcast, unsolicited, or non-standard reply): forward the raw payload
@@ -184,20 +262,19 @@ void CommandProcessor::ForwardMessageToSbc(CanMessageBuffer& buf) noexcept
 	header.status = (uint8_t)CanStatus::Ok;
 	header.padding = 0;
 	header.padding2 = 0;
-	if (!sbc.EnqueueCanResponse(header, reinterpret_cast<const char*>(&buf.msg)))
+	const CanStatus queued = sbc.EnqueueCanResponse(header, reinterpret_cast<const char*>(&buf.msg));
+	if (queued != CanStatus::Ok && txToken != SbcProtocol::UnsolicitedTxToken)
 	{
-		// TODO handle this error
+		// The reply is gone and the request waiting for it can never be completed, so it is failed now
+		// rather than left to wait out a timeout for something that is not coming. Any fragments still
+		// to arrive belong to a request that no longer exists, so the mapping goes with it
+		sbc.ReportCanMessageSent(txToken, queued);
+		CanInterface::ReleasePendingRequestForToken(txToken);
 	}
-
-	if (mapping != nullptr)
-	{
-		if (msgType != CanMessageType::standardReply || !buf.msg.standardReply.moreFollows)
-		{
-			CanInterface::ReleasePendingRequest(mapping);
-		}
-	}
+	return queued == CanStatus::Ok;
 #  else
 	(void)buf;
+	return false;
 #  endif
 }
 
@@ -219,14 +296,32 @@ void CommandProcessor::ProcessReceivedMessage(CanMessageBuffer& buf) noexcept
 		}
 
 		{
-			const bool forwardToSbc = true;
+			// Forward broadcasts, status reports and responses (including standard replies) to the SBC.
+			// This happens before the local handling below because some of that handling replies to the
+			// sender out of this same buffer, which overwrites the message we have to forward.
+			//
+			// There is nowhere to put a message the SBC cannot take: the buffer is about to be reused
+			// and the bus has moved on, so this is where the reply is lost and where saying so is the
+			// only record of it
+			if (!ForwardMessageToSbc(buf))
+			{
+#  if HAS_SBC_INTERFACE
+				reprap.GetSbcInterface().NoteCanResponseDropped();
+#  endif
+			}
+
 			// Handle messages received in normal operation mode
 			switch (id)
 			{
 			case CanMessageType::inputStateChangedV1:
 			case CanMessageType::inputStateChangedV2:
-				// TODO: Latency-sensitive (these arrive via the high-priority CAN receiver task) can we forward these
-				// to the SBC any quicker?
+				// An endstop move told us which input stops which driver, so the stop is decided here
+				// rather than at the SBC. That is the whole point of doing it in this task: the round
+				// trip to the SBC and back would let the axis overrun the endstop.
+				//
+				// The message is forwarded as well, because the object model has to see the input
+				// change whether or not anything was moving
+				HandleInputStateChanged(buf, id);
 				break;
 
 			case CanMessageType::firmwareBlockRequest:
@@ -245,12 +340,6 @@ void CommandProcessor::ProcessReceivedMessage(CanMessageBuffer& buf) noexcept
 
 			default:
 				break;
-			}
-
-			// Forward broadcasts, status reports and responses (including standard replies) to the SBC
-			if (forwardToSbc)
-			{
-				ForwardMessageToSbc(buf);
 			}
 		}
 	}

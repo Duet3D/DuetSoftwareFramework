@@ -23,17 +23,20 @@ namespace DuetControlServer.Link;
 /// <summary>
 /// Main firmware interface
 /// </summary>
-/// <param name="channels">Channel manager</param>
 /// <param name="nativeLink">Native SPI transfer loop</param>
 /// <param name="logger">Logger instance</param>
 /// <param name="settings">Settings</param>
 [DiagnosticsPriority(-5)]
 public sealed partial class LinkInterface(
-    Channel.Manager channels,
     NativeLink nativeLink,
     ILogger<LinkInterface> logger,
     IOptions<Settings> settings) : IDiagnostics
 {
+    /// <summary>
+    /// The native SPI transfer loop and motion engine
+    /// </summary>
+    public NativeLink Native => nativeLink;
+
     // Information about the code channels
     internal int BytesReserved, BufferSpace;
 
@@ -76,12 +79,6 @@ public sealed partial class LinkInterface(
     /// </summary>
     internal Action? InvalidateCallback;
 
-    // Print handling
-    internal readonly AsyncLock PrintStateLock = new();
-    internal TaskCompletionSource? SetPrintInfoRequest;
-    internal PrintStoppedReason StopPrintReason;
-    internal TaskCompletionSource? StopPrintRequest;
-
     /// <summary>
     /// Print diagnostics of this class
     /// </summary>
@@ -90,33 +87,79 @@ public sealed partial class LinkInterface(
     public void PrintDiagnostics(StringBuilder builder)
     {
         builder.AppendLine($"Code buffer space: {BufferSpace}");
+
+        // Every move is scheduled by absolute start time in the controller's step clock, which this
+        // side has no counter for and fits to the samples the controller sends. Whether that fit has
+        // taken is not visible anywhere else, and an unfitted clock does not stop anything working
+        // until an endstop fires and the position it reverts to has no relation to where it stopped
+        NativeClockStats clock = Native.GetClockStats();
+        builder.AppendLine(clock.Synced != 0
+            ? $"Step clock: synchronised, {clock.NumSamples} samples, drift {clock.DriftPpm:F1}ppm, "
+              + $"peak residual {clock.PeakResidualNs / 1000}us, {clock.NumBackwardClamps} clamps, "
+              + $"{clock.NumRejectedSamples} rejected"
+            : $"Step clock: NOT synchronised, {clock.NumSamples} samples, {clock.NumRejectedSamples} rejected");
+
+        // Reported next to the clock because it is part of reading it: moves are timed in the
+        // movement timebase and an endstop reports its trigger in the raw one, so this is the gap
+        // between the two. It only ever grows, and it grows silently - every board slips by the same
+        // amount, so nothing about the motion looks wrong while it does
+        if (Native.GetMovementDelay() is uint movementDelay)
+        {
+            builder.AppendLine($"Movement delay: {movementDelay} ticks "
+                               + $"({movementDelay * 1000.0 / Motion.Native.MotionLimits.StepClockRate:F1}ms)");
+        }
     }
 
-    public Task<CanResponse> ConfigCanAsync(byte dstAddress, byte? newAddress, CanTiming timing, CancellationToken cancellationToken = default)
+    
+    /// <summary>
+    /// Set the CAN address and bit timing of an expansion board, which it saves in non-volatile memory
+    /// </summary>
+    /// <param name="dstAddress">Address the board has now</param>
+    /// <param name="newAddress">Address to give it, or null to leave the address alone</param>
+    /// <param name="timing">Arbitration phase bit timing to give it</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Success except on a timeout</returns>
+    /// <remarks>
+    /// Sent with <see cref="CanMessageType.NoReply"/>, because a board that has just been given a new
+    /// address cannot answer on the one the request went to.
+    /// </remarks>
+    public async Task<Message> ConfigCanAsync(byte dstAddress, byte? newAddress, CanTiming timing, CancellationToken cancellationToken = default)
     {
         CanMessageSetAddressAndNormalTiming message = new()
         {
-            oldAddress = dstAddress,
-            newAddress = newAddress ?? dstAddress,
-            newAddressInverted = (byte)~(newAddress ?? dstAddress),
-            doSetTiming = CanMessageSetAddressAndNormalTiming.DoSetTimingYes,
-            normalTiming = timing
+            OldAddress = dstAddress,
+            NewAddress = newAddress ?? dstAddress,
+            NewAddressInverted = (byte)~(newAddress ?? dstAddress),
+            DoSetTiming = CanMessageSetAddressAndNormalTiming.DoSetTimingYes,
+            NormalTiming = timing
         };
 
-        return SendCanMessageAsync(dstAddress, in message, cancellationToken: cancellationToken);
+        return (await SendCanMessageAsync(dstAddress, in message, cancellationToken: cancellationToken)).ToMessage();
     }
 
-    public Task<CanResponse> ReportCanConfigAsync(byte dstAddress, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Ask an expansion board to report its CAN address and bit timing, changing neither
+    /// </summary>
+    /// <param name="dstAddress">CAN address of the board</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>The board's reply</returns>
+    public Task<Message> ReportCanConfigAsync(byte dstAddress, CancellationToken cancellationToken = default)
     {
         CanMessageSetAddressAndNormalTiming message = new()
         {
-            oldAddress = dstAddress,
-            doSetTiming = CanMessageSetAddressAndNormalTiming.DoSetTimingNo
+            OldAddress = dstAddress,
+            DoSetTiming = CanMessageSetAddressAndNormalTiming.DoSetTimingNo
         };
 
-        return SendCanMessageAsync(dstAddress, message, CanMessageType.StandardReply, cancellationToken: cancellationToken);
+        return SendCanRequestAsync(dstAddress, in message, cancellationToken);
     }
 
+    /// <summary>
+    /// Turn the controller's CAN interface on or off
+    /// </summary>
+    /// <param name="enable">True to turn it on</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>An awaitable task that completes once the request has been written to the controller</returns>
     public async Task EnableCanAsync(bool enable, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -130,10 +173,10 @@ public sealed partial class LinkInterface(
     /// Send a typed CAN message to an expansion board and wait for the (optional) reply
     /// </summary>
     /// <typeparam name="TReq">Type of the CAN message body</typeparam>
-    /// <param name="dstAddress">CAN destination: 0..126, or 127 for broadcast</param>
+    /// <param name="dstAddress">CAN destination: up to <see cref="CanId.MaxCanAddress" />, or <see cref="CanId.BroadcastAddress" /></param>
     /// <param name="message">CAN message body to send</param>
     /// <param name="replyType">Expected reply type (<see cref="CanMessageType.NoReply"/> if none)</param>
-    /// <param name="flags">Flags for the CAN message</param>
+    /// <param name="isResponse">True if this message is a response to something an expansion board sent, rather than a request</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Reassembled reply (empty if no reply was expected)</returns>
     public Task<CanResponse> SendCanMessageAsync<TReq>(byte dstAddress, in TReq message, CanMessageType replyType = CanMessageType.NoReply, bool isResponse = false, CancellationToken cancellationToken = default)
@@ -147,13 +190,100 @@ public sealed partial class LinkInterface(
     }
 
     /// <summary>
+    /// Send a request to an expansion board and report back what it made of it
+    /// </summary>
+    /// <typeparam name="TReq">Type of the CAN message body</typeparam>
+    /// <param name="dstAddress">CAN address of the board the request is for</param>
+    /// <param name="message">CAN message body to send</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>What the board said about the request</returns>
+    /// <remarks>
+    /// This is the shape a request takes: it expects the standard reply, and what the caller wants
+    /// back is the board's answer as a <see cref="Message"/> rather than the transport's own
+    /// <see cref="CanResponse"/>. The firmware sends its requests the same way (CanInterface.cpp
+    /// SendRequestAndGetStandardReply). Reach for
+    /// <see cref="SendCanMessageAsync{TReq}(byte, in TReq, CanMessageType, bool, CancellationToken)"/>
+    /// instead when the reply type differs or the caller needs what only a
+    /// <see cref="CanResponse"/> carries, such as <see cref="CanResponse.Extra"/> or the payload of a
+    /// typed reply.
+    /// </remarks>
+    public Task<Message> SendCanRequestAsync<TReq>(byte dstAddress, in TReq message, CancellationToken cancellationToken = default)
+        where TReq : struct, ICanMessage<TReq>
+    {
+        // An async method cannot take an `in` parameter, so the await happens in a local function and
+        // the message reaches the send by reference as it does everywhere else
+        Task<CanResponse> response = SendCanMessageAsync(dstAddress, in message, CanMessageType.StandardReply,
+                                                         cancellationToken: cancellationToken);
+        return AwaitReplyAsync(response);
+
+        static async Task<Message> AwaitReplyAsync(Task<CanResponse> response) => (await response).ToMessage();
+    }
+
+    /// <summary>
+    /// Repackage a G-code as the generic CAN message its parameter table describes, and send it
+    /// </summary>
+    /// <typeparam name="TReq">Type of the CAN message body</typeparam>
+    /// <param name="dstAddress">CAN address of the board that will act on it</param>
+    /// <param name="code">The code whose parameters the message carries</param>
+    /// <param name="replyType">Expected reply type</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Reassembled reply</returns>
+    /// <remarks>
+    /// <para>
+    /// A generic message <em>is</em> its parameter table: the table says which G-code letters it
+    /// carries and in what form, so turning a code into one is a repackaging rather than a
+    /// translation. That makes it a property of the wire format, which is why it lives here - a
+    /// handler that built its own would be reimplementing the format one code at a time.
+    /// </para>
+    /// <para>
+    /// The reply comes back as a <see cref="CanResponse"/> rather than a message, because what the
+    /// board said and how a code should report it are different questions and only the handler knows
+    /// the second. A handler whose answer is simply the board's wants
+    /// <see cref="SendCodeRequestAsync{TReq}(byte, Code, CancellationToken)"/> instead
+    /// </para>
+    /// </remarks>
+    public Task<CanResponse> SendCodeAsync<TReq>(byte dstAddress, Code code,
+                                                 CanMessageType replyType = CanMessageType.StandardReply,
+                                                 CancellationToken cancellationToken = default)
+        where TReq : struct, ICanGenericMessage<TReq>
+    {
+        TReq message = default;
+        message.FromCode(code);
+        return SendCanMessageAsync(dstAddress, in message, replyType, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
+    /// Repackage a G-code as the generic CAN message its parameter table describes, send it, and
+    /// report back what the board made of it
+    /// </summary>
+    /// <typeparam name="TReq">Type of the CAN message body</typeparam>
+    /// <param name="dstAddress">CAN address of the board that will act on it</param>
+    /// <param name="code">The code whose parameters the message carries</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>What the board said about the code</returns>
+    /// <remarks>
+    /// <see cref="SendCanRequestAsync{TReq}(byte, in TReq, CancellationToken)"/> for a code that is
+    /// repackaged rather than built. This is the shape of a code the board answers for outright: the
+    /// board holds what the code configures, so its reply is the code's result and there is nothing
+    /// on this side to add to it
+    /// </remarks>
+    public Task<Message> SendCodeRequestAsync<TReq>(byte dstAddress, Code code,
+                                                    CancellationToken cancellationToken = default)
+        where TReq : struct, ICanGenericMessage<TReq>
+    {
+        TReq message = default;
+        message.FromCode(code);
+        return SendCanRequestAsync(dstAddress, in message, cancellationToken);
+    }
+
+    /// <summary>
     /// Send a raw CAN message to an expansion board and wait for the (optional) reply
     /// </summary>
     /// <param name="messageType">Type of the CAN message</param>
     /// <param name="replyType">Expected reply type (<see cref="CanMessageType.NoReply"/> if none)</param>
-    /// <param name="dstAddress">CAN destination: 0..126, or 127 for broadcast</param>
+    /// <param name="dstAddress">CAN destination: up to <see cref="CanId.MaxCanAddress" />, or <see cref="CanId.BroadcastAddress" /></param>
     /// <param name="payload">Serialized CAN message payload</param>
-    /// <param name="flags">Flags for the CAN message</param>
+    /// <param name="isResponse">True if this message is a response to something an expansion board sent, rather than a request</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Reassembled reply (empty if no reply was expected)</returns>
     private async Task<CanResponse> SendCanMessageAsync(CanMessageType messageType, CanMessageType replyType, byte dstAddress, byte[] payload, bool isResponse, CancellationToken cancellationToken)
@@ -174,55 +304,44 @@ public sealed partial class LinkInterface(
 
         try
         {
-            // Hand the message to the native loop, which stages it into the next transfer. The reply
-            // (if any) arrives as a CanResponse event and is matched back to this request by its token
+            // Hand the message to the native loop, which stages it into the next transfer. Both kinds
+            // of request are then resolved by what the controller reports for the token: the
+            // acknowledgement completes one that expects no reply and fails either kind, and a reply
+            // that is expected arrives afterwards as a CanResponse event. Reaching the controller is
+            // not reaching the bus, so delivery of the transfer is not an outcome either one can be
+            // resolved on
             nativeLink.QueueCanMessage(request.TxToken, (ushort)request.MessageType, (ushort)request.ReplyType,
                 request.DstAddress, request.IsResponse, request.RequestPayload);
-            request.Sent = true;
 
-            // A request expecting no reply is complete as soon as the native loop has taken it: there
-            // is nothing further to wait for, and no CanResponse event will ever arrive to resolve it.
-            // It must also be dropped from the list here, because only a matching response would
-            // otherwise remove it -- leaving it to accumulate for every fire-and-forget message.
-            if (!request.ExpectsReply)
-            {
-                lock (CanRequests)
-                {
-                    CanRequests.Remove(request);
-                }
-                request.SetResult();
-            }
+            // The controller reports every send and the link cancels what is outstanding when it
+            // drops, so this bounds the cases neither covers: the acknowledgement ring or the response
+            // ring overflowing while the link stays up
+            await request.Task.WaitAsync(TimeSpan.FromMilliseconds(settings.Value.CanRequestTimeout), cancellationToken);
         }
-        catch
+        catch (TimeoutException) when (request.ExpectsReply)
+        {
+            // A board that does not answer is reported, not thrown: see CanResponse.FromTimeout. The
+            // controller normally says so first and this only covers an outcome lost on the way
+            return CanResponse.FromTimeout(request);
+        }
+        catch (TimeoutException)
+        {
+            // Nothing is waiting on a board here - the controller never said what became of the
+            // message at all, which is a fault in the link rather than in the machine it addresses
+            throw new IOException($"Controller did not report what became of CAN message type {messageType} to board {dstAddress}");
+        }
+        finally
         {
             lock (CanRequests)
             {
                 CanRequests.Remove(request);
             }
-            throw;
         }
-
-        try
+        return request.ResultCode switch
         {
-            if (request.ExpectsReply)
-            {
-                // If no reply is received within the timeout, the request will be canceled and an exception will be thrown
-                await request.Task.WaitAsync(TimeSpan.FromMilliseconds(settings.Value.CanRequestTimeout), cancellationToken);
-            }
-            else
-            {
-                await request.Task.WaitAsync(cancellationToken);
-            }
-        }
-        catch
-        {
-            lock (CanRequests)
-            {
-                CanRequests.Remove(request);
-            }
-            throw;
-        }
-        return CanResponse.FromRequest(request);
+            CodeResult.CanResponseTimeout => CanResponse.FromTimeout(request),
+            _ => CanResponse.FromRequest(request)
+        };
     }
 
     /// <summary>
@@ -238,74 +357,6 @@ public sealed partial class LinkInterface(
             _canTxToken = 0;
         }
         return token;
-    }
-
-    /// <summary>
-    /// Wait for all pending codes of the first or last stack item to finish
-    /// </summary>
-    /// <param name="channel">Code channel to wait for</param>
-    /// <param name="flushAll">Flush everything</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Whether the codes have been flushed successfully</returns>
-    public async ValueTask<bool> FlushAsync(CodeChannel channel, bool flushAll, CancellationToken cancellationToken = default)
-    {
-        ValueTask<bool> flushTask;
-        using (await channels[channel].LockAsync(cancellationToken))
-        {
-            flushTask = flushAll ? channels[channel].FlushAllAsync(cancellationToken) : channels[channel].FlushAsync(cancellationToken);
-        }
-        return await flushTask;
-    }
-
-    /// <summary>
-    /// Wait for all pending codes to finish
-    /// </summary>
-    /// <param name="file">Code file</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Whether the codes have been flushed successfully</returns>
-    public async ValueTask<bool> FlushAsync(CodeFile file, CancellationToken cancellationToken = default)
-    {
-        ValueTask<bool> flushTask;
-        using (await channels[file.Channel].LockAsync(cancellationToken))
-        {
-            flushTask = channels[file.Channel].FlushAsync(file, cancellationToken);
-        }
-        return await flushTask;
-    }
-
-    /// <summary>
-    /// Wait for all pending codes on the same stack level as the given code to finish.
-    /// By default this replaces all expressions as well for convenient parsing by the code processors.
-    /// </summary>
-    /// <param name="code">Code waiting for the flush</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Whether the codes have been flushed successfully</returns>
-    public async ValueTask<bool> FlushAsync(Code code, CancellationToken cancellationToken = default)
-    {
-        ValueTask<bool> flushTask;
-        using (await channels[code.Channel].LockAsync(cancellationToken))
-        {
-            flushTask = (code.File == null) ? channels[code.Channel].FlushAsync(cancellationToken) : channels[code.Channel].FlushAsync(code.File, cancellationToken);
-        }
-        return await flushTask;
-    }
-
-    /// <summary>
-    /// Copy the state from one channel processor to another
-    /// </summary>
-    /// <param name="from">Source channel</param>
-    /// <param name="to">Target channel</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    public async Task CopyStateAsync(CodeChannel from, CodeChannel to, CancellationToken cancellationToken = default)
-    {
-        using (await channels[to].LockAsync(cancellationToken))
-        {
-            using (await channels[from].LockAsync(cancellationToken))
-            {
-                channels[to].CopyState(channels[from]);
-            }
-        }
     }
 
     /// <summary>
@@ -343,116 +394,6 @@ public sealed partial class LinkInterface(
             await nativeLink.ResetAsync(cancellationToken);
         }
         logger.LogWarning("Resetting controller");
-    }
-
-    /// <summary>
-    /// Attempt to flag the currently executing macro file as (not) pausable
-    /// </summary>
-    /// <param name="channel">Code channel where the macro is being executed</param>
-    /// <param name="isPausable">Whether or not the macro file is pausable</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    public async Task SetMacroPausableAsync(CodeChannel channel, bool isPausable, CancellationToken cancellationToken = default)
-    {
-        using (await channels[channel].LockAsync(cancellationToken))
-        {
-            await channels[channel].SetMacroPausable(isPausable).WaitAsync(cancellationToken);
-        }
-    }
-
-    /// <summary>
-    /// Update the print file info in the firmware
-    /// </summary>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    public async Task SetPrintFileInfo(CancellationToken cancellationToken = default)
-    {
-        Task task;
-        using (await PrintStateLock.LockAsync(cancellationToken))
-        {
-            SetPrintInfoRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            task = SetPrintInfoRequest.Task;
-        }
-        await task.WaitAsync(cancellationToken);
-    }
-
-    /// <summary>
-    /// Notify the firmware that the file print has been stopped
-    /// </summary>
-    /// <param name="reason">Reason why the print has stopped</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    /// <exception cref="OperationCanceledException">Connection lost while trying to notify RRF</exception>
-    public async Task StopPrintAsync(PrintStoppedReason reason, CancellationToken cancellationToken = default)
-    {
-        Task onPrintStopped;
-        using (await PrintStateLock.LockAsync(cancellationToken))
-        {
-            StopPrintReason = reason;
-            StopPrintRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            onPrintStopped = StopPrintRequest.Task;
-        }
-        await onPrintStopped.WaitAsync(cancellationToken);
-    }
-
-    /// <summary>
-    /// Class representing an acquired movement lock
-    /// </summary>
-    /// <param name="channel">Locked code channel</param>
-    /// <param name="linkInterface">Link interface</param>
-    private class MovementLock(CodeChannel channel, LinkInterface linkInterface) : IAsyncDisposable
-    {
-        /// <summary>
-        /// Called when this instance is being disposed
-        /// </summary>
-        /// <returns>Asynchronous task</returns>
-        public async ValueTask DisposeAsync()
-        {
-            GC.SuppressFinalize(this);
-            await linkInterface.UnlockAll(channel);
-        }
-    }
-
-    /// <summary>
-    /// Lock all movement systems and wait for standstill
-    /// </summary>
-    /// <param name="channel">Code channel acquiring the lock</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Disposable lock object that releases the lock when disposed</returns>
-    /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    /// <exception cref="OperationCanceledException">Failed to get movement lock</exception>
-    public async Task<IAsyncDisposable> LockAllMovementSystemsAndWaitForStandstill(CodeChannel channel, CancellationToken cancellationToken = default)
-    {
-        Task<bool> lockTask;
-        using (await channels[channel].LockAsync(cancellationToken))
-        {
-            lockTask = channels[channel].LockAllMovementSystemsAndWaitForStandstill();
-        }
-
-        if (await lockTask.WaitAsync(cancellationToken))
-        {
-            return new MovementLock(channel, this);
-        }
-        throw new OperationCanceledException();
-    }
-
-    /// <summary>
-    /// Unlock all resources occupied by the given channel
-    /// </summary>
-    /// <param name="channel">Channel holding the resources</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    internal async Task UnlockAll(CodeChannel channel, CancellationToken cancellationToken = default)
-    {
-        Task unlockTask;
-        using (await channels[channel].LockAsync(cancellationToken))
-        {
-            unlockTask = channels[channel].UnlockAll();
-        }
-        await unlockTask.WaitAsync(cancellationToken);
     }
 
     /// <summary>
@@ -531,17 +472,62 @@ public sealed partial class LinkInterface(
     }
 
     /// <summary>
-    /// Abort all files in RRF on the given channel asynchronously
+    /// Record what became of a CAN message the controller was asked to send
     /// </summary>
-    /// <param name="channel">Channel where all the files have been aborted</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    public async Task AbortAllAsync(CodeChannel channel, CancellationToken cancellationToken = default)
+    /// <param name="txToken">Token the message was queued with</param>
+    /// <param name="status">Outcome the controller reported</param>
+    /// <remarks>
+    /// <para>
+    /// A message expecting no reply is complete here: this is the furthest anything can say it got.
+    /// One expecting a reply is only failed here - a reply it can no longer receive is one it would
+    /// otherwise wait out the whole timeout for.
+    /// </para>
+    /// </remarks>
+    internal void CompleteCanMessageSent(ushort txToken, Protocol.FirmwareRequests.CanStatus status)
     {
-        using (await channels[channel].LockAsync(cancellationToken))
+        CanRequest? request = null;
+        lock (CanRequests)
         {
-            await channels[channel].AbortAllFilesAsync().WaitAsync(cancellationToken);
+            foreach (CanRequest candidate in CanRequests)
+            {
+                if (candidate.TxToken == txToken)
+                {
+                    request = candidate;
+                    break;
+                }
+            }
+
+            if (request is null || (request.ExpectsReply && status == Protocol.FirmwareRequests.CanStatus.Ok))
+            {
+                return;
+            }
+            CanRequests.Remove(request);
+        }
+
+        switch (status)
+        {
+            case Protocol.FirmwareRequests.CanStatus.Ok:
+                // Only reached by a message expecting no reply; one that expects a reply returned above
+                request.SetResult();
+                break;
+
+            case Protocol.FirmwareRequests.CanStatus.ResponseTimeout:
+            case Protocol.FirmwareRequests.CanStatus.DispatchTimeout:
+                /* 
+                TODO revisit this in the future, we might make this throw a GCodeException so that the code ends early.
+                The ultimate goal would be for a Code to be atomic so if it fails in anyway, the machine state is rolled
+                back to before the code ran. This means reverting any OM changes and possibling sending new CAN messages
+                to expansion boards.
+
+                It may also be useful in the future to clarify to the user whether the CAN message was dispatched or not
+                but to keep RRF parity that is not done yet.
+                 */
+                request.SetTimedOut();
+                break;
+
+            default:
+                request.SetException(new IOException($"Controller could not send CAN message: {status}"));
+                break;
         }
     }
 
@@ -550,29 +536,6 @@ public sealed partial class LinkInterface(
     /// </summary>
     internal void InvalidateCodes()
     {
-        // No longer starting or stopping a print. Must do this before aborting the print
-        using (PrintStateLock.Lock())
-        {
-            if (SetPrintInfoRequest is not null)
-            {
-                SetPrintInfoRequest.SetCanceled();
-                SetPrintInfoRequest = null;
-            }
-            if (StopPrintRequest is not null)
-            {
-                StopPrintRequest.SetCanceled();
-                StopPrintRequest = null;
-            }
-        }
-
-        // Resolve pending macros, unbuffered (system) codes and flush requests
-        foreach (Channel.Processor channel in channels)
-        {
-            using (channel.Lock())
-            {
-                channel.Invalidate();
-            }
-        }
         BytesReserved = BufferSpace = 0;
 
         // Resolve pending CAN requests
@@ -596,56 +559,4 @@ public sealed partial class LinkInterface(
         InvalidateCodes();
     }
 
-    /// <summary>
-    /// Invalidate pending codes and code-relevant requests due to an emergency stop asynchronously
-    /// </summary>
-    /// <returns>Asynchronous task</returns>
-    internal async Task InvalidateCodesAsync(CancellationToken cancellationToken)
-    {
-        // No longer starting or stopping a print. Must do this before aborting the print
-        using (await PrintStateLock.LockAsync(cancellationToken))
-        {
-            if (SetPrintInfoRequest is not null)
-            {
-                SetPrintInfoRequest.SetCanceled(cancellationToken);
-                SetPrintInfoRequest = null;
-            }
-            if (StopPrintRequest is not null)
-            {
-                StopPrintRequest.SetCanceled(cancellationToken);
-                StopPrintRequest = null;
-            }
-        }
-
-        // Resolve pending macros, unbuffered (system) codes and flush requests
-        foreach (Channel.Processor channel in channels)
-        {
-            using (await channel.LockAsync(cancellationToken))
-            {
-                channel.Invalidate();
-            }
-        }
-        BytesReserved = BufferSpace = 0;
-
-        // Resolve pending CAN requests
-        lock (CanRequests)
-        {
-            foreach (CanRequest request in CanRequests)
-            {
-                request.SetCanceled();
-            }
-            CanRequests.Clear();
-        }
-    }
-
-    /// <summary>
-    /// Invalidate every resource due to a disconnect or reset asynchronously
-    /// </summary>
-    /// <returns>Asynchronous task</returns>
-    internal async Task InvalidateAsync(CancellationToken cancellationToken)
-    {
-        // Invalidate codes and code-relevant requests. See Invalidate() on why messages need no
-        // clearing here
-        await InvalidateCodesAsync(cancellationToken);
-    }
 }

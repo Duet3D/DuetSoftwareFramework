@@ -8,6 +8,16 @@ namespace DuetAPI.ObjectModel;
 /// </summary>
 public partial class Probe : ModelObject, IStaticModelObject
 {
+    // What a probe does before M558 and G31 have configured it, as RepRapFirmware's ZProbe
+    // constructor sets it.
+
+    /// <summary>Height the probe rises to between taps until M558 says otherwise (in mm)</summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>DefaultZDive</c>. Zero would leave the nozzle on the bed between the taps
+    /// of a multi-tap probe, so each tap after the first would measure nothing
+    /// </remarks>
+    public const float DefaultDiveHeight = 5F;
+
     /// <summary>
     /// Calibration temperature (in C)
     /// </summary>
@@ -47,13 +57,13 @@ public partial class Probe : ModelObject, IStaticModelObject
         get => _diveHeight;
         set => SetPropertyValue(ref _diveHeight, value);
     }
-    private float _diveHeight;
+    private float _diveHeight = DefaultDiveHeight;
 
     /// <summary>
     /// Dive heights of the probe (in mm).
     /// The first element is the dive height for the first tap; the second element is used for subsequent taps when multi-tapping
     /// </summary>
-    public ObservableCollection<float> DiveHeights { get; } = [0F, 0F];
+    public ObservableCollection<float> DiveHeights { get; } = [DefaultDiveHeight, DefaultDiveHeight];
 
     /// <summary>
     /// Indicates if the scanning probe is calibrated
@@ -102,6 +112,21 @@ public partial class Probe : ModelObject, IStaticModelObject
     public ObservableCollection<float> Offsets { get; } = [0F, 0F];
 
     /// <summary>
+    /// Port of this probe as given to M558, or null if it has none
+    /// </summary>
+    /// <remarks>
+    /// The expansion board carrying the port is what watches the input, but the port is recorded here
+    /// because the object model has to hold enough to recreate the machine: a board that reconnects
+    /// is given its input monitor again from this, and M500 writes it back out
+    /// </remarks>
+    public string? Port
+    {
+        get => _port;
+        set => SetPropertyValue(ref _port, value);
+    }
+    private string? _port;
+
+    /// <summary>
     /// Recovery time (in s)
     /// </summary>
     public float RecoveryTime
@@ -110,6 +135,21 @@ public partial class Probe : ModelObject, IStaticModelObject
         set => SetPropertyValue(ref _recoveryTime, value);
     }
     private float _recoveryTime;
+
+    /// <summary>
+    /// Temperature sensor the temperature coefficients are measured against, or null if none is set
+    /// </summary>
+    /// <remarks>
+    /// Set by G31 H. RepRapFirmware keeps this on the probe but does not report it, and M500 does not
+    /// write it back out; it is held here because the object model has to carry enough to recreate
+    /// the machine
+    /// </remarks>
+    public int? Sensor
+    {
+        get => _sensor;
+        set => SetPropertyValue(ref _sensor, value);
+    }
+    private int? _sensor;
 
     /// <summary>
     /// Coefficients for the scanning Z-probe (4 elements, if applicable)

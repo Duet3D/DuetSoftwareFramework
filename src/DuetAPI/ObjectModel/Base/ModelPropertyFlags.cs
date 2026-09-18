@@ -19,11 +19,6 @@ public enum ModelPropertyFlags
     HasSetter = 1,
 
     /// <summary>
-    /// Property is only available in SBC mode, see <see cref="SbcPropertyAttribute"/>
-    /// </summary>
-    SbcProperty = 2,
-
-    /// <summary>
     /// Property is updated live, see <see cref="LiveAttribute"/>
     /// </summary>
     Live = 4,

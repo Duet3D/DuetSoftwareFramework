@@ -11,6 +11,8 @@ namespace DuetControlServer.Codes.Meta.Parsing;
 /// Recursive-descent evaluator for meta G-code expressions. This is a C# port of the firmware ExpressionParser so
 /// that DSF can evaluate expressions itself instead of forwarding them to the firmware. Operator precedence, type
 /// coercion, numeric promotion rules and error messages are kept identical to the firmware to avoid behavioural drift.
+/// Where an error is about the type of an operand, the message says which types were involved: the firmware cannot,
+/// because it has no printable form of its type codes, and "unexpected operand type" alone leaves the reader guessing.
 ///
 /// Values are represented as boxed CLR objects matching the firmware type codes:
 /// null (none/null), <see cref="bool"/>, <see cref="char"/>, <see cref="int"/> (int32), <see cref="uint"/> (uint32),
@@ -131,7 +133,7 @@ public sealed class MetaExpressionParser
                     default:
                         if (evaluate)
                         {
-                            ThrowParseException("expected numeric value after '-'");
+                            ThrowParseException($"expected numeric value after '-', got {TypeName(val)}");
                         }
                         break;
                 }
@@ -160,7 +162,7 @@ public sealed class MetaExpressionParser
                     default:
                         if (evaluate)
                         {
-                            ThrowParseException("expected numeric or enumeration value after '+'");
+                            ThrowParseException($"expected numeric or enumeration value after '+', got {TypeName(val)}");
                         }
                         break;
                 }
@@ -491,7 +493,7 @@ public sealed class MetaExpressionParser
                         default:
                             if (evaluate)
                             {
-                                ThrowParseException("expected numeric or Boolean operands to comparison operator");
+                                ThrowParseException($"expected numeric or Boolean operands to comparison operator, got {TypeNames(val, val2)}");
                             }
                             result = false;
                             break;
@@ -517,6 +519,10 @@ public sealed class MetaExpressionParser
                         BalanceTypes(ref val, ref val2, evaluate);
                         switch (val)
                         {
+                            case ObjectModelValue:
+                                ThrowParseException("cannot compare objects");
+                                result = false;
+                                break;
                             case int i:
                                 result = i == (int)val2!;
                                 break;
@@ -538,7 +544,7 @@ public sealed class MetaExpressionParser
                             default:
                                 if (evaluate)
                                 {
-                                    ThrowParseException("unexpected operand type to equality operator");
+                                    ThrowParseException($"unexpected operand type to equality operator: expected int, uint, float, datetime, bool or string, got {TypeNames(val, val2)}");
                                 }
                                 result = false;
                                 break;
@@ -798,9 +804,11 @@ public sealed class MetaExpressionParser
             case "line":
                 result = _context.LineNumber;
                 break;
+            case "result":
+                result = _context.Result;
+                break;
             default:
-                // 'result' and 'input' are firmware execution state that the SBC does not hold, so they are left to
-                // the identifier path, which forwards them to the firmware
+                // 'input' is the value entered in an M291 message box, which is not implemented yet
                 return false;
         }
 
@@ -839,7 +847,7 @@ public sealed class MetaExpressionParser
             default:
                 if (evaluate)
                 {
-                    ThrowParseException("expected object model value or string after '#");
+                    ThrowParseException($"expected object model value or string after '#, got {TypeName(val)}");
                 }
                 val = 0;
                 break;
@@ -1164,7 +1172,7 @@ public sealed class MetaExpressionParser
         {
             if (evaluate)
             {
-                ThrowParseException("expected numeric operands");
+                ThrowParseException($"expected numeric operands, got {TypeNames(val1, val2)}");
             }
             val1 = 0;
             val2 = 0;
@@ -1207,7 +1215,7 @@ public sealed class MetaExpressionParser
         {
             if (evaluate)
             {
-                ThrowParseException("cannot convert operands to same type");
+                ThrowParseException($"cannot convert operands to same type: {TypeNames(val1, val2)}");
             }
             val1 = 0;
             val2 = 0;
@@ -1216,6 +1224,32 @@ public sealed class MetaExpressionParser
 
     // Types that have no literal representation and must be converted to string when compared with a string
     private static bool TypeHasNoLiterals(object? val) => val is char or DateTime or DriverId;
+
+    // Name a value's type the way the meta G-code documentation names it, for an error message. RepRapFirmware
+    // has no printable form of its type codes, so its wording stops at "unexpected operand type" and leaves the
+    // reader to work out which operand and what it held
+    private static string TypeName(object? val) => val switch
+    {
+        null => "null",
+        bool => "bool",
+        char => "char",
+        string => "string",
+        int or long => "int",
+        uint or ulong => "uint",
+        float or double => "float",
+        DateTime => "datetime",
+        DriverId => "driver id",
+        ObjectModelValue => "object",
+        object?[] => "array",
+        _ => val.GetType().Name
+    };
+
+    // Name the types of both operands, saying it once when they are the same
+    private static string TypeNames(object? val1, object? val2)
+    {
+        string name1 = TypeName(val1), name2 = TypeName(val2);
+        return (name1 == name2) ? name1 : $"{name1} and {name2}";
+    }
 
     private void ConvertToFloat(ref object? val, bool evaluate)
     {
@@ -1270,7 +1304,7 @@ public sealed class MetaExpressionParser
         {
             if (evaluate)
             {
-                ThrowParseException("expected Boolean operand");
+                ThrowParseException($"expected Boolean operand, got {TypeName(val)}");
             }
             val = false;
         }
@@ -1303,9 +1337,11 @@ public sealed class MetaExpressionParser
                 return Convert.ToString(val, CultureInfo.InvariantCulture)!;
             case DateTime dt:
                 return dt.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
+            case ObjectModelValue om:
+                return om.ToString();
             case object?[] array:
                 {
-                    StringBuilder sb = new("{");
+                    StringBuilder sb = new("[");
                     for (int i = 0; i < array.Length; i++)
                     {
                         if (i > 0)
@@ -1314,7 +1350,7 @@ public sealed class MetaExpressionParser
                         }
                         sb.Append(AppendAsString(array[i]));
                     }
-                    sb.Append('}');
+                    sb.Append(']');
                     return sb.ToString();
                 }
             default:

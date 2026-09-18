@@ -1,3 +1,15 @@
+# Argument names every lib/<Name>/<Name>.cmake module accepts, referenced by each module's
+# cmake_parse_arguments call. They live here rather than in a consumer so that a project can use one
+# library module on its own - DuetSbcInterface wants RRFLibraries and nothing else - without having
+# to replicate a convention it does not otherwise participate in.
+set(DEFAULT_INTERFACE_ARGS
+    "MCU"       # MCU to compile library for
+)
+set(DEFAULT_LIBRARY_ARGS
+    ${DEFAULT_INTERFACE_ARGS}
+    "ARCH"      # Default interface target for the library (from duet_arch_target)
+)
+
 function(get_enabled_features OUT)
     foreach(feature IN LISTS ARGN)
         if(ARG_${feature})

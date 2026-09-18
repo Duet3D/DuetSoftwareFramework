@@ -82,7 +82,7 @@ namespace UnitTests.Machine
             using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
 
             ObjectModel model = new();
-            model.UpdateFromJson(parsedJson.RootElement, false);
+            model.UpdateFromJson(parsedJson.RootElement);
 
             // Test the loaded model values
             TestLoadedModel(model);
@@ -100,7 +100,7 @@ namespace UnitTests.Machine
             reader.Read();
 
             ObjectModel model = new();
-            model.UpdateFromJsonReader(ref reader, false);
+            model.UpdateFromJsonReader(ref reader);
 
             // Test the loaded model values
             TestLoadedModel(model);
@@ -118,7 +118,7 @@ namespace UnitTests.Machine
             using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
 
             ObjectModel model = new();
-            bool success = model.UpdateFromFirmwareJson("state", parsedJson.RootElement);
+            bool success = model.UpdateFromJson("state", parsedJson.RootElement);
 
             Assert.That(success, Is.True);
         }
@@ -131,7 +131,7 @@ namespace UnitTests.Machine
             reader.Read();
 
             ObjectModel model = new();
-            bool success = model.UpdateFromFirmwareJsonReader("state", ref reader);
+            bool success = model.UpdateFromJsonReader("state", ref reader);
 
             Assert.That(success, Is.True);
         }
@@ -185,7 +185,7 @@ namespace UnitTests.Machine
 
             byte[] json = updatedModel.ToUtf8Json();
             using JsonDocument jsonPatch = JsonDocument.Parse(json);
-            modelToUpdate.UpdateFromJson(jsonPatch.RootElement, false);
+            modelToUpdate.UpdateFromJson(jsonPatch.RootElement);
 
             Assert.That(modelToUpdate.Boards[0].FirmwareName, Is.EqualTo("Yum"));
             Assert.That(modelToUpdate.Heat.BedHeaterMapping, Is.EquivalentTo(expectedBedHeaterMapping));
@@ -204,12 +204,12 @@ namespace UnitTests.Machine
             string jsonText = System.IO.File.ReadAllText(modelPath);
             using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
             ObjectModel model = new();
-            model.UpdateFromJson(parsedJson.RootElement, false);
+            model.UpdateFromJson(parsedJson.RootElement);
 
             string patchPath = Path.Combine(Directory.GetCurrentDirectory(), "../../../Machine/JSON/patch.json");
             string patchText = System.IO.File.ReadAllText(patchPath);
             using JsonDocument patchJson = JsonDocument.Parse(patchText);
-            model.UpdateFromJson(patchJson.RootElement, false);
+            model.UpdateFromJson(patchJson.RootElement);
 
             Assert.That(model.Boards[0].FirmwareName, Is.EqualTo("Test"));
         }
@@ -222,7 +222,7 @@ namespace UnitTests.Machine
             using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
 
             ObjectModel model = new();
-            model.UpdateFromJson(parsedJson.RootElement, false);
+            model.UpdateFromJson(parsedJson.RootElement);
 
             ObjectModel newModel = new();
             newModel.Assign(model);
@@ -238,11 +238,11 @@ namespace UnitTests.Machine
             ObjectModel cartesianModel = new(), deltaModel = new();
             using (JsonDocument json = JsonDocument.Parse("{\"move\":{\"kinematics\":{\"name\":\"cartesian\"}}}"))
             {
-                cartesianModel.UpdateFromJson(json.RootElement, false);
+                cartesianModel.UpdateFromJson(json.RootElement);
             }
             using (JsonDocument json = JsonDocument.Parse("{\"move\":{\"kinematics\":{\"name\":\"delta\"}}}"))
             {
-                deltaModel.UpdateFromJson(json.RootElement, false);
+                deltaModel.UpdateFromJson(json.RootElement);
             }
             Assert.That(cartesianModel.Move.Kinematics, Is.TypeOf<CoreKinematics>());
             Assert.That(deltaModel.Move.Kinematics, Is.TypeOf<DeltaKinematics>());
@@ -260,7 +260,7 @@ namespace UnitTests.Machine
             using JsonDocument parsedJson = JsonDocument.Parse(jsonText);
 
             ObjectModel model = new();
-            model.UpdateFromJson(parsedJson.RootElement, false);
+            model.UpdateFromJson(parsedJson.RootElement);
 
             ObjectModel newModel = (ObjectModel)model.Clone();
             TestLoadedModel(newModel);

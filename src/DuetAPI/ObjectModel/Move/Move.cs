@@ -7,6 +7,39 @@ namespace DuetAPI.ObjectModel;
 /// </summary>
 public partial class Move : ModelObject, IStaticModelObject
 {
+    // The floors a configuration code clamps to, so that no machine can be configured into a state
+    // the planner cannot plan for. RepRapFirmware applies the same three in Move::SetAcceleration,
+    // Move::SetInstantDv and its M92 handler.
+    //
+    // They live beside the defaults they bound rather than in the code that applies them: a default
+    // below its own floor would be a machine that starts life outside the range it is allowed to be
+    // configured into, and that is only visible where the two are written together.
+
+    /// <summary>Lowest acceleration a drive may be configured with (in mm/s^2)</summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>MinimumAcceleration</c>. Zero is the value that matters: a move's duration
+    /// is worked out by dividing by the acceleration, so a drive without one can never move
+    /// </remarks>
+    public const float MinimumAcceleration = 0.1F;
+
+    /// <summary>Lowest jerk a drive may be configured with (in mm/min)</summary>
+    /// <remarks>RepRapFirmware's <c>MinimumJerk</c>, which is 0.1 mm/s</remarks>
+    public const float MinimumJerk = 0.1F * 60F;
+
+    /// <summary>Fewest microsteps per mm a drive may be configured with</summary>
+    /// <remarks>RepRapFirmware's <c>MinimumStepsPerMm</c></remarks>
+    public const float MinimumStepsPerMm = 0.01F;
+
+    /// <summary>
+    /// Default acceleration for printing moves in mm/s
+    /// </summary>
+    public const float DefaultPrintingAcceleration = 10000F;
+
+    /// <summary>
+    /// Default acceleration for travel moves in mm/s
+    /// </summary>
+    public const float DefaultTravelAcceleration = 10000F;
+
     /// <summary>
     /// Value of the M201 T parameter. Only present in builds that support S-curve acceleration
     /// </summary>
@@ -64,6 +97,34 @@ public partial class Move : ModelObject, IStaticModelObject
     public MotorsIdleControl Idle { get; } = new MotorsIdleControl();
 
     /// <summary>
+    /// How aggressively moves may be melded into each other (M566 P)
+    /// </summary>
+    /// <remarks>
+    /// 0 allows a junction speed only between moves of the same kind - both printing, or both
+    /// travel; higher values allow melding across those boundaries. Read by the planner's lookahead
+    /// </remarks>
+    public int JerkPolicy
+    {
+        get => _jerkPolicy;
+        set => SetPropertyValue(ref _jerkPolicy, value);
+    }
+    private int _jerkPolicy;
+
+    /// <summary>
+    /// Slowest a move is allowed to run (in mm/s)
+    /// </summary>
+    /// <remarks>
+    /// A floor rather than a preference: the planner's timing arithmetic overflows for a move slow
+    /// enough to take more than about 2^31 step clocks
+    /// </remarks>
+    public float MinimumMovementSpeed
+    {
+        get => _minimumMovementSpeed;
+        set => SetPropertyValue(ref _minimumMovementSpeed, value);
+    }
+    private float _minimumMovementSpeed = 0.5F;
+
+    /// <summary>
     /// List of configured keep-out zones
     /// </summary>
     public StaticModelCollection<KeepoutZone> Keepout { get; } = [];
@@ -113,7 +174,7 @@ public partial class Move : ModelObject, IStaticModelObject
         get => _printingAcceleration;
         set => SetPropertyValue(ref _printingAcceleration, value);
     }
-    private float _printingAcceleration = 10000F;
+    private float _printingAcceleration = DefaultPrintingAcceleration;
 
     /// <summary>
     /// List of move queue items (DDA rings)
@@ -150,7 +211,7 @@ public partial class Move : ModelObject, IStaticModelObject
         get => _travelAcceleration;
         set => SetPropertyValue(ref _travelAcceleration, value);
     }
-    private float _travelAcceleration = 10000F;
+    private float _travelAcceleration = DefaultTravelAcceleration;
 
     /// <summary>
     /// Indicates if third-order S-curve acceleration is enabled.

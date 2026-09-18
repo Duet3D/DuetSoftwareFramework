@@ -14,8 +14,16 @@
 
 #  include "CanInterface.h"
 #  include <Platform/Platform.h>
+#  include <Platform/RepRap.h>
+
+#  if HAS_SBC_INTERFACE
+#    include <SBC/SbcInterface.h>
+#    include <SBC/SbcMessageFormats.h>
+#  endif
 
 #  include <General/FreelistManager.h>
+
+#  include <array>
 
 struct PrepParams
 {
@@ -155,18 +163,13 @@ namespace CanMotion
 		DriversStopList* next;
 		CanAddress boardAddress;
 		uint8_t numDrivers{};
-		bool sentRevertRequest{false};
 		volatile DriverStopState stopStates[MaxLinearDriversPerCanSlave]{};
-		volatile int32_t stopSteps[MaxLinearDriversPerCanSlave]{};
 	};
 
 	static CanMessageBuffer urgentMessageBuffer;
 	static CanMessageBuffer* _ecv_null movementBufferList = nullptr;
 	static DriversStopList* volatile _ecv_null stopList = nullptr;
 	static uint32_t currentMoveClocks;
-	static volatile bool revertAll = false;
-	static volatile bool revertedAll = false;
-	static volatile uint32_t whenRevertedAll;
 	static Mutex stopListMutex;
 	static uint8_t nextSeq[CanId::MaxCanAddress + 1] = {0};
 
@@ -201,8 +204,6 @@ void CanMotion::StartMovement() noexcept
 	// Free up any stop list items left over from the previous move
 	const MutexLocker lock(stopListMutex);
 
-	revertedAll = false;
-	revertAll = false;
 	for (;;)
 	{
 		DriversStopList* _ecv_null p = stopList;
@@ -391,6 +392,196 @@ uint32_t CanMotion::FinishMovement(uint32_t moveStartTime, bool simulating, bool
 	return clocks;
 }
 
+#  if HAS_SBC_INTERFACE
+
+namespace CanMotion
+{
+	// The move being accumulated from ScheduleMove packets, and how many drivers it has so far.
+	// A move split across several packets shares one moveId; anything held when a different id
+	// arrives belonged to a move the SBC abandoned part way through and must not reach the boards.
+	static uint32_t sbcMoveId = 0;
+	static bool sbcMoveInProgress = false;
+
+	// Which input stops which driver, for the move being accumulated or executed. One entry per
+	// driver that watches something, which is at most the drivers a move can carry.
+	//
+	// Only the stop is decided here. Where the drive should end up is worked out on the SBC, which
+	// already evaluates the same motion to report live positions (Motion::DriveTracker), so the
+	// velocity profile is not duplicated on this side.
+	//
+	// SbcProtocol::DriverStopWatch rather than a struct of our own, because the rule that matches a
+	// trigger against these is shared with the host-side tests. Holding the tested type as our own
+	// state is what stops the two drifting; see DuetSpiProtocol/StopRules.h
+	static std::array<SbcProtocol::DriverStopWatch, SbcProtocol::MaxMoveDrivers> endstopWatches;
+	static size_t numEndstopWatches = 0;
+
+	// The inputs known to be active, so that a move armed on one that is already active can be
+	// stopped before it starts.
+	//
+	// Sized like the watches above, because that is the same bound: a move names at most one input
+	// per driver it carries, so a store this size can never be short of the input a driver needs.
+	// Only the kinds a move can be stopped by are held, so nothing else can take up the room.
+	//
+	// SbcProtocol::NoteInputState decides what is held and what is not, for the same reason the
+	// watches above use SbcProtocol::DriverStopWatch: it is the shared, host-tested rule.
+	//
+	// This holds only what the boards have reported since startup. An input that was already active
+	// before the first change arrived is unknown here, which is the SBC's to answer: the reply to
+	// CanMessageCreateInputMonitor carries the level, and that is what seeds sensors.endstops[].
+	static std::array<SbcProtocol::ActiveInput, SbcProtocol::MaxMoveDrivers> activeInputs;
+	static size_t numActiveInputs = 0;
+
+	// Stop the drivers of the move being accumulated whose input is already active, filling in the
+	// move they belong to. Returns how many were stopped
+	static size_t StopDriversWatchingActiveInputs(std::span<SbcProtocol::MotionStoppedDriver> stopped,
+												 uint32_t& moveId) noexcept
+	{
+		// Read on the SBC task while the CAN receiver task may be adding to it; see NoteInputState
+		const TaskCriticalSectionLocker lock;
+		size_t numStopped = 0;
+		for (size_t i = 0; i < numActiveInputs && numStopped < stopped.size(); ++i)
+		{
+			// Zero for the reading: only a stall names drivers in one, and a stall is never held here
+			numStopped += StopDriversWatchingInput(activeInputs[i].board, activeInputs[i].handle, 0,
+												   stopped.subspan(numStopped), moveId);
+		}
+		return numStopped;
+	}
+
+} // namespace CanMotion
+
+void CanMotion::NoteInputState(uint8_t inputBoard, uint16_t inputHandle, bool active) noexcept
+{
+	// Two tasks reach this: the CAN receiver task, for a level a board reported, and the SBC task,
+	// for a handle whose monitor is being replaced or dropped. The update is read-modify-write on
+	// both the array and the count, and losing the SBC task's half is the dangerous direction - it
+	// would leave a level held for a monitor that no longer exists
+	const TaskCriticalSectionLocker lock;
+	numActiveInputs = SbcProtocol::NoteInputState(std::span{activeInputs}, numActiveInputs, inputBoard, inputHandle,
+												  active);
+}
+
+void CanMotion::ScheduleFromSbc(const SbcProtocol::ScheduleMoveHeader& header,
+								std::span<const SbcProtocol::ScheduleMoveDriver> drivers) noexcept
+{
+	if (!sbcMoveInProgress || header.moveId != sbcMoveId)
+	{
+		// Either the first packet of a move, or the first of a new one while an old one is still
+		// held. StartMovement frees whatever was accumulated, which is what makes the second case
+		// safe: half a move must never be sent.
+		StartMovement();
+		sbcMoveId = header.moveId;
+		sbcMoveInProgress = true;
+		numEndstopWatches = 0;			// the watches belong to the move being abandoned, not the new one
+	}
+
+	// Rebuild PrepParams from the packet. The SBC plans second-order moves - it has no S-curve
+	// support - so when this firmware is built with S-curve on, the profile goes into the seven-phase
+	// form with jerk zero and only the constant-acceleration phases used. That is the same shape
+	// PrepParams::SetFromDDA produces for a second-order move, and GetBuffer already special-cases
+	// jerk == 0, so nothing downstream can tell the difference.
+	PrepParams params{};
+	params.totalDistance = (motioncalc_t)header.totalDistance;
+	params.startSpeed = (motioncalc_t)header.startSpeed;
+	params.topSpeed = (motioncalc_t)header.topSpeed;
+	params.endSpeed = (motioncalc_t)header.endSpeed;
+	params.useInputShaping = (header.flags & ScheduleMoveFlags::UseInputShaping) != 0;
+
+	const auto accelDistance = (motioncalc_t)header.accelDistance;
+	const auto decelStartDistance = (motioncalc_t)header.decelStartDistance;
+
+#    if SUPPORT_S_CURVE
+	params.jerk = (motioncalc_t)0.0;					// signals that this is not an S-curve move
+	params.peakAcceleration = params.initialAcceleration = (motioncalc_t)header.acceleration;
+	params.peakDeceleration = params.initialDeceleration = (motioncalc_t)header.deceleration;
+	params.phaseClocks[0] = params.phaseClocks[2] = params.phaseClocks[4] = params.phaseClocks[6] = 0;
+	params.phaseClocks[1] = header.accelClocks;
+	params.phaseClocks[3] = header.steadyClocks;
+	params.phaseClocks[5] = header.decelClocks;
+	params.distances[0] = params.distances[2] = params.distances[4] = params.distances[6] = (motioncalc_t)0.0;
+	params.distances[1] = accelDistance;
+	params.distances[3] = decelStartDistance - accelDistance;
+	params.distances[5] = params.totalDistance - decelStartDistance;
+	params.speedsCalculated = false;
+#    else
+	params.accelClocks = header.accelClocks;
+	params.steadyClocks = header.steadyClocks;
+	params.decelClocks = header.decelClocks;
+	params.acceleration = (motioncalc_t)header.acceleration;
+	params.deceleration = (motioncalc_t)header.deceleration;
+	params.accelDistance = accelDistance;
+	params.decelStartDistance = decelStartDistance;
+#    endif
+
+	// Iterating the span rather than header.numDrivers: the count and the records arrive in the same
+	// packet, so trusting the count to describe the records is trusting the packet to be consistent
+	// with itself. The caller sized the span from what the payload actually carries.
+	const bool usePressureAdvance = (header.flags & ScheduleMoveFlags::UsePressureAdvance) != 0;
+	for (const SbcProtocol::ScheduleMoveDriver& d : drivers)
+	{
+		const DriverId driver(d.boardAddress, d.driverNumber);
+		if (d.isExtruder != 0)
+		{
+			AddExtruderMovement(params, driver, d.extrusion, usePressureAdvance);
+		}
+		else
+		{
+			AddAxisMovement(params, driver, d.steps);
+		}
+
+		// Record what stops this driver, if anything. Only an endstop move carries these.
+		//
+		// The array is sized for a whole move rather than a packet, because the count is only reset
+		// when a new move starts. Dropping a watch is not a small loss: that driver is then stopped
+		// by nothing and runs to the end of its commanded travel, so it is reported rather than
+		// quietly skipped
+		if (d.stopOnBoard != SbcProtocol::NoEndstopBoard)
+		{
+			if (numEndstopWatches < endstopWatches.size())
+			{
+				endstopWatches[numEndstopWatches] = { d.boardAddress, d.driverNumber, d.stopOnBoard, d.stopOnHandle,
+													  d.stopGroup,   d.stopAction,   true };
+				++numEndstopWatches;
+			}
+			else
+			{
+				reprap.GetPlatform().MessageF(ErrorMessage,
+											  "move %" PRIu32 ": driver %u.%u will not be stopped by its endstop, "
+											  "because this move watches more than %u drivers\n",
+											  header.moveId, d.boardAddress, d.driverNumber,
+											  (unsigned int)endstopWatches.size());
+			}
+		}
+	}
+
+	if ((header.flags & ScheduleMoveFlags::LastPacket) != 0)
+	{
+		// Every driver of the move is recorded now, so an input that is already active can be applied
+		// to it. This is the only chance to: a board reports an input when it changes, so one that
+		// closed while this move was on its way here will not be reported again, and one closed
+		// before the SBC decided what to watch is already in the level it read
+		SbcProtocol::MotionStoppedDriver stopped[SbcProtocol::MaxMotionStoppedDrivers];
+		uint32_t moveId = 0;
+		const size_t numStopped = StopDriversWatchingActiveInputs(std::span{stopped}, moveId);
+
+		sbcMoveInProgress = false;
+		(void)FinishMovement(header.whenToExecute,
+							 false, // the SBC does not send a move it is only simulating
+							 (header.flags & ScheduleMoveFlags::CheckEndstops) != 0);
+
+		if (numStopped != 0)
+		{
+			// Zero for the trigger time: the input was active before the move started, so there is
+			// no overshoot to wind back and the drives are where the SBC will find them. What the
+			// report is for is the SBC learning the endstop was reached, without which the move ends
+			// as one that watched something and saw nothing
+			reprap.GetSbcInterface().ReportMotionStopped(0, moveId, std::span{stopped, numStopped});
+		}
+	}
+}
+
+#  endif
+
 bool CanMotion::CanPrepareMove() noexcept
 {
 	return CanMessageBuffer::GetFreeBuffers() >= MaxCanBoards;
@@ -401,77 +592,38 @@ bool CanMotion::CanPrepareMove() noexcept
 // now been stopped and they need to revert to the requested stop position.
 CanMessageBuffer* _ecv_null CanMotion::GetUrgentMessage() noexcept
 {
-	if (!revertedAll)
+	const MutexLocker lock(stopListMutex);	// make sure the list isn't being changed while we traverse it
+
+	// The links won't change while we hold the mutex, but the receiver task may still move a driver
+	// to StopRequested as we scan
+	for (DriversStopList* _ecv_null sl = stopList; sl != nullptr; sl = sl->next)
 	{
-		const MutexLocker lock(stopListMutex); // make sure the list isn't being changed while we traverse it
-
-		// We have to be careful of race conditions here. The stop list links won't change while we are scanning it
-		// because we hold the mutex, but ISR may change the stop states to StopRequested up until the time at which it
-		// changes revertAll from false to true.
-		const bool revertingAll = revertAll;
-		for (DriversStopList* _ecv_null sl = stopList; sl != nullptr; sl = sl->next)
+		uint16_t driversToStop = 0;
+		for (size_t driver = 0; driver < sl->numDrivers; ++driver)
 		{
-			if (!sl->sentRevertRequest) // if we've already reverted the drivers on this board, no more to do
+			if (sl->stopStates[driver] == DriverStopState::StopRequested)
 			{
-				// Set up a reversion message in case we are going to revert the drivers on this board
-				auto revertMsg = urgentMessageBuffer.SetupRequestMessageNoRid<CanMessageRevertPosition>(
-					CanInterface::GetCanAddress(), sl->boardAddress);
-				uint16_t driversToStop = 0;
-				uint16_t driversToRevert = 0;
-				size_t numDriversReverted = 0;
-				for (size_t driver = 0; driver < sl->numDrivers; ++driver)
-				{
-					const DriverStopState ss = sl->stopStates[driver];
-					if (ss == DriverStopState::StopRequested)
-					{
-						driversToStop |= 1u << driver;
-						sl->stopStates[driver] = DriverStopState::StopSent;
-					}
-					else if (revertingAll && ss == DriverStopState::StopSent)
-					{
-						driversToRevert |= 1u << driver;
-						revertMsg->finalStepCounts[numDriversReverted++] = sl->stopSteps[driver];
-					}
-				}
-
-				// Stop messages take priority over revert messages
-				if (driversToStop != 0)
-				{
-					auto stopMsg = urgentMessageBuffer.SetupRequestMessageNoRid<CanMessageStopMovement>(
-						CanInterface::GetCanAddress(), sl->boardAddress);
-					stopMsg->whichDrives = driversToStop;
-					// debugPrintf("Stopping drivers %u on board %u\n", driversToStop, sl->boardAddress);
-					return &urgentMessageBuffer;
-				}
-
-				if (driversToRevert != 0)
-				{
-					sl->sentRevertRequest = true;
-					revertMsg->whichDrives = driversToRevert;
-					revertMsg->clocksAllowed = MillisToStepClocks(BasicDriverPositionRevertMillis);
-					urgentMessageBuffer.dataLength = CanMessageRevertPosition::GetActualDataLength(numDriversReverted);
-					// debugPrintf("Reverting drivers %u by %" PRIi32 " on board %u\n",
-					// driversToRevert,revertMsg->finalStepCounts[0], sl->boardAddress);
-					return &urgentMessageBuffer;
-				}
+				driversToStop |= 1u << driver;
+				sl->stopStates[driver] = DriverStopState::StopSent;
 			}
 		}
 
-		// We found nothing to send
-		if (revertingAll)
+		if (driversToStop != 0)
 		{
-			// All drivers have been stopped and reverted where requested
-			whenRevertedAll = millis();
-			revertedAll = true;
+			auto stopMsg = urgentMessageBuffer.SetupRequestMessageNoRid<CanMessageStopMovement>(
+				CanInterface::GetCanAddress(), sl->boardAddress);
+			stopMsg->whichDrives = driversToStop;
+			return &urgentMessageBuffer;
 		}
 	}
+
 	return nullptr;
 }
 
 // The next 4 functions may be called from the step ISR, so they can't send CAN messages directly
 
 // Flag a CAN-connected driver as not moving when we haven't sent the movement message yet
-void CanMotion::StopDriverWhenProvisional(DriverId driver) noexcept
+bool CanMotion::StopDriverWhenProvisional(DriverId driver) noexcept
 {
 	// Search for the correct movement buffer
 	CanMessageBuffer* _ecv_null buf = movementBufferList;
@@ -481,15 +633,81 @@ void CanMotion::StopDriverWhenProvisional(DriverId driver) noexcept
 		{
 			// The move was found so set the steps to zero. We still send the message so that the drivers get enabled.
 			buf->msg.moveLinearShaped.perDrive[driver.localDriver].steps = 0;
-			break;
+			return true;
 		}
 		buf = buf->next;
 	}
+	return false;
 }
+
+#  if HAS_SBC_INTERFACE
+
+size_t CanMotion::StopDriversWatchingInput(uint8_t inputBoard, uint16_t inputHandle, uint32_t reading,
+										   std::span<SbcProtocol::MotionStoppedDriver> stopped,
+										   uint32_t& moveId) noexcept
+{
+	// Read here rather than by a second call from the caller: the drivers stopped and the move they
+	// belong to are one answer, and a move scheduled in between would make two calls disagree
+	moveId = sbcMoveId;
+
+	// Which watch this trigger matched and what that watch stops - itself, its whole drive, or the
+	// whole move. Both are decided by DuetSpiProtocol/StopRules.h, which is where this rule can be
+	// tested; everything below is the acting on it
+	const std::span<const SbcProtocol::DriverStopWatch> watches{ endstopWatches.data(), numEndstopWatches };
+	const SbcProtocol::StopDecision decision =
+		SbcProtocol::DecideStop(watches, inputBoard, inputHandle, reading);
+	if (decision.action == SbcProtocol::StopAction::none)
+	{
+		return 0;
+	}
+
+	size_t numStopped = 0;
+	for (size_t i = 0; i < numEndstopWatches; ++i)
+	{
+		SbcProtocol::DriverStopWatch& watch = endstopWatches[i];
+		if (!watch.stillRunning || !SbcProtocol::StopsDriver(watches, decision, i))
+		{
+			continue;
+		}
+
+		// Recorded before the stop is attempted, because what it feeds is the escalation: a driver
+		// stopped individually has to stop counting towards its group, or the last motor of a
+		// gantry squaring itself would never escalate to stopping the axis
+		watch.stillRunning = false;
+
+		const DriverId driver(watch.driverBoard, watch.driverNumber);
+		bool didStop = false;
+		if (sbcMoveInProgress)
+		{
+			// The move has not gone out yet, so the driver can simply be given no steps. This is the
+			// case RepRapFirmware calls an endstop already triggered at the start of the move. It is
+			// still reported: the drive needs no correction because it never moved, but the SBC has
+			// no other way to learn that the axis reached its endstop
+			didStop = StopDriverWhenProvisional(driver);
+		}
+		else
+		{
+			// The move is running on the boards. Stopping it is this side's whole job; where the
+			// drive should end up is the SBC's, which is why it is reported below
+			didStop = StopDriverWhenExecuting(driver);
+		}
+
+		if (didStop && numStopped < stopped.size())
+		{
+			stopped[numStopped].boardAddress = watch.driverBoard;
+			stopped[numStopped].driverNumber = watch.driverNumber;
+			stopped[numStopped].padding = 0;
+			++numStopped;
+		}
+	}
+	return numStopped;
+}
+
+#  endif
 
 // Tell a CAN-connected driver to stop moving after we have sent the movement message.
 // Return true if we found it, we hadn't already requested a stop, and now we have.
-bool CanMotion::StopDriverWhenExecuting(DriverId driver, int32_t netStepsTaken) noexcept
+bool CanMotion::StopDriverWhenExecuting(DriverId driver) noexcept
 {
 	DriversStopList* _ecv_null sl = stopList;
 	while (sl != nullptr)
@@ -499,7 +717,6 @@ bool CanMotion::StopDriverWhenExecuting(DriverId driver, int32_t netStepsTaken) 
 			if (driver.localDriver < sl->numDrivers &&
 				sl->stopStates[driver.localDriver] == DriverStopState::Active) // if active and stop not yet requested
 			{
-				sl->stopSteps[driver.localDriver] = netStepsTaken; // must assign this one first
 				sl->stopStates[driver.localDriver] = DriverStopState::StopRequested;
 				return true;
 			}
@@ -508,18 +725,6 @@ bool CanMotion::StopDriverWhenExecuting(DriverId driver, int32_t netStepsTaken) 
 		sl = sl->next;
 	}
 	return false;
-}
-
-// Revert any stopped drivers that we haven't already and return true when there are no drivers to revert
-bool CanMotion::RevertStoppedDrivers() noexcept
-{
-	if (!revertAll && !revertedAll) // if not started reverting yet
-	{
-		revertAll = true;
-		CanInterface::WakeAsyncSender();
-		return false;
-	}
-	return !revertAll || (revertedAll && millis() - whenRevertedAll >= TotalDriverPositionRevertMillis);
 }
 
 #endif

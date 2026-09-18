@@ -1,0 +1,298 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using System.Threading.Tasks;
+using NUnit.Framework;
+
+namespace SystemTests.Host;
+
+/// <summary>
+/// The shared pieces of the job control scenarios: one machine configuration, one instrumented set
+/// of job system macros, and the helpers the assertions repeat. Each scenario still owns its job
+/// file and the order it drives the lifecycle in
+/// </summary>
+internal static class JobControlBench
+{
+    /// <summary>A unique socket path for one test's fake controller</summary>
+    public static string SocketPath() => Path.Combine(Path.GetTempPath(), $"dsf-fake-{Guid.NewGuid():N}.sock");
+
+    /// <summary>
+    /// X and Y axes plus one extruder on board 1 (board 0 runs DuetCANMaster and has no drivers),
+    /// free to move without homing and with cold extrusion allowed, as the test jobs extrude with
+    /// no heater configured. M953 comes first: with the bus disabled the configuration's CAN
+    /// messages would be answered with BusError, as the real controller answers them
+    /// </summary>
+    public const string XyeConfig = """
+        M953
+        M569 P1.0 S1
+        M569 P1.1 S1
+        M569 P1.2 S1
+        M584 X1.0 Y1.1 E1.2
+        M92 X80 Y80 E420
+        M906 X800 Y800 E800
+        M201 X500 Y500 E250
+        M203 X6000 Y6000 E3600
+        M566 X900 Y900 E120
+        M208 X0:200 Y0:200
+        M302 P1
+        M564 H0 S0
+        """;
+
+    /// <summary>
+    /// What config.g ends with, after whatever the scenario configured of its own: the machine is
+    /// told where it is, which is also what marks X and Y homed, and the pause macros run only on a
+    /// machine that knows where it is. It comes last because configuring the geometry un-homes every
+    /// axis - M669 does so whether it changed the geometry or only the segmentation, which is what
+    /// RepRapFirmware does too (GCodes2.cpp case 669)
+    /// </summary>
+    private const string HomedAtOrigin = "G92 X0 Y0";
+
+    /// <summary>
+    /// M669 turning segmentation on: 100 segments per second of movement, and no segment shorter
+    /// than 0.2 mm. A stop is planned at a move boundary, and with segmentation off a whole G-code
+    /// is one move, so a scenario that means to stop part-way through a line has to have the line
+    /// cut up for there to be a boundary inside it to stop at
+    /// </summary>
+    public const string SegmentedMoves = "M669 S100 T0.2";
+
+    /// <summary>
+    /// One extruding tool, selected. Extruding with no tool selected is an error rather than a
+    /// move, so a scenario whose job extrudes configures this
+    /// </summary>
+    public const string OneTool = "M563 P0 D0 H-1\nT0";
+
+    /// <summary>
+    /// Globals the instrumented macros count their runs in, created by config.g so a scenario can
+    /// read them before any macro ran
+    /// </summary>
+    private const string MarkerGlobals = """
+        global startRan = 0
+        global stopRan = 0
+        global pauseRan = 0
+        global resumeRan = 0
+        global cancelRan = 0
+        global filChangeRan = 0
+        global macroRuns = 0
+        """;
+
+    /// <summary>
+    /// Write config.g and the instrumented job system macros, each counting its runs in a global
+    /// for the assertions. pause.g parks at X0 Y0 so a scenario can tell the restore point (taken
+    /// before the park) from where pause.g leaves the machine; the other macros only mark that
+    /// they ran
+    /// </summary>
+    /// <param name="sd">The virtual SD card to populate</param>
+    /// <param name="configExtra">Extra configuration lines, run before <see cref="HomedAtOrigin"/></param>
+    /// <param name="machineConfig">The machine configuration to boot from, <see cref="XyeConfig"/> by default</param>
+    public static void WriteSystemFiles(VirtualSd sd, string configExtra = "", string? machineConfig = null)
+    {
+        sd.WriteSys("config.g", (machineConfig ?? XyeConfig) + "\n" + MarkerGlobals + "\n" + configExtra + "\n"
+                                + HomedAtOrigin + DcsTestHost.ConfigDoneMarker);
+        sd.WriteSys("start.g", "set global.startRan = global.startRan + 1\n");
+        sd.WriteSys("stop.g", "set global.stopRan = global.stopRan + 1\n");
+        sd.WriteSys("pause.g", "set global.pauseRan = global.pauseRan + 1\nG90\nG1 X0 Y0 F6000\n");
+        sd.WriteSys("resume.g", "set global.resumeRan = global.resumeRan + 1\n");
+        sd.WriteSys("cancel.g", "set global.cancelRan = global.cancelRan + 1\n");
+        sd.WriteSys("filament-change.g", "set global.filChangeRan = global.filChangeRan + 1\n");
+    }
+
+    /// <summary>
+    /// Start a complete job control bench: the fake controller answering CAN requests like healthy
+    /// boards, and a host booted from the shared configuration and instrumented macros
+    /// </summary>
+    /// <param name="configExtra">Extra configuration lines, e.g. per-scenario globals</param>
+    /// <param name="prepareSd">Populates the rest of the virtual SD card, typically the job file</param>
+    /// <param name="machineConfig">The machine configuration to boot from, <see cref="XyeConfig"/> by default</param>
+    /// <param name="prepareController">Scripts the fake controller before the host connects to it</param>
+    public static async Task<JobBench> StartAsync(string configExtra = "", Action<VirtualSd>? prepareSd = null,
+                                                  string? machineConfig = null,
+                                                  Action<ScriptedCanMaster>? prepareController = null)
+    {
+        ScriptedCanMaster canMaster = new(SocketPath());
+        canMaster.AckCanRequestsWithStandardReplies();
+        prepareController?.Invoke(canMaster);
+        DcsTestHost host;
+        try
+        {
+            host = await DcsTestHost.StartAsync(canMaster, sd =>
+            {
+                WriteSystemFiles(sd, configExtra, machineConfig);
+                prepareSd?.Invoke(sd);
+            });
+        }
+        catch
+        {
+            canMaster.Dispose();
+            throw;
+        }
+        await host.WaitForConfigDoneAsync();
+        return new JobBench(canMaster, host);
+    }
+
+    /// <summary>
+    /// A block of position-neutral zigzag moves. A job completes as soon as its last code is
+    /// queued, so a scenario that pauses from the console keeps the job alive by carrying more
+    /// moves than the ring holds (40 by default); these fillers are that padding. Each pair nets
+    /// to nothing, so they change neither the final position nor any step total
+    /// </summary>
+    /// <param name="pairs">Number of out-and-back pairs; 30 pairs comfortably exceed the ring</param>
+    /// <param name="feed">Feed rate in mm/min, trading how long the padding takes to execute</param>
+    public static string FillerMoves(int pairs = 30, int feed = 6000)
+    {
+        System.Text.StringBuilder moves = new("G91\n");
+        for (int i = 0; i < pairs; i++)
+        {
+            moves.Append($"G1 Y0.5 F{feed}\nG1 Y-0.5 F{feed}\n");
+        }
+        return moves.Append("G90\n").ToString();
+    }
+
+    /// <summary>
+    /// Start a job control bench whose motion timeline the test drives, rather than one that runs
+    /// against the wall clock. The caller owns the timeline and must dispose it after the bench
+    /// </summary>
+    /// <param name="timeline">The timeline to run the controller's clock from</param>
+    /// <param name="configExtra">Extra configuration lines, e.g. per-scenario globals</param>
+    /// <param name="prepareSd">Populates the rest of the virtual SD card, typically the job file</param>
+    public static async Task<JobBench> StartSteppedAsync(SteppedTimeline timeline, string configExtra = "",
+                                                         Action<VirtualSd>? prepareSd = null)
+    {
+        ScriptedCanMaster canMaster = new(SocketPath(), timeline.Clock);
+        canMaster.AckCanRequestsWithStandardReplies();
+        DcsTestHost host;
+        try
+        {
+            host = await DcsTestHost.StartAsync(canMaster, sd =>
+            {
+                WriteSystemFiles(sd, configExtra);
+                prepareSd?.Invoke(sd);
+            });
+        }
+        catch
+        {
+            canMaster.Dispose();
+            throw;
+        }
+
+        // config.g runs macros and waits on the machine, so it needs the timeline moving under it
+        await timeline.WhileRunningAsync(() => host.WaitForConfigDoneAsync());
+        return new JobBench(canMaster, host);
+    }
+
+    /// <summary>Where an axis has got to, in mm</summary>
+    public static Task<double> MachinePositionAsync(this DcsTestHost host, int axis)
+        => host.ReadModelAsync(model => (double)(model.Move.Axes[axis].MachinePosition ?? 0.0f));
+
+    /// <summary>
+    /// Run the machine until an axis reaches the given position, and stop the timeline there
+    /// </summary>
+    /// <remarks>
+    /// What a pause scenario names instead of a delay: the stop then lands at a position the test
+    /// chose rather than wherever the host happened to be when a timer expired
+    /// </remarks>
+    public static Task RunToPositionAsync(this JobBench bench, SteppedTimeline timeline, int axis, double position)
+        => timeline.RunUntilAsync(async () => await bench.Host.MachinePositionAsync(axis) >= position,
+                                  $"axis {axis} reaching {position}");
+
+    /// <summary>Read one of the macro run counters</summary>
+    public static Task<int> GlobalAsync(this DcsTestHost host, string name)
+        => host.ReadModelAsync(model => GlobalValue(model, name).GetInt32());
+
+    /// <summary>Read a global a macro records a yes or no in</summary>
+    public static Task<bool> GlobalFlagAsync(this DcsTestHost host, string name)
+        => host.ReadModelAsync(model => GlobalValue(model, name).GetBoolean());
+
+    /// <summary>Read a global a macro records a name in</summary>
+    public static Task<string> GlobalTextAsync(this DcsTestHost host, string name)
+        => host.ReadModelAsync(model => GlobalValue(model, name).GetString() ?? string.Empty);
+
+    /// <summary>
+    /// One of the job file's global variables, as the object model holds it
+    /// </summary>
+    /// <remarks>
+    /// The globals are JSON rather than typed fields, so the caller says what it expects and this
+    /// fails naming the variable when it is not there at all - which is a different fault from the
+    /// variable holding the wrong thing, and the assertion should not have to tell them apart
+    /// </remarks>
+    private static JsonElement GlobalValue(DuetControlServer.Model.ObjectModel model, string name)
+        => model.Global.TryGetValue(name, out JsonElement? value) && value is JsonElement set
+            ? set
+            : throw new AssertionException($"global.{name} is not set");
+
+    /// <summary>
+    /// The coordinates of a restore point. Both axes come out of one read, so a move landing between
+    /// them cannot produce a pair the machine was never at
+    /// </summary>
+    public static Task<(double X, double Y)> RestorePointAsync(this DcsTestHost host, int slot)
+        => host.ReadModelAsync(model => ((double)Restore(model, slot).Coords[0],
+                                         (double)Restore(model, slot).Coords[1]));
+
+    /// <summary>
+    /// One restore point of the first motion system. Not <c>state.restorePoints</c>, which
+    /// DuetControlServer still publishes but marks obsolete in favour of this
+    /// </summary>
+    private static DuetAPI.ObjectModel.RestorePoint Restore(DuetControlServer.Model.ObjectModel model, int slot)
+        => model.Move.MotionSystems[0].RestorePoints[slot];
+
+    /// <summary>
+    /// Wait until the machine is paused with the pause restore point at the given coordinates.
+    /// This is the wait for the second of two pauses in one job: a resume's read-ahead can reach
+    /// the next in-file pause so quickly that no intermediate status is ever observable, so the
+    /// handover is only visible in the restore point moving on
+    /// </summary>
+    public static async Task WaitForPauseAtAsync(this DcsTestHost host, double x, double y, int timeoutMs = 20_000)
+    {
+        DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        (double X, double Y) point;
+        do
+        {
+            point = await host.RestorePointAsync(1);
+            if (Math.Abs(point.X - x) < 1e-3 && Math.Abs(point.Y - y) < 1e-3)
+            {
+                await host.WaitForStatusAsync(DuetAPI.ObjectModel.MachineStatus.Paused, timeoutMs);
+                return;
+            }
+            await Task.Delay(25);
+        }
+        while (DateTime.UtcNow < deadline);
+        throw new TimeoutException($"The pause restore point stayed at {point}, expected ({x}, {y})");
+    }
+
+    /// <summary>Every scheduled move's total distance so far, in order</summary>
+    public static float[] MoveDistances(this ScriptedCanMaster canMaster)
+        => canMaster.ScheduledMoves().Select(move => move.Header.TotalDistance).ToArray();
+
+    /// <summary>
+    /// The net steps scheduled per driver of board 1 so far. Steps are what the expansion board
+    /// would execute, so their sum is the automated stand-in for where the physical head (or how
+    /// much extruded filament) ends up
+    /// </summary>
+    public static int ScheduledSteps(this ScriptedCanMaster canMaster, byte driver)
+        => canMaster.ScheduledMoves().Steps(driver);
+
+    /// <summary>
+    /// The net extrusion scheduled for one driver of board 1 so far, in microsteps. An extruder's
+    /// movement is carried as extrusion rather than as steps, because pressure advance is applied on
+    /// the board and the steps are not known here - so <see cref="ScheduledSteps"/> reads zero for
+    /// one however much filament it is asked for
+    /// </summary>
+    public static float ScheduledExtrusion(this ScriptedCanMaster canMaster, byte driver)
+        => canMaster.ScheduledMoves().Extrusion(driver);
+}
+
+/// <summary>One running job control bench: the fake controller and the host started against it</summary>
+internal sealed class JobBench(ScriptedCanMaster canMaster, DcsTestHost host) : IAsyncDisposable
+{
+    /// <summary>The fake controller</summary>
+    public ScriptedCanMaster CanMaster { get; } = canMaster;
+
+    /// <summary>The hosted DuetControlServer</summary>
+    public DcsTestHost Host { get; } = host;
+
+    public async ValueTask DisposeAsync()
+    {
+        await Host.DisposeAsync();
+        CanMaster.Dispose();
+    }
+}

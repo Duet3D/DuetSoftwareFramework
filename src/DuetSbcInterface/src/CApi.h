@@ -51,6 +51,13 @@ extern "C"
 		int32_t maxSbcRetries;
 
 		int32_t updateOnly; // bool: tolerate a newer-than-supported protocol version so it can be flashed
+
+		// Which transport carries the link: 0 = SPI (the real controller over spidev), 1 = socket
+		// (the same transfer protocol over a Unix domain socket to a virtual controller; see
+		// DuetSpiProtocol/SocketLinkFormats.h). Mirrors duet::sbc::TransportKind.
+		int32_t transport;
+		// Socket transport only: path of the Unix domain socket the virtual controller listens on
+		const char* socketPath;
 	};
 
 	// Fill `config` with the default values.
@@ -71,8 +78,9 @@ extern "C"
 
 	// These return 0 on success and non-zero if the outbound ring is full (i.e. the message was NOT
 	// queued and the caller must surface that rather than lose it).
-	int32_t DuetSbc_QueueMessage(DuetSbcHandle* h, uint32_t flags, const char* message, int32_t length);
-	int32_t DuetSbc_QueueCanMessage(DuetSbcHandle* h,
+	// The Queue* calls return the sequence number the command was given, or -1 if it was refused
+	int64_t DuetSbc_QueueMessage(DuetSbcHandle* h, uint32_t flags, const char* message, int32_t length);
+	int64_t DuetSbc_QueueCanMessage(DuetSbcHandle* h,
 									uint16_t txToken,
 									uint16_t msgType,
 									uint16_t replyType,
@@ -81,7 +89,7 @@ extern "C"
 									const uint8_t* payload,
 									int32_t length);
 	// requestId may be 0 for fire-and-forget; otherwise the outcome arrives as a RequestCompleted event.
-	int32_t DuetSbc_QueueEnableCan(DuetSbcHandle* h, int32_t enable, uint32_t requestId);
+	int64_t DuetSbc_QueueEnableCan(DuetSbcHandle* h, int32_t enable, uint32_t requestId);
 	void DuetSbc_RequestEmergencyStop(DuetSbcHandle* h, uint32_t requestId);
 	void DuetSbc_RequestReset(DuetSbcHandle* h, uint32_t requestId);
 
@@ -120,6 +128,177 @@ extern "C"
 	int32_t DuetSbc_GetResyncCount(DuetSbcHandle* h);
 	// Events dropped because the inbound ring was full (i.e. the consumer could not keep up).
 	uint64_t DuetSbc_GetDroppedEvents(DuetSbcHandle* h);
+
+	// --- Motion ---
+	//
+	// The motion engine runs on its own thread inside the library. These calls hand moves to it and
+	// read back what it has done; none of them blocks on that thread, because the caller is a
+	// garbage-collected runtime and the motion thread must not wait on one.
+
+	// Machine description, pushed down from DuetControlServer. Mirrors Motion::MachineConfig; the
+	// managed side builds the bytes and this copies them, so the struct is not repeated here.
+	// Safe only while no move is in flight.
+	int32_t DuetSbc_MotionConfigure(DuetSbcHandle* h, const void* config, int32_t length);
+
+	// Start and stop the motion thread. `rtPriority` is a SCHED_FIFO priority, or 0 for the default
+	// scheduler; it must be below the interface thread's, so that a late transfer never waits on a
+	// move being prepared.
+	int32_t DuetSbc_MotionStart(DuetSbcHandle* h, int32_t rtPriority);
+	void DuetSbc_MotionStop(DuetSbcHandle* h);
+
+	// 1 if the ring has room for another move. Advisory: it may have room again a moment later.
+	int32_t DuetSbc_MotionCanAddMove(DuetSbcHandle* h, int32_t ring);
+
+	// Queue a move. `moveParams` is a MoveParamsHeader followed by its two arrays; see
+	// Motion/MoveParams.h and its C# mirror. Returns 1 if queued, 0 if the caller must retry.
+	int32_t DuetSbc_MotionSubmitMove(DuetSbcHandle* h, const void* moveParams, int32_t length);
+
+	// Ask the ring to stop early and drop the moves after it. Returns 1 if the request was queued,
+	// 0 if the queue was full and it was not.
+	//
+	// The answer does not come back from this call. Dropping a move frees its segments, which only
+	// the motion thread may do, so the request is queued and DuetSbc_MotionGetFeedholdResult reports
+	// what happened once it has acted. Read the sequence first and wait for it to change.
+	// `kind` is 0 for RepRapFirmware's search for a junction that is already slow enough to stop at,
+	// and 1 for the feedhold that plans a deceleration of its own.
+	int32_t DuetSbc_MotionRequestStop(DuetSbcHandle* h, int32_t kind);
+
+	// What the last feedhold did. `sequence` counts completed feedholds, `stopped` is 1 if the ring
+	// was brought to a planned stop and 0 if there was nothing it could stop before, in which case
+	// the caller waits for the ring to drain as it did before. Returns 1 on success.
+	//
+	// `restEndpointsOut` receives where the machine will come to rest in microsteps, which is what
+	// the planner resynchronises against after a stop - the moves the stop could not recall carry
+	// the machine on past wherever DuetSbc_MotionGetMotorPositions reads at the time. Only
+	// meaningful when `stopped` is 1. Pass a null pointer and a count of 0 to skip it.
+	int32_t DuetSbc_MotionGetFeedholdResult(DuetSbcHandle* h, uint32_t* sequenceOut,
+											uint32_t* firstPurgedMoveIdOut, uint32_t* movesPurgedOut,
+											uint32_t* lastSurvivingMoveIdOut, int32_t* stoppedOut,
+											int32_t* restEndpointsOut, int32_t restEndpointCount);
+
+	// Motor positions in microsteps and the step-clock time they were taken at. Returns how many
+	// were written. Reads a snapshot rather than the live state, so it never stalls the motion
+	// thread and never tears.
+	int32_t DuetSbc_MotionGetMotorPositions(DuetSbcHandle* h, int32_t* stepsOut, int32_t count, uint32_t* whenTicks);
+
+	// Where the drives are now, interpolated within the segment each is running. GetMotorPositions
+	// reports the commanded position instead, which is what the planner resynchronises against.
+	int32_t DuetSbc_MotionGetLivePositions(DuetSbcHandle* h, int32_t* stepsOut, int32_t count, uint32_t* whenTicks);
+
+	// Where one drive was at a given step-clock time, and where it was when its current move began.
+	// This is what undoing an endstop overshoot needs: the position at the instant the switch fired
+	// rather than the one the stop message caught. Only this side can answer it, because only this
+	// side holds the segment chain the move was planned into.
+	//
+	// `usedTimestamp` reports whether the answer came from evaluating at `whenTicks` or from where the
+	// drive is now. It is 0 when `whenTicks` is 0 - what a board using the older message reports - and
+	// when the step-clock fit is not yet trusted. Falling back leaves the overshoot uncorrected, which
+	// the caller has to be able to tell.
+	//
+	// Returns 1 on success, 0 if `drive` is out of range.
+	int32_t DuetSbc_MotionGetPositionAt(DuetSbcHandle* h, int32_t drive, uint32_t whenTicks,
+										int32_t* positionOut, int32_t* positionAtMoveStartOut,
+										int32_t* usedTimestampOut);
+
+	// Force motor positions, after homing or a move that stopped early. The endpoint each ring
+	// measures its next move from follows, because a move is scheduled as the difference between two
+	// endpoints - so a position the rings never heard about would be undone by the next move.
+	//
+	// Queued for the motion thread, which takes it up before any move submitted after this call.
+	// Returns 1 if it was taken, 0 if the queue was full and the caller must retry - a dropped
+	// position is a machine that thinks it is somewhere it is not.
+	int32_t DuetSbc_MotionSetMotorPositions(DuetSbcHandle* h, uint32_t driveMask, const int32_t* positions, int32_t count);
+
+	// State DCS decides from its own bookkeeping each cycle, stored for the motion thread to read.
+	void DuetSbc_MotionSetRingState(DuetSbcHandle* h, int32_t ring, int32_t shouldStartMove, int32_t waitingForEmpty);
+
+	uint32_t DuetSbc_MotionGetScheduledMoves(DuetSbcHandle* h, int32_t ring);
+	uint32_t DuetSbc_MotionGetCompletedMoves(DuetSbcHandle* h, int32_t ring);
+	// Submissions refused because the queue was full. Non-zero means DCS ignored a retry.
+	uint32_t DuetSbc_MotionGetSubmissionsDropped(DuetSbcHandle* h);
+
+	// 1 while a submitted move has not yet been taken up by the motion thread. A ring's scheduled
+	// count only rises once it has, so asking the rings alone whether the machine has stopped is
+	// answered "yes" about a move that has not started. Anything waiting for standstill must check
+	// both.
+	int32_t DuetSbc_MotionHasPendingSubmissions(DuetSbcHandle* h);
+
+	// Forced positions the motion thread has adopted. Compared against what the caller believes it
+	// has sent, this is the difference between a position that was queued and one that took effect.
+	uint32_t DuetSbc_MotionGetForcedPositionsApplied(DuetSbcHandle* h);
+
+	// Everything M122 reports about the motion engine. Counters rather than text: the caller owns
+	// the wording of the report, as it does for the step clock stats below.
+	using DuetSbcRingStats = struct
+	{
+		uint32_t scheduledMoves;
+		uint32_t completedMoves;
+		uint32_t numLookaheadErrors;
+		uint32_t numLookaheadUnderruns;
+		uint32_t numNoMoveUnderruns;
+	};
+
+	// Movement systems the engine builds. Must match Motion::maxRings.
+	#define DUET_SBC_MAX_RINGS 2
+
+	using DuetSbcMotionStats = struct
+	{
+		uint32_t segmentsCreated;		 // MoveSegments allocated since startup
+		uint32_t movementDelayTicks;	 // how far the movement timebase lags the raw step clock
+		uint32_t submissionsDropped;	 // moves refused because the submission queue was full
+		uint32_t forcedPositionsApplied; // positions the motion thread has adopted
+		uint32_t droppedSchedulePackets; // ScheduleMove packets the link refused: motion was lost
+		DuetSbcRingStats rings[DUET_SBC_MAX_RINGS];
+	};
+
+	void DuetSbc_MotionGetStats(DuetSbcHandle* h, DuetSbcMotionStats* stats);
+
+	// Zero the error and underrun counters. Separate from reading them, so that reporting twice does
+	// not show zeros the second time.
+	void DuetSbc_MotionResetStats(DuetSbcHandle* h);
+
+	// --- Step clock ---
+	//
+	// The SBC has no step clock of its own: it models the controller's, from the MasterClock packet
+	// the controller sends every transfer. Move start times are in that timebase, so how well the
+	// model tracks is how well moves land - a move scheduled against a model that is out by more
+	// than the preparation margin arrives late.
+
+	// The current step-clock reading, in the controller's ticks.
+	uint32_t DuetSbc_GetStepClockTicks(DuetSbcHandle* h);
+
+	// How far the movement timebase lags the raw step clock, in ticks. Moves are scheduled in the
+	// movement timebase and an endstop's trigger timestamp is a reading of the raw one, so this is
+	// the difference between the two clocks the endstop correction has to reconcile. It only grows,
+	// and it grows whenever any board reports that it could not keep up.
+	uint32_t DuetSbc_GetMovementDelay(DuetSbcHandle* h);
+
+	// How the model is tracking. Mirrors StepTimer::ClockStats; see LinkEvents.cs's counterpart for
+	// the managed shape. `synced` is 0 until the fit has enough samples to be trusted, during which
+	// the model still works but is anchored to the last sample at the nominal rate.
+	using DuetSbcClockStats = struct
+	{
+		double driftPpm;			 // fitted rate minus nominal, in parts per million
+		uint32_t numSamples;		 // samples in the current fit
+		uint32_t peakResidualNs;	 // largest deviation of a sample from the fit since startup
+		uint32_t numBackwardClamps;	 // times a new fit would have made the reading go backwards
+		uint32_t numRejectedSamples; // samples discarded as implausible
+		int32_t synced;
+	};
+
+	void DuetSbc_GetClockStats(DuetSbcHandle* h, DuetSbcClockStats* stats);
+
+	// --- Test seam ---
+	//
+	// Pin the local time base the step-clock model is fitted against to a caller-controlled value,
+	// instead of CLOCK_MONOTONIC. With the master clock a test bench reports also frozen, the whole
+	// motion timeline stands still until the test advances both together - which is what makes move
+	// retirement deterministic on the virtual bench (docs/devel/SYSTEM_EMULATION.md, stage 1).
+	// Process-wide, like the clock it replaces. Never call this against a real controller: the model
+	// would fit real ticks against a clock that does not move.
+	void DuetSbc_PinLocalClock(int64_t ns);
+	// Restore CLOCK_MONOTONIC as the local time base.
+	void DuetSbc_UnpinLocalClock(void);
 
 	// Destroy the instance (stops the loop first).
 	void DuetSbc_Destroy(DuetSbcHandle* h);

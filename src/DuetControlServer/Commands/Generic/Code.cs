@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -9,6 +10,7 @@ using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Codes.Handlers;
 using DuetControlServer.IPC;
+using DuetControlServer.Files;
 using DuetControlServer.IPC.Processors;
 using DuetControlServer.Link;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,7 +33,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     private readonly TCodeHandler _tCodes;
     private readonly KeywordHandler _keywords;
     private readonly IHostApplicationLifetime _lifetime;
-    private readonly LinkInterface _linkInterface;
+    private readonly MacroRunner _macroRunner;
     private readonly ILogger<Code> _logger;
     private readonly Settings _settings;
 
@@ -45,7 +47,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <param name="tCodes">T-code handler</param>
     /// <param name="keywords">Keyword handler</param>
     /// <param name="lifetime">Host application lifetime</param>
-    /// <param name="linkInterface">Link interface</param>
+    /// <param name="macroRunner">Runs macro files</param>
     /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
     public Code(Codes.CodeProcessor codeProcessor,
@@ -55,7 +57,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         [FromKeyedServices(Keys.TCodes)] ICodeHandler tCodes,
         [FromKeyedServices(Keys.Keywords)] ICodeHandler keywords,
         IHostApplicationLifetime lifetime,
-        LinkInterface linkInterface,
+        MacroRunner macroRunner,
         ILogger<Code> logger,
         IOptions<Settings> settings) : base()
     {
@@ -66,7 +68,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         _tCodes = (TCodeHandler)tCodes;
         _keywords = (KeywordHandler)keywords;
         _lifetime = lifetime;
-        _linkInterface = linkInterface;
+        _macroRunner = macroRunner;
         _logger = logger;
         _settings = settings.Value;
     }
@@ -82,7 +84,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <param name="tCodes">T-code handler</param>
     /// <param name="keywords">Keyword handler</param>
     /// <param name="lifetime">Host application lifetime</param>
-    /// <param name="linkInterface">Link interface</param>
+    /// <param name="macroRunner">Runs macro files</param>
     /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
     public Code(string code,
@@ -93,7 +95,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         [FromKeyedServices(Keys.TCodes)] ICodeHandler tCodes,
         [FromKeyedServices(Keys.Keywords)] ICodeHandler keywords,
         IHostApplicationLifetime lifetime,
-        LinkInterface linkInterface,
+        MacroRunner macroRunner,
         ILogger<Code> logger,
         IOptions<Settings> settings) : base(code)
     {
@@ -104,7 +106,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         _tCodes = (TCodeHandler)tCodes;
         _keywords = (KeywordHandler)keywords;
         _lifetime = lifetime;
-        _linkInterface = linkInterface;
+        _macroRunner = macroRunner;
         _logger = logger;
         _settings = settings.Value;
     }
@@ -132,6 +134,24 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// Cancellation token that may be used to cancel this code
     /// </summary>
     internal CancellationToken CancellationToken { get; set; }
+
+    /// <summary>
+    /// Take this code out of its channel's cancellation, so that only a shutdown ends it
+    /// </summary>
+    /// <remarks>
+    /// The job-control codes a job file can contain - M0, M1, M2, M25, M226, M600, M601, M32 - ask
+    /// for something that cancels the read-ahead they are part of. Under the channel's token that
+    /// would cancel their own reply, so from handler entry they run under
+    /// <c>ApplicationStopping</c>, as prioritised codes do. The handler has to pass the returned
+    /// token on as well: waiting for the job's answer on the token the request has just cancelled
+    /// is the same defect one call further down
+    /// </remarks>
+    /// <returns>The token it now runs under, which the handler passes on in place of its own</returns>
+    internal CancellationToken DetachFromChannelCancellation()
+    {
+        CancellationToken = _lifetime.ApplicationStopping;
+        return CancellationToken;
+    }
 
     /// <summary>
     /// Used to reset the cancellation token of this code
@@ -188,6 +208,59 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// File that started this code
     /// </summary>
     internal Files.CodeFile? File { get; set; }
+
+    /// <summary>
+    /// Whether the ProcessInternally worker is deferring this code: the channel continues past it,
+    /// and its handler runs when its anchor move has retired
+    /// </summary>
+    internal bool IsCurrentlyDeferred { get; set; }
+
+    /// <summary>
+    /// Ring the anchor move was queued on
+    /// </summary>
+    internal int DeferredRing { get; set; }
+
+    /// <summary>
+    /// Column of this code to quote in front of its error, or -1 for an error about no one place in it
+    /// </summary>
+    /// <remarks>
+    /// Taken from the <see cref="GCodeException.Column"/> of the refusal a guard threw, which is
+    /// where the value stood. RepRapFirmware quotes the column for exactly these - a value out of
+    /// range, a value that was not a number - and for nothing else, because a rule about the whole
+    /// command has no one character to point at (GCodeException::GetMessage)
+    /// </remarks>
+    internal int ErrorColumn { get; set; } = CodeParameter.NoColumn;
+
+    /// <summary>
+    /// Id of the anchor: the last move submitted on the channel's ring when this code was read.
+    /// The code's effect belongs after the end of that move
+    /// </summary>
+    internal uint DeferredAnchor { get; set; }
+
+    /// <summary>
+    /// Completion of the previously deferred code on the same pipeline, or null if there is none
+    /// pending. Handlers of deferred codes must run in file order even when they share an anchor,
+    /// and the anchor wait alone does not order their wakes
+    /// </summary>
+    internal Task? DeferredPredecessor { get; set; }
+
+    /// <summary>
+    /// The handler this code's type routes to, or null if none does
+    /// </summary>
+    private ICodeHandler? InternalHandler => Type switch
+    {
+        CodeType.GCode => _gCodes,
+        CodeType.MCode => _mCodes,
+        CodeType.TCode => _tCodes,
+        CodeType.Keyword => _keywords,
+        _ => null
+    };
+
+    /// <summary>
+    /// Classify this code through the handler its type routes to
+    /// </summary>
+    /// <returns>The declared class, or null if no handler implements the code</returns>
+    internal Codes.CodeClass? ClassifyInternally() => InternalHandler?.Classify(this);
 
     /// <summary>
     /// Update the next file position in case we need to fork this file
@@ -271,49 +344,104 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         // Try to process this code internally
         _logger.LogDebug("Processing {Code}", this);
 
-        // Flush the code channel and populate SBC fields where applicable
-        if (Keyword == KeywordType.None && _expressions.ContainsSbcFields(this) && !await _codeProcessor.FlushAsync(this, true, false))
+        // An expression reading the object model must not be evaluated while earlier codes are
+        // still completing, so such a code waits for them first; the flush evaluates the
+        // expressions once the state has settled. One referencing only variables needs no wait,
+        // because this stage runs codes in stream order, but its parameters still have to be
+        // evaluated here: the handlers read numeric parameters only
+        if (Keyword == KeywordType.None)
         {
-            throw new OperationCanceledException();
+            if (_expressions.ContainsModelFields(this))
+            {
+                if (!await _codeProcessor.FlushAsync(this, evaluateExpressions: true, cancellationToken: CancellationToken))
+                {
+                    throw new OperationCanceledException();
+                }
+            }
+            else
+            {
+                await _expressions.EvaluateAsync(this, CancellationToken);
+            }
         }
 
-        // Attempt to process the code internally
+        // Attempt to process the code internally. The handler declares each code's class in its
+        // table; the class's synchronisation runs here, before the handler sees the code, so "does
+        // this code need a standstill" is a declared fact rather than a call the handler remembers
+        // to make. A code its handler does not classify has no row: no handler runs, and the code
+        // goes down the macro-then-unsupported path below
         try
         {
-            switch (Type)
+            ICodeHandler? handler = InternalHandler;
+            if (handler is not null && handler.Classify(this) is Codes.CodeClass codeClass)
             {
-                case CodeType.GCode:
-                    Result = await _gCodes.ProcessAsync(this, CancellationToken);
-                    break;
-                case CodeType.MCode:
-                    Result = await _mCodes.ProcessAsync(this, CancellationToken);
-                    break;
-                case CodeType.TCode:
-                    Result = await _tCodes.ProcessAsync(this, CancellationToken);
-                    break;
-                case CodeType.Keyword:
-                    Result = await _keywords.ProcessAsync(this, CancellationToken);
-                    break;
+                // A prioritized code jumps every queue by definition
+                if (!Flags.HasFlag(CodeFlags.IsPrioritized))
+                {
+                    switch (codeClass)
+                    {
+                        case Codes.CodeClass.Flush:
+                            // The move carries the value; the flush keeps evaluation order
+                            if (!await _codeProcessor.FlushAsync(this, cancellationToken: CancellationToken))
+                            {
+                                throw new OperationCanceledException();
+                            }
+                            break;
+                        case Codes.CodeClass.FlushAndStandstill:
+                            // The code changes what a queued move means, or needs the board's
+                            // reply: nothing may be moving when the handler runs
+                            if (!await _codeProcessor.FlushAsync(this, cancellationToken: CancellationToken) ||
+                                !await _codeProcessor.WaitForStandstillAsync(Channel, CancellationToken))
+                            {
+                                throw new OperationCanceledException();
+                            }
+                            break;
+                        case Codes.CodeClass.Deferred:
+                            // The effect belongs at a point in the path. A currently deferred
+                            // code was flushed by the worker beforehand, so its parameters are
+                            // frozen; it holds its handler back until its anchor move has
+                            // retired, after the deferred code before it so that effects land in
+                            // file order even when they share an anchor. One not being deferred
+                            // (no move in flight, or not from the job) flushes and applies now
+                            if (IsCurrentlyDeferred)
+                            {
+                                if (DeferredPredecessor is not null)
+                                {
+                                    await DeferredPredecessor;
+                                }
+                                if (DeferredAnchor != 0 &&
+                                    !await _codeProcessor.WaitForRetirementAsync(DeferredRing, DeferredAnchor, CancellationToken))
+                                {
+                                    // A stop dropped the move this code's effect belongs after, so
+                                    // the point in the path it was waiting for will never be
+                                    // reached. The rewind re-reads its line, which is what makes it
+                                    // fire exactly once
+                                    throw new OperationCanceledException();
+                                }
+                            }
+                            else if (!await _codeProcessor.FlushAsync(this, cancellationToken: CancellationToken))
+                            {
+                                throw new OperationCanceledException();
+                            }
+                            break;
+                    }
+                }
+                Result = await handler.ProcessAsync(this, CancellationToken);
             }
 
             if (Result is not null)
             {
-#if false // TODO: do we need to do anything now RRF is removed?
-                if (Type is CodeType.GCode or CodeType.MCode or CodeType.TCode && (Type != CodeType.MCode || MajorNumber is not 112 and not 997 and not 999))
-                {
-                    // Update the last result but only if this code is no comment and if it is not shutting down the application
-                    await _linkInterface.SetLastCodeResultAsync(this, CancellationToken);
-                }
-#endif
                 return true;
             }
         }
-        catch (Exception e) when (e is MissingParameterException or InvalidParameterTypeException)
+        catch (Exception e) when (e is NotSupportedException)
         {
+            ResolveAsUnsupported();
+            return true;
+        }
+        catch (Exception e) when (e is GCodeException or MissingParameterException or InvalidParameterTypeException)
+        {
+            ErrorColumn = (e as GCodeException)?.Column ?? CodeParameter.NoColumn;
             Result = new(MessageType.Error, e.Message);
-#if false // TODO: do we need to do anything now RRF is removed?
-            await _linkInterface.SetLastCodeResultAsync(this, CancellationToken);
-#endif
             return true;
         }
 
@@ -325,22 +453,89 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
             Flags |= CodeFlags.IsPostProcessed;
             if (resolved)
             {
-#if false // TODO: do we need to do anything now RRF is removed?
-                await _linkInterface.SetLastCodeResultAsync(this, CancellationToken);
-#endif
                 return true;
             }
         }
 
-        // Do not send comments that may not be interpreted by RRF
+        // A comment carries no instruction, so there is nothing left to interpret
         if (IsNonFirmwareComment)
         {
             Result = new Message();
             return true;
         }
 
-        // Code has not been interpreted yet - let RRF deal with it
-        return false;
+        // No handler recognised this code, so try a macro named after it. This is how a machine adds
+        // a code of its own in RepRapFirmware - M1234 runs sys/M1234.g - and it has to be tried
+        // before the code is called unsupported, or those machines stop working
+        if (await TryRunCodeMacroAsync())
+        {
+            Result ??= new Message();
+            return true;
+        }
+
+        ResolveAsUnsupported();
+        return true;
+    }
+
+    /// <summary>
+    /// Run the macro file named after this code, if there is one
+    /// </summary>
+    /// <returns>True if such a macro existed and was run</returns>
+    /// <remarks>
+    /// RepRapFirmware looks for <c>&lt;letter&gt;&lt;number&gt;.g</c>, or
+    /// <c>&lt;letter&gt;&lt;number&gt;.&lt;fraction&gt;.g</c> for a code with a fraction, in the
+    /// system directory, and gives the macro the code's own parameters, so that <c>M1234 X5</c> can
+    /// read <c>param.X</c>
+    /// </remarks>
+    private async ValueTask<bool> TryRunCodeMacroAsync()
+    {
+        if (Type is not (CodeType.GCode or CodeType.MCode) || MajorNumber is null or < 0 or >= 10000)
+        {
+            return false;
+        }
+
+        char letter = Type == CodeType.GCode ? 'G' : 'M';
+        string macroName = MinorNumber > 0 ? $"{letter}{MajorNumber}.{MinorNumber}.g" : $"{letter}{MajorNumber}.g";
+
+        // The code's own parameters, by letter, keeping the type the parser gave each one so that
+        // param.S is a string and param.X is a number
+        // TODO: pass array parameters too, once a variable can hold an array
+        Dictionary<string, object?> parameters = [];
+        foreach (CodeParameter parameter in Parameters)
+        {
+            object? value =
+                parameter.IsNull ? null :
+                parameter.Type == typeof(string) ? (string?)parameter :
+                parameter.Type == typeof(int) ? (int)parameter :
+                parameter.Type == typeof(uint) ? (uint)parameter :
+                parameter.Type == typeof(long) ? (long)parameter :
+                parameter.Type == typeof(float) ? (float)parameter :
+                null;
+            if (value is not null || parameter.IsNull)
+            {
+                parameters[parameter.Letter.ToString()] = value;
+            }
+        }
+
+        // A macro standing in for a code the user typed, so it is not a system macro unless the
+        // code that reached here came from one
+        return await _macroRunner.TryRunAsync(Channel, macroName, this, isSystemMacro: false,
+                                              parameters: parameters, cancellationToken: CancellationToken);
+    }
+
+    /// <summary>
+    /// Resolve this code as one nothing supports
+    /// </summary>
+    /// <remarks>
+    /// There used to be a firmware behind DuetControlServer that unrecognised codes were passed to,
+    /// and "no handler here" meant "let RepRapFirmware try". It no longer does: a code is either
+    /// executed here or it is not executed at all. The wording and the severity match what
+    /// RepRapFirmware replied in the same situation - a warning, not an error - because macros and
+    /// user interfaces have been reading it for years
+    /// </remarks>
+    internal void ResolveAsUnsupported()
+    {
+        Result ??= new Message(MessageType.Warning, $"{ToShortString()}: Command is not supported");
     }
 
     /// <summary>
@@ -385,5 +580,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         File = null;
         _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         BinarySize = 0;
+        ErrorColumn = DuetAPI.Commands.CodeParameter.NoColumn;
     }
 }

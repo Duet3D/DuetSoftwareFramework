@@ -1,0 +1,893 @@
+using DuetAPI.ObjectModel;
+using DuetControlServer.Events;
+using DuetControlServer.Link.Protocol.CanMessages;
+using DuetControlServer.Link.Protocol.Shared;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Channels;
+using System.Threading.Tasks;
+
+namespace DuetControlServer.Link.Expansion;
+
+/// <summary>
+/// Turns the status reports the expansion boards broadcast into object model state
+/// </summary>
+/// <remarks>
+/// <para>
+/// The boards report on their own initiative: an announcement when one starts or regains time sync,
+/// then a periodic board status report and whichever of the driver, sensor, heater, fan, input and
+/// filament monitor reports apply to what it is carrying. Nothing here asks for any of it, so this is
+/// a receiver rather than a poller, and the object model is the only place the information goes.
+/// </para>
+/// <para>
+/// Reports arrive on the link dispatch thread, which also carries move completions and message
+/// output, so nothing is decoded there. Messages are queued as raw payloads and applied on this
+/// service's own task, which is also what keeps the object model write lock off the dispatch thread.
+/// The queue is bounded and drops the oldest report when it fills: status reports are periodic, so a
+/// stale one is worth less than the newest, and blocking the dispatch thread to keep it would stall
+/// the link.
+/// </para>
+/// </remarks>
+/// <param name="model">Object model</param>
+/// <param name="logger">Logger</param>
+internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.EventQueue events,
+                                           IOptions<Settings> settings, ILogger<ExpansionBoardManager> logger) : BackgroundService
+{
+    /// <summary>
+    /// When each board was last heard from, for the watchdog below
+    /// </summary>
+    private readonly DateTime?[] _lastSeen = new DateTime?[CanId.MaxCanAddress + 1];
+
+    /// <summary>
+    /// How many reports may be waiting before the oldest is dropped
+    /// </summary>
+    private const int QueueSize = 256;
+
+    /// <summary>
+    /// A report as it came off the bus, decoded later on this service's own task
+    /// </summary>
+    /// <param name="Type">CAN message type</param>
+    /// <param name="Source">CAN address that sent it</param>
+    /// <param name="Payload">Raw message payload</param>
+    private readonly record struct Report(CanMessageType Type, byte Source, byte[] Payload);
+
+    private readonly Channel<Report> _reports = Channel.CreateBounded<Report>(new BoundedChannelOptions(QueueSize)
+    {
+        FullMode = BoundedChannelFullMode.DropOldest,
+        SingleReader = true,
+        SingleWriter = true
+    });
+
+    /// <summary>
+    /// Take a report broadcast by an expansion board
+    /// </summary>
+    /// <param name="type">CAN message type</param>
+    /// <param name="source">CAN address that sent it</param>
+    /// <param name="payload">Raw message payload</param>
+    /// <returns>True if this manager consumes the message type</returns>
+    /// <remarks>
+    /// Called from the link dispatch thread, so this does no more than recognise the type and queue
+    /// the bytes
+    /// </remarks>
+    public bool TryEnqueue(CanMessageType type, byte source, byte[] payload)
+    {
+        switch (type)
+        {
+            case CanMessageType.AnnounceV0:
+            case CanMessageType.AnnounceV1:
+            case CanMessageType.BoardStatusReportV0:
+            case CanMessageType.BoardStatusReportV1:
+            case CanMessageType.DriversStatusReport:
+            case CanMessageType.SensorTemperaturesReport:
+            case CanMessageType.HeatersStatusReport:
+            case CanMessageType.FansReport:
+            case CanMessageType.InputStateChangedV1:
+            case CanMessageType.InputStateChangedV2:
+            case CanMessageType.FilamentMonitorsStatusReportV2:
+            case CanMessageType.Event:
+            case CanMessageType.DebugText:
+                break;
+
+            default:
+                return false;
+        }
+
+        if (!_reports.Writer.TryWrite(new Report(type, source, payload)))
+        {
+            logger.LogWarning("Dropped a {Type} report from board {Source}", type, source);
+        }
+        return true;
+    }
+
+    /// <inheritdoc />
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _ = WatchForSilentBoardsAsync(stoppingToken);
+
+        await foreach (Report report in _reports.Reader.ReadAllAsync(stoppingToken))
+        {
+            try
+            {
+                await ApplyAsync(report, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception e)
+            {
+                // One malformed report must not take the receiver down; the next one supersedes it
+                logger.LogError(e, "Failed to apply a {Type} report from board {Source}", report.Type, report.Source);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Apply one report to the object model
+    /// </summary>
+    /// <param name="report">The report</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    private async ValueTask ApplyAsync(Report report, CancellationToken cancellationToken)
+    {
+        if (report.Source <= CanId.MaxCanAddress)
+        {
+            _lastSeen[report.Source] = DateTime.UtcNow;
+        }
+
+        switch (report.Type)
+        {
+            case CanMessageType.AnnounceV0:
+                await ApplyAnnouncementAsync(report.Source,
+                    CanMessageSerializer.Deserialize<CanMessageAnnounceV0>(report.Payload).BoardTypeAndFirmwareVersionString,
+                    numDrivers: null, uniqueId: null, cancellationToken);
+                break;
+
+            case CanMessageType.AnnounceV1:
+                {
+                    CanMessageAnnounceV1 announce = CanMessageSerializer.Deserialize<CanMessageAnnounceV1>(report.Payload);
+                    await ApplyAnnouncementAsync(report.Source, announce.BoardTypeAndFirmwareVersionString,
+                                                 announce.NumDrivers, FormatUniqueId(announce.UniqueId), cancellationToken);
+                }
+                break;
+
+            case CanMessageType.BoardStatusReportV0:
+                await ApplyBoardStatusAsync(report.Source, CanMessageSerializer.Deserialize<CanMessageBoardStatusV0>(report.Payload), cancellationToken);
+                break;
+
+            case CanMessageType.BoardStatusReportV1:
+                await ApplyBoardStatusAsync(report.Source, CanMessageSerializer.Deserialize<CanMessageBoardStatusV1>(report.Payload),
+                                            report.Payload, cancellationToken);
+                break;
+
+            case CanMessageType.DriversStatusReport:
+                await ApplyDriversStatusAsync(report.Source, CanMessageSerializer.Deserialize<CanMessageDriversStatus>(report.Payload), cancellationToken);
+                break;
+
+            case CanMessageType.SensorTemperaturesReport:
+                await ApplySensorTemperaturesAsync(CanMessageSerializer.Deserialize<CanMessageSensorTemperatures>(report.Payload), cancellationToken);
+                break;
+
+            case CanMessageType.HeatersStatusReport:
+                await ApplyHeatersStatusAsync(CanMessageSerializer.Deserialize<CanMessageHeatersStatus>(report.Payload), cancellationToken);
+                break;
+
+            case CanMessageType.FansReport:
+                await ApplyFansReportAsync(CanMessageSerializer.Deserialize<CanMessageFansReport>(report.Payload), cancellationToken);
+                break;
+
+            case CanMessageType.InputStateChangedV1:
+                {
+                    // V1 and V2 differ in the size of their per-handle entries, so each has to be
+                    // read as itself; reading one as the other silently shifts every handle
+                    CanMessageInputChangedV1 changed = CanMessageSerializer.Deserialize<CanMessageInputChangedV1>(report.Payload);
+                    await ApplyInputChangedAsync(changed.States, changed.NumHandles, changed.GetEntryHandle, cancellationToken);
+                }
+                break;
+
+            case CanMessageType.InputStateChangedV2:
+                {
+                    CanMessageInputChangedV2 changed = CanMessageSerializer.Deserialize<CanMessageInputChangedV2>(report.Payload);
+                    await ApplyInputChangedAsync(changed.States, changed.NumHandles, changed.GetEntryHandle, cancellationToken);
+                }
+                break;
+
+            case CanMessageType.FilamentMonitorsStatusReportV2:
+                logger.LogDebug("Filament monitor status from board {Source} is not applied yet: sensors.filamentMonitors[] is keyed by extruder, which needs the filament monitor configuration M591 does not write yet",
+                                report.Source);
+                break;
+
+            case CanMessageType.Event:
+                {
+                    CanMessageEvent canEvent = CanMessageSerializer.Deserialize<CanMessageEvent>(report.Payload);
+                    events.Raise(new MachineEvent(canEvent.EventType, canEvent.EventParam, report.Source,
+                                                  canEvent.DeviceNumber, canEvent.TextString));
+                }
+                break;
+
+            case CanMessageType.DebugText:
+                logger.LogDebug("Board {Source}: {Text}", report.Source,
+                                CanMessageSerializer.Deserialize<CanMessageDebugText>(report.Payload).TextString);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Record a board that has just announced itself
+    /// </summary>
+    /// <param name="source">CAN address of the board</param>
+    /// <param name="description">Board type, firmware version and firmware date, separated by pipes</param>
+    /// <param name="numDrivers">How many drivers it carries, if it said</param>
+    /// <param name="uniqueId">Its unique id, if it said</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    private async ValueTask ApplyAnnouncementAsync(byte source, string description, byte? numDrivers, string? uniqueId,
+                                                   CancellationToken cancellationToken)
+    {
+        // Duet3Expansion sends "<board type>|<firmware version>|<firmware date>"
+        string[] parts = description.Split('|');
+
+        bool wasRunning;
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            Board board = GetOrCreateBoard(source);
+            wasRunning = board.State == BoardState.Running;
+            board.ShortName = parts.Length > 0 ? parts[0] : string.Empty;
+            board.Name = board.ShortName;
+            board.FirmwareVersion = parts.Length > 1 ? parts[1] : string.Empty;
+            board.FirmwareDate = parts.Length > 2 ? parts[2] : string.Empty;
+            board.State = BoardState.Running;
+
+            if (uniqueId is not null)
+            {
+                board.UniqueId = uniqueId;
+            }
+
+            if (numDrivers is not null)
+            {
+                board.MaxMotors = numDrivers.Value;
+                board.Drivers ??= [];
+                while (board.Drivers.Count > numDrivers.Value)
+                {
+                    board.Drivers.RemoveAt(board.Drivers.Count - 1);
+                }
+                while (board.Drivers.Count < numDrivers.Value)
+                {
+                    board.Drivers.Add(new Driver());
+                    // TODO RRF 3.7.0-rc.1 applies a default driver mode but for boards that don't have smart drivers
+                    // this is misleading. Currently there is no way for a board to inform RRF/DSF that it has non smart
+                    // drivers
+                }
+            }
+        }
+
+        logger.LogInformation("Expansion board {Source} announced itself as {Description}", source, description);
+        _lastSeen[source] = DateTime.UtcNow;
+
+        // A board announces itself when it starts and when it regains time sync. The second is a board
+        // the machine thought it still had, which is a different thing worth telling a macro about
+        if (wasRunning)
+        {
+            events.Raise(new MachineEvent(EventType.ExpansionReconnect, 0, source, 0, string.Empty));
+        }
+    }
+
+    /// <summary>
+    /// Apply a board status report
+    /// </summary>
+    /// <param name="source">CAN address of the board</param>
+    /// <param name="status">The report</param>
+    /// <param name="payload">The raw report, which is where the analog handle readings are</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    private async ValueTask ApplyBoardStatusAsync(byte source, CanMessageBoardStatusV1 status,
+                                                  byte[] payload, CancellationToken cancellationToken)
+    {
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            Board board = GetOrCreateBoard(source);
+            board.State = BoardState.Running;
+
+            // A report carrying a movement delay is reporting that instead of its free memory
+            if (!status.HasMovementDelay)
+            {
+                board.FreeRam = status.NeverUsedRam;
+            }
+
+            // The readings are packed in a fixed order and only the present ones take a slot, so they
+            // have to be walked in that order rather than indexed by what they are
+            int index = 0;
+            board.VIn = status.HasVin ? ToMinMaxCurrent(status.ShortValues[index++]) : null;
+            board.V12 = status.HasV12 ? ToMinMaxCurrent(status.ShortValues[index++]) : null;
+            board.McuTemp = status.HasMcuTemp ? ToMinMaxCurrent(status.ShortValues[index]) : null;
+
+            ApplyAnalogHandles(status, payload);
+        }
+    }
+
+    /// <summary>
+    /// Apply the analog readings a board appends to its status report
+    /// </summary>
+    /// <param name="status">The report</param>
+    /// <param name="payload">The raw report, which is where the readings are</param>
+    /// <remarks>
+    /// <para>
+    /// A board status report is variable length: the packed min/current/max values are followed by
+    /// one <see cref="AnalogHandleDataV1"/> per analog input the board is watching. They are not part
+    /// of the fixed struct, because where they start depends on how many of Vin, V12 and MCU
+    /// temperature that board has - which is why they are read from the payload rather than from a
+    /// field.
+    /// </para>
+    /// <para>
+    /// Only Z probes use analog handles, as in RepRapFirmware. This is where an analog or scanning
+    /// probe's reading comes from; a digital probe reports a level through
+    /// <c>InputStateChanged</c> instead
+    /// </para>
+    /// </remarks>
+    /// <remarks>The caller must hold the object model write lock</remarks>
+    private void ApplyAnalogHandles(CanMessageBoardStatusV1 status, byte[] payload)
+    {
+        int offset = (int)status.GetAnalogHandlesOffset();
+        int entrySize = Marshal.SizeOf<AnalogHandleDataV1>();
+
+        for (int i = 0; i < status.NumAnalogHandles && offset + entrySize <= payload.Length; i++)
+        {
+            AnalogHandleDataV1 data = MemoryMarshal.Read<AnalogHandleDataV1>(payload.AsSpan(offset));
+            offset += entrySize;
+
+            if (data.Handle.Type != RemoteInputHandle.TypeZprobe)
+            {
+                continue;
+            }
+
+            Probe? probe = data.Handle.Major < model.Sensors.Probes.Count
+                ? model.Sensors.Probes[data.Handle.Major]
+                : null;
+            if (probe is not null)
+            {
+                while (probe.Value.Count < 1)
+                {
+                    probe.Value.Add(0);
+                }
+                probe.Value[0] = data.Reading;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Apply a board status report in the older format
+    /// </summary>
+    /// <param name="source">CAN address of the board</param>
+    /// <param name="status">The report</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    private async ValueTask ApplyBoardStatusAsync(byte source, CanMessageBoardStatusV0 status, CancellationToken cancellationToken)
+    {
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            Board board = GetOrCreateBoard(source);
+            board.State = BoardState.Running;
+
+            int index = 0;
+            board.VIn = status.HasVin ? ToMinMaxCurrent(status.Values[index++]) : null;
+            board.V12 = status.HasV12 ? ToMinMaxCurrent(status.Values[index++]) : null;
+            board.McuTemp = status.HasMcuTemp ? ToMinMaxCurrent(status.Values[index]) : null;
+        }
+    }
+
+    /// <summary>
+    /// Apply a driver status report
+    /// </summary>
+    /// <param name="source">CAN address of the board</param>
+    /// <param name="status">The report</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    private async ValueTask ApplyDriversStatusAsync(byte source, CanMessageDriversStatus status, CancellationToken cancellationToken)
+    {
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            Board board = GetOrCreateBoard(source);
+            board.Drivers ??= [];
+
+            int reported = Math.Min((int)status.NumDriversReported, OpenLoopStatusArray15.Length);
+            while (board.Drivers.Count < reported)
+            {
+                board.Drivers.Add(new Driver());
+            }
+
+            for (int driver = 0; driver < reported; driver++)
+            {
+                // The closed-loop form carries the same status word plus the tracking data, which has
+                // nowhere to go until the closed-loop configuration is ported
+                board.Drivers[driver].Status = status.HasClosedLoopData
+                    ? status.ClosedLoopData[driver].Status
+                    : status.OpenLoopData[driver].Status;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Apply a sensor temperature report
+    /// </summary>
+    /// <param name="report">The report</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    private async ValueTask ApplySensorTemperaturesAsync(CanMessageSensorTemperatures report, CancellationToken cancellationToken)
+    {
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            int slot = 0;
+            foreach (int sensor in SetBits(report.WhichSensors, CanSensorReportArray11.Length))
+            {
+                CanSensorReport sensorReport = report.TemperatureReports[slot++];
+                if (Find(model.Sensors.Analog, sensor) is AnalogSensor analogSensor)
+                {
+                    analogSensor.LastReading = sensorReport.GetTemperature();
+                    analogSensor.State = (TemperatureError)sensorReport.ErrorCode;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Apply a heater status report
+    /// </summary>
+    /// <param name="report">The report</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    private async ValueTask ApplyHeatersStatusAsync(CanMessageHeatersStatus report, CancellationToken cancellationToken)
+    {
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            int slot = 0;
+            foreach (int heaterNumber in SetBits(report.WhichHeaters, CanHeaterReportArray9.Length))
+            {
+                CanHeaterReport heaterReport = report.Reports[slot++];
+                if (Find(model.Heat.Heaters, heaterNumber) is Heater heater)
+                {
+                    heater.Current = heaterReport.GetTemperature();
+
+                    // The wire value is a PWM duty cycle in 0..255 and the object model carries a fraction
+                    heater.AvgPwm = heaterReport.AveragePwm / 255.0f;
+
+                    // The board reports a HeaterMode, which is not a HeaterState: the PID modes
+                    // (cooling, stable, heating) all mean "running", and whether running means
+                    // active or standby is what this side commanded, not something the board knows.
+                    // This is RepRapFirmware's Heater::GetStatus mapping, with the commanded
+                    // active/standby flag read from the state the M-code handlers set
+                    // TODO assess whether new HeaterStates are needed
+                    heater.State = heaterReport.Mode switch
+                    {
+                        HeaterMode.Fault => HeaterState.Fault,
+                        HeaterMode.Offline => HeaterState.Offline,
+                        HeaterMode.Off => HeaterState.Off,
+                        >= HeaterMode.Tuning0Settling => HeaterState.Tuning,
+                        _ => heater.State == HeaterState.Standby ? HeaterState.Standby : HeaterState.Active
+                    };
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Apply a fan report
+    /// </summary>
+    /// <param name="report">The report</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    private async ValueTask ApplyFansReportAsync(CanMessageFansReport report, CancellationToken cancellationToken)
+    {
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            int slot = 0;
+            foreach (int fanNumber in SetBits(report.WhichFans, FanReportArray14.Length))
+            {
+                FanReport fanReport = report.FanReports[slot++];
+                if (Find(model.Fans, fanNumber) is Fan fan)
+                {
+                    fan.ActualValue = fanReport.ActualPwm / 65535.0f;
+
+                    // A negative RPM means the board has no tacho for that fan
+                    fan.Rpm = fanReport.Rpm;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Which switches of each endstop are currently closed, one bit per switch
+    /// </summary>
+    /// <remarks>
+    /// An axis with a switch per driver has several switches under one endstop, and each reports
+    /// separately. The object model has one flag for the endstop, so the switches are tracked here
+    /// and the flag is whether any of them is closed - which is what
+    /// <c>SwitchEndstop::Stopped</c> answers in RepRapFirmware
+    /// </remarks>
+    private readonly Dictionary<int, uint> _endstopSwitches = [];
+
+    /// <summary>
+    /// Which switches of one endstop are currently closed, one bit per switch
+    /// </summary>
+    /// <param name="axis">Axis the endstop belongs to</param>
+    /// <returns>The switches, as a bitmap</returns>
+    /// <remarks>
+    /// <c>sensors.endstops[].triggered</c> answers whether <em>any</em> switch is closed, which is
+    /// the question a single-switch axis has. An axis with a switch per driver has a different one:
+    /// which motors are already down, because those are the ones that must not be moved while the
+    /// others run on to their own switches. Only the arming path asks this
+    /// </remarks>
+    public uint GetClosedEndstopSwitches(int axis)
+    {
+        _endstopSwitches.TryGetValue(axis, out uint switches);
+        return switches;
+    }
+
+    /// <summary>
+    /// Record the state of one switch of an endstop
+    /// </summary>
+    /// <param name="axis">Axis the endstop belongs to</param>
+    /// <param name="switchIndex">Which switch of that endstop</param>
+    /// <param name="closed">Whether it is now closed</param>
+    /// <returns>Whether any switch of the endstop is closed</returns>
+    private bool NoteEndstopSwitch(int axis, int switchIndex, bool closed)
+    {
+        _endstopSwitches.TryGetValue(axis, out uint switches);
+        uint bit = 1u << (switchIndex & 31);
+        switches = closed ? switches | bit : switches & ~bit;
+        _endstopSwitches[axis] = switches;
+        return switches != 0;
+    }
+
+    /// <summary>
+    /// Apply an input change notification
+    /// </summary>
+    /// <param name="states">Digital level of each reported handle, one per bit</param>
+    /// <param name="numHandles">How many handles the message carries</param>
+    /// <param name="getHandle">Reads the n'th handle</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <remarks>
+    /// General-purpose inputs and endstops are applied. A Z probe handle is not: M558 has not been
+    /// ported, so nothing has created the probe it would refer to.
+    /// <para>
+    /// This only records the state. Stopping a move on an endstop is decided by the controller,
+    /// which is the only place close enough to the bus for the latency - see section 10 of
+    /// docs/devel/MCODE_MIGRATION.md
+    /// </para>
+    /// </remarks>
+    private async ValueTask ApplyInputChangedAsync(ushort states, byte numHandles, Func<uint, RemoteInputHandle> getHandle,
+                                                   CancellationToken cancellationToken)
+    {
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            // One bit of States per handle, so a message can carry no more handles than that
+            int handles = Math.Min((int)numHandles, 16);
+            for (int i = 0; i < handles; i++)
+            {
+                // Bit i of States is the digital level of the i'th handle in this message
+                ApplyInputState(getHandle((uint)i), (states & (1 << i)) != 0);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Adopt the state a board reported when an input monitor was created
+    /// </summary>
+    /// <param name="handle">Handle the monitor was created under</param>
+    /// <param name="active">The state the board answered with</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>An awaitable task</returns>
+    /// <remarks>
+    /// <para>
+    /// A board reports an input when it <em>changes</em>, so a switch that was already closed when
+    /// the monitor was created never reports anything and would read as open here for as long as
+    /// nobody touched it. That is the state a machine powered up resting on its endstop is in, and
+    /// the consequence is a homing move that drives into a switch it is already sitting on - the
+    /// axis is not held, because nothing knows it needs holding.
+    /// </para>
+    /// <para>
+    /// The board answers the create request with the current state for exactly this reason
+    /// (<c>InputMonitor::Create</c> sets <c>extra</c>), so the only thing needed is to believe it.
+    /// This goes through the same bookkeeping a change does, rather than writing the object model
+    /// directly, so that the seeded state and the reported state cannot disagree about an axis with
+    /// more than one switch
+    /// </para>
+    /// </remarks>
+    public async ValueTask NoteMonitorCreatedAsync(RemoteInputHandle handle, bool active,
+                                                   CancellationToken cancellationToken = default)
+    {
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            ApplyInputState(handle, active);
+        }
+    }
+
+    /// <summary>
+    /// Record the state of one monitored input
+    /// </summary>
+    /// <param name="handle">The handle it is monitored under</param>
+    /// <param name="active">Its digital level</param>
+    /// <remarks>The caller must hold the object model write lock</remarks>
+    private void ApplyInputState(RemoteInputHandle handle, bool active)
+    {
+        if (handle.Type == RemoteInputHandle.TypeGpIn)
+        {
+            // The only one of these reports that still creates what it reports on, because nothing
+            // else does: M950 J is not ported, so a general-purpose input has no other way into
+            // sensors.gpIn[]. TODO make this a Find like the others when M950 J lands, so that a
+            // deleted input cannot come back the way a deleted fan used to
+            GpInputPort? port = GetOrCreate(model.Sensors.GpIn, handle.Major, () => new GpInputPort());
+            if (port is not null)
+            {
+                port.Value = active ? 1.0f : 0.0f;
+            }
+        }
+        else if (handle.Type == RemoteInputHandle.TypeEndstop)
+        {
+            // Major is the axis the endstop belongs to, which is how M574 registered it. An axis with
+            // a switch per driver reports each switch under its own minor, and any of them being
+            // closed is the axis being stopped, which is how RepRapFirmware's SwitchEndstop::Stopped
+            // reads it too
+            Endstop? endstop = handle.Major < model.Sensors.Endstops.Count
+                ? model.Sensors.Endstops[handle.Major]
+                : null;
+            if (endstop is not null)
+            {
+                endstop.Triggered = NoteEndstopSwitch(handle.Major, handle.Minor, active);
+            }
+        }
+        else if (handle.Type == RemoteInputHandle.TypeZprobe)
+        {
+            // Major is the probe number, which is how M558 registered it. The board sends the level
+            // of a digital probe and the reading of an analog one; both arrive here as one bit, so a
+            // digital probe reads as the extremes of the analog range
+            Probe? probe = handle.Major < model.Sensors.Probes.Count
+                ? model.Sensors.Probes[handle.Major]
+                : null;
+            if (probe is not null)
+            {
+                while (probe.Value.Count < 1)
+                {
+                    probe.Value.Add(0);
+                }
+                probe.Value[0] = active ? Motion.RemoteProbes.MaxReading : 0;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Find the board with the given CAN address, adding it if this is the first thing heard from it
+    /// </summary>
+    /// <param name="address">CAN address</param>
+    /// <returns>The board</returns>
+    /// <remarks>The caller must hold the object model write lock</remarks>
+    /// <summary>
+    /// Notice a board that has stopped reporting
+    /// </summary>
+    /// <param name="stoppingToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    /// <remarks>
+    /// <para>
+    /// The controller used to do this and no longer does: nothing there acted on the result, the event
+    /// it raised had no consumer, and the object model this belongs in is here. See §3.3.1 of
+    /// docs/devel/EVENTS_MIGRATION.md.
+    /// </para>
+    /// <para>
+    /// The one thing the controller's timer had that this does not is independence from the SPI link.
+    /// Reports only arrive while the link is up, so what a board was last heard from is meaningless
+    /// across an outage - which is why an invalidation forgets the timestamps rather than letting the
+    /// first sweep after a reconnect time out every board at once
+    /// </para>
+    /// </remarks>
+    private async Task WatchForSilentBoardsAsync(CancellationToken stoppingToken)
+    {
+        TimeSpan timeout = TimeSpan.FromMilliseconds(settings.Value.ExpansionBoardTimeout);
+        PeriodicTimer timer = new(TimeSpan.FromMilliseconds(settings.Value.ExpansionBoardTimeout / 4));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(stoppingToken))
+            {
+                DateTime now = DateTime.UtcNow;
+                for (byte address = 0; address <= CanId.MaxCanAddress; address++)
+                {
+                    if (_lastSeen[address] is not DateTime lastSeen || now - lastSeen < timeout)
+                    {
+                        continue;
+                    }
+
+                    bool wasRunning = false;
+                    using (await model.AccessReadWriteAsync(stoppingToken))
+                    {
+                        if (FindBoard(address) is Board board && board.State == BoardState.Running)
+                        {
+                            board.State = BoardState.TimedOut;
+                            wasRunning = true;
+                        }
+                    }
+
+                    // Only once per silence: the timestamp stays until the board is heard from again,
+                    // so without this every sweep would raise the same event afresh
+                    _lastSeen[address] = null;
+                    if (wasRunning)
+                    {
+                        events.Raise(new MachineEvent(EventType.ExpansionTimeout, 0, address, 0, string.Empty));
+                    }
+                }
+            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // Shutting down
+        }
+        finally
+        {
+            timer.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Forget when each board was last heard from
+    /// </summary>
+    /// <remarks>
+    /// Called when the link goes down, because a timestamp taken before an outage says nothing about a
+    /// board that has had no way to report since
+    /// </remarks>
+    public void Invalidate() => Array.Clear(_lastSeen);
+
+    /// <summary>
+    /// Find the board at a CAN address, or null if none has been heard from
+    /// </summary>
+    /// <param name="address">CAN address of the board</param>
+    /// <remarks>
+    /// <c>boards[]</c> is in the order the boards were discovered rather than by CAN address, so the
+    /// address is a field to match on and not an index
+    /// </remarks>
+    public Board? FindBoard(byte address)
+    {
+        foreach (Board existing in model.Boards)
+        {
+            if (existing.CanAddress == address)
+            {
+                return existing;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// The board at a CAN address, creating the entry if nothing has been heard from it yet
+    /// </summary>
+    /// <param name="address">CAN address of the board</param>
+    /// <returns>The board</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>boards[]</c> is one entry per address, always present and
+    /// <c>state == unknown</c> until the board announces itself, so a command may record something
+    /// about a board that is not there yet. Here the collection holds only what has been discovered,
+    /// and this is what stands in for that: the entry is created in the same unknown state, which is
+    /// what keeps it out of the reports that enumerate boards. The caller must hold the object model
+    /// write lock
+    /// </remarks>
+    public Board GetOrCreateBoard(byte address)
+    {
+        if (FindBoard(address) is Board existing)
+        {
+            return existing;
+        }
+
+        Board board = new() { CanAddress = address, State = BoardState.Unknown };
+        model.Boards.Add(board);
+        logger.LogInformation("Discovered expansion board at CAN address {Address}", address);
+        return board;
+    }
+
+    /// <summary>
+    /// Get an item of an object model collection, growing the collection to reach it
+    /// </summary>
+    /// <typeparam name="T">Type of the item</typeparam>
+    /// <param name="collection">The collection</param>
+    /// <param name="index">Index being reported on</param>
+    /// <param name="create">Creates a missing item</param>
+    /// <returns>The item, or null if the index is not usable</returns>
+    /// <remarks>
+    /// A board reports on the things it has been configured with, so an index arriving before the
+    /// object model has an entry for it means the configuration is ahead of us rather than wrong.
+    /// The gaps are left null, which is what an unconfigured slot means in these collections
+    /// </remarks>
+    /// <summary>
+    /// The object model entry a report is about, or null if the machine has no such device
+    /// </summary>
+    /// <typeparam name="T">Kind of device</typeparam>
+    /// <param name="collection">Where that kind lives in the object model</param>
+    /// <param name="index">Number the board reported</param>
+    /// <returns>The entry, or null</returns>
+    /// <remarks>
+    /// A report says what a board is doing, not what the machine has: the M-code that created the
+    /// device is what says that. RepRapFirmware reads its reports the same way and skips what it
+    /// cannot find - <c>FansManager::ProcessRemoteFanRpms</c>, <c>Heat::ProcessRemoteHeatersReport</c>
+    /// and <c>Heat::ProcessRemoteSensorsReport</c> all look the number up and do nothing when it is
+    /// not there. Creating an entry instead resurrects a device that was just deleted, because a
+    /// board goes on reporting one for as long as it still holds it: <c>M950 F0 C"nil"</c> put
+    /// <c>fans[0]</c> back within one report interval, as a fan with no port that nothing could drive
+    /// </remarks>
+    private static T? Find<T>(StaticModelCollection<T?> collection, int index)
+        where T : ModelObject, IStaticModelObject, new()
+        => index >= 0 && index < collection.Count ? collection[index] : null;
+
+    private static T? GetOrCreate<T>(StaticModelCollection<T?> collection, int index, Func<T> create)
+        where T : ModelObject, IStaticModelObject, new()
+    {
+        if (index < 0 || index >= MaxReportedIndex)
+        {
+            return null;
+        }
+
+        while (collection.Count <= index)
+        {
+            collection.Add(null);
+        }
+        return collection[index] ??= create();
+    }
+
+    /// <summary>
+    /// Highest index a report may address, as a guard against a malformed bitmap growing a collection without bound
+    /// </summary>
+    private const int MaxReportedIndex = 64;
+
+    /// <summary>
+    /// The set bit positions of a bitmap, lowest first
+    /// </summary>
+    /// <param name="bitmap">The bitmap</param>
+    /// <param name="maxResults">How many values the message actually carries</param>
+    /// <returns>The bit positions</returns>
+    /// <remarks>
+    /// The n'th value in one of these reports belongs to the n'th set bit, so the order matters and
+    /// the count is capped by the size of the value array rather than by the bitmap
+    /// </remarks>
+    private static System.Collections.Generic.IEnumerable<int> SetBits(ulong bitmap, int maxResults)
+    {
+        int found = 0;
+        for (int bit = 0; bit < 64 && found < maxResults; bit++)
+        {
+            if ((bitmap & (1UL << bit)) != 0)
+            {
+                found++;
+                yield return bit;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Turn a reported minimum/current/maximum triple into its object model form
+    /// </summary>
+    /// <param name="value">The reported triple</param>
+    /// <returns>The object model value</returns>
+    private static MinMaxCurrent ToMinMaxCurrent(ShortMinCurMax value) => new()
+    {
+        Current = (float)value.Current,
+        Min = (float)value.Minimum,
+        Max = (float)value.Maximum
+    };
+
+    /// <summary>
+    /// Turn a reported minimum/current/maximum triple in the older format into its object model form
+    /// </summary>
+    /// <param name="value">The reported triple</param>
+    /// <returns>The object model value</returns>
+    private static MinMaxCurrent ToMinMaxCurrent(MinCurMax value) => new()
+    {
+        Current = value.Current,
+        Min = value.Minimum,
+        Max = value.Maximum
+    };
+
+    /// <summary>
+    /// Format a board's unique id the way it is shown everywhere else
+    /// </summary>
+    /// <param name="uniqueId">The raw id</param>
+    /// <returns>The formatted id</returns>
+    private static string FormatUniqueId(ByteArray16 uniqueId)
+    {
+        Span<byte> bytes = stackalloc byte[16];
+        for (int i = 0; i < 16; i++)
+        {
+            bytes[i] = uniqueId[i];
+        }
+        return Convert.ToHexStringLower(bytes);
+    }
+}

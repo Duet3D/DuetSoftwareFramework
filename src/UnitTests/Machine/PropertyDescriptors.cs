@@ -196,13 +196,13 @@ namespace UnitTests.Machine
         [Test]
         public void PropertyFlags()
         {
-            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Messages", false).Flags, Is.EqualTo(ModelPropertyFlags.SbcProperty));
+            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Messages", false).Flags, Is.EqualTo(ModelPropertyFlags.None));
             Assert.That(ObjectModel.TypeDescriptor.FindProperty("Limits", false).Flags, Is.EqualTo(ModelPropertyFlags.Verbose));
-            Assert.That(ObjectModel.TypeDescriptor.FindProperty("SBC", false).Flags, Is.EqualTo(ModelPropertyFlags.HasSetter | ModelPropertyFlags.SbcProperty));
+            Assert.That(ObjectModel.TypeDescriptor.FindProperty("SBC", false).Flags, Is.EqualTo(ModelPropertyFlags.HasSetter));
             Assert.That(Heat.TypeDescriptor.FindProperty("Heaters", false).Flags, Is.EqualTo(ModelPropertyFlags.Live));
             Assert.That(Heat.TypeDescriptor.FindProperty("BedHeaters", false).Flags, Is.EqualTo(ModelPropertyFlags.Obsolete));
             Assert.That(Heat.TypeDescriptor.FindProperty("ColdExtrudeTemperature", false).Flags, Is.EqualTo(ModelPropertyFlags.HasSetter));
-            Assert.That(Network.TypeDescriptor.FindProperty("CorsSite", false).Flags, Is.EqualTo(ModelPropertyFlags.HasSetter | ModelPropertyFlags.SbcProperty));
+            Assert.That(Network.TypeDescriptor.FindProperty("CorsSite", false).Flags, Is.EqualTo(ModelPropertyFlags.HasSetter));
 
             // Read-only collections and dictionaries have no setter
             Assert.That(ObjectModel.TypeDescriptor.FindProperty("Tools", false).Flags & ModelPropertyFlags.HasSetter, Is.EqualTo(ModelPropertyFlags.None));

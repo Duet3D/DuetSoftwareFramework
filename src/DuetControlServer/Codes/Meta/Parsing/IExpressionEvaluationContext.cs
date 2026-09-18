@@ -27,6 +27,11 @@ public interface IExpressionEvaluationContext
     int LineNumber { get; }
 
     /// <summary>
+    /// How the last code on this channel ended (the 'result' constant), or null where there is no channel
+    /// </summary>
+    int? Result { get; }
+
+    /// <summary>
     /// Try to resolve an identifier path such as <c>move.axes[0].machinePosition</c>, <c>var.foo</c> or
     /// <c>global.bar</c>. Array indices in the path have already been evaluated to integers
     /// </summary>

@@ -11,7 +11,6 @@ public partial class NetworkInterface : ModelObject, IStaticModelObject
     /// <summary>
     /// List of active protocols
     /// </summary>
-    [SbcProperty(false)]
     public ObservableCollection<NetworkProtocol> ActiveProtocols { get; } = [];
 
     /// <summary>
@@ -27,7 +26,6 @@ public partial class NetworkInterface : ModelObject, IStaticModelObject
     /// <summary>
     /// Configured IPv4 address of the network adapter or null if unknown
     /// </summary>
-    [SbcProperty(false)]
     public string? ConfiguredIP
     {
         get => _configuredIP;
@@ -38,7 +36,6 @@ public partial class NetworkInterface : ModelObject, IStaticModelObject
     /// <summary>
     /// Configured IPv4 DNS server of the network adapter or null if unknown
     /// </summary>
-    [SbcProperty(false)]
     public string? DnsServer
     {
         get => _dnsServer;
@@ -80,7 +77,6 @@ public partial class NetworkInterface : ModelObject, IStaticModelObject
     /// <summary>
     /// Received signal strength indicator of the WiFi adapter (only WiFi, in dBm, or null if unknown)
     /// </summary>
-    [SbcProperty(true)]
     public int? RSSI
     {
         get => _rssi;
@@ -91,7 +87,6 @@ public partial class NetworkInterface : ModelObject, IStaticModelObject
     /// <summary>
     /// Speed of the network interface (in MBit, null if unknown, 0 if not connected)
     /// </summary>
-    [SbcProperty(false)]
     public int? Speed
     {
         get => _speed;
@@ -102,7 +97,6 @@ public partial class NetworkInterface : ModelObject, IStaticModelObject
     /// <summary>
     /// SSID of the WiFi network or null if not applicable
     /// </summary>
-    [SbcProperty(true)]
     public string? SSID
     {
         get => _ssid;
@@ -147,7 +141,6 @@ public partial class NetworkInterface : ModelObject, IStaticModelObject
     /// For this setting to be populated in SBC mode it is required to have the DuetPiManagementPlugin running.
     /// This is required due to missing Linux permissions of the control server.
     /// </remarks>
-    [SbcProperty(false)]
     public string? WifiCountry
     {
         get => _wifiCountry;

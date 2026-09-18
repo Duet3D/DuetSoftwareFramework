@@ -38,7 +38,6 @@ public partial class Volume : ModelObject, IStaticModelObject
     /// <summary>
     /// Name of this volume
     /// </summary>
-    [SbcProperty(false)]
     public string? Name
     {
         get => _name;
@@ -70,7 +69,6 @@ public partial class Volume : ModelObject, IStaticModelObject
     /// <summary>
     /// Logical path of the storage device
     /// </summary>
-    [SbcProperty(false)]
     public string? Path
     {
         get => _path;

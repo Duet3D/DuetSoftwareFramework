@@ -82,10 +82,6 @@ internal static class PropertyAccess
             {
                 flags.Add("ModelPropertyFlags.HasSetter");
             }
-            if (prop.IsSbcProperty())
-            {
-                flags.Add("ModelPropertyFlags.SbcProperty");
-            }
             if (prop.IsLiveProperty())
             {
                 flags.Add("ModelPropertyFlags.Live");

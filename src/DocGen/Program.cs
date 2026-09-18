@@ -145,20 +145,7 @@ async Task WritePropertyDocumentation(StreamWriter writer, PropertyInfo property
             }
             writeNL = true;
         }
-        if (Attribute.IsDefined(property, typeof(SbcPropertyAttribute)))
-        {
-            SbcPropertyAttribute attribute = (SbcPropertyAttribute)Attribute.GetCustomAttribute(property, typeof(SbcPropertyAttribute))!;
-            if (attribute.AvailableInStandaloneMode)
-            {
-                await writer.WriteLineAsync("*This field is maintained by DSF in SBC mode*");
-            }
-            else
-            {
-                await writer.WriteLineAsync("*This field is exclusively maintained by DSF in SBC mode and/or by DWC. It is not available in standalone mode*");
-            }
-            writeNL = true;
-        }
-        else if (Attribute.IsDefined(property, typeof(LiveAttribute)))
+        if (Attribute.IsDefined(property, typeof(LiveAttribute)))
         {
             await writer.WriteLineAsync("*This field is live and can be queried using the 'f' flag*");
             writeNL = true;

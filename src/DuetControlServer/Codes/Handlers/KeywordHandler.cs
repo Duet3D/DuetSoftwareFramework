@@ -7,6 +7,7 @@ using DuetControlServer.Link;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -20,11 +21,18 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="codeProcessor">Code processor</param>
 /// <param name="expressions">Meta G-code expression parser</param>
 /// <param name="filePathResolver">File path resolver</param>
-/// <param name="linkInterface">Link interface</param>
+/// <param name="variableStore">Variables in scope</param>
 /// <param name="logger">Logger</param>
 /// <param name="settings">Settings</param>
-public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expressions, FilePathResolver filePathResolver, LinkInterface linkInterface, ILogger<KeywordHandler> logger, IOptions<Settings> settings) : ICodeHandler
+public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expressions, FilePathResolver filePathResolver, VariableStore variableStore, ILogger<KeywordHandler> logger, IOptions<Settings> settings) : ICodeHandler
 {
+    /// <inheritdoc />
+    /// <remarks>
+    /// Keywords are not classified: the pipeline dispatches them without synchronisation, and this
+    /// member exists only to satisfy the handler contract
+    /// </remarks>
+    public CodeClass? Classify(DuetAPI.Commands.Code code) => CodeClass.Immediate;
+
     // Private fields
     private readonly ILogger<KeywordHandler> _logger = logger;
     private readonly Settings _settings = settings.Value;
@@ -36,7 +44,7 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result of the code if the code completed</returns>
     /// <exception cref="OperationCanceledException">The code was cancelled</exception>
-    public async ValueTask<Message?> ProcessAsync(Commands.Code code, CancellationToken cancellationToken)
+    public async ValueTask<Message> ProcessAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (code.KeywordArgument is null)
         {
@@ -129,9 +137,9 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
                         }
 
                         // Evaluate the filename and result to write
-                        string filename = await expressions.EvaluateExpressionToStringAsync(code, filenameExpression, false, false, cancellationToken);
+                        string filename = await expressions.EvaluateExpressionToStringAsync(code, filenameExpression, false, cancellationToken);
                         string physicalFilename = await filePathResolver.ToPhysicalAsync(filename, FileDirectory.System, cancellationToken), parentDirectory = Path.GetDirectoryName(physicalFilename)!;
-                        result = await expressions.EvaluateAsync(code, true, cancellationToken);
+                        result = await expressions.EvaluateAsync(code, cancellationToken);
 
                         // Write it to the designated file
                         _logger.LogDebug("{Operation} '{Expression}' to {File}", append ? "Appending" : "Writing", result, filename);
@@ -158,11 +166,11 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
                         return new Message();
                     }
                 }
-                result = await expressions.EvaluateAsync(code, true, cancellationToken);
+                result = await expressions.EvaluateAsync(code, cancellationToken);
 
                 if (code.Keyword == KeywordType.Abort)
                 {
-                    await linkInterface.AbortAllAsync(code.Channel, cancellationToken);
+                    await codeProcessor.AbortAllFilesAsync(code.Channel, cancellationToken);
                 }
                 return new Message(MessageType.Success, result ?? string.Empty);
 
@@ -252,35 +260,123 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
                     throw new CodeParserException("expected '='", code);
                 }
 
-                // Replace SBC fields and prepare the variable name
-                expression = await expressions.EvaluateAsync(code, false, cancellationToken) ?? string.Empty;
-                string fullVarName = varName;
+                // Work out what is being assigned to. "set" names the scope itself, the other two imply it
+                bool isGlobal = code.Keyword == KeywordType.Global;
                 if (code.Keyword == KeywordType.Set)
                 {
-                    fullVarName = await expressions.EvaluateExpressionToStringAsync(code, fullVarName, true, false, cancellationToken);
+                    if (varName.StartsWith("global.", StringComparison.Ordinal))
+                    {
+                        isGlobal = true;
+                        varName = varName["global.".Length..];
+                    }
+                    else if (varName.StartsWith("var.", StringComparison.Ordinal))
+                    {
+                        varName = varName["var.".Length..];
+                    }
+                    else
+                    {
+                        // Parameters are read-only, so "param." lands here too, as it does in RepRapFirmware
+                        throw new CodeParserException("expected a global or local variable", code);
+                    }
+                }
+                string fullVarName = (isGlobal ? "global." : "var.") + varName;
+
+                // "set" may name an element of an array; "var" and "global" name the variable they create
+                if (!VariableStore.TrySplitIndexedName(varName, out varName, out IReadOnlyList<string> indexExpressions))
+                {
+                    throw new CodeParserException($"expected a variable name, got '{fullVarName}'", code);
+                }
+                if (indexExpressions.Count > 0 && code.Keyword != KeywordType.Set)
+                {
+                    throw new CodeParserException($"expected a new variable name, got '{fullVarName}'", code);
+                }
+
+                // An index is an expression of its own, which is what makes "set var.a[var.i] = ..." work
+                int[] indices = new int[indexExpressions.Count];
+                for (int index = 0; index < indexExpressions.Count; index++)
+                {
+                    object? indexValue = await expressions.EvaluateExpressionToValueAsync(code, indexExpressions[index], cancellationToken);
+                    indices[index] = indexValue switch
+                    {
+                        int intIndex => intIndex,
+                        long longIndex when longIndex is >= 0 and <= int.MaxValue => (int)longIndex,
+                        uint uintIndex when uintIndex <= int.MaxValue => (int)uintIndex,
+                        _ => throw new CodeParserException(Meta.Parsing.ExpressionErrors.ExpectedNonNegativeInt, code)
+                    };
+                    if (indices[index] < 0)
+                    {
+                        throw new CodeParserException(Meta.Parsing.ExpressionErrors.ExpectedNonNegativeInt, code);
+                    }
+                }
+
+                // Evaluate what it is being assigned to
+                object? value = await expressions.EvaluateExpressionToValueAsync(code, expression, cancellationToken);
+                if (Meta.Parsing.ObjectModelValue.OccursIn(value))
+                {
+                    // An object is not a value, and an array of them is not one either: what would be
+                    // stored holds nothing, so a macro reading it back gets "{object}" where it expected
+                    // the machine. RepRapFirmware refuses the first for the same reason and stores the
+                    // second as references, which a variable here cannot hold
+                    throw new CodeParserException((value is Meta.Parsing.ObjectModelValue)
+                        ? "Cannot assign a value of type 'object' to a variable"
+                        : "Cannot assign an array of objects to a variable", code);
+                }
+
+                // Assign it. A "var" or "global" statement creates, "set" assigns to what already exists;
+                // neither does the other's job, so that a name cannot quietly change meaning halfway through a file
+                if (code.Keyword == KeywordType.Set)
+                {
+                    VariableAssignment assignment;
+                    if (indices.Length > 0)
+                    {
+                        assignment = isGlobal
+                            ? await variableStore.TryAssignGlobalElementAsync(varName, indices, value, cancellationToken)
+                            : variableStore.For(code).TryAssignVariableElement(varName, indices, value);
+                    }
+                    else
+                    {
+                        bool assigned = isGlobal
+                            ? await variableStore.TryAssignGlobalAsync(varName, value, cancellationToken)
+                            : variableStore.For(code).TryAssignVariable(varName, value);
+                        assignment = assigned ? VariableAssignment.Assigned : VariableAssignment.UnknownVariable;
+                    }
+
+                    switch (assignment)
+                    {
+                        case VariableAssignment.Assigned:
+                            break;
+                        case VariableAssignment.NotAnArray:
+                            throw new CodeParserException("Expected an array expression", code);
+                        case VariableAssignment.IndexOutOfRange:
+                            throw new CodeParserException(Meta.Parsing.ExpressionErrors.ArrayIndexOutOfRange, code);
+                        default:
+                            throw new CodeParserException($"unknown variable '{varName}'", code);
+                    }
+                }
+                else if (isGlobal)
+                {
+                    if (!await variableStore.TryCreateGlobalAsync(varName, value, cancellationToken))
+                    {
+                        throw new CodeParserException($"variable '{varName}' already exists", code);
+                    }
                 }
                 else
                 {
-                    fullVarName = (code.Keyword == KeywordType.Global ? "global." : "var.") + varName;
-                }
-
-                // Assign the variable
-                // TODO save the variable
-#if false
-                object? value = await linkInterface.SetVariableAsync(code.Channel, code.Keyword != KeywordType.Set, fullVarName, expression, cancellationToken);
-#else
-                object? value = null;
-#endif
-                _logger.LogDebug("Set variable {Variable} to {Value}", fullVarName, value);
-
-                // Keep track of it
-                if (code.Keyword == KeywordType.Var && code.File is not null)
-                {
-                    using (await code.File.LockAsync(cancellationToken))
+                    if (!variableStore.For(code).TryCreateVariable(varName, value))
                     {
-                        code.File.AddLocalVariable(varName);
+                        throw new CodeParserException($"variable '{varName}' already exists", code);
+                    }
+
+                    // The block that created it is the block that deletes it again
+                    if (code.File is not null)
+                    {
+                        using (await code.File.LockAsync(cancellationToken))
+                        {
+                            code.File.AddLocalVariable(varName);
+                        }
                     }
                 }
+                _logger.LogDebug("Set variable {Variable} to {Value}", fullVarName, value);
                 return new Message();
         }
 

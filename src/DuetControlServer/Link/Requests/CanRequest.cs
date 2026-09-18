@@ -1,4 +1,4 @@
-using DuetControlServer.Link.Protocol.FirmwareRequests;
+using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
 using System;
 using System.Collections.Generic;
@@ -17,9 +17,10 @@ namespace DuetControlServer.Link;
 /// <param name="isResponse">Is the CAN message a response to an expansion board</param>
 /// <param name="requestPayload">Serialized CAN message payload to send</param>
 /// <remarks>
-/// If no reply is expected then the task is completed immediately after the request is sent over SPI.
-/// If a reply is expected then the task is completed once the (possibly fragmented) reply has been
-/// fully received, or if the request times out or the connection is lost.
+/// If no reply is expected then the task is completed once the controller reports what became of the
+/// message. If a reply is expected then the task is completed once the (possibly fragmented) reply has
+/// been fully received, or once the controller reports that the board never answered. Either kind is
+/// failed by a send the controller could not make, and by the connection being lost.
 /// </remarks>
 public class CanRequest(CanMessageType messageType, CanMessageType replyType, ushort txToken, byte dstAddress, bool isResponse, byte[] requestPayload)
 {
@@ -54,11 +55,6 @@ public class CanRequest(CanMessageType messageType, CanMessageType replyType, us
     public byte[] RequestPayload { get; } = requestPayload;
 
     /// <summary>
-    /// Whether this request has already been written to the firmware
-    /// </summary>
-    public bool Sent { get; set; }
-
-    /// <summary>
     /// Whether a reply is expected for this request
     /// </summary>
     public bool ExpectsReply => ReplyType != CanMessageType.NoReply;
@@ -69,19 +65,32 @@ public class CanRequest(CanMessageType messageType, CanMessageType replyType, us
     public byte SrcAddress { get; private set; }
 
     /// <summary>
-    /// Actual type of the received reply
+    /// Actual type of the received reply, which stays <see cref="CanMessageType.NoReply"/> for a request
+    /// that never expected one
     /// </summary>
-    public CanMessageType ResponseType { get; private set; }
-
-    /// <summary>
-    /// Status of the received reply
-    /// </summary>
-    public CanStatus Status { get; private set; }
+    public CanMessageType ResponseType { get; private set; } = CanMessageType.NoReply;
 
     /// <summary>
     /// Reassembled payload of the reply (concatenated content of all fragments)
     /// </summary>
     public byte[] ResponsePayload { get; private set; } = [];
+
+    /// <summary>
+    /// The reply's <c>extra</c> byte, which a few requests answer in rather than in the text
+    /// </summary>
+    /// <remarks>Taken from the first fragment, which is where the answer is when there is one</remarks>
+    public byte Extra { get; private set; }
+
+    /// <summary>
+    /// What became of the request: what the board answered, or why it got no answer
+    /// </summary>
+    /// <remarks>
+    /// Taken from the first fragment of a reply. Every fragment repeats it, but only the first one is
+    /// guaranteed to have arrived when a later fragment is being added. A request that the controller
+    /// expired instead carries <see cref="CodeResult.CanResponseTimeout"/>, which is the same value
+    /// RepRapFirmware returns for it, so that one field answers the question either way
+    /// </remarks>
+    public CodeResult ResultCode { get; private set; } = CodeResult.Ok;
 
     /// <summary>
     /// Received reply fragments, keyed by fragment number to handle out-of-order delivery
@@ -101,25 +110,27 @@ public class CanRequest(CanMessageType messageType, CanMessageType replyType, us
     /// <summary>
     /// Add a received reply fragment. Duplicate fragment numbers are ignored.
     /// </summary>
-    /// <param name="fragmentNumber">Zero-based index of the fragment</param>
-    /// <param name="content">Reassembly-relevant content of the fragment</param>
-    public void AddFragment(int fragmentNumber, ReadOnlySpan<byte> content)
+    /// <param name="fragment">Decoded reply fragment</param>
+    public void AddFragment(in CanFragment fragment)
     {
-        if (!_fragments.ContainsKey(fragmentNumber))
+        if (!_fragments.ContainsKey(fragment.Number))
         {
-            _fragments[fragmentNumber] = content.ToArray();
+            _fragments[fragment.Number] = fragment.Content.ToArray();
+            if (fragment.Number == 0)
+            {
+                Extra = fragment.Extra;
+                ResultCode = fragment.ResultCode;
+            }
         }
     }
 
     /// <summary>
     /// Store the reply metadata, assemble the buffered fragments and complete the task
     /// </summary>
-    /// <param name="status">Status of the reply</param>
     /// <param name="responseType">Actual type of the reply</param>
     /// <param name="srcAddress">Source address of the replying board</param>
-    public void SetResult(CanStatus status, CanMessageType responseType, byte srcAddress)
+    public void SetResult(CanMessageType responseType, byte srcAddress)
     {
-        Status = status;
         ResponseType = responseType;
         SrcAddress = srcAddress;
 
@@ -137,6 +148,20 @@ public class CanRequest(CanMessageType messageType, CanMessageType replyType, us
     /// Complete a request for which no reply is expected
     /// </summary>
     public void SetResult() => _tcs.TrySetResult();
+
+    /// <summary>
+    /// Complete a request whose board was given its time and did not answer
+    /// </summary>
+    /// <remarks>
+    /// Not a failure of the request: a board that does not answer is something the operator is told
+    /// about, so this resolves the request and <see cref="CanResponse.FromTimeout"/> turns it into the
+    /// reply the caller sees.
+    /// </remarks>
+    public void SetTimedOut()
+    {
+        ResultCode = CodeResult.CanResponseTimeout;
+        _tcs.TrySetResult();
+    }
 
     /// <summary>
     /// Set the task to canceled

@@ -142,6 +142,20 @@ public sealed class Settings
     public double MaxMessageAge { get; set; } = 60.0;
 
     /// <summary>
+    /// Transport that carries the link to the controller. "Spi" is the real controller over
+    /// <see cref="SpiDevice"/>; "Socket" speaks the same transfer protocol over the Unix domain
+    /// socket at <see cref="SbcSocketPath"/> to a virtual controller (the system test bench, see
+    /// docs/devel/SYSTEM_EMULATION.md)
+    /// </summary>
+    public string SbcTransport { get; set; } = "Spi";
+
+    /// <summary>
+    /// Path of the Unix domain socket the virtual controller listens on when
+    /// <see cref="SbcTransport"/> is "Socket"
+    /// </summary>
+    public string SbcSocketPath { get; set; } = "/run/dsf/sbc.sock";
+
+    /// <summary>
     /// SPI device that is connected to RepRapFirmware
     /// </summary>
     public string SpiDevice { get; set; } = "/dev/spidev0.0";
@@ -249,9 +263,28 @@ public sealed class Settings
     public int MaxSbcRetries { get; set; } = 3;
 
     /// <summary>
-    /// Timeout for CAN requests that expect a reply (in ms).
+    /// Backstop for a CAN request the controller never answers for (in ms).
     /// </summary>
-    public int CanRequestTimeout { get; set; } = 2000;
+    /// <remarks>
+    /// Not the deadline a board is judged against: the controller gives a board
+    /// <c>CanInterface::UsualResponseTimeout</c> (1 s) to reply and reports the timeout itself, and a
+    /// link that drops cancels everything outstanding. What is left for this to catch is an outcome
+    /// lost while the link stays up, which the controller's acknowledgement and response rings both do
+    /// when they overflow. It therefore has to sit above the controller's deadline plus a transfer, so
+    /// that the controller is the one that decides a board is silent
+    /// </remarks>
+    public int CanRequestTimeout { get; set; } = 1500;
+
+    /// <summary>
+    /// How long a board may go without reporting before it is presumed gone (in ms).
+    /// </summary>
+    /// <remarks>
+    /// The controller used the same 5 s for the sweep it used to run. Reports reach here one SPI
+    /// transfer later and jittered by the transfer cadence, which is well inside that: a board reports
+    /// far more often than once every five seconds, so what this measures is silence rather than
+    /// lateness
+    /// </remarks>
+    public int ExpansionBoardTimeout { get; set; } = 5000;
 
     /// <summary>
     /// Path to the GPIO chip device node
@@ -351,8 +384,16 @@ public sealed class Settings
     /// </summary>
     public int ModelUpdateInterval { get; set; } = 100;
 
+    /// <summary>
+    /// Prefix of the main firmware file an expansion board is served, the rest of the name being the
+    /// board type it asked for and either .bin or .uf2
+    /// </summary>
     public string FirmwareFilePrefix { get; set; } = "Duet3Firmware_";
 
+    /// <summary>
+    /// Prefix of the bootloader file an expansion board is served, made up the same way as
+    /// <see cref="FirmwareFilePrefix" />
+    /// </summary>
     public string BootloaderFilePrefix { get; set; } = "Duet3Bootloader_";
 
     /// <summary>

@@ -559,12 +559,11 @@ public partial class Filter(ObjectModel model)
     /// Find a specific object in the object model (wildcards are not supported)
     /// </summary>
     /// <param name="filter">Filter for finding a property or a list item</param>
-    /// <param name="findSbcProperty">Whether the object may be an SBC property</param>
     /// <param name="result">Partial object model or null</param>
     /// <returns>Whether the object could be found</returns>
-    public bool GetSpecific(string filter, bool findSbcProperty, out object? result)
+    public bool GetSpecific(string filter, out object? result)
     {
-        return InternalGetSpecific(model, ConvertFilter(filter, false), findSbcProperty, false, out result);
+        return InternalGetSpecific(model, ConvertFilter(filter, false), out result);
     }
 
     /// <summary>
@@ -572,11 +571,9 @@ public partial class Filter(ObjectModel model)
     /// </summary>
     /// <param name="partialModel">Partial object model</param>
     /// <param name="partialFilter">Array consisting of item indices or case-insensitive property names</param>
-    /// <param name="findSbcProperty">Whether the object may be an SBC property</param>
-    /// <param name="hadSbcProperty">Whether an SBC property is part of the current node path</param>
     /// <param name="result">Partial object model or null</param>
     /// <returns>Whether the object could be found</returns>
-    private static bool InternalGetSpecific(object partialModel, object[] partialFilter, bool findSbcProperty, bool hadSbcProperty, out object? result)
+    private static bool InternalGetSpecific(object partialModel, object[] partialFilter, out object? result)
     {
         // Cannot proceed if there is nothing more to do...
         if (partialModel is null || partialFilter.Length == 0)
@@ -594,25 +591,17 @@ public partial class Filter(ObjectModel model)
                 ModelPropertyDescriptor? property = accessor.Descriptor.FindProperty(propertyName, true);
                 if (property is not null)
                 {
-                    if (findSbcProperty && (property.Flags & ModelPropertyFlags.SbcProperty) != 0)
-                    {
-                        hadSbcProperty = true;
-                    }
-
                     if (partialFilter.Length == 0)
                     {
-                        if (!findSbcProperty || hadSbcProperty)
-                        {
-                            // This is exactly the property we've been looking for
-                            result = accessor.GetPropertyValue(property.Index);
-                            return true;
-                        }
+                        // This is exactly the property we've been looking for
+                        result = accessor.GetPropertyValue(property.Index);
+                        return true;
                     }
                     else if (property.Kind != ModelPropertyKind.Value)
                     {
                         // Property is somewhere deeper
                         object propertyValue = accessor.GetPropertyValue(property.Index)!;
-                        return InternalGetSpecific(propertyValue, partialFilter, findSbcProperty, hadSbcProperty, out result);
+                        return InternalGetSpecific(propertyValue, partialFilter, out result);
                     }
                 }
             }
@@ -621,12 +610,9 @@ public partial class Filter(ObjectModel model)
                 object? dictItem = dict[propertyName];
                 if (partialFilter.Length == 0)
                 {
-                    if (!findSbcProperty || hadSbcProperty)
-                    {
-                        // This is exactly the property we've been looking for
-                        result = dictItem;
-                        return true;
-                    }
+                    // This is exactly the property we've been looking for
+                    result = dictItem;
+                    return true;
                 }
                 else if (dictItem is not null)
                 {
@@ -634,7 +620,7 @@ public partial class Filter(ObjectModel model)
                     if (dictItemType == typeof(JsonElement) || dictItemType.IsSubclassOf(typeof(ModelObject)) || typeof(IList).IsAssignableFrom(dictItemType))
                     {
                         // Property is somewhere deeper
-                        return InternalGetSpecific(dictItem, partialFilter, findSbcProperty, hadSbcProperty, out result);
+                        return InternalGetSpecific(dictItem, partialFilter, out result);
                     }
                 }
             }
@@ -642,30 +628,27 @@ public partial class Filter(ObjectModel model)
             {
                 if (partialFilter.Length == 0)
                 {
-                    if (!findSbcProperty || hadSbcProperty)
+                    // This is exactly the property we've been looking for
+                    result = jsonItem.ValueKind switch
                     {
-                        // This is exactly the property we've been looking for
-                        result = jsonItem.ValueKind switch
-                        {
-                            JsonValueKind.String => jsonItem.GetString(),
-                            JsonValueKind.Number => jsonItem.TryGetInt32(out int intValue) ? intValue : jsonItem.GetDouble(),
-                            JsonValueKind.True => true,
-                            JsonValueKind.False => false,
-                            JsonValueKind.Object => jsonItem,
-                            JsonValueKind.Array => jsonItem,
-                            _ => null
-                        };
-                        return true;
-                    }
+                        JsonValueKind.String => jsonItem.GetString(),
+                        JsonValueKind.Number => jsonItem.TryGetInt32(out int intValue) ? intValue : jsonItem.GetDouble(),
+                        JsonValueKind.True => true,
+                        JsonValueKind.False => false,
+                        JsonValueKind.Object => jsonItem,
+                        JsonValueKind.Array => jsonItem,
+                        _ => null
+                    };
+                    return true;
                 }
                 else
                 {
                     // Property is somewhere deeper
-                    return InternalGetSpecific(jsonItem, partialFilter, findSbcProperty, hadSbcProperty, out result);
+                    return InternalGetSpecific(jsonItem, partialFilter, out result);
                 }
             }
         }
-        else if (partialFilter[0] is int itemIndex && (!findSbcProperty || hadSbcProperty))
+        else if (partialFilter[0] is int itemIndex)
         {
             partialFilter = partialFilter.Skip(1).ToArray();
             if (partialModel is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.Array)
@@ -703,7 +686,7 @@ public partial class Filter(ObjectModel model)
                     if (item is ModelObject || item is IList)
                     {
                         // Property is somewhere deeper
-                        return InternalGetSpecific(item, partialFilter, findSbcProperty, hadSbcProperty, out result);
+                        return InternalGetSpecific(item, partialFilter, out result);
                     }
                 }
             }

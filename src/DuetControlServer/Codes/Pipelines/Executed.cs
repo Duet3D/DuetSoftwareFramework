@@ -11,6 +11,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
+using System.Globalization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -34,6 +35,7 @@ public sealed class Executed : PipelineBase
     private readonly IHostApplicationLifetime _lifetime;
     private readonly IOptions<Settings> _settings;
     private readonly PipelineStackItem _stackItem;
+    private readonly LastCodeResult _lastCodeResult;
 
     /// <summary>
     /// Constructor of this class
@@ -46,6 +48,7 @@ public sealed class Executed : PipelineBase
     /// <param name="gCodes">G-code handler</param>
     /// <param name="mCodes">M-code handler</param>
     /// <param name="tCodes">T-code handler</param>
+    /// <param name="lastCodeResult">How the last code on each channel ended</param>
     /// <param name="lifetime">Application lifetime</param>
     /// <param name="settings">Application settings</param>
     public Executed(ChannelProcessor channelProcessor,
@@ -56,6 +59,7 @@ public sealed class Executed : PipelineBase
         [FromKeyedServices(Keys.GCodes)] ICodeHandler gCodes,
         [FromKeyedServices(Keys.MCodes)] ICodeHandler mCodes,
         [FromKeyedServices(Keys.TCodes)] ICodeHandler tCodes,
+        LastCodeResult lastCodeResult,
         IHostApplicationLifetime lifetime,
         IOptions<Settings> settings) : base(PipelineStage.Executed, channelProcessor, codeProcessor, lifetime, settings)
     {
@@ -69,6 +73,7 @@ public sealed class Executed : PipelineBase
         _lifetime = lifetime;
         _settings = settings;
 
+        _lastCodeResult = lastCodeResult;
         _stackItem = _stack.Peek();
     }
 
@@ -77,6 +82,10 @@ public sealed class Executed : PipelineBase
     {
         if (code.Result is not null)
         {
+            // Record how it ended, which is what meta G-code reads as "result". RepRapFirmware does the
+            // same where it handles a reply, which is what this stage is
+            _lastCodeResult.Set(code.Channel, code.Result);
+
             // Update the file position
             await code.UpdateNextFilePositionAsync(code.CancellationToken);
 
@@ -99,10 +108,17 @@ public sealed class Executed : PipelineBase
             // Check if the result came from a DSF-only source
             if (!code.Flags.HasFlag(CodeFlags.IsPostProcessed))
             {
-                // RepRapFirmware generally prefixes error messages with the code itself, mimic this behavior if DSF resolved this code
-                if (code.Result.Type == MessageType.Error)
+                // RepRapFirmware prefixes an error or a warning with the code itself, and nothing else
+                // (GCodes2.cpp HandleResult, the GCodeResult::error and ::warning arm). Mimic that if
+                // DSF resolved this code
+                if (code.Result.Type is MessageType.Error or MessageType.Warning)
                 {
-                    code.Result.Content = code.ToShortString() + ": " + code.Result.Content;
+                    // A refused value is quoted by where it stood, ahead of the code, and one higher
+                    // than it is held because the column a person counts starts at one
+                    string column = (code.ErrorColumn != DuetAPI.Commands.CodeParameter.NoColumn)
+                        ? string.Create(CultureInfo.InvariantCulture, $" at column {code.ErrorColumn + 1}: ")
+                        : string.Empty;
+                    code.Result.Content = column + code.ToShortString() + ": " + code.Result.Content;
                 }
 
                 // Messages from RRF and replies to file print codes are logged somewhere else,

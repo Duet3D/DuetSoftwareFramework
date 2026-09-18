@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
+		<!-- Carries the documentation sources only, nothing is deployed from here -->
+		<IsPublishable>false</IsPublishable>
 	</PropertyGroup>
 </Project>

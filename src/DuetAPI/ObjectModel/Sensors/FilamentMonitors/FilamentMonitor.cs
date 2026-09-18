@@ -58,10 +58,9 @@ public partial class FilamentMonitor : ModelObject, IDynamicModelObject
     /// Update this instance from a given JSON element
     /// </summary>
     /// <param type="jsonElement">Element to update this intance from</param>
-    /// <param type="ignoreSbcProperties">Whether SBC properties are ignored</param>
     /// <returns>Updated instance</returns>
     /// <exception cref="JsonException">Failed to deserialize data</exception>
-    public IDynamicModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+    public IDynamicModelObject? UpdateFromJson(JsonElement jsonElement)
     {
         if (jsonElement.ValueKind == JsonValueKind.Null)
         {
@@ -76,7 +75,7 @@ public partial class FilamentMonitor : ModelObject, IDynamicModelObject
                 if (this is not LaserFilamentMonitor)
                 {
                     FilamentMonitor newInstance = new LaserFilamentMonitor();
-                    return newInstance.UpdateFromJson(jsonElement, ignoreSbcProperties);
+                    return newInstance.UpdateFromJson(jsonElement);
                 }
             }
             else if (type is "pulsed")
@@ -84,7 +83,7 @@ public partial class FilamentMonitor : ModelObject, IDynamicModelObject
                 if (this is not PulsedFilamentMonitor)
                 {
                     FilamentMonitor newInstance = new PulsedFilamentMonitor();
-                    return newInstance.UpdateFromJson(jsonElement, ignoreSbcProperties);
+                    return newInstance.UpdateFromJson(jsonElement);
                 }
             }
             else if (type is "rotatingMagnet")
@@ -92,16 +91,16 @@ public partial class FilamentMonitor : ModelObject, IDynamicModelObject
                 if (this is not RotatingMagnetFilamentMonitor)
                 {
                     FilamentMonitor newInstance = new RotatingMagnetFilamentMonitor();
-                    return newInstance.UpdateFromJson(jsonElement, ignoreSbcProperties);
+                    return newInstance.UpdateFromJson(jsonElement);
                 }
             }
             else if (this is LaserFilamentMonitor or PulsedFilamentMonitor or RotatingMagnetFilamentMonitor)
             {
                 FilamentMonitor newInstance = new();
-                return newInstance.UpdateFromJson(jsonElement, ignoreSbcProperties);
+                return newInstance.UpdateFromJson(jsonElement);
             }
         }
-        return GeneratedUpdateFromJson(jsonElement, ignoreSbcProperties);
+        return GeneratedUpdateFromJson(jsonElement);
     }
 
 
@@ -109,10 +108,9 @@ public partial class FilamentMonitor : ModelObject, IDynamicModelObject
     /// Update this instance from a given JSON reader
     /// </summary>
     /// <param type="reader">JSON reader</param>
-    /// <param type="ignoreSbcProperties">Whether SBC properties are ignored</param>
     /// <returns>Updated instance</returns>
     /// <exception cref="JsonException">Failed to deserialize data</exception>
-    public IDynamicModelObject? UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
+    public IDynamicModelObject? UpdateFromJsonReader(ref Utf8JsonReader reader)
     {
         if (reader.TokenType == JsonTokenType.None && !reader.Read())
         {
@@ -140,7 +138,7 @@ public partial class FilamentMonitor : ModelObject, IDynamicModelObject
                         if (this is not LaserFilamentMonitor)
                         {
                             FilamentMonitor newInstance = new LaserFilamentMonitor();
-                            return newInstance.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            return newInstance.UpdateFromJsonReader(ref reader);
                         }
                     }
                     else if (type is "pulsed")
@@ -148,7 +146,7 @@ public partial class FilamentMonitor : ModelObject, IDynamicModelObject
                         if (this is not PulsedFilamentMonitor)
                         {
                             FilamentMonitor newInstance = new PulsedFilamentMonitor();
-                            return newInstance.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            return newInstance.UpdateFromJsonReader(ref reader);
                         }
                     }
                     else if (type is "rotatingMagnet")
@@ -156,13 +154,13 @@ public partial class FilamentMonitor : ModelObject, IDynamicModelObject
                         if (this is not RotatingMagnetFilamentMonitor)
                         {
                             FilamentMonitor newInstance = new RotatingMagnetFilamentMonitor();
-                            return newInstance.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            return newInstance.UpdateFromJsonReader(ref reader);
                         }
                     }
                     else if (this is LaserFilamentMonitor or PulsedFilamentMonitor or RotatingMagnetFilamentMonitor)
                     {
                         FilamentMonitor newInstance = new();
-                        return newInstance.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                        return newInstance.UpdateFromJsonReader(ref reader);
                     }
                 }
             }
@@ -171,6 +169,6 @@ public partial class FilamentMonitor : ModelObject, IDynamicModelObject
                 readerCopy.Skip();
             }
         }
-        return GeneratedUpdateFromJsonReader(ref reader, ignoreSbcProperties);
+        return GeneratedUpdateFromJsonReader(ref reader);
     }
 }

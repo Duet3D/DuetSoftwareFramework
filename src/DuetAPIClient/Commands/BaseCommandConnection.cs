@@ -888,7 +888,8 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     }
 
     /// <summary>
-    /// Wait for the full object model to be updated from RepRapFirmware
+    /// Wait for the object model to be up-to-date. DuetControlServer maintains it in process, so this
+    /// returns at once and is kept for the clients that still ask
     /// </summary>
     /// <exception cref="SocketException">Command could not be processed</exception>
     /// <seealso cref="SbcPermissions.CommandExecution"/>
@@ -897,7 +898,8 @@ public abstract class BaseCommandConnection(ConnectionMode mode) : BaseConnectio
     public void SyncObjectModel() => PerformCommand(new SyncObjectModel());
 
     /// <summary>
-    /// Wait asynchronously for the full object model to be updated from RepRapFirmware
+    /// Wait asynchronously for the object model to be up-to-date. DuetControlServer maintains it in
+    /// process, so this returns at once and is kept for the clients that still ask
     /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>

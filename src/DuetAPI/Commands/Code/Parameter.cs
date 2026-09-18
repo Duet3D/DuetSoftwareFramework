@@ -36,6 +36,21 @@ public class CodeParameter
     public bool IsDriverId { get; internal set; }
 
     /// <summary>
+    /// Where this parameter's value starts in the line it was parsed from, or -1 if it is not known
+    /// </summary>
+    /// <remarks>
+    /// Zero-based, and the position after the letter rather than the letter's own - which is where a
+    /// value that was refused or was never there would have begun. It is what RepRapFirmware quotes
+    /// when a value is rejected, one higher, as "at column 6" (GCodeBuffer::GetPositiveFValue over
+    /// StringParser::GetColumn). A parameter that did not come from a line has none: one built by an
+    /// expression or by a caller has no column to quote
+    /// </remarks>
+    public int Column { get; internal set; } = NoColumn;
+
+    /// <summary>What <see cref="Column" /> holds when the parameter did not come from a line</summary>
+    public const int NoColumn = -1;
+
+    /// <summary>
     /// Unparsed string representation of the code parameter or an empty string if none present
     /// </summary>
     internal readonly string StringValue;

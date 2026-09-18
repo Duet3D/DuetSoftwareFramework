@@ -46,16 +46,7 @@ public class Functions(Expressions expressions, FilePathResolver filePathResolve
         if (arguments.Length == 1 && arguments[0] is string stringArgument)
         {
             stringArgument = stringArgument.Trim();
-            if (filter.GetSpecific(stringArgument, true, out _))
-            {
-                return true;
-            }
-            // TODO: evaluate the expression locally
-#if false
-            return await linkInterface.EvaluateExpressionAsync(channel, $"exists({stringArgument})");
-#else
-            return false;
-#endif
+            return filter.GetSpecific(stringArgument, out _);
         }
         throw new ArgumentException("exists requires an argument");
     }

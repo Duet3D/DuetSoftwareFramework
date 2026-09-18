@@ -12,20 +12,40 @@ using System.Threading.Tasks;
 
 namespace UnitTests.HttpClient;
 
-[TestFixture]
+/// <summary>
+/// Integration tests against a real machine. These require physical hardware, so they are skipped
+/// unless the DSF_TEST_MACHINE_URL environment variable points to a Duet (standalone mode) or to a
+/// SBC running DSF (SBC mode), for example:
+/// <code>DSF_TEST_MACHINE_URL=http://192.168.1.42 dotnet test UnitTests.csproj --filter HttpClient</code>
+/// </summary>
+[TestFixture, Category("RequiresMachine")]
 public class Session
 {
+    /// <summary>
+    /// Name of the environment variable holding the base URI of the machine to test against
+    /// </summary>
+    private const string MachineUrlEnvironmentVariable = "DSF_TEST_MACHINE_URL";
+
     private DuetHttpSession session;
 
     [OneTimeSetUp]
     public async Task Connect()
     {
+        string machineUrl = Environment.GetEnvironmentVariable(MachineUrlEnvironmentVariable);
+        if (string.IsNullOrWhiteSpace(machineUrl))
+        {
+            Assert.Ignore($"Set {MachineUrlEnvironmentVariable} to the base URI of a Duet or SBC to run these tests");
+        }
+
+        if (!Uri.TryCreate(machineUrl, UriKind.Absolute, out Uri baseUri))
+        {
+            Assert.Fail($"{MachineUrlEnvironmentVariable} is not a valid absolute URI: {machineUrl}");
+        }
+
         // It may be necessary to assign an error handler first so that JSON errors are caught and the ObjectModel test completes
         DuetAPI.ObjectModel.ObjectModel.OnDeserializationFailed += delegate { };
 
-        // This has to be changed depending on the test setup.
-        // The IP address must be either a Duet (standalone mode) or a SBC running DSF (SBC mode)
-        session = await DuetHttpSession.ConnectAsync(new("http://ender3pro.fritz.box"));
+        session = await DuetHttpSession.ConnectAsync(baseUri);
     }
 
     [Test]
@@ -126,6 +146,9 @@ public class Session
     [OneTimeTearDown]
     public async Task Disconnect()
     {
-        await session!.DisposeAsync();
+        if (session is not null)
+        {
+            await session.DisposeAsync();
+        }
     }
 }

@@ -34,6 +34,6 @@ public sealed class Flush(CodeProcessor codeProcessor, Model.ObjectModel model) 
 
         // Wait for it to be flushed
         Code? codeBeingIntercepted = IPC.Processors.CodeInterception.GetCodeBeingIntercepted(Connection, out _);
-        return await ((codeBeingIntercepted is not null) ? codeProcessor.FlushAsync(codeBeingIntercepted, false, false, SyncFileStreams, IfExecuting, cancellationToken) : codeProcessor.FlushAsync(Channel, cancellationToken: cancellationToken));
+        return await ((codeBeingIntercepted is not null) ? codeProcessor.FlushAsync(codeBeingIntercepted, false, SyncFileStreams, IfExecuting, cancellationToken) : codeProcessor.FlushAsync(Channel, cancellationToken: cancellationToken));
     }
 }

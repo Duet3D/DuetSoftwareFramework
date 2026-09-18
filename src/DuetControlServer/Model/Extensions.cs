@@ -18,6 +18,7 @@ public static partial class ServiceCollectionExtensions
         return services
             .AddSingleton<Filter>()
             .AddSingleton<ObjectModel>()
+            .AddHostedService<MachineStatusService>()
             .AddSingleton<IDiagnostics, ObjectModel>(services => services.GetRequiredService<ObjectModel>())
             .AddSingleton<Observer>()
             .AddSingleton<PeriodicUpdateService>()
@@ -25,6 +26,5 @@ public static partial class ServiceCollectionExtensions
             .AddHostedService(provider => provider.GetRequiredService<Observer>())
             .AddHostedService(provider => provider.GetRequiredService<PeriodicUpdateService>())
             .AddHostedService(provider => provider.GetRequiredService<SbcTriggerService>());
-            // .AddHostedService<UpdateService>(); // TODO: remove this if the class is not needed anymore
     }
 }

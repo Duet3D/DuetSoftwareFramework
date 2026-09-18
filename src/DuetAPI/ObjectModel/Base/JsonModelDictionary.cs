@@ -291,11 +291,10 @@ public sealed class JsonModelDictionary(bool nullRemovesItems) : IDictionary<str
     /// Update this instance from a given JSON element
     /// </summary>
     /// <param name="jsonElement">Element to update this intance from</param>
-    /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
     /// <returns>Updated instance</returns>
     /// <exception cref="JsonException">Failed to deserialize data</exception>
     /// <remarks>Accepts null as the JSON value to clear existing items</remarks>
-    public void UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+    public void UpdateFromJson(JsonElement jsonElement)
     {
         if (jsonElement.ValueKind == JsonValueKind.Null)
         {
@@ -318,7 +317,7 @@ public sealed class JsonModelDictionary(bool nullRemovesItems) : IDictionary<str
     }
 
     /// <inheritdoc />
-    public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
+    public void UpdateFromJsonReader(ref Utf8JsonReader reader)
     {
         if (reader.TokenType == JsonTokenType.Null)
         {

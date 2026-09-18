@@ -10,12 +10,21 @@ namespace DuetControlServer.Codes.Handlers;
 public interface ICodeHandler
 {
     /// <summary>
+    /// The class of the given code, or null when this handler has no such code, in which case the
+    /// pipeline runs the macro named after the code if one exists and resolves the code as
+    /// unsupported otherwise. Side-effect free
+    /// </summary>
+    /// <param name="code">Code to classify</param>
+    /// <returns>Class of the code, or null for "no such code"</returns>
+    CodeClass? Classify(DuetAPI.Commands.Code code);
+
+    /// <summary>
     /// Process a code that should be interpreted by the control server
     /// </summary>
     /// <param name="code">Code to process</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result of the code if the code completed, else null</returns>
-    ValueTask<Message?> ProcessAsync(Commands.Code code, CancellationToken cancellationToken);
+    ValueTask<Message> ProcessAsync(Commands.Code code, CancellationToken cancellationToken);
 
     /// <summary>
     /// React to an executed code before its result is returned

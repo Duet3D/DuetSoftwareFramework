@@ -3,6 +3,7 @@ using DuetAPI.Commands;
 using DuetAPI.Utility;
 using NUnit.Framework;
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -40,7 +41,7 @@ public class Code
             Assert.That(code.MinorNumber, Is.EqualTo(-1));
             Assert.That(code.Parameters.Count, Is.EqualTo(1));
             Assert.That(code.Parameters[0].Letter, Is.EqualTo('S'));
-            Assert.That(code.GetInt('S', 0), Is.EqualTo(1));
+            Assert.That(code.GetInt('S', defaultValue: 0), Is.EqualTo(1));
         }
     }
 
@@ -471,6 +472,23 @@ public class Code
             Assert.That((string)code.Parameters[0], Is.EqualTo("{123,456}"));
         }
 
+    }
+
+    [Test]
+    public void ParseM584WithoutDrivers()
+    {
+        // A letter given without a value names no driver. It must not read as driver 0.0, which is
+        // what a driver ID parsed from an empty string defaults to
+        foreach (DuetAPI.Commands.Code code in Parse("M584 X E2.0"))
+        {
+            Assert.That(code.Type, Is.EqualTo(CodeType.MCode));
+            Assert.That(code.MajorNumber, Is.EqualTo(584));
+            Assert.That(code.Parameters.Count, Is.EqualTo(2));
+            Assert.That(code.Parameters[0].Letter, Is.EqualTo('X'));
+            Assert.That(code.Parameters[0].IsNull, Is.True);
+            Assert.That(code.Parameters[1].Letter, Is.EqualTo('E'));
+            Assert.That((DriverId)code.Parameters[1], Is.EqualTo(new DriverId(2, 0)));
+        }
     }
 
     [Test]
@@ -1148,6 +1166,593 @@ public class Code
         // The byte length must match between the sync and async parsers
         DuetAPI.Commands.Code[] codes = [.. Parse("G1 X10 Y20 ; some comment with Ümläute")];
         Assert.That(codes[1].Length, Is.EqualTo(codes[0].Length));
+    }
+
+    /// <summary>Read a value the way <c>GetFloat</c> and its siblings do</summary>
+    private delegate T Getter<T, TRefusal>(char letter, T? defaultValue, T? min, T? max,
+                                          Func<TRefusal, string>? errorString = null) where T : struct;
+
+    /// <summary>Read a value into a plain out parameter, as the first Try shape does</summary>
+    private delegate bool ValueTryGetter<T, TRefusal>(char letter, out T parameter, T? min, T? max,
+                                                      Func<TRefusal, string>? errorString = null) where T : struct;
+
+    /// <summary>Read a value into a nullable out parameter, as the second Try shape does</summary>
+    private delegate bool NullableTryGetter<T, TRefusal>(char letter, out T? parameter, T? min, T? max,
+                                                         Func<TRefusal, string>? errorString = null) where T : struct;
+
+    /// <summary>Read an array the way <c>GetFloatArray</c> and its siblings do</summary>
+    private delegate T[] ArrayGetter<T, TRefusal>(char letter, T[]? defaultValue, T? min, T? max,
+                                                  Func<TRefusal, string>? errorString = null) where T : struct;
+
+    /// <summary>Read an array into an out parameter, as the array Try shape does</summary>
+    private delegate bool ArrayTryGetter<T, TRefusal>(char letter, out T[]? parameter, T? min, T? max,
+                                                      Func<TRefusal, string>? errorString = null) where T : struct;
+
+    /// <summary>
+    /// Hold one numeric type's three accessors to every parameter each of them takes
+    /// </summary>
+    /// <param name="what">Name of the type, to tell the assertions of one type from another's</param>
+    /// <param name="get">The returning accessor</param>
+    /// <param name="tryGetValue">The Try accessor that writes a plain out parameter</param>
+    /// <param name="tryGetNullable">The Try accessor that writes a nullable out parameter</param>
+    /// <param name="present">Letter the code carries</param>
+    /// <param name="absent">Letter the code does not carry</param>
+    /// <param name="value">What the code carries at <paramref name="present" /></param>
+    /// <param name="below">A value lower than <paramref name="value" /></param>
+    /// <param name="above">A value higher than <paramref name="value" /></param>
+    /// <param name="fallback">A default to hand the accessors, unequal to every other value here</param>
+    /// <param name="bare">Letter the code carries with nothing after it</param>
+    /// <remarks>
+    /// The limits throw where the value stands rather than storing the nearest one that fits, as
+    /// RepRapFirmware's GCodeBuffer::GetLimitedFValue, ::GetLimitedIValue and ::GetLimitedUIValue do,
+    /// because the nearest one that fits is not what the line asked for.
+    /// <paramref name="bare" /> is held to the third answer these accessors have to give: a letter
+    /// written with nothing after it is a parse error rather than a missing parameter, and
+    /// RepRapFirmware answers it the same way whichever accessor read it, Seen followed by GetFValue
+    /// reaching the parser's "expected number". The defaulting and Try forms used to answer it as a
+    /// failed conversion instead, which named a CLR type in a reply an operator reads
+    /// </remarks>
+    private static void AssertNumericAccessors<T, TRefusal>(string what, Getter<T, TRefusal> get,
+                                                            ValueTryGetter<T, TRefusal> tryGetValue,
+                                                            NullableTryGetter<T, TRefusal> tryGetNullable,
+                                                            char present, char absent,
+                                                  T value, T below, T above, T fallback, char bare) where T : struct
+    {
+        string tooLow = $"parameter '{present}' too low", tooHigh = $"parameter '{present}' too high";
+        string noValue = $"expected number after '{bare}'";
+
+        Assert.Multiple(() =>
+        {
+            // defaultValue
+            Assert.That(get(absent, fallback, null, null), Is.EqualTo(fallback), $"{what}: the default answers an absent letter");
+            Assert.That(get(present, fallback, null, null), Is.EqualTo(value), $"{what}: and stands aside for a letter that is there");
+            Assert.That(get(absent, fallback, above, above), Is.EqualTo(fallback), $"{what}: the limits are about the line, so they do not reach the default");
+            Assert.That(Assert.Throws<MissingParameterException>(() => get(absent, null, null, null))!.Letter,
+                        Is.EqualTo(absent), $"{what}: with no default the letter has to be there");
+
+            // min
+            Assert.That(get(present, null, below, null), Is.EqualTo(value), $"{what}: a value above min is taken");
+            Assert.That(get(present, null, value, null), Is.EqualTo(value), $"{what}: min is inclusive");
+            Assert.That(Assert.Throws<GCodeException>(() => get(present, null, above, null))!.Message,
+                        Is.EqualTo(tooLow), $"{what}: and a value beneath it is refused");
+
+            // max
+            Assert.That(get(present, null, null, above), Is.EqualTo(value), $"{what}: a value below max is taken");
+            Assert.That(get(present, null, null, value), Is.EqualTo(value), $"{what}: max is inclusive");
+            Assert.That(Assert.Throws<GCodeException>(() => get(present, null, null, below))!.Message,
+                        Is.EqualTo(tooHigh), $"{what}: and a value above it is refused");
+
+            // all three together
+            Assert.That(get(present, fallback, below, above), Is.EqualTo(value), $"{what}: the line wins between both ends");
+
+            // the Try shape that writes a plain out parameter
+            Assert.That(tryGetValue(present, out T found, below, above), Is.True, $"{what}: Try finds the letter");
+            Assert.That(found, Is.EqualTo(value), $"{what}: and hands back what it read");
+            Assert.That(tryGetValue(present, out T atEnds, value, value), Is.True, $"{what}: Try holds both ends inclusive");
+            Assert.That(atEnds, Is.EqualTo(value));
+            Assert.That(tryGetValue(absent, out T missed, above, below), Is.False, $"{what}: an absent letter is neither found nor limit-checked");
+            Assert.That(missed, Is.EqualTo(default(T)), $"{what}: and leaves the type's own default behind");
+            Assert.That(Assert.Throws<GCodeException>(() => tryGetValue(present, out T _, above, null))!.Message,
+                        Is.EqualTo(tooLow), $"{what}: Try refuses beneath min");
+            Assert.That(Assert.Throws<GCodeException>(() => tryGetValue(present, out T _, null, below))!.Message,
+                        Is.EqualTo(tooHigh), $"{what}: Try refuses above max");
+
+            // the Try shape that writes a nullable out parameter
+            Assert.That(tryGetNullable(present, out T? foundOrNull, below, above), Is.True, $"{what}: the nullable Try finds the letter");
+            Assert.That(foundOrNull, Is.EqualTo(value), $"{what}: and hands back what it read");
+            Assert.That(tryGetNullable(present, out T? atEndsOrNull, value, value), Is.True, $"{what}: it holds both ends inclusive too");
+            Assert.That(atEndsOrNull, Is.EqualTo(value));
+            Assert.That(tryGetNullable(absent, out T? missedOrNull, above, below), Is.False, $"{what}: an absent letter is neither found nor limit-checked");
+            Assert.That(missedOrNull, Is.Null, $"{what}: and leaves null behind");
+            Assert.That(Assert.Throws<GCodeException>(() => tryGetNullable(present, out T? _, above, null))!.Message,
+                        Is.EqualTo(tooLow), $"{what}: the nullable Try refuses beneath min");
+            Assert.That(Assert.Throws<GCodeException>(() => tryGetNullable(present, out T? _, null, below))!.Message,
+                        Is.EqualTo(tooHigh), $"{what}: the nullable Try refuses above max");
+
+            // a letter written with nothing after it, which none of the three may take for absent
+            Assert.That(Assert.Throws<GCodeException>(() => get(bare, null, null, null))!.Message,
+                        Is.EqualTo(noValue), $"{what}: a letter with no value is a parse error");
+            Assert.That(Assert.Throws<GCodeException>(() => get(bare, fallback, null, null))!.Message,
+                        Is.EqualTo(noValue), $"{what}: a default stands in for an absent letter, not for one written badly");
+            Assert.That(Assert.Throws<GCodeException>(() => tryGetValue(bare, out T _, null, null))!.Message,
+                        Is.EqualTo(noValue), $"{what}: Try refuses it too");
+            Assert.That(Assert.Throws<GCodeException>(() => tryGetNullable(bare, out T? _, null, null))!.Message,
+                        Is.EqualTo(noValue), $"{what}: and so does the nullable Try");
+        });
+    }
+
+    /// <summary>
+    /// Hold one array type's two accessors to every parameter each of them takes
+    /// </summary>
+    /// <param name="what">Name of the type, to tell the assertions of one type from another's</param>
+    /// <param name="get">The returning accessor</param>
+    /// <param name="tryGet">The Try accessor</param>
+    /// <param name="present">Letter the code carries</param>
+    /// <param name="absent">Letter the code does not carry</param>
+    /// <param name="values">What the code carries at <paramref name="present" />, in ascending order</param>
+    /// <param name="below">A value lower than every item</param>
+    /// <param name="above">A value higher than every item</param>
+    /// <param name="fallback">A default to hand the accessors, unequal to <paramref name="values" /></param>
+    /// <param name="bare">Letter the code carries with nothing after it</param>
+    /// <remarks>
+    /// The limits are held against the middle item as well as the ends, so a check that only looked
+    /// at the first item or only at the last would fail here. <paramref name="bare" /> is held to the
+    /// same refusal the scalar accessors give, which the array accessors used to disagree over
+    /// </remarks>
+    private static void AssertArrayAccessors<T, TRefusal>(string what, ArrayGetter<T, TRefusal> get,
+                                                          ArrayTryGetter<T, TRefusal> tryGet,
+                                                char present, char absent, T[] values, T below, T above,
+                                                T[] fallback, char bare) where T : struct
+    {
+        string tooLow = $"parameter '{present}' too low", tooHigh = $"parameter '{present}' too high";
+        string noValue = $"expected number after '{bare}'";
+        T first = values[0], middle = values[1], last = values[^1];
+
+        Assert.Multiple(() =>
+        {
+            // defaultValue
+            Assert.That(get(absent, fallback, null, null), Is.EqualTo(fallback), $"{what}: the default answers an absent letter");
+            Assert.That(get(present, fallback, null, null), Is.EqualTo(values), $"{what}: and stands aside for a letter that is there");
+            Assert.That(get(absent, fallback, above, below), Is.EqualTo(fallback), $"{what}: the limits are about the line, so they do not reach the default");
+            Assert.That(Assert.Throws<MissingParameterException>(() => get(absent, null, null, null))!.Letter,
+                        Is.EqualTo(absent), $"{what}: with no default the letter has to be there");
+
+            // min, against every item
+            Assert.That(get(present, null, below, null), Is.EqualTo(values), $"{what}: every item above min is taken");
+            Assert.That(get(present, null, first, null), Is.EqualTo(values), $"{what}: min is inclusive at the lowest item");
+            Assert.That(Assert.Throws<GCodeException>(() => get(present, null, middle, null))!.Message,
+                        Is.EqualTo(tooLow), $"{what}: an item beneath min refuses the list, first item or not");
+
+            // max, against every item
+            Assert.That(get(present, null, null, above), Is.EqualTo(values), $"{what}: every item below max is taken");
+            Assert.That(get(present, null, null, last), Is.EqualTo(values), $"{what}: max is inclusive at the highest item");
+            Assert.That(Assert.Throws<GCodeException>(() => get(present, null, null, middle))!.Message,
+                        Is.EqualTo(tooHigh), $"{what}: an item above max refuses the list, last item or not");
+
+            // all three together
+            Assert.That(get(present, fallback, below, above), Is.EqualTo(values), $"{what}: the line wins between both ends");
+
+            // the Try shape
+            Assert.That(tryGet(present, out T[]? found, below, above), Is.True, $"{what}: Try finds the letter");
+            Assert.That(found, Is.EqualTo(values), $"{what}: and hands back what it read");
+            Assert.That(tryGet(present, out T[]? atEnds, first, last), Is.True, $"{what}: Try holds both ends inclusive");
+            Assert.That(atEnds, Is.EqualTo(values));
+            Assert.That(tryGet(absent, out T[]? missed, above, below), Is.False, $"{what}: an absent letter is neither found nor limit-checked");
+            Assert.That(missed, Is.Null, $"{what}: and leaves null behind");
+            Assert.That(Assert.Throws<GCodeException>(() => tryGet(present, out T[]? _, middle, null))!.Message,
+                        Is.EqualTo(tooLow), $"{what}: Try refuses an item beneath min");
+            Assert.That(Assert.Throws<GCodeException>(() => tryGet(present, out T[]? _, null, middle))!.Message,
+                        Is.EqualTo(tooHigh), $"{what}: Try refuses an item above max");
+
+            // a letter written with nothing after it, which neither accessor may take for absent
+            Assert.That(Assert.Throws<GCodeException>(() => get(bare, null, null, null))!.Message,
+                        Is.EqualTo(noValue), $"{what}: a letter with no value is a parse error");
+            Assert.That(Assert.Throws<GCodeException>(() => get(bare, fallback, null, null))!.Message,
+                        Is.EqualTo(noValue), $"{what}: a default does not stand in for a list written badly");
+            Assert.That(Assert.Throws<GCodeException>(() => tryGet(bare, out T[]? _, null, null))!.Message,
+                        Is.EqualTo(noValue), $"{what}: Try refuses it too");
+        });
+    }
+
+    [Test]
+    public void GetAndTryGetFloatCoverDefaultMinAndMax()
+    {
+        DuetAPI.Commands.Code code = new("M906 X50 K");
+        AssertNumericAccessors<float, float>("float", code.GetFloat, code.TryGetFloat, code.TryGetFloat,
+                                      present: 'X', absent: 'Z', value: 50.0f, below: 10.0f, above: 100.0f,
+                                      fallback: 7.5f, bare: 'K');
+    }
+
+    [Test]
+    public void GetAndTryGetIntCoverDefaultMinAndMax()
+    {
+        DuetAPI.Commands.Code code = new("M906 X50 K");
+        AssertNumericAccessors<int, long>("int", code.GetInt, code.TryGetInt, code.TryGetInt,
+                                    present: 'X', absent: 'Z', value: 50, below: 10, above: 100, fallback: -7, bare: 'K');
+    }
+
+    [Test]
+    public void GetAndTryGetUIntCoverDefaultMinAndMax()
+    {
+        DuetAPI.Commands.Code code = new("M906 X50 K");
+        AssertNumericAccessors<uint, long>("uint", code.GetUInt, code.TryGetUInt, code.TryGetUInt,
+                                     present: 'X', absent: 'Z', value: 50u, below: 10u, above: 100u, fallback: 7u, bare: 'K');
+    }
+
+    [Test]
+    public void GetAndTryGetLongCoverDefaultMinAndMax()
+    {
+        DuetAPI.Commands.Code code = new("M906 X50 K");
+        AssertNumericAccessors<long, long>("long", code.GetLong, code.TryGetLong, code.TryGetLong,
+                                     present: 'X', absent: 'Z', value: 50L, below: 10L, above: 100L, fallback: -7L, bare: 'K');
+    }
+
+    [Test]
+    public void GetAndTryGetFloatArrayCoverDefaultMinAndMax()
+    {
+        DuetAPI.Commands.Code code = new("M906 E10:50:100 K");
+        AssertArrayAccessors<float, float>("float[]", code.GetFloatArray, code.TryGetFloatArray,
+                                    present: 'E', absent: 'Z', values: [10.0f, 50.0f, 100.0f],
+                                    below: 0.0f, above: 200.0f, fallback: [7.5f], bare: 'K');
+    }
+
+    [Test]
+    public void GetAndTryGetIntArrayCoverDefaultMinAndMax()
+    {
+        DuetAPI.Commands.Code code = new("M906 E10:50:100 K");
+        AssertArrayAccessors<int, long>("int[]", code.GetIntArray, code.TryGetIntArray,
+                                  present: 'E', absent: 'Z', values: [10, 50, 100],
+                                  below: 0, above: 200, fallback: [-7], bare: 'K');
+    }
+
+    [Test]
+    public void GetAndTryGetUIntArrayCoverDefaultMinAndMax()
+    {
+        DuetAPI.Commands.Code code = new("M906 E10:50:100 K");
+        AssertArrayAccessors<uint, long>("uint[]", code.GetUIntArray, code.TryGetUIntArray,
+                                   present: 'E', absent: 'Z', values: [10u, 50u, 100u],
+                                   below: 0u, above: 200u, fallback: [7u], bare: 'K');
+    }
+
+    [Test]
+    public void GetAndTryGetLongArrayCoverDefaultMinAndMax()
+    {
+        DuetAPI.Commands.Code code = new("M906 E10:50:100 K");
+        AssertArrayAccessors<long, long>("long[]", code.GetLongArray, code.TryGetLongArray,
+                                   present: 'E', absent: 'Z', values: [10L, 50L, 100L],
+                                   below: 0L, above: 200L, fallback: [-7L], bare: 'K');
+    }
+
+    [Test]
+    public void GetBoolCoversItsDefaultAndItsTryShapesTakeNoLimits()
+    {
+        // GetBool is the one numeric accessor with no min and no max, because the two values a
+        // boolean can hold are both inside any range that would admit either of them
+        DuetAPI.Commands.Code code = new("M42 S1 K");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(code.GetBool('S', defaultValue: false), Is.True, "a letter that is there wins over the default");
+            Assert.That(code.GetBool('Z', defaultValue: true), Is.True, "and the default answers an absent one");
+            Assert.That(code.GetBool('Z', defaultValue: false), Is.False);
+            Assert.That(Assert.Throws<MissingParameterException>(() => code.GetBool('Z'))!.Letter,
+                        Is.EqualTo('Z'), "with no default the letter has to be there");
+
+            Assert.That(code.TryGetBool('S', out bool found), Is.True);
+            Assert.That(found, Is.True);
+            Assert.That(code.TryGetBool('Z', out bool missed), Is.False);
+            Assert.That(missed, Is.False);
+
+            Assert.That(code.TryGetBool('S', out bool? foundOrNull), Is.True);
+            Assert.That(foundOrNull, Is.True);
+            Assert.That(code.TryGetBool('Z', out bool? missedOrNull), Is.False);
+            Assert.That(missedOrNull, Is.Null);
+
+            // and a letter with no value is the parse error it is for every other accessor
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetBool('K'))!.Message,
+                        Is.EqualTo("expected number after 'K'"));
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetBool('K', defaultValue: true))!.Message,
+                        Is.EqualTo("expected number after 'K'"));
+            Assert.That(Assert.Throws<GCodeException>(() => code.TryGetBool('K', out bool _))!.Message,
+                        Is.EqualTo("expected number after 'K'"));
+            Assert.That(Assert.Throws<GCodeException>(() => code.TryGetBool('K', out bool? _))!.Message,
+                        Is.EqualTo("expected number after 'K'"));
+        });
+    }
+
+    [Test]
+    public void TheAccessorsThatTakeOnlyADefaultCoverIt()
+    {
+        // A string, a driver ID and an IP address have no magnitude to hold against a range, so the
+        // default is the only parameter they take besides the letter
+        DuetAPI.Commands.Code code = new("M569 P1.2 S\"named\" I192.168.1.5 K");
+        DriverId fallbackId = new("9.9");
+        DriverId[] fallbackIds = [new("8.8")];
+        IPAddress fallbackAddress = IPAddress.Loopback;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(code.GetString('S', defaultValue: "other"), Is.EqualTo("named"));
+            Assert.That(code.GetString('Z', defaultValue: "other"), Is.EqualTo("other"));
+            Assert.That(Assert.Throws<MissingParameterException>(() => code.GetString('Z'))!.Letter, Is.EqualTo('Z'));
+
+            Assert.That(code.GetDriverId('P', defaultValue: fallbackId), Is.EqualTo(new DriverId(1, 2)));
+            Assert.That(code.GetDriverId('Z', defaultValue: fallbackId), Is.EqualTo(fallbackId));
+            Assert.That(Assert.Throws<MissingParameterException>(() => code.GetDriverId('Z'))!.Letter, Is.EqualTo('Z'));
+
+            Assert.That(code.GetIPAddress('I', defaultValue: fallbackAddress), Is.EqualTo(IPAddress.Parse("192.168.1.5")));
+            Assert.That(code.GetIPAddress('Z', defaultValue: fallbackAddress), Is.EqualTo(fallbackAddress));
+            Assert.That(Assert.Throws<MissingParameterException>(() => code.GetIPAddress('Z'))!.Letter, Is.EqualTo('Z'));
+
+            Assert.That(code.GetDriverIdArray('P', defaultValue: fallbackIds), Is.EqualTo(new DriverId[] { new(1, 2) }));
+            Assert.That(code.GetDriverIdArray('Z', defaultValue: fallbackIds), Is.EqualTo(fallbackIds));
+            Assert.That(Assert.Throws<MissingParameterException>(() => code.GetDriverIdArray('Z'))!.Letter, Is.EqualTo('Z'));
+
+            Assert.That(code.TryGetDriverIdArray('P', out DriverId[]? found), Is.True);
+            Assert.That(found, Is.EqualTo(new DriverId[] { new(1, 2) }));
+            Assert.That(code.TryGetDriverIdArray('Z', out DriverId[]? missed), Is.False);
+            Assert.That(missed, Is.Null);
+
+            // and a letter with no value is the parse error it is for every other accessor
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetDriverIdArray('K'))!.Message,
+                        Is.EqualTo("expected number after 'K'"));
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetDriverIdArray('K', defaultValue: fallbackIds))!.Message,
+                        Is.EqualTo("expected number after 'K'"));
+            Assert.That(Assert.Throws<GCodeException>(() => code.TryGetDriverIdArray('K', out DriverId[]? _))!.Message,
+                        Is.EqualTo("expected number after 'K'"));
+        });
+    }
+
+    [Test]
+    public void RefusalsQuoteTheColumnRepRapFirmwareQuotes()
+    {
+        // RepRapFirmware quotes the column from GetLimitedFValue (GCodeBuffer.cpp:553) and none
+        // from GetLimitedIValue or ::GetLimitedUIValue (:592 and :614). A letter with no value is
+        // the other refusal that carries one, whatever type went looking for it
+        DuetAPI.Commands.Code code = new("M906 I120 S12 E100:2000:50 X1:2:3 K");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetFloat('I', max: 100.0f))!.Column,
+                        Is.EqualTo(6), "where the value stood, counting from zero");
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetFloat('I', min: 200.0f))!.Column,
+                        Is.EqualTo(6), "and the same for a value beneath its floor");
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetUInt('S', max: 10))!.Column,
+                        Is.EqualTo(CodeParameter.NoColumn));
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetUInt('S', min: 20))!.Column,
+                        Is.EqualTo(CodeParameter.NoColumn));
+
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetFloatArray('E', max: 1000.0f))!.Column,
+                        Is.EqualTo(15), "an array quotes where its list began");
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetFloatArray('E', min: 60.0f))!.Column,
+                        Is.EqualTo(15), "at either end");
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetIntArray('X', max: 2))!.Column,
+                        Is.EqualTo(CodeParameter.NoColumn));
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetIntArray('X', min: 2))!.Column,
+                        Is.EqualTo(CodeParameter.NoColumn));
+
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetFloat('K'))!.Column, Is.EqualTo(35),
+                        "a letter with no value is quoted by where its value should have begun");
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetInt('K'))!.Column, Is.EqualTo(35),
+                        "whatever type went looking for it, the refusal coming from the letter rather than the value");
+        });
+    }
+
+    [Test]
+    public void AnAbsentParameterIsNotFound()
+    {
+        // GetParameter is what every accessor looks a letter up with, so a letter the line does not
+        // carry has to come back as nothing rather than as a parameter holding zero
+        DuetAPI.Commands.Code code = new("M950 F0 C\"1.out3\" K4");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(code.GetParameter('Z'), Is.Null);
+            Assert.That(code.HasParameter('Z'), Is.False);
+            Assert.That(code.TryGetParameter('Z', out CodeParameter? absent), Is.False);
+            Assert.That(absent, Is.Null);
+
+            Assert.That(code.GetParameter('F'), Is.Not.Null, "a letter that is there still comes back");
+            Assert.That((int)code.GetParameter('F')!, Is.EqualTo(0),
+                        "including one whose value is zero, which is not the same as not being there");
+        });
+    }
+
+    [Test]
+    public void GetParameterWithADefaultBuildsOneThatWasNotInTheLine()
+    {
+        // The default overload stands in for the missing letter so a caller can read it like any
+        // other parameter. It never came from the line, so it has no column to quote
+        DuetAPI.Commands.Code code = new("M950 F0");
+
+        CodeParameter standIn = code.GetParameter('Q', defaultValue: 500);
+        Assert.Multiple(() =>
+        {
+            Assert.That(standIn.Letter, Is.EqualTo('Q'));
+            Assert.That((int)standIn, Is.EqualTo(500));
+            Assert.That(standIn.Column, Is.EqualTo(CodeParameter.NoColumn));
+            Assert.That(code.GetParameter('F', defaultValue: 9), Is.SameAs(code.GetParameter('F')),
+                        "a letter that is there is returned as it stands, not replaced by the default");
+        });
+    }
+
+    [Test]
+    public void TryGetOverwritesReferenceTypesWithNullWhenTheParameterIsAbsent()
+    {
+        // A string, a driver ID, an IP address and every array answer the miss with null, which is
+        // what tells a caller that reads the value without checking the result apart from one the
+        // code really supplied. The nullable numeric forms are held to the same rule by the matrix
+        DuetAPI.Commands.Code code = new("M950 F0 C\"1.out3\" K4");
+
+        string? stringValue = "held";
+        DriverId? driverId = new("1.2");
+        IPAddress? ipAddress = IPAddress.Loopback;
+        float[]? floatArray = [1.0f];
+        int[]? intArray = [1];
+        uint[]? uintArray = [1u];
+        long[]? longArray = [1L];
+        DriverId[]? driverIdArray = [new("1.2")];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(code.TryGetString('Z', out stringValue), Is.False);
+            Assert.That(code.TryGetDriverId('Z', out driverId), Is.False);
+            Assert.That(code.TryGetIPAddress('Z', out ipAddress), Is.False);
+            Assert.That(code.TryGetFloatArray('Z', out floatArray), Is.False);
+            Assert.That(code.TryGetIntArray('Z', out intArray), Is.False);
+            Assert.That(code.TryGetUIntArray('Z', out uintArray), Is.False);
+            Assert.That(code.TryGetLongArray('Z', out longArray), Is.False);
+            Assert.That(code.TryGetDriverIdArray('Z', out driverIdArray), Is.False);
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(stringValue, Is.Null);
+            Assert.That(driverId, Is.Null);
+            Assert.That(ipAddress, Is.Null);
+            Assert.That(floatArray, Is.Null);
+            Assert.That(intArray, Is.Null);
+            Assert.That(uintArray, Is.Null);
+            Assert.That(longArray, Is.Null);
+            Assert.That(driverIdArray, Is.Null);
+        });
+    }
+
+    /// <summary>
+    /// A contiguous enumeration, as every one a G-code parameter selects from is
+    /// </summary>
+    private enum Shade
+    {
+        Off = 0,
+        Dim = 1,
+        Bright = 2
+    }
+
+    /// <summary>
+    /// An enumeration that does not start at zero, to hold the refusal to naming the right end
+    /// </summary>
+    private enum Offset
+    {
+        Below = -1,
+        Level = 0,
+        Above = 1
+    }
+
+    /// <summary>
+    /// GetEnum and TryGetEnum read a parameter as one of an enumeration's members, and refuse a
+    /// value that names none of them the way every other limited read refuses one
+    /// </summary>
+    /// <remarks>
+    /// The enumeration is the limits, so the wording is RepRapFirmware's for
+    /// <c>GCodeBuffer::GetLimitedUIValue</c>: "too low" below the lowest member and "too high" above
+    /// the highest. A default is returned as it stands, as it is for the numeric accessors, because
+    /// it comes from the caller rather than from the line
+    /// </remarks>
+    [Test]
+    public void EnumAccessors()
+    {
+        foreach (DuetAPI.Commands.Code code in Parse("M1 S1 T3 U-2 V"))
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.That(code.GetEnum<Shade>('S'), Is.EqualTo(Shade.Dim), "a value names its member");
+                Assert.That(code.GetEnum<Shade>('Q', Shade.Bright), Is.EqualTo(Shade.Bright),
+                            "the default answers an absent letter");
+                Assert.That(code.GetEnum<Shade>('S', Shade.Bright), Is.EqualTo(Shade.Dim),
+                            "and stands aside for a letter that is there");
+                Assert.That(Assert.Throws<MissingParameterException>(() => code.GetEnum<Shade>('Q'))!.Letter,
+                            Is.EqualTo('Q'), "with no default the letter has to be there");
+
+                Assert.That(Assert.Throws<GCodeException>(() => code.GetEnum<Shade>('T'))!.Message,
+                            Is.EqualTo("parameter 'T' too high"), "a value above every member is too high");
+                Assert.That(Assert.Throws<GCodeException>(() => code.GetEnum<Shade>('U'))!.Message,
+                            Is.EqualTo("parameter 'U' too low"), "and one below every member is too low");
+
+                Assert.That(code.GetEnum<Shade>('Q', (Shade)9), Is.EqualTo((Shade)9),
+                            "the limits are about the line, so they do not reach the default");
+
+                // An enumeration whose lowest member is negative moves the line between the two
+                Assert.That(Assert.Throws<GCodeException>(() => code.GetEnum<Offset>('U'))!.Message,
+                            Is.EqualTo("parameter 'U' too low"), "-2 is below Offset.Below");
+                Assert.That(code.GetEnum<Offset>('S'), Is.EqualTo(Offset.Above), "and 1 is a member of it");
+                Assert.That(Assert.Throws<GCodeException>(() => code.GetEnum<Offset>('T'))!.Message,
+                            Is.EqualTo("parameter 'T' too high"), "while 3 is above Offset.Above");
+
+                Assert.That(Assert.Throws<GCodeException>(() => code.GetEnum<Shade>('V'))!.Message,
+                            Is.EqualTo("expected number after 'V'"),
+                            "a letter written with nothing after it is a parse error, not a missing parameter");
+            });
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(code.TryGetEnum('S', out Shade seen), Is.True);
+                Assert.That(seen, Is.EqualTo(Shade.Dim), "the Try form writes the member it read");
+
+                Assert.That(code.TryGetEnum('Q', out Shade absent), Is.False);
+                Assert.That(absent, Is.EqualTo(default(Shade)), "and leaves an absent letter at the default");
+
+                Assert.That(code.TryGetEnum('S', out Shade? nullableSeen), Is.True);
+                Assert.That(nullableSeen, Is.EqualTo(Shade.Dim));
+                Assert.That(code.TryGetEnum('Q', out Shade? nullableAbsent), Is.False);
+                Assert.That(nullableAbsent, Is.Null, "the nullable form says nothing was there rather than zero");
+
+                Assert.That(Assert.Throws<GCodeException>(() => code.TryGetEnum('T', out Shade _))!.Message,
+                            Is.EqualTo("parameter 'T' too high"),
+                            "the Try form is about whether the letter is there, not about whether its value is usable");
+            });
+        }
+    }
+
+    /// <summary>
+    /// Every accessor that refuses a value builds the refusal from the value it would not take
+    /// </summary>
+    /// <remarks>
+    /// "too low" and "too high" describe a limit, and some codes refuse by naming what was wrong
+    /// instead: RepRapFirmware's M574 answers an unknown endstop type with "Invalid endstop input
+    /// type", and its M558 names the probe type it would not take - "Invalid Z probe type 4". The
+    /// second is why this is a function of the value rather than a string: a handler that had to name
+    /// the value would otherwise have to read it itself before asking for it
+    /// </remarks>
+    [Test]
+    public void OverriddenRefusals()
+    {
+        foreach (DuetAPI.Commands.Code code in Parse("M1 S9 T-9 U1.5 V1:9"))
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.That(Assert.Throws<GCodeException>(
+                                () => code.GetInt('S', min: 0, max: 4, errorString: value => $"Invalid mode {value}"))!.Message,
+                            Is.EqualTo("Invalid mode 9"), "the refusal replaces \"too high\" and names the value");
+                Assert.That(Assert.Throws<GCodeException>(
+                                () => code.GetInt('T', min: 0, max: 4, errorString: value => $"Invalid mode {value}"))!.Message,
+                            Is.EqualTo("Invalid mode -9"),
+                            "and \"too low\", since a code that refuses by name refuses both ends alike");
+                Assert.That(code.GetInt('S', min: 0, max: 9, errorString: _ => "Invalid mode"), Is.EqualTo(9),
+                            "a value inside the limits never builds one");
+
+                Assert.That(Assert.Throws<GCodeException>(
+                                () => code.GetFloat('U', min: 0.0f, max: 1.0f, errorString: value => $"Invalid ratio {value}"))!.Message,
+                            Is.EqualTo($"Invalid ratio {1.5f}"),
+                            "the float accessors hand over a float, formatted by whoever builds the refusal");
+                Assert.That(Assert.Throws<GCodeException>(
+                                () => code.GetIntArray('V', min: 0, max: 4, errorString: value => $"Invalid list entry {value}"))!.Message,
+                            Is.EqualTo("Invalid list entry 9"),
+                            "and the array ones hand over the first item outside the limits, not the whole array");
+
+                Assert.That(Assert.Throws<GCodeException>(
+                                () => code.GetEnum<Shade>('S', errorString: value => $"Invalid shade {value}"))!.Message,
+                            Is.EqualTo("Invalid shade 9"), "GetEnum names the value that matched no member");
+                Assert.That(Assert.Throws<GCodeException>(
+                                () => code.TryGetEnum('S', out Shade _, errorString: value => $"Invalid shade {value}"))!.Message,
+                            Is.EqualTo("Invalid shade 9"), "as does the Try form");
+
+                Assert.That(Assert.Throws<MissingParameterException>(
+                                () => code.GetInt('Q', min: 0, max: 4, errorString: _ => "Invalid mode"))!.Letter,
+                            Is.EqualTo('Q'),
+                            "an absent letter is a missing parameter rather than a refused value, so the refusal "
+                            + "never stands in for the letter itself");
+            });
+        }
     }
 
     public static IEnumerable<DuetAPI.Commands.Code> Parse(string code)

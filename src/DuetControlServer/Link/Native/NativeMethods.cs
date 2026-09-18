@@ -68,6 +68,25 @@ internal struct NativeConfig
 
     /// <summary>Whether to tolerate a newer-than-supported protocol version so it can be flashed</summary>
     public int UpdateOnly;
+
+    /// <summary>Transport that carries the link: 0 = SPI, 1 = Unix domain socket</summary>
+    public int Transport;
+
+    /// <summary>Socket transport only: path of the socket the virtual controller listens on (UTF-8, NUL-terminated)</summary>
+    public IntPtr SocketPath;
+}
+
+/// <summary>
+/// Transport values for <see cref="NativeConfig.Transport"/>. Mirrors <c>TransportKind</c> in
+/// <c>DuetSbcInterface/src/Config/Configuration.h</c>
+/// </summary>
+internal enum NativeTransport
+{
+    /// <summary>The real controller over spidev</summary>
+    Spi = 0,
+
+    /// <summary>A virtual controller over a Unix domain socket (see DuetSpiProtocol/SocketLinkFormats.h)</summary>
+    Socket = 1
 }
 
 /// <summary>
@@ -143,7 +162,7 @@ internal static partial class NativeMethods
     /// <param name="length">Length of <paramref name="message"/> in bytes</param>
     /// <returns>Zero on success, non-zero if the outbound ring is full</returns>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_QueueMessage(IntPtr handle, uint flags, ReadOnlySpan<byte> message, int length);
+    internal static partial long DuetSbc_QueueMessage(IntPtr handle, uint flags, ReadOnlySpan<byte> message, int length);
 
     /// <summary>
     /// Queue a CAN message for transmission
@@ -158,7 +177,7 @@ internal static partial class NativeMethods
     /// <param name="length">Length of <paramref name="payload"/></param>
     /// <returns>Zero on success, non-zero if the outbound ring is full</returns>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_QueueCanMessage(IntPtr handle, ushort txToken, ushort msgType,
+    internal static partial long DuetSbc_QueueCanMessage(IntPtr handle, ushort txToken, ushort msgType,
         ushort replyType, byte dstAddress, int isResponse, ReadOnlySpan<byte> payload, int length);
 
     /// <summary>
@@ -169,7 +188,7 @@ internal static partial class NativeMethods
     /// <param name="requestId">Request id to report completion against, or 0 for fire-and-forget</param>
     /// <returns>Zero on success, non-zero if the outbound ring is full</returns>
     [LibraryImport(LibraryName)]
-    internal static partial int DuetSbc_QueueEnableCan(IntPtr handle, int enable, uint requestId);
+    internal static partial long DuetSbc_QueueEnableCan(IntPtr handle, int enable, uint requestId);
 
     /// <summary>
     /// Request an immediate emergency stop
@@ -290,6 +309,248 @@ internal static partial class NativeMethods
     /// <returns>Dropped event count</returns>
     [LibraryImport(LibraryName)]
     internal static partial ulong DuetSbc_GetDroppedEvents(IntPtr handle);
+
+    /// <summary>
+    /// The current step-clock reading, in the controller's ticks
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <returns>Step clock ticks</returns>
+    /// <remarks>
+    /// The SBC has no step clock of its own: it models the controller's, from the MasterClock reading the SPI transfer header carries
+    /// the controller sends every transfer. Move start times are in that timebase
+    /// </remarks>
+    [LibraryImport(LibraryName)]
+    internal static partial uint DuetSbc_GetStepClockTicks(IntPtr handle);
+
+    /// <summary>
+    /// How far the movement timebase lags the raw step clock, in ticks
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <returns>The delay in step clock ticks</returns>
+    /// <remarks>
+    /// Moves are scheduled in the movement timebase and an endstop reports its trigger in the raw
+    /// one, so this is the difference the endstop correction has to reconcile. It only ever grows,
+    /// and it grows whenever a board reports that it could not keep up
+    /// </remarks>
+    [LibraryImport(LibraryName)]
+    internal static partial uint DuetSbc_GetMovementDelay(IntPtr handle);
+
+    /// <summary>
+    /// How well the step-clock model is tracking the controller
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <param name="stats">Receives the statistics</param>
+    [LibraryImport(LibraryName)]
+    internal static partial void DuetSbc_GetClockStats(IntPtr handle, out NativeClockStats stats);
+
+    /// <summary>
+    /// What the motion engine has done since the counters were last reset
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <param name="stats">Receives the statistics</param>
+    [LibraryImport(LibraryName)]
+    internal static partial void DuetSbc_MotionGetStats(IntPtr handle, out NativeMotionStats stats);
+
+    /// <summary>
+    /// Zero the motion engine's error and underrun counters
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <remarks>
+    /// Separate from reading them so that reporting twice does not show zeros the second time, which
+    /// is what the native side used to do by reporting and zeroing in one call
+    /// </remarks>
+    [LibraryImport(LibraryName)]
+    internal static partial void DuetSbc_MotionResetStats(IntPtr handle);
+
+    /// <summary>
+    /// Push the machine description down to the motion engine
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <param name="config">Serialised MachineConfig</param>
+    /// <param name="length">Length of <paramref name="config"/> in bytes</param>
+    /// <returns>1 on success, 0 if the length did not match</returns>
+    /// <remarks>Safe only while no move is in flight</remarks>
+    [LibraryImport(LibraryName)]
+    internal static partial int DuetSbc_MotionConfigure(IntPtr handle, ReadOnlySpan<byte> config, int length);
+
+    /// <summary>
+    /// Start the motion thread
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <param name="rtPriority">SCHED_FIFO priority, or 0 for the default scheduler</param>
+    /// <returns>1 on success</returns>
+    /// <remarks>
+    /// The priority must stay below the interface thread's: a late transfer loses the link, while a
+    /// late move preparation only costs a hiccup that every board slips by together
+    /// </remarks>
+    [LibraryImport(LibraryName)]
+    internal static partial int DuetSbc_MotionStart(IntPtr handle, int rtPriority);
+
+    /// <summary>
+    /// Stop the motion thread
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    [LibraryImport(LibraryName)]
+    internal static partial void DuetSbc_MotionStop(IntPtr handle);
+
+    /// <summary>
+    /// Whether the given ring has room for another move
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <param name="ring">Ring number</param>
+    /// <returns>1 if there is room</returns>
+    /// <remarks>Advisory: the ring may retire a move and make room a moment later</remarks>
+    [LibraryImport(LibraryName)]
+    internal static partial int DuetSbc_MotionCanAddMove(IntPtr handle, int ring);
+
+    /// <summary>
+    /// Queue a move
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <param name="moveParams">A MoveParamsHeader followed by its two arrays</param>
+    /// <param name="length">Length of <paramref name="moveParams"/> in bytes</param>
+    /// <returns>1 if queued, 0 if the caller must retry</returns>
+    [LibraryImport(LibraryName)]
+    internal static partial int DuetSbc_MotionSubmitMove(IntPtr handle, ReadOnlySpan<byte> moveParams, int length);
+
+    /// <summary>
+    /// Read the motor positions the motion engine last published
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <param name="steps">Receives the positions in microsteps</param>
+    /// <param name="count">Capacity of <paramref name="steps"/></param>
+    /// <param name="whenTicks">Receives the step-clock time the snapshot was taken at</param>
+    /// <returns>Number of positions written</returns>
+    /// <remarks>
+    /// Reads a snapshot rather than the live state, so a garbage collection here cannot stall the
+    /// motion thread and the values never tear
+    /// </remarks>
+    [LibraryImport(LibraryName)]
+    internal static partial int DuetSbc_MotionGetMotorPositions(IntPtr handle, Span<int> steps, int count, out uint whenTicks);
+    [LibraryImport(LibraryName)]
+    internal static partial int DuetSbc_MotionGetLivePositions(IntPtr handle, Span<int> steps, int count, out uint whenTicks);
+
+    /// <summary>
+    /// Where one drive was at a given step-clock time, and where it was when its move began
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <param name="drive">Logical drive</param>
+    /// <param name="whenTicks">Master step-clock time to evaluate at, zero if none was reported</param>
+    /// <param name="position">Receives the position in microsteps</param>
+    /// <param name="positionAtMoveStart">Receives where the drive was when its current move began</param>
+    /// <param name="usedTimestamp">Receives 1 if the answer came from <paramref name="whenTicks"/></param>
+    /// <returns>1 on success, 0 if the drive is out of range</returns>
+    /// <remarks>
+    /// The one question only the native side can answer: it planned the motion and holds the segment
+    /// chain, so it can evaluate the profile at an instant that has already passed. Undoing an endstop
+    /// overshoot needs the position at the moment the switch fired, not the one the stop report caught
+    /// </remarks>
+    [LibraryImport(LibraryName)]
+    internal static partial int DuetSbc_MotionGetPositionAt(IntPtr handle, int drive, uint whenTicks,
+                                                            out int position, out int positionAtMoveStart,
+                                                            out int usedTimestamp);
+
+    /// <summary>
+    /// Force motor positions, after homing or a move that stopped early
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <param name="driveMask">Logical drives to set</param>
+    /// <param name="positions">Positions in microsteps</param>
+    /// <param name="count">Number of entries in <paramref name="positions"/></param>
+    /// <returns>Non-zero if the engine took it, zero if its queue was full</returns>
+    [LibraryImport(LibraryName)]
+    internal static partial int DuetSbc_MotionSetMotorPositions(IntPtr handle, uint driveMask, ReadOnlySpan<int> positions, int count);
+
+    /// <summary>
+    /// Ask the engine to stop early and drop the moves after it
+    /// </summary>
+    /// <param name="handle">Engine handle</param>
+    /// <param name="kind">0 for RepRapFirmware's search for a slow-enough junction, 1 for a planned deceleration</param>
+    /// <returns>Non-zero if the request was queued, zero if its queue was full</returns>
+    /// <remarks>
+    /// The answer does not come back from this call: dropping a move frees its segments and only the
+    /// motion thread may do that. <see cref="DuetSbc_MotionGetFeedholdResult"/> reports what happened
+    /// </remarks>
+    [LibraryImport(LibraryName)]
+    internal static partial int DuetSbc_MotionRequestStop(IntPtr handle, int kind);
+
+    /// <summary>
+    /// What the last feedhold did
+    /// </summary>
+    /// <param name="handle">Engine handle</param>
+    /// <param name="sequence">Receives the number of completed feedholds</param>
+    /// <param name="firstPurgedMoveId">Receives the id of the earliest move dropped</param>
+    /// <param name="movesPurged">Receives how many moves were dropped</param>
+    /// <param name="lastSurvivingMoveId">Receives the id of the last move the stop left standing</param>
+    /// <param name="stopped">Receives non-zero if the ring was brought to a planned stop</param>
+    /// <param name="restEndpoints">Receives where the machine will come to rest, in microsteps</param>
+    /// <param name="restEndpointCount">Capacity of <paramref name="restEndpoints"/></param>
+    /// <returns>Non-zero on success</returns>
+    [LibraryImport(LibraryName)]
+    internal static partial int DuetSbc_MotionGetFeedholdResult(IntPtr handle, out uint sequence,
+                                                                out uint firstPurgedMoveId, out uint movesPurged,
+                                                                out uint lastSurvivingMoveId, out int stopped,
+                                                                Span<int> restEndpoints, int restEndpointCount);
+
+    /// <summary>
+    /// Store the ring state this side decides from its own bookkeeping
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <param name="ring">Ring number</param>
+    /// <param name="shouldStartMove">Whether queued moves should start executing</param>
+    /// <param name="waitingForEmpty">Whether this side is waiting for the ring to drain</param>
+    [LibraryImport(LibraryName)]
+    internal static partial void DuetSbc_MotionSetRingState(IntPtr handle, int ring, int shouldStartMove, int waitingForEmpty);
+
+    /// <summary>
+    /// Number of moves the given ring has been given
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <param name="ring">Ring number</param>
+    /// <returns>Scheduled move count</returns>
+    [LibraryImport(LibraryName)]
+    internal static partial uint DuetSbc_MotionGetScheduledMoves(IntPtr handle, int ring);
+
+    /// <summary>
+    /// Number of moves the given ring has finished
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <param name="ring">Ring number</param>
+    /// <returns>Completed move count</returns>
+    [LibraryImport(LibraryName)]
+    internal static partial uint DuetSbc_MotionGetCompletedMoves(IntPtr handle, int ring);
+
+    /// <summary>
+    /// Submissions refused because the queue was full
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <returns>Dropped submission count</returns>
+    /// <remarks>Non-zero means a retry was skipped: a move was lost</remarks>
+    [LibraryImport(LibraryName)]
+    internal static partial uint DuetSbc_MotionGetSubmissionsDropped(IntPtr handle);
+
+    /// <summary>
+    /// Forced positions the motion thread has adopted
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <returns>Applied position count</returns>
+    /// <remarks>
+    /// Lagging behind what this side has sent means a position was queued but has not taken effect
+    /// </remarks>
+    [LibraryImport(LibraryName)]
+    internal static partial uint DuetSbc_MotionGetForcedPositionsApplied(IntPtr handle);
+
+    /// <summary>
+    /// Whether a submitted move has not yet been taken up by the motion thread
+    /// </summary>
+    /// <param name="handle">Interface handle</param>
+    /// <returns>Non-zero while a submission is still queued</returns>
+    /// <remarks>
+    /// A ring counts a move as scheduled only once the motion thread has taken it out of the
+    /// submission queue, so the rings alone report a machine as idle while a move is on its way to it
+    /// </remarks>
+    [LibraryImport(LibraryName)]
+    internal static partial int DuetSbc_MotionHasPendingSubmissions(IntPtr handle);
 
     /// <summary>
     /// Stop the loop and destroy the instance

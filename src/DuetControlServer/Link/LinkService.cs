@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Events;
 using DuetControlServer.Files;
 using DuetControlServer.Link.Native;
 using DuetControlServer.Link.Protocol.CanMessages;
@@ -37,24 +38,36 @@ namespace DuetControlServer.Link;
 /// stall an SPI transfer in flight.
 /// </para>
 /// </remarks>
-/// <param name="channels">Channel manager</param>
 /// <param name="eventLogger">Event logger</param>
-/// <param name="jobProcessor">Job processor</param>
+/// <param name="expansionBoardManager">Receiver for expansion board status reports</param>
+/// <param name="macroRunner">Runs macro files</param>
+/// <param name="jobController">Job controller</param>
+/// <param name="events">Events waiting to be dealt with</param>
+/// <param name="eventProcessor">Event processor, for the reconnect default action</param>
 /// <param name="nativeLink">Native SPI transfer loop</param>
 /// <param name="linkInterface">Link interface</param>
 /// <param name="model">Object model</param>
 /// <param name="filePathResolver">File path resolver</param>
+/// <param name="motionTracker">Where what the native motion engine reports is recorded</param>
+/// <param name="planner">Holds the index of which job code each queued move came from</param>
+/// <param name="endstopCorrection">Applies the position an endstop actually fired at</param>
 /// <param name="lifetime">Host application lifetime</param>
 /// <param name="logger">Logger</param>
 /// <param name="settings">Settings</param>
-public sealed class LinkService(
-    Channel.Manager channels,
+internal sealed class LinkService(
     EventLogger eventLogger,
-    JobProcessor jobProcessor,
+    Expansion.ExpansionBoardManager expansionBoardManager,
+    MacroRunner macroRunner,
+    Files.Job.JobController jobController,
+    Events.EventQueue events,
+    Events.EventProcessor eventProcessor,
     NativeLink nativeLink,
     LinkInterface linkInterface,
     Model.ObjectModel model,
     FilePathResolver filePathResolver,
+    Motion.MotionTracker motionTracker,
+    Motion.MovePlanner planner,
+    Motion.EndstopCorrection endstopCorrection,
     IHostApplicationLifetime lifetime,
     ILogger<LinkService> logger,
     IOptions<Settings> settings) : BackgroundService
@@ -81,6 +94,10 @@ public sealed class LinkService(
         // service owns (job processor, channel processors, open files), so hand it the entry points
         linkInterface.InvalidateCodesCallback = InvalidateCodes;
         linkInterface.InvalidateCallback = Invalidate;
+
+        // A controller that comes back has to be configured again. controller-reconnect.g replaces
+        // this when a machine has one, which is what lets it home or resume instead
+        eventProcessor.ReconnectDefaultAction = _ => RunStartupFilesAsync();
 
         // Create the native interface and complete the initial handshake. This throws if the
         // controller is absent or fundamentally incompatible, which is worth failing startup over
@@ -132,13 +149,10 @@ public sealed class LinkService(
     public override async Task StopAsync(CancellationToken stoppingToken)
     {
         // Cancel the file being printed
-        using (await jobProcessor.LockAsync(stoppingToken))
-        {
-            jobProcessor.Abort();
-        }
+        jobController.Abort();
 
         // Shut down the link subsystem
-        await linkInterface.InvalidateAsync(stoppingToken);
+        linkInterface.Invalidate();
 
         // Stop the native transfer loop, which releases the dispatcher from its wait
         nativeLink.Stop();
@@ -216,6 +230,10 @@ public sealed class LinkService(
             case InboundEventType.ControllerReset:
                 Invalidate();
                 eventLogger.LogOutput(MessageType.Warning, "Connection to controller has been reset");
+
+                // A reboot quick enough to fit inside one connection timeout is an outage the timeout
+                // never saw, so this is the only signal there is for it
+                RaiseControllerDisconnect(ControllerResetCause, "the controller reset");
                 break;
             case InboundEventType.ConnectionLost:
                 HandleConnectionLost(record);
@@ -231,6 +249,23 @@ public sealed class LinkService(
                 break;
             case InboundEventType.MalformedPacket:
                 DumpMalformedPacket(record);
+                break;
+            case InboundEventType.MoveCompleted:
+                HandleMoveCompleted(record);
+                break;
+            case InboundEventType.MoveFailed:
+                HandleMoveFailed(record);
+                break;
+            case InboundEventType.MotionStopped:
+                HandleMotionStopped(record);
+                break;
+            case InboundEventType.CanMessagesSent:
+                HandleCanMessagesSent(record);
+                break;
+            case InboundEventType.OutboundDelivered:
+            case InboundEventType.OutboundDropped:
+                nativeLink.CompleteOutbound(MemoryMarshal.Read<OutboundSeqEvent>(record).SequenceNumber,
+                                            (InboundEventType)header.Type == InboundEventType.OutboundDelivered);
                 break;
             case InboundEventType.FatalError:
                 HandleFatalError(record);
@@ -267,6 +302,78 @@ public sealed class LinkService(
             eventLogger.LogOutput(MessageType.Warning, "Incompatible firmware, please upgrade as soon as possible");
         }
         eventLogger.LogOutput(MessageType.Success, "Connection to Duet established");
+
+        if (_controllerDown)
+        {
+            // Coming back rather than starting up. The macro decides what that means for this machine,
+            // and running config.g is what happens when it has nothing to say - see §4.3 of
+            // docs/devel/EVENTS_MIGRATION.md for why the recovery does not live in the macro alone
+            _controllerDown = false;
+            events.Raise(new MachineEvent(EventType.ControllerReconnect, connectionEvent.HadReset,
+                                          CanId.MasterAddress, 0, string.Empty));
+            return;
+        }
+
+        // The machine is only configured once config.g has run, and nothing else runs it
+        _ = RunStartupFilesAsync();
+    }
+
+    /// <summary>
+    /// Run the files that configure the machine, in the order RepRapFirmware runs them
+    /// </summary>
+    /// <returns>Asynchronous task</returns>
+    /// <remarks>
+    /// config.g is what turns an unconfigured process into a machine: until it has run there are no
+    /// axes, no drivers and no way to move. It runs on the trigger channel, as it does in
+    /// RepRapFirmware, so that it does not consume the job or user channels. runonce.g follows it and
+    /// is deleted afterwards, which is the whole point of it
+    /// </remarks>
+    private async Task RunStartupFilesAsync()
+    {
+        try
+        {
+            // The link is up, so whatever the status was while it was not, it is not that now
+            model.IsDisconnected = false;
+
+            if (!await macroRunner.TryRunAsync(CodeChannel.Trigger, FilePathResolver.ConfigFile,
+                                               cancellationToken: lifetime.ApplicationStopping) &&
+                !await macroRunner.TryRunAsync(CodeChannel.Trigger, FilePathResolver.ConfigFileFallback,
+                                               cancellationToken: lifetime.ApplicationStopping))
+            {
+                eventLogger.LogOutput(MessageType.Warning, "Configuration file not found, the machine is unconfigured");
+                return;
+            }
+
+            if (await macroRunner.TryRunAsync(CodeChannel.Trigger, FilePathResolver.RunOnceFile,
+                                              cancellationToken: lifetime.ApplicationStopping))
+            {
+                // runonce.g is meant to run exactly once, so it removes itself
+                try
+                {
+                    System.IO.File.Delete(await filePathResolver.ToPhysicalAsync(FilePathResolver.RunOnceFile, FileDirectory.System,
+                                                                                 lifetime.ApplicationStopping));
+                }
+                catch (Exception e)
+                {
+                    logger.LogWarning(e, "Failed to delete {File} after running it", FilePathResolver.RunOnceFile);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Shutting down
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "Failed to run the startup files");
+        }
+        finally
+        {
+            // Starting ends when the startup files have been run, whether or not they were found:
+            // the machine is as configured as it is going to get, so reporting it as still starting
+            // would leave a machine with no config.g looking permanently mid-boot
+            model.IsStarting = false;
+        }
     }
 
     /// <summary>
@@ -279,7 +386,57 @@ public sealed class LinkService(
         logger.LogDebug("Lost connection to Duet: {Reason}", reason);
 
         Invalidate();
-        eventLogger.LogOutput(MessageType.Warning, $"Lost connection to Duet ({reason})");
+        RaiseControllerDisconnect(TimeoutCause, reason);
+    }
+
+    /// <summary>
+    /// Cause of a disconnect that the link timed out
+    /// </summary>
+    private const ushort TimeoutCause = 0;
+
+    /// <summary>
+    /// Cause of a disconnect noticed only because the controller had reset
+    /// </summary>
+    private const ushort ControllerResetCause = 1;
+
+    /// <summary>
+    /// Whether the controller is currently away
+    /// </summary>
+    /// <remarks>
+    /// Both signals that say so can arrive for one outage, and a slow one will have finished running
+    /// the disconnect macro long before the second does - so the queue's own suppression, which only
+    /// covers an event still waiting, is not enough to keep it to one
+    /// </remarks>
+    private bool _controllerDown;
+
+    /// <summary>
+    /// Raise the disconnect event, at most once for an outage
+    /// </summary>
+    /// <param name="cause">What noticed the outage</param>
+    /// <param name="reason">What to tell the operator</param>
+    private void RaiseControllerDisconnect(ushort cause, string reason)
+    {
+        if (_controllerDown)
+        {
+            return;
+        }
+        _controllerDown = true;
+        events.Raise(new MachineEvent(EventType.ControllerDisconnect, cause, CanId.MasterAddress, 0, reason));
+    }
+
+    /// <summary>
+    /// Resolve the CAN messages the controller has dealt with
+    /// </summary>
+    /// <param name="record">Raw event record</param>
+    private void HandleCanMessagesSent(ReadOnlySpan<byte> record)
+    {
+        CanMessagesSentEvent sent = MemoryMarshal.Read<CanMessagesSentEvent>(record);
+        ReadOnlySpan<byte> entries = record[Marshal.SizeOf<CanMessagesSentEvent>()..];
+        for (int i = 0; i < sent.Count; i++)
+        {
+            CanMessageSentEntry entry = MemoryMarshal.Read<CanMessageSentEntry>(entries[(i * Marshal.SizeOf<CanMessageSentEntry>())..]);
+            linkInterface.CompleteCanMessageSent(entry.TxToken, (CanStatus)entry.Status);
+        }
     }
 
     /// <summary>
@@ -331,6 +488,72 @@ public sealed class LinkService(
         logger.LogError("Fatal error in native SPI interface: {Message}", message);
         eventLogger.LogOutput(MessageType.Error, $"Fatal SPI error: {message}");
         lifetime.StopApplication();
+    }
+
+    /// <summary>
+    /// Handle a queued move finishing execution
+    /// </summary>
+    /// <param name="record">Raw event record</param>
+    private void HandleMoveCompleted(ReadOnlySpan<byte> record)
+    {
+        if (record.Length < Marshal.SizeOf<MoveCompletedEvent>())
+        {
+            logger.LogError("Discarding truncated MoveCompleted event ({Length} bytes)", record.Length);
+            return;
+        }
+
+        MoveCompletedEvent moveEvent = MemoryMarshal.Read<MoveCompletedEvent>(record);
+        motionTracker.MoveCompleted(moveEvent.Ring, moveEvent.MoveId, moveEvent.CompletedMoves);
+    }
+
+    /// <summary>
+    /// Handle a move that was rejected or could not be executed
+    /// </summary>
+    /// <param name="record">Raw event record</param>
+    private void HandleMoveFailed(ReadOnlySpan<byte> record)
+    {
+        if (record.Length < Marshal.SizeOf<MoveFailedEvent>())
+        {
+            logger.LogError("Discarding truncated MoveFailed event ({Length} bytes)", record.Length);
+            return;
+        }
+
+        MoveFailedEvent moveEvent = MemoryMarshal.Read<MoveFailedEvent>(record);
+        motionTracker.MoveFailed(moveEvent.Ring, moveEvent.MoveId, moveEvent.Error);
+    }
+
+    /// <summary>
+    /// Undo the overshoot of a move an endstop cut short
+    /// </summary>
+    /// <param name="record">Raw event record</param>
+    /// <remarks>
+    /// The controller stopped the drives but cannot say where they should end up - it never generated
+    /// the steps. This is its report, and <see cref="Motion.EndstopCorrection"/> is what turns it into
+    /// a position and a message telling the boards to wind back
+    /// </remarks>
+    private void HandleMotionStopped(ReadOnlySpan<byte> record)
+    {
+        int headerSize = Marshal.SizeOf<MotionStoppedEvent>();
+        if (record.Length < headerSize)
+        {
+            logger.LogError("Discarding truncated MotionStopped event ({Length} bytes)", record.Length);
+            return;
+        }
+
+        MotionStoppedEvent stoppedEvent = MemoryMarshal.Read<MotionStoppedEvent>(record);
+        ReadOnlySpan<byte> tail = record[headerSize..];
+        int entrySize = Marshal.SizeOf<MotionStoppedDriverEntry>();
+        if (tail.Length < stoppedEvent.NumDrivers * entrySize)
+        {
+            logger.LogError(
+                "Discarding MotionStopped event claiming {NumDrivers} drivers but carrying {Length} bytes",
+                stoppedEvent.NumDrivers, tail.Length);
+            return;
+        }
+
+        ReadOnlySpan<MotionStoppedDriverEntry> drivers =
+            MemoryMarshal.Cast<byte, MotionStoppedDriverEntry>(tail[..(stoppedEvent.NumDrivers * entrySize)]);
+        endstopCorrection.Apply(stoppedEvent.WhenTriggered, stoppedEvent.MoveId, drivers);
     }
 
     /// <summary>
@@ -419,11 +642,10 @@ public sealed class LinkService(
         // Check if this is a code reply
         if (flags.HasFlag(MessageTypeFlags.BinaryCodeReplyFlag))
         {
-            if (!channels.HandleReply(flags, reply))
-            {
-                // Must be a left-over error message...
-                OutputGenericMessage(flags, reply);
-            }
+            // Codes are resolved where they are executed now, so nothing is waiting to be matched
+            // up with a reply arriving separately. Anything still flagged as one is an unsolicited
+            // message from the link itself
+            OutputGenericMessage(flags, reply);
         }
         else if ((flags & MessageTypeFlags.GenericMessage) == MessageTypeFlags.GenericMessage)
         {
@@ -454,12 +676,11 @@ public sealed class LinkService(
         ushort txToken = response.TxToken;
         CanMessageType msgType = (CanMessageType)response.MsgType;
         byte srcAddress = response.SrcAddress;
-        CanStatus status = (CanStatus)response.Status;
 
         // Messages that are not a reply to one of our requests carry the reserved token
         if (txToken == LinkInterface.UnsolicitedTxToken)
         {
-            HandleUnsolicitedCanMessage(msgType, srcAddress, response.Flags, status, payload);
+            HandleUnsolicitedCanMessage(msgType, srcAddress, response.Flags, payload);
             return;
         }
 
@@ -482,21 +703,16 @@ public sealed class LinkService(
                 return;
             }
 
-            // Propagate transport-level failures immediately
-            if (status != CanStatus.Ok)
+            // Reassemble the (possibly fragmented) reply. A forwarded message is only ever one the
+            // controller took off the bus, so there is no transport outcome to read here: a request the
+            // controller could not send, or gave up waiting on, is answered on the acknowledgement ring
+            // instead and never reaches this point
+            CanFragment fragment = CanFragmentation.Parse(request.ReplyType, payload);
+            logger.LogDebug("Received CAN response fragment {FragmentNumber} of type {MsgType} from address {SrcAddress} ({Length} bytes, result {ResultCode}, more follows: {MoreFollows})", fragment.Number, msgType, srcAddress, fragment.Content.Length, fragment.ResultCode, fragment.MoreFollows);
+            request.AddFragment(in fragment);
+            if (!fragment.MoreFollows)
             {
-                request.SetResult(status, msgType, srcAddress);
-                linkInterface.CanRequests.Remove(request);
-                return;
-            }
-
-            // Reassemble the (possibly fragmented) reply
-            CanFragmentation.GetFragmentInfo(request.ReplyType, payload, out int fragmentNumber, out bool moreFollows, out ReadOnlySpan<byte> content);
-            logger.LogDebug("Received CAN response fragment {FragmentNumber} of type {MsgType} from address {SrcAddress} ({Length} bytes, more follows: {MoreFollows})", fragmentNumber, msgType, srcAddress, content.Length, moreFollows);
-            request.AddFragment(fragmentNumber, content);
-            if (!moreFollows)
-            {
-                request.SetResult(status, msgType, srcAddress);
+                request.SetResult(msgType, srcAddress);
                 linkInterface.CanRequests.Remove(request);
             }
         }
@@ -508,12 +724,17 @@ public sealed class LinkService(
     /// <param name="msgType">Type of the received CAN message</param>
     /// <param name="srcAddress">Source address of the sending board</param>
     /// <param name="flags">Flags of the CAN message</param>
-    /// <param name="status">Status of the CAN message</param>
     /// <param name="payload">CAN payload</param>
-    private void HandleUnsolicitedCanMessage(CanMessageType msgType, byte srcAddress, byte flags, CanStatus status, byte[] payload)
+    private void HandleUnsolicitedCanMessage(CanMessageType msgType, byte srcAddress, byte flags, byte[] payload)
     {
-        // TODO: route unsolicited CAN messages (e.g. events, status reports, announcements) to their consumers
-        logger.LogDebug("Received unsolicited CAN message of type {MsgType} from address {SrcAddress} ({Length} bytes)", msgType, srcAddress, payload.Length);
+        logger.LogTrace("Received unsolicited CAN message of type {MsgType} from address {SrcAddress} ({Length} bytes)", msgType, srcAddress, payload.Length);
+
+        // The status reports the expansion boards broadcast are decoded and applied to the object
+        // model on the board manager's own task, so nothing is deserialized on this thread
+        if (expansionBoardManager.TryEnqueue(msgType, srcAddress, payload))
+        {
+            return;
+        }
 
         // Route on the message type and deserialize straight into the concrete struct. Switching here rather than
         // on the runtime type keeps this allocation-free (no boxing) on a path that runs in the kHz range.
@@ -530,7 +751,7 @@ public sealed class LinkService(
 
     private async void HandleFirmwareBlockRequestAsync(CanMessageFirmwareUpdateRequest request, byte srcAddress, CancellationToken cancellationToken = default)
     {
-        logger.LogInformation("Received firmware block request: FileOffset={FileOffset}, BootloaderVersion={BootloaderVersion}, UsesUf2Binary={UsesUf2Binary}, FileWanted={FileWanted}, LengthRequested={LengthRequested}, BoardType={BoardType}", request.FileOffset, request.BootloaderVersion, request.UsesUf2Binary, request.FileWanted, request.LengthRequested, request.BoardType);
+        logger.LogInformation("Received firmware block request: FileOffset={FileOffset}, BootloaderVersion={BootloaderVersion}, Uf2Format={Uf2Format}, FileWanted={FileWanted}, LengthRequested={LengthRequested}, BoardType={BoardType}", request.FileOffset, request.BootloaderVersion, request.Uf2Format, request.FileWanted, request.LengthRequested, request.BoardType);
 
         if (request.BootloaderVersion == CanMessageFirmwareUpdateRequest.BootloaderVersion0 && (request.FileWanted == 0 || request.FileWanted == 3))
         {
@@ -546,7 +767,7 @@ public sealed class LinkService(
             filename += request.BoardTypeString;
 
             // Add file extension
-            filename += request.UsesUf2Binary ? ".uf2" : ".bin";
+            filename += request.Uf2Format ? ".uf2" : ".bin";
             uint fileOffset = request.FileOffset;
             uint lengthRequested = request.LengthRequested;
 
@@ -566,9 +787,9 @@ public sealed class LinkService(
                 {
                     FileOffset = fileOffset,
                     DataLength = 0,
-                    Err = CanMessageFirmwareUpdateResponse.ErrBadOffset,
+                    Err = (byte)CanMessageFirmwareUpdateResponse.ErrBadOffset,
                     FileLength = (uint)fs.Length,
-                    Data = new CanMessageFirmwareUpdateResponseDataBuffer()
+                    Data = new ByteArray56()
                 },
                 isResponse: true,
                 cancellationToken: cancellationToken);
@@ -583,7 +804,7 @@ public sealed class LinkService(
 
             for (;;)
             {
-                uint lengthToSend = Math.Min(lengthRequested, CanMessageFirmwareUpdateResponseDataBuffer.Length);
+                uint lengthToSend = Math.Min(lengthRequested, ByteArray56.Length);
 
                 byte[] buffer = new byte[lengthToSend];
                 int bytesRead = fs.Read(buffer, 0, buffer.Length);
@@ -594,10 +815,10 @@ public sealed class LinkService(
                     await linkInterface.SendCanMessageAsync(srcAddress, new CanMessageFirmwareUpdateResponse
                     {
                         DataLength = 0,
-                        Err = CanMessageFirmwareUpdateResponse.ErrOther,
+                        Err = (byte)CanMessageFirmwareUpdateResponse.ErrOther,
                         FileLength = (uint)fs.Length,
                         FileOffset = 0,
-                        Data = new CanMessageFirmwareUpdateResponseDataBuffer()
+                        Data = new ByteArray56()
                     },
                     isResponse: true,
                     cancellationToken: cancellationToken);
@@ -608,11 +829,11 @@ public sealed class LinkService(
                 // Send the requested block back to the firmware
                 CanMessageFirmwareUpdateResponse response = new()
                 {
-                    DataLength = (uint)bytesRead,
-                    Err = CanMessageFirmwareUpdateResponse.ErrNone,
+                    DataLength = (byte)bytesRead,
+                    Err = (byte)CanMessageFirmwareUpdateResponse.ErrNone,
                     FileLength = (uint)fs.Length,
                     FileOffset = fileOffset,
-                    Data = new CanMessageFirmwareUpdateResponseDataBuffer()
+                    Data = new ByteArray56()
                 };
                 buffer.AsSpan(0, bytesRead).CopyTo(response.Data);
 
@@ -727,7 +948,7 @@ public sealed class LinkService(
     {
         using (model.AccessReadWrite(cancellationToken))
         {
-            model.State.Status = MachineStatus.Updating;
+            model.IsUpdating = true;
         }
 
         // Everything in flight is about to become invalid: the controller is going to reboot into IAP
@@ -770,19 +991,7 @@ public sealed class LinkService(
         linkInterface.InvalidateCodes();
 
         // Cancel the file being printed (if any)
-        using (jobProcessor.Lock())
-        {
-            jobProcessor.Abort();
-        }
-
-        // Resolve pending macros, unbuffered (system) codes and flush requests
-        foreach (Channel.Processor channel in channels)
-        {
-            using (channel.Lock())
-            {
-                channel.Invalidate();
-            }
-        }
+        jobController.Abort();
     }
 
     /// <summary>
@@ -798,6 +1007,21 @@ public sealed class LinkService(
 
         // Fail anything still waiting on the native loop
         nativeLink.CancelPendingRequests();
+
+        // Forget what the motion engine reported. The moves it refers to are gone with the link, and
+        // a stale endpoint reading applied to a move planned after the reconnect would be a jump
+        motionTracker.Invalidate();
+
+        // The same for what each of those moves was going to tell the job file: a move id from
+        // before the link went down describes a queue the engine no longer has
+        using (planner.Lock())
+        {
+            planner.JobMoves.Clear();
+        }
+
+        // Forget when each board was last heard from, so that the first sweep after the link returns
+        // does not time out every board for a silence they had no way to break
+        expansionBoardManager.Invalidate();
 
         // Close all the files
         foreach (var kv in _openFiles)

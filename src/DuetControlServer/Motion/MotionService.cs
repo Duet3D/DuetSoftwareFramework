@@ -9,7 +9,7 @@ using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
 using DuetControlServer.Link;
-using DuetControlServer.Link.Protocol.CanMessages;
+using DuetControlServer.Motion.Native;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Utility;
@@ -22,20 +22,29 @@ namespace DuetControlServer.Motion;
 /// <summary>
 /// This class accesses RepRapFirmware via SPI and deals with general communication
 /// </summary>
-/// <param name="eventLogger">Event logger</param>
 /// <param name="linkInterface">Link interface</param>
+/// <param name="planner">Where G-codes become queued moves</param>
 /// <param name="model">Object model</param>
-/// <param name="lifetime">Host application lifetime</param>
 /// <param name="logger">Logger</param>
 /// <param name="settings">Settings</param>
-public sealed class MotionService(
+internal sealed class MotionService(
     // EventLogger eventLogger,
     LinkInterface linkInterface,
-    // Model.ObjectModel model,
+    MovePlanner planner,
+    Model.ObjectModel model,
     // IHostApplicationLifetime lifetime,
     ILogger<MotionService> logger,
     IOptions<Settings> settings) : BackgroundService
 {
+    /// <summary>
+    /// How often the live machine position is republished
+    /// </summary>
+    private static readonly TimeSpan LivePositionInterval = TimeSpan.FromMilliseconds(50);
+
+    /// <summary>Scratch buffers for the live position, so publishing does not allocate</summary>
+    private readonly int[] _liveEndPoints = new int[MotionLimits.MaxAxesPlusExtruders];
+    private readonly float[] _livePosition = new float[MotionLimits.MaxAxesPlusExtruders];
+
     /// <inheritdoc />
     public override Task StartAsync(CancellationToken cancellationToken)
     {
@@ -142,31 +151,97 @@ public sealed class MotionService(
     }
 
     /// <summary>
-    /// Perform communication with the RepRapFirmware controller over SPI
+    /// Run the motion engine
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This thread no longer produces moves - the G-code path does that now, through
+    /// <see cref="MovePlanner"/>. What is left is the engine's lifecycle: configure it before
+    /// starting it, keep it running, and stop it on shutdown.
+    /// </para>
+    /// <para>
+    /// Configuration has to come first. The engine's defaults are all zero, and a zeroed description
+    /// is not a conservative one: with no steps per mm and no extruders every axis is misclassified
+    /// and no move can be scheduled. Init also builds the rings from the configured depth and grace
+    /// period, so a description pushed down later would not be reflected in them
+    /// </para>
+    /// </remarks>
     /// <param name="stoppingToken">Cancellation token</param>
     private void Execute(CancellationToken stoppingToken)
     {
-        byte seq = 0;
-        do
+        if (!planner.ReconfigureAsync(stoppingToken, adoptGeometryFromObjectModel: true).AsTask().GetAwaiter().GetResult())
         {
-            CanMessageMovementLinearShaped msg = new()
-            {
-                WhenToExecute = 0,
-                AccelerationClocks = 0,
-                SteadyClocks = 1000,
-                DecelerationClocks = 0,
-                ExtruderDrives = 0,
-                NumDrivers = 0,
-                Seq = seq++,
-                UsePressureAdvance = false,
-                UseLateInputShaping = false
-            };
-            byte dstAddress = 2;
-            // linkInterface.SendCanMessageAsync(dstAddress, msg);
-
-            Thread.Sleep(TimeSpan.FromMilliseconds(217));
+            logger.LogError("Could not configure the native motion engine; no moves will be executed");
+            return;
         }
-        while (!stoppingToken.IsCancellationRequested);
+
+        if (!linkInterface.Native.StartMotion(settings.Value.UseRealtimeScheduling ? settings.Value.MotionRtPriority : 0))
+        {
+            logger.LogWarning("Native motion engine did not start; no moves will be executed");
+            return;
+        }
+
+        logger.LogInformation("Motion engine started for {NumAxes} axes and {NumExtruders} extruders",
+                              planner.Parameters.NumAxes, planner.Parameters.NumExtruders);
+
+        try
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                // The engine runs its own thread natively, so nothing here drives the motion. What
+                // this loop does drive is the reported position: the object model's machinePosition
+                // is the live one, which means it has to be read back from the engine rather than
+                // written by whoever queued the last move
+                PublishLivePosition(stoppingToken);
+                Thread.Sleep(LivePositionInterval);
+            }
+        }
+        finally
+        {
+            linkInterface.Native.StopMotion();
+        }
+    }
+
+    /// <summary>
+    /// Report where the machine actually is
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <remarks>
+    /// <para>
+    /// <c>move.axes[].machinePosition</c> is the position of the move being executed, which is
+    /// several moves behind whatever the G-code interpreter has queued. That lag is the whole point
+    /// of a look-ahead, and it is why nothing may plan a move from this number -
+    /// <see cref="MovementState"/> is what a move is measured from.
+    /// </para>
+    /// <para>
+    /// The motor positions are the engine's own snapshot, so they are converted back through the
+    /// kinematics rather than tracked separately: two ideas of where the machine is could disagree,
+    /// and one of them would be wrong
+    /// </para>
+    /// </remarks>
+    private void PublishLivePosition(CancellationToken cancellationToken)
+    {
+        MotionParameters parameters;
+        int numAxes;
+        using (planner.Lock())
+        {
+            if (linkInterface.Native.GetLivePositions(_liveEndPoints, out _) <= 0)
+            {
+                return;
+            }
+            parameters = planner.Parameters;
+            numAxes = parameters.NumAxes;
+            parameters.Geometry.MotorStepsToCartesian(
+                _liveEndPoints, parameters.StepsPerMm, numAxes, numAxes, _livePosition);
+        }
+
+        using (model.AccessReadWriteAsync(cancellationToken).AsTask().GetAwaiter().GetResult())
+        {
+            int count = Math.Min(numAxes, model.Move.Axes.Count);
+            for (int axis = 0; axis < count; axis++)
+            {
+                model.Move.Axes[axis].MachinePosition = _livePosition[axis];
+            }
+        }
     }
 }

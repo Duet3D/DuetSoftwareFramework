@@ -3,20 +3,58 @@
 DSF is a collection of processes and libraries under `src/`. This article is a reference for each one.
 For how they fit together, see the [architecture overview](intro.md#high-level-architecture).
 
-## Core processes
+## Core components
+
+Two of these are processes on the SBC, one is a library inside DCS, and two are firmware on the
+boards. They are grouped together because between them they are the machine.
 
 ### DuetControlServer
 
-`src/DuetControlServer/` - the heart of DSF. A long-running service that:
+`src/DuetControlServer/` - the heart of DSF, and the machine controller. A long-running service that:
 
 - owns the global [object model](object-model.md) and its read/write locking,
-- runs the [G-code pipeline](gcode-flow.md) (intake, interception, internal processing, firmware),
-- drives the [Firmware link](firmware-link.md) to RepRapFirmware,
+- runs the [G-code pipeline](gcode-flow.md) (intake, interception, internal processing),
+- interprets every G/M/T-code itself, including motion, heaters, tools and probing,
+- decides what each move means and hands it to the motion planner in
+  [DuetSbcInterface](#duetsbcinterface),
+- composes the [CAN messages](can-messages.md) that configure and drive the expansion boards,
 - maps virtual SD paths to the Linux filesystem and parses G-code [file info](file-management.md),
 - hosts the [IPC server](ipc.md) that every other process connects to.
 
 Command-line options, return codes, and the link/IPC details are documented in the repository
 `README.md`. The bulk of this documentation set describes DCS internals.
+
+### DuetSbcInterface
+
+`src/DuetSbcInterface/` - a native shared library (`libduet_sbc.so`) loaded into the DCS process,
+built from C++ ported from RepRapFirmware. It holds the work that has to keep real time or has to
+evaluate a motion profile:
+
+- the **motion engine** - `MoveBuilder`'s output becomes a `DDA` in a ring, look-ahead and speed
+  matching run over it, and each move becomes a per-drive segment chain,
+- the **drive trackers**, which can say where any drive was at any instant - what the endstop
+  wind-back is computed from ([Endstops](endstops.md)),
+- the **step-clock model**, a linear fit of the controller's clock onto `CLOCK_MONOTONIC`, because
+  moves are scheduled by absolute start time in the controller's timebase,
+- the **SPI transfer loop** to DuetCANMaster ([Firmware link](firmware-link.md),
+  [SPI transfer state machine](spi-state-machine.md)).
+
+DCS calls into it through `Link/Native/NativeLink.cs` and receives events back through a ring buffer.
+Nothing in it decides what a code means; it is handed moves and messages and reports what became of
+them.
+
+### DuetCANMaster and Duet3Expansion
+
+`src/DuetCANMaster/` runs on the Duet 3 mainboard and `src/Duet3Expansion/` on each expansion board.
+Neither is part of the .NET solution; both are cross-compiled firmware, built by
+`./scripts/build.sh` alongside the rest.
+
+- **DuetCANMaster** bridges the SPI link to the CAN bus. It carries one piece of machine knowledge and
+  no more: which input stops which driver, so a move can be cut short in time
+  ([Endstops](endstops.md)). Everything else it receives, it forwards.
+- **Duet3Expansion** owns the pins and the drivers - it generates the steps, watches the inputs,
+  drives the heaters and fans, and reports temperatures, driver status and input changes back over
+  CAN.
 
 ### DuetWebServer
 
@@ -104,7 +142,7 @@ These small executables under `src/` are utilities and references. Most connect 
 | `ModelObserver` | Developer | Streams live [object-model](object-model.md) changes as JSON, with an optional filter |
 | `PluginManager` | Administrator | CLI for the [plugin](plugins.md) lifecycle (list/install/start/stop/uninstall/set-data) |
 | `CustomHttpEndpoint` | Developer | Example plugin that registers a custom HTTP / WebSocket endpoint |
-| `DuetPiManagementPlugin` | Built-in plugin | Implements DuetPi system M-codes (networking, RTC, firmware update) by intercepting RRF codes |
+| `DuetPiManagementPlugin` | Built-in plugin | Implements DuetPi system M-codes (networking, RTC, firmware update) by intercepting codes on their way through the pipeline |
 
 `CodeLogger` and `CustomHttpEndpoint` are the canonical references for writing an interception plugin
 and an HTTP-endpoint plugin respectively.
@@ -120,9 +158,15 @@ flowchart LR
     AUTH --> DWS
     DWS -->|"CommandConnection<br/>(IPC socket)"| DCS["DuetControlServer"]
     DCS -->|"G-code pipeline"| PIPE["see gcode-flow.md"]
-    PIPE -->|"firmware link"| RRF["RepRapFirmware"]
-    RRF -->|"reply"| DCS --> DWS --> BROWSER
+    PIPE -->|"a move, or a CAN message"| SBCI["DuetSbcInterface"]
+    SBCI -->|"SPI"| CM["DuetCANMaster"]
+    CM -->|"CAN"| EXP["Duet3Expansion"]
+    PIPE -->|"reply"| DCS --> DWS --> BROWSER
 ```
+
+The reply does not wait on the hardware unless the code says it must: a handler resolves the code
+when it has done its work, and codes that have to see the machine stop first say so by flushing and
+waiting for standstill.
 
 For the WebSocket model-subscription path and the plugin HTTP-endpoint path, see
 [Object model](object-model.md#observing-changes-and-patches) and [Plugins](plugins.md).

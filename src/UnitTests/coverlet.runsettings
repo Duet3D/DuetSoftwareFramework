@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+
+          <!-- The test assembly is instrumented along with everything it references. Its own
+               coverage is close to 100% by construction and only inflates the total, so it is
+               left out and the report describes the code under test. -->
+          <Exclude>[UnitTests]*</Exclude>
+
+          <!-- The object model is thousands of trivial '{ get; set; }' properties. Counting them
+               swamps the assemblies they live in and moves the total without any test having
+               exercised behaviour, so plain auto-properties are not measured. Properties with a
+               body are still counted. -->
+          <SkipAutoProps>true</SkipAutoProps>
+
+          <!-- Only excludes members explicitly marked as such. The source generators do not emit
+               GeneratedCodeAttribute, so generated object model code is still measured. -->
+          <ExcludeByAttribute>Obsolete,GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
+
+          <UseSourceLink>true</UseSourceLink>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

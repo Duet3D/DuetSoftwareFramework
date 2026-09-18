@@ -20,4 +20,24 @@ internal static class ExpressionErrors
     /// A non-negative integer was required
     /// </summary>
     public const string ExpectedNonNegativeInt = "expected non-negative integer";
+
+    /// <summary>
+    /// A local or global variable that does not exist was read. Takes the variable name
+    /// </summary>
+    public const string UnknownVariable = "unknown variable '{0}'";
+
+    /// <summary>
+    /// A parameter the file was not called with was read. Takes the parameter name
+    /// </summary>
+    public const string UnknownParameter = "unknown parameter '{0}'";
+
+    /// <summary>
+    /// An expression named something that could not be produced. Takes the expression
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware reports <c>unknown value '&lt;path&gt;'</c> for the case this covers most often -
+    /// an object model path that does not exist - but this fires for anything the evaluator cannot
+    /// produce, so it names the whole expression rather than claiming to know which part was at fault
+    /// </remarks>
+    public const string CannotEvaluate = "cannot evaluate '{0}'";
 }

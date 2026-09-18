@@ -162,7 +162,7 @@ public sealed class SubscribeConnection : BaseConnection
             Utf8JsonReader reader = new(jsonStream.ToArray());
 
             ObjectModel model = new();
-            model.UpdateFromJsonReader(ref reader, false);
+            model.UpdateFromJsonReader(ref reader);
             return model;
         }
         return Deserialize();
@@ -191,7 +191,7 @@ public sealed class SubscribeConnection : BaseConnection
             Utf8JsonReader reader = new(jsonStream.ToArray());
 
             ObjectModel model = new();
-            model.UpdateFromJsonReader(ref reader, false);
+            model.UpdateFromJsonReader(ref reader);
             return model;
         }
         return Deserialize();

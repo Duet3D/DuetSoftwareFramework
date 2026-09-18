@@ -30,6 +30,11 @@ public enum EndstopType
     MotorStallIndividual,
 
     /// <summary>
+    /// Motor stall detected from the encoder position error rather than from StallGuard
+    /// </summary>
+    MotorStallEncoder,
+
+    /// <summary>
     /// Unknown type
     /// </summary>
     Unknown

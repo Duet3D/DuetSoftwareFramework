@@ -6,7 +6,7 @@ namespace DuetAPI.ObjectModel;
 /// <summary>
 /// Information about a configured axis
 /// </summary>
-public partial class Axis : ModelObject, IStaticModelObject
+public partial class Axis : ModelObject, IStaticModelObject, IPhaseSteppingDrive
 {
     /// <summary>
     /// List of supported axis letters
@@ -18,6 +18,61 @@ public partial class Axis : ModelObject, IStaticModelObject
         'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'
     ];
 
+    // What an axis may do before anything has configured it. RepRapFirmware's Move::Init writes the
+    // same values into every axis slot before config.g runs, so an axis that no M201, M203 or M566
+    // mentions is still movable.
+    //
+    // Its constants are in mm/sec and mm/sec^2. Speed and jerk are carried here in mm/min, so those
+    // are converted once, here, rather than a per-minute field being given a per-second number.
+    //
+    // The acceleration is the one that must never be left at zero: the planner works a move's
+    // duration out by dividing by it, so an axis without one has every move on it rejected as
+    // infinitely long and simply never moves.
+
+    /// <summary>Speed an axis may move at until M203 says otherwise (in mm/min)</summary>
+    public const float DefaultSpeed = 100F * 60F;
+
+    /// <summary>Speed a Z axis may move at until M203 says otherwise (in mm/min)</summary>
+    /// <remarks>
+    /// Z gets its own, slower, defaults throughout, as it does in RepRapFirmware: it is usually a
+    /// leadscrew carrying the bed or the gantry, and the speeds the other axes tolerate would damage
+    /// it. The axis letter is what selects these, so they are applied where an axis is created
+    /// </remarks>
+    public const float DefaultZSpeed = 20F * 60F;
+
+    /// <summary>Acceleration of an axis until M201 says otherwise (in mm/s^2)</summary>
+    public const float DefaultAcceleration = 1000F;
+
+    /// <summary>Acceleration of a Z axis until M201 says otherwise (in mm/s^2)</summary>
+    public const float DefaultZAcceleration = 200F;
+
+    /// <summary>Jerk of an axis until M566 says otherwise (in mm/min)</summary>
+    public const float DefaultJerk = 15F * 60F;
+
+    /// <summary>Jerk of a Z axis until M566 says otherwise (in mm/min)</summary>
+    public const float DefaultZJerk = 10F * 60F;
+
+    /// <summary>Microsteps per mm of an axis until M92 says otherwise</summary>
+    public const float DefaultStepsPerMm = 80F;
+
+    /// <summary>
+    /// Percentage of the motor current a drive holds at standstill until M917 says otherwise
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>DefaultStandstillCurrentPercent</c> for the Duet 3 main board
+    /// (Config/Pins_Duet3_MB6HC.h), applied to every drive in Move::Init whatever board its driver is
+    /// on. It is high enough for accurate slow motion, which is what separates it from M906's idle
+    /// factor
+    /// </remarks>
+    public const int DefaultStandstillCurrentPercent = 71;
+
+    /// <summary>Microsteps per mm of a Z axis until M92 says otherwise</summary>
+    /// <remarks>
+    /// Ten times the other axes', because a Z is usually a leadscrew and a belt's figure would move
+    /// it ten times too far
+    /// </remarks>
+    public const float DefaultZStepsPerMm = 800F;
+
     /// <summary>
     /// Acceleration of this axis (in mm/s^2)
     /// </summary>
@@ -26,7 +81,7 @@ public partial class Axis : ModelObject, IStaticModelObject
         get => _acceleration;
         set => SetPropertyValue(ref _acceleration, value);
     }
-    private float _acceleration;
+    private float _acceleration = DefaultAcceleration;
 
     /// <summary>
     /// Babystep amount (in mm)
@@ -81,7 +136,7 @@ public partial class Axis : ModelObject, IStaticModelObject
         get => _jerk;
         set => SetPropertyValue(ref _jerk, value);
     }
-    private float _jerk = 15F;
+    private float _jerk = DefaultJerk;
 
     /// <summary>
     /// Letter of this axis
@@ -170,7 +225,7 @@ public partial class Axis : ModelObject, IStaticModelObject
         get => _percentStstCurrent;
         set => SetPropertyValue(ref _percentStstCurrent, value);
     }
-    private int? _percentStstCurrent;
+    private int? _percentStstCurrent = DefaultStandstillCurrentPercent;
 
     /// <summary>
     /// Whether or not the axis is currently using phase stepping
@@ -180,17 +235,72 @@ public partial class Axis : ModelObject, IStaticModelObject
         get => _phaseStep;
         set => SetPropertyValue(ref _phaseStep, value);
     }
-    private bool? _phaseStep;
+    private bool? _phaseStep = false;
 
     /// <summary>
-    /// Motor jerk during the current print only (in mm/s)
+    /// Velocity feedforward gain of the phase stepping control loop (M970.1 Kv)
+    /// </summary>
+    /// <remarks>
+    /// The expansion board applies the gain, so nothing on this side would otherwise remember what it
+    /// was asked for and a bare M970.1 could not report it. A DSF addition, per
+    /// rrf-differences.md section 3
+    /// </remarks>
+    public float PhaseStepKv
+    {
+        get => _phaseStepKv;
+        set => SetPropertyValue(ref _phaseStepKv, value);
+    }
+    private float _phaseStepKv;
+
+    /// <summary>
+    /// Acceleration feedforward gain of the phase stepping control loop (M970.2 Ka)
+    /// </summary>
+    /// <remarks>
+    /// The expansion board applies the gain, so nothing on this side would otherwise remember what it
+    /// was asked for and a bare M970.2 could not report it. A DSF addition, per
+    /// rrf-differences.md section 3
+    /// </remarks>
+    public float PhaseStepKa
+    {
+        get => _phaseStepKa;
+        set => SetPropertyValue(ref _phaseStepKa, value);
+    }
+    private float _phaseStepKa;
+
+    /// <summary>
+    /// Motor jerk during the current print only (in mm/min)
     /// </summary>
     public float PrintingJerk
     {
         get => _printingJerk;
         set => SetPropertyValue(ref _printingJerk, value);
     }
-    private float _printingJerk = 15;
+    private float _printingJerk = DefaultJerk;
+
+    /// <summary>
+    /// Whether this axis rotates rather than translates, so its units are degrees
+    /// </summary>
+    /// <remarks>
+    /// A rotational axis takes no part in the linear distance a move covers, so the feed rate does
+    /// not apply to it unless the move is rotational only. Set by the R parameter of M584
+    /// </remarks>
+    public bool Rotational
+    {
+        get => _rotational;
+        set => SetPropertyValue(ref _rotational, value);
+    }
+    private bool _rotational;
+
+    /// <summary>
+    /// Whether this axis wraps at 360 degrees, so a move may take the short way round
+    /// </summary>
+    /// <remarks>Only meaningful when <see cref="Rotational"/> is set</remarks>
+    public bool ContinuousRotation
+    {
+        get => _continuousRotation;
+        set => SetPropertyValue(ref _continuousRotation, value);
+    }
+    private bool _continuousRotation;
 
     /// <summary>
     /// Reduced accelerations used by Z probing and stall homing moves (in mm/s^2)
@@ -200,7 +310,7 @@ public partial class Axis : ModelObject, IStaticModelObject
         get => _reducedAcceleration;
         set => SetPropertyValue(ref _reducedAcceleration, value);
     }
-    private float _reducedAcceleration;
+    private float _reducedAcceleration = DefaultAcceleration;
 
     /// <summary>
     /// Maximum speed (in mm/min)
@@ -210,7 +320,7 @@ public partial class Axis : ModelObject, IStaticModelObject
         get => _speed;
         set => SetPropertyValue(ref _speed, value);
     }
-    private float _speed = 100F;
+    private float _speed = DefaultSpeed;
 
     /// <summary>
     /// Number of microsteps per mm
@@ -220,7 +330,7 @@ public partial class Axis : ModelObject, IStaticModelObject
         get => _stepsPerMm;
         set => SetPropertyValue(ref _stepsPerMm, value);
     }
-    private float _stepsPerMm = 80F;
+    private float _stepsPerMm = DefaultStepsPerMm;
 
     /// <summary>
     /// Current step position of the axis (in steps)

@@ -2,11 +2,17 @@
 using DuetControlServer;
 using DuetControlServer.Codes;
 using DuetControlServer.Commands;
+using DuetControlServer.Events;
+using DuetControlServer.Fans;
 using DuetControlServer.Files;
+using DuetControlServer.Heat;
 using DuetControlServer.IPC;
 using DuetControlServer.Link;
 using DuetControlServer.Motion;
+using DuetControlServer.Ports;
+using DuetControlServer.Spindles;
 using DuetControlServer.Model;
+using DuetControlServer.Tools;
 using DuetControlServer.Utility;
 using DuetSharedLibrary;
 using Microsoft.Extensions.Configuration;
@@ -151,7 +157,10 @@ rootCommand.SetAction(async (parserResult) =>
                 })
                 .AddCommonLogFormatter()
                 .SetMinimumLevel(LogLevel.Trace)
-                .AddFilter((_, level) => level >= (capturedSettings?.LogLevel ?? logLevel));
+                .AddFilter((_, level) => level >= (capturedSettings?.LogLevel ?? logLevel))
+                // Onto the Tracy timeline as well, beside the zones that were running when they
+                // were logged. Does nothing unless this is a profiling build
+                .AddTracyIfProfiling();
             })
             .UseSystemd()
             .ConfigureAppConfiguration((hostingContext, config) =>
@@ -183,12 +192,18 @@ rootCommand.SetAction(async (parserResult) =>
                     .AddSettings(context.Configuration, updateOnlyValue, logLevelValue, configFileValue, socketDirectoryValue, socketFileValue, baseDirectoryValue, out startErrorFile)
                     .AddCodes()
                     .AddCommands()
+                    .AddEvents()
                     .AddFiles()
                     .AddIPC()
                     .AddLink()
                     .AddModel()
                     .AddLinkAdapter()
                     .AddMotion()
+                    .AddPorts()
+                    .AddSpindles()
+                    .AddFans()
+                    .AddHeat()
+                    .AddTools()
                     .AddUtility();
             })
             .Build();

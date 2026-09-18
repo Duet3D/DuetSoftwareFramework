@@ -43,7 +43,7 @@ public sealed class PluginService(CommandFactory commandFactory, IPermissionMana
                     await using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read);
                     using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream, cancellationToken: cancellationToken);
                     Plugin plugin = new();
-                    plugin.UpdateFromJson(manifestJson.RootElement, false);
+                    plugin.UpdateFromJson(manifestJson.RootElement);
                     plugin.Pid = -1;
                     using (await pluginStore.LockAsync(cancellationToken))
                     {

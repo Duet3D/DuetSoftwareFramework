@@ -1,0 +1,134 @@
+using DuetControlServer.Link;
+using DuetControlServer.Link.Protocol.Shared;
+using NUnit.Framework;
+
+namespace UnitTests.Link;
+
+/// <summary>
+/// The grammar of a port name, and the policy on which of them can be used
+/// </summary>
+/// <remarks>
+/// This is the one place the syntax is read, and the tests are here rather than beside any of the
+/// callers for that reason. Two functions used to read it - one for endstops and probes, one for the
+/// generic CAN messages - and they had drifted into different subsets of RepRapFirmware's
+/// <c>IoPort::RemoveBoardAddress</c> without either being wrong on its own inputs
+/// </remarks>
+[TestFixture]
+public class IoPortsTests
+{
+    [TestCase("1.io1.in", (byte)1, "io1.in")]
+    [TestCase("0.io1.in", (byte)0, "io1.in")]
+    [TestCase("121.io3.in", (byte)121, "io3.in")]
+    [TestCase("126.out0", (byte)126, "out0", TestName = "TheHighestAddressIsAnAddress")]
+    public void AnAddressBeforeADotIsAnAddress(string port, byte expectedBoard, string expectedLocal)
+    {
+        Assert.That(IoPorts.RemoveBoardAddress(port, out string local), Is.EqualTo(expectedBoard));
+        Assert.That(local, Is.EqualTo(expectedLocal));
+    }
+
+    [TestCase("!1.io1.in", "!io1.in")]
+    [TestCase("^1.io1.in", "^io1.in")]
+    [TestCase("*1.io1.in", "*io1.in")]
+    [TestCase("!^1.io1.in", "!^io1.in")]
+    [TestCase("^!*1.io1.in", "^!*io1.in")]
+    public void TheModifiersStayOnTheNameTheBoardIsGiven(string port, string expectedLocal)
+    {
+        // They say the pin is inverted or wants a pull-up, which is the board's business. Stripping
+        // them along with the address would quietly turn a normally-closed switch into a
+        // normally-open one - the machine would home by driving away from the endstop
+        Assert.That(IoPorts.RemoveBoardAddress(port, out string local), Is.EqualTo(1));
+        Assert.That(local, Is.EqualTo(expectedLocal));
+    }
+
+    [TestCase("out2", TestName = "NoAddressAtAll")]
+    [TestCase("e0heat", TestName = "DigitsInsideTheNameAreNotAnAddress")]
+    [TestCase("!io2.out", TestName = "ModifiedButUnaddressed")]
+    [TestCase("io1.in", TestName = "ADotButNoDigits")]
+    [TestCase("1x.io", TestName = "DigitsNotFollowedByADot")]
+    [TestCase("127.out0", TestName = "PastTheHighestCanAddress")]
+    [TestCase("999999999999.out0", TestName = "TooManyDigitsToBeAnAddress")]
+    [TestCase("", TestName = "Empty")]
+    [TestCase("!", TestName = "NothingButAModifier")]
+    public void AnythingElseBelongsToTheLocalBoardUnchanged(string port)
+    {
+        // RepRapFirmware answers with the local board's own address for all of these, and leaves the
+        // name alone. Here the local board is always the main board, which is what makes such a port
+        // unusable - but that is the caller's rule to apply, not this one's
+        Assert.That(IoPorts.RemoveBoardAddress(port, out string local), Is.EqualTo(CanId.MasterAddress));
+        Assert.That(local, Is.EqualTo(port), "an unrecognised prefix is part of the name");
+    }
+
+    [Test]
+    public void AnAddressWithNoPinLeavesNothing()
+    {
+        // Not an error here - callers that need a pin check for one. RepRapFirmware likewise strips
+        // the address and lets the port assignment fail afterwards
+        Assert.That(IoPorts.RemoveBoardAddress("3.", out string local), Is.EqualTo(3));
+        Assert.That(local, Is.Empty);
+    }
+
+    [TestCase("3.io2.in", (byte)3, "io2.in")]
+    [TestCase("1.io1.in", (byte)1, "io1.in")]
+    [TestCase("!1.io1.in", (byte)1, "!io1.in", TestName = "AnInvertedEndstopPortIsAccepted")]
+    [TestCase("^2.io2.in", (byte)2, "^io2.in", TestName = "AnEndstopPortWithAPullUpIsAccepted")]
+    public void APortNamesTheBoardThatCarriesIt(string port, byte expectedBoard, string expectedLocal)
+    {
+        Assert.That(IoPorts.TrySplitPort(port, "Endstop port", out byte board, out string local, out string? error), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(board, Is.EqualTo(expectedBoard));
+            Assert.That(local, Is.EqualTo(expectedLocal), "the board keeps the name it knows the port by");
+            Assert.That(error, Is.Null);
+        });
+    }
+
+    [TestCase("0.io1.in", TestName = "APortOnTheMainBoardIsRefused(explicit prefix)")]
+    [TestCase("io1.in", TestName = "APortOnTheMainBoardIsRefused(no prefix)")]
+    [TestCase("!io1.in", TestName = "APortOnTheMainBoardIsRefused(modified, no prefix)")]
+    public void APortOnTheMainBoardIsRefused(string port)
+    {
+        // Board 0 runs DuetCANMaster and has no ports of its own, and a name with no board prefix
+        // means board 0 as it does in RepRapFirmware. Both spellings have to be caught here rather
+        // than by the caller: four of the call sites did not check the board, so a rule enforced by
+        // the caller is a rule that is enforced in some places and not others
+        Assert.That(IoPorts.TrySplitPort(port, "Endstop port", out _, out _, out string? error), Is.False);
+        Assert.That(error, Does.Contain("expansion board"),
+                    "the reason has to say what to do instead, not just that the port is invalid");
+    }
+
+    [Test]
+    public void BothSpellingsOfTheMainBoardGiveTheSameReason()
+    {
+        // The two used to diverge: one was refused as a bad board, the other as a malformed name, so
+        // the same mistake produced two different messages and only one of them was any help
+        IoPorts.TrySplitPort("0.io1.in", "Endstop port", out _, out _, out string? explicitly);
+        IoPorts.TrySplitPort("io1.in", "Endstop port", out _, out _, out string? implicitly);
+        Assert.That(implicitly, Is.EqualTo(explicitly?.Replace("'0.io1.in'", "'io1.in'")));
+    }
+
+    [Test]
+    public void APortWithNoPinIsRefused()
+    {
+        Assert.That(IoPorts.TrySplitPort("3.", "Endstop port", out _, out _, out string? error), Is.False);
+        Assert.That(error, Does.Contain("no pin"));
+    }
+
+    [TestCase("nil")]
+    [TestCase("NIL", TestName = "TheNoPortNameIsCaseInsensitive")]
+    [TestCase("1.nil", TestName = "TheNoPortNameIsReadAfterTheAddressComesOff")]
+    public void TheNoPortNameAsksForADelete(string port)
+    {
+        // This is what M950 C"nil" means, and it is read the same way for a fan, a heater, an output
+        // or a spindle. RepRapFirmware reduces the name before it tests it (FansManager.cpp), which
+        // is why an address in front of it makes no difference
+        Assert.That(IoPorts.IsNoPort(port), Is.True);
+    }
+
+    [TestCase("1.out3")]
+    [TestCase("nil.in", TestName = "ANameThatMerelyStartsWithItIsAPin")]
+    [TestCase("", TestName = "EmptyIsNotADelete")]
+    public void AnythingThatNamesAPinIsNotADelete(string port)
+    {
+        Assert.That(IoPorts.IsNoPort(port), Is.False);
+    }
+}

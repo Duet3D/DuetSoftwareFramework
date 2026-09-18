@@ -292,7 +292,7 @@ public sealed class InstallPlugin(IPermissionManager permissionManager, PluginSt
         await using (Stream manifestStream = manifestFile.Open())
         {
             using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream);
-            plugin.UpdateFromJson(manifestJson.RootElement, false);
+            plugin.UpdateFromJson(manifestJson.RootElement);
         }
         plugin.Pid = -1;
 

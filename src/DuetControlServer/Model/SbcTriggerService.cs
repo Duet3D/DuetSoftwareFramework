@@ -107,7 +107,7 @@ public sealed class SbcTriggerService(
     /// <param name="code">M581.1 code with T, P, and optional R parameters</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result message, or null to pass the code on to RRF</returns>
-    public async Task<Message?> ConfigureAsync(Commands.Code code, CancellationToken cancellationToken)
+    public async Task<Message> ConfigureAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         if (!code.TryGetInt('T', out int triggerNumber) || triggerNumber < 0 || triggerNumber >= 32)
         {
@@ -135,12 +135,6 @@ public sealed class SbcTriggerService(
         }
         string triggerExpression = (string)pParam!;
 
-        if (!expressions.ContainsSbcFields(triggerExpression))
-        {
-            // No SBC fields — let RRF handle M581.1 natively
-            return null;
-        }
-
         int condition = code.TryGetInt('R', out int rParam) ? rParam : 0;
 
         // Clear any existing pin-based RRF trigger for this slot to avoid duplicate firing
@@ -159,7 +153,7 @@ public sealed class SbcTriggerService(
         {
             Commands.Code evalCode = codeFactory.Create();
             evalCode.Channel = CodeChannel.Trigger;
-            object? evalResult = await expressions.EvaluateExpressionToValueAsync(evalCode, triggerExpression, false, cancellationToken);
+            object? evalResult = await expressions.EvaluateExpressionToValueAsync(evalCode, triggerExpression, cancellationToken);
             initialResult = evalResult is bool b && b;
         }
         catch (Exception e) when (e is not OperationCanceledException)
@@ -246,7 +240,7 @@ public sealed class SbcTriggerService(
                 {
                     Commands.Code evalCode = codeFactory.Create();
                     evalCode.Channel = CodeChannel.Trigger;
-                    object? result = await expressions.EvaluateExpressionToValueAsync(evalCode, state.Expression, false, stoppingToken);
+                    object? result = await expressions.EvaluateExpressionToValueAsync(evalCode, state.Expression, stoppingToken);
                     bool newResult = result is bool b && b;
 
                     bool fire;

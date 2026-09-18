@@ -22,9 +22,11 @@ public static class Consts
     public const byte InvalidFormatCode = 0xC9;
 
     /// <summary>
-    /// Used protocol version. This is incremented whenever the protocol details change
+    /// Used protocol version. This is incremented whenever the protocol details change and must
+    /// match <c>ProtocolVersion</c> in <c>DuetSpiProtocol/MessageFormats.h</c>, which the native
+    /// side negotiates with; this constant is what the firmware-compatibility warning compares
     /// </summary>
-    public const ushort ProtocolVersion = 7;
+    public const ushort ProtocolVersion = 8;
 
     /// <summary>
     /// Default size of a data transfer buffer

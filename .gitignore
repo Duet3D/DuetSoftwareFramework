@@ -33,6 +33,11 @@ bld/
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*
 
+# scripts/coverage.sh output
+test-results/
+coverage.log
+coverage-report/
+
 # NUNIT
 *.VisualState.xml
 TestResult.xml
@@ -292,3 +297,15 @@ src/DuetAPI/Generated
 aot/out
 
 build/
+# Claude Code
+.claude/*
+!.claude/memory/
+# Private memories: kept in the workspace so they survive a container rebuild,
+# never committed.
+.claude/memory/private/
+
+# Reference checkout of RepRapFirmware; not a submodule of this repo.
+lib/RepRapFirmware/
+
+# Schema Fody generates next to FodyWeavers.xml in a -p:Profiling=true build
+FodyWeavers.xsd

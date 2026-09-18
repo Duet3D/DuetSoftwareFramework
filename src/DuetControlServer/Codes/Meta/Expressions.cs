@@ -22,7 +22,9 @@ namespace DuetControlServer.Codes.Meta;
 /// </summary>
 /// <param name="filter">Object model filter</param>
 /// <param name="model">Object model</param>
-public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
+/// <param name="variableStore">Variables in scope, by the code being evaluated</param>
+/// <param name="lastCodeResult">How the last code on each channel ended</param>
+public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, VariableStore variableStore, LastCodeResult lastCodeResult)
 {
     /// <summary>
     /// Delegate for asynchronously resolving custom meta G-code fuctions
@@ -161,12 +163,13 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
     }
 
     /// <summary>
-    /// Checks if the given code contains any SBC object model fields
+    /// Checks if the given code references the object model or the special variables, in which
+    /// case its expressions must not be evaluated before the pending codes have finished
     /// </summary>
     /// <param name="code">Code to check</param>
-    /// <returns>Whether the code contains any SBC object model fields</returns>
+    /// <returns>Whether the code references the object model</returns>
     /// <exception cref="CodeParserException">Failed to parse expression</exception>
-    public bool ContainsSbcFields(Code code)
+    public bool ContainsModelFields(Code code)
     {
         if (code.KeywordArgument is not null)
         {
@@ -175,7 +178,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
             {
                 foreach (string expression in SplitExpression(code.KeywordArgument))
                 {
-                    if (ContainsSbcFields(expression))
+                    if (ContainsModelFields(expression))
                     {
                         return true;
                     }
@@ -186,14 +189,14 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
             // Conditional code
             if (code.Keyword != KeywordType.None)
             {
-                return ContainsSbcFields(code.KeywordArgument);
+                return ContainsModelFields(code.KeywordArgument);
             }
         }
 
         // Regular G/M/T-code
         foreach (CodeParameter parameter in code.Parameters)
         {
-            if (parameter.IsExpression && ContainsSbcFields((string)parameter))
+            if (parameter.IsExpression && ContainsModelFields((string)parameter))
             {
                 return true;
             }
@@ -202,12 +205,12 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
     }
 
     /// <summary>
-    /// Checks if the given expression string contains any SBC object model fields
+    /// Checks if the given expression string references the object model or the special variables
     /// </summary>
     /// <param name="expression">Expression to check</param>
-    /// <returns>Whether the expressions contains any SBC object model fields</returns>
+    /// <returns>Whether the expression references the object model</returns>
     /// <exception cref="CodeParserException">Failed to parse expression</exception>
-    public bool ContainsSbcFields(string expression)
+    public bool ContainsModelFields(string expression)
     {
         bool inQuotes = false, clearToken = false;
         StringBuilder lastExpression = new();
@@ -232,7 +235,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
             }
             else if (!char.IsWhiteSpace(c))
             {
-                if (lastExpression.Length > 0 && IsSbcExpression(lastExpression.ToString(), c == '('))
+                if (lastExpression.Length > 0 && IsModelExpression(lastExpression.ToString(), c == '('))
                 {
                     return true;
                 }
@@ -246,7 +249,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
             }
         }
 
-        return lastExpression.Length > 0 && IsSbcExpression(lastExpression.ToString(), false);
+        return lastExpression.Length > 0 && IsModelExpression(lastExpression.ToString(), false);
     }
 
     /// <summary>
@@ -334,12 +337,13 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
     }
 
     /// <summary>
-    /// Checks if the given expression without indices is a SBC object model field
+    /// Checks if the given expression without indices is an object model field or a special
+    /// variable. Every model field counts: the object model has a single owner now
     /// </summary>
     /// <param name="expression">Expression without indices to check</param>
     /// <param name="isFunction">Expression is followed by an opening brace, check only if it is a custom function</param>
-    /// <returns>Whether the given expression is a SBC object model field</returns>
-    public bool IsSbcExpression(string expression, bool isFunction)
+    /// <returns>Whether the given expression is an object model field</returns>
+    public bool IsModelExpression(string expression, bool isFunction)
     {
         // Check for functions
         if (isFunction)
@@ -365,42 +369,37 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
 
         // This walks the generated type descriptors, so it neither reads from nor instantiates the OM
         IModelObjectDescriptor descriptor = model.Descriptor;
-        foreach (string pathItem in strippedExpression.ToString().Split('.'))
+        string[] pathItems = strippedExpression.ToString().Split('.');
+        for (int i = 0; i < pathItems.Length; i++)
         {
-            if (string.IsNullOrEmpty(pathItem))
+            if (string.IsNullOrEmpty(pathItems[i]))
             {
                 return false;
             }
 
-            ModelPropertyDescriptor? property = descriptor.FindProperty(pathItem, true);
+            ModelPropertyDescriptor? property = descriptor.FindProperty(pathItems[i], true);
             if (property is null)
             {
                 return false;
             }
 
-            if ((property.Flags & ModelPropertyFlags.SbcProperty) != 0)
-            {
-                return true;
-            }
-
             if (property.ElementDescriptor is null)
             {
-                // Reached a scalar or non-model item type; no SBC property found along this path
-                break;
+                // Reached a scalar or non-model item type: a model path only if nothing follows it
+                return i == pathItems.Length - 1;
             }
             descriptor = property.ElementDescriptor;
         }
-        return false;
+        return true;
     }
 
     /// <summary>
     /// Evaluate a conditional code
     /// </summary>
     /// <param name="code">Code holding expressions</param>
-    /// <param name="evaluateAll">Whether all or only SBC fields are supposed to be evaluated</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Evaluation result or null</returns>
-    public async Task<string?> EvaluateAsync(Code code, bool evaluateAll, CancellationToken cancellationToken = default)
+    public async Task<string?> EvaluateAsync(Code code, CancellationToken cancellationToken = default)
     {
         if (!string.IsNullOrEmpty(code.KeywordArgument))
         {
@@ -409,7 +408,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
                 StringBuilder builder = new();
                 foreach (string expression in SplitExpression(code.KeywordArgument))
                 {
-                    string result = await EvaluateExpressionToStringAsync(code, expression, !evaluateAll, false, cancellationToken);
+                    string result = await EvaluateExpressionToStringAsync(code, expression, false, cancellationToken);
                     if (builder.Length != 0)
                     {
                         builder.Append(' ');
@@ -422,7 +421,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
             if (code.Keyword == KeywordType.Abort)
             {
                 string keywordArgument = code.KeywordArgument.Trim();
-                return await EvaluateExpressionToStringAsync(code, keywordArgument, !evaluateAll, false, cancellationToken);
+                return await EvaluateExpressionToStringAsync(code, keywordArgument, false, cancellationToken);
             }
 
             string keywordExpression;
@@ -449,8 +448,8 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
                 keywordExpression = code.KeywordArgument;
             }
 
-            // Evaluate SBC properties
-            return await EvaluateExpressionToStringAsync(code, keywordExpression.Trim(), !evaluateAll, false, cancellationToken);
+            // Evaluate the condition or assigned value
+            return await EvaluateExpressionToStringAsync(code, keywordExpression.Trim(), false, cancellationToken);
         }
 
         if (code.Parameters.Any(parameter => parameter.IsExpression))
@@ -461,12 +460,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
                 if (parameter.IsExpression)
                 {
                     string trimmedExpression = ((string)parameter).Trim();
-                    string parameterValue = await EvaluateExpressionToStringAsync(code, trimmedExpression, !evaluateAll, !evaluateAll, cancellationToken);
-                    if (!evaluateAll && !parameterValue.StartsWith('{') && !parameterValue.EndsWith('}'))
-                    {
-                        // Encapsulate fully expanded parameters so that plugins and RRF know it was an expression
-                        parameterValue = '{' + parameterValue + '}';
-                    }
+                    string parameterValue = await EvaluateExpressionToStringAsync(code, trimmedExpression, false, cancellationToken);
                     newParameters.Add(new CodeParameter(parameter.Letter, parameterValue, false, false));
                 }
                 else
@@ -568,39 +562,39 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
         }
         if (obj is bool[] boolArray)
         {
-            return '{' + string.Join(',', boolArray.Select(boolValue => boolValue ? "true" : "false")) + (encodeValues && boolArray.Length == 1 ? ",}" : "}");
+            return '[' + string.Join(',', boolArray.Select(boolValue => boolValue ? "true" : "false")) + ']';
         }
         if (obj is char[] charArray)
         {
-            return '{' + string.Join(',', charArray.Select(charValue => $"'{charValue}'")) + (encodeValues && charArray.Length == 1 ? ",}" : "}");
+            return '[' + string.Join(',', charArray.Select(charValue => $"'{charValue}'")) + ']';
         }
         if (obj is string[] stringArray)
         {
-            return '{' + string.Join(',', stringArray.Select(stringValue => encodeString(stringValue))) + (encodeValues && stringArray.Length == 1 ? ",}" : "}");
+            return '[' + string.Join(',', stringArray.Select(stringValue => encodeString(stringValue))) + ']';
         }
         if (obj is DriverId[] driverIdArray)
         {
-            return '{' + string.Join(',', driverIdArray.Select(driverIdValue => encodeString(driverIdValue.ToString()))) + (encodeValues && driverIdArray.Length == 1 ? ",}" : "}");
+            return '[' + string.Join(',', driverIdArray.Select(driverIdValue => encodeString(driverIdValue.ToString()))) + ']';
         }
         if (obj is int[] intArray)
         {
-            return '{' + string.Join(',', intArray.Select(intValue => intValue.ToString("G", CultureInfo.InvariantCulture))) + (encodeValues && intArray.Length == 1 ? ",}" : "}");
+            return '[' + string.Join(',', intArray.Select(intValue => intValue.ToString("G", CultureInfo.InvariantCulture))) + ']';
         }
         if (obj is uint[] uintArray)
         {
-            return '{' + string.Join(',', uintArray.Select(uintValue => uintValue.ToString("G", CultureInfo.InvariantCulture))) + (encodeValues && uintArray.Length == 1 ? ",}" : "}");
+            return '[' + string.Join(',', uintArray.Select(uintValue => uintValue.ToString("G", CultureInfo.InvariantCulture))) + ']';
         }
         if (obj is float[] floatArray)
         {
-            return '{' + string.Join(',', floatArray.Select(floatValue => floatValue.ToString("G", CultureInfo.InvariantCulture))) + (encodeValues && floatArray.Length == 1 ? ",}" : "}");
+            return '[' + string.Join(',', floatArray.Select(floatValue => floatValue.ToString("G", CultureInfo.InvariantCulture))) + ']';
         }
         if (obj is long[] longArray)
         {
-            return '{' + string.Join(',', longArray.Select(longValue => longValue.ToString("G", CultureInfo.InvariantCulture))) + (encodeValues && longArray.Length == 1 ? ",}" : "}");
+            return '[' + string.Join(',', longArray.Select(longValue => longValue.ToString("G", CultureInfo.InvariantCulture))) + ']';
         }
         if (obj is object[] objectArray)
         {
-            return '{' + string.Join(',', objectArray.Select(objectValue => ObjectToString(objectValue, false, encodeValues, code))) + (encodeValues && objectArray.Length == 1 ? ",}" : "}");
+            return '[' + string.Join(',', objectArray.Select(objectValue => ObjectToString(objectValue, false, encodeValues, code))) + ']';
         }
         if (!wantsCount && obj is IList)
         {
@@ -614,18 +608,23 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
     }
 
     /// <summary>
-    /// Evaluate expression(s), returning the resulting value (or the partially-substituted string when only SBC fields are replaced)
+    /// Evaluate expression(s), returning the resulting value
     /// </summary>
     /// <param name="code">Code holding the expression(s)</param>
     /// <param name="expression">Expression(s) to replace</param>
-    /// <param name="onlySbcFields">Whether to replace only SBC fields</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Resulting value, or the partially-substituted expression</returns>
+    /// <returns>Resulting value</returns>
     /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
     /// <exception cref="OperationCanceledException">Code was cancelled</exception>
-    public async Task<object?> EvaluateExpressionToValueAsync(Code code, string expression, bool onlySbcFields, CancellationToken cancellationToken = default)
+    public async Task<object?> EvaluateExpressionToValueAsync(Code code, string expression, CancellationToken cancellationToken = default)
     {
         int i = 0;
+
+        // What the running code can see: the object model, its own variables, and where it is in its file
+        Parsing.IExpressionEvaluationContext context = new ExpressionContext(() => code.File?.GetIterations(code),
+                                                                            (int)(code.LineNumber ?? 0),
+                                                                            lastCodeResult.Get(code.Channel), filter,
+                                                                            variableStore.For(code), model);
 
         // Eat a single-quoted char and append its content to the given builder instance
         void eatChar(StringBuilder builder)
@@ -706,13 +705,13 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
                 default:
                     bool wantsCount = lastTokenValue.TrimStart().StartsWith('#');
                     string filterString = wantsCount ? lastTokenValue[1..].Trim() : lastTokenValue.Trim();
-                    if (IsSbcExpression(filterString, false))
+                    if (IsModelExpression(filterString, false))
                     {
                         using (await model.AccessReadOnlyAsync(cancellationToken))
                         {
-                            if (filter.GetSpecific(filterString, true, out object? sbcField))
+                            if (filter.GetSpecific(filterString, out object? modelField))
                             {
-                                string subResult = ObjectToString(sbcField, wantsCount, true, code);
+                                string subResult = ObjectToString(modelField, wantsCount, true, code);
                                 result.Append(subResult);
                             }
                             else
@@ -729,7 +728,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
             }
         }
 
-        // Evaluate a given expression to its final value. This function attempts to look up well-known values before asking RRF
+        // Evaluate a given expression to its final value
         async Task<object?> getExpressionValue(string subExpression)
         {
             // Attempt to evaluate an atomic value and return the parsed result, returns null if that failed
@@ -846,19 +845,16 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
 
             // Don't return exceptions from cancelled codes
             cancellationToken.ThrowIfCancellationRequested();
-            try
+
+            // Not a literal, so it is an expression of its own - a function argument or an array index
+            using (await model.AccessReadOnlyAsync(cancellationToken))
             {
-                // TODO: evaluate the expression locally
-#if false
-                return await linkInterface.EvaluateExpressionAsync(code.Channel, subExpression, cancellationToken);
-#else
-                return null;
-#endif
+                if (Parsing.MetaExpressionParser.TryEvaluate(subExpression, context, out object? parsedResult))
+                {
+                    return parsedResult;
+                }
             }
-            catch (CodeParserException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw new OperationCanceledException();
-            }
+            throw new CodeParserException(string.Format(Parsing.ExpressionErrors.CannotEvaluate, subExpression.Trim()), code);
         }
 
         // Eat a sub-expression and evaluate SBC-only properties + custom functions where applicable
@@ -918,7 +914,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
                     lastToken.Append('[');
 
                     string subExpression = await eatExpression(c);
-                    if (IsSbcExpression(lastToken.ToString().Trim(), false))
+                    if (IsModelExpression(lastToken.ToString().Trim(), false))
                     {
                         object? evaluatedSubExpression = await getExpressionValue(subExpression);
                         if (evaluatedSubExpression is int intValue)
@@ -1005,12 +1001,8 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
             return result.ToString();
         }
 
-        // Fast path: evaluate the whole expression on the SBC when possible, avoiding the firmware round-trip.
-        // If anything in it cannot be resolved here, fall back to substituting SBC fields and forwarding the rest
-        if (!onlySbcFields)
+        // First pass: evaluate the whole expression in one go, which is what nearly everything takes
         {
-            // Whole-mirror evaluation will be selected by the connection method (it is needed when sending G-codes directly over CAN-FD); off for now
-            Parsing.IExpressionEvaluationContext context = new ExpressionContext(this, () => code.File?.GetIterations(code), (int)(code.LineNumber ?? 0), filter, false);
             bool resolvedLocally;
             object? localResult;
             using (await model.AccessReadOnlyAsync(cancellationToken))
@@ -1023,27 +1015,24 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
             }
         }
 
+        // Second pass: substitute what only an asynchronous lookup can produce - the custom functions
+        // fileexists(), fileread() and exists() - which the synchronous evaluator above cannot call
         string expressionContent = await eatExpression('\0');
-        if (onlySbcFields)
-        {
-            return expressionContent;
-        }
 
         // Don't return exceptions from cancelled codes
         cancellationToken.ThrowIfCancellationRequested();
-        try
+
+        // Those substitutions are encoded as literals, so what came back is an expression the
+        // evaluator can finish. Anything that still will not resolve is an error: there is no
+        // firmware behind this to forward it to, and a silent null reads as a valid answer
+        using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            // TODO: evaluate the expression locally
-#if false
-            return await linkInterface.EvaluateExpressionAsync(code.Channel, expressionContent, cancellationToken);
-#else
-            return null;
-#endif
+            if (Parsing.MetaExpressionParser.TryEvaluate(expressionContent, context, out object? substitutedResult))
+            {
+                return substitutedResult;
+            }
         }
-        catch (CodeParserException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw new OperationCanceledException();
-        }
+        throw new CodeParserException(string.Format(Parsing.ExpressionErrors.CannotEvaluate, expression.Trim()), code);
     }
 
     /// <summary>
@@ -1051,27 +1040,27 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
     /// </summary>
     /// <param name="code">Code holding the expression(s)</param>
     /// <param name="expression">Expression(s) to replace</param>
-    /// <param name="onlySbcFields">Whether to replace only SBC fields</param>
     /// <param name="encodeResult">Whether the final result shall be encoded</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Result as a string</returns>
     /// <exception cref="CodeParserException">Failed to parse expression(s)</exception>
     /// <exception cref="OperationCanceledException">Code was cancelled</exception>
-    public async Task<string> EvaluateExpressionToStringAsync(Code code, string expression, bool onlySbcFields, bool encodeResult, CancellationToken cancellationToken = default)
+    public async Task<string> EvaluateExpressionToStringAsync(Code code, string expression, bool encodeResult, CancellationToken cancellationToken = default)
     {
-        object? result = await EvaluateExpressionToValueAsync(code, expression, onlySbcFields, cancellationToken);
-        return (onlySbcFields && result is string resultString) ? resultString : ObjectToString(result, false, encodeResult, code);
+        object? result = await EvaluateExpressionToValueAsync(code, expression, cancellationToken);
+        return ObjectToString(result, false, encodeResult, code);
     }
 
     /// <summary>
-    /// Evaluation context backing the SBC-side expression evaluator with the running code and the object model mirror
+    /// Evaluation context backing the expression evaluator with the running code and the object model
     /// </summary>
-    /// <param name="owner">Owning expression evaluator (for SBC field detection)</param>
     /// <param name="iterationsProvider">Provides the current loop iteration count lazily (it errors outside a loop)</param>
     /// <param name="lineNumber">Current G-code line number</param>
+    /// <param name="lastResult">How the last code on this channel ended</param>
     /// <param name="filter">Object model filter</param>
-    /// <param name="evaluateAllObjectModelFields">Whether to resolve all object model fields and not just SBC-specific ones</param>
-    internal sealed class ExpressionContext(Expressions owner, Func<int?> iterationsProvider, int lineNumber, Model.Filter filter, bool evaluateAllObjectModelFields) : Parsing.IExpressionEvaluationContext
+    /// <param name="variables">Variables the running code can see</param>
+    /// <param name="objectModel">Object model, which is where the global variables live</param>
+    internal sealed class ExpressionContext(Func<int?> iterationsProvider, int lineNumber, int lastResult, Model.Filter filter, VariableSet variables, Model.ObjectModel objectModel) : Parsing.IExpressionEvaluationContext
     {
         /// <inheritdoc/>
         public int? Iterations => iterationsProvider();
@@ -1080,33 +1069,33 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
         public int LineNumber => lineNumber;
 
         /// <inheritdoc/>
+        public int? Result => lastResult;
+
+        /// <inheritdoc/>
         public bool TryResolveIdentifier(string path, bool wantExists, bool wantArrayLength, out object? value)
         {
             value = null;
+
+            // Variables are not object model fields: which ones a code can see depends on the file it
+            // came from, so they are resolved from the set it was given rather than through the filter
+            if (TryResolveVariable(path, wantExists, wantArrayLength, out value))
+            {
+                return true;
+            }
+
             if (wantExists)
             {
                 if (wantArrayLength)
                 {
-                    return false;       // exists(#...) is forwarded for now
+                    return false;       // exists(#...) is not answered here yet
                 }
 
-                // var/param are owned by the firmware, so their existence cannot be determined here
-                if (path is "var" or "param" || path.StartsWith("var.", StringComparison.Ordinal) || path.StartsWith("param.", StringComparison.Ordinal))
-                {
-                    return false;
-                }
-
-                // Default mode can only answer for SBC-rooted paths; the flag opts into the whole (non-live) mirror
-                if (!evaluateAllObjectModelFields && !owner.IsSbcExpression(path, false))
-                {
-                    return false;
-                }
-                value = filter.GetSpecific(path, false, out _);
+                value = filter.GetSpecific(path, out _);
                 return true;
             }
 
-            // findSbcProperty restricts resolution to SBC-only fields unless the operator opts into the whole mirror
-            if (!filter.GetSpecific(path, !evaluateAllObjectModelFields, out object? field))
+            // The whole object model is resolved here
+            if (!filter.GetSpecific(path, out object? field))
             {
                 return false;
             }
@@ -1123,19 +1112,201 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model)
                         value = collection.Count;
                         return true;
                     default:
-                        return false;   // not an array or string -> let the firmware handle it
+                        return false;   // the length operator only applies to an array or a string
                 }
             }
 
-            // The value is used after the object model read lock is released, so only hand back immutable scalars.
-            // Live collections and model objects are mutated in place by the SPI update task, so they are left to the
-            // locked fallback path to substitute and format
-            if (field is null or bool or char or int or uint or long or ulong or float or double or string or DateTime)
+            return TryConvertField(field, out value);
+        }
+
+        /// <summary>
+        /// Convert an object model field into a value an expression can hold
+        /// </summary>
+        /// <param name="field">Field as the object model stores it</param>
+        /// <param name="value">The same thing as an expression value</param>
+        /// <returns>True if it could be converted</returns>
+        /// <remarks>
+        /// <para>
+        /// Everything handed back has to be immutable, because it is read under the object model lock and
+        /// used after that lock has been released, while the update task goes on mutating what it was read
+        /// from. So a collection is copied rather than passed on, and an object becomes a stand-in that
+        /// holds nothing - which is all RepRapFirmware does with one either.
+        /// </para>
+        /// <para>
+        /// One function decides this for a field and for the elements inside a collection, so that an array
+        /// cannot end up holding something a scalar of the same type would have been refused
+        /// </para>
+        /// </remarks>
+        private static bool TryConvertField(object? field, out object? value)
+        {
+            switch (field)
             {
-                value = field;
+                // Values the language has, handed on as they are
+                case null or bool or char or string or int or uint or long or ulong or float or double or DateTime or DriverId:
+                    value = field;
+                    return true;
+
+                // An enum is a string in the object model - "processing", "inactive" - and that is what a
+                // macro compares it against, so it is one here too rather than a CLR enumerator name
+                case Enum enumValue:
+                    value = JsonSerializer.Serialize(enumValue, JsonHelper.DefaultJsonOptions.GetTypeInfo(enumValue.GetType())).Trim('"');
+                    return true;
+
+                // A dictionary is an object, not an array: its elements are keys and values, not values
+                case IModelDictionary:
+                    value = Parsing.ObjectModelValue.Instance;
+                    return true;
+
+                case ICollection collection:
+                    {
+                        value = null;
+                        object?[] snapshot = new object?[collection.Count];
+                        int index = 0;
+                        foreach (object? element in collection)
+                        {
+                            if (!TryConvertField(element, out snapshot[index++]))
+                            {
+                                return false;
+                            }
+                        }
+                        value = snapshot;
+                        return true;
+                    }
+
+                case IModelObject:
+                    value = Parsing.ObjectModelValue.Instance;
+                    return true;
+
+                default:
+                    value = null;
+                    return false;
+            }
+        }
+
+        /// <summary>
+        /// Resolve a path that names a variable rather than an object model field
+        /// </summary>
+        /// <param name="path">Fully-qualified identifier path</param>
+        /// <param name="wantExists">Caller only wants to know whether the variable exists</param>
+        /// <param name="wantArrayLength">The length operator '#' was applied</param>
+        /// <param name="value">Value the variable holds, or whether it exists</param>
+        /// <returns>True if the path named a variable and could be resolved</returns>
+        /// <exception cref="CodeParserException">The variable does not exist</exception>
+        /// <remarks>
+        /// <c>global</c> is read from the object model, where it lives, but through this path rather
+        /// than the filter: it is not an SBC property, so the filter refuses it in the default mode
+        /// </remarks>
+        private bool TryResolveVariable(string path, bool wantExists, bool wantArrayLength, out object? value)
+        {
+            value = null;
+
+            string name;
+            bool isParameter = false, isGlobal = false;
+            if (path.StartsWith("var.", StringComparison.Ordinal))
+            {
+                name = path["var.".Length..];
+            }
+            else if (path.StartsWith("param.", StringComparison.Ordinal))
+            {
+                name = path["param.".Length..];
+                isParameter = true;
+            }
+            else if (path.StartsWith("global.", StringComparison.Ordinal))
+            {
+                name = path["global.".Length..];
+                isGlobal = true;
+            }
+            else
+            {
+                return false;
+            }
+
+            // The parser folds evaluated indices into the path it asks about, so var.x[2] arrives here
+            // as one string. A field of a variable is not a thing: a variable holds a value, not an object
+            if (!VariableStore.TrySplitIndexedName(name, out name, out IReadOnlyList<string> indexExpressions) ||
+                !VariableStore.TryParseIndices(indexExpressions, out IReadOnlyList<int> indices))
+            {
+                return false;
+            }
+
+            bool found;
+            if (isGlobal)
+            {
+                found = objectModel.Global.TryGetValue(name, out JsonElement? globalValue) &&
+                        VariableStore.TryFromJson(globalValue, out value);
+            }
+            else
+            {
+                found = isParameter ? variables.TryGetParameter(name, out value) : variables.TryGetVariable(name, out value);
+            }
+
+            if (!found)
+            {
+                value = null;
+                if (wantExists)
+                {
+                    value = false;
+                    return true;
+                }
+                throw new CodeParserException(string.Format(isParameter ? Parsing.ExpressionErrors.UnknownParameter
+                                                                       : Parsing.ExpressionErrors.UnknownVariable, name));
+            }
+
+            // Apply the indices, if any. An index past the end is an error when the value is being read
+            // and merely a "no" when its existence is the question
+            foreach (int index in indices)
+            {
+                int length = value switch
+                {
+                    object?[] array => array.Length,
+                    string text => text.Length,
+                    _ => -1
+                };
+                if (length < 0)
+                {
+                    value = null;
+                    if (wantExists)
+                    {
+                        value = false;
+                        return true;
+                    }
+                    return false;       // an index applied to something that is not indexable
+                }
+                if (index < 0 || index >= length)
+                {
+                    value = null;
+                    if (wantExists)
+                    {
+                        value = false;
+                        return true;
+                    }
+                    throw new CodeParserException(Parsing.ExpressionErrors.ArrayIndexOutOfRange);
+                }
+                value = (value is object?[] indexedArray) ? indexedArray[index] : ((string)value!)[index];
+            }
+
+            if (wantExists)
+            {
+                value = true;
                 return true;
             }
-            return false;
+
+            if (wantArrayLength)
+            {
+                switch (value)
+                {
+                    case object?[] array:
+                        value = array.Length;
+                        return true;
+                    case string text:
+                        value = text.Length;
+                        return true;
+                    default:
+                        value = null;
+                        return false;   // the length operator only applies to an array or a string
+                }
+            }
+            return true;
         }
 
         /// <inheritdoc/>

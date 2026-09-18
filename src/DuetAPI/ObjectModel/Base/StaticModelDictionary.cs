@@ -389,11 +389,10 @@ public sealed class StaticModelDictionary<TValue>(bool nullRemovesItems, bool ca
     /// Update this instance from a given JSON element
     /// </summary>
     /// <param name="jsonElement">Element to update this intance from</param>
-    /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
     /// <returns>Updated instance</returns>
     /// <exception cref="JsonException">Failed to deserialize data</exception>
     /// <remarks>Accepts null as the JSON value to clear existing items</remarks>
-    public void UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+    public void UpdateFromJson(JsonElement jsonElement)
     {
         foreach (JsonProperty jsonProperty in jsonElement.EnumerateObject())
         {
@@ -410,13 +409,13 @@ public sealed class StaticModelDictionary<TValue>(bool nullRemovesItems, bool ca
                         if (jsonProperty.Value.ValueKind != JsonValueKind.Null)
                         {
                             item = new();
-                            item.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
+                            item.UpdateFromJson(jsonProperty.Value);
                             this[jsonProperty.Name] = item;
                         }
                     }
                     else
                     {
-                        item.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
+                        item.UpdateFromJson(jsonProperty.Value);
                     }
                 }
                 catch (Exception e) when (ObjectModel.DeserializationFailed(this, typeof(TValue), jsonProperty.Value.Clone(), e))
@@ -429,7 +428,7 @@ public sealed class StaticModelDictionary<TValue>(bool nullRemovesItems, bool ca
                 try
                 {
                     TValue newValue = new();
-                    newValue.UpdateFromJson(jsonProperty.Value, ignoreSbcProperties);
+                    newValue.UpdateFromJson(jsonProperty.Value);
                     Add(jsonProperty.Name, newValue);
                 }
                 catch (Exception e) when (ObjectModel.DeserializationFailed(this, typeof(TValue), jsonProperty.Value.Clone(), e))
@@ -444,9 +443,8 @@ public sealed class StaticModelDictionary<TValue>(bool nullRemovesItems, bool ca
     /// Update this instance from a given JSON reader
     /// </summary>
     /// <param name="reader">JSON reader</param>
-    /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
     /// <exception cref="JsonException">Failed to deserialize data</exception>
-    public void UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
+    public void UpdateFromJsonReader(ref Utf8JsonReader reader)
     {
         if (reader.TokenType == JsonTokenType.None && !reader.Read())
         {
@@ -482,19 +480,19 @@ public sealed class StaticModelDictionary<TValue>(bool nullRemovesItems, bool ca
                         if (reader.TokenType != JsonTokenType.Null)
                         {
                             item = new();
-                            item.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            item.UpdateFromJsonReader(ref reader);
                             this[key] = item;
                         }
                     }
                     else
                     {
-                        item.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                        item.UpdateFromJsonReader(ref reader);
                     }
                 }
                 else
                 {
                     TValue newItem = new();
-                    newItem.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                    newItem.UpdateFromJsonReader(ref reader);
                     Add(key, newItem);
                 }
             }

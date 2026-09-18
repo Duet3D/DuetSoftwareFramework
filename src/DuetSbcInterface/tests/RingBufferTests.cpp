@@ -1,38 +1,38 @@
 // Standalone validation of duet::sbc::RingBuffer: framing, wrap/skip-marker, full-ring rejection,
 // and a threaded producer/consumer soak that checks every record arrives intact and in order.
+#include "TestSupport.h"
+
 #include <Platform/RingBuffer.h>
 
 #include <atomic>
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <optional>
 #include <random>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 
+using Duet::Sbc::AsBytes;
+using Duet::Sbc::ByteSpan;
 using Duet::Sbc::RingBuffer;
 
-static int failures = 0;
-#define CHECK(cond, msg)                                                                                               \
-	do                                                                                                                 \
-	{                                                                                                                  \
-		if (!(cond))                                                                                                   \
-		{                                                                                                              \
-			std::printf("FAIL: %s (line %d)\n", msg, __LINE__);                                                        \
-			failures++;                                                                                                \
-		}                                                                                                              \
-	} while (0)
+// Text as bytes, so the tests can keep writing string literals at a byte-oriented ring
+static ByteSpan Bytes(std::string_view text)
+{
+	return AsBytes(text.data(), text.size());
+}
 
 static bool ReadOne(RingBuffer& r, std::string& out)
 {
-	const uint8_t* data = nullptr;
-	uint32_t len = 0;
-	if (!r.Peek(data, len))
+	const std::optional<ByteSpan> record = r.Peek();
+	if (!record.has_value())
 	{
 		return false;
 	}
-	out.assign(reinterpret_cast<const char*>(data), len);
+	out.assign(reinterpret_cast<const char*>(record->data()), record->size());
 	r.Consume();
 	return true;
 }
@@ -43,8 +43,8 @@ static void TestBasicFraming()
 	std::string out;
 	CHECK(!ReadOne(r, out), "empty ring must not yield a record");
 
-	CHECK(r.Write("hello", 5), "write hello");
-	CHECK(r.Write("world!!", 7), "write world");
+	CHECK(r.Write(Bytes("hello")), "write hello");
+	CHECK(r.Write(Bytes("world!!")), "write world");
 	CHECK(ReadOne(r, out) && out == "hello", "first record round-trips");
 	CHECK(ReadOne(r, out) && out == "world!!", "second record round-trips");
 	CHECK(!ReadOne(r, out), "ring drained");
@@ -53,20 +53,22 @@ static void TestBasicFraming()
 static void TestScattered()
 {
 	RingBuffer r(1024);
-	uint32_t hdr = 0xDEADBEEF;
-	const char* body = "payload";
-	const void* frags[2] = {&hdr, body};
-	const size_t lens[2] = {sizeof(hdr), 7};
-	CHECK(r.WriteScattered(frags, lens, 2), "scattered write");
+	const uint32_t hdr = 0xDEADBEEF;
+	const std::string_view body = "payload";
+	const ByteSpan frags[2] = {AsBytes(hdr), Bytes(body)};
+	CHECK(r.WriteScattered(frags), "scattered write");
 
-	const uint8_t* data = nullptr;
-	uint32_t len = 0;
-	CHECK(r.Peek(data, len), "peek scattered");
-	CHECK(len == sizeof(hdr) + 7, "scattered length");
+	const std::optional<ByteSpan> record = r.Peek();
+	CHECK(record.has_value(), "peek scattered");
+	if (!record.has_value())
+	{
+		return;
+	}
+	CHECK(record->size() == sizeof(hdr) + body.size(), "scattered length");
 	uint32_t got = 0;
-	std::memcpy(&got, data, sizeof(got));
+	std::memcpy(&got, record->data(), sizeof(got));
 	CHECK(got == 0xDEADBEEF, "scattered header intact");
-	CHECK(std::memcmp(data + sizeof(hdr), body, 7) == 0, "scattered body intact");
+	CHECK(std::memcmp(record->subspan(sizeof(hdr)).data(), body.data(), body.size()) == 0, "scattered body intact");
 	r.Consume();
 }
 
@@ -77,8 +79,8 @@ static void TestWrapAround()
 	std::string out;
 	for (int i = 0; i < 5000; i++)
 	{
-		std::string payload(1 + (i % 40), static_cast<char>('a' + (i % 26)));
-		CHECK(r.Write(payload.data(), payload.size()), "wrap write");
+		const std::string payload(1 + (i % 40), static_cast<char>('a' + (i % 26)));
+		CHECK(r.Write(Bytes(payload)), "wrap write");
 		CHECK(ReadOne(r, out), "wrap read");
 		CHECK(out == payload, "wrap payload intact");
 	}
@@ -95,8 +97,8 @@ static void TestWrapWithBacklog()
 	{
 		if ((rng() % 2) == 0)
 		{
-			std::string payload(1 + (rng() % 30), static_cast<char>('A' + (i % 26)));
-			if (r.Write(payload.data(), payload.size()))
+			const std::string payload(1 + (rng() % 30), static_cast<char>('A' + (i % 26)));
+			if (r.Write(Bytes(payload)))
 			{
 				pending.push_back(payload);
 			}
@@ -121,7 +123,7 @@ static void TestFullRingRejects()
 {
 	RingBuffer r(64);
 	int written = 0;
-	while (r.Write("0123456789", 10))
+	while (r.Write(Bytes("0123456789")))
 	{
 		written++;
 		if (written > 100)
@@ -137,11 +139,11 @@ static void TestFullRingRejects()
 	while (ReadOne(r, out))
 	{
 	}
-	CHECK(r.Write("0123456789", 10), "ring reusable after drain");
+	CHECK(r.Write(Bytes("0123456789")), "ring reusable after drain");
 
 	// A record larger than the ring is always rejected
-	std::string huge(1000, 'x');
-	CHECK(!r.Write(huge.data(), huge.size()), "oversized record rejected");
+	const std::string huge(1000, 'x');
+	CHECK(!r.Write(Bytes(huge)), "oversized record rejected");
 }
 
 // One producer, one consumer, checking every record arrives in order and intact.
@@ -165,7 +167,7 @@ static void TestThreadedSoak()
 				{
 					payload[j] = static_cast<uint8_t>(i + j);
 				}
-				if (r.Write(payload.data(), payload.size()))
+				if (r.Write(payload))
 				{
 					i++;
 					produced.fetch_add(1);
@@ -181,23 +183,22 @@ static void TestThreadedSoak()
 	int expected = 0;
 	while (expected < kRecords)
 	{
-		const uint8_t* data = nullptr;
-		uint32_t len = 0;
-		if (r.Peek(data, len))
+		const std::optional<ByteSpan> record = r.Peek();
+		if (record.has_value())
 		{
 			int seq = 0;
-			std::memcpy(&seq, data, sizeof(seq));
+			std::memcpy(&seq, record->data(), sizeof(seq));
 			if (seq != expected)
 			{
 				std::printf("FAIL: soak out of order, got %d expected %d\n", seq, expected);
-				failures++;
+				++TestSupport::failures;
 				r.Consume();
 				break;
 			}
 			bool bodyOk = true;
-			for (uint32_t j = sizeof(seq); j < len; j++)
+			for (size_t j = sizeof(seq); j < record->size(); j++)
 			{
-				if (data[j] != static_cast<uint8_t>(seq + j))
+				if ((*record)[j] != static_cast<uint8_t>(seq + j))
 				{
 					bodyOk = false;
 					break;
@@ -206,7 +207,7 @@ static void TestThreadedSoak()
 			if (!bodyOk)
 			{
 				std::printf("FAIL: soak payload corrupt at record %d\n", seq);
-				failures++;
+				++TestSupport::failures;
 				r.Consume();
 				break;
 			}
@@ -225,6 +226,59 @@ static void TestThreadedSoak()
 	CHECK(expected == kRecords, "soak received every record");
 }
 
+// BytesFree drives the motion engine's decision to stop preparing moves, so it has to stay honest
+// after the write position has wrapped past the read position - where the obvious head-minus-tail
+// arithmetic underflows, because these are positions in the buffer rather than counters that only
+// ever increase. Reaching that state takes a backlog: the producer has to wrap while the consumer
+// is still behind, which is exactly the busy-machine case this figure is consulted in.
+void TestBytesFreeSurvivesWrap()
+{
+	constexpr size_t capacity = 256;
+	constexpr size_t payloadSize = 48;
+	Duet::Sbc::RingBuffer r(capacity);
+
+	const size_t whenEmpty = r.BytesFree();
+	CHECK(whenEmpty > 0, "an empty ring reports free space");
+	CHECK(whenEmpty < capacity, "an empty ring keeps back the slack the framing needs");
+
+	const std::vector<uint8_t> payload(payloadSize, 0xA5);
+
+	// Fill most of the buffer, then free just enough at the start for the next write to have to
+	// wrap around to it.
+	for (int i = 0; i < 4; ++i)
+	{
+		CHECK(r.Write(payload), "the ring accepts a record while it has room");
+	}
+	for (int i = 0; i < 2; ++i)
+	{
+		CHECK(r.Peek().has_value(), "a queued record is there to read");
+		r.Consume();
+	}
+
+	const size_t freeBeforeWrap = r.BytesFree();
+	CHECK(freeBeforeWrap < whenEmpty, "the records still queued count as used");
+
+	// This one cannot fit at the end, so it wraps: the write position is now behind the read one.
+	CHECK(r.Write(payload), "a record that does not fit at the end wraps");
+
+	const size_t freeAfterWrap = r.BytesFree();
+	CHECK(freeAfterWrap <= capacity, "free space stays within the ring once the write position wraps");
+	CHECK(freeAfterWrap < freeBeforeWrap, "the wrapped record counts as used like any other");
+	// The one that matters: subtracting positions the wrong way round underflows, and the guard
+	// against that turns the underflow into a reported zero. Zero here would stop the motion engine
+	// preparing moves and it would never start again, because the ring is not actually full.
+	CHECK(freeAfterWrap > 0, "a ring with records still in it reports the space that is left");
+
+	// And it all comes back once the backlog is read.
+	while (const std::optional<ByteSpan> record = r.Peek())
+	{
+		CHECK(record->size() == payloadSize, "records read back at the length they were written");
+		r.Consume();
+	}
+	CHECK(r.IsEmpty(), "the ring drains");
+	CHECK(r.BytesFree() == whenEmpty, "a drained ring reports the same free space as a new one");
+}
+
 int main()
 {
 	TestBasicFraming();
@@ -232,14 +286,7 @@ int main()
 	TestWrapAround();
 	TestWrapWithBacklog();
 	TestFullRingRejects();
+	TestBytesFreeSurvivesWrap();
 	TestThreadedSoak();
-	if (failures == 0)
-	{
-		std::printf("All ring buffer tests passed.\n");
-	}
-	else
-	{
-		std::printf("%d check(s) failed.\n", failures);
-	}
-	return failures == 0 ? 0 : 1;
+	return TestSupport::Summarise("ring buffer");
 }

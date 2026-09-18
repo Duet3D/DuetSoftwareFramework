@@ -21,6 +21,12 @@ public partial class Code
     private sealed class ParserState
     {
         public char Letter;
+
+        /// <summary>
+        /// Where the value of the parameter being read starts, zero-based within the line: the
+        /// position just after its letter, which is what RepRapFirmware quotes when it refuses a value
+        /// </summary>
+        public int ValueColumn = CodeParameter.NoColumn;
         public bool ContentRead, UnprecedentedParameter;
         public bool InFinalComment, InEncapsulatedComment, InChunk, InSingleQuotes, InDoubleQuotes, InExpression, InKeywordArgument;
         public bool ReadingAtStart, IsLineNumber, HadLineNumber, IsNumericParameter, EndingChunk;
@@ -620,7 +626,7 @@ public partial class Code
                     }
                     else if (!result.HasParameter(state.Letter))
                     {
-                        AddParameter(result, state.Letter, value, false, state.MayRepeatCode || state.UnprecedentedParameter || state.IsNumericParameter);
+                        AddParameter(result, state.Letter, value, false, state.MayRepeatCode || state.UnprecedentedParameter || state.IsNumericParameter, state.ValueColumn);
                     }
                     // Ignore duplicate parameters
                 }
@@ -642,7 +648,7 @@ public partial class Code
                         {
                             value = '{' + value.Trim() + '}';
                         }
-                        AddParameter(result, state.Letter, value, state.WasQuoted, state.UnprecedentedParameter || state.IsNumericParameter || state.WasExpression);
+                        AddParameter(result, state.Letter, value, state.WasQuoted, state.UnprecedentedParameter || state.IsNumericParameter || state.WasExpression, state.ValueColumn);
                     }
                     // Ignore duplicate parameters
                 }
@@ -695,18 +701,22 @@ public partial class Code
                 {
                     state.InDoubleQuotes = true;
                 }
-                else if (state.NextCharLowerCase)
-                {
-                    state.Letter = char.ToLowerInvariant(c);
-                    state.NextCharLowerCase = false;
-                }
-                else if (!state.UnprecedentedParameter)
-                {
-                    state.Letter = char.ToUpperInvariant(c);
-                }
                 else
                 {
-                    state.Letter = c;
+                    if (state.NextCharLowerCase)
+                    {
+                        state.Letter = char.ToLowerInvariant(c);
+                        state.NextCharLowerCase = false;
+                    }
+                    else
+                    {
+                        state.Letter = state.UnprecedentedParameter ? c : char.ToUpperInvariant(c);
+                    }
+
+                    // The value starts at the next character, which is the position RepRapFirmware
+                    // quotes when it refuses one. Length counts the letter just read, so it is that
+                    // position already
+                    state.ValueColumn = result.Length ?? CodeParameter.NoColumn;
                 }
             }
         }
@@ -899,7 +909,9 @@ public partial class Code
     /// <param name="value">Value of the parameter</param>
     /// <param name="isQuoted">Whether the parameter is a quoted string</param>
     /// <param name="isSingleParameter">Whether the parameter is definitely a single parameter</param>
-    private static void AddParameter(Code code, char letter, string value, bool isQuoted, bool isSingleParameter)
+    /// <param name="valueColumn">Where the value starts in the line, or <see cref="CodeParameter.NoColumn" /></param>
+    private static void AddParameter(Code code, char letter, string value, bool isQuoted, bool isSingleParameter,
+                                     int valueColumn = CodeParameter.NoColumn)
     {
         if (letter != '@' && !char.IsLetter(letter))
         {
@@ -909,12 +921,13 @@ public partial class Code
         if (isQuoted || isSingleParameter)
         {
             // Standard parameter
-            code.Parameters.Add(new CodeParameter(letter, value, isQuoted, false));
+            code.Parameters.Add(new CodeParameter(letter, value, isQuoted, false) { Column = valueColumn });
         }
         else
         {
-            // Parameters like "XYZ" in M84 XYZ
-            code.Parameters.Add(new CodeParameter(letter, string.Empty, false, false));
+            // Parameters like "XYZ" in M84 XYZ, each letter standing where it was written
+            code.Parameters.Add(new CodeParameter(letter, string.Empty, false, false) { Column = valueColumn });
+            int column = valueColumn;
             foreach (char c in value)
             {
                 if (c == '"')
@@ -925,7 +938,11 @@ public partial class Code
                 {
                     throw new CodeParserException($"Illegal parameter letter '{c}'");
                 }
-                code.Parameters.Add(new CodeParameter(c, string.Empty, false, false));
+                if (column != CodeParameter.NoColumn)
+                {
+                    column++;
+                }
+                code.Parameters.Add(new CodeParameter(c, string.Empty, false, false) { Column = column });
             }
         }
     }
@@ -944,6 +961,7 @@ public partial class Code
                 case 915:
                 case 955:
                 case 956:
+                case 970:
                     foreach (CodeParameter parameter in Parameters)
                     {
                         if (!parameter.IsExpression && char.ToUpperInvariant(parameter.Letter) == 'P')
@@ -974,6 +992,14 @@ public partial class Code
     {
         if (!parameter.IsExpression)
         {
+            // A parameter given without a value names no driver at all. Splitting an empty string
+            // yields one empty item, which DriverId reads as its default of 0.0
+            if (string.IsNullOrEmpty(parameter.StringValue))
+            {
+                parameter.IsDriverId = true;
+                return;
+            }
+
             List<DriverId> drivers = [];
 
             string[] parameters = parameter.StringValue.Split(':') ?? [];

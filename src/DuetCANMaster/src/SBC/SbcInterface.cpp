@@ -27,9 +27,12 @@
 
 #  if SUPPORT_CAN_EXPANSION
 #	include <CAN/CanInterface.h>
+#	include <CAN/CanMotion.h>
+#	include <CAN/ExpansionManager.h>
 #	include <CanMessageBuffer.h>
 
-#include <algorithm>
+#	include <algorithm>
+#	include <span>
 #  endif
 
 // script (same70q20b_flash.ld); the leading underscore is part of that contract
@@ -73,6 +76,8 @@ SbcInterface::SbcInterface() noexcept
 
 	, m_canResponseHead(0)
 	, m_canResponseTail(0)
+	, m_motionStoppedHead(0)
+	, m_motionStoppedTail(0)
 #  ifdef TRACK_FILE_CODES
 	, fileCodesRead(0)
 	, fileCodesHandled(0)
@@ -192,7 +197,10 @@ static void SendUsbInitMessage(SerialCDC* dev) noexcept
 					// (no SPI transfer has happened yet). Fold the new data into the armed buffer and
 					// re-arm - without advancing the sequence number - so SbcDataAvailable goes high and
 					// the SBC pulls it on the next clock.
-					if (ProcessCanResponses())
+					// Motion-stopped reports first: a move is already stopped and waiting for the
+					// SBC to say where it should end up, so it should not queue behind status traffic
+					const bool wroteEverything = ProcessMotionStopped() & ProcessCanResponses() & ProcessCanMessagesSent();
+					if (wroteEverything)
 					{
 						m_transfer.StartNextTransfer(true);
 					}
@@ -287,7 +295,15 @@ static void SendUsbInitMessage(SerialCDC* dev) noexcept
 				reprap.GetPlatform().MessageF(NetworkInfoMessage,
 											  "Connection to SBC established over %s!\n",
 											  m_transfer.GetTransportType() == SbcTransportType::Usb ? "USB" : "SPI");
+
+				// The SBC starts with no record of the expansion boards and the boards only announce
+				// themselves until they are acknowledged, so this is where it is told what we know
+				reprap.GetExpansion().BeginReplayToSbc();
 			}
+
+			// A machine can carry more boards than the response queue holds, so the replay is topped up
+			// here for as many transfers as it takes
+			reprap.GetExpansion().ContinueReplayToSbc();
 
 			// Handle exchanged data and kick off the next transfer
 			ExchangeData();
@@ -317,18 +333,30 @@ static void SendUsbInitMessage(SerialCDC* dev) noexcept
 
 // Queue a CAN response to be forwarded to the SBC. Called from the CAN receiver tasks. Returns false if the queue is
 // full.
-bool SbcInterface::EnqueueCanResponse(const CANResponseHeader& header, const char* _ecv_null data) noexcept
+CanStatus SbcInterface::EnqueueCanResponse(const CANResponseHeader& header, const char* _ecv_null data) noexcept
 {
 	const TaskCriticalSectionLocker lock;
+
+	// A slot holds a whole CAN frame, so this cannot happen for a message off the bus. Refusing rather
+	// than queueing the header alone keeps a length that does not describe the payload off the link
+	if (header.dataLength > sizeof(m_canResponseRing[0].payload))
+	{
+		++m_canResponsesTooLong;
+		return CanStatus::Overflow;
+	}
+
+	// Not counted as a drop here: a full ring is back-pressure, and the board-announcement replay
+	// answers it by trying the same message again next transfer. Only a caller that abandons the
+	// message knows it was lost, and NoteCanResponseDropped is how it says so
 	const size_t next = (m_canResponseHead + 1) % NumCanResponseBuffers;
 	if (next == m_canResponseTail)
 	{
-		return false; // queue full
+		return CanStatus::NoBuffer;
 	}
 
 	CanResponseBuffer& item = m_canResponseRing[m_canResponseHead];
 	item.header = header;
-	if (data != nullptr && header.dataLength <= sizeof(item.payload))
+	if (data != nullptr)
 	{
 		memcpy(item.payload, data, header.dataLength);
 	}
@@ -336,6 +364,52 @@ bool SbcInterface::EnqueueCanResponse(const CANResponseHeader& header, const cha
 
 	// const bool timeCritical = header.msgType <= CanMessageType::inputStateChangedV2;
 	EventOccurred(true);
+	return CanStatus::Ok;
+}
+
+bool SbcInterface::ReportMotionStopped(uint32_t whenTriggered, uint32_t moveId,
+									   std::span<const duet::spi::protocol::MotionStoppedDriver> stopped) noexcept
+{
+	if (stopped.empty())
+	{
+		return true;
+	}
+
+	const TaskCriticalSectionLocker lock;
+	++m_motionStoppedReports;
+	const size_t next = (m_motionStoppedHead + 1) % NumMotionStoppedBuffers;
+	if (next == m_motionStoppedTail)
+	{
+		++m_motionStoppedDropped;
+		return false;						// queue full; the move will stop but keep its overshoot
+	}
+
+	MotionStoppedBuffer& item = m_motionStoppedRing[m_motionStoppedHead];
+	const auto count = min<size_t>(stopped.size(), ARRAY_SIZE(item.drivers));
+	item.header.whenTriggered = whenTriggered;
+	item.header.moveId = moveId;
+	item.header.numDrivers = (uint8_t)count;
+	memset(item.header.padding, 0, sizeof(item.header.padding));
+	memcpy(item.drivers, stopped.data(), count * sizeof(item.drivers[0]));
+	m_motionStoppedHead = next;
+
+	EventOccurred(true);
+	return true;
+}
+
+// Write any queued motion-stopped reports into the current transfer.
+// Returns false when the transfer is full, in which case the rest go next time.
+bool SbcInterface::ProcessMotionStopped() noexcept
+{
+	while (m_motionStoppedTail != m_motionStoppedHead)
+	{
+		const MotionStoppedBuffer& item = m_motionStoppedRing[m_motionStoppedTail];
+		if (!m_transfer.WriteMotionStopped(item.header, item.drivers))
+		{
+			return false;
+		}
+		m_motionStoppedTail = (m_motionStoppedTail + 1) % NumMotionStoppedBuffers;
+	}
 	return true;
 }
 
@@ -356,8 +430,8 @@ void SbcInterface::EnqueueCanTextReply(uint16_t txToken, CanRequestId requestId,
 		msg.fragmentNumber = fragment;
 
 		size_t thisLength = textLength - offset;
-		thisLength = std::min(thisLength, CanMessageStandardReply::MaxTextLength);
-		memcpy(msg.text, text + offset, thisLength);
+		thisLength = std::min(thisLength, msg.GetMaxTextLength());
+		memcpy(msg.GetText(), text + offset, thisLength);
 		offset += thisLength;
 		msg.moreFollows = (offset < textLength) ? 1 : 0;
 
@@ -370,7 +444,12 @@ void SbcInterface::EnqueueCanTextReply(uint16_t txToken, CanRequestId requestId,
 		header.status = (uint8_t)CanStatus::Ok;
 		header.padding = 0;
 		header.padding2 = 0;
-		(void)EnqueueCanResponse(header, reinterpret_cast<const char*>(&msg));
+		// A dropped fragment truncates the report silently, so the request is failed instead
+		if (EnqueueCanResponse(header, reinterpret_cast<const char*>(&msg)) != CanStatus::Ok)
+		{
+			ReportCanMessageSent(txToken, CanStatus::NoBuffer);
+			return;
+		}
 
 		++fragment;
 	} while (offset < textLength);
@@ -405,12 +484,65 @@ bool SbcInterface::ProcessCanResponses() noexcept
 	return ret;
 }
 
+// Record what became of a CAN message the SBC asked to be sent
+void SbcInterface::ReportCanMessageSent(uint16_t txToken, CanStatus status) noexcept
+{
+	const TaskCriticalSectionLocker lock;
+	const size_t next = (m_canMessageSentHead + 1) % NumCanMessageSentEntries;
+	if (next == m_canMessageSentTail)
+	{
+		// The SBC bounds its own wait, so a lost outcome costs a timeout rather than a hang
+		return;
+	}
+
+	CanMessageSentEntry& entry = m_canMessageSentRing[m_canMessageSentHead];
+	entry.txToken = txToken;
+	entry.status = (uint8_t)status;
+	entry.padding = 0;
+	m_canMessageSentHead = next;
+	EventOccurred(true);
+}
+
+// Send what became of the CAN messages the SBC asked to be sent, as many as fit in one packet
+bool SbcInterface::ProcessCanMessagesSent() noexcept
+{
+	CanMessageSentEntry batch[NumCanMessageSentEntries];
+	size_t count = 0;
+	{
+		const TaskCriticalSectionLocker lock;
+		while (m_canMessageSentTail != m_canMessageSentHead && count < NumCanMessageSentEntries)
+		{
+			batch[count++] = m_canMessageSentRing[m_canMessageSentTail];
+			m_canMessageSentTail = (m_canMessageSentTail + 1) % NumCanMessageSentEntries;
+		}
+	}
+
+	if (count == 0)
+	{
+		return true;
+	}
+
+	if (!m_transfer.WriteCanMessagesSent(batch, count))
+	{
+		// No room this time: put them back at the front, in the order they were taken
+		const TaskCriticalSectionLocker lock;
+		for (size_t i = count; i > 0; i--)
+		{
+			m_canMessageSentTail = (m_canMessageSentTail + NumCanMessageSentEntries - 1) % NumCanMessageSentEntries;
+			m_canMessageSentRing[m_canMessageSentTail] = batch[i - 1];
+		}
+		return false;
+	}
+	return true;
+}
+
 void SbcInterface::ExchangeData() noexcept
 {
-#  if 0
-	// The master clock must be the first packet of the transfer so the SBC processes it first.
-	// packetId/txPointer were reset to 0 when the previous transfer completed, so this becomes packet 0.
-	transfer.WriteMasterClock();
+#  if SUPPORT_CAN_EXPANSION
+	// Retire any CAN request whose board has run out of time to answer. Done here rather than on a
+	// timer of its own because this runs once per transfer, which is both often enough to report a
+	// timeout promptly and the task that carries the report
+	CanInterface::CheckPendingRequestTimeouts();
 #  endif
 
 // Process incoming packets
@@ -458,6 +590,40 @@ void SbcInterface::ExchangeData() noexcept
 			break;
 		}
 
+		// Schedule a move planned by the SBC. The packet is DDA::Prepare's output, so this hands it
+		// straight to CanMotion; nothing here needs to understand the move.
+		case SbcRequest::ScheduleMove:
+		{
+			// Take the whole declared payload in one read, so the read pointer lands on the next
+			// packet whether or not this one turns out to be usable. numDrivers is what says how
+			// much follows the header, and it arrives over SPI: sizing the driver array from it
+			// without checking would read past the payload and desynchronise the rest of the
+			// transfer as well.
+			const char* const payload = m_transfer.ReadData(packet->length);
+			if (packet->length < sizeof(ScheduleMoveHeader))
+			{
+				REPORT_INTERNAL_ERROR;
+				break;
+			}
+
+			const auto* const header = reinterpret_cast<const ScheduleMoveHeader*>(payload);
+			const size_t numDrivers = header->numDrivers;
+			if (numDrivers > SbcProtocol::MaxScheduleMoveDrivers ||
+				packet->length < sizeof(ScheduleMoveHeader) + (numDrivers * sizeof(ScheduleMoveDriver)))
+			{
+				REPORT_INTERNAL_ERROR;
+				break;
+			}
+
+			// The span is built from the count that has just been checked against the payload, so
+			// the bound travels with the pointer instead of being re-derived from the header at the
+			// far end.
+			const std::span drivers{reinterpret_cast<const ScheduleMoveDriver*>(payload + sizeof(ScheduleMoveHeader)),
+									numDrivers};
+			CanMotion::ScheduleFromSbc(*header, drivers);
+			break;
+		}
+
 		// Send a CAN message on behalf of the SBC
 		case SbcRequest::SendCANMessage:
 		{
@@ -486,7 +652,34 @@ void SbcInterface::ExchangeData() noexcept
 						// Forward the timing report back to the SBC as a CAN response tagged with the request's txToken
 						EnqueueCanTextReply(txToken, (CanRequestId)timingMsg->requestId, reply.c_str());
 					}
+
+					// This message never reaches the bus, so SendCanRequest never reports it. The SBC
+					// resolves every message it sends on this outcome, so one that is missing leaves
+					// the code that sent it waiting out its timeout
+					ReportCanMessageSent(txToken, CanStatus::Ok);
 					break;
+				}
+			}
+
+			// A handle whose monitor is being replaced or dropped must not leave a level behind. The
+			// level held for it was reported by a monitor that is about to stop existing, and acting
+			// on it would stop the first move armed on the handle its replacement is created under
+			// The pin name is the tail of a createInputMonitor and is sent truncated to its terminating
+			// null, so the message on the wire is nothing like sizeof the struct: what must be present
+			// is everything up to the name, which is where the handle is
+			if (msgType == CanMessageType::createInputMonitorV1 &&
+				dataLength >= offsetof(CanMessageCreateInputMonitorV1, pinName))
+			{
+				const auto* const createMsg = reinterpret_cast<const CanMessageCreateInputMonitorV1*>(payload);
+				CanMotion::NoteInputState(dstAddress, createMsg->handle.asU16(), false);
+			}
+			else if (msgType == CanMessageType::changeInputMonitorV1 &&
+					 dataLength >= sizeof(CanMessageChangeInputMonitorV1))
+			{
+				const auto* const changeMsg = reinterpret_cast<const CanMessageChangeInputMonitorV1*>(payload);
+				if (changeMsg->action == CanMessageChangeInputMonitorV1::actionDelete)
+				{
+					CanMotion::NoteInputState(dstAddress, changeMsg->handle.asU16(), false);
 				}
 			}
 
@@ -599,7 +792,9 @@ void SbcInterface::ExchangeData() noexcept
 #  endif
 
 	// Forward any CAN responses queued by the CAN receiver tasks
+	ProcessMotionStopped();
 	ProcessCanResponses();
+	ProcessCanMessagesSent();
 }
 
 [[noreturn]] void SbcInterface::ReceiveAndStartIap(const char* iapChunk, size_t length) noexcept
@@ -686,6 +881,14 @@ void SbcInterface::InvalidateResources() noexcept
 		m_gcodeReply.ReleaseAll();
 	}
 
+	// The queued CAN responses describe a connection that is gone, and the SBC discards what it knew
+	// along with it. Status reports are periodic and the announcements are replayed on reconnect, so
+	// delivering these late would only apply readings older than the ones about to arrive.
+	{
+		const TaskCriticalSectionLocker lock;
+		m_canResponseTail = m_canResponseHead;
+	}
+
 	// TODO Turn off all the heaters
 }
 
@@ -708,6 +911,14 @@ void SbcInterface::Diagnostics(const StringRef& reply) noexcept
 				m_numSbcTimeouts,
 				m_iapRamAvailable);
 	reply.lcatf("Buffer RX/TX: %d/%d-%d", (int)m_rxPointer, (int)m_txPointer, (int)m_txEnd);
+
+	// Where an endstop stop leaves this board. The SBC works out where the drives should end up, so
+	// a stop that is never reported here is one it can never correct - and nothing else says whether
+	// the report was made
+	reply.lcatf("Motion stops reported: %" PRIu32 ", dropped: %" PRIu32, m_motionStoppedReports, m_motionStoppedDropped);
+	reply.lcatf("CAN replies dropped: %" PRIu32 " no buffer, %" PRIu32 " too long",
+				m_canResponsesDropped,
+				m_canResponsesTooLong);
 #  ifdef TRACK_FILE_CODES
 	reply.lcatf("File codes read/handled: %d/%d, file macros open/closing: %d %d",
 				(int)fileCodesRead,

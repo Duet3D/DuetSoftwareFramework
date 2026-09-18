@@ -6,8 +6,24 @@ namespace DuetAPI.ObjectModel;
 /// <summary>
 /// Information about an extruder drive
 /// </summary>
-public partial class Extruder : ModelObject, IStaticModelObject
+public partial class Extruder : ModelObject, IStaticModelObject, IPhaseSteppingDrive
 {
+    // What an extruder may do before anything has configured it, as RepRapFirmware's Move::Init sets
+    // it. Its constants are in mm/sec; speed and jerk are carried here in mm/min, so those are
+    // converted once, here.
+
+    /// <summary>Speed an extruder may run at until M203 says otherwise (in mm/min)</summary>
+    public const float DefaultSpeed = 100F * 60F;
+
+    /// <summary>Acceleration of an extruder until M201 says otherwise (in mm/s^2)</summary>
+    public const float DefaultAcceleration = 500F;
+
+    /// <summary>Jerk of an extruder until M566 says otherwise (in mm/min)</summary>
+    public const float DefaultJerk = 5F * 60F;
+
+    /// <summary>Microsteps per mm of an extruder until M92 says otherwise</summary>
+    public const float DefaultStepsPerMm = 420F;
+
     /// <summary>
     /// Acceleration of this extruder (in mm/s^2)
     /// </summary>
@@ -16,7 +32,7 @@ public partial class Extruder : ModelObject, IStaticModelObject
         get => _acceleration;
         set => SetPropertyValue(ref _acceleration, value);
     }
-    private float _acceleration = 500F;
+    private float _acceleration = DefaultAcceleration;
 
     /// <summary>
     /// Motor current (in mA)
@@ -46,7 +62,7 @@ public partial class Extruder : ModelObject, IStaticModelObject
         get => _printingJerk;
         set => SetPropertyValue(ref _printingJerk, value);
     }
-    private float _printingJerk = 15;
+    private float _printingJerk = DefaultJerk;
 
     /// <summary>
     /// Name of the currently loaded filament
@@ -79,14 +95,14 @@ public partial class Extruder : ModelObject, IStaticModelObject
     private float _factor = 1F;
 
     /// <summary>
-    /// Motor jerk (in mm/s)
+    /// Motor jerk (in mm/min)
     /// </summary>
     public float Jerk
     {
         get => _jerk;
         set => SetPropertyValue(ref _jerk, value);
     }
-    private float _jerk = 15F;
+    private float _jerk = DefaultJerk;
 
     /// <summary>
     /// Microstepping configuration
@@ -116,7 +132,7 @@ public partial class Extruder : ModelObject, IStaticModelObject
         get => _percentStstCurrent;
         set => SetPropertyValue(ref _percentStstCurrent, value);
     }
-    private int? _percentStstCurrent;
+    private int? _percentStstCurrent = Axis.DefaultStandstillCurrentPercent;
 
     /// <summary>
     /// Whether or not the extruder is currently using phase stepping
@@ -126,7 +142,37 @@ public partial class Extruder : ModelObject, IStaticModelObject
         get => _phaseStep;
         set => SetPropertyValue(ref _phaseStep, value);
     }
-    private bool? _phaseStep;
+    private bool? _phaseStep = false;
+
+    /// <summary>
+    /// Velocity feedforward gain of the phase stepping control loop (M970.1 Kv)
+    /// </summary>
+    /// <remarks>
+    /// The expansion board applies the gain, so nothing on this side would otherwise remember what it
+    /// was asked for and a bare M970.1 could not report it. A DSF addition, per
+    /// rrf-differences.md section 3
+    /// </remarks>
+    public float PhaseStepKv
+    {
+        get => _phaseStepKv;
+        set => SetPropertyValue(ref _phaseStepKv, value);
+    }
+    private float _phaseStepKv;
+
+    /// <summary>
+    /// Acceleration feedforward gain of the phase stepping control loop (M970.2 Ka)
+    /// </summary>
+    /// <remarks>
+    /// The expansion board applies the gain, so nothing on this side would otherwise remember what it
+    /// was asked for and a bare M970.2 could not report it. A DSF addition, per
+    /// rrf-differences.md section 3
+    /// </remarks>
+    public float PhaseStepKa
+    {
+        get => _phaseStepKa;
+        set => SetPropertyValue(ref _phaseStepKa, value);
+    }
+    private float _phaseStepKa;
 
     /// <summary>
     /// Extruder position (in mm)
@@ -172,7 +218,7 @@ public partial class Extruder : ModelObject, IStaticModelObject
         get => _speed;
         set => SetPropertyValue(ref _speed, value);
     }
-    private float _speed = 100F;
+    private float _speed = DefaultSpeed;
 
     /// <summary>
     /// Number of microsteps per mm
@@ -182,5 +228,5 @@ public partial class Extruder : ModelObject, IStaticModelObject
         get => _stepsPerMm;
         set => SetPropertyValue(ref _stepsPerMm, value);
     }
-    private float _stepsPerMm = 420F;
+    private float _stepsPerMm = DefaultStepsPerMm;
 }

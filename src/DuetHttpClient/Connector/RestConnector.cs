@@ -226,7 +226,7 @@ internal class RestConnector : BaseConnector
                         using JsonDocument modelJson = await JsonDocument.ParseAsync(modelStream, cancellationToken: _terminateSession.Token).ConfigureAwait(false);
                         lock (Model)
                         {
-                            Model.UpdateFromJson(modelJson.RootElement, false);
+                            Model.UpdateFromJson(modelJson.RootElement);
                             if (!Options.ObserveMessages && Model.Messages.Count > 0)
                             {
                                 // Clear messages automatically if they are not cleared by a consumer
@@ -277,7 +277,7 @@ internal class RestConnector : BaseConnector
                                         using JsonDocument modelJson = await JsonDocument.ParseAsync(patchStream, cancellationToken: _terminateSession.Token).ConfigureAwait(false);
                                         lock (Model)
                                         {
-                                            Model.UpdateFromJson(modelJson.RootElement, false);
+                                            Model.UpdateFromJson(modelJson.RootElement);
                                             if (!Options.ObserveMessages && Model.Messages.Count > 0)
                                             {
                                                 // Clear messages automatically if they are not cleared by a consumer
@@ -684,7 +684,7 @@ internal class RestConnector : BaseConnector
                     {
                         Utf8JsonReader reader = new(responseData);
                         GCodeFileInfo fileInfo = new();
-                        fileInfo.UpdateFromJsonReader(ref reader, false);
+                        fileInfo.UpdateFromJsonReader(ref reader);
                         return fileInfo;
                     }
                     return Deserialize();

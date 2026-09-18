@@ -27,7 +27,11 @@ public sealed class Post(ChannelProcessor channelProcessor, CodeProcessor codePr
             {
                 bool resolved = await IPC.Processors.CodeInterception.InterceptAsync(code, InterceptionMode.Post);
                 code.Flags |= CodeFlags.IsPostProcessed;
-                await ChannelProcessor.WriteCodeAsync(code, resolved ? PipelineStage.Executed : PipelineStage.Firmware);
+                if (!resolved)
+                {
+                    code.ResolveAsUnsupported();
+                }
+                await ChannelProcessor.WriteCodeAsync(code, PipelineStage.Executed);
             }
             catch (Exception e)
             {
@@ -40,7 +44,8 @@ public sealed class Post(ChannelProcessor channelProcessor, CodeProcessor codePr
         }
         else
         {
-            await ChannelProcessor.WriteCodeAsync(code, PipelineStage.Firmware);
+            code.ResolveAsUnsupported();
+            await ChannelProcessor.WriteCodeAsync(code, PipelineStage.Executed);
         }
     }
 }

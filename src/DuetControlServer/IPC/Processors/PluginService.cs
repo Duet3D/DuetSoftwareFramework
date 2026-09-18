@@ -217,9 +217,6 @@ public sealed class PluginService : IProcessor, IDisposable
         // Start the plugins when both services are connected
         if (!_settings.UpdateOnly && _serviceConnected && _rootServiceConnected)
         {
-            // First ensure that object model is up-to-date
-            await _model.WaitForFullUpdateAsync(cancellationToken);
-
             Commands.StartPlugins startCommand = _commandFactory.Create<Commands.StartPlugins>();
             _ = Task.Run(async () => await startCommand.ExecuteAsync(), cancellationToken);
         }

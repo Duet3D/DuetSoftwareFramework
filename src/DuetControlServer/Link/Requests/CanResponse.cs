@@ -1,7 +1,9 @@
-using DuetControlServer.Link.Protocol.FirmwareRequests;
+using DuetAPI;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
-using System.Runtime.InteropServices;
+using System;
+using System.Collections.Generic;
 using System.Text;
 
 namespace DuetControlServer.Link;
@@ -9,32 +11,201 @@ namespace DuetControlServer.Link;
 /// <summary>
 /// Result of a CAN request, exposing the reassembled reply.
 /// </summary>
-/// <param name="Status">Status of the reply</param>
-/// <param name="ResponseType">Actual type of the reply</param>
+/// <param name="ResponseType">Actual type of the reply (<see cref="CanMessageType.NoReply"/> if none was expected)</param>
 /// <param name="SrcAddress">Source address of the replying board</param>
+/// <param name="DstAddress">Address the request was sent to</param>
 /// <param name="Payload">Reassembled payload of the reply</param>
-public readonly record struct CanResponse(CanStatus Status, CanMessageType ResponseType, byte SrcAddress, byte[] Payload)
+/// <param name="Extra">The reply's <c>extra</c> byte, which a few requests answer in rather than in the text</param>
+/// <param name="ResultCode">What became of the request: what the board answered, or why it got no answer</param>
+/// <remarks>
+/// <para>
+/// Whether the board did what it was asked is <see cref="ResultCode"/>, not whether it sent any text: a
+/// board that refuses a request may say why, but it may equally say nothing, and a board that carried
+/// one out may still have something to report.
+/// </para>
+/// </remarks>
+public readonly record struct CanResponse(CanMessageType ResponseType, byte SrcAddress, byte DstAddress,
+                                          byte[] Payload, byte Extra, CodeResult ResultCode)
 {
     /// <summary>
     /// Create a response from a completed request
     /// </summary>
     /// <param name="request">Completed CAN request</param>
     internal static CanResponse FromRequest(CanRequest request)
-        => new(request.Status, request.ResponseType, request.SrcAddress, request.ResponsePayload);
+        => new(request.ResponseType, request.SrcAddress, request.DstAddress, request.ResponsePayload,
+               request.Extra, request.ResultCode);
 
     /// <summary>
-    /// Interpret the start of the reply payload as a CAN message body struct
+    /// The answer a request stands in with when the board never gave one
     /// </summary>
-    /// <typeparam name="T">CAN message body type</typeparam>
+    /// <param name="request">The request that went unanswered</param>
+    /// <returns>A reply carrying RepRapFirmware's wording for a CAN timeout</returns>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>CanInterface::SendRequestAndGetStandardReply</c> ends
+    /// <c>reply.lcatf("CAN response timeout: board %u, req type %u, RID %u", …)</c> and returns
+    /// <c>canResponseTimeout</c>, which is reported rather than thrown: a board that does not answer
+    /// is something the operator is told about, not a fault in the code that asked. Throwing loses
+    /// that, and loses it twice over - the caller gets an exception message about an operation rather
+    /// than about a board, and every code after it in a macro is abandoned.
+    /// </para>
+    /// <para>
+    /// The request id is DuetCANMaster's to allocate - this side sends the all-ones placeholder and
+    /// never learns what it became - so the transmission token stands in for it. It identifies the
+    /// same request in this program's logs, which is what a reader of this line needs it for
+    /// </para>
+    /// </remarks>
+    internal static CanResponse FromTimeout(CanRequest request)
+        => new(CanMessageType.StandardReply, request.DstAddress, request.DstAddress,
+               Encoding.ASCII.GetBytes($"CAN response timeout: board {request.DstAddress}, "
+                                       + $"req type {(ushort)request.MessageType}, RID {request.TxToken}"),
+               Extra: 0, CodeResult.CanResponseTimeout);
+
+    /// <summary>
+    /// Text the board sent with the reply, empty if it said nothing
+    /// </summary>
+    /// <remarks>
+    /// Only a standard reply carries text. For any other reply type the payload is the message body,
+    /// which <see cref="AsCanMessage{T}" /> is the way to read
+    /// </remarks>
+    public string Text => ResponseType == CanMessageType.StandardReply ? Encoding.ASCII.GetString(Payload).TrimEnd('\0') : string.Empty;
+
+    /// <summary>
+    /// Whether the board did what it was asked
+    /// </summary>
+    /// <remarks>
+    /// The one test code should branch on. <see cref="Severity"/> answers a different question - how
+    /// to report the reply - and has three answers because reporting needs three; asking it whether
+    /// the request was carried out means picking two of its three values and picking them again at
+    /// the next call site
+    /// </remarks>
+    public bool Succeeded => ResultCode.Succeeded();
+
+    /// <summary>
+    /// How this reply should be reported: what the board made of the request, or an error if it never
+    /// answered
+    /// </summary>
+    public MessageType Severity => ResultCode.ToMessageType();
+
+    /// <summary>
+    /// The reply as a message to pass back to whoever sent the request
+    /// </summary>
+    /// <returns>What the board said, reported as what it made of the request</returns>
+    /// <remarks>
+    /// A board that did what it was asked without comment gives an empty success message, which is
+    /// what this codebase means by "nothing to report": returning it as a code's result says the code
+    /// is done and produced no output, and <see cref="CanReplies.ToMessage" /> leaves it out when
+    /// collecting what several boards said. Callers therefore never have to decide whether there is
+    /// anything worth passing on - the decision a warning would lose by
+    /// </remarks>
+    public Message ToMessage() => new(Severity, Description);
+
+    /// <summary>
+    /// Interpret the reply payload as the message body its type maps to
+    /// </summary>
+    /// <typeparam name="T">CAN message type this reply is sent as</typeparam>
     /// <returns>Deserialized message body</returns>
-    public readonly T As<T>() where T : struct => MemoryMarshal.Read<T>(Payload);
+    /// <exception cref="InvalidOperationException">The reply is not of that type</exception>
+    /// <remarks>
+    /// A reply type maps to exactly one message struct, but C# cannot pick a type from a value known
+    /// only at run time, so the caller names it and this checks the choice. Reading the reply as the
+    /// wrong struct would otherwise be silent: the payload is bytes, and every message is happy to be
+    /// read out of any of them. <c>T.MessageType</c> is a static abstract member on a value type, so
+    /// the JIT resolves it per instantiation and the check costs a comparison against a constant.
+    /// </remarks>
+    public readonly T AsCanMessage<T>() where T : struct, ICanMessage<T>
+    {
+        if (T.MessageType != ResponseType)
+        {
+            throw new InvalidOperationException(ResponseType == CanMessageType.NoReply
+                ? $"Cannot read a {T.MessageType} from a request that expected no reply"
+                : $"Cannot read a {T.MessageType} from a reply of type {ResponseType}");
+        }
+        if (ResponseType == CanMessageType.StandardReply)
+        {
+            // Reassembly keeps only the text of a standard reply, since that is what the fragments
+            // stitch together; its header is gone by the time anyone can ask for it
+            throw new InvalidOperationException($"A standard reply is read through {nameof(Text)} and {nameof(ResultCode)}");
+        }
+        return CanMessageSerializer.Deserialize<T>(Payload);
+    }
 
     /// <summary>
-    /// Interpret the reply payload as a specific CAN message body type.
+    /// What the board said, or why it did not say it
     /// </summary>
-    /// <typeparam name="T">CAN message body type.</typeparam>
-    /// <returns>Deserialized message body.</returns>
-    public readonly T AsCanMessage<T>() where T : struct, ICanMessage<T> => CanMessageSerializer.Deserialize<T>(Payload);
+    /// <remarks>
+    /// The text comes first because an unanswered request carries RepRapFirmware's own wording for why
+    /// (see <see cref="FromTimeout"/>), and that names the board, the request type and the id. Testing
+    /// the result code ahead of it would replace all of that with the name of an enumeration value
+    /// </remarks>
+    private string Description => !string.IsNullOrWhiteSpace(Text) ? Text
+        : Severity == MessageType.Error ? $"Board {DstAddress} rejected the request ({ResultCode})"
+        : string.Empty;
+}
 
-    public string PayloadString => Encoding.ASCII.GetString(Payload);
+/// <summary>
+/// Helpers for the replies collected from several boards at once.
+/// </summary>
+public static class CanReplies
+{
+    /// <summary>
+    /// Whether the board did what it was asked, once its reply is a message
+    /// </summary>
+    /// <param name="reply">What the board said</param>
+    /// <returns>True if the request was carried out</returns>
+    /// <remarks>
+    /// <see cref="CanResponse.Succeeded"/> read off the message the reply became, for the handlers
+    /// that have only the message by the time they judge it: one that collected several boards'
+    /// replies, or one whose refusal is its own rather than a board's. A warning still means it was
+    /// done, so this is not <c>Type == Success</c>
+    /// </remarks>
+    public static bool Succeeded(this Message reply) => reply.Type != MessageType.Error;
+
+    /// <summary>
+    /// Pass a reply on, or refuse the code it came from if the board would not do what it was asked
+    /// </summary>
+    /// <param name="reply">What the board said</param>
+    /// <returns>The same reply, when the board did it</returns>
+    /// <exception cref="GCodeException">The board refused</exception>
+    /// <remarks>
+    /// For the callers that arm something before a move: an endstop, a probe or a stall detector that
+    /// was refused must stop the move being built, because the move would otherwise run its full
+    /// commanded length with nothing to stop it. Everywhere else a refusal is returned rather than
+    /// thrown, which stops the code without abandoning the file it came from
+    /// </remarks>
+    public static Message OrRefuse(this Message reply)
+    {
+        if (!reply.Succeeded())
+        {
+            throw new GCodeException(reply.Content);
+        }
+        return reply;
+    }
+
+    /// <summary>
+    /// Combine what several boards said into the one message the code they came from returns
+    /// </summary>
+    /// <param name="replies">What each board replied, ignoring the ones that said nothing</param>
+    /// <returns>The collected text, reported as the worst of what the boards made of it</returns>
+    public static Message ToMessage(this IEnumerable<Message?> replies)
+    {
+        MessageType type = MessageType.Success;
+        List<string> lines = [];
+        foreach (Message? reply in replies)
+        {
+            if (reply is null)
+            {
+                continue;
+            }
+            if (reply.Type > type)
+            {
+                type = reply.Type;
+            }
+            if (!string.IsNullOrWhiteSpace(reply.Content))
+            {
+                lines.Add(reply.Content);
+            }
+        }
+        return new Message(type, string.Join('\n', lines));
+    }
 }

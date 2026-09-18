@@ -17,11 +17,14 @@ public static partial class ServiceCollectionExtensions
     {
         return services
             .AddSingleton<Meta.Expressions>()
+            .AddSingleton<Meta.VariableStore>()
+            .AddSingleton<LastCodeResult>()
             .AddHostedService<Meta.Functions>()
             .AddSingleton<CodeFactory>()
             .AddSingleton<CodeProcessor>()
             .AddSingleton<IDiagnostics, CodeProcessor>(services => services.GetRequiredService<CodeProcessor>())
             .AddHostedService<CodeProcessorService>()
+            .AddSingleton<InterpreterStateStack>()
             .AddKeyedSingleton<Handlers.ICodeHandler, Handlers.GCodeHandler>(Handlers.Keys.GCodes)
             .AddKeyedSingleton<Handlers.ICodeHandler, Handlers.MCodeHandler>(Handlers.Keys.MCodes)
             .AddKeyedSingleton<Handlers.ICodeHandler, Handlers.TCodeHandler>(Handlers.Keys.TCodes)

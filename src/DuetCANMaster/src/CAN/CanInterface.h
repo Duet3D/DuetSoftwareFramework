@@ -26,6 +26,7 @@ struct PrepParams;
 
 namespace CanInterface
 {
+
 	// Note: GetCanAddress() in this namespace is now declared in RepRapFirmware.h to overcome ordering issues
 	constexpr uint32_t UsualResponseTimeout = 1000; // how long we normally wait for a response, in milliseconds
 	constexpr uint32_t UsualSendTimeout = 200;		// how long we normally wait to send a message, in milliseconds
@@ -44,6 +45,7 @@ namespace CanInterface
 	void SendResponseNoFree(CanMessageBuffer& buf) noexcept;
 	void SendBroadcastNoFree(CanMessageBuffer& buf) noexcept;
 	void SendMessageNoReplyNoFree(CanMessageBuffer& buf) noexcept;
+	void SendEmergencyStopNoFree(CanMessageBuffer& buf) noexcept; // one message of an emergency stop sweep
 	void Diagnostics(const StringRef& reply) noexcept;
 	CanMessageBuffer* AllocateBuffer() THROWS(CanException);
 	void CheckCanAddress(uint32_t address) THROWS(CanException);
@@ -59,33 +61,30 @@ namespace CanInterface
 	uint16_t GetTimeStampPeriod() noexcept; // return the period of the time stamp counter in units of 48MHz CAN clocks
 #  endif
 
+	// Widen a 16-bit timestamp an expansion board reported to a full step clock reading.
+	//
+	// The boards' step clocks track this one, because CanMessageTimeSync keeps them there, so a
+	// board's low 16 bits are directly comparable with ours. What they are not is a whole reading:
+	// 16 bits of step clock wrap in well under a second, so the value only means anything relative
+	// to now.
+	uint32_t Convert16bitReceivedTimeStampTo32bits(uint16_t ts) noexcept;
+
 	// Info functions
 	GCodeResult GetRemoteFirmwareDetails(uint32_t boardAddress, const StringRef& reply) THROWS(CanException);
 	GCodeResult RemoteDiagnostics(MessageType mt, uint32_t boardAddress, unsigned int type, const StringRef& reply)
 		THROWS(CanException);
 	GCodeResult HandleM111(uint32_t boardAddress, const StringRef& reply) THROWS(CanException);
 
-	// SBC bridging: in-flight SBC-originated CAN request, so that a response can be matched back to the SBC's txToken
-	// and multi-fragment replies reassembled. Written by the SBC task, read/cleared by the CAN receiver tasks.
-	struct CanRequestMapping
-	{
-		bool active;
-		CanAddress board;		   // the expansion board we sent to and expect the reply from
-		CanRequestId rid;		   // the request ID we allocated
-		uint16_t txToken;		   // the SBC's token to return in the response
-		CanMessageType replyType;  // the CanMessageType the SBC expects (CanMessageType::unusedMessageType means none)
-		uint32_t whenStarted;	   // millis() when the request was sent, used for silent expiry
-		uint8_t fragmentsReceived; // number of reply fragments collated so far
-	};
-
 	// Send a CAN request that originated from the SBC. 'buf' has already been populated by the SBC interface.
 	// 'txToken' is the SBC's token to return in any response; 'replyType' is the reply the SBC expects (0xFFFF means
 	// none).
 	void SendCanRequest(CanMessageBuffer& buf, uint16_t txToken, CanMessageType replyType) noexcept;
-	CanRequestMapping* _ecv_null FindPendingRequest(
-		CanAddress src, CanRequestId rid) noexcept; // Find an in-flight request matching a received response
-	void ReleasePendingRequest(
-		CanRequestMapping* mapping) noexcept; // Free a pending request slot and any reassembly buffer
+	// Match a received response to the in-flight request waiting for it, freeing the slot if this is the
+	// last reply it will get. Returns the SBC's token, or UnsolicitedTxToken if nothing matches.
+	uint16_t MatchPendingRequest(CanAddress src, CanRequestId rid, bool isFinalReply) noexcept;
+	void ReleasePendingRequestForToken(
+		uint16_t txToken) noexcept; // Free the slot held for a request whose message was never sent
+	void CheckPendingRequestTimeouts() noexcept; // Expire requests whose reply never came, reporting each to the SBC
 
 	// Motor control functions
 	void SendMotion(CanMessageBuffer* buf) noexcept;

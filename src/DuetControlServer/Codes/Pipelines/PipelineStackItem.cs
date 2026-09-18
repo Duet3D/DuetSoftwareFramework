@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Nito.AsyncEx;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -56,51 +57,67 @@ public sealed class PipelineStackItem
         File = file;
 
         // Feed incoming codes to the code handler
-        if (pipeline.Stage != PipelineStage.Firmware)
+        ProcessorTask = Task.Factory.StartNew(async delegate
         {
-            ProcessorTask = Task.Factory.StartNew(async delegate
+            await foreach (Code code in PendingCodes.Reader.ReadAllAsync(_lifetime.ApplicationStopping))
             {
-                await foreach (Code code in PendingCodes.Reader.ReadAllAsync(_lifetime.ApplicationStopping))
+                // Set it up
+                lock (this)
                 {
-                    // Set it up
-                    lock (this)
-                    {
-                        CodeBeingExecuted = code;
-                    }
-                    code.Stage = pipeline.Stage;
+                    CodeBeingExecuted = code;
+                }
+                code.Stage = pipeline.Stage;
 
-                    // Process it
-                    try
+                // Process it
+                try
+                {
+                    if (pipeline.Stage != PipelineStage.Executed &&
+                        (code.CancellationToken.IsCancellationRequested || File?.HoldAtNextCode == true))
                     {
-                        if (code.CancellationToken.IsCancellationRequested && pipeline.Stage != PipelineStage.Executed)
+                        // Do not deal with cancelled codes, nor with the codes of a file a pause is
+                        // waiting to reach the end of: the barrier belongs in the dispatch path, so
+                        // that the code after the macro is cancelled where it would have been started
+                        codeProcessor.CancelCode(code);
+                    }
+                    else if (pipeline.Stage == PipelineStage.ProcessInternally &&
+                             !code.Flags.HasFlag(DuetAPI.Commands.CodeFlags.IsInternallyProcessed) &&
+                             codeProcessor.ShouldDefer(code, pipeline.LastDeferredCodeTask() is not null, out int ring, out uint anchor))
+                    {
+                        // A Deferred-class code with a live anchor is deferred: dispatched
+                        // without being awaited, so the channel continues past it while its
+                        // handler waits for the anchor move to retire. Every other class is awaited,
+                        // which keeps dispatch order FIFO. The flush comes first and is awaited,
+                        // because it freezes the code's parameters and its place in the
+                        // evaluation order, which must happen before anything later runs
+                        if (await codeProcessor.FlushAsync(code, cancellationToken: code.CancellationToken))
                         {
-                            // Do not deal with cancelled codes
-                            codeProcessor.CancelCode(code);
+                            pipeline.DeferCode(code, ring, anchor);
                         }
                         else
                         {
-                            await pipeline.ProcessCodeAsync(code);
+                            codeProcessor.CancelCode(code);
                         }
                     }
-                    catch (Exception e)
+                    else
                     {
-                        pipeline.ChannelProcessor.Logger.LogError(e, "Failed to process code in stage {0}", pipeline.Stage);
-                    }
-
-                    // Code processed, see if there is more to do
-                    lock (this)
-                    {
-                        Busy = PendingCodes.Reader.TryPeek(out _);
-                        CodeBeingExecuted = null;
+                        await pipeline.ProcessCodeAsync(code);
                     }
                 }
-            }).Unwrap();
-        }
-        else
-        {
-            ProcessorTask = Task.CompletedTask;
-        }
+                catch (Exception e)
+                {
+                    pipeline.ChannelProcessor.Logger.LogError(e, "Failed to process code in stage {0}", pipeline.Stage);
+                }
+
+                // Code processed, see if there is more to do
+                lock (this)
+                {
+                    Busy = PendingCodes.Reader.TryPeek(out _);
+                    CodeBeingExecuted = null;
+                }
+            }
+        }).Unwrap();
     }
+
 
     /// <summary>
     /// Pending codes to be executed
@@ -139,7 +156,6 @@ public sealed class PipelineStackItem
 
     /// <summary>
     /// Current code being executed.
-    /// This is not applicable on the Firmware stage because we buffer multiple codes there
     /// </summary>
     public Code? CodeBeingExecuted;
 

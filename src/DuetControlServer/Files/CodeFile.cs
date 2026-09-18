@@ -120,6 +120,34 @@ public class CodeFile(
     public long NextFilePosition { get; set; }
 
     /// <summary>
+    /// Whether this file is on its first command since a restart
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>GCodeMachineState::firstCommandAfterRestart</c>. A resume after a pause
+    /// that abandoned macros sets it on the job file, as does starting a job from a saved position.
+    /// A macro started while the invoking file holds it inherits it, which is what
+    /// <c>state.macroRestarted</c> is computed from, and it is cleared once the file's first
+    /// command has executed, so only the command at the restart point ever carries it
+    /// </remarks>
+    public bool FirstCommandAfterRestart { get; set; }
+
+    /// <summary>
+    /// The G-code number a line that names no command letter repeats, or -1 if there is none
+    /// </summary>
+    /// <remarks>
+    /// Reading from a new position throws this away with the rest of the parser state, which is
+    /// right for a seek to somewhere unrelated and wrong for the seek a pause makes: the job carries
+    /// on from a line that may well be a bare <c>X100 Y100 E5</c>, and what makes that a move is the
+    /// G1 several lines above it. So a resume puts it back, which is RepRapFirmware's
+    /// <c>SetModalGCommand</c>
+    /// </remarks>
+    public int ModalGCommand
+    {
+        get => _parserBuffer.LastGCode;
+        set => _parserBuffer.LastGCode = value;
+    }
+
+    /// <summary>
     /// Get the current number of iterations of the current loop
     /// </summary>
     /// <param name="code">Code that requested the number of iterations</param>
@@ -152,6 +180,30 @@ public class CodeFile(
     private volatile bool _isClosed = false;
 
     /// <summary>
+    /// Whether the codes of this file are to be held at the dispatch barrier
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A pause that has to wait for a macro to finish arms this on the job file. The pipeline
+    /// consults it beside the cancellation check it already makes, so a code whose stack level is
+    /// this file is cancelled instead of being processed - which puts the barrier in the dispatch
+    /// path itself rather than in something that has to poll for the macro ending. The macro's own
+    /// codes are a child stack item and are not held, so the macro runs to its end.
+    /// </para>
+    /// <para>
+    /// RepRapFirmware makes the same check in <c>StartNextGCode</c>, before it starts the next
+    /// command from the file. Cancelling rather than holding is what keeps a flush of this level
+    /// from waiting on the barrier, and the codes it cancels are the ones the rewind re-reads
+    /// </para>
+    /// </remarks>
+    public bool HoldAtNextCode
+    {
+        get => _holdAtNextCode;
+        set => _holdAtNextCode = value;
+    }
+    private volatile bool _holdAtNextCode;
+
+    /// <summary>
     /// Close this file
     /// </summary>
     public void Close() => _isClosed = true;
@@ -164,7 +216,6 @@ public class CodeFile(
     /// <param name="codeFactory">Factory to create new codes</param>
     /// <param name="codeProcessor">Code processor to process the codes</param>
     /// <param name="expressions">Expressions to evaluate the codes</param>
-    /// <param name="linkInterface">Link interface</param>
     /// <param name="model">Object model to access the machine state</param>
     /// <param name="loggerFactory">Logger factory</param>
     /// <param name="settings">Settings to use</param>
@@ -187,6 +238,7 @@ public class CodeFile(
 
         // Seek to the next code's file position and shallow-copy the parser state
         Position = copyFrom.NextFilePosition;
+        FirstCommandAfterRestart = copyFrom.FirstCommandAfterRestart;
 
         _parserBuffer.LineNumber = copyFrom._parserBuffer.LineNumber;
         _parserBuffer.LastGCode = copyFrom._parserBuffer.LastGCode;
@@ -293,6 +345,18 @@ public class CodeFile(
             {
                 if (!codeRead || (code.Type != CodeType.Comment && state.IsFinished(code.Indent)))
                 {
+                    // Blocks the end of the file would close are left standing, unless an enclosing
+                    // loop is about to run the file again: the machine may still be executing codes
+                    // that were read ahead, and a pause in that window rewinds the file into them, so
+                    // the local variables they reference must stay resolvable. The blocks die with
+                    // this instance instead, which is when RepRapFirmware deletes them too: its
+                    // StopPrint clears the job file's blocks, not the read-ahead reaching the end of
+                    // the file
+                    if (!codeRead && !IsInsideActiveLoop())
+                    {
+                        break;
+                    }
+
                     if (state.HasLocalVariables)
                     {
                         // Wait for pending commands to be executed so all the local variables can be disposed of again.
@@ -319,7 +383,6 @@ public class CodeFile(
                                     await codeProcessor.FlushAsync(this, cancellationToken);
                                 }
 
-                                Task varDeletionTask;
                                 using (await LockAsync(cancellationToken))
                                 {
                                     Position = state.FilePosition ?? 0;
@@ -327,14 +390,13 @@ public class CodeFile(
                                     state.ProcessBlock = true;
                                     state.ContinueLoop = false;
                                     state.Iterations++;
-                                    varDeletionTask = DeleteLocalVariablesAsync(state);
+                                    DeleteLocalVariables(state);
                                     readAgain = true;
                                     if (!IsClosed)
                                     {
                                         logger.LogRestartingBlock(state.Keyword, state.Iterations);
                                     }
                                 }
-                                await varDeletionTask;  // wait outside the code lock to avoid deadlocks
                                 break;
                             }
                             await EndCodeBlockAsync(cancellationToken);
@@ -421,7 +483,7 @@ public class CodeFile(
                         }
 
                         // Evaluate the condition
-                        string? stringEvaluationResult = await expressions.EvaluateAsync(code, true, cancellationToken);
+                        string? stringEvaluationResult = await expressions.EvaluateAsync(code, cancellationToken);
                         if (bool.TryParse(stringEvaluationResult, out bool evaluationResult))
                         {
                             logger.LogDebug("Evaluation result: ({KeywordArgument}) = {Result}", code.KeywordArgument, evaluationResult);
@@ -514,6 +576,15 @@ public class CodeFile(
     }
 
     /// <summary>
+    /// Variables this file has created and the parameters it was called with
+    /// </summary>
+    /// <remarks>
+    /// A file gets its own set, so a macro cannot see the variables of whatever started it. The block
+    /// a variable was created in decides how long it lives; the file decides who can see it
+    /// </remarks>
+    public VariableSet Variables { get; } = new();
+
+    /// <summary>
     /// Add a new local variable to the current code block
     /// </summary>
     /// <param name="varName">Name of the variable</param>
@@ -536,23 +607,36 @@ public class CodeFile(
     }
 
     /// <summary>
-    /// Delete local variables from a given code block asynchronously
+    /// Delete the local variables a code block created
     /// </summary>
-    /// <param name="codeBlock">Code block</param>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    private async Task DeleteLocalVariablesAsync(CodeBlock codeBlock, CancellationToken cancellationToken = default)
+    /// <param name="codeBlock">Code block that is ending or restarting</param>
+    private void DeleteLocalVariables(CodeBlock codeBlock)
     {
-        Task[] deletionTasks = new Task[codeBlock.LocalVariables.Count];
-        for (int i = 0; i < codeBlock.LocalVariables.Count; i++)
+        foreach (string varName in codeBlock.LocalVariables)
         {
-#if false // TODO: delete local variables once they are stored in DCS
-            deletionTasks[i] = linkInterface.SetVariableAsync(Channel, false, codeBlock.LocalVariables[i], null, cancellationToken);
-#endif
+            Variables.DeleteVariable(varName);
         }
-        await Task.WhenAll(deletionTasks);
         codeBlock.LocalVariables.Clear();
         codeBlock.HasLocalVariables = false;
+    }
+
+    /// <summary>
+    /// Whether any code block on the stack is a while loop that is going to run again
+    /// </summary>
+    /// <returns>True if an enclosing while loop is still looping</returns>
+    private bool IsInsideActiveLoop()
+    {
+        lock (_codeBlocks)
+        {
+            foreach (CodeBlock codeBlock in _codeBlocks)
+            {
+                if (codeBlock.Keyword == KeywordType.While && (codeBlock.ProcessBlock || codeBlock.ContinueLoop))
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /// <summary>
@@ -562,8 +646,6 @@ public class CodeFile(
     /// <returns>Asynchronous task</returns>
     private async Task EndCodeBlockAsync(CancellationToken cancellationToken)
     {
-        Task? varDeletionTask = null;
-
         using (await LockAsync(cancellationToken))
         {
             CodeBlock? codeBlock;
@@ -588,16 +670,11 @@ public class CodeFile(
                 }
 
                 // Delete previously created local variables
-                varDeletionTask = DeleteLocalVariablesAsync(codeBlock, cancellationToken);
+                DeleteLocalVariables(codeBlock);
 
                 // End
                 _lastCodeBlock = codeBlock;
             }
-        }
-
-        if (varDeletionTask is not null)
-        {
-            await varDeletionTask;
         }
     }
 }

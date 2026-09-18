@@ -27,8 +27,12 @@ struct ExpansionBoardData
 
 	const char* _ecv_array _ecv_null typeName;
 	volatile uint32_t whenLastStatusReportReceived;
+	uint32_t whenBoardStarted;	// the board's start time on our clock, from the timeSinceStarted it announced
 	UniqueId uniqueId;
 	BoardState state;
+	uint8_t numDrivers;
+	bool announcedV1;			// true if the announcement carried a unique id, which the V0 format has no room for
+	bool usesUf2Binary;			// true if this board takes its main firmware in .uf2 rather than .bin format
 };
 
 class ExpansionManager
@@ -41,6 +45,8 @@ class ExpansionManager
 
 	void ProcessAnnouncement(CanMessageBuffer& buf, bool isNewFormat) noexcept;
 	void ProcessBoardStatusReport(const CanMessageBuffer& buf) noexcept;
+	void BeginReplayToSbc() noexcept;
+	void ContinueReplayToSbc() noexcept;
 
 	// Firmware update and related functions
 	GCodeResult ResetRemote(uint32_t boardAddress, const StringRef& reply) THROWS(GCodeException);
@@ -69,6 +75,10 @@ class ExpansionManager
 	mutable volatile unsigned int m_lastIndexSearched; // the last board index we searched for, or 0 if invalid
 	mutable volatile unsigned int
 		m_lastAddressFound; // if lastIndexSearched is nonzero, this is the corresponding board address we found
+	// Where the replay to the SBC has got to, or NoReplayPending when there is nothing left to send
+	static constexpr unsigned int NoReplayPending = CanId::MaxCanAddress + 1;
+	unsigned int m_replayNextAddress;
+
 	ExpansionBoardData m_boards[CanId::MaxCanAddress + 1]; // the first entry is a dummy one
 };
 

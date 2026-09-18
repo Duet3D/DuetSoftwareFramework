@@ -34,13 +34,36 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
     private MoveSegmentation? _segmentation;
 
     /// <summary>
+    /// Create the kinematics instance that carries a given geometry's parameters
+    /// </summary>
+    /// <param name="name">Name of the geometry</param>
+    /// <returns>A new instance of the type that holds that geometry's configuration</returns>
+    /// <remarks>
+    /// Several geometries share one class because they differ only in their matrix, so the name has
+    /// to be applied separately from the type. M669 uses this to switch geometry, which is why the
+    /// factory lives here: <see cref="Name"/> is only settable from within this hierarchy
+    /// </remarks>
+    public static Kinematics Create(KinematicsName name)
+    {
+        Kinematics kinematics = name switch
+        {
+            KinematicsName.LinearDelta or KinematicsName.RotaryDelta => new DeltaKinematics(),
+            KinematicsName.Scara or KinematicsName.FiveBarScara => new ScaraKinematics(),
+            KinematicsName.Polar => new PolarKinematics(),
+            KinematicsName.Hangprinter => new HangprinterKinematics(),
+            _ => new CoreKinematics()
+        };
+        kinematics.Name = name;
+        return kinematics;
+    }
+
+    /// <summary>
     /// Update this instance from a given JSON element
     /// </summary>
     /// <param name="jsonElement">Element to update this intance from</param>
-    /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
     /// <returns>Updated instance</returns>
     /// <exception cref="JsonException">Failed to deserialize data</exception>
-    public IDynamicModelObject? UpdateFromJson(JsonElement jsonElement, bool ignoreSbcProperties)
+    public IDynamicModelObject? UpdateFromJson(JsonElement jsonElement)
     {
         if (jsonElement.ValueKind == JsonValueKind.Null)
         {
@@ -56,7 +79,7 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
                 if (this is not CoreKinematics)
                 {
                     Kinematics newKinematics = new CoreKinematics();
-                    return newKinematics.UpdateFromJson(jsonElement, ignoreSbcProperties);
+                    return newKinematics.UpdateFromJson(jsonElement);
                 }
             }
             else if (name is "delta" or "lineardelta")
@@ -64,7 +87,7 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
                 if (this is not DeltaKinematics)
                 {
                     Kinematics newKinematics = new DeltaKinematics();
-                    return newKinematics.UpdateFromJson(jsonElement, ignoreSbcProperties);
+                    return newKinematics.UpdateFromJson(jsonElement);
                 }
             }
             else if (name is "hangprinter")
@@ -72,7 +95,7 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
                 if (this is not HangprinterKinematics)
                 {
                     Kinematics newKinematics = new HangprinterKinematics();
-                    return newKinematics.UpdateFromJson(jsonElement, ignoreSbcProperties);
+                    return newKinematics.UpdateFromJson(jsonElement);
                 }
             }
             else if (name is "fivebarscara" or "scara")
@@ -80,7 +103,7 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
                 if (this is not ScaraKinematics)
                 {
                     Kinematics newKinematics = new ScaraKinematics();
-                    return newKinematics.UpdateFromJson(jsonElement, ignoreSbcProperties);
+                    return newKinematics.UpdateFromJson(jsonElement);
                 }
             }
             else if (name is "polar")
@@ -88,26 +111,25 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
                 if (this is not PolarKinematics)
                 {
                     Kinematics newKinematics = new PolarKinematics();
-                    return newKinematics.UpdateFromJson(jsonElement, ignoreSbcProperties);
+                    return newKinematics.UpdateFromJson(jsonElement);
                 }
             }
             else if (this is CoreKinematics or DeltaKinematics or HangprinterKinematics or ScaraKinematics or PolarKinematics)
             {
                 Kinematics newKinematics = new();
-                return newKinematics.UpdateFromJson(jsonElement, ignoreSbcProperties);
+                return newKinematics.UpdateFromJson(jsonElement);
             }
         }
-        return GeneratedUpdateFromJson(jsonElement, ignoreSbcProperties);
+        return GeneratedUpdateFromJson(jsonElement);
     }
 
     /// <summary>
     /// Update this instance from a given JSON reader
     /// </summary>
     /// <param name="reader">JSON reader</param>
-    /// <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
     /// <returns>Updated instance</returns>
     /// <exception cref="JsonException">Failed to deserialize data</exception>
-    public IDynamicModelObject? UpdateFromJsonReader(ref Utf8JsonReader reader, bool ignoreSbcProperties)
+    public IDynamicModelObject? UpdateFromJsonReader(ref Utf8JsonReader reader)
     {
         if (reader.TokenType == JsonTokenType.None && !reader.Read())
         {
@@ -136,7 +158,7 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
                         if (this is not CoreKinematics)
                         {
                             Kinematics newKinematics = new CoreKinematics();
-                            return newKinematics.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            return newKinematics.UpdateFromJsonReader(ref reader);
                         }
                     }
                     else if (name is "delta" or "lineardelta")
@@ -144,7 +166,7 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
                         if (this is not DeltaKinematics)
                         {
                             Kinematics newKinematics = new DeltaKinematics();
-                            return newKinematics.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            return newKinematics.UpdateFromJsonReader(ref reader);
                         }
                     }
                     else if (name is "hangprinter")
@@ -152,7 +174,7 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
                         if (this is not HangprinterKinematics)
                         {
                             Kinematics newKinematics = new HangprinterKinematics();
-                            return newKinematics.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            return newKinematics.UpdateFromJsonReader(ref reader);
                         }
                     }
                     else if (name is "fivebarscara" or "scara")
@@ -160,7 +182,7 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
                         if (this is not ScaraKinematics)
                         {
                             Kinematics newKinematics = new ScaraKinematics();
-                            return newKinematics.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            return newKinematics.UpdateFromJsonReader(ref reader);
                         }
                     }
                     else if (name is "polar")
@@ -168,13 +190,13 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
                         if (this is not PolarKinematics)
                         {
                             Kinematics newKinematics = new PolarKinematics();
-                            return newKinematics.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                            return newKinematics.UpdateFromJsonReader(ref reader);
                         }
                     }
                     else if (this is CoreKinematics or DeltaKinematics or HangprinterKinematics or ScaraKinematics or PolarKinematics)
                     {
                         Kinematics newKinematics = new();
-                        return newKinematics.UpdateFromJsonReader(ref reader, ignoreSbcProperties);
+                        return newKinematics.UpdateFromJsonReader(ref reader);
                     }
                 }
                 else
@@ -187,6 +209,6 @@ public partial class Kinematics : ModelObject, IDynamicModelObject
                 readerCopy.Skip();
             }
         }
-        return GeneratedUpdateFromJsonReader(ref reader, ignoreSbcProperties);
+        return GeneratedUpdateFromJsonReader(ref reader);
     }
 }

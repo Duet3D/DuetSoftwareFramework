@@ -10,6 +10,8 @@
 
 #include <RepRapFirmware.h>
 
+#include <span>
+
 #if HAS_SBC_INTERFACE
 
 #  include "RTOSIface/RTOSIface.h"
@@ -56,7 +58,27 @@ class SbcInterface
 	void HandleGCodeReply(MessageType mt, const char* reply) noexcept;	  // accessed by Platform
 	void HandleGCodeReply(MessageType mt, OutputBuffer* buffer) noexcept; // accessed by Platform
 
-	bool EnqueueCanResponse(const CANResponseHeader& header, const char* _ecv_null data) noexcept;
+	// Queue a CAN message for forwarding to the SBC. Returns CanStatus::Ok if it was queued, or why it
+	// could not be: NoBuffer when the ring is full, Overflow when the payload is longer than a slot.
+	CanStatus EnqueueCanResponse(const CANResponseHeader& header, const char* _ecv_null data) noexcept;
+
+	// Record that a reply EnqueueCanResponse refused has been given up on rather than retried
+	void NoteCanResponseDropped() noexcept
+	{
+		++m_canResponsesDropped;
+	}
+
+	// Record what became of a CAN message the SBC asked to be sent. Called from whichever task dealt
+	// with it, so that every outcome is reported by the code that produced it rather than inferred
+	void ReportCanMessageSent(uint16_t txToken, CanStatus status) noexcept;
+
+	// Tell the SBC that an endstop cut a move short. The controller stops the drives itself, but only
+	// the SBC can say where they should have ended up, so it takes the trigger timestamp from here
+	// and sends the revert. `moveId` is the move that was stopped, as the SBC numbered it, so that a
+	// report arriving after the next move has armed is not applied to that move.
+	// Called from the CAN receiver task
+	bool ReportMotionStopped(uint32_t whenTriggered, uint32_t moveId,
+							 std::span<const duet::spi::protocol::MotionStoppedDriver> stopped) noexcept;
 	void EnqueueCanTextReply(
 		uint16_t txToken,
 		CanRequestId requestId,
@@ -90,10 +112,38 @@ class SbcInterface
 		uint8_t payload[64];
 	};
 	CanResponseBuffer m_canResponseRing[NumCanResponseBuffers]{};
+
+	// Outcomes waiting to be reported, batched into one packet per transfer
+	static constexpr size_t NumCanMessageSentEntries = SbcProtocol::MaxCanMessagesSentPerTransfer;
+	CanMessageSentEntry m_canMessageSentRing[NumCanMessageSentEntries]{};
+	volatile size_t m_canMessageSentHead = 0;
+	volatile size_t m_canMessageSentTail = 0;
 	volatile size_t m_canResponseHead,
 		m_canResponseTail; // head = next slot to write, tail = next slot to read; empty when equal
 
-	bool ProcessCanResponses() noexcept; // Write queued CAN responses into the current transfer
+	bool ProcessCanResponses() noexcept;
+	bool ProcessCanMessagesSent() noexcept; // Write queued CAN responses into the current transfer
+
+	// Ring of motion-stopped reports waiting to go to the SBC. Endstop stops are rare, so this is
+	// much smaller than the CAN response ring
+	static constexpr size_t NumMotionStoppedBuffers = 4;
+	struct MotionStoppedBuffer
+	{
+		duet::spi::protocol::MotionStoppedHeader header;
+		duet::spi::protocol::MotionStoppedDriver drivers[duet::spi::protocol::MaxMotionStoppedDrivers];
+	};
+	MotionStoppedBuffer m_motionStoppedRing[NumMotionStoppedBuffers]{};
+	volatile size_t m_motionStoppedHead, m_motionStoppedTail;
+
+	// Reported in M122. A stop the SBC never hears about is one it cannot correct, and the failure
+	// looks the same from the SBC whether this board never sent it or the SBC never acted on it
+	uint32_t m_motionStoppedReports = 0, m_motionStoppedDropped = 0;
+
+	// A reply that never reaches the SBC is one the code that asked for it waits out a timeout for, and
+	// nothing else says it happened
+	uint32_t m_canResponsesDropped = 0, m_canResponsesTooLong = 0;
+
+	bool ProcessMotionStopped() noexcept; // Write queued motion-stopped reports into the current transfer
 
 #  ifdef TRACK_FILE_CODES
 	volatile size_t fileCodesRead, fileCodesHandled, fileMacrosRunning, fileMacrosClosing;

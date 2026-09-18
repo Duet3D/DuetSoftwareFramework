@@ -25,8 +25,6 @@ namespace DuetControlServer.Model;
 /// <summary>
 /// Static class that updates the machine model in certain intervals
 /// </summary>
-/// <param name="codeFactory">Code factory to create codes</param>
-/// <param name="linkInterface">Link interface to the machine</param>
 /// <param name="model">Object model</param>
 /// <param name="logger">Logger instance</param>
 /// <param name="settings">Settings of the application</param>
@@ -99,7 +97,7 @@ public partial class PeriodicUpdateService(
                         await using FileStream manifestStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
                         using JsonDocument manifestJson = await JsonDocument.ParseAsync(manifestStream, cancellationToken: cancellationToken);
                         Plugin plugin = new();
-                        plugin.UpdateFromJson(manifestJson.RootElement, false);
+                        plugin.UpdateFromJson(manifestJson.RootElement);
                         plugin.Pid = -1;
 
                         // Do not add incomplete manifests to the object model, a plugin without id or

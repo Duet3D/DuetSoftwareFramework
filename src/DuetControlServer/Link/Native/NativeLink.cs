@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using DuetControlServer.Motion.Native;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -97,9 +98,18 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
         Check<CanResponseEvent>(16);
         Check<CodeBufferEvent>(8);
         Check<ConnectionEstablishedEvent>(8);
+        Check<OutboundSeqEvent>(8);
+        Check<CanMessagesSentEvent>(8);
+        Check<CanMessageSentEntry>(4);
         Check<RequestCompletedEvent>(12);
         Check<LogEvent>(8);
         Check<MalformedPacketEvent>(12);
+        Check<MoveCompletedEvent>(16);
+        Check<MoveFailedEvent>(12);
+        Check<MotionStoppedEvent>(16);
+        Check<MotionStoppedDriverEntry>(4);
+        Check<MoveParamsHeader>(40);
+        Check<MoveDriveTuning>(28);
     }
 
     /// <summary>
@@ -110,9 +120,14 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     {
         VerifyLayouts();
 
+        NativeTransport transport = settings.Value.SbcTransport.Equals("Socket", StringComparison.OrdinalIgnoreCase)
+            ? NativeTransport.Socket
+            : NativeTransport.Spi;
+
         // The config carries raw UTF-8 pointers, so they must stay alive across the Create call
         IntPtr spiDevice = Marshal.StringToCoTaskMemUTF8(settings.Value.SpiDevice);
         IntPtr gpioChipDevice = Marshal.StringToCoTaskMemUTF8(settings.Value.GpioChipDevice);
+        IntPtr socketPath = Marshal.StringToCoTaskMemUTF8(settings.Value.SbcSocketPath);
         try
         {
             NativeConfig config = new()
@@ -139,14 +154,16 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
                 SbcConnectionTimeout = settings.Value.SbcConnectionTimeout,
                 SbcConnectionKeepAliveInterval = settings.Value.SbcConnectionKeepAliveInterval,
                 MaxSbcRetries = settings.Value.MaxSbcRetries,
-                UpdateOnly = settings.Value.UpdateOnly ? 1 : 0
+                UpdateOnly = settings.Value.UpdateOnly ? 1 : 0,
+                Transport = (int)transport,
+                SocketPath = socketPath
             };
 
             byte[] errorBuffer = new byte[ErrorBufferSize];
             _handle = NativeMethods.DuetSbc_Create(ref config, errorBuffer, errorBuffer.Length);
             if (_handle == IntPtr.Zero)
             {
-                throw new InvalidOperationException($"Failed to create native SPI interface: {ReadError(errorBuffer)}");
+                throw new InvalidOperationException($"Failed to create native link interface: {ReadError(errorBuffer)}");
             }
 
             Array.Clear(errorBuffer);
@@ -155,16 +172,17 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
                 string error = ReadError(errorBuffer);
                 NativeMethods.DuetSbc_Destroy(_handle);
                 _handle = IntPtr.Zero;
-                throw new InvalidOperationException($"Failed to connect to controller over SPI: {error}");
+                throw new InvalidOperationException($"Failed to connect to controller over {transport}: {error}");
             }
 
             ProtocolVersion = NativeMethods.DuetSbc_GetProtocolVersion(_handle);
-            logger.LogInformation("Connected to controller over SPI (protocol version {ProtocolVersion})", ProtocolVersion);
+            logger.LogInformation("Connected to controller over {Transport} (protocol version {ProtocolVersion})", transport, ProtocolVersion);
         }
         finally
         {
             Marshal.FreeCoTaskMem(spiDevice);
             Marshal.FreeCoTaskMem(gpioChipDevice);
+            Marshal.FreeCoTaskMem(socketPath);
         }
     }
 
@@ -233,7 +251,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     {
         ThrowIfDisposed();
         byte[] encoded = Encoding.UTF8.GetBytes(message);
-        if (NativeMethods.DuetSbc_QueueMessage(_handle, (uint)flags, encoded, encoded.Length) != 0)
+        if (NativeMethods.DuetSbc_QueueMessage(_handle, (uint)flags, encoded, encoded.Length) < 0)
         {
             // The transfer loop is not draining the ring, so the message would be silently lost
             throw new InvalidOperationException("Failed to queue message: native outbound buffer is full");
@@ -249,14 +267,17 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     /// <param name="dstAddress">CAN destination: 0..126, or 127 for broadcast</param>
     /// <param name="isResponse">Whether this message is a response</param>
     /// <param name="payload">CAN payload (0..64 bytes)</param>
+    /// <returns>Sequence number to wait on with <see cref="WaitForDeliveryAsync"/></returns>
     /// <exception cref="InvalidOperationException">The outbound ring is full</exception>
-    public void QueueCanMessage(ushort txToken, ushort msgType, ushort replyType, byte dstAddress, bool isResponse, ReadOnlySpan<byte> payload)
+    public uint QueueCanMessage(ushort txToken, ushort msgType, ushort replyType, byte dstAddress, bool isResponse, ReadOnlySpan<byte> payload)
     {
         ThrowIfDisposed();
-        if (NativeMethods.DuetSbc_QueueCanMessage(_handle, txToken, msgType, replyType, dstAddress, isResponse ? 1 : 0, payload, payload.Length) != 0)
+        long sequenceNumber = NativeMethods.DuetSbc_QueueCanMessage(_handle, txToken, msgType, replyType, dstAddress, isResponse ? 1 : 0, payload, payload.Length);
+        if (sequenceNumber < 0)
         {
             throw new InvalidOperationException("Failed to queue CAN message: native outbound buffer is full");
         }
+        return (uint)sequenceNumber;
     }
 
     /// <summary>
@@ -327,7 +348,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
         ThrowIfDisposed();
         TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         uint requestId = RegisterRequest(tcs);
-        if (NativeMethods.DuetSbc_QueueEnableCan(_handle, enable ? 1 : 0, requestId) != 0)
+        if (NativeMethods.DuetSbc_QueueEnableCan(_handle, enable ? 1 : 0, requestId) < 0)
         {
             _pendingRequests.TryRemove(requestId, out _);
             throw new InvalidOperationException("Failed to queue CAN enable request: native outbound buffer is full");
@@ -449,6 +470,79 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     }
 
     /// <summary>
+    /// Commands waiting to hear that they reached the controller, by sequence number
+    /// </summary>
+    private readonly SortedDictionary<uint, TaskCompletionSource> _outboundWaiters = [];
+
+    /// <summary>
+    /// Wait until a queued command has reached the controller
+    /// </summary>
+    /// <param name="sequenceNumber">Sequence number the command was given when it was queued</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    /// <exception cref="OperationCanceledException">The command was dropped instead</exception>
+    internal Task WaitForDeliveryAsync(uint sequenceNumber, CancellationToken cancellationToken)
+    {
+        TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_outboundWaiters)
+        {
+            if (sequenceNumber <= _deliveredSequenceNumber)
+            {
+                return Task.CompletedTask;
+            }
+            _outboundWaiters[sequenceNumber] = tcs;
+        }
+        return tcs.Task.WaitAsync(cancellationToken);
+    }
+
+    private uint _deliveredSequenceNumber;
+
+    /// <summary>
+    /// Resolve everything the controller has taken, or everything that was abandoned
+    /// </summary>
+    /// <param name="sequenceNumber">Last command this applies to</param>
+    /// <param name="delivered">Whether the commands reached the controller</param>
+    internal void CompleteOutbound(uint sequenceNumber, bool delivered)
+    {
+        List<TaskCompletionSource> completed = [];
+        lock (_outboundWaiters)
+        {
+            if (delivered)
+            {
+                _deliveredSequenceNumber = sequenceNumber;
+            }
+
+            // Sorted by sequence number, so everything this covers is at the front
+            List<uint> keys = [];
+            foreach (var kv in _outboundWaiters)
+            {
+                if (kv.Key > sequenceNumber)
+                {
+                    break;
+                }
+                keys.Add(kv.Key);
+                completed.Add(kv.Value);
+            }
+            foreach (uint key in keys)
+            {
+                _outboundWaiters.Remove(key);
+            }
+        }
+
+        foreach (TaskCompletionSource tcs in completed)
+        {
+            if (delivered)
+            {
+                tcs.TrySetResult();
+            }
+            else
+            {
+                tcs.TrySetCanceled();
+            }
+        }
+    }
+
+    /// <summary>
     /// Cancel every pending request, e.g. because the connection was lost
     /// </summary>
     internal void CancelPendingRequests()
@@ -539,6 +633,347 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
     /// Number of events dropped because the inbound ring was full
     /// </summary>
     public ulong DroppedEvents => _handle != IntPtr.Zero ? NativeMethods.DuetSbc_GetDroppedEvents(_handle) : 0;
+
+    /// <summary>
+    /// The controller's step clock, as the native side models it
+    /// </summary>
+    /// <remarks>
+    /// The SBC has no step clock of its own. Move start times are in this timebase, so a model that
+    /// has drifted schedules moves that arrive late
+    /// </remarks>
+    public uint StepClockTicks => _handle != IntPtr.Zero ? NativeMethods.DuetSbc_GetStepClockTicks(_handle) : 0;
+
+    /// <summary>
+    /// How far the movement timebase lags the raw step clock, in ticks
+    /// </summary>
+    /// <returns>The delay, or null if the loaded library does not report it</returns>
+    /// <remarks>
+    /// Moves are scheduled in the movement timebase and an endstop reports its trigger in the raw
+    /// one. Anything other than zero here is the gap the endstop correction has to reconcile, and it
+    /// is the one part of the clock that grows silently: every board slips by the same amount so
+    /// nothing about the motion looks wrong
+    /// </remarks>
+    public uint? GetMovementDelay()
+    {
+        if (_handle == IntPtr.Zero)
+        {
+            return null;
+        }
+
+        try
+        {
+            return NativeMethods.DuetSbc_GetMovementDelay(_handle);
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// How well the step-clock model is tracking the controller
+    /// </summary>
+    /// <returns>The statistics, or a zeroed struct if the link is not up</returns>
+    public NativeClockStats GetClockStats()
+    {
+        if (_handle == IntPtr.Zero)
+        {
+            return default;
+        }
+        NativeMethods.DuetSbc_GetClockStats(_handle, out NativeClockStats stats);
+        return stats;
+    }
+
+    /// <summary>
+    /// What the motion engine has done since the counters were last reset
+    /// </summary>
+    /// <returns>The statistics, or a zeroed struct if the link is not up</returns>
+    public NativeMotionStats GetMotionStats()
+    {
+        if (_handle == IntPtr.Zero)
+        {
+            return default;
+        }
+        NativeMethods.DuetSbc_MotionGetStats(_handle, out NativeMotionStats stats);
+        return stats;
+    }
+
+    /// <summary>
+    /// Zero the motion engine's error and underrun counters
+    /// </summary>
+    public void ResetMotionStats()
+    {
+        if (_handle != IntPtr.Zero)
+        {
+            NativeMethods.DuetSbc_MotionResetStats(_handle);
+        }
+    }
+
+    /// <summary>
+    /// Push the machine description down to the native motion engine
+    /// </summary>
+    /// <param name="config">Serialised MachineConfig</param>
+    /// <returns>True if it was accepted</returns>
+    /// <remarks>Safe only while no move is in flight</remarks>
+    public bool ConfigureMotion(ReadOnlySpan<byte> config)
+        => _handle != IntPtr.Zero && NativeMethods.DuetSbc_MotionConfigure(_handle, config, config.Length) != 0;
+
+    /// <summary>
+    /// Start the native motion thread
+    /// </summary>
+    /// <param name="rtPriority">SCHED_FIFO priority, or 0 for the default scheduler</param>
+    /// <returns>True if it started</returns>
+    public bool StartMotion(int rtPriority)
+        => _handle != IntPtr.Zero && NativeMethods.DuetSbc_MotionStart(_handle, rtPriority) != 0;
+
+    /// <summary>
+    /// Stop the native motion thread
+    /// </summary>
+    public void StopMotion()
+    {
+        if (_handle != IntPtr.Zero)
+        {
+            NativeMethods.DuetSbc_MotionStop(_handle);
+        }
+    }
+
+    /// <summary>
+    /// Whether the given ring has room for another move
+    /// </summary>
+    /// <param name="ring">Ring number</param>
+    /// <returns>True if there is room</returns>
+    public bool CanAddMove(int ring)
+        => _handle != IntPtr.Zero && NativeMethods.DuetSbc_MotionCanAddMove(_handle, ring) != 0;
+
+    /// <summary>
+    /// Queue a move
+    /// </summary>
+    /// <param name="moveParams">A MoveParamsHeader followed by its two arrays</param>
+    /// <returns>True if queued, false if the caller must retry</returns>
+    public bool SubmitMove(ReadOnlySpan<byte> moveParams)
+        => _handle != IntPtr.Zero && NativeMethods.DuetSbc_MotionSubmitMove(_handle, moveParams, moveParams.Length) != 0;
+
+    /// <summary>
+    /// Read the motor positions the motion engine last published
+    /// </summary>
+    /// <param name="steps">Receives the positions in microsteps</param>
+    /// <param name="whenTicks">Receives the step-clock time the snapshot was taken at</param>
+    /// <returns>Number of positions written</returns>
+    public int GetMotorPositions(Span<int> steps, out uint whenTicks)
+    {
+        if (_handle == IntPtr.Zero)
+        {
+            whenTicks = 0;
+            return 0;
+        }
+        return NativeMethods.DuetSbc_MotionGetMotorPositions(_handle, steps, steps.Length, out whenTicks);
+    }
+
+    /// <summary>
+    /// Where the drives are now, interpolated within the segment each is running
+    /// </summary>
+    /// <param name="steps">Receives the positions in microsteps</param>
+    /// <param name="whenTicks">Receives the step-clock time the snapshot was taken at</param>
+    /// <returns>Number of positions written</returns>
+    /// <remarks>
+    /// <see cref="GetMotorPositions"/> reports what the drives were <em>commanded</em> to, which only
+    /// advances as each segment of a move retires - so a trapezoidal move moves it three times, once
+    /// per phase. That is the right answer for resynchronising the planner and the wrong one for a
+    /// position display, which is what this is for
+    /// </remarks>
+    public int GetLivePositions(Span<int> steps, out uint whenTicks)
+    {
+        if (_handle == IntPtr.Zero)
+        {
+            whenTicks = 0;
+            return 0;
+        }
+        return NativeMethods.DuetSbc_MotionGetLivePositions(_handle, steps, steps.Length, out whenTicks);
+    }
+
+    /// <summary>
+    /// Where one drive was at a given step-clock time
+    /// </summary>
+    /// <param name="drive">Logical drive</param>
+    /// <param name="whenTicks">Master step-clock time to evaluate at, zero if none was reported</param>
+    /// <param name="position">Receives the position in microsteps</param>
+    /// <param name="positionAtMoveStart">Receives where the drive was when its current move began</param>
+    /// <param name="usedTimestamp">
+    /// Receives whether the answer came from <paramref name="whenTicks"/> rather than from where the
+    /// drive is now, which it does not when no timestamp was reported or the step clock is not yet
+    /// synchronised
+    /// </param>
+    /// <returns>True on success</returns>
+    /// <remarks>
+    /// Only the engine can answer this: it planned the motion and holds the segment chain, so it can
+    /// evaluate the profile at an instant that has already passed. That is what undoing an endstop
+    /// overshoot needs - where the drive was when the switch fired, not where the report caught it
+    /// </remarks>
+    public bool GetPositionAt(int drive, uint whenTicks, out int position, out int positionAtMoveStart,
+                              out bool usedTimestamp)
+    {
+        position = positionAtMoveStart = 0;
+        usedTimestamp = false;
+        if (_handle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        int ok = NativeMethods.DuetSbc_MotionGetPositionAt(_handle, drive, whenTicks, out position,
+                                                           out positionAtMoveStart, out int usedTimestampFlag);
+        usedTimestamp = usedTimestampFlag != 0;
+        return ok != 0;
+    }
+
+    /// <summary>
+    /// Force motor positions, after homing or a move that stopped early
+    /// </summary>
+    /// <param name="driveMask">Logical drives to set</param>
+    /// <param name="positions">Positions in microsteps</param>
+    /// <returns>True if the engine took the position</returns>
+    /// <remarks>
+    /// The engine adopts it on its own thread, because adopting a position discards the pending
+    /// motion of the drives it names and that is not something another thread may do to it. It
+    /// happens before any move submitted afterwards, so a caller that forces a position and then
+    /// queues a move gets the move it meant
+    /// </remarks>
+    public bool SetMotorPositions(uint driveMask, ReadOnlySpan<int> positions)
+        => _handle != IntPtr.Zero
+           && NativeMethods.DuetSbc_MotionSetMotorPositions(_handle, driveMask, positions, positions.Length) != 0;
+
+    /// <summary>
+    /// Ask the motion engine to stop early and drop the moves after it
+    /// </summary>
+    /// <param name="plannedDeceleration">
+    /// False to look for a junction the toolpath is already slow enough to stop at, which is what
+    /// RepRapFirmware does; true to plan a deceleration of its own
+    /// </param>
+    /// <returns>True if the request was queued</returns>
+    /// <remarks>
+    /// The result arrives through <see cref="TryGetFeedholdResult"/> once the motion thread has
+    /// acted, because dropping a move frees its segments and only that thread may do it
+    /// </remarks>
+    public bool RequestStop(bool plannedDeceleration)
+        => _handle != IntPtr.Zero && NativeMethods.DuetSbc_MotionRequestStop(_handle, plannedDeceleration ? 1 : 0) != 0;
+
+    /// <summary>
+    /// What the last feedhold did
+    /// </summary>
+    /// <param name="sequence">Receives the number of completed feedholds</param>
+    /// <param name="firstPurgedMoveId">Receives the id of the earliest move dropped</param>
+    /// <param name="movesPurged">Receives how many moves were dropped</param>
+    /// <param name="lastSurvivingMoveId">
+    /// Receives the id of the last move the stop left standing, which is the one the machine comes to
+    /// rest on. Everything this side is holding beyond it has been cancelled
+    /// </param>
+    /// <param name="stopped">Receives whether the ring was brought to a planned stop</param>
+    /// <param name="restEndpoints">
+    /// Receives where the machine will come to rest in microsteps, meaningful only when the ring was
+    /// stopped. This and not <see cref="GetMotorPositions"/> is what the planner resynchronises
+    /// against after a stop: the moves the stop could not recall carry the machine on past whatever
+    /// the positions snapshot reads at the time
+    /// </param>
+    /// <returns>True if the engine answered</returns>
+    public bool TryGetFeedholdResult(out uint sequence, out uint firstPurgedMoveId, out uint movesPurged,
+                                     out uint lastSurvivingMoveId, out bool stopped,
+                                     Span<int> restEndpoints = default)
+    {
+        sequence = firstPurgedMoveId = movesPurged = lastSurvivingMoveId = 0;
+        stopped = false;
+        if (_handle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        if (NativeMethods.DuetSbc_MotionGetFeedholdResult(_handle, out sequence, out firstPurgedMoveId,
+                                                          out movesPurged, out lastSurvivingMoveId,
+                                                          out int stoppedFlag,
+                                                          restEndpoints, restEndpoints.Length) == 0)
+        {
+            return false;
+        }
+        stopped = stoppedFlag != 0;
+        return true;
+    }
+
+    /// <summary>
+    /// Store the ring state decided here for the motion thread to read
+    /// </summary>
+    /// <param name="ring">Ring number</param>
+    /// <param name="shouldStartMove">Whether queued moves should start executing</param>
+    /// <param name="waitingForEmpty">Whether this side is waiting for the ring to drain</param>
+    public void SetRingState(int ring, bool shouldStartMove, bool waitingForEmpty)
+    {
+        if (_handle != IntPtr.Zero)
+        {
+            NativeMethods.DuetSbc_MotionSetRingState(_handle, ring, shouldStartMove ? 1 : 0, waitingForEmpty ? 1 : 0);
+        }
+    }
+
+    /// <summary>
+    /// Number of moves the given ring has been given
+    /// </summary>
+    /// <param name="ring">Ring number</param>
+    /// <returns>Scheduled move count</returns>
+    public uint GetScheduledMoves(int ring) => _handle != IntPtr.Zero ? NativeMethods.DuetSbc_MotionGetScheduledMoves(_handle, ring) : 0;
+
+    /// <summary>
+    /// Number of moves the given ring has finished
+    /// </summary>
+    /// <param name="ring">Ring number</param>
+    /// <returns>Completed move count</returns>
+    public uint GetCompletedMoves(int ring) => _handle != IntPtr.Zero ? NativeMethods.DuetSbc_MotionGetCompletedMoves(_handle, ring) : 0;
+
+    /// <summary>
+    /// Submissions refused because the queue was full. Non-zero means a move was lost
+    /// </summary>
+    public uint SubmissionsDropped => _handle != IntPtr.Zero ? NativeMethods.DuetSbc_MotionGetSubmissionsDropped(_handle) : 0;
+
+    /// <summary>
+    /// Whether a submitted move has not yet been taken up by the engine's motion thread
+    /// </summary>
+    /// <remarks>
+    /// <see cref="SubmitMove"/> hands the move to a lock-free queue and returns; the ring that
+    /// executes it only counts it as scheduled once the motion thread has taken it out. Between
+    /// those two the ring counters describe a machine with nothing to do while a move is already on
+    /// its way to it, so anything waiting for the machine to stop has to ask this as well
+    /// </remarks>
+    public bool HasPendingSubmissions
+        => _handle != IntPtr.Zero && NativeMethods.DuetSbc_MotionHasPendingSubmissions(_handle) != 0;
+
+    /// <summary>
+    /// Forced positions the engine has adopted
+    /// </summary>
+    /// <returns>The count since startup, or null if the loaded library does not report it</returns>
+    /// <remarks>
+    /// <para>
+    /// <see cref="SetMotorPositions"/> queues a position for the motion thread; this says how many it
+    /// has taken up. The two are the difference between a position that was sent and one that took
+    /// effect, which nothing else distinguishes.
+    /// </para>
+    /// <para>
+    /// Null rather than a throw when the symbol is absent. This is a diagnostic, and a diagnostic
+    /// that takes the whole of <c>M122</c> down with it when the native library is older than this
+    /// program is worse than no diagnostic - not least because "the library was not updated" is
+    /// exactly what it would have been reporting
+    /// </para>
+    /// </remarks>
+    public uint? GetForcedPositionsApplied()
+    {
+        if (_handle == IntPtr.Zero)
+        {
+            return null;
+        }
+
+        try
+        {
+            return NativeMethods.DuetSbc_MotionGetForcedPositionsApplied(_handle);
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return null;
+        }
+    }
     #endregion
 
     /// <summary>

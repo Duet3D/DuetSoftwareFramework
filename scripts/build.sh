@@ -3,6 +3,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# shellcheck source=scripts/native-arch.sh
+source "$SCRIPT_DIR/native-arch.sh"
 DEFAULT_BUILD_DIR="$REPO_ROOT/build/dotnet"
 DEFAULT_AOT_BUILD_DIR="$REPO_ROOT/build/aot"
 
@@ -68,7 +71,8 @@ Options:
       --fetch-sysroot  Fetch a sysroot from the deploy target and build against it
       --aot            Build ahead of time binaries. Defaults to "false"
       --arch           Architecture to build for. Defaults to "$ARCH"
-      --build-type     Defaults to "Debug"
+      --build-type     Defaults to "Debug". Also selects the CMake preset libduet_sbc.so
+                       is built with, so Debug builds it unoptimised and steppable
   -p, --publish-args   msbuild properties
   -o, --dest-dir       Defaults to "$DEFAULT_BUILD_DIR unless --aot then "$DEFAULT_AOT_BUILD_DIR/<arch>/" 
   -h, --help           Show this help
@@ -112,6 +116,7 @@ while [[ $# -gt 0 ]]; do
         --fetch-sysroot) FETCH_SYSROOT=true; shift ;;
         --aot)        AOT=true;       shift ;;
         --arch)       ARCH="$2";      shift 2 ;;
+        --build-type) BUILD_TYPE="$2"; shift 2 ;;
         -o|--dest-dir) BUILD_DIR="$2"; shift 2 ;;
         -p|--publish-args)    PUBLISH_ARGS="$2"; shift 2 ;;
         -h|--help)    usage; exit 0           ;;
@@ -231,6 +236,14 @@ build_sbc_interface() {
         fi
     fi
 
+    # An optimised .so is not steppable: the debugger loses locals and reorders lines. Every preset
+    # has a -debug twin that differs only in CMAKE_BUILD_TYPE, so --build-type picks the same
+    # configuration for the native library as it already does for the managed assemblies.
+    if [[ "${BUILD_TYPE,,}" == "debug" ]]; then
+        preset="$preset-debug"
+        echo "    Build type is $BUILD_TYPE; using the unoptimised preset"
+    fi
+
     local build_dir="$SBC_SRC_DIR/build/$preset"
 
     # --preset must be run from the project directory (that is where CMakePresets.json lives). Only
@@ -238,6 +251,8 @@ build_sbc_interface() {
     (cd "$SBC_SRC_DIR" \
         && cmake --preset "$preset" "${cmake_args[@]}" \
         && cmake --build --preset "$preset" --target duet_sbc_shared -j"$(nproc)")
+
+    verify_elf_arch "$build_dir/src/$SBC_LIB_NAME" "$ARCH" "$build_dir"
 
     # Land it next to the managed assemblies so default P/Invoke probing resolves it
     cp "$build_dir/src/$SBC_LIB_NAME" "$BUILD_DIR/"
@@ -282,25 +297,6 @@ project_publish_dir() {
     echo "${matches[0]}"
 }
 
-# write_solution_filter <path>
-# The whole solution cannot be published as-is: the multi-target libraries (DuetAPI,
-# DuetHttpClient) fail with NETSDK1129 unless a target framework is given, and the test and
-# documentation projects are not deployed. A filter narrows the publish to the deployable projects;
-# their project references are still built as dependencies.
-write_solution_filter() {
-    local filter="$1" project first=true
-    {
-        printf '{\n  "solution": {\n    "path": "%s",\n    "projects": [\n' "$SOLUTION"
-        for project in "${DOTNET_PROJECTS[@]}"; do
-            $first || printf ',\n'
-            first=false
-            # Paths in a filter are relative to the solution, which lives in src/
-            printf '      "%s/%s.csproj"' "${PROJECT_SRC[$project]#src/}" "$project"
-        done
-        printf '\n    ]\n  }\n}\n'
-    } > "$filter"
-}
-
 # Merge the per-project publish directories into BUILD_DIR. The projects share most of their
 # dependencies, so the copies overlap; later copies simply overwrite identical files.
 collect_output() {
@@ -327,12 +323,12 @@ if ! $SKIP_BUILD; then
     done
 
     if $ALL; then
-        # A single publish of the solution; MSBuild builds the projects in parallel itself
+        # A single publish of the solution; MSBuild builds the projects in parallel itself. Only the
+        # deployable projects publish: the libraries, tests, source generators and documentation are
+        # all marked IsPublishable=false, so they are built as dependencies but produce no output
+        # here.
         echo "=== Building solution ($BUILD_LABEL) ==="
-        FILTER_DIR="$(mktemp -d)"
-        write_solution_filter "$FILTER_DIR/DuetSoftwareFramework.slnf"
-        dotnet_publish "$FILTER_DIR/DuetSoftwareFramework.slnf"
-        rm -rf "$FILTER_DIR"
+        dotnet_publish "$SOLUTION"
     elif [[ ${#DOTNET_PROJECTS[@]} -eq 1 ]]; then
         echo "=== Building ${DOTNET_PROJECTS[0]} ($BUILD_LABEL) ==="
         dotnet_publish "$REPO_ROOT/${PROJECT_SRC[${DOTNET_PROJECTS[0]}]}"
@@ -434,12 +430,13 @@ $postinst_failed && exit 1
 
 # --- Start services if requested ---
 if $START_SERVICES; then
+    sleep 1
     if $LOCAL; then
         echo "=== Starting DSF services ==="
-        sudo systemctl start $SERVICES || true
+        sudo systemctl restart $SERVICES || true
     else
         echo "=== Starting DSF services on $SSH_USER@$TARGET ==="
-        ssh "${SSH_USER}@${TARGET}" "systemctl start $SERVICES || true"
+        ssh "${SSH_USER}@${TARGET}" "systemctl restart $SERVICES || true"
     fi
 fi
 

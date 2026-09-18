@@ -299,7 +299,7 @@ internal partial class PollConnector : BaseConnector
                             {
                                 lock (Model)
                                 {
-                                    Model.UpdateFromFirmwareJson("limits", limitsResult);
+                                    Model.UpdateFromJson("limits", limitsResult);
                                 }
                             }
                         }
@@ -312,7 +312,7 @@ internal partial class PollConnector : BaseConnector
                             // Update frequently changing properties
                             lock (Model)
                             {
-                                Model.UpdateFromFirmwareJson(string.Empty, statusResult);
+                                Model.UpdateFromJson(string.Empty, statusResult);
                                 UpdateLayers();
                             }
 
@@ -354,7 +354,7 @@ internal partial class PollConnector : BaseConnector
                                                     GCodeFileInfo? fileInfoToUpdate = null;
                                                     lock (Model)
                                                     {
-                                                        if (Model.UpdateFromFirmwareJson(keyName.GetString(), keyResult, offset, next == 0))
+                                                        if (Model.UpdateFromJson(keyName.GetString(), keyResult, offset, next == 0))
                                                         {
                                                             if (keyName.GetString() == "job" &&
                                                                 Model.Job.File.Thumbnails.Count != 0 && _thumbnailFile != Model.Job.File.FileName)
@@ -393,7 +393,7 @@ internal partial class PollConnector : BaseConnector
                                                             {
                                                                 lock (Model)
                                                                 {
-                                                                    Model.Move.Axes.UpdateFromJson(moveAxesResult, false, axisOffset, nextAxis == 0);
+                                                                    Model.Move.Axes.UpdateFromJson(moveAxesResult, axisOffset, nextAxis == 0);
                                                                 }
                                                             }
                                                         }
@@ -1197,7 +1197,7 @@ internal partial class PollConnector : BaseConnector
                         if (err == 0)
                         {
                             GCodeFileInfo result = new();
-                            result.UpdateFromJson(responseJson.RootElement, false);
+                            result.UpdateFromJson(responseJson.RootElement);
 
                             if (readThumbnailContent)
                             {

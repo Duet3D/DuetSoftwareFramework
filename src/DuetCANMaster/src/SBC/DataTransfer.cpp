@@ -681,6 +681,7 @@ const T* DataTransfer::ReadDataHeader() noexcept
 // Explicit instantiation so SbcInterface can read these headers (the template is defined in this translation unit)
 template const CANRequestHeader* DataTransfer::ReadDataHeader<CANRequestHeader>() noexcept;
 template const EnableCANHeader* DataTransfer::ReadDataHeader<EnableCANHeader>() noexcept;
+template const ScheduleMoveHeader* DataTransfer::ReadDataHeader<ScheduleMoveHeader>() noexcept;
 
 bool DataTransfer::ReadBoolean() noexcept
 {
@@ -830,7 +831,7 @@ TransferState DataTransfer::DoTransfer() noexcept
 			}
 
 			const uint32_t checksum =
-				CalcCRC32(reinterpret_cast<const char*>(&rxHeader), sizeof(SpiTransferHeader) - sizeof(uint32_t));
+				CalcCRC32(reinterpret_cast<const char*>(&rxHeader), SbcProtocol::SpiTransferHeaderCrcLength);
 			if (rxHeader.crcHeader != checksum)
 			{
 				if (reprap.Debug(Module::SbcInterface))
@@ -1097,9 +1098,16 @@ void DataTransfer::StartNextTransfer(bool keepSequence) noexcept
 		txHeader.sequenceNumber++;
 	}
 	txHeader.dataLength = m_txPointer;
+
+	// Sampled here rather than when the transfer was assembled: this is the last thing done before
+	// the exchange is armed, so the delay between the reading and the SBC receiving it is as near
+	// constant as it can be. The SBC fits its step clock to these, and a varying delay is what that
+	// fit cannot remove
+	txHeader.masterClock = StepTimer::GetTimerTicks();
+	txHeader.hiccupTime = StepTimer::GetMovementDelay();
+
 	txHeader.crcData = CalcCRC32(m_txBuffer, m_txPointer);
-	txHeader.crcHeader =
-		CalcCRC32(reinterpret_cast<const char*>(&txHeader), sizeof(SpiTransferHeader) - sizeof(uint32_t));
+	txHeader.crcHeader = CalcCRC32(reinterpret_cast<const char*>(&txHeader), SbcProtocol::SpiTransferHeaderCrcLength);
 
 	// Tell the SBC whether this armed transfer carries outgoing data. When set, the SBC will clock a
 	// transfer even if it has nothing of its own to send, so our data gets pulled promptly.
@@ -1244,18 +1252,45 @@ bool DataTransfer::WriteCANResponse(const CANResponseHeader& header, const char*
 	return true;
 }
 
-// Write the master clock packet. This must be the first packet of every transfer so the SBC processes it first.
-void DataTransfer::WriteMasterClock() noexcept
+// Tell the SBC what became of the CAN messages it asked to be sent, several at a time.
+// Returns false if there isn't enough room in this transfer, in which case the caller should try again next time.
+bool DataTransfer::WriteCanMessagesSent(const CanMessageSentEntry* entries, size_t count) noexcept
 {
-	if (!CanWritePacket(sizeof(MasterClockHeader)))
+	const size_t dataLength = sizeof(CanMessageSentHeader) + (count * sizeof(CanMessageSentEntry));
+	if (count == 0 || !CanWritePacket(dataLength))
 	{
-		return;
+		return false;
 	}
 
-	(void)WritePacketHeader(FirmwareRequest::MasterClock, sizeof(MasterClockHeader));
-	auto* header = WriteDataHeader<MasterClockHeader>();
-	header->masterClock = StepTimer::GetTimerTicks();
-	header->hiccupTime = StepTimer::GetMovementDelay();
+	(void)WritePacketHeader(FirmwareRequest::CanMessageSent, dataLength);
+
+	auto* hdr = WriteDataHeader<CanMessageSentHeader>();
+	hdr->count = (uint16_t)count;
+	hdr->padding = 0;
+	WriteData(reinterpret_cast<const char*>(entries), count * sizeof(CanMessageSentEntry));
+	return true;
+}
+
+// Tell the SBC which drives an endstop stopped and when it fired, so it can work out where they
+// should end up and send the revert.
+// Returns false if there isn't enough room in this transfer, in which case the caller should try again next time.
+bool DataTransfer::WriteMotionStopped(const MotionStoppedHeader& header, const MotionStoppedDriver* drivers) noexcept
+{
+	const size_t driversBytes = header.numDrivers * sizeof(MotionStoppedDriver);
+	if (!CanWritePacket(sizeof(MotionStoppedHeader) + driversBytes))
+	{
+		return false;
+	}
+
+	(void)WritePacketHeader(FirmwareRequest::MotionStopped, sizeof(MotionStoppedHeader) + driversBytes);
+
+	auto* hdr = WriteDataHeader<MotionStoppedHeader>();
+	*hdr = header;
+	if (driversBytes != 0)
+	{
+		WriteData(reinterpret_cast<const char*>(drivers), driversBytes);
+	}
+	return true;
 }
 
 PacketHeader* DataTransfer::WritePacketHeader(FirmwareRequest request,

@@ -47,6 +47,15 @@ public sealed class MacroFile : CodeFile, IDisposable
     public bool IsPausable { get; set; }
 
     /// <summary>
+    /// Indicates if the firmware asked for this macro rather than the user invoking it
+    /// </summary>
+    /// <remarks>
+    /// See <see cref="CodeFlags.IsFromSystemMacro"/>, which this becomes on every code the file
+    /// produces. Set by <see cref="MacroRunner"/>, which is where the distinction is known
+    /// </remarks>
+    public bool IsSystemMacro { get; set; }
+
+    /// <summary>
     /// Internal cancellation token source used for codes
     /// </summary>
     private readonly CancellationTokenSource _cts;
@@ -97,6 +106,19 @@ public sealed class MacroFile : CodeFile, IDisposable
     public bool IsAborted { get; private set; }
 
     /// <summary>
+    /// Where in the job file the code that started this macro stack is, or null if the job did not
+    /// start it
+    /// </summary>
+    /// <remarks>
+    /// The moves a macro makes are the job's, but the macro's own offsets are into the macro, so a
+    /// stop that comes to rest on one of them has to rewind the job file to the invocation and run
+    /// the macro again. Inherited from the enclosing macro when one macro starts another, so this is
+    /// the outermost invocation however deep the stack goes. See
+    /// <see cref="Motion.JobMoveOrigin.IsMacroInvocation"/>
+    /// </remarks>
+    internal Motion.JobMacroInvocation? InvokingJobCode { get; }
+
+    /// <summary>
     /// Constructor of a macro started by a G/M/T-code
     /// </summary>
     /// <param name="filePath">Filename of the macro</param>
@@ -127,6 +149,13 @@ public sealed class MacroFile : CodeFile, IDisposable
         _settings = settings.Value;
 
         _cts = CancellationTokenSource.CreateLinkedTokenSource(lifetime.ApplicationStopping);
+
+        // Whichever job code this stack of macros hangs off. Taken from the starting code, or
+        // inherited when that code is itself one of a macro's, so that a move made however deep in
+        // the stack names the one position in the job file that means anything
+        InvokingJobCode = startCode.File is MacroFile parentMacro
+                          ? parentMacro.InvokingJobCode
+                          : Motion.JobMacroInvocation.From(startCode);
 
         // Are we executing dsf-config.g? Note that this file may not reside in /sys/ but in a custom sys location, so only check the requested filename
         IsNested = true;
@@ -189,8 +218,10 @@ public sealed class MacroFile : CodeFile, IDisposable
         : base(copyFrom, channel, codeFactory, codeProcessor, expressions, model, loggerFactory, settings)
     {
         SourceConnection = copyFrom.SourceConnection;
+        InvokingJobCode = copyFrom.InvokingJobCode;
         IsNested = copyFrom.IsNested;
         IsPausable = copyFrom.IsPausable;
+        IsSystemMacro = copyFrom.IsSystemMacro;
         IsConfig = copyFrom.IsConfig;
         IsConfigOverride = copyFrom.IsConfigOverride;
         IsDsfConfig = copyFrom.IsDsfConfig;
@@ -332,6 +363,7 @@ public sealed class MacroFile : CodeFile, IDisposable
             if (IsConfig) { result.Flags |= CodeFlags.IsFromConfig; }
             if (IsConfigOverride) { result.Flags |= CodeFlags.IsFromConfigOverride; }
             if (IsNested) { result.Flags |= CodeFlags.IsNestedMacro; }
+            if (IsSystemMacro) { result.Flags |= CodeFlags.IsFromSystemMacro; }
             result.SourceConnection = SourceConnection;
             return result;
         }

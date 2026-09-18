@@ -8,6 +8,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Heat;
+using DuetControlServer.Link.Protocol.CanMessages;
+using DuetControlServer.Link.Protocol.Shared;
+using DuetControlServer.Motion.Native;
+using DuetControlServer.Tools;
 using DuetControlServer.Utility;
 using DuetSharedLibrary;
 using Microsoft.Extensions.Hosting;
@@ -36,20 +41,10 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     private readonly AsyncReaderWriterLock _readWriteLock = new();
 
     /// <summary>
-    /// Base lock for update conditions
-    /// </summary>
-    private readonly AsyncLock _updateLock = new();
-
-    /// <summary>
     /// Completion source that is pulsed whenever the machine model has been updated. Waiters race it against a
     /// timeout instead of cancelling a condition variable, so poll timeouts do not throw
     /// </summary>
     private TaskCompletionSource _updateTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-    /// <summary>
-    /// Condition variable to trigger when the machine model has been fully updated from RepRapFirmware
-    /// </summary>
-    private readonly AsyncConditionVariable _fullUpdateEvent;
 
     // Private fields
     private readonly IHostApplicationLifetime _lifetime;
@@ -64,8 +59,6 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     /// <param name="settings">Settings</param>
     public ObjectModel(IHostApplicationLifetime lifetime, ILogger<ObjectModel> logger, IOptions<Settings> settings)
     {
-        _fullUpdateEvent = new(_updateLock);
-
         _lifetime = lifetime;
         _logger = logger;
         _settings = settings;
@@ -91,6 +84,57 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
         SBC.Serial = GetSbcSerial();
         Network.Hostname = Environment.MachineName;
         Network.Name = Environment.MachineName;
+        SetLimits();
+    }
+
+    /// <summary>
+    /// Publish the limits the machine is built to, so a client sizing itself against them and the
+    /// codes enforcing them read the same numbers
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The values are constants rather than anything discovered at run time, which is why they are
+    /// set here and never again. Each comes from whatever owns it: a limit shared with the expansion
+    /// boards from the CAN message schema, because a bitmap on the bus is what bounds it and both
+    /// sides have to agree on the width; the rest from the subsystem that enforces them, or from
+    /// <see cref="MachineLimits"/> where nothing enforces one yet.
+    /// </para>
+    /// <para>
+    /// <c>drivers</c> and <c>volumes</c> stay null, which the object model reads as unknown rather
+    /// than as unlimited. Neither has a figure this side can state: every driver is on an expansion
+    /// board, so what bounds the total is how many boards are attached, and the volumes are whatever
+    /// the SBC has mounted when it is asked. RepRapFirmware takes both from main board hardware that
+    /// this architecture does not have
+    /// </para>
+    /// </remarks>
+    private void SetLimits()
+    {
+        Limits.Axes = MotionLimits.MaxAxes;
+        Limits.AxesPlusExtruders = MotionLimits.MaxAxesPlusExtruders;
+        Limits.BedHeaters = HeatManager.MaxBedHeaters;
+        Limits.Boards = CanId.MaxCanAddress + 1;
+        Limits.ChamberHeaters = HeatManager.MaxChamberHeaters;
+        Limits.DriversPerAxis = MotionLimits.MaxDriversPerAxis;
+        Limits.Extruders = MotionLimits.MaxExtruders;
+        Limits.ExtrudersPerTool = ToolManager.MaxExtrudersPerTool;
+        Limits.Fans = CanLimits.MaxFans;
+        Limits.GpInPorts = CanLimits.MaxGpInPorts;
+        Limits.GpOutPorts = CanLimits.MaxGpOutPorts;
+        Limits.Heaters = CanLimits.MaxHeaters;
+        Limits.HeatersPerTool = HeatManager.MaxHeatersPerTool;
+        Limits.LedStrips = CanLimits.MaxLedStrips;
+        Limits.MonitorsPerHeater = CanLimits.MaxMonitorsPerHeater;
+        Limits.PortsPerHeater = HeatManager.MaxPortsPerHeater;
+        Limits.ReportedAxes = MachineLimits.MaxReportedAxes;
+        Limits.RestorePoints = Motion.RestorePoint.NumVisible;
+        Limits.Sensors = CanLimits.MaxSensors;
+        Limits.Spindles = CanLimits.MaxSpindles;
+        Limits.Tools = ToolManager.MaxTools;
+        Limits.TrackedObjects = MachineLimits.MaxTrackedObjects;
+        Limits.Triggers = MachineLimits.MaxTriggers;
+        Limits.Workplaces = MachineLimits.NumWorkplaces;
+        Limits.ZProbeProgramBytes = CanLimits.MaxZProbeProgramBytes;
+        Limits.ZProbes = CanLimits.MaxZProbes;
     }
 
     /// <summary>
@@ -111,21 +155,31 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     internal string Password { get; set; } = DuetAPI.Connection.Defaults.Password;
 
     /// <summary>
-    /// Whether the current machine status is overridden because an update is in progress
+    /// Whether a firmware update is in progress
     /// </summary>
-    internal bool IsUpdating
-    {
-        get => _isUpdating;
-        set
-        {
-            if (value)
-            {
-                State.Status = MachineStatus.Updating;
-            }
-            _isUpdating = value;
-        }
-    }
-    private bool _isUpdating;
+    /// <remarks>
+    /// One of the conditions <c>MachineStatusService</c> derives <c>state.status</c> from. Setting it
+    /// no longer writes the status itself: RepRapFirmware computes its status from conditions like
+    /// this one rather than storing it, and a condition that also wrote the answer would be one of
+    /// several writers racing to describe the same machine
+    /// </remarks>
+    internal bool IsUpdating { get; set; }
+
+    /// <summary>
+    /// Whether an emergency stop has halted the machine (M112)
+    /// </summary>
+    /// <remarks>Cleared by a reset, which is the only thing that ends a halt</remarks>
+    internal bool IsHalted { get; set; }
+
+    /// <summary>
+    /// Whether the link to the machine is down
+    /// </summary>
+    internal bool IsDisconnected { get; set; }
+
+    /// <summary>
+    /// Whether the machine is still starting up, which it is until config.g has run
+    /// </summary>
+    internal bool IsStarting { get; set; } = true;
 
     /// <summary>
     /// Dictionary of the properties vs. sender type + JSON content that failed to be deserialized
@@ -466,57 +520,19 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     public Task WaitForUpdateAsync() => WaitForUpdateAsync(_lifetime.ApplicationStopping);
 
     /// <summary>
-    /// Wait for the model to be fully updated from RepRapFirmware
-    /// </summary>
-    public void WaitForFullUpdate()
-    {
-        using (_updateLock.Lock())
-        {
-            _fullUpdateEvent.Wait();
-        }
-    }
-
-    /// <summary>
-    /// Wait asynchronously for the model to be fully updated from RepRapFirmware
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    public async Task WaitForFullUpdateAsync(CancellationToken cancellationToken = default)
-    {
-        using (await _updateLock.LockAsync(cancellationToken))
-        {
-            await _fullUpdateEvent.WaitAsync(cancellationToken);
-        }
-    }
-
-    /// <summary>
-    /// Called in non-SPI mode to notify waiting tasks about a finished model update (synchronous version)
-    /// </summary>
-    internal void FullyUpdated()
-    {
-        using (_updateLock.Lock())
-        {
-            _fullUpdateEvent.NotifyAll();
-        }
-    }
-
-    /// <summary>
-    /// Called in non-SPI mode to notify waiting tasks about a finished model update
-    /// </summary>
-    /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    internal async Task FullyUpdatedAsync(CancellationToken cancellationToken = default)
-    {
-        using (await _updateLock.LockAsync(cancellationToken))
-        {
-            _fullUpdateEvent.NotifyAll();
-        }
-    }
-
-    /// <summary>
     /// Indicates how many config files are being processed
     /// </summary>
     private int _numRunningConfigFiles = 0;
+
+    /// <summary>
+    /// Whether config.g or a file it calls is running
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>runningConfigFile</c>. Its <c>CheckFinishedRunningConfigFile</c> uses it
+    /// to let modal state set in config.g and the files it calls persist rather than being restored
+    /// when each frame ends, which is what makes an <c>M83</c> in config.g stick
+    /// </remarks>
+    public bool IsExecutingConfig => Volatile.Read(ref _numRunningConfigFiles) > 0;
 
     /// <summary>
     /// Flag asynchronously that a start-up file is being executed. Must be called WITHOUT locking this instance first!
@@ -759,10 +775,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
             Boards.Clear();
             Global.Clear();
             Seqs.Clear();
-            if (State.Status != MachineStatus.Halted && State.Status != MachineStatus.Updating)
-            {
-                State.Status = MachineStatus.Disconnected;
-            }
+            IsDisconnected = true;
             State.DisplayMessage = string.Empty;
             State.MessageBox = null;
         }

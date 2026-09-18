@@ -18,11 +18,11 @@ namespace Duet::Sbc
 			std::string line;
 			while (std::getline(f, line))
 			{
-				if (line.rfind("Hardware", 0) == 0 && line.find("BCM") != std::string::npos)
+				if (line.starts_with("Hardware") && line.find("BCM") != std::string::npos)
 				{
 					return true;
 				}
-				if (line.rfind("Model", 0) == 0 && line.find("Raspberry Pi") != std::string::npos)
+				if (line.starts_with("Model") && line.find("Raspberry Pi") != std::string::npos)
 				{
 					return true;
 				}

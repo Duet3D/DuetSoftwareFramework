@@ -20,6 +20,9 @@ public sealed class ForwardingExpressionContext : IExpressionEvaluationContext
     public int LineNumber => 0;
 
     /// <inheritdoc/>
+    public int? Result => null;
+
+    /// <inheritdoc/>
     public bool TryResolveIdentifier(string path, bool wantExists, bool wantArrayLength, out object? value)
     {
         value = null;

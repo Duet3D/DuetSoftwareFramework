@@ -31,7 +31,7 @@ public sealed class GetObjectModel(Model.ObjectModel model, Model.Filter filter)
 
             ObjectModel result = new();
             using JsonDocument filteredJson = GetFilteredJson();
-            result.UpdateFromJson(filteredJson.RootElement, false);
+            result.UpdateFromJson(filteredJson.RootElement);
             return result;
         }
     }
@@ -55,7 +55,7 @@ public sealed class GetObjectModel(Model.ObjectModel model, Model.Filter filter)
             {
                 ObjectModel result = new();
                 using JsonDocument filteredJson = GetFilteredJson();
-                result.UpdateFromJson(filteredJson.RootElement, false);
+                result.UpdateFromJson(filteredJson.RootElement);
                 JsonSerializer.Serialize(writer, result, ObjectModelContext.Default.ObjectModel);
             }
         }

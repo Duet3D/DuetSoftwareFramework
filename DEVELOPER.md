@@ -14,10 +14,12 @@ No prior knowledge of VS Code, Docker, or DSF is assumed.
 6. [Open in Dev Container](#open-in-dev-container)
 7. [First Build](#first-build)
 8. [Build Using VS Code Tasks](#build-using-vs-code-tasks)
-9. [Deploy to a Remote DuetPi/SBC](#deploy-to-a-remote-duetpisbc)
-10. [Optional: Build with Make](#optional-build-with-make)
-11. [Working with Git in the Dev Container](#working-with-git-in-the-dev-container)
-12. [Troubleshooting](#troubleshooting)
+9. [Run the Tests](#run-the-tests)
+10. [Deploy to a Remote DuetPi/SBC](#deploy-to-a-remote-duetpisbc)
+11. [Optional: Build with Make](#optional-build-with-make)
+12. [Profiling with Tracy](#profiling-with-tracy)
+13. [Working with Git in the Dev Container](#working-with-git-in-the-dev-container)
+14. [Troubleshooting](#troubleshooting)
 
 ## Overview
 
@@ -176,6 +178,62 @@ Common tasks:
 
 The Build All task produces binaries under the local build/ directory.
 
+## Run the Tests
+
+The unit tests run under coverage and print a per-assembly table:
+
+```bash
+./scripts/coverage.sh
+```
+
+The system tests start a real DuetControlServer against a scripted CAN controller, so they take
+minutes rather than seconds:
+
+```bash
+./scripts/system-tests.sh
+```
+
+They run the real `libduet_sbc.so`, which the project builds from `src/DuetSbcInterface` as part of
+the test build, so the submodule that native build needs has to be checked out. A clone made without
+`--recurse-submodules`, and every new git worktree, starts without it:
+
+```bash
+git submodule update --init lib/RRFLibraries
+```
+
+Each test is named on the console as it starts, with its position in the run and how long the run
+has been going:
+
+```
+[  42  03:17] SystemTests.Scenarios.DeferredPauseTests.PauseDuringToolChange
+  Passed PauseDuringToolChange [2 s]
+```
+
+A run that has stopped therefore looks different from a run that is merely slow: whatever was named
+last is the test that is stuck. Once the run is over the script lists the failed tests by name,
+below the stack traces and the DuetControlServer logs a failure dumps, where they can be read as a
+list.
+
+Scenarios in the `KnownGap` category assert behaviour that is not implemented yet, so they fail.
+The script leaves them out; `--all` puts them back, which is what CI runs. To narrow a run:
+
+```bash
+./scripts/system-tests.sh --filter 'FullyQualifiedName~JobControl'
+./scripts/system-tests.sh --help
+```
+
+Running the project directly works, but the progress needs the console logger asked for by name,
+because at its default verbosity it prints nothing until the run is over:
+
+```bash
+dotnet test src/SystemTests/SystemTests.csproj -tl:off \
+    --logger 'console;verbosity=normal' --filter 'TestCategory!=KnownGap'
+```
+
+`-tl:off` turns off MSBuild's terminal logger, which otherwise echoes the test output on top of that
+logger and prints every line twice. It turns itself on only when the output is a terminal, so
+without it the same command behaves differently piped and interactively.
+
 ## Deploy to a Remote DuetPi/SBC
 
 The VS Code tasks include a deployment flow that uses SSH and rsync.
@@ -205,6 +263,97 @@ Optional helper task:
 This installs Microsoft vsdbg on the remote machine for debugging scenarios.
 
 The task definitions are in [.vscode/tasks.json](.vscode/tasks.json) if you want to inspect or extend them.
+
+## Profiling with Tracy
+
+`-p:Profiling=true` builds DuetControlServer with a Tracy zone around every method in the namespaces
+listed in
+[src/DuetControlServer/Profiling/ProfiledCode.cs](src/DuetControlServer/Profiling/ProfiledCode.cs).
+Connecting the [Tracy](https://github.com/wolfpld/tracy) GUI to the running process then shows the
+call tree of the profiled code on a timeline, with the duration, count and distribution of every
+zone and the log messages that came out alongside them. Nothing in the profiled code is annotated:
+the zones are woven into the compiled assembly by
+[src/DuetProfiling.Fody](src/DuetProfiling.Fody), and a normal build does not compile, reference or
+run any of it.
+
+This is a development tool. It cannot be combined with `--aot`, which the build fails to say so, and
+it is not something to leave switched on in a deployment.
+
+### One-off setup
+
+Build the Tracy client library for the architecture being profiled. The one in the NuGet package is
+linked against a newer glibc than either the devcontainer or Raspberry Pi OS Bookworm has, so it is
+built here instead:
+
+```bash
+./scripts/build-tracy-client.sh                     # this machine, for the system tests
+./scripts/build-tracy-client.sh --arch linux-arm64  # a Pi
+```
+
+Install the Tracy GUI on the machine you will watch from. It must be the same release as the client,
+v0.13.1: Tracy's protocol carries a version and the server refuses a connection from anything else.
+
+### Profiling the system tests
+
+```bash
+dotnet test src/SystemTests/SystemTests.csproj --filter Name~PauseStopsMidMove -p:Profiling=true
+```
+
+### Profiling a Pi
+
+```bash
+./scripts/build.sh --all --target <pi-ip> --start-services -p "Profiling=true"
+```
+
+`build.sh -p` takes the property without the `-p:` prefix, which it adds itself.
+
+### Connecting
+
+The client library is built on demand, so it records nothing and costs almost nothing until the GUI
+connects, and DuetControlServer can be left running with it. In the Tracy GUI, connect to the
+address of the machine being profiled on port 8086. Capture starts on connection and stops when you
+disconnect, so a session covers whatever you do in between.
+
+### What ends up on the timeline
+
+Only the namespaces listed in `ProfiledCode.cs`. Add or remove entries there to change that; each
+one covers the namespace or type named and everything below it. Every profiled method costs a field
+read and two calls into the Tracy client per invocation, so profiling everything at once slows down
+what is being measured. The build says what it did:
+
+```
+Fody/DuetProfiling: Profiling: wove 1323 methods in 4 scopes; left alone 1453 property accessors,
+1056 compiler generated, 505 constructors, 15 using stackalloc
+```
+
+Those exclusions are why an expected method may be missing. Property accessors are skipped as too
+small to measure; constructors and methods using `stackalloc` cannot have their bodies wrapped in
+the try/finally a zone needs; compiler generated methods are the lambdas, closures, iterators and
+async state machines behind the methods that are woven.
+
+An async method's zone covers its synchronous run up to the first `await` that yields, not the
+lifetime of the task it returns. Tracy requires a zone to be closed on the thread that opened it,
+and a continuation is free to resume on another one. The work after an await appears as the zones of
+whatever profiled methods that continuation calls.
+
+For a profile that follows work across awaits, or of code no zone covers, use the sampling profiler
+instead: `dotnet-trace collect -p <pid> --profile cpu-sampling --format Chromium` and open the result
+in [Perfetto](https://ui.perfetto.dev).
+
+### Log messages
+
+A profiling build also registers a logging provider that puts DuetControlServer's log messages on
+the timeline, marked on the thread that logged them and so among the zones that were open at the
+time, coloured by level and collected in Tracy's message window. The filters that drive the console
+apply to it too, so the runtime log level (`M111 P-1 S"debug"`) decides what Tracy sees as well.
+Nothing is formatted while no GUI is connected.
+
+### Notes
+
+- The `Profiling/` sources are excluded from a normal build, so an editor that has not been told
+  about the switch reports them as errors. Building with `-p:Profiling=true` resolves them.
+- `TRACY_CLIENT_LIBRARY` points the process at a specific client library, overriding the one beside
+  the assemblies and the one in `build/tracy/<arch>/`.
 
 ## Working with Git in the Dev Container
 

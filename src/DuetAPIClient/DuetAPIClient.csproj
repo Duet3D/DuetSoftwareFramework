@@ -9,6 +9,8 @@
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<IsTrimmable>true</IsTrimmable>
 		<NoWarn>NETSDK1212</NoWarn>
+		<!-- Shipped as a NuGet package and consumed as a project reference, not deployed by itself -->
+		<IsPublishable>false</IsPublishable>
 	</PropertyGroup>
 
 	<PropertyGroup>

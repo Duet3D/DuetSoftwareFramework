@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<!--
+	  The Fody weaver that a -p:Profiling=true build of DuetControlServer runs over its own output.
+	  Not part of DuetSoftwareFramework.sln and not referenced by anything a normal build touches:
+	  DuetControlServer references it only when profiling is switched on, and only to build it.
+
+	  netstandard2.0 because that is what Fody loads weavers as, and the .Fody suffix because that is
+	  how Fody matches the <DuetProfiling /> element in FodyWeavers.xml to this assembly.
+	-->
+	<PropertyGroup>
+		<TargetFramework>netstandard2.0</TargetFramework>
+		<AssemblyName>DuetProfiling.Fody</AssemblyName>
+		<RootNamespace>DuetProfiling</RootNamespace>
+		<Nullable>enable</Nullable>
+		<LangVersion>14</LangVersion>
+		<IsPackable>false</IsPackable>
+		<IsPublishable>false</IsPublishable>
+		<!-- A weaver is loaded by Fody, never referenced, so nothing consumes its documentation -->
+		<GenerateDocumentationFile>false</GenerateDocumentationFile>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- Brings in Mono.Cecil and BaseModuleWeaver. PrivateAssets: Fody supplies both at weave time -->
+		<PackageReference Include="FodyHelpers" Version="6.9.2" PrivateAssets="all" />
+	</ItemGroup>
+</Project>

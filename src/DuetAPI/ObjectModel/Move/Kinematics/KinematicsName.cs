@@ -84,8 +84,20 @@ public class KinematicsNameConverter : JsonConverter<KinematicsName>
 {
     /// <inheritdoc />
     public override KinematicsName Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => Parse(reader.GetString());
+
+    /// <summary>
+    /// Resolve a kinematics name as RepRapFirmware spells it
+    /// </summary>
+    /// <param name="name">The name, case-insensitive</param>
+    /// <returns>The kinematics, or <see cref="KinematicsName.Unknown"/></returns>
+    /// <remarks>
+    /// The same spellings M669 accepts and the object model reports, so a name that arrives as text -
+    /// from JSON, from a code, from a report - resolves the same way wherever it came from
+    /// </remarks>
+    public static KinematicsName Parse(string? name)
     {
-        return reader.GetString()?.ToLowerInvariant() switch
+        return name?.ToLowerInvariant() switch
         {
             "cartesian" => KinematicsName.Cartesian,
             "corexy" => KinematicsName.CoreXY,
@@ -105,8 +117,20 @@ public class KinematicsNameConverter : JsonConverter<KinematicsName>
 
     /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, KinematicsName value, JsonSerializerOptions options)
+        => writer.WriteStringValue(ToName(value));
+
+    /// <summary>
+    /// Spell a kinematics name the way RepRapFirmware does
+    /// </summary>
+    /// <param name="value">The kinematics</param>
+    /// <returns>Its name</returns>
+    /// <remarks>
+    /// This is what the object model reports and what M669 prints, and DuetWebControl, PanelDue and a
+    /// decade of macros parse both. It is the one spelling of each geometry
+    /// </remarks>
+    public static string ToName(KinematicsName value)
     {
-        writer.WriteStringValue(value switch
+        return value switch
         {
             KinematicsName.Cartesian => "cartesian",
             KinematicsName.CoreXY => "coreXY",
@@ -121,6 +145,6 @@ public class KinematicsNameConverter : JsonConverter<KinematicsName>
             KinematicsName.RotaryDelta => "Rotary delta",
             KinematicsName.Scara => "Scara",
             _ => "unknown",
-        });
+        };
     }
 }

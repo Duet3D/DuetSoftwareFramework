@@ -1,0 +1,26 @@
+FIRST, BEFORE REPLYING: read `private/MEMORY.md` in full and load every memory it lists that
+bears on the request. Those are local-only and gitignored, so none of them can be named here,
+and several set standing rules that apply whatever is asked. Then read on.
+
+- [Editable vendored projects](editable-vendored-projects.md) — lib/* and src/Duet3Expansion, DuetCANMaster, DuetSbcInterface are in scope for edits
+- [RRF reference clone](rrf-reference-clone.md) — lib/RepRapFirmware is reference-only, not part of the project
+- [Build command](build-command.md) — build everything with ./scripts/build.sh --all, no --local or --target
+- [DSF architecture migration](dsf-architecture-migration.md) — mandatory SBC runs DSF, Duet3Expansion does the rest, DuetCANMaster bridges SPI to CAN-FD
+- [Plans vs articles](docs-plans-vs-articles.md) — reasoning/plans in docs/devel, current-state user docs in src/Documentation/articles
+- [rrf-differences article](rrf-differences-article.md) — only deliberate, implemented deviations from RRF; gaps go in docs/devel
+- [RRF porting contract](rrf-porting-contract.md) — port behaviour exactly, ask before deviating, shim unported deps with TODO
+- [Machine state in the Object Model](machine-state-in-object-model.md) — OM must hold enough to recreate the config; add new fields as needed
+- [No magic numbers](no-magic-numbers.md) — look for an existing setting/config/parameter before writing a numeric literal
+- [Comments describe present code](comments-describe-present-code.md) — never narrate what was removed or moved in a code comment
+- [Migration plans in docs/devel](mcode-migration-plan.md) — MCODE_MIGRATION, EVENTS_MIGRATION, STALL_DETECTION, INPUT_MONITORS and what each covers
+- [Plans describe the current state](plans-describe-current-state.md) — no references to earlier plan iterations; justify against the plan as it stands
+- [Keep plans and overview current](keep-plans-and-overview-current.md) — update the covering docs/devel plan and PROJECT_OVERVIEW.md in the same commit as the change
+- [Leave the git index alone](leave-the-git-index-alone.md) — never unstage what the user staged; commit named paths instead
+- [Direct technical writing style](writing-style-direct-technical.md) — no colloquialisms, slang, metaphor, or chatty language; never the word "honest"
+- [No em dashes](no-em-dashes.md) — use commas, semicolons, or colons instead
+- [No duplicate functionality](no-duplicate-functionality.md) — refactor to a shared base instead of copying; maintainability over speed of implementation
+- [System tests come first](system-tests-first-for-features.md) — write the scenarios for a feature before implementing it, covering inputs, object model, packets and board responses
+- [Pi hardware test workflow](pi-hardware-test-workflow.md) — deploy with build.sh --target, drive with CodeConsole, read journalctl debug logs
+- [Regression suite workflow](regression-suite-workflow.md) — the harness runs on the host at :8765, drive it over its HTTP API
+- [Sensitive memories are private](sensitive-memories-are-private.md) — personal or sensitive details (IPs, keys, names, emails) belong in `private/`, never the committed half
+- [No full system test suite](no-full-system-test-suite.md) — filter SystemTests to the affected fixtures; never run the whole suite

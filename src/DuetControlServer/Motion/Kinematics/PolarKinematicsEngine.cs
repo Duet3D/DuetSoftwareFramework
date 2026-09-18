@@ -1,0 +1,427 @@
+using System;
+using System.Globalization;
+using System.Text;
+using DuetAPI.ObjectModel;
+using DuetControlServer.Motion.Native;
+using DuetControlServer.Link.Native;
+
+using Code = DuetAPI.Commands.Code;
+using static DuetControlServer.Motion.AxisIndices;
+
+namespace DuetControlServer.Motion.Kinematics;
+
+/// <summary>
+/// The polar geometry: a radius arm over a turntable
+/// </summary>
+/// <remarks>
+/// <para>
+/// Ported from RepRapFirmware's <c>PolarKinematics</c>. The first drive moves the head in and out
+/// along a radius and the second turns the bed under it, so a position is a radius and an angle rather
+/// than an X and a Y. Steps per mm on the second drive are steps per degree.
+/// </para>
+/// <para>
+/// The transform itself is just polar coordinates. What makes the geometry awkward is speed: near the
+/// centre a small movement in X or Y is a large movement in angle, and the turntable cannot be spun
+/// arbitrarily fast whatever the head is doing. That is what the extra speed limit is for, and it is
+/// why the turntable carries its own maximum speed and acceleration separate from the axis limits
+/// </para>
+/// </remarks>
+internal sealed class PolarKinematicsEngine : KinematicsEngine
+{
+    private const int RadiusDrive = 0, TurntableDrive = 1;
+
+    private const float DegreesToRadians = MathF.PI / 180.0f;
+    private const float RadiansToDegrees = 180.0f / MathF.PI;
+
+    /// <summary>Closest the head may come to the centre of the turntable, mm</summary>
+    public float MinRadius { get; }
+
+    /// <summary>Furthest the head may go from the centre, mm</summary>
+    public float MaxRadius { get; }
+
+    /// <summary>Radius the head is at when homed, mm</summary>
+    public float HomedRadius { get; }
+
+    /// <summary>How fast the turntable may turn, degrees per second</summary>
+    /// <remarks>
+    /// The configured value, in the units M669 F gives it and the object model reports it. The
+    /// per-step-clock form the planner uses is derived from this rather than stored instead of it, so
+    /// that what is reported is what was configured and not a value that has been through a
+    /// conversion and back
+    /// </remarks>
+    public float MaxTurntableSpeedPerSec { get; }
+
+    /// <summary>How hard the turntable may be accelerated, degrees per second squared</summary>
+    public float MaxTurntableAccelerationPerSec { get; }
+
+    /// <summary>How fast the turntable may turn, degrees per step clock</summary>
+    /// <remarks>
+    /// Degrees convert to step clocks exactly as millimetres do, which is why RepRapFirmware puts its
+    /// turntable limits through the same <c>ConvertSpeedFromMmPerSec</c> the axes use
+    /// </remarks>
+    public float MaxTurntableSpeed => MotionUnits.SpeedFromMmPerSec(MaxTurntableSpeedPerSec);
+
+    /// <summary>How hard the turntable may be accelerated, degrees per step clock squared</summary>
+    public float MaxTurntableAcceleration => MotionUnits.AccelerationFromMmPerSecSquared(MaxTurntableAccelerationPerSec);
+
+    /// <inheritdoc />
+    public override KinematicsName Kind => KinematicsName.Polar;
+
+    /// <summary>
+    /// A polar machine with RepRapFirmware's defaults, for before M669 has been seen
+    /// </summary>
+    /// <returns>The engine</returns>
+    /// <remarks>
+    /// The bed reaches to its centre and the head is homed there, as <c>PolarKinematics</c>'s own
+    /// constructor leaves it
+    /// </remarks>
+    public static PolarKinematicsEngine CreateDefault()
+        => new(minRadius: 0.0f, maxRadius: DefaultMaxRadius, homedRadius: 0.0f);
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Ported from <c>PolarKinematics::Configure</c>. R carries the radius limits - one value is the
+    /// maximum on its own, two are the minimum and the maximum
+    /// </remarks>
+    public override KinematicsEngine Configure(Code code, ref bool seen)
+    {
+        if (code.MajorNumber != 669)
+        {
+            return this;
+        }
+
+        float minRadius = MinRadius, maxRadius = MaxRadius, homedRadius = HomedRadius;
+        float maxSpeed = MaxTurntableSpeedPerSec, maxAcceleration = MaxTurntableAccelerationPerSec;
+        bool changed = false;
+
+        if (code.TryGetFloatArray('R', out float[]? radiusLimits) && radiusLimits.Length > 0)
+        {
+            if (radiusLimits.Length == 1)
+            {
+                maxRadius = radiusLimits[0];
+            }
+            else
+            {
+                minRadius = radiusLimits[0];
+                maxRadius = radiusLimits[1];
+            }
+            changed = true;
+        }
+        changed |= TryUpdate(code, 'H', ref homedRadius);
+        changed |= TryUpdate(code, 'F', ref maxSpeed);
+        changed |= TryUpdate(code, 'A', ref maxAcceleration);
+
+        if (!changed)
+        {
+            return this;
+        }
+
+        seen = true;
+        return new PolarKinematicsEngine(minRadius, maxRadius, homedRadius, maxSpeed, maxAcceleration);
+    }
+
+    /// <inheritdoc />
+    public override void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics)
+    {
+        base.WriteTo(kinematics);
+
+        PolarKinematics polar = (PolarKinematics)kinematics;
+        polar.RadiusMin = MinRadius;
+        polar.RadiusMax = MaxRadius;
+        polar.RadiusHomed = HomedRadius;
+        polar.TTSpeedMax = MaxTurntableSpeedPerSec;
+        polar.TTAccMax = MaxTurntableAccelerationPerSec;
+    }
+
+    /// <inheritdoc />
+    /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
+    public override bool HomesIndividualDrives => true;
+    /// <inheritdoc />
+    /// <remarks>A straight line across the bed is an arc in radius and angle; Z is independent</remarks>
+    protected override SegmentationType DefaultSegmentation => SegmentationType.Segment;
+
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The radius arm and the turntable together decide where the head is, so neither is known until
+    /// both are homed - whatever M564 says about moving before homing
+    /// </remarks>
+    public override uint MustBeHomedAxes(uint axesMoving, bool disallowMovesBeforeHoming)
+    {
+        const uint xyAxes = (1u << RadiusDrive) | (1u << TurntableDrive);
+        return (axesMoving & xyAxes) != 0 ? axesMoving | xyAxes : axesMoving;
+    }
+
+
+    /// <inheritdoc />
+    /// <remarks>The radius motor and the turntable are pinned down only when X and Y are both named</remarks>
+    public override uint AxesAssumedHomed(uint g92Axes)
+    {
+        const uint xyAxes = (1u << RadiusDrive) | (1u << TurntableDrive);
+        return (g92Axes & xyAxes) == xyAxes ? g92Axes : g92Axes & ~xyAxes;
+    }
+
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The reachable region is an annulus, not a box: the arm cannot retract past its minimum radius
+    /// nor extend past its maximum, and a point outside either is pulled onto the nearer circle rather
+    /// than clamped per axis. X and Y are radius and bed angle here, so the M208 box applies only from
+    /// Z upwards
+    /// </remarks>
+    public override LimitPositionResult LimitPosition(Span<float> finalCoords, ReadOnlySpan<float> initialCoords,
+                                                      int numVisibleAxes, uint axesToLimit, bool isCoordinated,
+                                                      bool applyM208Limits)
+    {
+        bool m208Limited = applyM208Limits && LimitToAxisRange(finalCoords, ZAxis, numVisibleAxes, axesToLimit);
+
+        bool radiusLimited = false;
+        if ((axesToLimit & ((1u << RadiusDrive) | (1u << TurntableDrive))) != 0)
+        {
+            float r2 = (finalCoords[RadiusDrive] * finalCoords[RadiusDrive]) + (finalCoords[TurntableDrive] * finalCoords[TurntableDrive]);
+            if (r2 < MinRadius * MinRadius)
+            {
+                radiusLimited = true;
+                float r = MathF.Sqrt(r2);
+                if (r < 0.01f)
+                {
+                    // The user asked for the middle of the bed, which has no direction to push out in
+                    finalCoords[RadiusDrive] = MinRadius;
+                    finalCoords[TurntableDrive] = 0.0f;
+                }
+                else
+                {
+                    finalCoords[RadiusDrive] *= MinRadius / r;
+                    finalCoords[TurntableDrive] *= MinRadius / r;
+                }
+            }
+            else if (r2 > MaxRadius * MaxRadius)
+            {
+                radiusLimited = true;
+                float r = MathF.Sqrt(r2);
+                finalCoords[RadiusDrive] *= MaxRadius / r;
+                finalCoords[TurntableDrive] *= MaxRadius / r;
+            }
+        }
+
+        return m208Limited || radiusLimited ? LimitPositionResult.Adjusted : LimitPositionResult.Ok;
+    }
+
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The radius arm homes to a known radius; the turntable homes to zero degrees, whichever end its
+    /// switch is at
+    /// </remarks>
+    public override float GetEndstopPosition(int drive, bool highEnd, float axisMin, float axisMax,
+                                             ReadOnlySpan<int> endPoints, ReadOnlySpan<float> stepsPerMm)
+        => drive switch
+        {
+            RadiusDrive => HomedRadius,
+            TurntableDrive => 0.0f,
+            _ => base.GetEndstopPosition(drive, highEnd, axisMin, axisMax, endPoints, stepsPerMm)
+        };
+
+
+    /// <inheritdoc />
+    /// <remarks>The turntable turns all the way round, so a move may take the short way there</remarks>
+    public override uint ContinuousRotationAxes => 1u << TurntableDrive;
+
+    /// <summary>Maximum radius RepRapFirmware assumes until M669 says otherwise, mm</summary>
+    public const float DefaultMaxRadius = 150.0f;
+
+    /// <summary>Turntable speed RepRapFirmware assumes until M669 says otherwise, degrees per second</summary>
+    public const float DefaultMaxTurntableSpeed = 30.0f;
+
+    /// <summary>Turntable acceleration RepRapFirmware assumes until M669 says otherwise, degrees per second squared</summary>
+    public const float DefaultMaxTurntableAcceleration = 30.0f;
+
+    /// <summary>
+    /// Create a polar geometry
+    /// </summary>
+    /// <param name="minRadius">Closest the head may come to the centre, mm</param>
+    /// <param name="maxRadius">Furthest the head may go from the centre, mm</param>
+    /// <param name="homedRadius">Radius the head is at when homed, mm</param>
+    /// <param name="maxTurntableSpeed">How fast the turntable may turn, degrees per second</param>
+    /// <param name="maxTurntableAcceleration">How hard it may be accelerated, degrees per second squared</param>
+    /// <remarks>
+    /// The turntable limits are in the units M669 gives them and the object model reports them. The
+    /// step clock form the planner works in is a derived property, so a configured value survives
+    /// being written to the object model and read back unchanged
+    /// </remarks>
+    public PolarKinematicsEngine(
+        float minRadius,
+        float maxRadius,
+        float homedRadius,
+        float maxTurntableSpeed = DefaultMaxTurntableSpeed,
+        float maxTurntableAcceleration = DefaultMaxTurntableAcceleration)
+    {
+        MinRadius = MathF.Max(minRadius, 0.0f);
+        MaxRadius = maxRadius;
+        HomedRadius = homedRadius;
+        MaxTurntableSpeedPerSec = maxTurntableSpeed;
+        MaxTurntableAccelerationPerSec = maxTurntableAcceleration;
+    }
+
+    /// <inheritdoc />
+    public override NativeMovementError CartesianToMotorSteps(
+        ReadOnlySpan<float> machinePos,
+        ReadOnlySpan<float> stepsPerMm,
+        int numVisibleAxes,
+        int numTotalAxes,
+        Span<int> motorPos,
+        bool isCoordinated = false)
+    {
+        if (machinePos.Length < 2 || motorPos.Length < 2 || stepsPerMm.Length < 2)
+        {
+            return NativeMovementError.UnreachablePosition;
+        }
+
+        NativeMovementError result = NativeMovementError.Ok;
+
+        float radius = MathF.Sqrt((machinePos[0] * machinePos[0]) + (machinePos[1] * machinePos[1]));
+        if (TryRoundToInt32(radius * stepsPerMm[RadiusDrive], out int radiusSteps))
+        {
+            motorPos[RadiusDrive] = radiusSteps;
+        }
+        else
+        {
+            result = NativeMovementError.MicrostepPositionTooLarge;
+        }
+
+        if (motorPos[RadiusDrive] == 0)
+        {
+            // Dead centre: every angle puts the head in the same place, so turning the bed would be
+            // movement for nothing. Leaving it at zero also keeps the angle defined rather than
+            // whatever atan2 makes of a point at the origin
+            motorPos[TurntableDrive] = 0;
+        }
+        else
+        {
+            float angle = MathF.Atan2(machinePos[1], machinePos[0]) * RadiansToDegrees;
+            if (TryRoundToInt32(angle * stepsPerMm[TurntableDrive], out int angleSteps))
+            {
+                motorPos[TurntableDrive] = angleSteps;
+            }
+            else
+            {
+                result = NativeMovementError.MicrostepPositionTooLarge;
+            }
+        }
+
+        NativeMovementError linearResult = LinearAxesToMotorSteps(machinePos, stepsPerMm, ZAxis, numVisibleAxes, motorPos);
+        return result != NativeMovementError.Ok ? result : linearResult;
+    }
+
+    /// <inheritdoc />
+    public override void MotorStepsToCartesian(
+        ReadOnlySpan<int> motorPos,
+        ReadOnlySpan<float> stepsPerMm,
+        int numVisibleAxes,
+        int numTotalAxes,
+        Span<float> machinePos)
+    {
+        if (machinePos.Length < 2 || motorPos.Length < 2 || stepsPerMm.Length < 2)
+        {
+            return;
+        }
+
+        float angle = (motorPos[TurntableDrive] * DegreesToRadians) / stepsPerMm[TurntableDrive];
+        float radius = motorPos[RadiusDrive] / stepsPerMm[RadiusDrive];
+        machinePos[0] = radius * MathF.Cos(angle);
+        machinePos[1] = radius * MathF.Sin(angle);
+
+        LinearMotorStepsToCartesian(motorPos, stepsPerMm, ZAxis, numVisibleAxes, machinePos);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Deliberately not the base class's combined XY limit. On a polar machine the constraint that
+    /// bites is the turntable, and how hard it bites depends on where on the bed the move is: the same
+    /// arc near the centre is far more rotation than out at the rim
+    /// </remarks>
+    public override void LimitSpeedAndAcceleration(
+        ref MoveLimits limits,
+        in PlannedMove move,
+        ReadOnlySpan<float> maxFeedrates,
+        ReadOnlySpan<float> accelerations)
+    {
+        if (move.StartMotorPos.Length <= TurntableDrive || move.EndMotorPos.Length <= TurntableDrive
+            || move.StepsPerMm.Length <= TurntableDrive)
+        {
+            return;
+        }
+
+        long turntableMovement = (long)move.EndMotorPos[TurntableDrive] - move.StartMotorPos[TurntableDrive];
+        if (turntableMovement == 0)
+        {
+            return;
+        }
+
+        float stepsPerDegree = move.StepsPerMm[TurntableDrive];
+        if (move.ContinuousRotationShortcut)
+        {
+            // Going more than half way round means the other way round is shorter, and that is the way
+            // the machine will actually go
+            long stepsPerRotation = (long)MathF.Round(360.0f * stepsPerDegree);
+            if (turntableMovement > stepsPerRotation / 2)
+            {
+                turntableMovement -= stepsPerRotation;
+            }
+            else if (turntableMovement < -stepsPerRotation / 2)
+            {
+                turntableMovement += stepsPerRotation;
+            }
+
+            if (turntableMovement == 0)
+            {
+                return;
+            }
+        }
+
+        // mm of movement per degree of rotation. The turntable's own limits are per degree, so this is
+        // what turns them into limits on the move
+        float stepRatio = move.TotalDistance * stepsPerDegree / Math.Abs(turntableMovement);
+        limits.Limit(stepRatio * MaxTurntableSpeed, stepRatio * MaxTurntableAcceleration);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>Both motors move for either X or Y, since neither maps onto one of them</remarks>
+    public override uint GetControllingDrives(int axis)
+        => (axis == RadiusDrive || axis == TurntableDrive) ? LowestDrives(2) : base.GetControllingDrives(axis);
+
+    /// <summary>
+    /// Whether the head can be put at the given XY position
+    /// </summary>
+    /// <param name="x">X coordinate in mm</param>
+    /// <param name="y">Y coordinate in mm</param>
+    /// <returns>True if it is within the annulus the arm sweeps</returns>
+    public bool IsReachable(float x, float y)
+    {
+        float radiusSquared = (x * x) + (y * y);
+        return radiusSquared >= MinRadius * MinRadius && radiusSquared <= MaxRadius * MaxRadius;
+    }
+
+    /// <summary>
+    /// Which macro to run next to home some of a set of axes
+    /// </summary>
+    /// <param name="toBeHomed">Axes still to home, as a bitmap</param>
+    /// <param name="alreadyHomed">Axes already homed, as a bitmap</param>
+    /// <param name="axisLetters">Letter of each axis, in axis order</param>
+    /// <param name="fileName">The macro to run</param>
+    /// <returns>Axes that have to be homed first</returns>
+    /// <remarks>
+    /// X is the radius arm and Y is the turntable. The turntable has nowhere to home to, so only the
+    /// radius has a macro of its own
+    /// </remarks>
+    public override uint GetHomingFileName(uint toBeHomed, uint alreadyHomed, ReadOnlySpan<char> axisLetters,
+                                           out string fileName)
+    {
+        uint mustHomeFirst = base.GetHomingFileName(toBeHomed, alreadyHomed, axisLetters, out fileName);
+        if (mustHomeFirst == 0 && fileName == "homex.g")
+        {
+            fileName = "homeradius.g";
+        }
+        return mustHomeFirst;
+    }
+}

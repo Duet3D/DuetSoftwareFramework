@@ -8,6 +8,12 @@ namespace DuetAPI.ObjectModel;
 public partial class Board : ModelObject, IStaticModelObject
 {
     /// <summary>
+    /// Connection timeout a board has until it is given another
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>DefaultConnectionTimeoutSeconds</c> (ExpansionManager.h)</remarks>
+    public const int DefaultConnectionTimeoutSeconds = 10;
+
+    /// <summary>
     /// Accelerometer of this board or null if unknown
     /// </summary>
     public Accelerometer? Accelerometer
@@ -221,7 +227,7 @@ public partial class Board : ModelObject, IStaticModelObject
         get => _timeout;
         set => SetPropertyValue(ref _timeout, value);
     }
-    private int _timeout = 10;
+    private int _timeout = DefaultConnectionTimeoutSeconds;
 
     /// <summary>
     /// Unique identifier of the board or null if unknown

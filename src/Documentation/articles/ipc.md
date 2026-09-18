@@ -1,6 +1,6 @@
 # Inter-process communication
 
-Every process that is not RepRapFirmware reaches DCS through a single Unix domain socket, by default
+Every other process reaches DCS through a single Unix domain socket, by default
 `/var/run/dsf/dcs.sock`. DuetWebServer, the CLI tools, and plugins all use it through the
 [DuetAPIClient](components.md#duetapiclient) library; the protocol itself is line-framed JSON.
 
@@ -65,7 +65,7 @@ processor that drives the connection:
 | --- | --- | --- |
 | `Command` | `Command.cs` | Run commands (including codes), query/patch the model, manage files, plugins, sessions |
 | `CodeStream` | `CodeStream.cs` | Stream newline-delimited codes on a channel and read replies, no per-code JSON |
-| `Intercept` | `CodeInterception.cs` | Plugin hook into the [code pipeline](gcode-flow.md#the-six-stage-code-pipeline) |
+| `Intercept` | `CodeInterception.cs` | Plugin hook into the [code pipeline](gcode-flow.md#the-five-stage-code-pipeline) |
 | `Subscribe` | `ModelSubscription.cs` | Receive the [object model](object-model.md) and its patches |
 | `PluginService` | `PluginService.cs` | Internal channel between DCS and [DuetPluginService](plugins.md) |
 
@@ -101,12 +101,12 @@ Lets a plugin observe and alter codes as they pass through the pipeline. The cli
 channels, code types, and interception stage it wants:
 
 - **Pre** - before DCS processes the code internally,
-- **Post** - after internal processing, before the code is sent to RRF,
+- **Post** - after internal processing, if no handler claimed the code,
 - **Executed** - after the code has run.
 
 For each intercepted code the plugin may `Resolve` it (supply a result and stop further processing),
 `Cancel` it, `Ignore` it (let it continue untouched), or `Rewrite` it (replace it). See how these
-stages sit in the pipeline in [G-code flow](gcode-flow.md#the-six-stage-code-pipeline).
+stages sit in the pipeline in [G-code flow](gcode-flow.md#the-five-stage-code-pipeline).
 `CodeLogger` and `DuetPiManagementPlugin` are working examples ([Components](components.md#command-line-tools-and-example-plugins)).
 
 ### Subscribe

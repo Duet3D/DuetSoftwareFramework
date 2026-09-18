@@ -245,6 +245,183 @@ public abstract class PipelineBase
     }
 
     /// <summary>
+    /// How many levels this pipeline's stack holds, counting the base level
+    /// </summary>
+    public int StackDepth
+    {
+        get
+        {
+            lock (_stack)
+            {
+                return _stack.Count;
+            }
+        }
+    }
+
+    /// <summary>
+    /// The files this pipeline's stack holds, innermost first
+    /// </summary>
+    /// <returns>A snapshot of the stack's files</returns>
+    /// <remarks>
+    /// A snapshot rather than the stack itself, so that a caller deciding what to do about the stack
+    /// is not walking it while another thread pushes onto it
+    /// </remarks>
+    public IReadOnlyList<Files.CodeFile?> StackedFiles()
+    {
+        lock (_stack)
+        {
+            return [.. _stack.Select(item => item.File)];
+        }
+    }
+
+    /// <summary>
+    /// A code currently deferred on this pipeline: dispatched without being awaited, its handler
+    /// held back until its anchor move retires
+    /// </summary>
+    /// <param name="Code">The deferred code</param>
+    /// <param name="Cts">Cancellation source that cancels this deferred code alone</param>
+    /// <param name="Completion">Completion of the code's dispatch, including its onward routing</param>
+    private sealed record DeferredCode(Commands.Code Code, CancellationTokenSource Cts, Task Completion);
+
+    /// <summary>
+    /// Codes deferred on this pipeline, in dispatch order. Guarded by itself
+    /// </summary>
+    /// <remarks>
+    /// The set belongs to the pipeline rather than to a stack level, as RepRapFirmware's queued
+    /// codes belong to the channel rather than to the macro that produced them: a macro may finish
+    /// and pop while a code it deferred is still owed, and the code must stay visible to the
+    /// standstill wait and to purge cancellation. Deferred codes are excluded from the stack items'
+    /// <see cref="PipelineStackItem.Busy"/>, so flushes and the waits that pop a finished file do
+    /// not wait for them; the standstill wait counts them through
+    /// <see cref="CodeProcessor.WaitForStandstillAsync"/> instead. That is the split of the two
+    /// pending predicates
+    /// </remarks>
+    private readonly List<DeferredCode> _deferredCodes = [];
+
+    /// <summary>
+    /// Dispatch a deferred code without awaiting it
+    /// </summary>
+    /// <param name="code">Code to defer</param>
+    /// <param name="ring">Ring its anchor was queued on</param>
+    /// <param name="anchor">Id of its anchor move</param>
+    /// <remarks>
+    /// The code gets a cancellation source of its own, detached from the channel's: a pause
+    /// cancels the channel's pending codes wholesale, but a deferred code whose anchor was not
+    /// purged is owed and must survive that. It is cancelled selectively instead, by
+    /// <see cref="CancelDeferredCodesAfter"/> when a feedhold purges its anchor and by
+    /// <see cref="CancelAllDeferredCodes"/> when everything pending is discarded. Each deferred code
+    /// chains on the one deferred before it, so effects land in file order even when they share an
+    /// anchor
+    /// </remarks>
+    public void DeferCode(Commands.Code code, int ring, uint anchor)
+    {
+        CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.ApplicationStopping);
+        TaskCompletionSource completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        DeferredCode deferred = new(code, cts, completion.Task);
+
+        code.IsCurrentlyDeferred = true;
+        code.DeferredRing = ring;
+        code.DeferredAnchor = anchor;
+        code.CancellationToken = cts.Token;
+        lock (_deferredCodes)
+        {
+            code.DeferredPredecessor = _deferredCodes.Count > 0 ? _deferredCodes[^1].Completion : null;
+            _deferredCodes.Add(deferred);
+        }
+        _ = RunDeferredCodeAsync(deferred, completion);
+    }
+
+    private async Task RunDeferredCodeAsync(DeferredCode deferred, TaskCompletionSource completion)
+    {
+        try
+        {
+            await ProcessCodeAsync(deferred.Code);
+        }
+        catch (Exception e)
+        {
+            // ProcessCodeAsync handles its own errors; nothing may escape an unawaited task
+            ChannelProcessor.Logger.LogError(e, "Failed to process deferred code {Code}", deferred.Code);
+        }
+        finally
+        {
+            lock (_deferredCodes)
+            {
+                _deferredCodes.Remove(deferred);
+                deferred.Cts.Dispose();
+            }
+            completion.TrySetResult();
+        }
+    }
+
+    /// <summary>
+    /// Completion of the last code currently deferred on this pipeline, or null if none is
+    /// </summary>
+    /// <remarks>
+    /// Deferred codes chain on their predecessors, so the last one's completion is the whole set's
+    /// </remarks>
+    public Task? LastDeferredCodeTask()
+    {
+        lock (_deferredCodes)
+        {
+            return _deferredCodes.Count > 0 ? _deferredCodes[^1].Completion : null;
+        }
+    }
+
+    /// <summary>
+    /// Cancel every deferred code whose anchor is at or past the given move id
+    /// </summary>
+    /// <param name="firstPurgedMoveId">Id of the earliest move a feedhold purged</param>
+    /// <remarks>
+    /// The purge boundary and the job's rewind point are the same number, so the cancelled codes
+    /// are exactly the ones the replay re-reads: each deferred code fires once, on whichever side
+    /// of the pause it ends up
+    /// </remarks>
+    public void CancelDeferredCodesAfter(uint firstPurgedMoveId)
+        => Cancel(deferred => (int)(deferred.Code.DeferredAnchor - firstPurgedMoveId) >= 0);
+
+    /// <summary>
+    /// Cancel every deferred code on this pipeline
+    /// </summary>
+    public void CancelAllDeferredCodes() => Cancel(_ => true);
+
+    /// <summary>
+    /// Cancel the deferred codes a predicate picks out
+    /// </summary>
+    /// <param name="shouldCancel">Which of them to cancel</param>
+    /// <remarks>
+    /// The set to cancel is taken under the lock and cancelled outside it. Cancelling runs the
+    /// waiting code's continuation on this thread, and what that code does as it unwinds is remove
+    /// itself from this list - so cancelling while iterating it would throw, part way through, out
+    /// of whatever asked for the cancellation. For the pause that is the sequence that puts the
+    /// machine down, which would be left half done with the job still holding the codes it was
+    /// waiting for.
+    /// <para>
+    /// A source already disposed belongs to a code that has just finished on another thread, which
+    /// is the outcome asked for here
+    /// </para>
+    /// </remarks>
+    private void Cancel(Func<DeferredCode, bool> shouldCancel)
+    {
+        DeferredCode[] toCancel;
+        lock (_deferredCodes)
+        {
+            toCancel = _deferredCodes.Where(shouldCancel).ToArray();
+        }
+
+        foreach (DeferredCode deferred in toCancel)
+        {
+            try
+            {
+                deferred.Cts.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // The code finished as this was deciding to cancel it
+            }
+        }
+    }
+
+    /// <summary>
     /// Push a new element onto the stack
     /// </summary>
     /// <param name="file">Code file or null if waiting for acknowledgment</param>
