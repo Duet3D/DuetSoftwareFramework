@@ -464,6 +464,7 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
     /// </remarks>
     [Category("KnownGap")]
     [Test]
+    [Category("LongRunning")]
     public async Task M568SetsTemperaturesAndHeaterStates()
     {
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: HeaterToolConfig);

@@ -20,6 +20,7 @@ public class SyncPauseTests : BenchFixture
     /// (taken before pause.g parks), and the resume runs the codes after the M25
     /// </summary>
     [Test]
+    [Category("LongRunning")]
     public async Task PauseFromWithinTheFile()
     {
         await using JobBench bench = await JobControlBench.StartAsync(
@@ -102,6 +103,7 @@ public class SyncPauseTests : BenchFixture
 
     /// <summary>M601 pauses like M226, and M24 P0 skips resume.g while still resuming</summary>
     [Test]
+    [Category("LongRunning")]
     public async Task M601ResumedWithM24P0()
     {
         await using JobBench bench = await JobControlBench.StartAsync(prepareSd: sd =>
@@ -160,6 +162,7 @@ public class SyncPauseTests : BenchFixture
 
     /// <summary>Without a filament-change.g, M600 falls back to pause.g</summary>
     [Test]
+    [Category("LongRunning")]
     public async Task M600FallsBackToPauseMacro()
     {
         await using JobBench bench = await JobControlBench.StartAsync(prepareSd: sd =>

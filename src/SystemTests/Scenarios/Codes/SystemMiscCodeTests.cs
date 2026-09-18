@@ -502,6 +502,7 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
     /// </remarks>
     [Category("KnownGap")]
     [Test]
+    [Category("LongRunning")]
     public async Task M581Dot1ExpressionTriggerRunsItsMacro()
     {
         await using JobBench bench = await JobControlBench.StartAsync(

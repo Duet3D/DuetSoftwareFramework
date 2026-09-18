@@ -659,8 +659,9 @@ public class ProbeEndstopHomingCodeTests : SystemTests.Host.BenchFixture
     /// the move, and the input is released again once the tap has been judged so the next tap's
     /// pre-check sees a clear probe
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
+    [Category("KnownGap")]
+    [Category("LongRunning")]
     public async Task G29S0ProbesTheGridAndAdoptsTheMap()
     {
         await using JobBench bench = await StartBenchAsync(

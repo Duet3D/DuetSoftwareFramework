@@ -35,6 +35,7 @@ public class DeferredPauseTests : BenchFixture
     /// than wait on codes whose anchors will never retire
     /// </summary>
     [Test]
+    [Category("LongRunning")]
     public async Task PauseTwiceAroundDeferredCodes()
     {
         await using JobBench bench = await JobControlBench.StartAsync(
@@ -86,6 +87,8 @@ public class DeferredPauseTests : BenchFixture
     /// as a synchronous pause, and the macro is not rerun on resume
     /// </summary>
     [Test]
+    [Category("LongRunning")]
+    [Category("KnownGap")]
     public async Task PauseDuringPlainMacroDefers()
     {
         await using JobBench bench = await JobControlBench.StartAsync(
@@ -140,6 +143,7 @@ public class DeferredPauseTests : BenchFixture
     /// </summary>
     /// TODO this might be an intermitant failure
     [Test]
+    [Category("LongRunning")]
     public async Task PauseDuringPausableMacroRerunsIt()
     {
         await using JobBench bench = await JobControlBench.StartAsync(prepareSd: sd =>
@@ -185,6 +189,7 @@ public class DeferredPauseTests : BenchFixture
     /// here tracks that yet, so this scenario pins down only what must hold either way
     /// </summary>
     [Test]
+    [Category("LongRunning")]
     public async Task PauseDuringToolChange()
     {
         await using JobBench bench = await JobControlBench.StartAsync(

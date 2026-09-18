@@ -59,6 +59,7 @@ public class JobControlRefusalTests : BenchFixture
     /// job, and pausing twice
     /// </summary>
     [Test]
+    [Category("LongRunning")]
     public async Task RefusalsAroundARunningJob()
     {
         await using JobBench bench = await JobControlBench.StartAsync(prepareSd: sd =>
@@ -98,6 +99,7 @@ public class JobControlRefusalTests : BenchFixture
     /// resuming, is silently ignored with an empty reply rather than refused
     /// </summary>
     [Test]
+    [Category("LongRunning")]
     public async Task M24DuringTransitionsIsIgnored()
     {
         await using JobBench bench = await JobControlBench.StartAsync(prepareSd: sd =>

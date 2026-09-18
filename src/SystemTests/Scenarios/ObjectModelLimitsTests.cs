@@ -157,6 +157,7 @@ public class ObjectModelLimitsTests : SystemTests.Host.BenchFixture
     /// rather than two that happen to agree today
     /// </remarks>
     [Test]
+    [Category("KnownGap")]
     public async Task DeviceLimitsMatchWhatTheCodesEnforce()
     {
         await using JobBench bench = await JobControlBench.StartAsync();

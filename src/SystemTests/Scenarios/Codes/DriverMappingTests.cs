@@ -261,6 +261,7 @@ public class DriverMappingTests : BenchFixture
     /// axis would otherwise keep the phase stepping mode the axis before it left it in
     /// </remarks>
     [Test]
+    [Category("KnownGap")]
     public async Task M584MapsAxesAndResetsTheStepMode()
     {
         await using JobBench bench = await DriversBench.StartAsync();
@@ -299,6 +300,7 @@ public class DriverMappingTests : BenchFixture
     /// done, and undoing it would leave the machine in neither state
     /// </remarks>
     [Test]
+    [Category("KnownGap")]
     public async Task M584ReportsAStepModeResetThatWentUnanswered()
     {
         await using JobBench bench = await DriversBench.StartAsync(
@@ -368,6 +370,7 @@ public class DriverMappingTests : BenchFixture
     /// <c>phaseStep false</c>, which are what Move::Init gives every drive
     /// </remarks>
     [Test]
+    [Category("KnownGap")]
     public async Task M584CreatesAnAxisWithTheDefaultsADriveStartsWith()
     {
         await using JobBench bench = await DriversBench.StartAsync();

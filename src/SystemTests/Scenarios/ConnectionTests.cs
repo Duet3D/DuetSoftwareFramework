@@ -69,6 +69,7 @@ public class ConnectionTests : SystemTests.Host.BenchFixture
     }
 
     [Test]
+    [Category("LongRunning")]
     public async Task ControllerRebootReconnectsAndRunsConfigAgain()
     {
         using ScriptedCanMaster fake = new(SocketPath());
@@ -88,6 +89,7 @@ public class ConnectionTests : SystemTests.Host.BenchFixture
     }
 
     [Test]
+    [Category("LongRunning")]
     public async Task WithheldReadinessTimesOutAndRecovers()
     {
         using ScriptedCanMaster fake = new(SocketPath());

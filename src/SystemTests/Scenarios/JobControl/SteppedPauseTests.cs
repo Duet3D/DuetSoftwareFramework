@@ -286,6 +286,7 @@ public class SteppedPauseTests : BenchFixture
     /// a whole 100 mm too far or too little rather than landing near where it should
     /// </summary>
     [Test]
+    [Category("LongRunning")]
     public Task ARelativeJobMakesItsDistanceFromEveryPausePoint()
         => EveryPausePointMakesTheWholeJobAsync("""
             G91
@@ -302,6 +303,7 @@ public class SteppedPauseTests : BenchFixture
     /// wrong place instead of a distance travelled twice - the same defect, differently expressed
     /// </summary>
     [Test]
+    [Category("LongRunning")]
     public Task AnAbsoluteJobEndsAtItsLastTargetFromEveryPausePoint()
         => EveryPausePointMakesTheWholeJobAsync("""
             G90

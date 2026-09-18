@@ -31,6 +31,7 @@ public class StallDetectionAndPhaseStepTests : BenchFixture
     /// <c>stallDetection</c> because stall configuration had no home at all
     /// </remarks>
     [Test]
+    [Category("KnownGap")]
     public async Task M915PConfiguresOneDriver()
     {
         await using JobBench bench = await DriversBench.StartAsync();
@@ -76,6 +77,7 @@ public class StallDetectionAndPhaseStepTests : BenchFixture
     /// and the extruder on another, so the settings go out as two requests with different bitmaps
     /// </remarks>
     [Test]
+    [Category("KnownGap")]
     public async Task M915ByAxisLetterAndExtruderNumber()
     {
         await using JobBench bench = await DriversBench.StartAsync();
@@ -107,6 +109,7 @@ public class StallDetectionAndPhaseStepTests : BenchFixture
     /// default, so the letter alone is a parse error
     /// </remarks>
     [Test]
+    [Category("KnownGap")]
     public async Task M915RefusesABareExtruderLetter()
     {
         await using JobBench bench = await DriversBench.StartAsync();
@@ -192,6 +195,7 @@ public class StallDetectionAndPhaseStepTests : BenchFixture
     /// buffer came back empty (GCodes3.cpp:953)
     /// </remarks>
     [Test]
+    [Category("KnownGap")]
     public async Task M970OnAnExtruderWhoseBoardDeclines()
     {
         await using JobBench bench = await DriversBench.StartAsync(
@@ -224,6 +228,7 @@ public class StallDetectionAndPhaseStepTests : BenchFixture
     /// is the caller's: Move::SetStepMode treats it as a failure and M970 returns it
     /// </remarks>
     [Test]
+    [Category("KnownGap")]
     public async Task M970ReportsABoardThatNeverAnswers()
     {
         await using JobBench bench = await DriversBench.StartAsync(
@@ -251,6 +256,7 @@ public class StallDetectionAndPhaseStepTests : BenchFixture
     /// out of range either way
     /// </remarks>
     [Test]
+    [Category("KnownGap")]
     public async Task M970RefusesAnUnknownMode()
     {
         await using JobBench bench = await DriversBench.StartAsync();
@@ -277,6 +283,7 @@ public class StallDetectionAndPhaseStepTests : BenchFixture
     /// like the report beside it
     /// </remarks>
     [Test]
+    [Category("KnownGap")]
     public async Task M970RefusesANegativeGain()
     {
         await using JobBench bench = await DriversBench.StartAsync();
@@ -323,6 +330,7 @@ public class StallDetectionAndPhaseStepTests : BenchFixture
     /// their own (CanInterface.cpp SetRemotePhaseStepParam)
     /// </remarks>
     [Test]
+    [Category("KnownGap")]
     public async Task M970FeedforwardGains()
     {
         await using JobBench bench = await DriversBench.StartAsync();

@@ -22,6 +22,7 @@ public class JobEdgeCaseTests : BenchFixture
     /// from that point on would be refused for want of a job to pause
     /// </summary>
     [Test]
+    [Category("LongRunning")]
     public async Task JobLastsAsLongAsItsMotion()
     {
         await using JobBench bench = await JobControlBench.StartAsync(prepareSd: sd =>
@@ -69,6 +70,7 @@ public class JobEdgeCaseTests : BenchFixture
     /// than an unpaused run and nothing errors when the seek lands inside the block
     /// </summary>
     [Test]
+    [Category("LongRunning")]
     public async Task PauseInsideWhileLoop()
     {
         await using JobBench bench = await JobControlBench.StartAsync(
@@ -108,6 +110,7 @@ public class JobEdgeCaseTests : BenchFixture
     /// pause writes slot 1 without touching either
     /// </summary>
     [Test]
+    [Category("LongRunning")]
     public async Task RestorePointSlotsAreIsolated()
     {
         await using JobBench bench = await JobControlBench.StartAsync(prepareSd: sd =>
@@ -149,6 +152,7 @@ public class JobEdgeCaseTests : BenchFixture
     /// resume completes the remainder, and the job then finishes normally instead of hanging
     /// </summary>
     [Test]
+    [Category("LongRunning")]
     public async Task PauseDuringFinalMove()
     {
         await using JobBench bench = await JobControlBench.StartAsync(
@@ -195,6 +199,7 @@ public class JobEdgeCaseTests : BenchFixture
     /// itself still happens, synchronously and asynchronously
     /// </summary>
     [Test]
+    [Category("LongRunning")]
     public async Task PauseUnhomedSkipsTheMacros()
     {
         await using JobBench bench = await JobControlBench.StartAsync(prepareSd: sd =>

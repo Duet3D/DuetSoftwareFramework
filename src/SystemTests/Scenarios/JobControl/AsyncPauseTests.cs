@@ -37,6 +37,7 @@ public class AsyncPauseTests : BenchFixture
     /// skipped and nothing is doubled
     /// </summary>
     [Test]
+    [Category("LongRunning")]
     public async Task PauseStopsMidMove()
     {
         const float feedrate = 50; // mm/s
@@ -137,6 +138,7 @@ public class AsyncPauseTests : BenchFixture
     /// so the resume travels from a place the machine is not at
     /// </summary>
     [Test]
+    [Category("LongRunning")]
     public async Task RestorePointIsWhereTheMachineStopped()
     {
         await using JobBench bench = await JobControlBench.StartAsync(prepareSd: sd =>
@@ -191,6 +193,7 @@ public class AsyncPauseTests : BenchFixture
     /// the scaling were wrong the square would not close and the extrusion total would drift
     /// </summary>
     [Test]
+    [Category("LongRunning")]
     public async Task ResumeFractionScalesRelativeMoves()
     {
         await using JobBench bench = await JobControlBench.StartAsync(
@@ -232,6 +235,7 @@ public class AsyncPauseTests : BenchFixture
     /// either re-extrudes the whole line or skips the remainder
     /// </summary>
     [Test]
+    [Category("LongRunning")]
     public async Task ResumeFractionScalesAbsoluteExtrusion()
     {
         await using JobBench bench = await JobControlBench.StartAsync(
@@ -266,6 +270,7 @@ public class AsyncPauseTests : BenchFixture
     /// both back before re-reading the line
     /// </summary>
     [Test]
+    [Category("LongRunning")]
     public async Task PauseOnBareModalLine()
     {
         await using JobBench bench = await JobControlBench.StartAsync(
@@ -311,6 +316,7 @@ public class AsyncPauseTests : BenchFixture
     /// rate and the job would get slower each time
     /// </summary>
     [Test]
+    [Category("LongRunning")]
     public async Task RecordedFeedRateIsUnscaledByM220()
     {
         await using JobBench bench = await JobControlBench.StartAsync(prepareSd: sd =>
@@ -341,6 +347,7 @@ public class AsyncPauseTests : BenchFixture
     /// with the first instead of repeating or cutting short part of the line
     /// </summary>
     [Test]
+    [Category("LongRunning")]
     public async Task TwoPausesInsideOneLine()
     {
         await using JobBench bench = await JobControlBench.StartAsync(

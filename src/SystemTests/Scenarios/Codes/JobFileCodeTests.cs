@@ -645,6 +645,7 @@ public class JobFileCodeTests : SystemTests.Host.BenchFixture
     /// <c>job.file.simulatedTime</c>
     /// </remarks>
     [Test]
+    [Category("LongRunning")]
     public async Task M37SimulatesAFile()
     {
         // Slow padding, so the simulation is still running when the model is read
@@ -682,7 +683,6 @@ public class JobFileCodeTests : SystemTests.Host.BenchFixture
     /// or replacing the "; Simulated print time" comment FileInfoParser.h names, which
     /// FileInfoParser.cpp reads back into <c>printingFileInfo.simulatedTime</c>
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M37WritesTheSimulatedTimeIntoTheFile()
     {
@@ -770,7 +770,6 @@ public class JobFileCodeTests : SystemTests.Host.BenchFixture
     /// stored value less the time since it was stored, and null when no file is being printed
     /// </remarks>
     /// TODO this test is intermitant
-    [Category("KnownGap")]
     [Test]
     public async Task M73SetsTheSlicerTimeEstimate()
     {
@@ -922,6 +921,7 @@ public class JobFileCodeTests : SystemTests.Host.BenchFixture
     /// through the same <c>DoSynchronousPause</c>
     /// </remarks>
     [Test]
+    [Category("LongRunning")]
     public async Task M600AndM601PauseFromWithinTheFile()
     {
         await using JobBench bench = await JobControlBench.StartAsync(prepareSd: sd =>

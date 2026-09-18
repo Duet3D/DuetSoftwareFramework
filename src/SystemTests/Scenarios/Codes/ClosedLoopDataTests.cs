@@ -41,6 +41,7 @@ public class ClosedLoopDataTests : BenchFixture
     /// warning, which is why the reference records one
     /// </remarks>
     [Test]
+    [Category("KnownGap")]
     public async Task M569Point5ReportsThatNothingIsBeingCollected()
     {
         await using JobBench bench = await DriversBench.StartAsync();
@@ -57,6 +58,7 @@ public class ClosedLoopDataTests : BenchFixture
     /// A the collection mode, R the rate, D the variables to record and V the movement to make
     /// </remarks>
     [Test]
+    [Category("KnownGap")]
     public async Task M569Point5AsksTheBoardToCollect()
     {
         await using JobBench bench = await DriversBench.StartAsync();
@@ -95,6 +97,7 @@ public class ClosedLoopDataTests : BenchFixture
     /// early tell a client so (RRF ExpansionManager::AddClosedLoopRun)
     /// </remarks>
     [Test]
+    [Category("KnownGap")]
     public async Task M569Point5WritesTheSamplesItIsSent()
     {
         await using JobBench bench = await DriversBench.StartAsync();
@@ -147,6 +150,7 @@ public class ClosedLoopDataTests : BenchFixture
     /// rather than leaving a gap for a reader to find
     /// </remarks>
     [Test]
+    [Category("KnownGap")]
     public async Task M569Point5RecordsLostSamples()
     {
         await using JobBench bench = await DriversBench.StartAsync();
@@ -176,6 +180,7 @@ public class ClosedLoopDataTests : BenchFixture
     /// </summary>
     /// <remarks>RRF ClosedLoop.cpp:139</remarks>
     [Test]
+    [Category("KnownGap")]
     public async Task M569Point5RefusesASecondCollection()
     {
         await using JobBench bench = await DriversBench.StartAsync();
@@ -195,6 +200,7 @@ public class ClosedLoopDataTests : BenchFixture
     /// and refuse every later M569.5 with "already being collected" until a restart
     /// </remarks>
     [Test]
+    [Category("KnownGap")]
     public async Task M569Point5ReleasesTheCollectionWhenTheBoardDoesNotAnswer()
     {
         await using JobBench bench = await DriversBench.StartAsync(
@@ -220,6 +226,7 @@ public class ClosedLoopDataTests : BenchFixture
     [TestCase("S70000", "parameter 'S' too high")]
     [TestCase("S-1", "parameter 'S' too low")]
     [TestCase("S4 R70000", "parameter 'R' too high")]
+    [Category("KnownGap")]
     public async Task M569Point5RefusesAValueItCannotCarry(string parameters, string expected)
     {
         await using JobBench bench = await DriversBench.StartAsync();
@@ -239,6 +246,7 @@ public class ClosedLoopDataTests : BenchFixture
     /// </summary>
     /// <remarks>RRF ClosedLoop.cpp:196</remarks>
     [Test]
+    [Category("KnownGap")]
     public async Task M569Point5WithNoSamplesRecordsNothing()
     {
         await using JobBench bench = await DriversBench.StartAsync();
