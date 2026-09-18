@@ -111,7 +111,7 @@ internal partial class MCodeHandler
             {
                 return new Message(MessageType.Success, string.Create(CultureInfo.InvariantCulture,
                     $"Board {board} connection timeout "
-                    + $"{expansionBoardManager.FindBoard(board)?.Timeout ?? Board.DefaultConnectionTimeoutSeconds} seconds"));
+                    + $"{model.FindBoard(board)?.Timeout ?? Board.DefaultConnectionTimeoutSeconds} seconds"));
             }
         }
 

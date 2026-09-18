@@ -123,9 +123,8 @@ public sealed class StartPlugin(CommandFactory commandFactory, Model.ObjectModel
                 // Check the required RRF version
                 if (!string.IsNullOrEmpty(plugin.RrfVersion))
                 {
-                    if (model.Boards.Count > 0)
+                    if (model.FirmwareVersion is string rrfVersion)
                     {
-                        string rrfVersion = model.Boards[0].FirmwareVersion;
                         if (!PluginManifest.CheckVersion(rrfVersion, plugin.RrfVersion))
                         {
                             throw new ArgumentException($"Incompatible RRF version (requires {plugin.RrfVersion}, got {rrfVersion})");

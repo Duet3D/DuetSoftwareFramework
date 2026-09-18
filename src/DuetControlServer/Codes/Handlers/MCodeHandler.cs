@@ -1996,16 +1996,19 @@ internal partial class MCodeHandler(
             string? iapFile, firmwareFile;
             using (await model.AccessReadOnlyAsync(cancellationToken))
             {
-                if (model.Boards.Count == 0)
+                // The main board is boards[0] and is always there, but it only names its firmware
+                // files once it has reported them, so what decides this is whether one has
+                Board mainBoard = model.Boards[0];
+                if (string.IsNullOrEmpty(mainBoard.IapFileNameSBC) && string.IsNullOrEmpty(mainBoard.FirmwareFileName))
                 {
                     return new Message(MessageType.Error, "No boards have been detected");
                 }
 
                 // There are now two different IAP binaries, check which one to use
-                iapFile = model.Boards[0].IapFileNameSBC;
+                iapFile = mainBoard.IapFileNameSBC;
                 if (!code.TryGetString('P', out firmwareFile))
                 {
-                    firmwareFile = model.Boards[0].FirmwareFileName;
+                    firmwareFile = mainBoard.FirmwareFileName;
                 }
             }
 

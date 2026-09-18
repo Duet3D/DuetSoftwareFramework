@@ -1050,13 +1050,7 @@ internal partial class MCodeHandler
     /// </remarks>
     private Driver GetOrCreateDriver(DriverId driver)
     {
-        Board? board = model.Boards.FirstOrDefault(b => b.CanAddress == driver.Board);
-        if (board is null)
-        {
-            board = new Board { CanAddress = driver.Board };
-            model.Boards.Add(board);
-        }
-
+        Board board = model.GetOrCreateBoard((byte)driver.Board);
         board.Drivers ??= [];
         while (board.Drivers.Count <= driver.Port)
         {
@@ -1418,12 +1412,9 @@ internal partial class MCodeHandler
     /// one message with a different parameter rather than two
     /// </remarks>
     private async ValueTask<Message> SendPhaseSteppingAsync(DriverId driver, char letter, float value,
-                                                            CancellationToken cancellationToken)
+                                                                CancellationToken cancellationToken)
     {
-        if (CanAddresses.HasNoHardware(driver.Board))
-        {
-            return new Message(MessageType.Error, CanAddresses.NoHardwareMessage($"Driver {driver}"));
-        }
+        CanAddresses.CheckAddressHasHardware(driver.Board, $"Driver {driver}");
 
         CanMessageM970 message = default;
         message.P = (byte)driver.Port;
@@ -1440,7 +1431,8 @@ internal partial class MCodeHandler
             message.A = value;
         }
 
-        return await linkInterface.SendCanRequestAsync((byte)driver.Board, in message, cancellationToken);
+        return await linkInterface.SendCanRequestAsync((byte)driver.Board, in message,
+                                                      cancellationToken: cancellationToken);
     }
 
     /// <summary>
@@ -2768,7 +2760,7 @@ internal partial class MCodeHandler
 
         // MaxMotors is zero for a board that has announced itself but not yet reported its details,
         // which says nothing about whether the driver exists
-        Board? board = model.Boards.FirstOrDefault(b => b.CanAddress == driver.Board);
+        Board? board = model.FindBoard((byte)driver.Board);
         if (board is not null && board.MaxMotors > 0 && driver.Port >= board.MaxMotors)
         {
             warnings.Add($"Driver {driver} does not exist");

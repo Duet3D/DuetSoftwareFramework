@@ -80,11 +80,11 @@ public sealed class InstallPlugin(CommandFactory commandFactory, Model.ObjectMod
             // Check the required RRF version
             if (!string.IsNullOrEmpty(plugin.RrfVersion))
             {
-                if (model.Boards.Count > 0)
+                if (model.FirmwareVersion is string firmwareVersion)
                 {
-                    if (!PluginManifest.CheckVersion(model.Boards[0].FirmwareVersion, plugin.RrfVersion))
+                    if (!PluginManifest.CheckVersion(firmwareVersion, plugin.RrfVersion))
                     {
-                        throw new ArgumentException($"Incompatible RRF version (requires {plugin.RrfVersion}, got {model.Boards[0].FirmwareVersion})");
+                        throw new ArgumentException($"Incompatible RRF version (requires {plugin.RrfVersion}, got {firmwareVersion})");
                     }
                 }
                 else

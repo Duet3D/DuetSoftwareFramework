@@ -212,12 +212,19 @@ public class CanMessages
     public void ARefusedRequestIsAnErrorEvenWithoutText()
     {
         // The board said no and did not say why, which used to read as success because the only thing
-        // anyone looked at was whether there was any text
+        // anyone looked at was whether there was any text. The refusal carries no text of its own:
+        // only the code that sent the request knows what it was about, so the sentence is the
+        // caller's to write - M970 answers "Could not set step mode for extruder 0 to mode 1" and
+        // M584, which resets the step mode of every driver it re-maps, says nothing at all
         CanResponse response = Reply(CodeResult.BadOrMissingParameter, "");
 
         Assert.That(response.Severity, Is.EqualTo(MessageType.Error));
+        Assert.That(response.Succeeded, Is.False);
         Assert.That(response.ToMessage().Type, Is.EqualTo(MessageType.Error));
         Assert.That(response.ToMessage().Content, Does.Contain("21").And.Contain("BadOrMissingParameter"));
+        Assert.That(response.Text, Is.Empty,
+                    "and the board's own words are empty, which is how a caller with a better sentence "
+                    + "than the standard one knows to use it");
     }
 
     [Test]
@@ -291,7 +298,8 @@ public class CanMessages
         Assert.That(Reply(CodeResult.Ok, "").ToMessage().Content, Is.Empty);
         Assert.That(Reply(CodeResult.Warning, "stall threshold clamped").ToMessage().Type, Is.EqualTo(MessageType.Warning));
 
-        Message combined = new[] { Reply(CodeResult.Ok, "").ToMessage(), Reply(CodeResult.Warning, "clamped").ToMessage() }.ToMessage();
+        Message combined = Reply(CodeResult.Ok, "").ToMessage()
+                                                   .CombinedWith(Reply(CodeResult.Warning, "clamped").ToMessage());
         Assert.That(combined.Type, Is.EqualTo(MessageType.Warning));
         Assert.That(combined.Content, Is.EqualTo("clamped"));
     }
@@ -309,6 +317,37 @@ public class CanMessages
 
         Assert.That(combined.Type, Is.EqualTo(MessageType.Error));
         Assert.That(combined.Content, Is.EqualTo("board 21: driver 0 not present\nboard 22: bad parameter"));
+    }
+
+    /// <summary>
+    /// Two replies a handler is already holding combine by the same rule as a collected list
+    /// </summary>
+    /// <remarks>
+    /// A handler that sent twice has the two in hand rather than in a list, which is what this saves
+    /// building. Either may be null, because a step that did not run has nothing to say
+    /// </remarks>
+    [Test]
+    public void TwoRepliesCombineWithoutACollectionToPutThemIn()
+    {
+        Message warned = new(MessageType.Warning, "stall threshold clamped");
+        Message refused = new(MessageType.Error, "driver 0 not present");
+
+        Assert.Multiple(() =>
+        {
+            Message both = warned.CombinedWith(refused);
+            Assert.That(both.Type, Is.EqualTo(MessageType.Error), "the worse of the two is what it is reported as");
+            Assert.That(both.Content, Is.EqualTo("stall threshold clamped\ndriver 0 not present"),
+                        "and both texts are kept, in the order they were said");
+
+            Assert.That(warned.CombinedWith(null).Content, Is.EqualTo("stall threshold clamped"),
+                        "nothing said is nothing added");
+            Assert.That(warned.CombinedWith(new Message()).Type, Is.EqualTo(MessageType.Warning),
+                        "and an empty success does not drag the type back down");
+            Assert.That(((Message?)null).CombinedWith(refused).Content, Is.EqualTo("driver 0 not present"),
+                        "which holds for the first of the two as well");
+            Assert.That(((Message?)null).CombinedWith(null).Content, Is.Empty,
+                        "two of them being an empty success, as a code with nothing to report returns");
+        });
     }
 
     /// <summary>A standard reply from board 21, as the link would hand it over once reassembled</summary>

@@ -730,25 +730,8 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
     /// </remarks>
     public void Invalidate() => Array.Clear(_lastSeen);
 
-    /// <summary>
-    /// Find the board at a CAN address, or null if none has been heard from
-    /// </summary>
-    /// <param name="address">CAN address of the board</param>
-    /// <remarks>
-    /// <c>boards[]</c> is in the order the boards were discovered rather than by CAN address, so the
-    /// address is a field to match on and not an index
-    /// </remarks>
-    public Board? FindBoard(byte address)
-    {
-        foreach (Board existing in model.Boards)
-        {
-            if (existing.CanAddress == address)
-            {
-                return existing;
-            }
-        }
-        return null;
-    }
+    /// <inheritdoc cref="Model.ObjectModel.FindBoard" />
+    public Board? FindBoard(byte address) => model.FindBoard(address);
 
     /// <summary>
     /// The board at a CAN address, creating the entry if nothing has been heard from it yet

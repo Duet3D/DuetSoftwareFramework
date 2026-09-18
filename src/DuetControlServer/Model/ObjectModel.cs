@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -85,6 +86,101 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
         Network.Hostname = Environment.MachineName;
         Network.Name = Environment.MachineName;
         SetLimits();
+        AddMainBoard();
+    }
+
+    /// <summary>
+    /// Put the main board in <c>boards[0]</c>, where every client and every code that reaches for
+    /// "the main board" already looks for it
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>boards[]</c> is the main board followed by the expansion boards it knows,
+    /// in ascending CAN address order (RepRap.cpp objectModelArrayTable entry 0 over
+    /// ExpansionManager::GetBoardDetails). The main board here is this program and DuetCANMaster at
+    /// CAN address 0, which is always there, so the entry is made once rather than discovered
+    /// </remarks>
+    private void AddMainBoard()
+        => Boards.Add(new Board { CanAddress = CanId.MasterAddress, State = BoardState.Running });
+
+    /// <summary>
+    /// The firmware version the machine reports, or null while no board has said what it runs
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's main board answers this for itself, and everything that wants "the version
+    /// this machine runs" reads <c>boards[0]</c>. The main board here is this program and
+    /// DuetCANMaster, and nothing tells DuetControlServer what firmware DuetCANMaster is running, so
+    /// <c>boards[0]</c> has no version to give. The expansion boards do report theirs when they
+    /// announce themselves, and a machine's boards run the same release, so the first one to have
+    /// said is the answer.
+    /// </para>
+    /// <para>
+    /// Null rather than an empty string, because "no board has reported yet" and "a board reported
+    /// nothing" are the same thing to a caller and neither is a version to compare against
+    /// </para>
+    /// </remarks>
+    public string? FirmwareVersion
+        => Boards.FirstOrDefault(board => !string.IsNullOrEmpty(board.FirmwareVersion))?.FirmwareVersion;
+
+    /// <summary>
+    /// The object model entry for the board at a CAN address, creating it if the machine has not
+    /// seen that board yet
+    /// </summary>
+    /// <param name="address">CAN address of the board</param>
+    /// <returns>Its entry in <c>boards[]</c></returns>
+    /// <remarks>
+    /// <para>
+    /// Kept in ascending CAN address order behind the main board, which is what makes an index into
+    /// <c>boards[]</c> mean something: a client reading <c>boards[2]</c> is reading the same board on
+    /// every run, and on a machine with no gaps in its addresses it is the board at address 2 - which
+    /// is what a reference recorded against RepRapFirmware compares against.
+    /// </para>
+    /// <para>
+    /// Discovery order would give neither. The order the boards happened to announce themselves in
+    /// says nothing about the machine, and a board created early because config.g recorded a setting
+    /// for it would sort ahead of one that announced itself first
+    /// </para>
+    /// </remarks>
+    public Board GetOrCreateBoard(byte address)
+    {
+        for (int i = 0; i < Boards.Count; i++)
+        {
+            if (Boards[i].CanAddress == address)
+            {
+                return Boards[i];
+            }
+            if (Boards[i].CanAddress > address)
+            {
+                Board inserted = new() { CanAddress = address, State = BoardState.Unknown };
+                Boards.Insert(i, inserted);
+                return inserted;
+            }
+        }
+
+        Board board = new() { CanAddress = address, State = BoardState.Unknown };
+        Boards.Add(board);
+        return board;
+    }
+
+    /// <summary>
+    /// The board at a CAN address, or null if the machine has not seen it
+    /// </summary>
+    /// <param name="address">CAN address of the board</param>
+    /// <returns>Its entry in <c>boards[]</c>, or null</returns>
+    /// <remarks>
+    /// The address is a field to match on rather than an index, because a machine may have gaps in
+    /// its addresses and <c>boards[2]</c> then means the second board rather than the board at 2
+    /// </remarks>
+    public Board? FindBoard(byte address)
+    {
+        foreach (Board board in Boards)
+        {
+            if (board.CanAddress == address)
+            {
+                return board;
+            }
+        }
+        return null;
     }
 
     /// <summary>
@@ -773,6 +869,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
         using (AccessReadWrite())
         {
             Boards.Clear();
+            AddMainBoard();
             Global.Clear();
             Seqs.Clear();
             IsDisconnected = true;
