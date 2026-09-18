@@ -304,8 +304,7 @@ build/
 # never committed.
 .claude/memory/private/
 
-# Reference checkout of RepRapFirmware; not a submodule of this repo.
-lib/RepRapFirmware/
+# Reference checkout of DuetRegressionTesting; not a submodule of this repo.
 lib/DuetRegressionTesting/
 
 # Schema Fody generates next to FodyWeavers.xml in a -p:Profiling=true build

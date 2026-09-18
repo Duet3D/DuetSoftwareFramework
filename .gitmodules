@@ -23,3 +23,6 @@
 [submodule "lib/Qfplib-M0-full"]
 	path = lib/Qfplib-M0-full
 	url = git@github.com:Duet3D/Qfplib-M0-full.git
+[submodule "lib/RepRapFirmware"]
+	path = lib/RepRapFirmware
+	url = git@github.com:Duet3D/RepRapFirmware.git
