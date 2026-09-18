@@ -48,5 +48,10 @@ public enum PrintPausedReason : byte
     /// <summary>
     /// Motor driver reported an error
     /// </summary>
-    DriverError = 9
+    DriverError = 9,
+
+    /// <summary>
+    /// Board temperature exceeded the limit and its drivers were disabled
+    /// </summary>
+    BoardOverTemperature = 10
 }
