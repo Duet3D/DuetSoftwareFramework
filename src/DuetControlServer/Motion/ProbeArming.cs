@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
@@ -95,10 +96,11 @@ internal static class ProbeArming
     public static async ValueTask<Message> StartAsync(ProbeMonitor monitor, LinkInterface link,
                                                       CancellationToken cancellationToken)
     {
-        Message thresholdReply = (await SetThresholdAsync(monitor, link, cancellationToken)).OrRefuse();
-        Message intervalReply = (await ChangeAsync(monitor, CanMessageChangeInputMonitorV1.ActionChangeMinInterval,
-                                                   ActiveReportInterval, link, cancellationToken)).OrRefuse();
-        return new[] { thresholdReply, intervalReply }.ToMessage();
+        List<Message> replies = [];
+        replies.Add((await SetThresholdAsync(monitor, link, cancellationToken)).OrRefuse());
+        replies.Add((await ChangeAsync(monitor, CanMessageChangeInputMonitorV1.ActionChangeMinInterval,
+                                                   ActiveReportInterval, link, cancellationToken)).OrRefuse());
+        return replies.ToMessage();
     }
 
     /// <summary>

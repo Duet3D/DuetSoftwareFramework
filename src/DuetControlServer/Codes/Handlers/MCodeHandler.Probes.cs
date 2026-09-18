@@ -165,7 +165,7 @@ internal partial class MCodeHandler
 
         // A board that took the port but had something to say about it is reported too, since M558
         // otherwise looks like it configured exactly what was asked for
-        return new[] { monitorReply, new Message(MessageType.Success, report ?? string.Empty) }.ToMessage();
+        return monitorReply.CombinedWith(new Message(MessageType.Success, report ?? string.Empty));
     }
 
     /// <summary>

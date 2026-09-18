@@ -253,8 +253,7 @@ internal sealed partial class GCodeHandler(
             // A board that armed the driver but had something to say about it is reported alongside
             // whatever the move itself came back with, rather than being dropped for not being an
             // error. A move that never completed still returns null, which is what says so
-            Message result = await SubmitMoveAsync(code, isCoordinated, moveType, plans, cancellationToken);
-            return new[] { armReply, result }.ToMessage();
+            return armReply.CombinedWith(await SubmitMoveAsync(code, isCoordinated, moveType, plans, cancellationToken));
         }
         finally
         {

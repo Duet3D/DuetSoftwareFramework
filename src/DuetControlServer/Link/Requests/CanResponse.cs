@@ -183,6 +183,20 @@ public static class CanReplies
     }
 
     /// <summary>
+    /// Combine two replies into the one message the code they came from returns
+    /// </summary>
+    /// <param name="first">What was said first</param>
+    /// <param name="second">What was said after it</param>
+    /// <returns>Both texts, reported as the worse of the two</returns>
+    /// <remarks>
+    /// <see cref="ToMessage"/> for the two a handler is already holding rather than a list it built:
+    /// the same rule, that the worse type wins and a reply that said nothing is left out, without a
+    /// collection to put them in first. Either may be null, which counts as having said nothing
+    /// </remarks>
+    public static Message CombinedWith(this Message? first, Message? second)
+        => new[] { first, second }.ToMessage();
+
+    /// <summary>
     /// Combine what several boards said into the one message the code they came from returns
     /// </summary>
     /// <param name="replies">What each board replied, ignoring the ones that said nothing</param>

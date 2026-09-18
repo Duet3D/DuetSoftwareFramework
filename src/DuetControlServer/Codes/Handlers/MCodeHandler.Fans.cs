@@ -362,7 +362,7 @@ internal partial class MCodeHandler
             {
                 saved = planner.State.RestorePoints[restorePointNumber].FanSpeed;
             }
-            return new[] { reply, await SetMappedFanSpeedAsync(saved, cancellationToken) }.ToMessage();
+            return reply.CombinedWith(await SetMappedFanSpeedAsync(saved, cancellationToken));
         }
 
         return reply;
