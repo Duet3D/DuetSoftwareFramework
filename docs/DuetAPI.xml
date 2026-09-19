@@ -14166,6 +14166,11 @@
             Stepper driver sensors on the DueX expansion board
             </summary>
         </member>
+        <member name="F:DuetAPI.ObjectModel.AnalogSensorType.Remote">
+            <summary>
+            Sensor on a CAN-connected expansion board
+            </summary>
+        </member>
         <member name="F:DuetAPI.ObjectModel.AnalogSensorType.Unknown">
             <summary>
             Unknown temperature sensor
@@ -16937,13 +16942,14 @@
         </member>
         <member name="P:DuetAPI.ObjectModel.Tool.Axes">
             <summary>
-            Associated axes. At present only X and Y can be mapped per tool.
+            Associated axes. At present only X, Y and Z can be mapped per tool.
             </summary>
             <remarks>
             The order is the same as the visual axes, so by default the layout is
             [
               [0],        // X
-              [1]         // Y
+              [1],        // Y
+              [2]         // Z
             ]
             Make sure to set each item individually so the change events are called.
             Each item is a bitmap represented as an array
