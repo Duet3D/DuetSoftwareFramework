@@ -126,6 +126,11 @@ public enum AnalogSensorType
     DriversDuex,
 
     /// <summary>
+    /// Sensor on a CAN-connected expansion board
+    /// </summary>
+    Remote,
+
+    /// <summary>
     /// Unknown temperature sensor
     /// </summary>
     Unknown
@@ -166,6 +171,7 @@ public class AnalogSensorTypeConverter : JsonConverter<AnalogSensorType>
                 "mcutemp" => AnalogSensorType.McuTemp,
                 "drivers" => AnalogSensorType.Drivers,
                 "driversduex" => AnalogSensorType.DriversDuex,
+                "remote" => AnalogSensorType.Remote,
                 _ => AnalogSensorType.Unknown,
             };
         }
@@ -245,6 +251,9 @@ public class AnalogSensorTypeConverter : JsonConverter<AnalogSensorType>
                 break;
             case AnalogSensorType.DriversDuex:
                 writer.WriteStringValue("driversduex");
+                break;
+            case AnalogSensorType.Remote:
+                writer.WriteStringValue("remote");
                 break;
             default:
                 writer.WriteStringValue("unknown");

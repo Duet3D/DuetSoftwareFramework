@@ -15,13 +15,14 @@ public partial class Tool : ModelObject, IStaticModelObject
     public ObservableCollection<float> Active { get; } = [];
 
     /// <summary>
-    /// Associated axes. At present only X and Y can be mapped per tool.
+    /// Associated axes. At present only X, Y and Z can be mapped per tool.
     /// </summary>
     /// <remarks>
     /// The order is the same as the visual axes, so by default the layout is
     /// [
     ///   [0],        // X
-    ///   [1]         // Y
+    ///   [1],        // Y
+    ///   [2]         // Z
     /// ]
     /// Make sure to set each item individually so the change events are called.
     /// Each item is a bitmap represented as an array
