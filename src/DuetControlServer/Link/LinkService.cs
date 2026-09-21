@@ -319,6 +319,11 @@ internal sealed class LinkService(
         using (model.AccessReadWrite(lifetime.ApplicationStopping))
         {
             model.GetOrCreateBoard(CanId.MasterAddress).State = BoardState.Running;
+
+            // The link being up is also what ends the disconnected status, whatever recovery
+            // follows: a machine with a controller-reconnect.g replaces the default action, and it
+            // must not be the thing that decides whether the machine still counts as disconnected
+            model.IsDisconnected = false;
         }
 
         if (_controllerDown)
@@ -350,9 +355,6 @@ internal sealed class LinkService(
     {
         try
         {
-            // The link is up, so whatever the status was while it was not, it is not that now
-            model.IsDisconnected = false;
-
             if (!await macroRunner.TryRunAsync(CodeChannel.Trigger, FilePathResolver.ConfigFile,
                                                cancellationToken: lifetime.ApplicationStopping) &&
                 !await macroRunner.TryRunAsync(CodeChannel.Trigger, FilePathResolver.ConfigFileFallback,

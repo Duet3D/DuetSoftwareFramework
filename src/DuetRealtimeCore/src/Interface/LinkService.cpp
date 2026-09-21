@@ -366,6 +366,12 @@ namespace Duet::Sbc
 					// board that went away, and it was composed for a machine that no longer exists
 					DropOutgoing();
 
+					// The controller answering now is not the one the connection was established
+					// with, so that connection has ended whether or not a transfer ever failed.
+					// Saying so here is what puts a ConnectionEstablished after every reset,
+					// including one too quick for the connection timeout to have seen an outage
+					m_wasConnected = false;
+
 					InboundEventHeader header{};
 					header.type = static_cast<uint16_t>(InboundEventType::ControllerReset);
 					PostEvent(InboundEventType::ControllerReset, AsBytes(header));

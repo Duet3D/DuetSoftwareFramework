@@ -313,12 +313,35 @@ internal sealed class ScriptedCanMaster : IDisposable
     {
         lock (_lock)
         {
-            _sequenceNumber = 0;
-            _canEnabled = false;
-            _staged.Clear();
-            _stagedGeneration++;
+            RestartState();
             _connection?.Close();
         }
+    }
+
+    /// <summary>
+    /// Reboot the controller without the link dropping: the sequence numbers restart but the
+    /// transfers keep succeeding, which is how a controller that comes back between two of the SBC's
+    /// transfers looks. The restart is then the only evidence there is, because no transfer ever
+    /// timed out
+    /// </summary>
+    public void SimulateWarmReboot()
+    {
+        lock (_lock)
+        {
+            RestartState();
+        }
+    }
+
+    /// <summary>
+    /// Discard everything the running controller had, as a reboot does
+    /// </summary>
+    /// <remarks>The caller must hold <see cref="_lock"/></remarks>
+    private void RestartState()
+    {
+        _sequenceNumber = 0;
+        _canEnabled = false;
+        _staged.Clear();
+        _stagedGeneration++;
     }
     #endregion
 
@@ -999,10 +1022,7 @@ internal sealed class ScriptedCanMaster : IDisposable
                 // the SBC runs its reconnect and reset paths for real
                 lock (_lock)
                 {
-                    _sequenceNumber = 0;
-                    _canEnabled = false;
-                    _staged.Clear();
-                    _stagedGeneration++;
+                    RestartState();
                 }
                 return;
             }

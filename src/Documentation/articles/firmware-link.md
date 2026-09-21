@@ -100,7 +100,13 @@ reacts in a fixed order:
    Once per outage, whether the outage was seen as a timeout or as a reset.
 3. On recovery, raise `controller_reconnect`. Its default action is to run `config.g`, because a
    controller that reset has lost every setting and something has to put them back. A machine that
-   provides `sys/controller-reconnect.g` takes that responsibility on instead.
+   provides `sys/controller-reconnect.g` takes that responsibility on instead. Either way the link
+   being up is what ends the `disconnected` status; the recovery decides what the machine does next,
+   not whether it still counts as disconnected.
+
+A controller that reboots quickly enough that no transfer ever failed is an outage all the same. The
+restarted sequence numbers end the connection exactly as a timeout does, so the same two events
+follow in the same order, with `param.P` = 1 on the disconnect to say that a reset is what noticed it.
 
 Both events are DSF's own - RepRapFirmware has no equivalent because it *is* the controller. See
 [Differences from RepRapFirmware](rrf-differences.md#4-events).

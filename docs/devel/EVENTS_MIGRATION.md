@@ -488,6 +488,10 @@ than after `PerformFullTransfer` returns:
   ([SbcTransfer.cpp:211](src/DuetRealtimeCore/src/SBC/SbcTransfer.cpp#L211)), post
   `ConnectionEstablished`, and carry whether the controller had reset (`HadReset()`) so the managed
   side can tell "the same controller resumed" from "a rebooted controller".
+- A reset the connection timeout never saw ends the connection just as an outage does, so the
+  interface loop clears `m_wasConnected` where it posts `ControllerReset`. That is what puts a
+  `ConnectionEstablished` behind a reboot quick enough that no transfer ever failed; without it the
+  fast-reboot column of §4.5 stops after the disconnect and nothing ever recovers.
 - Delete the now-dead transition check at
   [SbcInterface.cpp:398-417](src/DuetRealtimeCore/src/SBC/SbcInterface.cpp#L398-L417), or reduce it to
   the startup post it still performs correctly.
@@ -729,8 +733,10 @@ does. If `controller-reconnect.g` exists it replaces that entirely — the macro
 `M98 P"config.g"` itself, and a machine that writes one is taking responsibility for the recovery
 (homing, resuming, notifying) in exchange.
 
-`IsDisconnected` is cleared and `runonce.g` is *not* re-run either way: it deletes itself on first
-use and is not part of recovery.
+`IsDisconnected` is cleared by `HandleConnectionEstablished`, not by the default action: the link
+being up is the fact, and a machine that writes the macro must not be left reporting `disconnected`
+for choosing its own recovery. `runonce.g` is *not* re-run either way: it deletes itself on first use
+and is not part of recovery.
 
 ### 4.4 What these macros can actually do
 
@@ -869,8 +875,11 @@ Each phase is independently useful and independently testable.
 - [ ] Ship example macros and document the link-down restriction (§4.4)
 - [ ] Test: pull the controller's power mid-print; expect one disconnect event, one macro run, and a
       reconnect that reconfigures the board
-- [ ] Test: reboot the controller inside one `SbcConnectionTimeout` window; expect the same two
+- [x] Test: reboot the controller inside one `SbcConnectionTimeout` window; expect the same two
       events in the same order, with `param.P` = 1 on the disconnect
+      (`ConnectionTests.WarmControllerResetReconnectsWithoutTheLinkDropping`, which also asserts the
+      link never dropped). `ReconnectMacroReplacesTheDefaultRecovery` covers the other column: the
+      macro replaces `config.g`, and the status still leaves `disconnected`
 
 ### Phase D — `M957` ✅
 
