@@ -229,9 +229,9 @@ than an ordinary status would.
 | §5.7 Tools and filament | 3 | 0 | 11 | 14 |
 | §5.8 Spindles, laser and machine mode | 5 | 2 | 2 | 9 |
 | §5.9 Job, files and SD | 19 | 3 | 7 | 29 |
-| §5.10 Network | 5 | 0 | 8 | 13 |
+| §5.10 Network | 5 | 0 | 5 | 10 |
 | §5.11 I/O, expansion and miscellaneous | 11 | 5 | 23 | 39 |
-| **Total** | **109** | **11** | **67** | **187** |
+| **Total** | **109** | **11** | **64** | **184** |
 
 Recount these from §5 when a box is ticked rather than adjusting them from memory of what changed:
 that is how they came to say a group was untouched after most of it had been ported (§17). The last
@@ -536,9 +536,9 @@ frame in `testcases/fans/m106-fan-invert-and-frequency.yaml` and turned one diff
 | M575 | 3901 | Serial communications parameters | ⬜ |
 | M576 | 3906 | SPI communications parameters | ⛔ the SPI link is gone |
 | M586 | 3965 | Configure network protocols | ✅ |
-| M587 | 3974 | Add WiFi network | ⬜ |
-| M588 | 3975 | Forget WiFi network | ⬜ |
-| M589 | 3976 | Configure access point | ⬜ |
+| M587 | 3974 | Add WiFi network (incl. M587.1/.2 scan) | ⛔ DuetPiManagementPlugin configures wpa_supplicant/hostapd; the row here answers `reserved - requires DuetPiManagementPlugin` |
+| M588 | 3975 | Forget WiFi network | ⛔ DuetPiManagementPlugin configures wpa_supplicant/hostapd; the row here answers `reserved - requires DuetPiManagementPlugin` |
+| M589 | 3976 | Configure access point | ⛔ DuetPiManagementPlugin configures wpa_supplicant/hostapd; the row here answers `reserved - requires DuetPiManagementPlugin` |
 
 ### 5.11 I/O, expansion and miscellaneous
 

@@ -305,8 +305,8 @@ internal partial class MCodeHandler(
         { 550, CodeClass.Flush, (h, c, ct) => h.HandleSetNameAsync(c, ct) }, // identity changes land between codes, not while replies are in flight
         // Set password
         { 551, CodeClass.Flush, (h, c, ct) => h.HandleSetPasswordAsync(c, ct) }, // as M550
-        // Set IP address
-        { 552, CodeClass.Flush, (h, c, ct) => h.HandleSetIPAddressAsync(c, ct) }, // as M550
+        // Set network settings
+        { [552, 553, 554], CodeClass.Flush, (h, c, ct) => h.ReservedCommand(c, ReservedForManagementPlugin, ct) },
         // Axis compensation
         { 556, CodeClass.Immediate, (h, c, ct) => h.HandleAxisCompensationAsync(c, ct) }, // the skew transform is applied when a move is built
         // Define the mesh compensation grid
@@ -346,6 +346,10 @@ internal partial class MCodeHandler(
         // Configure network protocols; M586.4 configures MQTT
         { 586, CodeClass.Flush, (h, c, ct) => h.HandleNetworkProtocolsAsync(c, configureMqtt: false, ct) }, // protocol changes land between codes
         { (586, 4), CodeClass.Flush, (h, c, ct) => h.HandleNetworkProtocolsAsync(c, configureMqtt: true, ct) }, // as M586
+        // Remembered WiFi networks and access point settings, which DuetPiManagementPlugin owns
+        // because they are wpa_supplicant and hostapd configuration. M587.1 starts a scan and
+        // M587.2 reads its results; they are listed so that the whole code answers the same way
+        { [587, (587, 1), (587, 2), 588, 589], CodeClass.Immediate, (h, c, ct) => h.ReservedCommand(c, ReservedForManagementPlugin, ct) },
         // Configure nonlinear extrusion
         { 592, CodeClass.Immediate, (h, c, ct) => h.HandleNonlinearExtrusionAsync(c, ct) },
         // Configure input shaping: queued moves were shaped with the old filter, so setting waits;
@@ -389,6 +393,34 @@ internal partial class MCodeHandler(
         // Reset the controller; M999 B resets a board, which must not happen with moves in its queue
         { 999, c => c.Parameters.Any(p => p.Letter == 'B') ? CodeClass.FlushAndStandstill : CodeClass.Immediate, (h, c, ct) => h.HandleResetAsync(c, ct) }, // the bare form flushes inline before rebooting DCS
     };
+
+    /// <summary>
+    /// Reason given for a code DuetPiManagementPlugin implements
+    /// </summary>
+    /// <remarks>
+    /// These codes configure the Linux host rather than the machine, and doing so needs privileges
+    /// this program does not run with. The plugin intercepts them before this stage, so a code that
+    /// reaches its row here is one the plugin did not answer, which in practice means it is not
+    /// running
+    /// </remarks>
+    private const string ReservedForManagementPlugin = "requires DuetPiManagementPlugin";
+
+    /// <summary>
+    /// Answer a code this program deliberately leaves to something else
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="reason">What claims the code, phrased to follow "reserved - "</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// Distinct from the unsupported path, which says nothing implements the code. This says the
+    /// code exists and is spoken for, so the reply points at whatever owns it instead of reading as
+    /// a gap in the port
+    /// </remarks>
+    private ValueTask<Message> ReservedCommand(Commands.Code code, string reason, CancellationToken cancellationToken)
+    {
+        return new ValueTask<Message>(new Message(MessageType.Warning, $"reserved - {reason}"));
+    }
 
     /// <summary>
     /// M0, M1 and M2: stop, sleep or end the program
@@ -1642,18 +1674,6 @@ internal partial class MCodeHandler(
     }
 
     /// <summary>
-    /// M552: set the IP address
-    /// </summary>
-    /// <param name="code">The code</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message> HandleSetIPAddressAsync(Commands.Code code, CancellationToken cancellationToken)
-    {
-        // TODO implement M552
-        throw new NotImplementedException();
-    }
-
-    /// <summary>
     /// M581: configure an external trigger
     /// </summary>
     /// <param name="code">The code</param>
@@ -2066,7 +2086,7 @@ internal partial class MCodeHandler(
             return new Message();
         }
         // TODO this used to fallthrough to RRF
-        return new Message(MessageType.Warning, "Not implemented");
+        return new Message(MessageType.Warning, "Fallthrough not implemented");
     }
 
     /// <summary>
