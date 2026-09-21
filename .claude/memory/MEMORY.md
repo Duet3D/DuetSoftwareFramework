@@ -20,6 +20,7 @@ and several set standing rules that apply whatever is asked. Then read on.
 - [No em dashes](no-em-dashes.md) — use commas, semicolons, or colons instead
 - [No duplicate functionality](no-duplicate-functionality.md) — refactor to a shared base instead of copying; maintainability over speed of implementation
 - [System tests come first](system-tests-first-for-features.md) — write the scenarios for a feature before implementing it, covering inputs, object model, packets and board responses
+- [Ask before flashing DuetCANMaster](ask-before-flashing-duetcanmaster.md) — never flash the controller; build it and ask the user
 - [Pi hardware test workflow](pi-hardware-test-workflow.md) — deploy with build.sh --target, drive with CodeConsole, read journalctl debug logs
 - [Regression suite workflow](regression-suite-workflow.md) — the harness runs on the host at :8765, drive it over its HTTP API
 - [Sensitive memories are private](sensitive-memories-are-private.md) — personal or sensitive details (IPs, keys, names, emails) belong in `private/`, never the committed half

@@ -72,6 +72,8 @@ class DataTransfer
 	bool WritePrintPaused(FilePosition position, FilePosition position2, PrintPausedReason reason) noexcept;
 	bool WriteMotionStopped(const MotionStoppedHeader& header, const MotionStoppedDriver* drivers) noexcept;
 	bool WriteCanMessagesSent(const CanMessageSentEntry* entries, size_t count) noexcept;
+	bool WriteBoardInfo() noexcept;								  // Tell the SBC what board this is, for boards[0]
+	bool WriteBoardStatus(const BoardStatusHeader& status) noexcept;  // Tell the SBC this board's own health
 	bool WriteCANResponse(const CANResponseHeader& header,
 						  const char* _ecv_null payload) noexcept; // Forward a received CAN message to the SBC
 

@@ -54,6 +54,16 @@ constexpr uint32_t sbcYieldTimeout = 10;
 
 static Task<sbcTaskStackWords>* sbcTask;
 
+// Copy a reading into its wire form. The two structs have the same three floats in the same order,
+// but MinCurMax belongs to CANlib and the wire struct deliberately does not, so they are copied
+// field by field rather than assumed to be layout-compatible.
+static void CopyMinCurMax(MinCurMaxValues& dst, const MinCurMax& src) noexcept
+{
+	dst.minimum = src.minimum;
+	dst.current = src.current;
+	dst.maximum = src.maximum;
+}
+
 extern "C" [[noreturn]] void SBCTaskStart(void* /*pvParameters*/) noexcept
 {
 	reprap.GetSbcInterface().TaskLoop();
@@ -299,6 +309,10 @@ static void SendUsbInitMessage(SerialCDC* dev) noexcept
 				// The SBC starts with no record of the expansion boards and the boards only announce
 				// themselves until they are acknowledged, so this is where it is told what we know
 				reprap.GetExpansion().BeginReplayToSbc();
+
+				// It starts with no record of this board either, and unlike the expansion boards this
+				// one cannot announce itself over CAN
+				m_boardInfoPending = true;
 			}
 
 			// A machine can carry more boards than the response queue holds, so the replay is topped up
@@ -533,6 +547,62 @@ bool SbcInterface::ProcessCanMessagesSent() noexcept
 		}
 		return false;
 	}
+	return true;
+}
+
+// Tell the SBC what board this is, once per connection.
+// Returns false when the transfer is full, in which case it goes next time.
+bool SbcInterface::ProcessBoardInfo() noexcept
+{
+	if (!m_boardInfoPending)
+	{
+		return true;
+	}
+
+	if (!m_transfer.WriteBoardInfo())
+	{
+		return false;
+	}
+	m_boardInfoPending = false;
+	return true;
+}
+
+// Tell the SBC this board's own voltages, MCU temperature and free memory, at the same interval an
+// expansion board broadcasts its board status report.
+// Returns false when the transfer is full, in which case it goes next time.
+bool SbcInterface::ProcessBoardStatus() noexcept
+{
+	const uint32_t now = millis();
+	if (now - m_whenBoardStatusSent < UnsolicitedStatusReportInterval)
+	{
+		return true;
+	}
+
+	// A reading this board has no hardware for keeps its flag clear, so that the SBC leaves the
+	// field null rather than publishing a zero nobody measured
+	BoardStatusHeader status{};
+	status.neverUsedRam = (int32_t)Tasks::GetNeverUsedRam();
+#  if HAS_CPU_TEMP_SENSOR
+	CopyMinCurMax(status.mcuTemp, reprap.GetPlatform().GetMcuTemperatures());
+	status.hasMcuTemp = 1;
+#  endif
+#  if HAS_VOLTAGE_MONITOR
+	CopyMinCurMax(status.vIn, reprap.GetPlatform().GetPowerVoltages());
+	status.hasVin = 1;
+#  endif
+#  if HAS_12V_MONITOR
+	CopyMinCurMax(status.v12, reprap.GetPlatform().GetV12Voltages());
+	status.hasV12 = 1;
+#  endif
+
+	if (!m_transfer.WriteBoardStatus(status))
+	{
+		return false;
+	}
+
+	// Stamped only once the report is away, so a transfer with no room for it does not cost a whole
+	// interval of silence
+	m_whenBoardStatusSent = now;
 	return true;
 }
 
@@ -795,6 +865,10 @@ void SbcInterface::ExchangeData() noexcept
 	ProcessMotionStopped();
 	ProcessCanResponses();
 	ProcessCanMessagesSent();
+
+	// This board's own identity and health, which nothing on the CAN bus reports for it
+	ProcessBoardInfo();
+	ProcessBoardStatus();
 }
 
 [[noreturn]] void SbcInterface::ReceiveAndStartIap(const char* iapChunk, size_t length) noexcept

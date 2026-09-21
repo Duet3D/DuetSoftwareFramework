@@ -13,6 +13,9 @@ Tracking known issues to keep Github issues from being spammed by issues for the
 
 - [ ] `Code.IsCurrentlyDeferred` is set true at `PipelineBase.cs:322` and never set `false` anywhere, and `Reset()` does not clear it, so a pooled code that was deferred once carries that state into its next life along with `DeferredRing`, `DeferredAnchor` and `DeferredPredecessor`
 
+### Object Model
+- [ ] `om-default-boards` records `1`; DSF reports `true`.
+
 ## DuetWebServer
 
 ### The HTTP API stayed dead after a deploy, once

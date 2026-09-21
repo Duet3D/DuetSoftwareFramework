@@ -145,6 +145,15 @@ class SbcInterface
 
 	bool ProcessMotionStopped() noexcept; // Write queued motion-stopped reports into the current transfer
 
+	// What this board is, and how it is doing. The SBC has no other way to learn either: this board
+	// is not on the CAN bus, so it cannot announce itself or broadcast a board status report the way
+	// every expansion board does, and boards[0] stays empty until it says so here
+	bool m_boardInfoPending = false;   // set when the SBC connects, cleared once the info has gone
+	uint32_t m_whenBoardStatusSent = 0;
+
+	bool ProcessBoardInfo() noexcept;   // Write the board identity into the current transfer, once per connection
+	bool ProcessBoardStatus() noexcept; // Write this board's own health into the current transfer, periodically
+
 #  ifdef TRACK_FILE_CODES
 	volatile size_t fileCodesRead, fileCodesHandled, fileMacrosRunning, fileMacrosClosing;
 #  endif

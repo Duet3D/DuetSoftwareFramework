@@ -14,6 +14,9 @@
 
 #  include <Movement/StepTimer.h>
 #  include <Platform/OutputMemory.h>
+#  include <Platform/Platform.h>
+#  include <Platform/RepRap.h>
+#  include <Version.h>
 #  include <Storage/CRC32.h>
 #  include <algorithm>
 
@@ -1290,6 +1293,73 @@ bool DataTransfer::WriteMotionStopped(const MotionStoppedHeader& header, const M
 	{
 		WriteData(reinterpret_cast<const char*>(drivers), driversBytes);
 	}
+	return true;
+}
+
+// Tell the SBC what board this is and what firmware it runs, which is what fills boards[0]. Sent
+// once per connection because none of it changes while the firmware runs.
+// Returns false if there isn't enough room in this transfer, in which case the caller should try again next time.
+bool DataTransfer::WriteBoardInfo() noexcept
+{
+	// In BoardInfoString order, which is the order the SBC reads them back out in
+	const char* const strings[SbcProtocol::NumBoardInfoStrings] = {
+		BOARD_NAME, BOARD_SHORT_NAME, FIRMWARE_NAME, VERSION, DateText,
+		IAP_FIRMWARE_FILE, IAP_UPDATE_FILE_SBC, IAP_UPDATE_FILE
+	};
+
+	// A length is one byte on the wire, so anything longer is truncated rather than written with a
+	// length that does not describe it
+	size_t lengths[SbcProtocol::NumBoardInfoStrings];
+	size_t textLength = 0;
+	for (size_t i = 0; i < ARRAY_SIZE(strings); i++)
+	{
+		lengths[i] = min<size_t>(strlen(strings[i]), UINT8_MAX);
+		textLength += lengths[i];
+	}
+
+	if (!CanWritePacket(sizeof(BoardInfoHeader) + textLength))
+	{
+		return false;
+	}
+
+	(void)WritePacketHeader(FirmwareRequest::BoardInfo, sizeof(BoardInfoHeader) + textLength);
+
+	auto* header = WriteDataHeader<BoardInfoHeader>();
+	memset(header, 0, sizeof(*header));
+#  if MCU_HAS_UNIQUE_ID
+	const UniqueId& uniqueId = reprap.GetPlatform().GetUniqueId();
+	if (uniqueId.IsValid())
+	{
+		header->hasUniqueId = 1;
+		memcpy(header->uniqueId, uniqueId.GetRaw(), sizeof(header->uniqueId));
+	}
+#  endif
+
+	for (size_t i = 0; i < ARRAY_SIZE(strings); i++)
+	{
+		header->textLengths[i] = (uint8_t)lengths[i];
+	}
+	for (size_t i = 0; i < ARRAY_SIZE(strings); i++)
+	{
+		WriteData(strings[i], lengths[i]);
+	}
+	return true;
+}
+
+// Tell the SBC this board's own voltages, MCU temperature and free memory, which is what keeps
+// boards[0] live in the way an expansion board's CanMessageBoardStatusV1 keeps its own entry live.
+// Returns false if there isn't enough room in this transfer, in which case the caller should try again next time.
+bool DataTransfer::WriteBoardStatus(const BoardStatusHeader& status) noexcept
+{
+	if (!CanWritePacket(sizeof(BoardStatusHeader)))
+	{
+		return false;
+	}
+
+	(void)WritePacketHeader(FirmwareRequest::BoardStatus, sizeof(BoardStatusHeader));
+
+	auto* header = WriteDataHeader<BoardStatusHeader>();
+	*header = status;
 	return true;
 }
 

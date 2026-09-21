@@ -57,6 +57,27 @@ has no equivalent rule because its main board does have ports. One function,
 did: a normally-closed endstop on an expansion board, which is how most machines are wired, was
 rejected outright.
 
+**`boards[0]` describes itself over the SPI link rather than being read out of the program that serves
+it.** In RepRapFirmware `boards[0]` is the board the object model lives on, so its name, firmware and
+readings are compile-time constants and local sensors. Here they belong to DuetCANMaster, which is
+not on the CAN bus and so cannot announce itself or broadcast a board status report the way an
+expansion board does. It sends both over SPI instead: `FirmwareRequest::BoardInfo` once per
+connection with the identity, and `FirmwareRequest::BoardStatus` periodically with the same readings
+a board broadcasts. `maxMotors`, `maxHeaters` and `supportsDirectDisplay` are not in either message:
+board 0 owns no pins and never will, so they are `0`, `0` and `false` by architecture, where
+RepRapFirmware reports the main board's own hardware. `timeout` goes the other way and is `null` there:
+it is how long an expansion board may go unheard from before it is given up on, and the main board is
+reached over SPI rather than over the bus, so the link watches itself instead.
+
+**`boards[0].state` is the state of that link.** It is the one field with no RepRapFirmware
+counterpart at all: there the object model and the main board are the same program, so `boards[0]`
+cannot be absent and a state would say nothing. Here the controller is a separate board at the far end
+of a link that can drop, so the field carries what the link knows - `unknown` until it first comes up,
+`running` while it is up, `timedOut` once it has gone. The link is its only writer. The controller's
+own reports deliberately leave it alone, because they are applied off a queue rather than as they
+arrive, and one enqueued just before an outage is applied just after it - which would put the board
+back to `running` while it was gone.
+
 ---
 
 ## 2. There is no step interrupt, so the endstop path is a different shape

@@ -86,7 +86,9 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
         Network.Hostname = Environment.MachineName;
         Network.Name = Environment.MachineName;
         SetLimits();
-        AddMainBoard();
+
+        // Nothing has been heard from the controller yet, which is what unknown means for any board
+        AddMainBoard(BoardState.Unknown);
     }
 
     /// <summary>
@@ -99,8 +101,22 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     /// ExpansionManager::GetBoardDetails). The main board here is this program and DuetCANMaster at
     /// CAN address 0, which is always there, so the entry is made once rather than discovered
     /// </remarks>
-    private void AddMainBoard()
-        => Boards.Add(new Board { CanAddress = CanId.MasterAddress, State = BoardState.Running });
+    /// <param name="state">What is known about the link to it</param>
+    /// <remarks>
+    /// <para>
+    /// <c>timeout</c> is cleared because it is the CAN connection timeout an expansion board is given
+    /// up on after, which M959 sets and nothing applies to the main board: it is not on the bus, and
+    /// the link watches itself. RepRapFirmware does not report one for <c>boards[0]</c> either.
+    /// </para>
+    /// <para>
+    /// The state is asked for rather than assumed, because the entry is made before the link has ever
+    /// carried anything and again every time the link drops. RepRapFirmware's <c>boards[0]</c> has no
+    /// state at all - it is the board its object model runs on, so it cannot be anything but present -
+    /// while here it is a separate board across SPI that can be absent, so the state is the link's
+    /// </para>
+    /// </remarks>
+    private void AddMainBoard(BoardState state)
+        => Boards.Add(new Board { CanAddress = CanId.MasterAddress, State = state, Timeout = null });
 
     /// <summary>
     /// The firmware version the machine reports, or null while no board has said what it runs
@@ -869,7 +885,10 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
         using (AccessReadWrite())
         {
             Boards.Clear();
-            AddMainBoard();
+
+            // The expansion boards go with the link that reached them; the controller stays, because
+            // it is the thing at the far end of the link that has just stopped answering
+            AddMainBoard(BoardState.TimedOut);
             Global.Clear();
             Seqs.Clear();
             IsDisconnected = true;

@@ -148,6 +148,9 @@ internal sealed class ScriptedCanMaster : IDisposable
         Check<CanMessageSentHeader>(4);
         Check<CanMessageSentEntry>(4);
         Check<CanResponseHeader>(12);
+        Check<MinCurMaxValues>(12);
+        Check<BoardInfoHeader>(25);
+        Check<BoardStatusHeader>(44);
     }
 
     #region Scripting
@@ -475,6 +478,170 @@ internal sealed class ScriptedCanMaster : IDisposable
                          (ushort)CanMessageType.InputStateChangedV2,
                          srcAddress,
                          payload);
+    }
+
+    /// <summary>
+    /// Announce a board on the bus exactly as Duet3Expansion does when it starts or regains time sync
+    /// </summary>
+    /// <param name="srcAddress">CAN address of the board announcing itself</param>
+    /// <param name="shortName">Board type, e.g. "EXP3HC"</param>
+    /// <param name="firmwareVersion">Firmware version it runs</param>
+    /// <param name="firmwareDate">Date that firmware was built</param>
+    /// <param name="numDrivers">How many drivers it carries</param>
+    /// <param name="uniqueId">Its 16-byte unique id, or null for all zeroes</param>
+    /// <param name="usesUf2Binary">Whether its firmware binary is a .uf2 rather than a .bin</param>
+    /// <remarks>
+    /// The three text fields travel as one pipe-separated string, which is the whole of what a board
+    /// says about itself: everything else in <c>boards[]</c> is derived from the type or comes from
+    /// the status reports that follow
+    /// </remarks>
+    public void InjectAnnounce(byte srcAddress, string shortName, string firmwareVersion, string firmwareDate,
+                               byte numDrivers, byte[]? uniqueId = null, bool usesUf2Binary = false)
+    {
+        CanMessageAnnounceV1 announce = default;
+        announce.BoardTypeAndFirmwareVersionString = $"{shortName}|{firmwareVersion}|{firmwareDate}";
+        announce.NumDrivers = numDrivers;
+        announce.UsesUf2Binary = usesUf2Binary;
+        for (int i = 0; i < ByteArray16.Length; i++)
+        {
+            announce.UniqueId[i] = (uniqueId is not null && i < uniqueId.Length) ? uniqueId[i] : (byte)0;
+        }
+
+        byte[] payload = new byte[Marshal.SizeOf<CanMessageAnnounceV1>()];
+        CanMessageSerializer.Serialize(in announce, payload);
+        InjectCanResponse(LinkInterface.UnsolicitedTxToken,
+                          (ushort)CanMessageType.AnnounceV1,
+                          srcAddress, payload);
+    }
+
+    /// <summary>
+    /// Broadcast a board status report as an expansion board does, which is what feeds
+    /// <c>boards[].vIn</c>, <c>.v12</c>, <c>.mcuTemp</c>, <c>.freeRam</c> and the three feature flags
+    /// </summary>
+    /// <param name="srcAddress">CAN address of the board reporting</param>
+    /// <param name="neverUsedRam">Bytes of RAM it has never allocated</param>
+    /// <param name="vIn">Input voltage, or null if the board has no monitor for it</param>
+    /// <param name="v12">12V rail voltage, or null if the board has no monitor for it</param>
+    /// <param name="mcuTemp">MCU temperature, or null if the board has no sensor for it</param>
+    /// <param name="hasAccelerometer">Whether the board claims an accelerometer</param>
+    /// <param name="hasClosedLoop">Whether the board claims closed loop support</param>
+    /// <param name="hasInductiveSensor">Whether the board claims an inductive sensor</param>
+    /// <remarks>
+    /// The readings are packed in a fixed order and only the present ones take a slot, so which of
+    /// the three are passed decides where the others land. Getting that wrong is the bug the
+    /// scenarios about a board with no 12V rail exist to catch
+    /// </remarks>
+    public void InjectBoardStatus(byte srcAddress, int neverUsedRam = 0,
+                                  float? vIn = null, float? v12 = null, float? mcuTemp = null,
+                                  bool hasAccelerometer = false, bool hasClosedLoop = false,
+                                  bool hasInductiveSensor = false)
+    {
+        CanMessageBoardStatusV1 status = default;
+        status.Clear();
+        status.NeverUsedRam = neverUsedRam;
+        status.HasAccelerometer = hasAccelerometer;
+        status.HasClosedLoop = hasClosedLoop;
+        status.HasInductiveSensor = hasInductiveSensor;
+
+        int index = 0;
+        foreach ((bool present, float value) in new[] { (vIn.HasValue, vIn ?? 0.0f), (v12.HasValue, v12 ?? 0.0f), (mcuTemp.HasValue, mcuTemp ?? 0.0f) })
+        {
+            if (present)
+            {
+                status.ShortValues[index].Minimum = (Half)value;
+                status.ShortValues[index].Current = (Half)value;
+                status.ShortValues[index].Maximum = (Half)value;
+                index++;
+            }
+        }
+        status.HasVin = vIn.HasValue;
+        status.HasV12 = v12.HasValue;
+        status.HasMcuTemp = mcuTemp.HasValue;
+
+        byte[] payload = new byte[status.GetActualDataLength()];
+        CanMessageSerializer.Serialize(in status, payload);
+        InjectCanResponse(LinkInterface.UnsolicitedTxToken,
+                          (ushort)CanMessageType.BoardStatusReportV1,
+                          srcAddress, payload);
+    }
+
+    /// <summary>
+    /// Say what board the controller is, as DuetCANMaster does once per connection. This is what
+    /// fills <c>boards[0]</c>, which no CAN message can
+    /// </summary>
+    /// <param name="name">Long board name</param>
+    /// <param name="shortName">Short board name</param>
+    /// <param name="firmwareName">Firmware the controller runs</param>
+    /// <param name="firmwareVersion">Its version</param>
+    /// <param name="firmwareDate">The date it was built</param>
+    /// <param name="firmwareFileName">Binary that carries it</param>
+    /// <param name="iapFileNameSbc">Programmer used to flash it from the SBC</param>
+    /// <param name="iapFileNameSd">Programmer used to flash it from an SD card</param>
+    /// <param name="uniqueId">Its 16-byte unique id, or null if the MCU has none</param>
+    /// <remarks>
+    /// What the controller can drive is not among what it says. It bridges SPI to CAN-FD and keeps
+    /// the master step clock, so <c>maxMotors</c>, <c>maxHeaters</c> and <c>supportsDirectDisplay</c>
+    /// cannot be anything but zero, zero and false, and the SBC states them rather than reading them
+    /// off the wire
+    /// </remarks>
+    public void InjectControllerBoardInfo(string name = "", string shortName = "", string firmwareName = "",
+                                          string firmwareVersion = "", string firmwareDate = "",
+                                          string firmwareFileName = "", string iapFileNameSbc = "",
+                                          string iapFileNameSd = "", byte[]? uniqueId = null)
+    {
+        // In BoardInfoString order, which is the order they go on the wire in
+        string[] strings = [name, shortName, firmwareName, firmwareVersion, firmwareDate,
+                            firmwareFileName, iapFileNameSbc, iapFileNameSd];
+        byte[][] encoded = strings.Select(Encoding.UTF8.GetBytes).ToArray();
+        int textLength = encoded.Sum(bytes => bytes.Length);
+
+        BoardInfoHeader header = default;
+        header.HasUniqueId = (byte)(uniqueId is not null ? 1 : 0);
+        for (int i = 0; i < BoardUniqueId.Length; i++)
+        {
+            header.UniqueId[i] = (uniqueId is not null && i < uniqueId.Length) ? uniqueId[i] : (byte)0;
+        }
+        for (int i = 0; i < encoded.Length; i++)
+        {
+            header.TextLengths[i] = (byte)encoded[i].Length;
+        }
+
+        int headerSize = Marshal.SizeOf<BoardInfoHeader>();
+        byte[] data = new byte[SpiWire.AddPadding(headerSize + textLength)];
+        Wire.Write(data, header);
+        int offset = headerSize;
+        foreach (byte[] bytes in encoded)
+        {
+            bytes.CopyTo(data, offset);
+            offset += bytes.Length;
+        }
+        InjectPacket(FirmwareRequest.BoardInfo, data);
+    }
+
+    /// <summary>
+    /// Report the controller's own health, as DuetCANMaster does periodically. The counterpart of
+    /// <see cref="InjectBoardStatus"/> for the board that is not on the bus
+    /// </summary>
+    /// <param name="neverUsedRam">Bytes of RAM it has never allocated</param>
+    /// <param name="mcuTemp">MCU temperature, or null if the board has no sensor for it</param>
+    /// <param name="vIn">Input voltage, or null if the board has no monitor for it</param>
+    /// <param name="v12">12V rail voltage, or null if the board has no monitor for it</param>
+    public void InjectControllerBoardStatus(int neverUsedRam = 0, float? mcuTemp = null,
+                                            float? vIn = null, float? v12 = null)
+    {
+        static MinCurMaxValues Reading(float? value)
+            => new() { Minimum = value ?? 0.0f, Current = value ?? 0.0f, Maximum = value ?? 0.0f };
+
+        InjectPacket(FirmwareRequest.BoardStatus, Wire.ToBytes(new BoardStatusHeader
+        {
+            NeverUsedRam = neverUsedRam,
+            McuTemp = Reading(mcuTemp),
+            VIn = Reading(vIn),
+            V12 = Reading(v12),
+            HasMcuTemp = (byte)(mcuTemp.HasValue ? 1 : 0),
+            HasVin = (byte)(vIn.HasValue ? 1 : 0),
+            HasV12 = (byte)(v12.HasValue ? 1 : 0)
+        }));
     }
 
     /// <summary>Ask the SBC to resend the packet with the given id, exercising the retransmission path</summary>

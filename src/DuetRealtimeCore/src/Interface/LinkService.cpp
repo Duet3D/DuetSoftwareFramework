@@ -29,6 +29,15 @@ namespace Duet::Sbc
 		constexpr size_t kInboundCapacity = 256 * 1024;
 		constexpr size_t kOutboundCapacity = 128 * 1024;
 
+		// Flatten a wire reading into the three floats the event carries. Copied field by field
+		// rather than memcpy'd so the order the managed side reads them back in is stated here.
+		void CopyMinCurMax(float (&dst)[3], const proto::MinCurMaxValues& src)
+		{
+			dst[0] = src.minimum;
+			dst[1] = src.current;
+			dst[2] = src.maximum;
+		}
+
 	} // namespace
 
 	LinkService::LinkService(const Config& config, std::unique_ptr<Transport> transport)
@@ -708,6 +717,57 @@ namespace Duet::Sbc
 			event.flags = header.flags;
 			event.status = header.status;
 			PostEvent(InboundEventType::CanResponse, AsBytes(event), data.subspan(sizeof(header), header.dataLength));
+			break;
+		}
+		case proto::FirmwareRequest::BoardInfo:
+		{
+			if (data.size() < sizeof(proto::BoardInfoHeader))
+			{
+				PostLog(LogLevel::Error, "Discarded a truncated board info report");
+				break;
+			}
+			proto::BoardInfoHeader header{};
+			std::memcpy(&header, data.data(), sizeof(header));
+
+			size_t textLength = 0;
+			for (const uint8_t length : header.textLengths)
+			{
+				textLength += length;
+			}
+			if (data.size() < sizeof(header) + textLength)
+			{
+				PostLog(LogLevel::Error, "Discarded a board info report that does not carry the text it claims");
+				break;
+			}
+
+			BoardInfoEvent event{};
+			event.header.type = static_cast<uint16_t>(InboundEventType::BoardInfo);
+			std::memcpy(event.uniqueId, header.uniqueId, sizeof(event.uniqueId));
+			event.hasUniqueId = header.hasUniqueId;
+			std::memcpy(event.textLengths, header.textLengths, sizeof(event.textLengths));
+			PostEvent(InboundEventType::BoardInfo, AsBytes(event), data.subspan(sizeof(header), textLength));
+			break;
+		}
+		case proto::FirmwareRequest::BoardStatus:
+		{
+			if (data.size() < sizeof(proto::BoardStatusHeader))
+			{
+				PostLog(LogLevel::Error, "Discarded a truncated board status report");
+				break;
+			}
+			proto::BoardStatusHeader header{};
+			std::memcpy(&header, data.data(), sizeof(header));
+
+			BoardStatusEvent event{};
+			event.header.type = static_cast<uint16_t>(InboundEventType::BoardStatus);
+			event.neverUsedRam = header.neverUsedRam;
+			CopyMinCurMax(event.mcuTemp, header.mcuTemp);
+			CopyMinCurMax(event.vIn, header.vIn);
+			CopyMinCurMax(event.v12, header.v12);
+			event.hasMcuTemp = header.hasMcuTemp;
+			event.hasVin = header.hasVin;
+			event.hasV12 = header.hasV12;
+			PostEvent(InboundEventType::BoardStatus, AsBytes(event));
 			break;
 		}
 		case proto::FirmwareRequest::CanMessageSent:

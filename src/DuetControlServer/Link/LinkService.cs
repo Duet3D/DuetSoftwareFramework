@@ -262,6 +262,16 @@ internal sealed class LinkService(
             case InboundEventType.CanMessagesSent:
                 HandleCanMessagesSent(record);
                 break;
+            case InboundEventType.BoardInfo:
+                // boards[0] is the controller, which is not on the CAN bus and so has no announcement
+                // or status report of its own; these two are what fill it. Both are handed straight
+                // to the board manager, which decodes and applies them on its own task rather than
+                // taking the object model write lock on this thread
+                expansionBoardManager.EnqueueControllerInfo(record);
+                break;
+            case InboundEventType.BoardStatus:
+                expansionBoardManager.EnqueueControllerStatus(record);
+                break;
             case InboundEventType.OutboundDelivered:
             case InboundEventType.OutboundDropped:
                 nativeLink.CompleteOutbound(MemoryMarshal.Read<OutboundSeqEvent>(record).SequenceNumber,
@@ -302,6 +312,14 @@ internal sealed class LinkService(
             eventLogger.LogOutput(MessageType.Warning, "Incompatible firmware, please upgrade as soon as possible");
         }
         eventLogger.LogOutput(MessageType.Success, "Connection to Duet established");
+
+        // boards[0] is the controller, so its state is the state of this link. Set here rather than
+        // when it first reports something about itself, because the link being up is what the state
+        // says and that is known now
+        using (model.AccessReadWrite(lifetime.ApplicationStopping))
+        {
+            model.GetOrCreateBoard(CanId.MasterAddress).State = BoardState.Running;
+        }
 
         if (_controllerDown)
         {

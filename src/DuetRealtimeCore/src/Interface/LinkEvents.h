@@ -67,6 +67,11 @@ namespace Duet::Sbc
 		// CanMessagesSentEvent + CanMessageSentEntry[] tail. What became of the CAN messages the SBC
 		// asked the controller to send
 		CanMessagesSent = 16,
+		// BoardInfoEvent + the packet's string tail. What board the controller is and what firmware it
+		// runs, which is what fills boards[0]. Sent once per connection
+		BoardInfo = 17,
+		// BoardStatusEvent, no tail. The controller's own voltages, MCU temperature and free memory
+		BoardStatus = 18,
 	};
 
 	// Severity for InboundEventType::Log, mirroring the subset of MessageType DCS logs at.
@@ -149,6 +154,35 @@ namespace Duet::Sbc
 	{
 		InboundEventHeader header;
 		uint32_t sequenceNumber;
+	};
+
+	// What board the controller is. The strings the packet carried follow verbatim, in
+	// protocol::BoardInfoString order, with textLengths saying how long each one is; the transfer
+	// loop forwards them rather than decoding them, because turning bytes into strings is the managed
+	// side's job and this runs on the real-time thread.
+	struct BoardInfoEvent
+	{
+		InboundEventHeader header;
+		uint8_t uniqueId[16];
+		uint8_t hasUniqueId;
+		uint8_t textLengths[8]; // protocol::NumBoardInfoStrings, indexed by protocol::BoardInfoString
+		// The strings follow, back to back and unpadded
+	};
+
+	// The controller's own health, the counterpart of the board status report every expansion board
+	// broadcasts over CAN. A has... flag that is clear means the board has no hardware for that
+	// reading, not that the reading is zero.
+	struct BoardStatusEvent
+	{
+		InboundEventHeader header;
+		int32_t neverUsedRam;
+		float mcuTemp[3]; // minimum, current, maximum
+		float vIn[3];
+		float v12[3];
+		uint8_t hasMcuTemp;
+		uint8_t hasVin;
+		uint8_t hasV12;
+		uint8_t padding;
 	};
 
 	struct RequestCompletedEvent
@@ -303,6 +337,8 @@ namespace Duet::Sbc
 	static_assert(sizeof(MoveFailedEvent) == 12, "MoveFailedEvent must be 12 bytes");
 	static_assert(sizeof(MotionStoppedDriverEntry) == 4, "MotionStoppedDriverEntry must be 4 bytes");
 	static_assert(sizeof(MotionStoppedEvent) == 16, "MotionStoppedEvent must be 16 bytes");
+	static_assert(sizeof(BoardInfoEvent) == 29, "BoardInfoEvent must be 29 bytes");
+	static_assert(sizeof(BoardStatusEvent) == 48, "BoardStatusEvent must be 48 bytes");
 
 	static_assert(sizeof(OutboundCommandHeader) == 4, "OutboundCommandHeader must be 4 bytes");
 	static_assert(sizeof(MessageCommand) == 8, "MessageCommand must be 8 bytes");

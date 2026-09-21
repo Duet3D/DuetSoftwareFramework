@@ -84,14 +84,19 @@ public partial class Board : ModelObject, IStaticModelObject
     private string _firmwareFileName = string.Empty;
 
     /// <summary>
-    /// Name of the firmware build
+    /// Name of the firmware build, or null if this board does not report one
     /// </summary>
-    public string FirmwareName
+    /// <remarks>
+    /// Only the main board has one. RepRapFirmware reports this from <c>Platform</c>'s object model
+    /// table, which serves <c>boards[0]</c> alone; an expansion board announces its type and version
+    /// and never names its firmware, so <c>ExpansionManager</c>'s table has no such entry
+    /// </remarks>
+    public string? FirmwareName
     {
         get => _firmwareName;
         set => SetPropertyValue(ref _firmwareName, value);
     }
-    private string _firmwareName = string.Empty;
+    private string? _firmwareName;
 
     /// <summary>
     /// Version of the firmware build
@@ -150,14 +155,19 @@ public partial class Board : ModelObject, IStaticModelObject
     private InductiveSensor? _inductiveSensor;
 
     /// <summary>
-    /// Maximum number of heaters this board can control
+    /// Maximum number of heaters this board can control, or null if this board does not report one
     /// </summary>
-    public int MaxHeaters
+    /// <remarks>
+    /// Only the main board has one, for the same reason as <see cref="FirmwareName"/>: it comes from
+    /// the object model table RepRapFirmware serves <c>boards[0]</c> from, and an expansion board
+    /// reports how many drivers it carries but never how many heaters
+    /// </remarks>
+    public int? MaxHeaters
     {
         get => _maxHeaters;
         set => SetPropertyValue(ref _maxHeaters, value);
     }
-    private int _maxHeaters;
+    private int? _maxHeaters;
 
     /// <summary>
     /// Maximum number of motors this board can drive
@@ -202,6 +212,12 @@ public partial class Board : ModelObject, IStaticModelObject
     /// <summary>
     /// State of this board
     /// </summary>
+    /// <remarks>
+    /// For an expansion board this follows its announcements and status reports. For the main board
+    /// it is the state of the link to the controller, which is the only thing that can say whether it
+    /// is there: unknown until the link first comes up, running while it is up, and timed out once it
+    /// has gone.
+    /// </remarks>
     public BoardState State
     {
         get => _state;
@@ -210,24 +226,33 @@ public partial class Board : ModelObject, IStaticModelObject
     private BoardState _state;
 
     /// <summary>
-    /// Indicates if this board supports external displays
+    /// Indicates if this board supports external displays, or null if this board does not report it
     /// </summary>
-    public bool SupportsDirectDisplay
+    /// <remarks>
+    /// Only the main board reports it, for the same reason as <see cref="FirmwareName"/>
+    /// </remarks>
+    public bool? SupportsDirectDisplay
     {
         get => _supportsDirectDisplay;
         set => SetPropertyValue(ref _supportsDirectDisplay, value);
     }
-    private bool _supportsDirectDisplay;
+    private bool? _supportsDirectDisplay;
 
     /// <summary>
-    /// Connection timeout of this board (in s)
+    /// Connection timeout of this board (in s), or null where the board has none
     /// </summary>
-    public int Timeout
+    /// <remarks>
+    /// This is how long an expansion board may go without being heard from before it is given up on,
+    /// which is what M959 sets and what <c>ExpansionManager</c>'s object model table reports. The
+    /// main board has none: it is not on the CAN bus, and the link to it is watched by the link
+    /// itself rather than by this timeout
+    /// </remarks>
+    public int? Timeout
     {
         get => _timeout;
         set => SetPropertyValue(ref _timeout, value);
     }
-    private int _timeout = DefaultConnectionTimeoutSeconds;
+    private int? _timeout = DefaultConnectionTimeoutSeconds;
 
     /// <summary>
     /// Unique identifier of the board or null if unknown

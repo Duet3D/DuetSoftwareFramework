@@ -52,6 +52,8 @@ SerialCDC serialUSB2(1);
 // Device initialisation
 void DeviceInit() noexcept
 {
+	LegacyAnalogIn::AnalogInInit();
+
 #if defined(DUET3_MB6HC) || defined(DUET3_MB6XD)
 #  ifdef DEBUG
 	// Set up PB4..PB5 as normal I/O, not JTAG. Leave PB6/7 pins as SWD. STATUS and ACT LEDs will not work.

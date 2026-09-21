@@ -623,7 +623,10 @@ it is ported except the two decisions at the end of this section. What the work 
 `state == unknown` until the board announces itself, so a command may record something about a board
 that is not there yet. Here the collection holds only what has been discovered, so M959 creates the
 entry in that same unknown state through `ExpansionBoardManager.GetOrCreateBoard`, and the bare M959
-listing filters `unknown` out exactly as RepRapFirmware's does.
+listing filters `unknown` out exactly as RepRapFirmware's does. That method is the object model's
+own, which places the entry in ascending CAN address order behind `boards[0]`; the manager adds only
+the log line. Discovery order would make an index into `boards[]` mean nothing, because the order the
+boards happened to announce themselves in says nothing about the machine.
 
 Twelve of the eighteen pass on the bench, up from three. Of the six that do not, three are the
 decisions below and the rest are these:
@@ -1097,8 +1100,8 @@ thread would stall move completions and message output.
 
 | Report | Object model |
 |---|---|
-| `AnnounceV0` / `AnnounceV1` | `boards[]` — short name, firmware version and date (split from the `type|version|date` string Duet3Expansion sends), unique id, `maxMotors`, `state` |
-| `BoardStatusReportV0` / `V1` | `boards[].vIn`, `.v12`, `.mcuTemp` (min/current/max), `.freeRam` |
+| `AnnounceV0` / `AnnounceV1` | `boards[]` — short name, firmware version and date (split from the `type|version|date` string Duet3Expansion sends), `name` and `firmwareFileName` derived from the type, unique id, `maxMotors`, `state` |
+| `BoardStatusReportV0` / `V1` | `boards[].vIn`, `.v12`, `.mcuTemp` (min/current/max), `.freeRam`, and the presence of `.accelerometer`, `.closedLoop` and `.inductiveSensor` |
 | `DriversStatusReport` | `boards[].drivers[].status` |
 | `SensorTemperaturesReport` | `sensors.analog[].lastReading`, `.state` |
 | `HeatersStatusReport` | `heat.heaters[].current`, `.avgPwm`, `.state` |
@@ -1119,6 +1122,73 @@ a reading to the wrong device rather than failing.
 
 The V1 and V2 input messages have different per-handle entry sizes, so each is deserialized as
 itself. Reading one as the other shifts every handle silently.
+
+### What a board announces and what is derived from it
+
+An announcement carries a type, a version and a date, and nothing else. `name` and
+`firmwareFileName` are worked out from the type, which is what `ExpressionValue::ExtractRequestedPart`
+does on the way out of RepRapFirmware's object model — `"Duet 3 Expansion " + type` and
+`"Duet3Firmware_" + type + ".bin"`, the extension becoming `.uf2` when `CanMessageAnnounceV1` says
+the board takes one or when the type is `Mini5plus`, which predates that flag. Deriving them here
+rather than on the way out is the only difference: both are stored, because this object model holds
+values rather than computing them per read.
+
+`firmwareFileName` is not cosmetic. It is what
+[FirmwareUpdater](../../src/DuetControlServer/Utility/FirmwareUpdater.cs) looks a board up by, so a
+board without one is never found to be out of date, and a board that announced no type at all gets an
+empty name rather than `Duet3Firmware_.bin`.
+
+The three feature flags in a board status report — `hasAccelerometer`, `hasClosedLoop`,
+`hasInductiveSensor` — are what put `accelerometer`, `closedLoop` and `inductiveSensor` in `boards[]`.
+All three are assigned on every report, as `ExpansionManager::ProcessBoardStatusReport` assigns them,
+so a board that stops claiming one loses the entry; an entry that is already there is kept rather
+than replaced, because what it holds is the record of the runs that have been done.
+
+### boards[0], which is not on the bus
+
+`boards[0]` is this program and DuetCANMaster (§1.4). It has no announcement and no board status
+report, because it is not on the CAN bus and has nothing to broadcast to, so the controller says both
+over the SPI link instead: `FirmwareRequest::BoardInfo` once per connection and
+`FirmwareRequest::BoardStatus` every `UnsolicitedStatusReportInterval`. Both are declared in
+[MessageFormats.h](../../lib/DuetSpiInterface/include/DuetSpiProtocol/MessageFormats.h), forwarded by
+`DuetRealtimeCore` as `InboundEventType::BoardInfo` and `::BoardStatus`, and applied by the same
+manager on the same task as everything else in `boards[]`.
+
+`BoardInfo` carries what an announcement cannot: `name`, `shortName`, `firmwareName`,
+`firmwareVersion`, `firmwareDate`, `firmwareFileName`, `iapFileNameSBC`, `iapFileNameSD` and the
+unique id. `BoardStatus` carries the same three readings and the same never-used RAM figure an
+expansion board broadcasts, as full floats rather than `float16_t` because there is no CAN frame to
+pack them into.
+
+`maxMotors`, `maxHeaters` and `supportsDirectDisplay` are not on the wire. DuetCANMaster bridges SPI
+to CAN-FD and keeps the master step clock; it will never drive a motor, a heater or a display, and
+that is a property of the architecture (§1.4) rather than of a build, so zero, zero and false are
+stated on this side. It is the same fact M308 states when it refuses a port on board 0.
+
+### Which fields belong to which kind of board
+
+RepRapFirmware serves `boards[]` from two object model tables that share no keys: `Platform`'s, which
+answers for `boards[0]` alone, and `ExpansionManager`'s, which answers for the rest. `firmwareName`,
+`maxHeaters`, `supportsDirectDisplay` and `wifiFirmwareFileName` are in the first only; `state` and
+`timeout` are in the second only. One `Board` class serves both here, so each of those is nullable
+and is set only on the kind of board that has it - otherwise every board publishes the union of the
+two tables, which is what `om-default-boards` caught: `firmwareName: ""`, `maxHeaters: 0` and
+`supportsDirectDisplay: false` on every expansion board, and a `timeout` on `boards[0]` that nothing
+applies because the main board is not on the CAN bus.
+
+The one difference left on `boards[n>0]` in that case is `drivers[].config.direction`, which is an
+integer in RepRapFirmware and a bool in `DuetAPI` - an upstream divergence, recorded in
+[KNOWN_BUGS.md](KNOWN_BUGS.md).
+
+`state` is the exception that stays. RepRapFirmware reports none for `boards[0]`, because there the
+object model and the main board are one program; here it is the state of the link to the controller,
+written only by the link - `unknown` at startup, `running` from `ConnectionEstablished`, `timedOut`
+from `ConnectionLost`. The controller's own reports do not touch it: they are applied on the board
+manager's task rather than as they arrive, so one enqueued before an outage arrives after it.
+
+`M997` for the main board reads `boards[0].iapFileNameSBC` and `.firmwareFileName`, so until the
+controller reports them there is nothing to flash it with: a DuetCANMaster too old to send `BoardInfo`
+has to be flashed over SWD or USB once, and updates itself over SPI from then on.
 
 ---
 

@@ -100,6 +100,8 @@ enum class FirmwareRequest : uint16_t {
     CANResponse = 5,       // Forwarded CAN message from expansion boards
     MotionStopped = 6,     // Drive(s) that have stopped
     CanMessageSent = 7,    // What became of the CAN messages the SBC asked to be sent
+    BoardInfo = 8,         // What board the controller is and what firmware it runs
+    BoardStatus = 9,       // The controller's own voltages, MCU temperature and free memory
 };
 
 // Status of a forwarded CAN message (FirmwareRequests/CanStatus.cs)
@@ -111,6 +113,22 @@ enum class CanStatus : uint8_t {
     Overflow = 4,        // Reply larger than the SBC could handle
     DispatchTimeout = 5, // The frame was handed to the CAN peripheral and no node on the bus ever acknowledged it
 };
+
+// Which string is which in BoardInfoHeader::textLengths, which is also the order the strings follow
+// that header in (Link/Native/LinkEvents.cs, BoardInfoString)
+enum class BoardInfoString : uint8_t {
+    Name = 0,             // long board name, e.g. "Duet 3 MB6HC"
+    ShortName = 1,        // short board name, e.g. "MB6HC"
+    FirmwareName = 2,     // firmware the controller runs, e.g. "RepRapFirmware for Duet 3 MB6HC"
+    FirmwareVersion = 3,  // its version
+    FirmwareDate = 4,     // the date it was built
+    FirmwareFileName = 5, // binary that carries that firmware
+    IapFileNameSbc = 6,   // in-application programmer used to flash it from the SBC
+    IapFileNameSd = 7,    // in-application programmer used to flash it from an SD card
+};
+
+// How many strings a BoardInfo packet carries, which is the width of its textLengths field
+inline constexpr size_t NumBoardInfoStrings = 8;
 
 // ---------------------------------------------------------------------------
 // Wire structs. Layouts verified against the C# structs with static_asserts below.
@@ -359,6 +377,51 @@ struct CanResponseHeader {
     uint16_t padding2;
 };
 
+// A minimum, current and maximum reading of the same quantity, as boards[] holds one
+// (Link/Native/LinkEvents.cs, MinCurMaxFloats). Laid out like CANlib's MinCurMax so that a board reporting
+// over CAN and the controller reporting over SPI arrive in the same shape, but declared here because
+// this header takes no dependency on CANlib.
+struct MinCurMaxValues {
+    float minimum;
+    float current;
+    float maximum;
+};
+
+// What board the controller is and what firmware it runs (Link/Native/LinkEvents.cs, BoardInfoEvent),
+// which is what fills boards[0]. Every expansion board says this of itself in CanMessageAnnounceV1;
+// the controller is not on the bus, so it says it here instead, once per connection.
+//
+// The strings follow the header back to back and unpadded, in BoardInfoString order, none of them
+// null-terminated. A length of zero means the controller has nothing to say for that field, which is
+// not the same as an empty value and is why the lengths travel rather than separators.
+//
+// Unlike the other headers here this one is not a whole number of dwords, and does not need to be:
+// every field is a byte, so nothing in it has to be aligned, and the text that follows is unaligned
+// whatever the header's size. WritePacketHeader realigns before the next packet.
+struct BoardInfoHeader {
+    uint8_t uniqueId[16];  // the MCU's 128-bit id, valid only if hasUniqueId is set
+    uint8_t hasUniqueId;   // non-zero if this MCU has a unique id
+    uint8_t textLengths[NumBoardInfoStrings];  // bytes of each string, indexed by BoardInfoString
+};
+
+// The controller's own health (Link/Native/LinkEvents.cs, BoardStatusEvent), sent periodically. This is
+// CanMessageBoardStatusV1 for the one board that cannot broadcast one: the same three readings and
+// the same never-used RAM figure, as full floats because there is no CAN frame to pack them into.
+//
+// A reading the board has no hardware for is left out by clearing its has... flag rather than by
+// sending zeroes, because zero volts and "no 12V rail" are different things to anything reading
+// boards[0].
+struct BoardStatusHeader {
+    int32_t neverUsedRam;     // bytes of RAM never yet allocated
+    MinCurMaxValues mcuTemp;  // degrees Celsius
+    MinCurMaxValues vIn;      // volts
+    MinCurMaxValues v12;      // volts
+    uint8_t hasMcuTemp;
+    uint8_t hasVin;
+    uint8_t hasV12;
+    uint8_t padding;
+};
+
 #pragma pack(pop)
 
 // ---------------------------------------------------------------------------
@@ -406,6 +469,16 @@ static_assert(sizeof(CodeBufferUpdateHeader) == 4, "CodeBufferUpdateHeader must 
 static_assert(sizeof(CanResponseHeader) == 12, "CanResponseHeader must be 12 bytes");
 static_assert(sizeof(CanMessageSentHeader) == 4, "CanMessageSentHeader must be 4 bytes");
 static_assert(sizeof(CanMessageSentEntry) == 4, "CanMessageSentEntry must be 4 bytes");
+static_assert(sizeof(MinCurMaxValues) == 12, "MinCurMaxValues must be 12 bytes");
+static_assert(sizeof(BoardInfoHeader) == 25, "BoardInfoHeader must be 25 bytes");
+static_assert(offsetof(BoardInfoHeader, hasUniqueId) == 16, "");
+static_assert(offsetof(BoardInfoHeader, textLengths) == 17, "");
+static_assert(sizeof(BoardInfoHeader::textLengths) == NumBoardInfoStrings, "");
+static_assert(sizeof(BoardStatusHeader) == 44, "BoardStatusHeader must be 44 bytes");
+static_assert(offsetof(BoardStatusHeader, mcuTemp) == 4, "");
+static_assert(offsetof(BoardStatusHeader, vIn) == 16, "");
+static_assert(offsetof(BoardStatusHeader, v12) == 28, "");
+static_assert(offsetof(BoardStatusHeader, hasMcuTemp) == 40, "");
 
 // Round a length up to the next 4-byte boundary, matching the padding rules used by both sides.
 inline constexpr size_t AddPadding(size_t length) noexcept {

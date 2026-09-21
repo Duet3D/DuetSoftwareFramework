@@ -80,7 +80,15 @@ internal enum InboundEventType : ushort
     OutboundDropped = 15,
 
     /// <summary>What became of CAN messages sent for us: <see cref="CanMessagesSentEvent"/> plus entries</summary>
-    CanMessagesSent = 16
+    CanMessagesSent = 16,
+
+    /// <summary>
+    /// What board the controller is: <see cref="BoardInfoEvent"/> plus the strings it names
+    /// </summary>
+    BoardInfo = 17,
+
+    /// <summary>The controller's own health: <see cref="BoardStatusEvent"/></summary>
+    BoardStatus = 18
 }
 
 /// <summary>
@@ -552,4 +560,131 @@ internal struct MotionStoppedEvent
 
     /// <summary>Padding</summary>
     public ushort Padding1;
+}
+
+/// <summary>
+/// Which string is which in <see cref="BoardInfoEvent.TextLengths"/>, which is also the order the
+/// strings follow that header in
+/// </summary>
+/// <remarks>
+/// <c>BoardInfoString</c> in <c>lib/DuetSpiInterface/include/DuetSpiProtocol/MessageFormats.h</c>
+/// </remarks>
+internal enum BoardInfoString : byte
+{
+    /// <summary>Long board name, e.g. "Duet 3 MB6HC"</summary>
+    Name = 0,
+
+    /// <summary>Short board name, e.g. "MB6HC"</summary>
+    ShortName = 1,
+
+    /// <summary>Firmware the controller runs, e.g. "RepRapFirmware for Duet 3 MB6HC"</summary>
+    FirmwareName = 2,
+
+    /// <summary>Version of that firmware</summary>
+    FirmwareVersion = 3,
+
+    /// <summary>Date that firmware was built</summary>
+    FirmwareDate = 4,
+
+    /// <summary>Binary that carries that firmware</summary>
+    FirmwareFileName = 5,
+
+    /// <summary>In-application programmer used to flash it from the SBC</summary>
+    IapFileNameSbc = 6,
+
+    /// <summary>In-application programmer used to flash it from an SD card</summary>
+    IapFileNameSd = 7
+}
+
+/// <summary>Blittable inline buffer of the eight string lengths a board info record carries</summary>
+[InlineArray(Length)]
+internal struct BoardInfoLengths
+{
+    /// <summary>Number of elements in this buffer</summary>
+    public const int Length = 8;
+
+    private byte _element0;
+}
+
+/// <summary>Blittable inline buffer of a board's 128-bit unique id</summary>
+[InlineArray(Length)]
+internal struct BoardUniqueId
+{
+    /// <summary>Number of elements in this buffer</summary>
+    public const int Length = 16;
+
+    private byte _element0;
+}
+
+/// <summary>Blittable inline buffer of a minimum, current and maximum reading</summary>
+[InlineArray(Length)]
+internal struct MinCurMaxFloats
+{
+    /// <summary>Number of elements in this buffer</summary>
+    public const int Length = 3;
+
+    private float _element0;
+}
+
+/// <summary>
+/// What board the controller is and what firmware it runs, which is what fills <c>boards[0]</c>.
+/// The strings follow this header back to back and unpadded, in <see cref="BoardInfoString"/> order
+/// </summary>
+/// <remarks>
+/// Every expansion board says this of itself in <c>CanMessageAnnounceV1</c>. The controller is not on
+/// the CAN bus, so it says it over the link instead, once per connection.
+/// </remarks>
+[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 29)]
+internal struct BoardInfoEvent
+{
+    /// <summary>Record header</summary>
+    public InboundEventHeader Header;
+
+    /// <summary>The MCU's 128-bit id, meaningful only if <see cref="HasUniqueId"/> is set</summary>
+    public BoardUniqueId UniqueId;
+
+    /// <summary>Non-zero if this MCU has a unique id</summary>
+    public byte HasUniqueId;
+
+    /// <summary>Bytes of each trailing string, indexed by <see cref="BoardInfoString"/></summary>
+    public BoardInfoLengths TextLengths;
+}
+
+/// <summary>
+/// The controller's own health, the counterpart of the board status report every expansion board
+/// broadcasts over CAN
+/// </summary>
+/// <remarks>
+/// A has... flag that is clear means the board has no hardware for that reading, not that the
+/// reading is zero, which is why they travel instead of the values standing for themselves
+/// </remarks>
+[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 48)]
+internal struct BoardStatusEvent
+{
+    /// <summary>Record header</summary>
+    public InboundEventHeader Header;
+
+    /// <summary>Bytes of RAM never yet allocated</summary>
+    public int NeverUsedRam;
+
+    /// <summary>Minimum, current and maximum MCU temperature in degrees Celsius</summary>
+    public MinCurMaxFloats McuTemp;
+
+    /// <summary>Minimum, current and maximum input voltage</summary>
+    public MinCurMaxFloats VIn;
+
+    /// <summary>Minimum, current and maximum 12V rail voltage</summary>
+    public MinCurMaxFloats V12;
+
+    /// <summary>Non-zero if the board measures its MCU temperature</summary>
+    public byte HasMcuTemp;
+
+    /// <summary>Non-zero if the board measures its input voltage</summary>
+    public byte HasVin;
+
+    /// <summary>Non-zero if the board measures its 12V rail</summary>
+    public byte HasV12;
+
+    /// <summary>Padding</summary>
+    public byte Padding;
 }

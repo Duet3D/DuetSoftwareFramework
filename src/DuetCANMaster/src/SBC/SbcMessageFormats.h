@@ -67,6 +67,9 @@ using ScheduleMoveHeader = SbcProtocol::ScheduleMoveHeader;
 using ScheduleMoveDriver = SbcProtocol::ScheduleMoveDriver;
 using MotionStoppedHeader = SbcProtocol::MotionStoppedHeader;
 using MotionStoppedDriver = SbcProtocol::MotionStoppedDriver;
+using MinCurMaxValues = SbcProtocol::MinCurMaxValues;
+using BoardInfoHeader = SbcProtocol::BoardInfoHeader;
+using BoardStatusHeader = SbcProtocol::BoardStatusHeader;
 namespace ScheduleMoveFlags = SbcProtocol::ScheduleMoveFlags;
 
 // ---------------------------------------------------------------------------

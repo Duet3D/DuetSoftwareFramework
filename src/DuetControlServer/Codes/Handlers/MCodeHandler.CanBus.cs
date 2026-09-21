@@ -158,7 +158,7 @@ internal partial class MCodeHandler
                                          .OrderBy(b => b.CanAddress))
             {
                 builder.AppendLine(string.Create(CultureInfo.InvariantCulture,
-                    $"Board {known.CanAddress} connection timeout {known.Timeout} seconds"));
+                    $"Board {known.CanAddress} connection timeout {known.Timeout ?? Board.DefaultConnectionTimeoutSeconds} seconds"));
             }
         }
         return builder.Length == 0

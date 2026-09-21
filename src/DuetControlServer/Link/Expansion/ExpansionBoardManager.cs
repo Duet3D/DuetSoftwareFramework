@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -15,7 +16,7 @@ using System.Threading.Tasks;
 namespace DuetControlServer.Link.Expansion;
 
 /// <summary>
-/// Turns the status reports the expansion boards broadcast into object model state
+/// Turns the status reports the boards send into object model state
 /// </summary>
 /// <remarks>
 /// <para>
@@ -23,6 +24,12 @@ namespace DuetControlServer.Link.Expansion;
 /// then a periodic board status report and whichever of the driver, sensor, heater, fan, input and
 /// filament monitor reports apply to what it is carrying. Nothing here asks for any of it, so this is
 /// a receiver rather than a poller, and the object model is the only place the information goes.
+/// </para>
+/// <para>
+/// The controller is <c>boards[0]</c> and reports the same two things about itself over the SPI link,
+/// because it is not on the CAN bus and has nothing to broadcast to. They are applied here rather
+/// than beside the link so that every entry in <c>boards[]</c> is written from one task under one
+/// lock, whichever wire it arrived on.
 /// </para>
 /// <para>
 /// Reports arrive on the link dispatch thread, which also carries move completions and message
@@ -49,12 +56,28 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
     private const int QueueSize = 256;
 
     /// <summary>
-    /// A report as it came off the bus, decoded later on this service's own task
+    /// Where a queued report came from, which is what says how to decode it
     /// </summary>
-    /// <param name="Type">CAN message type</param>
+    private enum ReportKind : byte
+    {
+        /// <summary>A message an expansion board broadcast on the CAN bus</summary>
+        CanMessage,
+
+        /// <summary>The controller saying what board it is, as a <see cref="Native.BoardInfoEvent"/></summary>
+        ControllerInfo,
+
+        /// <summary>The controller's own health, as a <see cref="Native.BoardStatusEvent"/></summary>
+        ControllerStatus
+    }
+
+    /// <summary>
+    /// A report as it came off the wire, decoded later on this service's own task
+    /// </summary>
+    /// <param name="Kind">Which wire it came off, and so how to read it</param>
+    /// <param name="Type">CAN message type, for <see cref="ReportKind.CanMessage"/></param>
     /// <param name="Source">CAN address that sent it</param>
-    /// <param name="Payload">Raw message payload</param>
-    private readonly record struct Report(CanMessageType Type, byte Source, byte[] Payload);
+    /// <param name="Payload">Raw message payload, or the raw native event record</param>
+    private readonly record struct Report(ReportKind Kind, CanMessageType Type, byte Source, byte[] Payload);
 
     private readonly Channel<Report> _reports = Channel.CreateBounded<Report>(new BoundedChannelOptions(QueueSize)
     {
@@ -97,11 +120,44 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
                 return false;
         }
 
-        if (!_reports.Writer.TryWrite(new Report(type, source, payload)))
+        if (!_reports.Writer.TryWrite(new Report(ReportKind.CanMessage, type, source, payload)))
         {
             logger.LogWarning("Dropped a {Type} report from board {Source}", type, source);
         }
         return true;
+    }
+
+    /// <summary>
+    /// Take the controller's account of what board it is
+    /// </summary>
+    /// <param name="record">Raw <see cref="Native.BoardInfoEvent"/> record, strings and all</param>
+    /// <remarks>
+    /// The controller is <c>boards[0]</c> and is not on the CAN bus, so it cannot announce itself the
+    /// way an expansion board does and says this over the link instead. It arrives on the link
+    /// dispatch thread like everything else, so it is queued rather than applied here
+    /// </remarks>
+    public void EnqueueControllerInfo(ReadOnlySpan<byte> record)
+    {
+        if (!_reports.Writer.TryWrite(new Report(ReportKind.ControllerInfo, default, CanId.MasterAddress, record.ToArray())))
+        {
+            logger.LogWarning("Dropped the controller's board info");
+        }
+    }
+
+    /// <summary>
+    /// Take the controller's own health report
+    /// </summary>
+    /// <param name="record">Raw <see cref="Native.BoardStatusEvent"/> record</param>
+    /// <remarks>
+    /// The counterpart of the board status report every expansion board broadcasts, for the one
+    /// board that has no bus to broadcast it on
+    /// </remarks>
+    public void EnqueueControllerStatus(ReadOnlySpan<byte> record)
+    {
+        if (!_reports.Writer.TryWrite(new Report(ReportKind.ControllerStatus, default, CanId.MasterAddress, record.ToArray())))
+        {
+            logger.LogWarning("Dropped the controller's board status report");
+        }
     }
 
     /// <inheritdoc />
@@ -122,7 +178,9 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
             catch (Exception e)
             {
                 // One malformed report must not take the receiver down; the next one supersedes it
-                logger.LogError(e, "Failed to apply a {Type} report from board {Source}", report.Type, report.Source);
+                logger.LogError(e, "Failed to apply a {Type} report from board {Source}",
+                                report.Kind == ReportKind.CanMessage ? report.Type.ToString() : report.Kind.ToString(),
+                                report.Source);
             }
         }
     }
@@ -134,6 +192,20 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
     /// <param name="cancellationToken">Cancellation token</param>
     private async ValueTask ApplyAsync(Report report, CancellationToken cancellationToken)
     {
+        switch (report.Kind)
+        {
+            case ReportKind.ControllerInfo:
+                await ApplyControllerInfoAsync(report.Payload, cancellationToken);
+                return;
+
+            case ReportKind.ControllerStatus:
+                await ApplyControllerStatusAsync(report.Payload, cancellationToken);
+                return;
+        }
+
+        // Only the boards on the bus are watched for silence. The controller is the link itself, and
+        // an outage there is already reported as a ControllerDisconnect; timing it out as well would
+        // put boards[0] into a state meant for a board that stopped answering
         if (report.Source <= CanId.MaxCanAddress)
         {
             _lastSeen[report.Source] = DateTime.UtcNow;
@@ -142,16 +214,19 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
         switch (report.Type)
         {
             case CanMessageType.AnnounceV0:
+                // The older announcement says nothing about the binary the board takes, and every
+                // board old enough to send one takes a .bin, which is what RepRapFirmware assumes too
                 await ApplyAnnouncementAsync(report.Source,
                     CanMessageSerializer.Deserialize<CanMessageAnnounceV0>(report.Payload).BoardTypeAndFirmwareVersionString,
-                    numDrivers: null, uniqueId: null, cancellationToken);
+                    numDrivers: null, uniqueId: null, usesUf2Binary: false, cancellationToken);
                 break;
 
             case CanMessageType.AnnounceV1:
                 {
                     CanMessageAnnounceV1 announce = CanMessageSerializer.Deserialize<CanMessageAnnounceV1>(report.Payload);
                     await ApplyAnnouncementAsync(report.Source, announce.BoardTypeAndFirmwareVersionString,
-                                                 announce.NumDrivers, FormatUniqueId(announce.UniqueId), cancellationToken);
+                                                 announce.NumDrivers, FormatUniqueId(announce.UniqueId),
+                                                 announce.UsesUf2Binary, cancellationToken);
                 }
                 break;
 
@@ -223,9 +298,10 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
     /// <param name="description">Board type, firmware version and firmware date, separated by pipes</param>
     /// <param name="numDrivers">How many drivers it carries, if it said</param>
     /// <param name="uniqueId">Its unique id, if it said</param>
+    /// <param name="usesUf2Binary">Whether its firmware binary is a .uf2 rather than a .bin</param>
     /// <param name="cancellationToken">Cancellation token</param>
     private async ValueTask ApplyAnnouncementAsync(byte source, string description, byte? numDrivers, string? uniqueId,
-                                                   CancellationToken cancellationToken)
+                                                   bool usesUf2Binary, CancellationToken cancellationToken)
     {
         // Duet3Expansion sends "<board type>|<firmware version>|<firmware date>"
         string[] parts = description.Split('|');
@@ -236,7 +312,8 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
             Board board = GetOrCreateBoard(source);
             wasRunning = board.State == BoardState.Running;
             board.ShortName = parts.Length > 0 ? parts[0] : string.Empty;
-            board.Name = board.ShortName;
+            board.Name = ExpansionBoardName(board.ShortName);
+            board.FirmwareFileName = ExpansionFirmwareFileName(board.ShortName, usesUf2Binary);
             board.FirmwareVersion = parts.Length > 1 ? parts[1] : string.Empty;
             board.FirmwareDate = parts.Length > 2 ? parts[2] : string.Empty;
             board.State = BoardState.Running;
@@ -303,6 +380,7 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
             board.V12 = status.HasV12 ? ToMinMaxCurrent(status.ShortValues[index++]) : null;
             board.McuTemp = status.HasMcuTemp ? ToMinMaxCurrent(status.ShortValues[index]) : null;
 
+            ApplyBoardFeatures(board, status.HasAccelerometer, status.HasClosedLoop, status.HasInductiveSensor);
             ApplyAnalogHandles(status, payload);
         }
     }
@@ -373,7 +451,137 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
             board.VIn = status.HasVin ? ToMinMaxCurrent(status.Values[index++]) : null;
             board.V12 = status.HasV12 ? ToMinMaxCurrent(status.Values[index++]) : null;
             board.McuTemp = status.HasMcuTemp ? ToMinMaxCurrent(status.Values[index]) : null;
+
+            ApplyBoardFeatures(board, status.HasAccelerometer, status.HasClosedLoop, status.HasInductiveSensor);
         }
+    }
+
+    /// <summary>
+    /// Record what the controller said it is, which is what fills <c>boards[0]</c>
+    /// </summary>
+    /// <param name="record">Raw <see cref="Native.BoardInfoEvent"/> record, strings and all</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <remarks>
+    /// Its counterpart for every other board is <see cref="ApplyAnnouncementAsync"/>. This one says
+    /// more, because a board that announces itself over CAN has room for a type and a version and
+    /// nothing else, while the controller is not squeezing itself into a CAN frame
+    /// </remarks>
+    private async ValueTask ApplyControllerInfoAsync(byte[] record, CancellationToken cancellationToken)
+    {
+        int headerSize = Marshal.SizeOf<Native.BoardInfoEvent>();
+        if (record.Length < headerSize)
+        {
+            logger.LogError("Discarding a truncated controller board info record ({Length} bytes)", record.Length);
+            return;
+        }
+
+        Native.BoardInfoEvent info = MemoryMarshal.Read<Native.BoardInfoEvent>(record);
+        string[] strings = new string[Native.BoardInfoLengths.Length];
+        int offset = headerSize;
+        for (int i = 0; i < strings.Length; i++)
+        {
+            int length = info.TextLengths[i];
+            if (offset + length > record.Length)
+            {
+                logger.LogError("Discarding a controller board info record that does not carry the text it claims");
+                return;
+            }
+            strings[i] = Encoding.UTF8.GetString(record, offset, length);
+            offset += length;
+        }
+
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            // The state is the link's to say, not this report's: a report is applied on this task
+            // rather than as it arrives, so one enqueued just before an outage is applied just after
+            // it and would put the board back to running while the link is down
+            Board board = GetOrCreateBoard(CanId.MasterAddress);
+            board.Name = strings[(int)Native.BoardInfoString.Name];
+            board.ShortName = strings[(int)Native.BoardInfoString.ShortName];
+            board.FirmwareName = strings[(int)Native.BoardInfoString.FirmwareName];
+            board.FirmwareVersion = strings[(int)Native.BoardInfoString.FirmwareVersion];
+            board.FirmwareDate = strings[(int)Native.BoardInfoString.FirmwareDate];
+            board.FirmwareFileName = strings[(int)Native.BoardInfoString.FirmwareFileName];
+
+            // Null rather than empty where the controller has no such file: the object model reads
+            // these as "this board cannot be updated that way", which an empty file name does not say
+            board.IapFileNameSBC = NullIfEmpty(strings[(int)Native.BoardInfoString.IapFileNameSbc]);
+            board.IapFileNameSD = NullIfEmpty(strings[(int)Native.BoardInfoString.IapFileNameSd]);
+
+            // DuetCANMaster doesn't support local hardware control
+            board.MaxMotors = 0;
+            board.MaxHeaters = 0;
+            board.SupportsDirectDisplay = false;
+
+            board.UniqueId = info.HasUniqueId != 0 ? FormatUniqueId(info.UniqueId) : null;
+        }
+
+        logger.LogInformation("Controller is {Name} running {FirmwareName} {FirmwareVersion}",
+                              strings[(int)Native.BoardInfoString.Name],
+                              strings[(int)Native.BoardInfoString.FirmwareName],
+                              strings[(int)Native.BoardInfoString.FirmwareVersion]);
+    }
+
+    /// <summary>
+    /// Record the controller's own health, which is what keeps <c>boards[0]</c> live
+    /// </summary>
+    /// <param name="record">Raw <see cref="Native.BoardStatusEvent"/> record</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <remarks>
+    /// The same three readings and the same free memory figure an expansion board broadcasts in
+    /// <c>CanMessageBoardStatusV1</c>, for the one board that has no bus to broadcast them on
+    /// </remarks>
+    private async ValueTask ApplyControllerStatusAsync(byte[] record, CancellationToken cancellationToken)
+    {
+        if (record.Length < Marshal.SizeOf<Native.BoardStatusEvent>())
+        {
+            logger.LogError("Discarding a truncated controller board status record ({Length} bytes)", record.Length);
+            return;
+        }
+
+        Native.BoardStatusEvent status = MemoryMarshal.Read<Native.BoardStatusEvent>(record);
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            Board board = GetOrCreateBoard(CanId.MasterAddress);
+            board.FreeRam = status.NeverUsedRam;
+            board.McuTemp = status.HasMcuTemp != 0 ? ToMinMaxCurrent(status.McuTemp) : null;
+            board.VIn = status.HasVin != 0 ? ToMinMaxCurrent(status.VIn) : null;
+            board.V12 = status.HasV12 != 0 ? ToMinMaxCurrent(status.V12) : null;
+        }
+    }
+
+    /// <summary>
+    /// The string, or null where there is none
+    /// </summary>
+    /// <param name="value">The string</param>
+    /// <returns>The string, or null if it is empty</returns>
+    private static string? NullIfEmpty(string value) => string.IsNullOrEmpty(value) ? null : value;
+
+    /// <summary>
+    /// Record which of the optional features a board says it has
+    /// </summary>
+    /// <param name="board">The board</param>
+    /// <param name="hasAccelerometer">Whether it has an accelerometer</param>
+    /// <param name="hasClosedLoop">Whether it supports closed loop control</param>
+    /// <param name="hasInductiveSensor">Whether it has an inductive sensor</param>
+    /// <remarks>
+    /// <para>
+    /// A board repeats these in every status report, and RepRapFirmware assigns all three every time
+    /// (<c>ExpansionManager::ProcessBoardStatusReport</c>): the presence of the object model entry is
+    /// what tells a client the feature is there, so a board that stops claiming one has to lose it.
+    /// </para>
+    /// <para>
+    /// An entry that is already there is left alone rather than replaced, because what it holds is
+    /// the record of the runs that have been done - <c>accelerometer.runs</c>, <c>closedLoop.points</c>
+    /// - and a report arriving between two runs must not reset it
+    /// </para>
+    /// </remarks>
+    /// <remarks>The caller must hold the object model write lock</remarks>
+    private static void ApplyBoardFeatures(Board board, bool hasAccelerometer, bool hasClosedLoop, bool hasInductiveSensor)
+    {
+        board.Accelerometer = hasAccelerometer ? board.Accelerometer ?? new Accelerometer() : null;
+        board.ClosedLoop = hasClosedLoop ? board.ClosedLoop ?? new BoardClosedLoop() : null;
+        board.InductiveSensor = hasInductiveSensor ? board.InductiveSensor ?? new InductiveSensor() : null;
     }
 
     /// <summary>
@@ -652,12 +860,6 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
     }
 
     /// <summary>
-    /// Find the board with the given CAN address, adding it if this is the first thing heard from it
-    /// </summary>
-    /// <param name="address">CAN address</param>
-    /// <returns>The board</returns>
-    /// <remarks>The caller must hold the object model write lock</remarks>
-    /// <summary>
     /// Notice a board that has stopped reporting
     /// </summary>
     /// <param name="stoppingToken">Cancellation token</param>
@@ -733,45 +935,24 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
     /// <inheritdoc cref="Model.ObjectModel.FindBoard" />
     public Board? FindBoard(byte address) => model.FindBoard(address);
 
-    /// <summary>
-    /// The board at a CAN address, creating the entry if nothing has been heard from it yet
-    /// </summary>
-    /// <param name="address">CAN address of the board</param>
-    /// <returns>The board</returns>
+    /// <inheritdoc cref="Model.ObjectModel.GetOrCreateBoard" />
     /// <remarks>
-    /// RepRapFirmware's <c>boards[]</c> is one entry per address, always present and
-    /// <c>state == unknown</c> until the board announces itself, so a command may record something
-    /// about a board that is not there yet. Here the collection holds only what has been discovered,
-    /// and this is what stands in for that: the entry is created in the same unknown state, which is
-    /// what keeps it out of the reports that enumerate boards. The caller must hold the object model
+    /// The object model owns where the entry goes, which is in CAN address order; this adds only the
+    /// log line, because a board turning up is worth recording once and the object model is asked for
+    /// entries by codes that are not discovering anything. The caller must hold the object model
     /// write lock
     /// </remarks>
     public Board GetOrCreateBoard(byte address)
     {
-        if (FindBoard(address) is Board existing)
+        bool isNew = FindBoard(address) is null;
+        Board board = model.GetOrCreateBoard(address);
+        if (isNew)
         {
-            return existing;
+            logger.LogInformation("Discovered expansion board at CAN address {Address}", address);
         }
-
-        Board board = new() { CanAddress = address, State = BoardState.Unknown };
-        model.Boards.Add(board);
-        logger.LogInformation("Discovered expansion board at CAN address {Address}", address);
         return board;
     }
 
-    /// <summary>
-    /// Get an item of an object model collection, growing the collection to reach it
-    /// </summary>
-    /// <typeparam name="T">Type of the item</typeparam>
-    /// <param name="collection">The collection</param>
-    /// <param name="index">Index being reported on</param>
-    /// <param name="create">Creates a missing item</param>
-    /// <returns>The item, or null if the index is not usable</returns>
-    /// <remarks>
-    /// A board reports on the things it has been configured with, so an index arriving before the
-    /// object model has an entry for it means the configuration is ahead of us rather than wrong.
-    /// The gaps are left null, which is what an unconfigured slot means in these collections
-    /// </remarks>
     /// <summary>
     /// The object model entry a report is about, or null if the machine has no such device
     /// </summary>
@@ -792,6 +973,19 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
         where T : ModelObject, IStaticModelObject, new()
         => index >= 0 && index < collection.Count ? collection[index] : null;
 
+    /// <summary>
+    /// Get an item of an object model collection, growing the collection to reach it
+    /// </summary>
+    /// <typeparam name="T">Type of the item</typeparam>
+    /// <param name="collection">The collection</param>
+    /// <param name="index">Index being reported on</param>
+    /// <param name="create">Creates a missing item</param>
+    /// <returns>The item, or null if the index is not usable</returns>
+    /// <remarks>
+    /// A board reports on the things it has been configured with, so an index arriving before the
+    /// object model has an entry for it means the configuration is ahead of us rather than wrong.
+    /// The gaps are left null, which is what an unconfigured slot means in these collections
+    /// </remarks>
     private static T? GetOrCreate<T>(StaticModelCollection<T?> collection, int index, Func<T> create)
         where T : ModelObject, IStaticModelObject, new()
     {
@@ -848,6 +1042,18 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
     };
 
     /// <summary>
+    /// Turn the controller's own minimum/current/maximum triple into its object model form
+    /// </summary>
+    /// <param name="value">The reported triple, minimum first</param>
+    /// <returns>The object model value</returns>
+    private static MinMaxCurrent ToMinMaxCurrent(Native.MinCurMaxFloats value) => new()
+    {
+        Min = value[0],
+        Current = value[1],
+        Max = value[2]
+    };
+
+    /// <summary>
     /// Turn a reported minimum/current/maximum triple in the older format into its object model form
     /// </summary>
     /// <param name="value">The reported triple</param>
@@ -860,17 +1066,61 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
     };
 
     /// <summary>
+    /// Prefix RepRapFirmware puts in front of an expansion board's short name to make its full name
+    /// </summary>
+    /// <remarks><c>ExpressionValue::ExtractRequestedPart</c>, <c>ExpansionDetail::longName</c></remarks>
+    private const string ExpansionBoardNamePrefix = "Duet 3 Expansion ";
+
+    /// <summary>
+    /// Prefix and extensions of the firmware binary a Duet 3 board takes
+    /// </summary>
+    /// <remarks>
+    /// <c>ExpressionValue::ExtractRequestedPart</c>, <c>ExpansionDetail::firmwareFileNameBin</c>. This
+    /// is derived rather than reported: an expansion board names its type and nothing else, and what
+    /// it is flashed with follows from that type by convention
+    /// </remarks>
+    private const string FirmwareFileNamePrefix = "Duet3Firmware_";
+    private const string BinFirmwareExtension = ".bin";
+    private const string Uf2FirmwareExtension = ".uf2";
+
+    /// <summary>
+    /// The one board whose firmware is a .uf2 without its announcement saying so
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware special-cases the same name in the same place, because the Mini 5+ predates the
+    /// <c>usesUf2Binary</c> flag and still announces itself without it
+    /// </remarks>
+    private const string Uf2BoardWithoutTheFlag = "Mini5plus";
+
+    /// <summary>
+    /// The full name of an expansion board, from the short name it announced
+    /// </summary>
+    /// <param name="shortName">Short name the board announced</param>
+    /// <returns>Its full name, or an empty string if it named no type</returns>
+    private static string ExpansionBoardName(string shortName)
+        => string.IsNullOrEmpty(shortName) ? string.Empty : ExpansionBoardNamePrefix + shortName;
+
+    /// <summary>
+    /// The firmware binary an expansion board takes, from the short name it announced
+    /// </summary>
+    /// <param name="shortName">Short name the board announced</param>
+    /// <param name="usesUf2Binary">Whether the board said its binary is a .uf2</param>
+    /// <returns>The file name, or an empty string if it named no type</returns>
+    /// <remarks>
+    /// Empty rather than a name built from nothing, because this is what the firmware updater looks
+    /// a board up by: a board with no type has no binary to check, and <c>Duet3Firmware_.bin</c> is
+    /// a file that does not exist rather than a board that is up to date
+    /// </remarks>
+    private static string ExpansionFirmwareFileName(string shortName, bool usesUf2Binary)
+        => string.IsNullOrEmpty(shortName)
+            ? string.Empty
+            : FirmwareFileNamePrefix + shortName +
+              (usesUf2Binary || shortName == Uf2BoardWithoutTheFlag ? Uf2FirmwareExtension : BinFirmwareExtension);
+
+    /// <summary>
     /// Format a board's unique id the way it is shown everywhere else
     /// </summary>
     /// <param name="uniqueId">The raw id</param>
     /// <returns>The formatted id</returns>
-    private static string FormatUniqueId(ByteArray16 uniqueId)
-    {
-        Span<byte> bytes = stackalloc byte[16];
-        for (int i = 0; i < 16; i++)
-        {
-            bytes[i] = uniqueId[i];
-        }
-        return Convert.ToHexStringLower(bytes);
-    }
+    private static string FormatUniqueId(ReadOnlySpan<byte> uniqueId) => Convert.ToHexStringLower(uniqueId);
 }

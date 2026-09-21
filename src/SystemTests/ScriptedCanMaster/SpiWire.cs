@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace SystemTests;
@@ -34,6 +35,9 @@ internal static class SpiWire
 
     /// <summary>Round a length up to the next 4-byte boundary, matching both sides' padding rules</summary>
     public static int AddPadding(int length) => (length + 3) & ~3;
+
+    /// <summary>How many strings a BoardInfo packet carries</summary>
+    public const int NumBoardInfoStrings = 8;
 }
 
 /// <summary>Result codes for header and data transfers (Shared/TransferResponse.cs)</summary>
@@ -71,6 +75,24 @@ internal enum FirmwareRequest : ushort
     CANResponse = 5,
     MotionStopped = 6,
     CanMessageSent = 7,
+    BoardInfo = 8,
+    BoardStatus = 9,
+}
+
+/// <summary>
+/// Which string is which in <see cref="BoardInfoHeader.TextLengths"/>, and the order they follow
+/// that header in
+/// </summary>
+internal enum BoardInfoString : byte
+{
+    Name = 0,
+    ShortName = 1,
+    FirmwareName = 2,
+    FirmwareVersion = 3,
+    FirmwareDate = 4,
+    FirmwareFileName = 5,
+    IapFileNameSbc = 6,
+    IapFileNameSd = 7,
 }
 
 /// <summary>Status of a forwarded CAN message</summary>
@@ -82,6 +104,61 @@ internal enum CanStatus : byte
     NoBuffer = 3,
     Overflow = 4,
     DispatchTimeout = 5,
+}
+
+/// <summary>Blittable inline buffer of the eight string lengths a board info packet carries</summary>
+[InlineArray(SpiWire.NumBoardInfoStrings)]
+internal struct BoardInfoLengths
+{
+    /// <summary>Number of elements in this buffer</summary>
+    public const int Length = SpiWire.NumBoardInfoStrings;
+
+    private byte _element0;
+}
+
+/// <summary>Blittable inline buffer of a board's 128-bit unique id</summary>
+[InlineArray(16)]
+internal struct BoardUniqueId
+{
+    /// <summary>Number of elements in this buffer</summary>
+    public const int Length = 16;
+
+    private byte _element0;
+}
+
+/// <summary>A minimum, current and maximum reading of the same quantity (MinCurMaxValues)</summary>
+[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 12)]
+internal struct MinCurMaxValues
+{
+    public float Minimum;
+    public float Current;
+    public float Maximum;
+}
+
+/// <summary>
+/// What board the controller is and what firmware it runs; the strings follow back to back and
+/// unpadded, in <see cref="BoardInfoString"/> order
+/// </summary>
+[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 25)]
+internal struct BoardInfoHeader
+{
+    public BoardUniqueId UniqueId;
+    public byte HasUniqueId;
+    public BoardInfoLengths TextLengths;
+}
+
+/// <summary>The controller's own voltages, MCU temperature and free memory</summary>
+[StructLayout(LayoutKind.Sequential, Pack = 1, Size = 44)]
+internal struct BoardStatusHeader
+{
+    public int NeverUsedRam;
+    public MinCurMaxValues McuTemp;
+    public MinCurMaxValues VIn;
+    public MinCurMaxValues V12;
+    public byte HasMcuTemp;
+    public byte HasVin;
+    public byte HasV12;
+    public byte Padding;
 }
 
 /// <summary>Frame types of the socket framing (SocketLinkFormats.h)</summary>
