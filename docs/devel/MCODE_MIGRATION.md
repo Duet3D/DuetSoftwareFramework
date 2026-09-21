@@ -1144,6 +1144,27 @@ All three are assigned on every report, as `ExpansionManager::ProcessBoardStatus
 so a board that stops claiming one loses the entry; an entry that is already there is kept rather
 than replaced, because what it holds is the record of the runs that have been done.
 
+### A board that joins after the machine has started
+
+A board announces itself until the main board acknowledges it, and then goes quiet: the announcement
+it made is the only one it will ever make until it resets or loses and regains time sync
+(`CanInterface::UpdateSyncLockState` in Duet3Expansion clears `mainBoardAcknowledgedAnnounce` on the
+latter, which is what makes a board joining a running bus announce at all).
+
+That makes the acknowledgement load-bearing in a way it is not in RepRapFirmware, where the thing
+acknowledging and the thing recording are the same program. Here DuetCANMaster acknowledges while
+DuetControlServer records, so an announcement that reaches the first and not the second leaves that
+board in `boards[]` with a CAN address, live status readings and no identity - no name, no firmware
+version, no unique id - for as long as it stays on the bus. `CommandProcessor::ProcessReceivedMessage`
+therefore withholds the acknowledgement when the forward to a connected SBC failed, so the board
+repeats itself. With no SBC connected there is nothing to have reached and the replay on connect
+covers it, so that case still acknowledges.
+
+Applying the announcement replaces what is there rather than merging with it. config.g runs before any
+of this and addresses boards that may not be present, so `M569 P3.0` creates `boards[3]` with one
+driver and `state == unknown`; the board then announces three. What the board says wins, because
+`boards[]` describes the machine that is there.
+
 ### boards[0], which is not on the bus
 
 `boards[0]` is this program and DuetCANMaster (§1.4). It has no announcement and no board status

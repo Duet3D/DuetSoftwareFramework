@@ -78,7 +78,11 @@ void ExpansionManager::UpdateBoardState(CanAddress address, const BoardState& ne
 }
 
 // Process an announcement from an expansion board. Don't free the message buffer that it arrived in
-void ExpansionManager::ProcessAnnouncement(CanMessageBuffer& buf, bool isNewFormat) noexcept
+// acknowledge is false when the announcement could not be handed to a connected SBC. A board
+// announces until it is acknowledged and then goes quiet, so acknowledging one the SBC never saw
+// leaves that board nameless in boards[] until it resets or the link comes back and the replay runs.
+// Leaving it unacknowledged costs one more announcement and is the protocol's own retry.
+void ExpansionManager::ProcessAnnouncement(CanMessageBuffer& buf, bool isNewFormat, bool acknowledge) noexcept
 {
 	const CanAddress src = buf.id.Src();
 	if (src <= CanId::MaxCanAddress)
@@ -141,10 +145,13 @@ void ExpansionManager::ProcessAnnouncement(CanMessageBuffer& buf, bool isNewForm
 			UpdateBoardState(src, BoardState::Running);
 		}
 
-		// Tell the sending board that we don't need any more announcements from it. This overwrites the
-		// announcement in buf, so the caller must be done with it - see CommandProcessor::ProcessReceivedMessage
-		buf.SetupRequestMessageNoRid<CanMessageAcknowledgeAnnounce>(CanInterface::GetCanAddress(), src);
-		CanInterface::SendMessageNoReplyNoFree(buf);
+		if (acknowledge)
+		{
+			// Tell the sending board that we don't need any more announcements from it. This overwrites the
+			// announcement in buf, so the caller must be done with it - see CommandProcessor::ProcessReceivedMessage
+			buf.SetupRequestMessageNoRid<CanMessageAcknowledgeAnnounce>(CanInterface::GetCanAddress(), src);
+			CanInterface::SendMessageNoReplyNoFree(buf);
+		}
 	}
 }
 

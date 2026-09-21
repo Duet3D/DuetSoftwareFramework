@@ -248,6 +248,45 @@ public class BoardIdentityTests : SystemTests.Host.BenchFixture
     }
 
     /// <summary>
+    /// A board that was not on the bus when config.g ran is filled in when it later announces itself
+    /// </summary>
+    /// <remarks>
+    /// config.g addressing an absent board creates the entry in the unknown state with as many
+    /// drivers as it mentioned, which is what M959 and the driver codes need to record anything at
+    /// all. The announcement that follows has to replace all of that rather than merge with it: the
+    /// board says how many drivers it really has, and the entry it finds was built from what config.g
+    /// guessed
+    /// </remarks>
+    [Test]
+    public async Task ABoardThatJoinsAfterConfigIsFilledIn()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync(configExtra: $"M569 P{NewBoard}.0 S1");
+
+        Board blind = await bench.Host.ReadModelAsync(model => model.FindBoard(NewBoard)!);
+        Assert.Multiple(() =>
+        {
+            Assert.That(blind.State, Is.EqualTo(BoardState.Unknown), "nothing has been heard from it");
+            Assert.That(blind.Name, Is.Empty, "and it has said nothing about itself");
+            Assert.That(blind.Drivers, Has.Count.EqualTo(1), "only the one driver config.g mentioned");
+        });
+
+        bench.CanMaster.InjectAnnounce(NewBoard, "EXP3HC", "3.7.0-rc.1", "2026-09-08", numDrivers: 3, UniqueId);
+
+        Board joined = await bench.Host.WaitForModelAsync(model => model.FindBoard(NewBoard)!,
+                                                           found => found?.State == BoardState.Running,
+                                                           $"board {NewBoard} announced itself");
+        Assert.Multiple(() =>
+        {
+            Assert.That(joined.Name, Is.EqualTo("Duet 3 Expansion EXP3HC"));
+            Assert.That(joined.FirmwareVersion, Is.EqualTo("3.7.0-rc.1"));
+            Assert.That(joined.FirmwareFileName, Is.EqualTo("Duet3Firmware_EXP3HC.bin"));
+            Assert.That(joined.UniqueId, Is.EqualTo("6949f358594d32532020204638420eff"));
+            Assert.That(joined.MaxMotors, Is.EqualTo(3), "what the board says it has, not what config.g assumed");
+            Assert.That(joined.Drivers, Has.Count.EqualTo(3));
+        });
+    }
+
+    /// <summary>
     /// A board status report publishes the readings the board has and the features it claims
     /// </summary>
     /// <remarks>

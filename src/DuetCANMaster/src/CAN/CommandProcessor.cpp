@@ -303,7 +303,8 @@ void CommandProcessor::ProcessReceivedMessage(CanMessageBuffer& buf) noexcept
 			// There is nowhere to put a message the SBC cannot take: the buffer is about to be reused
 			// and the bus has moved on, so this is where the reply is lost and where saying so is the
 			// only record of it
-			if (!ForwardMessageToSbc(buf))
+			const bool forwarded = ForwardMessageToSbc(buf);
+			if (!forwarded)
 			{
 #  if HAS_SBC_INTERFACE
 				reprap.GetSbcInterface().NoteCanResponseDropped();
@@ -330,7 +331,12 @@ void CommandProcessor::ProcessReceivedMessage(CanMessageBuffer& buf) noexcept
 
 			case CanMessageType::announceV0:
 			case CanMessageType::announceV1:
-				reprap.GetExpansion().ProcessAnnouncement(buf, id == CanMessageType::announceV1);
+				// Acknowledged only once the announcement has been handed to the SBC. A board
+				// announces until it is acknowledged and then goes quiet, so acknowledging one that
+				// went nowhere loses that board from boards[] for as long as it stays on the bus.
+				// Withholding costs one repeated announcement per status cycle, which is the
+				// protocol's own retry.
+				reprap.GetExpansion().ProcessAnnouncement(buf, id == CanMessageType::announceV1, forwarded);
 				break;
 
 			case CanMessageType::boardStatusReportV0:

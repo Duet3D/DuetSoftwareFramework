@@ -34,6 +34,20 @@ Tracking known issues to keep Github issues from being spammed by issues for the
   `CanSenderTask` rather than sending them inline: the outcome is already reported asynchronously
   through `ReportCanMessageSent`, so nothing else would have to move.
 
+## RepRapFirmware (upstream)
+
+### An MB6HC in expansion mode never re-announces itself, so it disappears from `boards[]`
+- [ ] `CanInterface::mainBoardAcknowledgedAnnounce` is a one-way latch in RepRapFirmware: set once by
+  `MainBoardAcknowledgedAnnounce()` and never cleared. Duet3Expansion clears it in
+  `UpdateSyncLockState` when time sync is regained after a loss, which is what makes a board announce
+  again after the main board restarts. RepRapFirmware in expansion mode has no equivalent at all - no
+  `syncLockLost`, no sync-loss timeout, no heater shutdown - so once acknowledged it is silent for the
+  rest of its uptime. Restart DuetCANMaster and that board's `boards[]` entry has a CAN address and
+  live readings and no identity until it is reset.
+
+  Nothing on this side can recover it: the board will not speak, DuetCANMaster has nothing to replay,
+  and the protocol has no way to ask. To be reported upstream; `M999 B<n>` is the workaround.
+
 ## Duet3Expansion
 
 ### Pressure Advance Race

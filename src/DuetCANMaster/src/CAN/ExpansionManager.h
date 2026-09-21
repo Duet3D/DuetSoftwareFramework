@@ -43,7 +43,7 @@ class ExpansionManager
 	unsigned int GetNumExpansionBoards() const noexcept { return m_numExpansionBoards; }
 	const ExpansionBoardData* _ecv_null GetBoardDetails(uint8_t address) const noexcept;
 
-	void ProcessAnnouncement(CanMessageBuffer& buf, bool isNewFormat) noexcept;
+	void ProcessAnnouncement(CanMessageBuffer& buf, bool isNewFormat, bool acknowledge) noexcept;
 	void ProcessBoardStatusReport(const CanMessageBuffer& buf) noexcept;
 	void BeginReplayToSbc() noexcept;
 	void ContinueReplayToSbc() noexcept;
