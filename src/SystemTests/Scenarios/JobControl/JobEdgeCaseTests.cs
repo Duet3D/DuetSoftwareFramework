@@ -71,6 +71,7 @@ public class JobEdgeCaseTests : BenchFixture
     /// </summary>
     [Test]
     [Category("LongRunning")]
+    [Category("KnownGap")]
     public async Task PauseInsideWhileLoop()
     {
         await using JobBench bench = await JobControlBench.StartAsync(

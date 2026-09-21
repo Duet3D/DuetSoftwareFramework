@@ -70,7 +70,6 @@ public class DriverConfigM569Tests : BenchFixture
     /// write it to would otherwise degenerate into a report
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M569Point2WithoutRIsRefused()
     {
         await using JobBench bench = await DriversBench.StartAsync();
@@ -98,7 +97,6 @@ public class DriverConfigM569Tests : BenchFixture
     /// </remarks>
     [TestCase(DriversBench.ClosedLoopBoard, (byte)0)]
     [TestCase(DriversBench.MainDriverBoard, (byte)3)]
-    [Category("KnownGap")]
     public async Task M569SetsDirection(byte board, byte driver)
     {
         await using JobBench bench = await DriversBench.StartAsync();
@@ -157,7 +155,6 @@ public class DriverConfigM569Tests : BenchFixture
     /// "Driver number 1.6 out of range"
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M569OnAnUnknownDriverReportsTheBoardsRefusal()
     {
         const string refusal = "Driver number 1.6 out of range";
@@ -196,7 +193,6 @@ public class DriverConfigM569Tests : BenchFixture
     /// model entries are rrf-differences.md section 3
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M569ChopperParametersReachTheDriverAndAreRecorded()
     {
         await using JobBench bench = await DriversBench.StartAsync();
@@ -281,7 +277,6 @@ public class DriverConfigM569Tests : BenchFixture
     [TestCase(3, DriverMode.StealthChop)]
     [TestCase(4, DriverMode.Direct)]
     [TestCase(5, DriverMode.Unknown)]
-    [Category("KnownGap")]
     public async Task M569DSelectsTheDriverMode(int mode, DriverMode expected)
     {
         await using JobBench bench = await DriversBench.StartAsync();
@@ -303,7 +298,6 @@ public class DriverConfigM569Tests : BenchFixture
     /// </summary>
     /// <remarks><c>testcases/drivers/m569-driver-mode-stealthchop.yaml</c> sends D3 and V300 together</remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M569VSetsTheStealthChopThreshold()
     {
         await using JobBench bench = await DriversBench.StartAsync();
@@ -335,7 +329,6 @@ public class DriverConfigM569Tests : BenchFixture
     /// reports back the rounded-up values it applied, which is its business rather than this side's
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M569TCarriesTheStepPulseTiming()
     {
         await using JobBench bench = await DriversBench.StartAsync();

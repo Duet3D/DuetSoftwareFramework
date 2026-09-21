@@ -31,7 +31,6 @@ public class StallDetectionAndPhaseStepTests : BenchFixture
     /// <c>stallDetection</c> because stall configuration had no home at all
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M915PConfiguresOneDriver()
     {
         await using JobBench bench = await DriversBench.StartAsync();
