@@ -29,6 +29,18 @@ REALTIME_CORE_SRC_DIR="$REPO_ROOT/src/DuetRealtimeCore"
 REALTIME_CORE_LIB_NAME="libduet_realtime_core.so"
 DEFAULT_SYSROOT="$REALTIME_CORE_SRC_DIR/pi-sysroot"
 
+# DuetPiManagementPlugin is a DSF plugin, not a service: DuetPluginService runs it out of the plugin
+# directory, and DuetControlServer only starts it if the manifest beside it declares the DSF version
+# that is running. So the plugin is staged into the layout the package installs rather than collated
+# into the binary directory with the services, and its manifest is regenerated on every build.
+# The project name in PROJECT_SRC and the plugin id in the manifest are the same string
+PLUGIN_ID=DuetPiManagementPlugin
+PLUGIN_COMMON_DIR="$REPO_ROOT/pkg/common/duetpimanagementplugin/opt/dsf/plugins"
+PLUGIN_INSTALL_DIR="/opt/dsf/plugins"
+# Files the packaging marks executable; the plugin runs them by name, so a lost +x bit is a runtime
+# failure rather than a build one
+PLUGIN_EXECUTABLES=(gen-https-cert.sh install-dsf.sh)
+
 declare -A PROJECT_POSTINST=(
     [DuetControlServer]="pkg/deb/duetcontrolserver/DEBIAN/postinst"
     [DuetPiManagementPlugin]="pkg/deb/duetpimanagementplugin/DEBIAN/postinst"
@@ -89,6 +101,12 @@ Notes:
   DuetRealtimeCore is the native SPI transfer loop (libduet_realtime_core.so) that DuetControlServer
   P/Invokes into. DCS cannot run without it, so selecting DuetControlServer builds it too.
 
+  DuetPiManagementPlugin is a plugin rather than a service. It is staged into a "plugins" directory
+  beside the build directory and deployed to $PLUGIN_INSTALL_DIR, which is where DuetPluginService
+  runs it from; it is not copied in with the binaries. Its manifest is regenerated from
+  src/Directory.Build.props on every build, because DCS refuses to start a plugin whose manifest
+  names a different DSF version than the one it is running.
+
   Because a shared library links glibc dynamically, the .so must not need a newer glibc than the
   target has. The devcontainer is Debian Bookworm and so targets the same glibc 2.36 as Raspberry
   Pi OS Bookworm, meaning a plain cross-build is deployable and no sysroot is involved. To target
@@ -142,6 +160,12 @@ if [[ -z "$BUILD_DIR" ]]; then
     fi
 fi
 echo "Build directory: $BUILD_DIR"
+
+# The plugin is staged next to the binaries rather than inside them, so that the binary directory
+# stays a faithful picture of /opt/dsf/bin and can be synced with --delete
+PLUGIN_BUILD_DIR="$(dirname "$BUILD_DIR")/plugins"
+PLUGIN_STAGE_DIR="$PLUGIN_BUILD_DIR/$PLUGIN_ID"
+PLUGIN_MANIFEST="$PLUGIN_BUILD_DIR/$PLUGIN_ID.json"
 
 if $ALL; then
     SELECTED=("${ALL_PROJECTS[@]}")
@@ -298,16 +322,63 @@ project_publish_dir() {
 }
 
 # Merge the per-project publish directories into BUILD_DIR. The projects share most of their
-# dependencies, so the copies overlap; later copies simply overwrite identical files.
+# dependencies, so the copies overlap; later copies simply overwrite identical files. The plugin is
+# left out: it is staged by stage_plugin() into the layout it is installed in, and its own copies of
+# the shared assemblies must not land in the binary directory.
 collect_output() {
     echo "=== Collecting publish output into $BUILD_DIR ==="
     local project publish_dir
     for project in "${SELECTED[@]}"; do
-        [[ "$project" == "DuetRealtimeCore" ]] && continue
+        [[ "$project" == "DuetRealtimeCore" || "$project" == "$PLUGIN_ID" ]] && continue
         publish_dir="$(project_publish_dir "$project")"
         cp -a "$publish_dir/." "$BUILD_DIR/"
         echo "    $project <- $publish_dir"
     done
+}
+
+# Build the plugin directory the way the package does: the publish output and the configuration
+# files that ship with it under dsf/, and a manifest beside it listing what ended up there.
+stage_plugin() {
+    echo "=== Staging $PLUGIN_ID into $PLUGIN_BUILD_DIR ==="
+
+    local publish_dir version executable
+    publish_dir="$(project_publish_dir "$PLUGIN_ID")"
+
+    # DCS compares the manifest's sbcDsfVersion against its own version component by component, so
+    # the version has to come from the same place the assemblies get theirs
+    version="$(xmllint --xpath "string(//Project/PropertyGroup/Version)" "$REPO_ROOT/src/Directory.Build.props")"
+    if [[ -z "$version" ]]; then
+        echo "Error: could not read the DSF version from src/Directory.Build.props" >&2
+        exit 1
+    fi
+
+    # Rebuild from scratch so that a file dropped from the project does not survive in the staged
+    # plugin and go on being listed in dsfFiles
+    rm -rf "$PLUGIN_STAGE_DIR" "$PLUGIN_MANIFEST"
+    mkdir -p "$PLUGIN_STAGE_DIR/dsf"
+
+    # Debug symbols and documentation are no use on the target and only inflate the manifest
+    rsync -a --exclude='*.dbg' --exclude='*.pdb' --exclude='*.xml' "$publish_dir/." "$PLUGIN_STAGE_DIR/dsf/"
+    rsync -a "$PLUGIN_COMMON_DIR/$PLUGIN_ID/." "$PLUGIN_STAGE_DIR/"
+    for executable in "${PLUGIN_EXECUTABLES[@]}"; do
+        if [[ -f "$PLUGIN_STAGE_DIR/dsf/$executable" ]]; then
+            chmod +x "$PLUGIN_STAGE_DIR/dsf/$executable"
+        fi
+    done
+
+    # dsfFiles is what an uninstall removes, so it has to name what was actually staged
+    jq --arg version "$version" \
+       --argjson files "$(find "$PLUGIN_STAGE_DIR/dsf" -type f -printf '%f\n' | sort | jq -R -s -c 'split("\n")[:-1]')" \
+       '.version = $version | .sbcDsfVersion = $version | .dsfFiles = $files' \
+       "$PLUGIN_COMMON_DIR/$PLUGIN_ID.json" > "$PLUGIN_MANIFEST"
+
+    # Earlier versions of this script collated the plugin in with the services, so a build directory
+    # carried over from one of those still holds its binaries and would keep pushing them to
+    # /opt/dsf/bin. Only the plugin's own files are dropped; the assemblies it shares with the
+    # services belong there on their own account
+    rm -f "$BUILD_DIR/$PLUGIN_ID" "$BUILD_DIR/$PLUGIN_ID".*
+
+    echo "    $PLUGIN_ID $version <- $publish_dir"
 }
 
 if ! $SKIP_BUILD; then
@@ -366,6 +437,10 @@ if ! $SKIP_BUILD; then
     if [[ ${#DOTNET_PROJECTS[@]} -gt 0 ]]; then
         collect_output
     fi
+
+    if [[ " ${SELECTED[*]} " == *" $PLUGIN_ID "* ]]; then
+        stage_plugin
+    fi
 fi
 
 if ! $DEPLOY; then
@@ -388,12 +463,43 @@ fi
 RSYNC_OPTS="-rav --exclude='*.dbg' --exclude='*.pdb' --exclude='*.xml'"
 $ALL && RSYNC_OPTS="$RSYNC_OPTS --delete"
 
-if $LOCAL; then
-    echo "=== Syncing binaries to /opt/dsf/bin/ ==="
-    sudo rsync $RSYNC_OPTS "$BUILD_DIR/" /opt/dsf/bin/
-else
-    echo "=== Syncing binaries to ${TARGET}:/opt/dsf/bin/ ==="
-    rsync $RSYNC_OPTS "$BUILD_DIR/" "${SSH_USER}@${TARGET}:/opt/dsf/bin/"
+# Nothing but the plugin writes to BUILD_DIR when the plugin is the only selection, and BUILD_DIR may
+# still hold an earlier build, so syncing it would push binaries this run never produced
+SYNC_BIN=false
+for project in "${SELECTED[@]}"; do
+    [[ "$project" == "$PLUGIN_ID" ]] || SYNC_BIN=true
+done
+
+if $SYNC_BIN; then
+    if $LOCAL; then
+        echo "=== Syncing binaries to /opt/dsf/bin/ ==="
+        sudo rsync $RSYNC_OPTS "$BUILD_DIR/" /opt/dsf/bin/
+    else
+        echo "=== Syncing binaries to ${TARGET}:/opt/dsf/bin/ ==="
+        rsync $RSYNC_OPTS "$BUILD_DIR/" "${SSH_USER}@${TARGET}:/opt/dsf/bin/"
+    fi
+fi
+
+# --- Sync the plugin ---
+# The plugin directory is synced with --delete so a removed file does not linger, but the plugin
+# directory only: other plugins live beside it and must survive a deploy. The manifest is copied
+# separately for the same reason, and because the package makes it read-only, which rsync would
+# otherwise have to work around.
+if [[ " ${SELECTED[*]} " == *" $PLUGIN_ID "* ]]; then
+    if [[ ! -d "$PLUGIN_STAGE_DIR" ]]; then
+        echo "Error: $PLUGIN_ID has not been staged in $PLUGIN_BUILD_DIR; run without --skip-build first" >&2
+        exit 1
+    fi
+
+    if $LOCAL; then
+        echo "=== Syncing $PLUGIN_ID to $PLUGIN_INSTALL_DIR/ ==="
+        sudo rsync -rav --delete "$PLUGIN_STAGE_DIR/" "$PLUGIN_INSTALL_DIR/$PLUGIN_ID/"
+        sudo install -m 660 "$PLUGIN_MANIFEST" "$PLUGIN_INSTALL_DIR/$PLUGIN_ID.json"
+    else
+        echo "=== Syncing $PLUGIN_ID to ${TARGET}:$PLUGIN_INSTALL_DIR/ ==="
+        rsync -rav --delete "$PLUGIN_STAGE_DIR/" "${SSH_USER}@${TARGET}:$PLUGIN_INSTALL_DIR/$PLUGIN_ID/"
+        rsync -av --chmod=F660 "$PLUGIN_MANIFEST" "${SSH_USER}@${TARGET}:$PLUGIN_INSTALL_DIR/$PLUGIN_ID.json"
+    fi
 fi
 
 # --- Run postinst scripts for selected projects that have one (in parallel) ---

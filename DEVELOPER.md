@@ -249,11 +249,16 @@ What the task flow does:
 1. Stops DSF services on the target.
 2. Builds components locally into build/.
 3. Copies build output to /opt/dsf/bin/ on the target via rsync.
-4. Starts DSF services again.
+4. Copies DuetPiManagementPlugin to /opt/dsf/plugins/ on the target, manifest included.
+5. Starts DSF services again.
 
 Notes:
 
 - The remote commands use the root account by default.
+- DuetPiManagementPlugin is a plugin, not a service, so it is deployed to the plugin directory
+  DuetPluginService runs it from rather than to /opt/dsf/bin/. Its manifest is regenerated from
+  src/Directory.Build.props on every build, because DuetControlServer refuses to start a plugin
+  whose manifest names a different DSF version than the one it is running.
 - Ensure SSH access is configured to the target machine.
 - Ensure Docker container networking can reach the target IP.
 
