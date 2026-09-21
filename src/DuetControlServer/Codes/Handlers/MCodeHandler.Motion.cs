@@ -1,18 +1,19 @@
-using DuetAPI.ObjectModel;
-using DuetAPI.Utility;
-using DuetControlServer.Link.Protocol.CanMessages;
-using DuetControlServer.Link.Protocol.Shared;
-using DuetControlServer.Link;
-using DuetControlServer.Motion;
-using DuetControlServer.Motion.Kinematics;
-using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using System;
+using DuetAPI.ObjectModel;
+using DuetAPI.Utility;
+using DuetAPI;
+using DuetControlServer.Link.Protocol.CanMessages;
+using DuetControlServer.Link.Protocol.Shared;
+using DuetControlServer.Link;
+using DuetControlServer.Motion.Kinematics;
+using DuetControlServer.Motion;
 
 namespace DuetControlServer.Codes.Handlers;
 
@@ -949,6 +950,19 @@ internal partial class MCodeHandler
 
         CanAddresses.CheckAddressHasHardware(driver.Board, $"Driver {driver}");
 
+        if (code.MinorNumber == ClosedLoopDataSubCommand)
+        {
+            return await closedLoopDataCollector.StartAsync(driver, code, linkInterface, cancellationToken);
+        }
+
+        // A register value with no register number to write it to would degenerate into a report,
+        // so M569.2 refuses it before anything is sent (RRF CanInterface.cpp ConfigureRemoteDriver
+        // case 2)
+        if (code.MinorNumber == 2 && code.HasParameter('V'))
+        {
+            code.MustSee('R');
+        }
+
         Message reply = code.MinorNumber switch
         {
             <= 0 => await SendDriverConfigAsync<CanMessageM569>(driver, code, cancellationToken),
@@ -960,7 +974,11 @@ internal partial class MCodeHandler
             _ => throw new NotSupportedException($"M569.{code.MinorNumber} is not supported")
         };
 
-        if (code.MinorNumber <= 0)
+        // Only what a board took is recorded. A driver it refused - one past the end of the board, say
+        // - has no configuration to remember, and creating an entry for it would put a driver in the
+        // object model that the machine does not have (RRF GCodes3.cpp ConfigureDriver stores the
+        // direction and the mode under the same guard, `res <= GCodeResult::warning`)
+        if (code.MinorNumber <= 0 && reply.Succeeded())
         {
             await RecordDriverConfigAsync(driver, code, cancellationToken);
         }
@@ -1184,6 +1202,9 @@ internal partial class MCodeHandler
             }
         }
     }
+
+    /// <summary>M569.5 collects closed loop data from a driver and writes it to a file</summary>
+    private const int ClosedLoopDataSubCommand = 5;
 
     /// <summary>M970.1 sets the velocity feedforward gain</summary>
     private const int KvSubCommand = 1;

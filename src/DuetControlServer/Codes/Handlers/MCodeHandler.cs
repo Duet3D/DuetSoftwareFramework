@@ -66,6 +66,7 @@ internal partial class MCodeHandler(
     FilePathResolver filePathResolver,
     LinkInterface linkInterface,
     Link.Expansion.ExpansionBoardManager expansionBoardManager,
+    Link.Expansion.ClosedLoopDataCollector closedLoopDataCollector,
     Model.ObjectModel model,
     MQTT mqtt,
     SbcTriggerService sbcTriggerService,
@@ -328,7 +329,7 @@ internal partial class MCodeHandler(
         // Tool settings
         { 568, CodeClass.Deferred, (h, c, ct) => h.HandleToolSettingsAsync(c, ct) },
         // Configure a stepper driver and its subfunctions; unlisted minors have no row
-        { [569, (569, 1), (569, 2), (569, 4), (569, 6), (569, 7)], CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleDriverConfigAsync(c, ct) },
+        { [569, (569, 1), (569, 2), (569, 4), (569, 5), (569, 6), (569, 7)], CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleDriverConfigAsync(c, ct) },
         // Heater fault detection
         { 570, CodeClass.Immediate, (h, c, ct) => h.HandleHeaterFaultDetectionAsync(c, ct) },
         // Set pressure advance. TODO the value already rides the move on the SBC side; the

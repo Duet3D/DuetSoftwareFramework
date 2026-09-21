@@ -34,6 +34,7 @@ public static partial class ServiceCollectionExtensions
     {
         return services
             .AddSingleton<Native.NativeLink>()
+            .AddSingleton<Expansion.ClosedLoopDataCollector>()
             .AddSingleton<Expansion.ExpansionBoardManager>()
             .AddHostedService(services => services.GetRequiredService<Expansion.ExpansionBoardManager>())
             .AddSingleton<LinkInterface>()

@@ -28,7 +28,9 @@ public class ExpansionBoardManagerTests
                                                         NullLogger<DuetControlServer.Model.ObjectModel>.Instance,
                                                         Options.Create(new Settings()));
         events = new DuetControlServer.Events.EventQueue(NullLogger<DuetControlServer.Events.EventQueue>.Instance);
-        return new ExpansionBoardManager(model, events, Options.Create(new Settings()),
+        DuetControlServer.Link.Expansion.ClosedLoopDataCollector closedLoop =
+            new(null!, model, NullLogger<DuetControlServer.Link.Expansion.ClosedLoopDataCollector>.Instance);
+        return new ExpansionBoardManager(model, events, closedLoop, Options.Create(new Settings()),
                                          NullLogger<ExpansionBoardManager>.Instance);
     }
 

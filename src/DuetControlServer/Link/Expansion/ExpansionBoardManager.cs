@@ -43,6 +43,7 @@ namespace DuetControlServer.Link.Expansion;
 /// <param name="model">Object model</param>
 /// <param name="logger">Logger</param>
 internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.EventQueue events,
+                                           ClosedLoopDataCollector closedLoopDataCollector,
                                            IOptions<Settings> settings, ILogger<ExpansionBoardManager> logger) : BackgroundService
 {
     /// <summary>
@@ -111,6 +112,7 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
             case CanMessageType.FansReport:
             case CanMessageType.InputStateChangedV1:
             case CanMessageType.InputStateChangedV2:
+            case CanMessageType.ClosedLoopData:
             case CanMessageType.FilamentMonitorsStatusReportV2:
             case CanMessageType.Event:
             case CanMessageType.DebugText:
@@ -269,6 +271,12 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
                     CanMessageInputChangedV2 changed = CanMessageSerializer.Deserialize<CanMessageInputChangedV2>(report.Payload);
                     await ApplyInputChangedAsync(changed.States, changed.NumHandles, changed.GetEntryHandle, cancellationToken);
                 }
+                break;
+
+            case CanMessageType.ClosedLoopData:
+                await closedLoopDataCollector.ProcessDataAsync(report.Source,
+                                                               CanMessageSerializer.Deserialize<CanMessageClosedLoopData>(report.Payload),
+                                                               report.Payload, cancellationToken);
                 break;
 
             case CanMessageType.FilamentMonitorsStatusReportV2:
