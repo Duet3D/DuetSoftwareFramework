@@ -130,9 +130,13 @@ public sealed class Settings
     public string PluginDirectory { get; set; } = "/opt/dsf/plugins";
 
     /// <summary>
-    /// Internal model update interval after which properties of the machine model from
-    /// the host controller (e.g. network information and mass storage devices) are updated (in ms)
+    /// Interval at which the network interfaces and the mounted volumes are walked (in ms)
     /// </summary>
+    /// <remarks>
+    /// Slower than <see cref="ModelUpdateInterval"/> because this walk spawns a subprocess per
+    /// interface to tell a DHCP lease from a static address, and reads the size of every mounted
+    /// volume, which a network mount can be slow to answer. Neither changes from one second to the next
+    /// </remarks>
     public int HostUpdateInterval { get; set; } = 4000;
 
     /// <summary>

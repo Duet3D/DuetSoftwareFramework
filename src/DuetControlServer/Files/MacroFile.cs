@@ -23,7 +23,6 @@ namespace DuetControlServer.Files;
 public sealed class MacroFile : CodeFile, IDisposable
 {
     // Private fields
-    private readonly CodeFactory _codeFactory;
     private readonly CodeProcessor _codeProcessor;
     private readonly EventLogger _eventLogger;
     private readonly Model.ObjectModel _model;
@@ -140,7 +139,6 @@ public sealed class MacroFile : CodeFile, IDisposable
     {
         SourceConnection = sourceConnection;
 
-        _codeFactory = codeFactory;
         _codeProcessor = codeProcessor;
         _eventLogger = eventLogger;
         _model = model;
@@ -183,7 +181,6 @@ public sealed class MacroFile : CodeFile, IDisposable
     {
         SourceConnection = sourceConnection;
 
-        _codeFactory = codeFactory;
         _codeProcessor = codeProcessor;
         _eventLogger = eventLogger;
         _model = model;
@@ -227,7 +224,6 @@ public sealed class MacroFile : CodeFile, IDisposable
         IsDsfConfig = copyFrom.IsDsfConfig;
         IsAborted = copyFrom.IsAborted;
 
-        _codeFactory = copyFrom._codeFactory;
         _codeProcessor = copyFrom._codeProcessor;
         _eventLogger = copyFrom._eventLogger;
         _model = copyFrom._model;
@@ -295,65 +291,12 @@ public sealed class MacroFile : CodeFile, IDisposable
     }
 
     /// <summary>
-    /// Extra steps to perform before config.g is processed
-    /// </summary>
-    private enum ConfigExtraSteps
-    {
-        SendHostname,
-        SendDateTime,
-        Done
-    }
-
-    /// <summary>
-    /// Current extra step being performed (provided config.g is being executed)
-    /// </summary>
-    private ConfigExtraSteps _extraConfigStep = ConfigExtraSteps.SendHostname;
-
-    /// <summary>
     /// Read the next available code asynchronously
     /// </summary>
     /// <returns>Read code</returns>
     private async ValueTask<Code?> ReadCodeAsync()
     {
-        Code? result;
-
-        // When executing config.g, perform some extra steps...
-        if (IsConfig)
-        {
-            switch (_extraConfigStep)
-            {
-                case ConfigExtraSteps.SendHostname:
-                    result = _codeFactory.Create();
-                    result.Channel = Channel;
-                    result.File = this;
-                    result.Flags = CodeFlags.IsInternallyProcessed;        // don't check our own hostname
-                    result.Type = CodeType.MCode;
-                    result.MajorNumber = 550;
-                    result.Parameters.Add(new CodeParameter('P', Environment.MachineName));
-                    _extraConfigStep = ConfigExtraSteps.SendDateTime;
-                    break;
-
-                case ConfigExtraSteps.SendDateTime:
-                    result = _codeFactory.Create();
-                    result.Channel = Channel;
-                    result.File = this;
-                    result.Flags = CodeFlags.IsInternallyProcessed;        // don't check our own datetime
-                    result.Type = CodeType.MCode;
-                    result.MajorNumber = 905;
-                    result.Parameters.Add(new CodeParameter('P', DateTime.Now.ToString("yyyy-MM-dd")));
-                    result.Parameters.Add(new CodeParameter('S', DateTime.Now.ToString("HH:mm:ss")));
-                    _extraConfigStep = ConfigExtraSteps.Done;
-                    break;
-
-                default:
-                    result = await base.ReadCodeAsync();
-                    break;
-            }
-        }
-        else
-        {
-            result = await base.ReadCodeAsync();
-        }
+        Code? result = await base.ReadCodeAsync();
 
         // Update code information
         if (result is not null)

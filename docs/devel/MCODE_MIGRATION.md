@@ -949,6 +949,58 @@ consequence: every ⬜ row in §5 is now a *visible* error at runtime rather tha
 is the point, but it also means a config.g written for RRF will report a lot of errors until the
 remaining phases land.
 
+### The host facts the SBC publishes
+
+`PeriodicUpdateService` polls what only the Linux machine can state and writes it into the object
+model: `sbc.cpu`, `sbc.memory` and `sbc.uptime` from `/proc`, `volumes[]` from the mount table,
+`network.interfaces[]` from the interface list, `state.time` and `state.upTime`, and the expiry of
+messages older than `MaxMessageAge`. RepRapFirmware reads the equivalents off its own hardware in
+`RepRap::Spin`; the SBC is the main board here, so this poll is where they come from.
+
+It used to publish three of those facts by generating M550, M905 and M552 with
+`CodeFlags.IsInternallyProcessed` so that they bypassed DSF and went over SPI to RepRapFirmware, which
+held its own copy of the name, an RTC and a 12864 display. None of those exist now, and a code
+carrying that flag reaches the post stage with no interceptor and is answered `Command is not
+supported`, so all three are object model writes instead:
+
+| Was sent as | Is now |
+|---|---|
+| M550 P`<hostname>` when the Linux hostname changed | `network.hostname` and `network.name` written directly |
+| M905 P`<date>` S`<time>` when the system clock jumped | `state.time` written every poll, so a jump needs no detecting |
+| M552 P`<ip>` when the address changed, for the 12864 display | nothing: `network.interfaces[].actualIP` already carries it |
+
+`network.name` follows the hostname because M550 refuses a name the hostname does not match, so a name
+chosen under the old hostname is one the machine could no longer be renamed to.
+
+`state.upTime` is this program's uptime rather than the SBC's, which is what `sbc.uptime` holds:
+RepRapFirmware's is the main board's time since reset, and this program is the main board. The two
+differ by however long the machine was up before DSF started.
+
+**The poll is split in two, because one part of it is 80% of the cost.** Measured over 30 iterations
+on an x86 development machine with one ethernet interface, a tick that did everything took 2.59 ms, of
+which 2.07 ms was the single `ip -4 address show dev eth0` the DHCP detection spawns. A WiFi interface
+adds `iwgetid`, so the subprocesses scale with the interfaces while everything else is fixed. The
+readings are therefore taken every `ModelUpdateInterval` (100 ms, the rate the object model's live
+values are refreshed at) and the walk over the interfaces and the volumes every `HostUpdateInterval`
+(4 s, its existing default and meaning narrowed to this walk). Neither a DHCP lease nor a volume's
+size changes from one second to the next, and the walk is also the part that can block, since asking
+an unreachable network mount for its size does not return promptly.
+
+`sbc.cpu.avgLoad` is the load since the previous reading, not the average since boot. `/proc/stat`
+counts from boot, so the totals alone describe the whole uptime however often they are read; the
+share of the interval that was not spent idle is what a client watching the machine get busy needs.
+The first reading has nothing to compare against and reports no load.
+
+`state.time` is truncated to the second it is published in: the object model serialises it with the
+`"s"` format, so writing it more often than once a second patches every subscriber with a value that
+serialises identically. `state.msUpTime` is the one field that does change on every tick, which is
+what it is for.
+
+Two things follow from the poll running at all. `volumes[]` is populated, so `n:/...` paths resolve
+through real mount points and M21, M22 and M39 have a volume to describe. And the seq bumps the loop
+used to make (`linkInterface.ObjectModelKeyChanged`) are gone: subscribers are served by `Observer`
+watching the model, so a write is the notification.
+
 ### A port name has to name an expansion board
 
 Rule §1.4 says only CAN-attached hardware exists here, and port names are where that rule meets what
@@ -1255,6 +1307,19 @@ Every macro RRF invokes, taken from its `DoFileMacro` call sites and the filenam
 | `deployprobe<n>.g`, `retractprobe<n>.g` | M401, M402 and probing moves | ✅ including the redeploy a BLTouch needs between taps |
 | `tfree<n>.g`, `tpre<n>.g`, `tpost<n>.g` | T-codes | ✅ see §16.1 |
 | `filaments/<name>/load.g`, `unload.g`, `config.g` | M701, M702, M703 | ⬜ blocked: the filament codes are not ported |
+
+### config.g is run as written
+
+Nothing is prepended to it. `network.hostname` and `network.name` are seeded from the Linux hostname
+when the object model is constructed ([ObjectModel.cs](../../src/DuetControlServer/Model/ObjectModel.cs)),
+and the machine clock is the SBC clock, so there is no RTC for an M905 to set. A synthetic code
+carrying `IsInternallyProcessed` would in any case skip its own handler, reach the post stage with no
+interceptor and be answered `Command is not supported`, because the firmware stage it used to be
+routed to no longer exists.
+
+The hostname changing while DSF runs is handled the other way round, by
+[PeriodicUpdateService](../../src/DuetControlServer/Model/PeriodicUpdateService.cs) writing the object
+model directly; see §8's note on the host facts.
 
 ### A code no handler recognises runs a macro named after it
 

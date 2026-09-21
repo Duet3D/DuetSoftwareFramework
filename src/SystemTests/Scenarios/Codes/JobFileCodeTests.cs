@@ -226,7 +226,6 @@ public class JobFileCodeTests : SystemTests.Host.BenchFixture
     /// GCodes2.cpp case 21 mounts the card and case 39 reports the same values, with S2 giving them
     /// as the SDinfo JSON object
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M21MountsTheCardAndM39ReportsIt()
     {

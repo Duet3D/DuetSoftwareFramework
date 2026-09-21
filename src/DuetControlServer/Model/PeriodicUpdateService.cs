@@ -1,14 +1,9 @@
-﻿using DuetAPI;
-using DuetAPI.Commands;
-using DuetAPI.ObjectModel;
-using DuetControlServer.Codes;
-using DuetControlServer.Link;
+﻿using DuetAPI.ObjectModel;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -18,23 +13,37 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Code = DuetControlServer.Commands.Code;
 
 namespace DuetControlServer.Model;
 
 /// <summary>
-/// Static class that updates the machine model in certain intervals
+/// Publishes the facts only the Linux machine can state
 /// </summary>
+/// <remarks>
+/// RepRapFirmware reads the equivalents off its own hardware in <c>RepRap::Spin</c>; the SBC is the
+/// main board here, so its CPU, memory, uptime, mounted volumes, network interfaces, clock and
+/// hostname are read from the system and written straight into the object model. The readings cost a
+/// few reads from <c>/proc</c> and are taken every <see cref="Settings.ModelUpdateInterval"/>;
+/// walking the interfaces and the volumes spawns a subprocess per interface and asks every mount for
+/// its size, so it keeps the slower <see cref="Settings.HostUpdateInterval"/> of its own
+/// </remarks>
 /// <param name="model">Object model</param>
 /// <param name="logger">Logger instance</param>
 /// <param name="settings">Settings of the application</param>
 public partial class PeriodicUpdateService(
-    // CodeFactory codeFactory,
-    // LinkInterface linkInterface,
     ObjectModel model,
     ILogger<PeriodicUpdateService> logger,
     IOptions<Settings> settings) : BackgroundService
 {
+    /// <summary>
+    /// Where the Linux hostname is read from on each update
+    /// </summary>
+    /// <remarks>
+    /// Read through a delegate because a system test cannot rename the machine it runs on, and the
+    /// hostname changing under a running DuetControlServer is the behaviour that has to be covered
+    /// </remarks>
+    internal Func<string> HostnameSource { get; set; } = () => Environment.MachineName;
+
     /// <summary>
     /// List of enabled protocols
     /// </summary>
@@ -126,32 +135,46 @@ public partial class PeriodicUpdateService(
     }
 
     /// <summary>
-    /// Run model updates in a certain interval.
-    /// This function updates host properties like network interfaces and storage devices
+    /// Poll the host for as long as the program runs, taking the readings every
+    /// <see cref="Settings.ModelUpdateInterval"/> and the walk over the interfaces and the volumes
+    /// every <see cref="Settings.HostUpdateInterval"/>
     /// </summary>
     /// <param name="stoppingToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        string lastHostname = HostnameSource();
+        Stopwatch upTime = Stopwatch.StartNew();
+        Stopwatch sinceWalk = new();
+
         try
         {
-#if false
-// TODO this uses the old SPI interface. Some of the functionality might need to be retained
-            TimeSpan measuredDelay = TimeSpan.Zero;
-            string lastHostname = Environment.MachineName;
-            bool updateNetworkSeq, updateVolumesSeq;
-            string? lastIPAddress = null;
-
             do
             {
                 try
                 {
-                    // Gather data outside the lock on a background thread (slow I/O, not cancellable)
-                    var gatherTask = Task.Run(async () =>
+                    // The readings are taken on every tick; the walk over the interfaces and the
+                    // volumes is taken on its own slower one, because it spawns a subprocess per
+                    // interface and asks every mount for its size. sinceWalk is not running until
+                    // the first walk, so the first tick takes both
+                    bool walkDue = !sinceWalk.IsRunning || sinceWalk.ElapsedMilliseconds >= settings.Value.HostUpdateInterval;
+                    if (walkDue)
                     {
+                        // Timed from the attempt, so a walk that fails waits its interval like any other
+                        sinceWalk.Restart();
+                    }
+
+                    // Gather data outside the lock on a background thread (slow I/O, not cancellable)
+                    var gatherTask = Task.Run<(SbcData Sbc, List<Volume>? Volumes, List<NetworkInterface>? Network)>(async () =>
+                    {
+                        var sbcData = await GatherSbcDataAsync(stoppingToken);
+                        if (!walkDue)
+                        {
+                            return (sbcData, null, null);
+                        }
+
                         var networkInterfaces = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces();
                         var drives = DriveInfo.GetDrives();
-                        var sbcData = await GatherSbcDataAsync(stoppingToken);
                         var volumeData = GatherVolumeData(drives);
                         var networkData = await GatherNetworkDataAsync(networkInterfaces, stoppingToken);
                         return (sbcData, volumeData, networkData);
@@ -161,77 +184,20 @@ public partial class PeriodicUpdateService(
                     var (sbcData, volumeData, networkData) = await gatherTask.WaitAsync(stoppingToken);
 
                     // Apply to model with a short write lock
-                    string currentIPAddress;
                     using (await model.AccessReadWriteAsync(stoppingToken))
                     {
-                        updateNetworkSeq = ApplyNetworkData(networkData);
-                        currentIPAddress = model.Network.Interfaces.FirstOrDefault(iface => iface.ActualIP != null)?.ActualIP ?? "0.0.0.0";
-                        ApplySbcData(sbcData);
-                        updateVolumesSeq = ApplyVolumeData(volumeData);
-                        CleanMessages();
-                    }
-
-                    // Check if the system time has to be updated
-                    if (measuredDelay > TimeSpan.FromMilliseconds(settings.Value.HostUpdateInterval + 2000) && !Debugger.IsAttached)
-                    {
-                        logger.LogInformation("System time has been changed");
-                        Code code = codeFactory.Create();
-                        code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
-                        code.Channel = CodeChannel.Trigger;
-                        code.Type = CodeType.MCode;
-                        code.MajorNumber = 905;
-                        code.Parameters =
-                        [
-                            new('P', DateTime.Now.ToString("yyyy-MM-dd")),
-                            new('S', DateTime.Now.ToString("HH:mm:ss"))
-                        ];
-                        await code.ExecuteAsync();
-                    }
-
-                    // Check if the hostname has to be updated
-                    if (lastHostname != Environment.MachineName)
-                    {
-                        logger.LogInformation("Hostname has been changed");
-                        lastHostname = Environment.MachineName;
-                        Code code = codeFactory.Create();
-                        code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
-                        code.Channel = CodeChannel.Trigger;
-                        code.Type = CodeType.MCode;
-                        code.MajorNumber = 550;
-                        code.Parameters =
-                        [
-                            new('P', lastHostname)
-                        ];
-                        await code.ExecuteAsync();
-                    }
-
-                    // Check if the network or volume keys have been updated
-                    if (updateNetworkSeq)
-                    {
-                        // Update the network seq value
-                        linkInterface.ObjectModelKeyChanged("network");
-
-                        // Update the IP address to report on 12864 displays
-                        if (currentIPAddress != lastIPAddress)
+                        if (networkData is not null)
                         {
-                            lastIPAddress = currentIPAddress;
-
-                            Code code = codeFactory.Create();
-                            code.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
-                            code.Channel = CodeChannel.Trigger;
-                            code.Type = CodeType.MCode;
-                            code.MajorNumber = 552;
-                            code.Parameters =
-                            [
-                                new('P', currentIPAddress ?? "0.0.0.0")
-                            ];
-                            await code.ExecuteAsync();
+                            ApplyNetworkData(networkData);
                         }
-                    }
-
-                    if (updateVolumesSeq)
-                    {
-                        linkInterface.ObjectModelKeyChanged("volumes");
+                        ApplySbcData(sbcData);
+                        if (volumeData is not null)
+                        {
+                            ApplyVolumeData(volumeData);
+                        }
+                        ApplyHostname();
+                        ApplyClock(upTime);
+                        CleanMessages();
                     }
                 }
                 catch (Exception e) when (e is not OperationCanceledException)
@@ -241,21 +207,48 @@ public partial class PeriodicUpdateService(
                 }
 
                 // Wait for next scheduled update check
-                DateTime lastUpdateTime = DateTime.Now;
-                await Task.Delay(settings.Value.HostUpdateInterval, stoppingToken);
-                measuredDelay = DateTime.Now - lastUpdateTime;
+                await Task.Delay(settings.Value.ModelUpdateInterval, stoppingToken);
             } while (!stoppingToken.IsCancellationRequested);
-#else
-            do
-            {
-                await Task.Delay(settings.Value.HostUpdateInterval, stoppingToken);
-            } while (!stoppingToken.IsCancellationRequested);
-#endif
         }
         catch (OperationCanceledException)
         {
             // expected on shutdown
         }
+
+        // Apply the hostname the machine now has (must be called with OM write lock held)
+        void ApplyHostname()
+        {
+            string hostname = HostnameSource();
+            if (lastHostname != hostname)
+            {
+                logger.LogInformation("Hostname has been changed to {Hostname}", hostname);
+                lastHostname = hostname;
+
+                // The name goes with it: M550 refuses any name the hostname does not match, so a
+                // name chosen under the old hostname is one the machine can no longer be renamed to
+                model.Network.Hostname = hostname;
+                model.Network.Name = hostname;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Publish the machine clock and how long the machine has been running (must be called with OM
+    /// write lock held)
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware reads these off its RTC and its millisecond timer. The clock here is the SBC
+    /// clock and the uptime is this program's, because this program is the main board
+    /// </remarks>
+    /// <param name="upTime">Time since this service started</param>
+    private void ApplyClock(Stopwatch upTime)
+    {
+        // Truncated to the second the object model publishes it in, so that polling faster than the
+        // clock is reported does not patch subscribers with a value that serialises identically
+        DateTime now = DateTime.Now;
+        model.State.Time = now.AddTicks(-(now.Ticks % TimeSpan.TicksPerSecond));
+        model.State.UpTime = (int)(upTime.ElapsedMilliseconds / 1000);
+        model.State.MsUpTime = (int)(upTime.ElapsedMilliseconds % 1000);
     }
 
     /// <summary>
@@ -387,11 +380,8 @@ public partial class PeriodicUpdateService(
     /// <summary>
     /// Apply gathered network data to the object model (must be called with OM write lock held)
     /// </summary>
-    private bool ApplyNetworkData(List<NetworkInterface> gathered)
+    private void ApplyNetworkData(List<NetworkInterface> gathered)
     {
-        bool networkUpdated = false;
-        void InterfaceUpdated(object? sender, PropertyChangedEventArgs e) => networkUpdated = true;
-
         int index = 0;
         foreach (NetworkInterface data in gathered)
         {
@@ -415,23 +405,18 @@ public partial class PeriodicUpdateService(
             }
             index++;
 
-            networkInterface.PropertyChanged += InterfaceUpdated;
             string? wifiCountry = networkInterface.WifiCountry;
             networkInterface.Assign(data);
             if (networkInterface.Type == NetworkInterfaceType.WiFi)
             {
                 networkInterface.WifiCountry = wifiCountry;
             }
-            networkInterface.PropertyChanged -= InterfaceUpdated;
         }
 
         for (int i = model.Network.Interfaces.Count; i > index; i--)
         {
             model.Network.Interfaces.RemoveAt(i - 1);
-            networkUpdated = true;
         }
-
-        return networkUpdated;
     }
 
     [GeneratedRegex(@"^cpu\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)")]
@@ -461,6 +446,7 @@ public partial class PeriodicUpdateService(
         try
         {
             // Compute average CPU load
+            // TODO this computes the average CPU load since boot. We might want to change it to the live average
             await foreach (string line in File.ReadLinesAsync("/proc/stat", cancellationToken))
             {
                 Match match = cpuRegex.Match(line);
@@ -598,11 +584,8 @@ public partial class PeriodicUpdateService(
     /// <summary>
     /// Apply gathered volume data to the object model (must be called with OM write lock held)
     /// </summary>
-    private bool ApplyVolumeData(List<Volume> gathered)
+    private void ApplyVolumeData(List<Volume> gathered)
     {
-        bool volumesUpdated = false;
-        void VolumeUpdated(object? sender, PropertyChangedEventArgs e) => volumesUpdated = true;
-
         int index = 0;
         foreach (Volume data in gathered)
         {
@@ -618,18 +601,13 @@ public partial class PeriodicUpdateService(
             }
             index++;
 
-            volume.PropertyChanged += VolumeUpdated;
             volume.Assign(data);
-            volume.PropertyChanged -= VolumeUpdated;
         }
 
         for (int i = model.Volumes.Count; i > index; i--)
         {
             model.Volumes.RemoveAt(i - 1);
-            volumesUpdated = true;
         }
-
-        return volumesUpdated;
     }
 
     /// <summary>

@@ -68,7 +68,7 @@ Applies inbound object-model deltas from RRF (received as `FirmwareRequest.Objec
 
 ### `Model.PeriodicUpdateService` ([Model/PeriodicUpdateService.cs](../../src/DuetControlServer/Model/PeriodicUpdateService.cs))
 
-Updates fields that have to be polled (CPU usage, free memory, file system stats, etc.) — anything not pushed by RRF.
+Polls the facts only the Linux machine can state and writes them into the object model. The readings (`sbc.cpu`, `sbc.memory`, `sbc.uptime`, `state.time`/`state.upTime`, `network.hostname`/`network.name`, and the expiry of old `messages[]`) are a few `/proc` reads and are taken every `ModelUpdateInterval`, which is also the interval `sbc.cpu.avgLoad` is measured over; walking `network.interfaces[]` and the mounted `volumes[]` spawns a subprocess per interface and asks every mount for its size, so it keeps the slower `HostUpdateInterval`.
 
 ### `Model.SbcTriggerService` ([Model/SbcTriggerService.cs](../../src/DuetControlServer/Model/SbcTriggerService.cs))
 

@@ -215,7 +215,7 @@ flowchart TB
 
       UpdateSvc -->|RequestObjectModel and merge firmware JSON| LinkInterface
       UpdateSvc --> DsfModel
-      PeriodicSvc -->|host network volume updates and internal M550 M552 M905| CodeProcessor
+      PeriodicSvc -->|host, network, volume, clock and hostname updates| DsfModel
       Observer -->|subscribes to OM property changes| DsfModel
       TriggerSvc -->|OnPropertyPathChanged watchers| Observer
       TriggerSvc -->|fires M581.1 trigger codes via CodeFactory| CodeProcessor
