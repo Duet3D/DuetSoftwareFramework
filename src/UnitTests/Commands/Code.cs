@@ -1541,19 +1541,19 @@ public class Code
     [Test]
     public void AnAbsentParameterIsNotFound()
     {
-        // GetParameter is what every accessor looks a letter up with, so a letter the line does not
-        // carry has to come back as nothing rather than as a parameter holding zero
+        // A letter the line does not carry has to read as absent rather than as a parameter holding
+        // zero, whichever of the lookups goes after it
         DuetAPI.Commands.Code code = new("M950 F0 C\"1.out3\" K4");
 
         Assert.Multiple(() =>
         {
-            Assert.That(code.GetParameter('Z'), Is.Null);
             Assert.That(code.HasParameter('Z'), Is.False);
             Assert.That(code.TryGetParameter('Z', out CodeParameter? absent), Is.False);
             Assert.That(absent, Is.Null);
 
-            Assert.That(code.GetParameter('F'), Is.Not.Null, "a letter that is there still comes back");
-            Assert.That((int)code.GetParameter('F')!, Is.EqualTo(0),
+            Assert.That(code.TryGetParameter('F', out CodeParameter? present), Is.True,
+                        "a letter that is there still comes back");
+            Assert.That((int)present!, Is.EqualTo(0),
                         "including one whose value is zero, which is not the same as not being there");
         });
     }
@@ -1571,8 +1571,24 @@ public class Code
             Assert.That(standIn.Letter, Is.EqualTo('Q'));
             Assert.That((int)standIn, Is.EqualTo(500));
             Assert.That(standIn.Column, Is.EqualTo(CodeParameter.NoColumn));
-            Assert.That(code.GetParameter('F', defaultValue: 9), Is.SameAs(code.GetParameter('F')),
+            Assert.That(code.GetParameter('F', defaultValue: 9), Is.SameAs(code.GetParameter('F', defaultValue: 0)),
                         "a letter that is there is returned as it stands, not replaced by the default");
+        });
+    }
+
+    [Test]
+    public void GetParameterWithoutADefaultRefusesALetterThatIsNotInTheLine()
+    {
+        // No default is the caller saying it has nothing to fall back on, so the miss is refused
+        // where it is looked up instead of coming back as a parameter the caller has to check
+        DuetAPI.Commands.Code code = new("M950 F0");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(Assert.Throws<MissingParameterException>(() => code.GetParameter('Q'))!.Letter,
+                        Is.EqualTo('Q'));
+            Assert.That((int)code.GetParameter('F'), Is.EqualTo(0),
+                        "a letter that is there is still returned as it stands");
         });
     }
 

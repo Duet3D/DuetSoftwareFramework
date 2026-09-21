@@ -201,6 +201,18 @@ public partial class Code : Command<Message?>
     }
 
     /// <summary>
+    /// Find the parameter whose letter equals c
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <returns>The parameter, or null if the letter is not in the code</returns>
+    /// <remarks>
+    /// The lookup every accessor is built on. It is private because a caller that wants the letter
+    /// without insisting on it has <see cref="TryGetParameter"/>, which keeps the Get/TryGet pair
+    /// reading the same way here as it does for every value type
+    /// </remarks>
+    private CodeParameter? FindParameter(char letter) => Parameters.FirstOrDefault(p => p.Letter == letter);
+
+    /// <summary>
     /// Find a parameter that has to carry a value, refusing a letter written with nothing after it
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
@@ -215,7 +227,7 @@ public partial class Code : Command<Message?>
     /// </remarks>
     private CodeParameter? FindValuedParameter(char letter)
     {
-        CodeParameter? parameter = GetParameter(letter);
+        CodeParameter? parameter = FindParameter(letter);
         return (parameter is not null && parameter.IsNull)
             ? throw new GCodeException($"expected number after '{letter}'", parameter.Column)
             : parameter;
@@ -228,7 +240,7 @@ public partial class Code : Command<Message?>
     /// <returns>The parameter</returns>
     /// <exception cref="MissingParameterException">Parameter not found</exception>
     /// <exception cref="GCodeException">The letter carries no value</exception>
-    private CodeParameter GetValuedParameter(char letter)
+    public CodeParameter GetValuedParameter(char letter)
         => FindValuedParameter(letter) ?? throw new MissingParameterException(letter);
 
     /// <summary>
@@ -238,7 +250,7 @@ public partial class Code : Command<Message?>
     /// <param name="parameter">Parameter if found, else null</param>
     /// <returns>True if the requested parameter could be found</returns>
     /// <exception cref="GCodeException">The letter carries no value</exception>
-    private bool TryGetValuedParameter(char letter, [NotNullWhen(true)] out CodeParameter? parameter)
+    public bool TryGetValuedParameter(char letter, [NotNullWhen(true)] out CodeParameter? parameter)
     {
         if (TryGetParameter(letter, out parameter))
         {
@@ -256,16 +268,25 @@ public partial class Code : Command<Message?>
     /// Retrieve the parameter whose letter equals c
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
-    /// <returns>The parsed parameter instance or null if none could be found</returns>
-    public CodeParameter? GetParameter(char letter) => Parameters.FirstOrDefault(p => p.Letter == letter);
-
-    /// <summary>
-    /// Retrieve the parameter whose letter equals c or generate a default parameter
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="defaultValue">Default parameter value (no expression)</param>
-    /// <returns>The parsed parameter instance or null if none could be found</returns>
-    public CodeParameter GetParameter(char letter, object defaultValue) => GetParameter(letter) ?? new CodeParameter(letter, defaultValue);
+    /// <param name="defaultValue">Value to stand in for the letter if it is not in the code (no expression),
+    /// or null to require it</param>
+    /// <returns>The parsed parameter instance, or one built from the default value</returns>
+    /// <exception cref="MissingParameterException">Parameter not found and no default was given</exception>
+    /// <remarks>
+    /// A null default says the caller has nothing to fall back on, so the missing letter is refused
+    /// here instead of being handed back for the caller to check, which is how every other Get
+    /// accessor reads its default. A caller that wants the letter without insisting on it has
+    /// <see cref="TryGetParameter"/>
+    /// </remarks>
+    public CodeParameter GetParameter(char letter, object? defaultValue = null)
+    {
+        CodeParameter? parameter = FindParameter(letter);
+        if (parameter is not null)
+        {
+            return parameter;
+        }
+        return (defaultValue is not null) ? new CodeParameter(letter, defaultValue) : throw new MissingParameterException(letter);
+    }
 
     /// <summary>
     /// Try to get a parameter by letter
@@ -864,38 +885,23 @@ public partial class Code : Command<Message?>
     /// Get a string parameter value
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="defaultValue">Value to return if the letter is not in the code, or null to require it</param>
     /// <returns>Parameter value</returns>
-    /// <exception cref="MissingParameterException">Parameter not found</exception>
+    /// <exception cref="MissingParameterException">Parameter not found and no default was given</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public string GetString(char letter)
-    {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (string)param : throw new MissingParameterException(letter);
-    }
+    public string GetString(char letter, string? defaultValue = null) => (string)GetParameter(letter, defaultValue);
 
     /// <summary>
     /// Get a string parameter value
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
     /// <returns>Parameter value or null</returns>
-    public string? GetOptionalString(char letter)
-    {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (string)param : null;
-    }
-
-    /// <summary>
-    /// Get an unsigned integer parameter value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="defaultValue">Default value to return if no parameter could be found</param>
-    /// <returns>Parameter value</returns>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public string GetString(char letter, string defaultValue)
-    {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (string)param : defaultValue;
-    }
+    /// <remarks>
+    /// The one string reader that answers a missing letter with null rather than refusing it, for a
+    /// caller that has no default to put in its place and still has something to do without it
+    /// </remarks>
+    public string? GetOptionalString(char letter) => (string?)FindParameter(letter);
 
     /// <summary>
     /// Try to get a string parameter value by letter
@@ -922,27 +928,11 @@ public partial class Code : Command<Message?>
     /// Get a driver ID parameter value
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="defaultValue">Value to return if the letter is not in the code, or null to require it</param>
     /// <returns>Parameter value</returns>
-    /// <exception cref="MissingParameterException">Parameter not found</exception>
+    /// <exception cref="MissingParameterException">Parameter not found and no default was given</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public DriverId GetDriverId(char letter)
-    {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (DriverId)param : throw new MissingParameterException(letter);
-    }
-
-    /// <summary>
-    /// Get a driver ID parameter value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="defaultValue">Default value to return if no parameter could be found</param>
-    /// <returns>Parameter value</returns>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public DriverId GetDriverId(char letter, DriverId defaultValue)
-    {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (DriverId)param : defaultValue;
-    }
+    public DriverId GetDriverId(char letter, DriverId? defaultValue = null) => (DriverId)GetParameter(letter, defaultValue);
 
     /// <summary>
     /// Try to get a driver ID parameter value by letter
@@ -969,27 +959,11 @@ public partial class Code : Command<Message?>
     /// Get an IP address parameter value
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="defaultValue">Value to return if the letter is not in the code, or null to require it</param>
     /// <returns>Parameter value</returns>
-    /// <exception cref="MissingParameterException">Parameter not found</exception>
+    /// <exception cref="MissingParameterException">Parameter not found and no default was given</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public IPAddress GetIPAddress(char letter)
-    {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (IPAddress)param : throw new MissingParameterException(letter);
-    }
-
-    /// <summary>
-    /// Get an IP address parameter value
-    /// </summary>
-    /// <param name="letter">Letter of the parameter to find</param>
-    /// <param name="defaultValue">Default value to return if no parameter could be found</param>
-    /// <returns>Parameter value</returns>
-    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public IPAddress GetIPAddress(char letter, IPAddress defaultValue)
-    {
-        CodeParameter? param = GetParameter(letter);
-        return (param is not null) ? (IPAddress)param : defaultValue;
-    }
+    public IPAddress GetIPAddress(char letter, IPAddress? defaultValue = null) => (IPAddress)GetParameter(letter, defaultValue);
 
     /// <summary>
     /// Try to get a driver ID parameter value by letter

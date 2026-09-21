@@ -161,8 +161,6 @@ internal partial class MCodeHandler(
         { [17, 18, 84], CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleDriverStateAsync(c, ct) },
         // List SD card
         { 20, CodeClass.Immediate, (h, c, ct) => h.HandleListFilesAsync(c, ct) },
-        // Initialize SD card
-        { 21, CodeClass.Immediate, (h, c, ct) => h.HandleInitializeSDCardAsync(c, ct) },
         // Select a file to print, or select it and start printing
         { [23, 32], CodeClass.Immediate, (h, c, ct) => h.HandleSelectFileAsync(c, ct) }, // the handler flushes inline before swapping the job file
         // Resume a file print
@@ -515,22 +513,6 @@ internal partial class MCodeHandler(
         }
 
         return new Message(MessageType.Success, result.ToString());
-    }
-
-    /// <summary>
-    /// M21: initialize the SD card
-    /// </summary>
-    /// <param name="code">The code</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message> HandleInitializeSDCardAsync(Commands.Code code, CancellationToken cancellationToken)
-    {
-        if (code.GetInt('P', defaultValue: 0) == 0)
-        {
-            // M21 (P0) will always work because it's always mounted
-            return new Message();
-        }
-        throw new NotSupportedException();
     }
 
     /// <summary>

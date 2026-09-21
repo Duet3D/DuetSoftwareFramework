@@ -551,6 +551,10 @@ public class CodeParameter
         {
             return null;
         }
+        if (codeParameter.ParsedValue is IPAddress ipAddress)
+        {
+            return ipAddress;
+        }
         if (codeParameter.ParsedValue is string stringValue)
         {
             return IPAddress.Parse(stringValue);

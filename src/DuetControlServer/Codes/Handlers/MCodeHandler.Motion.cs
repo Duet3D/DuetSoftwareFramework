@@ -2782,8 +2782,7 @@ internal partial class MCodeHandler
     /// </remarks>
     private static bool TryGetDrivers(Commands.Code code, char letter, out DriverId[] drivers)
     {
-        DuetAPI.Commands.CodeParameter? parameter = code.GetParameter(letter);
-        if (parameter is not null && parameter.IsNull)
+        if (code.TryGetParameter(letter, out DuetAPI.Commands.CodeParameter? parameter) && parameter.IsNull)
         {
             drivers = [];
             return true;

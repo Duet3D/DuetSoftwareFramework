@@ -231,69 +231,57 @@ namespace DuetPiManagementPlugin
                         // Initialize SD card
                         case 21:
                             {
-                                if (code.TryGetParameter('P', out CodeParameter? pParam))
+                                CodeParameter pParam = code.GetParameter('P');
+                                if (pParam.Type == typeof(string))
                                 {
-                                    if (pParam.Type == typeof(string))
+                                    string device = (string)pParam;
+                                    string? directory = code.GetOptionalString('S'), type = code.GetOptionalString('T'), options = code.GetOptionalString('O');
+                                    try
                                     {
-                                        string device = (string)pParam;
-                                        string? directory = code.GetOptionalString('S'), type = code.GetOptionalString('T'), options = code.GetOptionalString('O');
-                                        try
+                                        if (!string.IsNullOrEmpty(directory))
                                         {
-                                            if (!string.IsNullOrEmpty(directory))
-                                            {
-                                                directory = await Connection.ResolvePathAsync(directory, CancellationToken);
-                                            }
-                                            Message result = await Mount.MountShare(device, directory, type, options);
-                                            await Connection.ResolveCodeAsync(result, CancellationToken);
+                                            directory = await Connection.ResolvePathAsync(directory, CancellationToken);
                                         }
-                                        catch (Exception e)
-                                        {
-                                            await Connection.ResolveCodeAsync(MessageType.Error, e.Message, CancellationToken);
-                                            Console.WriteLine(e);
-                                        }
+                                        Message result = await Mount.MountShare(device, directory, type, options);
+                                        await Connection.ResolveCodeAsync(result, CancellationToken);
                                     }
-                                    else if (pParam.Type == typeof(int))
+                                    catch (Exception e)
                                     {
-                                        // PanelDue wants to mount an already mounted volume, handle it
-                                        await Connection.ResolveCodeAsync(MessageType.Success, string.Empty, CancellationToken);
+                                        await Connection.ResolveCodeAsync(MessageType.Error, e.Message, CancellationToken);
+                                        Console.WriteLine(e);
                                     }
-                                    else
-                                    {
-                                        // Unsupported P parameter
-                                        await Connection.ResolveCodeAsync(MessageType.Error, "Unsupported P parameter", CancellationToken);
-                                    }
+                                }
+                                else if (pParam.Type == typeof(int))
+                                {
+                                    // PanelDue wants to mount an already mounted volume, handle it
+                                    await Connection.ResolveCodeAsync(MessageType.Success, string.Empty, CancellationToken);
                                 }
                                 else
                                 {
-                                    await Connection.IgnoreCodeAsync();
+                                    // Unsupported P parameter
+                                    await Connection.ResolveCodeAsync(MessageType.Error, "Unsupported P parameter", CancellationToken);
                                 }
                                 break;
                             }
 
                         // Release SD card
                         case 22:
-                            if (code.TryGetString('P', out string? node))
+                            string node = code.GetString('P');
+                            try
                             {
-                                try
+                                string directory = await Connection.ResolvePathAsync(node, CancellationToken);
+                                if (Directory.Exists(directory))
                                 {
-                                    string directory = await Connection.ResolvePathAsync(node, CancellationToken);
-                                    if (Directory.Exists(directory))
-                                    {
-                                        node = directory;
-                                    }
+                                    node = directory;
+                                }
 
-                                    Message result = await Mount.UnmountShare(node);
-                                    await Connection.ResolveCodeAsync(result, CancellationToken);
-                                }
-                                catch (Exception e)
-                                {
-                                    await Connection.ResolveCodeAsync(MessageType.Error, e.Message, CancellationToken);
-                                    Console.WriteLine(e);
-                                }
+                                Message result = await Mount.UnmountShare(node);
+                                await Connection.ResolveCodeAsync(result, CancellationToken);
                             }
-                            else
+                            catch (Exception e)
                             {
-                                await Connection.IgnoreCodeAsync();
+                                await Connection.ResolveCodeAsync(MessageType.Error, e.Message, CancellationToken);
+                                Console.WriteLine(e);
                             }
                             break;
 

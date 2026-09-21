@@ -217,8 +217,7 @@ public class JobFileCodeTests : SystemTests.Host.BenchFixture
     }
 
     /// <summary>
-    /// M21 mounts the SD card, which is what <c>volumes[0]</c> describes, and M39 reports the same
-    /// numbers the object model holds
+    /// M39 reports the same numbers the object model holds
     /// </summary>
     /// <remarks>
     /// MassStorage.cpp OBJECT_MODEL table: <c>mounted</c> is unconditional, while <c>capacity</c>,
@@ -227,18 +226,17 @@ public class JobFileCodeTests : SystemTests.Host.BenchFixture
     /// as the SDinfo JSON object
     /// </remarks>
     [Test]
-    public async Task M21MountsTheCardAndM39ReportsIt()
+    public async Task M39ReportsVolume0()
     {
         await using JobBench bench = await JobControlBench.StartAsync();
 
-        await bench.Host.ExecuteCodeAsync("M21");
         string report = await bench.Host.ExecuteCodeAsync("M39");
         JsonElement info = ParseJson("M39 S2", await bench.Host.ExecuteCodeAsync("M39 S2")).GetProperty("SDinfo");
 
         await Assert.MultipleAsync(async () =>
         {
             Assert.That(await bench.Host.ReadModelAsync(model => model.Volumes[0].Mounted), Is.True,
-                        "M21 leaves volumes[0].mounted true (MassStorage.cpp OBJECT_MODEL mounted)");
+                        "volumes[0].mounted true (MassStorage.cpp OBJECT_MODEL mounted)");
             Assert.That(await NumberAsync(bench.Host, model => model.Volumes[0].Capacity), Is.GreaterThan(0.0),
                         "a mounted volume reports volumes[0].capacity in bytes (MassStorage.cpp OBJECT_MODEL capacity)");
             Assert.That(await NumberAsync(bench.Host, model => model.Volumes[0].FreeSpace), Is.GreaterThan(0.0),
