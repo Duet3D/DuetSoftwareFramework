@@ -186,7 +186,7 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
         float[][]? updated = null;
         for (int axis = 0; axis < Axis.Letters.Length && axis < MatrixSize; axis++)
         {
-            if (code.TryGetFloatArray(Axis.Letters[axis], out float[]? values) && values.Length > 0)
+            if (code.TryGetFloatArray(Axis.Letters[axis], MatrixSize, out float[]? values))
             {
                 updated ??= BuildMatrix();
                 for (int motor = 0; motor < MatrixSize; motor++)

@@ -405,7 +405,7 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
         {
             // One rod length is all of them; several are one per tower, and a tower the parameter
             // does not reach keeps the length it had
-            if (code.TryGetFloatArray('L', out float[]? rodLengths) && rodLengths.Length > 0)
+            if (code.TryGetFloatArray('L', MaxTowers, out float[]? rodLengths))
             {
                 for (int tower = 0; tower < NumTowers; tower++)
                 {

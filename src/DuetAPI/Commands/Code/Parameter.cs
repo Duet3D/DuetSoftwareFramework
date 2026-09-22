@@ -51,6 +51,38 @@ public class CodeParameter
     public const int NoColumn = -1;
 
     /// <summary>
+    /// Where the item with the given index of a colon-separated value starts in the line
+    /// </summary>
+    /// <param name="index">Index of the item</param>
+    /// <returns>The column, or <see cref="NoColumn"/> if it is not known</returns>
+    /// <remarks>
+    /// The column a list refuses an item at. RepRapFirmware reads the items one at a time and quotes
+    /// where the read pointer stood, so an item it will not take is reported where that item begins
+    /// rather than where the parameter does (StringParser::CheckArrayLength over
+    /// StringParser::GetColumn). Index zero is the parameter's own column, which is also what an
+    /// index past the end of the value gives: a list that stops short has nothing further to point at
+    /// </remarks>
+    public int GetColumn(int index)
+    {
+        if (Column == NoColumn)
+        {
+            return NoColumn;
+        }
+
+        int offset = 0;
+        for (int i = 0; i < index; i++)
+        {
+            int separator = StringValue.IndexOf(':', offset);
+            if (separator < 0)
+            {
+                return Column;
+            }
+            offset = separator + 1;
+        }
+        return Column + offset;
+    }
+
+    /// <summary>
     /// Unparsed string representation of the code parameter or an empty string if none present
     /// </summary>
     internal readonly string StringValue;

@@ -109,7 +109,7 @@ public class Code
             Assert.That(code.Parameters.Count, Is.EqualTo(1));
 
             int[] steps = [810, 810, 407, 407];
-            Assert.That(code.GetIntArray('E')!, Is.EqualTo(steps));
+            Assert.That(code.GetIntArray('E', steps.Length)!, Is.EqualTo(steps));
         }
     }
 
@@ -1181,11 +1181,13 @@ public class Code
                                                          Func<TRefusal, string>? errorString = null) where T : struct;
 
     /// <summary>Read an array the way <c>GetFloatArray</c> and its siblings do</summary>
-    private delegate T[] ArrayGetter<T, TRefusal>(char letter, T[]? defaultValue, T? min, T? max,
+    private delegate T[] ArrayGetter<T, TRefusal>(char letter, int maxLength, T[]? defaultValue, bool pad,
+                                                  bool exactLength, bool allowZeroLength, T? min, T? max,
                                                   Func<TRefusal, string>? errorString = null) where T : struct;
 
     /// <summary>Read an array into an out parameter, as the array Try shape does</summary>
-    private delegate bool ArrayTryGetter<T, TRefusal>(char letter, out T[]? parameter, T? min, T? max,
+    private delegate bool ArrayTryGetter<T, TRefusal>(char letter, int maxLength, out T[]? parameter, bool pad,
+                                                      bool exactLength, bool allowZeroLength, T? min, T? max,
                                                       Func<TRefusal, string>? errorString = null) where T : struct;
 
     /// <summary>
@@ -1307,49 +1309,50 @@ public class Code
         string tooLow = $"parameter '{present}' too low", tooHigh = $"parameter '{present}' too high";
         string noValue = $"expected number after '{bare}'";
         T first = values[0], middle = values[1], last = values[^1];
+        int room = values.Length;
 
         Assert.Multiple(() =>
         {
             // defaultValue
-            Assert.That(get(absent, fallback, null, null), Is.EqualTo(fallback), $"{what}: the default answers an absent letter");
-            Assert.That(get(present, fallback, null, null), Is.EqualTo(values), $"{what}: and stands aside for a letter that is there");
-            Assert.That(get(absent, fallback, above, below), Is.EqualTo(fallback), $"{what}: the limits are about the line, so they do not reach the default");
-            Assert.That(Assert.Throws<MissingParameterException>(() => get(absent, null, null, null))!.Letter,
+            Assert.That(get(absent, room, fallback, false, false, false, null, null), Is.EqualTo(fallback), $"{what}: the default answers an absent letter");
+            Assert.That(get(present, room, fallback, false, false, false, null, null), Is.EqualTo(values), $"{what}: and stands aside for a letter that is there");
+            Assert.That(get(absent, room, fallback, false, false, false, above, below), Is.EqualTo(fallback), $"{what}: the limits are about the line, so they do not reach the default");
+            Assert.That(Assert.Throws<MissingParameterException>(() => get(absent, room, null, false, false, false, null, null))!.Letter,
                         Is.EqualTo(absent), $"{what}: with no default the letter has to be there");
 
             // min, against every item
-            Assert.That(get(present, null, below, null), Is.EqualTo(values), $"{what}: every item above min is taken");
-            Assert.That(get(present, null, first, null), Is.EqualTo(values), $"{what}: min is inclusive at the lowest item");
-            Assert.That(Assert.Throws<GCodeException>(() => get(present, null, middle, null))!.Message,
+            Assert.That(get(present, room, null, false, false, false, below, null), Is.EqualTo(values), $"{what}: every item above min is taken");
+            Assert.That(get(present, room, null, false, false, false, first, null), Is.EqualTo(values), $"{what}: min is inclusive at the lowest item");
+            Assert.That(Assert.Throws<GCodeException>(() => get(present, room, null, false, false, false, middle, null))!.Message,
                         Is.EqualTo(tooLow), $"{what}: an item beneath min refuses the list, first item or not");
 
             // max, against every item
-            Assert.That(get(present, null, null, above), Is.EqualTo(values), $"{what}: every item below max is taken");
-            Assert.That(get(present, null, null, last), Is.EqualTo(values), $"{what}: max is inclusive at the highest item");
-            Assert.That(Assert.Throws<GCodeException>(() => get(present, null, null, middle))!.Message,
+            Assert.That(get(present, room, null, false, false, false, null, above), Is.EqualTo(values), $"{what}: every item below max is taken");
+            Assert.That(get(present, room, null, false, false, false, null, last), Is.EqualTo(values), $"{what}: max is inclusive at the highest item");
+            Assert.That(Assert.Throws<GCodeException>(() => get(present, room, null, false, false, false, null, middle))!.Message,
                         Is.EqualTo(tooHigh), $"{what}: an item above max refuses the list, last item or not");
 
             // all three together
-            Assert.That(get(present, fallback, below, above), Is.EqualTo(values), $"{what}: the line wins between both ends");
+            Assert.That(get(present, room, fallback, false, false, false, below, above), Is.EqualTo(values), $"{what}: the line wins between both ends");
 
             // the Try shape
-            Assert.That(tryGet(present, out T[]? found, below, above), Is.True, $"{what}: Try finds the letter");
+            Assert.That(tryGet(present, room, out T[]? found, false, false, false, below, above), Is.True, $"{what}: Try finds the letter");
             Assert.That(found, Is.EqualTo(values), $"{what}: and hands back what it read");
-            Assert.That(tryGet(present, out T[]? atEnds, first, last), Is.True, $"{what}: Try holds both ends inclusive");
+            Assert.That(tryGet(present, room, out T[]? atEnds, false, false, false, first, last), Is.True, $"{what}: Try holds both ends inclusive");
             Assert.That(atEnds, Is.EqualTo(values));
-            Assert.That(tryGet(absent, out T[]? missed, above, below), Is.False, $"{what}: an absent letter is neither found nor limit-checked");
+            Assert.That(tryGet(absent, room, out T[]? missed, false, false, false, above, below), Is.False, $"{what}: an absent letter is neither found nor limit-checked");
             Assert.That(missed, Is.Null, $"{what}: and leaves null behind");
-            Assert.That(Assert.Throws<GCodeException>(() => tryGet(present, out T[]? _, middle, null))!.Message,
+            Assert.That(Assert.Throws<GCodeException>(() => tryGet(present, room, out T[]? _, false, false, false, middle, null))!.Message,
                         Is.EqualTo(tooLow), $"{what}: Try refuses an item beneath min");
-            Assert.That(Assert.Throws<GCodeException>(() => tryGet(present, out T[]? _, null, middle))!.Message,
+            Assert.That(Assert.Throws<GCodeException>(() => tryGet(present, room, out T[]? _, false, false, false, null, middle))!.Message,
                         Is.EqualTo(tooHigh), $"{what}: Try refuses an item above max");
 
             // a letter written with nothing after it, which neither accessor may take for absent
-            Assert.That(Assert.Throws<GCodeException>(() => get(bare, null, null, null))!.Message,
+            Assert.That(Assert.Throws<GCodeException>(() => get(bare, room, null, false, false, false, null, null))!.Message,
                         Is.EqualTo(noValue), $"{what}: a letter with no value is a parse error");
-            Assert.That(Assert.Throws<GCodeException>(() => get(bare, fallback, null, null))!.Message,
+            Assert.That(Assert.Throws<GCodeException>(() => get(bare, room, fallback, false, false, false, null, null))!.Message,
                         Is.EqualTo(noValue), $"{what}: a default does not stand in for a list written badly");
-            Assert.That(Assert.Throws<GCodeException>(() => tryGet(bare, out T[]? _, null, null))!.Message,
+            Assert.That(Assert.Throws<GCodeException>(() => tryGet(bare, room, out T[]? _, false, false, false, null, null))!.Message,
                         Is.EqualTo(noValue), $"{what}: Try refuses it too");
         });
     }
@@ -1484,21 +1487,21 @@ public class Code
             Assert.That(code.GetIPAddress('Z', defaultValue: fallbackAddress), Is.EqualTo(fallbackAddress));
             Assert.That(Assert.Throws<MissingParameterException>(() => code.GetIPAddress('Z'))!.Letter, Is.EqualTo('Z'));
 
-            Assert.That(code.GetDriverIdArray('P', defaultValue: fallbackIds), Is.EqualTo(new DriverId[] { new(1, 2) }));
-            Assert.That(code.GetDriverIdArray('Z', defaultValue: fallbackIds), Is.EqualTo(fallbackIds));
-            Assert.That(Assert.Throws<MissingParameterException>(() => code.GetDriverIdArray('Z'))!.Letter, Is.EqualTo('Z'));
+            Assert.That(code.GetDriverIdArray('P', 4, defaultValue: fallbackIds), Is.EqualTo(new DriverId[] { new(1, 2) }));
+            Assert.That(code.GetDriverIdArray('Z', 4, defaultValue: fallbackIds), Is.EqualTo(fallbackIds));
+            Assert.That(Assert.Throws<MissingParameterException>(() => code.GetDriverIdArray('Z', 4))!.Letter, Is.EqualTo('Z'));
 
-            Assert.That(code.TryGetDriverIdArray('P', out DriverId[]? found), Is.True);
+            Assert.That(code.TryGetDriverIdArray('P', 4, out DriverId[]? found), Is.True);
             Assert.That(found, Is.EqualTo(new DriverId[] { new(1, 2) }));
-            Assert.That(code.TryGetDriverIdArray('Z', out DriverId[]? missed), Is.False);
+            Assert.That(code.TryGetDriverIdArray('Z', 4, out DriverId[]? missed), Is.False);
             Assert.That(missed, Is.Null);
 
             // and a letter with no value is the parse error it is for every other accessor
-            Assert.That(Assert.Throws<GCodeException>(() => code.GetDriverIdArray('K'))!.Message,
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetDriverIdArray('K', 4))!.Message,
                         Is.EqualTo("expected number after 'K'"));
-            Assert.That(Assert.Throws<GCodeException>(() => code.GetDriverIdArray('K', defaultValue: fallbackIds))!.Message,
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetDriverIdArray('K', 4, defaultValue: fallbackIds))!.Message,
                         Is.EqualTo("expected number after 'K'"));
-            Assert.That(Assert.Throws<GCodeException>(() => code.TryGetDriverIdArray('K', out DriverId[]? _))!.Message,
+            Assert.That(Assert.Throws<GCodeException>(() => code.TryGetDriverIdArray('K', 4, out DriverId[]? _))!.Message,
                         Is.EqualTo("expected number after 'K'"));
         });
     }
@@ -1522,19 +1525,136 @@ public class Code
             Assert.That(Assert.Throws<GCodeException>(() => code.GetUInt('S', min: 20))!.Column,
                         Is.EqualTo(CodeParameter.NoColumn));
 
-            Assert.That(Assert.Throws<GCodeException>(() => code.GetFloatArray('E', max: 1000.0f))!.Column,
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetFloatArray('E', 3, max: 1000.0f))!.Column,
                         Is.EqualTo(15), "an array quotes where its list began");
-            Assert.That(Assert.Throws<GCodeException>(() => code.GetFloatArray('E', min: 60.0f))!.Column,
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetFloatArray('E', 3, min: 60.0f))!.Column,
                         Is.EqualTo(15), "at either end");
-            Assert.That(Assert.Throws<GCodeException>(() => code.GetIntArray('X', max: 2))!.Column,
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetIntArray('X', 3, max: 2))!.Column,
                         Is.EqualTo(CodeParameter.NoColumn));
-            Assert.That(Assert.Throws<GCodeException>(() => code.GetIntArray('X', min: 2))!.Column,
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetIntArray('X', 3, min: 2))!.Column,
                         Is.EqualTo(CodeParameter.NoColumn));
 
             Assert.That(Assert.Throws<GCodeException>(() => code.GetFloat('K'))!.Column, Is.EqualTo(35),
                         "a letter with no value is quoted by where its value should have begun");
             Assert.That(Assert.Throws<GCodeException>(() => code.GetInt('K'))!.Column, Is.EqualTo(35),
                         "whatever type went looking for it, the refusal coming from the letter rather than the value");
+        });
+    }
+
+    [Test]
+    public void AnArrayIsHeldToTheLengthItIsReadUnder()
+    {
+        // The line the regression suite records M906 against, on a machine with three extruders:
+        // RepRapFirmware refuses the fourth value where it stands rather than setting the first
+        // three, because the code asked for something the machine cannot do
+        DuetAPI.Commands.Code code = new("M906 E400:410:420:430");
+
+        Assert.Multiple(() =>
+        {
+            GCodeException refused = Assert.Throws<GCodeException>(() => code.GetFloatArray('E', 3))!;
+            Assert.That(refused.Message, Is.EqualTo("array too long for parameter 'E'"),
+                        "as StringParser::CheckArrayLength words it");
+            Assert.That(refused.Column, Is.EqualTo(18),
+                        "where the first value past the limit begins, which the reply quotes as column 19");
+
+            Assert.That(code.GetFloatArray('E', 4), Is.EqualTo(new[] { 400.0f, 410.0f, 420.0f, 430.0f }),
+                        "a list the caller can take is taken whole");
+            Assert.That(code.GetFloatArray('E', 5), Is.EqualTo(new[] { 400.0f, 410.0f, 420.0f, 430.0f }),
+                        "and a shorter one leaves the rest to the caller");
+
+            Assert.That(Assert.Throws<GCodeException>(() => code.TryGetFloatArray('E', 3, out float[]? _))!.Message,
+                        Is.EqualTo("array too long for parameter 'E'"), "the Try shape refuses it too");
+        });
+    }
+
+    [Test]
+    public void AnArrayRefusesEveryValueBeyondTheFirstItCannotTake()
+    {
+        // The column is the one that value stands in, so a list refused at its second item does not
+        // quote where the list began
+        DuetAPI.Commands.Code code = new("M92 X80 E420:420:420");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetFloatArray('E', 1))!.Column, Is.EqualTo(13));
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetFloatArray('E', 2))!.Column, Is.EqualTo(17));
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetFloatArray('X', 0))!.Column, Is.EqualTo(5),
+                        "a caller that can take nothing refuses the letter where its value begins");
+        });
+    }
+
+    [Test]
+    public void ACallerThatCanTakeNothingRefusesTheLetterBeforeItsValue()
+    {
+        // M17 E on a machine with no extruders, which the regression suite records as "array too
+        // long for parameter 'E'" rather than as a letter with no number after it: RepRapFirmware
+        // checks the length before it reads the value
+        DuetAPI.Commands.Code code = new("M17 E");
+
+        Assert.Multiple(() =>
+        {
+            GCodeException refused = Assert.Throws<GCodeException>(() => code.GetIntArray('E', 0))!;
+            Assert.That(refused.Message, Is.EqualTo("array too long for parameter 'E'"));
+            Assert.That(refused.Column, Is.EqualTo(5), "quoted as column 6");
+
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetIntArray('E', 1))!.Message,
+                        Is.EqualTo("expected number after 'E'"),
+                        "with room for a value, the letter without one is the parse error it always was");
+        });
+    }
+
+    [Test]
+    public void OneValueStandsForEveryOneOfThemWhenTheCallerPads()
+    {
+        // M906 E800 on a machine with three extruders sets all three, which is how nearly every
+        // configuration is written (GCodeBuffer::GetFloatArray with doPad)
+        DuetAPI.Commands.Code code = new("M906 E800 X400:500");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(code.GetFloatArray('E', 3, pad: true), Is.EqualTo(new[] { 800.0f, 800.0f, 800.0f }));
+            Assert.That(code.GetFloatArray('E', 3), Is.EqualTo(new[] { 800.0f }),
+                        "without padding the one value stays one value");
+            Assert.That(code.GetFloatArray('E', 1, pad: true), Is.EqualTo(new[] { 800.0f }),
+                        "and there is nothing to pad when the caller takes one");
+            Assert.That(code.GetFloatArray('X', 3, pad: true), Is.EqualTo(new[] { 400.0f, 500.0f }),
+                        "a list of more than one is taken as it stands, because only one value can stand for all");
+        });
+    }
+
+    [Test]
+    public void AnExactLengthRefusesAListThatStopsShort()
+    {
+        // M557 describes each axis with a minimum and a maximum, so anything else is refused
+        // (GCodeBuffer::TryGetFloatArray, which checks the count it got back)
+        DuetAPI.Commands.Code code = new("M557 X20 Y20:180 Z0:10:20");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(code.GetFloatArray('Y', 2, exactLength: true), Is.EqualTo(new[] { 20.0f, 180.0f }));
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetFloatArray('X', 2, exactLength: true))!.Message,
+                        Is.EqualTo("Wrong number of values in array, expected 2"));
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetFloatArray('Z', 2, exactLength: true))!.Message,
+                        Is.EqualTo("array too long for parameter 'Z'"),
+                        "a list too long is refused as too long, because the length is checked as it is read");
+            Assert.That(code.GetFloatArray('X', 2, pad: true, exactLength: true), Is.EqualTo(new[] { 20.0f, 20.0f }),
+                        "padding happens first, so one value satisfies a caller that pads");
+        });
+    }
+
+    [Test]
+    public void AnArrayFromNoLineHasNoColumnToRefuseAt()
+    {
+        // A parameter built by a caller or left by an evaluated expression never stood anywhere, so
+        // the refusal names the parameter and quotes nothing
+        DuetAPI.Commands.Code code = new();
+        code.Parameters.Add(new CodeParameter('E', new float[] { 1.0f, 2.0f, 3.0f }));
+
+        GCodeException refused = Assert.Throws<GCodeException>(() => code.GetFloatArray('E', 2))!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(refused.Message, Is.EqualTo("array too long for parameter 'E'"));
+            Assert.That(refused.Column, Is.EqualTo(CodeParameter.NoColumn));
         });
     }
 
@@ -1614,11 +1734,11 @@ public class Code
             Assert.That(code.TryGetString('Z', out stringValue), Is.False);
             Assert.That(code.TryGetDriverId('Z', out driverId), Is.False);
             Assert.That(code.TryGetIPAddress('Z', out ipAddress), Is.False);
-            Assert.That(code.TryGetFloatArray('Z', out floatArray), Is.False);
-            Assert.That(code.TryGetIntArray('Z', out intArray), Is.False);
-            Assert.That(code.TryGetUIntArray('Z', out uintArray), Is.False);
-            Assert.That(code.TryGetLongArray('Z', out longArray), Is.False);
-            Assert.That(code.TryGetDriverIdArray('Z', out driverIdArray), Is.False);
+            Assert.That(code.TryGetFloatArray('Z', 2, out floatArray), Is.False);
+            Assert.That(code.TryGetIntArray('Z', 2, out intArray), Is.False);
+            Assert.That(code.TryGetUIntArray('Z', 2, out uintArray), Is.False);
+            Assert.That(code.TryGetLongArray('Z', 2, out longArray), Is.False);
+            Assert.That(code.TryGetDriverIdArray('Z', 2, out driverIdArray), Is.False);
         });
 
         Assert.Multiple(() =>
@@ -1720,6 +1840,157 @@ public class Code
     }
 
     /// <summary>
+    /// GetEnumArray and TryGetEnumArray read a list of members and hold every item to the
+    /// enumeration, on top of the length rules every array read has
+    /// </summary>
+    /// <remarks>
+    /// One value per drive, each selecting one of a fixed set of behaviours, is what these are for.
+    /// The list stands or falls together, so the first item naming no member refuses the code and
+    /// the refusal names the parameter, as the limit checks do for the numeric arrays
+    /// </remarks>
+    [Test]
+    public void EnumArrayAccessors()
+    {
+        foreach (DuetAPI.Commands.Code code in Parse("M1 S0:1:2 T1:3 U1:-2 W1 V"))
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.That(code.GetEnumArray<Shade>('S', 3),
+                            Is.EqualTo(new[] { Shade.Off, Shade.Dim, Shade.Bright }), "every value names its member");
+                Assert.That(code.GetEnumArray<Shade>('Q', 3, [Shade.Bright]), Is.EqualTo(new[] { Shade.Bright }),
+                            "the default answers an absent letter");
+                Assert.That(code.GetEnumArray<Shade>('Q', 3, [(Shade)9]), Is.EqualTo(new[] { (Shade)9 }),
+                            "and is returned as it stands, because it did not come from the line");
+                Assert.That(Assert.Throws<MissingParameterException>(() => code.GetEnumArray<Shade>('Q', 3))!.Letter,
+                            Is.EqualTo('Q'), "with no default the letter has to be there");
+
+                Assert.That(Assert.Throws<GCodeException>(() => code.GetEnumArray<Shade>('T', 2))!.Message,
+                            Is.EqualTo("parameter 'T' too high"), "an item above every member refuses the list");
+                Assert.That(Assert.Throws<GCodeException>(() => code.GetEnumArray<Shade>('U', 2))!.Message,
+                            Is.EqualTo("parameter 'U' too low"), "and so does one below every member");
+                Assert.That(Assert.Throws<GCodeException>(
+                                () => code.GetEnumArray<Shade>('T', 2, errorString: value => $"Invalid shade {value}"))!.Message,
+                            Is.EqualTo("Invalid shade 3"),
+                            "the refusal is built from the first item that named no member, not from the whole list");
+
+                Assert.That(code.GetEnumArray<Shade>('W', 3, pad: true),
+                            Is.EqualTo(new[] { Shade.Dim, Shade.Dim, Shade.Dim }), "one value stands for all of them");
+                Assert.That(Assert.Throws<GCodeException>(() => code.GetEnumArray<Shade>('W', 3, exactLength: true))!.Message,
+                            Is.EqualTo("Wrong number of values in array, expected 3"),
+                            "a caller that needs three and pads for none of them refuses one value");
+
+                Assert.That(Assert.Throws<GCodeException>(() => code.GetEnumArray<Shade>('S', 2))!.Message,
+                            Is.EqualTo("array too long for parameter 'S'"),
+                            "the length is checked before the members are, as it is checked before any value");
+                Assert.That(Assert.Throws<GCodeException>(() => code.GetEnumArray<Shade>('T', 0))!.Message,
+                            Is.EqualTo("array too long for parameter 'T'"),
+                            "a caller that can take nothing refuses the letter before its value");
+
+                Assert.That(Assert.Throws<GCodeException>(() => code.GetEnumArray<Shade>('V', 3))!.Message,
+                            Is.EqualTo("expected number after 'V'"),
+                            "a letter written with nothing after it is a parse error, not a missing parameter");
+            });
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(code.TryGetEnumArray('S', 3, out Shade[]? seen), Is.True);
+                Assert.That(seen, Is.EqualTo(new[] { Shade.Off, Shade.Dim, Shade.Bright }),
+                            "the Try form writes the members it read");
+
+                Assert.That(code.TryGetEnumArray('Q', 3, out Shade[]? absent), Is.False);
+                Assert.That(absent, Is.Null, "and leaves null behind for an absent letter");
+
+                Assert.That(code.TryGetEnumArray('W', 3, out Shade[]? padded, pad: true), Is.True);
+                Assert.That(padded, Is.EqualTo(new[] { Shade.Dim, Shade.Dim, Shade.Dim }));
+
+                Assert.That(Assert.Throws<GCodeException>(() => code.TryGetEnumArray('T', 2, out Shade[]? _))!.Message,
+                            Is.EqualTo("parameter 'T' too high"),
+                            "the Try form is about whether the letter is there, not about whether its values are usable");
+                Assert.That(Assert.Throws<GCodeException>(() => code.TryGetEnumArray('S', 2, out Shade[]? _))!.Message,
+                            Is.EqualTo("array too long for parameter 'S'"));
+            });
+        }
+    }
+
+    /// <summary>
+    /// A letter written with no list after it is the empty list when the caller allows it, and the
+    /// parse error it always was when the caller does not
+    /// </summary>
+    /// <remarks>
+    /// <c>M584 U</c> releases the drivers of U, which is how a drive gives up the ones it has
+    /// (rrf-differences.md section 3.1). The letter is there, so the code means to set something,
+    /// and what it names is nothing. Only a caller that has something to do with that reads it this
+    /// way, which is why it is asked for rather than assumed
+    /// </remarks>
+    [Test]
+    public void ALetterWithNoListMeansNoneWhenTheCallerAllowsIt()
+    {
+        DuetAPI.Commands.Code code = new("M584 U E1.0");
+
+        // M584's letters parse as driver identifiers, so the numeric reads are held against a code
+        // whose letters are numbers
+        DuetAPI.Commands.Code numeric = new("M92 U X20:40");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(code.GetDriverIdArray('U', 8, allowZeroLength: true), Is.Empty,
+                        "the letter names no drivers");
+            Assert.That(code.TryGetDriverIdArray('U', 8, out DriverId[]? released, allowZeroLength: true), Is.True,
+                        "the Try shape finds the letter rather than reading it as absent");
+            Assert.That(released, Is.Empty);
+            Assert.That(code.GetDriverIdArray('E', 8, allowZeroLength: true), Is.EqualTo(new DriverId[] { new(1, 0) }),
+                        "and a letter that does carry a list is read as it always was");
+
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetDriverIdArray('U', 8))!.Message,
+                        Is.EqualTo("expected number after 'U'"),
+                        "without the allowance it is the parse error every other accessor gives");
+            Assert.That(code.TryGetDriverIdArray('Z', 8, out DriverId[]? _, allowZeroLength: true), Is.False,
+                        "a letter that is not in the code at all is absent rather than empty");
+            Assert.That(Assert.Throws<MissingParameterException>(() => code.GetDriverIdArray('Z', 8, allowZeroLength: true))!.Letter,
+                        Is.EqualTo('Z'), "and with no default it still has to be there");
+
+            Assert.That(numeric.GetFloatArray('U', 2, allowZeroLength: true), Is.Empty,
+                        "every array accessor reads it the same way");
+            Assert.That(numeric.GetFloatArray('U', 2, pad: true, exactLength: true, allowZeroLength: true), Is.Empty,
+                        "and the length rules are about a list that was given, which this letter was not");
+            Assert.That(numeric.GetFloatArray('X', 2, exactLength: true, allowZeroLength: true),
+                        Is.EqualTo(new[] { 20.0f, 40.0f }), "while a list that was given is still held to them");
+        });
+    }
+
+    /// <summary>
+    /// An enum list can pass over the values this version does not recognise, for the parameters
+    /// that are opt-ins rather than members
+    /// </summary>
+    /// <remarks>
+    /// M500 P is the one such parameter: RepRapFirmware's switch over it ends in
+    /// <c>default: break</c>, so a number naming no option is a newer firmware's rather than a
+    /// mistake. What comes back is what the line asked for and this version understands, so the
+    /// unrecognised values are dropped rather than left as a member nobody named
+    /// </remarks>
+    [Test]
+    public void AnEnumListCanPassOverWhatItDoesNotRecognise()
+    {
+        DuetAPI.Commands.Code code = new("M1 S0:9:2 T9");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(code.GetEnumArray<Shade>('S', 3, ignoreInvalid: true),
+                        Is.EqualTo(new[] { Shade.Off, Shade.Bright }), "the value naming no member is passed over");
+            Assert.That(code.GetEnumArray<Shade>('T', 3, ignoreInvalid: true), Is.Empty,
+                        "a list of nothing it recognises comes back empty rather than refused");
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetEnumArray<Shade>('S', 3))!.Message,
+                        Is.EqualTo("parameter 'S' too high"), "without it the list is refused as it stands");
+
+            Assert.That(code.TryGetEnumArray('S', 3, out Shade[]? seen, ignoreInvalid: true), Is.True);
+            Assert.That(seen, Is.EqualTo(new[] { Shade.Off, Shade.Bright }));
+            Assert.That(Assert.Throws<GCodeException>(() => code.GetEnumArray<Shade>('S', 2, ignoreInvalid: true))!.Message,
+                        Is.EqualTo("array too long for parameter 'S'"),
+                        "the length is still about what the line said, before any of it is read as members");
+        });
+    }
+
+    /// <summary>
     /// Every accessor that refuses a value builds the refusal from the value it would not take
     /// </summary>
     /// <remarks>
@@ -1751,7 +2022,7 @@ public class Code
                             Is.EqualTo($"Invalid ratio {1.5f}"),
                             "the float accessors hand over a float, formatted by whoever builds the refusal");
                 Assert.That(Assert.Throws<GCodeException>(
-                                () => code.GetIntArray('V', min: 0, max: 4, errorString: value => $"Invalid list entry {value}"))!.Message,
+                                () => code.GetIntArray('V', 3, min: 0, max: 4, errorString: value => $"Invalid list entry {value}"))!.Message,
                             Is.EqualTo("Invalid list entry 9"),
                             "and the array ones hand over the first item outside the limits, not the whole array");
 

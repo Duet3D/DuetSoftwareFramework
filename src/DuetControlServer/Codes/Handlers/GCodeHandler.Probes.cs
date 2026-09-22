@@ -101,7 +101,9 @@ internal sealed partial class GCodeHandler
                 seen = true;
             }
 
-            if (code.TryGetFloatArray('T', out float[]? coefficients))
+            // One coefficient per term the probe corrects with (RRF ZProbe.cpp, numValues =
+            // ARRAY_SIZE(temperatureCoefficients))
+            if (code.TryGetFloatArray('T', probe.TemperatureCoefficients.Count, out float[]? coefficients))
             {
                 for (int i = 0; i < probe.TemperatureCoefficients.Count; i++)
                 {

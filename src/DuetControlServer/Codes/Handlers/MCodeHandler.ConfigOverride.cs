@@ -39,7 +39,18 @@ internal partial class MCodeHandler
     /// means "include the G10 offsets" and P31 "include the G31 probe values". Both are things that
     /// are normally only written once they have been measured, and P says to write them anyway
     /// </remarks>
-    private const int SaveToolOffsets = 10, SaveProbeValues = 31;
+    private enum ConfigOverrideSaveOption : int
+    {
+        SaveToolOffsets = 10,
+        SaveProbeValues = 31,
+        SaveCoordinateRotation = 68,
+    }
+
+
+    /// <summary>
+    /// Opt-ins M500 P may name at once
+    /// </summary>
+    private const int MaxSaveOptions = 3;
 
     /// <summary>
     /// M500: save the calibrated settings
@@ -49,15 +60,14 @@ internal partial class MCodeHandler
     /// <returns>The result</returns>
     private async ValueTask<Message> HandleSaveConfigOverrideAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        bool saveToolOffsets = false, saveProbeValues = false;
-        if (code.TryGetIntArray('P', out int[]? requested))
+        bool saveToolOffsets = false;
+        bool saveProbeValues = false;
+        if (code.TryGetEnumArray('P', MaxSaveOptions, out ConfigOverrideSaveOption[]? requested, ignoreInvalid: true)) // Invalid values ignored as per RRF
         {
-            foreach (int value in requested)
+            foreach (ConfigOverrideSaveOption value in requested)
             {
-                // Anything else is ignored without a warning, as in RepRapFirmware: the parameter is
-                // a list of opt-ins and an unknown one is a newer firmware's, not a mistake
-                saveToolOffsets |= value == SaveToolOffsets;
-                saveProbeValues |= value == SaveProbeValues;
+                saveToolOffsets |= value == ConfigOverrideSaveOption.SaveToolOffsets;
+                saveProbeValues |= value == ConfigOverrideSaveOption.SaveProbeValues;
             }
         }
 

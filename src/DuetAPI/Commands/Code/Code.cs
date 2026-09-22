@@ -228,10 +228,19 @@ public partial class Code : Command<Message?>
     private CodeParameter? FindValuedParameter(char letter)
     {
         CodeParameter? parameter = FindParameter(letter);
-        return (parameter is not null && parameter.IsNull)
-            ? throw new GCodeException($"expected number after '{letter}'", parameter.Column)
-            : parameter;
+        return (parameter is not null) ? CheckValued(parameter) : null;
     }
+
+    /// <summary>
+    /// Refuse a letter that was written with nothing usable after it
+    /// </summary>
+    /// <param name="parameter">The parameter as it was parsed</param>
+    /// <returns>The parameter, which carries a value</returns>
+    /// <exception cref="GCodeException">The letter carries no value</exception>
+    private static CodeParameter CheckValued(CodeParameter parameter)
+        => parameter.IsNull
+            ? throw new GCodeException($"expected number after '{parameter.Letter}'", parameter.Column)
+            : parameter;
 
     /// <summary>
     /// Find a parameter that has to be there and has to carry a value
@@ -254,10 +263,7 @@ public partial class Code : Command<Message?>
     {
         if (TryGetParameter(letter, out parameter))
         {
-            if (parameter.IsNull)
-            {
-                throw new GCodeException($"expected number after '{letter}'", parameter.Column);
-            }
+            CheckValued(parameter);
             return true;
         }
         return false;
@@ -725,6 +731,12 @@ public partial class Code : Command<Message?>
         }
     }
 
+    private static bool EnumValueExists<T>(long value) where T : struct, Enum
+    {
+        T member = (T)Enum.ToObject(typeof(T), value);
+        return Enum.IsDefined(typeof(T), member);
+    }
+
     /// <summary>
     /// Refuse a value that names none of an enumeration's members
     /// </summary>
@@ -747,6 +759,8 @@ public partial class Code : Command<Message?>
         T member = (T)Enum.ToObject(typeof(T), value);
         if (!Enum.IsDefined(typeof(T), member))
         {
+            // TODO this error message is misleading for an enum which has gaps in valid values
+            // it is kept for consistent error messages with RRF but should be changed ultimately
             throw new GCodeException(errorString?.Invoke(value)
                                      ?? $"parameter '{letter}' too {(value < EnumBounds<T>.Lowest ? "low" : "high")}");
         }
@@ -1060,28 +1074,171 @@ public partial class Code : Command<Message?>
     }
 
     /// <summary>
+    /// Build the refusal of a list that carries more items than the caller can take
+    /// </summary>
+    /// <param name="parameter">Parameter the items came from</param>
+    /// <param name="index">Index of the first item past what the caller can take</param>
+    /// <returns>The refusal</returns>
+    /// <remarks>
+    /// RepRapFirmware reads a list into an array of the size the caller gives and refuses the item
+    /// that would not fit as it reaches it, so a line naming more than the machine has is refused
+    /// rather than quietly losing its tail (StringParser::CheckArrayLength). The column quoted is
+    /// the one that item begins at
+    /// </remarks>
+    private static GCodeException ArrayTooLong(CodeParameter parameter, int index)
+        => new($"array too long for parameter '{parameter.Letter}'", parameter.GetColumn(index));
+
+    /// <summary>
+    /// Hold a list to the length it was read under, padding it if the caller allows that
+    /// </summary>
+    /// <typeparam name="T">Type of the items</typeparam>
+    /// <param name="parameter">Parameter the items came from</param>
+    /// <param name="values">Items that were read</param>
+    /// <param name="maxLength">Most items the caller can take</param>
+    /// <param name="pad">Whether one item stands for all of them</param>
+    /// <param name="exactLength">Whether the caller needs the length it asked for</param>
+    /// <returns>The items, at a length the caller can take</returns>
+    /// <exception cref="GCodeException">Too many items, or not as many as the caller needs</exception>
+    /// <remarks>
+    /// The three rules RepRapFirmware's array reads share, in the order it applies them. The length
+    /// is checked as the list is parsed, so a list that is too long is refused before a value in it
+    /// can be: the firmware never reads the values of a line it has already refused. The padding
+    /// happens on the way out of <c>GCodeBuffer::GetFloatArray</c> and its siblings, which is what
+    /// lets one value stand for every drive. A caller that needs a fixed number of items checks the
+    /// length it got afterwards, so padding can satisfy it (<c>GCodeBuffer::TryGetFloatArray</c>)
+    /// </remarks>
+    private static T[] CheckArray<T>(CodeParameter parameter, T[] values, int maxLength, bool pad, bool exactLength)
+    {
+        if (values.Length > maxLength)
+        {
+            throw ArrayTooLong(parameter, maxLength);
+        }
+        if (pad && values.Length == 1 && maxLength > 1)
+        {
+            values = [.. Enumerable.Repeat(values[0], maxLength)];
+        }
+        if (exactLength && values.Length != maxLength)
+        {
+            throw new GCodeException($"Wrong number of values in array, expected {maxLength}");
+        }
+        return values;
+    }
+
+    /// <summary>
+    /// Read the list a parameter carries, or nothing from a letter written with no list after it
+    /// </summary>
+    /// <typeparam name="T">Type of the items</typeparam>
+    /// <param name="parameter">Parameter the list came from</param>
+    /// <param name="convert">Reads the parameter as a list of its type</param>
+    /// <param name="maxLength">Most items the caller can take</param>
+    /// <param name="pad">Whether one item stands for all of them</param>
+    /// <param name="exactLength">Whether the caller needs the length it asked for</param>
+    /// <returns>The items, at a length the caller can take</returns>
+    /// <exception cref="GCodeException">Too many items, or not as many as the caller needs</exception>
+    /// <remarks>
+    /// The letter with nothing after it only reaches here when the caller allowed it, and then it
+    /// means the empty list rather than a value that could not be read, so there is nothing to
+    /// convert and no length to hold it to: the caller asked for what the letter names and the
+    /// letter names none of them
+    /// </remarks>
+    private static T[] ReadArray<T>(CodeParameter parameter, Func<CodeParameter, T[]> convert,
+                                    int maxLength, bool pad, bool exactLength)
+        => parameter.IsNull ? [] : CheckArray(parameter, convert(parameter), maxLength, pad, exactLength);
+
+    /// <summary>
+    /// Find a parameter that has to carry a list of no more than the given length
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="maxLength">Most items the caller can take</param>
+    /// <param name="allowZeroLength">Whether the letter may be written with no list after it</param>
+    /// <returns>The parameter, or null if the letter is not in the code at all</returns>
+    /// <exception cref="GCodeException">The caller can take nothing, or the letter carries no value</exception>
+    /// <remarks>
+    /// A caller that can take nothing refuses the letter before the value is looked at, because
+    /// RepRapFirmware checks the length before reading each item: a machine with no extruders
+    /// refuses <c>M17 E</c> as a list too long rather than as a letter with no number after it.
+    /// <paramref name="allowZeroLength"/> comes before that, because a caller that reads the bare
+    /// letter as an empty list has been given one rather than nothing usable
+    /// </remarks>
+    private CodeParameter? FindArrayParameter(char letter, int maxLength, bool allowZeroLength)
+    {
+        CodeParameter? parameter = FindParameter(letter);
+        if (parameter is null)
+        {
+            return null;
+        }
+        if (parameter.IsNull && allowZeroLength)
+        {
+            return parameter;
+        }
+        if (maxLength == 0)
+        {
+            throw ArrayTooLong(parameter, 0);
+        }
+        return CheckValued(parameter);
+    }
+
+    /// <summary>
+    /// Try to find a parameter that has to carry a list of no more than the given length, skipping
+    /// one that is still an expression
+    /// </summary>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="maxLength">Most items the caller can take</param>
+    /// <param name="allowZeroLength">Whether the letter may be written with no list after it</param>
+    /// <param name="parameter">Parameter if found, else null</param>
+    /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="GCodeException">The caller can take nothing, or the letter carries no value</exception>
+    private bool TryGetArrayParameter(char letter, int maxLength, bool allowZeroLength,
+                                      [NotNullWhen(true)] out CodeParameter? parameter)
+    {
+        if (TryGetParameter(letter, out parameter))
+        {
+            if (parameter.IsNull && allowZeroLength)
+            {
+                return true;
+            }
+            if (maxLength == 0)
+            {
+                throw ArrayTooLong(parameter, 0);
+            }
+            CheckValued(parameter);
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
     /// Get a float array parameter value
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="maxLength">Most values the caller can take</param>
     /// <param name="defaultValue">Value to return if the letter is not in the code, or null to require it</param>
+    /// <param name="pad">Whether a single value stands for every one of them</param>
+    /// <param name="exactLength">Whether the caller needs as many values as it can take</param>
+    /// <param name="allowZeroLength">Whether the letter may be written with no values after it, which
+    /// the caller then reads as none of them</param>
     /// <param name="min">Lowest value each item may have, or null for no lower limit</param>
     /// <param name="max">Highest value each item may have, or null for no upper limit</param>
     /// <param name="errorString">Builds the refusal from the value it would not take, in place of the usual
     /// "too low" or "too high", or null for those</param>
     /// <returns>Parameter value</returns>
     /// <exception cref="MissingParameterException">Parameter not found and no default was given</exception>
-    /// <exception cref="GCodeException">The letter carries no value, or one item is outside the limits</exception>
+    /// <exception cref="GCodeException">The letter carries no value, the list is the wrong length,
+    /// or one item is outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
     /// <remarks>
-    /// The limits are about what the line said, so a default is returned as it stands: it comes from
-    /// the caller rather than from the code, and there is nothing to refuse it to
+    /// The limits and the length are about what the line said, so a default is returned as it
+    /// stands: it comes from the caller rather than from the code, and there is nothing to refuse it
+    /// to
     /// </remarks>
-    public float[] GetFloatArray(char letter, float[]? defaultValue = null, float? min = null, float? max = null,
+    public float[] GetFloatArray(char letter, int maxLength, float[]? defaultValue = null, bool pad = false,
+                                 bool exactLength = false, bool allowZeroLength = false,
+                                 float? min = null, float? max = null,
                                  Func<float, string>? errorString = null)
     {
-        CodeParameter? parameter = FindValuedParameter(letter);
+        CodeParameter? parameter = FindArrayParameter(letter, maxLength, allowZeroLength);
         return (parameter is not null)
-            ? CheckLimits((float[])parameter, min, max, parameter, errorString)
+            ? CheckLimits(ReadArray(parameter, static p => (float[])p, maxLength, pad, exactLength), min, max, parameter, errorString)
             : defaultValue ?? throw new MissingParameterException(letter);
     }
 
@@ -1089,20 +1246,28 @@ public partial class Code : Command<Message?>
     /// Try to get a float array parameter value by letter
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="maxLength">Most values the caller can take</param>
     /// <param name="parameter">Parameter if found, else null</param>
+    /// <param name="pad">Whether a single value stands for every one of them</param>
+    /// <param name="exactLength">Whether the caller needs as many values as it can take</param>
+    /// <param name="allowZeroLength">Whether the letter may be written with no values after it, which
+    /// the caller then reads as none of them</param>
     /// <param name="min">Lowest value each item may have, or null for no lower limit</param>
     /// <param name="max">Highest value each item may have, or null for no upper limit</param>
     /// <param name="errorString">Builds the refusal from the value it would not take, in place of the usual
     /// "too low" or "too high", or null for those</param>
     /// <returns>True if the requested parameter could be found</returns>
-    /// <exception cref="GCodeException">The letter carries no value, or one item is outside the limits</exception>
+    /// <exception cref="GCodeException">The letter carries no value, the list is the wrong length,
+    /// or one item is outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetFloatArray(char letter, [NotNullWhen(true)] out float[]? parameter,
-                                 float? min = null, float? max = null, Func<float, string>? errorString = null)
+    public bool TryGetFloatArray(char letter, int maxLength, [NotNullWhen(true)] out float[]? parameter,
+                                 bool pad = false, bool exactLength = false, bool allowZeroLength = false,
+                                 float? min = null, float? max = null,
+                                 Func<float, string>? errorString = null)
     {
-        if (TryGetValuedParameter(letter, out CodeParameter? param))
+        if (TryGetArrayParameter(letter, maxLength, allowZeroLength, out CodeParameter? param))
         {
-            parameter = CheckLimits((float[])param, min, max, param, errorString);
+            parameter = CheckLimits(ReadArray(param, static p => (float[])p, maxLength, pad, exactLength), min, max, param, errorString);
             return true;
         }
         parameter = null;
@@ -1113,26 +1278,35 @@ public partial class Code : Command<Message?>
     /// Get an integer array parameter value
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="maxLength">Most values the caller can take</param>
     /// <param name="defaultValue">Value to return if the letter is not in the code, or null to require it</param>
+    /// <param name="pad">Whether a single value stands for every one of them</param>
+    /// <param name="exactLength">Whether the caller needs as many values as it can take</param>
+    /// <param name="allowZeroLength">Whether the letter may be written with no values after it, which
+    /// the caller then reads as none of them</param>
     /// <param name="min">Lowest value each item may have, or null for no lower limit</param>
     /// <param name="max">Highest value each item may have, or null for no upper limit</param>
     /// <param name="errorString">Builds the refusal from the value it would not take, in place of the usual
     /// "too low" or "too high", or null for those</param>
     /// <returns>Parameter value</returns>
     /// <exception cref="MissingParameterException">Parameter not found and no default was given</exception>
-    /// <exception cref="GCodeException">The letter carries no value, or one item is outside the limits</exception>
+    /// <exception cref="GCodeException">The letter carries no value, the list is the wrong length,
+    /// or one item is outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
     /// <remarks>
-    /// The arrays RepRapFirmware reads with <c>GetUnsignedArray(..., false)</c>, which will not pad
-    /// what it was given: the letter alone carries nothing to use, so it cannot stand for "all of
-    /// them". A default supplied by the caller is a different thing and is returned as it stands
+    /// An array read without <paramref name="pad"/> is the one RepRapFirmware reads with
+    /// <c>GetUnsignedArray(..., false)</c>, which will not pad what it was given: the letter alone
+    /// carries nothing to use, so it cannot stand for "all of them". A default supplied by the
+    /// caller is a different thing and is returned as it stands
     /// </remarks>
-    public int[] GetIntArray(char letter, int[]? defaultValue = null, int? min = null, int? max = null,
+    public int[] GetIntArray(char letter, int maxLength, int[]? defaultValue = null, bool pad = false,
+                             bool exactLength = false, bool allowZeroLength = false,
+                             int? min = null, int? max = null,
                              Func<long, string>? errorString = null)
     {
-        CodeParameter? parameter = FindValuedParameter(letter);
+        CodeParameter? parameter = FindArrayParameter(letter, maxLength, allowZeroLength);
         return (parameter is not null)
-            ? CheckLimits((int[])parameter, min, max, letter, errorString)
+            ? CheckLimits(ReadArray(parameter, static p => (int[])p, maxLength, pad, exactLength), min, max, letter, errorString)
             : defaultValue ?? throw new MissingParameterException(letter);
     }
 
@@ -1140,20 +1314,28 @@ public partial class Code : Command<Message?>
     /// Try to get an integer array parameter value by letter
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="maxLength">Most values the caller can take</param>
     /// <param name="parameter">Parameter if found, else null</param>
+    /// <param name="pad">Whether a single value stands for every one of them</param>
+    /// <param name="exactLength">Whether the caller needs as many values as it can take</param>
+    /// <param name="allowZeroLength">Whether the letter may be written with no values after it, which
+    /// the caller then reads as none of them</param>
     /// <param name="min">Lowest value each item may have, or null for no lower limit</param>
     /// <param name="max">Highest value each item may have, or null for no upper limit</param>
     /// <param name="errorString">Builds the refusal from the value it would not take, in place of the usual
     /// "too low" or "too high", or null for those</param>
     /// <returns>True if the requested parameter could be found</returns>
-    /// <exception cref="GCodeException">The letter carries no value, or one item is outside the limits</exception>
+    /// <exception cref="GCodeException">The letter carries no value, the list is the wrong length,
+    /// or one item is outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetIntArray(char letter, [NotNullWhen(true)] out int[]? parameter,
-                               int? min = null, int? max = null, Func<long, string>? errorString = null)
+    public bool TryGetIntArray(char letter, int maxLength, [NotNullWhen(true)] out int[]? parameter,
+                               bool pad = false, bool exactLength = false, bool allowZeroLength = false,
+                               int? min = null, int? max = null,
+                               Func<long, string>? errorString = null)
     {
-        if (TryGetValuedParameter(letter, out CodeParameter? param))
+        if (TryGetArrayParameter(letter, maxLength, allowZeroLength, out CodeParameter? param))
         {
-            parameter = CheckLimits((int[])param, min, max, letter, errorString);
+            parameter = CheckLimits(ReadArray(param, static p => (int[])p, maxLength, pad, exactLength), min, max, letter, errorString);
             return true;
         }
         parameter = null;
@@ -1164,25 +1346,34 @@ public partial class Code : Command<Message?>
     /// Get an unsigned integer array parameter value
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="maxLength">Most values the caller can take</param>
     /// <param name="defaultValue">Value to return if the letter is not in the code, or null to require it</param>
+    /// <param name="pad">Whether a single value stands for every one of them</param>
+    /// <param name="exactLength">Whether the caller needs as many values as it can take</param>
+    /// <param name="allowZeroLength">Whether the letter may be written with no values after it, which
+    /// the caller then reads as none of them</param>
     /// <param name="min">Lowest value each item may have, or null for no lower limit</param>
     /// <param name="max">Highest value each item may have, or null for no upper limit</param>
     /// <param name="errorString">Builds the refusal from the value it would not take, in place of the usual
     /// "too low" or "too high", or null for those</param>
     /// <returns>Parameter value</returns>
     /// <exception cref="MissingParameterException">Parameter not found and no default was given</exception>
-    /// <exception cref="GCodeException">The letter carries no value, or one item is outside the limits</exception>
+    /// <exception cref="GCodeException">The letter carries no value, the list is the wrong length,
+    /// or one item is outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
     /// <remarks>
-    /// The limits are about what the line said, so a default is returned as it stands: it comes from
-    /// the caller rather than from the code, and there is nothing to refuse it to
+    /// The limits and the length are about what the line said, so a default is returned as it
+    /// stands: it comes from the caller rather than from the code, and there is nothing to refuse it
+    /// to
     /// </remarks>
-    public uint[] GetUIntArray(char letter, uint[]? defaultValue = null, uint? min = null, uint? max = null,
+    public uint[] GetUIntArray(char letter, int maxLength, uint[]? defaultValue = null, bool pad = false,
+                               bool exactLength = false, bool allowZeroLength = false,
+                               uint? min = null, uint? max = null,
                                Func<long, string>? errorString = null)
     {
-        CodeParameter? parameter = FindValuedParameter(letter);
+        CodeParameter? parameter = FindArrayParameter(letter, maxLength, allowZeroLength);
         return (parameter is not null)
-            ? CheckLimits((uint[])parameter, min, max, letter, errorString)
+            ? CheckLimits(ReadArray(parameter, static p => (uint[])p, maxLength, pad, exactLength), min, max, letter, errorString)
             : defaultValue ?? throw new MissingParameterException(letter);
     }
 
@@ -1190,20 +1381,28 @@ public partial class Code : Command<Message?>
     /// Try to get an unsigned integer array parameter value by letter
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="maxLength">Most values the caller can take</param>
     /// <param name="parameter">Parameter if found, else null</param>
+    /// <param name="pad">Whether a single value stands for every one of them</param>
+    /// <param name="exactLength">Whether the caller needs as many values as it can take</param>
+    /// <param name="allowZeroLength">Whether the letter may be written with no values after it, which
+    /// the caller then reads as none of them</param>
     /// <param name="min">Lowest value each item may have, or null for no lower limit</param>
     /// <param name="max">Highest value each item may have, or null for no upper limit</param>
     /// <param name="errorString">Builds the refusal from the value it would not take, in place of the usual
     /// "too low" or "too high", or null for those</param>
     /// <returns>True if the requested parameter could be found</returns>
-    /// <exception cref="GCodeException">The letter carries no value, or one item is outside the limits</exception>
+    /// <exception cref="GCodeException">The letter carries no value, the list is the wrong length,
+    /// or one item is outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetUIntArray(char letter, [NotNullWhen(true)] out uint[]? parameter,
-                                uint? min = null, uint? max = null, Func<long, string>? errorString = null)
+    public bool TryGetUIntArray(char letter, int maxLength, [NotNullWhen(true)] out uint[]? parameter,
+                                bool pad = false, bool exactLength = false, bool allowZeroLength = false,
+                                uint? min = null, uint? max = null,
+                                Func<long, string>? errorString = null)
     {
-        if (TryGetValuedParameter(letter, out CodeParameter? param))
+        if (TryGetArrayParameter(letter, maxLength, allowZeroLength, out CodeParameter? param))
         {
-            parameter = CheckLimits((uint[])param, min, max, letter, errorString);
+            parameter = CheckLimits(ReadArray(param, static p => (uint[])p, maxLength, pad, exactLength), min, max, letter, errorString);
             return true;
         }
         parameter = null;
@@ -1214,25 +1413,34 @@ public partial class Code : Command<Message?>
     /// Get a long array parameter value
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="maxLength">Most values the caller can take</param>
     /// <param name="defaultValue">Value to return if the letter is not in the code, or null to require it</param>
+    /// <param name="pad">Whether a single value stands for every one of them</param>
+    /// <param name="exactLength">Whether the caller needs as many values as it can take</param>
+    /// <param name="allowZeroLength">Whether the letter may be written with no values after it, which
+    /// the caller then reads as none of them</param>
     /// <param name="min">Lowest value each item may have, or null for no lower limit</param>
     /// <param name="max">Highest value each item may have, or null for no upper limit</param>
     /// <param name="errorString">Builds the refusal from the value it would not take, in place of the usual
     /// "too low" or "too high", or null for those</param>
     /// <returns>Parameter value</returns>
     /// <exception cref="MissingParameterException">Parameter not found and no default was given</exception>
-    /// <exception cref="GCodeException">The letter carries no value, or one item is outside the limits</exception>
+    /// <exception cref="GCodeException">The letter carries no value, the list is the wrong length,
+    /// or one item is outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
     /// <remarks>
-    /// The limits are about what the line said, so a default is returned as it stands: it comes from
-    /// the caller rather than from the code, and there is nothing to refuse it to
+    /// The limits and the length are about what the line said, so a default is returned as it
+    /// stands: it comes from the caller rather than from the code, and there is nothing to refuse it
+    /// to
     /// </remarks>
-    public long[] GetLongArray(char letter, long[]? defaultValue = null, long? min = null, long? max = null,
+    public long[] GetLongArray(char letter, int maxLength, long[]? defaultValue = null, bool pad = false,
+                               bool exactLength = false, bool allowZeroLength = false,
+                               long? min = null, long? max = null,
                                Func<long, string>? errorString = null)
     {
-        CodeParameter? parameter = FindValuedParameter(letter);
+        CodeParameter? parameter = FindArrayParameter(letter, maxLength, allowZeroLength);
         return (parameter is not null)
-            ? CheckLimits((long[])parameter, min, max, letter, errorString)
+            ? CheckLimits(ReadArray(parameter, static p => (long[])p, maxLength, pad, exactLength), min, max, letter, errorString)
             : defaultValue ?? throw new MissingParameterException(letter);
     }
 
@@ -1240,20 +1448,132 @@ public partial class Code : Command<Message?>
     /// Try to get a long array parameter value by letter
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="maxLength">Most values the caller can take</param>
     /// <param name="parameter">Parameter if found, else null</param>
+    /// <param name="pad">Whether a single value stands for every one of them</param>
+    /// <param name="exactLength">Whether the caller needs as many values as it can take</param>
+    /// <param name="allowZeroLength">Whether the letter may be written with no values after it, which
+    /// the caller then reads as none of them</param>
     /// <param name="min">Lowest value each item may have, or null for no lower limit</param>
     /// <param name="max">Highest value each item may have, or null for no upper limit</param>
     /// <param name="errorString">Builds the refusal from the value it would not take, in place of the usual
     /// "too low" or "too high", or null for those</param>
     /// <returns>True if the requested parameter could be found</returns>
-    /// <exception cref="GCodeException">The letter carries no value, or one item is outside the limits</exception>
+    /// <exception cref="GCodeException">The letter carries no value, the list is the wrong length,
+    /// or one item is outside the limits</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetLongArray(char letter, [NotNullWhen(true)] out long[]? parameter,
-                                long? min = null, long? max = null, Func<long, string>? errorString = null)
+    public bool TryGetLongArray(char letter, int maxLength, [NotNullWhen(true)] out long[]? parameter,
+                                bool pad = false, bool exactLength = false, bool allowZeroLength = false,
+                                long? min = null, long? max = null,
+                                Func<long, string>? errorString = null)
     {
-        if (TryGetValuedParameter(letter, out CodeParameter? param))
+        if (TryGetArrayParameter(letter, maxLength, allowZeroLength, out CodeParameter? param))
         {
-            parameter = CheckLimits((long[])param, min, max, letter, errorString);
+            parameter = CheckLimits(ReadArray(param, static p => (long[])p, maxLength, pad, exactLength), min, max, letter, errorString);
+            return true;
+        }
+        parameter = null;
+        return false;
+    }
+
+    /// <summary>
+    /// Refuse a list whose values do not all name a member of an enumeration
+    /// </summary>
+    /// <typeparam name="T">Enumeration the values select members of</typeparam>
+    /// <param name="values">Values that were read</param>
+    /// <param name="letter">Letter of the parameter the values came from</param>
+    /// <param name="ignoreInvalid">Whether a value naming no member is passed over instead of
+    /// refusing the list</param>
+    /// <param name="errorString">Builds the refusal from the value it would not take, in place of the usual
+    /// "too low" or "too high", or null for those</param>
+    /// <returns>The members the values name, without the ones that were passed over</returns>
+    /// <exception cref="GCodeException">A value names no member</exception>
+    /// <remarks>
+    /// The array counterpart of <see cref="CheckEnum{T}" />, refusing on the first item that names
+    /// no member and naming the parameter rather than the item, for the reason the limit checks
+    /// give: the list stands or falls together.
+    /// </remarks>
+    private static T[] CheckEnums<T>(long[] values, char letter, bool ignoreInvalid,
+                                     Func<long, string>? errorString) where T : struct, Enum
+    {
+        List<T> members = new(values.Length);
+        foreach (long value in values)
+        {
+            try
+            {
+                members.Add(CheckEnum<T>(value, letter, errorString));
+            }
+            catch (GCodeException) when (ignoreInvalid)
+            {
+                // Passed over
+            }
+        }
+        return [.. members];
+    }
+
+    /// <summary>
+    /// Get a parameter value as a list of members of an enumeration
+    /// </summary>
+    /// <typeparam name="T">Enumeration the values select members of</typeparam>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="maxLength">Most values the caller can take</param>
+    /// <param name="defaultValue">Value to return if the letter is not in the code, or null to require it</param>
+    /// <param name="pad">Whether a single value stands for every one of them</param>
+    /// <param name="exactLength">Whether the caller needs as many values as it can take</param>
+    /// <param name="allowZeroLength">Whether the letter may be written with no values after it, which
+    /// the caller then reads as none of them</param>
+    /// <param name="ignoreInvalid">Whether a value naming no member is passed over instead of
+    /// refusing the list, which shortens what comes back</param>
+    /// <param name="errorString">Builds the refusal from the value it would not take, in place of the usual
+    /// "too low" or "too high", or null for those</param>
+    /// <returns>Parameter value</returns>
+    /// <exception cref="MissingParameterException">Parameter not found and no default was given</exception>
+    /// <exception cref="GCodeException">The letter carries no value, the list is the wrong length,
+    /// or one item names no member</exception>
+    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+    /// <remarks>
+    /// Every item is held to the enumeration, because the enumeration is the limits: one value per
+    /// drive, each selecting one of a fixed set of behaviours, is refused as a whole for naming one
+    /// that does not exist. There are no <c>min</c> and <c>max</c> for the same reason the scalar
+    /// form has none. The length is about what the line said, so a default is returned as it stands
+    /// </remarks>
+    public T[] GetEnumArray<T>(char letter, int maxLength, T[]? defaultValue = null, bool pad = false,
+                               bool exactLength = false, bool allowZeroLength = false, bool ignoreInvalid = false,
+                               Func<long, string>? errorString = null) where T : struct, Enum
+    {
+        CodeParameter? parameter = FindArrayParameter(letter, maxLength, allowZeroLength);
+        return (parameter is not null)
+            ? CheckEnums<T>(ReadArray(parameter, static p => (long[])p, maxLength, pad, exactLength), letter, ignoreInvalid, errorString)
+            : defaultValue ?? throw new MissingParameterException(letter);
+    }
+
+    /// <summary>
+    /// Try to get a parameter value as a list of members of an enumeration
+    /// </summary>
+    /// <typeparam name="T">Enumeration the values select members of</typeparam>
+    /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="maxLength">Most values the caller can take</param>
+    /// <param name="parameter">Parameter if found, else null</param>
+    /// <param name="pad">Whether a single value stands for every one of them</param>
+    /// <param name="exactLength">Whether the caller needs as many values as it can take</param>
+    /// <param name="allowZeroLength">Whether the letter may be written with no values after it, which
+    /// the caller then reads as none of them</param>
+    /// <param name="ignoreInvalid">Whether a value naming no member is passed over instead of
+    /// refusing the list, which shortens what comes back</param>
+    /// <param name="errorString">Builds the refusal from the value it would not take, in place of the usual
+    /// "too low" or "too high", or null for those</param>
+    /// <returns>True if the requested parameter could be found</returns>
+    /// <exception cref="GCodeException">The letter carries no value, the list is the wrong length,
+    /// or one item names no member</exception>
+    /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
+    public bool TryGetEnumArray<T>(char letter, int maxLength, [NotNullWhen(true)] out T[]? parameter,
+                                   bool pad = false, bool exactLength = false, bool allowZeroLength = false,
+                                   bool ignoreInvalid = false, Func<long, string>? errorString = null)
+        where T : struct, Enum
+    {
+        if (TryGetArrayParameter(letter, maxLength, allowZeroLength, out CodeParameter? param))
+        {
+            parameter = CheckEnums<T>(ReadArray(param, static p => (long[])p, maxLength, pad, exactLength), letter, ignoreInvalid, errorString);
             return true;
         }
         parameter = null;
@@ -1264,34 +1584,48 @@ public partial class Code : Command<Message?>
     /// Get a driver ID array parameter value
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="maxLength">Most drivers the caller can take</param>
     /// <param name="defaultValue">Value to return if the letter is not in the code, or null to require it</param>
+    /// <param name="exactLength">Whether the caller needs as many drivers as it can take</param>
+    /// <param name="allowZeroLength">Whether the letter may be written with no drivers after it, which
+    /// the caller then reads as none of them</param>
     /// <returns>Parameter value</returns>
     /// <exception cref="MissingParameterException">Parameter not found and no default was given</exception>
-    /// <exception cref="GCodeException">The letter carries no value</exception>
+    /// <exception cref="GCodeException">The letter carries no value, or the list is the wrong length</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
     /// <remarks>
     /// There are no limits to give, because a driver ID is a board and a port rather than a
-    /// magnitude: which of two drivers is the greater is not a question a code asks
+    /// magnitude: which of two drivers is the greater is not a question a code asks. Nor is there
+    /// padding, for the same reason RepRapFirmware's <c>GetDriverIdArray</c> has none: one driver
+    /// cannot stand for every driver of a drive, because each of them is a different motor
     /// </remarks>
-    public DriverId[] GetDriverIdArray(char letter, DriverId[]? defaultValue = null)
+    public DriverId[] GetDriverIdArray(char letter, int maxLength, DriverId[]? defaultValue = null,
+                                       bool exactLength = false, bool allowZeroLength = false)
     {
-        CodeParameter? parameter = FindValuedParameter(letter);
-        return (parameter is not null) ? (DriverId[])parameter : defaultValue ?? throw new MissingParameterException(letter);
+        CodeParameter? parameter = FindArrayParameter(letter, maxLength, allowZeroLength);
+        return (parameter is not null)
+            ? ReadArray(parameter, static p => (DriverId[])p, maxLength, pad: false, exactLength)
+            : defaultValue ?? throw new MissingParameterException(letter);
     }
 
     /// <summary>
     /// Try to get a driver ID array parameter value by letter
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="maxLength">Most drivers the caller can take</param>
     /// <param name="parameter">Parameter if found, else null</param>
+    /// <param name="exactLength">Whether the caller needs as many drivers as it can take</param>
+    /// <param name="allowZeroLength">Whether the letter may be written with no drivers after it, which
+    /// the caller then reads as none of them</param>
     /// <returns>True if the requested parameter could be found</returns>
-    /// <exception cref="GCodeException">The letter carries no value</exception>
+    /// <exception cref="GCodeException">The letter carries no value, or the list is the wrong length</exception>
     /// <exception cref="InvalidParameterTypeException">Failed to convert parameter value</exception>
-    public bool TryGetDriverIdArray(char letter, [NotNullWhen(true)] out DriverId[]? parameter)
+    public bool TryGetDriverIdArray(char letter, int maxLength, [NotNullWhen(true)] out DriverId[]? parameter,
+                                    bool exactLength = false, bool allowZeroLength = false)
     {
-        if (TryGetValuedParameter(letter, out CodeParameter? param))
+        if (TryGetArrayParameter(letter, maxLength, allowZeroLength, out CodeParameter? param))
         {
-            parameter = (DriverId[])param;
+            parameter = ReadArray(param, static p => (DriverId[])p, maxLength, pad: false, exactLength);
             return true;
         }
         parameter = null;

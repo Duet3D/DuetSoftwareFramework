@@ -59,7 +59,7 @@ internal partial class MCodeHandler
             for (int axis = 0; axis < model.Move.Axes.Count; axis++)
             {
                 char letter = model.Move.Axes[axis].Letter;
-                if (!code.TryGetFloatArray(letter, out float[]? values))
+                if (!code.HasParameter(letter))
                 {
                     continue;
                 }
@@ -72,9 +72,12 @@ internal partial class MCodeHandler
                 {
                     return new Message(MessageType.Error, "Mesh leveling expects exactly two axes");
                 }
-                if (values.Length < 2)
+
+                // A range is a minimum and a maximum, so an axis named with anything else is refused
+                // rather than half read (RRF GCodes6.cpp, TryGetFloatArray with a length of two)
+                if (!code.TryGetFloatArray(letter, 2, out float[]? values, exactLength: true))
                 {
-                    return new Message(MessageType.Error, $"Expected a minimum and a maximum for {letter}");
+                    continue;
                 }
 
                 letters[axesSeen] = letter;
@@ -88,12 +91,13 @@ internal partial class MCodeHandler
                 return new Message(MessageType.Error, "Specify zero or two axes in M557");
             }
 
-            bool seenPoints = code.TryGetIntArray('P', out int[]? numPoints);
+            // One value stands for both axes, so M557 P20 is a square grid
+            bool seenPoints = code.TryGetIntArray('P', 2, out int[]? numPoints, pad: true, exactLength: true);
             bool seenSpacing = false;
-            if (!seenPoints && code.TryGetFloatArray('S', out float[]? given) && given.Length > 0)
+            if (!seenPoints && code.TryGetFloatArray('S', 2, out float[]? given, pad: true, exactLength: true))
             {
                 spacings[0] = given[0];
-                spacings[1] = given.Length > 1 ? given[1] : given[0];
+                spacings[1] = given[1];
                 seenSpacing = true;
             }
 
@@ -113,14 +117,12 @@ internal partial class MCodeHandler
                 return new Message(MessageType.Error, "Specify at least a radius or two axis ranges in M557");
             }
 
-            if (seenPoints && (numPoints!.Length == 0 || numPoints[0] < 2))
+            if (seenPoints && numPoints![0] < 2)
             {
                 return new Message(MessageType.Error, "Expected at least two points per axis");
             }
 
-            int[] points = seenPoints
-                ? [numPoints![0], numPoints.Length > 1 ? numPoints[1] : numPoints[0]]
-                : [0, 0];
+            int[] points = seenPoints ? [numPoints![0], numPoints[1]] : [0, 0];
 
             if (axesSeen > 0)
             {

@@ -61,6 +61,11 @@ internal partial class MCodeHandler
     /// <summary>Seconds per minute, for the object model's mm/min speeds</summary>
     private const float SecondsPerMinute = 60.0f;
 
+    /// <summary>Step timings M569 T carries: the pulse widths and the setup and hold times</summary>
+    /// <remarks>RepRapFirmware reads four of them and lets one stand for all (<c>Move::ConfigureDriver</c>,
+    /// <c>numTimings = ARRAY_SIZE(timings)</c> with padding)</remarks>
+    private const int DriverStepTimings = 4;
+
     /// <summary>Lowest input shaping frequency RepRapFirmware accepts, in Hz</summary>
     private const float MinShapingFrequency = 1.0f;
 
@@ -134,7 +139,7 @@ internal partial class MCodeHandler
                 }
             }
 
-            if (TryGetExtruderValues(code, move, out float[]? extruderValues))
+            if (code.TryGetFloatArray('E', move.Extruders.Count, out float[]? extruderValues, pad: true, min: 0.0f))
             {
                 for (int i = 0; i < extruderValues.Length; i++)
                 {
@@ -199,7 +204,7 @@ internal partial class MCodeHandler
                 }
             }
 
-            if (TryGetExtruderValues(code, move, out float[]? extruderValues))
+            if (code.TryGetFloatArray('E', move.Extruders.Count, out float[]? extruderValues, pad: true, min: 0.0f))
             {
                 // An extruder has no reduced acceleration of its own in the object model; probing and
                 // stall homing moves do not extrude, so M201.1 has nothing to set for one
@@ -269,7 +274,7 @@ internal partial class MCodeHandler
                 }
             }
 
-            if (TryGetExtruderValues(code, move, out float[]? extruderValues))
+            if (code.TryGetFloatArray('E', move.Extruders.Count, out float[]? extruderValues, pad: true, min: 0.0f))
             {
                 for (int i = 0; i < extruderValues.Length; i++)
                 {
@@ -391,7 +396,7 @@ internal partial class MCodeHandler
                 }
             }
 
-            if (TryGetExtruderValues(code, move, out float[]? extruderValues))
+            if (code.TryGetFloatArray('E', move.Extruders.Count, out float[]? extruderValues, pad: true, min: 0.0f))
             {
                 for (int i = 0; i < extruderValues.Length; i++)
                 {
@@ -454,7 +459,7 @@ internal partial class MCodeHandler
 
             foreach (Axis axis in move.Axes)
             {
-                if (!code.TryGetFloatArray(axis.Letter, out float[]? values) || values.Length == 0)
+                if (!code.TryGetFloatArray(axis.Letter, 2, out float[]? values))
                 {
                     continue;
                 }
@@ -519,7 +524,7 @@ internal partial class MCodeHandler
 
             foreach (Axis axis in move.Axes)
             {
-                if (code.TryGetInt(axis.Letter, out int microstepping))
+                if (code.TryGetInt(axis.Letter, out int microstepping, min: 0))
                 {
                     uint previousMicrostepping = (uint)axis.Microstepping.Value;
                     axis.Microstepping.Value = microstepping;
@@ -537,12 +542,14 @@ internal partial class MCodeHandler
                 }
             }
 
-            if (code.TryGetIntArray('E', out int[]? extruderValues) && extruderValues.Length > 0)
+            int eCount = move.Extruders.Count;
+            // One value applies to every extruder, as RepRapFirmware reads it (GCodes2.cpp case 350,
+            // eCount = numExtruders with padding)
+            if (code.TryGetIntArray('E', eCount, out int[]? extruderValues, pad: true, min: 0))
             {
-                for (int i = 0; i < move.Extruders.Count; i++)
+                for (int i = 0; i < eCount; i++)
                 {
-                    int microstepping = extruderValues.Length == 1 ? extruderValues[0]
-                                        : i < extruderValues.Length ? extruderValues[i] : int.MinValue;
+                    int microstepping = extruderValues[i];
                     if (microstepping < 0)
                     {
                         // Negative values are how a mixing configuration skips an extruder it does
@@ -632,14 +639,20 @@ internal partial class MCodeHandler
             List<(char Letter, DriverId[] Drivers)> axisMapping = [];
             foreach (char letter in Axis.Letters)
             {
-                if (TryGetDrivers(code, letter, out DriverId[] drivers))
+                // A letter given without a driver means no drivers, which is how a drive gives up
+                // the ones it has: the axis stays in place but can no longer move
+                // (rrf-differences.md section 3.1)
+                if (code.TryGetDriverIdArray(letter, Motion.Native.MotionLimits.MaxDriversPerAxis,
+                                             out DriverId[]? drivers, allowZeroLength: true))
                 {
                     axisMapping.Add((letter, [.. drivers.Where(driver => IsValidDriver(driver, warnings))]));
                 }
             }
 
             DriverId?[]? extruderMapping = null;
-            if (TryGetDrivers(code, 'E', out DriverId[] extruderDrivers))
+            // A bare E does the same for the extruders, leaving the machine with none at all
+            if (code.TryGetDriverIdArray('E', Motion.Native.MotionLimits.MaxExtruders,
+                                         out DriverId[]? extruderDrivers, allowZeroLength: true))
             {
                 extruderMapping = [.. extruderDrivers.Select(driver => IsValidDriver(driver, warnings) ? driver : null)];
             }
@@ -740,7 +753,10 @@ internal partial class MCodeHandler
     /// <returns>The result</returns>
     private async ValueTask<Message> HandleMotorCurrentsAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        List<RemoteDrivers.DriverValue<float>> toUpdate = [];
+        // One entry per drive the code names, because that is what one message carries: RepRapFirmware
+        // sets the current a drive at a time (Move2.cpp Move::SetMotorCurrent, called once per axis or
+        // extruder) and each call sends its own request for that drive's drivers
+        List<List<RemoteDrivers.DriverValue<float>>> perDrive = [];
         bool seen = false;
         string? report = null;
 
@@ -751,18 +767,16 @@ internal partial class MCodeHandler
 
             foreach (Axis axis in move.Axes)
             {
-                if (code.TryGetFloat(axis.Letter, out float value))
+                if (code.TryGetFloat(axis.Letter, out float value, min: 0.0f))
                 {
                     SetCurrent(axis, which, value);
-                    foreach (DriverId driver in axis.Drivers)
-                    {
-                        toUpdate.Add(new RemoteDrivers.DriverValue<float>(driver, CurrentToSend(axis, which)));
-                    }
+                    perDrive.Add([.. axis.Drivers.Select(
+                        driver => new RemoteDrivers.DriverValue<float>(driver, CurrentToSend(axis, which)))]);
                     seen = true;
                 }
             }
 
-            if (TryGetExtruderValues(code, move, out float[]? extruderValues))
+            if (code.TryGetFloatArray('E', move.Extruders.Count, out float[]? extruderValues, pad: true, min: 0.0f))
             {
                 for (int i = 0; i < extruderValues.Length; i++)
                 {
@@ -770,7 +784,7 @@ internal partial class MCodeHandler
                     SetCurrent(extruder, which, extruderValues[i]);
                     if (extruder.Driver is not null)
                     {
-                        toUpdate.Add(new RemoteDrivers.DriverValue<float>(extruder.Driver, CurrentToSend(extruder, which)));
+                        perDrive.Add([new RemoteDrivers.DriverValue<float>(extruder.Driver, CurrentToSend(extruder, which))]);
                     }
                 }
                 seen = true;
@@ -780,6 +794,7 @@ internal partial class MCodeHandler
             {
                 if (code.TryGetFloat('I', out float idleFactor, min: 0.0f, max: 100.0f))
                 {
+                    // TODO send the idle current to drivers in the idle state
                     move.Idle.Factor = idleFactor / 100.0f;
                     seen = true;
                 }
@@ -822,9 +837,14 @@ internal partial class MCodeHandler
 
         // The standstill percentage is its own setting on the driver; the other two both end up as
         // the current the driver should run at
-        IList<Message> replies = which == 917
-            ? await RemoteDrivers.SetStandstillCurrentFactorAsync(linkInterface, toUpdate, cancellationToken)
-            : await RemoteDrivers.SetMotorCurrentsAsync(linkInterface, toUpdate, cancellationToken);
+        // TODO we could probably reduce the number of CAN messages sent by removing this for loop
+        List<Message> replies = [];
+        foreach (List<RemoteDrivers.DriverValue<float>> drive in perDrive.Where(drive => drive.Count > 0))
+        {
+            replies.AddRange(which == 917
+                ? await RemoteDrivers.SetStandstillCurrentFactorAsync(linkInterface, drive, cancellationToken)
+                : await RemoteDrivers.SetMotorCurrentsAsync(linkInterface, drive, cancellationToken));
+        }
         return replies.ToMessage();
     }
 
@@ -851,21 +871,23 @@ internal partial class MCodeHandler
             // An S parameter is a drive named as much as an axis letter is: it makes the code
             // something other than a request to disable everything
             bool named = false;
-            if (code.TryGetFloat('S', out float idleTimeout))
+            if (code.TryGetFloat('S', out float idleTimeout, min: 0.0f))
             {
-                move.Idle.Timeout = MathF.Max(idleTimeout, 0.0f);
+                move.Idle.Timeout = idleTimeout;
                 named = true;
             }
 
+            // The idle percentage belongs to the idle state and to nothing else: RepRapFirmware carries
+            // it only in SetRemoteDriversIdle, while EnableRemoteDrivers and DisableRemoteDrivers send a
+            // bare DriverStateControl (CanInterface.cpp:988-1017). M17 and M18 are those two
             ushort mode = enable ? DriverStateControl.DriverActive : DriverStateControl.DriverDisabled;
-            ushort idlePercent = (ushort)Math.Clamp((int)MathF.Round(move.Idle.Factor * 100.0f), 0, 100);
 
             foreach (Axis axis in move.Axes)
             {
                 if (code.HasParameter(axis.Letter))
                 {
                     named = true;
-                    ApplyDriverState(toUpdate, axis.Drivers, mode, idlePercent);
+                    ApplyDriverState(toUpdate, axis.Drivers, mode);
                     if (!enable)
                     {
                         axis.Homed = false;
@@ -873,16 +895,17 @@ internal partial class MCodeHandler
                 }
             }
 
-            if (code.TryGetIntArray('E', out int[]? extruders) && extruders.Length > 0)
+            // The extruders are named by number, as many as the machine has, with no default: a bare
+            // E is a parse error rather than "every extruder" (RRF GCodes2.cpp case 17, eCount =
+            // numExtruders and GetUnsignedArray without padding)
+            if (code.TryGetIntArray('E', move.Extruders.Count, out int[]? extruders,
+                                    min: 0, max: move.Extruders.Count - 1,
+                                    errorString: extruder => $"Invalid extruder number specified: {extruder}"))
             {
                 named = true;
                 foreach (int extruder in extruders)
                 {
-                    if (extruder < 0 || extruder >= move.Extruders.Count)
-                    {
-                        return new Message(MessageType.Error, $"Invalid extruder number specified: {extruder}");
-                    }
-                    AddDriverState(toUpdate, move.Extruders[extruder].Driver, mode, idlePercent);
+                    AddDriverState(toUpdate, move.Extruders[extruder].Driver, mode);
                 }
             }
 
@@ -891,7 +914,7 @@ internal partial class MCodeHandler
                 // No drive named, so this is about all of them
                 foreach (Axis axis in move.Axes)
                 {
-                    ApplyDriverState(toUpdate, axis.Drivers, mode, idlePercent);
+                    ApplyDriverState(toUpdate, axis.Drivers, mode);
                     if (!enable)
                     {
                         axis.Homed = false;
@@ -899,7 +922,7 @@ internal partial class MCodeHandler
                 }
                 foreach (Extruder extruder in move.Extruders)
                 {
-                    AddDriverState(toUpdate, extruder.Driver, mode, idlePercent);
+                    AddDriverState(toUpdate, extruder.Driver, mode);
                 }
             }
         }
@@ -946,6 +969,7 @@ internal partial class MCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleDriverConfigAsync(Commands.Code code, CancellationToken cancellationToken)
     {
+        // TODO this needs to handle a driver array
         DriverId driver = code.GetDriverId('P');
 
         CanAddresses.CheckAddressHasHardware(driver.Board, $"Driver {driver}");
@@ -1033,7 +1057,7 @@ internal partial class MCodeHandler
             {
                 config.CurrentScaler = currentScaler;
             }
-            if (code.TryGetIntArray('Y', out int[]? hysteresis) && hysteresis.Length > 0)
+            if (code.TryGetIntArray('Y', DriverHysteresis.ValueCount, out int[]? hysteresis, min: 0))
             {
                 config.Hysteresis.Start = hysteresis[0];
                 if (hysteresis.Length > 1)
@@ -1045,13 +1069,13 @@ internal partial class MCodeHandler
                     config.Hysteresis.Decrement = hysteresis[2];
                 }
             }
-            if (code.TryGetFloatArray('T', out float[]? timings) && timings.Length > 0)
+            // A single value sets all four timings, which is how most configurations are written
+            if (code.TryGetFloatArray('T', DriverStepTimings, out float[]? timings, pad: true))
             {
-                // A single value sets all four timings, which is how most configurations are written
                 config.StepTiming.Clear();
-                for (int i = 0; i < 4; i++)
+                for (int i = 0; i < DriverStepTimings; i++)
                 {
-                    config.StepTiming.Add(timings.Length == 1 ? timings[0] : i < timings.Length ? timings[i] : 0.0f);
+                    config.StepTiming.Add(i < timings.Length ? timings[i] : 0.0f);
                 }
             }
         }
@@ -1113,13 +1137,11 @@ internal partial class MCodeHandler
 
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            if (code.TryGetDriverIdArray('P', out DriverId[]? named))
+            // RRF bounds this by the number of local drivers but it will be changed to only take a single driver
+            if (code.TryGetDriverId('P', out DriverId? driver))
             {
-                foreach (DriverId driver in named)
-                {
                     CanAddresses.CheckAddressHasHardware(driver.Board, $"Driver {driver}");
                     drivers.Add(driver);
-                }
             }
 
             foreach (Axis axis in model.Move.Axes)
@@ -1127,6 +1149,21 @@ internal partial class MCodeHandler
                 if (code.HasParameter(axis.Letter))
                 {
                     drivers.AddRange(axis.Drivers);
+                }
+            }
+
+            // Extruders are named by number rather than by letter, and the list has no default: a
+            // bare E is a parse error rather than "every extruder" (RRF Move2.cpp
+            // Move::ConfigureStallDetection, GetUnsignedArray(..., false))
+            if (code.HasParameter('E'))
+            {
+                int eCount = model.Move.Extruders.Count;
+                foreach (int extruder in code.GetIntArray('E', eCount, min: 0, max: eCount - 1, errorString: extruder => $"Invalid extruder number specified: {extruder}"))
+                {
+                    if (model.Move.Extruders[extruder].Driver is DriverId eDriver)
+                    {
+                        drivers.Add(eDriver);
+                    }
                 }
             }
         }
@@ -1464,7 +1501,7 @@ internal partial class MCodeHandler
     /// <returns>The result</returns>
     private async ValueTask<Message> HandlePressureAdvanceAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (!code.TryGetFloatArray('S', out float[]? given) || given.Length == 0)
+        if (!code.TryGetFloatArray('S', ExtruderPressureAdvance.CoefficientCount, out float[]? given, min: 0.0f))
         {
             using (await model.AccessReadOnlyAsync(cancellationToken))
             {
@@ -1481,19 +1518,11 @@ internal partial class MCodeHandler
 
         // S may carry a second coefficient, which applies above the extrusion speed named by L
         float k0 = given[0], k1 = given.Length > 1 ? given[1] : given[0];
-        if (k0 < 0.0f || k1 < 0.0f)
-        {
-            return new Message(MessageType.Error, "pressure advance values must be non-negative");
-        }
 
         float? dk = null;
         if (given.Length > 1)
         {
-            if (!code.TryGetFloat('L', out float transition) || transition < 0.0f)
-            {
-                return new Message(MessageType.Error, "a second pressure advance coefficient needs a non-negative L parameter");
-            }
-            dk = transition;
+            dk = code.GetFloat('L', min: 0.0f, errorString: _ => "a second pressure advance coefficient needs a non-negative L parameter");
         }
 
         // The coefficient still goes to the boards, which apply it to the moves already in their own
@@ -1503,32 +1532,54 @@ internal partial class MCodeHandler
         // is declared with can become Ordered
         // TODO revisit when pressure advance no longer has to be pushed to the drivers
 
-        List<RemoteDrivers.DriverValue<float>> toUpdate = [];
+        static void UpdateExtruder(Extruder e, ShortPressureAdvanceParameters p, List<RemoteDrivers.DriverValue<ShortPressureAdvanceParameters>> toUpdate)
+        {
+            if (e.Driver is null)
+            {
+                return;
+            }
+
+#pragma warning disable CS0618
+            e.PressureAdvance = (float)p.K[0];
+#pragma warning restore
+            e.PressAdv.K0 = (float)p.K[0];
+            e.PressAdv.K1 = (float)p.K[1];
+            e.PressAdv.D = (float)p.Dk;
+            toUpdate.Add(new RemoteDrivers.DriverValue<ShortPressureAdvanceParameters>(e.Driver, p));
+        }
+
+        List<RemoteDrivers.DriverValue<ShortPressureAdvanceParameters>> toUpdate = [];
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             Move move = model.Move;
+            ShortPressureAdvanceParameters p = new();
+            p.K[0] = (Half)k0;
+            p.K[1] = (Half)k1;
+            p.Dk = (Half)(dk ?? 0.0);
 
             // D names the extruders to change; without it every extruder is set
-            bool hasSelection = code.TryGetIntArray('D', out int[]? selected);
-            for (int extruder = 0; extruder < move.Extruders.Count; extruder++)
+            if (code.TryGetIntArray('D', Motion.Native.MotionLimits.MaxExtruders, out int[]? selected, min: 0, max: move.Extruders.Count - 1))
             {
-                if (hasSelection && !selected!.Contains(extruder))
+                foreach (int extruder in selected)
                 {
-                    continue;
-                }
+                    Extruder e = move.Extruders[extruder];
+                    UpdateExtruder(e, p, toUpdate);
 
-                Extruder e = move.Extruders[extruder];
-#pragma warning disable CS0618
-                e.PressureAdvance = k0;
-#pragma warning restore
-                e.PressAdv.K0 = k0;
-                e.PressAdv.K1 = k1;
-                e.PressAdv.D = dk;
-                if (e.Driver is not null)
+                }
+            }
+            else
+            {
+                if (toolManager.Current is Tool ct)
                 {
-                    // The message carries the first coefficient; the second and its transition point
-                    // are held here until the wider pressure advance message is ported
-                    toUpdate.Add(new RemoteDrivers.DriverValue<float>(e.Driver, k0));
+                    foreach (int extruder in ct.Extruders)
+                    {
+                        Extruder e = move.Extruders[extruder];
+                        UpdateExtruder(e, p, toUpdate);
+                    }
+                }
+                else
+                {
+                    return new Message(MessageType.Error, "No tool selected");
                 }
             }
         }
@@ -2166,7 +2217,7 @@ internal partial class MCodeHandler
 
             TiltCorrection tilt = leadscrewKinematics.TiltCorrection;
 
-            if (code.TryGetFloatArray('X', out float[]? screwX))
+            if (code.TryGetFloatArray('X', ZLeadscrewKinematics.MaxLeadscrews, out float[]? screwX))
             {
                 tilt.ScrewX.Clear();
                 foreach (float x in screwX)
@@ -2175,7 +2226,7 @@ internal partial class MCodeHandler
                 }
                 seen = true;
             }
-            if (code.TryGetFloatArray('Y', out float[]? screwY))
+            if (code.TryGetFloatArray('Y', ZLeadscrewKinematics.MaxLeadscrews, out float[]? screwY))
             {
                 tilt.ScrewY.Clear();
                 foreach (float y in screwY)
@@ -2657,33 +2708,6 @@ internal partial class MCodeHandler
     }
 
     /// <summary>
-    /// Read the E parameter as one value per extruder
-    /// </summary>
-    /// <param name="code">The code</param>
-    /// <param name="move">The move subsystem</param>
-    /// <param name="values">One value per configured extruder</param>
-    /// <returns>True if the code carried an E parameter</returns>
-    /// <remarks>
-    /// A single value applies to every extruder, which is how nearly every configuration is written.
-    /// More than one is taken positionally, and any extruder the list does not reach keeps its setting
-    /// </remarks>
-    private static bool TryGetExtruderValues(Commands.Code code, Move move, out float[] values)
-    {
-        if (!code.TryGetFloatArray('E', out float[]? given) || given.Length == 0)
-        {
-            values = [];
-            return false;
-        }
-
-        values = new float[given.Length == 1 ? move.Extruders.Count : Math.Min(given.Length, move.Extruders.Count)];
-        for (int i = 0; i < values.Length; i++)
-        {
-            values[i] = given.Length == 1 ? given[0] : given[i];
-        }
-        return true;
-    }
-
-    /// <summary>
     /// Apply a jerk value to the machine limit, the printing limit, or both
     /// </summary>
     /// <param name="value">The jerk in mm/min</param>
@@ -2788,35 +2812,6 @@ internal partial class MCodeHandler
             return false;
         }
         return true;
-    }
-
-    /// <summary>
-    /// Read the drivers M584 assigns to one drive letter
-    /// </summary>
-    /// <param name="code">The code</param>
-    /// <param name="letter">The axis letter, or E for the extruders</param>
-    /// <param name="drivers">The drivers named for it, empty if the letter was given without any</param>
-    /// <returns>True if the code names the letter at all</returns>
-    /// <remarks>
-    /// A letter given without a value means no drivers, which is how a drive gives up the ones it
-    /// has: an axis stays in place but can no longer move, and a bare E leaves no extruders at all
-    /// </remarks>
-    private static bool TryGetDrivers(Commands.Code code, char letter, out DriverId[] drivers)
-    {
-        if (code.TryGetParameter(letter, out DuetAPI.Commands.CodeParameter? parameter) && parameter.IsNull)
-        {
-            drivers = [];
-            return true;
-        }
-
-        if (code.TryGetDriverIdArray(letter, out DriverId[]? given))
-        {
-            drivers = given;
-            return true;
-        }
-
-        drivers = [];
-        return false;
     }
 
     /// <summary>
@@ -2951,7 +2946,7 @@ internal partial class MCodeHandler
     /// so what goes out for both M906 and M913 is the resulting current
     /// </remarks>
     private static float CurrentToSend(Axis axis, int which)
-        => which == 917 ? axis.PercentStstCurrent ?? 0 : axis.Current * axis.PercentCurrent / 100.0f;
+        => which == 917 ? axis.PercentStstCurrent ?? 0 : CurrentAfterScaling(axis.Current, axis.PercentCurrent);
 
     /// <summary>
     /// The value to send to an extruder's driver after a current setting changed
@@ -2960,7 +2955,29 @@ internal partial class MCodeHandler
     /// <param name="which">906, 913 or 917</param>
     /// <returns>Standstill percentage for M917, otherwise the current in mA</returns>
     private static float CurrentToSend(Extruder extruder, int which)
-        => which == 917 ? extruder.PercentStstCurrent ?? 0 : extruder.Current * extruder.PercentCurrent / 100.0f;
+        => which == 917 ? extruder.PercentStstCurrent ?? 0 : CurrentAfterScaling(extruder.Current, extruder.PercentCurrent);
+
+    /// <summary>What one percent is as a fraction, the factor M913's percentage is stored through</summary>
+    /// <remarks>
+    /// RepRapFirmware's own literal (Move2.cpp Move::SetMotorCurrent case 913). It is single precision
+    /// there - the firmware builds with <c>-fsingle-precision-constant</c> - and it has to be single
+    /// precision here too, because the product is what goes on the bus: 400mA at 60% is 239.99998 in
+    /// single precision and 240.0 in double, and a reference recorded from the firmware holds the first
+    /// </remarks>
+    private const float PercentToFraction = 0.01f;
+
+    /// <summary>
+    /// The current a driver is sent once M913's percentage has been applied to M906's current
+    /// </summary>
+    /// <param name="current">Configured current in mA</param>
+    /// <param name="percent">Percentage of it to run at</param>
+    /// <returns>The current in mA</returns>
+    /// <remarks>
+    /// In the order RepRapFirmware applies it: the percentage becomes a fraction first and the current
+    /// is scaled by that, rather than the current being scaled and divided
+    /// </remarks>
+    private static float CurrentAfterScaling(int current, int percent)
+        => current * Math.Clamp(PercentToFraction * percent, 0.0f, 1.0f);
 
     /// <summary>Clamp a percentage to the range a driver accepts</summary>
     /// <param name="value">The value as given</param>
@@ -2973,13 +2990,12 @@ internal partial class MCodeHandler
     /// <param name="toUpdate">List being built</param>
     /// <param name="drivers">The axis' drivers</param>
     /// <param name="mode">Driver state to apply</param>
-    /// <param name="idlePercent">Idle current percentage</param>
     private static void ApplyDriverState(List<RemoteDrivers.DriverValue<(ushort, ushort)>> toUpdate, IEnumerable<DriverId> drivers,
-                                         ushort mode, ushort idlePercent)
+                                         ushort mode)
     {
         foreach (DriverId driver in drivers)
         {
-            AddDriverState(toUpdate, driver, mode, idlePercent);
+            AddDriverState(toUpdate, driver, mode);
         }
     }
 
@@ -2989,13 +3005,17 @@ internal partial class MCodeHandler
     /// <param name="toUpdate">List being built</param>
     /// <param name="driver">The driver, or null if the drive has none assigned</param>
     /// <param name="mode">Driver state to apply</param>
-    /// <param name="idlePercent">Idle current percentage</param>
+    /// <remarks>
+    /// The idle percentage that rides alongside the state belongs to the idle state alone, which is
+    /// the one state M17 and M18 never ask for, so it is always zero here
+    /// (CanInterface.cpp:988-1017)
+    /// </remarks>
     private static void AddDriverState(List<RemoteDrivers.DriverValue<(ushort, ushort)>> toUpdate, DriverId? driver,
-                                       ushort mode, ushort idlePercent)
+                                       ushort mode)
     {
         if (driver is not null)
         {
-            toUpdate.Add(new RemoteDrivers.DriverValue<(ushort, ushort)>(driver, (mode, idlePercent)));
+            toUpdate.Add(new RemoteDrivers.DriverValue<(ushort, ushort)>(driver, (mode, 0)));
         }
     }
 
@@ -3047,24 +3067,6 @@ internal partial class MCodeHandler
         }
 
         IList<Message> replies = await RemoteDrivers.SetStepsPerMmAndMicrosteppingAsync(linkInterface, toUpdate, cancellationToken);
-        return replies.ToMessage();
-    }
-
-    /// <summary>
-    /// Send the motor currents of the given drivers to the boards that carry them
-    /// </summary>
-    /// <param name="toUpdate">Drivers and their currents in mA</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>The result, carrying anything the boards objected to</returns>
-    private async ValueTask<Message> UpdateRemoteDriversAsync(List<RemoteDrivers.DriverValue<float>> toUpdate,
-                                                              CancellationToken cancellationToken)
-    {
-        if (toUpdate.Count == 0)
-        {
-            return new Message();
-        }
-
-        IList<Message> replies = await RemoteDrivers.SetMotorCurrentsAsync(linkInterface, toUpdate, cancellationToken);
         return replies.ToMessage();
     }
 

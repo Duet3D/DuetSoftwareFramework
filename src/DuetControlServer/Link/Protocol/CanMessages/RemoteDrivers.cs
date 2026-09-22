@@ -168,13 +168,13 @@ internal static class RemoteDrivers
     /// <param name="values">Drivers and their pressure advance in seconds</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>What each board made of it</returns>
-    public static async ValueTask<IList<Message>> SetPressureAdvanceAsync(LinkInterface linkInterface, IEnumerable<DriverValue<float>> values,
+    public static async ValueTask<IList<Message>> SetPressureAdvanceAsync(LinkInterface linkInterface, IEnumerable<DriverValue<ShortPressureAdvanceParameters>> values,
                                                                         CancellationToken cancellationToken = default)
     {
         List<Message> replies = [];
-        foreach ((byte board, ushort bitmap, float[] ordered) in GroupByBoard(values))
+        foreach ((byte board, ushort bitmap, ShortPressureAdvanceParameters[] ordered) in GroupByBoard(values))
         {
-            CanMessageMultipleDrivesRequestPressureAdvanceV1 message = new()
+            CanMessageMultipleDrivesRequestShortPressureAdvanceParameters message = new()
             {
                 DriversToUpdate = bitmap
             };

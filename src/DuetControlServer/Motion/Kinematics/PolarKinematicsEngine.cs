@@ -30,6 +30,10 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
 {
     private const int RadiusDrive = 0, TurntableDrive = 1;
 
+    /// <summary>Radii M669 R describes the machine with: the smallest and the largest</summary>
+    /// <remarks>RepRapFirmware's <c>numRadiusLimits = 2</c> in <c>PolarKinematics::Configure</c></remarks>
+    private const int RadiusLimits = 2;
+
     private const float DegreesToRadians = MathF.PI / 180.0f;
     private const float RadiansToDegrees = 180.0f / MathF.PI;
 
@@ -94,7 +98,9 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
         float maxSpeed = MaxTurntableSpeedPerSec, maxAcceleration = MaxTurntableAccelerationPerSec;
         bool changed = false;
 
-        if (code.TryGetFloatArray('R', out float[]? radiusLimits) && radiusLimits.Length > 0)
+        // A minimum and a maximum radius, or one value for the maximum alone (RRF
+        // PolarKinematics.cpp, numRadiusLimits = 2)
+        if (code.TryGetFloatArray('R', RadiusLimits, out float[]? radiusLimits))
         {
             if (radiusLimits.Length == 1)
             {

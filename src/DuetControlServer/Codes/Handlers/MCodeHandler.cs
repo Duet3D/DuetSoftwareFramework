@@ -329,7 +329,7 @@ internal partial class MCodeHandler(
         // Tool settings
         { 568, CodeClass.Deferred, (h, c, ct) => h.HandleToolSettingsAsync(c, ct) },
         // Configure a stepper driver and its subfunctions; unlisted minors have no row
-        { [569, (569, 1), (569, 2), (569, 4), (569, 5), (569, 6), (569, 7)], CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleDriverConfigAsync(c, ct) },
+        { [569, (569, 1), (569, 2), (569, 4), (569, 5), (569, 6), (569, 7)], CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleDriverConfigAsync(c, ct) }, // TODO RRF doesn't always wait for standstill
         // Heater fault detection
         { 570, CodeClass.Immediate, (h, c, ct) => h.HandleHeaterFaultDetectionAsync(c, ct) },
         // Set pressure advance. TODO the value already rides the move on the SBC side; the
@@ -405,6 +405,13 @@ internal partial class MCodeHandler(
     /// running
     /// </remarks>
     private const string ReservedForManagementPlugin = "requires DuetPiManagementPlugin";
+
+    /// <summary>
+    /// Modules M997 S may name at once
+    /// </summary>
+    /// <remarks>RepRapFirmware reads them into <c>uint32_t modulesToUpdate[5]</c> and checks each
+    /// against <c>FirmwareUpdater::NumUpdateModules</c> (GCodes3.cpp <c>UpdateFirmware</c>)</remarks>
+    private const int MaxUpdateModules = 5;
 
     /// <summary>
     /// Answer a code this program deliberately leaves to something else
@@ -1993,7 +2000,7 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleFirmwareUpdateAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (code.GetIntArray('S', defaultValue: [0]).Contains(0) && code.GetInt('B', defaultValue: 0) == 0)
+        if (code.GetIntArray('S', MaxUpdateModules, defaultValue: [0]).Contains(0) && code.GetInt('B', defaultValue: 0) == 0)
         {
             // Get the IAP and Firmware files
             string? iapFile, firmwareFile;

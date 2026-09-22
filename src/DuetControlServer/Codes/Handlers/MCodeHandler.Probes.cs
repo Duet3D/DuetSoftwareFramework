@@ -36,6 +36,21 @@ internal partial class MCodeHandler
     private const int MaxProbeTaps = 31;
 
     /// <summary>
+    /// Dive heights a probe is described by: the one it starts the first tap from and the one it
+    /// starts every later tap from
+    /// </summary>
+    /// <remarks>RepRapFirmware reads M558 H into two values and lets one stand for both (ZProbe.cpp
+    /// <c>ZProbe::Configure</c>, <c>numHeights = 2</c> with padding)</remarks>
+    private const int DiveHeightsPerProbe = 2;
+
+    /// <summary>
+    /// Speeds a probe is described by: the one the first tap runs at, the one every later tap runs
+    /// at, and the one a scanning probe maps at
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>numSpeeds = 3</c> in <c>ZProbe::Configure</c></remarks>
+    private const int ProbingSpeeds = 3;
+
+    /// <summary>
     /// M558: configure a Z probe
     /// </summary>
     /// <param name="code">The code</param>
@@ -199,16 +214,16 @@ internal partial class MCodeHandler
     {
         bool seen = false;
 
-        if (code.TryGetFloatArray('H', out float[]? diveHeights) && diveHeights.Length > 0)
+        // One value sets both, so that M558 H5 raises the probe for every tap rather than only the
+        // first, which is what it read as before multi-tapping had its own dive height
+        if (code.TryGetFloatArray('H', DiveHeightsPerProbe, out float[]? diveHeights, pad: true) && diveHeights.Length > 0)
         {
-            // One value sets both, so that M558 H5 raises the probe for every tap rather than only
-            // the first, which is what it read as before multi-tapping had its own dive height
             probe.DiveHeights[0] = diveHeights[0];
-            probe.DiveHeights[1] = diveHeights.Length > 1 ? diveHeights[1] : diveHeights[0];
+            probe.DiveHeights[1] = diveHeights[1];
             seen = true;
         }
 
-        if (code.TryGetFloatArray('F', out float[]? speeds) && speeds.Length > 0)
+        if (code.TryGetFloatArray('F', ProbingSpeeds, out float[]? speeds) && speeds.Length > 0)
         {
             // Given in mm/min like every other feed rate, held in mm/s like every other speed here
             while (probe.Speeds.Count < 2)
@@ -516,7 +531,9 @@ internal partial class MCodeHandler
     {
         // S defaults to 1, so M577 with no S waits for the inputs to become active
         bool activeHigh = code.GetInt('S', defaultValue: 1) >= 1;
-        bool seenPorts = code.TryGetIntArray('P', out int[]? ports);
+        // The inputs are named by number, as many as the machine can have (RRF GCodes3.cpp
+        // WaitForPin, GetUnsignedArray over an array of MaxGpInPorts)
+        bool seenPorts = code.TryGetIntArray('P', CanLimits.MaxGpInPorts, out int[]? ports);
 
         List<int> axes = [];
         using (await model.AccessReadOnlyAsync(cancellationToken))

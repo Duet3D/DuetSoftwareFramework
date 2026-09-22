@@ -6,6 +6,11 @@
 public partial class ZLeadscrewKinematics : Kinematics
 {
     /// <summary>
+    /// Coordinates M671 may give for the leadscrews or levelling screws of one axis
+    /// </summary>
+    public const int MaxLeadscrews = 4;
+
+    /// <summary>
     /// Parameters describing the tilt correction
     /// </summary>
     public TiltCorrection TiltCorrection { get; } = new TiltCorrection();

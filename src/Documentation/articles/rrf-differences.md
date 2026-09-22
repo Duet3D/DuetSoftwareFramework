@@ -44,7 +44,6 @@ What it removes:
 |---|---|
 | `M954` configure as expansion board | DSF is always the main board |
 | `M576` SPI communications parameters | The DSF/RRF SPI link is gone |
-| `M970` phase stepping | RRF refuses it for any remote driver, because the mode drives the coils from the main board. Every driver is remote, so the code answers `Phase stepping is not supported on CAN-connected drivers` rather than pretending to configure it |
 | Local stall detection (`HAS_STALL_DETECT`) | Board 0 has no drivers |
 | Local heater, driver and filament faults | They arrive from the board as CAN events instead, which is the same event by a different door |
 
@@ -253,6 +252,7 @@ That adds fields RepRapFirmware does not keep, does not report, or both:
 | `boards[].drivers[].config.stallDetection` | M915 had no home at all |
 | `move.extruders[].pressAdv.K1` and `.D` | The CAN message carries only the first coefficient, so the second and its transition speed are held here alone — which is exactly what the rule is for |
 | `move.axes[].phaseStepKv` and `.phaseStepKa`, and the same on `move.extruders[]` | M970.1 and M970.2 send the phase stepping feedforward gains to the board that applies them. RepRapFirmware keeps its own copy in `DriveMovement` and answers a bare M970.1 from it; here the board is the only other place they exist, so without these a restart would lose them and the bare form would have nothing to report |
+| `move.axes[].rotational` and `.continuousRotation` | M584's R and S say what kind of axis is being created, which RepRapFirmware keeps in bitmaps of its own and prints as `(r)` and `(c)` in the M584 report without reporting anywhere a client can read |
 
 Three further differences follow from the same rule.
 
@@ -361,7 +361,21 @@ the first move.
 
 ---
 
-## 6. Meta G-code and expressions
+## 6. G-code and expressions
+
+## 6.1 Error handling
+
+Added minimum array limits to the following gcodes:
+- `M92` - steps per mm
+- `M201`/`M201.1` - acceleration
+- `M203` - max feedrate
+- `M205`/`M566` - jerk
+- `M563` - define tool
+- `M572` - pressure advance
+- `M906`/`M913`/`M917` - motor current & standstill current
+A `GCodeException` is thrown if the value is below the minimum (`0.0f`)
+
+## 6.2 Meta G-code
 
 **A variable cannot hold an object model reference.** `var a = move.axes` and `global a = move` are
 refused, where RepRapFirmware stores pointers into its own model and lets `var.a[0].letter` work.

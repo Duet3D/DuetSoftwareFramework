@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -37,33 +39,49 @@ internal partial class MCodeHandler
 
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
-            List<int> extruders = IntArray(code, 'D');
+            int axesCount = model.Move.Axes.Count;
+            int eCount = model.Move.Extruders.Count;
+
+            int[] extruders = code.GetIntArray('D', ToolManager.MaxExtrudersPerTool, defaultValue: [], min: 0, max: eCount - 1);
             ToolDefinition definition = new()
             {
                 Number = toolNumber,
-                Name = code.TryGetString('S', out string? name) ? name : null,
+                Name = code.GetString('S', defaultValue: String.Empty),
                 Extruders = extruders,
-                Heaters = IntArray(code, 'H'),
-                Fans = code.HasParameter('F') ? IntArray(code, 'F') : [0],
-                XMap = code.HasParameter('X') ? IntArray(code, 'X') : [0],
-                YMap = code.HasParameter('Y') ? IntArray(code, 'Y') : [1],
-                ZMap = code.HasParameter('Z') ? IntArray(code, 'Z') : [2],
+                Heaters = code.GetIntArray('H', Heat.HeatManager.MaxHeatersPerTool, defaultValue: [], min: 0, max: model.Heat.Heaters.Count - 1),
+                Fans = code.GetIntArray('F', Fans.FanManager.MaxFans, defaultValue: [0], min: 0, max: model.Fans.Count - 1),
+                XMap = code.GetIntArray('X', axesCount, defaultValue: [0], min: 0, max: axesCount - 1),
+                YMap = code.GetIntArray('Y', axesCount, defaultValue: [1], min: 0, max: axesCount - 1),
+                ZMap = code.GetIntArray('Z', axesCount, defaultValue: [2], min: 0, max: axesCount - 1),
 
                 // RepRapFirmware defaults this to the tool's only drive when it has exactly one:
                 // with several drives there is no single filament to speak of
-                FilamentExtruder = code.TryGetInt('L', out int filament) ? filament
-                                   : extruders.Count == 1 ? extruders[0] : -1,
-                Spindle = code.TryGetInt('R', out int spindle) ? spindle : -1
+                FilamentExtruder = code.GetInt('L', defaultValue: extruders.Length == 1 ? extruders[0] : -1, min: -1, max: eCount - 1),
+                Spindle = code.GetInt('R', defaultValue: -1, min: -1, max: model.Spindles.Count - 1),
             };
 
-            string? error = toolManager.Define(definition);
-            if (error is not null)
+            if (ShouldDeleteTool(definition))
             {
-                return new Message(MessageType.Error, error);
+                toolManager.Remove(toolNumber);
+            }
+            else
+            {
+                string? error = toolManager.Define(definition);
+                if (error is not null)
+                {
+                    return new Message(MessageType.Error, error);
+                }
             }
         }
 
         return new Message();
+    }
+
+    private static bool ShouldDeleteTool(ToolDefinition definition)
+    {
+        return definition.Extruders.All(e => e == -1)
+            && definition.Heaters.All(h => h == -1)
+            && definition.Spindle == -1;
     }
 
     /// <summary>
@@ -87,7 +105,9 @@ internal partial class MCodeHandler
                 return new Message(MessageType.Error, "No tool selected");
             }
 
-            if (!code.TryGetFloatArray('E', out float[]? ratios) || ratios.Length == 0)
+            // One ratio per drive of the tool, as RepRapFirmware reads it (GCodes2.cpp case 567,
+            // eCount = tool->DriveCount())
+            if (!code.TryGetFloatArray('E', tool.Extruders.Count, out float[]? ratios) || ratios.Length == 0)
             {
                 StringBuilder report = new();
                 report.Append(CultureInfo.InvariantCulture, $"Tool {tool.Number} mix ratios:");
@@ -194,29 +214,6 @@ internal partial class MCodeHandler
     }
 
     /// <summary>
-    /// Read an integer array parameter, treating a single value as a one-element array
-    /// </summary>
-    /// <remarks>
-    /// A negative entry means "none of them", which is how <c>M563 P0 F-1</c> gives a tool no fans.
-    /// RepRapFirmware reads the array into a signed type for exactly that reason
-    /// </remarks>
-    private static List<int> IntArray(Commands.Code code, char letter)
-    {
-        List<int> values = [];
-        if (code.TryGetIntArray(letter, out int[]? array))
-        {
-            foreach (int value in array)
-            {
-                if (value >= 0)
-                {
-                    values.Add(value);
-                }
-            }
-        }
-        return values;
-    }
-
-    /// <summary>
     /// M568: set a tool's active and standby temperatures, its spindle speed, and whether it is on
     /// </summary>
     /// <remarks>
@@ -238,12 +235,15 @@ internal partial class MCodeHandler
             }
 
             bool seen = false;
-            if (code.TryGetFloatArray('S', out float[]? active))
+            int hCount = tool.Heaters.Count;
+            // One temperature per heater of the tool, and a single value stands for all of them
+            // (RRF GCodes.cpp SetOrReportToolTemperatures, hCount = tool->HeaterCount())
+            if (code.TryGetFloatArray('S', hCount, out float[]? active, pad: true))
             {
                 Assign(tool.Active, active);
                 seen = true;
             }
-            if (code.TryGetFloatArray('R', out float[]? standby))
+            if (code.TryGetFloatArray('R', hCount, out float[]? standby, pad: true))
             {
                 Assign(tool.Standby, standby);
                 seen = true;

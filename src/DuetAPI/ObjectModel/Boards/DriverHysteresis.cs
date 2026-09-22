@@ -6,6 +6,14 @@ namespace DuetAPI.ObjectModel;
 public partial class DriverHysteresis : ModelObject, IStaticModelObject
 {
     /// <summary>
+    /// How many hysteresis values there are to set.
+    /// </summary>
+    /// <remarks>
+    /// Used to validate M569 Y array length
+    /// </remarks>
+    public const int ValueCount = 3;
+
+    /// <summary>
     /// Hysteresis start value
     /// </summary>
     public int Start

@@ -6,6 +6,14 @@ namespace DuetAPI.ObjectModel;
 public partial class ExtruderPressureAdvance : ModelObject, IStaticModelObject
 {
     /// <summary>
+    /// How many coefficients there are
+    /// </summary>
+    /// <remarks>
+    /// Used to limit gcode parameter array length
+    /// </remarks>
+    public const int CoefficientCount = 2;
+
+    /// <summary>
     /// Delay coefficient (in ms), or null if pressure advance is in simple mode (k0 = 0) - RRF reports infinity here as null
     /// </summary>
     public float? D

@@ -31,6 +31,14 @@ internal partial class MCodeHandler
     private const int MappedFanWithoutTool = 0;
 
     /// <summary>
+    /// Temperatures a thermostatic fan is described by: the one it comes on at and the one it is
+    /// full on at
+    /// </summary>
+    /// <remarks>RepRapFirmware reads M106 T into two values and lets one stand for both (Fan.cpp
+    /// <c>Fan::Configure</c>, <c>numTemps = 2</c> with padding)</remarks>
+    private const int ThermostaticTemperatures = 2;
+
+    /// <summary>
     /// M950: create a heater, fan or other I/O device
     /// </summary>
     /// <param name="code">The code</param>
@@ -399,10 +407,10 @@ internal partial class MCodeHandler
 
             // Two temperatures: the fan is off below the first and full on above the second, which is
             // what makes it ramp rather than chatter around one threshold. A single value is both
-            if (code.TryGetFloatArray('T', out float[]? temperatures) && temperatures.Length > 0)
+            if (code.TryGetFloatArray('T', ThermostaticTemperatures, out float[]? temperatures, pad: true) && temperatures.Length > 0)
             {
                 fan.Thermostatic.LowTemperature = temperatures[0];
-                fan.Thermostatic.HighTemperature = temperatures.Length > 1 ? temperatures[1] : temperatures[0];
+                fan.Thermostatic.HighTemperature = temperatures[1];
                 seen = true;
             }
             if (code.TryGetFloat('B', out float blip))
@@ -431,7 +439,9 @@ internal partial class MCodeHandler
                 fan.Max = MathF.Max(fan.Min, fan.Max);
             }
 
-            if (code.TryGetIntArray('H', out int[]? sensors))
+            // Signed, because M106 H-1 is how thermostatic mode is turned off (RRF Fan.cpp
+            // Fan::Configure, GetIntArray over an array of MaxSensors)
+            if (code.TryGetIntArray('H', CanLimits.MaxSensors, out int[]? sensors))
             {
                 // A negative sensor number is how M106 H-1 turns thermostatic mode off, so rebuilding
                 // the list from the non-negative ones implements that on its own

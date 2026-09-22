@@ -933,7 +933,7 @@ internal sealed class MoveInterpreter(
         bool hasExtrusion = false;
         raw.HasPositiveExtrusion = false;
 
-        if (!code.TryGetFloatArray('E', out float[]? extrusion) || extrusion.Length == 0)
+        if (!code.HasParameter('E'))
         {
             return false;
         }
@@ -945,6 +945,13 @@ internal sealed class MoveInterpreter(
         if (tool is null || tool.Extruders.Count == 0)
         {
             throw new GCodeException("Attempting to extrude with no tool selected");
+        }
+
+        // One value per drive of the tool, which is what mixing divides between them (RRF
+        // GCodes.cpp, mc = tool->DriveCount())
+        if (!code.TryGetFloatArray('E', tool.Extruders.Count, out float[]? extrusion) || extrusion.Length == 0)
+        {
+            return false;
         }
 
         int numExtruders = Parameters.SharedExtruderCount(model.Move);

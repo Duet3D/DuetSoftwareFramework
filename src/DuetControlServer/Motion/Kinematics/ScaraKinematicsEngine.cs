@@ -138,12 +138,12 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
     /// <param name="values">Array to update</param>
     /// <returns>True if the code carried the parameter</returns>
     /// <remarks>
-    /// RepRapFirmware's <c>TryGetFloatArray</c> with a fixed length: a parameter that carries fewer
-    /// values than the array holds leaves the rest alone
+    /// RepRapFirmware's <c>TryGetFloatArray</c> with a fixed length, which refuses a parameter that
+    /// carries any other number of values: half a pair of limits describes nothing
     /// </remarks>
     private static bool TryReplace(Code code, char letter, float[] values)
     {
-        if (!code.TryGetFloatArray(letter, out float[]? parsed))
+        if (!code.TryGetFloatArray(letter, values.Length, out float[]? parsed, exactLength: true))
         {
             return false;
         }
