@@ -64,9 +64,9 @@
     "sliceHeight\\D+(?<mm>(\\d+\\.?\\d*))"
   ],
   "NumLayersFilters": [
-    "NUM_LAYERS\\D+(\\d+)",
-    "LAYER_COUNT\\D+(\\d+)",
-    "total layer number\\D+(\\d+)"
+    "^\\s*NUM_LAYERS\\D+(\\d+)",
+    "^\\s*LAYER_COUNT\\D+(\\d+)",
+    "^\\s*total layer number\\D+(\\d+)"
   ],
   "ObjectHeightFilters": [
     "^\\s*max_z_height\\D+(?<mm>(\\d+\\.?\\d*))",
