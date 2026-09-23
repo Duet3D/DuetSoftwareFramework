@@ -306,9 +306,9 @@ namespace DuetControlServer
         /// </remarks>
         public static List<Regex> NumLayersFilters { get; set; } =
         [
-            new Regex(@"NUM_LAYERS\D+(\d+)", RegexFlags),                              // PrusaSlicer
-            new Regex(@"LAYER_COUNT\D+(\d+)", RegexFlags),                             // Cura
-            new Regex(@"total layer number\D+(\d+)", RegexFlags)                       // OrcaSlicer
+            new Regex(@"^\s*NUM_LAYERS\D+(\d+)", RegexFlags),                          // PrusaSlicer
+            new Regex(@"^\s*LAYER_COUNT\D+(\d+)", RegexFlags),                         // Cura, preFlight
+            new Regex(@"^\s*total layer number\D+(\d+)", RegexFlags)                   // OrcaSlicer
         ];
 
         /// <summary>
