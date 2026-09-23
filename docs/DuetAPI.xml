@@ -4687,97 +4687,6 @@
             Properties with this attribute are only included when the 'v' flag is used in object model queries.
             </summary>
         </member>
-        <member name="T:DuetAPI.ObjectModel.Accelerometer">
-            <summary>
-            This represents an accelerometer
-            </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.Accelerometer.Orientation">
-            <summary>
-            Orientation of the accelerometer
-            </summary>
-            <remarks>
-            See https://docs.duet3d.com/en/Duet3D_hardware/Accessories/Duet3D_Accelerometer#orientation for a list of orientations
-            </remarks>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.Accelerometer.Points">
-            <summary>
-            Number of collected data points in the last run or 0 if it failed
-            </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.Accelerometer.Resolution">
-            <summary>
-            Resolution the accelerometer is programmed for (in bits) or 0 if unknown
-            </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.Accelerometer.Runs">
-            <summary>
-            Number of completed sampling runs
-            </summary>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.Accelerometer.SamplingRate">
-            <summary>
-            Rate the accelerometer is programmed for (in Hz) or 0 if unknown
-            </summary>
-            <remarks>
-            This is the rate the accelerometer settled on, which may be lower than the one M955 asked for.
-            Once it has completed a run, the rate measured during that run is reported instead
-            </remarks>
-        </member>
-        <member name="M:DuetAPI.ObjectModel.Accelerometer.Assign(DuetAPI.ObjectModel.IStaticModelObject)">
-            <summary>
-            Assign the properties from another instance.
-            This is required to update model properties which do not have a setter
-            </summary>
-            <param name="from">Other instance</param>
-        </member>
-        <member name="M:DuetAPI.ObjectModel.Accelerometer.Clone">
-            <summary>
-            Clone this instance
-            </summary>
-            <remarks>This method is auto-generated</remarks>
-            <returns>Cloned instance</returns>
-        </member>
-        <member name="M:DuetAPI.ObjectModel.Accelerometer.UpdateFromJson(System.Text.Json.JsonElement,System.Boolean)">
-            <summary>
-            Update this instance from a given JSON element
-            </summary>
-            <remarks>This method is auto-generated</remarks>
-            <param name="jsonElement">Element to update this intance from</param>
-            <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
-            <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
-        </member>
-        <member name="M:DuetAPI.ObjectModel.Accelerometer.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
-            <summary>
-            Update this instance from a given JSON element
-            </summary>
-            <remarks>This method is auto-generated</remarks>
-            <param name="reader">Reader to update this intance from</param>
-            <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
-            <param name="scope">Extent of this update</param>
-            <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.Accelerometer.TypeDescriptor">
-            <summary>
-            Static description of this type
-            </summary>
-            <remarks>This property is auto-generated</remarks>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.Accelerometer.Descriptor">
-            <summary>
-            Static description of this instance's type
-            </summary>
-            <remarks>This property is auto-generated</remarks>
-        </member>
-        <member name="M:DuetAPI.ObjectModel.Accelerometer.GetPropertyValue(System.Int32)">
-            <summary>
-            Read the value of the property with the given index
-            </summary>
-            <param name="index">Index of the property</param>
-            <returns>Property value</returns>
-            <exception cref="T:System.ArgumentOutOfRangeException">Property index is invalid</exception>
-            <remarks>This method is auto-generated</remarks>
-        </member>
         <member name="T:DuetAPI.ObjectModel.Board">
             <summary>
             Information about a connected board
@@ -4786,11 +4695,6 @@
             Every item of the boards array is either a <see cref="T:DuetAPI.ObjectModel.MainBoard"/> or an <see cref="T:DuetAPI.ObjectModel.ExpansionBoard"/>,
             which is decided by its position, see <see cref="T:DuetAPI.ObjectModel.Boards"/>
             </remarks>
-        </member>
-        <member name="P:DuetAPI.ObjectModel.Board.Accelerometer">
-            <summary>
-            Accelerometer of this board or null if unknown
-            </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.Board.CanAddress">
             <summary>
@@ -12603,6 +12507,11 @@
             Defines the source generated JSON serialization contract metadata for a given type.
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.ObjectModelContext.StaticModelCollectionAccelerometer">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
         <member name="P:DuetAPI.ObjectModel.ObjectModelContext.StaticModelCollectionAnalogSensor">
             <summary>
             Defines the source generated JSON serialization contract metadata for a given type.
@@ -13908,6 +13817,105 @@
             <remarks>This property is auto-generated</remarks>
         </member>
         <member name="M:DuetAPI.ObjectModel.Upgrade.GetPropertyValue(System.Int32)">
+            <summary>
+            Read the value of the property with the given index
+            </summary>
+            <param name="index">Index of the property</param>
+            <returns>Property value</returns>
+            <exception cref="T:System.ArgumentOutOfRangeException">Property index is invalid</exception>
+            <remarks>This method is auto-generated</remarks>
+        </member>
+        <member name="T:DuetAPI.ObjectModel.Accelerometer">
+            <summary>
+            This represents an accelerometer
+            </summary>
+            <remarks>
+            The index of an accelerometer in the sensors.accelerometers list is the P number used by M955 and M956
+            </remarks>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.Accelerometer.Orientation">
+            <summary>
+            Orientation of the accelerometer
+            </summary>
+            <remarks>
+            See https://docs.duet3d.com/en/Duet3D_hardware/Accessories/Duet3D_Accelerometer#orientation for a list of orientations
+            </remarks>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.Accelerometer.Points">
+            <summary>
+            Number of collected data points in the last run or 0 if it failed
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.Accelerometer.Port">
+            <summary>
+            Port name(s) the accelerometer is connected to as passed to M955 C, including the CAN address prefix on expansion boards
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.Accelerometer.Resolution">
+            <summary>
+            Resolution the accelerometer is programmed for (in bits) or 0 if unknown
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.Accelerometer.Runs">
+            <summary>
+            Number of completed sampling runs
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.Accelerometer.SamplingRate">
+            <summary>
+            Rate the accelerometer is programmed for (in Hz) or 0 if unknown
+            </summary>
+            <remarks>
+            This is the rate the accelerometer settled on, which may be lower than the one M955 asked for.
+            Once it has completed a run, the rate measured during that run is reported instead
+            </remarks>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.Accelerometer.Assign(DuetAPI.ObjectModel.IStaticModelObject)">
+            <summary>
+            Assign the properties from another instance.
+            This is required to update model properties which do not have a setter
+            </summary>
+            <param name="from">Other instance</param>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.Accelerometer.Clone">
+            <summary>
+            Clone this instance
+            </summary>
+            <remarks>This method is auto-generated</remarks>
+            <returns>Cloned instance</returns>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.Accelerometer.UpdateFromJson(System.Text.Json.JsonElement,System.Boolean)">
+            <summary>
+            Update this instance from a given JSON element
+            </summary>
+            <remarks>This method is auto-generated</remarks>
+            <param name="jsonElement">Element to update this intance from</param>
+            <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.Accelerometer.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
+            <summary>
+            Update this instance from a given JSON element
+            </summary>
+            <remarks>This method is auto-generated</remarks>
+            <param name="reader">Reader to update this intance from</param>
+            <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
+            <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.Accelerometer.TypeDescriptor">
+            <summary>
+            Static description of this type
+            </summary>
+            <remarks>This property is auto-generated</remarks>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.Accelerometer.Descriptor">
+            <summary>
+            Static description of this instance's type
+            </summary>
+            <remarks>This property is auto-generated</remarks>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.Accelerometer.GetPropertyValue(System.Int32)">
             <summary>
             Read the value of the property with the given index
             </summary>
@@ -15786,6 +15794,12 @@
             <summary>
             Information about sensors
             </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.Sensors.Accelerometers">
+            <summary>
+            List of configured accelerometers, indexed by their M955/M956 P number
+            </summary>
+            <seealso cref="T:DuetAPI.ObjectModel.Accelerometer"/>
         </member>
         <member name="P:DuetAPI.ObjectModel.Sensors.Analog">
             <summary>
