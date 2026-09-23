@@ -14,16 +14,6 @@ namespace DuetAPI.ObjectModel;
 public partial class Board : ModelObject, IStaticModelObject
 {
     /// <summary>
-    /// Accelerometer of this board or null if unknown
-    /// </summary>
-    public Accelerometer? Accelerometer
-    {
-        get => _accelerometer;
-        set => SetPropertyValue(ref _accelerometer, value);
-    }
-    private Accelerometer? _accelerometer;
-
-    /// <summary>
     /// CAN address of this board or null if not applicable
     /// </summary>
     public int? CanAddress

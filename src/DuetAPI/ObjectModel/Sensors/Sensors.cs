@@ -6,6 +6,12 @@
 public partial class Sensors : ModelObject, IStaticModelObject
 {
     /// <summary>
+    /// List of configured accelerometers, indexed by their M955/M956 P number
+    /// </summary>
+    /// <seealso cref="Accelerometer"/>
+    public StaticModelCollection<Accelerometer?> Accelerometers { get; } = [];
+
+    /// <summary>
     /// List of analog sensors
     /// </summary>
     /// <seealso cref="AnalogSensor"/>

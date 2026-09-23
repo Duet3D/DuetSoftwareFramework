@@ -3,6 +3,9 @@
 /// <summary>
 /// This represents an accelerometer
 /// </summary>
+/// <remarks>
+/// The index of an accelerometer in the sensors.accelerometers list is the P number used by M955 and M956
+/// </remarks>
 public partial class Accelerometer : ModelObject, IStaticModelObject
 {
     /// <summary>
@@ -27,6 +30,16 @@ public partial class Accelerometer : ModelObject, IStaticModelObject
         set => SetPropertyValue(ref _points, value);
     }
     private int _points;
+
+    /// <summary>
+    /// Port name(s) the accelerometer is connected to as passed to M955 C, including the CAN address prefix on expansion boards
+    /// </summary>
+    public string Port
+    {
+        get => _port;
+        set => SetPropertyValue(ref _port, value);
+    }
+    private string _port = string.Empty;
 
     /// <summary>
     /// Resolution the accelerometer is programmed for (in bits) or 0 if unknown
