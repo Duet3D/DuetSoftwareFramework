@@ -80,15 +80,15 @@
   ],
   "NumLayersFilters": [
     {
-      "Pattern": "NUM_LAYERS\\D+(\\d+)",
+      "Pattern": "^\\s*NUM_LAYERS\\D+(\\d+)",
       "Options": 17
     },
     {
-      "Pattern": "LAYER_COUNT\\D+(\\d+)",
+      "Pattern": "^\\s*LAYER_COUNT\\D+(\\d+)",
       "Options": 17
     },
     {
-      "Pattern": "total layer number\\D+(\\d+)",
+      "Pattern": "^\\s*total layer number\\D+(\\d+)",
       "Options": 17
     }
   ],
