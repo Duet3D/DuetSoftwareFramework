@@ -331,9 +331,9 @@ public sealed class Settings
     /// </remarks>
     public List<string> NumLayersFilters { get; set; } =
     [
-        @"NUM_LAYERS\D+(\d+)",                               // PrusaSlicer
-        @"LAYER_COUNT\D+(\d+)",                              // Cura
-        @"total layer number\D+(\d+)"                        // OrcaSlicer
+        @"^\s*NUM_LAYERS\D+(\d+)",                           // PrusaSlicer
+        @"^\s*LAYER_COUNT\D+(\d+)",                          // Cura, preFlight
+        @"^\s*total layer number\D+(\d+)"                    // OrcaSlicer
     ];
 
     /// <summary>
