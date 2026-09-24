@@ -134,7 +134,7 @@ namespace DuetControlServer.Codes.Handlers
 
                             await using (FileStream fs = new(physicalFilename, append ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.Read, Settings.FileBufferSize))
                             {
-                                await using StreamWriter writer = new(fs, Encoding.UTF8, Settings.FileBufferSize);
+                                await using StreamWriter writer = new(fs, new UTF8Encoding(false), Settings.FileBufferSize);
                                 if (appendNoNL)
                                 {
                                     await writer.WriteAsync(result);
