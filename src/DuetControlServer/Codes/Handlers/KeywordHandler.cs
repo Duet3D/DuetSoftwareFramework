@@ -143,7 +143,7 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
 
                         await using (FileStream fs = new(physicalFilename, append ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.Read, _settings.FileBufferSize))
                         {
-                            await using StreamWriter writer = new(fs, Encoding.UTF8, _settings.FileBufferSize);
+                            await using StreamWriter writer = new(fs, new UTF8Encoding(false), _settings.FileBufferSize);
                             if (appendNoNL)
                             {
                                 await writer.WriteAsync(result);
