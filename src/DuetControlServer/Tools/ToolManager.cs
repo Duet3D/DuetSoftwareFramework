@@ -122,6 +122,14 @@ public sealed class ToolManager(Model.ObjectModel model, MacroRunner macroRunner
             return $"A tool may drive at most {MaxExtrudersPerTool} extruders";
         }
 
+        foreach (int heater in definition.Heaters)
+        {
+            if (heater < 0 || heater >= model.Heat.Heaters.Count)
+            {
+                return $"Heater {heater} does not exist";
+            }
+        }
+
         Remove(definition.Number);
 
         Tool tool = new()

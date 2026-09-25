@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -42,14 +41,14 @@ internal partial class MCodeHandler
             int axesCount = model.Move.Axes.Count;
             int eCount = model.Move.Extruders.Count;
 
-            int[] extruders = code.GetIntArray('D', ToolManager.MaxExtrudersPerTool, defaultValue: [], min: 0, max: eCount - 1);
+            int[] extruders = code.GetIntArray('D', ToolManager.MaxExtrudersPerTool, defaultValue: [], min: -1, max: eCount - 1);
             ToolDefinition definition = new()
             {
                 Number = toolNumber,
                 Name = code.GetString('S', defaultValue: String.Empty),
                 Extruders = extruders,
-                Heaters = code.GetIntArray('H', Heat.HeatManager.MaxHeatersPerTool, defaultValue: [], min: 0, max: model.Heat.Heaters.Count - 1),
-                Fans = code.GetIntArray('F', Fans.FanManager.MaxFans, defaultValue: [0], min: 0, max: model.Fans.Count - 1),
+                Heaters = code.GetIntArray('H', Heat.HeatManager.MaxHeatersPerTool, defaultValue: [], min: -1, max: model.Heat.Heaters.Count - 1),
+                Fans = code.GetIntArray('F', Fans.FanManager.MaxFans, defaultValue: [], min: 0, max: model.Fans.Count - 1),
                 XMap = code.GetIntArray('X', axesCount, defaultValue: [0], min: 0, max: axesCount - 1),
                 YMap = code.GetIntArray('Y', axesCount, defaultValue: [1], min: 0, max: axesCount - 1),
                 ZMap = code.GetIntArray('Z', axesCount, defaultValue: [2], min: 0, max: axesCount - 1),
@@ -77,10 +76,18 @@ internal partial class MCodeHandler
         return new Message();
     }
 
+    /// <summary>
+    /// Whether the code is <c>M563 P# D-1 H-1 [R-1]</c>, which removes the tool
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>ManageTool</c> tests for exactly one drive and exactly one heater, both
+    /// of them -1, with no spindle. A -1 anywhere else is a bad drive or heater number and is
+    /// refused when the tool is built
+    /// </remarks>
     private static bool ShouldDeleteTool(ToolDefinition definition)
     {
-        return definition.Extruders.All(e => e == -1)
-            && definition.Heaters.All(h => h == -1)
+        return definition.Extruders.Count == 1 && definition.Extruders[0] == -1
+            && definition.Heaters.Count == 1 && definition.Heaters[0] == -1
             && definition.Spindle == -1;
     }
 

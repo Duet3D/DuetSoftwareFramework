@@ -214,7 +214,6 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
     /// GCodes::ManageTool (GCodes.cpp): a movement state whose current tool is the deleted number
     /// runs SelectTool(-1), then Tool::DeleteTool recomputes numToolsToReport, so #tools drops to 0
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M563DeleteRemovesToolAndDeselects()
     {
