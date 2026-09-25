@@ -58,7 +58,7 @@ internal static class ScheduleMoveBench
     /// X, Y, Z and one extruder on board 1, free to move without homing and with cold extrusion
     /// allowed so that a move may extrude with no heater configured. M953 comes first: with the bus
     /// disabled the configuration's CAN messages would be answered with BusError, as the real
-    /// controller answers them. Tool 0 is selected because an extrusion with no tool moves nothing
+    /// controller answers them.
     /// </summary>
     public const string CartesianConfig = """
         M953
@@ -75,7 +75,7 @@ internal static class ScheduleMoveBench
         M208 X0:200 Y0:200 Z0:150
         M302 P1
         M564 H0 S0
-        M563 P0 D0 H-1
+        M563 P0 D0
         T0
         """;
 

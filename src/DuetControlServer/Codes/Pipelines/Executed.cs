@@ -116,7 +116,7 @@ public sealed class Executed : PipelineBase
                     // A refused value is quoted by where it stood, ahead of the code, and one higher
                     // than it is held because the column a person counts starts at one
                     string column = (code.ErrorColumn != DuetAPI.Commands.CodeParameter.NoColumn)
-                        ? string.Create(CultureInfo.InvariantCulture, $" at column {code.ErrorColumn + 1}: ")
+                        ? string.Create(CultureInfo.InvariantCulture, $"at column {code.ErrorColumn + 1}: ")
                         : string.Empty;
                     code.Result.Content = column + code.ToShortString() + ": " + code.Result.Content;
                 }

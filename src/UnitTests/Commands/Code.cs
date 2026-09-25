@@ -1507,11 +1507,13 @@ public class Code
     }
 
     [Test]
-    public void RefusalsQuoteTheColumnRepRapFirmwareQuotes()
+    public void RefusalsQuoteTheColumnTheValueStoodIn()
     {
-        // RepRapFirmware quotes the column from GetLimitedFValue (GCodeBuffer.cpp:553) and none
-        // from GetLimitedIValue or ::GetLimitedUIValue (:592 and :614). A letter with no value is
-        // the other refusal that carries one, whatever type went looking for it
+        // A value refused for what it is belongs to the place in the line it stood, whatever type
+        // went looking for it, so every limited read quotes the column. RepRapFirmware quotes one
+        // from GetLimitedFValue (GCodeBuffer.cpp:553) and none from GetLimitedIValue or
+        // ::GetLimitedUIValue (:592 and :614), having only there a read that knows one. A letter
+        // with no value is the other refusal that carries a column
         DuetAPI.Commands.Code code = new("M906 I120 S12 E100:2000:50 X1:2:3 K");
 
         Assert.Multiple(() =>
@@ -1521,18 +1523,18 @@ public class Code
             Assert.That(Assert.Throws<GCodeException>(() => code.GetFloat('I', min: 200.0f))!.Column,
                         Is.EqualTo(6), "and the same for a value beneath its floor");
             Assert.That(Assert.Throws<GCodeException>(() => code.GetUInt('S', max: 10))!.Column,
-                        Is.EqualTo(CodeParameter.NoColumn));
+                        Is.EqualTo(11), "an integer read quotes it as a float read does");
             Assert.That(Assert.Throws<GCodeException>(() => code.GetUInt('S', min: 20))!.Column,
-                        Is.EqualTo(CodeParameter.NoColumn));
+                        Is.EqualTo(11), "at either end");
 
             Assert.That(Assert.Throws<GCodeException>(() => code.GetFloatArray('E', 3, max: 1000.0f))!.Column,
                         Is.EqualTo(15), "an array quotes where its list began");
             Assert.That(Assert.Throws<GCodeException>(() => code.GetFloatArray('E', 3, min: 60.0f))!.Column,
                         Is.EqualTo(15), "at either end");
             Assert.That(Assert.Throws<GCodeException>(() => code.GetIntArray('X', 3, max: 2))!.Column,
-                        Is.EqualTo(CodeParameter.NoColumn));
+                        Is.EqualTo(28), "and an integer list where its own began");
             Assert.That(Assert.Throws<GCodeException>(() => code.GetIntArray('X', 3, min: 2))!.Column,
-                        Is.EqualTo(CodeParameter.NoColumn));
+                        Is.EqualTo(28), "at either end");
 
             Assert.That(Assert.Throws<GCodeException>(() => code.GetFloat('K'))!.Column, Is.EqualTo(35),
                         "a letter with no value is quoted by where its value should have begun");
@@ -2021,6 +2023,14 @@ public class Code
                                 () => code.GetFloat('U', min: 0.0f, max: 1.0f, errorString: value => $"Invalid ratio {value}"))!.Message,
                             Is.EqualTo($"Invalid ratio {1.5f}"),
                             "the float accessors hand over a float, formatted by whoever builds the refusal");
+                Assert.That(Assert.Throws<GCodeException>(
+                                () => code.GetFloat('U', min: 0.0f, max: 1.0f, errorString: value => $"Invalid ratio {value}"))!.Column,
+                            Is.EqualTo(CodeParameter.NoColumn),
+                            "and the refusal replaces the column a limited read quotes with it, being a "
+                            + "sentence the handler wrote rather than a position in the line");
+                Assert.That(Assert.Throws<GCodeException>(
+                                () => code.GetInt('S', min: 0, max: 4, errorString: value => $"Invalid mode {value}"))!.Column,
+                            Is.EqualTo(CodeParameter.NoColumn), "whichever type read the value");
                 Assert.That(Assert.Throws<GCodeException>(
                                 () => code.GetIntArray('V', 3, min: 0, max: 4, errorString: value => $"Invalid list entry {value}"))!.Message,
                             Is.EqualTo("Invalid list entry 9"),

@@ -621,7 +621,7 @@ internal partial class MCodeHandler
     private async ValueTask<Message> HandleDriveMappingAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         List<RemoteDrivers.DriverValue<(float, int, bool)>> toUpdate = [];
-        List<string> warnings = [];
+        List<Message> replies = [];
         bool seen = false;
         string? error = null;
 
@@ -645,20 +645,26 @@ internal partial class MCodeHandler
                 if (code.TryGetDriverIdArray(letter, Motion.Native.MotionLimits.MaxDriversPerAxis,
                                              out DriverId[]? drivers, allowZeroLength: true))
                 {
-                    axisMapping.Add((letter, [.. drivers.Where(driver => IsValidDriver(driver, warnings))]));
+                    foreach (DriverId driver in drivers)
+                    {
+                        CheckIsValidDriver(driver);
+                    }
+                    axisMapping.Add((letter, drivers));
                 }
             }
 
-            DriverId?[]? extruderMapping = null;
             // A bare E does the same for the extruders, leaving the machine with none at all
             if (code.TryGetDriverIdArray('E', Motion.Native.MotionLimits.MaxExtruders,
                                          out DriverId[]? extruderDrivers, allowZeroLength: true))
             {
-                extruderMapping = [.. extruderDrivers.Select(driver => IsValidDriver(driver, warnings) ? driver : null)];
+                foreach (DriverId driver in extruderDrivers)
+                {
+                    CheckIsValidDriver(driver);
+                }
             }
-            seen = axisMapping.Count > 0 || extruderMapping is not null;
+            seen = axisMapping.Count > 0 || extruderDrivers is not null;
 
-            string? conflict = FindDriverConflict(move, axisMapping, extruderMapping);
+            string? conflict = FindDriverConflict(move, axisMapping, extruderDrivers);
             if (conflict is not null)
             {
                 return new Message(MessageType.Error, conflict);
@@ -679,25 +685,31 @@ internal partial class MCodeHandler
                     axis.Drivers.Add(driver);
                 }
                 AddDrivers(toUpdate, axis.Drivers, axis.StepsPerMm, axis.Microstepping);
+
+                // Reset the new drivers
+                replies.Add(await SetStepModeAsync(axis, axis.Drivers, StepMode.StepDir, cancellationToken));
             }
 
-            if (extruderMapping is not null)
+            if (extruderDrivers is not null)
             {
                 // The E list is the whole set of extruders, so one that is no longer named goes away
-                while (move.Extruders.Count > extruderMapping.Length)
+                while (move.Extruders.Count > extruderDrivers.Length)
                 {
                     move.Extruders.RemoveAt(move.Extruders.Count - 1);
                 }
-                while (move.Extruders.Count < extruderMapping.Length)
+                while (move.Extruders.Count < extruderDrivers.Length)
                 {
                     move.Extruders.Add(new Extruder());
                 }
 
-                for (int i = 0; i < extruderMapping.Length; i++)
+                for (int i = 0; i < extruderDrivers.Length; i++)
                 {
                     Extruder extruder = move.Extruders[i];
-                    extruder.Driver = extruderMapping[i];
+
+                    extruder.Driver = extruderDrivers[i];
                     AddDriver(toUpdate, extruder.Driver, extruder.StepsPerMm, extruder.Microstepping);
+                
+                    replies.Add(await SetStepModeAsync(extruder, [extruder.Driver], StepMode.StepDir, cancellationToken));
                 }
             }
 
@@ -733,12 +745,8 @@ internal partial class MCodeHandler
             return MotionConfigRejected;
         }
 
-        Message result = await UpdateRemoteDriversAsync(toUpdate, cancellationToken);
-        foreach (string warning in warnings)
-        {
-            result.Append(MessageType.Warning, warning);
-        }
-        return result;
+        replies.Add(await UpdateRemoteDriversAsync(toUpdate, cancellationToken));
+        return replies.ToMessage();
     }
 
     /// <summary>
@@ -1140,8 +1148,8 @@ internal partial class MCodeHandler
             // RRF bounds this by the number of local drivers but it will be changed to only take a single driver
             if (code.TryGetDriverId('P', out DriverId? driver))
             {
-                    CanAddresses.CheckAddressHasHardware(driver.Board, $"Driver {driver}");
-                    drivers.Add(driver);
+                CanAddresses.CheckAddressHasHardware(driver.Board, $"Driver {driver}");
+                drivers.Add(driver);
             }
 
             foreach (Axis axis in model.Move.Axes)
@@ -1243,30 +1251,41 @@ internal partial class MCodeHandler
     /// <summary>M569.5 collects closed loop data from a driver and writes it to a file</summary>
     private const int ClosedLoopDataSubCommand = 5;
 
-    /// <summary>M970.1 sets the velocity feedforward gain</summary>
-    private const int KvSubCommand = 1;
+    /// <summary>
+    /// Valid subcommand numbers for M970
+    /// </summary>
+    private enum PhaseStepSubCommands : int
+    {
+        /// <summary>M970.1 sets the velocity feedforward gain</summary>
+        Kv = 1,
 
-    /// <summary>M970.2 sets the acceleration feedforward gain</summary>
-    private const int KaSubCommand = 2;
+        /// <summary>M970.2 sets the acceleration feedforward gain</summary>
+        Ka = 2,
 
-    /// <summary>M970.3 configures the phase correction of one driver</summary>
-    private const int PhaseCorrectionSubCommand = 3;
+        /// <summary>M970.3 configures the phase correction of one driver</summary>
+        PhaseCorrection = 3,
+    };
+
+    private enum PhaseStepFeedForwardConfig : int
+    {
+        Kv,
+        Ka
+    };
 
     /// <summary>
     /// How a drive's steps are produced
     /// </summary>
-    /// <remarks>RepRapFirmware's <c>StepMode</c> (PhaseStep.h), which M970 takes as its value</remarks>
     private enum StepMode
     {
         /// <summary>A step pulse and a direction level, which is how a stepper is normally driven</summary>
         StepDir = 0,
 
         /// <summary>The coil currents are driven directly to the phase the position calls for</summary>
-        Phase = 1,
-
-        /// <summary>Not a mode: the first value M970 refuses, as RepRapFirmware's enum does</summary>
-        Unknown = 2
+        Phase = 1
     }
+
+    /// <summary>Writes what a form of M970 asks into the message the board reads it from</summary>
+    private delegate void WritePhaseSteppingValue<T>(ref CanMessageM970 message, T value);
 
     /// <summary>
     /// M970, M970.1, M970.2 and M970.3: configure phase stepping
@@ -1283,160 +1302,329 @@ internal partial class MCodeHandler
     /// <para>
     /// Every driver is on an expansion board here, so all four forms are the board's to apply and this
     /// side is the mapping and the record: what the code asked for goes to each driver of the drive
-    /// and into <c>move.axes[]</c> or <c>move.extruders[]</c>, which is where a bare form reports from
+    /// and into <c>move.axes[]</c> or <c>move.extruders[]</c>, which is where a bare form reports from.
+    /// </para>
+    /// <para>
+    /// The step mode and the gains are separate arms here as they are in the firmware, because they
+    /// differ in everything but the drives they address: what the code carries, when it is recorded,
+    /// and what a board that refuses it is answered with
     /// </para>
     /// </remarks>
     private async ValueTask<Message> HandlePhaseSteppingAsync(Commands.Code code, CancellationToken cancellationToken)
-    {
-        if (code.MinorNumber == PhaseCorrectionSubCommand)
+        => (PhaseStepSubCommands)code.MinorNumber switch
         {
-            return await ConfigurePhaseCorrectionAsync(code, cancellationToken);
-        }
+            PhaseStepSubCommands.PhaseCorrection => await ConfigurePhaseCorrectionAsync(code, cancellationToken),
+            PhaseStepSubCommands.Kv or PhaseStepSubCommands.Ka => await ConfigureFeedforwardGainAsync(code, cancellationToken),
+            _ => await ConfigureStepModeAsync(code, cancellationToken)
+        };
 
-        // Which drives the code names, and what each is being asked for, read once under the lock
-        List<(IReadOnlyList<DriverId> Drivers, float Value)> targets = [];
-        string? report = null;
-        using (await model.AccessReadWriteAsync(cancellationToken))
+    /// <summary>
+    /// A bare M970: put every driver of the drives the code names into a step mode
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// The mode is the board's to take and this side's to record once it has: <c>Move::SetStepMode</c>
+    /// sets <c>remotePhaseStepDrives</c> after its sends rather than before them (Move.cpp:2395), so a
+    /// drive whose board refused reads as it was
+    /// </remarks>
+    private async ValueTask<Message> ConfigureStepModeAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        List<Message> replies = [];
+        bool seen = false;
+
+        using (await model.AccessReadOnlyAsync(cancellationToken))
         {
             Move move = model.Move;
 
-            for (int axis = 0; axis < move.Axes.Count; axis++)
+            foreach (Axis axis in move.Axes)
             {
-                if (code.TryGetFloat(move.Axes[axis].Letter, out float value))
+                if (code.TryGetEnum(axis.Letter, out StepMode mode))
                 {
-                    if (ApplyPhaseStepping(move.Axes[axis], code.MinorNumber, value) is string error)
+                    seen = true;
+
+                    Message reply = await SetStepModeAsync(axis, axis.Drivers, mode, cancellationToken);
+                    replies.Add(reply);
+                    if (!reply.Succeeded())
                     {
-                        return new Message(MessageType.Error, error);
+                        return replies.ToMessage();
                     }
-                    targets.Add((move.Axes[axis].Drivers, value));
                 }
             }
 
-            if (code.TryGetFloatArray('E', out float[]? extruderValues) && extruderValues.Length > 0)
+            if (code.TryGetEnumArray('E', move.Extruders.Count, out StepMode[]? modes, pad: true))
             {
-                for (int i = 0; i < move.Extruders.Count && i < extruderValues.Length; i++)
+                seen = true;
+
+                for (int i = 0; i < move.Extruders.Count && i < modes.Length; i++)
                 {
                     Extruder extruder = move.Extruders[i];
+                    StepMode mode = modes[i];
                     if (extruder.Driver is null)
                     {
-                        return new Message(MessageType.Error, "Extruder doesn't have a driver mapped");
+                        throw new GCodeException("Extruder doesn't have a driver mapped");
                     }
-                    if (ApplyPhaseStepping(extruder, code.MinorNumber, extruderValues[i]) is string error)
+                    Message reply = await SetStepModeAsync(extruder, [extruder.Driver], mode, cancellationToken);
+                    replies.Add(reply);
+
+                    if (!reply.Succeeded())
                     {
-                        return new Message(MessageType.Error, error);
+                        return replies.ToMessage();
                     }
-                    targets.Add(([extruder.Driver!], extruderValues[i]));
                 }
             }
 
-            if (targets.Count == 0)
+            if (!seen)
             {
-                report = ReportPhaseStepping(move, code.MinorNumber);
+                return new Message(MessageType.Success, ReportStepModes(model.Move));
             }
         }
 
-        if (report is not null)
-        {
-            return new Message(MessageType.Success, report);
-        }
-
-        // The parameter letter the board reads it as: the step mode is S, and the two gains are the
-        // V and A of the same M970 message rather than sub-codes of their own
-        char letter = code.MinorNumber switch
-        {
-            KvSubCommand => 'V',
-            KaSubCommand => 'A',
-            _ => 'S'
-        };
-
-        // A driver that refused stops the rest, as RepRapFirmware's Move::SetStepMode does: the mode
-        // was already written to this side's model for every drive the code named, and carrying on
-        // would widen the gap between what it says and what the machine is doing
-        List<Message> replies = [];
-        foreach ((IReadOnlyList<DriverId> drivers, float value) in targets)
-        {
-            foreach (DriverId driver in drivers)
-            {
-                Message reply = await SendPhaseSteppingAsync(driver, letter, value, cancellationToken);
-                if (!reply.Succeeded())
-                {
-                    return reply;
-                }
-                replies.Add(reply);
-            }
-        }
         return replies.ToMessage();
     }
 
     /// <summary>
-    /// Write what M970 asked of one drive into the object model
+    /// M970.1 and M970.2: set the velocity or acceleration feedforward gain of the drives the code names
     /// </summary>
-    /// <param name="drive">The axis or extruder</param>
-    /// <param name="minorNumber">Which form of M970 this is</param>
-    /// <param name="value">The value it was given</param>
-    /// <returns>Why the value was refused, or null if it was taken</returns>
-    /// <remarks>The caller must hold the object model write lock</remarks>
-    private static string? ApplyPhaseStepping(IPhaseSteppingDrive drive, int minorNumber, float value)
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// A gain is recorded as it is read, because RepRapFirmware stores it before forwarding it
+    /// (Move.cpp Move::ConfigurePhaseStepping) and reports it whether or not the forward lands
+    /// </remarks>
+    private async ValueTask<Message> ConfigureFeedforwardGainAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        switch (minorNumber)
-        {
-            case KvSubCommand:
-            case KaSubCommand:
-                if (value < 0.0f || float.IsInfinity(value) || float.IsNaN(value))
-                {
-                    return string.Create(CultureInfo.InvariantCulture,
-                                         $"Invalid K{(minorNumber == KvSubCommand ? 'v' : 'a')} {value:F1}");
-                }
-                if (minorNumber == KvSubCommand)
-                {
-                    drive.PhaseStepKv = value;
-                }
-                else
-                {
-                    drive.PhaseStepKa = value;
-                }
-                return null;
+        List<Message> replies = [];
+        bool seen = false;
 
-            default:
-                int mode = (int)value;
-                if (mode < 0 || mode >= (int)StepMode.Unknown)
+        PhaseStepFeedForwardConfig config = (PhaseStepSubCommands)code.MinorNumber switch
+        {
+            PhaseStepSubCommands.Kv => PhaseStepFeedForwardConfig.Kv,
+            PhaseStepSubCommands.Ka => PhaseStepFeedForwardConfig.Ka,
+            _ => throw new ArgumentException("Invalid subcommand")
+        };
+
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            Move move = model.Move;
+
+            foreach (Axis axis in move.Axes)
+            {
+                if (code.TryGetFloat(axis.Letter, out float value, min: 0.0f))
                 {
-                    return $"Unknown mode {mode}";
+                    seen = true;
+
+                    Message reply = await SetRemotePhaseStepParamAsync(axis, axis.Drivers, value, config, cancellationToken);
+                    replies.Add(reply);
+                    if (!reply.Succeeded())
+                    {
+                        return replies.ToMessage();
+                    }
                 }
-                drive.PhaseStep = mode == (int)StepMode.Phase;
-                return null;
+            }
+
+            if (code.TryGetFloatArray('E', move.Extruders.Count, out float[]? values, pad: true, min: 0.0f))
+            {
+                seen = true;
+
+                for (int i = 0; i < move.Extruders.Count && i < values.Length; i++)
+                {
+                    Extruder extruder = move.Extruders[i];
+                    float value = values[i];
+                    if (extruder.Driver is null)
+                    {
+                        throw new GCodeException("Extruder doesn't have a driver mapped");
+                    }
+                    Message reply = await SetRemotePhaseStepParamAsync(extruder, [extruder.Driver], value, config, cancellationToken);
+                    replies.Add(reply);
+
+                    if (!reply.Succeeded())
+                    {
+                        return replies.ToMessage();
+                    }
+                }
+            }
+
+            if (!seen)
+            {
+                return new Message(MessageType.Success, ReportGains(model.Move, config));
+            }
+        }
+
+        return replies.ToMessage();
+    }
+
+    private async ValueTask<Message> SetStepModeAsync(IPhaseSteppingDrive drive, IReadOnlyList<DriverId> drivers, StepMode mode, CancellationToken cancellationToken)
+    {
+        List<Message> replies = [];
+        foreach (DriverId driver in drivers)
+        {
+            Message reply = await SendDriverPhaseSteppingAsync(
+                driver,
+                mode,
+                (ref message, mode) => message.S = (byte)mode,
+                cancellationToken
+            );
+
+            // Add reply to previous
+            replies.Add(reply);
+
+            if (!reply.Succeeded())
+            {
+                break;
+            }
+        }
+
+        {
+            Message reply = replies.ToMessage();
+            if (reply.Succeeded())
+                drive.PhaseStep = mode == StepMode.Phase;
+
+            return reply;
         }
     }
 
     /// <summary>
-    /// What a bare M970, M970.1 or M970.2 reports
+    /// Set phase step parameters for drive
     /// </summary>
+    /// <param name="drive"></param>
+    /// <param name="drivers"></param>
+    /// <param name="value"></param>
+    /// <param name="config"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    private async ValueTask<Message> SetRemotePhaseStepParamAsync(IPhaseSteppingDrive drive, IReadOnlyList<DriverId> drivers,
+                                                                  float value,
+                                                                  PhaseStepFeedForwardConfig config,
+                                                                  CancellationToken cancellationToken)
+    {
+        List<Message> replies = [];
+
+
+        WritePhaseSteppingValue<float>? write;
+        Action<IPhaseSteppingDrive, float>? record;
+
+        switch (config)
+        {
+            case PhaseStepFeedForwardConfig.Kv:
+                {
+                    write = (ref message, gain) => message.V = gain;
+                    record = (drive, gain) => drive.PhaseStepKv = gain;
+                    break;
+                }
+            case PhaseStepFeedForwardConfig.Ka:
+                {
+                    write = (ref Message, gain) => Message.A = gain;
+                    record = (drive, gain) => drive.PhaseStepKa = gain;
+                    break;
+                }
+            default:
+                throw new ArgumentException();
+        }
+
+        foreach (DriverId driver in drivers)
+        {
+            Message reply = await SendDriverPhaseSteppingAsync(driver, value, write, cancellationToken);
+
+            // Add reply to previous
+            replies.Add(reply);
+
+            if (!reply.Succeeded())
+            {
+                break;
+            }
+
+        }
+        {
+            Message reply = replies.ToMessage();
+            if (reply.Succeeded())
+            {
+                record(drive, value);
+            }
+            return replies.ToMessage();
+        }
+    }
+
+    /// <summary>
+    /// Ask one board for one phase stepping setting on one of its drivers
+    /// </summary>
+    /// <typeparam name="T">What this form of the code carries</typeparam>
+    /// <param name="driver">The driver</param>
+    /// <param name="value">The value</param>
+    /// <param name="write">Writes the value into the message the board reads it from</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>What the board said about it</returns>
+    /// <remarks>
+    /// CanInterface::SetRemoteDriverStepMode and SetRemotePhaseStepParam (CanInterface.cpp), which are
+    /// one message with a different parameter rather than two.
+    /// <para>
+    /// The reply comes back whole rather than as a message, because what the board said and what the
+    /// caller should say about it are different questions: M970 replaces a wordless refusal with the
+    /// drive and the mode, and M584's step-mode reset carries only what the board actually said
+    /// </para>
+    /// </remarks>
+    private async ValueTask<Message> SendDriverPhaseSteppingAsync<T>(DriverId driver, T value,
+                                                                   WritePhaseSteppingValue<T> write,
+                                                                   CancellationToken cancellationToken)
+    {
+        CanAddresses.CheckAddressHasHardware(driver.Board, $"Driver {driver}");
+
+        CanMessageM970 message = default;
+        message.P = (byte)driver.Port;
+        write(ref message, value);
+
+        return await linkInterface.SendCanRequestAsync((byte)driver.Board, in message, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>What a bare M970 reports: the step mode of every drive</summary>
     /// <param name="move">The move subsystem</param>
-    /// <param name="minorNumber">Which form of M970 this is</param>
     /// <returns>The report</returns>
     /// <remarks>The caller must hold the object model lock</remarks>
-    private static string ReportPhaseStepping(Move move, int minorNumber)
-        => minorNumber switch
+    private static string ReportStepModes(Move move)
+        => ReportPerDrive(move, "Axis step mode - ",
+                          axis => ((int)StepModeOf(axis)).ToString(CultureInfo.InvariantCulture),
+                          extruder => ((int)StepModeOf(extruder)).ToString(CultureInfo.InvariantCulture),
+                          axisSeparator: ":", extruderHeader: "E", firstExtruderSeparator: ":");
+
+    /// <summary>What a bare M970.1 or M970.2 reports: the feedforward gain of every drive</summary>
+    /// <param name="move">The move subsystem</param>
+    /// <param name="velocity">Whether the velocity gain is the one being reported</param>
+    /// <returns>The report</returns>
+    /// <remarks>
+    /// Six decimal places, which is what RepRapFirmware's "%f" gives a gain (GCodes3.cpp:1014). The
+    /// caller must hold the object model lock
+    /// </remarks>
+    private static string ReportGains(Move move, PhaseStepFeedForwardConfig config)
+    {
+
+        char letter = config switch
         {
-            KvSubCommand or KaSubCommand => ReportPerDrive(
-                move, $"Axis phase step K{(minorNumber == KvSubCommand ? 'v' : 'a')} - ",
-                axis => Gain(axis, minorNumber).ToString("F1", CultureInfo.InvariantCulture),
-                extruder => Gain(extruder, minorNumber).ToString("F1", CultureInfo.InvariantCulture),
-                axisSeparator: ":", extruderHeader: "E", firstExtruderSeparator: ":"),
-            _ => ReportPerDrive(
-                move, "Axis step mode - ",
-                axis => StepModeOf(axis).ToString(CultureInfo.InvariantCulture),
-                extruder => StepModeOf(extruder).ToString(CultureInfo.InvariantCulture),
-                axisSeparator: ":", extruderHeader: "E", firstExtruderSeparator: ":")
+            PhaseStepFeedForwardConfig.Kv => 'v',
+            PhaseStepFeedForwardConfig.Ka => 'a',
+            _ => throw new ArgumentException()
         };
 
-    /// <summary>The feedforward gain M970.1 or M970.2 reports for one drive</summary>
-    private static float Gain(IPhaseSteppingDrive drive, int minorNumber)
-        => minorNumber == KvSubCommand ? drive.PhaseStepKv : drive.PhaseStepKa;
+        return ReportPerDrive(move, $"Axis phase step K{letter} - ",
+                          axis => GainOf(axis, config).ToString("F6", CultureInfo.InvariantCulture),
+                          extruder => GainOf(extruder, config).ToString("F6", CultureInfo.InvariantCulture),
+                          axisSeparator: ":", extruderHeader: "E", firstExtruderSeparator: ":");
+    }
 
-    /// <summary>The step mode number a bare M970 reports for one drive</summary>
-    private static int StepModeOf(IPhaseSteppingDrive drive)
-        => drive.PhaseStep == true ? (int)StepMode.Phase : (int)StepMode.StepDir;
+    /// <summary>The feedforward gain M970.1 or M970.2 reports for one drive</summary>
+    private static float GainOf(IPhaseSteppingDrive drive, PhaseStepFeedForwardConfig config)
+        => config switch
+        {
+            PhaseStepFeedForwardConfig.Kv => drive.PhaseStepKv,
+            PhaseStepFeedForwardConfig.Ka => drive.PhaseStepKa,
+            _ => throw new ArgumentException()
+        };
+
+    /// <summary>The step mode a drive is in, which is what a bare M970 reports for it</summary>
+    private static StepMode StepModeOf(IPhaseSteppingDrive drive)
+        => drive.PhaseStep == true ? StepMode.Phase : StepMode.StepDir;
 
     /// <summary>
     /// M970.3: configure the phase correction of one driver
@@ -1455,42 +1643,6 @@ internal partial class MCodeHandler
         CanAddresses.CheckAddressHasHardware(driver.Board, $"Driver {driver}");
 
         return await SendDriverConfigAsync<CanMessageM970Point3>(driver, code, cancellationToken);
-    }
-
-    /// <summary>
-    /// Ask a board for one phase stepping setting on one of its drivers
-    /// </summary>
-    /// <param name="driver">The driver</param>
-    /// <param name="letter">Parameter the board reads the value as</param>
-    /// <param name="value">The value</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>What the board said about it</returns>
-    /// <remarks>
-    /// CanInterface::SetRemoteDriverStepMode and SetRemotePhaseStepParam (CanInterface.cpp), which are
-    /// one message with a different parameter rather than two
-    /// </remarks>
-    private async ValueTask<Message> SendPhaseSteppingAsync(DriverId driver, char letter, float value,
-                                                                CancellationToken cancellationToken)
-    {
-        CanAddresses.CheckAddressHasHardware(driver.Board, $"Driver {driver}");
-
-        CanMessageM970 message = default;
-        message.P = (byte)driver.Port;
-        if (letter == 'S')
-        {
-            message.S = (byte)value;
-        }
-        else if (letter == 'V')
-        {
-            message.V = value;
-        }
-        else
-        {
-            message.A = value;
-        }
-
-        return await linkInterface.SendCanRequestAsync((byte)driver.Board, in message,
-                                                      cancellationToken: cancellationToken);
     }
 
     /// <summary>
@@ -2063,13 +2215,8 @@ internal partial class MCodeHandler
         {
             Skew skew = model.Move.Compensation.Skew;
 
-            if (code.TryGetFloat('S', out float measuredOver))
+            if (code.TryGetFloat('S', out float measuredOver, min: 0.0f))
             {
-                if (measuredOver <= 0.0f)
-                {
-                    return new Message(MessageType.Error, "S parameter must be greater than zero");
-                }
-
                 if (code.TryGetFloat('X', out float xDeviation))
                 {
                     skew.TanXY = xDeviation / measuredOver;
@@ -2789,29 +2936,20 @@ internal partial class MCodeHandler
     /// Whether a driver can be addressed, recording why not if it cannot
     /// </summary>
     /// <param name="driver">The driver</param>
-    /// <param name="warnings">Where to record the reason it was rejected</param>
-    /// <returns>True if the driver is usable</returns>
+    /// <exception cref="GCodeException"></exception>
     /// <remarks>
     /// A board that has not announced itself yet is not a reason to reject a driver: config.g runs
     /// before the expansion boards have necessarily all been seen
     /// </remarks>
-    private bool IsValidDriver(DriverId driver, List<string> warnings)
+    private void CheckIsValidDriver(DriverId driver)
     {
-        if (CanAddresses.HasNoHardware(driver.Board))
-        {
-            warnings.Add(CanAddresses.NoHardwareMessage($"Driver {driver}"));
-            return false;
-        }
+        CanAddresses.CheckAddressHasHardware(driver.Board, $"Driver {driver}");
 
-        // MaxMotors is zero for a board that has announced itself but not yet reported its details,
-        // which says nothing about whether the driver exists
         Board? board = model.FindBoard((byte)driver.Board);
         if (board is not null && board.MaxMotors > 0 && driver.Port >= board.MaxMotors)
         {
-            warnings.Add($"Driver {driver} does not exist");
-            return false;
+            throw new GCodeException($"Driver {driver} does not exist");
         }
-        return true;
     }
 
     /// <summary>
@@ -3121,14 +3259,45 @@ internal partial class MCodeHandler
     private static string ReportDriveMapping(Move move)
     {
         StringBuilder builder = new("Driver assignments:");
+        bool printed = false;
         foreach (Axis axis in move.Axes)
         {
-            builder.Append(' ').Append(axis.Letter)
-                   .Append(string.Join(':', axis.Drivers.Select(driver => driver.ToString())));
+            // The kind of axis comes before its drivers, so a machine built with R or S can be told
+            // from one that took the default its letter implies
+            builder.Append(' ');
+            if (axis.Rotational)
+            {
+                builder.Append("(r)");
+            }
+            if (axis.ContinuousRotation)
+            {
+                builder.Append("(c)");
+            }
+
+            // The letter introduces the drivers and a colon separates them, so an axis with no drivers
+            // at all prints nothing but the space and its markers
+            if (axis.Drivers.Count > 0)
+            {
+                printed = true;
+                builder.Append(axis.Letter).Append(string.Join(':', axis.Drivers));
+            }
         }
 
-        builder.Append(" E");
-        builder.Append(string.Join(':', move.Extruders.Select(extruder => extruder.Driver?.ToString() ?? "none")));
+        // Extruders are one group after the axes, and a machine with none has no group at all rather
+        // than an empty one. They do not count towards whether anything was printed: RepRapFirmware
+        // sets that flag from the axis drivers alone (GCodes3.cpp:629), so a machine with an extruder
+        // and no axis driver still reports "none" 
+        if (move.Extruders.Count > 0)
+        {
+            builder.Append(' ');
+            builder.Append('E')
+                   .Append(string.Join(':', move.Extruders.Select(extruder => extruder.Driver?.ToString() ?? "none")));
+        }
+
+        if (!printed)
+        {
+            builder.Append(" none");
+        }
 
         int visible = move.Axes.Count(axis => axis.Visible);
         builder.Append(", ").Append(visible).Append(" axes visible");

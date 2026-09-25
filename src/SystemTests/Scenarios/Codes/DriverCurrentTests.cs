@@ -29,7 +29,6 @@ public class DriverCurrentTests : BenchFixture
     /// </summary>
     /// <remarks><c>testcases/drivers/m906-set-motor-current.yaml</c></remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M906SetsMotorCurrentPerAxis()
     {
         await using JobBench bench = await DriversBench.StartAsync();
@@ -133,7 +132,6 @@ public class DriverCurrentTests : BenchFixture
     /// RepRapFirmware's, in single precision, so 400mA at 70% is what its reference holds to the bit
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M913ScalesTheConfiguredCurrent()
     {
         await using JobBench bench = await DriversBench.StartAsync();
@@ -164,7 +162,6 @@ public class DriverCurrentTests : BenchFixture
     /// 239.99998 - 400mA at 60% worked out in single precision
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M913ScalesTheExtruderCurrent()
     {
         await using JobBench bench = await DriversBench.StartAsync(configExtra: "M906 E400");
@@ -211,7 +208,6 @@ public class DriverCurrentTests : BenchFixture
     /// message type, one per drive
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M917SetsTheStandstillPercentage()
     {
         await using JobBench bench = await DriversBench.StartAsync();
@@ -272,7 +268,6 @@ public class DriverCurrentTests : BenchFixture
     /// DisableRemoteDrivers send the state on its own (CanInterface.cpp:988-1017)
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M18SendsABareDriverState()
     {
         await using JobBench bench = await DriversBench.StartAsync();

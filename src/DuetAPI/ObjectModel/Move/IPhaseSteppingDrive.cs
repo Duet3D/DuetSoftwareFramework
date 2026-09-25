@@ -11,7 +11,7 @@ namespace DuetAPI.ObjectModel;
 public interface IPhaseSteppingDrive
 {
     /// <summary>Whether the drive is currently using phase stepping</summary>
-    bool? PhaseStep { get; set; }
+    bool PhaseStep { get; set; }
 
     /// <summary>Velocity feedforward gain of the phase stepping control loop</summary>
     float PhaseStepKv { get; set; }

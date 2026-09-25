@@ -58,9 +58,9 @@ internal static class JobControlBench
 
     /// <summary>
     /// One extruding tool, selected. Extruding with no tool selected is an error rather than a
-    /// move, so a scenario whose job extrudes configures this
+    /// move, so a scenario whose job extrudes configures this.
     /// </summary>
-    public const string OneTool = "M563 P0 D0 H-1\nT0";
+    public const string OneTool = "M563 P0 D0\nT0";
 
     /// <summary>
     /// Globals the instrumented macros count their runs in, created by config.g so a scenario can

@@ -194,9 +194,9 @@ public class FanPortCodeTests : SystemTests.Host.BenchFixture
         string tooHigh = (await bench.Host.ExecuteCodeAsync("M950 F0 K1000")).TrimEnd();
         Assert.Multiple(() =>
         {
-            Assert.That(tooLow, Is.EqualTo("Error:  at column 20: M950: parameter 'K' too low"),
+            Assert.That(tooLow, Is.EqualTo("Error: at column 20: M950: parameter 'K' too low"),
                         "K below the minimum is refused where it stood (CANlib MinFanPulsesPerRev)");
-            Assert.That(tooHigh, Is.EqualTo("Error:  at column 10: M950: parameter 'K' too high"),
+            Assert.That(tooHigh, Is.EqualTo("Error: at column 10: M950: parameter 'K' too high"),
                         "and K above the maximum too (CANlib MaxFanPulsesPerRev)");
         });
 

@@ -230,12 +230,12 @@ public partial class Axis : ModelObject, IStaticModelObject, IPhaseSteppingDrive
     /// <summary>
     /// Whether or not the axis is currently using phase stepping
     /// </summary>
-    public bool? PhaseStep
+    public bool PhaseStep
     {
         get => _phaseStep;
         set => SetPropertyValue(ref _phaseStep, value);
     }
-    private bool? _phaseStep = false;
+    private bool _phaseStep = false;
 
     /// <summary>
     /// Velocity feedforward gain of the phase stepping control loop (M970.1 Kv)

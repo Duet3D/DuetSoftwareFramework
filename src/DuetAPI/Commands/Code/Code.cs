@@ -328,7 +328,12 @@ public partial class Code : Command<Message?>
     /// <remarks>
     /// RepRapFirmware's GCodeBuffer::GetLimitedFValue (GCodeBuffer.cpp:553). Both ends are
     /// inclusive, and the refusal quotes the column, because it is about one value in the line
-    /// rather than about the command
+    /// rather than about the command.
+    /// <para>
+    /// An <paramref name="errorString"/> replaces the whole refusal, column and all: it is there for
+    /// a handler that refuses the value in RepRapFirmware's own words, and those come from a
+    /// <c>reply.printf</c> in the handler rather than from the read that quoted a position
+    /// </para>
     /// </remarks>
     private static float CheckLimits(float value, float? min, float? max, CodeParameter parameter,
                                      Func<float, string>? errorString)
@@ -336,13 +341,15 @@ public partial class Code : Command<Message?>
         // TODO exception wording matches RRF for now but should give the min/max values to be more useful after feature parity is reached
         if (min is float lowest && value < lowest)
         {
-            throw new GCodeException(errorString?.Invoke(value) ?? $"parameter '{parameter.Letter}' too low",
-                                     parameter.Column);
+            throw (errorString is not null)
+                ? new GCodeException(errorString(value))
+                : new GCodeException($"parameter '{parameter.Letter}' too low", parameter.Column);
         }
         if (max is float highest && value > highest)
         {
-            throw new GCodeException(errorString?.Invoke(value) ?? $"parameter '{parameter.Letter}' too high",
-                                     parameter.Column);
+            throw (errorString is not null)
+                ? new GCodeException(errorString(value))
+                : new GCodeException($"parameter '{parameter.Letter}' too high", parameter.Column);
         }
         return value;
     }
@@ -353,28 +360,39 @@ public partial class Code : Command<Message?>
     /// <param name="value">Value that was read</param>
     /// <param name="min">Lowest value that is allowed, or null for no lower limit</param>
     /// <param name="max">Highest value that is allowed, or null for no upper limit</param>
-    /// <param name="letter">Letter of the parameter the value came from</param>
+    /// <param name="parameter">Parameter the value came from</param>
     /// <param name="errorString">Builds the refusal from the value it would not take, in place of the usual
     /// "too low" or "too high", or null for those</param>
     /// <returns>The value, which lies within the limits</returns>
     /// <exception cref="GCodeException">Value is outside the limits</exception>
     /// <remarks>
     /// RepRapFirmware's GCodeBuffer::GetLimitedIValue (GCodeBuffer.cpp:592) and
-    /// ::GetLimitedUIValue (GCodeBuffer.cpp:614), which name the parameter but quote no column
-    /// where the float form quotes one. Both ends are inclusive; RepRapFirmware's unsigned form
-    /// writes its upper limit as one past the last value it allows, so a call ported from it passes
-    /// <c>maxValuePlusOne - 1</c> here. The signed and unsigned forms share one check because every
-    /// value either of them can carry fits in a long
+    /// ::GetLimitedUIValue (GCodeBuffer.cpp:614). Both ends are inclusive; RepRapFirmware's unsigned
+    /// form writes its upper limit as one past the last value it allows, so a call ported from it
+    /// passes <c>maxValuePlusOne - 1</c> here. The signed and unsigned forms share one check because
+    /// every value either of them can carry fits in a long.
+    /// <para>
+    /// The refusal quotes the column and an <paramref name="errorString"/> replaces it along with the
+    /// wording, as the float form does: a value refused for what it is belongs to the place in the
+    /// line it stood, whatever type went looking for it, and a handler that refuses it in
+    /// RepRapFirmware's own words is writing a sentence about the command instead. RepRapFirmware
+    /// quotes a column only from its float form, having only there a read that knows one
+    /// </para>
     /// </remarks>
-    private static long CheckLimits(long value, long? min, long? max, char letter, Func<long, string>? errorString)
+    private static long CheckLimits(long value, long? min, long? max, CodeParameter parameter,
+                                    Func<long, string>? errorString)
     {
         if (min is long lowest && value < lowest)
         {
-            throw new GCodeException(errorString?.Invoke(value) ?? $"parameter '{letter}' too low");
+            throw (errorString is not null)
+                ? new GCodeException(errorString(value))
+                : new GCodeException($"parameter '{parameter.Letter}' too low", parameter.Column);
         }
         if (max is long highest && value > highest)
         {
-            throw new GCodeException(errorString?.Invoke(value) ?? $"parameter '{letter}' too high");
+            throw (errorString is not null)
+                ? new GCodeException(errorString(value))
+                : new GCodeException($"parameter '{parameter.Letter}' too high", parameter.Column);
         }
         return value;
     }
@@ -495,7 +513,7 @@ public partial class Code : Command<Message?>
     {
         CodeParameter? parameter = FindValuedParameter(letter);
         return (parameter is not null)
-            ? (int)CheckLimits((int)parameter, min, max, letter, errorString)
+            ? (int)CheckLimits((int)parameter, min, max, parameter, errorString)
             : defaultValue ?? throw new MissingParameterException(letter);
     }
 
@@ -516,7 +534,7 @@ public partial class Code : Command<Message?>
     {
         if (TryGetValuedParameter(letter, out CodeParameter? param))
         {
-            parameter = (int)CheckLimits((int)param, min, max, letter, errorString);
+            parameter = (int)CheckLimits((int)param, min, max, param, errorString);
             return true;
         }
         parameter = default;
@@ -540,7 +558,7 @@ public partial class Code : Command<Message?>
     {
         if (TryGetValuedParameter(letter, out CodeParameter? param))
         {
-            parameter = (int)CheckLimits((int)param, min, max, letter, errorString);
+            parameter = (int)CheckLimits((int)param, min, max, param, errorString);
             return true;
         }
         parameter = null;
@@ -569,7 +587,7 @@ public partial class Code : Command<Message?>
     {
         CodeParameter? parameter = FindValuedParameter(letter);
         return (parameter is not null)
-            ? (uint)CheckLimits((uint)parameter, min, max, letter, errorString)
+            ? (uint)CheckLimits((uint)parameter, min, max, parameter, errorString)
             : defaultValue ?? throw new MissingParameterException(letter);
     }
 
@@ -590,7 +608,7 @@ public partial class Code : Command<Message?>
     {
         if (TryGetValuedParameter(letter, out CodeParameter? param))
         {
-            parameter = (uint)CheckLimits((uint)param, min, max, letter, errorString);
+            parameter = (uint)CheckLimits((uint)param, min, max, param, errorString);
             return true;
         }
         parameter = default;
@@ -614,7 +632,7 @@ public partial class Code : Command<Message?>
     {
         if (TryGetValuedParameter(letter, out CodeParameter? param))
         {
-            parameter = (uint)CheckLimits((uint)param, min, max, letter, errorString);
+            parameter = (uint)CheckLimits((uint)param, min, max, param, errorString);
             return true;
         }
         parameter = null;
@@ -643,7 +661,7 @@ public partial class Code : Command<Message?>
     {
         CodeParameter? parameter = FindValuedParameter(letter);
         return (parameter is not null)
-            ? CheckLimits((long)parameter, min, max, letter, errorString)
+            ? CheckLimits((long)parameter, min, max, parameter, errorString)
             : defaultValue ?? throw new MissingParameterException(letter);
     }
 
@@ -664,7 +682,7 @@ public partial class Code : Command<Message?>
     {
         if (TryGetValuedParameter(letter, out CodeParameter? param))
         {
-            parameter = CheckLimits((long)param, min, max, letter, errorString);
+            parameter = CheckLimits((long)param, min, max, param, errorString);
             return true;
         }
         parameter = default;
@@ -688,7 +706,7 @@ public partial class Code : Command<Message?>
     {
         if (TryGetValuedParameter(letter, out CodeParameter? param))
         {
-            parameter = CheckLimits((long)param, min, max, letter, errorString);
+            parameter = CheckLimits((long)param, min, max, param, errorString);
             return true;
         }
         parameter = null;
@@ -1033,7 +1051,7 @@ public partial class Code : Command<Message?>
     /// <param name="values">Values that were read</param>
     /// <param name="min">Lowest value that is allowed, or null for no lower limit</param>
     /// <param name="max">Highest value that is allowed, or null for no upper limit</param>
-    /// <param name="letter">Letter of the parameter the values came from</param>
+    /// <param name="parameter">Parameter the values came from</param>
     /// <param name="errorString">Builds the refusal from the value it would not take, in place of the usual
     /// "too low" or "too high", or null for those</param>
     /// <returns>The values, which all lie within the limits</returns>
@@ -1044,31 +1062,34 @@ public partial class Code : Command<Message?>
     /// of these per array type because an int[] is not a long[], where the scalar forms share a
     /// single check through the widening every value has
     /// </remarks>
-    private static int[] CheckLimits(int[] values, long? min, long? max, char letter, Func<long, string>? errorString)
+    private static int[] CheckLimits(int[] values, long? min, long? max, CodeParameter parameter,
+                                     Func<long, string>? errorString)
     {
         foreach (int value in values)
         {
-            CheckLimits(value, min, max, letter, errorString);
+            CheckLimits(value, min, max, parameter, errorString);
         }
         return values;
     }
 
-    /// <inheritdoc cref="CheckLimits(int[], long?, long?, char, Func{long, string})" />
-    private static uint[] CheckLimits(uint[] values, long? min, long? max, char letter, Func<long, string>? errorString)
+    /// <inheritdoc cref="CheckLimits(int[], long?, long?, CodeParameter, Func{long, string})" />
+    private static uint[] CheckLimits(uint[] values, long? min, long? max, CodeParameter parameter,
+                                      Func<long, string>? errorString)
     {
         foreach (uint value in values)
         {
-            CheckLimits(value, min, max, letter, errorString);
+            CheckLimits(value, min, max, parameter, errorString);
         }
         return values;
     }
 
-    /// <inheritdoc cref="CheckLimits(int[], long?, long?, char, Func{long, string})" />
-    private static long[] CheckLimits(long[] values, long? min, long? max, char letter, Func<long, string>? errorString)
+    /// <inheritdoc cref="CheckLimits(int[], long?, long?, CodeParameter, Func{long, string})" />
+    private static long[] CheckLimits(long[] values, long? min, long? max, CodeParameter parameter,
+                                      Func<long, string>? errorString)
     {
         foreach (long value in values)
         {
-            CheckLimits(value, min, max, letter, errorString);
+            CheckLimits(value, min, max, parameter, errorString);
         }
         return values;
     }
@@ -1306,7 +1327,7 @@ public partial class Code : Command<Message?>
     {
         CodeParameter? parameter = FindArrayParameter(letter, maxLength, allowZeroLength);
         return (parameter is not null)
-            ? CheckLimits(ReadArray(parameter, static p => (int[])p, maxLength, pad, exactLength), min, max, letter, errorString)
+            ? CheckLimits(ReadArray(parameter, static p => (int[])p, maxLength, pad, exactLength), min, max, parameter, errorString)
             : defaultValue ?? throw new MissingParameterException(letter);
     }
 
@@ -1335,7 +1356,7 @@ public partial class Code : Command<Message?>
     {
         if (TryGetArrayParameter(letter, maxLength, allowZeroLength, out CodeParameter? param))
         {
-            parameter = CheckLimits(ReadArray(param, static p => (int[])p, maxLength, pad, exactLength), min, max, letter, errorString);
+            parameter = CheckLimits(ReadArray(param, static p => (int[])p, maxLength, pad, exactLength), min, max, param, errorString);
             return true;
         }
         parameter = null;
@@ -1373,7 +1394,7 @@ public partial class Code : Command<Message?>
     {
         CodeParameter? parameter = FindArrayParameter(letter, maxLength, allowZeroLength);
         return (parameter is not null)
-            ? CheckLimits(ReadArray(parameter, static p => (uint[])p, maxLength, pad, exactLength), min, max, letter, errorString)
+            ? CheckLimits(ReadArray(parameter, static p => (uint[])p, maxLength, pad, exactLength), min, max, parameter, errorString)
             : defaultValue ?? throw new MissingParameterException(letter);
     }
 
@@ -1402,7 +1423,7 @@ public partial class Code : Command<Message?>
     {
         if (TryGetArrayParameter(letter, maxLength, allowZeroLength, out CodeParameter? param))
         {
-            parameter = CheckLimits(ReadArray(param, static p => (uint[])p, maxLength, pad, exactLength), min, max, letter, errorString);
+            parameter = CheckLimits(ReadArray(param, static p => (uint[])p, maxLength, pad, exactLength), min, max, param, errorString);
             return true;
         }
         parameter = null;
@@ -1440,7 +1461,7 @@ public partial class Code : Command<Message?>
     {
         CodeParameter? parameter = FindArrayParameter(letter, maxLength, allowZeroLength);
         return (parameter is not null)
-            ? CheckLimits(ReadArray(parameter, static p => (long[])p, maxLength, pad, exactLength), min, max, letter, errorString)
+            ? CheckLimits(ReadArray(parameter, static p => (long[])p, maxLength, pad, exactLength), min, max, parameter, errorString)
             : defaultValue ?? throw new MissingParameterException(letter);
     }
 
@@ -1469,7 +1490,7 @@ public partial class Code : Command<Message?>
     {
         if (TryGetArrayParameter(letter, maxLength, allowZeroLength, out CodeParameter? param))
         {
-            parameter = CheckLimits(ReadArray(param, static p => (long[])p, maxLength, pad, exactLength), min, max, letter, errorString);
+            parameter = CheckLimits(ReadArray(param, static p => (long[])p, maxLength, pad, exactLength), min, max, param, errorString);
             return true;
         }
         parameter = null;

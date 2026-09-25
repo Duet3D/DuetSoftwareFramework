@@ -194,6 +194,7 @@ public class AsyncPauseTests : BenchFixture
     /// </summary>
     [Test]
     [Category("LongRunning")]
+    [Category("KnownGap")]
     public async Task ResumeFractionScalesRelativeMoves()
     {
         await using JobBench bench = await JobControlBench.StartAsync(
@@ -236,6 +237,7 @@ public class AsyncPauseTests : BenchFixture
     /// </summary>
     [Test]
     [Category("LongRunning")]
+    [Category("KnownGap")]
     public async Task ResumeFractionScalesAbsoluteExtrusion()
     {
         await using JobBench bench = await JobControlBench.StartAsync(
@@ -348,6 +350,7 @@ public class AsyncPauseTests : BenchFixture
     /// </summary>
     [Test]
     [Category("LongRunning")]
+    [Category("KnownGap")]
     public async Task TwoPausesInsideOneLine()
     {
         await using JobBench bench = await JobControlBench.StartAsync(

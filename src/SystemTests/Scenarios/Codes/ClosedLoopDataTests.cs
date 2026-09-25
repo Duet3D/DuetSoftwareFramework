@@ -215,7 +215,8 @@ public class ClosedLoopDataTests : BenchFixture
     /// <remarks>
     /// RepRapFirmware reads both with <c>TryGetLimitedUIValue</c> (ClosedLoop.cpp:112 and :150).
     /// Casting instead would make S70000 collect 4464 samples and S-1 collect 65535, neither of them
-    /// what was asked for and neither of them reported
+    /// what was asked for and neither of them reported. The column is quoted rather than stated,
+    /// because it is where the value stands in a line the case builds
     /// </remarks>
     [TestCase("S70000", "parameter 'S' too high")]
     [TestCase("S-1", "parameter 'S' too low")]
@@ -229,7 +230,7 @@ public class ClosedLoopDataTests : BenchFixture
         {
             Assert.That(bench.Host.ExecuteCodeAsync($"M569.5 P{DriversBench.ClosedLoopBoard}.0 {parameters} D{Filter}")
                              .Result.TrimEnd(),
-                        Is.EqualTo($"Error: M569.5: {expected}"));
+                        Does.StartWith("Error: at column ").And.EndWith($"M569.5: {expected}"));
             Assert.That(bench.CanMaster.CanMessages<CanMessageStartClosedLoopDataCollection>(), Is.Empty);
         });
     }
