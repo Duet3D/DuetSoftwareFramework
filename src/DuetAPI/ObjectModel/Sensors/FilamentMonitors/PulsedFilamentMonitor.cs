@@ -121,12 +121,12 @@ public partial class PulsedFilamentMonitor : FilamentMonitor
 	public PulsedFilamentMonitorConfigured Configured { get; } = new PulsedFilamentMonitorConfigured();
 
 	/// <summary>
-	/// Current position of the filament monitor (in mm)
+	/// Raw pulse count of this filament monitor (0..4095)
 	/// </summary>
-	public float Position
+	public int Position
 	{
 		get => _position;
 		set => SetPropertyValue(ref _position, value);
 	}
-	private float _position;
+	private int _position;
 }

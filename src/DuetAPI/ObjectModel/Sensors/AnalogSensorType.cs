@@ -126,6 +126,31 @@ public enum AnalogSensorType
     DriversDuex,
 
     /// <summary>
+    /// Board temperature sensor of an expansion board
+    /// </summary>
+    BoardTemp,
+
+    /// <summary>
+    /// Heater current sensor of an expansion board
+    /// </summary>
+    Current,
+
+    /// <summary>
+    /// TPiS thermopile object temperature
+    /// </summary>
+    ThermopileTPiSObject,
+
+    /// <summary>
+    /// TPiS thermopile ambient temperature
+    /// </summary>
+    ThermopileTPiSAmbient,
+
+    /// <summary>
+    /// TPiS thermopile environment temperature
+    /// </summary>
+    ThermopileTPiSEnvironment,
+
+    /// <summary>
     /// Sensor on a CAN-connected expansion board
     /// </summary>
     Remote,
@@ -171,6 +196,11 @@ public class AnalogSensorTypeConverter : JsonConverter<AnalogSensorType>
                 "mcutemp" => AnalogSensorType.McuTemp,
                 "drivers" => AnalogSensorType.Drivers,
                 "driversduex" => AnalogSensorType.DriversDuex,
+                "boardtemp" => AnalogSensorType.BoardTemp,
+                "current" => AnalogSensorType.Current,
+                "thermopile_tpis.object" => AnalogSensorType.ThermopileTPiSObject,
+                "thermopile_tpis.ambient" => AnalogSensorType.ThermopileTPiSAmbient,
+                "thermopile_tpis.environment" => AnalogSensorType.ThermopileTPiSEnvironment,
                 "remote" => AnalogSensorType.Remote,
                 _ => AnalogSensorType.Unknown,
             };
@@ -251,6 +281,21 @@ public class AnalogSensorTypeConverter : JsonConverter<AnalogSensorType>
                 break;
             case AnalogSensorType.DriversDuex:
                 writer.WriteStringValue("driversduex");
+                break;
+            case AnalogSensorType.BoardTemp:
+                writer.WriteStringValue("boardtemp");
+                break;
+            case AnalogSensorType.Current:
+                writer.WriteStringValue("current");
+                break;
+            case AnalogSensorType.ThermopileTPiSObject:
+                writer.WriteStringValue("thermopile_tpis.object");
+                break;
+            case AnalogSensorType.ThermopileTPiSAmbient:
+                writer.WriteStringValue("thermopile_tpis.ambient");
+                break;
+            case AnalogSensorType.ThermopileTPiSEnvironment:
+                writer.WriteStringValue("thermopile_tpis.environment");
                 break;
             case AnalogSensorType.Remote:
                 writer.WriteStringValue("remote");

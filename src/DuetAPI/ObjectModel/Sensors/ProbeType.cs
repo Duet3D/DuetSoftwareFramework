@@ -21,9 +21,10 @@ public enum ProbeType
     DumbModulated = 2,
 
     /// <summary>
-    /// Alternate analog probe (like the ultrasonic probe)
+    /// Alternate analog probe (obsolete, should not be used any more)
     /// </summary>
-    AlternateAnalog = 3,
+    /// <seealso cref="Analog"/>
+    AlternateAnalog_Obsolete = 3,
 
     /// <summary>
     /// Endstop switch (obsolete, should not be used any more)

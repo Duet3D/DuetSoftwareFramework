@@ -20,7 +20,7 @@ public partial class InputShaping : ModelObject, IStaticModelObject
         get => _damping;
         set => SetPropertyValue(ref _damping, value);
     }
-    private float _damping = 0.1F;
+    private float _damping = 0.05F;
 
     /// <summary>
     /// Input shaper delays (in s)

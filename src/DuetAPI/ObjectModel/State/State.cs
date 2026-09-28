@@ -227,7 +227,6 @@ public partial class State : ModelObject, IStaticModelObject
     /// <summary>
     /// Shorthand for inputs[state.thisInput].active
     /// </summary>
-    [Verbose]
     public bool? ThisActive
     {
         get => _thisActive;

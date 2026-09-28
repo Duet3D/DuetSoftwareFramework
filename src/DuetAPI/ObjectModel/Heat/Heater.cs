@@ -41,6 +41,7 @@ public partial class Heater : ModelObject, IStaticModelObject
     /// <summary>
     /// Current feedforward PWM boost applied to the heater
     /// </summary>
+    [Live]
     public float? ExtrPwmBoost
     {
         get => _extrPwmBoost;
@@ -51,6 +52,7 @@ public partial class Heater : ModelObject, IStaticModelObject
     /// <summary>
     /// Current temperature boost applied to the heater
     /// </summary>
+    [Live]
     public float? ExtrTempBoost
     {
         get => _extrTempBoost;
