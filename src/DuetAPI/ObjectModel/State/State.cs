@@ -77,6 +77,7 @@ public partial class State : ModelObject, IStaticModelObject
     /// List of general-purpose output ports
     /// </summary>
     /// <seealso cref="GpOutputPort"/>
+    [Live]
     public StaticModelCollection<GpOutputPort?> GpOut { get; } = [];
 
     /// <summary>

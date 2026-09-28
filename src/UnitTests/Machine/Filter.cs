@@ -164,8 +164,10 @@ namespace UnitTests.Machine
             DcsModel model = CreateModel();
             DcsFilter filter = new(model);
 
-            Assert.That(filter.GetFiltered("*", QueryFlags.Parse(null)).ContainsKey("limits"), Is.False);
-            Assert.That(filter.GetFiltered("*", QueryFlags.Parse("v")).ContainsKey("limits"), Is.True);
+            Assert.That(filter.GetFiltered("*", QueryFlags.Parse(null)).ContainsKey("limits"), Is.True);
+            Dictionary<string, object?> nonVerboseLimits = filter.GetFiltered("limits/*", QueryFlags.Parse("n"));
+            Assert.That(nonVerboseLimits.ContainsKey("limits") && ((Dictionary<string, object?>)nonVerboseLimits["limits"]!).ContainsKey("axes"), Is.False);
+            Assert.That(SubDictionary(filter.GetFiltered("limits/*", QueryFlags.Parse("vn")), "limits").ContainsKey("axes"), Is.True);
 
             Assert.That(SubDictionary(filter.GetFiltered("heat/*", QueryFlags.Parse(null)), "heat").ContainsKey("bedHeaters"), Is.False);
             Assert.That(SubDictionary(filter.GetFiltered("heat/*", QueryFlags.Parse("o")), "heat").ContainsKey("bedHeaters"), Is.True);

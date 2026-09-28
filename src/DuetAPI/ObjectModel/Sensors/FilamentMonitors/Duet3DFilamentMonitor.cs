@@ -9,6 +9,7 @@ public partial class Duet3DFilamentMonitor : FilamentMonitor
     /// <summary>
     /// Average ratio of measured vs. commanded movement
     /// </summary>
+    [Live]
     public int? AvgPercentage
     {
         get => _avgPercentage;
@@ -19,6 +20,7 @@ public partial class Duet3DFilamentMonitor : FilamentMonitor
     /// <summary>
     /// Last ratio of measured vs. commanded movement
     /// </summary>
+    [Live]
     public int? LastPercentage
     {
         get => _lastPercentage;
@@ -29,6 +31,7 @@ public partial class Duet3DFilamentMonitor : FilamentMonitor
     /// <summary>
     /// Maximum ratio of measured vs. commanded movement
     /// </summary>
+    [Live]
     public int? MaxPercentage
     {
         get => _maxPercentage;
@@ -39,6 +42,7 @@ public partial class Duet3DFilamentMonitor : FilamentMonitor
     /// <summary>
     /// Minimum ratio of measured vs. commanded movement
     /// </summary>
+    [Live]
     public int? MinPercentage
     {
         get => _minPercentage;
@@ -50,6 +54,7 @@ public partial class Duet3DFilamentMonitor : FilamentMonitor
         /// Reported sensor position of this filament monitor.
         /// The maximum value depends on the type of the sensor, e.g. 0..1023 for a Duet3D MFM.
         /// </summary>
+        [Live]
         public int Position
         {
             get => _position;
@@ -60,6 +65,7 @@ public partial class Duet3DFilamentMonitor : FilamentMonitor
     /// <summary>
     /// Total extrusion commanded (in mm)
     /// </summary>
+    [Live]
     public float TotalExtrusion
     {
         get => _totalExtrusion;

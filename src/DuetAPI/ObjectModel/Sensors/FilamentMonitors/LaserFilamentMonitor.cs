@@ -8,6 +8,7 @@ public partial class LaserFilamentMonitorCalibrated : ModelObject, IStaticModelO
 	/// <summary>
 	/// Maximum percentage (0..1 or greater)
 	/// </summary>
+	[Live]
 	public float PercentMax
 	{
 		get => _percentMax;
@@ -18,6 +19,7 @@ public partial class LaserFilamentMonitorCalibrated : ModelObject, IStaticModelO
 	/// <summary>
 	/// Minimum percentage (0..1)
 	/// </summary>
+	[Live]
 	public float PercentMin
 	{
 		get => _percentMin;
@@ -28,6 +30,7 @@ public partial class LaserFilamentMonitorCalibrated : ModelObject, IStaticModelO
 	/// <summary>
 	/// Calibrated sensitivity
 	/// </summary>
+	[Live]
 	public float Sensitivity
 	{
 		get => _sensitivity;
@@ -38,6 +41,7 @@ public partial class LaserFilamentMonitorCalibrated : ModelObject, IStaticModelO
 	/// <summary>
 	/// Total extruded distance (in mm)
 	/// </summary>
+	[Live]
 	public float TotalDistance
 	{
 		get => _totalDistance;
@@ -118,6 +122,7 @@ public partial class LaserFilamentMonitor : Duet3DFilamentMonitor
 	/// <summary>
 	/// Calibrated properties of this filament monitor
 	/// </summary>
+	[Live]
 	public LaserFilamentMonitorCalibrated? Calibrated
 	{
 		get => _calibrated;

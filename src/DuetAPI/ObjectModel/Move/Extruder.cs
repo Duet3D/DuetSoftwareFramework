@@ -131,6 +131,7 @@ public partial class Extruder : ModelObject, IStaticModelObject
     /// <summary>
     /// Extruder position (in mm)
     /// </summary>
+    [Live]
     public float Position
     {
         get => _position;
@@ -157,6 +158,7 @@ public partial class Extruder : ModelObject, IStaticModelObject
     /// <summary>
     /// Raw extruder position as commanded by the slicer without extrusion factor applied (in mm)
     /// </summary>
+    [Live]
     public float RawPosition
     {
         get => _rawPosition;

@@ -8,6 +8,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of axes or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? Axes
 	{
 		get => _axes;
@@ -18,6 +19,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of axes + extruders or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? AxesPlusExtruders
 	{
 		get => _axesPlusExtruders;
@@ -28,6 +30,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of bed heaters or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? BedHeaters
 	{
 		get => _bedHeaters;
@@ -38,6 +41,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of boards or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? Boards
 	{
 		get => _boards;
@@ -48,6 +52,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of chamber heaters or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? ChamberHeaters
 	{
 		get => _chamberHeaters;
@@ -58,6 +63,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of drivers or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? Drivers
 	{
 		get => _drivers;
@@ -68,6 +74,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of drivers per axis or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? DriversPerAxis
 	{
 		get => _driversPerAxis;
@@ -78,6 +85,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of extruders or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? Extruders
 	{
 		get => _extruders;
@@ -88,6 +96,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of extruders per tool or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? ExtrudersPerTool
 	{
 		get => _extrudersPerTool;
@@ -98,6 +107,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of fans or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? Fans
 	{
 		get => _fans;
@@ -108,6 +118,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of general-purpose input ports or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? GpInPorts
 	{
 		get => _gpInPorts;
@@ -118,6 +129,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of general-purpose output ports or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? GpOutPorts
 	{
 		get => _gpOutPorts;
@@ -128,6 +140,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of heaters or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? Heaters
 	{
 		get => _heaters;
@@ -138,6 +151,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of heaters per tool or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? HeatersPerTool
 	{
 		get => _heatersPerTool;
@@ -148,6 +162,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of configured LED strips or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? LedStrips
 	{
 		get => _ledStrips;
@@ -158,6 +173,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of monitors per heater or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? MonitorsPerHeater
 	{
 		get => _monitorsPerHeater;
@@ -168,6 +184,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of output ports per heater or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? PortsPerHeater
 	{
 		get => _portsPerHeater;
@@ -180,6 +197,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// If the number of reported axes is greater than or equal to this value, a client
 	/// may need to request move.axes explicitly in order to get the full move.axes array
 	/// </summary>
+	[Verbose]
 	public int? ReportedAxes
 	{
 		get => _reportedAxes;
@@ -190,6 +208,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of restore points or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? RestorePoints
 	{
 		get => _restorePoints;
@@ -200,6 +219,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of sensors or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? Sensors
 	{
 		get => _sensors;
@@ -210,6 +230,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of spindles or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? Spindles
 	{
 		get => _spindles;
@@ -220,6 +241,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of tools or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? Tools
 	{
 		get => _tools;
@@ -230,6 +252,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of tracked objects or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? TrackedObjects
 	{
 		get => _trackedObjects;
@@ -240,6 +263,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of triggers or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? Triggers
 	{
 		get => _triggers;
@@ -250,6 +274,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of volumes or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? Volumes
 	{
 		get => _volumes;
@@ -260,6 +285,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of workplaces or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? Workplaces
 	{
 		get => _workplaces;
@@ -270,6 +296,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of Z-probe programming bytes or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? ZProbeProgramBytes
 	{
 		get => _zProbeProgramBytes;
@@ -280,6 +307,7 @@ public partial class Limits : ModelObject, IStaticModelObject
 	/// <summary>
 	/// Maximum number of Z-probes or null if unknown
 	/// </summary>
+	[Verbose]
 	public int? ZProbes
 	{
 		get => _zProbes;

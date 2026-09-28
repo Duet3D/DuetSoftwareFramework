@@ -71,6 +71,7 @@ public partial class Volume : ModelObject, IStaticModelObject
     /// Logical path of the storage device
     /// </summary>
     [SbcProperty(false)]
+    [Verbose]
     public string? Path
     {
         get => _path;

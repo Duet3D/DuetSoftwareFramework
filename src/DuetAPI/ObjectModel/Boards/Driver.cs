@@ -8,6 +8,7 @@ public partial class Driver : ModelObject, IStaticModelObject
     /// <summary>
     /// Closed-loop settings (if applicable)
     /// </summary>
+    [Live]
     public DriverClosedLoop? ClosedLoop
     {
         get => _closedLoop;
@@ -26,6 +27,7 @@ public partial class Driver : ModelObject, IStaticModelObject
     /// The TMC5160 DRV_STATUS is different so the bits are translated to this. Similarly for TMC2660.
     /// Only the lowest 16 bits are passed in driver event messages
     /// </summary>
+    [Live]
     public uint Status
     {
         get => _status;

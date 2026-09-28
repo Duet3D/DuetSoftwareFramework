@@ -10,6 +10,7 @@ public partial class MoveRotation : ModelObject, IStaticModelObject
     /// <summary>
     /// Angle of the centre rotatation (in deg)
     /// </summary>
+    [Live]
     public float Angle
     {
         get => _angle;
@@ -20,5 +21,6 @@ public partial class MoveRotation : ModelObject, IStaticModelObject
     /// <summary>
     /// XY coordinates of the centre rotation
     /// </summary>
+    [Live]
     public ObservableCollection<float> Centre { get; } = [0F, 0F];
 }

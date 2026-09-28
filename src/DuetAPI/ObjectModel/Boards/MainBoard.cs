@@ -48,6 +48,7 @@ public partial class MainBoard : Board
     /// <summary>
     /// Maximum number of heaters this board can control
     /// </summary>
+    [Verbose]
     public int MaxHeaters
     {
         get => _maxHeaters;
@@ -58,6 +59,7 @@ public partial class MainBoard : Board
     /// <summary>
     /// Indicates if this board supports external displays
     /// </summary>
+    [Verbose]
     public bool SupportsDirectDisplay
     {
         get => _supportsDirectDisplay;

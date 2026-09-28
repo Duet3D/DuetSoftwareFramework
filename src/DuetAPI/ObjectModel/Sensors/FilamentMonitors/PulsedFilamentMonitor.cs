@@ -8,6 +8,7 @@ public partial class PulsedFilamentMonitorCalibrated : ModelObject, IStaticModel
 	/// <summary>
 	/// Extruded distance per pulse (in mm)
 	/// </summary>
+	[Live]
 	public float MmPerPulse
 	{
 		get => _mmPerPulse;
@@ -18,6 +19,7 @@ public partial class PulsedFilamentMonitorCalibrated : ModelObject, IStaticModel
 	/// <summary>
 	/// Maximum percentage (0..1 or greater)
 	/// </summary>
+	[Live]
 	public float PercentMax
 	{
 		get => _percentMax;
@@ -28,6 +30,7 @@ public partial class PulsedFilamentMonitorCalibrated : ModelObject, IStaticModel
 	/// <summary>
 	/// Minimum percentage (0..1)
 	/// </summary>
+	[Live]
 	public float PercentMin
 	{
 		get => _percentMin;
@@ -38,6 +41,7 @@ public partial class PulsedFilamentMonitorCalibrated : ModelObject, IStaticModel
 	/// <summary>
 	/// Total extruded distance (in mm)
 	/// </summary>
+	[Live]
 	public float TotalDistance
 	{
 		get => _totalDistance;
@@ -108,6 +112,7 @@ public partial class PulsedFilamentMonitor : FilamentMonitor
 	/// <summary>
 	/// Calibrated properties of this filament monitor
 	/// </summary>
+	[Live]
 	public PulsedFilamentMonitorCalibrated? Calibrated
 	{
 		get => _calibrated;
@@ -123,6 +128,7 @@ public partial class PulsedFilamentMonitor : FilamentMonitor
 	/// <summary>
 	/// Raw pulse count of this filament monitor (0..4095)
 	/// </summary>
+	[Live]
 	public int Position
 	{
 		get => _position;

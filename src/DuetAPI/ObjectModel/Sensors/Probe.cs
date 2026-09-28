@@ -78,6 +78,7 @@ public partial class Probe : ModelObject, IStaticModelObject
     /// <summary>
     /// Load cell parameters (only applicable for load cell probes, otherwise null)
     /// </summary>
+    [Live]
     public ProbeLoadCell? LoadCell
     {
         get => _loadCell;

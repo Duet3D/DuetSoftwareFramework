@@ -8,6 +8,7 @@ public partial class MinMaxCurrent : ModelObject, IStaticModelObject
     /// <summary>
     /// Current value
     /// </summary>
+    [Live]
     public float Current
     {
         get => _current;

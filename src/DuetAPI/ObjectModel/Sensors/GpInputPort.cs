@@ -8,6 +8,7 @@ public partial class GpInputPort : ModelObject, IStaticModelObject
     /// <summary>
     /// Value of this port (0..1)
     /// </summary>
+    [Live]
     public float Value
     {
         get => _value;

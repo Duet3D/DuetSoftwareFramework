@@ -18,6 +18,7 @@ public partial class GpOutputPort : ModelObject, IStaticModelObject
     /// <summary>
     /// PWM value of this port (0..1)
     /// </summary>
+    [Live]
     public float Pwm
     {
         get => _pwm;

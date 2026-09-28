@@ -133,6 +133,7 @@ public partial class NetworkInterface : ModelObject, IStaticModelObject
     /// <summary>
     /// Type of this network interface
     /// </summary>
+    [Verbose]
     public NetworkInterfaceType Type
     {
         get => _type;

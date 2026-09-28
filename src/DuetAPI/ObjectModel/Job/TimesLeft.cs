@@ -8,6 +8,7 @@ public partial class TimesLeft : ModelObject, IStaticModelObject
     /// <summary>
     /// Time left based on filament consumption (in s or null)
     /// </summary>
+    [Live]
     public int? Filament
     {
         get => _filament;
@@ -18,6 +19,7 @@ public partial class TimesLeft : ModelObject, IStaticModelObject
     /// <summary>
     /// Time left based on file progress (in s or null)
     /// </summary>
+    [Live]
     public int? File
     {
         get => _file;
@@ -28,6 +30,7 @@ public partial class TimesLeft : ModelObject, IStaticModelObject
     /// <summary>
     /// Time left based on the slicer reports (see M73 R, in s or null)
     /// </summary>
+    [Live]
     public int? Slicer
     {
         get => _slicer;
@@ -38,6 +41,7 @@ public partial class TimesLeft : ModelObject, IStaticModelObject
     /// <summary>
     /// Time left before the next colour change is expected (see M73 C, in s or null) 
     /// </summary>
+    [Live]
     public int? ToPause
     {
         get => _toPause;

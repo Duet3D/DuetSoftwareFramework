@@ -12,6 +12,7 @@ public partial class InputChannel : ModelObject, IStaticModelObject
     /// <remarks>
     /// This will always be true except for the File and File2 inputs
     /// </remarks>
+    [Live]
     public bool Active
     {
         get => _active;
@@ -42,6 +43,7 @@ public partial class InputChannel : ModelObject, IStaticModelObject
     /// <summary>
     /// Name of the file being executed or null if none
     /// </summary>
+    [Live]
     public string? CurrentFile
     {
         get => _currentFile;
@@ -72,6 +74,7 @@ public partial class InputChannel : ModelObject, IStaticModelObject
     /// <summary>
     /// Current feedrate as passed by the last G0/G1 F... command
     /// </summary>
+    [Live]
     public float FeedRate
     {
         get => _feedRate;
@@ -82,6 +85,7 @@ public partial class InputChannel : ModelObject, IStaticModelObject
     /// <summary>
     /// Whether a macro file is being processed
     /// </summary>
+    [Live]
     public bool InMacro
     {
         get => _inMacro;
@@ -102,6 +106,7 @@ public partial class InputChannel : ModelObject, IStaticModelObject
     /// <summary>
     /// Number of the current line
     /// </summary>
+    [Live]
     public long LineNumber
     {
         get => _lineNumber;
@@ -122,6 +127,7 @@ public partial class InputChannel : ModelObject, IStaticModelObject
     /// <summary>
     /// Active motion system index
     /// </summary>
+    [Live]
     public int MotionSystem
     {
         get => _motionSystem;
@@ -162,6 +168,7 @@ public partial class InputChannel : ModelObject, IStaticModelObject
     /// <summary>
     /// State of this input channel
     /// </summary>
+    [Live]
     public InputChannelState State
     {
         get => _state;

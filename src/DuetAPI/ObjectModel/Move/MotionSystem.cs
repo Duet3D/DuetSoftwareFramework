@@ -11,7 +11,8 @@ public partial class MotionSystem : ModelObject, IStaticModelObject
     /// <summary>
     /// Information about the current move
     /// </summary>
-    public CurrentMove CurrentMove { get; } = new CurrentMove();
+    [Live]
+    public MotionSystemCurrentMove CurrentMove { get; } = new MotionSystemCurrentMove();
 
     /// <summary>
     /// Number of the current object being printed or null if not printing
@@ -26,6 +27,7 @@ public partial class MotionSystem : ModelObject, IStaticModelObject
     /// <summary>
     /// Number of the currently selected tool or -1 if none is selected
     /// </summary>
+    [Live]
     public int CurrentTool
     {
         get => _currentTool;
@@ -71,6 +73,7 @@ public partial class MotionSystem : ModelObject, IStaticModelObject
     /// <summary>
     /// Parameters for centre rotation
     /// </summary>
+    [Live]
     public MoveRotation Rotation { get; } = new MoveRotation();
 
     /// <summary>
@@ -96,11 +99,13 @@ public partial class MotionSystem : ModelObject, IStaticModelObject
     /// <summary>
     /// User coordinates of the motion system
     /// </summary>
+    [Live]
     public ObservableCollection<float> UserPosition { get; } = [];
 
     /// <summary>
     /// Virtual total extruder position
     /// </summary>
+    [Live]
     public float VirtualEPos
     {
         get => _virtualEPos;

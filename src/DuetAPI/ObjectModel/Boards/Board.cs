@@ -26,6 +26,7 @@ public partial class Board : ModelObject, IStaticModelObject
     /// <summary>
     /// Drivers of this board
     /// </summary>
+    [Live]
     public StaticModelCollection<Driver>? Drivers
     {
         get => _drivers;
@@ -66,6 +67,7 @@ public partial class Board : ModelObject, IStaticModelObject
     /// <summary>
     /// Amount of free RAM on this board (in bytes or null if unknown)
     /// </summary>
+    [Live]
     public int? FreeRam
     {
         get => _freeRam;
@@ -76,6 +78,7 @@ public partial class Board : ModelObject, IStaticModelObject
     /// <summary>
     /// Maximum number of motors this board can drive
     /// </summary>
+    [Verbose]
     public int MaxMotors
     {
         get => _maxMotors;
@@ -86,6 +89,7 @@ public partial class Board : ModelObject, IStaticModelObject
     /// <summary>
     /// Minimum, maximum, and current temperatures of the MCU or null if unknown
     /// </summary>
+    [Live]
     public MinMaxCurrent? McuTemp
     {
         get => _mcuTemp;
@@ -126,6 +130,7 @@ public partial class Board : ModelObject, IStaticModelObject
     /// <summary>
     /// Minimum, maximum, and current voltages on the 12V rail or null if unknown
     /// </summary>
+    [Live]
     public MinMaxCurrent? V12
     {
         get => _v12;
@@ -136,6 +141,7 @@ public partial class Board : ModelObject, IStaticModelObject
     /// <summary>
     /// Minimum, maximum, and current voltages on the input rail or null if unknown
     /// </summary>
+    [Live]
     public MinMaxCurrent? VIn
     {
         get => _vIn;

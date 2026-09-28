@@ -176,6 +176,7 @@ public partial class Move : ModelObject, IStaticModelObject
     /// <summary>
     /// Virtual total extruder position
     /// </summary>
+    [Live]
     [Obsolete("use motionSystems[].virtualEPos instead")]
     public float VirtualEPos
     {

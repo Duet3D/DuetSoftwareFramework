@@ -8,6 +8,7 @@ public partial class RotatingMagnetFilamentMonitorCalibrated : ModelObject, ISta
     /// <summary>
     /// Extruded distance per revolution (in mm)
     /// </summary>
+    [Live]
     public float MmPerRev
     {
         get => _mmPerRev;
@@ -18,6 +19,7 @@ public partial class RotatingMagnetFilamentMonitorCalibrated : ModelObject, ISta
     /// <summary>
     /// Maximum percentage (0..1 or greater)
     /// </summary>
+    [Live]
     public float PercentMax
     {
         get => _percentMax;
@@ -28,6 +30,7 @@ public partial class RotatingMagnetFilamentMonitorCalibrated : ModelObject, ISta
     /// <summary>
     /// Minimum percentage (0..1)
     /// </summary>
+    [Live]
     public float PercentMin
     {
         get => _percentMin;
@@ -38,6 +41,7 @@ public partial class RotatingMagnetFilamentMonitorCalibrated : ModelObject, ISta
     /// <summary>
     /// Total extruded distance (in mm)
     /// </summary>
+    [Live]
     public float TotalDistance
     {
         get => _totalDistance;
@@ -126,6 +130,7 @@ public partial class RotatingMagnetFilamentMonitor : Duet3DFilamentMonitor
     /// <summary>
     /// Calibrated properties of this filament monitor
     /// </summary>
+    [Live]
     public RotatingMagnetFilamentMonitorCalibrated? Calibrated
     {
         get => _calibrated;

@@ -15,6 +15,7 @@ public partial class ObjectModel : ModelObject, IStaticModelObject
     /// <remarks>
     /// The first item represents the main board
     /// </remarks>
+    [Live]
     public Boards Boards { get; } = [];
 
     /// <summary>
@@ -49,6 +50,7 @@ public partial class ObjectModel : ModelObject, IStaticModelObject
     /// <summary>
     /// Information about every available G/M/T-code channel
     /// </summary>
+    [Live]
     public Inputs Inputs { get; } = [];
 
     /// <summary>
@@ -66,7 +68,6 @@ public partial class ObjectModel : ModelObject, IStaticModelObject
     /// <summary>
     /// Machine configuration limits
     /// </summary>
-    [Verbose]
     public Limits Limits { get; } = new Limits();
 
     /// <summary>

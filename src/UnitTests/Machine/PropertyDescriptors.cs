@@ -197,7 +197,8 @@ namespace UnitTests.Machine
         public void PropertyFlags()
         {
             Assert.That(ObjectModel.TypeDescriptor.FindProperty("Messages", false)!.Flags, Is.EqualTo(ModelPropertyFlags.SbcProperty));
-            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Limits", false)!.Flags, Is.EqualTo(ModelPropertyFlags.Verbose));
+            Assert.That(ObjectModel.TypeDescriptor.FindProperty("Limits", false)!.Flags, Is.EqualTo(ModelPropertyFlags.None));
+            Assert.That(Limits.TypeDescriptor.FindProperty("Axes", false)!.Flags, Is.EqualTo(ModelPropertyFlags.HasSetter | ModelPropertyFlags.Verbose));
             Assert.That(ObjectModel.TypeDescriptor.FindProperty("SBC", false)!.Flags, Is.EqualTo(ModelPropertyFlags.HasSetter | ModelPropertyFlags.SbcProperty));
             Assert.That(Heat.TypeDescriptor.FindProperty("Heaters", false)!.Flags, Is.EqualTo(ModelPropertyFlags.Live));
             Assert.That(Heat.TypeDescriptor.FindProperty("BedHeaters", false)!.Flags, Is.EqualTo(ModelPropertyFlags.Obsolete));
