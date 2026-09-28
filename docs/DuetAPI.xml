@@ -14174,6 +14174,31 @@
             Stepper driver sensors on the DueX expansion board
             </summary>
         </member>
+        <member name="F:DuetAPI.ObjectModel.AnalogSensorType.BoardTemp">
+            <summary>
+            Board temperature sensor of an expansion board
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.AnalogSensorType.Current">
+            <summary>
+            Heater current sensor of an expansion board
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.AnalogSensorType.ThermopileTPiSObject">
+            <summary>
+            TPiS thermopile object temperature
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.AnalogSensorType.ThermopileTPiSAmbient">
+            <summary>
+            TPiS thermopile ambient temperature
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.AnalogSensorType.ThermopileTPiSEnvironment">
+            <summary>
+            TPiS thermopile environment temperature
+            </summary>
+        </member>
         <member name="F:DuetAPI.ObjectModel.AnalogSensorType.Remote">
             <summary>
             Sensor on a CAN-connected expansion board
@@ -15018,7 +15043,7 @@
         </member>
         <member name="P:DuetAPI.ObjectModel.PulsedFilamentMonitor.Position">
             <summary>
-            Current position of the filament monitor (in mm)
+            Raw pulse count of this filament monitor (0..4095)
             </summary>
         </member>
         <member name="M:DuetAPI.ObjectModel.PulsedFilamentMonitor.Assign(DuetAPI.ObjectModel.IDynamicModelObject)">
@@ -15737,10 +15762,11 @@
             A modulated probe (like the original one shipped with the RepRapPro Ormerod)
             </summary>
         </member>
-        <member name="F:DuetAPI.ObjectModel.ProbeType.AlternateAnalog">
+        <member name="F:DuetAPI.ObjectModel.ProbeType.AlternateAnalog_Obsolete">
             <summary>
-            Alternate analog probe (like the ultrasonic probe)
+            Alternate analog probe (obsolete, should not be used any more)
             </summary>
+            <seealso cref="F:DuetAPI.ObjectModel.ProbeType.Analog"/>
         </member>
         <member name="F:DuetAPI.ObjectModel.ProbeType.EndstopSwitch_Obsolete">
             <summary>
