@@ -10240,6 +10240,105 @@
             <exception cref="T:System.ArgumentOutOfRangeException">Property index is invalid</exception>
             <remarks>This method is auto-generated</remarks>
         </member>
+        <member name="T:DuetAPI.ObjectModel.MotionSystemCurrentMove">
+            <summary>
+            Information about the current move of a motion system
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MotionSystemCurrentMove.Acceleration">
+            <summary>
+            Acceleration of the current move (in mm/s^2)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MotionSystemCurrentMove.Deceleration">
+            <summary>
+            Deceleration of the current move (in mm/s^2)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MotionSystemCurrentMove.Distance">
+            <summary>
+            Total distance of the current move (in mm)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MotionSystemCurrentMove.Duration">
+            <summary>
+            Duration of the current move (in s)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MotionSystemCurrentMove.ExtrusionRate">
+            <summary>
+            Current extrusion rate (in mm/s)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MotionSystemCurrentMove.FilePosition">
+            <summary>
+            Position in the job file of the move being executed (in bytes or null)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MotionSystemCurrentMove.RequestedSpeed">
+            <summary>
+            Requested speed of the current move (in mm/s)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MotionSystemCurrentMove.TopSpeed">
+            <summary>
+            Top speed of the current move (in mm/s)
+            </summary>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.MotionSystemCurrentMove.Assign(DuetAPI.ObjectModel.IStaticModelObject)">
+            <summary>
+            Assign the properties from another instance.
+            This is required to update model properties which do not have a setter
+            </summary>
+            <param name="from">Other instance</param>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.MotionSystemCurrentMove.Clone">
+            <summary>
+            Clone this instance
+            </summary>
+            <remarks>This method is auto-generated</remarks>
+            <returns>Cloned instance</returns>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.MotionSystemCurrentMove.UpdateFromJson(System.Text.Json.JsonElement,System.Boolean)">
+            <summary>
+            Update this instance from a given JSON element
+            </summary>
+            <remarks>This method is auto-generated</remarks>
+            <param name="jsonElement">Element to update this intance from</param>
+            <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.MotionSystemCurrentMove.UpdateFromJsonReader(System.Text.Json.Utf8JsonReader@,System.Boolean,DuetAPI.ObjectModel.ModelUpdateScope)">
+            <summary>
+            Update this instance from a given JSON element
+            </summary>
+            <remarks>This method is auto-generated</remarks>
+            <param name="reader">Reader to update this intance from</param>
+            <param name="ignoreSbcProperties">Whether SBC properties are ignored</param>
+            <param name="scope">Extent of this update</param>
+            <exception cref="T:System.Text.Json.JsonException">Failed to deserialize data</exception>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MotionSystemCurrentMove.TypeDescriptor">
+            <summary>
+            Static description of this type
+            </summary>
+            <remarks>This property is auto-generated</remarks>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.MotionSystemCurrentMove.Descriptor">
+            <summary>
+            Static description of this instance's type
+            </summary>
+            <remarks>This property is auto-generated</remarks>
+        </member>
+        <member name="M:DuetAPI.ObjectModel.MotionSystemCurrentMove.GetPropertyValue(System.Int32)">
+            <summary>
+            Read the value of the property with the given index
+            </summary>
+            <param name="index">Index of the property</param>
+            <returns>Property value</returns>
+            <exception cref="T:System.ArgumentOutOfRangeException">Property index is invalid</exception>
+            <remarks>This method is auto-generated</remarks>
+        </member>
         <member name="T:DuetAPI.ObjectModel.MotorsIdleControl">
             <summary>
             Idle factor parameters for automatic motor current reduction
@@ -12298,6 +12397,11 @@
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.ObjectModelContext.MotionSystem">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ObjectModelContext.MotionSystemCurrentMove">
             <summary>
             Defines the source generated JSON serialization contract metadata for a given type.
             </summary>
