@@ -78,7 +78,10 @@ public partial class Board : ModelObject, IStaticModelObject
     /// <summary>
     /// Maximum number of motors this board can drive
     /// </summary>
-    [Verbose]
+    /// <remarks>
+    /// RRF reports this as verbose on the main board only, because expansion boards can be hot-plugged
+    /// and verbose values are only fetched on the initial connect
+    /// </remarks>
     public int MaxMotors
     {
         get => _maxMotors;
