@@ -349,7 +349,7 @@ public partial class Filter(ObjectModel model)
                         {
                             // When using "**" with query flags, recurse into sub-objects
                             // so that attribute-based filtering is applied at every level
-                            if (propertyName == "**" && queryFlags is not null)
+                            if (queryFlags is not null && (propertyName == "**" || partialFilter.Length == 1))
                             {
                                 object? propertyValue = accessor.GetPropertyValue(property.Index);
                                 if (propertyValue is ModelObject || propertyValue is IList)

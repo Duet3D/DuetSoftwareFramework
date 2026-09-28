@@ -10,6 +10,7 @@ using System.Threading;
 using ApiModel = DuetAPI.ObjectModel.ObjectModel;
 using DcsFilter = DuetControlServer.Model.Filter;
 using DcsModel = DuetControlServer.Model.ObjectModel;
+using Volume = DuetAPI.ObjectModel.Volume;
 
 namespace UnitTests.Machine
 {
@@ -171,6 +172,22 @@ namespace UnitTests.Machine
 
             Assert.That(SubDictionary(filter.GetFiltered("heat/*", QueryFlags.Parse(null)), "heat").ContainsKey("bedHeaters"), Is.False);
             Assert.That(SubDictionary(filter.GetFiltered("heat/*", QueryFlags.Parse("o")), "heat").ContainsKey("bedHeaters"), Is.True);
+        }
+
+        [Test]
+        public void GetFilteredFlagsBelowNamedKey()
+        {
+            DcsModel model = CreateModel();
+            model.Volumes.Add(new Volume { Mounted = true, Path = "/" });
+            DcsFilter filter = new(model);
+
+            List<object?> volumes = (List<object?>)filter.GetFiltered("volumes/**", QueryFlags.Parse(null))["volumes"]!;
+            Dictionary<string, object?> volume = (Dictionary<string, object?>)volumes[0]!;
+            Assert.That(volume.ContainsKey("mounted"), Is.True);
+            Assert.That(volume.ContainsKey("path"), Is.False);
+
+            volumes = (List<object?>)filter.GetFiltered("volumes/**", QueryFlags.Parse("v"))["volumes"]!;
+            Assert.That(((Dictionary<string, object?>)volumes[0]!)["path"], Is.EqualTo("/"));
         }
 
         [Test]
