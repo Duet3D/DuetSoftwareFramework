@@ -37,6 +37,10 @@ public partial class Board : ModelObject, IStaticModelObject
     /// <summary>
     /// Date of the firmware build
     /// </summary>
+    /// <remarks>
+    /// RRF reports this as verbose on the main board only, because expansion boards can be hot-plugged
+    /// and verbose values are only fetched on the initial connect
+    /// </remarks>
     public string FirmwareDate
     {
         get => _firmwareDate;
@@ -47,6 +51,10 @@ public partial class Board : ModelObject, IStaticModelObject
     /// <summary>
     /// Filename of the firmware binary
     /// </summary>
+    /// <remarks>
+    /// RRF reports this as verbose on the main board only, because expansion boards can be hot-plugged
+    /// and verbose values are only fetched on the initial connect
+    /// </remarks>
     public string FirmwareFileName
     {
         get => _firmwareFileName;
@@ -123,6 +131,12 @@ public partial class Board : ModelObject, IStaticModelObject
     /// <summary>
     /// Unique identifier of the board or null if unknown
     /// </summary>
+    /// <remarks>
+    /// RRF reports this as verbose on the main board only, because expansion boards can be hot-plugged
+    /// and verbose values are only fetched on the initial connect.
+    /// It is flagged verbose here so that non-verbose board updates do not reset it on the main board.
+    /// </remarks>
+    [Verbose]
     public string? UniqueId
     {
         get => _uniqueId;

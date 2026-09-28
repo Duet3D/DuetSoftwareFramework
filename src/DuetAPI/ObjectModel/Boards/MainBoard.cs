@@ -28,6 +28,7 @@ public partial class MainBoard : Board
     /// <summary>
     /// Filename of the IAP binary that is used for updates from the SBC or null if unsupported
     /// </summary>
+    [Verbose]
     public string? IapFileNameSBC
     {
         get => _iapFileNameSBC;
@@ -38,6 +39,7 @@ public partial class MainBoard : Board
     /// <summary>
     /// Filename of the IAP binary that is used for updates from the SD card or null if unsupported
     /// </summary>
+    [Verbose]
     public string? IapFileNameSD
     {
         get => _iapFileNameSD;
@@ -70,6 +72,7 @@ public partial class MainBoard : Board
     /// <summary>
     /// Filename of the on-board WiFi chip or null if not present
     /// </summary>
+    [Verbose]
     public string? WifiFirmwareFileName
     {
         get => _wifiFirmwareFileName;
