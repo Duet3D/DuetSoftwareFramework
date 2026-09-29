@@ -71,6 +71,7 @@
   "ObjectHeightFilters": [
     "^\\s*max_z_height\\D+(?<mm>(\\d+\\.?\\d*))",
     "^\\s*MAXZ\\D+(?<mm>(\\d+\\.?\\d*))",
+    "^\\s*print_height\\D+(?<mm>(\\d+\\.?\\d*))",
     "(?-i)^\\s*Height\\D+(?<mm>(\\d+\\.?\\d*))"
   ],
   "FilamentFilters": [

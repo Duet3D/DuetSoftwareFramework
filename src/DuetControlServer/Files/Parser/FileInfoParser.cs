@@ -29,7 +29,7 @@ namespace DuetControlServer.Files.Parser;
 /// <param name="filePath">File path helper</param>
 /// <param name="logger">Logger instance</param>
 /// <param name="settings">Settings</param>
-public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, FilePathResolver filePath, ILogger<FileInfoParser> logger, IOptions<Settings> settings)
+public partial class FileInfoParser(CodeFactory codeFactory, Expressions expressions, FilePathResolver filePath, ILogger<FileInfoParser> logger, IOptions<Settings> settings)
 {
     // Filters are configured as patterns, so they are compiled once here instead of on every parse
     private readonly List<Regex> _layerHeightFilters = Settings.CompileFilters(settings.Value.LayerHeightFilters);
@@ -500,27 +500,33 @@ public class FileInfoParser(CodeFactory codeFactory, Expressions expressions, Fi
         return false;
     }
 
-    private const string CustomInfoPrefix = "customInfo";
+    /// <summary>
+    /// Regex to match a user-defined key-value pair like <c>; CustomInfo key = value</c>
+    /// </summary>
+    /// <returns>Regex instance</returns>
+    [GeneratedRegex(@"^[ -]*[cC]ustomInfo\s+(?<key>[a-zA-Z][a-zA-Z0-9_]*)\s*=(?<value>.+)$")]
+    private static partial Regex CustomInfoRegex();
 
     /// <summary>
     /// Check if this line contains a user-defined key and add it if that is the case
     /// </summary>
     /// <param name="code">Code possibly containing the user-defined key-value pair</param>
     /// <param name="userDefinedKeys">Dictionary of user-defined key vs. value evaluation task</param>
+    /// <remarks>
+    /// Like in RRF, the first value of a key wins if it is specified more than once
+    /// </remarks>
     private bool AddUserDefinedKey(Code code, Dictionary<string, Task<object?>> userDefinedKeys)
     {
-        if (code.Comment!.StartsWith(CustomInfoPrefix))
+        Match match = CustomInfoRegex().Match(code.Comment!);
+        if (match.Success)
         {
-            string comment = code.Comment[CustomInfoPrefix.Length..];
-            int index = comment.IndexOf('=');
-            if (index > 0)
+            string key = match.Groups["key"].Value, value = match.Groups["value"].Value.Trim();
+            if (!userDefinedKeys.ContainsKey(key))
             {
-                string key = comment[..index].Trim(), value = comment[(index + 1)..].Trim();
                 logger.LogDebug("Evaluating user-defined key '{Key}' with value '{Value}'", key, value);
-                // Use the indexer so a duplicate key overwrites the previous value instead of throwing
-                userDefinedKeys[key] = expressions.EvaluateExpressionToValueAsync(code, value, false);
-                return true;
+                userDefinedKeys.Add(key, expressions.EvaluateExpressionToValueAsync(code, value, false));
             }
+            return true;
         }
         return false;
     }

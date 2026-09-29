@@ -346,6 +346,7 @@ public sealed class Settings
     [
         @"^\s*max_z_height\D+(?<mm>(\d+\.?\d*))",            // OrcaSlicer
         @"^\s*MAXZ\D+(?<mm>(\d+\.?\d*))",                    // Cura
+        @"^\s*print_height\D+(?<mm>(\d+\.?\d*))",            // preFlight
         @"(?-i)^\s*Height\D+(?<mm>(\d+\.?\d*))"              // Fusion 360, case-sensitive so PrusaSlicer's per-layer ;HEIGHT: is not matched
     ];
 
