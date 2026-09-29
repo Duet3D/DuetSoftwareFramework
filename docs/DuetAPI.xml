@@ -4710,11 +4710,19 @@
             <summary>
             Date of the firmware build
             </summary>
+            <remarks>
+            RRF reports this as verbose on the main board only, because expansion boards can be hot-plugged
+            and verbose values are only fetched on the initial connect
+            </remarks>
         </member>
         <member name="P:DuetAPI.ObjectModel.Board.FirmwareFileName">
             <summary>
             Filename of the firmware binary
             </summary>
+            <remarks>
+            RRF reports this as verbose on the main board only, because expansion boards can be hot-plugged
+            and verbose values are only fetched on the initial connect
+            </remarks>
         </member>
         <member name="P:DuetAPI.ObjectModel.Board.FirmwareVersion">
             <summary>
@@ -4754,6 +4762,11 @@
             <summary>
             Unique identifier of the board or null if unknown
             </summary>
+            <remarks>
+            RRF reports this as verbose on the main board only, because expansion boards can be hot-plugged
+            and verbose values are only fetched on the initial connect.
+            It is flagged verbose here so that non-verbose board updates do not reset it on the main board.
+            </remarks>
         </member>
         <member name="P:DuetAPI.ObjectModel.Board.V12">
             <summary>
