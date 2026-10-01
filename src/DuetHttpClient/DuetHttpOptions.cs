@@ -24,7 +24,8 @@ namespace DuetHttpClient
 
         /// <summary>
         /// Defines whether messages are supposed to be observed.
-        /// If this is true, messages are added to the object model and they must be cleared manually
+        /// If this is true, messages are added to the object model and they must be cleared manually,
+        /// else they accumulate and leak memory
         /// </summary>
         public bool ObserveMessages { get; set; }
 

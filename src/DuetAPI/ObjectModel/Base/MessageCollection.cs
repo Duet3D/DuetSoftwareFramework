@@ -9,6 +9,10 @@ namespace DuetAPI.ObjectModel;
 /// <summary>
 /// Generic list container to which messages can only be added or cleared
 /// </summary>
+/// <remarks>
+/// Deserialization only adds items, so a client applying object model updates must clear this collection
+/// itself once the new messages have been processed, else they accumulate and leak memory
+/// </remarks>
 public class MessageCollection : ObservableCollection<Message>, IModelCollection
 {
     /// <inheritdoc />

@@ -262,6 +262,10 @@ public sealed class SubscribeConnection : BaseConnection
     /// If the subscription mode is set to <see cref="SubscriptionMode.Patch"/>, new update patches of the object model
     /// need to be applied manually. This method is intended to receive such fragments.
     /// </summary>
+    /// <remarks>
+    /// Patches only ever add items to <see cref="ObjectModel.Messages"/>, so it must be cleared manually
+    /// after the new messages have been processed, else they accumulate and leak memory
+    /// </remarks>
     /// <returns>The partial update JSON</returns>
     /// <exception cref="SocketException">Receipt could not be acknowledged</exception>
     /// <seealso cref="GetObjectModel"/>
@@ -278,6 +282,10 @@ public sealed class SubscribeConnection : BaseConnection
     /// If the subscription mode is set to <see cref="SubscriptionMode.Patch"/>, new update patches of the object model
     /// need to be applied manually. This method is intended to receive such fragments.
     /// </summary>
+    /// <remarks>
+    /// Patches only ever add items to <see cref="ObjectModel.Messages"/>, so it must be cleared manually
+    /// after the new messages have been processed, else they accumulate and leak memory
+    /// </remarks>
     /// <param name="cancellationToken">An optional cancellation token</param>
     /// <returns>The partial update JSON</returns>
     /// <exception cref="OperationCanceledException">Operation has been cancelled</exception>

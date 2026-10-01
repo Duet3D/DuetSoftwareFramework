@@ -116,6 +116,24 @@ Streams [object-model](object-model.md#observing-changes-and-patches) state to t
 set of filter paths restricts what is sent. The [DuetWebServer WebSocket](components.md#duetwebserver)
 and the `ModelObserver` tool both use this mode.
 
+`Messages` is append-only. DCS reports new messages as additions and never tells the subscriber to
+remove them again, so a client in **Patch** mode must clear `messages[]` in its own copy of the model
+once it has processed the entries. Leaving them in place means every message ever received piles up
+for the lifetime of the connection, which is a memory leak - the .NET `MessageCollection` does not
+guard against it either, since its `UpdateFromJson` only adds items. In **Full** mode this does not
+apply: each update carries the whole model, and DCS clears its own list once the waiting clients have
+been served.
+
+The preferred way to use `SubscribeConnection` is precisely the case that needs this: subscribe in
+**Patch** mode and feed every patch into one `ObjectModel` instance that is kept for the lifetime of
+the connection, the same way [DuetHttpClient](components.md#duethttpclient) maintains its model.
+`DuetWebServer`'s `Services/ModelObserver.cs` shows the loop - consume `model.Messages`, clear it, then
+ask for the next patch - and DuetHttpClient does the clearing itself unless
+`DuetHttpOptions.ObserveMessages` states that the consumer takes care of it. A client that keeps no
+model is unaffected either way: a **Full** subscription hands out a fresh instance per update, and a
+JSON-level merge that replaces arrays holds only the latest batch, since each patch carries just the
+new messages.
+
 Fields flagged as verbose or obsolete are left out unless the subscriber asks for them via the
 `Verbose` and `Obsolete` flags of `SubscribeInitMessage`. DCS reads those fields from RRF once on
 start-up and from then on only while at least one subscriber wants them, so a client that displays

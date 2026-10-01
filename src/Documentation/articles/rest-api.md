@@ -31,6 +31,10 @@ for each change. The client replies `OK\n` to acknowledge each message and may s
 server answers `PONG\n`) as a keep-alive. This path is backed by a [`Subscribe` connection](ipc.md#subscribe)
 to DCS.
 
+Those patches only ever add entries to `messages[]`, so the client has to clear that array itself once
+it has processed the new messages, else they accumulate until the WebSocket is closed, see the
+[`Subscribe` connection mode](ipc.md#subscribe).
+
 `verbose` and `obsolete` default to `false` and add the object model fields flagged as verbose or
 obsolete to the subscription, see the [`Subscribe` connection mode](ipc.md#subscribe). Both are
 properties of the connection rather than of a request, so a client that changes its mind has to open

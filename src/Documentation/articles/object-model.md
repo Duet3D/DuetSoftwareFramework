@@ -128,6 +128,14 @@ value. The [`ModelSubscription` IPC processor](ipc.md#connection-modes) turns th
 (or sends the whole model, depending on the subscriber's mode) and pushes them to clients - this is
 what drives the live DWC interface through the [DuetWebServer WebSocket](components.md#duetwebserver).
 
+`MessageCollection` changes are the exception to that round trip: only additions are forwarded to
+subscribers, a clear is not. DCS empties its own
+`Messages` list as soon as a subscriber or [`CodeStream`](ipc.md#codestream) client could output the
+message (`Model/LockWrapper.cs`), and `PeriodicUpdateService` drops entries older than
+`MaxMessageAge` for the case where nobody is listening. On the receiving side nothing does that for a
+client, so a [patch subscriber](ipc.md#subscribe) has to clear `messages[]` in its own model after
+processing it or it leaks memory.
+
 `Model/SbcTriggerService.cs` is a second observer: it re-evaluates `M581.1` external-trigger
 expressions that reference SBC fields (which RRF cannot evaluate) whenever a relevant path changes,
 and queues codes when a trigger fires.
