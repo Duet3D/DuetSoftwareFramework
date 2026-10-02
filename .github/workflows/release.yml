@@ -12,6 +12,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v3
@@ -29,17 +30,28 @@ jobs:
           dotnet restore
           dotnet build
 
-      # Publish packages
-      - name: Publish packages
+      # Publish packages to the GitHub package registry
+      - name: Publish packages on GitHub
         run: |
-          # Publish to GitHub package registry
           dotnet nuget push src/DuetAPI/bin/Debug/DuetAPI.*.nupkg --source "https://nuget.pkg.github.com/Duet3D/index.json" --api-key $GITHUB_TOKEN
           dotnet nuget push src/DuetAPIClient/bin/Debug/DuetAPIClient.*.nupkg --source "https://nuget.pkg.github.com/Duet3D/index.json" --api-key $GITHUB_TOKEN
           dotnet nuget push src/DuetHttpClient/bin/Debug/DuetHttpClient.*.nupkg --source "https://nuget.pkg.github.com/Duet3D/index.json" --api-key $GITHUB_TOKEN
-          # Publish to NuGet package registry
-          dotnet nuget push src/DuetAPI/bin/Debug/DuetAPI.*.nupkg --source "nuget.org" --api-key $NUGET_API_KEY
-          dotnet nuget push src/DuetAPIClient/bin/Debug/DuetAPIClient.*.nupkg --source "nuget.org" --api-key $NUGET_API_KEY
-          dotnet nuget push src/DuetHttpClient/bin/Debug/DuetHttpClient.*.nupkg --source "nuget.org" --api-key $NUGET_API_KEY
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+
+      # Exchange the GitHub OIDC token for a temporary nuget.org API key. It is only valid for an
+      # hour, so this must stay directly in front of the push step
+      - name: Log in to NuGet
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: Duet3D
+
+      # Publish packages to the NuGet package registry
+      - name: Publish packages on NuGet
+        run: |
+          dotnet nuget push src/DuetAPI/bin/Debug/DuetAPI.*.nupkg --source "https://api.nuget.org/v3/index.json" --api-key $NUGET_API_KEY
+          dotnet nuget push src/DuetAPIClient/bin/Debug/DuetAPIClient.*.nupkg --source "https://api.nuget.org/v3/index.json" --api-key $NUGET_API_KEY
+          dotnet nuget push src/DuetHttpClient/bin/Debug/DuetHttpClient.*.nupkg --source "https://api.nuget.org/v3/index.json" --api-key $NUGET_API_KEY
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
