@@ -236,7 +236,8 @@ namespace DuetControlServer.Commands
                 Keyword != KeywordType.Abort &&
                 Keyword != KeywordType.Global &&
                 Keyword != KeywordType.Var &&
-                Keyword != KeywordType.Set)
+                Keyword != KeywordType.Set &&
+                Keyword != KeywordType.Skip)
             {
                 // Other meta keywords will be handled later
                 throw new InvalidOperationException("Conditional codes must not be executed");

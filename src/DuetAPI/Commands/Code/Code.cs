@@ -1129,6 +1129,7 @@ namespace DuetAPI.Commands
                 KeywordType.Set => "set",
                 KeywordType.Echo => "echo",
                 KeywordType.Global => "global",
+                KeywordType.Skip => "skip",
                 _ => throw new NotImplementedException(),
             };
         }

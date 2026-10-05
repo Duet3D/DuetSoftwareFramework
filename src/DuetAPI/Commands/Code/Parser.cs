@@ -551,6 +551,11 @@ namespace DuetAPI.Commands
                                 result.KeywordArgument = string.Empty;
                                 inKeywordArgument = true;
                             }
+                            else if (keyword == "skip")
+                            {
+                                result.Type = CodeType.Keyword;
+                                result.Keyword = KeywordType.Skip;
+                            }
                             else if (!result.HasParameter(letter))
                             {
                                 AddParameter(result, letter, value, false, unprecedentedParameter || isNumericParameter);

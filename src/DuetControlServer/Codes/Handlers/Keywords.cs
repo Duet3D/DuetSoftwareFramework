@@ -29,6 +29,11 @@ namespace DuetControlServer.Codes.Handlers
         /// <exception cref="OperationCanceledException">The code was cancelled</exception></exception>
         public static async Task<Message> Process(Code code)
         {
+            if (code.Keyword == KeywordType.Skip)
+            {
+                return new Message();
+            }
+
             if (code.KeywordArgument is null)
             {
                 throw new ArgumentException("KeywordArgument must not be empty");

@@ -68,6 +68,11 @@ namespace DuetAPI.Commands
         /// <summary>
         /// Global operation
         /// </summary>
-        Global
+        Global,
+
+        /// <summary>
+        /// Skip the rest of the current line (no-op)
+        /// </summary>
+        Skip
     }
 }

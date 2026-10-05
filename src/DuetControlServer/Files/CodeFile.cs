@@ -536,6 +536,10 @@ namespace DuetControlServer.Files
                             }
                             return code;
 
+                        case KeywordType.Skip:
+                            // No-op, the rest of the line is ignored
+                            break;
+
                         case KeywordType.Echo:
                         case KeywordType.Global:
                         case KeywordType.None:

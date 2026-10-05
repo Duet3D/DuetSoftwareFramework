@@ -732,6 +732,18 @@ namespace UnitTests.Commands
         }
 
         [Test]
+        public void ParseSkip()
+        {
+            foreach (DuetAPI.Commands.Code code in Parse("skip M104 S205"))
+            {
+                Assert.That(code.Type, Is.EqualTo(CodeType.Keyword));
+                Assert.That(code.Keyword, Is.EqualTo(KeywordType.Skip));
+                Assert.That(code.KeywordArgument, Is.Null);
+                Assert.That(code.ToString(), Is.EqualTo("skip"));
+            }
+        }
+
+        [Test]
         public void ParseAbort()
         {
             foreach (DuetAPI.Commands.Code code in Parse("    abort foo bar"))
