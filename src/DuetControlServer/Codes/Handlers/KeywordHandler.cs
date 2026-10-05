@@ -38,6 +38,11 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
     /// <exception cref="OperationCanceledException">The code was cancelled</exception>
     public async ValueTask<Message?> ProcessAsync(Commands.Code code, CancellationToken cancellationToken)
     {
+        if (code.Keyword == KeywordType.Skip)
+        {
+            return new Message();
+        }
+
         if (code.KeywordArgument is null)
         {
             throw new ArgumentException("KeywordArgument must not be empty");
