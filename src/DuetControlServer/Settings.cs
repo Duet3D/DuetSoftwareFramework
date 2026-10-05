@@ -332,7 +332,7 @@ public sealed class Settings
     public List<string> NumLayersFilters { get; set; } =
     [
         @"^\s*NUM_LAYERS\D+(\d+)",                           // PrusaSlicer
-        @"^\s*LAYER_COUNT\D+(\d+)",                          // Cura, preFlight
+        @"^\s*LAYER[_ ]COUNT\D+(\d+)",                       // Cura, preFlight, Fusion 360
         @"^\s*total layer number\D+(\d+)"                    // OrcaSlicer
     ];
 
@@ -357,10 +357,13 @@ public sealed class Settings
     [
         @"filament used\D+(((?<mm>\d+\.?\d*)\s*mm)(\D+)?)+",                     // Slic3r and Kiri:Moto (mm)
         @"filament used\D+(((?<m>\d+\.?\d*)m([^m]|$))(\D+)?)+",                  // Cura (m)
-        @"filament length\D+(((?<mm>\d+\.?\d*)\s*mm)(\D+)?)+",                   // Simplify3D (mm)
+        @"filament length\D+(((?<mm>\d+\.?\d*)\s*mm)(\D+)?)+",                   // Simplify3D v4 (mm)
+        @"material length\D+(((?<mm>\d+\.?\d*)\s*mm)(\D+)?)+",                   // Simplify3D v5 (mm)
+        @"extruder\s*\d+ material used\D+(?<mm>\d+\.?\d*)",                      // Fusion 360 (mm)
         @"filament used \[mm\]\D+((?<mm>\d+\.?\d*)(\D+)?)+",                     // Prusa Slicer (mm)
         @"material\#(?<index>\d+)\D+(?<mm>\d+\.?\d*)",                           // IdeaMaker (mm)
         @"Ext\s*\#\d+\D+(?<mm>\d+\.?\d*)",                                       // KISSSlicer v2.0 (mm)
+        @"Estimated Build Volume\D+(?<cm3>\d+\.?\d*)",                           // KISSlicer (old) and Pathio (cm3)
         @"Filament used per extruder:\r\n;\s*(?<name>.+)\s+=\s*(?<mm>[0-9.]+)",  // Canvas
         @"filament used extruder (?<index>\d+) \(mm\) = (?<mm>\d+\.?\d*)"        // MatterControl v2
     ];
@@ -374,7 +377,9 @@ public sealed class Settings
         @"Sliced by\s+(.+)",                                 // IdeaMaker and Canvas
         @"(KISSlicer.*)",                                    // KISSlicer
         @"Sliced at:\s*(.+)",                                // Cura (old)
-        @"Generated with\s*(.+)"                             // Cura (new)
+        @"Generated with\s*(.+)",                            // Cura (new)
+        @"GENERATOR\.NAME:\s*(.+)",                          // Pathio
+        @"(Fusion version.*)"                                // Fusion 360
     ];
 
     /// <summary>
@@ -384,7 +389,10 @@ public sealed class Settings
     [
         @"estimated printing time (\(normal mode\) )?= ((?<d>(\d+))d\s*)?((?<h>(\d+))h\s*)?((?<m>(\d+))m\s*)?((?<s>(\d+))s)?",                // Slic3r PE
         @"TIME:(?<s>(\d+\.?\d*))",                                                                                           // Cura
+        @"^\s*TIME\s+(?<s>(\d+\.?\d*))",                                                                                     // Kiri:Moto
+        @"^\s*PRINT\.TIME\D+(?<s>(\d+\.?\d*))",                                                                              // Pathio
         @"Build Time:\s+((?<h>(\d+\.?\d*)) hour(s)?\s*)?((?<m>(\d+\.?\d*)) minute(s)?\s*)?((?<s>(\d+\.?\d*)) second(s)?)?",  // Simplify3D, KISSlicer, Canvas, IceSL
+        @"print time:\s*((?<h>\d+\.?\d*)h:?\s*)?((?<m>\d+\.?\d*)m:?\s*)?((?<s>\d+\.?\d*)s)?",                                // Fusion 360, must precede the plain seconds filter below
         @"print time:\s+(?<s>(\d+\.?\d*))(s)?",                                                                              // Kiri:Moto, and IdeaMaker v4
         @"Total estimated \(pre-cool\) minutes: ((?<m>\d+\.?\d*))",                                                          // KISSlicer v2.0
         @"total print time \(s\) = (?<s>(\d+\.?\d*))",                                                                       // MatterControl v2

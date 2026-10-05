@@ -27,10 +27,16 @@ namespace DuetControlServer.Files.Parser;
 /// <param name="codeFactory">Code factory</param>
 /// <param name="expressions">Expression evaluator</param>
 /// <param name="filePath">File path helper</param>
+/// <param name="model">Object model</param>
 /// <param name="logger">Logger instance</param>
 /// <param name="settings">Settings</param>
-public partial class FileInfoParser(CodeFactory codeFactory, Expressions expressions, FilePathResolver filePath, ILogger<FileInfoParser> logger, IOptions<Settings> settings)
+public partial class FileInfoParser(CodeFactory codeFactory, Expressions expressions, FilePathResolver filePath, Model.ObjectModel model, ILogger<FileInfoParser> logger, IOptions<Settings> settings)
 {
+    /// <summary>
+    /// Filament diameter assumed when the object model does not have an extruder yet, matching RRF's default
+    /// </summary>
+    private const float DefaultFilamentDiameter = 1.75F;
+
     // Filters are configured as patterns, so they are compiled once here instead of on every parse
     private readonly List<Regex> _layerHeightFilters = Settings.CompileFilters(settings.Value.LayerHeightFilters);
     private readonly List<Regex> _numLayersFilters = Settings.CompileFilters(settings.Value.NumLayersFilters);
@@ -75,9 +81,16 @@ public partial class FileInfoParser(CodeFactory codeFactory, Expressions express
         {
             Dictionary<string, Task<object?>> evaluationTasks = [];
 
+            // Slicers that report only the filament volume need the filament diameter to convert it to a length
+            float filamentDiameter;
+            using (await model.AccessReadOnlyAsync(cancellationToken))
+            {
+                filamentDiameter = (model.Move.Extruders.Count > 0) ? model.Move.Extruders[0].FilamentDiameter : DefaultFilamentDiameter;
+            }
+
             // Parse the file
-            await ParseHeaderAsync(fileStream, readThumbnailContent, evaluationTasks, result, cancellationToken);
-            await ParseFooterAsync(fileStream, result, cancellationToken);
+            await ParseHeaderAsync(fileStream, readThumbnailContent, evaluationTasks, result, filamentDiameter, cancellationToken);
+            await ParseFooterAsync(fileStream, result, filamentDiameter, cancellationToken);
 
             // Wait for key-value evaluation tasks to finish and add the results
             foreach (KeyValuePair<string, Task<object?>> kvp in evaluationTasks)
@@ -120,9 +133,10 @@ public partial class FileInfoParser(CodeFactory codeFactory, Expressions express
     /// <param name="readThumbnailContent">Whether thumbnail content shall be returned</param>
     /// <param name="userDefinedKeys">User-defined keys and the corresponding evaluation task</param>
     /// <param name="partialFileInfo">G-code file information</param>
+    /// <param name="filamentDiameter">Filament diameter for volume-based filament usage</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    private async Task ParseHeaderAsync(Stream stream, bool readThumbnailContent, Dictionary<string, Task<object?>> userDefinedKeys, GCodeFileInfo partialFileInfo, CancellationToken cancellationToken)
+    private async Task ParseHeaderAsync(Stream stream, bool readThumbnailContent, Dictionary<string, Task<object?>> userDefinedKeys, GCodeFileInfo partialFileInfo, float filamentDiameter, CancellationToken cancellationToken)
     {
         Code code = codeFactory.Create();
         CodeParserBuffer codeParserBuffer = new(settings.Value.FileBufferSize, true);
@@ -144,7 +158,7 @@ public partial class FileInfoParser(CodeFactory codeFactory, Expressions express
                 gotNewInfo |= (partialFileInfo.Height == 0) && FindObjectHeight(code.Comment, ref partialFileInfo);
                 gotNewInfo |= (partialFileInfo.LayerHeight == 0) && FindLayerHeight(code.Comment, ref partialFileInfo);
                 gotNewInfo |= (partialFileInfo.NumLayers == 0) && FindNumLayers(code.Comment, ref partialFileInfo);
-                gotNewInfo |= FindFilamentUsed(code.Comment, ref partialFileInfo);
+                gotNewInfo |= FindFilamentUsed(code.Comment, filamentDiameter, ref partialFileInfo);
                 gotNewInfo |= AddUserDefinedKey(code, userDefinedKeys);
                 gotNewInfo |= string.IsNullOrEmpty(partialFileInfo.GeneratedBy) && FindGeneratedBy(code.Comment, ref partialFileInfo);
                 gotNewInfo |= await ParseThumbnails(stream, code, codeParserBuffer, partialFileInfo, readThumbnailContent, cancellationToken);
@@ -165,9 +179,10 @@ public partial class FileInfoParser(CodeFactory codeFactory, Expressions express
     /// </summary>
     /// <param name="stream">Stream</param>
     /// <param name="partialFileInfo">G-code file information</param>
+    /// <param name="filamentDiameter">Filament diameter for volume-based filament usage</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    private async Task ParseFooterAsync(Stream stream, GCodeFileInfo partialFileInfo, CancellationToken cancellationToken)
+    private async Task ParseFooterAsync(Stream stream, GCodeFileInfo partialFileInfo, float filamentDiameter, CancellationToken cancellationToken)
     {
         stream.Seek(0, SeekOrigin.End);
         ReadLineFromEndData readData = new(stream.Position, settings.Value.FileBufferSize);
@@ -218,7 +233,7 @@ public partial class FileInfoParser(CodeFactory codeFactory, Expressions express
                         gotNewInfo |= !gotNewInfo && (partialFileInfo.PrintTime is null) && FindPrintTime(code.Comment, ref partialFileInfo);
                         gotNewInfo |= (partialFileInfo.LayerHeight == 0) && FindLayerHeight(code.Comment, ref partialFileInfo);
                         gotNewInfo |= (partialFileInfo.NumLayers == 0) && FindNumLayers(code.Comment, ref partialFileInfo);
-                        gotNewInfo |= !hadFilament && FindFilamentUsed(code.Comment, ref partialFileInfo);
+                        gotNewInfo |= !hadFilament && FindFilamentUsed(code.Comment, filamentDiameter, ref partialFileInfo);
                         gotNewInfo |= string.IsNullOrEmpty(partialFileInfo.GeneratedBy) && FindGeneratedBy(code.Comment, ref partialFileInfo);
                     }
 
@@ -431,9 +446,10 @@ public partial class FileInfoParser(CodeFactory codeFactory, Expressions express
     /// Try to find the filament usage
     /// </summary>
     /// <param name="line">Line</param>
+    /// <param name="filamentDiameter">Filament diameter for volume-based filament usage</param>
     /// <param name="fileInfo">File information</param>
     /// <returns>Whether filament consumption could be found</returns>
-    private bool FindFilamentUsed(string line, ref GCodeFileInfo fileInfo)
+    private bool FindFilamentUsed(string line, float filamentDiameter, ref GCodeFileInfo fileInfo)
     {
         foreach (Regex item in _filamentFilters)
         {
@@ -492,6 +508,16 @@ public partial class FileInfoParser(CodeFactory codeFactory, Expressions express
                                 }
                             }
                         }
+                    }
+                    return true;
+                }
+
+                if (match.Groups.TryGetValue("cm3", out Group? cm3Group))
+                {
+                    if (filamentDiameter > 0F && float.TryParse(cm3Group.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out float filamentVolume) &&
+                        float.IsFinite(filamentVolume))
+                    {
+                        fileInfo.Filament.Add(filamentVolume * 1000F / (MathF.PI * MathF.Pow(filamentDiameter / 2F, 2F)));
                     }
                     return true;
                 }

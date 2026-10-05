@@ -65,7 +65,7 @@
   ],
   "NumLayersFilters": [
     "^\\s*NUM_LAYERS\\D+(\\d+)",
-    "^\\s*LAYER_COUNT\\D+(\\d+)",
+    "^\\s*LAYER[_ ]COUNT\\D+(\\d+)",
     "^\\s*total layer number\\D+(\\d+)"
   ],
   "ObjectHeightFilters": [
@@ -78,9 +78,12 @@
     "filament used\\D+(((?<mm>\\d+\\.?\\d*)\\s*mm)(\\D+)?)+",
     "filament used\\D+(((?<m>\\d+\\.?\\d*)m([^m]|$))(\\D+)?)+",
     "filament length\\D+(((?<mm>\\d+\\.?\\d*)\\s*mm)(\\D+)?)+",
+    "material length\\D+(((?<mm>\\d+\\.?\\d*)\\s*mm)(\\D+)?)+",
+    "extruder\\s*\\d+ material used\\D+(?<mm>\\d+\\.?\\d*)",
     "filament used \\[mm\\]\\D+((?<mm>\\d+\\.?\\d*)(\\D+)?)+",
     "material\\#(?<index>\\d+)\\D+(?<mm>\\d+\\.?\\d*)",
     "Ext\\s*\\#\\d+\\D+(?<mm>\\d+\\.?\\d*)",
+    "Estimated Build Volume\\D+(?<cm3>\\d+\\.?\\d*)",
     "Filament used per extruder:\\r\\n;\\s*(?<name>.+)\\s+=\\s*(?<mm>[0-9.]+)",
     "filament used extruder (?<index>\\d+) \\(mm\\) = (?<mm>\\d+\\.?\\d*)"
   ],
@@ -89,12 +92,17 @@
     "Sliced by\\s+(.+)",
     "(KISSlicer.*)",
     "Sliced at:\\s*(.+)",
-    "Generated with\\s*(.+)"
+    "Generated with\\s*(.+)",
+    "GENERATOR\\.NAME:\\s*(.+)",
+    "(Fusion version.*)"
   ],
   "PrintTimeFilters": [
     "estimated printing time (\\(normal mode\\) )?= ((?<d>(\\d+))d\\s*)?((?<h>(\\d+))h\\s*)?((?<m>(\\d+))m\\s*)?((?<s>(\\d+))s)?",
     "TIME:(?<s>(\\d+\\.?\\d*))",
+    "^\\s*TIME\\s+(?<s>(\\d+\\.?\\d*))",
+    "^\\s*PRINT\\.TIME\\D+(?<s>(\\d+\\.?\\d*))",
     "Build Time:\\s+((?<h>(\\d+\\.?\\d*)) hour(s)?\\s*)?((?<m>(\\d+\\.?\\d*)) minute(s)?\\s*)?((?<s>(\\d+\\.?\\d*)) second(s)?)?",
+    "print time:\\s*((?<h>\\d+\\.?\\d*)h:?\\s*)?((?<m>\\d+\\.?\\d*)m:?\\s*)?((?<s>\\d+\\.?\\d*)s)?",
     "print time:\\s+(?<s>(\\d+\\.?\\d*))(s)?",
     "Total estimated \\(pre-cool\\) minutes: ((?<m>\\d+\\.?\\d*))",
     "total print time \\(s\\) = (?<s>(\\d+\\.?\\d*))",

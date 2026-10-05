@@ -65,7 +65,7 @@ public class InfoParser
             .AddKeyedSingleton<ICodeHandler>(Keys.TCodes, new NullCodeHandler())
             .AddKeyedSingleton<ICodeHandler>(Keys.Keywords, new NullCodeHandler())
             .BuildServiceProvider();
-        _parser = new FileInfoParser(new CodeFactory(serviceProvider), expressions, new FilePathResolver(model, settings), NullLogger<FileInfoParser>.Instance, settings);
+        _parser = new FileInfoParser(new CodeFactory(serviceProvider), expressions, new FilePathResolver(model, settings), model, NullLogger<FileInfoParser>.Instance, settings);
     }
 
     private static string GetTestFile(string fileName) => Path.Combine(Directory.GetCurrentDirectory(), "../../../File/GCodes", fileName);
@@ -194,6 +194,60 @@ public class InfoParser
         GCodeFileInfo info = await _parser.ParseAsync(filePath, false);
 
         Assert.That(info.PrintTime, Is.EqualTo(3941));
+    }
+
+    /// <summary>
+    /// Write a job file consisting of the given header comments and a single Z move
+    /// </summary>
+    private static async Task<string> WriteHeaderOnlyJobAsync(string header)
+    {
+        string filePath = Path.Combine(Path.GetTempPath(), $"Header_{Guid.NewGuid():N}.gcode");
+        await System.IO.File.WriteAllTextAsync(filePath, $"{header}G90\nG1 Z1\n");
+        return filePath;
+    }
+
+    [TestCase(";GENERATOR.NAME: Pathio\n", "Pathio")]
+    [TestCase(";Fusion version: 2.0.1234\n", "Fusion version: 2.0.1234")]
+    [TestCase(";Generated with Cura_SteamEngine 5.10.0\n", "Cura_SteamEngine 5.10.0")]
+    [TestCase(";Sliced by ideaMaker 4.2.3\n", "ideaMaker 4.2.3")]
+    public async Task TestGeneratedBy(string header, string generatedBy)
+    {
+        GCodeFileInfo info = await _parser.ParseAsync(await WriteHeaderOnlyJobAsync(header), false);
+        Assert.That(info.GeneratedBy, Is.EqualTo(generatedBy));
+    }
+
+    [TestCase(";Layer count: 125\n", 125)]
+    [TestCase(";LAYER_COUNT:100\n", 100)]
+    [TestCase("; layer_count = 60\n", 60)]
+    public async Task TestNumLayers(string header, int numLayers)
+    {
+        GCodeFileInfo info = await _parser.ParseAsync(await WriteHeaderOnlyJobAsync(header), false);
+        Assert.That(info.NumLayers, Is.EqualTo(numLayers));
+    }
+
+    [TestCase(";Print time: 40m:36s\n", 2436)]
+    [TestCase(";Print time: 1h:20m:36s\n", 4836)]
+    [TestCase(";Print Time: 1234\n", 1234)]
+    [TestCase(";PRINT.TIME: 1234\n", 1234)]
+    [TestCase(";TIME 3720.97\n", 3721)]
+    [TestCase(";TIME:38846\n", 38846)]
+    [TestCase("; Estimated Build Time:   332.83 minutes\n", 19980)]
+    public async Task TestPrintTime(string header, long printTime)
+    {
+        GCodeFileInfo info = await _parser.ParseAsync(await WriteHeaderOnlyJobAsync(header), false);
+        Assert.That(info.PrintTime, Is.EqualTo(printTime));
+    }
+
+    [TestCase(";Extruder 1 material used: 1811mm\n", 1811)]
+    [TestCase(";   Material Length: 13572.2 mm (13.57 m)\n", 13572.2)]
+    [TestCase(";   Filament length: 13572.2 mm (13.57 m)\n", 13572.2)]
+    [TestCase("; Estimated Build Volume: 32.5 cm^3\n", 13511.93)]
+    public async Task TestFilamentUsed(string header, double filament)
+    {
+        GCodeFileInfo info = await _parser.ParseAsync(await WriteHeaderOnlyJobAsync(header), false);
+
+        Assert.That(info.Filament, Has.Count.EqualTo(1));
+        Assert.That(info.Filament[0], Is.EqualTo(filament).Within(0.01));
     }
 
     [Test]
