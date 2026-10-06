@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using DuetAPI;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
 using DuetControlServer.Motion;
@@ -515,6 +516,67 @@ public class AxisOrderTests
         engine.WriteTo(kinematics);
 
         Assert.That(kinematics.InverseMatrix[2][..3], Is.EqualTo(new[] { 0.0f, 1.0f, 1.0f }));
+    }
+
+    [Test]
+    public void AMatrixThatCannotBeInvertedIsRefusedWhenItsRowsCanBePlaced()
+    {
+        // Both rows turn the same two motors the same way, so no motor positions tell X from Y
+        CoreKinematicsEngine engine = CoreKinematicsEngine.TryCreate(KinematicsName.Cartesian)!.WithAxes("XYZ");
+        bool seen = false;
+
+        GCodeException? refused = Assert.Throws<GCodeException>(() => engine.Configure(new Code("M669 X1:1 Y1:1"), ref seen));
+        Assert.That(refused!.Message, Is.EqualTo(CoreKinematicsEngine.InvalidMatrixError));
+        Assert.That(CoreKinematicsEngine.InvalidMatrixError, Is.EqualTo("Invalid kinematics matrix"), "RepRapFirmware's words");
+    }
+
+    [TestCase("M669 X1:1 Y1:1", "", TestName = "AMatrixIsNotJudgedBeforeItsAxesExist")]
+    [TestCase("M669 X1:1 Y1:1", "X", TestName = "AMatrixIsNotJudgedWhileARowWaitsForItsAxis")]
+    [TestCase("M669 X0:1", "X", TestName = "AMatrixIsNotJudgedWhileARowTurnsAMotorNotYetCreated")]
+    public void AMatrixThatCannotBePlacedYetIsAcceptedAndJudgedWhenItCan(string m669, string axesBefore)
+    {
+        CoreKinematicsEngine engine = CoreKinematicsEngine.TryCreate(KinematicsName.Cartesian)!.WithAxes(axesBefore);
+        bool seen = false;
+        KinematicsEngine configured = engine.Configure(new Code(m669), ref seen);
+        Assert.That(seen, Is.True);
+
+        // M584 creating the rest: now the rows land, and the matrix they make is singular
+        configured.WithAxes("XYZ");
+
+        float[] machinePos = Lay("XYZ", l => l switch { 'X' => 10.0f, 'Y' => 20.0f, _ => 5.0f });
+        float[] stepsPerMm = Lay("XYZ", _ => 80.0f);
+        int[] motorPos = new int[NumDrives];
+        Array.Fill(motorPos, 1234);
+        float[] position = new float[NumDrives];
+        Array.Fill(position, -1.0f);
+        configured.MotorStepsToCartesian(motorPos, stepsPerMm, 3, 3, position);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(configured.ConfigurationError, Is.EqualTo(CoreKinematicsEngine.InvalidMatrixError));
+            Assert.That(configured.CannotPlanReason, Is.EqualTo(CoreKinematicsEngine.InvalidMatrixError));
+            Assert.That(configured.CartesianToMotorSteps(machinePos, stepsPerMm, 3, 3, motorPos),
+                        Is.EqualTo(NativeMovementError.UnreachablePosition), "nothing is planned through it");
+            Assert.That(position[..3], Is.EqualTo(new[] { -1.0f, -1.0f, -1.0f }),
+                        "there is no way back from the motors, so the positions are left alone rather than zeroed");
+        });
+    }
+
+    [Test]
+    public void ASingularMatrixCanBeCorrected()
+    {
+        CoreKinematicsEngine engine = CoreKinematicsEngine.TryCreate(KinematicsName.Cartesian)!;
+        bool seen = false;
+        KinematicsEngine singular = engine.Configure(new Code("M669 X1:1 Y1:1"), ref seen).WithAxes("XYZ");
+        Assert.That(singular.CannotPlanReason, Is.Not.Null);
+
+        KinematicsEngine corrected = singular.Configure(new Code("M669 Y1:-1"), ref seen);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(corrected.CannotPlanReason, Is.Null);
+            Assert.That(((CoreKinematicsEngine)corrected).GetInverseMatrixRow(1)[..3], Is.EqualTo(new[] { 1.0f, -1.0f, 0.0f }));
+        });
     }
 
     // ---- Tool transform ---------------------------------------------------------------------------

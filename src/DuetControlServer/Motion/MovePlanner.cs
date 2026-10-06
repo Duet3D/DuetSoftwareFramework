@@ -175,12 +175,20 @@ internal sealed class MovePlanner(
     /// Only safe at standstill, for the same reason <see cref="ReconfigureAsync"/> is
     /// </para>
     /// </remarks>
-    public void FollowAxes(Move move)
+    /// <returns>
+    /// Why the geometry, placed over the axes as they now are, does not describe a machine its motors
+    /// can drive - a core matrix given before its axes existed that turns out singular - or null
+    /// </returns>
+    public string? FollowAxes(Move move)
     {
-        if (Geometry.SetAxes(AxisIndices.From(move)))
+        KinematicsEngine geometry = Geometry;
+        if (!geometry.SetAxes(AxisIndices.From(move)))
         {
-            KinematicsConfigurator.WriteTo(Geometry, move);
+            return null;
         }
+
+        KinematicsConfigurator.WriteTo(geometry, move);
+        return geometry.ConfigurationError;
     }
 
     /// <summary>Where the last move left the machine, and the state that carries between moves</summary>

@@ -341,10 +341,11 @@ internal sealed partial class GCodeHandler
                 return new Message(MessageType.Error, "No axes have been configured");
             }
 
-            // Every homing macro moves through the geometry, which cannot work without its axes
-            if (planner.Parameters.Geometry.MissingAxesError is string missingAxes)
+            // Every homing macro moves through the geometry, which cannot work without its axes or
+            // with a matrix its motors cannot drive
+            if (planner.Parameters.Geometry.CannotPlanReason is string cannotPlan)
             {
-                return new Message(MessageType.Error, missingAxes);
+                return new Message(MessageType.Error, cannotPlan);
             }
 
             axisLetters = new char[model.Move.Axes.Count];

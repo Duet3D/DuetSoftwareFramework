@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using DuetAPI;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
 using DuetControlServer.Motion.Native;
@@ -89,6 +90,19 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
     /// Whether the forward matrix could be derived. False means the geometry is unusable
     /// </summary>
     public bool IsValid => _matrices.IsValid;
+
+    /// <summary>
+    /// What a singular matrix is reported as, in RepRapFirmware's words (<c>CoreKinematics::Recalc</c>)
+    /// </summary>
+    public const string InvalidMatrixError = "Invalid kinematics matrix";
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The placed matrix cannot be inverted, so there is no way back from motor positions to axis
+    /// positions. RepRapFirmware reports this whenever it recalculates the matrix and carries on with
+    /// a zeroed forward matrix; here it is also why every move is refused
+    /// </remarks>
+    public override string? ConfigurationError => _matrices.IsValid ? null : InvalidMatrixError;
 
     /// <summary>
     /// Create a geometry from its inverse matrix
@@ -232,9 +246,17 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
     /// The row goes to the axis carrying the letter, wherever it is. RepRapFirmware only looks for the
     /// letters of axes that exist, which on its machines always include X, Y and Z; a row given here
     /// for an axis M584 has not created yet is kept and placed when it is, so the usual config.g order
-    /// of M669 before M584 describes the same machine
+    /// of M669 before M584 describes the same machine.
+    /// </para>
+    /// <para>
+    /// A matrix that cannot be inverted is refused with RepRapFirmware's message, and the geometry
+    /// that was there stays. That is decided here only once every row M669 has given can be placed:
+    /// while one still waits for its axis, or names a motor of an axis not created yet, the matrix is
+    /// not the machine's final one, so it is accepted and M584 reports it if it turns out singular
+    /// when the axes exist (<see cref="KinematicsEngine.ConfigurationError"/>)
     /// </para>
     /// </remarks>
+    /// <exception cref="GCodeException">The matrix, placed in full, cannot be inverted</exception>
     public override KinematicsEngine Configure(Code code, ref bool seen)
     {
         Dictionary<char, float[]>? rows = null;
@@ -259,11 +281,39 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
             return this;
         }
 
-        // A matrix M669 cannot invert describes a machine whose motors cannot reach every position,
-        // so the geometry that was working is kept rather than replaced with one that cannot plan
+        // A matrix that cannot be inverted describes a machine whose motors cannot reach every
+        // position, so the geometry that was there is kept rather than replaced with one that cannot plan
         CoreKinematicsEngine engine = new(Kind, (float[,])_base.Clone(), _namedRows, rows);
         engine.SetAxes(Axes);
-        return engine.IsValid ? engine : this;
+        if (!engine.IsValid && engine.PlacesEveryRow(Axes))
+        {
+            throw new GCodeException(InvalidMatrixError);
+        }
+        return engine;
+    }
+
+    /// <summary>
+    /// Whether every row M669 has given lands in full on the given axes
+    /// </summary>
+    /// <param name="axes">The machine's axes</param>
+    /// <returns>False if a row's letter has no axis yet, or a row turns the motor of an axis not created yet</returns>
+    private bool PlacesEveryRow(AxisIndices axes)
+    {
+        foreach ((char letter, float[] values) in _rowsByLetter)
+        {
+            if (axes.IndexOf(letter) < 0)
+            {
+                return false;
+            }
+            for (int motor = axes.Count; motor < values.Length; motor++)
+            {
+                if (values[motor] != 0.0f)
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /// <inheritdoc />
@@ -456,8 +506,14 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
         bool isCoordinated = false)
     {
         // A linear combination has exactly one solution, so there is no pose to choose and
-        // isCoordinated makes no difference here
+        // isCoordinated makes no difference here. A singular one has no way back from the motor
+        // positions, so nothing is planned through it
         Matrices matrices = _matrices;
+        if (!matrices.IsValid)
+        {
+            return NativeMovementError.UnreachablePosition;
+        }
+
         NativeMovementError result = NativeMovementError.Ok;
         int motorLimit = Math.Min(numTotalAxes, Math.Min(MatrixSize, Math.Min(motorPos.Length, stepsPerMm.Length)));
 
@@ -501,8 +557,14 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
         Span<float> machinePos)
     {
         // Where there are more motors than visible axes - CoreXYU has a V motor - the trailing ones
-        // are ignored when working out where the machine is
+        // are ignored when working out where the machine is. A singular matrix has no forward
+        // transform, so the positions the caller holds are left as they are rather than zeroed
         Matrices matrices = _matrices;
+        if (!matrices.IsValid)
+        {
+            return;
+        }
+
         int axisLimit = Math.Min(numVisibleAxes, Math.Min(MatrixSize, machinePos.Length));
 
         for (int axis = 0; axis < axisLimit; axis++)

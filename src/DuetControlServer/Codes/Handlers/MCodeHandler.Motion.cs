@@ -734,8 +734,13 @@ internal partial class MCodeHandler
                 return new Message(MessageType.Success, ReportDriveMapping(move));
             }
 
-            // A geometry finds X, Y and Z by letter, so an axis created here can be one it was waiting for
-            planner.FollowAxes(move);
+            // A geometry finds X, Y and Z by letter, so an axis created here can be one it was waiting
+            // for. The axes exist either way, so a geometry they leave unusable is reported but does
+            // not stop the rest of the code: the moves it would plan are refused instead
+            if (planner.FollowAxes(move) is string geometryError)
+            {
+                replies.Add(new Message(MessageType.Error, geometryError));
+            }
         }
 
         if (error is not null)

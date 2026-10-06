@@ -274,6 +274,26 @@ internal abstract class KinematicsEngine
     }
 
     /// <summary>
+    /// Why this geometry's configuration does not describe a machine its motors can drive, now that
+    /// it is placed over the machine's axes, or null if it does
+    /// </summary>
+    /// <remarks>
+    /// A core matrix given by letter before M584 created all its axes can turn out to be singular only
+    /// once they exist, so this can change when <see cref="SetAxes"/> does
+    /// </remarks>
+    public virtual string? ConfigurationError => null;
+
+    /// <summary>
+    /// Why no move can be planned through this geometry, or null if one can
+    /// </summary>
+    /// <remarks>
+    /// Either an axis it needs is missing (<see cref="MissingAxesError"/>) or its configuration is
+    /// unusable (<see cref="ConfigurationError"/>). Every move and every homing is refused with this
+    /// rather than planned through a transform that cannot give the right answer
+    /// </remarks>
+    public string? CannotPlanReason => MissingAxesError ?? ConfigurationError;
+
+    /// <summary>
     /// The axes this geometry transforms, resolved against the machine's
     /// </summary>
     /// <remarks>

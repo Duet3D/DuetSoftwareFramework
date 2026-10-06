@@ -320,6 +320,68 @@ public class AxisLetterOrderTests : BenchFixture
         });
     }
 
+    [Test]
+    public async Task M669RefusesAMatrixItCannotInvert()
+    {
+        // Both rows turn the same two motors the same way, so no motor positions tell X from Y. The
+        // axes exist, so the matrix can be judged as M669 gives it
+        await using JobBench bench = await StartAsync("XYZU");
+
+        string refused = await bench.Host.ExecuteCodeAsync("M669 X1:1 Y1:1");
+        await bench.Host.ExecuteCodeAsync("G91");
+        IReadOnlyList<ScheduledMove> move = await bench.RunMoveAsync("G1 X10 F6000");
+
+        float[][] inverse = await bench.Host.ReadModelAsync(
+            model => ((CoreKinematics)model.Move.Kinematics).InverseMatrix.Select(row => row.ToArray()).ToArray());
+        Assert.Multiple(() =>
+        {
+            Assert.That(refused.Trim(), Is.EqualTo("Error: M669: Invalid kinematics matrix"), "RepRapFirmware's words");
+            Assert.That(inverse[0][..2], Is.EqualTo(new[] { 1.0f, 0.0f }), "the geometry that was there stays");
+            Assert.That(inverse[1][..2], Is.EqualTo(new[] { 0.0f, 1.0f }));
+            Assert.That(move.DriversMoved(), Is.EqualTo(new[] { (ScheduleMoveBench.DriverBoard, XDriver) }), "and still moves");
+        });
+    }
+
+    [Test]
+    public async Task AMatrixGivenBeforeItsAxesThatCannotBeInvertedIsReportedByM584AndRefusesToMove()
+    {
+        // M669 before M584, as config.g usually has it: until X and Y exist the rows have nowhere to
+        // go, so the matrix can only be judged when M584 creates them
+        await using JobBench bench = await ScheduleMoveBench.StartAsync(
+            "M953\nM569 P1.0 S1\nM569 P1.1 S1\nM669 X1:1 Y1:1");
+
+        string created = await bench.Host.ExecuteCodeAsync("M584 X1.0 Y1.1");
+        foreach (string line in new[] { "M92 X80 Y80", "M201 X500 Y500", "M203 X6000 Y6000", "M564 H0 S0", "G91" })
+        {
+            await bench.Host.ExecuteCodeAsync(line);
+        }
+        int before = bench.CanMaster.ScheduledMoves().Count;
+
+        string move = await bench.Host.ExecuteCodeAsync("G1 X10 F6000");
+        string home = await bench.Host.ExecuteCodeAsync("G28");
+        await bench.Host.ExecuteCodeAsync("M400");
+
+        Assert.Multiple(async () =>
+        {
+            Assert.That(created.Trim(), Is.EqualTo("Error: M584: Invalid kinematics matrix"));
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Select(axis => axis.Letter).ToArray()),
+                        Is.EqualTo(new[] { 'X', 'Y' }), "the axes are created all the same");
+            Assert.That(move.Trim(), Is.EqualTo("Error: G1: Invalid kinematics matrix"));
+            Assert.That(home.Trim(), Is.EqualTo("Error: G28: Invalid kinematics matrix"));
+            Assert.That(bench.CanMaster.ScheduledMoves(), Has.Count.EqualTo(before), "nothing reached the link");
+        });
+
+        // Correcting the row makes it CoreXY, which moves both motors for X
+        string corrected = await bench.Host.ExecuteCodeAsync("M669 Y1:-1");
+        IReadOnlyList<ScheduledMove> alongX = await bench.RunMoveAsync("G1 X10 F6000");
+        Assert.Multiple(() =>
+        {
+            Assert.That(corrected.Trim(), Is.Empty);
+            Assert.That(alongX.Steps(XDriver), Is.EqualTo(10 * XyuStepsPerMm));
+            Assert.That(alongX.Steps(YDriver), Is.EqualTo(10 * XyuStepsPerMm));
+        });
+    }
+
     // ---- A machine without Z --------------------------------------------------------------------
 
     /// <summary>X, Y and an extruder, and nothing lettered Z</summary>
