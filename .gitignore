@@ -297,12 +297,9 @@ src/DuetAPI/Generated
 aot/out
 
 build/
-# Claude Code
-.claude/*
-!.claude/memory/
-# Private memories: kept in the workspace so they survive a container rebuild,
-# never committed.
-.claude/memory/private/
+# Claude Code state, memories included: kept in the workspace so it survives a
+# container rebuild, never committed.
+.claude/
 
 # Reference checkout of DuetRegressionTesting; not a submodule of this repo.
 lib/DuetRegressionTesting/
