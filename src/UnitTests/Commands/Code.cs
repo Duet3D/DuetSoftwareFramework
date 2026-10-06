@@ -205,7 +205,7 @@ public class Code
 #endif
 
     [Test]
-    public void TestBadM291()
+    public async Task TestBadM291()
     {
         using MemoryStream stream = new(Encoding.UTF8.GetBytes("M291 P\"Please select the tool to load.Press\"Cancel\" to abort\" R\"Load Tool\" S4 K{\"Cancel\",\"Tool#1\",\"Tool#2\",\"Tool#3\"};display message box with choices"));
         using StreamReader reader = new(stream);
@@ -214,7 +214,7 @@ public class Code
 
         stream.Seek(0, SeekOrigin.Begin);
         CodeParserBuffer buffer = new(8192, false);
-        Assert.CatchAsync<CodeParserException>(async () => await DuetAPI.Commands.Code.ParseAsync(stream, result, buffer));
+        await Assert.CatchAsync<CodeParserException>(async () => await DuetAPI.Commands.Code.ParseAsync(stream, result, buffer));
     }
 
     [Test]

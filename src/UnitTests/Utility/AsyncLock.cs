@@ -87,7 +87,7 @@ public class AsyncLockTests
             });
             await Task.Delay(40);
             await cts.CancelAsync();
-            Assert.ThrowsAsync<OperationCanceledException>(async () => await cancelled);
+            await Assert.ThrowsAsync<OperationCanceledException>(async () => await cancelled);
         }
 
         // The lock must still be obtainable after a waiter gave up
