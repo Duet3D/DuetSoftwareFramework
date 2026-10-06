@@ -118,8 +118,18 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
     /// is made by <see cref="TryCreate(KinematicsName)"/> instead, which places its matrix by letter
     /// </remarks>
     public CoreKinematicsEngine(KinematicsName name, float[][] inverseMatrix)
-        : this(name, Identity(), [], new Dictionary<char, float[]>())
+        : this(name, BaseFrom(inverseMatrix), [], new Dictionary<char, float[]>())
     {
+    }
+
+    /// <summary>
+    /// The base matrix a whole inverse matrix describes
+    /// </summary>
+    /// <param name="inverseMatrix">Rows are axes, columns are motors, both by index</param>
+    /// <returns>The matrix, the identity beyond the rows given</returns>
+    private static float[,] BaseFrom(float[][] inverseMatrix)
+    {
+        float[,] matrix = Identity();
         for (int axis = 0; axis < inverseMatrix.Length && axis < MatrixSize; axis++)
         {
             float[] row = inverseMatrix[axis];
@@ -128,10 +138,10 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
             // "no motor moves for this axis" rather than silently keeping the diagonal
             for (int motor = 0; motor < MatrixSize; motor++)
             {
-                _base[axis, motor] = motor < row.Length ? row[motor] : 0.0f;
+                matrix[axis, motor] = motor < row.Length ? row[motor] : 0.0f;
             }
         }
-        _matrices = Place(Axes);
+        return matrix;
     }
 
     /// <summary>
