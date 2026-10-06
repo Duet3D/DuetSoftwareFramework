@@ -469,8 +469,10 @@ public class AxisLetterOrderTests : BenchFixture
     public async Task WithoutZAScaraStillMovesItsArms()
     {
         // A pen plotter: a SCARA needs only its two joints, and its crosstalk onto Z has nothing to act
-        // on. The move is compared driver by driver against the same SCARA with a Z axis
-        const string scara = "M669 K4";
+        // on. The move is compared driver by driver against the same SCARA with a Z axis. The distal
+        // joint is limited to one side, so the elbow can bend only one way: which way an arm free to
+        // bend either way ends up is state, which the two benches need not have arrived at alike
+        const string scara = "M669 K4 B0:135";
         const string start = "G90\nG92 X100 Y50";
 
         await using JobBench withZ = await ScheduleMoveBench.StartAsync(NoZConfig + "\nM569 P1.2 S1\nM584 Z1.2\n" + scara);
