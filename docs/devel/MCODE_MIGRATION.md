@@ -736,11 +736,9 @@ Record decisions here as they are made, so a later reader does not have to re-de
 
 ### Phase 1 (M92, M201, M203, M204, M205/M566, M208, M350, M400, M584, M906)
 
-**M584 is what creates an axis.** Nothing in DuetControlServer populated `move.axes[]`,
-`move.extruders[]` or `move.motionSystems[]` — RepRapFirmware used to, over SPI. `move.axes[]` starts
-empty and stays empty until M584 names a letter, exactly as in RRF, so M584 has to run before any of
-the other motion codes have anything to configure. This is the reason a machine could not be set up
-at all before this phase.
+**M584 is what creates an axis.** Nothing in DuetControlServer populated `move.axes[]`, `move.extruders[]` or `move.motionSystems[]` — RepRapFirmware used to, over SPI. `move.axes[]` starts empty and stays empty until M584 names a letter, so M584 has to run before any of the other motion codes have anything to configure. This is the reason a machine could not be set up at all before this phase.
+
+**There are no default axes, so X, Y and Z are found by letter.** This is where DSF differs from RRF, which creates X, Y and Z before config.g runs and so always has them as axes 0, 1 and 2. Here config.g can create the axes in any order across several M584 codes, and need not create X, Y or Z at all, so nothing treats an axis number as a letter. `Motion/AxisIndices` is the one letter-to-index lookup: an immutable resolution of `move.axes[]` that the geometry holds (`KinematicsEngine.Axes`, replaced by `SetAxes` when the axes change - in `MotionParameters.ApplyAxes` on every reconfiguration and in `MovePlanner.FollowAxes` from M584) and the move path reads through `MotionParameters.Axes`, so no per-move path searches the axis list. Code that looks a letter up once uses `AxisIndices.IndexOf(move, letter)`. Each geometry names the letters it transforms (`KinematicAxisLetters`) and resolves them to indices once; one that needs a letter the machine lacks reports `MissingAxesError`, which G0/G1 and G28 return. The core geometries keep their named matrix and M669's rows by letter and place them at the actual indices. The user-visible consequences are listed in `rrf-differences.md` §5.1.
 
 **M204 writes `move.motionSystems[].printingAcceleration`, not `move.printingAcceleration`.** The
 latter is `[Obsolete]` in the object model. `MotionParameters.FromObjectModel` was reading the
@@ -3510,7 +3508,7 @@ look like work. The ones that turned out to be questions are gone, with the answ
 |---|---|
 | `MoveBuilder`: *"is this valid after an endstop move?"* on copying `_endPoints` into `_newEndPoints` | Yes. §12 made the endstop correction write the position the drives actually reached into `_endPoints` before the next move is built, so this copies the corrected position and not the planned one |
 | `MoveBuilder`: *"is this needed since the array was copied above?"* on resetting an unowned drive's endpoint | Yes, and the test says so - removing it fails `ADriveTheMoveDoesNotOwnIsLeftWhereItWas`. `CartesianToMotorSteps` runs over **every** axis from the requested coordinates before the ownership loop, so an unowned axis has already been overwritten and has to be put back rather than left alone |
-| `MoveBuilder` and `KinematicsEngine`: *"convert the magic numbers to constants (or get from kinematics)"* | Constants. `XAxis`/`YAxis`/`ZAxis` are RepRapFirmware's `X_AXIS`/`Y_AXIS`/`Z_AXIS` and are fixed positions in the vector whatever M584 called the axes, so they are not something to ask the geometry for. They moved onto `KinematicsEngine` where four engines had been declaring their own copies, and `0.05f` became `MinXyComponent` |
+| `MoveBuilder` and `KinematicsEngine`: *"convert the magic numbers to constants (or get from kinematics)"* | Asked of the geometry. RepRapFirmware's `X_AXIS`/`Y_AXIS`/`Z_AXIS` are positions because its first three axes are always X, Y and Z; DSF has no default axes, so X, Y and Z are the axes carrying those letters and the geometry resolves them (`KinematicsEngine.Axes`, see the M584 note in §8). `0.05f` became `MinXyComponent` |
 
 ### 15.2 Recorded here for the first time
 
