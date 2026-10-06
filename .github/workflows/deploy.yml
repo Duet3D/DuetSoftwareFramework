@@ -52,6 +52,21 @@ jobs:
           ./build.sh --signing-key=C406404B2459FE0B1C6CC19D3738126EDA91C86B --target-arch=armhf --dest-dir=./out
           ./build.sh --signing-key=C406404B2459FE0B1C6CC19D3738126EDA91C86B --target-arch=arm64 --dest-dir=./out
 
+      # The resolved NuGet closure, as a CycloneDX software BOM. Test projects and development
+      # dependencies are left out because their code is not in the packages
+      - name: Generate software BOM
+        run: |
+          version=$(xmllint --xpath "string(//Version)" src/Directory.Build.props)
+          dotnet tool install --global CycloneDX
+          dotnet CycloneDX src/DuetSoftwareFramework.sln --output sbom --exclude-test-projects --exclude-dev \
+            --set-version "$version" --output-format Json --spec-version 1.6 --filename "DuetSoftwareFramework-$version-sbom.json"
+
+      - name: Attach software BOM
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom
+          path: ./sbom/DuetSoftwareFramework-*-sbom.json
+
       # Upload packages to dev feed
       - name: Upload packages to dev feed
         uses: Creepios/sftp-action@v1.0.5
