@@ -90,8 +90,9 @@ constexpr size_t maxExtruders = 20;			// maximum number of extruders
 constexpr size_t maxAxesPlusExtruders = 32; // may be <= maxAxes + maxExtruders
 constexpr size_t maxDriversPerAxis = 8;
 
-constexpr size_t xyzAxes = 3;
-constexpr size_t xAxis = 0, yAxis = 1, zAxis = 2;
+// Axes are numbered by logical drive only. DuetControlServer creates them in whatever order M584
+// names them and finds X, Y and Z by letter, and everything it sends - endpoints, direction vectors,
+// driver maps - is indexed by drive, so no axis number here stands for a particular letter.
 
 static_assert(maxAxesPlusExtruders <= maxAxes + maxExtruders);
 

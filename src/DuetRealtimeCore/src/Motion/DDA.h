@@ -285,8 +285,8 @@ class DDA final
 	uint32_t m_moveId;
 
 	int32_t m_endPoint[maxAxesPlusExtruders]{};		 // Machine coordinates of the endpoint
-	float m_directionVector[maxAxesPlusExtruders]{}; // The normalised direction vector - first 3 are XYZ Cartesian
-													 // coordinates even on a delta
+	float m_directionVector[maxAxesPlusExtruders]{}; // The normalised direction vector, by logical drive, in
+													 // axis coordinates even on a delta
 	// Which switches stop each drive, and how its drivers share them. Only meaningful when
 	// checkEndstops is set. Carried per drive so one move can home several axes at once, each
 	// stopping on its own endstop

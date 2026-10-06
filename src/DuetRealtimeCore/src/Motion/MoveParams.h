@@ -65,7 +65,7 @@ namespace Duet::Sbc::Motion
 	// Fixed part of a move submission. Four arrays follow it in the same record:
 	//
 	//     int32_t         endPoint[numDrives];        machine position each drive ends at, microsteps
-	//     float           directionVector[numDrives]; normalised direction, first three Cartesian
+	//     float           directionVector[numDrives]; normalised direction in axis coordinates, by drive
 	//     MoveStopInput   stopInputs[numDrives];      which switches stop each drive, if any
 	//     MoveDriveTuning tuning[numDrives];          the limits this move is to be executed with
 	//

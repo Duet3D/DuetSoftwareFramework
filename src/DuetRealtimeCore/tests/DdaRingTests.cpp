@@ -33,6 +33,10 @@ namespace ScheduleMoveFlags = duet::spi::protocol::ScheduleMoveFlags;
 
 namespace
 {
+	// The axis the test moves drive. The test machine's first axis; which letter it carries is
+	// DuetControlServer's business, and nothing here depends on it
+	constexpr size_t xAxis = 0;
+
 	// --- The clock the test drives ----------------------------------------------------------
 
 	int64_t fakeNow = 0;
