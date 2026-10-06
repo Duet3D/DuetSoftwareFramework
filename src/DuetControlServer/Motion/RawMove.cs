@@ -186,10 +186,15 @@ internal sealed class RawMove
     public MoveType MoveType { get; set; }
 
     /// <summary>Axes the current tool maps X onto, as a bitmap</summary>
-    public uint XAxes { get; set; } = 1;
+    /// <remarks>
+    /// Set wherever a move is built, from <see cref="ToolTransform.AxisBitmap"/>: there is no default,
+    /// because X is wherever M584 put it and may not exist at all
+    /// </remarks>
+    public uint XAxes { get; set; }
 
     /// <summary>Axes the current tool maps Y onto, as a bitmap</summary>
-    public uint YAxes { get; set; } = 2;
+    /// <remarks>Set wherever a move is built, as <see cref="XAxes"/> is</remarks>
+    public uint YAxes { get; set; }
 
     /// <summary>Logical drives this move is allowed to touch, as a bitmap</summary>
     /// <remarks>

@@ -1,56 +1,149 @@
+using System;
 using DuetAPI.ObjectModel;
 
 namespace DuetControlServer.Motion;
 
 /// <summary>
-/// Where X, Y and Z sit in a coordinate vector
+/// Which axis carries each letter, and in particular where X, Y and Z are
 /// </summary>
 /// <remarks>
 /// <para>
-/// RepRapFirmware's <c>X_AXIS</c>, <c>Y_AXIS</c> and <c>Z_AXIS</c>. These are <em>positions</em>
-/// rather than letters, and that is the whole point of them: a geometry reasons about the first two
-/// as the pair its motors couple and the third as the one that lifts, whatever M584 called them, and
-/// a tool's axis maps and the skew correction are indexed the same way. So they are not something to
-/// ask the geometry or the object model for.
+/// DSF has no default axes. Every axis is created by M584, in whatever order config.g names them, so
+/// X, Y and Z can sit at any index and any of them may not exist at all. RepRapFirmware's
+/// <c>X_AXIS</c>, <c>Y_AXIS</c> and <c>Z_AXIS</c> are fixed positions because its first three axes are
+/// always X, Y and Z; here the axis that means X is the axis lettered X, wherever it is, and every
+/// part of the motion system that needs one of the three finds it by letter through this class.
 /// </para>
 /// <para>
-/// Imported with <c>using static</c> where they are needed, so that the code reads as
-/// <c>coords[XAxis]</c> as it does in RepRapFirmware. Declared once: the kinematics, the move
-/// builder and the G-code handler all index the same vector, and separate declarations would be
-/// separate chances to give one of them a different value
+/// An instance is a resolved, immutable view of <c>move.axes[]</c>, which stays the one source of the
+/// letters. The geometry holds one (<see cref="Kinematics.KinematicsEngine.Axes"/>), replaced whenever
+/// the axes change, and the move path reaches it through <see cref="MotionParameters.Axes"/>, so
+/// nothing that runs per move searches the axis list. Code that reads the object model once, rather
+/// than per move, asks <see cref="IndexOf(Move, char)"/> directly
 /// </para>
 /// </remarks>
-public static class AxisIndices
+internal sealed class AxisIndices
 {
-    /// <summary>Position of the X axis</summary>
-    public const int XAxis = 0;
-
-    /// <summary>Position of the Y axis</summary>
-    public const int YAxis = 1;
-
-    /// <summary>Position of the Z axis</summary>
-    public const int ZAxis = 2;
+    /// <summary>
+    /// A machine with no axes, which is what there is before M584 has created any
+    /// </summary>
+    public static readonly AxisIndices None = new(string.Empty);
 
     /// <summary>
-    /// Which axis is Z, or -1 if the machine has none
+    /// The letter of each axis, in axis order
+    /// </summary>
+    public string Letters { get; }
+
+    /// <summary>
+    /// Index of the axis lettered X, or -1 if there is none
+    /// </summary>
+    public int X { get; }
+
+    /// <summary>
+    /// Index of the axis lettered Y, or -1 if there is none
+    /// </summary>
+    public int Y { get; }
+
+    /// <summary>
+    /// Index of the axis lettered Z, or -1 if there is none
+    /// </summary>
+    public int Z { get; }
+
+    /// <summary>
+    /// Whichever of X and Y exist, as a bitmap
+    /// </summary>
+    public uint XyBitmap { get; }
+
+    /// <summary>
+    /// Whichever of X, Y and Z exist, as a bitmap
+    /// </summary>
+    public uint XyzBitmap { get; }
+
+    /// <summary>
+    /// Number of axes
+    /// </summary>
+    public int Count => Letters.Length;
+
+    private AxisIndices(string letters)
+    {
+        Letters = letters;
+        X = IndexOf(letters, 'X');
+        Y = IndexOf(letters, 'Y');
+        Z = IndexOf(letters, 'Z');
+        XyBitmap = Bit(X) | Bit(Y);
+        XyzBitmap = XyBitmap | Bit(Z);
+    }
+
+    /// <summary>
+    /// Resolve the axes the object model describes
     /// </summary>
     /// <param name="move">The move model</param>
-    /// <returns>The axis index</returns>
+    /// <returns>The resolved axes</returns>
+    /// <remarks>The caller must hold the object model lock</remarks>
+    public static AxisIndices From(Move move)
+    {
+        if (move.Axes.Count == 0)
+        {
+            return None;
+        }
+
+        char[] letters = new char[move.Axes.Count];
+        for (int axis = 0; axis < letters.Length; axis++)
+        {
+            letters[axis] = move.Axes[axis].Letter;
+        }
+        return new AxisIndices(new string(letters));
+    }
+
+    /// <summary>
+    /// Resolve a list of axis letters
+    /// </summary>
+    /// <param name="letters">The letter of each axis, in axis order</param>
+    /// <returns>The resolved axes</returns>
+    public static AxisIndices From(ReadOnlySpan<char> letters) => letters.IsEmpty ? None : new AxisIndices(new string(letters));
+
+    /// <summary>
+    /// Which axis carries a letter
+    /// </summary>
+    /// <param name="letter">The axis letter</param>
+    /// <returns>The axis index, or -1 if no axis carries it</returns>
+    public int IndexOf(char letter) => IndexOf(Letters, letter);
+
+    /// <summary>
+    /// Which axis of the object model carries a letter
+    /// </summary>
+    /// <param name="move">The move model</param>
+    /// <param name="letter">The axis letter</param>
+    /// <returns>The axis index, or -1 if the machine has no such axis</returns>
     /// <remarks>
-    /// The axis <em>called</em> Z rather than <see cref="ZAxis"/>, which is the third position in the
-    /// vector. The two are the same on an ordinary machine and need not be: the bed correction lifts
-    /// whichever axis the operator named Z, wherever M584 put it. The caller must hold the object
-    /// model lock
+    /// For code that looks an axis up once rather than per move. The caller must hold the object model
+    /// lock
     /// </remarks>
-    public static int ZAxisIndex(Move move)
+    public static int IndexOf(Move move, char letter)
     {
         for (int axis = 0; axis < move.Axes.Count; axis++)
         {
-            if (move.Axes[axis].Letter == 'Z')
+            if (move.Axes[axis].Letter == letter)
             {
                 return axis;
             }
         }
         return -1;
     }
+
+    /// <summary>
+    /// Whether this describes the same axes as another
+    /// </summary>
+    /// <param name="other">The other axes</param>
+    /// <returns>True if the letters and their order agree</returns>
+    public bool SameAs(AxisIndices other) => string.Equals(Letters, other.Letters, StringComparison.Ordinal);
+
+    /// <summary>
+    /// The bitmap bit of an axis, or nothing for an axis that does not exist
+    /// </summary>
+    /// <param name="axis">The axis index, or -1</param>
+    /// <returns>The bit, zero for -1</returns>
+    public static uint Bit(int axis) => axis is >= 0 and < 32 ? 1u << axis : 0u;
+
+    private static int IndexOf(ReadOnlySpan<char> letters, char letter) => letters.IndexOf(letter);
 }

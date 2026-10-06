@@ -733,6 +733,9 @@ internal partial class MCodeHandler
             {
                 return new Message(MessageType.Success, ReportDriveMapping(move));
             }
+
+            // A geometry finds X, Y and Z by letter, so an axis created here can be one it was waiting for
+            planner.FollowAxes(move);
         }
 
         if (error is not null)
@@ -2093,7 +2096,9 @@ internal partial class MCodeHandler
     /// <remarks>
     /// The offset is applied to every move built afterwards rather than by moving now, which is what
     /// lets it be adjusted while a print is running. S is a synonym for Z, and R0 makes the values
-    /// absolute rather than a change to what is already applied
+    /// absolute rather than a change to what is already applied. Z is the axis lettered Z wherever it
+    /// is; RepRapFirmware's S always has one to go to, so S on a machine without a Z axis is an error
+    /// rather than a value quietly dropped
     /// </remarks>
     private async ValueTask<Message> HandleBabysteppingAsync(Commands.Code code, CancellationToken cancellationToken)
     {
@@ -2105,13 +2110,19 @@ internal partial class MCodeHandler
         {
             Move move = model.Move;
 
+            // S has meant "the Z axis" since before M290 took axis letters
+            int zAxis = AxisIndices.IndexOf(move, 'Z');
+            if (zAxis < 0 && code.HasParameter('S'))
+            {
+                return new Message(MessageType.Error, "The machine has no Z axis");
+            }
+
             for (int index = 0; index < move.Axes.Count; index++)
             {
                 Axis axis = move.Axes[index];
 
-                // S has meant "the Z axis" since before M290 took axis letters
                 bool haveValue = code.TryGetFloat(axis.Letter, out float value);
-                if (!haveValue && index == 2)
+                if (!haveValue && index == zAxis)
                 {
                     haveValue = code.TryGetFloat('S', out value);
                 }

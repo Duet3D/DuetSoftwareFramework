@@ -294,7 +294,7 @@ public sealed class BedCompensation(Model.ObjectModel model)
             return false;
         }
 
-        int zAxis = AxisIndices.ZAxisIndex(model.Move);
+        int zAxis = AxisIndices.IndexOf(model.Move, 'Z');
         return zAxis < 0 || zAxis >= numAxes || AppliesAt(move.Coords[zAxis]);
     }
 
@@ -315,7 +315,7 @@ public sealed class BedCompensation(Model.ObjectModel model)
             return;
         }
 
-        int zAxis = AxisIndices.ZAxisIndex(model.Move);
+        int zAxis = AxisIndices.IndexOf(model.Move, 'Z');
         if (zAxis < 0 || zAxis >= numAxes)
         {
             return;                             // nothing to correct on a machine with no Z
@@ -351,7 +351,7 @@ public sealed class BedCompensation(Model.ObjectModel model)
             return;
         }
 
-        int zAxis = AxisIndices.ZAxisIndex(model.Move);
+        int zAxis = AxisIndices.IndexOf(model.Move, 'Z');
         if (zAxis < 0 || zAxis >= numAxes)
         {
             return;                             // nothing to correct on a machine with no Z

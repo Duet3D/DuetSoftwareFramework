@@ -92,7 +92,7 @@ public class EndstopArmingTests
                                  IReadOnlyList<int> axes, Func<int, uint>? closed = null,
                                  KinematicsName kinematics = KinematicsName.Cartesian)
     {
-        KinematicsEngine geometry = KinematicsFactory.Create(kinematics);
+        KinematicsEngine geometry = KinematicsFactory.Create(kinematics).WithAxes(machine.Move);
         List<EndstopPlan> plans = EndstopPlanner.Plan(CodeNaming(machine.Move, axes), machine.Move,
                                                       machine.Sensors, geometry, NumAxes, StepsPerMm,
                                                       FeedRateMmPerSec);
@@ -346,7 +346,7 @@ public class EndstopArmingTests
             core.InverseMatrix.Add(row);
         }
         move.Kinematics = core;
-        return ((move, sensors), KinematicsFactory.Create(move.Kinematics));
+        return ((move, sensors), KinematicsFactory.Create(move.Kinematics).WithAxes(move));
     }
 
     private static ArmedMove ArmCoreXYUV((Move Move, Sensors Sensors) machine, KinematicsEngine geometry,

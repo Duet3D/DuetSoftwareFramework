@@ -34,7 +34,7 @@ public class EndstopPositionTests
     [Test]
     public void ACartesianAxisHomesToItsOwnLimit()
     {
-        KinematicsEngine engine = CoreKinematicsEngine.TryCreate("cartesian")!;
+        KinematicsEngine engine = CoreKinematicsEngine.TryCreate("cartesian")!.WithAxes();
         Assert.Multiple(() =>
         {
             Assert.That(Ask(engine, 0, highEnd: true), Is.EqualTo(AxisMax));
@@ -46,7 +46,7 @@ public class EndstopPositionTests
     [Test]
     public void ADeltaTowerHomesToItsCarriageHeight()
     {
-        LinearDeltaKinematicsEngine engine = LinearDeltaKinematicsEngine.CreateDefault();
+        LinearDeltaKinematicsEngine engine = LinearDeltaKinematicsEngine.CreateDefault().WithAxes();
         Assert.Multiple(() =>
         {
             for (int tower = 0; tower < LinearDeltaKinematicsEngine.UsualNumTowers; tower++)
@@ -67,7 +67,7 @@ public class EndstopPositionTests
     [Test]
     public void ARotaryDeltaArmHomesToItsMaximumAngle()
     {
-        RotaryDeltaKinematicsEngine engine = new();
+        RotaryDeltaKinematicsEngine engine = new RotaryDeltaKinematicsEngine().WithAxes();
         Assert.Multiple(() =>
         {
             for (int tower = 0; tower < RotaryDeltaKinematicsEngine.DeltaAxes; tower++)
@@ -83,8 +83,8 @@ public class EndstopPositionTests
     [Test]
     public void APolarRadiusHomesToItsHomedRadiusAndTheTurntableToZero()
     {
-        PolarKinematicsEngine engine = new(minRadius: 0.0f, maxRadius: 150.0f, homedRadius: 25.0f,
-                                          maxTurntableSpeed: 30.0f, maxTurntableAcceleration: 30.0f);
+        PolarKinematicsEngine engine = new PolarKinematicsEngine(minRadius: 0.0f, maxRadius: 150.0f, homedRadius: 25.0f,
+                                          maxTurntableSpeed: 30.0f, maxTurntableAcceleration: 30.0f).WithAxes();
         Assert.Multiple(() =>
         {
             Assert.That(Ask(engine, 0), Is.EqualTo(engine.HomedRadius), "the radius arm");
@@ -101,7 +101,7 @@ public class EndstopPositionTests
         // Crosstalk is the whole point: turning the proximal arm drags the distal one, so where the
         // distal switch sits depends on where the proximal arm was left. Homing a SCARA in the wrong
         // order gives the wrong answer, in RepRapFirmware too
-        ScaraKinematicsEngine engine = new();
+        ScaraKinematicsEngine engine = new ScaraKinematicsEngine().WithAxes();
 
         ReadOnlySpan<float> stepsPerMm = [100.0f, 200.0f, 400.0f];
         ReadOnlySpan<int> atOrigin = [0, 0, 0];
@@ -114,7 +114,7 @@ public class EndstopPositionTests
 
         // With the default crosstalk of zero the two agree; the point of the test is that the
         // proximal position reaches the calculation at all, so drive it with a known factor
-        ScaraKinematicsEngine crossTalking = new(crosstalk: [0.5f, 0.0f, 0.0f]);
+        ScaraKinematicsEngine crossTalking = new ScaraKinematicsEngine(crosstalk: [0.5f, 0.0f, 0.0f]).WithAxes();
         float crossedAtOrigin = crossTalking.GetEndstopPosition(1, true, AxisMin, AxisMax, atOrigin, stepsPerMm);
         float crossedAfterTurning = crossTalking.GetEndstopPosition(1, true, AxisMin, AxisMax, proximalTurned, stepsPerMm);
 
@@ -133,8 +133,8 @@ public class EndstopPositionTests
     [Test]
     public void AFiveBarScaraActuatorHomesToItsWorkModesAngle()
     {
-        FiveBarScaraKinematicsEngine engine = new(xOrigL: -50.0f, yOrigL: 0.0f, xOrigR: 50.0f, yOrigR: 0.0f,
-                                                  proximalL: 100.0f, proximalR: 100.0f, distalL: 100.0f, distalR: 100.0f);
+        FiveBarScaraKinematicsEngine engine = new FiveBarScaraKinematicsEngine(xOrigL: -50.0f, yOrigL: 0.0f, xOrigR: 50.0f, yOrigR: 0.0f,
+                                                  proximalL: 100.0f, proximalR: 100.0f, distalL: 100.0f, distalR: 100.0f).WithAxes();
         Assert.Multiple(() =>
         {
             Assert.That(Ask(engine, 0), Is.EqualTo(engine.HomingAngleLeft));
@@ -148,7 +148,7 @@ public class EndstopPositionTests
     {
         // RepRapFirmware says outright that hangprinter homing is not supported, and returns the base
         // answer. Reproduced rather than left to chance, so the engine does not quietly grow one
-        KinematicsEngine engine = HangprinterKinematicsEngine.CreateDefault();
+        KinematicsEngine engine = HangprinterKinematicsEngine.CreateDefault().WithAxes();
         Assert.That(Ask(engine, 0), Is.EqualTo(AxisMax));
     }
 }

@@ -38,8 +38,8 @@ public class PolarKinematicsTests
     /// <see cref="PolarKinematicsEngine.MaxTurntableSpeed"/> rather than in degrees per second
     /// </remarks>
     private static PolarKinematicsEngine CreatePolar(float maxTurntableSpeed = 30.0f, float maxTurntableAcceleration = 30.0f)
-        => new(minRadius: 0.0f, maxRadius: 150.0f, homedRadius: 0.0f,
-               maxTurntableSpeed: maxTurntableSpeed, maxTurntableAcceleration: maxTurntableAcceleration);
+        => new PolarKinematicsEngine(minRadius: 0.0f, maxRadius: 150.0f, homedRadius: 0.0f,
+               maxTurntableSpeed: maxTurntableSpeed, maxTurntableAcceleration: maxTurntableAcceleration).WithAxes();
 
     private static int[] ToMotorSteps(KinematicsEngine engine, float[] machinePos, int numAxes)
     {
@@ -145,8 +145,8 @@ public class PolarKinematicsTests
     [Test]
     public void AnnulusLimitsAreEnforcedAtBothEnds()
     {
-        PolarKinematicsEngine engine = new(minRadius: 20.0f, maxRadius: 150.0f, homedRadius: 20.0f,
-                                           maxTurntableSpeed: 30.0f, maxTurntableAcceleration: 30.0f);
+        PolarKinematicsEngine engine = new PolarKinematicsEngine(minRadius: 20.0f, maxRadius: 150.0f, homedRadius: 20.0f,
+                                           maxTurntableSpeed: 30.0f, maxTurntableAcceleration: 30.0f).WithAxes();
 
         Assert.Multiple(() =>
         {

@@ -95,7 +95,7 @@ public class MoveInterpreterTests
         }
 
         KinematicsEngine geometry = KinematicsFactory.Create(move.Kinematics);
-        MotionParameters.ApplyAxisLimits(move, geometry);
+        MotionParameters.ApplyAxes(move, geometry);
 
         MoveBuilder builder = new(MotionParameters.FromObjectModel(move, geometry));
         MovementState state = new();

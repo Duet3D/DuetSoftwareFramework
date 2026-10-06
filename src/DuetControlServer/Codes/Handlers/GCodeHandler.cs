@@ -15,7 +15,6 @@ using DuetControlServer.Motion.Native;
 using DuetControlServer.Motion.Kinematics;
 using Microsoft.Extensions.Logging;
 using DuetAPI;
-using static DuetControlServer.Motion.AxisIndices;
 
 namespace DuetControlServer.Codes.Handlers;
 
@@ -328,6 +327,13 @@ internal sealed partial class GCodeHandler(
                     {
                         return new Message(MessageType.Error,
                                            "The motion configuration was not applied; no moves can be planned until it is");
+                    }
+
+                    // A geometry that needs an axis the machine does not have - a delta with no Z -
+                    // cannot transform any position, so nothing can be planned through it
+                    if (planner.Parameters.Geometry.MissingAxesError is string missingAxes)
+                    {
+                        return new Message(MessageType.Error, missingAxes);
                     }
 
                     // Held across building and queueing, because the move is a delta from the state the

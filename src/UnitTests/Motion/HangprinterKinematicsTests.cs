@@ -31,7 +31,7 @@ public class HangprinterKinematicsTests
     }
 
     /// <summary>The four-anchor machine RepRapFirmware assumes before M669 has been seen</summary>
-    private static HangprinterKinematicsEngine CreateHangprinter() => HangprinterKinematicsEngine.CreateDefault();
+    private static HangprinterKinematicsEngine CreateHangprinter() => HangprinterKinematicsEngine.CreateDefault().WithAxes();
 
     private static int[] ToMotorSteps(KinematicsEngine engine, float[] machinePos)
     {
@@ -166,14 +166,14 @@ public class HangprinterKinematicsTests
     {
         // More anchors than unknowns is the normal case; a fifth just makes the least squares problem
         // more over-determined, which is if anything easier to solve
-        HangprinterKinematicsEngine engine = new(
+        HangprinterKinematicsEngine engine = new HangprinterKinematicsEngine(
         [
             [0.0f, -2000.0f, -100.0f],
             [2000.0f, 1000.0f, -100.0f],
             [-2000.0f, 1000.0f, -100.0f],
             [0.0f, 0.0f, 3000.0f],
             [1500.0f, -1500.0f, 2000.0f]
-        ]);
+        ]).WithAxes();
 
         Assert.Multiple(() =>
         {

@@ -76,7 +76,7 @@ public class EndstopPlannerTests
 
     private static List<EndstopPlan> Plan((Move Move, Sensors Sensors) machine, Code code,
                                           KinematicsName kinematics = KinematicsName.Cartesian)
-        => EndstopPlanner.Plan(code, machine.Move, machine.Sensors, KinematicsFactory.Create(kinematics),
+        => EndstopPlanner.Plan(code, machine.Move, machine.Sensors, KinematicsFactory.Create(kinematics).WithAxes(machine.Move),
                                NumAxes, StepsPerMm, FeedRateMmPerSec);
 
     [Test]
@@ -177,7 +177,7 @@ public class EndstopPlannerTests
         _ = sensors;
 
         IReadOnlyList<WatchedDriver> drivers =
-            EndstopPlanner.DriversMoving(move, KinematicsFactory.Create(KinematicsName.CoreXZ), NumAxes, 2,
+            EndstopPlanner.DriversMoving(move, KinematicsFactory.Create(KinematicsName.CoreXZ).WithAxes(move), NumAxes, 2,
                                          StepsPerMm, FeedRateMmPerSec);
 
         Assert.Multiple(() =>
@@ -197,7 +197,7 @@ public class EndstopPlannerTests
         _ = sensors;
 
         IReadOnlyList<WatchedDriver> drivers =
-            EndstopPlanner.DriversMoving(move, KinematicsFactory.Create(KinematicsName.Cartesian), NumAxes, 2,
+            EndstopPlanner.DriversMoving(move, KinematicsFactory.Create(KinematicsName.Cartesian).WithAxes(move), NumAxes, 2,
                                          StepsPerMm, FeedRateMmPerSec);
 
         Assert.That(drivers.Select(d => d.Driver.Board), Is.EqualTo(new[] { 3 }));

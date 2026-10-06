@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
-using static DuetControlServer.Motion.AxisIndices;
 
 namespace DuetControlServer.Codes.Handlers;
 
@@ -149,7 +148,7 @@ internal sealed partial class GCodeHandler
                 return new ProbeSettings($"Z probe {probeNumber} cannot stop a move", 0, [], [], 0, 0, 0, 0, 0, 0);
             }
 
-            int zAxis = ZAxisIndex(model.Move);
+            int zAxis = AxisIndices.IndexOf(model.Move, 'Z');
             if (zAxis < 0)
             {
                 return new ProbeSettings("The machine has no Z axis", 0, [], [], 0, 0, 0, 0, 0, 0);
@@ -362,7 +361,9 @@ internal sealed partial class GCodeHandler
                     FeedRateMmPerSec = speed,
                     LinearAxesMentioned = true,
                     CheckEndstops = checkProbe,
-                    ReduceAcceleration = checkProbe
+                    ReduceAcceleration = checkProbe,
+                    XAxes = ToolTransform.AxisBitmap(toolManager.Current, planner.Parameters.Axes, 'X'),
+                    YAxes = ToolTransform.AxisBitmap(toolManager.Current, planner.Parameters.Axes, 'Y')
                 };
 
                 // Everything else stays where it is, so the move is built from the current position
@@ -595,7 +596,7 @@ internal sealed partial class GCodeHandler
                 probePosition[axis] += probe.Offsets[axis];
             }
         }
-        AxisSkew.Apply(toolManager.Current, model.Move, probePosition, numAxes);
+        AxisSkew.Apply(toolManager.Current, model.Move, planner.Parameters.Axes, probePosition, numAxes);
 
         (float axis0, float axis1) = bedCompensation.GridCoordinates(probePosition, numAxes);
         bedCompensation.SetZeroHeightError(axis0, axis1);
@@ -703,8 +704,8 @@ internal sealed partial class GCodeHandler
                 return new Message(MessageType.Error, "No valid grid defined for bed probing");
             }
 
-            axis0 = AxisWithLetter(model.Move, grid.Axes[0]);
-            axis1 = AxisWithLetter(model.Move, grid.Axes[1]);
+            axis0 = AxisIndices.IndexOf(model.Move, grid.Axes[0]);
+            axis1 = AxisIndices.IndexOf(model.Move, grid.Axes[1]);
             if (axis0 < 0 || axis1 < 0)
             {
                 return new Message(MessageType.Error, "The grid names an axis the machine does not have");
@@ -784,7 +785,9 @@ internal sealed partial class GCodeHandler
                 RawMove move = new()
                 {
                     FeedRateMmPerSec = settings.TravelSpeed,
-                    LinearAxesMentioned = true
+                    LinearAxesMentioned = true,
+                    XAxes = ToolTransform.AxisBitmap(toolManager.Current, planner.Parameters.Axes, 'X'),
+                    YAxes = ToolTransform.AxisBitmap(toolManager.Current, planner.Parameters.Axes, 'Y')
                 };
 
                 for (int axis = 0; axis < model.Move.Axes.Count; axis++)
@@ -801,24 +804,5 @@ internal sealed partial class GCodeHandler
                 return planner.QueueMove(move);
             }
         }, cancellationToken);
-    }
-
-    /// <summary>
-    /// Which axis carries a letter
-    /// </summary>
-    /// <param name="move">The move model</param>
-    /// <param name="letter">The letter</param>
-    /// <returns>The axis index, or -1 if the machine has no such axis</returns>
-    /// <remarks>The caller must hold the object model lock</remarks>
-    private static int AxisWithLetter(Move move, char letter)
-    {
-        for (int axis = 0; axis < move.Axes.Count; axis++)
-        {
-            if (move.Axes[axis].Letter == letter)
-            {
-                return axis;
-            }
-        }
-        return -1;
     }
 }

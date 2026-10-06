@@ -80,7 +80,7 @@ public class RemoteEndstopsTests
     // property RRF's SwitchEndstop::PrimeAxis tests.
     private static bool StoppingTheAxisStopsEverything(string geometry, int axis)
     {
-        KinematicsEngine engine = CoreKinematicsEngine.TryCreate(geometry)!;
+        KinematicsEngine engine = CoreKinematicsEngine.TryCreate(geometry)!.WithAxes();
         return (engine.GetControllingDrives(axis) & ~(1u << axis)) != 0;
     }
 

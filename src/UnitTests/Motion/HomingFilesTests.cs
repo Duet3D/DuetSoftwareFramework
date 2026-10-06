@@ -29,7 +29,7 @@ public class HomingFilesTests
     private static MotionParameters Snapshot(Move move)
     {
         KinematicsEngine geometry = KinematicsFactory.Create(move.Kinematics);
-        MotionParameters.ApplyAxisLimits(move, geometry);
+        MotionParameters.ApplyAxes(move, geometry);
         return MotionParameters.FromObjectModel(move, geometry);
     }
     private static readonly char[] Xyz = ['X', 'Y', 'Z'];
@@ -46,6 +46,10 @@ public class HomingFilesTests
     private static KinematicsEngine Engine(KinematicsName name)
     {
         Move move = new() { Kinematics = Kinematics.Create(name) };
+        foreach (char letter in Xyz)
+        {
+            move.Axes.Add(new Axis { Letter = letter });
+        }
         return Snapshot(move).Geometry;
     }
 

@@ -3,7 +3,6 @@ using System.Globalization;
 using System.Text;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
-using static DuetControlServer.Motion.AxisIndices;
 
 namespace DuetControlServer.Motion.Kinematics;
 
@@ -29,12 +28,17 @@ namespace DuetControlServer.Motion.Kinematics;
 /// A linkage like this jams: there are poses where the arms are in line and the mechanism can no
 /// longer be steered, and poses that would need a link to pass through another. The angle limits are
 /// what keeps it out of them, so a position that violates one is unreachable rather than merely
-/// outside the bed
+/// outside the bed.
+/// </para>
+/// <para>
+/// The left and right actuators are the drives of the axes lettered X and Y, wherever M584 put them;
+/// every other axis, Z included, has a motor of its own
 /// </para>
 /// </remarks>
 internal sealed class FiveBarScaraKinematicsEngine : KinematicsEngine
 {
-    private const int XyzAxes = 3;
+    /// <summary>Positions in <see cref="KinematicsEngine.KinematicAxes.Roles"/></summary>
+    private const int LeftActuator = 0, RightActuator = 1;
 
     private const float DegreesToRadians = MathF.PI / 180.0f;
 
@@ -74,6 +78,10 @@ internal sealed class FiveBarScaraKinematicsEngine : KinematicsEngine
     /// <inheritdoc />
     public override KinematicsName Kind => KinematicsName.FiveBarScara;
 
+    /// <inheritdoc />
+    /// <remarks>The left actuator and the right one</remarks>
+    protected override string KinematicAxisLetters => "XY";
+
     /// <summary>
     /// A five-bar parallel SCARA with the defaults its M669 documentation gives
     /// </summary>
@@ -102,17 +110,21 @@ internal sealed class FiveBarScaraKinematicsEngine : KinematicsEngine
     /// </remarks>
     public override uint MustBeHomedAxes(uint axesMoving, bool disallowMovesBeforeHoming)
     {
-        const uint xyAxes = (1u << XAxis) | (1u << YAxis);
+        uint xyAxes = Axes.XyBitmap;
         return (axesMoving & xyAxes) != 0 ? axesMoving | xyAxes : axesMoving;
     }
 
 
     /// <inheritdoc />
-    /// <remarks>Both arm motors are pinned down only when X and Y are both named</remarks>
+    /// <remarks>
+    /// Both arm motors are pinned down only when X and Y are both named, which a machine missing one of
+    /// them can never do
+    /// </remarks>
     public override uint AxesAssumedHomed(uint g92Axes)
     {
-        const uint xyAxes = (1u << XAxis) | (1u << YAxis);
-        return (g92Axes & xyAxes) == xyAxes ? g92Axes : g92Axes & ~xyAxes;
+        KinematicAxes kinematic = Kinematic;
+        uint xyAxes = kinematic.Machine.XyBitmap;
+        return kinematic.IsComplete && (g92Axes & xyAxes) == xyAxes ? g92Axes : g92Axes & ~xyAxes;
     }
 
 
@@ -124,10 +136,10 @@ internal sealed class FiveBarScaraKinematicsEngine : KinematicsEngine
     /// </remarks>
     public override float GetEndstopPosition(int drive, bool highEnd, float axisMin, float axisMax,
                                              ReadOnlySpan<int> endPoints, ReadOnlySpan<float> stepsPerMm)
-        => drive switch
+        => Kinematic.RoleOf(drive) switch
         {
-            XAxis => HomingAngleLeft,
-            YAxis => HomingAngleRight,
+            LeftActuator => HomingAngleLeft,
+            RightActuator => HomingAngleRight,
             _ => base.GetEndstopPosition(drive, highEnd, axisMin, axisMax, endPoints, stepsPerMm)
         };
 
@@ -144,7 +156,7 @@ internal sealed class FiveBarScaraKinematicsEngine : KinematicsEngine
 
     /// <inheritdoc />
     /// <remarks>Both actuators turn about a fixed point with nothing to stop them going round</remarks>
-    public override uint ContinuousRotationAxes => (1u << XAxis) | (1u << YAxis);
+    public override uint ContinuousRotationAxes => Kinematic.Bitmap;
 
     /// <summary>
     /// Create a five-bar parallel SCARA geometry
@@ -210,38 +222,41 @@ internal sealed class FiveBarScaraKinematicsEngine : KinematicsEngine
         Span<int> motorPos,
         bool isCoordinated = false)
     {
-        if (machinePos.Length < XyzAxes || motorPos.Length < XyzAxes || stepsPerMm.Length < XyzAxes)
+        KinematicAxes kinematic = Kinematic;
+        if (!kinematic.IsComplete || !kinematic.FitIn(machinePos.Length) || !kinematic.FitIn(motorPos.Length)
+            || !kinematic.FitIn(stepsPerMm.Length))
         {
             return NativeMovementError.UnreachablePosition;
         }
 
-        if (!ConstraintsOk(machinePos[XAxis], machinePos[YAxis]))
+        int xAxis = kinematic.Roles[LeftActuator], yAxis = kinematic.Roles[RightActuator];
+        if (!ConstraintsOk(machinePos[xAxis], machinePos[yAxis]))
         {
             return NativeMovementError.UnreachablePosition;
         }
 
         NativeMovementError result = NativeMovementError.Ok;
 
-        if (TryRoundToInt32(_cachedThetaL * stepsPerMm[XAxis], out int leftSteps))
+        if (TryRoundToInt32(_cachedThetaL * stepsPerMm[xAxis], out int leftSteps))
         {
-            motorPos[XAxis] = leftSteps;
+            motorPos[xAxis] = leftSteps;
         }
         else
         {
             result = NativeMovementError.MicrostepPositionTooLarge;
         }
 
-        if (TryRoundToInt32(_cachedThetaR * stepsPerMm[YAxis], out int rightSteps))
+        if (TryRoundToInt32(_cachedThetaR * stepsPerMm[yAxis], out int rightSteps))
         {
-            motorPos[YAxis] = rightSteps;
+            motorPos[yAxis] = rightSteps;
         }
         else
         {
             result = NativeMovementError.MicrostepPositionTooLarge;
         }
 
-        // Z and anything above it have a motor each
-        NativeMovementError linearResult = LinearAxesToMotorSteps(machinePos, stepsPerMm, ZAxis, numVisibleAxes, motorPos);
+        // Z and every other axis have a motor each
+        NativeMovementError linearResult = LinearAxesToMotorSteps(machinePos, stepsPerMm, kinematic.Bitmap, numVisibleAxes, motorPos);
         return result != NativeMovementError.Ok ? result : linearResult;
     }
 
@@ -253,13 +268,17 @@ internal sealed class FiveBarScaraKinematicsEngine : KinematicsEngine
         int numTotalAxes,
         Span<float> machinePos)
     {
-        if (machinePos.Length < XyzAxes || motorPos.Length < XyzAxes || stepsPerMm.Length < XyzAxes)
+        KinematicAxes kinematic = Kinematic;
+        LinearMotorStepsToCartesian(motorPos, stepsPerMm, kinematic.Bitmap, numVisibleAxes, machinePos);
+        if (!kinematic.IsComplete || !kinematic.FitIn(machinePos.Length) || !kinematic.FitIn(motorPos.Length)
+            || !kinematic.FitIn(stepsPerMm.Length))
         {
             return;
         }
 
-        float thetaL = motorPos[XAxis] / stepsPerMm[XAxis];
-        float thetaR = motorPos[YAxis] / stepsPerMm[YAxis];
+        int xAxis = kinematic.Roles[LeftActuator], yAxis = kinematic.Roles[RightActuator];
+        float thetaL = motorPos[xAxis] / stepsPerMm[xAxis];
+        float thetaR = motorPos[yAxis] / stepsPerMm[yAxis];
 
         Forward(thetaL, thetaR, out float xL, out float yL, out float xR, out float yR, out float x1, out float y1);
 
@@ -282,17 +301,17 @@ internal sealed class FiveBarScaraKinematicsEngine : KinematicsEngine
             y0 = y1;
         }
 
-        machinePos[XAxis] = x0;
-        machinePos[YAxis] = y0;
-        machinePos[ZAxis] = motorPos[ZAxis] / stepsPerMm[ZAxis];
-
-        LinearMotorStepsToCartesian(motorPos, stepsPerMm, XyzAxes, numVisibleAxes, machinePos);
+        machinePos[xAxis] = x0;
+        machinePos[yAxis] = y0;
     }
 
     /// <inheritdoc />
     /// <remarks>Both actuators move for either X or Y; neither maps onto one of them</remarks>
     public override uint GetControllingDrives(int axis)
-        => (axis == XAxis || axis == YAxis) ? LowestDrives(2) : base.GetControllingDrives(axis);
+    {
+        uint actuators = Kinematic.Bitmap;
+        return (actuators & AxisIndices.Bit(axis)) != 0 ? actuators : base.GetControllingDrives(axis);
+    }
 
     /// <summary>
     /// Whether the head can be put at the given XY position without violating a joint limit

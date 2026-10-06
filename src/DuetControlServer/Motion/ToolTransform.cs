@@ -1,7 +1,6 @@
 using System;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Motion.Native;
-using static DuetControlServer.Motion.AxisIndices;
 
 namespace DuetControlServer.Motion;
 
@@ -17,7 +16,12 @@ namespace DuetControlServer.Motion;
 /// </para>
 /// <para>
 /// Static and given the tool rather than reading one, because the transform is a function of the
-/// tool and the axis configuration and nothing else. Which tool is selected is the caller's business
+/// tool and the axis configuration and nothing else. Which tool is selected is the caller's business.
+/// </para>
+/// <para>
+/// X, Y and Z are the axes carrying those letters, wherever M584 put them, rather than the first
+/// three axes as in RepRapFirmware. A letter the machine does not have contributes nothing: there is
+/// no coordinate to read for it and no axis to write back to
 /// </para>
 /// </remarks>
 internal static class ToolTransform
@@ -27,6 +31,7 @@ internal static class ToolTransform
     /// </summary>
     /// <param name="tool">The selected tool, or null if none is</param>
     /// <param name="move">The move model</param>
+    /// <param name="axes">The machine's axes by letter</param>
     /// <param name="state">The channel's interpreter state, which the coordinates come from</param>
     /// <param name="coords">Machine coordinates, written for every axis below <paramref name="numAxes"/></param>
     /// <param name="numAxes">Number of axes to write</param>
@@ -46,8 +51,8 @@ internal static class ToolTransform
     /// coordinate they asked for
     /// </para>
     /// </remarks>
-    public static void Apply(Tool? tool, Move move, MovementState state, Span<float> coords, int numAxes,
-                             uint explicitAxes = 0)
+    public static void Apply(Tool? tool, Move move, AxisIndices axes, MovementState state, Span<float> coords,
+                             int numAxes, uint explicitAxes = 0)
     {
         // TODO apply the axis scale factors (M579) here, which is where RepRapFirmware multiplies
         // them in - move.axes[].scale does not exist yet, see §6
@@ -60,18 +65,19 @@ internal static class ToolTransform
             return;
         }
 
-        uint xAxes = AxisMap(tool, XAxis);
-        uint yAxes = AxisMap(tool, YAxis);
-        uint zAxes = AxisMap(tool, ZAxis);
+        int xAxis = axes.X, yAxis = axes.Y, zAxis = axes.Z;
+        uint xAxes = AxisMap(tool, axes, XMap);
+        uint yAxes = AxisMap(tool, axes, YMap);
+        uint zAxes = AxisMap(tool, axes, ZMap);
 
         for (int axis = 0; axis < numAxes && axis < MotionLimits.MaxAxes; axis++)
         {
             // An axis that X is mapped away from keeps whatever it already held. RepRapFirmware says
             // so in as many words above its own version: with X mapped to U and V, the X slot is not
             // a machine position at all, and writing one would move an axis the tool does not drive
-            if ((axis == XAxis && (xAxes & (1u << XAxis)) == 0)
-                || (axis == YAxis && (yAxes & (1u << YAxis)) == 0)
-                || (axis == ZAxis && (zAxes & (1u << ZAxis)) == 0))
+            if ((axis == xAxis && (xAxes & (1u << xAxis)) == 0)
+                || (axis == yAxis && (yAxes & (1u << yAxis)) == 0)
+                || (axis == zAxis && (zAxes & (1u << zAxis)) == 0))
             {
                 continue;
             }
@@ -86,11 +92,13 @@ internal static class ToolTransform
 
             // Which coordinate this axis takes. An axis the code named reads its own; one that is
             // only in a map reads the mapped letter's, which is what makes a single X move two
-            // carriages on an IDEX machine
+            // carriages on an IDEX machine. A map is only non-empty where its letter exists, since
+            // M563 maps a missing letter to nothing, but a map recorded some other way is still not
+            // read through a letter the machine does not have
             int inputAxis = (explicitAxes & (1u << axis)) != 0 ? axis
-                            : (xAxes & (1u << axis)) != 0 ? XAxis
-                            : (yAxes & (1u << axis)) != 0 ? YAxis
-                            : (zAxes & (1u << axis)) != 0 ? ZAxis
+                            : (xAxes & (1u << axis)) != 0 && xAxis >= 0 ? xAxis
+                            : (yAxes & (1u << axis)) != 0 && yAxis >= 0 ? yAxis
+                            : (zAxes & (1u << axis)) != 0 && zAxis >= 0 ? zAxis
                             : axis;
             coords[axis] = state.CurrentUserPosition[inputAxis] + offset;
         }
@@ -101,6 +109,7 @@ internal static class ToolTransform
     /// </summary>
     /// <param name="tool">The selected tool, or null if none is</param>
     /// <param name="move">The move model</param>
+    /// <param name="axes">The machine's axes by letter</param>
     /// <param name="coords">Machine coordinates in, user coordinates out</param>
     /// <param name="numAxes">Number of axes to consider</param>
     /// <remarks>
@@ -117,7 +126,7 @@ internal static class ToolTransform
     /// probing, G92 - and losing a little there is the price of knowing where the machine is
     /// </para>
     /// </remarks>
-    public static void Remove(Tool? tool, Move move, Span<float> coords, int numAxes)
+    public static void Remove(Tool? tool, Move move, AxisIndices axes, Span<float> coords, int numAxes)
     {
         if (tool is null)
         {
@@ -128,9 +137,9 @@ internal static class ToolTransform
             return;
         }
 
-        uint xAxes = AxisMap(tool, XAxis);
-        uint yAxes = AxisMap(tool, YAxis);
-        uint zAxes = AxisMap(tool, ZAxis);
+        uint xAxes = AxisMap(tool, axes, XMap);
+        uint yAxes = AxisMap(tool, axes, YMap);
+        uint zAxes = AxisMap(tool, axes, ZMap);
 
         float xSum = 0.0f, ySum = 0.0f, zSum = 0.0f;
         int xCount = 0, yCount = 0, zCount = 0;
@@ -163,17 +172,18 @@ internal static class ToolTransform
             }
         }
 
-        if (xCount > 0 && XAxis < numAxes)
+        // Back into the axis carrying the letter, which is where Apply read the coordinate from
+        if (xCount > 0 && axes.X >= 0 && axes.X < numAxes)
         {
-            coords[XAxis] = xSum / xCount;
+            coords[axes.X] = xSum / xCount;
         }
-        if (yCount > 0 && YAxis < numAxes)
+        if (yCount > 0 && axes.Y >= 0 && axes.Y < numAxes)
         {
-            coords[YAxis] = ySum / yCount;
+            coords[axes.Y] = ySum / yCount;
         }
-        if (zCount > 0 && ZAxis < numAxes)
+        if (zCount > 0 && axes.Z >= 0 && axes.Z < numAxes)
         {
-            coords[ZAxis] = zSum / zCount;
+            coords[axes.Z] = zSum / zCount;
         }
     }
 
@@ -181,7 +191,7 @@ internal static class ToolTransform
     /// Bitmap of the axes a letter drives
     /// </summary>
     /// <param name="tool">The selected tool, or null if none is</param>
-    /// <param name="move">The move model</param>
+    /// <param name="axes">The machine's axes by letter</param>
     /// <param name="letter">Axis letter</param>
     /// <returns>The bitmap</returns>
     /// <remarks>
@@ -190,27 +200,21 @@ internal static class ToolTransform
     /// user space, and therefore whether the printing jerk limits apply: on an IDEX machine an X move
     /// drives U, and a move that reached U through the X map is still an XY move
     /// </remarks>
-    public static uint AxisBitmap(Tool? tool, Move move, char letter)
+    public static uint AxisBitmap(Tool? tool, AxisIndices axes, char letter)
     {
         if (tool is not null)
         {
-            int which = letter switch
-            {
-                'X' => XAxis,
-                'Y' => YAxis,
-                'Z' => ZAxis,
-                _ => -1
-            };
+            int which = MapLetters.IndexOf(letter);
             if (which >= 0)
             {
-                return AxisMap(tool, which);
+                return AxisMap(tool, axes, which);
             }
         }
 
         uint bitmap = 0;
-        for (int axis = 0; axis < move.Axes.Count && axis < MotionLimits.MaxAxes; axis++)
+        for (int axis = 0; axis < axes.Count && axis < MotionLimits.MaxAxes; axis++)
         {
-            if (char.ToUpperInvariant(move.Axes[axis].Letter) == letter)
+            if (char.ToUpperInvariant(axes.Letters[axis]) == letter)
             {
                 bitmap |= 1u << axis;
             }
@@ -219,22 +223,30 @@ internal static class ToolTransform
     }
 
     /// <summary>
+    /// The letters a tool's axis maps are for, in the order <c>tools[].axes</c> stores them
+    /// </summary>
+    private const string MapLetters = "XYZ";
+
+    /// <summary>Position of each map in <c>tools[].axes</c></summary>
+    private const int XMap = 0, YMap = 1, ZMap = 2;
+
+    /// <summary>
     /// One of a tool's axis maps, as a bitmap
     /// </summary>
     /// <param name="tool">The tool</param>
-    /// <param name="which">The axis whose map is wanted - <see cref="AxisIndices.XAxis"/> and friends</param>
+    /// <param name="axes">The machine's axes by letter</param>
+    /// <param name="which">Which map: 0 for X, 1 for Y, 2 for Z, the order the object model stores them in</param>
     /// <returns>The axes that letter drives</returns>
     /// <remarks>
     /// The object model stores each map as an array of axis numbers rather than a bitmap, so this is
-    /// the conversion. It is indexed by axis because the maps are stored in visible-axis order, so
-    /// X's map is at X's position - there is no second numbering to keep in step. A tool with no map
-    /// recorded falls back to the letter driving its own axis, which is RepRapFirmware's default
+    /// the conversion. A tool with no map recorded falls back to the letter driving the axis that
+    /// carries it, which is RepRapFirmware's default, and to nothing on a machine without that letter
     /// </remarks>
-    public static uint AxisMap(Tool tool, int which)
+    public static uint AxisMap(Tool tool, AxisIndices axes, int which)
     {
         if (which >= tool.Axes.Count)
         {
-            return 1u << which;                 // the default: the letter drives its own axis
+            return AxisIndices.Bit(axes.IndexOf(MapLetters[which]));
         }
 
         uint bitmap = 0;

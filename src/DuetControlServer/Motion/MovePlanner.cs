@@ -159,6 +159,30 @@ internal sealed class MovePlanner(
         }
     }
 
+    /// <summary>
+    /// Bring the geometry in step with the axes the object model now has
+    /// </summary>
+    /// <param name="move">The move subsystem of the object model</param>
+    /// <remarks>
+    /// <para>
+    /// For M584, which is what creates axes. A geometry that places anything by letter - a core
+    /// geometry's matrix - places it again when an axis it names appears, and the object model's
+    /// <c>move.kinematics</c> describes the result, so it is written here, under the write lock the
+    /// caller holds. <see cref="ReconfigureAsync"/> follows the axes as well, but only reads the
+    /// object model.
+    /// </para>
+    /// <para>
+    /// Only safe at standstill, for the same reason <see cref="ReconfigureAsync"/> is
+    /// </para>
+    /// </remarks>
+    public void FollowAxes(Move move)
+    {
+        if (Geometry.SetAxes(AxisIndices.From(move)))
+        {
+            KinematicsConfigurator.WriteTo(Geometry, move);
+        }
+    }
+
     /// <summary>Where the last move left the machine, and the state that carries between moves</summary>
     public MoveBuilder Builder { get; }  = new(MotionParameters.CreateDefault());
 
@@ -215,9 +239,10 @@ internal sealed class MovePlanner(
                 Geometry = KinematicsFactory.Create(model.Move.Kinematics);
             }
 
-            // The geometry keeps its own copy of M208's box, and this is where it follows the object
-            // model. Separate from taking the snapshot, because it writes to the geometry
-            MotionParameters.ApplyAxisLimits(model.Move, Geometry);
+            // The geometry finds its axes by letter and keeps its own copy of M208's box, and this is
+            // where both follow the object model. Separate from taking the snapshot, because it writes
+            // to the geometry
+            MotionParameters.ApplyAxes(model.Move, Geometry);
 
             parameters = MotionParameters.FromObjectModel(model.Move, Geometry);
             length = parameters.Config.Serialize(configBuffer);
@@ -274,7 +299,7 @@ internal sealed class MovePlanner(
         MotionParameters parameters;
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            MotionParameters.ApplyAxisLimits(model.Move, Geometry);
+            MotionParameters.ApplyAxes(model.Move, Geometry);
             parameters = MotionParameters.FromObjectModel(model.Move, Geometry);
         }
 

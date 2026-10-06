@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Motion;
 using DuetControlServer.Tools;
 
 namespace DuetControlServer.Codes.Handlers;
@@ -41,6 +42,12 @@ internal partial class MCodeHandler
             int axesCount = model.Move.Axes.Count;
             int eCount = model.Move.Extruders.Count;
 
+            // By default each of X, Y and Z drives the axis carrying that letter, wherever M584 put it,
+            // and a letter the machine does not have drives nothing
+            int xAxis = AxisIndices.IndexOf(model.Move, 'X');
+            int yAxis = AxisIndices.IndexOf(model.Move, 'Y');
+            int zAxis = AxisIndices.IndexOf(model.Move, 'Z');
+
             int[] extruders = code.GetIntArray('D', ToolManager.MaxExtrudersPerTool, defaultValue: [], min: -1, max: eCount - 1);
             ToolDefinition definition = new()
             {
@@ -49,9 +56,9 @@ internal partial class MCodeHandler
                 Extruders = extruders,
                 Heaters = code.GetIntArray('H', Heat.HeatManager.MaxHeatersPerTool, defaultValue: [], min: -1, max: model.Heat.Heaters.Count - 1),
                 Fans = code.GetIntArray('F', Fans.FanManager.MaxFans, defaultValue: [], min: 0, max: model.Fans.Count - 1),
-                XMap = code.GetIntArray('X', axesCount, defaultValue: [0], min: 0, max: axesCount - 1),
-                YMap = code.GetIntArray('Y', axesCount, defaultValue: [1], min: 0, max: axesCount - 1),
-                ZMap = code.GetIntArray('Z', axesCount, defaultValue: [2], min: 0, max: axesCount - 1),
+                XMap = code.GetIntArray('X', axesCount, defaultValue: xAxis >= 0 ? [xAxis] : [], min: 0, max: axesCount - 1),
+                YMap = code.GetIntArray('Y', axesCount, defaultValue: yAxis >= 0 ? [yAxis] : [], min: 0, max: axesCount - 1),
+                ZMap = code.GetIntArray('Z', axesCount, defaultValue: zAxis >= 0 ? [zAxis] : [], min: 0, max: axesCount - 1),
 
                 // RepRapFirmware defaults this to the tool's only drive when it has exactly one:
                 // with several drives there is no single filament to speak of

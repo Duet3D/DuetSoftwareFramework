@@ -7,7 +7,6 @@ using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Motion.Kinematics;
 using DuetControlServer.Motion.Native;
-using static DuetControlServer.Motion.AxisIndices;
 
 namespace DuetControlServer.Motion;
 
@@ -108,8 +107,8 @@ internal sealed class MoveInterpreter(
         {
             IsCoordinated = isCoordinated,
             InverseTimeMode = input.InverseTimeMode,
-            XAxes = ToolTransform.AxisBitmap(tool, model.Move, 'X'),
-            YAxes = ToolTransform.AxisBitmap(tool, model.Move, 'Y'),
+            XAxes = ToolTransform.AxisBitmap(tool, parameters.Axes, 'X'),
+            YAxes = ToolTransform.AxisBitmap(tool, parameters.Axes, 'Y'),
 
             // H selected what kind of move this is. H1, H3 and H4 stop on the endstops - that is
             // homing, measuring an axis' length, and probing - and H2 is an individual motor move
@@ -141,7 +140,7 @@ internal sealed class MoveInterpreter(
             // is reachable now rather than theoretical. RRF interpolates from the old babystep to the
             // new one across the move; here the whole change lands on the first segment. Closing it
             // means carrying the previous move's coords rather than re-deriving them
-            ToolTransform.Apply(tool, model.Move, state, raw.InitialCoords, numAxes);
+            ToolTransform.Apply(tool, model.Move, parameters.Axes, state, raw.InitialCoords, numAxes);
 
             // The axes start where the last move left them, which is what an axis the code does not
             // mention is being commanded to. RepRapFirmware gets this for free - ms.raw.coords is a
@@ -310,7 +309,7 @@ internal sealed class MoveInterpreter(
                 // TODO support coordinate rotation
 
                 // Apply the tool offsets, babystepping, Z hop and axis scaling
-                ToolTransform.Apply(tool, model.Move, state, raw.Coords, numAxes, axesMentioned);
+                ToolTransform.Apply(tool, model.Move, parameters.Axes, state, raw.Coords, numAxes, axesMentioned);
 
                 // TODO supoort keepout zones, keep if move enters keepout zone
                 // TODO collision checker for multiple motion systems
@@ -424,7 +423,7 @@ internal sealed class MoveInterpreter(
     /// </remarks>
     public void AxisAndBedTransform(RawMove raw, int numAxes)
     {
-        AxisSkew.Apply(currentTool(), model.Move, raw.Coords, numAxes);
+        AxisSkew.Apply(currentTool(), model.Move, Parameters.Axes, raw.Coords, numAxes);
 
         if (bedCompensation.AppliesTo(raw, numAxes))
         {
@@ -618,16 +617,14 @@ internal sealed class MoveInterpreter(
         // two would count one mesh correction as movement
         ReadOnlySpan<float> start = raw.InitialCoords;
 
-        // How far the move goes, counting the axes this geometry's error depends on
-        float lengthSquared = 0.0f;
-        for (int axis = 0; axis < numAxes && axis < 3; axis++)
+        // How far the move goes, counting the axes this geometry's error depends on: X and Y, and Z
+        // where the geometry says so. They are the axes with those letters, and one the machine does
+        // not have adds nothing
+        AxisIndices axes = geometry.Axes;
+        float lengthSquared = SquaredDelta(raw, start, axes.X, numAxes) + SquaredDelta(raw, start, axes.Y, numAxes);
+        if (geometry.Segmentation.HasFlag(SegmentationType.IncludeZ))
         {
-            bool counts = axis < 2 || geometry.Segmentation.HasFlag(SegmentationType.IncludeZ);
-            if (counts)
-            {
-                float delta = raw.Coords[axis] - start[axis];
-                lengthSquared += delta * delta;
-            }
+            lengthSquared += SquaredDelta(raw, start, axes.Z, numAxes);
         }
         float length = MathF.Sqrt(lengthSquared);
 
@@ -667,6 +664,24 @@ internal sealed class MoveInterpreter(
         }
 
         return Math.Max(1, segments);
+    }
+
+    /// <summary>
+    /// How far one axis moves in a move, squared
+    /// </summary>
+    /// <param name="raw">The move</param>
+    /// <param name="start">Where it starts</param>
+    /// <param name="axis">The axis, or -1 for one the machine does not have</param>
+    /// <param name="numAxes">Number of axes the move covers</param>
+    /// <returns>The squared distance in mm², zero for an axis that is not there</returns>
+    private static float SquaredDelta(RawMove raw, ReadOnlySpan<float> start, int axis, int numAxes)
+    {
+        if (axis < 0 || axis >= numAxes)
+        {
+            return 0.0f;
+        }
+        float delta = raw.Coords[axis] - start[axis];
+        return delta * delta;
     }
 
     /// <summary>
@@ -837,7 +852,7 @@ internal sealed class MoveInterpreter(
     public void SyncInterpreterToTarget(RawMove raw, int numAxes)
     {
         raw.Coords.AsSpan(0, numAxes).CopyTo(state.CurrentUserPosition);
-        ToolTransform.Remove(currentTool(), model.Move, state.CurrentUserPosition, numAxes);
+        ToolTransform.Remove(currentTool(), model.Move, Parameters.Axes, state.CurrentUserPosition, numAxes);
     }
 
     /// <summary>
@@ -869,8 +884,8 @@ internal sealed class MoveInterpreter(
         // InverseAxisAndBedTransform uses - the mirror of applying the axis transform before the bed
         // one, because the map is indexed by coordinates the skew has already moved
         bedCompensation.Remove(state.CurrentUserPosition, numAxes);
-        AxisSkew.Remove(currentTool(), model.Move, state.CurrentUserPosition, numAxes);
-        ToolTransform.Remove(currentTool(), model.Move, state.CurrentUserPosition, numAxes);
+        AxisSkew.Remove(currentTool(), model.Move, Parameters.Axes, state.CurrentUserPosition, numAxes);
+        ToolTransform.Remove(currentTool(), model.Move, Parameters.Axes, state.CurrentUserPosition, numAxes);
     }
 
     /// <summary>

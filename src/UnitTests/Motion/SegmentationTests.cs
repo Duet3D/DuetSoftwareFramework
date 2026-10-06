@@ -28,7 +28,7 @@ public class SegmentationTests
     public void ACartesianMachineNeedsNoSegmentation()
     {
         // The transform is the identity, so a straight line in motor space already is one
-        KinematicsEngine engine = CoreKinematicsEngine.TryCreate("cartesian")!;
+        KinematicsEngine engine = CoreKinematicsEngine.TryCreate("cartesian")!.WithAxes();
         Assert.That(engine.Segmentation, Is.EqualTo(SegmentationType.None));
     }
 
@@ -36,7 +36,7 @@ public class SegmentationTests
     public void ACoreXyMachineNeedsNoSegmentationEither()
     {
         // CoreXY's transform is a matrix, which is still linear: a straight line stays straight
-        KinematicsEngine engine = CoreKinematicsEngine.TryCreate("corexy")!;
+        KinematicsEngine engine = CoreKinematicsEngine.TryCreate("corexy")!.WithAxes();
         Assert.That(engine.Segmentation, Is.EqualTo(SegmentationType.None));
     }
 
@@ -46,7 +46,7 @@ public class SegmentationTests
         // A delta bows in every direction, so even an uncoordinated move has to be segmented. Z is
         // one of the towers rather than an independent axis, but its movement is deliberately not
         // counted towards the segment length - RepRapFirmware counts XY only for a linear delta
-        LinearDeltaKinematicsEngine engine = LinearDeltaKinematicsEngine.CreateDefault();
+        LinearDeltaKinematicsEngine engine = LinearDeltaKinematicsEngine.CreateDefault().WithAxes();
         Assert.Multiple(() =>
         {
             Assert.That(engine.Segmentation.HasFlag(SegmentationType.Segment), Is.True);
@@ -59,7 +59,7 @@ public class SegmentationTests
     public void ARotaryDeltaCountsZAsWell()
     {
         // Every coordinate of the head is an arm angle here, so Z bows like the rest of it
-        RotaryDeltaKinematicsEngine engine = new();
+        RotaryDeltaKinematicsEngine engine = new RotaryDeltaKinematicsEngine().WithAxes();
         Assert.Multiple(() =>
         {
             Assert.That(engine.Segmentation.HasFlag(SegmentationType.Segment), Is.True);
@@ -72,7 +72,7 @@ public class SegmentationTests
     public void AScaraSegmentsInXyOnly()
     {
         // The arms bow in the plane; Z is an ordinary leadscrew, and a travel move may be left whole
-        ScaraKinematicsEngine engine = new();
+        ScaraKinematicsEngine engine = new ScaraKinematicsEngine().WithAxes();
         Assert.Multiple(() =>
         {
             Assert.That(engine.Segmentation.HasFlag(SegmentationType.Segment), Is.True);
@@ -85,8 +85,8 @@ public class SegmentationTests
     public void APolarSegmentsInXyOnly()
     {
         // A straight line across the bed is an arc in radius and angle, so it bows; Z is independent
-        PolarKinematicsEngine engine = new(minRadius: 0.0f, maxRadius: 150.0f, homedRadius: 0.0f,
-                                           maxTurntableSpeed: 30.0f, maxTurntableAcceleration: 30.0f);
+        PolarKinematicsEngine engine = new PolarKinematicsEngine(minRadius: 0.0f, maxRadius: 150.0f, homedRadius: 0.0f,
+                                           maxTurntableSpeed: 30.0f, maxTurntableAcceleration: 30.0f).WithAxes();
         Assert.Multiple(() =>
         {
             Assert.That(engine.Segmentation.HasFlag(SegmentationType.Segment), Is.True);
@@ -102,14 +102,14 @@ public class SegmentationTests
         // different shapes, which is exactly when a straight line does not survive the transform
         KinematicsEngine[] engines =
         [
-            LinearDeltaKinematicsEngine.CreateDefault(),
-            new RotaryDeltaKinematicsEngine(),
-            new ScaraKinematicsEngine(),
+            LinearDeltaKinematicsEngine.CreateDefault().WithAxes(),
+            new RotaryDeltaKinematicsEngine().WithAxes(),
+            new ScaraKinematicsEngine().WithAxes(),
             new PolarKinematicsEngine(minRadius: 0.0f, maxRadius: 150.0f, homedRadius: 0.0f,
-                                      maxTurntableSpeed: 30.0f, maxTurntableAcceleration: 30.0f),
-            HangprinterKinematicsEngine.CreateDefault(),
+                                      maxTurntableSpeed: 30.0f, maxTurntableAcceleration: 30.0f).WithAxes(),
+            HangprinterKinematicsEngine.CreateDefault().WithAxes(),
             new FiveBarScaraKinematicsEngine(xOrigL: -50.0f, yOrigL: 0.0f, xOrigR: 50.0f, yOrigR: 0.0f,
-                                             proximalL: 100.0f, proximalR: 100.0f, distalL: 100.0f, distalR: 100.0f)
+                                             proximalL: 100.0f, proximalR: 100.0f, distalL: 100.0f, distalR: 100.0f).WithAxes()
         ];
 
         Assert.Multiple(() =>
@@ -129,7 +129,7 @@ public class SegmentationTests
         // are given, so on a delta the head follows a curve between them. Measuring that curve is
         // the point of this test: it is real, it is large enough to see on a normal-sized move, and
         // cutting the move up is what removes it
-        LinearDeltaKinematicsEngine engine = LinearDeltaKinematicsEngine.CreateDefault();
+        LinearDeltaKinematicsEngine engine = LinearDeltaKinematicsEngine.CreateDefault().WithAxes();
         float[] stepsPerMm = new float[MotionLimits.MaxAxesPlusExtruders];
         Array.Fill(stepsPerMm, 100.0f);
 
@@ -217,7 +217,7 @@ public class SegmentationTests
         // Two limits rather than one: the length keeps the bow below a step on a fast move, and the
         // rate keeps a slow move from being cut into far more pieces than the error justifies. The
         // segment count is the smaller of what each asks for
-        KinematicsEngine engine = LinearDeltaKinematicsEngine.CreateDefault();
+        KinematicsEngine engine = LinearDeltaKinematicsEngine.CreateDefault().WithAxes();
         Assert.Multiple(() =>
         {
             Assert.That(engine.SegmentsPerSecond, Is.EqualTo(100.0f));

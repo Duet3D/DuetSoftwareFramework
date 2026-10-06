@@ -381,7 +381,7 @@ internal static class MoveParams
     /// <param name="destination">Buffer of at least <see cref="Length"/> bytes</param>
     /// <param name="header">Fixed part of the submission; its NumDrives must match the arrays</param>
     /// <param name="endPoints">Machine position each drive ends at, in microsteps</param>
-    /// <param name="directionVector">Normalised direction, first three entries Cartesian</param>
+    /// <param name="directionVector">Normalised direction, by logical drive</param>
     /// <param name="stopOnInput">Which switches stop each drive</param>
     /// <param name="tuning">The limits each drive is to be executed with</param>
     /// <returns>Number of bytes written</returns>

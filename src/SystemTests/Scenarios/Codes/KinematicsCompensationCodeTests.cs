@@ -408,7 +408,6 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
     /// no kinematics code cartesian kinematics, so move.kinematics.name reports "cartesian"
     /// (CoreKinematics::GetName)
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M667RepliesRetiredInFavourOfM669()
     {

@@ -30,7 +30,7 @@ public class DeltaKinematicsTests
     }
 
     /// <summary>A machine with the dimensions RepRapFirmware assumes before M665 has been seen</summary>
-    private static LinearDeltaKinematicsEngine CreateLinearDelta() => LinearDeltaKinematicsEngine.CreateDefault();
+    private static LinearDeltaKinematicsEngine CreateLinearDelta() => LinearDeltaKinematicsEngine.CreateDefault().WithAxes();
 
     private static float[] ToCartesian(KinematicsEngine engine, int[] motorPos, int numAxes)
     {
@@ -131,12 +131,12 @@ public class DeltaKinematicsTests
     {
         // The forward transform derives its constants from the tower positions and rod lengths, so a
         // machine where they are not all the same is what actually exercises them
-        LinearDeltaKinematicsEngine engine = new(
+        LinearDeltaKinematicsEngine engine = new LinearDeltaKinematicsEngine(
             numTowers: 3, radius: 105.6f,
             diagonals: [215.0f, 217.5f, 213.0f],
             angleCorrections: [0.4f, -0.3f, 0.15f],
             endstopAdjustments: [0.2f, -0.1f, 0.05f],
-            homedHeight: 240.0f, printRadius: 80.0f);
+            homedHeight: 240.0f, printRadius: 80.0f).WithAxes();
 
         int[] motorPos = ToMotorSteps(engine, [22.0f, -35.0f, 90.0f], 3);
         float[] roundTripped = ToCartesian(engine, motorPos, 3);
@@ -154,13 +154,13 @@ public class DeltaKinematicsTests
     {
         // Tilt correction is a fudge applied to Z as the head moves in X and Y, to square up a bed
         // that is not level. It must not leak into the position the machine thinks it is at
-        LinearDeltaKinematicsEngine engine = new(
+        LinearDeltaKinematicsEngine engine = new LinearDeltaKinematicsEngine(
             numTowers: 3, radius: 105.6f,
             diagonals: [215.0f, 215.0f, 215.0f],
             angleCorrections: [0.0f, 0.0f, 0.0f],
             endstopAdjustments: [0.0f, 0.0f, 0.0f],
             homedHeight: 240.0f, printRadius: 80.0f,
-            xTilt: 0.01f, yTilt: -0.005f);
+            xTilt: 0.01f, yTilt: -0.005f).WithAxes();
 
         Assert.Multiple(() =>
         {
@@ -261,7 +261,7 @@ public class DeltaKinematicsTests
     {
         // The same symmetry argument as for the linear delta: at the centre every arm is swung to the
         // same angle
-        RotaryDeltaKinematicsEngine engine = new();
+        RotaryDeltaKinematicsEngine engine = new RotaryDeltaKinematicsEngine().WithAxes();
 
         int[] motorPos = ToMotorSteps(engine, [0.0f, 0.0f, 100.0f], 3);
         Assert.Multiple(() =>
@@ -277,7 +277,7 @@ public class DeltaKinematicsTests
     [TestCase(30.0f, -30.0f, 120.0f)]
     public void RotaryDeltaPositionsSurviveTheRoundTrip(float x, float y, float z)
     {
-        RotaryDeltaKinematicsEngine engine = new();
+        RotaryDeltaKinematicsEngine engine = new RotaryDeltaKinematicsEngine().WithAxes();
 
         int[] motorPos = ToMotorSteps(engine, [x, y, z], 3);
         float[] roundTripped = ToCartesian(engine, motorPos, 3);
@@ -295,13 +295,13 @@ public class DeltaKinematicsTests
     {
         // The trilateration constants are all derived per tower, so a machine whose arms differ is
         // what proves each one is being indexed by its own tower
-        RotaryDeltaKinematicsEngine engine = new(
+        RotaryDeltaKinematicsEngine engine = new RotaryDeltaKinematicsEngine(
             radius: 50.0f,
             armLengths: [100.0f, 104.0f, 97.0f],
             rodLengths: [200.0f, 203.0f, 198.0f],
             bearingHeights: [250.0f, 251.5f, 249.0f],
             angleCorrections: [0.3f, -0.2f, 0.1f],
-            endstopAdjustments: [0.0f, 0.0f, 0.0f]);
+            endstopAdjustments: [0.0f, 0.0f, 0.0f]).WithAxes();
 
         int[] motorPos = ToMotorSteps(engine, [18.0f, -22.0f, 105.0f], 3);
         float[] roundTripped = ToCartesian(engine, motorPos, 3);
@@ -317,7 +317,7 @@ public class DeltaKinematicsTests
     [Test]
     public void ARotaryDeltaPositionTheRodsCannotReachIsUnreachable()
     {
-        RotaryDeltaKinematicsEngine engine = new();
+        RotaryDeltaKinematicsEngine engine = new RotaryDeltaKinematicsEngine().WithAxes();
 
         float[] machinePos = new float[NumDrives];
         machinePos[0] = 5000.0f;
@@ -332,7 +332,7 @@ public class DeltaKinematicsTests
     [Test]
     public void RotaryDeltaHoldingAnyAxisStillNeedsAllThreeMotors()
     {
-        RotaryDeltaKinematicsEngine engine = new();
+        RotaryDeltaKinematicsEngine engine = new RotaryDeltaKinematicsEngine().WithAxes();
         Assert.Multiple(() =>
         {
             Assert.That(engine.GetControllingDrives(0), Is.EqualTo(0b111u));
@@ -347,7 +347,7 @@ public class DeltaKinematicsTests
         // The angle limits are the mechanism, not the bed: past them the arm fouls something. With the
         // default 100mm arms on 250mm bearings, reaching all the way down to the bed needs about 55
         // degrees of swing, which is past the 45 the arms are allowed
-        RotaryDeltaKinematicsEngine engine = new();
+        RotaryDeltaKinematicsEngine engine = new RotaryDeltaKinematicsEngine().WithAxes();
 
         Assert.Multiple(() =>
         {

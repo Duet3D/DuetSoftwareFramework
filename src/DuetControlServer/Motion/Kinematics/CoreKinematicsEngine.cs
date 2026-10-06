@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
 using DuetControlServer.Motion.Native;
@@ -21,7 +22,15 @@ namespace DuetControlServer.Motion.Kinematics;
 /// <para>
 /// The forward matrix, which converts back, is the matrix inverse of that. RepRapFirmware computes it
 /// by Gauss-Jordan elimination once when the geometry is configured rather than solving on every
-/// move, and so does this
+/// move, and so does this.
+/// </para>
+/// <para>
+/// The matrix is indexed by axis and by motor, and a motor is an axis' drive, but what a named
+/// geometry describes is letters: CoreXY couples the X and Y motors, whatever positions M584 gave
+/// those axes. So the named matrices and the rows M669 gives by letter are kept by letter and placed
+/// at the indices of the axes that carry those letters, again whenever the axes change. A row for an
+/// axis that does not exist yet waits until M584 creates it, which is what lets config.g select and
+/// describe the geometry before it creates the axes
 /// </para>
 /// </remarks>
 internal sealed class CoreKinematicsEngine : KinematicsEngine
@@ -31,25 +40,42 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
     /// </summary>
     private const int MatrixSize = MotionLimits.MaxAxes;
 
-    /// <summary>Maps axis coordinates to motor positions: inverse[axis, motor]</summary>
-    private readonly float[,] _inverse = new float[MatrixSize, MatrixSize];
+    /// <summary>
+    /// The letters the named matrices' rows and columns stand for, in order
+    /// </summary>
+    /// <remarks>
+    /// The axes RepRapFirmware's named matrices are written for, which are its first five axes
+    /// </remarks>
+    public const string NamedMatrixLetters = "XYZUV";
 
-    /// <summary>Maps motor positions back to axis coordinates: forward[motor, axis]</summary>
-    private readonly float[,] _forward = new float[MatrixSize, MatrixSize];
+    /// <summary>
+    /// The matrix the named rows and the rows by letter are placed over, by axis and motor index
+    /// </summary>
+    /// <remarks>
+    /// The identity for a geometry selected by name, so that an axis nothing describes keeps a motor
+    /// of its own. A geometry built from a whole matrix - one adopted from the object model - has
+    /// that matrix here instead, and then nothing is placed over it until M669 gives a row
+    /// </remarks>
+    private readonly float[,] _base;
 
-    /// <summary>Which drives control each axis</summary>
-    private readonly uint[] _controllingDrives = new uint[MatrixSize];
+    /// <summary>
+    /// The named geometry's matrix, rows and columns in <see cref="NamedMatrixLetters"/> order, or
+    /// empty for one built from a whole matrix
+    /// </summary>
+    private readonly float[][] _namedRows;
 
-    /// <summary>First and last axis each motor is affected by, to keep the inner loops short</summary>
-    private readonly int[] _firstAxis = new int[MatrixSize];
-    private readonly int[] _lastAxis = new int[MatrixSize];
+    /// <summary>
+    /// Rows M669 has given, by axis letter, each as many motors long as it gave
+    /// </summary>
+    private readonly IReadOnlyDictionary<char, float[]> _rowsByLetter;
 
-    /// <summary>First and last motor each axis is affected by</summary>
-    private readonly int[] _firstMotor = new int[MatrixSize];
-    private readonly int[] _lastMotor = new int[MatrixSize];
-
-    /// <summary>True if the axis is moved by a motor that another axis also moves</summary>
-    private readonly bool[] _hasSharedMotor = new bool[MatrixSize];
+    /// <summary>
+    /// The matrix placed for the current axes, and what follows from it
+    /// </summary>
+    /// <remarks>
+    /// Replaced as a whole when the axes change, so a reader without a lock never sees half of it
+    /// </remarks>
+    private Matrices _matrices;
 
     /// <inheritdoc />
     /// <remarks>
@@ -62,27 +88,24 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
     /// <summary>
     /// Whether the forward matrix could be derived. False means the geometry is unusable
     /// </summary>
-    public bool IsValid { get; private set; }
+    public bool IsValid => _matrices.IsValid;
 
     /// <summary>
     /// Create a geometry from its inverse matrix
     /// </summary>
     /// <param name="name">Which core arrangement this is</param>
     /// <param name="inverseMatrix">
-    /// Rows are axes, columns are motors. Entries outside the given rows and columns are taken to be
-    /// the identity, so a 3x3 matrix describes a machine whose fourth and later axes each have their
-    /// own motor
+    /// Rows are axes, columns are motors, both by index. Entries outside the given rows and columns
+    /// are taken to be the identity, so a 3x3 matrix describes a machine whose fourth and later axes
+    /// each have their own motor
     /// </param>
+    /// <remarks>
+    /// For a matrix that is already placed, as the object model holds it. A geometry selected by name
+    /// is made by <see cref="TryCreate(KinematicsName)"/> instead, which places its matrix by letter
+    /// </remarks>
     public CoreKinematicsEngine(KinematicsName name, float[][] inverseMatrix)
+        : this(name, Identity(), [], new Dictionary<char, float[]>())
     {
-        Kind = name;
-
-        // Start from the identity so that axes the caller did not describe keep a motor of their own
-        for (int i = 0; i < MatrixSize; i++)
-        {
-            _inverse[i, i] = 1.0f;
-        }
-
         for (int axis = 0; axis < inverseMatrix.Length && axis < MatrixSize; axis++)
         {
             float[] row = inverseMatrix[axis];
@@ -91,11 +114,27 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
             // "no motor moves for this axis" rather than silently keeping the diagonal
             for (int motor = 0; motor < MatrixSize; motor++)
             {
-                _inverse[axis, motor] = motor < row.Length ? row[motor] : 0.0f;
+                _base[axis, motor] = motor < row.Length ? row[motor] : 0.0f;
             }
         }
+        _matrices = Place(Axes);
+    }
 
-        Recalculate();
+    /// <summary>
+    /// Create a geometry from what it is defined by
+    /// </summary>
+    /// <param name="name">Which core arrangement this is</param>
+    /// <param name="baseMatrix">The matrix by index the rest is placed over</param>
+    /// <param name="namedRows">The named geometry's matrix by letter</param>
+    /// <param name="rowsByLetter">Rows M669 has given</param>
+    private CoreKinematicsEngine(KinematicsName name, float[,] baseMatrix, float[][] namedRows,
+                                 IReadOnlyDictionary<char, float[]> rowsByLetter)
+    {
+        Kind = name;
+        _base = baseMatrix;
+        _namedRows = namedRows;
+        _rowsByLetter = rowsByLetter;
+        _matrices = Place(Axes);
     }
 
     /// <summary>
@@ -110,10 +149,14 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
     /// </summary>
     /// <param name="name">Which core arrangement</param>
     /// <returns>The engine, or null if that geometry is not a core one</returns>
+    /// <remarks>
+    /// Its matrix is placed when the geometry learns the machine's axes, see
+    /// <see cref="KinematicsEngine.SetAxes"/>; until then every axis has a motor of its own
+    /// </remarks>
     public static CoreKinematicsEngine? TryCreate(KinematicsName name)
     {
         float[][]? matrix = DefaultMatrixFor(name);
-        return matrix is null ? null : new CoreKinematicsEngine(name, matrix);
+        return matrix is null ? null : new CoreKinematicsEngine(name, Identity(), matrix, new Dictionary<char, float[]>());
     }
 
     /// <summary>
@@ -137,8 +180,10 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
     /// <returns>Its matrix, or null if that geometry is not a core one</returns>
     /// <remarks>
     /// RepRapFirmware's, from <c>CoreKinematics::CoreKinematics</c>. Each row says how much each motor
-    /// turns per mm of that axis. Selecting a geometry by name is selecting one of these, and M669's
-    /// axis-letter parameters then replace individual rows of it
+    /// turns per mm of that axis. The rows and the columns are the axes lettered as in
+    /// <see cref="NamedMatrixLetters"/>, in that order, which is where RepRapFirmware's first axes always
+    /// are; here they are placed wherever those letters are. Selecting a geometry by name is selecting
+    /// one of these, and M669's axis-letter parameters then replace individual rows of it
     /// </remarks>
     public static float[][]? DefaultMatrixFor(KinematicsName name)
         => name switch
@@ -166,80 +211,238 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
     /// <returns>The row, as long as the axis space</returns>
     public float[] GetInverseMatrixRow(int axis)
     {
+        float[,] inverse = _matrices.Inverse;
         float[] row = new float[MatrixSize];
         for (int motor = 0; motor < MatrixSize; motor++)
         {
-            row[motor] = _inverse[axis, motor];
+            row[motor] = inverse[axis, motor];
         }
         return row;
     }
 
     /// <inheritdoc />
     /// <remarks>
+    /// <para>
     /// Ported from <c>CoreKinematics::Configure</c>. Each axis letter carries that axis' row of the
     /// inverse matrix, which is how a machine that is none of the named arrangements is described.
     /// A row shorter than the axis space leaves the rest of that row as it was, so a parameter can
-    /// correct the motors it mentions without restating the ones it does not
+    /// correct the motors it mentions without restating the ones it does not.
+    /// </para>
+    /// <para>
+    /// The row goes to the axis carrying the letter, wherever it is. RepRapFirmware only looks for the
+    /// letters of axes that exist, which on its machines always include X, Y and Z; a row given here
+    /// for an axis M584 has not created yet is kept and placed when it is, so the usual config.g order
+    /// of M669 before M584 describes the same machine
+    /// </para>
     /// </remarks>
     public override KinematicsEngine Configure(Code code, ref bool seen)
     {
-        float[][]? updated = null;
-        for (int axis = 0; axis < Axis.Letters.Length && axis < MatrixSize; axis++)
+        Dictionary<char, float[]>? rows = null;
+        foreach (char letter in Axis.Letters)
         {
-            if (code.TryGetFloatArray(Axis.Letters[axis], MatrixSize, out float[]? values))
+            if (code.TryGetFloatArray(letter, MatrixSize, out float[]? values))
             {
-                updated ??= BuildMatrix();
-                for (int motor = 0; motor < MatrixSize; motor++)
+                rows ??= new Dictionary<char, float[]>(_rowsByLetter);
+                if (rows.TryGetValue(letter, out float[]? previous) && previous.Length > values.Length)
                 {
-                    updated[axis][motor] = motor < values.Length ? values[motor] : updated[axis][motor];
+                    float[] merged = [.. previous];
+                    values.CopyTo(merged, 0);
+                    values = merged;
                 }
+                rows[letter] = values;
                 seen = true;
             }
         }
 
-        if (updated is null)
+        if (rows is null)
         {
             return this;
         }
 
         // A matrix M669 cannot invert describes a machine whose motors cannot reach every position,
         // so the geometry that was working is kept rather than replaced with one that cannot plan
-        CoreKinematicsEngine engine = new(Kind, updated);
+        CoreKinematicsEngine engine = new(Kind, (float[,])_base.Clone(), _namedRows, rows);
+        engine.SetAxes(Axes);
         return engine.IsValid ? engine : this;
     }
 
-    /// <summary>
-    /// The inverse matrix as rows, for rebuilding a geometry from it
-    /// </summary>
-    /// <returns>The matrix</returns>
-    private float[][] BuildMatrix()
-    {
-        float[][] matrix = new float[MatrixSize][];
-        for (int axis = 0; axis < MatrixSize; axis++)
-        {
-            matrix[axis] = GetInverseMatrixRow(axis);
-        }
-        return matrix;
-    }
+    /// <inheritdoc />
+    /// <remarks>The named matrix and the rows by letter go to wherever their letters now are</remarks>
+    protected override void OnAxesChanged() => _matrices = Place(Axes);
 
     /// <inheritdoc />
     public override void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics)
     {
         base.WriteTo(kinematics);
 
+        Matrices matrices = _matrices;
         CoreKinematics core = (CoreKinematics)kinematics;
         core.InverseMatrix.Clear();
         core.ForwardMatrix.Clear();
         for (int axis = 0; axis < MatrixSize; axis++)
         {
-            core.InverseMatrix.Add(GetInverseMatrixRow(axis));
-
+            float[] inverse = new float[MatrixSize];
             float[] forward = new float[MatrixSize];
             for (int i = 0; i < MatrixSize; i++)
             {
-                forward[i] = _forward[axis, i];
+                inverse[i] = matrices.Inverse[axis, i];
+                forward[i] = matrices.Forward[axis, i];
             }
+            core.InverseMatrix.Add(inverse);
             core.ForwardMatrix.Add(forward);
+        }
+    }
+
+    /// <summary>
+    /// The identity matrix, which is every axis on a motor of its own
+    /// </summary>
+    /// <returns>A new matrix</returns>
+    private static float[,] Identity()
+    {
+        float[,] matrix = new float[MatrixSize, MatrixSize];
+        for (int i = 0; i < MatrixSize; i++)
+        {
+            matrix[i, i] = 1.0f;
+        }
+        return matrix;
+    }
+
+    /// <summary>
+    /// Place the matrix this geometry is defined by at the indices of the given axes
+    /// </summary>
+    /// <param name="axes">The machine's axes</param>
+    /// <returns>The placed matrix and what follows from it</returns>
+    private Matrices Place(AxisIndices axes)
+    {
+        float[,] inverse = (float[,])_base.Clone();
+
+        for (int row = 0; row < _namedRows.Length && row < NamedMatrixLetters.Length; row++)
+        {
+            int axis = axes.IndexOf(NamedMatrixLetters[row]);
+            if (axis < 0 || axis >= MatrixSize)
+            {
+                continue;
+            }
+
+            // The named row replaces the whole row, so a motor it does not mention does not move
+            for (int motor = 0; motor < MatrixSize; motor++)
+            {
+                inverse[axis, motor] = 0.0f;
+            }
+            for (int column = 0; column < _namedRows[row].Length && column < NamedMatrixLetters.Length; column++)
+            {
+                int motor = axes.IndexOf(NamedMatrixLetters[column]);
+                if (motor >= 0 && motor < MatrixSize)
+                {
+                    inverse[axis, motor] = _namedRows[row][column];
+                }
+            }
+        }
+
+        foreach ((char letter, float[] values) in _rowsByLetter)
+        {
+            int axis = axes.IndexOf(letter);
+            if (axis < 0 || axis >= MatrixSize)
+            {
+                continue;
+            }
+            for (int motor = 0; motor < values.Length && motor < MatrixSize; motor++)
+            {
+                inverse[axis, motor] = values[motor];
+            }
+        }
+
+        return new Matrices(inverse);
+    }
+
+    /// <summary>
+    /// A placed inverse matrix and everything derived from it
+    /// </summary>
+    private sealed class Matrices
+    {
+        /// <summary>Maps axis coordinates to motor positions: inverse[axis, motor]</summary>
+        public readonly float[,] Inverse;
+
+        /// <summary>Maps motor positions back to axis coordinates: forward[motor, axis]</summary>
+        public readonly float[,] Forward = new float[MatrixSize, MatrixSize];
+
+        /// <summary>Which drives control each axis</summary>
+        public readonly uint[] ControllingDrives = new uint[MatrixSize];
+
+        /// <summary>First and last axis each motor is affected by, to keep the inner loops short</summary>
+        public readonly int[] FirstAxis = new int[MatrixSize], LastAxis = new int[MatrixSize];
+
+        /// <summary>First and last motor each axis is affected by</summary>
+        public readonly int[] FirstMotor = new int[MatrixSize], LastMotor = new int[MatrixSize];
+
+        /// <summary>True if the axis is moved by a motor that another axis also moves</summary>
+        public readonly bool[] HasSharedMotor = new bool[MatrixSize];
+
+        /// <summary>Whether the forward matrix could be derived</summary>
+        public readonly bool IsValid;
+
+        /// <summary>
+        /// Derive the forward matrix and the index bounds from an inverse matrix
+        /// </summary>
+        /// <param name="inverse">The inverse matrix, which this takes ownership of</param>
+        public Matrices(float[,] inverse)
+        {
+            Inverse = inverse;
+            IsValid = TryInvert(Inverse, Forward);
+            if (!IsValid)
+            {
+                Array.Clear(Forward);
+            }
+
+            for (int i = 0; i < MatrixSize; i++)
+            {
+                FirstMotor[i] = FirstAxis[i] = MatrixSize;
+                LastMotor[i] = LastAxis[i] = 0;
+            }
+
+            for (int axis = 0; axis < MatrixSize; axis++)
+            {
+                for (int motor = 0; motor < MatrixSize; motor++)
+                {
+                    if (Inverse[axis, motor] != 0.0f)
+                    {
+                        // This axis needs this motor driven
+                        FirstAxis[motor] = Math.Min(FirstAxis[motor], axis);
+                        LastAxis[motor] = Math.Max(LastAxis[motor], axis);
+                        ControllingDrives[axis] |= 1u << motor;
+                    }
+
+                    if (Forward[motor, axis] != 0.0f)
+                    {
+                        // This motor affects this axis
+                        FirstMotor[axis] = Math.Min(FirstMotor[axis], motor);
+                        LastMotor[axis] = Math.Max(LastMotor[axis], motor);
+                        ControllingDrives[axis] |= 1u << motor;
+                    }
+                }
+            }
+
+            // An axis has a shared motor if any motor it drives is also driven by another axis
+            for (int axis = 0; axis < MatrixSize; axis++)
+            {
+                bool shared = false;
+                for (int motor = 0; motor < MatrixSize && !shared; motor++)
+                {
+                    if (Inverse[axis, motor] == 0.0f)
+                    {
+                        continue;
+                    }
+                    for (int otherAxis = 0; otherAxis < MatrixSize; otherAxis++)
+                    {
+                        if (otherAxis != axis && Inverse[otherAxis, motor] != 0.0f)
+                        {
+                            shared = true;
+                            break;
+                        }
+                    }
+                }
+                HasSharedMotor[axis] = shared;
+            }
         }
     }
 
@@ -254,15 +457,16 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
     {
         // A linear combination has exactly one solution, so there is no pose to choose and
         // isCoordinated makes no difference here
+        Matrices matrices = _matrices;
         NativeMovementError result = NativeMovementError.Ok;
         int motorLimit = Math.Min(numTotalAxes, Math.Min(MatrixSize, Math.Min(motorPos.Length, stepsPerMm.Length)));
 
         for (int motor = 0; motor < motorLimit; motor++)
         {
-            int axisLimit = Math.Min(numVisibleAxes, _lastAxis[motor] + 1);
+            int axisLimit = Math.Min(numVisibleAxes, matrices.LastAxis[motor] + 1);
             axisLimit = Math.Min(axisLimit, machinePos.Length);
 
-            int axis = _firstAxis[motor];
+            int axis = matrices.FirstAxis[motor];
             if (axis >= axisLimit)
             {
                 // No visible axis drives this motor, so it stays where the caller left it
@@ -272,7 +476,7 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
             float movement = 0.0f;
             for (; axis < axisLimit; axis++)
             {
-                movement += _inverse[axis, motor] * machinePos[axis];
+                movement += matrices.Inverse[axis, motor] * machinePos[axis];
             }
 
             if (TryRoundToInt32(movement * stepsPerMm[motor], out int steps))
@@ -298,17 +502,18 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
     {
         // Where there are more motors than visible axes - CoreXYU has a V motor - the trailing ones
         // are ignored when working out where the machine is
+        Matrices matrices = _matrices;
         int axisLimit = Math.Min(numVisibleAxes, Math.Min(MatrixSize, machinePos.Length));
 
         for (int axis = 0; axis < axisLimit; axis++)
         {
             float position = 0.0f;
-            int motorLimit = Math.Min(numVisibleAxes, _lastMotor[axis] + 1);
+            int motorLimit = Math.Min(numVisibleAxes, matrices.LastMotor[axis] + 1);
             motorLimit = Math.Min(motorLimit, Math.Min(motorPos.Length, stepsPerMm.Length));
 
-            for (int motor = _firstMotor[axis]; motor < motorLimit; motor++)
+            for (int motor = matrices.FirstMotor[axis]; motor < motorLimit; motor++)
             {
-                float factor = _forward[motor, axis];
+                float factor = matrices.Forward[motor, axis];
                 if (factor != 0.0f)
                 {
                     position += factor * motorPos[motor] / stepsPerMm[motor];
@@ -328,6 +533,7 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
         // Deliberately not the base implementation: on a Cartesian machine X and Y really are limited
         // independently, so a diagonal move may go faster than either axis alone
         ReadOnlySpan<float> normalisedDirectionVector = move.NormalisedDirectionVector;
+        Matrices matrices = _matrices;
 
         // How much of the move each shared motor contributes. A motor that only one axis drives has
         // already been limited by the per-axis pass, so only the shared ones are of interest here
@@ -337,7 +543,7 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
         int axisLimit = Math.Min(move.NumVisibleAxes, Math.Min(MatrixSize, normalisedDirectionVector.Length));
         for (int axis = 0; axis < axisLimit; axis++)
         {
-            if (!_hasSharedMotor[axis])
+            if (!matrices.HasSharedMotor[axis])
             {
                 continue;
             }
@@ -350,7 +556,7 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
 
             for (int motor = 0; motor < MatrixSize; motor++)
             {
-                float factor = _inverse[axis, motor];
+                float factor = matrices.Inverse[axis, motor];
                 if (factor != 0.0f)
                 {
                     motorMovements[motor] += factor * dv;
@@ -372,77 +578,14 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
 
     /// <inheritdoc />
     public override uint GetControllingDrives(int axis)
-        => (axis >= 0 && axis < MatrixSize) ? _controllingDrives[axis] : base.GetControllingDrives(axis);
+        => (axis >= 0 && axis < MatrixSize) ? _matrices.ControllingDrives[axis] : base.GetControllingDrives(axis);
 
     /// <summary>
     /// Whether the given axis shares a motor with another axis
     /// </summary>
     /// <param name="axis">Axis number</param>
     /// <returns>True if it has no motor to itself</returns>
-    public bool HasSharedMotor(int axis) => axis >= 0 && axis < MatrixSize && _hasSharedMotor[axis];
-
-    /// <summary>
-    /// Derive the forward matrix and the index bounds from the inverse matrix
-    /// </summary>
-    private void Recalculate()
-    {
-        IsValid = TryInvert(_inverse, _forward);
-        if (!IsValid)
-        {
-            Array.Clear(_forward);
-        }
-
-        for (int i = 0; i < MatrixSize; i++)
-        {
-            _firstMotor[i] = _firstAxis[i] = MatrixSize;
-            _lastMotor[i] = _lastAxis[i] = 0;
-            _controllingDrives[i] = 0;
-        }
-
-        for (int axis = 0; axis < MatrixSize; axis++)
-        {
-            for (int motor = 0; motor < MatrixSize; motor++)
-            {
-                if (_inverse[axis, motor] != 0.0f)
-                {
-                    // This axis needs this motor driven
-                    _firstAxis[motor] = Math.Min(_firstAxis[motor], axis);
-                    _lastAxis[motor] = Math.Max(_lastAxis[motor], axis);
-                    _controllingDrives[axis] |= 1u << motor;
-                }
-
-                if (_forward[motor, axis] != 0.0f)
-                {
-                    // This motor affects this axis
-                    _firstMotor[axis] = Math.Min(_firstMotor[axis], motor);
-                    _lastMotor[axis] = Math.Max(_lastMotor[axis], motor);
-                    _controllingDrives[axis] |= 1u << motor;
-                }
-            }
-        }
-
-        // An axis has a shared motor if any motor it drives is also driven by another axis
-        for (int axis = 0; axis < MatrixSize; axis++)
-        {
-            bool shared = false;
-            for (int motor = 0; motor < MatrixSize && !shared; motor++)
-            {
-                if (_inverse[axis, motor] == 0.0f)
-                {
-                    continue;
-                }
-                for (int otherAxis = 0; otherAxis < MatrixSize; otherAxis++)
-                {
-                    if (otherAxis != axis && _inverse[otherAxis, motor] != 0.0f)
-                    {
-                        shared = true;
-                        break;
-                    }
-                }
-            }
-            _hasSharedMotor[axis] = shared;
-        }
-    }
+    public bool HasSharedMotor(int axis) => axis >= 0 && axis < MatrixSize && _matrices.HasSharedMotor[axis];
 
     /// <summary>
     /// Invert a square matrix by Gauss-Jordan elimination

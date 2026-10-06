@@ -34,7 +34,7 @@ public class MotionParametersTests
     private static MotionParameters Snapshot(Move move)
     {
         KinematicsEngine geometry = KinematicsFactory.Create(move.Kinematics);
-        MotionParameters.ApplyAxisLimits(move, geometry);
+        MotionParameters.ApplyAxes(move, geometry);
         return MotionParameters.FromObjectModel(move, geometry);
     }
     private const float StepClockRate = MotionLimits.StepClockRate;
@@ -86,6 +86,21 @@ public class MotionParametersTests
 
         MoveQueueItem queue = new() { Length = 30, GracePeriod = 0.02f };
         move.Queue.Add(queue);
+        return move;
+    }
+
+    /// <summary>
+    /// The same machine with X, Y, Z and U axes, for the geometries that find X, Y and Z by letter
+    /// and drive a fourth anchor from the axis after them
+    /// </summary>
+    private static Move MachineWithXyzu()
+    {
+        Move move = MachineWithOneOfEach();
+        move.Axes.RemoveAt(1);
+        foreach (char letter in "YZU")
+        {
+            move.Axes.Add(new Axis { Letter = letter, StepsPerMm = 80.0f });
+        }
         return move;
     }
 
@@ -395,7 +410,7 @@ public class MotionParametersTests
     [Test]
     public void ADeltaInTheObjectModelBuildsADeltaEngine()
     {
-        Move move = MachineWithOneOfEach();
+        Move move = MachineWithXyzu();
         DeltaKinematics kinematics = new() { DeltaRadius = 105.6f, HomedHeight = 240.0f, PrintRadius = 80.0f };
         for (int tower = 0; tower < 3; tower++)
         {
@@ -419,7 +434,7 @@ public class MotionParametersTests
     {
         // Before M665 has run the object model has zeroes in it. A delta radius of zero would put all
         // three towers on top of each other, which is not a machine - so the defaults stand in
-        Move move = MachineWithOneOfEach();
+        Move move = MachineWithXyzu();
         move.Kinematics = new DeltaKinematics();
 
         MotionParameters parameters = Snapshot(move);
@@ -433,7 +448,7 @@ public class MotionParametersTests
     [Test]
     public void AScaraInTheObjectModelBuildsAScaraEngine()
     {
-        Move move = MachineWithOneOfEach();
+        Move move = MachineWithXyzu();
         ScaraKinematics kinematics = new() { ProximalLength = 100.0f, DistalLength = 100.0f };
         kinematics.ThetaLimits[0] = -90.0f;
         kinematics.ThetaLimits[1] = 90.0f;
@@ -453,7 +468,7 @@ public class MotionParametersTests
     [Test]
     public void APolarInTheObjectModelCarriesItsTurntableLimitsInStepClocks()
     {
-        Move move = MachineWithOneOfEach();
+        Move move = MachineWithXyzu();
         move.Kinematics = new PolarKinematics { RadiusMin = 20.0f, RadiusMax = 150.0f, TTSpeedMax = 30.0f, TTAccMax = 60.0f };
 
         MotionParameters parameters = Snapshot(move);
@@ -473,7 +488,7 @@ public class MotionParametersTests
     [Test]
     public void AHangprinterInTheObjectModelCarriesItsAnchors()
     {
-        Move move = MachineWithOneOfEach();
+        Move move = MachineWithXyzu();
         move.Kinematics = new HangprinterKinematics();
 
         MotionParameters parameters = Snapshot(move);

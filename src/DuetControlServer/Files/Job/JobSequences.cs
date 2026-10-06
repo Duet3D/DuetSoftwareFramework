@@ -453,7 +453,7 @@ internal sealed class JobSequences(
             using (planner.Lock())
             {
                 RestorePoint rp = planner.State.RestorePoints[RestorePoint.PauseNumber];
-                int zAxis = AxisIndices.ZAxisIndex(model.Move);
+                int zAxis = AxisIndices.IndexOf(model.Move, 'Z');
 
                 // Both sides are user coordinates. RepRapFirmware compares its machine Z against the
                 // restore point's user Z, which differ by the tool Z offset and the babystep; the
@@ -505,12 +505,15 @@ internal sealed class JobSequences(
                 {
                     RestorePoint rp = planner.State.RestorePoints[RestorePoint.PauseNumber];
                     int numAxes = planner.Parameters.SharedAxisCount(model.Move);
-                    int zAxis = AxisIndices.ZAxisIndex(model.Move);
+                    AxisIndices axes = planner.Parameters.Axes;
+                    int zAxis = axes.Z;
 
                     RawMove move = new()
                     {
                         IsCoordinated = true,
-                        FeedRateMmPerSec = ResumeFeedRateMmPerSec
+                        FeedRateMmPerSec = ResumeFeedRateMmPerSec,
+                        XAxes = ToolTransform.AxisBitmap(toolManager.Current, axes, 'X'),
+                        YAxes = ToolTransform.AxisBitmap(toolManager.Current, axes, 'Y')
                     };
 
                     bool anythingToDo = false;
@@ -544,7 +547,7 @@ internal sealed class JobSequences(
                         return null;
                     }
 
-                    ToolTransform.Apply(toolManager.Current, model.Move, planner.State, move.Coords, numAxes);
+                    ToolTransform.Apply(toolManager.Current, model.Move, axes, planner.State, move.Coords, numAxes);
                     MoveSubmitResult result = planner.QueueMove(move);
                     if (result.IsSettled())
                     {
@@ -735,7 +738,7 @@ internal sealed class JobSequences(
                 return;
             }
 
-            int zAxis = AxisIndices.ZAxisIndex(model.Move);
+            int zAxis = AxisIndices.IndexOf(model.Move, 'Z');
             if (zAxis >= 0)
             {
                 using (planner.Lock())

@@ -36,7 +36,7 @@ public class MoveBuilderTests
     private static MotionParameters Snapshot(Move move)
     {
         KinematicsEngine geometry = KinematicsFactory.Create(move.Kinematics);
-        MotionParameters.ApplyAxisLimits(move, geometry);
+        MotionParameters.ApplyAxes(move, geometry);
         return MotionParameters.FromObjectModel(move, geometry);
     }
     private const int NumDrives = MotionLimits.MaxAxesPlusExtruders;
@@ -150,7 +150,16 @@ public class MoveBuilderTests
 
     private static RawMove LinearMove(uint moveId, float x, float y, float z, float feedRateMmPerSec = 50.0f)
     {
-        RawMove move = new() { MoveId = moveId, FeedRateMmPerSec = feedRateMmPerSec, LinearAxesMentioned = true };
+        // The interpreter sets which axes are X and Y on every move it builds; here they are the
+        // Cartesian machine's first two
+        RawMove move = new()
+        {
+            MoveId = moveId,
+            FeedRateMmPerSec = feedRateMmPerSec,
+            LinearAxesMentioned = true,
+            XAxes = 1u << 0,
+            YAxes = 1u << 1
+        };
         move.Coords[0] = x;
         move.Coords[1] = y;
         move.Coords[2] = z;

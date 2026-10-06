@@ -2,7 +2,6 @@ using System;
 using DuetControlServer.Link.Native;
 using DuetControlServer.Motion.Kinematics;
 using DuetControlServer.Motion.Native;
-using static DuetControlServer.Motion.AxisIndices;
 
 namespace DuetControlServer.Motion;
 
@@ -397,12 +396,17 @@ internal sealed class MoveBuilder(MotionParameters parameters)
         {
             // There is some linear axis movement, so normalise the direction vector so that the total linear movement has unit length and 'totalDistance' is the linear distance moved.
             // This means that the user gets the feed rate that he asked for. It also makes the delta calculations simpler.
-            // First do the bed tilt compensation for deltas.
-            float tiltX = Parameters.Geometry.GetTiltCorrection(XAxis);
-            float tiltY = Parameters.Geometry.GetTiltCorrection(YAxis);
-            if ((tiltX != 0.0f || tiltY != 0.0f) && numAxes > ZAxis)
+            // First do the bed tilt compensation for deltas. X, Y and Z are the axes with those
+            // letters, as the geometry resolved them; a delta missing one of them never gets this far
+            AxisIndices axes = Parameters.Axes;
+            if (axes.X >= 0 && axes.Y >= 0 && axes.Z >= 0 && axes.Z < numAxes)
             {
-                _directionVector[ZAxis] += (_directionVector[XAxis] * tiltX) + (_directionVector[YAxis] * tiltY);
+                float tiltX = Parameters.Geometry.GetTiltCorrection(axes.X);
+                float tiltY = Parameters.Geometry.GetTiltCorrection(axes.Y);
+                if (tiltX != 0.0f || tiltY != 0.0f)
+                {
+                    _directionVector[axes.Z] += (_directionVector[axes.X] * tiltX) + (_directionVector[axes.Y] * tiltY);
+                }
             }
 
             totalDistance = MoveVector.NormaliseLinearMotion(_directionVector, Parameters.LinearAxes, raw.XAxes, raw.YAxes);

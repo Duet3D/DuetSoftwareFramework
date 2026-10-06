@@ -67,6 +67,16 @@ internal sealed class MotionParameters
     public KinematicsEngine Geometry { get; private init; } = CoreKinematicsEngine.TryCreate(KinematicsName.Cartesian)!;
 
     /// <summary>
+    /// Where each axis letter is, X, Y and Z in particular
+    /// </summary>
+    /// <remarks>
+    /// The geometry's, which <see cref="ApplyAxes"/> keeps in step with <c>move.axes[]</c>, so the move
+    /// path finds X, Y and Z without searching the axis list and agrees with the geometry about where
+    /// they are
+    /// </remarks>
+    public AxisIndices Axes => Geometry.Axes;
+
+    /// <summary>
     /// The same machine as the native motion engine takes it
     /// </summary>
     /// <remarks>
@@ -355,14 +365,15 @@ internal sealed class MotionParameters
     public static MotionParameters CreateDefault() => new();
 
     /// <summary>
-    /// Give the geometry the travel limits M208 configured
+    /// Give the geometry the machine's axes: where each letter is, and the travel limits M208 configured
     /// </summary>
     /// <param name="move">The move subsystem of the object model</param>
     /// <param name="geometry">The machine's geometry</param>
     /// <remarks>
     /// <para>
-    /// The geometry holds the M208 box because every geometry limits positions with it, so it is a
-    /// copy of <c>move.axes[].min</c> and <c>max</c> and has to follow them.
+    /// The geometry finds the axes it transforms by letter, so it has to know which axis carries which
+    /// letter, and it holds the M208 box because every geometry limits positions with it. Both follow
+    /// <c>move.axes[]</c>.
     /// </para>
     /// <para>
     /// This is the one thing the object model still configures on the geometry rather than the other
@@ -371,8 +382,10 @@ internal sealed class MotionParameters
     /// planner's geometry - taking a snapshot should not change the machine
     /// </para>
     /// </remarks>
-    public static void ApplyAxisLimits(Move move, KinematicsEngine geometry)
+    public static void ApplyAxes(Move move, KinematicsEngine geometry)
     {
+        geometry.SetAxes(AxisIndices.From(move));
+
         int numAxes = Math.Min(move.Axes.Count, MotionLimits.MaxAxes);
         for (int axis = 0; axis < numAxes; axis++)
         {

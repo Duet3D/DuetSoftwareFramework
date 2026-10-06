@@ -6,7 +6,6 @@ using DuetControlServer.Motion.Native;
 using DuetControlServer.Link.Native;
 
 using Code = DuetAPI.Commands.Code;
-using static DuetControlServer.Motion.AxisIndices;
 
 namespace DuetControlServer.Motion.Kinematics;
 
@@ -15,9 +14,10 @@ namespace DuetControlServer.Motion.Kinematics;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Ported from RepRapFirmware's <c>PolarKinematics</c>. The first drive moves the head in and out
-/// along a radius and the second turns the bed under it, so a position is a radius and an angle rather
-/// than an X and a Y. Steps per mm on the second drive are steps per degree.
+/// Ported from RepRapFirmware's <c>PolarKinematics</c>. The X axis' drive moves the head in and out
+/// along a radius and the Y axis' drive turns the bed under it, so a position is a radius and an angle
+/// rather than an X and a Y. Steps per mm on the turntable drive are steps per degree. X and Y are the
+/// axes with those letters, wherever M584 put them; every other axis has a motor of its own.
 /// </para>
 /// <para>
 /// The transform itself is just polar coordinates. What makes the geometry awkward is speed: near the
@@ -28,7 +28,8 @@ namespace DuetControlServer.Motion.Kinematics;
 /// </remarks>
 internal sealed class PolarKinematicsEngine : KinematicsEngine
 {
-    private const int RadiusDrive = 0, TurntableDrive = 1;
+    /// <summary>Positions in <see cref="KinematicsEngine.KinematicAxes.Roles"/></summary>
+    private const int Radius = 0, Turntable = 1;
 
     /// <summary>Radii M669 R describes the machine with: the smallest and the largest</summary>
     /// <remarks>RepRapFirmware's <c>numRadiusLimits = 2</c> in <c>PolarKinematics::Configure</c></remarks>
@@ -70,6 +71,10 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
 
     /// <inheritdoc />
     public override KinematicsName Kind => KinematicsName.Polar;
+
+    /// <inheritdoc />
+    /// <remarks>The radius arm and the turntable</remarks>
+    protected override string KinematicAxisLetters => "XY";
 
     /// <summary>
     /// A polar machine with RepRapFirmware's defaults, for before M669 has been seen
@@ -154,17 +159,21 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
     /// </remarks>
     public override uint MustBeHomedAxes(uint axesMoving, bool disallowMovesBeforeHoming)
     {
-        const uint xyAxes = (1u << RadiusDrive) | (1u << TurntableDrive);
+        uint xyAxes = Kinematic.Bitmap;
         return (axesMoving & xyAxes) != 0 ? axesMoving | xyAxes : axesMoving;
     }
 
 
     /// <inheritdoc />
-    /// <remarks>The radius motor and the turntable are pinned down only when X and Y are both named</remarks>
+    /// <remarks>
+    /// The radius motor and the turntable are pinned down only when X and Y are both named, which a
+    /// machine missing one of them can never do
+    /// </remarks>
     public override uint AxesAssumedHomed(uint g92Axes)
     {
-        const uint xyAxes = (1u << RadiusDrive) | (1u << TurntableDrive);
-        return (g92Axes & xyAxes) == xyAxes ? g92Axes : g92Axes & ~xyAxes;
+        KinematicAxes kinematic = Kinematic;
+        uint xyAxes = kinematic.Bitmap;
+        return kinematic.IsComplete && (g92Axes & xyAxes) == xyAxes ? g92Axes : g92Axes & ~xyAxes;
     }
 
 
@@ -172,19 +181,21 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
     /// <remarks>
     /// The reachable region is an annulus, not a box: the arm cannot retract past its minimum radius
     /// nor extend past its maximum, and a point outside either is pulled onto the nearer circle rather
-    /// than clamped per axis. X and Y are radius and bed angle here, so the M208 box applies only from
-    /// Z upwards
+    /// than clamped per axis. X and Y are radius and bed angle here, so the M208 box applies only to
+    /// the other axes
     /// </remarks>
     public override LimitPositionResult LimitPosition(Span<float> finalCoords, ReadOnlySpan<float> initialCoords,
                                                       int numVisibleAxes, uint axesToLimit, bool isCoordinated,
                                                       bool applyM208Limits)
     {
-        bool m208Limited = applyM208Limits && LimitToAxisRange(finalCoords, ZAxis, numVisibleAxes, axesToLimit);
+        KinematicAxes kinematic = Kinematic;
+        bool m208Limited = applyM208Limits && LimitToAxisRange(finalCoords, numVisibleAxes, axesToLimit & ~kinematic.Bitmap);
 
         bool radiusLimited = false;
-        if ((axesToLimit & ((1u << RadiusDrive) | (1u << TurntableDrive))) != 0)
+        if (kinematic.IsComplete && kinematic.FitIn(finalCoords.Length) && (axesToLimit & kinematic.Bitmap) != 0)
         {
-            float r2 = (finalCoords[RadiusDrive] * finalCoords[RadiusDrive]) + (finalCoords[TurntableDrive] * finalCoords[TurntableDrive]);
+            int x = kinematic.Roles[Radius], y = kinematic.Roles[Turntable];
+            float r2 = (finalCoords[x] * finalCoords[x]) + (finalCoords[y] * finalCoords[y]);
             if (r2 < MinRadius * MinRadius)
             {
                 radiusLimited = true;
@@ -192,21 +203,21 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
                 if (r < 0.01f)
                 {
                     // The user asked for the middle of the bed, which has no direction to push out in
-                    finalCoords[RadiusDrive] = MinRadius;
-                    finalCoords[TurntableDrive] = 0.0f;
+                    finalCoords[x] = MinRadius;
+                    finalCoords[y] = 0.0f;
                 }
                 else
                 {
-                    finalCoords[RadiusDrive] *= MinRadius / r;
-                    finalCoords[TurntableDrive] *= MinRadius / r;
+                    finalCoords[x] *= MinRadius / r;
+                    finalCoords[y] *= MinRadius / r;
                 }
             }
             else if (r2 > MaxRadius * MaxRadius)
             {
                 radiusLimited = true;
                 float r = MathF.Sqrt(r2);
-                finalCoords[RadiusDrive] *= MaxRadius / r;
-                finalCoords[TurntableDrive] *= MaxRadius / r;
+                finalCoords[x] *= MaxRadius / r;
+                finalCoords[y] *= MaxRadius / r;
             }
         }
 
@@ -221,17 +232,17 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
     /// </remarks>
     public override float GetEndstopPosition(int drive, bool highEnd, float axisMin, float axisMax,
                                              ReadOnlySpan<int> endPoints, ReadOnlySpan<float> stepsPerMm)
-        => drive switch
+        => Kinematic.RoleOf(drive) switch
         {
-            RadiusDrive => HomedRadius,
-            TurntableDrive => 0.0f,
+            Radius => HomedRadius,
+            Turntable => 0.0f,
             _ => base.GetEndstopPosition(drive, highEnd, axisMin, axisMax, endPoints, stepsPerMm)
         };
 
 
     /// <inheritdoc />
     /// <remarks>The turntable turns all the way round, so a move may take the short way there</remarks>
-    public override uint ContinuousRotationAxes => 1u << TurntableDrive;
+    public override uint ContinuousRotationAxes => AxisIndices.Bit(Kinematic.Roles[Turntable]);
 
     /// <summary>Maximum radius RepRapFirmware assumes until M669 says otherwise, mm</summary>
     public const float DefaultMaxRadius = 150.0f;
@@ -278,36 +289,40 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
         Span<int> motorPos,
         bool isCoordinated = false)
     {
-        if (machinePos.Length < 2 || motorPos.Length < 2 || stepsPerMm.Length < 2)
+        KinematicAxes kinematic = Kinematic;
+        if (!kinematic.IsComplete || !kinematic.FitIn(machinePos.Length) || !kinematic.FitIn(motorPos.Length)
+            || !kinematic.FitIn(stepsPerMm.Length))
         {
             return NativeMovementError.UnreachablePosition;
         }
 
         NativeMovementError result = NativeMovementError.Ok;
+        int radiusDrive = kinematic.Roles[Radius], turntableDrive = kinematic.Roles[Turntable];
+        float x = machinePos[radiusDrive], y = machinePos[turntableDrive];
 
-        float radius = MathF.Sqrt((machinePos[0] * machinePos[0]) + (machinePos[1] * machinePos[1]));
-        if (TryRoundToInt32(radius * stepsPerMm[RadiusDrive], out int radiusSteps))
+        float radius = MathF.Sqrt((x * x) + (y * y));
+        if (TryRoundToInt32(radius * stepsPerMm[radiusDrive], out int radiusSteps))
         {
-            motorPos[RadiusDrive] = radiusSteps;
+            motorPos[radiusDrive] = radiusSteps;
         }
         else
         {
             result = NativeMovementError.MicrostepPositionTooLarge;
         }
 
-        if (motorPos[RadiusDrive] == 0)
+        if (motorPos[radiusDrive] == 0)
         {
             // Dead centre: every angle puts the head in the same place, so turning the bed would be
             // movement for nothing. Leaving it at zero also keeps the angle defined rather than
             // whatever atan2 makes of a point at the origin
-            motorPos[TurntableDrive] = 0;
+            motorPos[turntableDrive] = 0;
         }
         else
         {
-            float angle = MathF.Atan2(machinePos[1], machinePos[0]) * RadiansToDegrees;
-            if (TryRoundToInt32(angle * stepsPerMm[TurntableDrive], out int angleSteps))
+            float angle = MathF.Atan2(y, x) * RadiansToDegrees;
+            if (TryRoundToInt32(angle * stepsPerMm[turntableDrive], out int angleSteps))
             {
-                motorPos[TurntableDrive] = angleSteps;
+                motorPos[turntableDrive] = angleSteps;
             }
             else
             {
@@ -315,7 +330,7 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
             }
         }
 
-        NativeMovementError linearResult = LinearAxesToMotorSteps(machinePos, stepsPerMm, ZAxis, numVisibleAxes, motorPos);
+        NativeMovementError linearResult = LinearAxesToMotorSteps(machinePos, stepsPerMm, kinematic.Bitmap, numVisibleAxes, motorPos);
         return result != NativeMovementError.Ok ? result : linearResult;
     }
 
@@ -327,17 +342,18 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
         int numTotalAxes,
         Span<float> machinePos)
     {
-        if (machinePos.Length < 2 || motorPos.Length < 2 || stepsPerMm.Length < 2)
+        KinematicAxes kinematic = Kinematic;
+        if (kinematic.IsComplete && kinematic.FitIn(machinePos.Length) && kinematic.FitIn(motorPos.Length)
+            && kinematic.FitIn(stepsPerMm.Length))
         {
-            return;
+            int radiusDrive = kinematic.Roles[Radius], turntableDrive = kinematic.Roles[Turntable];
+            float angle = (motorPos[turntableDrive] * DegreesToRadians) / stepsPerMm[turntableDrive];
+            float radius = motorPos[radiusDrive] / stepsPerMm[radiusDrive];
+            machinePos[radiusDrive] = radius * MathF.Cos(angle);
+            machinePos[turntableDrive] = radius * MathF.Sin(angle);
         }
 
-        float angle = (motorPos[TurntableDrive] * DegreesToRadians) / stepsPerMm[TurntableDrive];
-        float radius = motorPos[RadiusDrive] / stepsPerMm[RadiusDrive];
-        machinePos[0] = radius * MathF.Cos(angle);
-        machinePos[1] = radius * MathF.Sin(angle);
-
-        LinearMotorStepsToCartesian(motorPos, stepsPerMm, ZAxis, numVisibleAxes, machinePos);
+        LinearMotorStepsToCartesian(motorPos, stepsPerMm, kinematic.Bitmap, numVisibleAxes, machinePos);
     }
 
     /// <inheritdoc />
@@ -352,19 +368,20 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
         ReadOnlySpan<float> maxFeedrates,
         ReadOnlySpan<float> accelerations)
     {
-        if (move.StartMotorPos.Length <= TurntableDrive || move.EndMotorPos.Length <= TurntableDrive
-            || move.StepsPerMm.Length <= TurntableDrive)
+        int turntableDrive = Kinematic.Roles[Turntable];
+        if (turntableDrive < 0 || move.StartMotorPos.Length <= turntableDrive || move.EndMotorPos.Length <= turntableDrive
+            || move.StepsPerMm.Length <= turntableDrive)
         {
             return;
         }
 
-        long turntableMovement = (long)move.EndMotorPos[TurntableDrive] - move.StartMotorPos[TurntableDrive];
+        long turntableMovement = (long)move.EndMotorPos[turntableDrive] - move.StartMotorPos[turntableDrive];
         if (turntableMovement == 0)
         {
             return;
         }
 
-        float stepsPerDegree = move.StepsPerMm[TurntableDrive];
+        float stepsPerDegree = move.StepsPerMm[turntableDrive];
         if (move.ContinuousRotationShortcut)
         {
             // Going more than half way round means the other way round is shorter, and that is the way
@@ -394,7 +411,10 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
     /// <inheritdoc />
     /// <remarks>Both motors move for either X or Y, since neither maps onto one of them</remarks>
     public override uint GetControllingDrives(int axis)
-        => (axis == RadiusDrive || axis == TurntableDrive) ? LowestDrives(2) : base.GetControllingDrives(axis);
+    {
+        uint motors = Kinematic.Bitmap;
+        return (motors & AxisIndices.Bit(axis)) != 0 ? motors : base.GetControllingDrives(axis);
+    }
 
     /// <summary>
     /// Whether the head can be put at the given XY position

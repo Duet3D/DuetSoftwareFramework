@@ -5,7 +5,6 @@ using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
 
 using Code = DuetAPI.Commands.Code;
-using static DuetControlServer.Motion.AxisIndices;
 
 namespace DuetControlServer.Motion.Kinematics;
 
@@ -29,7 +28,12 @@ namespace DuetControlServer.Motion.Kinematics;
 /// <para>
 /// Beyond the usual three towers the geometry allows up to six, which is how machines with paired
 /// carriages are described. The extra towers take part in the inverse transform and in the height
-/// limit but not in the forward transform, which needs exactly three distances to trilaterate
+/// limit but not in the forward transform, which needs exactly three distances to trilaterate.
+/// </para>
+/// <para>
+/// Towers A, B and C are driven by the X, Y and Z axes' drives, found by letter wherever M584 put
+/// them, and the effector position is in those three axes. A machine missing any of the three cannot
+/// be planned for at all - see <see cref="KinematicsEngine.MissingAxesError"/>
 /// </para>
 /// </remarks>
 internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
@@ -99,6 +103,13 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
     public override KinematicsName Kind => KinematicsName.LinearDelta;
 
     /// <inheritdoc />
+    /// <remarks>Towers A, B and C, in that order</remarks>
+    protected override string KinematicAxisLetters => "XYZ";
+
+    /// <inheritdoc />
+    protected override int ExtraKinematicAxes => NumTowers - UsualNumTowers;
+
+    /// <inheritdoc />
     /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
     public override bool HomesIndividualDrives => true;
     /// <inheritdoc />
@@ -114,17 +125,21 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
     /// </remarks>
     public override uint MustBeHomedAxes(uint axesMoving, bool disallowMovesBeforeHoming)
     {
-        const uint xyzAxes = (1u << XAxis) | (1u << YAxis) | (1u << ZAxis);
+        uint xyzAxes = Axes.XyzBitmap;
         return (axesMoving & xyzAxes) != 0 ? axesMoving | xyzAxes : axesMoving;
     }
 
 
     /// <inheritdoc />
-    /// <remarks>All three tower motors are pinned down only when X, Y and Z are all named</remarks>
+    /// <remarks>
+    /// All three tower motors are pinned down only when X, Y and Z are all named, which a machine
+    /// missing one of them can never do
+    /// </remarks>
     public override uint AxesAssumedHomed(uint g92Axes)
     {
-        const uint xyzAxes = (1u << XAxis) | (1u << YAxis) | (1u << ZAxis);
-        return (g92Axes & xyzAxes) == xyzAxes ? g92Axes : g92Axes & ~xyzAxes;
+        KinematicAxes kinematic = Kinematic;
+        uint xyzAxes = kinematic.Machine.XyzBitmap;
+        return kinematic.IsComplete && (g92Axes & xyzAxes) == xyzAxes ? g92Axes : g92Axes & ~xyzAxes;
     }
 
 
@@ -148,56 +163,60 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
                                                       bool applyM208Limits)
     {
         bool limited = false;
-        const uint xyzAxes = (1u << XAxis) | (1u << YAxis) | (1u << ZAxis);
+        KinematicAxes kinematic = Kinematic;
+        AxisIndices axes = kinematic.Machine;
+        int x = axes.X, y = axes.Y, z = axes.Z;
 
-        if ((axesToLimit & xyzAxes) != 0)
+        // Without all three there is no effector position to limit; the move is refused before it
+        // gets here, and this leaves the coordinates alone rather than indexing an axis that is not there
+        if (kinematic.IsComplete && (axesToLimit & axes.XyzBitmap) != 0)
         {
             // Inside the print radius first, because the height check below is only meaningful for a
             // point the towers can actually reach over
-            float radiusSquared = (finalCoords[XAxis] * finalCoords[XAxis]) + (finalCoords[YAxis] * finalCoords[YAxis]);
+            float radiusSquared = (finalCoords[x] * finalCoords[x]) + (finalCoords[y] * finalCoords[y]);
             float printRadiusSquared = PrintRadius * PrintRadius;
             if (applyM208Limits && radiusSquared > printRadiusSquared)
             {
                 float factor = MathF.Sqrt(printRadiusSquared / radiusSquared);
-                finalCoords[XAxis] *= factor;
-                finalCoords[YAxis] *= factor;
+                finalCoords[x] *= factor;
+                finalCoords[y] *= factor;
                 limited = true;
             }
 
             if (initialCoords.IsEmpty)
             {
                 // One position rather than a line, so only the end has to be reachable
-                if (finalCoords[ZAxis] > AlwaysReachableHeight)
+                if (finalCoords[z] > AlwaysReachableHeight)
                 {
                     for (int tower = 0; tower < NumTowers; tower++)
                     {
-                        float carriageHeight = Transform(finalCoords, tower);
+                        float carriageHeight = Transform(finalCoords[x], finalCoords[y], finalCoords[z], tower);
                         if (carriageHeight > GetHomedCarriageHeight(tower))
                         {
-                            finalCoords[ZAxis] -= carriageHeight - GetHomedCarriageHeight(tower);
+                            finalCoords[z] -= carriageHeight - GetHomedCarriageHeight(tower);
                             limited = true;
                         }
                     }
                 }
             }
-            else if (finalCoords[ZAxis] > AlwaysReachableHeight || initialCoords[ZAxis] > AlwaysReachableHeight)
+            else if (finalCoords[z] > AlwaysReachableHeight || initialCoords[z] > AlwaysReachableHeight)
             {
-                LimitPositionResult alongLine = LimitAlongLine(finalCoords, initialCoords, ref limited);
+                LimitPositionResult alongLine = LimitAlongLine(finalCoords, initialCoords, x, y, z, ref limited);
                 if (alongLine != LimitPositionResult.Ok)
                 {
                     return alongLine;
                 }
             }
 
-            if (applyM208Limits && ZAxis < numVisibleAxes && finalCoords[ZAxis] < AxisMinima[ZAxis])
+            if (applyM208Limits && z < numVisibleAxes && finalCoords[z] < AxisMinima[z])
             {
-                finalCoords[ZAxis] = AxisMinima[ZAxis];
+                finalCoords[z] = AxisMinima[z];
                 limited = true;
             }
         }
 
-        // Anything past the towers is an ordinary axis in an ordinary box
-        if (applyM208Limits && LimitToAxisRange(finalCoords, NumTowers, numVisibleAxes, axesToLimit))
+        // Anything that is not a tower is an ordinary axis in an ordinary box
+        if (applyM208Limits && LimitToAxisRange(finalCoords, numVisibleAxes, axesToLimit & ~kinematic.Bitmap))
         {
             limited = true;
         }
@@ -210,6 +229,9 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
     /// </summary>
     /// <param name="finalCoords">Target position, lowered in place if that makes the move possible</param>
     /// <param name="initialCoords">Where the move starts</param>
+    /// <param name="x">Index of the X axis</param>
+    /// <param name="y">Index of the Y axis</param>
+    /// <param name="z">Index of the Z axis</param>
     /// <param name="limited">Set if anything was adjusted</param>
     /// <returns>Ok if the move is now possible, else which kind of unreachable it is</returns>
     /// <remarks>
@@ -226,12 +248,12 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
     /// </para>
     /// </remarks>
     private LimitPositionResult LimitAlongLine(Span<float> finalCoords, ReadOnlySpan<float> initialCoords,
-                                               ref bool limited)
+                                               int x, int y, int z, ref bool limited)
     {
-        float dx = finalCoords[XAxis] - initialCoords[XAxis];
-        float dy = finalCoords[YAxis] - initialCoords[YAxis];
+        float dx = finalCoords[x] - initialCoords[x];
+        float dy = finalCoords[y] - initialCoords[y];
         float p2 = (dx * dx) + (dy * dy);               // squared XY distance
-        float dz = finalCoords[ZAxis] - initialCoords[ZAxis];
+        float dz = finalCoords[z] - initialCoords[z];
         float tdmSquared = p2 + (dz * dz);              // squared total distance
 
         if (tdmSquared == 0.0f)
@@ -239,11 +261,10 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
             return LimitPositionResult.Ok;              // no movement, so nothing to check
         }
 
-        Span<float> intermediate = stackalloc float[3];
         for (int tower = 0; tower < NumTowers; tower++)
         {
-            float tx = initialCoords[XAxis] - GetTowerX(tower);
-            float ty = initialCoords[YAxis] - GetTowerY(tower);
+            float tx = initialCoords[x] - GetTowerX(tower);
+            float ty = initialCoords[y] - GetTowerY(tower);
             float discriminant = (GetDiagonalSquared(tower) * p2) - MathF.Pow((dx * ty) - (dy * tx), 2);
 
             bool limitFinalHeight;
@@ -271,11 +292,10 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
                         if (tp2q2 > 0.0f)
                         {
                             float t = tp2q2 / p2q2;
-                            intermediate[XAxis] = initialCoords[XAxis] + (t * dx);
-                            intermediate[YAxis] = initialCoords[YAxis] + (t * dy);
-                            intermediate[ZAxis] = initialCoords[ZAxis] + (t * dz);
-
-                            float carriageHeight = Transform(intermediate, tower);
+                            float carriageHeight = Transform(initialCoords[x] + (t * dx),
+                                                             initialCoords[y] + (t * dy),
+                                                             initialCoords[z] + (t * dz),
+                                                             tower);
                             if (carriageHeight > GetHomedCarriageHeight(tower))
                             {
                                 // Half a millimetre past the limit, so that lowering by this much
@@ -290,7 +310,7 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
 
                                 // Lowering the target lowers the path, which moves the peak, so the
                                 // same tower has to be checked again
-                                finalCoords[ZAxis] -= adjustment;
+                                finalCoords[z] -= adjustment;
                                 dz -= adjustment;
                                 tdmSquared = p2 + (dz * dz);
                                 limited = true;
@@ -304,7 +324,7 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
 
             if (limitFinalHeight)
             {
-                float carriageHeight = Transform(finalCoords, tower);
+                float carriageHeight = Transform(finalCoords[x], finalCoords[y], finalCoords[z], tower);
                 if (carriageHeight > GetHomedCarriageHeight(tower))
                 {
                     float adjustment = carriageHeight - GetHomedCarriageHeight(tower);
@@ -315,7 +335,7 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
                             : LimitPositionResult.IntermediateUnreachable;
                     }
 
-                    finalCoords[ZAxis] -= adjustment;
+                    finalCoords[z] -= adjustment;
                     limited = true;
                     if (tower + 1 < NumTowers)
                     {
@@ -330,11 +350,14 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
 
 
     /// <inheritdoc />
-    /// <remarks>A tower's switch is at the top of its travel, so the answer is the carriage height</remarks>
+    /// <remarks>
+    /// A tower's switch is at the top of its travel, so the answer is the carriage height. The drive is
+    /// a tower's when it belongs to the axis that tower is driven by
+    /// </remarks>
     public override float GetEndstopPosition(int drive, bool highEnd, float axisMin, float axisMax,
                                              ReadOnlySpan<int> endPoints, ReadOnlySpan<float> stepsPerMm)
-        => drive < NumTowers && highEnd
-            ? GetHomedCarriageHeight(drive)
+        => Kinematic.RoleOf(drive) is int tower and >= 0 && highEnd
+            ? GetHomedCarriageHeight(tower)
             : base.GetEndstopPosition(drive, highEnd, axisMin, axisMax, endPoints, stepsPerMm);
 
 
@@ -567,26 +590,34 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
         Span<int> motorPos,
         bool isCoordinated = false)
     {
-        if (machinePos.Length < UsualNumTowers)
+        KinematicAxes kinematic = Kinematic;
+        AxisIndices axes = kinematic.Machine;
+        if (!kinematic.IsComplete || !kinematic.LettersFitIn(machinePos.Length))
         {
             return NativeMovementError.UnreachablePosition;
         }
 
         NativeMovementError result = NativeMovementError.Ok;
-        int towerLimit = Math.Min(NumTowers, Math.Min(motorPos.Length, stepsPerMm.Length));
+        float x = machinePos[axes.X], y = machinePos[axes.Y], z = machinePos[axes.Z];
 
-        for (int tower = 0; tower < towerLimit; tower++)
+        for (int tower = 0; tower < NumTowers; tower++)
         {
-            float carriageHeight = Transform(machinePos, tower);
+            int drive = kinematic.Roles[tower];
+            if (drive < 0 || drive >= motorPos.Length || drive >= stepsPerMm.Length)
+            {
+                continue;
+            }
+
+            float carriageHeight = Transform(x, y, z, tower);
             if (float.IsNaN(carriageHeight) || float.IsInfinity(carriageHeight))
             {
                 // The rod is not long enough to span the gap, so there is no carriage height that
                 // puts the effector there at all
                 result = NativeMovementError.UnreachablePosition;
             }
-            else if (TryRoundToInt32(carriageHeight * stepsPerMm[tower], out int steps))
+            else if (TryRoundToInt32(carriageHeight * stepsPerMm[drive], out int steps))
             {
-                motorPos[tower] = steps;
+                motorPos[drive] = steps;
             }
             else
             {
@@ -594,7 +625,7 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
             }
         }
 
-        NativeMovementError linearResult = LinearAxesToMotorSteps(machinePos, stepsPerMm, NumTowers, numVisibleAxes, motorPos);
+        NativeMovementError linearResult = LinearAxesToMotorSteps(machinePos, stepsPerMm, kinematic.Bitmap, numVisibleAxes, motorPos);
         return result != NativeMovementError.Ok ? result : linearResult;
     }
 
@@ -606,18 +637,21 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
         int numTotalAxes,
         Span<float> machinePos)
     {
-        if (machinePos.Length < UsualNumTowers || motorPos.Length < UsualNumTowers || stepsPerMm.Length < UsualNumTowers)
+        KinematicAxes kinematic = Kinematic;
+        AxisIndices axes = kinematic.Machine;
+        if (kinematic.IsComplete && kinematic.LettersFitIn(machinePos.Length) && kinematic.LettersFitIn(motorPos.Length)
+            && kinematic.LettersFitIn(stepsPerMm.Length))
         {
-            return;
+            (float x, float y, float z) = ForwardTransform(
+                motorPos[axes.X] / stepsPerMm[axes.X],
+                motorPos[axes.Y] / stepsPerMm[axes.Y],
+                motorPos[axes.Z] / stepsPerMm[axes.Z]);
+            machinePos[axes.X] = x;
+            machinePos[axes.Y] = y;
+            machinePos[axes.Z] = z;
         }
 
-        ForwardTransform(
-            motorPos[TowerA] / stepsPerMm[TowerA],
-            motorPos[TowerB] / stepsPerMm[TowerB],
-            motorPos[TowerC] / stepsPerMm[TowerC],
-            machinePos);
-
-        LinearMotorStepsToCartesian(motorPos, stepsPerMm, NumTowers, numVisibleAxes, machinePos);
+        LinearMotorStepsToCartesian(motorPos, stepsPerMm, kinematic.Bitmap, numVisibleAxes, machinePos);
     }
 
     /// <inheritdoc />
@@ -626,11 +660,17 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
     /// effector still even when only one axis is being commanded
     /// </remarks>
     public override uint GetControllingDrives(int axis)
-        => (axis >= 0 && axis <= ZAxis) ? LowestDrives(NumTowers) : base.GetControllingDrives(axis);
+    {
+        KinematicAxes kinematic = Kinematic;
+        return (kinematic.Machine.XyzBitmap & AxisIndices.Bit(axis)) != 0 ? kinematic.Bitmap : base.GetControllingDrives(axis);
+    }
 
     /// <inheritdoc />
     public override float GetTiltCorrection(int axis)
-        => axis == XAxis ? XTilt : axis == YAxis ? YTilt : 0.0f;
+    {
+        AxisIndices axes = Axes;
+        return axis < 0 ? 0.0f : axis == axes.X ? XTilt : axis == axes.Y ? YTilt : 0.0f;
+    }
 
     /// <summary>
     /// Whether a position is inside the printable cylinder and under the reachable ceiling
@@ -644,25 +684,28 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
     /// </remarks>
     public bool IsReachable(ReadOnlySpan<float> machinePos)
     {
-        if (machinePos.Length < UsualNumTowers)
+        KinematicAxes kinematic = Kinematic;
+        AxisIndices axes = kinematic.Machine;
+        if (!kinematic.IsComplete || !kinematic.LettersFitIn(machinePos.Length))
         {
             return false;
         }
 
-        float radiusSquared = (machinePos[XAxis] * machinePos[XAxis]) + (machinePos[YAxis] * machinePos[YAxis]);
+        float x = machinePos[axes.X], y = machinePos[axes.Y], z = machinePos[axes.Z];
+        float radiusSquared = (x * x) + (y * y);
         if (radiusSquared > PrintRadius * PrintRadius)
         {
             return false;
         }
 
-        if (machinePos[ZAxis] <= AlwaysReachableHeight)
+        if (z <= AlwaysReachableHeight)
         {
             return true;
         }
 
         for (int tower = 0; tower < UsualNumTowers; tower++)
         {
-            float carriageHeight = Transform(machinePos, tower);
+            float carriageHeight = Transform(x, y, z, tower);
             if (float.IsNaN(carriageHeight) || carriageHeight > _homedCarriageHeights[tower])
             {
                 return false;
@@ -671,28 +714,23 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
         return true;
     }
 
+
     /// <summary>
     /// The carriage height one tower needs for the effector to be at the given position
     /// </summary>
-    /// <param name="machinePos">Axis coordinates in mm</param>
+    /// <param name="x">Effector X in mm</param>
+    /// <param name="y">Effector Y in mm</param>
+    /// <param name="z">Effector Z in mm</param>
     /// <param name="tower">Tower number</param>
     /// <returns>The height in mm, or NaN if the rod cannot span the gap</returns>
-    private float Transform(ReadOnlySpan<float> machinePos, int tower)
+    private float Transform(float x, float y, float z, int tower)
     {
-        if (tower >= NumTowers)
-        {
-            return machinePos[tower];
-        }
-
-        float dx = machinePos[XAxis] - _towerX[tower];
-        float dy = machinePos[YAxis] - _towerY[tower];
+        float dx = x - _towerX[tower];
+        float dy = y - _towerY[tower];
 
         // Pythagoras on the rod: what is left of its length after the horizontal part is the vertical
         // drop from the carriage to the effector
-        return MathF.Sqrt(_diagonalsSquared[tower] - (dx * dx) - (dy * dy))
-               + machinePos[ZAxis]
-               + (machinePos[XAxis] * XTilt)
-               + (machinePos[YAxis] * YTilt);
+        return MathF.Sqrt(_diagonalsSquared[tower] - (dx * dx) - (dy * dy)) + z + (x * XTilt) + (y * YTilt);
     }
 
     /// <summary>
@@ -701,14 +739,14 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
     /// <param name="ha">Height of the A carriage, mm</param>
     /// <param name="hb">Height of the B carriage, mm</param>
     /// <param name="hc">Height of the C carriage, mm</param>
-    /// <param name="machinePos">Filled in with X, Y and Z in mm</param>
+    /// <returns>X, Y and Z in mm</returns>
     /// <remarks>
     /// Trilateration. Subtracting each pair of sphere equations kills the quadratic terms and leaves
     /// two planes, whose intersection is a line; parametrising X and Y along that line by Z and
     /// substituting back into one sphere gives a quadratic in Z. The lower root is the effector - the
     /// upper one is the reflection of it above the carriages, which the machine cannot reach
     /// </remarks>
-    private void ForwardTransform(float ha, float hb, float hc, Span<float> machinePos)
+    private (float X, float Y, float Z) ForwardTransform(float ha, float hb, float hc)
     {
         // x = (Uz + S)/Q and y = -(Rz + T)/Q describe the line the effector must be on
         float r = ((_xBc * ha) + (_xCa * hb) + (_xAb * hc)) * 2.0f;
@@ -731,11 +769,11 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
                   + (((ha * ha) - _diagonalsSquared[TowerA]) * _qSquared);
 
         float z = (minusHalfB - MathF.Sqrt((minusHalfB * minusHalfB) - (a * c))) / a;
-        machinePos[XAxis] = ((u * z) + s) / _q;
-        machinePos[YAxis] = -((r * z) + t) / _q;
+        float x = ((u * z) + s) / _q;
+        float y = -((r * z) + t) / _q;
 
         // The tilt correction went into the carriage heights on the way out, so it comes back off here
-        machinePos[ZAxis] = z - ((machinePos[XAxis] * XTilt) + (machinePos[YAxis] * YTilt));
+        return (x, y, z - ((x * XTilt) + (y * YTilt)));
     }
 
     /// <summary>
@@ -811,8 +849,7 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
     public override uint GetHomingFileName(uint toBeHomed, uint alreadyHomed, ReadOnlySpan<char> axisLetters,
                                            out string fileName)
     {
-        const uint xyz = 0b111;
-        if ((toBeHomed & xyz) != 0)
+        if ((toBeHomed & Axes.XyzBitmap) != 0)
         {
             fileName = "homedelta.g";
             return 0;
@@ -822,5 +859,5 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
 
     /// <inheritdoc />
     /// <remarks>All three towers, because a delta has no axis that moves a motor of its own</remarks>
-    public override uint AxesToHomeBeforeProbing => 0b111;
+    public override uint AxesToHomeBeforeProbing => Axes.XyzBitmap;
 }
