@@ -385,7 +385,7 @@ public class AxisLetterOrderTests : BenchFixture
     }
 
     [TestCase("M665 L215 R105.6 H240 B80", "The machine has no Z axis, which delta kinematics needs")]
-    [TestCase("M669 K4", "The machine has no Z axis, which Scara kinematics needs")]
+    [TestCase("M669 K10", "The machine has no Z axis, which Rotary delta kinematics needs")]
     public async Task WithoutZAGeometryThatNeedsItRefusesToMove(string geometry, string error)
     {
         await using JobBench bench = await ScheduleMoveBench.StartAsync(NoZConfig + "\n" + geometry);
@@ -400,6 +400,53 @@ public class AxisLetterOrderTests : BenchFixture
             Assert.That(move.Trim(), Is.EqualTo("Error: G1: " + error));
             Assert.That(home.Trim(), Is.EqualTo("Error: G28: " + error));
             Assert.That(bench.CanMaster.ScheduledMoves(), Has.Count.EqualTo(before), "nothing reached the link");
+        });
+    }
+
+    [Test]
+    public async Task WithoutZAScaraStillMovesItsArms()
+    {
+        // A pen plotter: a SCARA needs only its two joints, and its crosstalk onto Z has nothing to act
+        // on. The move is compared driver by driver against the same SCARA with a Z axis
+        const string scara = "M669 K4";
+        const string start = "G90\nG92 X100 Y50";
+
+        await using JobBench withZ = await ScheduleMoveBench.StartAsync(NoZConfig + "\nM569 P1.2 S1\nM584 Z1.2\n" + scara);
+        await using JobBench withoutZ = await ScheduleMoveBench.StartAsync(NoZConfig + "\n" + scara);
+        foreach (JobBench bench in new[] { withZ, withoutZ })
+        {
+            foreach (string line in start.Split('\n'))
+            {
+                await bench.Host.ExecuteCodeAsync(line);
+            }
+        }
+
+        IReadOnlyList<ScheduledMove> expected = await withZ.RunMoveAsync("G1 X120 Y30 F3000");
+        IReadOnlyList<ScheduledMove> actual = await withoutZ.RunMoveAsync("G1 X120 Y30 F3000");
+
+        Assert.Multiple(async () =>
+        {
+            Assert.That(expected.DriversMoved(), Is.EquivalentTo(new[]
+            {
+                (ScheduleMoveBench.DriverBoard, XDriver), (ScheduleMoveBench.DriverBoard, YDriver)
+            }), "both joints turn for a move in X and Y, and nothing drags Z");
+            Assert.That(actual.DriversMoved(), Is.EquivalentTo(expected.DriversMoved()));
+            Assert.That(actual.Steps(XDriver), Is.Not.Zero.And.EqualTo(expected.Steps(XDriver)), "the proximal joint");
+            Assert.That(actual.Steps(YDriver), Is.Not.Zero.And.EqualTo(expected.Steps(YDriver)), "the distal joint");
+            Assert.That(actual.Distance(), Is.EqualTo(expected.Distance()).Within(1e-3f));
+            Assert.That(actual, Has.Count.EqualTo(expected.Count), "segmented the same way");
+            for (int i = 0; i < Math.Min(actual.Count, expected.Count); i++)
+            {
+                Assert.That(actual[i].TotalClocks, Is.EqualTo(expected[i].TotalClocks), $"segment {i}'s duration");
+                foreach (byte driver in new[] { XDriver, YDriver })
+                {
+                    Assert.That(actual[i].DriverFor(ScheduleMoveBench.DriverBoard, driver),
+                                Is.EqualTo(expected[i].DriverFor(ScheduleMoveBench.DriverBoard, driver)),
+                                $"segment {i}, driver 1.{driver}");
+                }
+            }
+            Assert.That(await ReadAxisAsync(withoutZ, 'X', axis => axis.UserPosition), Is.EqualTo(120.0f).Within(1e-2f));
+            Assert.That(await ReadAxisAsync(withoutZ, 'Y', axis => axis.UserPosition), Is.EqualTo(30.0f).Within(1e-2f));
         });
     }
 }

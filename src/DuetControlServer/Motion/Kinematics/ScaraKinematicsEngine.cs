@@ -32,13 +32,14 @@ namespace DuetControlServer.Motion.Kinematics;
 /// back off on the way in.
 /// </para>
 /// <para>
-/// The X, Y and Z motors are the drives of the axes lettered X, Y and Z, wherever M584 put them. Z is
-/// needed as well as the two joints because the crosstalk drags it
+/// The X, Y and Z motors are the drives of the axes lettered X, Y and Z, wherever M584 put them. Only
+/// the two joints are needed: a machine without Z, such as a pen plotter, has nothing for the
+/// crosstalk to drag
 /// </para>
 /// </remarks>
 internal sealed class ScaraKinematicsEngine : KinematicsEngine
 {
-    /// <summary>Positions in <see cref="KinematicsEngine.KinematicAxes.Roles"/></summary>
+    /// <summary>Positions in <see cref="KinematicsEngine.KinematicAxes.Roles"/>; Lift is -1 without Z</summary>
     private const int Proximal = 0, Distal = 1, Lift = 2;
 
     private const float DegreesToRadians = MathF.PI / 180.0f;
@@ -96,8 +97,12 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
     public override KinematicsName Kind => KinematicsName.Scara;
 
     /// <inheritdoc />
-    /// <remarks>The proximal joint, the distal joint and the lift, in that order</remarks>
-    protected override string KinematicAxisLetters => "XYZ";
+    /// <remarks>The proximal joint and the distal joint, in that order</remarks>
+    protected override string KinematicAxisLetters => "XY";
+
+    /// <inheritdoc />
+    /// <remarks>The lift, which the arms drag through the crosstalk</remarks>
+    protected override string OptionalKinematicAxisLetters => "Z";
 
     /// <summary>
     /// A SCARA with RepRapFirmware's defaults, for before M669 has been seen
@@ -269,7 +274,7 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
                 return (highEnd ? _psiLimits[1] : _psiLimits[0])
                     - Crosstalk(endPoints, stepsPerMm, roles[Proximal], roles[Distal], _crosstalk[0]);
 
-            case Lift:                  // dragged by both arms
+            case Lift:                  // dragged by both arms, and only there when the machine has Z
                 return (highEnd ? axisMax : axisMin)
                     - Crosstalk(endPoints, stepsPerMm, roles[Proximal], roles[Lift], _crosstalk[1])
                     - Crosstalk(endPoints, stepsPerMm, roles[Distal], roles[Lift], _crosstalk[2]);
@@ -454,14 +459,17 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
             result = NativeMovementError.MicrostepPositionTooLarge;
         }
 
-        float z = machinePos[zAxis] - (_crosstalk[1] * theta) - (_crosstalk[2] * psi);
-        if (TryRoundToInt32(z * stepsPerMm[zAxis], out int zSteps))
+        if (zAxis >= 0)
         {
-            motorPos[zAxis] = zSteps;
-        }
-        else
-        {
-            result = NativeMovementError.MicrostepPositionTooLarge;
+            float z = machinePos[zAxis] - (_crosstalk[1] * theta) - (_crosstalk[2] * psi);
+            if (TryRoundToInt32(z * stepsPerMm[zAxis], out int zSteps))
+            {
+                motorPos[zAxis] = zSteps;
+            }
+            else
+            {
+                result = NativeMovementError.MicrostepPositionTooLarge;
+            }
         }
 
         NativeMovementError linearResult = LinearAxesToMotorSteps(machinePos, stepsPerMm, kinematic.Bitmap, numVisibleAxes, motorPos);
@@ -497,7 +505,10 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
                                            + (MathF.Sin((psi + theta) * DegreesToRadians) * DistalArmLength)
                                            - YOffset;
 
-            machinePos[zAxis] = (motorPos[zAxis] / stepsPerMm[zAxis]) + (_crosstalk[1] * theta) + (_crosstalk[2] * psi);
+            if (zAxis >= 0)
+            {
+                machinePos[zAxis] = (motorPos[zAxis] / stepsPerMm[zAxis]) + (_crosstalk[1] * theta) + (_crosstalk[2] * psi);
+            }
         }
 
         LinearMotorStepsToCartesian(motorPos, stepsPerMm, kinematic.Bitmap, numVisibleAxes, machinePos);
@@ -505,8 +516,8 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
 
     /// <inheritdoc />
     /// <remarks>
-    /// Both arm motors move for either X or Y. Z joins them only on a machine with arm-to-Z crosstalk,
-    /// where turning an arm lifts the head as well
+    /// Both arm motors move for either X or Y. Z joins them only on a machine that has Z and arm-to-Z
+    /// crosstalk, where turning an arm lifts the head as well
     /// </remarks>
     public override uint GetControllingDrives(int axis)
     {

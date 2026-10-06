@@ -295,7 +295,7 @@ public class AxisOrderTests
     {
         yield return new TestCaseData("LinearDelta", "XYU", "The machine has no Z axis, which delta kinematics needs");
         yield return new TestCaseData("RotaryDelta", "ZU", "The machine has no X or Y axis, which Rotary delta kinematics needs");
-        yield return new TestCaseData("Scara", "YXU", "The machine has no Z axis, which Scara kinematics needs");
+        yield return new TestCaseData("Scara", "ZXU", "The machine has no Y axis, which Scara kinematics needs");
         yield return new TestCaseData("FiveBarScara", "XZ", "The machine has no Y axis, which FiveBarScara kinematics needs");
         yield return new TestCaseData("Polar", "YZ", "The machine has no X axis, which Polar kinematics needs");
         yield return new TestCaseData("Hangprinter", "", "The machine has no X, Y or Z axis, which Hangprinter kinematics needs");
@@ -324,6 +324,43 @@ public class AxisOrderTests
             Assert.DoesNotThrow(() => engine.MotorStepsToCartesian(motorPos, stepsPerMm, letters.Length, letters.Length, position));
             Assert.That(engine.AxesAssumedHomed((1u << letters.Length) - 1) & AxisIndices.From(letters).XyBitmap, Is.Zero,
                         "naming every axis there is still does not pin the geometry down");
+        });
+    }
+
+    [Test]
+    public void AScaraWithoutZMovesItsArmsAndHasNoZToDrag()
+    {
+        // A pen plotter: two joints and no lift. The arms come out where they would on the same SCARA
+        // with Z, and the crosstalk onto Z has nothing to act on
+        const string noZ = "YXU";
+        KinematicsEngine withZ = Create("Scara").WithAxes(Canonical);
+        KinematicsEngine withoutZ = Create("Scara").WithAxes(noZ);
+        Func<char, float> point = Point([100.0f, 50.0f, 5.0f]);
+        float[] stepsPerMm = Lay(noZ, l => StepsByLetter[l]);
+
+        int[] canonicalMotors = new int[NumDrives], motors = new int[NumDrives];
+        Assert.That(withZ.CartesianToMotorSteps(Lay(Canonical, point), Lay(Canonical, l => StepsByLetter[l]), 5, 5, canonicalMotors),
+                    Is.EqualTo(NativeMovementError.Ok));
+        NativeMovementError error = withoutZ.CartesianToMotorSteps(Lay(noZ, point), stepsPerMm, 3, 3, motors);
+
+        float[] roundTripped = new float[NumDrives];
+        withoutZ.MotorStepsToCartesian(motors, stepsPerMm, 3, 3, roundTripped);
+
+        AxisIndices axes = AxisIndices.From(noZ);
+        Assert.Multiple(() =>
+        {
+            Assert.That(withoutZ.MissingAxesError, Is.Null);
+            Assert.That(error, Is.EqualTo(NativeMovementError.Ok));
+            foreach (char letter in "XYU")
+            {
+                Assert.That(motors[noZ.IndexOf(letter)], Is.EqualTo(canonicalMotors[Canonical.IndexOf(letter)]), $"the motor of {letter}");
+                Assert.That(roundTripped[noZ.IndexOf(letter)], Is.EqualTo(point(letter)).Within(0.05f), letter.ToString());
+            }
+            Assert.That(withoutZ.GetControllingDrives(axes.X), Is.EqualTo(axes.XyBitmap), "the two arms, with no Z to drag");
+            Assert.That(withoutZ.GetControllingDrives(noZ.IndexOf('U')), Is.EqualTo(AxisIndices.Bit(noZ.IndexOf('U'))));
+            Assert.That(withoutZ.AxesAssumedHomed(0b111), Is.EqualTo(0b111u), "G92 X Y U pins both arms down");
+            Assert.That(withoutZ.GetEndstopPosition(noZ.IndexOf('U'), true, 0.0f, 200.0f, motors, stepsPerMm), Is.EqualTo(200.0f),
+                        "U is an ordinary axis");
         });
     }
 

@@ -157,7 +157,7 @@ internal abstract class KinematicsEngine
     public abstract KinematicsName Kind { get; }
 
     /// <summary>
-    /// The letters of the axes this geometry transforms, in the order it uses them
+    /// The letters of the axes this geometry needs and transforms, in the order it uses them
     /// </summary>
     /// <remarks>
     /// <para>
@@ -165,7 +165,8 @@ internal abstract class KinematicsEngine
     /// the drives of X and Y. RepRapFirmware can take these to be the first axes because its first
     /// three axes are always X, Y and Z. DSF creates axes in whatever order M584 names them, so a
     /// geometry says which letters it needs and <see cref="SetAxes"/> finds where they are. Every axis
-    /// not listed here is an ordinary axis with a motor of its own.
+    /// not listed here or in <see cref="OptionalKinematicAxisLetters"/> is an ordinary axis with a
+    /// motor of its own.
     /// </para>
     /// <para>
     /// Empty for the matrix-driven geometries, which do not single out any axis: their matrix is placed
@@ -175,12 +176,23 @@ internal abstract class KinematicsEngine
     protected virtual string KinematicAxisLetters => string.Empty;
 
     /// <summary>
+    /// The letters of further axes this geometry transforms when the machine has them, in the order
+    /// it uses them after <see cref="KinematicAxisLetters"/>
+    /// </summary>
+    /// <remarks>
+    /// A SCARA's crosstalk drags Z, so it transforms Z when there is one, but a machine without Z - a
+    /// pen plotter - is still a SCARA. A letter here the machine does not have is left out of
+    /// <see cref="KinematicAxes.Roles"/> (-1) rather than counted as missing
+    /// </remarks>
+    protected virtual string OptionalKinematicAxisLetters => string.Empty;
+
+    /// <summary>
     /// How many further axes this geometry transforms beyond <see cref="KinematicAxisLetters"/>
     /// </summary>
     /// <remarks>
     /// A delta's fourth to sixth towers and a Hangprinter's fourth and later anchors. They have no
-    /// letter of their own, so they are the axes that carry none of <see cref="KinematicAxisLetters"/>,
-    /// taken in axis order - which on a machine whose first three axes are X, Y and Z is the fourth
+    /// letter of their own, so they are the axes that carry none of <see cref="KinematicAxisLetters"/>
+    /// and <see cref="OptionalKinematicAxisLetters"/>, taken in axis order - which on a machine whose first three axes are X, Y and Z is the fourth
     /// axis onwards, as in RepRapFirmware. One the machine does not have is left out rather than needed
     /// </remarks>
     protected virtual int ExtraKinematicAxes => 0;
@@ -218,7 +230,7 @@ internal abstract class KinematicsEngine
             return false;
         }
 
-        _kinematicAxes = new KinematicAxes(axes, KinematicAxisLetters, ExtraKinematicAxes);
+        _kinematicAxes = new KinematicAxes(axes, KinematicAxisLetters, OptionalKinematicAxisLetters, ExtraKinematicAxes);
         OnAxesChanged();
         return true;
     }
@@ -268,7 +280,7 @@ internal abstract class KinematicsEngine
     /// Read once at the top of a method that needs it, so that a whole calculation sees one set of
     /// axes even if <see cref="SetAxes"/> runs meanwhile
     /// </remarks>
-    protected KinematicAxes Kinematic => _kinematicAxes ??= new KinematicAxes(AxisIndices.None, KinematicAxisLetters, ExtraKinematicAxes);
+    protected KinematicAxes Kinematic => _kinematicAxes ??= new KinematicAxes(AxisIndices.None, KinematicAxisLetters, OptionalKinematicAxisLetters, ExtraKinematicAxes);
     private KinematicAxes? _kinematicAxes;
 
     /// <summary>
@@ -288,7 +300,10 @@ internal abstract class KinematicsEngine
         /// <summary>Every transformed axis the machine has, as a bitmap</summary>
         public uint Bitmap { get; }
 
-        /// <summary>The letters the geometry needs and the machine does not have, empty if none</summary>
+        /// <summary>
+        /// The letters the geometry needs and the machine does not have, empty if none. An optional
+        /// letter the machine does not have is not among them
+        /// </summary>
         public string Missing { get; }
 
         /// <summary>Whether every letter the geometry needs is there</summary>
@@ -303,7 +318,7 @@ internal abstract class KinematicsEngine
         private readonly int _highestAxis = -1;
 
         /// <summary>
-        /// Whether the lettered axes - X, Y and Z, not a delta's extra towers - can be indexed in a span
+        /// Whether the lettered axes the machine has - X, Y and Z, not a delta's extra towers - can be indexed in a span
         /// of the given length
         /// </summary>
         /// <param name="length">Length of the coordinate, step or motor position span</param>
@@ -315,10 +330,12 @@ internal abstract class KinematicsEngine
         /// Resolve a geometry's axes
         /// </summary>
         /// <param name="machine">The machine's axes</param>
-        /// <param name="letters">The letters the geometry needs, in its order</param>
-        /// <param name="extra">How many unlettered axes it transforms after those</param>
-        public KinematicAxes(AxisIndices machine, string letters, int extra)
+        /// <param name="required">The letters the geometry needs, in its order</param>
+        /// <param name="optional">The letters it uses after those when the machine has them</param>
+        /// <param name="extra">How many unlettered axes it transforms after all of those</param>
+        public KinematicAxes(AxisIndices machine, string required, string optional, int extra)
         {
+            string letters = required + optional;
             Machine = machine;
             Roles = new int[letters.Length + extra];
 
@@ -326,7 +343,7 @@ internal abstract class KinematicsEngine
             for (int role = 0; role < letters.Length; role++)
             {
                 Roles[role] = machine.IndexOf(letters[role]);
-                if (Roles[role] < 0)
+                if (Roles[role] < 0 && role < required.Length)
                 {
                     missing.Append(letters[role]);
                 }
