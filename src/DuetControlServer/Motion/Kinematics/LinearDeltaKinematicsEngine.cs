@@ -666,13 +666,6 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
     }
 
     /// <inheritdoc />
-    public override float GetTiltCorrection(int axis)
-    {
-        AxisIndices axes = Axes;
-        return axis < 0 ? 0.0f : axis == axes.X ? XTilt : axis == axes.Y ? YTilt : 0.0f;
-    }
-
-    /// <inheritdoc />
     public override void ApplyTiltCorrection(Span<float> directionVector, int numAxes)
     {
         AxisIndices axes = Axes;

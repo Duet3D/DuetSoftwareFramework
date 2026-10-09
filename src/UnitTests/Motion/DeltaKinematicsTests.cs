@@ -162,11 +162,14 @@ public class DeltaKinematicsTests
             homedHeight: 240.0f, printRadius: 80.0f,
             xTilt: 0.01f, yTilt: -0.005f).WithAxes();
 
+        float[] direction = [3.0f, 4.0f, 1.0f];
+        engine.ApplyTiltCorrection(direction, 3);
+
         Assert.Multiple(() =>
         {
-            Assert.That(engine.GetTiltCorrection(0), Is.EqualTo(0.01f));
-            Assert.That(engine.GetTiltCorrection(1), Is.EqualTo(-0.005f));
-            Assert.That(engine.GetTiltCorrection(2), Is.EqualTo(0.0f), "Z itself is not corrected");
+            Assert.That(direction[0], Is.EqualTo(3.0f), "X itself is not corrected");
+            Assert.That(direction[1], Is.EqualTo(4.0f), "Y itself is not corrected");
+            Assert.That(direction[2], Is.EqualTo(1.0f + (3.0f * 0.01f) + (4.0f * -0.005f)).Within(1e-6f));
         });
 
         int[] motorPos = ToMotorSteps(engine, [40.0f, 30.0f, 70.0f], 3);

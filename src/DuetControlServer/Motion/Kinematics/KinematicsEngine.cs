@@ -633,21 +633,14 @@ internal abstract class KinematicsEngine
     public virtual uint GetControllingDrives(int axis) => axis >= 0 ? 1u << axis : 0u;
 
     /// <summary>
-    /// Bed tilt correction to apply to Z for a unit of movement along the given axis
-    /// </summary>
-    /// <param name="axis">Axis number</param>
-    /// <returns>Correction factor, zero if this geometry has none</returns>
-    public virtual float GetTiltCorrection(int axis) => 0.0f;
-
-    /// <summary>
     /// Add the bed tilt correction to a move's direction vector
     /// </summary>
     /// <param name="directionVector">Movement of each axis, before it is normalised</param>
     /// <param name="numAxes">Number of axes the vector covers</param>
     /// <remarks>
-    /// Z moves by <see cref="GetTiltCorrection"/> for each unit of X and Y movement. Here rather than
-    /// in the move builder because X, Y and Z are the axes with those letters, which only the
-    /// geometry has resolved
+    /// Z moves by a fixed fraction of each unit of X and Y movement, which only a geometry with a
+    /// tilted bed has. Here rather than in the move builder because X, Y and Z are the axes with those
+    /// letters, which only the geometry has resolved
     /// </remarks>
     public virtual void ApplyTiltCorrection(Span<float> directionVector, int numAxes) { }
 

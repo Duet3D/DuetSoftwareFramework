@@ -392,7 +392,30 @@ public class AxisOrderTests
         {
             Assert.That(engine.MissingAxesError, Is.Null);
             Assert.That(engine.GetControllingDrives(0), Is.EqualTo(0b111u));
-            Assert.That(engine.GetTiltCorrection(1), Is.EqualTo(engine.XTilt), "X is the second axis");
+        });
+    }
+
+    [Test]
+    public void ADeltasBedTiltLiftsTheAxisLetteredZ()
+    {
+        // Z first, then U, then Y and X: the tilt reads X and Y and lifts Z wherever they are
+        LinearDeltaKinematicsEngine engine = new LinearDeltaKinematicsEngine(
+            numTowers: 3, radius: 105.6f,
+            diagonals: [215.0f, 215.0f, 215.0f],
+            angleCorrections: [0.0f, 0.0f, 0.0f],
+            endstopAdjustments: [0.0f, 0.0f, 0.0f],
+            homedHeight: 240.0f, printRadius: 80.0f,
+            xTilt: 0.01f, yTilt: -0.005f).WithAxes("ZUYX");
+
+        float[] direction = [1.0f, 7.0f, 4.0f, 3.0f];
+        engine.ApplyTiltCorrection(direction, 4);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(direction[0], Is.EqualTo(1.0f + (3.0f * 0.01f) + (4.0f * -0.005f)).Within(1e-6f), "Z");
+            Assert.That(direction[1], Is.EqualTo(7.0f), "U is not corrected");
+            Assert.That(direction[2], Is.EqualTo(4.0f), "Y is not corrected");
+            Assert.That(direction[3], Is.EqualTo(3.0f), "X is not corrected");
         });
     }
 
