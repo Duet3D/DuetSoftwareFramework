@@ -362,8 +362,8 @@ internal sealed partial class GCodeHandler
                     LinearAxesMentioned = true,
                     CheckEndstops = checkProbe,
                     ReduceAcceleration = checkProbe,
-                    XAxes = ToolTransform.AxisBitmap(toolManager.Current, planner.Parameters.Axes, 'X'),
-                    YAxes = ToolTransform.AxisBitmap(toolManager.Current, planner.Parameters.Axes, 'Y')
+                    XAxes = ToolTransform.AxisBitmap(toolManager.Current, model.Move, 'X'),
+                    YAxes = ToolTransform.AxisBitmap(toolManager.Current, model.Move, 'Y')
                 };
 
                 // Everything else stays where it is, so the move is built from the current position
@@ -596,7 +596,7 @@ internal sealed partial class GCodeHandler
                 probePosition[axis] += probe.Offsets[axis];
             }
         }
-        AxisSkew.Apply(toolManager.Current, model.Move, planner.Parameters.Axes, probePosition, numAxes);
+        AxisSkew.Apply(toolManager.Current, model.Move, probePosition, numAxes);
 
         (float axis0, float axis1) = bedCompensation.GridCoordinates(probePosition, numAxes);
         bedCompensation.SetZeroHeightError(axis0, axis1);
@@ -786,8 +786,8 @@ internal sealed partial class GCodeHandler
                 {
                     FeedRateMmPerSec = settings.TravelSpeed,
                     LinearAxesMentioned = true,
-                    XAxes = ToolTransform.AxisBitmap(toolManager.Current, planner.Parameters.Axes, 'X'),
-                    YAxes = ToolTransform.AxisBitmap(toolManager.Current, planner.Parameters.Axes, 'Y')
+                    XAxes = ToolTransform.AxisBitmap(toolManager.Current, model.Move, 'X'),
+                    YAxes = ToolTransform.AxisBitmap(toolManager.Current, model.Move, 'Y')
                 };
 
                 for (int axis = 0; axis < model.Move.Axes.Count; axis++)

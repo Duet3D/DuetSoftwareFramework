@@ -17,9 +17,9 @@ namespace DuetControlServer.Motion;
 /// <para>
 /// An instance is a resolved, immutable view of <c>move.axes[]</c>, which stays the one source of the
 /// letters. The geometry holds one (<see cref="Kinematics.KinematicsEngine.Axes"/>), replaced whenever
-/// the axes change, and the move path reaches it through <see cref="MotionParameters.Axes"/>, so
-/// nothing that runs per move searches the axis list. Code that reads the object model once, rather
-/// than per move, asks <see cref="IndexOf(Move, char)"/> directly
+/// the axes change, because it is read without the object model lock and derives state of its own
+/// from where the axes are. Everything else holds the object model lock while it works, so it asks
+/// <see cref="IndexOf(Move, char)"/> of <c>move.axes[]</c> directly
 /// </para>
 /// </remarks>
 internal sealed class AxisIndices

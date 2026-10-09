@@ -505,15 +505,14 @@ internal sealed class JobSequences(
                 {
                     RestorePoint rp = planner.State.RestorePoints[RestorePoint.PauseNumber];
                     int numAxes = planner.Parameters.SharedAxisCount(model.Move);
-                    AxisIndices axes = planner.Parameters.Axes;
-                    int zAxis = axes.Z;
+                    int zAxis = AxisIndices.IndexOf(model.Move, 'Z');
 
                     RawMove move = new()
                     {
                         IsCoordinated = true,
                         FeedRateMmPerSec = ResumeFeedRateMmPerSec,
-                        XAxes = ToolTransform.AxisBitmap(toolManager.Current, axes, 'X'),
-                        YAxes = ToolTransform.AxisBitmap(toolManager.Current, axes, 'Y')
+                        XAxes = ToolTransform.AxisBitmap(toolManager.Current, model.Move, 'X'),
+                        YAxes = ToolTransform.AxisBitmap(toolManager.Current, model.Move, 'Y')
                     };
 
                     bool anythingToDo = false;
@@ -547,7 +546,7 @@ internal sealed class JobSequences(
                         return null;
                     }
 
-                    ToolTransform.Apply(toolManager.Current, model.Move, axes, planner.State, move.Coords, numAxes);
+                    ToolTransform.Apply(toolManager.Current, model.Move, planner.State, move.Coords, numAxes);
                     MoveSubmitResult result = planner.QueueMove(move);
                     if (result.IsSettled())
                     {

@@ -202,9 +202,17 @@ internal abstract class KinematicsEngine
     /// </summary>
     /// <remarks>
     /// <see cref="AxisIndices.None"/> until <see cref="SetAxes"/> has been called, so a geometry built
-    /// before M584 has created anything knows of no axes rather than assuming some
+    /// before M584 has created anything knows of no axes rather than assuming some. The geometry's own:
+    /// code outside it holds the object model lock and looks letters up in <c>move.axes[]</c>
     /// </remarks>
-    public AxisIndices Axes => Kinematic.Machine;
+    protected AxisIndices Axes => Kinematic.Machine;
+
+    /// <summary>
+    /// Take over the axes another geometry has, for a new instance that replaces it
+    /// </summary>
+    /// <param name="other">The geometry being replaced</param>
+    /// <returns>True if they differed from what this geometry had</returns>
+    public bool TakeAxesFrom(KinematicsEngine other) => SetAxes(other.Axes);
 
     /// <summary>
     /// Follow a change to the machine's axes
@@ -630,6 +638,18 @@ internal abstract class KinematicsEngine
     /// <param name="axis">Axis number</param>
     /// <returns>Correction factor, zero if this geometry has none</returns>
     public virtual float GetTiltCorrection(int axis) => 0.0f;
+
+    /// <summary>
+    /// Add the bed tilt correction to a move's direction vector
+    /// </summary>
+    /// <param name="directionVector">Movement of each axis, before it is normalised</param>
+    /// <param name="numAxes">Number of axes the vector covers</param>
+    /// <remarks>
+    /// Z moves by <see cref="GetTiltCorrection"/> for each unit of X and Y movement. Here rather than
+    /// in the move builder because X, Y and Z are the axes with those letters, which only the
+    /// geometry has resolved
+    /// </remarks>
+    public virtual void ApplyTiltCorrection(Span<float> directionVector, int numAxes) { }
 
     /// <summary>
     /// Axes that wrap at 360 degrees, so a move may take the short way round

@@ -672,6 +672,17 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
         return axis < 0 ? 0.0f : axis == axes.X ? XTilt : axis == axes.Y ? YTilt : 0.0f;
     }
 
+    /// <inheritdoc />
+    public override void ApplyTiltCorrection(Span<float> directionVector, int numAxes)
+    {
+        AxisIndices axes = Axes;
+        if (axes.X < 0 || axes.Y < 0 || axes.Z < 0 || axes.X >= numAxes || axes.Y >= numAxes || axes.Z >= numAxes)
+        {
+            return;                             // a delta missing one of them never gets this far
+        }
+        directionVector[axes.Z] += (directionVector[axes.X] * XTilt) + (directionVector[axes.Y] * YTilt);
+    }
+
     /// <summary>
     /// Whether a position is inside the printable cylinder and under the reachable ceiling
     /// </summary>

@@ -31,7 +31,6 @@ internal static class AxisSkew
     /// </summary>
     /// <param name="tool">The selected tool, whose axis mapping names X and Y, or null if none is</param>
     /// <param name="move">The move model</param>
-    /// <param name="axes">The machine's axes by letter</param>
     /// <param name="coords">Machine coordinates, corrected in place</param>
     /// <param name="numAxes">Number of axes to consider</param>
     /// <remarks>
@@ -50,7 +49,7 @@ internal static class AxisSkew
     /// which is what makes the round trip exact
     /// </para>
     /// </remarks>
-    public static void Apply(Tool? tool, Move move, AxisIndices axes, Span<float> coords, int numAxes)
+    public static void Apply(Tool? tool, Move move, Span<float> coords, int numAxes)
     {
         Skew skew = move.Compensation.Skew;
         if (skew.TanXY == 0.0f && skew.TanXZ == 0.0f && skew.TanYZ == 0.0f)
@@ -58,8 +57,8 @@ internal static class AxisSkew
             return;                             // the machine is square, or says it is
         }
 
-        uint xAxes = ToolTransform.AxisBitmap(tool, axes, 'X');
-        uint yAxes = ToolTransform.AxisBitmap(tool, axes, 'Y');
+        uint xAxes = ToolTransform.AxisBitmap(tool, move, 'X');
+        uint yAxes = ToolTransform.AxisBitmap(tool, move, 'Y');
 
         int lowestY = LowestSetAxis(yAxes, numAxes);
         if (lowestY < 0)
@@ -68,7 +67,7 @@ internal static class AxisSkew
         }
         int lowestX = LowestSetAxis(xAxes, numAxes);
 
-        int zAxis = axes.Z;
+        int zAxis = AxisIndices.IndexOf(move, 'Z');
         float z = zAxis >= 0 && zAxis < numAxes ? coords[zAxis] : 0.0f;
 
         for (int axis = 0; axis < numAxes && axis < MotionLimits.MaxAxes; axis++)
@@ -95,7 +94,6 @@ internal static class AxisSkew
     /// </summary>
     /// <param name="tool">The selected tool, whose axis mapping names X and Y, or null if none is</param>
     /// <param name="move">The move model</param>
-    /// <param name="axes">The machine's axes by letter</param>
     /// <param name="coords">Machine coordinates, corrected on the way in and requested on the way out</param>
     /// <param name="numAxes">Number of axes to consider</param>
     /// <remarks>
@@ -105,7 +103,7 @@ internal static class AxisSkew
     /// saw it in, so Y is undone while X still carries its own correction, and X is undone once Y is
     /// back to the coordinate the move was commanded in
     /// </remarks>
-    public static void Remove(Tool? tool, Move move, AxisIndices axes, Span<float> coords, int numAxes)
+    public static void Remove(Tool? tool, Move move, Span<float> coords, int numAxes)
     {
         Skew skew = move.Compensation.Skew;
         if (skew.TanXY == 0.0f && skew.TanXZ == 0.0f && skew.TanYZ == 0.0f)
@@ -113,8 +111,8 @@ internal static class AxisSkew
             return;
         }
 
-        uint xAxes = ToolTransform.AxisBitmap(tool, axes, 'X');
-        uint yAxes = ToolTransform.AxisBitmap(tool, axes, 'Y');
+        uint xAxes = ToolTransform.AxisBitmap(tool, move, 'X');
+        uint yAxes = ToolTransform.AxisBitmap(tool, move, 'Y');
 
         int lowestY = LowestSetAxis(yAxes, numAxes);
         if (lowestY < 0)
@@ -123,7 +121,7 @@ internal static class AxisSkew
         }
         int lowestX = LowestSetAxis(xAxes, numAxes);
 
-        int zAxis = axes.Z;
+        int zAxis = AxisIndices.IndexOf(move, 'Z');
         float z = zAxis >= 0 && zAxis < numAxes ? coords[zAxis] : 0.0f;
 
         for (int axis = 0; axis < numAxes && axis < MotionLimits.MaxAxes; axis++)

@@ -417,8 +417,8 @@ internal sealed partial class GCodeHandler
         {
             // A machine with no Z endstop homes Z with its probe, and so does one whose Z endstop is
             // the probe. Both mean X and Y have to be homed first, which is what the kinematics needs
-            // to know to answer at all. Z is the axis lettered Z, as the geometry found it
-            Endstop? zEndstop = geometry.Axes.Z is int z && z >= 0 && z < model.Sensors.Endstops.Count
+            // to know to answer at all. Z is the axis lettered Z
+            Endstop? zEndstop = AxisIndices.IndexOf(model.Move, 'Z') is int z && z >= 0 && z < model.Sensors.Endstops.Count
                                 ? model.Sensors.Endstops[z]
                                 : null;
             geometry.HomesZWithProbe = zEndstop is null || zEndstop.Type == EndstopType.ZProbeAsEndstop;

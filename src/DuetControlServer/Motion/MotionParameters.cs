@@ -67,16 +67,6 @@ internal sealed class MotionParameters
     public KinematicsEngine Geometry { get; private init; } = CoreKinematicsEngine.TryCreate(KinematicsName.Cartesian)!;
 
     /// <summary>
-    /// Where each axis letter is, X, Y and Z in particular
-    /// </summary>
-    /// <remarks>
-    /// The geometry's, which <see cref="ApplyAxes"/> keeps in step with <c>move.axes[]</c>, so the move
-    /// path finds X, Y and Z without searching the axis list and agrees with the geometry about where
-    /// they are
-    /// </remarks>
-    public AxisIndices Axes => Geometry.Axes;
-
-    /// <summary>
     /// The same machine as the native motion engine takes it
     /// </summary>
     /// <remarks>

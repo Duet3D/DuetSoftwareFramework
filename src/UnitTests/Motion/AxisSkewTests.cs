@@ -1,4 +1,3 @@
-using System;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Motion;
 using NUnit.Framework;
@@ -17,14 +16,6 @@ namespace UnitTests.Motion;
 [TestFixture]
 public class AxisSkewTests
 {
-    /// <summary>Apply the correction on a machine whose axes are the ones the move model has</summary>
-    private static void Apply(Tool? tool, Move move, Span<float> coords, int numAxes)
-        => AxisSkew.Apply(tool, move, AxisIndices.From(move), coords, numAxes);
-
-    /// <summary>Remove the correction on a machine whose axes are the ones the move model has</summary>
-    private static void Remove(Tool? tool, Move move, Span<float> coords, int numAxes)
-        => AxisSkew.Remove(tool, move, AxisIndices.From(move), coords, numAxes);
-
     /// <summary>
     /// A machine with the given skew measured
     /// </summary>
@@ -55,7 +46,7 @@ public class AxisSkewTests
         // Every move goes through this, so a machine with no skew measured has to come out untouched
         // rather than approximately untouched
         float[] coords = [10.0f, 20.0f, 5.0f];
-        Apply(null, NewMove(), coords, 3);
+        AxisSkew.Apply(null, NewMove(), coords, 3);
 
         Assert.That(coords, Is.EqualTo(new[] { 10.0f, 20.0f, 5.0f }));
     }
@@ -66,10 +57,10 @@ public class AxisSkewTests
         // Correcting both would double it; which one it is is a matter of which axis the machine is
         // squared against, and is what M556 P selects
         float[] onY = [10.0f, 20.0f, 0.0f];
-        Apply(null, NewMove(tanXY: 0.01f, compensateXY: false), onY, 3);
+        AxisSkew.Apply(null, NewMove(tanXY: 0.01f, compensateXY: false), onY, 3);
 
         float[] onX = [10.0f, 20.0f, 0.0f];
-        Apply(null, NewMove(tanXY: 0.01f), onX, 3);
+        AxisSkew.Apply(null, NewMove(tanXY: 0.01f), onX, 3);
 
         Assert.Multiple(() =>
         {
@@ -85,7 +76,7 @@ public class AxisSkewTests
     public void TheHeightTermsMoveXAndYByTheirOwnTangents()
     {
         float[] coords = [10.0f, 20.0f, 50.0f];
-        Apply(null, NewMove(tanXZ: 0.002f, tanYZ: 0.004f), coords, 3);
+        AxisSkew.Apply(null, NewMove(tanXZ: 0.002f, tanYZ: 0.004f), coords, 3);
 
         Assert.Multiple(() =>
         {
@@ -101,7 +92,7 @@ public class AxisSkewTests
         Move move = NewMove(tanXY: 0.01f, tanXZ: 0.002f, numAxes: 1);
 
         float[] coords = [10.0f];
-        Apply(null, move, coords, 1);
+        AxisSkew.Apply(null, move, coords, 1);
 
         Assert.That(coords[0], Is.EqualTo(10.0f));
     }
@@ -119,11 +110,11 @@ public class AxisSkewTests
         Move move = NewMove(tanXY, tanXZ, tanYZ, compensateXY);
 
         float[] coords = [10.0f, 20.0f, 50.0f];
-        Apply(null, move, coords, 3);
+        AxisSkew.Apply(null, move, coords, 3);
         Assert.That(coords[compensateXY ? 0 : 1], Is.Not.EqualTo(compensateXY ? 10.0f : 20.0f),
                     "the correction was applied at all");
 
-        Remove(null, move, coords, 3);
+        AxisSkew.Remove(null, move, coords, 3);
 
         Assert.Multiple(() =>
         {
@@ -147,8 +138,8 @@ public class AxisSkewTests
             Move move = NewMove(tanXY: 0.01f, tanXZ: 0.002f, tanYZ: 0.004f, compensateXY);
 
             float[] coords = [10.0f, 20.0f, 50.0f];
-            Apply(null, move, coords, 3);
-            Remove(null, move, coords, 3);
+            AxisSkew.Apply(null, move, coords, 3);
+            AxisSkew.Remove(null, move, coords, 3);
 
             Assert.Multiple(() =>
             {
@@ -169,7 +160,7 @@ public class AxisSkewTests
         tool.Axes.Add([0, 3]);                  // X drives axes 0 and 3
 
         float[] coords = [10.0f, 20.0f, 50.0f, 30.0f];
-        Apply(tool, move, coords, 4);
+        AxisSkew.Apply(tool, move, coords, 4);
 
         Assert.Multiple(() =>
         {

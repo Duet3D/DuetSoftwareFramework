@@ -622,8 +622,8 @@ public class AxisOrderTests
         Lay("UZXY", user).AsSpan(0, 4).CopyTo(permutedState.CurrentUserPosition);
 
         float[] canonicalCoords = new float[4], permutedCoords = new float[4];
-        ToolTransform.Apply(canonicalTool, canonicalMove, AxisIndices.From(canonicalMove), canonicalState, canonicalCoords, 4);
-        ToolTransform.Apply(permutedTool, permutedMove, AxisIndices.From(permutedMove), permutedState, permutedCoords, 4);
+        ToolTransform.Apply(canonicalTool, canonicalMove, canonicalState, canonicalCoords, 4);
+        ToolTransform.Apply(permutedTool, permutedMove, permutedState, permutedCoords, 4);
 
         Assert.Multiple(() =>
         {
@@ -636,7 +636,7 @@ public class AxisOrderTests
         });
 
         // And back again, into the axes carrying the letters
-        ToolTransform.Remove(permutedTool, permutedMove, AxisIndices.From(permutedMove), permutedCoords, 4);
+        ToolTransform.Remove(permutedTool, permutedMove, permutedCoords, 4);
         Assert.Multiple(() =>
         {
             foreach (char letter in "XYZU")
@@ -660,14 +660,14 @@ public class AxisOrderTests
         state.CurrentUserPosition[1] = 10.0f;               // X
 
         float[] coords = new float[2];
-        ToolTransform.Apply(tool, move, AxisIndices.From(move), state, coords, 2);
+        ToolTransform.Apply(tool, move, state, coords, 2);
 
         Assert.Multiple(() =>
         {
             Assert.That(tool.Axes[2], Is.Empty, "M563's default Z map on a machine without Z");
             Assert.That(coords[0], Is.EqualTo(18.0f), "Y less its offset, and no hop");
             Assert.That(coords[1], Is.EqualTo(9.0f), "X less its offset, and no hop");
-            Assert.That(ToolTransform.AxisBitmap(tool, AxisIndices.From(move), 'Z'), Is.Zero);
+            Assert.That(ToolTransform.AxisBitmap(tool, move, 'Z'), Is.Zero);
         });
     }
 
@@ -679,9 +679,9 @@ public class AxisOrderTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(ToolTransform.AxisBitmap(tool, AxisIndices.From(move), 'X'), Is.EqualTo(0b100u));
-            Assert.That(ToolTransform.AxisBitmap(tool, AxisIndices.From(move), 'Z'), Is.EqualTo(0b001u));
-            Assert.That(ToolTransform.AxisBitmap(null, AxisIndices.From(move), 'Y'), Is.EqualTo(0b010u));
+            Assert.That(ToolTransform.AxisBitmap(tool, move, 'X'), Is.EqualTo(0b100u));
+            Assert.That(ToolTransform.AxisBitmap(tool, move, 'Z'), Is.EqualTo(0b001u));
+            Assert.That(ToolTransform.AxisBitmap(null, move, 'Y'), Is.EqualTo(0b010u));
         });
     }
 

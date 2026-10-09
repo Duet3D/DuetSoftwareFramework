@@ -16,14 +16,6 @@ namespace UnitTests.Motion;
 [TestFixture]
 public class ToolTransformTests
 {
-    /// <summary>Apply the transform on a machine whose axes are the ones the move model has</summary>
-    private static void Apply(Tool? tool, Move move, MovementState state, Span<float> coords, int numAxes, uint explicitAxes = 0)
-        => ToolTransform.Apply(tool, move, AxisIndices.From(move), state, coords, numAxes, explicitAxes);
-
-    /// <summary>Remove the transform on a machine whose axes are the ones the move model has</summary>
-    private static void Remove(Tool? tool, Move move, Span<float> coords, int numAxes)
-        => ToolTransform.Remove(tool, move, AxisIndices.From(move), coords, numAxes);
-
     /// <summary>A machine with as many axes as the test needs, named in order from XYZUV</summary>
     private static Move NewMove(int numAxes = 3)
     {
@@ -61,7 +53,7 @@ public class ToolTransformTests
         move.Axes[2].Babystep = -0.05f;
 
         float[] coords = new float[3];
-        Apply(null, move, At(10.0f, 20.0f, 5.0f), coords, 3);
+        ToolTransform.Apply(null, move, At(10.0f, 20.0f, 5.0f), coords, 3);
 
         Assert.Multiple(() =>
         {
@@ -79,7 +71,7 @@ public class ToolTransformTests
         Tool tool = NewTool(3.0f, -2.0f, 0.5f);
 
         float[] coords = new float[3];
-        Apply(tool, move, At(10.0f, 20.0f, 5.0f), coords, 3);
+        ToolTransform.Apply(tool, move, At(10.0f, 20.0f, 5.0f), coords, 3);
 
         Assert.Multiple(() =>
         {
@@ -98,9 +90,9 @@ public class ToolTransformTests
         tool.Retraction.ZHop = 0.4f;
 
         float[] down = new float[3], up = new float[3];
-        Apply(tool, move, At(0.0f, 0.0f, 5.0f), down, 3);
+        ToolTransform.Apply(tool, move, At(0.0f, 0.0f, 5.0f), down, 3);
         tool.IsRetracted = true;
-        Apply(tool, move, At(0.0f, 0.0f, 5.0f), up, 3);
+        ToolTransform.Apply(tool, move, At(0.0f, 0.0f, 5.0f), up, 3);
 
         Assert.Multiple(() =>
         {
@@ -118,7 +110,7 @@ public class ToolTransformTests
         tool.Axes.Add([0, 3]);                  // X drives axes 0 and 3
 
         float[] coords = new float[4];
-        Apply(tool, move, At(10.0f, 20.0f, 5.0f, 99.0f), coords, 4);
+        ToolTransform.Apply(tool, move, At(10.0f, 20.0f, 5.0f, 99.0f), coords, 4);
 
         Assert.Multiple(() =>
         {
@@ -137,7 +129,7 @@ public class ToolTransformTests
         tool.Axes.Add([3]);                     // X drives U only
 
         float[] coords = [-1.0f, -1.0f, -1.0f, -1.0f];
-        Apply(tool, move, At(10.0f, 20.0f, 5.0f), coords, 4);
+        ToolTransform.Apply(tool, move, At(10.0f, 20.0f, 5.0f), coords, 4);
 
         Assert.Multiple(() =>
         {
@@ -157,8 +149,8 @@ public class ToolTransformTests
         float[] mapped = new float[4], named = new float[4];
         MovementState state = At(10.0f, 20.0f, 5.0f, 40.0f);
 
-        Apply(tool, move, state, mapped, 4);
-        Apply(tool, move, state, named, 4, explicitAxes: 1u << 3);
+        ToolTransform.Apply(tool, move, state, mapped, 4);
+        ToolTransform.Apply(tool, move, state, named, 4, explicitAxes: 1u << 3);
 
         Assert.Multiple(() =>
         {
@@ -177,7 +169,7 @@ public class ToolTransformTests
         tool.Axes.Add([0, 3]);
 
         float[] coords = [10.0f, 0.0f, 0.0f, 20.0f];
-        Remove(tool, move, coords, 4);
+        ToolTransform.Remove(tool, move, coords, 4);
 
         Assert.That(coords[0], Is.EqualTo(15.0f));
     }
@@ -192,8 +184,8 @@ public class ToolTransformTests
         tool.IsRetracted = true;
 
         float[] coords = new float[3];
-        Apply(tool, move, At(10.0f, 20.0f, 5.0f), coords, 3);
-        Remove(tool, move, coords, 3);
+        ToolTransform.Apply(tool, move, At(10.0f, 20.0f, 5.0f), coords, 3);
+        ToolTransform.Remove(tool, move, coords, 3);
 
         Assert.Multiple(() =>
         {
@@ -210,10 +202,10 @@ public class ToolTransformTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(ToolTransform.AxisBitmap(null, AxisIndices.From(move), 'X'), Is.EqualTo(0b0001u));
-            Assert.That(ToolTransform.AxisBitmap(null, AxisIndices.From(move), 'Y'), Is.EqualTo(0b0010u));
-            Assert.That(ToolTransform.AxisBitmap(null, AxisIndices.From(move), 'U'), Is.EqualTo(0b1000u));
-            Assert.That(ToolTransform.AxisBitmap(null, AxisIndices.From(move), 'A'), Is.Zero, "a letter the machine does not have");
+            Assert.That(ToolTransform.AxisBitmap(null, move, 'X'), Is.EqualTo(0b0001u));
+            Assert.That(ToolTransform.AxisBitmap(null, move, 'Y'), Is.EqualTo(0b0010u));
+            Assert.That(ToolTransform.AxisBitmap(null, move, 'U'), Is.EqualTo(0b1000u));
+            Assert.That(ToolTransform.AxisBitmap(null, move, 'A'), Is.Zero, "a letter the machine does not have");
         });
     }
 
@@ -226,9 +218,9 @@ public class ToolTransformTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(ToolTransform.AxisBitmap(null, AxisIndices.From(move), 'X'), Is.EqualTo(0b0001u));
-            Assert.That(ToolTransform.AxisBitmap(null, AxisIndices.From(move), 'x'), Is.EqualTo(0b1000u));
-            Assert.That(ToolTransform.AxisBitmap(null, AxisIndices.From(move), 'y'), Is.Zero, "Y does not answer to y");
+            Assert.That(ToolTransform.AxisBitmap(null, move, 'X'), Is.EqualTo(0b0001u));
+            Assert.That(ToolTransform.AxisBitmap(null, move, 'x'), Is.EqualTo(0b1000u));
+            Assert.That(ToolTransform.AxisBitmap(null, move, 'y'), Is.Zero, "Y does not answer to y");
         });
     }
 
@@ -242,8 +234,8 @@ public class ToolTransformTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(ToolTransform.AxisBitmap(tool, AxisIndices.From(move), 'X'), Is.EqualTo(1u << 3));
-            Assert.That(ToolTransform.AxisBitmap(tool, AxisIndices.From(move), 'Y'), Is.EqualTo(1u << 1), "a letter the tool has no map for drives its own axis");
+            Assert.That(ToolTransform.AxisBitmap(tool, move, 'X'), Is.EqualTo(1u << 3));
+            Assert.That(ToolTransform.AxisBitmap(tool, move, 'Y'), Is.EqualTo(1u << 1), "a letter the tool has no map for drives its own axis");
         });
     }
 

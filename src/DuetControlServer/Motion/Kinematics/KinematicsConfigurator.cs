@@ -54,7 +54,7 @@ internal static class KinematicsConfigurator
                 // not the geometry's to reset, so it takes them over: a core geometry places its
                 // matrix by them, and the rest of this code may configure it
                 engine = KinematicsFactory.Create(name.Value);
-                engine.SetAxes(current.Axes);
+                engine.TakeAxesFrom(current);
             }
             seen = true;
         }
@@ -64,7 +64,7 @@ internal static class KinematicsConfigurator
             // M665 with a rod length switches the machine to a delta if it is not one already, which
             // is how a delta config.g is usually written
             engine = KinematicsFactory.Create(KinematicsName.LinearDelta);
-            engine.SetAxes(current.Axes);
+            engine.TakeAxesFrom(current);
             seen = true;
         }
 
@@ -77,7 +77,7 @@ internal static class KinematicsConfigurator
         if (!ReferenceEquals(configured, engine))
         {
             // Configuring builds a new instance, which has to know the machine's axes as well
-            configured.SetAxes(engine.Axes);
+            configured.TakeAxesFrom(engine);
             if (ReferenceEquals(engine, current))
             {
                 // The geometry itself did not change, so what M669 S and T had already set carries over
