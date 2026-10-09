@@ -356,7 +356,7 @@ internal sealed partial class GCodeHandler
 
             using (await model.AccessReadWriteAsync(cancellationToken))
             {
-                RawMove move = new()
+                RawMove raw = new()
                 {
                     FeedRateMmPerSec = speed,
                     LinearAxesMentioned = true,
@@ -369,9 +369,9 @@ internal sealed partial class GCodeHandler
                 // Everything else stays where it is, so the move is built from the current position
                 for (int axis = 0; axis < model.Move.Axes.Count; axis++)
                 {
-                    move.Coords[axis] = model.Move.Axes[axis].MachinePosition ?? 0.0f;
+                    raw.Coords[axis] = model.Move.Axes[axis].MachinePosition ?? 0.0f;
                 }
-                move.Coords[zAxis] = target;
+                raw.Coords[zAxis] = target;
 
                 if (checkProbe)
                 {
@@ -385,13 +385,13 @@ internal sealed partial class GCodeHandler
                     // report from the boards carrying the drivers that move Z - the same handle a
                     // stall-homed axis stops on, armed by the caller before the move
                     bool armed = probe.Type == ProbeType.ZMotorStall
-                        ? RemoteEndstops.TryGetStallStopInput(stallDrivers, move.StopOnInput[0])
-                        : RemoteProbes.TryGetStopInput(probe, probeNumber, StopAction.All, move.StopOnInput[0]);
+                        ? RemoteEndstops.TryGetStallStopInput(stallDrivers, raw.StopOnInput[0])
+                        : RemoteProbes.TryGetStopInput(probe, probeNumber, StopAction.All, raw.StopOnInput[0]);
                     if (!armed)
                     {
                         return false;
                     }
-                    move.StopOnInput[0].Action = StopAction.All;
+                    raw.StopOnInput[0].Action = StopAction.All;
 
                     // What stopped the last probing move says nothing about this one. A switch probe
                     // is read from its own input so it does not need this; a stall probe has no
@@ -400,16 +400,16 @@ internal sealed partial class GCodeHandler
                     {
                         planner.State.ArmEndstops();
                     }
-                    for (int drive = 1; drive < move.StopOnInput.Length; drive++)
+                    for (int drive = 1; drive < raw.StopOnInput.Length; drive++)
                     {
-                        move.StopOnInput[drive].CopyFrom(move.StopOnInput[0]);
+                        raw.StopOnInput[drive].CopyFrom(raw.StopOnInput[0]);
                     }
 
                     // What stopped the last move that watched something says nothing about this one
-                    moveInterpreter.ArmCorrection(move);
+                    moveInterpreter.ArmCorrection(raw);
                 }
 
-                result = planner.QueueMove(move);
+                result = planner.QueueMove(raw);
             }
 
             switch (result)
