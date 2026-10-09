@@ -759,6 +759,20 @@ public class MoveInterpreterTests
     }
 
     [Test]
+    public void MentionsAxisOtherThanZCountsALowerCaseZ()
+    {
+        // M584 'z0.5 creates an axis distinct from Z, so moving it is not a Z-only move
+        Machine machine = NewMachine();
+        AddAxis(machine.Model.Move, 'z', stepsPerMm: 80.0f, speedMmPerMin: 600.0f, acceleration: 100.0f, driver: 5);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(machine.Interpreter.MentionsAxisOtherThanZ(G("G1 'z5"), 4), Is.True);
+            Assert.That(machine.Interpreter.MentionsAxisOtherThanZ(G("G1 Z5"), 4), Is.False);
+        });
+    }
+
+    [Test]
     public void TheWorkplaceOffsetOfAnAxisThatHasNoneIsZero()
     {
         Axis axis = new();

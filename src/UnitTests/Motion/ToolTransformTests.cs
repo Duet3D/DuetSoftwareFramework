@@ -204,16 +204,31 @@ public class ToolTransformTests
     }
 
     [Test]
-    public void ALetterWithNoToolNamesTheAxesThatCarryIt()
+    public void ALetterWithNoToolNamesTheAxisThatCarriesIt()
     {
         Move move = NewMove(4);
-        move.Axes[3].Letter = 'X';              // a second axis called X, as M584 X0:3 would give
 
         Assert.Multiple(() =>
         {
-            Assert.That(ToolTransform.AxisBitmap(null, AxisIndices.From(move), 'X'), Is.EqualTo(0b1001u));
+            Assert.That(ToolTransform.AxisBitmap(null, AxisIndices.From(move), 'X'), Is.EqualTo(0b0001u));
             Assert.That(ToolTransform.AxisBitmap(null, AxisIndices.From(move), 'Y'), Is.EqualTo(0b0010u));
+            Assert.That(ToolTransform.AxisBitmap(null, AxisIndices.From(move), 'U'), Is.EqualTo(0b1000u));
             Assert.That(ToolTransform.AxisBitmap(null, AxisIndices.From(move), 'A'), Is.Zero, "a letter the machine does not have");
+        });
+    }
+
+    [Test]
+    public void ALowerCaseLetterIsAnAxisOfItsOwn()
+    {
+        // M584 'x0.3 creates an axis distinct from X, so neither letter names the other's axis
+        Move move = NewMove(3);
+        move.Axes.Add(new Axis { Letter = 'x', Visible = true });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ToolTransform.AxisBitmap(null, AxisIndices.From(move), 'X'), Is.EqualTo(0b0001u));
+            Assert.That(ToolTransform.AxisBitmap(null, AxisIndices.From(move), 'x'), Is.EqualTo(0b1000u));
+            Assert.That(ToolTransform.AxisBitmap(null, AxisIndices.From(move), 'y'), Is.Zero, "Y does not answer to y");
         });
     }
 

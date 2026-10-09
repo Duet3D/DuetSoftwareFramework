@@ -577,7 +577,7 @@ internal sealed class MoveInterpreter(
         for (int axis = 0; axis < numAxes; axis++)
         {
             Axis axisConfig = model.Move.Axes[axis];
-            if (char.ToUpperInvariant(axisConfig.Letter) != 'Z' && code.HasParameter(axisConfig.Letter))
+            if (axisConfig.Letter != 'Z' && code.HasParameter(axisConfig.Letter))
             {
                 return true;
             }

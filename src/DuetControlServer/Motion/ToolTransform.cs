@@ -214,7 +214,7 @@ internal static class ToolTransform
         uint bitmap = 0;
         for (int axis = 0; axis < axes.Count && axis < MotionLimits.MaxAxes; axis++)
         {
-            if (char.ToUpperInvariant(axes.Letters[axis]) == letter)
+            if (axes.Letters[axis] == letter)
             {
                 bitmap |= 1u << axis;
             }
