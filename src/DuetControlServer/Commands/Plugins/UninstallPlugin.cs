@@ -21,11 +21,6 @@ public sealed class UninstallPlugin(CommandFactory commandFactory, Model.ObjectM
     : DuetAPI.Commands.UninstallPlugin, IConnectionCommand
 {
     /// <summary>
-    /// Internal flag to indicate that custom plugin files should not be purged
-    /// </summary>
-    public bool ForUpgrade { get; set; }
-
-    /// <summary>
     /// Client connection
     /// </summary>
     [JsonIgnore]

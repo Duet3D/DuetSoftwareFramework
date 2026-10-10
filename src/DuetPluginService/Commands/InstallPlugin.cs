@@ -30,11 +30,6 @@ public sealed class InstallPlugin(IPermissionManager permissionManager, PluginSt
     private readonly Settings _settings = settings.Value;
 
     /// <summary>
-    /// Internal flag to indicate that custom plugin files should not be purged
-    /// </summary>
-    public bool Upgrade { get; set; }
-
-    /// <summary>
     /// Install or upgrade a plugin
     /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>

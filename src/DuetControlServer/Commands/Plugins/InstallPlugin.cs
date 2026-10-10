@@ -21,11 +21,6 @@ namespace DuetControlServer.Commands;
 public sealed class InstallPlugin(CommandFactory commandFactory, Model.ObjectModel model, IOptions<Settings> settings) : DuetAPI.Commands.InstallPlugin
 {
     /// <summary>
-    /// Internal flag to indicate that custom plugin files should not be purged
-    /// </summary>
-    public bool Upgrade { get; set; }
-
-    /// <summary>
     /// Install or upgrade a plugin
     /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>

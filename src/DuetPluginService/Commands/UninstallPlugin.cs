@@ -25,11 +25,6 @@ public sealed class UninstallPlugin(IPermissionManager permissionManager, Plugin
     private readonly Settings _settings = settings.Value;
 
     /// <summary>
-    /// Internal flag to indicate that custom plugin files should not be purged
-    /// </summary>
-    public bool ForUpgrade { get; set; }
-
-    /// <summary>
     /// Uninstall a plugin
     /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>
@@ -114,9 +109,29 @@ public sealed class UninstallPlugin(IPermissionManager permissionManager, Plugin
                 }
             }
 
+            // Remove the files installed on the virtual SD card, sparing config files on an upgrade
+            foreach (string sdFile in plugin.SdFiles)
+            {
+                string fileName = Path.Combine(sdPath, sdFile);
+                if (File.Exists(fileName) && !(ForUpgrade && plugin.SbcConfigFiles.Any(file => fileName == Path.Combine(sdPath, "sys", file) || fileName == Path.Combine(sdPath, file))))
+                {
+                    if (Path.GetFileName(sdFile).Equals("daemon.g"))
+                    {
+                        // daemon.g may be still open at this time
+                        logger.LogDebug("Renaming file {SourceFile} to {File}", fileName, fileName + ".bak");
+                        File.Move(fileName, fileName + ".bak", true);
+                    }
+                    else
+                    {
+                        logger.LogDebug("Deleting file {File}", fileName);
+                        File.Delete(fileName);
+                    }
+                }
+            }
+
             if (ForUpgrade)
             {
-                // Remove only installed files
+                // Remove only installed files so custom plugin files survive the upgrade
                 foreach (string dsfFile in plugin.DsfFiles)
                 {
                     string file = Path.Combine(settings.Value.PluginDirectory, Plugin, "dsf", dsfFile);
@@ -134,25 +149,6 @@ public sealed class UninstallPlugin(IPermissionManager permissionManager, Plugin
                     {
                         logger.LogDebug("Deleting file {File}", file);
                         File.Delete(file);
-                    }
-                }
-
-                foreach (string sdFile in plugin.SdFiles)
-                {
-                    string fileName = Path.Combine(sdPath, sdFile);
-                    if (File.Exists(fileName) && !plugin.SbcConfigFiles.Any(file => fileName == Path.Combine(sdPath, "sys", file) || fileName == Path.Combine(sdPath, file)))
-                    {
-                        if (Path.GetFileName(sdFile).Equals("daemon.g"))
-                        {
-                            // daemon.g may be still open at this time
-                            logger.LogDebug("Renaming file {SourceFile} to {File}", fileName, fileName + ".bak");
-                            File.Move(fileName, fileName + ".bak", true);
-                        }
-                        else
-                        {
-                            logger.LogDebug("Deleting file {File}", fileName);
-                            File.Delete(fileName);
-                        }
                     }
                 }
             }
