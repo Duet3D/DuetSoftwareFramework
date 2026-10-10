@@ -14,11 +14,6 @@ namespace DuetControlServer.Commands
     public sealed class InstallPlugin : DuetAPI.Commands.InstallPlugin
     {
         /// <summary>
-        /// Internal flag to indicate that custom plugin files should not be purged
-        /// </summary>
-        public bool Upgrade { get; set; }
-
-        /// <summary>
         /// Install or upgrade a plugin
         /// </summary>
         /// <returns>Asynchronous task</returns>

@@ -13,11 +13,6 @@ namespace DuetPluginService.Commands
     public sealed class UninstallPlugin : DuetAPI.Commands.UninstallPlugin
     {
         /// <summary>
-        /// Internal flag to indicate that custom plugin files should not be purged
-        /// </summary>
-        public bool ForUpgrade { get; set; }
-
-        /// <summary>
         /// Uninstall a plugin
         /// </summary>
         /// <returns>Asynchronous task</returns>
@@ -86,9 +81,29 @@ namespace DuetPluginService.Commands
                         }
                     }
 
+                    // Remove the files installed on the virtual SD card, sparing config files on an upgrade
+                    foreach (string sdFile in plugin.SdFiles)
+                    {
+                        string fileName = Path.Combine(Settings.BaseDirectory, sdFile);
+                        if (File.Exists(fileName) && !(ForUpgrade && plugin.SbcConfigFiles.Any(file => fileName == Path.Combine(Settings.BaseDirectory, "sys", file) || fileName == Path.Combine(Settings.BaseDirectory, file))))
+                        {
+                            if (Path.GetFileName(sdFile).Equals("daemon.g"))
+                            {
+                                // daemon.g may be still open at this time
+                                logger.Debug("Renaming file {0} to {1}", fileName, fileName + ".bak");
+                                File.Move(fileName, fileName + ".bak", true);
+                            }
+                            else
+                            {
+                                logger.Debug("Deleting file {0}", fileName);
+                                File.Delete(fileName);
+                            }
+                        }
+                    }
+
                     if (ForUpgrade)
                     {
-                        // Remove only installed files
+                        // Remove only installed files so custom plugin files survive the upgrade
                         foreach (string dsfFile in plugin.DsfFiles)
                         {
                             string file = Path.Combine(Settings.PluginDirectory, Plugin, "dsf", dsfFile);
@@ -106,25 +121,6 @@ namespace DuetPluginService.Commands
                             {
                                 logger.Debug("Deleting file {0}", file);
                                 File.Delete(file);
-                            }
-                        }
-
-                        foreach (string sdFile in plugin.SdFiles)
-                        {
-                            string fileName = Path.Combine(Settings.BaseDirectory, sdFile);
-                            if (File.Exists(fileName) && !plugin.SbcConfigFiles.Any(file => fileName == Path.Combine(Settings.BaseDirectory, "sys", file) || fileName == Path.Combine(Settings.BaseDirectory, file)))
-                            {
-                                if (Path.GetFileName(sdFile).Equals("daemon.g"))
-                                {
-                                    // daemon.g may be still open at this time
-                                    logger.Debug("Renaming file {0} to {1}", fileName, fileName + ".bak");
-                                    File.Move(fileName, fileName + ".bak", true);
-                                }
-                                else
-                                {
-                                    logger.Debug("Deleting file {0}", fileName);
-                                    File.Delete(fileName);
-                                }
                             }
                         }
                     }
