@@ -354,7 +354,6 @@ the first move.
 | `G93` inverse time is carried as `RawMove.DurationSec` | Deliberately not a second meaning for `FeedRateMmPerSec`; the quantity is a duration, which is also why the speed factor divides rather than multiplies |
 | `inputs[].feedRate` holds the raw `F` value | The inch conversion depends on which axes the move mentions, which is not known when `F` is read — and this is what the field's documentation already said |
 | M906, M913 and M917 are one handler; M665, M666 and M669 are another | They differ only in which quantity they address, which is true in RRF too. Which parameters mean what is the geometry's business |
-| `M669 K` numbers are mapped explicitly | RRF's `KinematicsType` is ordered differently from the object model's `KinematicsName`, and the mapping is part of the interface a config.g depends on |
 | Rotary delta and five-bar SCARA are built with defaults | Nothing in the object model configures them yet, so the engines take RRF's and the M669 documentation's values rather than inventing a home for the settings |
 | Hangprinter uses the constant-spool-radius model | Line buildup and flex compensation need `move.kinematics` fields that do not exist; this is the branch RRF itself takes when the buildup factor is zero |
 | The interpreter state stack is capped at 10, macro nesting at 10 | RRF caps its own stack; a macro looping over `M120` without `M121` would otherwise grow it without bound |

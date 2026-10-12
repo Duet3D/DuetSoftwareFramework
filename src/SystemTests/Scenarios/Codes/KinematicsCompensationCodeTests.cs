@@ -421,6 +421,48 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
     }
 
     /// <summary>
+    /// M669 K also takes the geometry's name as a quoted string, which selects the same geometry as
+    /// its number and clears the homed flags in the same way
+    /// </summary>
+    [Test]
+    public async Task M669SelectsAGeometryByName()
+    {
+        using ScriptedCanMaster canMaster = new(SocketPath());
+        await using DcsTestHost host = await StartXyzHostAsync(canMaster);
+
+        string reply = await host.ExecuteCodeAsync("M669 K\"corexy\"");
+        KinematicsName name = await host.ReadModelAsync(model => model.Move.Kinematics.Name);
+        bool xHomed = await host.ReadModelAsync(model => model.Move.Axes[0].Homed);
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply.Trim(), Is.Empty);
+            Assert.That(name, Is.EqualTo(KinematicsName.CoreXY));
+            Assert.That(xHomed, Is.False, "a kinematics change clears the homed flags");
+        });
+    }
+
+    /// <summary>
+    /// A K that names no geometry, by number or by name, is an error and leaves the geometry as it was
+    /// </summary>
+    /// <remarks>RepRapFirmware's reply for a number, GCodes2.cpp case 669: "Unknown kinematics type %d"</remarks>
+    [TestCase("M669 K12", "Error: M669: Unknown kinematics type 12")]
+    [TestCase("M669 K\"cubic\"", "Error: M669: Unknown kinematics type \"cubic\"")]
+    public async Task M669RefusesAKThatNamesNoGeometry(string code, string expected)
+    {
+        using ScriptedCanMaster canMaster = new(SocketPath());
+        await using DcsTestHost host = await StartXyzHostAsync(canMaster);
+
+        await host.ExecuteCodeAsync("M669 K1");
+        string reply = await host.ExecuteCodeAsync(code);
+        KinematicsName name = await host.ReadModelAsync(model => model.Move.Kinematics.Name);
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply.TrimEnd(), Is.EqualTo(expected));
+            Assert.That(name, Is.EqualTo(KinematicsName.CoreXY), "the geometry that was selected stays");
+        });
+    }
+
+    /// <summary>
     /// M669 K1 selects CoreXY: the kinematics name changes, the inverse matrix carries the CoreXY
     /// motor coupling, the forward matrix is its inverse, and the homed flags are cleared
     /// </summary>

@@ -1,3 +1,4 @@
+using System;
 using DuetAPI;
 using DuetAPI.ObjectModel;
 using Code = DuetAPI.Commands.Code;
@@ -37,21 +38,16 @@ internal static class KinematicsConfigurator
         AxisIndices axes = AxisIndices.From(move);
         KinematicsEngine engine = current;
 
-        if (code.MajorNumber == 669 && code.TryGetInt('K', out int kinematicsType))
+        if (code.MajorNumber == 669 && code.TryGetValuedParameter('K', out CodeParameter? kinematicsParameter))
         {
-            KinematicsName? name = NameFor(kinematicsType);
-            if (name is null)
-            {
-                throw new GCodeException($"Unknown kinematics type {kinematicsType}");
-            }
-
-            if (name.Value != engine.Kind)
+            KinematicsName name = KinematicsFrom(kinematicsParameter);
+            if (name != engine.Kind)
             {
                 // A new geometry starts from its own defaults, including its segmentation, which is
                 // what constructing a new Kinematics does in RepRapFirmware. It is told the machine's
                 // axes straight away: a core geometry places its matrix by them, and the rest of this
                 // code may configure it
-                engine = KinematicsFactory.Create(name.Value);
+                engine = KinematicsFactory.Create(name);
                 engine.SetAxes(axes);
             }
             seen = true;
@@ -111,6 +107,40 @@ internal static class KinematicsConfigurator
     }
 
     /// <summary>
+    /// The geometry an M669 K parameter selects
+    /// </summary>
+    /// <param name="parameter">The K parameter</param>
+    /// <returns>The geometry</returns>
+    /// <exception cref="GCodeException">The parameter names no geometry</exception>
+    /// <remarks>
+    /// Either RepRapFirmware's <c>KinematicsType</c> number, which <see cref="KinematicsName"/> follows,
+    /// or the geometry's name as a quoted string, spelled as the object model reports it
+    /// </remarks>
+    private static KinematicsName KinematicsFrom(CodeParameter parameter)
+    {
+        KinematicsName name;
+        if (parameter.Type == typeof(string))
+        {
+            string text = (string)parameter;
+            name = KinematicsNameConverter.Parse(text);
+            if (name == KinematicsName.Unknown)
+            {
+                throw new GCodeException($"Unknown kinematics type \"{text}\"");
+            }
+        }
+        else
+        {
+            long number = (long)parameter;
+            name = (KinematicsName)number;
+            if (!Enum.IsDefined(name) || name == KinematicsName.Unknown)
+            {
+                throw new GCodeException($"Unknown kinematics type {number}");
+            }
+        }
+        return name;
+    }
+
+    /// <summary>
     /// Whether a code carries anything beyond the geometry selection
     /// </summary>
     /// <param name="code">The code</param>
@@ -156,28 +186,4 @@ internal static class KinematicsConfigurator
         }
         engine.WriteTo(move.Kinematics);
     }
-
-    /// <summary>
-    /// The geometry an M669 K number selects
-    /// </summary>
-    /// <param name="kinematicsType">The K parameter</param>
-    /// <returns>The geometry, or null if the number names none</returns>
-    /// <remarks>RepRapFirmware's <c>KinematicsType</c> enumeration, in its declaration order</remarks>
-    public static KinematicsName? NameFor(int kinematicsType)
-        => kinematicsType switch
-        {
-            0 => KinematicsName.Cartesian,
-            1 => KinematicsName.CoreXY,
-            2 => KinematicsName.CoreXZ,
-            3 => KinematicsName.LinearDelta,
-            4 => KinematicsName.Scara,
-            5 => KinematicsName.CoreXYU,
-            6 => KinematicsName.Hangprinter,
-            7 => KinematicsName.Polar,
-            8 => KinematicsName.CoreXYUV,
-            9 => KinematicsName.FiveBarScara,
-            10 => KinematicsName.RotaryDelta,
-            11 => KinematicsName.MarkForged,
-            _ => null
-        };
 }

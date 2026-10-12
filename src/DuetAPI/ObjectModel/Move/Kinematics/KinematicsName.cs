@@ -13,62 +13,62 @@ public enum KinematicsName
     /// <summary>
     /// Cartesian
     /// </summary>
-    Cartesian,
+    Cartesian = 0,
 
     /// <summary>
     /// CoreXY
     /// </summary>
-    CoreXY,
-
-    /// <summary>
-    /// CoreXY with extra U axis
-    /// </summary>
-    CoreXYU,
-
-    /// <summary>
-    /// CoreXY with extra UV axes
-    /// </summary>
-    CoreXYUV,
+    CoreXY = 1,
 
     /// <summary>
     /// CoreXZ
     /// </summary>
-    CoreXZ,
-
-    /// <summary>
-    /// MarkForged
-    /// </summary>
-    MarkForged,
-
-    /// <summary>
-    /// Five-bar SCARA
-    /// </summary>
-    FiveBarScara,
-
-    /// <summary>
-    /// Hangprinter
-    /// </summary>
-    Hangprinter,
+    CoreXZ = 2,
 
     /// <summary>
     /// Linear delta
     /// </summary>
-    LinearDelta,
-
-    /// <summary>
-    /// Polar
-    /// </summary>
-    Polar,
-
-    /// <summary>
-    /// Rotary delta
-    /// </summary>
-    RotaryDelta,
+    LinearDelta = 3,
 
     /// <summary>
     /// SCARA
     /// </summary>
-    Scara,
+    Scara = 4,
+
+    /// <summary>
+    /// CoreXY with extra U axis
+    /// </summary>
+    CoreXYU = 5,
+
+    /// <summary>
+    /// Hangprinter
+    /// </summary>
+    Hangprinter = 6,
+
+    /// <summary>
+    /// Polar
+    /// </summary>
+    Polar = 7,
+
+    /// <summary>
+    /// CoreXY with extra UV axes
+    /// </summary>
+    CoreXYUV = 8,
+
+    /// <summary>
+    /// Five-bar SCARA
+    /// </summary>
+    FiveBarScara = 9,
+
+    /// <summary>
+    /// Rotary delta
+    /// </summary>
+    RotaryDelta = 10,
+
+    /// <summary>
+    /// MarkForged
+    /// </summary>
+    MarkForged = 11,
 
     /// <summary>
     /// Unknown

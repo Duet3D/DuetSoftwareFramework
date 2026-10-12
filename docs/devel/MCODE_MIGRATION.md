@@ -842,9 +842,7 @@ without a type switches the shaper on, as in RRF.
 **M667 is retired in RepRapFirmware itself**, which replies "M667 is no longer supported - use M669
 instead" and treats it as an error. Ported verbatim rather than reimplemented.
 
-**M669 K has its own numbering.** The K values are RepRapFirmware's `KinematicsType` enum, which is
-ordered differently from the object model's `KinematicsName`. The mapping is spelled out rather than
-derived from either enum, because it is part of the interface a config.g depends on.
+**M669 K takes a number or a name.** A number is RepRapFirmware's `KinematicsType` value, which the object model's `KinematicsName` follows value for value; it is checked with `Enum.IsDefined` rather than against a range, so a gap in the enumeration is refused rather than read as a geometry, and `Unknown` is never selectable. A quoted string is the geometry's name, spelled as the object model reports it (`KinematicsNameConverter.Parse`, case-insensitive). Either form that names no geometry is refused with RRF's "Unknown kinematics type" (`KinematicsConfigurator.KinematicsFrom`).
 
 **Selecting a geometry replaces the object model instance.** Several geometries share one class and
 differ only by name, so `Kinematics.Create` was added to the object model - `Name` has a protected
