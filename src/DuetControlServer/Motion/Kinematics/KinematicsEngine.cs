@@ -208,13 +208,6 @@ internal abstract class KinematicsEngine
     protected AxisIndices Axes => Kinematic.Machine;
 
     /// <summary>
-    /// Take over the axes another geometry has, for a new instance that replaces it
-    /// </summary>
-    /// <param name="other">The geometry being replaced</param>
-    /// <returns>True if they differed from what this geometry had</returns>
-    public bool TakeAxesFrom(KinematicsEngine other) => SetAxes(other.Axes);
-
-    /// <summary>
     /// Follow a change to the machine's axes
     /// </summary>
     /// <param name="axes">The axes as they are now</param>

@@ -173,7 +173,7 @@ public class KinematicsRoundTripTests
         foreach (string text in codes)
         {
             bool seen = false;
-            engine = KinematicsConfigurator.Apply(engine, new Code(text), ref seen);
+            engine = KinematicsConfigurator.Apply(engine, KinematicsAxes.NewMoveWithAxes(), new Code(text), ref seen);
             Assert.That(seen, Is.True, $"'{text}' configured nothing");
         }
         return engine;

@@ -3377,10 +3377,7 @@ mutating several fields is not. It also left every engine's derived state - the 
 the SCARA's arm-length squares, the core matrix inverse - computed in one place, the constructor, rather
 than in a constructor and a reconfigure path that have to agree.
 
-M665, M666 and M669 became one handler, because all three do the same thing to the same object. Which
-parameters mean what is the geometry's business. The handler configures first, takes the model's write
-lock only for the projection, and takes the planner lock inside it - §14.4's order, and the reason
-`Configure` was kept free of locks and of the object model.
+M665, M666 and M669 became one handler, because all three do the same thing to the same object. Which parameters mean what is the geometry's business. The handler takes the model's write lock, configures the geometry against the axes `move.axes[]` has (`KinematicsConfigurator.Apply` is handed them, and gives them to every engine it creates), installs it and writes the projection, taking the planner lock inside - §14.4's order. `Configure` itself takes no locks and holds no object model reference, because the geometry is also read by the consumers in §13.1 that cannot take the model lock.
 
 `KinematicsFactory.Create(Kinematics)` stays, with a smaller job: `MovePlanner.ReconfigureAsync` calls
 it once at startup to adopt whatever the object model already describes, before any code has selected a

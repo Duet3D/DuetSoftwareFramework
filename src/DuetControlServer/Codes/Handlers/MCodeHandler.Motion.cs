@@ -2325,28 +2325,30 @@ internal partial class MCodeHandler
     /// </para>
     /// <para>
     /// The geometry is configured first and the object model written from it, which is the direction
-    /// §14 of <c>docs/devel/MCODE_MIGRATION.md</c> establishes. Configuring takes no locks, so the
-    /// model's write lock is held only for the projection - and the planner lock is taken inside it,
-    /// which is the order §13.1 fixes
+    /// §14 of <c>docs/devel/MCODE_MIGRATION.md</c> establishes. All of it happens under the model's
+    /// write lock, so the geometry is configured against the axes <c>move.axes[]</c> has and installed
+    /// before anything else can change them; the planner lock is taken inside it, which is the order
+    /// §13.1 fixes
     /// </para>
     /// </remarks>
     private async ValueTask<Message> HandleKinematicsAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         int mCode = code.MajorNumber!.Value;
         bool seen = false;
-        KinematicsEngine geometry = KinematicsConfigurator.Apply(planner.Geometry, code, ref seen);
-
-        if (!seen)
-        {
-            // Nothing to configure, so the code is asking rather than telling. A geometry that the
-            // code does not apply to says so, and that is an error rather than a report
-            StringBuilder builder = new();
-            bool applies = geometry.AppendReport(builder, mCode);
-            return new Message(applies ? MessageType.Success : MessageType.Error, builder.ToString());
-        }
 
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
+            KinematicsEngine geometry = KinematicsConfigurator.Apply(planner.Geometry, model.Move, code, ref seen);
+
+            if (!seen)
+            {
+                // Nothing to configure, so the code is asking rather than telling. A geometry that the
+                // code does not apply to says so, and that is an error rather than a report
+                StringBuilder builder = new();
+                bool applies = geometry.AppendReport(builder, mCode);
+                return new Message(applies ? MessageType.Success : MessageType.Error, builder.ToString());
+            }
+
             planner.SetGeometry(geometry);
             KinematicsConfigurator.WriteTo(geometry, model.Move);
 

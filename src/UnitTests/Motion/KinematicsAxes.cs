@@ -32,6 +32,21 @@ internal static class KinematicsAxes
     }
 
     /// <summary>
+    /// A move model with the given axes, as M584 would have created them
+    /// </summary>
+    /// <param name="letters">The letter of each axis, in axis order</param>
+    /// <returns>The move model</returns>
+    public static Move NewMoveWithAxes(string letters = Canonical)
+    {
+        Move move = new();
+        foreach (char letter in letters)
+        {
+            move.Axes.Add(new Axis { Letter = letter, Visible = true });
+        }
+        return move;
+    }
+
+    /// <summary>
     /// Give a geometry the axes a move model has, as M584 would have
     /// </summary>
     /// <typeparam name="T">The geometry's type</typeparam>

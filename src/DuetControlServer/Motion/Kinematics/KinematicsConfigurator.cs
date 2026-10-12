@@ -27,16 +27,14 @@ internal static class KinematicsConfigurator
     /// Apply a configuring M-code to a geometry
     /// </summary>
     /// <param name="current">The geometry as it is now</param>
+    /// <param name="move">The move model, whose axes the geometry is configured against. The caller holds the object model write lock</param>
     /// <param name="code">An M665, M666 or M669</param>
     /// <param name="seen">Set when the code carried a parameter that configured something</param>
     /// <returns>The geometry the code leaves behind, which is <paramref name="current"/> if nothing changed</returns>
     /// <exception cref="GCodeException">The code asked for something this geometry cannot do</exception>
-    /// <remarks>
-    /// Takes no locks and touches no object model. The caller applies the result and then projects it
-    /// with <see cref="WriteTo"/>, which is what keeps the lock order in §14.4
-    /// </remarks>
-    public static KinematicsEngine Apply(KinematicsEngine current, Code code, ref bool seen)
+    public static KinematicsEngine Apply(KinematicsEngine current, Move move, Code code, ref bool seen)
     {
+        AxisIndices axes = AxisIndices.From(move);
         KinematicsEngine engine = current;
 
         if (code.MajorNumber == 669 && code.TryGetInt('K', out int kinematicsType))
@@ -50,11 +48,11 @@ internal static class KinematicsConfigurator
             if (name.Value != engine.Kind)
             {
                 // A new geometry starts from its own defaults, including its segmentation, which is
-                // what constructing a new Kinematics does in RepRapFirmware. The machine's axes are
-                // not the geometry's to reset, so it takes them over: a core geometry places its
-                // matrix by them, and the rest of this code may configure it
+                // what constructing a new Kinematics does in RepRapFirmware. It is told the machine's
+                // axes straight away: a core geometry places its matrix by them, and the rest of this
+                // code may configure it
                 engine = KinematicsFactory.Create(name.Value);
-                engine.TakeAxesFrom(current);
+                engine.SetAxes(axes);
             }
             seen = true;
         }
@@ -64,7 +62,7 @@ internal static class KinematicsConfigurator
             // M665 with a rod length switches the machine to a delta if it is not one already, which
             // is how a delta config.g is usually written
             engine = KinematicsFactory.Create(KinematicsName.LinearDelta);
-            engine.TakeAxesFrom(current);
+            engine.SetAxes(axes);
             seen = true;
         }
 
@@ -77,7 +75,7 @@ internal static class KinematicsConfigurator
         if (!ReferenceEquals(configured, engine))
         {
             // Configuring builds a new instance, which has to know the machine's axes as well
-            configured.TakeAxesFrom(engine);
+            configured.SetAxes(axes);
             if (ReferenceEquals(engine, current))
             {
                 // The geometry itself did not change, so what M669 S and T had already set carries over

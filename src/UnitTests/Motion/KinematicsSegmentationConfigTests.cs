@@ -19,7 +19,7 @@ public class KinematicsSegmentationConfigTests
     private static KinematicsEngine Apply(KinematicsEngine engine, string codeText)
     {
         bool seen = false;
-        return KinematicsConfigurator.Apply(engine, new Code(codeText), ref seen);
+        return KinematicsConfigurator.Apply(engine, KinematicsAxes.NewMoveWithAxes(), new Code(codeText), ref seen);
     }
 
     [Test]
