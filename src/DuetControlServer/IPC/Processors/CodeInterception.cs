@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -105,6 +104,12 @@ namespace DuetControlServer.IPC.Processors
         private BaseCommand? _interceptionResult;
 
         /// <summary>
+        /// Indicates if <see cref="Process"/> is still running. Only read and written while holding
+        /// <see cref="_codeMonitor"/> so that codes never wait for a pulse that can no longer come
+        /// </summary>
+        private bool _processorAlive = true;
+
+        /// <summary>
         /// Constructor of the interception processor
         /// </summary>
         /// <param name="conn">Connection instance</param>
@@ -161,56 +166,51 @@ namespace DuetControlServer.IPC.Processors
                         }
                         while (true);
 
-                        try
-                        {
-                            // Send it to the client
-                            await Connection.SendCommand(_codeBeingIntercepted!);
+                        // Send it to the client
+                        await Connection.SendCommand(_codeBeingIntercepted!);
 
-                            // Keep processing incoming commands until a final action for the code has been received
-                            do
+                        // Keep processing incoming commands until a final action for the code has been received
+                        do
+                        {
+                            // Read another command from the IPC connection
+                            BaseCommand command = await Connection.ReceiveCommand();
+                            Type commandType = command.GetType();
+                            if (Command.SupportedCommands.Contains(commandType))
                             {
-                                // Read another command from the IPC connection
-                                BaseCommand command = await Connection.ReceiveCommand();
-                                Type commandType = command.GetType();
-                                if (Command.SupportedCommands.Contains(commandType))
-                                {
-                                    // Make sure it is permitted
-                                    Connection.CheckPermissions(commandType);
+                                // Make sure it is permitted
+                                Connection.CheckPermissions(commandType);
 
-                                    // Execute regular commands here
-                                    object? result = await command.Invoke();
-                                    await Connection.SendResponse(result);
-                                }
-                                else if (SupportedCommands.Contains(commandType))
-                                {
-                                    // Make sure it is permitted
-                                    Connection.CheckPermissions(commandType);
-
-                                    // Send other commands to the task intercepting the code
-                                    _interceptionResult = command;
-                                    _codeMonitor.Pulse();
-                                    break;
-                                }
-                                else
-                                {
-                                    // Take care of unsupported commands
-                                    throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");
-                                }
+                                // Execute regular commands here
+                                object? result = await command.Invoke();
+                                await Connection.SendResponse(result);
                             }
-                            while (!Program.CancellationToken.IsCancellationRequested);
+                            else if (SupportedCommands.Contains(commandType))
+                            {
+                                // Make sure it is permitted
+                                Connection.CheckPermissions(commandType);
+
+                                // Send other commands to the task intercepting the code
+                                _interceptionResult = command;
+                                _codeMonitor.Pulse();
+                                break;
+                            }
+                            else
+                            {
+                                // Take care of unsupported commands
+                                throw new ArgumentException($"Invalid command {command.Command} (wrong mode?)");
+                            }
                         }
-                        catch (SocketException)
-                        {
-                            // Client has closed the connection while we're waiting for a result. Carry on...
-                            _interceptionResult = null;
-                            _codeMonitor.Pulse();
-                            throw;
-                        }
+                        while (!Program.CancellationToken.IsCancellationRequested);
                     }
                     while (!Program.CancellationToken.IsCancellationRequested);
                 }
                 finally
                 {
+                    // The monitor is still held here, so waking every waiter guarantees that no code can wait for
+                    // a pulse from this processor after it has terminated, no matter why it terminated
+                    _processorAlive = false;
+                    _codeMonitor.PulseAll();
+
                     lock (_connections[_mode])
                     {
                         _connections[_mode].Remove(this);
@@ -273,10 +273,17 @@ namespace DuetControlServer.IPC.Processors
             {
                 using (await _codeMonitor.EnterAsync(code.CancellationToken))
                 {
+                    if (!_processorAlive)
+                    {
+                        // Processor terminated after this code had been routed to it, so skip this interceptor
+                        return false;
+                    }
+
                     try
                     {
                         // Send the code being intercepted to the IPC client
                         _codeBeingIntercepted = code;
+                        _interceptionResult = null;
                         _codeMonitor.Pulse();
 
                         try

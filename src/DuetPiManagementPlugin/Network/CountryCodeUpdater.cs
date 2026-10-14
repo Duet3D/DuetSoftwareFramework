@@ -68,8 +68,6 @@ namespace DuetPiManagementPlugin
             }
             _updatingCountryCode = true;
 
-            await Task.Delay(10000);
-
             try
             {
                 string? countryCode = null;

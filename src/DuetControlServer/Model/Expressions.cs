@@ -10,6 +10,7 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
 
@@ -420,6 +421,12 @@ namespace DuetControlServer.Model
             if (obj is char charValue)
             {
                 return encodeValues ? $"'{charValue}'" : charValue.ToString();
+            }
+            if (obj is Enum)
+            {
+                // Enums are represented by their JSON value, which does not have to match the CLR name
+                string jsonValue = JsonSerializer.Serialize(obj, obj.GetType(), JsonHelper.DefaultJsonOptions);
+                return encodeValues ? jsonValue : jsonValue.Trim('"');
             }
             if (obj is string stringValue)
             {
