@@ -31,6 +31,7 @@ namespace DuetControlServer.Commands
     [JsonSerializable(typeof(PatchObjectModel))]
     [JsonSerializable(typeof(SetNetworkProtocol))]
     [JsonSerializable(typeof(SetObjectModel))]
+    [JsonSerializable(typeof(SetWifiCountry))]
     [JsonSerializable(typeof(SyncObjectModel))]
     [JsonSerializable(typeof(UnlockObjectModel))]
     [JsonSerializable(typeof(InstallSystemPackage))]
