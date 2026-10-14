@@ -21,6 +21,11 @@ namespace DuetAPI.Utility
     public class JsonRegexListConverter : JsonConverter<List<Regex>>
     {
         /// <summary>
+        /// Flags applied to filters given as plain patterns, matching what DSF 3.7 and later compile them with
+        /// </summary>
+        private const RegexOptions PlainPatternOptions = RegexOptions.IgnoreCase | RegexOptions.Singleline;
+
+        /// <summary>
         /// Read a Regex list from JSON
         /// </summary>
         /// <param name="reader">JSON reader</param>
@@ -56,6 +61,11 @@ namespace DuetAPI.Utility
                             {
                                 pattern = reader.GetString();
                             }
+                            else if (propertyName.Length == 0)
+                            {
+                                // DSF 3.7 and later store filters as plain patterns and apply the flags itself
+                                regexList.Add(new Regex(reader.GetString()!, PlainPatternOptions));
+                            }
                             break;
 
                         case JsonTokenType.Number:
@@ -70,6 +80,7 @@ namespace DuetAPI.Utility
                             {
                                 regexList.Add(new Regex(pattern, (RegexOptions)optionsValue));
                             }
+                            propertyName = string.Empty;
                             break;
 
                         case JsonTokenType.EndArray:
