@@ -90,5 +90,16 @@ namespace UnitTests.Machine
             result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
             Assert.That(result, Is.EqualTo("true"));
         }
+
+        [Test]
+        public async Task EvaluateEnum()
+        {
+            DuetControlServer.Model.Provider.Get.Network.Interfaces.Clear();
+            DuetControlServer.Model.Provider.Get.Network.Interfaces.Add(new DuetAPI.ObjectModel.NetworkInterface { Type = DuetAPI.ObjectModel.NetworkInterfaceType.Ethernet });
+
+            DuetControlServer.Commands.Code code = new("echo network.interfaces[0].type");
+            object result = await DuetControlServer.Model.Expressions.Evaluate(code, false);
+            Assert.That(result, Is.EqualTo("\"ethernet\""));
+        }
     }
 }

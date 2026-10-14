@@ -424,9 +424,14 @@ namespace DuetControlServer.Model
             }
             if (obj is Enum)
             {
-                // Enums are represented by their JSON value, which does not have to match the CLR name
+                // Enums are represented by their JSON value, which does not have to match the CLR name and is a number unless the enum has a string converter
                 string jsonValue = JsonSerializer.Serialize(obj, obj.GetType(), JsonHelper.DefaultJsonOptions);
-                return encodeValues ? jsonValue : jsonValue.Trim('"');
+                if (jsonValue.StartsWith('"'))
+                {
+                    string jsonName = jsonValue.Trim('"');
+                    return encodeValues ? encodeString(jsonName) : jsonName;
+                }
+                return jsonValue;
             }
             if (obj is string stringValue)
             {
