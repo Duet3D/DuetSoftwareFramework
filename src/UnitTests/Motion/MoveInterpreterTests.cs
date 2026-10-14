@@ -94,10 +94,7 @@ public class MoveInterpreterTests
             model.State.CurrentTool = tool.Number;
         }
 
-        KinematicsEngine geometry = KinematicsFactory.Create(move.Kinematics);
-        MotionParameters.ApplyAxes(move, geometry);
-
-        MoveBuilder builder = new(MotionParameters.FromObjectModel(move, geometry));
+        MoveBuilder builder = new(KinematicsAxes.Snapshot(move));
         MovementState state = new();
         MoveInterpreter interpreter = new(model, builder, state, new BedCompensation(model),
                                           new EndstopCorrection(null!, null!, NullLogger<EndstopCorrection>.Instance),

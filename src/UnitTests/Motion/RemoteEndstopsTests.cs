@@ -78,9 +78,9 @@ public class RemoteEndstopsTests
     // depends on the geometry rather than on the endstop. The deciding question is whether moving an
     // axis needs drives other than its own, which is what the engines answer below - the same
     // property RRF's SwitchEndstop::PrimeAxis tests.
-    private static bool StoppingTheAxisStopsEverything(string geometry, int axis)
+    private static bool StoppingTheAxisStopsEverything(KinematicsName geometry, int axis)
     {
-        KinematicsEngine engine = CoreKinematicsEngine.TryCreate(geometry)!.WithAxes();
+        KinematicsEngine engine = KinematicsFactory.Create(geometry, KinematicsAxes.From());
         return (engine.GetControllingDrives(axis) & ~(1u << axis)) != 0;
     }
 
@@ -88,8 +88,8 @@ public class RemoteEndstopsTests
     public void AnIndependentAxisStopsOnlyItself()
     {
         // On a Cartesian each axis has its own motor, so stopping that motor is the whole job
-        Assert.That(StoppingTheAxisStopsEverything("cartesian", 0), Is.False, "X");
-        Assert.That(StoppingTheAxisStopsEverything("cartesian", 1), Is.False, "Y");
+        Assert.That(StoppingTheAxisStopsEverything(KinematicsName.Cartesian, 0), Is.False, "X");
+        Assert.That(StoppingTheAxisStopsEverything(KinematicsName.Cartesian, 1), Is.False, "Y");
     }
 
     [Test]
@@ -97,11 +97,11 @@ public class RemoteEndstopsTests
     {
         // Holding X still on a CoreXY needs both motors, so stopping only "X's drivers" would leave
         // the other one running and drag the head diagonally into the switch
-        Assert.That(StoppingTheAxisStopsEverything("corexy", 0), Is.True, "X");
-        Assert.That(StoppingTheAxisStopsEverything("corexy", 1), Is.True, "Y");
+        Assert.That(StoppingTheAxisStopsEverything(KinematicsName.CoreXY, 0), Is.True, "X");
+        Assert.That(StoppingTheAxisStopsEverything(KinematicsName.CoreXY, 1), Is.True, "Y");
 
         // Z is still its own motor even on a CoreXY, so homing it need not stop everything
-        Assert.That(StoppingTheAxisStopsEverything("corexy", 2), Is.False, "Z");
+        Assert.That(StoppingTheAxisStopsEverything(KinematicsName.CoreXY, 2), Is.False, "Z");
     }
 
     [Test]

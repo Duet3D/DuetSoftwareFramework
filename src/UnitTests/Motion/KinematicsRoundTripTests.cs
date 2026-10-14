@@ -53,12 +53,12 @@ public class KinematicsRoundTripTests
         KinematicsEngine engine = Configure(codes);
 
         // What the geometry says about itself
-        OmKinematics first = Project(engine);
+        OmKinematics first = KinematicsAxes.Reported<OmKinematics>(engine);
 
         // ...read back into a geometry, and asked again. A parameter the projection dropped is a
         // default by now, and a parameter the factory does not read is one the machine never had
-        KinematicsEngine restored = KinematicsFactory.Create(first);
-        OmKinematics second = Project(restored);
+        KinematicsEngine restored = KinematicsFactory.Create(first, KinematicsAxes.From());
+        OmKinematics second = KinematicsAxes.Reported<OmKinematics>(restored);
 
         Assert.Multiple(() =>
         {
@@ -74,7 +74,7 @@ public class KinematicsRoundTripTests
         // geometry's own name. A geometry whose name resolves to a different class would throw here
         // rather than at the end of an M669 with the model write lock held
         KinematicsEngine engine = Configure(codes);
-        Assert.DoesNotThrow(() => Project(engine), description);
+        Assert.DoesNotThrow(() => KinematicsAxes.Reported<OmKinematics>(engine), description);
     }
 
     [Test]
@@ -101,7 +101,7 @@ public class KinematicsRoundTripTests
         Assert.Multiple(() =>
         {
             Assert.That(engine.Kind, Is.EqualTo(KinematicsName.Cartesian));
-            Assert.That(engine.SegmentsPerSecond, Is.EqualTo(KinematicsEngine.DefaultSegmentsPerSecond));
+            Assert.That(engine.SegmentsPerSecond, Is.EqualTo(100.0f), "RepRapFirmware's default");
             Assert.That(engine.Segmentation, Is.EqualTo(SegmentationType.None));
         });
     }
@@ -110,14 +110,13 @@ public class KinematicsRoundTripTests
     public void AParameterThatIsNotGivenKeepsItsValue()
     {
         // M665 R on its own must not reset the rest of the delta to nothing
-        KinematicsEngine engine = Configure(["M669 K3", "M665 L210 H300", "M665 R160"]);
-        LinearDeltaKinematicsEngine delta = (LinearDeltaKinematicsEngine)engine;
+        DeltaKinematics delta = KinematicsAxes.Reported<DeltaKinematics>(Configure(["M669 K3", "M665 L210 H300", "M665 R160"]));
 
         Assert.Multiple(() =>
         {
-            Assert.That(delta.Radius, Is.EqualTo(160.0f));
+            Assert.That(delta.DeltaRadius, Is.EqualTo(160.0f));
             Assert.That(delta.HomedHeight, Is.EqualTo(300.0f));
-            Assert.That(delta.GetDiagonalSquared(0), Is.EqualTo(210.0f * 210.0f).Within(1e-3f));
+            Assert.That(delta.Towers[0].Diagonal, Is.EqualTo(210.0f));
         });
     }
 
@@ -125,12 +124,13 @@ public class KinematicsRoundTripTests
     public void TheDeltaTiltIsAPercentage()
     {
         // RepRapFirmware's `xTilt = gb.GetFValue() * 0.01`, and the report multiplies it back up
-        LinearDeltaKinematicsEngine delta = (LinearDeltaKinematicsEngine)Configure(["M669 K3", "M666 A1.5 B-2.5"]);
+        KinematicsEngine delta = Configure(["M669 K3", "M666 A1.5 B-2.5"]);
+        DeltaKinematics projected = KinematicsAxes.Reported<DeltaKinematics>(delta);
 
         Assert.Multiple(() =>
         {
-            Assert.That(delta.XTilt, Is.EqualTo(0.015f).Within(1e-6f));
-            Assert.That(delta.YTilt, Is.EqualTo(-0.025f).Within(1e-6f));
+            Assert.That(projected.XTilt, Is.EqualTo(0.015f).Within(1e-6f));
+            Assert.That(projected.YTilt, Is.EqualTo(-0.025f).Within(1e-6f));
             Assert.That(Report(delta, 666), Does.Contain("tilt X1.50% Y-2.50%"));
         });
     }
@@ -152,8 +152,8 @@ public class KinematicsRoundTripTests
     {
         // The planner works in step clocks and the object model does not. Converting on the way in and
         // back out again would land somewhere near 45 rather than on it
-        PolarKinematicsEngine polar = (PolarKinematicsEngine)Configure(["M669 K7 F45.25 A90.75"]);
-        PolarKinematics projected = (PolarKinematics)Project(polar);
+        KinematicsEngine polar = Configure(["M669 K7 F45.25 A90.75"]);
+        PolarKinematics projected = KinematicsAxes.Reported<PolarKinematics>(polar);
 
         Assert.Multiple(() =>
         {
@@ -169,7 +169,7 @@ public class KinematicsRoundTripTests
     /// <returns>The geometry they leave behind</returns>
     private static KinematicsEngine Configure(string[] codes)
     {
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian);
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From());
         foreach (string text in codes)
         {
             bool seen = false;
@@ -177,18 +177,6 @@ public class KinematicsRoundTripTests
             Assert.That(seen, Is.True, $"'{text}' configured nothing");
         }
         return engine;
-    }
-
-    /// <summary>
-    /// Write a geometry into a fresh object model node
-    /// </summary>
-    /// <param name="engine">The geometry</param>
-    /// <returns>The node</returns>
-    private static OmKinematics Project(KinematicsEngine engine)
-    {
-        OmKinematics kinematics = OmKinematics.Create(engine.Kind);
-        engine.WriteTo(kinematics);
-        return kinematics;
     }
 
     /// <summary>

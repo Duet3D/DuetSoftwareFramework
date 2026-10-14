@@ -162,15 +162,17 @@ internal abstract class KinematicsEngine
     /// <remarks>
     /// <para>
     /// A delta's towers A, B and C are the drives of X, Y and Z; a SCARA's proximal and distal arms are
-    /// the drives of X and Y. RepRapFirmware can take these to be the first axes because its first
-    /// three axes are always X, Y and Z. DSF creates axes in whatever order M584 names them, so a
-    /// geometry says which letters it needs and <see cref="SetAxes"/> finds where they are. Every axis
-    /// not listed here or in <see cref="OptionalKinematicAxisLetters"/> is an ordinary axis with a
-    /// motor of its own.
+    /// the drives of X and Y; CoreXY couples the X and Y motors. RepRapFirmware can take these to be its
+    /// first axes because its first three axes are always X, Y and Z, and its further ones are U, V, W
+    /// and so on when config.g creates them in that order. DSF creates axes in whatever order M584
+    /// names them, so a geometry says which letters it needs and <see cref="SetAxes"/> finds where they
+    /// are. Every letter here is required: M669, M665 and M666 refuse to select or configure a geometry
+    /// whose letters the machine does not have (<see cref="KinematicsConfigurator"/>), and a geometry
+    /// that has come by its axes some other way refuses to plan (<see cref="MissingAxesError"/>).
     /// </para>
     /// <para>
-    /// Empty for the matrix-driven geometries, which do not single out any axis: their matrix is placed
-    /// by letter instead, see <see cref="CoreKinematicsEngine"/>
+    /// Every axis not listed here or in <see cref="OptionalKinematicAxisLetters"/> is an ordinary axis
+    /// with a motor of its own
     /// </para>
     /// </remarks>
     protected virtual string KinematicAxisLetters => string.Empty;
@@ -187,15 +189,16 @@ internal abstract class KinematicsEngine
     protected virtual string OptionalKinematicAxisLetters => string.Empty;
 
     /// <summary>
-    /// How many further axes this geometry transforms beyond <see cref="KinematicAxisLetters"/>
+    /// The letters RepRapFirmware's first axes carry when config.g creates them in one M584
     /// </summary>
+    /// <param name="count">How many</param>
+    /// <returns>The first <paramref name="count"/> of X, Y, Z, U, V, W, A, B and so on</returns>
     /// <remarks>
-    /// A delta's fourth to sixth towers and a Hangprinter's fourth and later anchors. They have no
-    /// letter of their own, so they are the axes that carry none of <see cref="KinematicAxisLetters"/>
-    /// and <see cref="OptionalKinematicAxisLetters"/>, taken in axis order - which on a machine whose first three axes are X, Y and Z is the fourth
-    /// axis onwards, as in RepRapFirmware. One the machine does not have is left out rather than needed
+    /// For the geometries with a variable number of lettered axes - a delta's fourth to sixth towers,
+    /// a Hangprinter's fourth and later anchors - which RepRapFirmware drives from its fourth axis
+    /// onwards. DSF names those axes by the letters they carry there
     /// </remarks>
-    protected virtual int ExtraKinematicAxes => 0;
+    protected static string FirstAxisLetters(int count) => new(Axis.Letters, 0, Math.Clamp(count, 0, Axis.Letters.Length));
 
     /// <summary>
     /// The machine's axes as this geometry last saw them
@@ -231,16 +234,8 @@ internal abstract class KinematicsEngine
             return false;
         }
 
-        _kinematicAxes = new KinematicAxes(axes, KinematicAxisLetters, OptionalKinematicAxisLetters, ExtraKinematicAxes);
-        OnAxesChanged();
+        _kinematicAxes = new KinematicAxes(axes, KinematicAxisLetters, OptionalKinematicAxisLetters);
         return true;
-    }
-
-    /// <summary>
-    /// Rebuild whatever this geometry derives from the axes, after <see cref="SetAxes"/> has changed them
-    /// </summary>
-    protected virtual void OnAxesChanged()
-    {
     }
 
     /// <summary>
@@ -256,21 +251,7 @@ internal abstract class KinematicsEngine
         get
         {
             string missing = Kinematic.Missing;
-            if (missing.Length == 0)
-            {
-                return null;
-            }
-
-            StringBuilder letters = new();
-            for (int i = 0; i < missing.Length; i++)
-            {
-                if (i > 0)
-                {
-                    letters.Append(i == missing.Length - 1 ? " or " : ", ");
-                }
-                letters.Append(missing[i]);
-            }
-            return $"The machine has no {letters} axis, which {Name} kinematics needs";
+            return missing.Length == 0 ? null : $"{AxisIndices.NoAxisMessage(missing)}, which {Name} kinematics needs";
         }
     }
 
@@ -279,8 +260,9 @@ internal abstract class KinematicsEngine
     /// it is placed over the machine's axes, or null if it does
     /// </summary>
     /// <remarks>
-    /// A core matrix given by letter before M584 created all its axes can turn out to be singular only
-    /// once they exist, so this can change when <see cref="SetAxes"/> does
+    /// M669 refuses a core matrix that cannot be inverted, so only a geometry that has come by its
+    /// configuration some other way - adopted from the object model at startup - can have one. This is
+    /// what refuses its moves
     /// </remarks>
     public virtual string? ConfigurationError => null;
 
@@ -301,7 +283,7 @@ internal abstract class KinematicsEngine
     /// Read once at the top of a method that needs it, so that a whole calculation sees one set of
     /// axes even if <see cref="SetAxes"/> runs meanwhile
     /// </remarks>
-    protected KinematicAxes Kinematic => _kinematicAxes ??= new KinematicAxes(AxisIndices.None, KinematicAxisLetters, OptionalKinematicAxisLetters, ExtraKinematicAxes);
+    protected KinematicAxes Kinematic => _kinematicAxes ??= new KinematicAxes(AxisIndices.None, KinematicAxisLetters, OptionalKinematicAxisLetters);
     private KinematicAxes? _kinematicAxes;
 
     /// <summary>
@@ -339,26 +321,16 @@ internal abstract class KinematicsEngine
         private readonly int _highestAxis = -1;
 
         /// <summary>
-        /// Whether the lettered axes the machine has - X, Y and Z, not a delta's extra towers - can be indexed in a span
-        /// of the given length
-        /// </summary>
-        /// <param name="length">Length of the coordinate, step or motor position span</param>
-        /// <returns>True if none of them is past its end</returns>
-        public bool LettersFitIn(int length) => _highestLetteredAxis < length;
-        private readonly int _highestLetteredAxis = -1;
-
-        /// <summary>
         /// Resolve a geometry's axes
         /// </summary>
         /// <param name="machine">The machine's axes</param>
         /// <param name="required">The letters the geometry needs, in its order</param>
         /// <param name="optional">The letters it uses after those when the machine has them</param>
-        /// <param name="extra">How many unlettered axes it transforms after all of those</param>
-        public KinematicAxes(AxisIndices machine, string required, string optional, int extra)
+        public KinematicAxes(AxisIndices machine, string required, string optional)
         {
             string letters = required + optional;
             Machine = machine;
-            Roles = new int[letters.Length + extra];
+            Roles = new int[letters.Length];
 
             StringBuilder missing = new();
             for (int role = 0; role < letters.Length; role++)
@@ -368,26 +340,8 @@ internal abstract class KinematicsEngine
                 {
                     missing.Append(letters[role]);
                 }
-            }
-
-            int nextAxis = 0;
-            for (int role = letters.Length; role < Roles.Length; role++)
-            {
-                while (nextAxis < machine.Count && letters.Contains(machine.Letters[nextAxis], StringComparison.Ordinal))
-                {
-                    nextAxis++;
-                }
-                Roles[role] = nextAxis < machine.Count ? nextAxis++ : -1;
-            }
-
-            for (int role = 0; role < Roles.Length; role++)
-            {
                 Bitmap |= AxisIndices.Bit(Roles[role]);
                 _highestAxis = Math.Max(_highestAxis, Roles[role]);
-                if (role < letters.Length)
-                {
-                    _highestLetteredAxis = Math.Max(_highestLetteredAxis, Roles[role]);
-                }
             }
             Missing = missing.ToString();
         }
@@ -669,11 +623,11 @@ internal abstract class KinematicsEngine
 
     /// <summary>Segments per second before M669 has said otherwise</summary>
     /// <remarks>RepRapFirmware's <c>Kinematics::DefaultSegmentsPerSecond</c></remarks>
-    public const float DefaultSegmentsPerSecond = 100.0f;
+    private const float DefaultSegmentsPerSecond = 100.0f;
 
     /// <summary>Shortest segment worth producing before M669 has said otherwise, in mm</summary>
     /// <remarks>RepRapFirmware's <c>Kinematics::DefaultMinSegmentLength</c></remarks>
-    public const float DefaultMinSegmentLength = 0.2f;
+    private const float DefaultMinSegmentLength = 0.2f;
 
     /// <summary>
     /// Whether this geometry needs a straight move broken into short ones, and along which axes,
@@ -859,13 +813,13 @@ internal abstract class KinematicsEngine
     /// How far outside its limit an axis may be before it counts as out of range, mm
     /// </summary>
     /// <remarks>RepRapFirmware's <c>AxisRoundingError</c></remarks>
-    public const float AxisRoundingError = 0.02f;
+    private const float AxisRoundingError = 0.02f;
 
     /// <summary>Configured minimum of each axis, mm</summary>
-    public float[] AxisMinima { get; } = new float[MotionLimits.MaxAxes];
+    protected float[] AxisMinima { get; } = new float[MotionLimits.MaxAxes];
 
     /// <summary>Configured maximum of each axis, mm</summary>
-    public float[] AxisMaxima { get; } = new float[MotionLimits.MaxAxes];
+    private float[] AxisMaxima { get; } = new float[MotionLimits.MaxAxes];
 
     /// <summary>
     /// Set one axis' travel limits

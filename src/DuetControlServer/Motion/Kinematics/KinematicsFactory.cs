@@ -29,10 +29,12 @@ internal static class KinematicsFactory
     /// Build the geometry engine described by the object model's kinematics
     /// </summary>
     /// <param name="kinematics">The configured kinematics</param>
+    /// <param name="axes">The machine's axes</param>
     /// <returns>The engine, falling back to Cartesian if the geometry cannot be described</returns>
-    public static KinematicsEngine Create(DuetAPI.ObjectModel.Kinematics kinematics)
+    public static KinematicsEngine Create(DuetAPI.ObjectModel.Kinematics kinematics, AxisIndices axes)
     {
-        KinematicsEngine engine = CreateGeometry(kinematics);
+        KinematicsEngine engine = CreateGeometry(kinematics, axes);
+        engine.SetAxes(axes);
 
         // Every geometry's Configure calls RepRapFirmware's TryConfigureSegmentation, so M669 S and T
         // mean the same thing on all of them and are applied here rather than per geometry. Absent
@@ -50,7 +52,8 @@ internal static class KinematicsFactory
     /// Build a geometry with the defaults it has before any M-code has configured it
     /// </summary>
     /// <param name="name">Which geometry</param>
-    /// <returns>The engine</returns>
+    /// <param name="axes">The machine's axes</param>
+    /// <returns>The engine, which knows the axes</returns>
     /// <remarks>
     /// <para>
     /// What RepRapFirmware's <c>SelectKinematics</c> does: constructing a geometry gives it the
@@ -64,8 +67,9 @@ internal static class KinematicsFactory
     /// unconfigured machine - for a name that is not a core geometry's
     /// </para>
     /// </remarks>
-    public static KinematicsEngine Create(KinematicsName name)
-        => name switch
+    public static KinematicsEngine Create(KinematicsName name, AxisIndices axes)
+    {
+        KinematicsEngine engine = name switch
         {
             KinematicsName.LinearDelta => LinearDeltaKinematicsEngine.CreateDefault(),
             KinematicsName.RotaryDelta => RotaryDeltaKinematicsEngine.CreateDefault(),
@@ -73,25 +77,29 @@ internal static class KinematicsFactory
             KinematicsName.FiveBarScara => FiveBarScaraKinematicsEngine.CreateDefault(),
             KinematicsName.Polar => PolarKinematicsEngine.CreateDefault(),
             KinematicsName.Hangprinter => HangprinterKinematicsEngine.CreateDefault(),
-            _ => CoreKinematicsEngine.CreateDefault(name)
+            _ => CoreKinematicsEngine.CreateDefault(name, axes)
         };
+        engine.SetAxes(axes);
+        return engine;
+    }
 
     /// <summary>
     /// Build the geometry itself, before M669's segmentation parameters are applied to it
     /// </summary>
     /// <param name="kinematics">The configured kinematics</param>
+    /// <param name="axes">The machine's axes</param>
     /// <returns>The engine</returns>
     /// <remarks>
     /// One case per object model class, each delegating to that geometry's <c>CreateX</c>. Two of the
     /// classes carry two geometries each - both deltas share one and both SCARAs share the other,
     /// because that is how RepRapFirmware reports them - so those cases have to look at the name as
     /// well as the type. The geometries the object model says nothing about fall through to
-    /// <see cref="Create(KinematicsName)"/>, which is also where an unusable description ends up
+    /// <see cref="Create(KinematicsName, AxisIndices)"/>, which is also where an unusable description ends up
     /// </remarks>
-    private static KinematicsEngine CreateGeometry(DuetAPI.ObjectModel.Kinematics kinematics)
+    private static KinematicsEngine CreateGeometry(DuetAPI.ObjectModel.Kinematics kinematics, AxisIndices axes)
         => kinematics switch
         {
-            CoreKinematics core => CreateCore(core),
+            CoreKinematics core => CreateCore(core, axes),
             DeltaKinematics delta when delta.Name != KinematicsName.RotaryDelta => CreateDelta(delta),
             ScaraKinematics scara when scara.Name != KinematicsName.FiveBarScara => CreateScara(scara),
             PolarKinematics polar => CreatePolar(polar),
@@ -99,21 +107,24 @@ internal static class KinematicsFactory
 
             // A rotary delta and a five-bar SCARA reach here: nothing in their nodes describes them,
             // so the geometry their name selects with its own defaults is all there is to build
-            _ => Create(kinematics.Name)
+            _ => Create(kinematics.Name, axes)
         };
 
     /// <summary>
     /// Build a core geometry from the object model
     /// </summary>
     /// <param name="core">The configured kinematics</param>
+    /// <param name="axes">The machine's axes</param>
     /// <returns>The engine</returns>
     /// <remarks>
     /// The matrix in the object model is authoritative when it is there: M669 can set an arbitrary
     /// one, which is the whole point of the matrix form. A matrix that cannot be inverted describes a
     /// machine whose motors cannot reach every position, so the named geometry's own matrix is used
-    /// instead of a geometry that cannot plan
+    /// instead of a geometry that cannot plan. That is placed once, now, so a name whose axes the
+    /// machine does not have is an unconfigured machine, which is Cartesian: placing it without them
+    /// would leave the matrix those axes need missing once M584 created them
     /// </remarks>
-    private static KinematicsEngine CreateCore(CoreKinematics core)
+    private static KinematicsEngine CreateCore(CoreKinematics core, AxisIndices axes)
     {
         if (core.InverseMatrix.Count > 0)
         {
@@ -130,7 +141,8 @@ internal static class KinematicsFactory
             }
         }
 
-        return CoreKinematicsEngine.CreateDefault(core.Name);
+        CoreKinematicsEngine named = CoreKinematicsEngine.CreateDefault(core.Name, axes);
+        return named.MissingAxesError is null ? named : CoreKinematicsEngine.CreateDefault(KinematicsName.Cartesian, axes);
     }
 
     /// <summary>

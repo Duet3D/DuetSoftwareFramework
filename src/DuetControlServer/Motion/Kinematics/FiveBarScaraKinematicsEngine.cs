@@ -148,10 +148,10 @@ internal sealed class FiveBarScaraKinematicsEngine : KinematicsEngine
     /// RepRapFirmware's default for the work mode, from <c>FiveBarScaraKinematics::Configure</c>.
     /// M669 B overrides it there; there is nothing to override it with here yet
     /// </remarks>
-    public float HomingAngleLeft => WorkMode switch { 1 => 20.0f, 2 => 110.0f, 4 => 110.0f, _ => 90.0f };
+    private float HomingAngleLeft => WorkMode switch { 1 => 20.0f, 2 => 110.0f, 4 => 110.0f, _ => 90.0f };
 
     /// <summary>Angle the right actuator is at when its switch fires, degrees</summary>
-    public float HomingAngleRight => WorkMode switch { 1 => 10.0f, 2 => 20.0f, 4 => 100.0f, _ => 90.0f };
+    private float HomingAngleRight => WorkMode switch { 1 => 10.0f, 2 => 20.0f, 4 => 100.0f, _ => 90.0f };
 
 
     /// <inheritdoc />
@@ -312,20 +312,6 @@ internal sealed class FiveBarScaraKinematicsEngine : KinematicsEngine
         uint actuators = Kinematic.Bitmap;
         return (actuators & AxisIndices.Bit(axis)) != 0 ? actuators : base.GetControllingDrives(axis);
     }
-
-    /// <summary>
-    /// Whether the head can be put at the given XY position without violating a joint limit
-    /// </summary>
-    /// <param name="x">X coordinate in mm</param>
-    /// <param name="y">Y coordinate in mm</param>
-    /// <returns>True if the linkage can hold that pose</returns>
-    public bool IsReachable(float x, float y) => ConstraintsOk(x, y);
-
-    /// <summary>The angle the left actuator was last solved to, degrees</summary>
-    public float ThetaLeft => _cachedThetaL;
-
-    /// <summary>The angle the right actuator was last solved to, degrees</summary>
-    public float ThetaRight => _cachedThetaR;
 
     /// <summary>
     /// Whether the head hangs off the end of a distal arm rather than sitting at the shared joint

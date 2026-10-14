@@ -140,7 +140,7 @@ internal sealed class MovePlanner(
     /// A machine that has not been configured is Cartesian, which is what RepRapFirmware starts as
     /// </para>
     /// </remarks>
-    public KinematicsEngine Geometry { get; private set; } = KinematicsFactory.Create(KinematicsName.Cartesian);
+    public KinematicsEngine Geometry { get; private set; } = KinematicsFactory.Create(KinematicsName.Cartesian, AxisIndices.None);
 
     /// <summary>
     /// Adopt a geometry a configuring M-code has produced
@@ -165,30 +165,24 @@ internal sealed class MovePlanner(
     /// <param name="move">The move subsystem of the object model</param>
     /// <remarks>
     /// <para>
-    /// For M584, which is what creates axes. A geometry that places anything by letter - a core
-    /// geometry's matrix - places it again when an axis it names appears, and the object model's
-    /// <c>move.kinematics</c> describes the result, so it is written here, under the write lock the
-    /// caller holds. <see cref="ReconfigureAsync"/> follows the axes as well, but only reads the
-    /// object model.
+    /// For M584, which is what creates axes. The geometry resolves the letters it needs again, and the
+    /// object model's <c>move.kinematics</c> describes the result, so it is written here, under the
+    /// write lock the caller holds. <see cref="ReconfigureAsync"/> follows the axes as well, but only
+    /// reads the object model.
     /// </para>
     /// <para>
-    /// Only safe at standstill, for the same reason <see cref="ReconfigureAsync"/> is
+    /// A new axis cannot make the geometry unusable: M669 has already refused one that needs an axis
+    /// the machine does not have, and the new axis gets a row and a column of its own in a core
+    /// matrix. Only safe at standstill, for the same reason <see cref="ReconfigureAsync"/> is
     /// </para>
     /// </remarks>
-    /// <returns>
-    /// Why the geometry, placed over the axes as they now are, does not describe a machine its motors
-    /// can drive - a core matrix given before its axes existed that turns out singular - or null
-    /// </returns>
-    public string? FollowAxes(Move move)
+    public void FollowAxes(Move move)
     {
         KinematicsEngine geometry = Geometry;
-        if (!geometry.SetAxes(AxisIndices.From(move)))
+        if (geometry.SetAxes(AxisIndices.From(move)))
         {
-            return null;
+            KinematicsConfigurator.WriteTo(geometry, move);
         }
-
-        KinematicsConfigurator.WriteTo(geometry, move);
-        return geometry.ConfigurationError;
     }
 
     /// <summary>Where the last move left the machine, and the state that carries between moves</summary>
@@ -244,7 +238,7 @@ internal sealed class MovePlanner(
                 // Before any code has configured a geometry, whatever the object model already
                 // describes is the best description of the machine there is - which matters when the
                 // model was populated by something other than this process's M-codes
-                Geometry = KinematicsFactory.Create(model.Move.Kinematics);
+                Geometry = KinematicsFactory.Create(model.Move.Kinematics, AxisIndices.From(model.Move));
             }
 
             // The geometry finds its axes by letter and keeps its own copy of M208's box, and this is

@@ -48,35 +48,4 @@ public class MovementStateTests
 
         Assert.That(state.EndstopsTriggered, Is.Zero);
     }
-
-    [Test]
-    public void ResettingForgetsAnUnfinishedMove()
-    {
-        // A move part-way through is what other channels wait on, so a reset that left the count set
-        // would stop every other channel moving until something else happened to clear it
-        MovementState state = new();
-        state.SegmentsLeft = 7;
-
-        state.Reset();
-
-        Assert.That(state.SegmentsLeft, Is.Zero);
-    }
-
-    [Test]
-    public void ResettingForgetsTheLastMove()
-    {
-        // Reset is for when the machine position stops meaning anything, and what stopped the last
-        // move is part of what it meant
-        MovementState state = new();
-        state.CurrentUserPosition[0] = 42.0f;
-        state.RecordEndstopTriggered(1u << 1);
-
-        state.Reset();
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(state.EndstopsTriggered, Is.Zero);
-            Assert.That(state.CurrentUserPosition[0], Is.Zero);
-        });
-    }
 }

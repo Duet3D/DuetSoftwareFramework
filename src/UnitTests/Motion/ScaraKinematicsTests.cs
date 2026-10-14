@@ -1,4 +1,5 @@
 using System;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
 using DuetControlServer.Motion.Kinematics;
 using DuetControlServer.Motion.Native;
@@ -29,9 +30,6 @@ public class ScaraKinematicsTests
         return stepsPerMm;
     }
 
-    /// <summary>A 100mm-plus-100mm arm with the joint ranges RepRapFirmware assumes</summary>
-    private static ScaraKinematicsEngine CreateScara() => new ScaraKinematicsEngine().WithAxes();
-
     private static int[] ToMotorSteps(KinematicsEngine engine, float[] machinePos, int numAxes, bool isCoordinated = false,
                                       NativeMovementError expected = NativeMovementError.Ok)
     {
@@ -50,28 +48,13 @@ public class ScaraKinematicsTests
 
     // ---- Serial SCARA -------------------------------------------------------------------------------
 
-    [Test]
-    public void TheArmsFoldAndStraightenBetweenTheTwoRadiusLimits()
-    {
-        ScaraKinematicsEngine engine = CreateScara();
-
-        Assert.Multiple(() =>
-        {
-            // Straightened out, the head is at the sum of the arm lengths; the 0.995 keeps it just
-            // clear of the singularity there
-            Assert.That(engine.MaxRadius, Is.EqualTo(200.0f * 0.995f).Within(0.01f));
-            Assert.That(engine.MinRadius, Is.GreaterThan(0.0f), "folded up, the head cannot reach the pillar");
-            Assert.That(engine.MinRadius, Is.LessThan(engine.MaxRadius));
-        });
-    }
-
     [TestCase(150.0f, 0.0f, 5.0f)]
     [TestCase(120.0f, 60.0f, 0.0f)]
     [TestCase(100.0f, -80.0f, 12.5f)]
     [TestCase(0.0f, 150.0f, -3.0f)]
     public void ScaraPositionsSurviveTheRoundTrip(float x, float y, float z)
     {
-        ScaraKinematicsEngine engine = CreateScara();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Scara, KinematicsAxes.From());
 
         int[] motorPos = ToMotorSteps(engine, [x, y, z], 3);
         float[] roundTripped = ToCartesian(engine, motorPos, 3);
@@ -89,7 +72,7 @@ public class ScaraKinematicsTests
     {
         // theta = 0 points the proximal arm along +X, and psi = 0 leaves the distal one in line with
         // it, so both angles zero is the one pose whose answer is obvious
-        ScaraKinematicsEngine engine = CreateScara();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Scara, KinematicsAxes.From());
 
         int[] motorPos = new int[NumDrives];
         float[] machinePos = ToCartesian(engine, motorPos, 3);
@@ -106,8 +89,8 @@ public class ScaraKinematicsTests
     {
         // xOffset and yOffset say where bed zero is relative to the pillar, so the same joint angles
         // report a position shifted by exactly that much
-        ScaraKinematicsEngine offset = new ScaraKinematicsEngine(xOffset: 30.0f, yOffset: -20.0f).WithAxes();
-        ScaraKinematicsEngine plain = CreateScara();
+        KinematicsEngine offset = new ScaraKinematicsEngine(xOffset: 30.0f, yOffset: -20.0f).WithAxes();
+        KinematicsEngine plain = KinematicsFactory.Create(KinematicsName.Scara, KinematicsAxes.From());
 
         int[] motorPos = new int[NumDrives];
         float[] offsetPos = ToCartesian(offset, motorPos, 3);
@@ -124,7 +107,7 @@ public class ScaraKinematicsTests
     public void APositionTooFarOutIsUnreachable()
     {
         // Beyond the reach of both arms straightened out there is no pose at all
-        ScaraKinematicsEngine engine = CreateScara();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Scara, KinematicsAxes.From());
 
         float[] machinePos = new float[NumDrives];
         machinePos[0] = 300.0f;
@@ -140,7 +123,7 @@ public class ScaraKinematicsTests
     {
         // Folded back on itself the arm reaches a minimum radius, and inside that the two arms would
         // have to be more than folded
-        ScaraKinematicsEngine engine = CreateScara();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Scara, KinematicsAxes.From());
 
         float[] machinePos = new float[NumDrives];
         machinePos[0] = 5.0f;
@@ -151,7 +134,6 @@ public class ScaraKinematicsTests
         Assert.Multiple(() =>
         {
             Assert.That(error, Is.EqualTo(NativeMovementError.UnreachablePosition));
-            Assert.That(engine.IsReachable(5.0f, 0.0f), Is.False);
         });
     }
 
@@ -162,7 +144,7 @@ public class ScaraKinematicsTests
         // would need one is refused rather than taken with the head wandering off the commanded line
         // With the proximal joint confined to the fourth quadrant, a point up and to the right needs
         // the elbow folded the other way: the pose the arm starts in would need theta above zero
-        ScaraKinematicsEngine engine = new ScaraKinematicsEngine(thetaLimits: [-90.0f, 0.0f], psiLimits: [-135.0f, 135.0f]).WithAxes();
+        KinematicsEngine engine = new ScaraKinematicsEngine(thetaLimits: [-90.0f, 0.0f], psiLimits: [-135.0f, 135.0f]).WithAxes();
         float[] machinePos = [120.0f, 60.0f, 0.0f];
 
         int[] motorPos = new int[NumDrives];
@@ -181,7 +163,7 @@ public class ScaraKinematicsTests
     {
         // On machines like the Helios, turning an arm drags the other joint and the Z column with it.
         // The correction is linear and fixed, so the round trip must come out exactly where it started
-        ScaraKinematicsEngine engine = new ScaraKinematicsEngine(crosstalk: [0.1f, 0.05f, -0.02f]).WithAxes();
+        KinematicsEngine engine = new ScaraKinematicsEngine(crosstalk: [0.1f, 0.05f, -0.02f]).WithAxes();
 
         int[] motorPos = ToMotorSteps(engine, [140.0f, 50.0f, 20.0f], 3);
         float[] roundTripped = ToCartesian(engine, motorPos, 3);
@@ -199,8 +181,8 @@ public class ScaraKinematicsTests
     {
         // Without crosstalk, holding X still needs the two arm motors. With arm-to-Z crosstalk it
         // needs the Z motor too, because letting an arm turn would drop the head
-        ScaraKinematicsEngine plain = CreateScara();
-        ScaraKinematicsEngine coupled = new ScaraKinematicsEngine(crosstalk: [0.0f, 0.05f, 0.0f]).WithAxes();
+        KinematicsEngine plain = KinematicsFactory.Create(KinematicsName.Scara, KinematicsAxes.From());
+        KinematicsEngine coupled = new ScaraKinematicsEngine(crosstalk: [0.0f, 0.05f, 0.0f]).WithAxes();
 
         Assert.Multiple(() =>
         {
@@ -214,8 +196,8 @@ public class ScaraKinematicsTests
     [Test]
     public void AJointThatTurnsMoreThanFullCircleIsContinuous()
     {
-        ScaraKinematicsEngine limited = CreateScara();
-        ScaraKinematicsEngine continuous = new ScaraKinematicsEngine(thetaLimits: [-200.0f, 200.0f], psiLimits: [-135.0f, 135.0f]).WithAxes();
+        KinematicsEngine limited = KinematicsFactory.Create(KinematicsName.Scara, KinematicsAxes.From());
+        KinematicsEngine continuous = new ScaraKinematicsEngine(thetaLimits: [-200.0f, 200.0f], psiLimits: [-135.0f, 135.0f]).WithAxes();
 
         Assert.Multiple(() =>
         {
@@ -227,7 +209,7 @@ public class ScaraKinematicsTests
     [Test]
     public void AxesAboveZAreLinear()
     {
-        ScaraKinematicsEngine engine = CreateScara();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Scara, KinematicsAxes.From());
 
         float[] machinePos = new float[NumDrives];
         machinePos[0] = 150.0f;
@@ -242,17 +224,12 @@ public class ScaraKinematicsTests
 
     // ---- Five-bar parallel SCARA --------------------------------------------------------------------
 
-    /// <summary>A symmetric linkage: actuators 100mm apart, all four arms 100mm</summary>
-    private static FiveBarScaraKinematicsEngine CreateFiveBar()
-        => new FiveBarScaraKinematicsEngine(xOrigL: -50.0f, yOrigL: 0.0f, xOrigR: 50.0f, yOrigR: 0.0f,
-               proximalL: 100.0f, proximalR: 100.0f, distalL: 100.0f, distalR: 100.0f).WithAxes();
-
     [TestCase(0.0f, 150.0f, 5.0f)]
     [TestCase(20.0f, 140.0f, 0.0f)]
     [TestCase(-25.0f, 130.0f, 10.0f)]
     public void FiveBarPositionsSurviveTheRoundTrip(float x, float y, float z)
     {
-        FiveBarScaraKinematicsEngine engine = CreateFiveBar();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.FiveBarScara, KinematicsAxes.From());
 
         int[] motorPos = ToMotorSteps(engine, [x, y, z], 3);
         float[] roundTripped = ToCartesian(engine, motorPos, 3);
@@ -271,14 +248,14 @@ public class ScaraKinematicsTests
         // Work mode 2 buckles the left elbow and bulges the right, which on a symmetric linkage is the
         // symmetric pose: the left angle measured from +X mirrors the right one measured from 180.
         // Work mode 1 turns both elbows the same way instead, so the same point gives a lopsided pose
-        FiveBarScaraKinematicsEngine symmetric = new FiveBarScaraKinematicsEngine(
+        KinematicsEngine symmetric = new FiveBarScaraKinematicsEngine(
             xOrigL: -50.0f, yOrigL: 0.0f, xOrigR: 50.0f, yOrigR: 0.0f,
             proximalL: 100.0f, proximalR: 100.0f, distalL: 100.0f, distalR: 100.0f, workMode: 2).WithAxes();
 
         int[] symmetricPos = ToMotorSteps(symmetric, [0.0f, 150.0f, 0.0f], 3);
         Assert.That((symmetricPos[0] + symmetricPos[1]) / StepsPerUnit, Is.EqualTo(180.0f).Within(0.05f));
 
-        int[] lopsidedPos = ToMotorSteps(CreateFiveBar(), [0.0f, 150.0f, 0.0f], 3);
+        int[] lopsidedPos = ToMotorSteps(KinematicsFactory.Create(KinematicsName.FiveBarScara, KinematicsAxes.From()), [0.0f, 150.0f, 0.0f], 3);
         Assert.That(lopsidedPos[0], Is.Not.EqualTo(symmetricPos[0]), "work mode 1 reaches the same point another way");
     }
 
@@ -290,17 +267,17 @@ public class ScaraKinematicsTests
         int modesTested = 0;
         foreach (int workMode in new[] { 1, 2, 4 })
         {
-            FiveBarScaraKinematicsEngine engine = new FiveBarScaraKinematicsEngine(
+            KinematicsEngine engine = new FiveBarScaraKinematicsEngine(
                 xOrigL: -50.0f, yOrigL: 0.0f, xOrigR: 50.0f, yOrigR: 0.0f,
                 proximalL: 100.0f, proximalR: 100.0f, distalL: 100.0f, distalR: 100.0f, workMode: workMode).WithAxes();
 
-            if (!engine.IsReachable(15.0f, 145.0f))
+            int[] motorPos = new int[NumDrives];
+            if (engine.CartesianToMotorSteps([15.0f, 145.0f, 0.0f], UniformStepsPerMm(), 3, 3, motorPos) == NativeMovementError.UnreachablePosition)
             {
                 continue;               // this pose is not one this work mode can hold
             }
             modesTested++;
 
-            int[] motorPos = ToMotorSteps(engine, [15.0f, 145.0f, 0.0f], 3);
             float[] roundTripped = ToCartesian(engine, motorPos, 3);
 
             Assert.Multiple(() =>
@@ -316,7 +293,7 @@ public class ScaraKinematicsTests
     [Test]
     public void APositionTheArmsCannotSpanIsUnreachable()
     {
-        FiveBarScaraKinematicsEngine engine = CreateFiveBar();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.FiveBarScara, KinematicsAxes.From());
 
         float[] machinePos = new float[NumDrives];
         machinePos[1] = 400.0f;
@@ -327,7 +304,6 @@ public class ScaraKinematicsTests
         Assert.Multiple(() =>
         {
             Assert.That(error, Is.EqualTo(NativeMovementError.UnreachablePosition));
-            Assert.That(engine.IsReachable(0.0f, 400.0f), Is.False);
         });
     }
 
@@ -336,12 +312,15 @@ public class ScaraKinematicsTests
     {
         // Far out, the two distal arms come nearly into line with each other and the linkage loses
         // control of the head. The head angle limit is what keeps the machine out of there
-        FiveBarScaraKinematicsEngine engine = CreateFiveBar();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.FiveBarScara, KinematicsAxes.From());
 
+        int[] motorPos = new int[NumDrives];
         Assert.Multiple(() =>
         {
-            Assert.That(engine.IsReachable(0.0f, 150.0f), Is.True);
-            Assert.That(engine.IsReachable(0.0f, 195.0f), Is.False, "the arms would be almost straight");
+            Assert.That(engine.CartesianToMotorSteps([0.0f, 150.0f, 0.0f], UniformStepsPerMm(), 3, 3, motorPos),
+                        Is.EqualTo(NativeMovementError.Ok));
+            Assert.That(engine.CartesianToMotorSteps([0.0f, 195.0f, 0.0f], UniformStepsPerMm(), 3, 3, motorPos),
+                        Is.EqualTo(NativeMovementError.UnreachablePosition), "the arms would be almost straight");
         });
     }
 
@@ -350,8 +329,8 @@ public class ScaraKinematicsTests
     {
         // With a cantilever the head is not at the joint but out along the left distal arm, so the
         // same joint angles put it somewhere else entirely
-        FiveBarScaraKinematicsEngine plain = CreateFiveBar();
-        FiveBarScaraKinematicsEngine cantilevered = new FiveBarScaraKinematicsEngine(
+        KinematicsEngine plain = KinematicsFactory.Create(KinematicsName.FiveBarScara, KinematicsAxes.From());
+        KinematicsEngine cantilevered = new FiveBarScaraKinematicsEngine(
             xOrigL: -50.0f, yOrigL: 0.0f, xOrigR: 50.0f, yOrigR: 0.0f,
             proximalL: 100.0f, proximalR: 100.0f, distalL: 100.0f, distalR: 100.0f, cantL: 40.0f).WithAxes();
 
@@ -367,7 +346,7 @@ public class ScaraKinematicsTests
     [Test]
     public void ACantileveredRoundTripStillComesBack()
     {
-        FiveBarScaraKinematicsEngine engine = new FiveBarScaraKinematicsEngine(
+        KinematicsEngine engine = new FiveBarScaraKinematicsEngine(
             xOrigL: -50.0f, yOrigL: 0.0f, xOrigR: 50.0f, yOrigR: 0.0f,
             proximalL: 100.0f, proximalR: 100.0f, distalL: 100.0f, distalR: 100.0f, cantL: 40.0f).WithAxes();
 
@@ -384,7 +363,7 @@ public class ScaraKinematicsTests
     [Test]
     public void BothActuatorsHoldEitherAxisStill()
     {
-        FiveBarScaraKinematicsEngine engine = CreateFiveBar();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.FiveBarScara, KinematicsAxes.From());
 
         Assert.Multiple(() =>
         {

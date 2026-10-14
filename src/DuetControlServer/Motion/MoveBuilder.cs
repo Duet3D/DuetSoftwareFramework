@@ -10,11 +10,7 @@ namespace DuetControlServer.Motion;
 /// </summary>
 /// <param name="Error">Ok, NoMovement, or why it could not be built</param>
 /// <param name="Length">Bytes written to the destination buffer, 0 unless Error is Ok</param>
-internal readonly record struct MoveBuildResult(NativeMovementError Error, int Length)
-{
-    /// <summary>Whether a submission was produced</summary>
-    public bool HasMove => Error == NativeMovementError.Ok && Length > 0;
-}
+internal readonly record struct MoveBuildResult(NativeMovementError Error, int Length);
 
 /// <summary>
 /// Turns a <see cref="RawMove"/> into the submission the native motion engine takes

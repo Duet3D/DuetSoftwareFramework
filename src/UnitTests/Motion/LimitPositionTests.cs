@@ -1,4 +1,5 @@
 using System;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Motion.Kinematics;
 using NUnit.Framework;
 
@@ -21,8 +22,7 @@ public class LimitPositionTests
     {
         for (int axis = 0; axis < numAxes; axis++)
         {
-            engine.AxisMinima[axis] = min;
-            engine.AxisMaxima[axis] = max;
+            engine.SetAxisLimits(axis, min, max);
         }
         return engine;
     }
@@ -35,7 +35,7 @@ public class LimitPositionTests
     [Test]
     public void ACartesianTargetIsClampedToTheM208Box()
     {
-        KinematicsEngine engine = WithLimits(CoreKinematicsEngine.TryCreate("cartesian")!.WithAxes(), 0.0f, 200.0f);
+        KinematicsEngine engine = WithLimits(KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From()), 0.0f, 200.0f);
 
         float[] coords = [250.0f, -30.0f, 100.0f];
         Assert.That(Limit(engine, coords), Is.EqualTo(LimitPositionResult.Adjusted));
@@ -53,7 +53,7 @@ public class LimitPositionTests
         // Only the axes that are both homed and moving are limited. Limiting an axis the move does
         // not touch would turn a move in one axis into a move in two, and the planner would then have
         // to decide what to do about movement the user never asked for
-        KinematicsEngine engine = WithLimits(CoreKinematicsEngine.TryCreate("cartesian")!.WithAxes(), 0.0f, 200.0f);
+        KinematicsEngine engine = WithLimits(KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From()), 0.0f, 200.0f);
 
         float[] coords = [250.0f, 250.0f, 100.0f];
         Assert.That(Limit(engine, coords, axesToLimit: 0b001), Is.EqualTo(LimitPositionResult.Adjusted));
@@ -69,10 +69,10 @@ public class LimitPositionTests
     {
         // Homing converts an axis limit to steps and back, and that does not land exactly on the limit
         // when the steps per mm is not a whole number. Without the tolerance an axis would be reported
-        // out of range the moment it was homed to its own maximum
-        KinematicsEngine engine = WithLimits(CoreKinematicsEngine.TryCreate("cartesian")!.WithAxes(), 0.0f, 200.0f);
+        // out of range the moment it was homed to its own maximum. RepRapFirmware's is 0.02mm
+        KinematicsEngine engine = WithLimits(KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From()), 0.0f, 200.0f);
 
-        float[] coords = [200.0f + (KinematicsEngine.AxisRoundingError / 2.0f), 100.0f, 100.0f];
+        float[] coords = [200.01f, 100.0f, 100.0f];
         Assert.That(Limit(engine, coords), Is.EqualTo(LimitPositionResult.Ok));
     }
 
@@ -81,7 +81,7 @@ public class LimitPositionTests
     {
         // M564 S0 H0 is what lets a homing macro drive an axis to its switch, which is past the limit
         // by definition
-        KinematicsEngine engine = WithLimits(CoreKinematicsEngine.TryCreate("cartesian")!.WithAxes(), 0.0f, 200.0f);
+        KinematicsEngine engine = WithLimits(KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From()), 0.0f, 200.0f);
 
         float[] coords = [-500.0f, 100.0f, 100.0f];
         Assert.That(Limit(engine, coords, applyM208: false), Is.EqualTo(LimitPositionResult.Ok));
@@ -93,9 +93,9 @@ public class LimitPositionTests
     {
         // The reachable region is an annulus. Clamping X and Y separately would give a point in the
         // corner of a box, which the arm cannot reach at all
-        PolarKinematicsEngine engine = new PolarKinematicsEngine(minRadius: 20.0f, maxRadius: 100.0f, homedRadius: 20.0f,
-                                           maxTurntableSpeed: 30.0f, maxTurntableAcceleration: 30.0f).WithAxes();
-        WithLimits(engine, -50.0f, 50.0f);
+        KinematicsEngine engine = WithLimits(new PolarKinematicsEngine(minRadius: 20.0f, maxRadius: 100.0f, homedRadius: 20.0f,
+                                                                       maxTurntableSpeed: 30.0f, maxTurntableAcceleration: 30.0f).WithAxes(),
+                                             -50.0f, 50.0f);
 
         float[] tooFar = [300.0f, 0.0f, 10.0f];
         Assert.That(Limit(engine, tooFar), Is.EqualTo(LimitPositionResult.Adjusted));
@@ -111,9 +111,9 @@ public class LimitPositionTests
     {
         // The middle of the bed has no direction to push out in, so RepRapFirmware picks one rather
         // than dividing by zero
-        PolarKinematicsEngine engine = new PolarKinematicsEngine(minRadius: 20.0f, maxRadius: 100.0f, homedRadius: 20.0f,
-                                           maxTurntableSpeed: 30.0f, maxTurntableAcceleration: 30.0f).WithAxes();
-        WithLimits(engine, -50.0f, 50.0f);
+        KinematicsEngine engine = WithLimits(new PolarKinematicsEngine(minRadius: 20.0f, maxRadius: 100.0f, homedRadius: 20.0f,
+                                                                       maxTurntableSpeed: 30.0f, maxTurntableAcceleration: 30.0f).WithAxes(),
+                                             -50.0f, 50.0f);
 
         float[] centre = [0.0f, 0.0f, 10.0f];
         Assert.That(Limit(engine, centre), Is.EqualTo(LimitPositionResult.Adjusted));
@@ -127,8 +127,7 @@ public class LimitPositionTests
     [Test]
     public void ADeltaTargetIsPulledInsideThePrintRadius()
     {
-        LinearDeltaKinematicsEngine engine = LinearDeltaKinematicsEngine.CreateDefault().WithAxes();
-        WithLimits(engine, 0.0f, 300.0f);
+        KinematicsEngine engine = WithLimits(KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From()), 0.0f, 300.0f);
 
         float beyond = LinearDeltaKinematicsEngine.DefaultPrintRadius * 2.0f;
         float[] coords = [beyond, 0.0f, 10.0f];
@@ -144,8 +143,7 @@ public class LimitPositionTests
         // A delta's ceiling is not flat: how high the effector can go depends on where it is, because
         // each carriage can only rise to its homed height. Asking for a height no tower can support
         // lowers the target rather than being refused
-        LinearDeltaKinematicsEngine engine = LinearDeltaKinematicsEngine.CreateDefault().WithAxes();
-        WithLimits(engine, 0.0f, 1000.0f);
+        KinematicsEngine engine = WithLimits(KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From()), 0.0f, 1000.0f);
 
         float[] coords = [0.0f, 0.0f, 900.0f];
         Assert.That(Limit(engine, coords), Is.EqualTo(LimitPositionResult.Adjusted));
@@ -165,8 +163,7 @@ public class LimitPositionTests
         // whose closest approach falls in the middle can pass under a ceiling that is higher at both
         // of its ends. This move runs left to right in front of the Z tower, so it approaches it and
         // recedes again - and the highest carriage is halfway, not at either end
-        LinearDeltaKinematicsEngine engine = LinearDeltaKinematicsEngine.CreateDefault().WithAxes();
-        WithLimits(engine, 0.0f, 1000.0f);
+        KinematicsEngine engine = WithLimits(KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From()), 0.0f, 1000.0f);
 
         float[] left = [-60.0f, 40.0f, 1000.0f];
         Limit(engine, left);
@@ -199,8 +196,7 @@ public class LimitPositionTests
         // A descending move has Z movement to give up, so lowering the target lowers the whole path
         // with it and the move becomes possible. That is the difference between "adjusted" and
         // "intermediate unreachable" - the same obstruction, but one of them can be moved out of
-        LinearDeltaKinematicsEngine engine = LinearDeltaKinematicsEngine.CreateDefault().WithAxes();
-        WithLimits(engine, 0.0f, 1000.0f);
+        KinematicsEngine engine = WithLimits(KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From()), 0.0f, 1000.0f);
 
         float[] left = [-60.0f, 40.0f, 1000.0f];
         Limit(engine, left);
@@ -218,8 +214,8 @@ public class LimitPositionTests
         // On a delta the head's position is a function of all three towers, so a coordinate in one of
         // them means nothing until every one is homed. M564 S0 does not make that safe, which is why
         // the geometry widens the set rather than the setting deciding on its own
-        LinearDeltaKinematicsEngine delta = LinearDeltaKinematicsEngine.CreateDefault().WithAxes();
-        KinematicsEngine cartesian = CoreKinematicsEngine.TryCreate("cartesian")!.WithAxes();
+        KinematicsEngine delta = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From());
+        KinematicsEngine cartesian = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From());
 
         Assert.Multiple(() =>
         {

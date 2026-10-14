@@ -22,23 +22,6 @@ namespace UnitTests.Motion;
 [TestFixture]
 public class MoveBuilderTests
 {
-
-    /// <summary>
-    /// Snapshot a machine, building its geometry from the object model as the factory does
-    /// </summary>
-    /// <param name="move">The move subsystem</param>
-    /// <returns>The snapshot</returns>
-    /// <remarks>
-    /// The planner owns its geometry rather than deriving it (§14), so the snapshot is handed one.
-    /// These tests describe a machine as an object model and want the geometry that describes, which
-    /// is what KinematicsFactory.Create is for
-    /// </remarks>
-    private static MotionParameters Snapshot(Move move)
-    {
-        KinematicsEngine geometry = KinematicsFactory.Create(move.Kinematics);
-        MotionParameters.ApplyAxes(move, geometry);
-        return MotionParameters.FromObjectModel(move, geometry);
-    }
     private const int NumDrives = MotionLimits.MaxAxesPlusExtruders;
     private const float StepClockRate = MotionLimits.StepClockRate;
 
@@ -118,7 +101,7 @@ public class MoveBuilderTests
         return kinematics;
     }
 
-    private static MoveBuilder NewBuilder(Move move) => new(Snapshot(move));
+    private static MoveBuilder NewBuilder(Move move) => new(KinematicsAxes.Snapshot(move));
 
     /// <summary>A handle with the given raw value, which is the form the record carries it in</summary>
     /// <param name="all">Type, major and minor packed as the boards read them</param>
@@ -145,7 +128,7 @@ public class MoveBuilderTests
     {
         byte[] buffer = new byte[MoveParams.Length(NumDrives)];
         MoveBuildResult result = builder.Build(move, buffer);
-        return (result, result.HasMove ? Decode(buffer.AsSpan(0, result.Length)) : null);
+        return (result, result is { Error: NativeMovementError.Ok, Length: > 0 } ? Decode(buffer.AsSpan(0, result.Length)) : null);
     }
 
     private static RawMove LinearMove(uint moveId, float x, float y, float z, float feedRateMmPerSec = 50.0f)
@@ -527,7 +510,7 @@ public class MoveBuilderTests
 
         byte[] buffer = new byte[MoveParams.Length(NumDrives)];
         MoveBuildResult result = builder.Build(move, buffer);
-        Assert.That(result.HasMove, Is.True);
+        Assert.That(result.Error, Is.EqualTo(NativeMovementError.Ok));
 
         int stopsAt = Marshal.SizeOf<MoveParamsHeader>() + (NumDrives * (sizeof(int) + sizeof(float)));
         byte[] x = buffer[stopsAt..(stopsAt + MoveStopInput.Length)];
@@ -562,7 +545,7 @@ public class MoveBuilderTests
         move.StopOnInput[1].HoldDriver(1);
 
         byte[] buffer = new byte[MoveParams.Length(NumDrives)];
-        Assert.That(builder.Build(move, buffer).HasMove, Is.True);
+        Assert.That(builder.Build(move, buffer).Error, Is.EqualTo(NativeMovementError.Ok));
 
         int stopsAt = Marshal.SizeOf<MoveParamsHeader>() + (NumDrives * (sizeof(int) + sizeof(float)));
         byte[] y = buffer[(stopsAt + MoveStopInput.Length)..(stopsAt + (2 * MoveStopInput.Length))];
@@ -624,11 +607,12 @@ public class MoveBuilderTests
         // Homing a delta knows where a tower's motor is, not where the head is: the switch is at the
         // top of the tower and the head position follows from all three carriages. So the endpoint is
         // set and the coordinates fall out of it, which is the opposite direction from SetAxisPosition
+        const float homedHeight = 240.0f;
         Move machine = CartesianMachine();
         machine.Kinematics = new DeltaKinematics
         {
             DeltaRadius = LinearDeltaKinematicsEngine.DefaultDeltaRadius,
-            HomedHeight = LinearDeltaKinematicsEngine.DefaultHomedHeight,
+            HomedHeight = homedHeight,
             PrintRadius = LinearDeltaKinematicsEngine.DefaultPrintRadius
         };
         foreach (DeltaTower tower in machine.Kinematics is DeltaKinematics d ? d.Towers : [])
@@ -637,12 +621,14 @@ public class MoveBuilderTests
         }
 
         MoveBuilder builder = NewBuilder(machine);
-        LinearDeltaKinematicsEngine engine = (LinearDeltaKinematicsEngine)Snapshot(machine).Geometry;
 
-        // Put all three carriages at their homed heights, which is what homing a delta ends up doing
+        // Put all three carriages at their homed heights, which is what homing a delta ends up doing:
+        // the homed height plus the vertical part of a rod reaching in from the delta radius
+        float homedCarriageHeight = homedHeight + MathF.Sqrt((LinearDeltaKinematicsEngine.DefaultDiagonal * LinearDeltaKinematicsEngine.DefaultDiagonal)
+                                                             - (LinearDeltaKinematicsEngine.DefaultDeltaRadius * LinearDeltaKinematicsEngine.DefaultDeltaRadius));
         for (int tower = 0; tower < LinearDeltaKinematicsEngine.UsualNumTowers; tower++)
         {
-            int steps = (int)MathF.Round(engine.GetHomedCarriageHeight(tower) * machine.Axes[tower].StepsPerMm);
+            int steps = (int)MathF.Round(homedCarriageHeight * machine.Axes[tower].StepsPerMm);
             builder.SetDriveEndpoint(tower, steps);
         }
 
@@ -651,7 +637,7 @@ public class MoveBuilderTests
             // All three carriages level means the head is on the axis, at the homed height
             Assert.That(builder.StartCoordinates[0], Is.EqualTo(0.0f).Within(0.01f), "X");
             Assert.That(builder.StartCoordinates[1], Is.EqualTo(0.0f).Within(0.01f), "Y");
-            Assert.That(builder.StartCoordinates[2], Is.EqualTo(engine.HomedHeight).Within(0.01f), "Z");
+            Assert.That(builder.StartCoordinates[2], Is.EqualTo(homedHeight).Within(0.01f), "Z");
         });
     }
 

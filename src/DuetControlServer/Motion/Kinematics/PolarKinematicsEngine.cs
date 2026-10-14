@@ -45,7 +45,7 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
     public float MaxRadius { get; }
 
     /// <summary>Radius the head is at when homed, mm</summary>
-    public float HomedRadius { get; }
+    private float HomedRadius { get; }
 
     /// <summary>How fast the turntable may turn, degrees per second</summary>
     /// <remarks>
@@ -64,10 +64,10 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
     /// Degrees convert to step clocks exactly as millimetres do, which is why RepRapFirmware puts its
     /// turntable limits through the same <c>ConvertSpeedFromMmPerSec</c> the axes use
     /// </remarks>
-    public float MaxTurntableSpeed => MotionUnits.SpeedFromMmPerSec(MaxTurntableSpeedPerSec);
+    private float MaxTurntableSpeed => MotionUnits.SpeedFromMmPerSec(MaxTurntableSpeedPerSec);
 
     /// <summary>How hard the turntable may be accelerated, degrees per step clock squared</summary>
-    public float MaxTurntableAcceleration => MotionUnits.AccelerationFromMmPerSecSquared(MaxTurntableAccelerationPerSec);
+    private float MaxTurntableAcceleration => MotionUnits.AccelerationFromMmPerSecSquared(MaxTurntableAccelerationPerSec);
 
     /// <inheritdoc />
     public override KinematicsName Kind => KinematicsName.Polar;
@@ -414,18 +414,6 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
     {
         uint motors = Kinematic.Bitmap;
         return (motors & AxisIndices.Bit(axis)) != 0 ? motors : base.GetControllingDrives(axis);
-    }
-
-    /// <summary>
-    /// Whether the head can be put at the given XY position
-    /// </summary>
-    /// <param name="x">X coordinate in mm</param>
-    /// <param name="y">Y coordinate in mm</param>
-    /// <returns>True if it is within the annulus the arm sweeps</returns>
-    public bool IsReachable(float x, float y)
-    {
-        float radiusSquared = (x * x) + (y * y);
-        return radiusSquared >= MinRadius * MinRadius && radiusSquared <= MaxRadius * MaxRadius;
     }
 
     /// <summary>

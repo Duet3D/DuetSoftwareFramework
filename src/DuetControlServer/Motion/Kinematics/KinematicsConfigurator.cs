@@ -32,9 +32,14 @@ internal static class KinematicsConfigurator
     /// <param name="code">An M665, M666 or M669</param>
     /// <param name="seen">Set when the code carried a parameter that configured something</param>
     /// <returns>The geometry the code leaves behind, which is <paramref name="current"/> if nothing changed</returns>
-    /// <exception cref="GCodeException">The code asked for something this geometry cannot do</exception>
+    /// <exception cref="GCodeException">
+    /// The code asked for something this geometry cannot do, or for a geometry the machine does not
+    /// have the axes for. The caller keeps the geometry it had
+    /// </exception>
     public static KinematicsEngine Apply(KinematicsEngine current, Move move, Code code, ref bool seen)
     {
+        // What the code needs and what it configures are judged against the axes as they are now.
+        // The installed geometry already has them: M584 gives them to it as it creates each axis
         AxisIndices axes = AxisIndices.From(move);
         KinematicsEngine engine = current;
 
@@ -44,11 +49,10 @@ internal static class KinematicsConfigurator
             if (name != engine.Kind)
             {
                 // A new geometry starts from its own defaults, including its segmentation, which is
-                // what constructing a new Kinematics does in RepRapFirmware. It is told the machine's
-                // axes straight away: a core geometry places its matrix by them, and the rest of this
-                // code may configure it
-                engine = KinematicsFactory.Create(name);
-                engine.SetAxes(axes);
+                // what constructing a new Kinematics does in RepRapFirmware. It is built for the
+                // machine's axes: a core geometry places its matrix by them, and the rest of this code
+                // may configure it
+                engine = KinematicsFactory.Create(name, axes);
             }
             seen = true;
         }
@@ -57,9 +61,14 @@ internal static class KinematicsConfigurator
         {
             // M665 with a rod length switches the machine to a delta if it is not one already, which
             // is how a delta config.g is usually written
-            engine = KinematicsFactory.Create(KinematicsName.LinearDelta);
-            engine.SetAxes(axes);
+            engine = KinematicsFactory.Create(KinematicsName.LinearDelta, axes);
             seen = true;
+        }
+
+        // A geometry just selected has to have its axes before anything configures it
+        if (seen)
+        {
+            RequireAxes(engine);
         }
 
         if (engine is HangprinterKinematicsEngine && HasConfiguringParameters(code))
@@ -103,7 +112,32 @@ internal static class KinematicsConfigurator
             seen = true;
         }
 
+        // Configuring a geometry the machine lacks the axes for is refused as selecting one is: the
+        // axes come first in config.g, and a code that left such a geometry behind would leave every
+        // move to be refused instead
+        if (seen)
+        {
+            RequireAxes(engine);
+        }
         return engine;
+    }
+
+    /// <summary>
+    /// Refuse a geometry that needs an axis the machine does not have
+    /// </summary>
+    /// <param name="engine">The geometry, told the machine's axes</param>
+    /// <exception cref="GCodeException">An axis it needs is missing</exception>
+    /// <remarks>
+    /// RepRapFirmware's geometries take their first axes to be X, Y, Z, U and so on, which its axes
+    /// always are when config.g creates them in one M584. DSF finds them by letter, so the letters
+    /// have to be there when the code runs; the caller then keeps the geometry it had
+    /// </remarks>
+    private static void RequireAxes(KinematicsEngine engine)
+    {
+        if (engine.MissingAxesError is string missing)
+        {
+            throw new GCodeException(missing);
+        }
     }
 
     /// <summary>

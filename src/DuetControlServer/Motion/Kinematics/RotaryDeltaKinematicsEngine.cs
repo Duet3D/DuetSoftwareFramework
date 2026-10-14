@@ -32,7 +32,7 @@ namespace DuetControlServer.Motion.Kinematics;
 internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
 {
     /// <summary>Number of arms, which is not configurable</summary>
-    public const int DeltaAxes = 3;
+    private const int DeltaAxes = 3;
 
     private const int TowerA = 0, TowerB = 1, TowerC = 2;
 
@@ -58,14 +58,19 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
     /// <summary>Distance from the centre of the bed to each bearing, mm</summary>
     public float Radius { get; }
 
-    /// <summary>How far from the centre the effector may go, mm</summary>
-    public float PrintRadius { get; }
+    // TODO: RepRapFirmware's RotaryDeltaKinematics::LimitPosition keeps a target inside the print radius
+    // and Z inside its M208 limits, and RoundBedKinematics::IsReachable tells G29 which probe points are
+    // inside the print radius. Neither is ported yet
 
-    /// <summary>Lowest arm angle the machine allows, degrees</summary>
-    public float MinArmAngle { get; }
+    /// <summary>How far from the centre the effector may go, mm</summary>
+    private float PrintRadius { get; }
+
+    /// <summary>Lowest arm angle, degrees</summary>
+    /// <remarks>RepRapFirmware only reports this (M669 A, and M500); no move is limited by it</remarks>
+    private float MinArmAngle { get; }
 
     /// <summary>Highest arm angle the machine allows, degrees</summary>
-    public float MaxArmAngle { get; }
+    private float MaxArmAngle { get; }
 
     /// <inheritdoc />
     public override KinematicsName Kind => KinematicsName.RotaryDelta;
@@ -189,7 +194,7 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
     /// <summary>How far each endstop is from where it ought to be, degrees</summary>
     /// <param name="tower">Tower number</param>
     /// <returns>The adjustment</returns>
-    public float GetEndstopAdjustment(int tower) => _endstopAdjustments[tower];
+    private float GetEndstopAdjustment(int tower) => _endstopAdjustments[tower];
 
     /// <inheritdoc />
     public override NativeMovementError CartesianToMotorSteps(
@@ -202,7 +207,7 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
     {
         KinematicAxes kinematic = Kinematic;
         AxisIndices axes = kinematic.Machine;
-        if (!kinematic.IsComplete || !kinematic.LettersFitIn(machinePos.Length))
+        if (!kinematic.IsComplete || !kinematic.FitIn(machinePos.Length))
         {
             return NativeMovementError.UnreachablePosition;
         }
@@ -250,8 +255,8 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
     {
         KinematicAxes kinematic = Kinematic;
         AxisIndices axes = kinematic.Machine;
-        if (kinematic.IsComplete && kinematic.LettersFitIn(machinePos.Length) && kinematic.LettersFitIn(motorPos.Length)
-            && kinematic.LettersFitIn(stepsPerMm.Length))
+        if (kinematic.IsComplete && kinematic.FitIn(machinePos.Length) && kinematic.FitIn(motorPos.Length)
+            && kinematic.FitIn(stepsPerMm.Length))
         {
             (float x, float y, float z) = ForwardTransform(
                 motorPos[axes.X] / stepsPerMm[axes.X],
@@ -271,38 +276,6 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
     {
         KinematicAxes kinematic = Kinematic;
         return (kinematic.Bitmap & AxisIndices.Bit(axis)) != 0 ? kinematic.Bitmap : base.GetControllingDrives(axis);
-    }
-
-    /// <summary>
-    /// Whether a position is inside the printable cylinder and within the arms' angular range
-    /// </summary>
-    /// <param name="machinePos">Axis coordinates in mm</param>
-    /// <returns>True if the effector can be put there</returns>
-    public bool IsReachable(ReadOnlySpan<float> machinePos)
-    {
-        KinematicAxes kinematic = Kinematic;
-        AxisIndices axes = kinematic.Machine;
-        if (!kinematic.IsComplete || !kinematic.LettersFitIn(machinePos.Length))
-        {
-            return false;
-        }
-
-        float x = machinePos[axes.X], y = machinePos[axes.Y], z = machinePos[axes.Z];
-        float radiusSquared = (x * x) + (y * y);
-        if (radiusSquared > PrintRadius * PrintRadius)
-        {
-            return false;
-        }
-
-        for (int tower = 0; tower < DeltaAxes; tower++)
-        {
-            float angle = Transform(x, y, z, tower);
-            if (float.IsNaN(angle) || angle < MinArmAngle || angle > MaxArmAngle)
-            {
-                return false;
-            }
-        }
-        return true;
     }
 
     /// <summary>

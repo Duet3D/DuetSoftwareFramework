@@ -734,13 +734,8 @@ internal partial class MCodeHandler
                 return new Message(MessageType.Success, ReportDriveMapping(move));
             }
 
-            // A geometry finds X, Y and Z by letter, so an axis created here can be one it was waiting
-            // for. The axes exist either way, so a geometry they leave unusable is reported but does
-            // not stop the rest of the code: the moves it would plan are refused instead
-            if (planner.FollowAxes(move) is string geometryError)
-            {
-                replies.Add(new Message(MessageType.Error, geometryError));
-            }
+            // A geometry finds its axes by letter, so it resolves them again when one is created
+            planner.FollowAxes(move);
         }
 
         if (error is not null)
@@ -2119,7 +2114,7 @@ internal partial class MCodeHandler
             int zAxis = AxisIndices.IndexOf(move, 'Z');
             if (zAxis < 0 && code.HasParameter('S'))
             {
-                return new Message(MessageType.Error, "The machine has no Z axis");
+                return new Message(MessageType.Error, AxisIndices.NoAxisMessage("Z"));
             }
 
             for (int index = 0; index < move.Axes.Count; index++)

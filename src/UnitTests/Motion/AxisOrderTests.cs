@@ -70,35 +70,34 @@ public class AxisOrderTests
     }
 
     /// <summary>
-    /// Build a geometry by the name a test case gives it
+    /// A geometry with its defaults for the machine's axes, but a SCARA with crosstalk onto Z so that
+    /// which axis it takes to be Z shows
     /// </summary>
-    /// <remarks>
-    /// By name rather than by passing a factory, because the geometries are internal and a public
-    /// test method cannot take a delegate that returns one
-    /// </remarks>
-    private static KinematicsEngine Create(string geometry) => geometry switch
-    {
-        "LinearDelta" => LinearDeltaKinematicsEngine.CreateDefault(),
-        "RotaryDelta" => new RotaryDeltaKinematicsEngine(),
-        "Scara" => new ScaraKinematicsEngine(crosstalk: [0.1f, 0.05f, -0.02f]),
-        "FiveBarScara" => FiveBarScaraKinematicsEngine.CreateDefault(),
-        "Polar" => new PolarKinematicsEngine(0.0f, 150.0f, 0.0f),
-        "Hangprinter" => HangprinterKinematicsEngine.CreateDefault(),
-        _ => CoreKinematicsEngine.TryCreate(geometry)!
-    };
+    /// <param name="geometry">Which geometry</param>
+    /// <param name="letters">The machine's axes, in axis order</param>
+    private static KinematicsEngine Create(KinematicsName geometry, string letters) => geometry == KinematicsName.Scara
+        ? new ScaraKinematicsEngine(crosstalk: [0.1f, 0.05f, -0.02f]).WithAxes(letters)
+        : KinematicsFactory.Create(geometry, KinematicsAxes.From(letters));
+
+    /// <summary>One row of a core geometry's inverse matrix, as the object model reports it</summary>
+    /// <param name="engine">The geometry</param>
+    /// <param name="axis">The axis whose row it is</param>
+    /// <returns>How far each motor turns per mm of that axis</returns>
+    private static float[] InverseRow(KinematicsEngine engine, int axis)
+        => KinematicsAxes.Reported<CoreKinematics>(engine).InverseMatrix[axis];
 
     /// <summary>One of each geometry, with a point it can reach given per letter</summary>
     private static IEnumerable<TestCaseData> Geometries()
     {
-        yield return new TestCaseData("LinearDelta", new[] { 10.0f, -20.0f, 50.0f });
-        yield return new TestCaseData("RotaryDelta", new[] { 20.0f, 0.0f, 110.0f });
-        yield return new TestCaseData("Scara", new[] { 100.0f, 50.0f, 5.0f });
-        yield return new TestCaseData("FiveBarScara", new[] { 20.0f, 140.0f, 3.0f });
-        yield return new TestCaseData("Polar", new[] { 60.0f, 80.0f, -2.5f });
-        yield return new TestCaseData("Hangprinter", new[] { 100.0f, 0.0f, 200.0f });
-        yield return new TestCaseData("CoreXY", new[] { 10.0f, 20.0f, 5.0f });
-        yield return new TestCaseData("CoreXYU", new[] { 10.0f, 20.0f, 5.0f });
-        yield return new TestCaseData("MarkForged", new[] { 10.0f, 20.0f, 5.0f });
+        yield return new TestCaseData(KinematicsName.LinearDelta, new[] { 10.0f, -20.0f, 50.0f });
+        yield return new TestCaseData(KinematicsName.RotaryDelta, new[] { 20.0f, 0.0f, 110.0f });
+        yield return new TestCaseData(KinematicsName.Scara, new[] { 100.0f, 50.0f, 5.0f });
+        yield return new TestCaseData(KinematicsName.FiveBarScara, new[] { 20.0f, 140.0f, 3.0f });
+        yield return new TestCaseData(KinematicsName.Polar, new[] { 60.0f, 80.0f, -2.5f });
+        yield return new TestCaseData(KinematicsName.Hangprinter, new[] { 100.0f, 0.0f, 200.0f });
+        yield return new TestCaseData(KinematicsName.CoreXY, new[] { 10.0f, 20.0f, 5.0f });
+        yield return new TestCaseData(KinematicsName.CoreXYU, new[] { 10.0f, 20.0f, 5.0f });
+        yield return new TestCaseData(KinematicsName.MarkForged, new[] { 10.0f, 20.0f, 5.0f });
     }
 
     /// <summary>The point a test case gives, plus U and V, by letter</summary>
@@ -106,10 +105,10 @@ public class AxisOrderTests
         => letter => letter switch { 'X' => xyz[0], 'Y' => xyz[1], 'Z' => xyz[2], 'U' => 7.0f, _ => -3.0f };
 
     [TestCaseSource(nameof(Geometries))]
-    public void PermutedAxesGiveTheSameMotorPositions(string geometry, float[] xyz)
+    public void PermutedAxesGiveTheSameMotorPositions(KinematicsName geometry, float[] xyz)
     {
-        KinematicsEngine canonical = Create(geometry).WithAxes(Canonical);
-        KinematicsEngine permuted = Create(geometry).WithAxes(Permuted);
+        KinematicsEngine canonical = Create(geometry, Canonical);
+        KinematicsEngine permuted = Create(geometry, Permuted);
         Func<char, float> point = Point(xyz);
 
         int[] canonicalMotors = new int[NumDrives], permutedMotors = new int[NumDrives];
@@ -131,9 +130,9 @@ public class AxisOrderTests
     }
 
     [TestCaseSource(nameof(Geometries))]
-    public void PermutedAxesRoundTripToTheSamePosition(string geometry, float[] xyz)
+    public void PermutedAxesRoundTripToTheSamePosition(KinematicsName geometry, float[] xyz)
     {
-        KinematicsEngine permuted = Create(geometry).WithAxes(Permuted);
+        KinematicsEngine permuted = Create(geometry, Permuted);
         Func<char, float> point = Point(xyz);
         float[] stepsPerMm = Lay(Permuted, l => StepsByLetter[l]);
 
@@ -158,11 +157,11 @@ public class AxisOrderTests
     }
 
     [TestCaseSource(nameof(Geometries))]
-    public void PermutedAxesCoupleTheSameMotors(string geometry, float[] xyz)
+    public void PermutedAxesCoupleTheSameMotors(KinematicsName geometry, float[] xyz)
     {
         _ = xyz;
-        KinematicsEngine canonical = Create(geometry).WithAxes(Canonical);
-        KinematicsEngine permuted = Create(geometry).WithAxes(Permuted);
+        KinematicsEngine canonical = Create(geometry, Canonical);
+        KinematicsEngine permuted = Create(geometry, Permuted);
 
         Assert.Multiple(() =>
         {
@@ -190,10 +189,10 @@ public class AxisOrderTests
     }
 
     [TestCaseSource(nameof(Geometries))]
-    public void PermutedAxesHomeTheirEndstopsToTheSamePlace(string geometry, float[] xyz)
+    public void PermutedAxesHomeTheirEndstopsToTheSamePlace(KinematicsName geometry, float[] xyz)
     {
-        KinematicsEngine canonical = Create(geometry).WithAxes(Canonical);
-        KinematicsEngine permuted = Create(geometry).WithAxes(Permuted);
+        KinematicsEngine canonical = Create(geometry, Canonical);
+        KinematicsEngine permuted = Create(geometry, Permuted);
         Func<char, float> point = Point(xyz);
 
         // Somewhere other than the origin, so that a SCARA joint's crosstalk has something to subtract
@@ -218,11 +217,11 @@ public class AxisOrderTests
     }
 
     [TestCaseSource(nameof(Geometries))]
-    public void PermutedAxesAreLimitedTheSameWay(string geometry, float[] xyz)
+    public void PermutedAxesAreLimitedTheSameWay(KinematicsName geometry, float[] xyz)
     {
         _ = xyz;
-        KinematicsEngine canonical = WithBox(Create(geometry).WithAxes(Canonical), Canonical);
-        KinematicsEngine permuted = WithBox(Create(geometry).WithAxes(Permuted), Permuted);
+        KinematicsEngine canonical = WithBox(Create(geometry, Canonical), Canonical);
+        KinematicsEngine permuted = WithBox(Create(geometry, Permuted), Permuted);
 
         // Far outside everything, so that every geometry has something to bring in
         Func<char, float> outside = letter => letter switch { 'X' => 400.0f, 'Y' => 300.0f, 'Z' => 900.0f, 'U' => 700.0f, _ => -500.0f };
@@ -252,11 +251,11 @@ public class AxisOrderTests
     }
 
     [TestCaseSource(nameof(Geometries))]
-    public void PermutedAxesLimitTheSameSpeed(string geometry, float[] xyz)
+    public void PermutedAxesLimitTheSameSpeed(KinematicsName geometry, float[] xyz)
     {
         _ = xyz;
-        KinematicsEngine canonical = Create(geometry).WithAxes(Canonical);
-        KinematicsEngine permuted = Create(geometry).WithAxes(Permuted);
+        KinematicsEngine canonical = Create(geometry, Canonical);
+        KinematicsEngine permuted = Create(geometry, Permuted);
 
         // A diagonal in X and Y, with X and Y given different limits so that which is which shows
         Func<char, float> direction = letter => letter switch { 'X' => 0.6f, 'Y' => 0.8f, _ => 0.0f };
@@ -294,18 +293,19 @@ public class AxisOrderTests
 
     private static IEnumerable<TestCaseData> GeometriesMissingAnAxis()
     {
-        yield return new TestCaseData("LinearDelta", "XYU", "The machine has no Z axis, which delta kinematics needs");
-        yield return new TestCaseData("RotaryDelta", "ZU", "The machine has no X or Y axis, which Rotary delta kinematics needs");
-        yield return new TestCaseData("Scara", "ZXU", "The machine has no Y axis, which Scara kinematics needs");
-        yield return new TestCaseData("FiveBarScara", "XZ", "The machine has no Y axis, which FiveBarScara kinematics needs");
-        yield return new TestCaseData("Polar", "YZ", "The machine has no X axis, which Polar kinematics needs");
-        yield return new TestCaseData("Hangprinter", "", "The machine has no X, Y or Z axis, which Hangprinter kinematics needs");
+        yield return new TestCaseData(KinematicsName.LinearDelta, "XYU", "The machine has no Z axis, which delta kinematics needs");
+        yield return new TestCaseData(KinematicsName.RotaryDelta, "ZU", "The machine has no X or Y axis, which Rotary delta kinematics needs");
+        yield return new TestCaseData(KinematicsName.Scara, "ZXU", "The machine has no Y axis, which Scara kinematics needs");
+        yield return new TestCaseData(KinematicsName.FiveBarScara, "XZ", "The machine has no Y axis, which FiveBarScara kinematics needs");
+        yield return new TestCaseData(KinematicsName.Polar, "YZ", "The machine has no X axis, which Polar kinematics needs");
+        yield return new TestCaseData(KinematicsName.Hangprinter, "", "The machine has no X, Y, Z or U axis, which Hangprinter kinematics needs");
+        yield return new TestCaseData(KinematicsName.Hangprinter, "ZYXV", "The machine has no U axis, which Hangprinter kinematics needs");
     }
 
     [TestCaseSource(nameof(GeometriesMissingAnAxis))]
-    public void AGeometryMissingAnAxisRefusesToTransform(string geometry, string letters, string error)
+    public void AGeometryMissingAnAxisRefusesToTransform(KinematicsName geometry, string letters, string error)
     {
-        KinematicsEngine engine = Create(geometry).WithAxes(letters);
+        KinematicsEngine engine = Create(geometry, letters);
 
         float[] machinePos = Lay(letters, _ => 10.0f);
         int[] motorPos = new int[NumDrives];
@@ -323,7 +323,7 @@ public class AxisOrderTests
             float[] position = new float[NumDrives];
             Array.Fill(position, -1.0f);
             Assert.DoesNotThrow(() => engine.MotorStepsToCartesian(motorPos, stepsPerMm, letters.Length, letters.Length, position));
-            Assert.That(engine.AxesAssumedHomed((1u << letters.Length) - 1) & AxisIndices.From(letters).XyBitmap, Is.Zero,
+            Assert.That(engine.AxesAssumedHomed((1u << letters.Length) - 1) & KinematicsAxes.From(letters).XyBitmap, Is.Zero,
                         "naming every axis there is still does not pin the geometry down");
         });
     }
@@ -334,8 +334,8 @@ public class AxisOrderTests
         // A pen plotter: two joints and no lift. The arms come out where they would on the same SCARA
         // with Z, and the crosstalk onto Z has nothing to act on
         const string noZ = "YXU";
-        KinematicsEngine withZ = Create("Scara").WithAxes(Canonical);
-        KinematicsEngine withoutZ = Create("Scara").WithAxes(noZ);
+        KinematicsEngine withZ = Create(KinematicsName.Scara, Canonical);
+        KinematicsEngine withoutZ = Create(KinematicsName.Scara, noZ);
         Func<char, float> point = Point([100.0f, 50.0f, 5.0f]);
         float[] stepsPerMm = Lay(noZ, l => StepsByLetter[l]);
 
@@ -347,7 +347,7 @@ public class AxisOrderTests
         float[] roundTripped = new float[NumDrives];
         withoutZ.MotorStepsToCartesian(motors, stepsPerMm, 3, 3, roundTripped);
 
-        AxisIndices axes = AxisIndices.From(noZ);
+        AxisIndices axes = KinematicsAxes.From(noZ);
         Assert.Multiple(() =>
         {
             Assert.That(withoutZ.MissingAxesError, Is.Null);
@@ -365,28 +365,90 @@ public class AxisOrderTests
         });
     }
 
-    [Test]
-    public void AGeometryThatNeedsNoParticularAxisIsNeverMissingOne()
+    private static IEnumerable<TestCaseData> CoreGeometriesMissingAnAxis()
     {
+        yield return new TestCaseData(KinematicsName.CoreXY, "XZU", "The machine has no Y axis, which coreXY kinematics needs");
+        yield return new TestCaseData(KinematicsName.CoreXZ, "ZYU", "The machine has no X axis, which coreXZ kinematics needs");
+        yield return new TestCaseData(KinematicsName.CoreXYU, "XYZU", "The machine has no V axis, which coreXYU kinematics needs");
+        yield return new TestCaseData(KinematicsName.CoreXYUV, "YXZ", "The machine has no U or V axis, which coreXYUV kinematics needs");
+        yield return new TestCaseData(KinematicsName.MarkForged, "UY", "The machine has no X axis, which markForged kinematics needs");
+    }
+
+    [TestCaseSource(nameof(CoreGeometriesMissingAnAxis))]
+    public void ACoreGeometryMissingAnAxisItsMatrixNamesRefusesToTransform(KinematicsName geometry, string letters, string error)
+    {
+        // Only a geometry adopted from the object model can get here: M669 refuses to select one
+        KinematicsEngine engine = Create(geometry, letters);
+        int[] motorPos = new int[NumDrives];
+
         Assert.Multiple(() =>
         {
-            Assert.That(CoreKinematicsEngine.TryCreate(KinematicsName.Cartesian)!.WithAxes("Y").MissingAxesError, Is.Null);
-            Assert.That(CoreKinematicsEngine.TryCreate(KinematicsName.CoreXY)!.WithAxes("UV").MissingAxesError, Is.Null);
-            Assert.That(LinearDeltaKinematicsEngine.CreateDefault().WithAxes("ZYX").MissingAxesError, Is.Null);
+            Assert.That(engine.MissingAxesError, Is.EqualTo(error));
+            Assert.That(engine.CannotPlanReason, Is.EqualTo(error));
+            Assert.That(engine.CartesianToMotorSteps(Lay(letters, _ => 10.0f), Lay(letters, _ => 80.0f), letters.Length, letters.Length, motorPos),
+                        Is.EqualTo(NativeMovementError.UnreachablePosition));
         });
     }
 
     [Test]
-    public void AGeometrySelectedBeforeTheAxesExistResolvesThemWhenTheyDo()
+    public void ADeltasFurtherTowersAreTheAxesLetteredUVAndW()
     {
-        // config.g commonly selects the geometry before M584 creates the axes, so the geometry has to
-        // pick them up afterwards rather than fail or fix on whatever it saw first
-        LinearDeltaKinematicsEngine engine = LinearDeltaKinematicsEngine.CreateDefault();
+        // Five towers: A, B and C on X, Y and Z, the fourth on U and the fifth on V, wherever they are
+        static LinearDeltaKinematicsEngine FiveTowers(string letters) => new LinearDeltaKinematicsEngine(
+            numTowers: 5, radius: 105.6f,
+            diagonals: [215.0f, 215.0f, 215.0f, 150.0f, 160.0f],
+            angleCorrections: [0.0f, 0.0f, 0.0f],
+            endstopAdjustments: [0.0f, 0.0f, 0.0f, 0.0f, 0.0f],
+            homedHeight: 240.0f, printRadius: 80.0f).WithAxes(letters);
+
+        LinearDeltaKinematicsEngine canonical = FiveTowers(Canonical);
+        LinearDeltaKinematicsEngine permuted = FiveTowers(Permuted);
+        Func<char, float> point = Point([10.0f, -20.0f, 50.0f]);
+        int[] canonicalMotors = new int[NumDrives], permutedMotors = new int[NumDrives];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(FiveTowers("XYZU").MissingAxesError, Is.EqualTo("The machine has no V axis, which delta kinematics needs"));
+            Assert.That(FiveTowers("XYZW").MissingAxesError, Is.EqualTo("The machine has no U or V axis, which delta kinematics needs"),
+                        "W is the sixth tower's, not the fourth's");
+            Assert.That(permuted.MissingAxesError, Is.Null);
+
+            Assert.That(canonical.CartesianToMotorSteps(Lay(Canonical, point), Lay(Canonical, l => StepsByLetter[l]), 5, 5, canonicalMotors),
+                        Is.EqualTo(NativeMovementError.Ok));
+            Assert.That(permuted.CartesianToMotorSteps(Lay(Permuted, point), Lay(Permuted, l => StepsByLetter[l]), 5, 5, permutedMotors),
+                        Is.EqualTo(NativeMovementError.Ok));
+            foreach (char letter in Canonical)
+            {
+                Assert.That(permutedMotors[Permuted.IndexOf(letter)], Is.EqualTo(canonicalMotors[Canonical.IndexOf(letter)]),
+                            $"the motor of {letter}");
+            }
+            Assert.That(permuted.GetControllingDrives(Permuted.IndexOf('X')), Is.EqualTo(0b11111u), "every tower holds the effector");
+        });
+    }
+
+    [Test]
+    public void OnlyTheLettersAGeometryNeedsHaveToExist()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From("Y")).MissingAxesError, Is.Null);
+            Assert.That(KinematicsFactory.Create(KinematicsName.CoreXY, KinematicsAxes.From("YX")).MissingAxesError, Is.Null, "Z is not needed");
+            Assert.That(KinematicsFactory.Create(KinematicsName.CoreXZ, KinematicsAxes.From("ZX")).MissingAxesError, Is.Null, "nor Y here");
+            Assert.That(KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From("ZYX")).MissingAxesError, Is.Null);
+        });
+    }
+
+    [Test]
+    public void AGeometryKnownBeforeTheAxesExistResolvesThemWhenTheyDo()
+    {
+        // One adopted from the object model at startup, before config.g's M584 has created the axes,
+        // has to pick them up afterwards rather than fail or fix on whatever it saw first
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, AxisIndices.None);
         Assert.That(engine.MissingAxesError, Is.Not.Null, "no axes yet");
 
-        engine.WithAxes("Y");
-        engine.WithAxes("YX");
-        engine.WithAxes("YXZ");
+        engine.SetAxes(KinematicsAxes.From("Y"));
+        engine.SetAxes(KinematicsAxes.From("YX"));
+        engine.SetAxes(KinematicsAxes.From("YXZ"));
 
         Assert.Multiple(() =>
         {
@@ -425,7 +487,7 @@ public class AxisOrderTests
     public void ZIsHomedLastWhereverItIs()
     {
         // Z created first, as M584 Z.. then M584 X.. Y.. would leave it
-        KinematicsEngine engine = CoreKinematicsEngine.TryCreate(KinematicsName.Cartesian)!.WithAxes("ZXY");
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From("ZXY"));
         engine.HomesZWithProbe = true;
         char[] letters = ['Z', 'X', 'Y'];
 
@@ -443,7 +505,7 @@ public class AxisOrderTests
     [Test]
     public void AMachineWithNoZHasNothingToHoldBack()
     {
-        KinematicsEngine engine = CoreKinematicsEngine.TryCreate(KinematicsName.Cartesian)!.WithAxes("XYU");
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From("XYU"));
         engine.HomesZWithProbe = true;
 
         Assert.Multiple(() =>
@@ -457,7 +519,7 @@ public class AxisOrderTests
     [Test]
     public void ADeltaHomesWhicheverAxesAreItsTowers()
     {
-        KinematicsEngine engine = LinearDeltaKinematicsEngine.CreateDefault().WithAxes("UZYX");
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From("UZYX"));
 
         Assert.Multiple(() =>
         {
@@ -475,30 +537,13 @@ public class AxisOrderTests
     public void ANamedMatrixIsPlacedAtTheLettersItNames()
     {
         // CoreXY couples the X and Y motors, wherever those axes are
-        CoreKinematicsEngine engine = CoreKinematicsEngine.TryCreate(KinematicsName.CoreXY)!.WithAxes("ZYX");
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.CoreXY, KinematicsAxes.From("ZYX"));
 
         Assert.Multiple(() =>
         {
-            Assert.That(engine.GetInverseMatrixRow(2)[..3], Is.EqualTo(new[] { 0.0f, 1.0f, 1.0f }), "X turns both motors one way");
-            Assert.That(engine.GetInverseMatrixRow(1)[..3], Is.EqualTo(new[] { 0.0f, -1.0f, 1.0f }), "Y turns them opposite ways");
-            Assert.That(engine.GetInverseMatrixRow(0)[..3], Is.EqualTo(new[] { 1.0f, 0.0f, 0.0f }), "Z has a motor of its own");
-        });
-    }
-
-    [Test]
-    public void ANamedMatrixFollowsAxesCreatedLater()
-    {
-        // M669 K1, then M584 Y.., then M584 X..: the X half of the coupling arrives with the X axis
-        CoreKinematicsEngine engine = CoreKinematicsEngine.TryCreate(KinematicsName.CoreXY)!;
-        engine.WithAxes("Y");
-        Assert.That(engine.GetInverseMatrixRow(0)[..2], Is.EqualTo(new[] { -1.0f, 0.0f }), "only Y's own motor so far");
-
-        engine.WithAxes("YX");
-        Assert.Multiple(() =>
-        {
-            Assert.That(engine.GetInverseMatrixRow(0)[..2], Is.EqualTo(new[] { -1.0f, 1.0f }));
-            Assert.That(engine.GetInverseMatrixRow(1)[..2], Is.EqualTo(new[] { 1.0f, 1.0f }));
-            Assert.That(engine.HasSharedMotor(0) && engine.HasSharedMotor(1), Is.True);
+            Assert.That(InverseRow(engine, 2)[..3], Is.EqualTo(new[] { 0.0f, 1.0f, 1.0f }), "X turns both motors one way");
+            Assert.That(InverseRow(engine, 1)[..3], Is.EqualTo(new[] { 0.0f, -1.0f, 1.0f }), "Y turns them opposite ways");
+            Assert.That(InverseRow(engine, 0)[..3], Is.EqualTo(new[] { 1.0f, 0.0f, 0.0f }), "Z has a motor of its own");
         });
     }
 
@@ -506,65 +551,98 @@ public class AxisOrderTests
     public void AMatrixRowGoesToTheAxisWithItsLetter()
     {
         // U created before Z, so U is the third axis: M669 U names that one, not the fourth
-        CoreKinematicsEngine engine = CoreKinematicsEngine.TryCreate(KinematicsName.Cartesian)!.WithAxes("XYUZ");
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From("XYUZ"));
         bool seen = false;
-        KinematicsEngine configured = engine.Configure(new Code("M669 U0:0:2:0"), ref seen);
+        KinematicsEngine configured = KinematicsConfigurator.Apply(engine, KinematicsAxes.NewMoveWithAxes("XYUZ"), new Code("M669 U0:0:2:0"), ref seen);
 
         Assert.Multiple(() =>
         {
             Assert.That(seen, Is.True);
-            Assert.That(((CoreKinematicsEngine)configured).GetInverseMatrixRow(2)[..4], Is.EqualTo(new[] { 0.0f, 0.0f, 2.0f, 0.0f }));
-            Assert.That(((CoreKinematicsEngine)configured).GetInverseMatrixRow(3)[..4], Is.EqualTo(new[] { 0.0f, 0.0f, 0.0f, 1.0f }),
-                        "Z is untouched");
+            Assert.That(InverseRow(configured, 2)[..4], Is.EqualTo(new[] { 0.0f, 0.0f, 2.0f, 0.0f }));
+            Assert.That(InverseRow(configured, 3)[..4], Is.EqualTo(new[] { 0.0f, 0.0f, 0.0f, 1.0f }), "Z is untouched");
+        });
+    }
+
+    [TestCase("M669 Z0:0:3", "XY", "The machine has no Z axis")]
+    [TestCase("M669 A1 X1:0 Z0:0:1", "XY", "The machine has no Z or A axis")]
+    public void AMatrixRowForAnAxisTheMachineDoesNotHaveIsRefused(string m669, string letters, string error)
+    {
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.CoreXY, KinematicsAxes.From(letters));
+        bool seen = false;
+
+        GCodeException? refused = Assert.Throws<GCodeException>(
+            () => KinematicsConfigurator.Apply(engine, KinematicsAxes.NewMoveWithAxes(letters), new Code(m669), ref seen));
+        Assert.Multiple(() =>
+        {
+            Assert.That(refused!.Message, Is.EqualTo(error));
+            Assert.That(InverseRow(engine, 0)[..2], Is.EqualTo(new[] { 1.0f, 1.0f }), "the geometry is as it was");
         });
     }
 
     [Test]
-    public void AMatrixRowForAnAxisNotYetCreatedWaitsForIt()
+    public void AMatrixRowLongerThanTheMachineHasMotorsIsRefused()
     {
-        CoreKinematicsEngine engine = CoreKinematicsEngine.TryCreate(KinematicsName.Cartesian)!.WithAxes("XY");
+        // The values are the motors of the axes there are, in axis order, as in RepRapFirmware
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From("XYZ"));
         bool seen = false;
-        KinematicsEngine configured = engine.Configure(new Code("M669 Z0:0:3"), ref seen);
-        Assert.That(seen, Is.True);
 
-        configured.WithAxes("XYZ");
-        Assert.That(((CoreKinematicsEngine)configured).GetInverseMatrixRow(2)[..3], Is.EqualTo(new[] { 0.0f, 0.0f, 3.0f }));
+        GCodeException? refused = Assert.Throws<GCodeException>(
+            () => KinematicsConfigurator.Apply(engine, KinematicsAxes.NewMoveWithAxes("XYZ"), new Code("M669 X1:0:0:1"), ref seen));
+        Assert.That(refused!.Message, Is.EqualTo("array too long for parameter 'X'"));
+    }
+
+    [Test]
+    public void AShortMatrixRowLeavesTheRestOfTheRowAsItWas()
+    {
+        // Z's own motor is the third, and the row given stops at the second
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.CoreXZ, KinematicsAxes.From("XYZ"));
+        bool seen = false;
+        KinematicsEngine configured = KinematicsConfigurator.Apply(engine, KinematicsAxes.NewMoveWithAxes("XYZ"), new Code("M669 Z1"), ref seen);
+
+        Assert.That(InverseRow(configured, 2)[..3], Is.EqualTo(new[] { 1.0f, 0.0f, -3.0f }));
+    }
+
+    [Test]
+    public void AnM665OrM666IsNotAMatrixRow()
+    {
+        // RepRapFirmware's CoreKinematics takes rows from M669 only
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From("XYZ"));
+        Move move = KinematicsAxes.NewMoveWithAxes("XYZ");
+        bool seen = false;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(KinematicsConfigurator.Apply(engine, move, new Code("M665 X2"), ref seen), Is.SameAs(engine));
+            Assert.That(KinematicsConfigurator.Apply(engine, move, new Code("M666 X2"), ref seen), Is.SameAs(engine));
+            Assert.That(seen, Is.False);
+        });
     }
 
     [Test]
     public void TheMatrixIsWrittenWhereTheAxesAre()
     {
-        CoreKinematicsEngine engine = CoreKinematicsEngine.TryCreate(KinematicsName.CoreXY)!.WithAxes("ZYX");
-        CoreKinematics kinematics = (CoreKinematics)DuetAPI.ObjectModel.Kinematics.Create(KinematicsName.CoreXY);
-        engine.WriteTo(kinematics);
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.CoreXY, KinematicsAxes.From("ZYX"));
 
-        Assert.That(kinematics.InverseMatrix[2][..3], Is.EqualTo(new[] { 0.0f, 1.0f, 1.0f }));
+        Assert.That(InverseRow(engine, 2)[..3], Is.EqualTo(new[] { 0.0f, 1.0f, 1.0f }));
     }
 
     [Test]
-    public void AMatrixThatCannotBeInvertedIsRefusedWhenItsRowsCanBePlaced()
+    public void AMatrixThatCannotBeInvertedIsRefused()
     {
         // Both rows turn the same two motors the same way, so no motor positions tell X from Y
-        CoreKinematicsEngine engine = CoreKinematicsEngine.TryCreate(KinematicsName.Cartesian)!.WithAxes("XYZ");
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From("XYZ"));
         bool seen = false;
 
-        GCodeException? refused = Assert.Throws<GCodeException>(() => engine.Configure(new Code("M669 X1:1 Y1:1"), ref seen));
-        Assert.That(refused!.Message, Is.EqualTo(CoreKinematicsEngine.InvalidMatrixError));
-        Assert.That(CoreKinematicsEngine.InvalidMatrixError, Is.EqualTo("Invalid kinematics matrix"), "RepRapFirmware's words");
+        GCodeException? refused = Assert.Throws<GCodeException>(
+            () => KinematicsConfigurator.Apply(engine, KinematicsAxes.NewMoveWithAxes("XYZ"), new Code("M669 X1:1 Y1:1"), ref seen));
+        Assert.That(refused!.Message, Is.EqualTo("Invalid kinematics matrix"), "RepRapFirmware's words");
     }
 
-    [TestCase("M669 X1:1 Y1:1", "", TestName = "AMatrixIsNotJudgedBeforeItsAxesExist")]
-    [TestCase("M669 X1:1 Y1:1", "X", TestName = "AMatrixIsNotJudgedWhileARowWaitsForItsAxis")]
-    [TestCase("M669 X0:1", "X", TestName = "AMatrixIsNotJudgedWhileARowTurnsAMotorNotYetCreated")]
-    public void AMatrixThatCannotBePlacedYetIsAcceptedAndJudgedWhenItCan(string m669, string axesBefore)
+    [Test]
+    public void ASingularMatrixFromElsewhereRefusesToPlanAndCanBeCorrected()
     {
-        CoreKinematicsEngine engine = CoreKinematicsEngine.TryCreate(KinematicsName.Cartesian)!.WithAxes(axesBefore);
-        bool seen = false;
-        KinematicsEngine configured = engine.Configure(new Code(m669), ref seen);
-        Assert.That(seen, Is.True);
-
-        // M584 creating the rest: now the rows land, and the matrix they make is singular
-        configured.WithAxes("XYZ");
+        // M669 never leaves one behind; one built from a whole matrix, as the object model holds it, can be
+        KinematicsEngine singular = new CoreKinematicsEngine(KinematicsName.CoreXY, [[1, 1, 0], [1, 1, 0], [0, 0, 1]]).WithAxes("XYZ");
 
         float[] machinePos = Lay("XYZ", l => l switch { 'X' => 10.0f, 'Y' => 20.0f, _ => 5.0f });
         float[] stepsPerMm = Lay("XYZ", _ => 80.0f);
@@ -572,48 +650,183 @@ public class AxisOrderTests
         Array.Fill(motorPos, 1234);
         float[] position = new float[NumDrives];
         Array.Fill(position, -1.0f);
-        configured.MotorStepsToCartesian(motorPos, stepsPerMm, 3, 3, position);
+        singular.MotorStepsToCartesian(motorPos, stepsPerMm, 3, 3, position);
 
         Assert.Multiple(() =>
         {
-            Assert.That(configured.ConfigurationError, Is.EqualTo(CoreKinematicsEngine.InvalidMatrixError));
-            Assert.That(configured.CannotPlanReason, Is.EqualTo(CoreKinematicsEngine.InvalidMatrixError));
-            Assert.That(configured.CartesianToMotorSteps(machinePos, stepsPerMm, 3, 3, motorPos),
+            Assert.That(singular.ConfigurationError, Is.EqualTo("Invalid kinematics matrix"));
+            Assert.That(singular.CannotPlanReason, Is.EqualTo("Invalid kinematics matrix"));
+            Assert.That(singular.CartesianToMotorSteps(machinePos, stepsPerMm, 3, 3, motorPos),
                         Is.EqualTo(NativeMovementError.UnreachablePosition), "nothing is planned through it");
             Assert.That(position[..3], Is.EqualTo(new[] { -1.0f, -1.0f, -1.0f }),
                         "there is no way back from the motors, so the positions are left alone rather than zeroed");
         });
-    }
 
-    [Test]
-    public void ASingularMatrixCanBeCorrected()
-    {
-        CoreKinematicsEngine engine = CoreKinematicsEngine.TryCreate(KinematicsName.Cartesian)!;
         bool seen = false;
-        KinematicsEngine singular = engine.Configure(new Code("M669 X1:1 Y1:1"), ref seen).WithAxes("XYZ");
-        Assert.That(singular.CannotPlanReason, Is.Not.Null);
-
-        KinematicsEngine corrected = singular.Configure(new Code("M669 Y1:-1"), ref seen);
-
+        KinematicsEngine corrected = KinematicsConfigurator.Apply(singular, KinematicsAxes.NewMoveWithAxes("XYZ"), new Code("M669 Y1:-1"), ref seen);
         Assert.Multiple(() =>
         {
             Assert.That(corrected.CannotPlanReason, Is.Null);
-            Assert.That(((CoreKinematicsEngine)corrected).GetInverseMatrixRow(1)[..3], Is.EqualTo(new[] { 1.0f, -1.0f, 0.0f }));
+            Assert.That(InverseRow(corrected, 1)[..3], Is.EqualTo(new[] { 1.0f, -1.0f, 0.0f }));
+        });
+    }
+
+    /// <summary>
+    /// RepRapFirmware's named matrices, from <c>CoreKinematics::CoreKinematics</c>: rows are axes and
+    /// columns motors, both X, Y, Z, U, V, A, which is where its first axes are
+    /// </summary>
+    private static IEnumerable<TestCaseData> RepRapFirmwareMatrices()
+    {
+        float[][] identity = [[1, 0, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0], [0, 0, 0, 1, 0, 0], [0, 0, 0, 0, 1, 0], [0, 0, 0, 0, 0, 1]];
+        yield return new TestCaseData(KinematicsName.Cartesian, identity);
+        yield return new TestCaseData(KinematicsName.CoreXY, new float[][]
+        {
+            [1, 1, 0, 0, 0, 0],
+            [1, -1, 0, 0, 0, 0],
+            [0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 1, 0, 0],
+            [0, 0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 0, 1]
+        });
+        yield return new TestCaseData(KinematicsName.CoreXZ, new float[][]
+        {
+            [1, 0, 1, 0, 0, 0],
+            [0, 1, 0, 0, 0, 0],
+            [3, 0, -3, 0, 0, 0],
+            [0, 0, 0, 1, 0, 0],
+            [0, 0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 0, 1]
+        });
+        yield return new TestCaseData(KinematicsName.CoreXYU, new float[][]
+        {
+            [1, 1, 0, 0, 0, 0],
+            [1, -1, 0, 1, -1, 0],
+            [0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 1, 1, 0],
+            [0, 0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 0, 1]
+        });
+        yield return new TestCaseData(KinematicsName.CoreXYUV, new float[][]
+        {
+            [1, 1, 0, 0, 0, 0],
+            [1, -1, 0, 0, 0, 0],
+            [0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 1, 1, 0],
+            [0, 0, 0, 1, -1, 0],
+            [0, 0, 0, 0, 0, 1]
+        });
+        yield return new TestCaseData(KinematicsName.MarkForged, new float[][]
+        {
+            [1, 0, 0, 0, 0, 0],
+            [-1, 1, 0, 0, 0, 0],
+            [0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 1, 0, 0],
+            [0, 0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 0, 1]
+        });
+    }
+
+    [TestCaseSource(nameof(RepRapFirmwareMatrices))]
+    public void ANamedMatrixIsRepRapFirmwaresWhereverItsAxesAre(KinematicsName geometry, float[][] expected)
+    {
+        const string rrfOrder = "XYZUVA";
+        foreach (string order in new[] { rrfOrder, "AUYVXZ", "ZVAXUY" })
+        {
+            KinematicsEngine engine = Create(geometry, order);
+            Assert.Multiple(() =>
+            {
+                Assert.That(engine.MissingAxesError, Is.Null, order);
+                Assert.That(engine.ConfigurationError, Is.Null, order);
+                for (int row = 0; row < rrfOrder.Length; row++)
+                {
+                    float[] placed = InverseRow(engine, order.IndexOf(rrfOrder[row]));
+                    for (int column = 0; column < rrfOrder.Length; column++)
+                    {
+                        Assert.That(placed[order.IndexOf(rrfOrder[column])], Is.EqualTo(expected[row][column]),
+                                    $"{order}: how far {rrfOrder[column]}'s motor turns per mm of {rrfOrder[row]}");
+                    }
+                }
+            });
+        }
+    }
+
+    // ---- M669, M665 and M666 need the geometry's axes --------------------------------------------
+
+    private static IEnumerable<TestCaseData> GeometriesSelectedWithoutTheirAxes()
+    {
+        yield return new TestCaseData("M669 K1", "XZ", "The machine has no Y axis, which coreXY kinematics needs");
+        yield return new TestCaseData("M669 K\"coreXZ\"", "XY", "The machine has no Z axis, which coreXZ kinematics needs");
+        yield return new TestCaseData("M669 K5", "XYZA", "The machine has no U or V axis, which coreXYU kinematics needs");
+        yield return new TestCaseData("M669 K8", "XYZU", "The machine has no V axis, which coreXYUV kinematics needs");
+        yield return new TestCaseData("M669 K11", "YZ", "The machine has no X axis, which markForged kinematics needs");
+        yield return new TestCaseData("M669 K3", "XY", "The machine has no Z axis, which delta kinematics needs");
+        yield return new TestCaseData("M665 L215 R105.6 H240", "XYU", "The machine has no Z axis, which delta kinematics needs");
+        yield return new TestCaseData("M669 K10", "", "The machine has no X, Y or Z axis, which Rotary delta kinematics needs");
+        yield return new TestCaseData("M669 K4 P150 D160", "XZ", "The machine has no Y axis, which Scara kinematics needs");
+        yield return new TestCaseData("M669 K9", "Y", "The machine has no X axis, which FiveBarScara kinematics needs");
+        yield return new TestCaseData("M669 K7", "XZ", "The machine has no Y axis, which Polar kinematics needs");
+        yield return new TestCaseData("M669 K6", "XYZ", "The machine has no U axis, which Hangprinter kinematics needs");
+        yield return new TestCaseData("M669 K1 X1:1:0", "XZ", "The machine has no Y axis, which coreXY kinematics needs");
+    }
+
+    [TestCaseSource(nameof(GeometriesSelectedWithoutTheirAxes))]
+    public void SelectingAGeometryWithoutItsAxesIsRefused(string code, string letters, string error)
+    {
+        KinematicsEngine current = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From(letters));
+        bool seen = false;
+
+        GCodeException? refused = Assert.Throws<GCodeException>(
+            () => KinematicsConfigurator.Apply(current, KinematicsAxes.NewMoveWithAxes(letters), new Code(code), ref seen));
+        Assert.That(refused!.Message, Is.EqualTo(error));
+    }
+
+    [TestCase("M669 K5", KinematicsName.CoreXYU)]
+    [TestCase("M669 K8", KinematicsName.CoreXYUV)]
+    [TestCase("M669 K3", KinematicsName.LinearDelta)]
+    [TestCase("M669 K6", KinematicsName.Hangprinter)]
+    public void SelectingAGeometryWithItsAxesInAnyOrderIsAccepted(string code, KinematicsName expected)
+    {
+        bool seen = false;
+        KinematicsEngine engine = KinematicsConfigurator.Apply(KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From()),
+                                                               KinematicsAxes.NewMoveWithAxes("VYAUZX"), new Code(code), ref seen);
+        Assert.Multiple(() =>
+        {
+            Assert.That(engine.Kind, Is.EqualTo(expected));
+            Assert.That(engine.CannotPlanReason, Is.Null);
+        });
+    }
+
+    [TestCase("M665 R100")]
+    [TestCase("M666 X0.5")]
+    [TestCase("M669 S50")]
+    public void ConfiguringAGeometryWithoutItsAxesIsRefused(string code)
+    {
+        // A delta adopted from the object model on a machine whose config.g never created Z
+        KinematicsEngine delta = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From("XYU"));
+        bool seen = false;
+
+        GCodeException? refused = Assert.Throws<GCodeException>(
+            () => KinematicsConfigurator.Apply(delta, KinematicsAxes.NewMoveWithAxes("XYU"), new Code(code), ref seen));
+        Assert.That(refused!.Message, Is.EqualTo("The machine has no Z axis, which delta kinematics needs"));
+    }
+
+    [TestCase("M665")]
+    [TestCase("M666")]
+    [TestCase("M669")]
+    public void AskingAboutAGeometryWithoutItsAxesIsNot(string code)
+    {
+        KinematicsEngine delta = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From("XYU"));
+        bool seen = false;
+
+        KinematicsEngine engine = KinematicsConfigurator.Apply(delta, KinematicsAxes.NewMoveWithAxes("XYU"), new Code(code), ref seen);
+        Assert.Multiple(() =>
+        {
+            Assert.That(seen, Is.False);
+            Assert.That(engine, Is.SameAs(delta));
         });
     }
 
     // ---- Tool transform ---------------------------------------------------------------------------
-
-    /// <summary>A machine whose axes were created in the given order</summary>
-    private static Move NewMove(string letters)
-    {
-        Move move = new();
-        foreach (char letter in letters)
-        {
-            move.Axes.Add(new Axis { Letter = letter, Visible = true });
-        }
-        return move;
-    }
 
     /// <summary>A tool mapped as M563 maps one by default: each letter to the axis carrying it</summary>
     private static Tool DefaultTool(Move move, float xOffset, float yOffset, float zOffset)
@@ -634,7 +847,7 @@ public class AxisOrderTests
     [Test]
     public void AToolMapsByLetterWhereverTheAxesAre()
     {
-        Move canonicalMove = NewMove("XYZU"), permutedMove = NewMove("UZXY");
+        Move canonicalMove = KinematicsAxes.NewMoveWithAxes("XYZU"), permutedMove = KinematicsAxes.NewMoveWithAxes("UZXY");
         Tool canonicalTool = DefaultTool(canonicalMove, 3.0f, -2.0f, 0.5f), permutedTool = DefaultTool(permutedMove, 3.0f, -2.0f, 0.5f);
         canonicalTool.IsRetracted = permutedTool.IsRetracted = true;
         canonicalTool.Retraction.ZHop = permutedTool.Retraction.ZHop = 0.4f;
@@ -673,7 +886,7 @@ public class AxisOrderTests
     public void ALetterTheMachineDoesNotHaveContributesNothing()
     {
         // No Z: the default Z map is empty, so the hop has nowhere to go and nothing reads a Z
-        Move move = NewMove("YX");
+        Move move = KinematicsAxes.NewMoveWithAxes("YX");
         Tool tool = DefaultTool(move, 1.0f, 2.0f, 0.0f);
         tool.IsRetracted = true;
         tool.Retraction.ZHop = 0.4f;
@@ -697,7 +910,7 @@ public class AxisOrderTests
     [Test]
     public void AToolWithNoMapRecordedDrivesTheAxisCarryingTheLetter()
     {
-        Move move = NewMove("ZYX");
+        Move move = KinematicsAxes.NewMoveWithAxes("ZYX");
         Tool tool = new();
 
         Assert.Multiple(() =>
@@ -713,7 +926,7 @@ public class AxisOrderTests
     [Test]
     public void TheAxesAreFoundByLetter()
     {
-        AxisIndices axes = AxisIndices.From(NewMove("UZXa"));
+        AxisIndices axes = AxisIndices.From(KinematicsAxes.NewMoveWithAxes("UZXa"));
 
         Assert.Multiple(() =>
         {
@@ -724,10 +937,10 @@ public class AxisOrderTests
             Assert.That(axes.IndexOf('A'), Is.EqualTo(-1));
             Assert.That(axes.XyBitmap, Is.EqualTo(0b0100u));
             Assert.That(axes.XyzBitmap, Is.EqualTo(0b0110u));
-            Assert.That(AxisIndices.IndexOf(NewMove("UZXa"), 'X'), Is.EqualTo(2));
+            Assert.That(AxisIndices.IndexOf(KinematicsAxes.NewMoveWithAxes("UZXa"), 'X'), Is.EqualTo(2));
             Assert.That(AxisIndices.None.X, Is.EqualTo(-1));
-            Assert.That(axes.SameAs(AxisIndices.From("UZXa")), Is.True);
-            Assert.That(axes.SameAs(AxisIndices.From("UZX")), Is.False);
+            Assert.That(axes.SameAs(KinematicsAxes.From("UZXa")), Is.True);
+            Assert.That(axes.SameAs(KinematicsAxes.From("UZX")), Is.False);
         });
     }
 }

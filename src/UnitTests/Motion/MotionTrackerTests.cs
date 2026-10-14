@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetControlServer.Link.Native;
 using DuetControlServer.Motion;
 using DuetControlServer.Motion.Native;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 
@@ -22,20 +24,48 @@ public class MotionTrackerTests
 {
     private static MotionTracker NewTracker() => new(NullLogger<MotionTracker>.Instance);
 
+    /// <summary>
+    /// The warnings a tracker logs, which is where a gap in a ring's running total of completed moves
+    /// shows: the total each completion reports has to be one more than the last one recorded
+    /// </summary>
+    private sealed class WarningLog : ILogger<MotionTracker>
+    {
+        public List<string> Warnings { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+                                Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel == LogLevel.Warning)
+            {
+                Warnings.Add(formatter(state, exception));
+            }
+        }
+    }
+
     [Test]
     public void CompletedMovesAreRecordedPerRing()
     {
-        MotionTracker tracker = NewTracker();
+        WarningLog log = new();
+        MotionTracker tracker = new(log);
         tracker.MoveCompleted(0, moveId: 7, completedMoves: 1);
         tracker.MoveCompleted(1, moveId: 99, completedMoves: 4);
 
         Assert.Multiple(() =>
         {
-            Assert.That(tracker.GetLastCompletedMoveId(0), Is.EqualTo(7u));
-            Assert.That(tracker.GetCompletedMoves(0), Is.EqualTo(1u));
-            Assert.That(tracker.GetLastCompletedMoveId(1), Is.EqualTo(99u));
-            Assert.That(tracker.GetCompletedMoves(1), Is.EqualTo(4u));
+            Assert.That(tracker.HasRetired(0, moveId: 7), Is.True);
+            Assert.That(tracker.HasRetired(0, moveId: 8), Is.False);
+            Assert.That(tracker.HasRetired(1, moveId: 99), Is.True);
+            Assert.That(tracker.HasRetired(1, moveId: 100), Is.False);
         });
+
+        // Each ring's total carries on from its own
+        tracker.MoveCompleted(0, moveId: 8, completedMoves: 2);
+        tracker.MoveCompleted(1, moveId: 100, completedMoves: 5);
+        Assert.That(log.Warnings, Is.Empty);
     }
 
     [Test]
@@ -47,8 +77,8 @@ public class MotionTrackerTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(tracker.GetCompletedMoves(0), Is.EqualTo(0u));
-            Assert.That(tracker.GetCompletedMoves(1), Is.EqualTo(0u));
+            Assert.That(tracker.HasRetired(0, moveId: 1), Is.False);
+            Assert.That(tracker.HasRetired(1, moveId: 2), Is.False);
         });
     }
 
@@ -57,30 +87,33 @@ public class MotionTrackerTests
     {
         // The moves those totals refer to are gone with the link, so a move planned after the
         // reconnect must not be checked against them
-        MotionTracker tracker = NewTracker();
+        WarningLog log = new();
+        MotionTracker tracker = new(log);
         tracker.MoveCompleted(0, moveId: 3, completedMoves: 3);
 
         tracker.Invalidate();
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(tracker.GetCompletedMoves(0), Is.EqualTo(0u));
-            Assert.That(tracker.GetLastCompletedMoveId(0), Is.EqualTo(0u));
-        });
+        Assert.That(tracker.HasRetired(0, moveId: 3), Is.False);
+        tracker.MoveCompleted(0, moveId: 1, completedMoves: 1);
+        Assert.That(log.Warnings, Is.Empty, "the total starts again");
     }
 
     [Test]
     public void MoveFailedDoesNotDisturbTheCompletionTotals()
     {
-        MotionTracker tracker = NewTracker();
+        WarningLog log = new();
+        MotionTracker tracker = new(log);
         tracker.MoveCompleted(0, moveId: 1, completedMoves: 1);
         tracker.MoveFailed(0, moveId: 2, NativeMovementError.MoveDurationTooLong);
 
         Assert.Multiple(() =>
         {
-            Assert.That(tracker.GetCompletedMoves(0), Is.EqualTo(1u));
-            Assert.That(tracker.GetLastCompletedMoveId(0), Is.EqualTo(1u));
+            Assert.That(tracker.HasRetired(0, moveId: 1), Is.True);
+            Assert.That(tracker.HasRetired(0, moveId: 2), Is.False, "the last completed move is still the first");
         });
+
+        tracker.MoveCompleted(0, moveId: 3, completedMoves: 2);
+        Assert.That(log.Warnings, Is.Empty, "the total is still the first move's");
     }
 
     [Test]

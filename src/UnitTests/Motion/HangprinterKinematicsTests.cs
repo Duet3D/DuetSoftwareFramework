@@ -1,4 +1,5 @@
 using System;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
 using DuetControlServer.Motion.Kinematics;
 using DuetControlServer.Motion.Native;
@@ -30,9 +31,6 @@ public class HangprinterKinematicsTests
         return stepsPerMm;
     }
 
-    /// <summary>The four-anchor machine RepRapFirmware assumes before M669 has been seen</summary>
-    private static HangprinterKinematicsEngine CreateHangprinter() => HangprinterKinematicsEngine.CreateDefault().WithAxes();
-
     private static int[] ToMotorSteps(KinematicsEngine engine, float[] machinePos)
     {
         int[] motorPos = new int[NumDrives];
@@ -53,7 +51,7 @@ public class HangprinterKinematicsTests
     {
         // Motor positions count line paid out since the origin, so the origin itself is by definition
         // all zeroes whatever the anchors are
-        HangprinterKinematicsEngine engine = CreateHangprinter();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Hangprinter, KinematicsAxes.From());
 
         int[] motorPos = ToMotorSteps(engine, new float[NumDrives]);
         for (int anchor = 0; anchor < 4; anchor++)
@@ -65,18 +63,22 @@ public class HangprinterKinematicsTests
     [Test]
     public void LinePositionsAreTheChangeInDistanceToTheAnchor()
     {
-        // The one part of this geometry with an answer that can be worked out by hand
-        HangprinterKinematicsEngine engine = CreateHangprinter();
+        // The one part of this geometry with an answer that can be worked out by hand. The anchors are
+        // the four RepRapFirmware assumes before M669 has been seen, as the object model reports them
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Hangprinter, KinematicsAxes.From());
+        HangprinterKinematics reported = KinematicsAxes.Reported<HangprinterKinematics>(engine);
 
         float[] machinePos = [100.0f, 50.0f, 200.0f];
         int[] motorPos = ToMotorSteps(engine, machinePos);
 
         for (int anchor = 0; anchor < 4; anchor++)
         {
-            float dx = machinePos[0] - engine.GetAnchor(anchor, 0);
-            float dy = machinePos[1] - engine.GetAnchor(anchor, 1);
-            float dz = machinePos[2] - engine.GetAnchor(anchor, 2);
-            float expected = MathF.Sqrt((dx * dx) + (dy * dy) + (dz * dz)) - engine.GetDistanceAtOrigin(anchor);
+            float[] position = reported.Anchors[anchor];
+            float dx = machinePos[0] - position[0];
+            float dy = machinePos[1] - position[1];
+            float dz = machinePos[2] - position[2];
+            float atOrigin = MathF.Sqrt((position[0] * position[0]) + (position[1] * position[1]) + (position[2] * position[2]));
+            float expected = MathF.Sqrt((dx * dx) + (dy * dy) + (dz * dz)) - atOrigin;
 
             Assert.That(motorPos[anchor] / StepsPerMm, Is.EqualTo(expected).Within(0.01f), $"line {anchor}");
         }
@@ -89,7 +91,7 @@ public class HangprinterKinematicsTests
     [TestCase(0.0f, 0.0f, 1000.0f)]
     public void HangprinterPositionsSurviveTheRoundTrip(float x, float y, float z)
     {
-        HangprinterKinematicsEngine engine = CreateHangprinter();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Hangprinter, KinematicsAxes.From());
 
         int[] motorPos = ToMotorSteps(engine, [x, y, z]);
         float[] roundTripped = ToCartesian(engine, motorPos);
@@ -109,7 +111,7 @@ public class HangprinterKinematicsTests
     {
         // No point in space is that far from all four anchors at once. The solver has to say so
         // rather than settling on whatever least-squares compromise fits worst
-        HangprinterKinematicsEngine engine = CreateHangprinter();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Hangprinter, KinematicsAxes.From());
 
         float[] machinePos = new float[NumDrives];
         machinePos[0] = 42.0f;
@@ -137,7 +139,7 @@ public class HangprinterKinematicsTests
     {
         // There is nothing rigid in a hangprinter: let any one line go and the effector moves in all
         // three directions at once
-        HangprinterKinematicsEngine engine = CreateHangprinter();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Hangprinter, KinematicsAxes.From());
 
         Assert.Multiple(() =>
         {
@@ -146,18 +148,6 @@ public class HangprinterKinematicsTests
             Assert.That(engine.GetControllingDrives(2), Is.EqualTo(0b1111u));
             Assert.That(engine.GetControllingDrives(3), Is.EqualTo(0b1111u));
             Assert.That(engine.GetControllingDrives(4), Is.EqualTo(0b10000u), "past the anchors there are no more lines");
-        });
-    }
-
-    [Test]
-    public void APositionOutsideThePrintRadiusIsNotReachable()
-    {
-        HangprinterKinematicsEngine engine = CreateHangprinter();
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(engine.IsReachable(0.0f, 0.0f), Is.True);
-            Assert.That(engine.IsReachable(HangprinterKinematicsEngine.DefaultPrintRadius + 1.0f, 0.0f), Is.False);
         });
     }
 
@@ -175,11 +165,7 @@ public class HangprinterKinematicsTests
             [1500.0f, -1500.0f, 2000.0f]
         ]).WithAxes();
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(engine.NumAnchors, Is.EqualTo(5));
-            Assert.That(engine.GetControllingDrives(0), Is.EqualTo(0b11111u));
-        });
+        Assert.That(engine.GetControllingDrives(0), Is.EqualTo(0b11111u), "five lines, one per anchor");
 
         int[] motorPos = ToMotorSteps(engine, [120.0f, -80.0f, 300.0f]);
         Assert.That(motorPos[4], Is.Not.EqualTo(0), "the fifth line moves too");
@@ -197,7 +183,7 @@ public class HangprinterKinematicsTests
     public void AHangprinterLimitsADiagonalMoveToTheSlowerOfXAndY()
     {
         // Nothing on a hangprinter moves one axis alone, so the inherited XY limit applies
-        HangprinterKinematicsEngine engine = CreateHangprinter();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Hangprinter, KinematicsAxes.From());
 
         float[] maxFeedrates = new float[NumDrives];
         float[] accelerations = new float[NumDrives];

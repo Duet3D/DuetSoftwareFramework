@@ -1,5 +1,7 @@
 using System;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
+using DuetControlServer.Motion;
 using DuetControlServer.Motion.Kinematics;
 using DuetControlServer.Motion.Native;
 using NUnit.Framework;
@@ -29,18 +31,6 @@ public class PolarKinematicsTests
         return stepsPerMm;
     }
 
-    /// <summary>
-    /// A bed of 150mm radius with the turntable limits RepRapFirmware assumes
-    /// </summary>
-    /// <remarks>
-    /// The limits go in as M669 F and A give them, degrees per second. The engine converts to step
-    /// clocks for the planner, so a speed limit these tests assert on is expressed through
-    /// <see cref="PolarKinematicsEngine.MaxTurntableSpeed"/> rather than in degrees per second
-    /// </remarks>
-    private static PolarKinematicsEngine CreatePolar(float maxTurntableSpeed = 30.0f, float maxTurntableAcceleration = 30.0f)
-        => new PolarKinematicsEngine(minRadius: 0.0f, maxRadius: 150.0f, homedRadius: 0.0f,
-               maxTurntableSpeed: maxTurntableSpeed, maxTurntableAcceleration: maxTurntableAcceleration).WithAxes();
-
     private static int[] ToMotorSteps(KinematicsEngine engine, float[] machinePos, int numAxes)
     {
         int[] motorPos = new int[NumDrives];
@@ -59,7 +49,7 @@ public class PolarKinematicsTests
     [Test]
     public void APositionOnThePlusXAxisIsAllRadiusAndNoAngle()
     {
-        PolarKinematicsEngine engine = CreatePolar();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.From());
 
         int[] motorPos = ToMotorSteps(engine, [100.0f, 0.0f, 5.0f], 3);
         Assert.Multiple(() =>
@@ -73,7 +63,7 @@ public class PolarKinematicsTests
     [Test]
     public void AQuarterTurnPutsTheHeadOnThePlusYAxis()
     {
-        PolarKinematicsEngine engine = CreatePolar();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.From());
 
         int[] motorPos = ToMotorSteps(engine, [0.0f, 100.0f, 0.0f], 3);
         Assert.Multiple(() =>
@@ -89,7 +79,7 @@ public class PolarKinematicsTests
     [TestCase(70.0f, -70.0f, 10.0f)]
     public void PolarPositionsSurviveTheRoundTrip(float x, float y, float z)
     {
-        PolarKinematicsEngine engine = CreatePolar();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.From());
 
         int[] motorPos = ToMotorSteps(engine, [x, y, z], 3);
         float[] roundTripped = ToCartesian(engine, motorPos, 3);
@@ -107,7 +97,7 @@ public class PolarKinematicsTests
     {
         // At the centre every angle puts the head in the same place, so turning the bed would be
         // movement for nothing - and the angle itself is not defined there
-        PolarKinematicsEngine engine = CreatePolar();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.From());
 
         int[] motorPos = new int[NumDrives];
         motorPos[1] = 12345;
@@ -125,7 +115,7 @@ public class PolarKinematicsTests
     [Test]
     public void BothMotorsHoldEitherOfXAndYStill()
     {
-        PolarKinematicsEngine engine = CreatePolar();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.From());
 
         Assert.Multiple(() =>
         {
@@ -138,22 +128,25 @@ public class PolarKinematicsTests
     [Test]
     public void TheTurntableIsAContinuousRotationAxis()
     {
-        PolarKinematicsEngine engine = CreatePolar();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.From());
         Assert.That(engine.ContinuousRotationAxes, Is.EqualTo(0b010u));
     }
 
     [Test]
     public void AnnulusLimitsAreEnforcedAtBothEnds()
     {
-        PolarKinematicsEngine engine = new PolarKinematicsEngine(minRadius: 20.0f, maxRadius: 150.0f, homedRadius: 20.0f,
-                                           maxTurntableSpeed: 30.0f, maxTurntableAcceleration: 30.0f).WithAxes();
+        KinematicsEngine engine = new PolarKinematicsEngine(minRadius: 20.0f, maxRadius: 150.0f, homedRadius: 20.0f,
+                                                            maxTurntableSpeed: 30.0f, maxTurntableAcceleration: 30.0f).WithAxes();
 
         Assert.Multiple(() =>
         {
-            Assert.That(engine.IsReachable(100.0f, 0.0f), Is.True);
-            Assert.That(engine.IsReachable(10.0f, 0.0f), Is.False, "inside the minimum radius");
-            Assert.That(engine.IsReachable(200.0f, 0.0f), Is.False, "outside the bed");
+            Assert.That(Limit(100.0f), Is.EqualTo(LimitPositionResult.Ok));
+            Assert.That(Limit(10.0f), Is.EqualTo(LimitPositionResult.Adjusted), "inside the minimum radius");
+            Assert.That(Limit(200.0f), Is.EqualTo(LimitPositionResult.Adjusted), "outside the bed");
         });
+
+        LimitPositionResult Limit(float radius)
+            => engine.LimitPosition([radius, 0.0f, 0.0f], [], 3, 0b011, isCoordinated: true, applyM208Limits: false);
     }
 
     [Test]
@@ -161,7 +154,7 @@ public class PolarKinematicsTests
     {
         // Half a turn over one millimetre of travel is 180 degrees of rotation per mm, and the
         // turntable will only do 30 degrees per second, so the move is held to a sixth of a mm/s
-        PolarKinematicsEngine engine = CreatePolar(maxTurntableSpeed: 30.0f, maxTurntableAcceleration: 30.0f);
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.From());
 
         int[] start = new int[NumDrives];
         int[] end = new int[NumDrives];
@@ -183,10 +176,12 @@ public class PolarKinematicsTests
         };
         engine.LimitSpeedAndAcceleration(ref limits, move, new float[NumDrives], new float[NumDrives]);
 
+        // The planner works in step clocks, so the turntable's limits are converted as an axis' would be
         Assert.Multiple(() =>
         {
-            Assert.That(limits.RequestedSpeed, Is.EqualTo(engine.MaxTurntableSpeed / 180.0f).Within(1.0e-10f));
-            Assert.That(limits.MaxAcceleration, Is.EqualTo(engine.MaxTurntableAcceleration / 180.0f).Within(1.0e-16f));
+            Assert.That(limits.RequestedSpeed, Is.EqualTo(MotionUnits.SpeedFromMmPerSec(PolarKinematicsEngine.DefaultMaxTurntableSpeed) / 180.0f).Within(1.0e-10f));
+            Assert.That(limits.MaxAcceleration,
+                        Is.EqualTo(MotionUnits.AccelerationFromMmPerSecSquared(PolarKinematicsEngine.DefaultMaxTurntableAcceleration) / 180.0f).Within(1.0e-16f));
         });
     }
 
@@ -194,7 +189,7 @@ public class PolarKinematicsTests
     public void AMoveThatDoesNotTurnTheBedIsNotSlowed()
     {
         // Straight in and out along a radius: the turntable does not move, so it imposes nothing
-        PolarKinematicsEngine engine = CreatePolar();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.From());
 
         int[] start = new int[NumDrives];
         int[] end = new int[NumDrives];
@@ -225,7 +220,7 @@ public class PolarKinematicsTests
         // A commanded turn of 350 degrees is really 10 degrees the other way, and the limit has to be
         // worked out for the rotation the machine will actually make rather than the one it was asked
         // for - otherwise a move that barely turns the bed gets throttled as if it spun it right round
-        PolarKinematicsEngine engine = CreatePolar();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.From());
 
         int[] start = new int[NumDrives];
         int[] end = new int[NumDrives];
@@ -261,15 +256,17 @@ public class PolarKinematicsTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(shortcut.RequestedSpeed, Is.EqualTo(engine.MaxTurntableSpeed / 10.0f).Within(1.0e-10f), "ten degrees the short way");
-            Assert.That(longWay.RequestedSpeed, Is.EqualTo(engine.MaxTurntableSpeed / 350.0f).Within(1.0e-10f), "three hundred and fifty the long way");
+            Assert.That(shortcut.RequestedSpeed, Is.EqualTo(MotionUnits.SpeedFromMmPerSec(PolarKinematicsEngine.DefaultMaxTurntableSpeed) / 10.0f).Within(1.0e-10f),
+                        "ten degrees the short way");
+            Assert.That(longWay.RequestedSpeed, Is.EqualTo(MotionUnits.SpeedFromMmPerSec(PolarKinematicsEngine.DefaultMaxTurntableSpeed) / 350.0f).Within(1.0e-10f),
+                        "three hundred and fifty the long way");
         });
     }
 
     [Test]
     public void AxesAboveZAreLinear()
     {
-        PolarKinematicsEngine engine = CreatePolar();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.From());
 
         float[] machinePos = new float[NumDrives];
         machinePos[0] = 100.0f;

@@ -151,7 +151,7 @@ internal sealed partial class GCodeHandler
             int zAxis = AxisIndices.IndexOf(model.Move, 'Z');
             if (zAxis < 0)
             {
-                return new ProbeSettings("The machine has no Z axis", 0, [], [], 0, 0, 0, 0, 0, 0);
+                return new ProbeSettings(AxisIndices.NoAxisMessage("Z"), 0, [], [], 0, 0, 0, 0, 0, 0);
             }
 
             return new ProbeSettings(

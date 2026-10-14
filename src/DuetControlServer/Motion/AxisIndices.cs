@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using DuetAPI.ObjectModel;
 
 namespace DuetControlServer.Motion;
@@ -96,13 +97,6 @@ internal sealed class AxisIndices
     }
 
     /// <summary>
-    /// Resolve a list of axis letters
-    /// </summary>
-    /// <param name="letters">The letter of each axis, in axis order</param>
-    /// <returns>The resolved axes</returns>
-    public static AxisIndices From(ReadOnlySpan<char> letters) => letters.IsEmpty ? None : new AxisIndices(new string(letters));
-
-    /// <summary>
     /// Which axis carries a letter
     /// </summary>
     /// <param name="letter">The axis letter</param>
@@ -132,6 +126,13 @@ internal sealed class AxisIndices
     }
 
     /// <summary>
+    /// Whether X, Y and Z, those of them there are, can be indexed in a span of the given length
+    /// </summary>
+    /// <param name="length">Length of the coordinate, step or motor position span</param>
+    /// <returns>True if none of them is past its end</returns>
+    public bool XyzFitIn(int length) => X < length && Y < length && Z < length;
+
+    /// <summary>
     /// Whether this describes the same axes as another
     /// </summary>
     /// <param name="other">The other axes</param>
@@ -144,6 +145,25 @@ internal sealed class AxisIndices
     /// <param name="axis">The axis index, or -1</param>
     /// <returns>The bit, zero for -1</returns>
     public static uint Bit(int axis) => axis is >= 0 and < 32 ? 1u << axis : 0u;
+
+    /// <summary>
+    /// What a code that needs axes the machine does not have says
+    /// </summary>
+    /// <param name="letters">The missing letters, at least one</param>
+    /// <returns>For example <c>The machine has no Z axis</c>, or <c>The machine has no U or V axis</c></returns>
+    public static string NoAxisMessage(ReadOnlySpan<char> letters)
+    {
+        StringBuilder list = new();
+        for (int i = 0; i < letters.Length; i++)
+        {
+            if (i > 0)
+            {
+                list.Append(i == letters.Length - 1 ? " or " : ", ");
+            }
+            list.Append(letters[i]);
+        }
+        return $"The machine has no {list} axis";
+    }
 
     private static int IndexOf(ReadOnlySpan<char> letters, char letter) => letters.IndexOf(letter);
 }

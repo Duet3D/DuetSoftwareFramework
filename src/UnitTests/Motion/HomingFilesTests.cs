@@ -15,23 +15,6 @@ namespace UnitTests.Motion;
 [TestFixture]
 public class HomingFilesTests
 {
-
-    /// <summary>
-    /// Snapshot a machine, building its geometry from the object model as the factory does
-    /// </summary>
-    /// <param name="move">The move subsystem</param>
-    /// <returns>The snapshot</returns>
-    /// <remarks>
-    /// The planner owns its geometry rather than deriving it (§14), so the snapshot is handed one.
-    /// These tests describe a machine as an object model and want the geometry that describes, which
-    /// is what KinematicsFactory.Create is for
-    /// </remarks>
-    private static MotionParameters Snapshot(Move move)
-    {
-        KinematicsEngine geometry = KinematicsFactory.Create(move.Kinematics);
-        MotionParameters.ApplyAxes(move, geometry);
-        return MotionParameters.FromObjectModel(move, geometry);
-    }
     private static readonly char[] Xyz = ['X', 'Y', 'Z'];
 
     /// <summary>
@@ -50,7 +33,7 @@ public class HomingFilesTests
         {
             move.Axes.Add(new Axis { Letter = letter });
         }
-        return Snapshot(move).Geometry;
+        return KinematicsAxes.Snapshot(move).Geometry;
     }
 
     private static string NextFile(KinematicsEngine engine, uint toBeHomed, uint alreadyHomed = 0,

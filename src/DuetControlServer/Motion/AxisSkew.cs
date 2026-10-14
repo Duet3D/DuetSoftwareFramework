@@ -149,6 +149,7 @@ internal static class AxisSkew
     /// <param name="axes">The bitmap</param>
     /// <param name="numAxes">Number of axes to consider</param>
     /// <returns>The axis, or -1 if the bitmap names none that exists</returns>
+    /// TODO this can probably be refactored since it shouldn't belong here
     public static int LowestSetAxis(uint axes, int numAxes)
     {
         for (int axis = 0; axis < numAxes && axis < MotionLimits.MaxAxes; axis++)

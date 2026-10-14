@@ -259,24 +259,6 @@ internal sealed class MovementState
     }
 
     /// <summary>
-    /// Forget everything, for when the machine position is no longer meaningful
-    /// </summary>
-    public void Reset()
-    {
-        Array.Clear(CurrentUserPosition);
-        EndstopsTriggered = 0;
-        SegmentsLeft = 0;
-        MoveFractionToSkip = 0.0f;
-        RestartMoveFractionDone = 0.0f;
-        RestartGCommandNumber = -1;
-        VirtualFanSpeed = 0.0f;
-        foreach (RestorePoint rp in RestorePoints)
-        {
-            rp.Reset();
-        }
-    }
-
-    /// <summary>
     /// Build the restore point array
     /// </summary>
     private static RestorePoint[] CreateRestorePoints()

@@ -309,42 +309,6 @@ internal sealed class MotionTracker(ILogger<MotionTracker> logger)
     }
 
     /// <summary>
-    /// The number of moves the given ring has completed, or 0 if it has not reported yet
-    /// </summary>
-    /// <param name="ring">Ring to read</param>
-    /// <returns>Number of completed moves</returns>
-    public uint GetCompletedMoves(int ring)
-    {
-        if (!IsValidRing(ring))
-        {
-            return 0;
-        }
-
-        lock (_lock)
-        {
-            return _rings[ring].CompletedMoves;
-        }
-    }
-
-    /// <summary>
-    /// The id of the last move the given ring reported as completed, or 0 if it has not reported yet
-    /// </summary>
-    /// <param name="ring">Ring to read</param>
-    /// <returns>Move id</returns>
-    public uint GetLastCompletedMoveId(int ring)
-    {
-        if (!IsValidRing(ring))
-        {
-            return 0;
-        }
-
-        lock (_lock)
-        {
-            return _rings[ring].LastCompletedMoveId;
-        }
-    }
-
-    /// <summary>
     /// Forget everything, because the link went down and the engine is no longer the same one
     /// </summary>
     public void Invalidate()

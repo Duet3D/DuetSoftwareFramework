@@ -28,6 +28,36 @@ public class KinematicsTests
         return stepsPerMm;
     }
 
+    /// <summary>Speed every motor in <see cref="SpeedAlong"/> may turn at</summary>
+    private const float MotorSpeed = 100.0f;
+
+    /// <summary>Speed <see cref="SpeedAlong"/> asks for, faster than any motor may turn</summary>
+    private const float RequestedSpeed = 2.0f * MotorSpeed;
+
+    /// <summary>
+    /// How fast a geometry lets a move along one axis go, when the per-axis limits have let it through
+    /// at <see cref="RequestedSpeed"/> and every motor may turn at <see cref="MotorSpeed"/>
+    /// </summary>
+    /// <remarks>
+    /// The geometry limits only the motors more than one axis drives, so this is <see cref="MotorSpeed"/>
+    /// along an axis that shares a motor and <see cref="RequestedSpeed"/> along one with a motor to itself
+    /// </remarks>
+    private static float SpeedAlong(KinematicsEngine engine, int axis)
+    {
+        float[] maxFeedrates = new float[NumDrives];
+        float[] accelerations = new float[NumDrives];
+        Array.Fill(maxFeedrates, MotorSpeed);
+        Array.Fill(accelerations, 1000.0f);
+
+        float[] direction = new float[NumDrives];
+        direction[axis] = 1.0f;
+
+        MoveLimits limits = new() { RequestedSpeed = RequestedSpeed, MaxAcceleration = 1000.0f };
+        PlannedMove move = new() { NormalisedDirectionVector = direction, NumVisibleAxes = 3 };
+        engine.LimitSpeedAndAcceleration(ref limits, move, maxFeedrates, accelerations);
+        return limits.RequestedSpeed;
+    }
+
     private static int[] ToMotorSteps(KinematicsEngine engine, float[] machinePos, int numAxes)
     {
         int[] motorPos = new int[NumDrives];
@@ -39,8 +69,8 @@ public class KinematicsTests
     [Test]
     public void CartesianMovesOneMotorPerAxis()
     {
-        CoreKinematicsEngine engine = CoreKinematicsEngine.TryCreate("cartesian")!.WithAxes();
-        Assert.That(engine.IsValid, Is.True);
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From());
+        Assert.That(engine.ConfigurationError, Is.Null);
 
         int[] motorPos = ToMotorSteps(engine, [10.0f, 20.0f, 5.0f], 3);
         Assert.Multiple(() =>
@@ -48,15 +78,15 @@ public class KinematicsTests
             Assert.That(motorPos[0], Is.EqualTo(800));
             Assert.That(motorPos[1], Is.EqualTo(1600));
             Assert.That(motorPos[2], Is.EqualTo(400));
-            Assert.That(engine.HasSharedMotor(0), Is.False, "no motor is shared on a Cartesian machine");
+            Assert.That(SpeedAlong(engine, 0), Is.EqualTo(RequestedSpeed), "no motor is shared on a Cartesian machine");
         });
     }
 
     [Test]
     public void CoreXyMovesBothMotorsForEitherAxis()
     {
-        CoreKinematicsEngine engine = CoreKinematicsEngine.TryCreate("corexy")!.WithAxes();
-        Assert.That(engine.IsValid, Is.True);
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.CoreXY, KinematicsAxes.From());
+        Assert.That(engine.ConfigurationError, Is.Null);
 
         // A = X + Y, B = X - Y. Moving X alone turns both motors the same way; moving Y alone turns
         // them opposite ways. That is the whole of CoreXY
@@ -77,9 +107,9 @@ public class KinematicsTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(engine.HasSharedMotor(0), Is.True, "X shares its motors with Y");
-            Assert.That(engine.HasSharedMotor(1), Is.True, "Y shares its motors with X");
-            Assert.That(engine.HasSharedMotor(2), Is.False, "Z has a motor to itself");
+            Assert.That(SpeedAlong(engine, 0), Is.EqualTo(MotorSpeed), "X shares its motors with Y");
+            Assert.That(SpeedAlong(engine, 1), Is.EqualTo(MotorSpeed), "Y shares its motors with X");
+            Assert.That(SpeedAlong(engine, 2), Is.EqualTo(RequestedSpeed), "Z has a motor to itself");
         });
     }
 
@@ -88,7 +118,7 @@ public class KinematicsTests
     {
         // The native planner uses this to decide which drivers to energise. Holding X still on a
         // CoreXY needs both motors: either one turning alone would move it
-        CoreKinematicsEngine engine = CoreKinematicsEngine.TryCreate("corexy")!.WithAxes();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.CoreXY, KinematicsAxes.From());
         Assert.Multiple(() =>
         {
             Assert.That(engine.GetControllingDrives(0), Is.EqualTo(0b011u));
@@ -100,7 +130,7 @@ public class KinematicsTests
     [Test]
     public void CartesianControllingDrivesAreOneEach()
     {
-        CoreKinematicsEngine engine = CoreKinematicsEngine.TryCreate("cartesian")!.WithAxes();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From());
         Assert.Multiple(() =>
         {
             Assert.That(engine.GetControllingDrives(0), Is.EqualTo(0b001u));
@@ -109,16 +139,16 @@ public class KinematicsTests
         });
     }
 
-    [TestCase("cartesian", 3)]
-    [TestCase("corexy", 3)]
-    [TestCase("corexz", 3)]
-    [TestCase("markforged", 3)]
-    [TestCase("corexyu", 4)]
-    [TestCase("corexyuv", 5)]
-    public void PositionsSurviveTheRoundTrip(string name, int numAxes)
+    [TestCase(KinematicsName.Cartesian, 3)]
+    [TestCase(KinematicsName.CoreXY, 3)]
+    [TestCase(KinematicsName.CoreXZ, 3)]
+    [TestCase(KinematicsName.MarkForged, 3)]
+    [TestCase(KinematicsName.CoreXYU, 4)]
+    [TestCase(KinematicsName.CoreXYUV, 5)]
+    public void PositionsSurviveTheRoundTrip(KinematicsName name, int numAxes)
     {
-        CoreKinematicsEngine engine = CoreKinematicsEngine.TryCreate(name)!.WithAxes();
-        Assert.That(engine.IsValid, Is.True, "the forward matrix could be derived");
+        KinematicsEngine engine = KinematicsFactory.Create(name, KinematicsAxes.From());
+        Assert.That(engine.ConfigurationError, Is.Null, "the forward matrix could be derived");
 
         float[] machinePos = new float[NumDrives];
         for (int axis = 0; axis < numAxes; axis++)
@@ -144,7 +174,7 @@ public class KinematicsTests
     {
         // A 3x3 matrix describes a three-axis machine. A fourth axis added later must still get a
         // motor of its own rather than inheriting a row of zeroes and never moving
-        CoreKinematicsEngine engine = CoreKinematicsEngine.TryCreate("cartesian")!.WithAxes();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From());
 
         float[] machinePos = new float[NumDrives];
         machinePos[3] = 10.0f;
@@ -158,7 +188,7 @@ public class KinematicsTests
     {
         // CartesianToMotorSteps leaves such a motor as it found it, which is how the caller carries
         // an untouched drive forward from the previous move
-        CoreKinematicsEngine engine = CoreKinematicsEngine.TryCreate("cartesian")!.WithAxes();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From());
 
         int[] motorPos = new int[NumDrives];
         motorPos[5] = 12345;
@@ -179,7 +209,7 @@ public class KinematicsTests
         // Endpoints are 32-bit microstep counts and moves are differences between them, so a value
         // that does not fit does not lose precision, it wraps - and the move that reads it commands
         // the drive most of the way round the 32-bit range
-        CoreKinematicsEngine engine = CoreKinematicsEngine.TryCreate("cartesian")!.WithAxes();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From());
 
         float[] machinePos = new float[NumDrives];
         machinePos[0] = 1.0e9f;             // 1e9 mm at 80 steps/mm is 8e10 microsteps
@@ -196,7 +226,7 @@ public class KinematicsTests
         // On a Cartesian machine a 45-degree move may go faster than either axis alone, because the
         // two axes are limited independently. On CoreXY both motors turn for either axis, so the
         // move has to be slowed to what a single motor can manage
-        CoreKinematicsEngine engine = CoreKinematicsEngine.TryCreate("corexy")!.WithAxes();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.CoreXY, KinematicsAxes.From());
 
         float[] maxFeedrates = new float[NumDrives];
         float[] accelerations = new float[NumDrives];
@@ -225,7 +255,7 @@ public class KinematicsTests
     [Test]
     public void CartesianAddsNoLimitOfItsOwn()
     {
-        CoreKinematicsEngine engine = CoreKinematicsEngine.TryCreate("cartesian")!.WithAxes();
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From());
 
         float[] maxFeedrates = new float[NumDrives];
         float[] accelerations = new float[NumDrives];
@@ -250,7 +280,7 @@ public class KinematicsTests
     [Test]
     public void AnUnknownGeometryIsNotCreated()
     {
-        Assert.That(CoreKinematicsEngine.TryCreate("delta"), Is.Null);
+        Assert.That(CoreKinematicsEngine.TryCreate(KinematicsName.LinearDelta, KinematicsAxes.From()), Is.Null);
     }
 
     [Test]
@@ -258,7 +288,7 @@ public class KinematicsTests
     {
         // Two axes driving the same motor identically: no set of motor positions distinguishes them,
         // so there is no forward transform and the geometry does not describe a real machine
-        CoreKinematicsEngine engine = new CoreKinematicsEngine(KinematicsName.Cartesian, [[1, 0, 0], [1, 0, 0], [0, 0, 1]]).WithAxes();
+        CoreKinematicsEngine engine = new(KinematicsName.Cartesian, [[1, 0, 0], [1, 0, 0], [0, 0, 1]]);
         Assert.That(engine.IsValid, Is.False);
     }
 }

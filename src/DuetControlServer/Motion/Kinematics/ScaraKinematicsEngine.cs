@@ -77,11 +77,16 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
     /// <summary>Where bed Y zero is relative to the proximal joint, mm</summary>
     public float YOffset { get; }
 
+    // TODO: RepRapFirmware's ScaraKinematics::LimitPosition pulls a target the arms cannot reach onto the
+    // annulus these two bound, and reports a straight line that passes inside MinRadius as unreachable
+    // along the way. Its IsReachable tells G29 which probe points the arms can reach within their joint
+    // limits. Neither is ported yet
+
     /// <summary>Closest the head may come to the pillar, mm</summary>
-    public float MinRadius { get; }
+    private float MinRadius { get; }
 
     /// <summary>Furthest the head may go from the pillar, mm</summary>
-    public float MaxRadius { get; }
+    private float MaxRadius { get; }
 
     /// <summary>
     /// The minimum radius M669 R asked for, before the mechanics had their say
@@ -392,15 +397,6 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
         MaxRadius = maxRadius * 0.995f;
     }
 
-    /// <summary>
-    /// Which way the elbow is currently bent
-    /// </summary>
-    /// <remarks>
-    /// False is anticlockwise relative to the proximal arm, true is clockwise. Exposed so that a test
-    /// or a diagnostic can see the choice the engine made, since it is not visible in the motor positions
-    /// </remarks>
-    public bool CurrentArmMode => _currentArmMode;
-
     /// <inheritdoc />
     public override NativeMovementError CartesianToMotorSteps(
         ReadOnlySpan<float> machinePos,
@@ -524,19 +520,6 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
         KinematicAxes kinematic = Kinematic;
         uint coupledAxes = (_crosstalk[1] != 0.0f || _crosstalk[2] != 0.0f) ? kinematic.Bitmap : kinematic.Machine.XyBitmap;
         return (coupledAxes & AxisIndices.Bit(axis)) != 0 ? coupledAxes : base.GetControllingDrives(axis);
-    }
-
-    /// <summary>
-    /// Whether the head can be put at the given XY position
-    /// </summary>
-    /// <param name="x">X coordinate in mm</param>
-    /// <param name="y">Y coordinate in mm</param>
-    /// <returns>True if it is within the annulus the arms sweep</returns>
-    public bool IsReachable(float x, float y)
-    {
-        float dx = x + XOffset, dy = y + YOffset;
-        float radiusSquared = (dx * dx) + (dy * dy);
-        return radiusSquared >= MinRadius * MinRadius && radiusSquared <= MaxRadius * MaxRadius;
     }
 
     /// <summary>

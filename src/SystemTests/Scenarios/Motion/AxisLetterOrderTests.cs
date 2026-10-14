@@ -70,8 +70,8 @@ public class AxisLetterOrderTests : BenchFixture
     /// Boot a machine whose axes were created in the given order
     /// </summary>
     /// <param name="order">Which machine, one of <see cref="Creation"/>'s keys</param>
-    /// <param name="before">Configuration to run before M584 creates any axis, as M669 often is</param>
-    /// <param name="after">Configuration to run once the machine is set up</param>
+    /// <param name="before">Configuration to run before M584 creates any axis</param>
+    /// <param name="after">Configuration to run once the machine is set up, which is where M669 goes</param>
     /// <param name="prepareSd">Populates the rest of the virtual SD card</param>
     private static Task<JobBench> StartAsync(string order, string before = "", string after = "",
                                              Action<VirtualSd>? prepareSd = null)
@@ -228,10 +228,9 @@ public class AxisLetterOrderTests : BenchFixture
     }
 
     [TestCaseSource(nameof(Orders))]
-    public async Task CoreXYSelectedBeforeTheAxesExistCouplesXAndY(string order)
+    public async Task CoreXYCouplesTheAxesLetteredXAndY(string order)
     {
-        // config.g commonly selects the geometry before M584 creates the axes
-        await using JobBench bench = await StartAsync(order, before: "M669 K1");
+        await using JobBench bench = await StartAsync(order, after: "M669 K1");
         await bench.Host.ExecuteCodeAsync("G91");
 
         IReadOnlyList<ScheduledMove> alongX = await bench.RunMoveAsync("G1 X10 F6000");
@@ -284,13 +283,12 @@ public class AxisLetterOrderTests : BenchFixture
     [TestCaseSource(nameof(Orders))]
     public async Task ADeltaMovesTheSameWhicheverOrderItsTowersWereCreatedIn(string order)
     {
-        // The geometry is configured before the axes exist, which it has to survive, and the move is
-        // compared driver by driver against the usual order
+        // The move is compared driver by driver against the usual order
         const string delta = "M665 L215 R105.6 H240 B80";
         const string moves = "G90\nG92 X0 Y0 Z100";
 
-        await using JobBench canonical = await StartAsync("XYZU", before: delta);
-        await using JobBench permuted = await StartAsync(order, before: delta);
+        await using JobBench canonical = await StartAsync("XYZU", after: delta);
+        await using JobBench permuted = await StartAsync(order, after: delta);
         foreach (JobBench bench in new[] { canonical, permuted })
         {
             foreach (string line in moves.Split('\n'))
@@ -342,43 +340,145 @@ public class AxisLetterOrderTests : BenchFixture
         });
     }
 
-    [Test]
-    public async Task AMatrixGivenBeforeItsAxesThatCannotBeInvertedIsReportedByM584AndRefusesToMove()
+    [TestCase("M669 A1:0:0:0")]
+    [TestCase("M669 X1:1:0:0 A1:0:0:0")]
+    public async Task M669RefusesARowForAnAxisTheMachineDoesNotHave(string code)
     {
-        // M669 before M584, as config.g usually has it: until X and Y exist the rows have nowhere to
-        // go, so the matrix can only be judged when M584 creates them
-        await using JobBench bench = await ScheduleMoveBench.StartAsync(
-            "M953\nM569 P1.0 S1\nM569 P1.1 S1\nM669 X1:1 Y1:1");
+        // config.g creates the axes before M669 describes them, so a row for a letter with no axis is
+        // a mistake rather than something to keep for later. Nothing of the code is applied
+        await using JobBench bench = await StartAsync("XYZU");
 
-        string created = await bench.Host.ExecuteCodeAsync("M584 X1.0 Y1.1");
-        foreach (string line in new[] { "M92 X80 Y80", "M201 X500 Y500", "M203 X6000 Y6000", "M564 H0 S0", "G91" })
+        string refused = await bench.Host.ExecuteCodeAsync(code);
+        await bench.Host.ExecuteCodeAsync("G91");
+        IReadOnlyList<ScheduledMove> move = await bench.RunMoveAsync("G1 X10 F6000");
+
+        float[][] inverse = await bench.Host.ReadModelAsync(
+            model => ((CoreKinematics)model.Move.Kinematics).InverseMatrix.Select(row => row.ToArray()).ToArray());
+        Assert.Multiple(() =>
         {
-            await bench.Host.ExecuteCodeAsync(line);
-        }
-        int before = bench.CanMaster.ScheduledMoves().Count;
+            Assert.That(refused.Trim(), Is.EqualTo("Error: M669: The machine has no A axis"));
+            Assert.That(inverse[0][..4], Is.EqualTo(new[] { 1.0f, 0.0f, 0.0f, 0.0f }), "X's row is as it was");
+            Assert.That(move.DriversMoved(), Is.EqualTo(new[] { (ScheduleMoveBench.DriverBoard, XDriver) }), "and X still moves alone");
+        });
+    }
 
-        string move = await bench.Host.ExecuteCodeAsync("G1 X10 F6000");
-        string home = await bench.Host.ExecuteCodeAsync("G28");
-        await bench.Host.ExecuteCodeAsync("M400");
+    [Test]
+    public async Task M669RefusesARowLongerThanTheMachineHasAxes()
+    {
+        // The values are the motors of the machine's axes in axis order, so there are at most four here
+        await using JobBench bench = await StartAsync("XYZU");
+
+        string refused = await bench.Host.ExecuteCodeAsync("M669 X1:0:0:0:1");
+
+        Assert.That(refused.Trim(), Is.EqualTo("Error: at column 15: M669: array too long for parameter 'X'"),
+                    "RepRapFirmware's words, pointing at the value there is no motor for");
+    }
+
+    // ---- Geometries that need more than X, Y and Z ----------------------------------------------
+
+    /// <summary>X, Y, Z, U and V on drivers 1.0, 1.1, 1.2, 1.4 and 1.5, created in the order given</summary>
+    private static Task<JobBench> StartCoreXyuMachineAsync(string creation, string after)
+        => ScheduleMoveBench.StartAsync($"""
+            M953
+            M569 P1.0 S1
+            M569 P1.1 S1
+            M569 P1.2 S1
+            M569 P1.4 S1
+            M569 P1.5 S1
+            {creation}
+            M92 X80 Y80 Z400 U80 V80 A80
+            M201 X500 Y500 Z100 U500 V500 A500
+            M203 X6000 Y6000 Z600 U6000 V6000 A6000
+            M564 H0 S0
+            {after}
+            """);
+
+    private const byte VDriver = 5;
+
+    [Test]
+    public async Task M669RefusesAGeometryWhoseAxesTheMachineDoesNotHave()
+    {
+        // CoreXYU needs U and V. A machine whose fourth axis is A has neither: RepRapFirmware would
+        // take A for U because it is the fourth axis, DSF goes by the letter
+        await using JobBench bench = await StartCoreXyuMachineAsync("M584 X1.0 Y1.1 Z1.2 A1.4", "G92 X0 Y0 Z0 A0");
+
+        string refused = await bench.Host.ExecuteCodeAsync("M669 K5");
+        await bench.Host.ExecuteCodeAsync("G91");
+        IReadOnlyList<ScheduledMove> alongX = await bench.RunMoveAsync("G1 X10 F6000");
+        IReadOnlyList<ScheduledMove> alongA = await bench.RunMoveAsync("G1 A5 F6000");
 
         Assert.Multiple(async () =>
         {
-            Assert.That(created.Trim(), Is.EqualTo("Error: M584: Invalid kinematics matrix"));
-            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Select(axis => axis.Letter).ToArray()),
-                        Is.EqualTo(new[] { 'X', 'Y' }), "the axes are created all the same");
-            Assert.That(move.Trim(), Is.EqualTo("Error: G1: Invalid kinematics matrix"));
-            Assert.That(home.Trim(), Is.EqualTo("Error: G28: Invalid kinematics matrix"));
-            Assert.That(bench.CanMaster.ScheduledMoves(), Has.Count.EqualTo(before), "nothing reached the link");
+            Assert.That(refused.Trim(), Is.EqualTo("Error: M669: The machine has no U or V axis, which coreXYU kinematics needs"));
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Kinematics.Name), Is.EqualTo(KinematicsName.Cartesian),
+                        "the geometry that was there stays");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Select(axis => axis.Homed).ToArray()), Has.All.True,
+                        "and the axes G92 homed are still homed, as they would not be had the geometry changed");
+            Assert.That(alongX.DriversMoved(), Is.EqualTo(new[] { (ScheduleMoveBench.DriverBoard, XDriver) }), "X still moves alone");
+            Assert.That(alongX.Steps(XDriver), Is.EqualTo(10 * XyuStepsPerMm));
+            Assert.That(alongA.DriversMoved(), Is.EqualTo(new[] { (ScheduleMoveBench.DriverBoard, UDriver) }), "as does A, on 1.4");
+            Assert.That(alongA.Steps(UDriver), Is.EqualTo(5 * XyuStepsPerMm));
         });
+    }
 
-        // Correcting the row makes it CoreXY, which moves both motors for X
-        string corrected = await bench.Host.ExecuteCodeAsync("M669 Y1:-1");
+    [TestCase("M584 X1.0 Y1.1 Z1.2 U1.4 V1.5", "XYZUV")]
+    [TestCase("M584 Y1.1\nM584 U1.4 V1.5\nM584 X1.0 Z1.2", "YUVXZ")]
+    public async Task CoreXYUDrivesTheMotorsOfItsLettersWhereverTheAxesAre(string creation, string order)
+    {
+        // RepRapFirmware's CoreXYU matrix: X turns the X and Y motors together, Y turns them apart and
+        // the U and V motors apart, U turns the U and V motors together, and Z has a motor of its own
+        await using JobBench bench = await StartCoreXyuMachineAsync(creation, "M669 K5");
+        Assert.That(await bench.Host.ReadModelAsync(model => new string([.. model.Move.Axes.Select(axis => axis.Letter)])),
+                    Is.EqualTo(order), "the axes were created in this order");
+        await bench.Host.ExecuteCodeAsync("G91");
+
         IReadOnlyList<ScheduledMove> alongX = await bench.RunMoveAsync("G1 X10 F6000");
+        IReadOnlyList<ScheduledMove> alongY = await bench.RunMoveAsync("G1 Y10 F6000");
+        IReadOnlyList<ScheduledMove> alongU = await bench.RunMoveAsync("G1 U5 F6000");
+        IReadOnlyList<ScheduledMove> alongZ = await bench.RunMoveAsync("G1 Z1 F600");
+
         Assert.Multiple(() =>
         {
-            Assert.That(corrected.Trim(), Is.Empty);
+            Assert.That(alongX.DriversMoved(), Is.EquivalentTo(new[]
+            {
+                (ScheduleMoveBench.DriverBoard, XDriver), (ScheduleMoveBench.DriverBoard, YDriver)
+            }), "X");
             Assert.That(alongX.Steps(XDriver), Is.EqualTo(10 * XyuStepsPerMm));
             Assert.That(alongX.Steps(YDriver), Is.EqualTo(10 * XyuStepsPerMm));
+            Assert.That(alongX.Distance(), Is.EqualTo(10.0f).Within(1e-3f));
+
+            Assert.That(alongY.DriversMoved(), Is.EquivalentTo(new[]
+            {
+                (ScheduleMoveBench.DriverBoard, XDriver), (ScheduleMoveBench.DriverBoard, YDriver),
+                (ScheduleMoveBench.DriverBoard, UDriver), (ScheduleMoveBench.DriverBoard, VDriver)
+            }), "Y");
+            Assert.That(alongY.Steps(XDriver), Is.EqualTo(10 * XyuStepsPerMm));
+            Assert.That(alongY.Steps(YDriver), Is.EqualTo(-10 * XyuStepsPerMm));
+            Assert.That(alongY.Steps(UDriver), Is.EqualTo(10 * XyuStepsPerMm));
+            Assert.That(alongY.Steps(VDriver), Is.EqualTo(-10 * XyuStepsPerMm));
+            Assert.That(alongY.Distance(), Is.EqualTo(10.0f).Within(1e-3f));
+
+            Assert.That(alongU.DriversMoved(), Is.EquivalentTo(new[]
+            {
+                (ScheduleMoveBench.DriverBoard, UDriver), (ScheduleMoveBench.DriverBoard, VDriver)
+            }), "U");
+            Assert.That(alongU.Steps(UDriver), Is.EqualTo(5 * XyuStepsPerMm));
+            Assert.That(alongU.Steps(VDriver), Is.EqualTo(5 * XyuStepsPerMm));
+            Assert.That(alongU.Distance(), Is.EqualTo(5.0f).Within(1e-3f));
+
+            Assert.That(alongZ.DriversMoved(), Is.EqualTo(new[] { (ScheduleMoveBench.DriverBoard, ZDriver) }), "Z");
+            Assert.That(alongZ.Steps(ZDriver), Is.EqualTo(1 * ZStepsPerMm));
+
+            foreach (ScheduledMove move in alongX.Concat(alongY).Concat(alongU).Concat(alongZ))
+            {
+                foreach (ScheduleMoveDriver driver in move.Drivers)
+                {
+                    Assert.That(driver.BoardAddress, Is.EqualTo(ScheduleMoveBench.DriverBoard));
+                    Assert.That(driver.IsExtruder, Is.Zero, "every one of them is an axis driver");
+                    Assert.That(driver.Extrusion, Is.Zero);
+                    ScheduleMoveBench.AssertWatchesNothing(driver, "a travel move stops on nothing");
+                }
+            }
         });
     }
 
@@ -448,20 +548,22 @@ public class AxisLetterOrderTests : BenchFixture
 
     [TestCase("M665 L215 R105.6 H240 B80", "The machine has no Z axis, which delta kinematics needs")]
     [TestCase("M669 K10", "The machine has no Z axis, which Rotary delta kinematics needs")]
-    public async Task WithoutZAGeometryThatNeedsItRefusesToMove(string geometry, string error)
+    [TestCase("M669 K3", "The machine has no Z axis, which delta kinematics needs")]
+    public async Task WithoutZAGeometryThatNeedsItIsRefused(string geometry, string error)
     {
-        await using JobBench bench = await ScheduleMoveBench.StartAsync(NoZConfig + "\n" + geometry);
-        int before = bench.CanMaster.ScheduledMoves().Count;
+        await using JobBench bench = await ScheduleMoveBench.StartAsync(NoZConfig);
 
-        string move = await bench.Host.ExecuteCodeAsync("G1 X10 F6000");
-        string home = await bench.Host.ExecuteCodeAsync("G28");
-        await bench.Host.ExecuteCodeAsync("M400");
+        string refused = await bench.Host.ExecuteCodeAsync(geometry);
+        await bench.Host.ExecuteCodeAsync("G91");
+        IReadOnlyList<ScheduledMove> move = await bench.RunMoveAsync("G1 X10 F6000");
 
-        Assert.Multiple(() =>
+        Assert.Multiple(async () =>
         {
-            Assert.That(move.Trim(), Is.EqualTo("Error: G1: " + error));
-            Assert.That(home.Trim(), Is.EqualTo("Error: G28: " + error));
-            Assert.That(bench.CanMaster.ScheduledMoves(), Has.Count.EqualTo(before), "nothing reached the link");
+            Assert.That(refused.Trim(), Is.EqualTo($"Error: {geometry[..4]}: {error}"));
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Kinematics.Name), Is.EqualTo(KinematicsName.Cartesian),
+                        "the geometry that was there stays");
+            Assert.That(move.DriversMoved(), Is.EqualTo(new[] { (ScheduleMoveBench.DriverBoard, XDriver) }), "and moves as it did");
+            Assert.That(move.Steps(XDriver), Is.EqualTo(10 * XyuStepsPerMm));
         });
     }
 

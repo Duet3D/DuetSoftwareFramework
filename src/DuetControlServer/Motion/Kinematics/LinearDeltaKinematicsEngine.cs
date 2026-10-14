@@ -32,7 +32,9 @@ namespace DuetControlServer.Motion.Kinematics;
 /// </para>
 /// <para>
 /// Towers A, B and C are driven by the X, Y and Z axes' drives, found by letter wherever M584 put
-/// them, and the effector position is in those three axes. A machine missing any of the three cannot
+/// them, and the effector position is in those three axes. The fourth, fifth and sixth towers are the
+/// drives of the axes lettered U, V and W, which is where RepRapFirmware's fourth axis onwards are
+/// when config.g creates them in one M584. A machine missing any of the axes its towers need cannot
 /// be planned for at all - see <see cref="KinematicsEngine.MissingAxesError"/>
 /// </para>
 /// </remarks>
@@ -75,19 +77,19 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
     public int NumTowers { get; }
 
     /// <summary>Nominal distance from the centre of the bed to each tower, mm</summary>
-    public float Radius { get; }
+    private float Radius { get; }
 
     /// <summary>How far above the bed the effector is when homed, mm</summary>
-    public float HomedHeight { get; }
+    private float HomedHeight { get; }
 
     /// <summary>How far from the centre the effector may go, mm</summary>
     public float PrintRadius { get; }
 
     /// <summary>How much Z rises per mm of +X movement, to square a tilted bed up</summary>
-    public float XTilt { get; }
+    private float XTilt { get; }
 
     /// <summary>How much Z rises per mm of +Y movement</summary>
-    public float YTilt { get; }
+    private float YTilt { get; }
 
     /// <summary>
     /// Height that is reachable wherever the effector is in XY, mm
@@ -97,17 +99,14 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
     /// a rod tilted out to the edge of the bed uses more of its length horizontally. Below this height
     /// no XY position can be out of reach, which lets the position limiter skip the per-tower check
     /// </remarks>
-    public float AlwaysReachableHeight { get; private set; }
+    private float AlwaysReachableHeight { get; set; }
 
     /// <inheritdoc />
     public override KinematicsName Kind => KinematicsName.LinearDelta;
 
     /// <inheritdoc />
-    /// <remarks>Towers A, B and C, in that order</remarks>
-    protected override string KinematicAxisLetters => "XYZ";
-
-    /// <inheritdoc />
-    protected override int ExtraKinematicAxes => NumTowers - UsualNumTowers;
+    /// <remarks>Towers A, B and C are X, Y and Z, and any further towers U, V and W, in that order</remarks>
+    protected override string KinematicAxisLetters => FirstAxisLetters(NumTowers);
 
     /// <inheritdoc />
     /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
@@ -551,7 +550,7 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
     public const float DefaultPrintRadius = 80.0f;
 
     /// <summary>Homed height RepRapFirmware assumes until M665 says otherwise, mm</summary>
-    public const float DefaultHomedHeight = 240.0f;
+    private const float DefaultHomedHeight = 240.0f;
 
     /// <summary>
     /// A delta with RepRapFirmware's defaults, for before M665 has been seen
@@ -566,20 +565,20 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
     /// <summary>Where a tower stands, mm</summary>
     /// <param name="tower">Tower number</param>
     /// <returns>Its X coordinate</returns>
-    public float GetTowerX(int tower) => _towerX[tower];
+    private float GetTowerX(int tower) => _towerX[tower];
 
     /// <summary>Where a tower stands, mm</summary>
     /// <param name="tower">Tower number</param>
     /// <returns>Its Y coordinate</returns>
-    public float GetTowerY(int tower) => _towerY[tower];
+    private float GetTowerY(int tower) => _towerY[tower];
 
     /// <summary>Squared rod length for a tower, mm^2</summary>
-    public float GetDiagonalSquared(int tower) => _diagonalsSquared[tower];
+    private float GetDiagonalSquared(int tower) => _diagonalsSquared[tower];
 
     /// <summary>Carriage height for a tower when the machine is homed, mm</summary>
     /// <param name="tower">Tower number</param>
     /// <returns>The height</returns>
-    public float GetHomedCarriageHeight(int tower) => _homedCarriageHeights[tower];
+    private float GetHomedCarriageHeight(int tower) => _homedCarriageHeights[tower];
 
     /// <inheritdoc />
     public override NativeMovementError CartesianToMotorSteps(
@@ -592,7 +591,7 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
     {
         KinematicAxes kinematic = Kinematic;
         AxisIndices axes = kinematic.Machine;
-        if (!kinematic.IsComplete || !kinematic.LettersFitIn(machinePos.Length))
+        if (!kinematic.IsComplete || !axes.XyzFitIn(machinePos.Length))
         {
             return NativeMovementError.UnreachablePosition;
         }
@@ -639,8 +638,8 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
     {
         KinematicAxes kinematic = Kinematic;
         AxisIndices axes = kinematic.Machine;
-        if (kinematic.IsComplete && kinematic.LettersFitIn(machinePos.Length) && kinematic.LettersFitIn(motorPos.Length)
-            && kinematic.LettersFitIn(stepsPerMm.Length))
+        if (kinematic.IsComplete && axes.XyzFitIn(machinePos.Length) && axes.XyzFitIn(motorPos.Length)
+            && axes.XyzFitIn(stepsPerMm.Length))
         {
             (float x, float y, float z) = ForwardTransform(
                 motorPos[axes.X] / stepsPerMm[axes.X],
@@ -674,48 +673,6 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
             return;                             // a delta missing one of them never gets this far
         }
         directionVector[axes.Z] += (directionVector[axes.X] * XTilt) + (directionVector[axes.Y] * YTilt);
-    }
-
-    /// <summary>
-    /// Whether a position is inside the printable cylinder and under the reachable ceiling
-    /// </summary>
-    /// <param name="machinePos">Axis coordinates in mm</param>
-    /// <returns>True if the effector can be put there</returns>
-    /// <remarks>
-    /// The two limits are of different kinds. The print radius is configuration - it is where the user
-    /// said the bed ends - while the height limit is the machine itself: above it a carriage would
-    /// have to go past its endstop
-    /// </remarks>
-    public bool IsReachable(ReadOnlySpan<float> machinePos)
-    {
-        KinematicAxes kinematic = Kinematic;
-        AxisIndices axes = kinematic.Machine;
-        if (!kinematic.IsComplete || !kinematic.LettersFitIn(machinePos.Length))
-        {
-            return false;
-        }
-
-        float x = machinePos[axes.X], y = machinePos[axes.Y], z = machinePos[axes.Z];
-        float radiusSquared = (x * x) + (y * y);
-        if (radiusSquared > PrintRadius * PrintRadius)
-        {
-            return false;
-        }
-
-        if (z <= AlwaysReachableHeight)
-        {
-            return true;
-        }
-
-        for (int tower = 0; tower < UsualNumTowers; tower++)
-        {
-            float carriageHeight = Transform(x, y, z, tower);
-            if (float.IsNaN(carriageHeight) || carriageHeight > _homedCarriageHeights[tower])
-            {
-                return false;
-            }
-        }
-        return true;
     }
 
 
