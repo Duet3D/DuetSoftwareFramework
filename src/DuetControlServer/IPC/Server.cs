@@ -231,7 +231,7 @@ namespace DuetControlServer.IPC
             catch (Exception e) when (e is not OperationCanceledException and not SocketException)
             {
                 _logger.Error(e, "IPC#{0}: Failed to assign connection processor", conn.Id);
-                await conn.SendResponse(e);
+                await conn.SendException(e);
             }
 
             return null;

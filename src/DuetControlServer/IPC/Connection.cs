@@ -201,7 +201,7 @@ namespace DuetControlServer.IPC
                 catch (JsonException e)
                 {
                     _logger.Error(e, "IPC#{0}: Received malformed JSON", Id);
-                    await SendResponse(e);
+                    await SendException(e);
                 }
             }
             while (true);
@@ -266,7 +266,7 @@ namespace DuetControlServer.IPC
                 catch (JsonException e)
                 {
                     _logger.Error(e, "IPC#{0}: Received malformed JSON", Id);
-                    await SendResponse(e);
+                    await SendException(e);
                 }
             }
             while (true);
@@ -334,7 +334,7 @@ namespace DuetControlServer.IPC
                 catch (JsonException e)
                 {
                     _logger.Error(e, "IPC#{0}: Received malformed JSON", Id);
-                    await SendResponse(e);
+                    await SendException(e);
                 }
             }
             while (true);
