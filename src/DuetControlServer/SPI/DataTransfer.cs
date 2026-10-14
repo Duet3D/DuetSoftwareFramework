@@ -302,6 +302,9 @@ namespace DuetControlServer.SPI
                     _txHeader.ProtocolVersion = Consts.ProtocolVersion;
                     _waitingForFirstTransfer = true;
 
+                    // Without this the retry guard above keeps throwing without exchanging anything
+                    retry = 0;
+
                     if (!_hadTimeout && _connected)
                     {
                         _hadTimeout = true;
