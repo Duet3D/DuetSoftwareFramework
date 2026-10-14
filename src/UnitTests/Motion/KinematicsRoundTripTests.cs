@@ -57,7 +57,7 @@ public class KinematicsRoundTripTests
 
         // ...read back into a geometry, and asked again. A parameter the projection dropped is a
         // default by now, and a parameter the factory does not read is one the machine never had
-        KinematicsEngine restored = KinematicsFactory.Create(first, KinematicsAxes.From());
+        KinematicsEngine restored = KinematicsFactory.Create(first, KinematicsAxes.NewMoveWithAxes());
         OmKinematics second = KinematicsAxes.Reported<OmKinematics>(restored);
 
         Assert.Multiple(() =>
@@ -169,7 +169,7 @@ public class KinematicsRoundTripTests
     /// <returns>The geometry they leave behind</returns>
     private static KinematicsEngine Configure(string[] codes)
     {
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.NewMoveWithAxes());
         foreach (string text in codes)
         {
             bool seen = false;

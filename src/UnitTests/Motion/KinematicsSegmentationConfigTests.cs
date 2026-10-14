@@ -28,7 +28,7 @@ public class KinematicsSegmentationConfigTests
     {
         // The reported bug: M669 S10 left the minimum segment length reading zero, so the pair
         // resolved to "off" on a code whose whole purpose was to ask for segmentation
-        KinematicsEngine engine = Apply(KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From()), "M669 K0 S10");
+        KinematicsEngine engine = Apply(KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.NewMoveWithAxes()), "M669 K0 S10");
 
         Assert.Multiple(() =>
         {
@@ -41,7 +41,7 @@ public class KinematicsSegmentationConfigTests
     [Test]
     public void MinSegmentLengthAloneTurnsSegmentationOn()
     {
-        KinematicsEngine engine = Apply(KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From()), "M669 T0.5");
+        KinematicsEngine engine = Apply(KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.NewMoveWithAxes()), "M669 T0.5");
 
         Assert.Multiple(() =>
         {
@@ -55,7 +55,7 @@ public class KinematicsSegmentationConfigTests
     public void ZeroTurnsSegmentationOff()
     {
         // Explicitly zero is different from absent, and is how a delta is told not to segment
-        KinematicsEngine engine = Apply(KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From()), "M669 S0");
+        KinematicsEngine engine = Apply(KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.NewMoveWithAxes()), "M669 S0");
         Assert.That(engine.Segmentation.HasFlag(SegmentationType.Segment), Is.False);
     }
 
@@ -64,7 +64,7 @@ public class KinematicsSegmentationConfigTests
     {
         // M669 K0 on a machine that is already Cartesian is not a new machine, so what an earlier
         // M669 S set has to survive it
-        KinematicsEngine engine = Apply(KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From()), "M669 S20 T0.3");
+        KinematicsEngine engine = Apply(KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.NewMoveWithAxes()), "M669 S20 T0.3");
         engine = Apply(engine, "M669 K0");
 
         Assert.Multiple(() =>

@@ -64,7 +64,7 @@ internal sealed class MotionParameters
     /// the reference it had when the snapshot was taken. See §14 of
     /// <c>docs/devel/MCODE_MIGRATION.md</c>
     /// </remarks>
-    public KinematicsEngine Geometry { get; private init; } = CoreKinematicsEngine.TryCreate(KinematicsName.Cartesian, AxisIndices.None)!;
+    public KinematicsEngine Geometry { get; private init; } = CoreKinematicsEngine.TryCreate(KinematicsName.Cartesian, new Move())!;
 
     /// <summary>
     /// The same machine as the native motion engine takes it
@@ -374,7 +374,7 @@ internal sealed class MotionParameters
     /// </remarks>
     public static void ApplyAxes(Move move, KinematicsEngine geometry)
     {
-        geometry.SetAxes(AxisIndices.From(move));
+        geometry.SetAxes(move);
 
         int numAxes = Math.Min(move.Axes.Count, MotionLimits.MaxAxes);
         for (int axis = 0; axis < numAxes; axis++)

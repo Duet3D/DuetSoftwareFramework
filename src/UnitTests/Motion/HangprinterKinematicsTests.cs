@@ -51,7 +51,7 @@ public class HangprinterKinematicsTests
     {
         // Motor positions count line paid out since the origin, so the origin itself is by definition
         // all zeroes whatever the anchors are
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Hangprinter, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Hangprinter, KinematicsAxes.NewMoveWithAxes());
 
         int[] motorPos = ToMotorSteps(engine, new float[NumDrives]);
         for (int anchor = 0; anchor < 4; anchor++)
@@ -65,7 +65,7 @@ public class HangprinterKinematicsTests
     {
         // The one part of this geometry with an answer that can be worked out by hand. The anchors are
         // the four RepRapFirmware assumes before M669 has been seen, as the object model reports them
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Hangprinter, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Hangprinter, KinematicsAxes.NewMoveWithAxes());
         HangprinterKinematics reported = KinematicsAxes.Reported<HangprinterKinematics>(engine);
 
         float[] machinePos = [100.0f, 50.0f, 200.0f];
@@ -91,7 +91,7 @@ public class HangprinterKinematicsTests
     [TestCase(0.0f, 0.0f, 1000.0f)]
     public void HangprinterPositionsSurviveTheRoundTrip(float x, float y, float z)
     {
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Hangprinter, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Hangprinter, KinematicsAxes.NewMoveWithAxes());
 
         int[] motorPos = ToMotorSteps(engine, [x, y, z]);
         float[] roundTripped = ToCartesian(engine, motorPos);
@@ -111,7 +111,7 @@ public class HangprinterKinematicsTests
     {
         // No point in space is that far from all four anchors at once. The solver has to say so
         // rather than settling on whatever least-squares compromise fits worst
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Hangprinter, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Hangprinter, KinematicsAxes.NewMoveWithAxes());
 
         float[] machinePos = new float[NumDrives];
         machinePos[0] = 42.0f;
@@ -139,7 +139,7 @@ public class HangprinterKinematicsTests
     {
         // There is nothing rigid in a hangprinter: let any one line go and the effector moves in all
         // three directions at once
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Hangprinter, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Hangprinter, KinematicsAxes.NewMoveWithAxes());
 
         Assert.Multiple(() =>
         {
@@ -183,7 +183,7 @@ public class HangprinterKinematicsTests
     public void AHangprinterLimitsADiagonalMoveToTheSlowerOfXAndY()
     {
         // Nothing on a hangprinter moves one axis alone, so the inherited XY limit applies
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Hangprinter, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Hangprinter, KinematicsAxes.NewMoveWithAxes());
 
         float[] maxFeedrates = new float[NumDrives];
         float[] accelerations = new float[NumDrives];

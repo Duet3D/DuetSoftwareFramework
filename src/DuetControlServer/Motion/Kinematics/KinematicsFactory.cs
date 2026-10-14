@@ -29,12 +29,12 @@ internal static class KinematicsFactory
     /// Build the geometry engine described by the object model's kinematics
     /// </summary>
     /// <param name="kinematics">The configured kinematics</param>
-    /// <param name="axes">The machine's axes</param>
+    /// <param name="move">The move model, whose axes are the machine's. The caller holds the object model lock</param>
     /// <returns>The engine, falling back to Cartesian if the geometry cannot be described</returns>
-    public static KinematicsEngine Create(DuetAPI.ObjectModel.Kinematics kinematics, AxisIndices axes)
+    public static KinematicsEngine Create(DuetAPI.ObjectModel.Kinematics kinematics, Move move)
     {
-        KinematicsEngine engine = CreateGeometry(kinematics, axes);
-        engine.SetAxes(axes);
+        KinematicsEngine engine = CreateGeometry(kinematics, move);
+        engine.SetAxes(move);
 
         // Every geometry's Configure calls RepRapFirmware's TryConfigureSegmentation, so M669 S and T
         // mean the same thing on all of them and are applied here rather than per geometry. Absent
@@ -52,7 +52,7 @@ internal static class KinematicsFactory
     /// Build a geometry with the defaults it has before any M-code has configured it
     /// </summary>
     /// <param name="name">Which geometry</param>
-    /// <param name="axes">The machine's axes</param>
+    /// <param name="move">The move model, whose axes are the machine's. The caller holds the object model lock</param>
     /// <returns>The engine, which knows the axes</returns>
     /// <remarks>
     /// <para>
@@ -67,7 +67,7 @@ internal static class KinematicsFactory
     /// unconfigured machine - for a name that is not a core geometry's
     /// </para>
     /// </remarks>
-    public static KinematicsEngine Create(KinematicsName name, AxisIndices axes)
+    public static KinematicsEngine Create(KinematicsName name, Move move)
     {
         KinematicsEngine engine = name switch
         {
@@ -77,9 +77,9 @@ internal static class KinematicsFactory
             KinematicsName.FiveBarScara => FiveBarScaraKinematicsEngine.CreateDefault(),
             KinematicsName.Polar => PolarKinematicsEngine.CreateDefault(),
             KinematicsName.Hangprinter => HangprinterKinematicsEngine.CreateDefault(),
-            _ => CoreKinematicsEngine.CreateDefault(name, axes)
+            _ => CoreKinematicsEngine.CreateDefault(name, move)
         };
-        engine.SetAxes(axes);
+        engine.SetAxes(move);
         return engine;
     }
 
@@ -87,19 +87,19 @@ internal static class KinematicsFactory
     /// Build the geometry itself, before M669's segmentation parameters are applied to it
     /// </summary>
     /// <param name="kinematics">The configured kinematics</param>
-    /// <param name="axes">The machine's axes</param>
+    /// <param name="move">The move model, whose axes are the machine's. The caller holds the object model lock</param>
     /// <returns>The engine</returns>
     /// <remarks>
     /// One case per object model class, each delegating to that geometry's <c>CreateX</c>. Two of the
     /// classes carry two geometries each - both deltas share one and both SCARAs share the other,
     /// because that is how RepRapFirmware reports them - so those cases have to look at the name as
     /// well as the type. The geometries the object model says nothing about fall through to
-    /// <see cref="Create(KinematicsName, AxisIndices)"/>, which is also where an unusable description ends up
+    /// <see cref="Create(KinematicsName, Move)"/>, which is also where an unusable description ends up
     /// </remarks>
-    private static KinematicsEngine CreateGeometry(DuetAPI.ObjectModel.Kinematics kinematics, AxisIndices axes)
+    private static KinematicsEngine CreateGeometry(DuetAPI.ObjectModel.Kinematics kinematics, Move move)
         => kinematics switch
         {
-            CoreKinematics core => CreateCore(core, axes),
+            CoreKinematics core => CreateCore(core, move),
             DeltaKinematics delta when delta.Name != KinematicsName.RotaryDelta => CreateDelta(delta),
             ScaraKinematics scara when scara.Name != KinematicsName.FiveBarScara => CreateScara(scara),
             PolarKinematics polar => CreatePolar(polar),
@@ -107,14 +107,14 @@ internal static class KinematicsFactory
 
             // A rotary delta and a five-bar SCARA reach here: nothing in their nodes describes them,
             // so the geometry their name selects with its own defaults is all there is to build
-            _ => Create(kinematics.Name, axes)
+            _ => Create(kinematics.Name, move)
         };
 
     /// <summary>
     /// Build a core geometry from the object model
     /// </summary>
     /// <param name="core">The configured kinematics</param>
-    /// <param name="axes">The machine's axes</param>
+    /// <param name="move">The move model, whose axes are the machine's. The caller holds the object model lock</param>
     /// <returns>The engine</returns>
     /// <remarks>
     /// The matrix in the object model is authoritative when it is there: M669 can set an arbitrary
@@ -124,7 +124,7 @@ internal static class KinematicsFactory
     /// machine does not have is an unconfigured machine, which is Cartesian: placing it without them
     /// would leave the matrix those axes need missing once M584 created them
     /// </remarks>
-    private static KinematicsEngine CreateCore(CoreKinematics core, AxisIndices axes)
+    private static KinematicsEngine CreateCore(CoreKinematics core, Move move)
     {
         if (core.InverseMatrix.Count > 0)
         {
@@ -141,8 +141,8 @@ internal static class KinematicsFactory
             }
         }
 
-        CoreKinematicsEngine named = CoreKinematicsEngine.CreateDefault(core.Name, axes);
-        return named.MissingAxesError is null ? named : CoreKinematicsEngine.CreateDefault(KinematicsName.Cartesian, axes);
+        CoreKinematicsEngine named = CoreKinematicsEngine.CreateDefault(core.Name, move);
+        return named.MissingAxesError is null ? named : CoreKinematicsEngine.CreateDefault(KinematicsName.Cartesian, move);
     }
 
     /// <summary>

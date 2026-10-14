@@ -77,7 +77,7 @@ public class AxisOrderTests
     /// <param name="letters">The machine's axes, in axis order</param>
     private static KinematicsEngine Create(KinematicsName geometry, string letters) => geometry == KinematicsName.Scara
         ? new ScaraKinematicsEngine(crosstalk: [0.1f, 0.05f, -0.02f]).WithAxes(letters)
-        : KinematicsFactory.Create(geometry, KinematicsAxes.From(letters));
+        : KinematicsFactory.Create(geometry, KinematicsAxes.NewMoveWithAxes(letters));
 
     /// <summary>One row of a core geometry's inverse matrix, as the object model reports it</summary>
     /// <param name="engine">The geometry</param>
@@ -323,7 +323,7 @@ public class AxisOrderTests
             float[] position = new float[NumDrives];
             Array.Fill(position, -1.0f);
             Assert.DoesNotThrow(() => engine.MotorStepsToCartesian(motorPos, stepsPerMm, letters.Length, letters.Length, position));
-            Assert.That(engine.AxesAssumedHomed((1u << letters.Length) - 1) & KinematicsAxes.From(letters).XyBitmap, Is.Zero,
+            Assert.That(engine.AxesAssumedHomed((1u << letters.Length) - 1) & AxisIndices.From(KinematicsAxes.NewMoveWithAxes(letters)).XyBitmap, Is.Zero,
                         "naming every axis there is still does not pin the geometry down");
         });
     }
@@ -347,7 +347,7 @@ public class AxisOrderTests
         float[] roundTripped = new float[NumDrives];
         withoutZ.MotorStepsToCartesian(motors, stepsPerMm, 3, 3, roundTripped);
 
-        AxisIndices axes = KinematicsAxes.From(noZ);
+        AxisIndices axes = AxisIndices.From(KinematicsAxes.NewMoveWithAxes(noZ));
         Assert.Multiple(() =>
         {
             Assert.That(withoutZ.MissingAxesError, Is.Null);
@@ -431,10 +431,10 @@ public class AxisOrderTests
     {
         Assert.Multiple(() =>
         {
-            Assert.That(KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From("Y")).MissingAxesError, Is.Null);
-            Assert.That(KinematicsFactory.Create(KinematicsName.CoreXY, KinematicsAxes.From("YX")).MissingAxesError, Is.Null, "Z is not needed");
-            Assert.That(KinematicsFactory.Create(KinematicsName.CoreXZ, KinematicsAxes.From("ZX")).MissingAxesError, Is.Null, "nor Y here");
-            Assert.That(KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From("ZYX")).MissingAxesError, Is.Null);
+            Assert.That(KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.NewMoveWithAxes("Y")).MissingAxesError, Is.Null);
+            Assert.That(KinematicsFactory.Create(KinematicsName.CoreXY, KinematicsAxes.NewMoveWithAxes("YX")).MissingAxesError, Is.Null, "Z is not needed");
+            Assert.That(KinematicsFactory.Create(KinematicsName.CoreXZ, KinematicsAxes.NewMoveWithAxes("ZX")).MissingAxesError, Is.Null, "nor Y here");
+            Assert.That(KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.NewMoveWithAxes("ZYX")).MissingAxesError, Is.Null);
         });
     }
 
@@ -443,12 +443,12 @@ public class AxisOrderTests
     {
         // One adopted from the object model at startup, before config.g's M584 has created the axes,
         // has to pick them up afterwards rather than fail or fix on whatever it saw first
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, AxisIndices.None);
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, new Move());
         Assert.That(engine.MissingAxesError, Is.Not.Null, "no axes yet");
 
-        engine.SetAxes(KinematicsAxes.From("Y"));
-        engine.SetAxes(KinematicsAxes.From("YX"));
-        engine.SetAxes(KinematicsAxes.From("YXZ"));
+        engine.SetAxes(KinematicsAxes.NewMoveWithAxes("Y"));
+        engine.SetAxes(KinematicsAxes.NewMoveWithAxes("YX"));
+        engine.SetAxes(KinematicsAxes.NewMoveWithAxes("YXZ"));
 
         Assert.Multiple(() =>
         {
@@ -487,7 +487,7 @@ public class AxisOrderTests
     public void ZIsHomedLastWhereverItIs()
     {
         // Z created first, as M584 Z.. then M584 X.. Y.. would leave it
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From("ZXY"));
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.NewMoveWithAxes("ZXY"));
         engine.HomesZWithProbe = true;
         char[] letters = ['Z', 'X', 'Y'];
 
@@ -505,7 +505,7 @@ public class AxisOrderTests
     [Test]
     public void AMachineWithNoZHasNothingToHoldBack()
     {
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From("XYU"));
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.NewMoveWithAxes("XYU"));
         engine.HomesZWithProbe = true;
 
         Assert.Multiple(() =>
@@ -519,7 +519,7 @@ public class AxisOrderTests
     [Test]
     public void ADeltaHomesWhicheverAxesAreItsTowers()
     {
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From("UZYX"));
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.NewMoveWithAxes("UZYX"));
 
         Assert.Multiple(() =>
         {
@@ -537,7 +537,7 @@ public class AxisOrderTests
     public void ANamedMatrixIsPlacedAtTheLettersItNames()
     {
         // CoreXY couples the X and Y motors, wherever those axes are
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.CoreXY, KinematicsAxes.From("ZYX"));
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.CoreXY, KinematicsAxes.NewMoveWithAxes("ZYX"));
 
         Assert.Multiple(() =>
         {
@@ -551,7 +551,7 @@ public class AxisOrderTests
     public void AMatrixRowGoesToTheAxisWithItsLetter()
     {
         // U created before Z, so U is the third axis: M669 U names that one, not the fourth
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From("XYUZ"));
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.NewMoveWithAxes("XYUZ"));
         bool seen = false;
         KinematicsEngine configured = KinematicsConfigurator.Apply(engine, KinematicsAxes.NewMoveWithAxes("XYUZ"), new Code("M669 U0:0:2:0"), ref seen);
 
@@ -567,7 +567,7 @@ public class AxisOrderTests
     [TestCase("M669 A1 X1:0 Z0:0:1", "XY", "The machine has no Z or A axis")]
     public void AMatrixRowForAnAxisTheMachineDoesNotHaveIsRefused(string m669, string letters, string error)
     {
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.CoreXY, KinematicsAxes.From(letters));
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.CoreXY, KinematicsAxes.NewMoveWithAxes(letters));
         bool seen = false;
 
         GCodeException? refused = Assert.Throws<GCodeException>(
@@ -583,7 +583,7 @@ public class AxisOrderTests
     public void AMatrixRowLongerThanTheMachineHasMotorsIsRefused()
     {
         // The values are the motors of the axes there are, in axis order, as in RepRapFirmware
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From("XYZ"));
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.NewMoveWithAxes("XYZ"));
         bool seen = false;
 
         GCodeException? refused = Assert.Throws<GCodeException>(
@@ -595,7 +595,7 @@ public class AxisOrderTests
     public void AShortMatrixRowLeavesTheRestOfTheRowAsItWas()
     {
         // Z's own motor is the third, and the row given stops at the second
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.CoreXZ, KinematicsAxes.From("XYZ"));
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.CoreXZ, KinematicsAxes.NewMoveWithAxes("XYZ"));
         bool seen = false;
         KinematicsEngine configured = KinematicsConfigurator.Apply(engine, KinematicsAxes.NewMoveWithAxes("XYZ"), new Code("M669 Z1"), ref seen);
 
@@ -606,7 +606,7 @@ public class AxisOrderTests
     public void AnM665OrM666IsNotAMatrixRow()
     {
         // RepRapFirmware's CoreKinematics takes rows from M669 only
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From("XYZ"));
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.NewMoveWithAxes("XYZ"));
         Move move = KinematicsAxes.NewMoveWithAxes("XYZ");
         bool seen = false;
 
@@ -621,7 +621,7 @@ public class AxisOrderTests
     [Test]
     public void TheMatrixIsWrittenWhereTheAxesAre()
     {
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.CoreXY, KinematicsAxes.From("ZYX"));
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.CoreXY, KinematicsAxes.NewMoveWithAxes("ZYX"));
 
         Assert.That(InverseRow(engine, 2)[..3], Is.EqualTo(new[] { 0.0f, 1.0f, 1.0f }));
     }
@@ -630,7 +630,7 @@ public class AxisOrderTests
     public void AMatrixThatCannotBeInvertedIsRefused()
     {
         // Both rows turn the same two motors the same way, so no motor positions tell X from Y
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From("XYZ"));
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.NewMoveWithAxes("XYZ"));
         bool seen = false;
 
         GCodeException? refused = Assert.Throws<GCodeException>(
@@ -772,7 +772,7 @@ public class AxisOrderTests
     [TestCaseSource(nameof(GeometriesSelectedWithoutTheirAxes))]
     public void SelectingAGeometryWithoutItsAxesIsRefused(string code, string letters, string error)
     {
-        KinematicsEngine current = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From(letters));
+        KinematicsEngine current = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.NewMoveWithAxes(letters));
         bool seen = false;
 
         GCodeException? refused = Assert.Throws<GCodeException>(
@@ -787,7 +787,7 @@ public class AxisOrderTests
     public void SelectingAGeometryWithItsAxesInAnyOrderIsAccepted(string code, KinematicsName expected)
     {
         bool seen = false;
-        KinematicsEngine engine = KinematicsConfigurator.Apply(KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From()),
+        KinematicsEngine engine = KinematicsConfigurator.Apply(KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.NewMoveWithAxes()),
                                                                KinematicsAxes.NewMoveWithAxes("VYAUZX"), new Code(code), ref seen);
         Assert.Multiple(() =>
         {
@@ -802,7 +802,7 @@ public class AxisOrderTests
     public void ConfiguringAGeometryWithoutItsAxesIsRefused(string code)
     {
         // A delta adopted from the object model on a machine whose config.g never created Z
-        KinematicsEngine delta = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From("XYU"));
+        KinematicsEngine delta = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.NewMoveWithAxes("XYU"));
         bool seen = false;
 
         GCodeException? refused = Assert.Throws<GCodeException>(
@@ -815,7 +815,7 @@ public class AxisOrderTests
     [TestCase("M669")]
     public void AskingAboutAGeometryWithoutItsAxesIsNot(string code)
     {
-        KinematicsEngine delta = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From("XYU"));
+        KinematicsEngine delta = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.NewMoveWithAxes("XYU"));
         bool seen = false;
 
         KinematicsEngine engine = KinematicsConfigurator.Apply(delta, KinematicsAxes.NewMoveWithAxes("XYU"), new Code(code), ref seen);
@@ -939,8 +939,8 @@ public class AxisOrderTests
             Assert.That(axes.XyzBitmap, Is.EqualTo(0b0110u));
             Assert.That(AxisIndices.IndexOf(KinematicsAxes.NewMoveWithAxes("UZXa"), 'X'), Is.EqualTo(2));
             Assert.That(AxisIndices.None.X, Is.EqualTo(-1));
-            Assert.That(axes.SameAs(KinematicsAxes.From("UZXa")), Is.True);
-            Assert.That(axes.SameAs(KinematicsAxes.From("UZX")), Is.False);
+            Assert.That(axes.SameAs(AxisIndices.From(KinematicsAxes.NewMoveWithAxes("UZXa"))), Is.True);
+            Assert.That(axes.SameAs(AxisIndices.From(KinematicsAxes.NewMoveWithAxes("UZX"))), Is.False);
         });
     }
 }

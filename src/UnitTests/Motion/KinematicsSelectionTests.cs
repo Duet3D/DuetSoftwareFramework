@@ -19,7 +19,7 @@ public class KinematicsSelectionTests
     private static KinematicsEngine Select(string codeText)
     {
         bool seen = false;
-        KinematicsEngine engine = KinematicsConfigurator.Apply(KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From()),
+        KinematicsEngine engine = KinematicsConfigurator.Apply(KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.NewMoveWithAxes()),
                                                                KinematicsAxes.NewMoveWithAxes(), new Code(codeText), ref seen);
         Assert.That(seen, Is.True, $"'{codeText}' selected nothing");
         return engine;
@@ -63,7 +63,7 @@ public class KinematicsSelectionTests
     {
         bool seen = false;
         GCodeException? error = Assert.Throws<GCodeException>(() => KinematicsConfigurator.Apply(
-            KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From()), KinematicsAxes.NewMoveWithAxes(), new Code(codeText), ref seen));
+            KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.NewMoveWithAxes()), KinematicsAxes.NewMoveWithAxes(), new Code(codeText), ref seen));
         Assert.That(error!.Message, Is.EqualTo(message));
     }
 }

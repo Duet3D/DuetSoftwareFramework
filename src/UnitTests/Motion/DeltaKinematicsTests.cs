@@ -51,7 +51,7 @@ public class DeltaKinematicsTests
     public void TowersAreEvenlySpacedAroundTheBed()
     {
         // Where the towers stand is what the object model reports for each of them
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.NewMoveWithAxes());
         StaticModelCollection<DeltaTower> towers = KinematicsAxes.Reported<DeltaKinematics>(engine).Towers;
 
         // A is at -150 degrees, B at -30 and C at +90, all at the delta radius from the centre
@@ -76,7 +76,7 @@ public class DeltaKinematicsTests
     {
         // Symmetry: the centre of the bed is the same distance from every tower, so every rod hangs at
         // the same angle and every carriage is at the same height
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.NewMoveWithAxes());
 
         int[] motorPos = ToMotorSteps(engine, [0.0f, 0.0f, 100.0f], 3);
         Assert.Multiple(() =>
@@ -94,7 +94,7 @@ public class DeltaKinematicsTests
     [Test]
     public void RaisingTheEffectorRaisesEveryCarriageEqually()
     {
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.NewMoveWithAxes());
 
         int[] low = ToMotorSteps(engine, [10.0f, -20.0f, 50.0f], 3);
         int[] high = ToMotorSteps(engine, [10.0f, -20.0f, 60.0f], 3);
@@ -113,7 +113,7 @@ public class DeltaKinematicsTests
     [TestCase(60.0f, -60.0f, 150.0f)]
     public void LinearDeltaPositionsSurviveTheRoundTrip(float x, float y, float z)
     {
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.NewMoveWithAxes());
 
         int[] motorPos = ToMotorSteps(engine, [x, y, z], 3);
         float[] roundTripped = ToCartesian(engine, motorPos, 3);
@@ -188,7 +188,7 @@ public class DeltaKinematicsTests
     {
         // Further from a tower than the rod is long: there is no carriage height at all that puts the
         // effector there, and the square root goes imaginary
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.NewMoveWithAxes());
 
         float[] machinePos = new float[NumDrives];
         machinePos[0] = 1000.0f;
@@ -204,7 +204,7 @@ public class DeltaKinematicsTests
     {
         // Nothing on a delta moves one motor alone, so all three have to be energised whichever axis
         // the caller asks about
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.NewMoveWithAxes());
 
         Assert.Multiple(() =>
         {
@@ -218,7 +218,7 @@ public class DeltaKinematicsTests
     [Test]
     public void AxesAboveTheTowersAreLinear()
     {
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.NewMoveWithAxes());
 
         float[] machinePos = new float[NumDrives];
         machinePos[2] = 100.0f;
@@ -236,7 +236,7 @@ public class DeltaKinematicsTests
     {
         // The ceiling sags away from the centre, so the height that is reachable everywhere is lower
         // than the height reachable at the middle, which is just under the homed height of 240mm
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.NewMoveWithAxes());
 
         float[] middle = [0.0f, 0.0f, 239.9f];
         float[] edge = [LinearDeltaKinematicsEngine.DefaultPrintRadius, 0.0f, 239.9f];
@@ -253,7 +253,7 @@ public class DeltaKinematicsTests
     [Test]
     public void APositionOutsideThePrintRadiusIsNotReachable()
     {
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.NewMoveWithAxes());
 
         float justOutside = LinearDeltaKinematicsEngine.DefaultPrintRadius + 1.0f;
         float[] outside = [justOutside, 0.0f, 50.0f];
@@ -274,7 +274,7 @@ public class DeltaKinematicsTests
     {
         // The same symmetry argument as for the linear delta: at the centre every arm is swung to the
         // same angle
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.RotaryDelta, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.RotaryDelta, KinematicsAxes.NewMoveWithAxes());
 
         int[] motorPos = ToMotorSteps(engine, [0.0f, 0.0f, 100.0f], 3);
         Assert.Multiple(() =>
@@ -290,7 +290,7 @@ public class DeltaKinematicsTests
     [TestCase(30.0f, -30.0f, 120.0f)]
     public void RotaryDeltaPositionsSurviveTheRoundTrip(float x, float y, float z)
     {
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.RotaryDelta, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.RotaryDelta, KinematicsAxes.NewMoveWithAxes());
 
         int[] motorPos = ToMotorSteps(engine, [x, y, z], 3);
         float[] roundTripped = ToCartesian(engine, motorPos, 3);
@@ -330,7 +330,7 @@ public class DeltaKinematicsTests
     [Test]
     public void ARotaryDeltaPositionTheRodsCannotReachIsUnreachable()
     {
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.RotaryDelta, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.RotaryDelta, KinematicsAxes.NewMoveWithAxes());
 
         float[] machinePos = new float[NumDrives];
         machinePos[0] = 5000.0f;
@@ -345,7 +345,7 @@ public class DeltaKinematicsTests
     [Test]
     public void RotaryDeltaHoldingAnyAxisStillNeedsAllThreeMotors()
     {
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.RotaryDelta, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.RotaryDelta, KinematicsAxes.NewMoveWithAxes());
         Assert.Multiple(() =>
         {
             Assert.That(engine.GetControllingDrives(0), Is.EqualTo(0b111u));
@@ -361,7 +361,7 @@ public class DeltaKinematicsTests
     {
         // The default limit, which every non-Cartesian geometry inherits: X and Y are not independent,
         // so a diagonal move gets no more than the axes it is made of
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.NewMoveWithAxes());
 
         float[] maxFeedrates = new float[NumDrives];
         float[] accelerations = new float[NumDrives];
@@ -384,7 +384,7 @@ public class DeltaKinematicsTests
     [Test]
     public void APureZMoveIsNotRestrictedByTheXyLimits()
     {
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.NewMoveWithAxes());
 
         float[] maxFeedrates = new float[NumDrives];
         float[] accelerations = new float[NumDrives];

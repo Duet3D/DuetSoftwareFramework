@@ -49,7 +49,7 @@ public class PolarKinematicsTests
     [Test]
     public void APositionOnThePlusXAxisIsAllRadiusAndNoAngle()
     {
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.NewMoveWithAxes());
 
         int[] motorPos = ToMotorSteps(engine, [100.0f, 0.0f, 5.0f], 3);
         Assert.Multiple(() =>
@@ -63,7 +63,7 @@ public class PolarKinematicsTests
     [Test]
     public void AQuarterTurnPutsTheHeadOnThePlusYAxis()
     {
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.NewMoveWithAxes());
 
         int[] motorPos = ToMotorSteps(engine, [0.0f, 100.0f, 0.0f], 3);
         Assert.Multiple(() =>
@@ -79,7 +79,7 @@ public class PolarKinematicsTests
     [TestCase(70.0f, -70.0f, 10.0f)]
     public void PolarPositionsSurviveTheRoundTrip(float x, float y, float z)
     {
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.NewMoveWithAxes());
 
         int[] motorPos = ToMotorSteps(engine, [x, y, z], 3);
         float[] roundTripped = ToCartesian(engine, motorPos, 3);
@@ -97,7 +97,7 @@ public class PolarKinematicsTests
     {
         // At the centre every angle puts the head in the same place, so turning the bed would be
         // movement for nothing - and the angle itself is not defined there
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.NewMoveWithAxes());
 
         int[] motorPos = new int[NumDrives];
         motorPos[1] = 12345;
@@ -115,7 +115,7 @@ public class PolarKinematicsTests
     [Test]
     public void BothMotorsHoldEitherOfXAndYStill()
     {
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.NewMoveWithAxes());
 
         Assert.Multiple(() =>
         {
@@ -128,7 +128,7 @@ public class PolarKinematicsTests
     [Test]
     public void TheTurntableIsAContinuousRotationAxis()
     {
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.NewMoveWithAxes());
         Assert.That(engine.ContinuousRotationAxes, Is.EqualTo(0b010u));
     }
 
@@ -154,7 +154,7 @@ public class PolarKinematicsTests
     {
         // Half a turn over one millimetre of travel is 180 degrees of rotation per mm, and the
         // turntable will only do 30 degrees per second, so the move is held to a sixth of a mm/s
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.NewMoveWithAxes());
 
         int[] start = new int[NumDrives];
         int[] end = new int[NumDrives];
@@ -189,7 +189,7 @@ public class PolarKinematicsTests
     public void AMoveThatDoesNotTurnTheBedIsNotSlowed()
     {
         // Straight in and out along a radius: the turntable does not move, so it imposes nothing
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.NewMoveWithAxes());
 
         int[] start = new int[NumDrives];
         int[] end = new int[NumDrives];
@@ -220,7 +220,7 @@ public class PolarKinematicsTests
         // A commanded turn of 350 degrees is really 10 degrees the other way, and the limit has to be
         // worked out for the rotation the machine will actually make rather than the one it was asked
         // for - otherwise a move that barely turns the bed gets throttled as if it spun it right round
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.NewMoveWithAxes());
 
         int[] start = new int[NumDrives];
         int[] end = new int[NumDrives];
@@ -266,7 +266,7 @@ public class PolarKinematicsTests
     [Test]
     public void AxesAboveZAreLinear()
     {
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.NewMoveWithAxes());
 
         float[] machinePos = new float[NumDrives];
         machinePos[0] = 100.0f;

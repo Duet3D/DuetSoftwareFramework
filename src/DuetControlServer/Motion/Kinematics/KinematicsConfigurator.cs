@@ -38,9 +38,9 @@ internal static class KinematicsConfigurator
     /// </exception>
     public static KinematicsEngine Apply(KinematicsEngine current, Move move, Code code, ref bool seen)
     {
-        // What the code needs and what it configures are judged against the axes as they are now.
-        // The installed geometry already has them: M584 gives them to it as it creates each axis
-        AxisIndices axes = AxisIndices.From(move);
+        // What the code needs and what it configures are judged against the axes as they are now. The
+        // installed geometry already has them, from the reconfiguration every M584 ends with, and a
+        // geometry built here is given them from the move model
         KinematicsEngine engine = current;
 
         if (code.MajorNumber == 669 && code.TryGetValuedParameter('K', out CodeParameter? kinematicsParameter))
@@ -52,7 +52,7 @@ internal static class KinematicsConfigurator
                 // what constructing a new Kinematics does in RepRapFirmware. It is built for the
                 // machine's axes: a core geometry places its matrix by them, and the rest of this code
                 // may configure it
-                engine = KinematicsFactory.Create(name, axes);
+                engine = KinematicsFactory.Create(name, move);
             }
             seen = true;
         }
@@ -61,7 +61,7 @@ internal static class KinematicsConfigurator
         {
             // M665 with a rod length switches the machine to a delta if it is not one already, which
             // is how a delta config.g is usually written
-            engine = KinematicsFactory.Create(KinematicsName.LinearDelta, axes);
+            engine = KinematicsFactory.Create(KinematicsName.LinearDelta, move);
             seen = true;
         }
 
@@ -80,7 +80,7 @@ internal static class KinematicsConfigurator
         if (!ReferenceEquals(configured, engine))
         {
             // Configuring builds a new instance, which has to know the machine's axes as well
-            configured.SetAxes(axes);
+            configured.SetAxes(move);
             if (ReferenceEquals(engine, current))
             {
                 // The geometry itself did not change, so what M669 S and T had already set carries over

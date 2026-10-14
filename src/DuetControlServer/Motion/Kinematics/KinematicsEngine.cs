@@ -213,7 +213,7 @@ internal abstract class KinematicsEngine
     /// <summary>
     /// Follow a change to the machine's axes
     /// </summary>
-    /// <param name="axes">The axes as they are now</param>
+    /// <param name="move">The move model, whose axes are the machine's. The caller holds the object model lock</param>
     /// <returns>True if they differed from what this geometry had, so that anything derived from it changed</returns>
     /// <remarks>
     /// <para>
@@ -227,7 +227,15 @@ internal abstract class KinematicsEngine
     /// endstop correction, the live position publisher - sees either the old axes or the new ones
     /// </para>
     /// </remarks>
-    public bool SetAxes(AxisIndices axes)
+    public bool SetAxes(Move move) => SetAxes(AxisIndices.From(move));
+
+    /// <summary>
+    /// Follow a change to the machine's axes, already resolved
+    /// </summary>
+    /// <param name="axes">The axes as they are now</param>
+    /// <returns>True if they differed from what this geometry had</returns>
+    /// <remarks>For a geometry handing the axes it holds to an instance it builds from itself</remarks>
+    protected bool SetAxes(AxisIndices axes)
     {
         if (_kinematicAxes is not null && _kinematicAxes.Machine.SameAs(axes))
         {

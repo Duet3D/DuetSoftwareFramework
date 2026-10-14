@@ -29,7 +29,7 @@ public class SegmentationTests
     public void ACartesianMachineNeedsNoSegmentation()
     {
         // The transform is the identity, so a straight line in motor space already is one
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.NewMoveWithAxes());
         Assert.That(engine.Segmentation, Is.EqualTo(SegmentationType.None));
     }
 
@@ -37,7 +37,7 @@ public class SegmentationTests
     public void ACoreXyMachineNeedsNoSegmentationEither()
     {
         // CoreXY's transform is a matrix, which is still linear: a straight line stays straight
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.CoreXY, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.CoreXY, KinematicsAxes.NewMoveWithAxes());
         Assert.That(engine.Segmentation, Is.EqualTo(SegmentationType.None));
     }
 
@@ -47,7 +47,7 @@ public class SegmentationTests
         // A delta bows in every direction, so even an uncoordinated move has to be segmented. Z is
         // one of the towers rather than an independent axis, but its movement is deliberately not
         // counted towards the segment length - RepRapFirmware counts XY only for a linear delta
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.NewMoveWithAxes());
         Assert.Multiple(() =>
         {
             Assert.That(engine.Segmentation.HasFlag(SegmentationType.Segment), Is.True);
@@ -60,7 +60,7 @@ public class SegmentationTests
     public void ARotaryDeltaCountsZAsWell()
     {
         // Every coordinate of the head is an arm angle here, so Z bows like the rest of it
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.RotaryDelta, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.RotaryDelta, KinematicsAxes.NewMoveWithAxes());
         Assert.Multiple(() =>
         {
             Assert.That(engine.Segmentation.HasFlag(SegmentationType.Segment), Is.True);
@@ -73,7 +73,7 @@ public class SegmentationTests
     public void AScaraSegmentsInXyOnly()
     {
         // The arms bow in the plane; Z is an ordinary leadscrew, and a travel move may be left whole
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Scara, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Scara, KinematicsAxes.NewMoveWithAxes());
         Assert.Multiple(() =>
         {
             Assert.That(engine.Segmentation.HasFlag(SegmentationType.Segment), Is.True);
@@ -86,7 +86,7 @@ public class SegmentationTests
     public void APolarSegmentsInXyOnly()
     {
         // A straight line across the bed is an arc in radius and angle, so it bows; Z is independent
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Polar, KinematicsAxes.NewMoveWithAxes());
         Assert.Multiple(() =>
         {
             Assert.That(engine.Segmentation.HasFlag(SegmentationType.Segment), Is.True);
@@ -114,7 +114,7 @@ public class SegmentationTests
         {
             foreach (KinematicsName geometry in geometries)
             {
-                KinematicsEngine engine = KinematicsFactory.Create(geometry, KinematicsAxes.From());
+                KinematicsEngine engine = KinematicsFactory.Create(geometry, KinematicsAxes.NewMoveWithAxes());
                 Assert.That(engine.HomesIndividualDrives, Is.True, engine.Name);
                 Assert.That(engine.Segmentation.HasFlag(SegmentationType.Segment), Is.True, engine.Name);
             }
@@ -128,7 +128,7 @@ public class SegmentationTests
         // are given, so on a delta the head follows a curve between them. Measuring that curve is
         // the point of this test: it is real, it is large enough to see on a normal-sized move, and
         // cutting the move up is what removes it
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.NewMoveWithAxes());
         float[] stepsPerMm = new float[MotionLimits.MaxAxesPlusExtruders];
         Array.Fill(stepsPerMm, 100.0f);
 
@@ -216,7 +216,7 @@ public class SegmentationTests
         // Two limits rather than one: the length keeps the bow below a step on a fast move, and the
         // rate keeps a slow move from being cut into far more pieces than the error justifies. The
         // segment count is the smaller of what each asks for
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.LinearDelta, KinematicsAxes.NewMoveWithAxes());
         Assert.Multiple(() =>
         {
             Assert.That(engine.SegmentsPerSecond, Is.EqualTo(100.0f));

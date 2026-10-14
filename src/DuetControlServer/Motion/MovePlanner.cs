@@ -140,7 +140,7 @@ internal sealed class MovePlanner(
     /// A machine that has not been configured is Cartesian, which is what RepRapFirmware starts as
     /// </para>
     /// </remarks>
-    public KinematicsEngine Geometry { get; private set; } = KinematicsFactory.Create(KinematicsName.Cartesian, AxisIndices.None);
+    public KinematicsEngine Geometry { get; private set; } = KinematicsFactory.Create(KinematicsName.Cartesian, new Move());
 
     /// <summary>
     /// Adopt a geometry a configuring M-code has produced
@@ -216,7 +216,7 @@ internal sealed class MovePlanner(
                 // model was populated by something other than this process's M-codes. A model that
                 // describes none gets the geometry the machine falls back to, Cartesian, which is
                 // what RepRapFirmware boots as
-                Geometry = KinematicsFactory.Create(model.Move.Kinematics, AxisIndices.From(model.Move));
+                Geometry = KinematicsFactory.Create(model.Move.Kinematics, model.Move);
                 KinematicsConfigurator.WriteTo(Geometry, model.Move);
             }
 

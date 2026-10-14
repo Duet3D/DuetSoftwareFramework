@@ -167,14 +167,14 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
     /// The well-known geometries, by name
     /// </summary>
     /// <param name="name">Which core arrangement</param>
-    /// <param name="axes">The machine's axes, which the named matrix is placed at</param>
+    /// <param name="move">The move model, at whose axes the named matrix is placed. The caller holds the object model lock</param>
     /// <returns>The engine, or null if that geometry is not a core one</returns>
     /// <remarks>
-    /// The named matrix is placed here, once. A letter it needs that <paramref name="axes"/> does not
+    /// The named matrix is placed here, once. A letter it needs that the machine does not
     /// have is left out of the placed matrix, and the geometry refuses to plan
     /// (<see cref="KinematicsEngine.MissingAxesError"/>); the caller refuses it rather than keep it
     /// </remarks>
-    public static CoreKinematicsEngine? TryCreate(KinematicsName name, AxisIndices axes)
+    public static CoreKinematicsEngine? TryCreate(KinematicsName name, Move move)
     {
         NamedMatrix? matrix = NamedMatrixFor(name);
         if (matrix is null)
@@ -182,6 +182,7 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
             return null;
         }
 
+        AxisIndices axes = AxisIndices.From(move);
         CoreKinematicsEngine engine = new(name, Place(matrix, axes));
         engine.SetAxes(axes);
         return engine;
@@ -191,7 +192,7 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
     /// A core geometry with the matrix its name implies, for before M669 has been seen
     /// </summary>
     /// <param name="name">Which core arrangement</param>
-    /// <param name="axes">The machine's axes, which the named matrix is placed at</param>
+    /// <param name="move">The move model, at whose axes the named matrix is placed. The caller holds the object model lock</param>
     /// <returns>The engine, Cartesian if the name is not a core geometry's</returns>
     /// <remarks>
     /// The counterpart of every other geometry's <c>CreateDefault</c>, taking a name because six of
@@ -199,8 +200,8 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
     /// always returns a geometry: a machine whose kinematics could not be worked out is an
     /// unconfigured one, and an unconfigured machine is Cartesian
     /// </remarks>
-    public static CoreKinematicsEngine CreateDefault(KinematicsName name, AxisIndices axes)
-        => TryCreate(name, axes) ?? TryCreate(KinematicsName.Cartesian, axes)!;
+    public static CoreKinematicsEngine CreateDefault(KinematicsName name, Move move)
+        => TryCreate(name, move) ?? TryCreate(KinematicsName.Cartesian, move)!;
 
     /// <summary>
     /// The inverse matrix a named core geometry implies

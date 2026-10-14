@@ -36,7 +36,7 @@ public class EndstopPositionTests
     [Test]
     public void ACartesianAxisHomesToItsOwnLimit()
     {
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.NewMoveWithAxes());
         Assert.Multiple(() =>
         {
             Assert.That(Ask(engine, 0, highEnd: true), Is.EqualTo(AxisMax));
@@ -89,7 +89,7 @@ public class EndstopPositionTests
     public void ARotaryDeltaArmHomesToItsMaximumAngle()
     {
         // RepRapFirmware's default maximum arm angle is 45 degrees, and nothing has adjusted an endstop
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.RotaryDelta, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.RotaryDelta, KinematicsAxes.NewMoveWithAxes());
         Assert.Multiple(() =>
         {
             for (int arm = 0; arm < 3; arm++)
@@ -121,7 +121,7 @@ public class EndstopPositionTests
         // Crosstalk is the whole point: turning the proximal arm drags the distal one, so where the
         // distal switch sits depends on where the proximal arm was left. Homing a SCARA in the wrong
         // order gives the wrong answer, in RepRapFirmware too
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Scara, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Scara, KinematicsAxes.NewMoveWithAxes());
 
         ReadOnlySpan<float> stepsPerMm = [100.0f, 200.0f, 400.0f];
         ReadOnlySpan<int> atOrigin = [0, 0, 0];
@@ -155,7 +155,7 @@ public class EndstopPositionTests
     {
         // Work mode 1, whose homing angles RepRapFirmware's FiveBarScaraKinematics::Configure defaults
         // to 20 degrees on the left and 10 on the right
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.FiveBarScara, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.FiveBarScara, KinematicsAxes.NewMoveWithAxes());
         Assert.Multiple(() =>
         {
             Assert.That(Ask(engine, 0), Is.EqualTo(20.0f));
@@ -169,7 +169,7 @@ public class EndstopPositionTests
     {
         // RepRapFirmware says outright that hangprinter homing is not supported, and returns the base
         // answer. Reproduced rather than left to chance, so the engine does not quietly grow one
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Hangprinter, KinematicsAxes.From());
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Hangprinter, KinematicsAxes.NewMoveWithAxes());
         Assert.That(Ask(engine, 0), Is.EqualTo(AxisMax));
     }
 }
