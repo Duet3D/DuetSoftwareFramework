@@ -623,124 +623,128 @@ internal partial class MCodeHandler
         List<RemoteDrivers.DriverValue<(float, int, bool)>> toUpdate = [];
         List<Message> replies = [];
         bool seen = false;
-        string? error = null;
+        bool mappingChanged = false;
 
         // R says how a newly created axis wraps and S whether it counts as rotational. Both apply
         // only to axes this code creates; an existing axis keeps the type it was given
         bool seenWrapType = code.TryGetInt('R', out int wrapType);
         bool seenRotational = code.TryGetInt('S', out int rotational);
 
-        using (await model.AccessReadWriteAsync(cancellationToken))
+        try
         {
-            Move move = model.Move;
-
-            // Read the whole mapping before writing any of it, because a driver claimed by two
-            // drives makes the code an error and the mapping it would have replaced has to survive
-            List<(char Letter, DriverId[] Drivers)> axisMapping = [];
-            foreach (char letter in Axis.Letters)
+            using (await model.AccessReadWriteAsync(cancellationToken))
             {
-                // A letter given without a driver means no drivers, which is how a drive gives up
-                // the ones it has: the axis stays in place but can no longer move
-                // (rrf-differences.md section 3.1)
-                if (code.TryGetDriverIdArray(letter, Motion.Native.MotionLimits.MaxDriversPerAxis,
-                                             out DriverId[]? drivers, allowZeroLength: true))
+                Move move = model.Move;
+
+                // Read the whole mapping before writing any of it, because a driver claimed by two
+                // drives makes the code an error and the mapping it would have replaced has to survive
+                List<(char Letter, DriverId[] Drivers)> axisMapping = [];
+                foreach (char letter in Axis.Letters)
                 {
-                    foreach (DriverId driver in drivers)
+                    // A letter given without a driver means no drivers, which is how a drive gives up
+                    // the ones it has: the axis stays in place but can no longer move
+                    // (rrf-differences.md section 3.1)
+                    if (code.TryGetDriverIdArray(letter, Motion.Native.MotionLimits.MaxDriversPerAxis,
+                                                 out DriverId[]? drivers, allowZeroLength: true))
+                    {
+                        foreach (DriverId driver in drivers)
+                        {
+                            CheckIsValidDriver(driver);
+                        }
+                        axisMapping.Add((letter, drivers));
+                    }
+                }
+
+                // A bare E does the same for the extruders, leaving the machine with none at all
+                if (code.TryGetDriverIdArray('E', Motion.Native.MotionLimits.MaxExtruders,
+                                             out DriverId[]? extruderDrivers, allowZeroLength: true))
+                {
+                    foreach (DriverId driver in extruderDrivers)
                     {
                         CheckIsValidDriver(driver);
                     }
-                    axisMapping.Add((letter, drivers));
                 }
-            }
+                seen = axisMapping.Count > 0 || extruderDrivers is not null;
 
-            // A bare E does the same for the extruders, leaving the machine with none at all
-            if (code.TryGetDriverIdArray('E', Motion.Native.MotionLimits.MaxExtruders,
-                                         out DriverId[]? extruderDrivers, allowZeroLength: true))
-            {
-                foreach (DriverId driver in extruderDrivers)
+                string? conflict = FindDriverConflict(move, axisMapping, extruderDrivers);
+                if (conflict is not null)
                 {
-                    CheckIsValidDriver(driver);
-                }
-            }
-            seen = axisMapping.Count > 0 || extruderDrivers is not null;
-
-            string? conflict = FindDriverConflict(move, axisMapping, extruderDrivers);
-            if (conflict is not null)
-            {
-                return new Message(MessageType.Error, conflict);
-            }
-
-            foreach ((char letter, DriverId[] drivers) in axisMapping)
-            {
-                Axis? axis = move.Axes.FirstOrDefault(a => a.Letter == letter);
-                if (axis is null)
-                {
-                    axis = CreateAxis(letter, seenWrapType ? wrapType : null, seenRotational ? rotational == 1 : null);
-                    move.Axes.Add(axis);
+                    return new Message(MessageType.Error, conflict);
                 }
 
-                axis.Drivers.Clear();
-                foreach (DriverId driver in drivers)
+                // From here on the mapping is being written, so the planner has to follow it even if
+                // the code goes on to fail
+                mappingChanged = seen;
+
+                foreach ((char letter, DriverId[] drivers) in axisMapping)
                 {
-                    axis.Drivers.Add(driver);
+                    Axis? axis = move.Axes.FirstOrDefault(a => a.Letter == letter);
+                    if (axis is null)
+                    {
+                        axis = CreateAxis(letter, seenWrapType ? wrapType : null, seenRotational ? rotational == 1 : null);
+                        move.Axes.Add(axis);
+                    }
+
+                    axis.Drivers.Clear();
+                    foreach (DriverId driver in drivers)
+                    {
+                        axis.Drivers.Add(driver);
+                    }
+                    AddDrivers(toUpdate, axis.Drivers, axis.StepsPerMm, axis.Microstepping);
+
+                    // Reset the new drivers
+                    replies.Add(await SetStepModeAsync(axis, axis.Drivers, StepMode.StepDir, cancellationToken));
                 }
-                AddDrivers(toUpdate, axis.Drivers, axis.StepsPerMm, axis.Microstepping);
 
-                // Reset the new drivers
-                replies.Add(await SetStepModeAsync(axis, axis.Drivers, StepMode.StepDir, cancellationToken));
-            }
-
-            if (extruderDrivers is not null)
-            {
-                // The E list is the whole set of extruders, so one that is no longer named goes away
-                while (move.Extruders.Count > extruderDrivers.Length)
+                if (extruderDrivers is not null)
                 {
-                    move.Extruders.RemoveAt(move.Extruders.Count - 1);
-                }
-                while (move.Extruders.Count < extruderDrivers.Length)
-                {
-                    move.Extruders.Add(new Extruder());
-                }
+                    // The E list is the whole set of extruders, so one that is no longer named goes away
+                    while (move.Extruders.Count > extruderDrivers.Length)
+                    {
+                        move.Extruders.RemoveAt(move.Extruders.Count - 1);
+                    }
+                    while (move.Extruders.Count < extruderDrivers.Length)
+                    {
+                        move.Extruders.Add(new Extruder());
+                    }
 
-                for (int i = 0; i < extruderDrivers.Length; i++)
-                {
-                    Extruder extruder = move.Extruders[i];
+                    for (int i = 0; i < extruderDrivers.Length; i++)
+                    {
+                        Extruder extruder = move.Extruders[i];
 
-                    extruder.Driver = extruderDrivers[i];
-                    AddDriver(toUpdate, extruder.Driver, extruder.StepsPerMm, extruder.Microstepping);
+                        extruder.Driver = extruderDrivers[i];
+                        AddDriver(toUpdate, extruder.Driver, extruder.StepsPerMm, extruder.Microstepping);
                 
-                    replies.Add(await SetStepModeAsync(extruder, [extruder.Driver], StepMode.StepDir, cancellationToken));
+                        replies.Add(await SetStepModeAsync(extruder, [extruder.Driver], StepMode.StepDir, cancellationToken));
+                    }
                 }
-            }
 
-            if (code.TryGetInt('P', out int visibleAxes))
-            {
-                seen = true;
-                if (visibleAxes < 0 || visibleAxes > move.Axes.Count)
+                if (code.TryGetInt('P', out int visibleAxes))
                 {
-                    error = "Invalid number of visible axes";
-                }
-                else
-                {
+                    seen = true;
+                    if (visibleAxes < 0 || visibleAxes > move.Axes.Count)
+                    {
+                        throw new GCodeException("Invalid number of visible axes");
+                    }
                     for (int i = 0; i < move.Axes.Count; i++)
                     {
                         move.Axes[i].Visible = i < visibleAxes;
                     }
                 }
-            }
 
-            if (!seen)
-            {
-                return new Message(MessageType.Success, ReportDriveMapping(move));
+                if (!seen)
+                {
+                    return new Message(MessageType.Success, ReportDriveMapping(move));
+                }
             }
-
-            // A geometry finds its axes by letter, so it resolves them again when one is created
-            planner.FollowAxes(move);
         }
-
-        if (error is not null)
+        catch when (mappingChanged)
         {
-            return new Message(MessageType.Error, error);
+            // A code that fails after writing the mapping - a P out of range or without a value, a
+            // cancelled step mode reset - still leaves the axes and drivers it wrote, which the
+            // planner has to follow
+            await planner.ReconfigureAsync(CancellationToken.None);
+            throw;
         }
 
         if (!await planner.ReconfigureAsync(cancellationToken))

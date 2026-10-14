@@ -159,32 +159,6 @@ internal sealed class MovePlanner(
         }
     }
 
-    /// <summary>
-    /// Bring the geometry in step with the axes the object model now has
-    /// </summary>
-    /// <param name="move">The move subsystem of the object model</param>
-    /// <remarks>
-    /// <para>
-    /// For M584, which is what creates axes. The geometry resolves the letters it needs again, and the
-    /// object model's <c>move.kinematics</c> describes the result, so it is written here, under the
-    /// write lock the caller holds. <see cref="ReconfigureAsync"/> follows the axes as well, but only
-    /// reads the object model.
-    /// </para>
-    /// <para>
-    /// A new axis cannot make the geometry unusable: M669 has already refused one that needs an axis
-    /// the machine does not have, and the new axis gets a row and a column of its own in a core
-    /// matrix. Only safe at standstill, for the same reason <see cref="ReconfigureAsync"/> is
-    /// </para>
-    /// </remarks>
-    public void FollowAxes(Move move)
-    {
-        KinematicsEngine geometry = Geometry;
-        if (geometry.SetAxes(AxisIndices.From(move)))
-        {
-            KinematicsConfigurator.WriteTo(geometry, move);
-        }
-    }
-
     /// <summary>Where the last move left the machine, and the state that carries between moves</summary>
     public MoveBuilder Builder { get; }  = new(MotionParameters.CreateDefault());
 
@@ -215,8 +189,9 @@ internal sealed class MovePlanner(
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <param name="adoptGeometryFromObjectModel">
-    /// Take the geometry from the object model rather than keeping the one this planner holds. Only
-    /// for the first configuration, before any M-code has selected one
+    /// Take the geometry from the object model rather than keeping the one this planner holds, and
+    /// write it back so that the object model describes the geometry the machine runs with. Only for
+    /// the first configuration, before any M-code has selected one
     /// </param>
     /// <returns>True if the engine accepted it</returns>
     /// <remarks>
@@ -231,14 +206,18 @@ internal sealed class MovePlanner(
         byte[] configBuffer = new byte[MachineConfig.SerializedLength];
         int length;
 
-        using (await model.AccessReadOnlyAsync(cancellationToken))
+        using (adoptGeometryFromObjectModel ? await model.AccessReadWriteAsync(cancellationToken)
+                                            : await model.AccessReadOnlyAsync(cancellationToken))
         {
             if (adoptGeometryFromObjectModel)
             {
                 // Before any code has configured a geometry, whatever the object model already
                 // describes is the best description of the machine there is - which matters when the
-                // model was populated by something other than this process's M-codes
+                // model was populated by something other than this process's M-codes. A model that
+                // describes none gets the geometry the machine falls back to, Cartesian, which is
+                // what RepRapFirmware boots as
                 Geometry = KinematicsFactory.Create(model.Move.Kinematics, AxisIndices.From(model.Move));
+                KinematicsConfigurator.WriteTo(Geometry, model.Move);
             }
 
             // The geometry finds its axes by letter and keeps its own copy of M208's box, and this is

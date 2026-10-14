@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
@@ -398,6 +400,40 @@ public class DriverMappingTests : BenchFixture
                     Is.EqualTo("Driver assignments: X1.0 Y1.1 Z1.2 U1.3 (r)(c)V1.4 E2.0, 5 axes visible"),
                     "the report marks a rotational axis (r) and a continuous one (c) before its "
                     + "drivers (RRF GCodes3.cpp DoDriveMapping report branch)");
+    }
+
+    /// <summary>
+    /// An M584 that creates an axis and then fails on a later parameter still leaves the axis, and the
+    /// planner moves it
+    /// </summary>
+    /// <remarks>
+    /// The axis loop writes the mapping before P is read, so the axis exists whether P is out of range
+    /// or has no value. No other code runs
+    /// between that M584 and the move, because any configuring code would bring the planner up to date
+    /// on its own
+    /// </remarks>
+    [TestCase("M584 U1.4 P9")]
+    [TestCase("M584 U1.4 P")]
+    public async Task M584ThatFailsAfterCreatingAnAxisStillLetsItMove(string code)
+    {
+        await using JobBench bench = await ScheduleMoveBench.StartAsync(ScheduleMoveBench.CartesianConfig + "\nM569 P1.4 S1");
+
+        string reply = await bench.Host.ExecuteCodeAsync(code);
+        float stepsPerMm = await bench.Host.ReadModelAsync(model => model.Move.Axes[3].StepsPerMm);
+        Assert.Multiple(async () =>
+        {
+            Assert.That(reply, Does.StartWith("Error: "), "the code fails");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[3].Letter), Is.EqualTo('U'),
+                        "but the axis it created stays");
+        });
+
+        await bench.Host.ExecuteCodeAsync("G91");
+        IReadOnlyList<ScheduledMove> move = await bench.RunMoveAsync("G1 U5 F600");
+        Assert.Multiple(() =>
+        {
+            Assert.That(move.DriversMoved(), Is.EqualTo(new[] { (ScheduleMoveBench.DriverBoard, (byte)4) }));
+            Assert.That(move.Steps(4), Is.EqualTo((int)MathF.Round(5 * stepsPerMm)));
+        });
     }
 
     /// <summary>
