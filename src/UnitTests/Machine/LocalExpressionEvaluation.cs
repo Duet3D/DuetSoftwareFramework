@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using System.Threading;
+using System.Threading.Tasks;
 using DcsModel = DuetControlServer.Model.ObjectModel;
 using DcsFilter = DuetControlServer.Model.Filter;
 
@@ -80,6 +81,13 @@ namespace UnitTests.Machine
         {
             Assert.That(TryEval("move.axes[0].machinePosition", true, out object? value), Is.True);
             Assert.That(value, Is.EqualTo(42.5f));
+        }
+
+        [Test]
+        public async Task StringEnumIsSubstitutedByItsJsonName()
+        {
+            _model.Network.Interfaces.Add(new NetworkInterface { Type = NetworkInterfaceType.Ethernet });
+            Assert.That(await _expressions.EvaluateExpressionToStringAsync(null!, "network.interfaces[0].type", true, false), Is.EqualTo("\"ethernet\""));
         }
 
         [Test]

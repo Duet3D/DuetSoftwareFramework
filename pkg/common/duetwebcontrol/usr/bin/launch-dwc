@@ -37,6 +37,15 @@ if [ -n "$chromium_bin" ]; then
 		sed -i 's/"exited_cleanly":false/"exited_cleanly":true/; s/"exit_type":"[^"]\+"/"exit_type":"Normal"/' ~/.config/chromium/Default/Preferences
 	fi
 
+	# Under labwc the panel and this script are both started from the same autostart file, so the
+	# panel may not have forked yet when we look for it; other compositors start it before us
+	if [ "$hide_panel" = 1 ] && pgrep -x labwc >/dev/null; then
+		for i in $(seq 20); do
+			pgrep -x wf-panel-pi >/dev/null && break
+			sleep 0.5
+		done
+	fi
+
 	# wf-panel-pi reserves a strip at the screen edge, so hide it (and its
 	# respawn wrapper) while DWC fills the screen, and bring it back on exit
 	if [ "$hide_panel" = 1 ] && pgrep -x wf-panel-pi >/dev/null; then

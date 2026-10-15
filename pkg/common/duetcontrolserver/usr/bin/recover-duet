@@ -1,0 +1,335 @@
+#!/bin/bash
+
+# Reflash a Duet 3 mainboard that no longer runs firmware. SAME70 and PIC32CZ boards wait in the
+# SAM-BA bootloader on a USB serial port and are written with bossac, boards with a UF2 bootloader
+# expose a USB drive the firmware file is copied to.
+
+set -u
+
+DSF_CONFIG=/opt/dsf/conf/config.json
+SAMBA_USB_ID=03eb:6124
+
+assume_yes=0
+requested_board=
+firmware_dir=
+dcs_stopped=0
+uf2_device=
+uf2_mount=
+uf2_mounted=0
+
+usage() {
+	cat <<-EOF
+	Usage: recover-duet [-y] [board]
+
+	Looks for a Duet 3 mainboard in bootloader mode over USB and writes the firmware from
+	the DSF firmware directory back to it.
+
+	  board  board to flash, e.g. MB6HC - only needed when the bootloader cannot tell which
+	         board it is running on
+	  -y     flash without asking first
+	  -h     show this help
+	EOF
+}
+
+die() {
+	echo "recover-duet: $*" >&2
+	exit 1
+}
+
+confirm() {
+	local reply
+
+	if [ $assume_yes -eq 1 ]; then
+		return 0
+	fi
+
+	read -r -p "$1 [Y/n] " reply || return 1
+	case "$reply" in
+		"" | [Yy] | [Yy][Ee][Ss])
+			return 0
+			;;
+	esac
+	return 1
+}
+
+usb_property() {
+	udevadm info -q property -n "$1" 2>/dev/null | sed -n "s/^$2=//p"
+}
+
+read_u32() {
+	od -An -tu4 -j "$2" -N4 "$1" | tr -d '[:space:]'
+}
+
+# RRF stores a pointer to its identifier string at offset 0x20 and the address it is linked at
+# right behind it, and the version is the last space-delimited word of that string
+firmware_version() {
+	local file=$1 header=0 version_address load_address offset version
+
+	if [ "${file##*.}" = uf2 ]; then
+		header=32
+	fi
+
+	version_address=$(read_u32 "$file" $((header + 0x20)))
+	load_address=$(read_u32 "$file" $((header + 0x24)))
+	if [ -z "$version_address" ] || [ -z "$load_address" ] || [ "$version_address" -le "$load_address" ]; then
+		return 0
+	fi
+
+	# UF2 wraps every 256 bytes of the image in a 512-byte block, so the file offset has to be mapped
+	offset=$((version_address - load_address))
+	if [ $header -ne 0 ]; then
+		offset=$((offset / 256 * 512 + header + offset % 256))
+	fi
+
+	version=$(dd if="$file" bs=1 skip=$offset count=128 status=none | tr '\000' '\n' | head -1 | awk '{ print $NF }')
+	case "$version" in
+		[0-9]*)
+			echo "$version"
+			;;
+	esac
+}
+
+# Every mainboard that can run in SBC mode ships an SBC IAP, so a new board needs no change here
+sbc_boards() {
+	local iap board
+
+	for iap in "$firmware_dir"/Duet3_SBCiap*_*.bin; do
+		board=$(sed -n 's/^Duet3_SBCiap[0-9]*_\(.*\)\.bin$/\1/p' <<< "${iap##*/}")
+		if [ -n "$board" ] && [ -f "$firmware_dir/Duet3Firmware_$board.$1" ]; then
+			echo "$board"
+		fi
+	done
+}
+
+# The SAM-BA bootloader only reports the chip, which rules out boards built around a different one
+boards_for_chip() {
+	case "$1" in
+		ATSAME70*)
+			echo "MB6HC MB6XD"
+			;;
+	esac
+}
+
+# The UF2 bootloader reports board IDs like Duet3-Mini5+ where the firmware file says Mini5plus
+board_from_uf2_id() {
+	local name=${1#Duet3-} candidate
+
+	name=${name//+/plus}
+	for candidate in $(sbc_boards uf2); do
+		if [ "${candidate,,}" = "${name,,}" ]; then
+			echo "$candidate"
+			return
+		fi
+	done
+}
+
+select_board() {
+	local candidates=("$@") reply index
+
+	if [ ${#candidates[@]} -eq 1 ]; then
+		echo "${candidates[0]}"
+		return
+	fi
+
+	for index in "${!candidates[@]}"; do
+		echo "$((index + 1))) ${candidates[index]}" >&2
+	done
+	read -r -p "Select board [1]: " reply || return 1
+	reply=${reply:-1}
+	if [[ ! $reply =~ ^[0-9]+$ ]] || [ "$reply" -lt 1 ] || [ "$reply" -gt ${#candidates[@]} ]; then
+		return 1
+	fi
+	echo "${candidates[reply - 1]}"
+}
+
+find_samba_port() {
+	local tty
+
+	for tty in /dev/ttyACM*; do
+		[ -e "$tty" ] || continue
+		if [ "$(usb_property "$tty" ID_VENDOR_ID):$(usb_property "$tty" ID_MODEL_ID)" = "$SAMBA_USB_ID" ]; then
+			echo "$tty"
+			return
+		fi
+	done
+}
+
+mount_uf2() {
+	uf2_mount=$(findmnt -nfo TARGET "$1")
+	if [ -n "$uf2_mount" ]; then
+		return 0
+	fi
+
+	uf2_mount=$(mktemp -d)
+	if ! mount -o ro "$1" "$uf2_mount" 2>/dev/null; then
+		rmdir "$uf2_mount"
+		uf2_mount=
+		return 1
+	fi
+	uf2_mounted=1
+}
+
+unmount_uf2() {
+	if [ $uf2_mounted -eq 1 ]; then
+		umount "$uf2_mount" 2>/dev/null || umount -l "$uf2_mount" 2>/dev/null
+		rmdir "$uf2_mount" 2>/dev/null
+		uf2_mounted=0
+	fi
+	uf2_mount=
+}
+
+# INFO_UF2.TXT has DOS line endings
+uf2_board_id() {
+	sed -n 's/^Board-ID:[[:space:]]*//p' "$uf2_mount/INFO_UF2.TXT" 2>/dev/null | tr -d '\r'
+}
+
+find_uf2_device() {
+	local device
+
+	for device in $(lsblk -rno PATH,FSTYPE | awk '$2 == "vfat" { print $1 }'); do
+		[ "$(usb_property "$device" ID_BUS)" = usb ] || continue
+		mount_uf2 "$device" || continue
+		case "$(uf2_board_id)" in
+			Duet3*)
+				uf2_device=$device
+				return 0
+				;;
+		esac
+		unmount_uf2
+	done
+	return 1
+}
+
+cleanup() {
+	unmount_uf2
+	if [ $dcs_stopped -eq 1 ]; then
+		echo "Starting duetcontrolserver"
+		systemctl start duetcontrolserver
+		dcs_stopped=0
+	fi
+}
+
+stop_dcs() {
+	if systemctl -q is-active duetcontrolserver; then
+		echo "Stopping duetcontrolserver"
+		systemctl stop duetcontrolserver
+		dcs_stopped=1
+	fi
+}
+
+approve_firmware() {
+	local firmware=$1 version
+
+	[ -f "$firmware" ] || die "$firmware does not exist"
+	version=$(firmware_version "$firmware")
+	if [ -n "$version" ]; then
+		confirm "Flash ${firmware##*/} (version $version)?" || die "aborted"
+	else
+		confirm "Flash ${firmware##*/}?" || die "aborted"
+	fi
+}
+
+recover_samba() {
+	local port=$1 chip allowed name candidates=() board firmware
+
+	command -v bossac >/dev/null || die "bossac not found, install it with 'apt install bossa-cli'"
+
+	chip=$(bossac -i --port="$port" 2>/dev/null | sed -n 's/^Device *: *//p')
+	[ -n "$chip" ] || die "the SAM-BA bootloader on $port did not report a device, try unplugging and reconnecting the board"
+	echo "Found $chip in the SAM-BA bootloader on $port"
+
+	if [ -n "$requested_board" ]; then
+		board=$requested_board
+	else
+		allowed=$(boards_for_chip "$chip")
+		for name in $(sbc_boards bin); do
+			if [ -z "$allowed" ]; then
+				candidates+=("$name")
+				continue
+			fi
+			case " $allowed " in
+				*" $name "*)
+					candidates+=("$name")
+					;;
+			esac
+		done
+		[ ${#candidates[@]} -ne 0 ] || die "no firmware for $chip in $firmware_dir"
+		board=$(select_board "${candidates[@]}") || die "aborted"
+	fi
+
+	firmware=$firmware_dir/Duet3Firmware_$board.bin
+	approve_firmware "$firmware"
+
+	stop_dcs
+	bossac -b -U -e -w -v -R --port="$port" "$firmware" || die "bossac failed to flash $firmware"
+	echo "Flashed $board, the board is running firmware again"
+}
+
+recover_uf2() {
+	local board_id board firmware attempt
+
+	board_id=$(uf2_board_id)
+	echo "Found $board_id in the UF2 bootloader on $uf2_device"
+
+	board=${requested_board:-$(board_from_uf2_id "$board_id")}
+	[ -n "$board" ] || die "no firmware for board ID $board_id in $firmware_dir, pass the board name as argument"
+
+	firmware=$firmware_dir/Duet3Firmware_$board.uf2
+	approve_firmware "$firmware"
+
+	stop_dcs
+	mount -o remount,rw "$uf2_mount" || die "failed to remount $uf2_device writable"
+	if ! cp "$firmware" "$uf2_mount/" && [ -e "$uf2_device" ]; then
+		die "failed to copy $firmware to $uf2_mount"
+	fi
+	sync -f "$uf2_mount" 2>/dev/null
+	unmount_uf2
+
+	# The bootloader flashes while it receives and resets the board once the last block has arrived
+	for attempt in $(seq 20); do
+		[ -e "$uf2_device" ] || break
+		sleep 0.5
+	done
+	[ -e "$uf2_device" ] && die "$uf2_device is still in bootloader mode, the firmware was not accepted"
+	echo "Flashed $board, the board is running firmware again"
+}
+
+while getopts ":yh" option; do
+	case "$option" in
+		y)
+			assume_yes=1
+			;;
+		h)
+			usage
+			exit 0
+			;;
+		*)
+			usage >&2
+			exit 2
+			;;
+	esac
+done
+shift $((OPTIND - 1))
+
+if [ $# -gt 1 ]; then
+	usage >&2
+	exit 2
+fi
+requested_board=${1:-}
+
+[ "$(id -u)" -eq 0 ] || die "must be run as root"
+
+firmware_dir=$(sed -n 's/.*"BaseDirectory"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$DSF_CONFIG" 2>/dev/null)
+firmware_dir=${firmware_dir:-/opt/dsf/sd}/firmware
+[ -d "$firmware_dir" ] || die "firmware directory $firmware_dir does not exist"
+
+trap cleanup EXIT
+
+samba_port=$(find_samba_port)
+if [ -n "$samba_port" ]; then
+	recover_samba "$samba_port"
+elif find_uf2_device; then
+	recover_uf2
+else
+	die "no Duet in bootloader mode found, check that the board is connected to this SBC over USB"
+fi
