@@ -28,7 +28,7 @@ namespace DuetControlServer.Files.ImageProcessing
         /// <returns>Asynchronous task</returns>
         public static async ValueTask ProcessAsync(Stream stream, CodeParserBuffer codeParserBuffer, GCodeFileInfo parsedFileInfo, Code code, bool readThumbnailContent)
         {
-            _logger.Info($"Processing Image {parsedFileInfo.FileName}");
+            _logger.Debug("Processing image {0}", parsedFileInfo.FileName);
             bool offsetAdjusted = false;
             long offset = codeParserBuffer.GetPosition(stream);
             code.Reset();
