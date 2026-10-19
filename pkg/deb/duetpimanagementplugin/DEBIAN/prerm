@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# DCS used to write this file with a UTF-8 BOM, which keeps the patterns below from matching
+if [[ -e /opt/dsf/conf/plugins.txt ]]; then
+	sed -e '1s/^\xEF\xBB\xBF//' -i /opt/dsf/conf/plugins.txt
+fi
+
 # Stop the plugin first
 if (systemctl is-active -q duetcontrolserver && /opt/dsf/bin/PluginManager -q is-started DuetPiManagementPlugin); then
 	/opt/dsf/bin/PluginManager -q stop DuetPiManagementPlugin

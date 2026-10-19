@@ -50,7 +50,7 @@ namespace DuetControlServer.Commands
                 if (File.Exists(Settings.PluginsFilename))
                 {
                     await using FileStream fileStream = new(Settings.PluginsFilename, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
-                    using StreamReader reader = new(fileStream, Encoding.UTF8, false, Settings.FileBufferSize);
+                    using StreamReader reader = new(fileStream, Encoding.UTF8, true, Settings.FileBufferSize);
                     while (!reader.EndOfStream)
                     {
                         string? pluginName = await reader.ReadLineAsync();
