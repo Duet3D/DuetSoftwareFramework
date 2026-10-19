@@ -2696,6 +2696,12 @@
             Absolute file path to the plugin ZIP bundle
             </summary>
         </member>
+        <member name="P:DuetAPI.Commands.InstallPlugin.Upgrade">
+            <summary>
+            Indicates that a previous version of the same plugin is being upgraded, so custom files in the plugin directory are retained.
+            Reserved for internal purposes, do not use
+            </summary>
+        </member>
         <member name="M:DuetAPI.Commands.InstallPlugin.UpdateFromJson(System.Text.Json.JsonElement)">
             <summary>
             Update this instance from a given JSON element
@@ -2989,6 +2995,12 @@
         <member name="P:DuetAPI.Commands.UninstallPlugin.Plugin">
             <summary>
             Identifier of the plugin
+            </summary>
+        </member>
+        <member name="P:DuetAPI.Commands.UninstallPlugin.ForUpgrade">
+            <summary>
+            Indicates that the plugin is being uninstalled for an upgrade, so only the files it installed are removed.
+            Reserved for internal purposes, do not use
             </summary>
         </member>
         <member name="M:DuetAPI.Commands.UninstallPlugin.UpdateFromJson(System.Text.Json.JsonElement)">
