@@ -60,7 +60,7 @@ namespace UnitTests.Machine
             Assert.That(result, Is.EqualTo("1"));
 
             code = new DuetControlServer.Commands.Code("echo volumes");
-            Assert.ThrowsAsync<CodeParserException>(async () => await DuetControlServer.Model.Expressions.Evaluate(code, true));
+            await Assert.ThrowsAsync<CodeParserException>(async () => await DuetControlServer.Model.Expressions.Evaluate(code, true));
 
             code = new DuetControlServer.Commands.Code("echo plugins");
             result = await DuetControlServer.Model.Expressions.Evaluate(code, false);

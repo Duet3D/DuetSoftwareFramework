@@ -15,13 +15,13 @@ jobs:
       id-token: write
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
 
       # Install .NET environment
       - name: Set up .NET
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 6
+          dotnet-version: 8
 
       # Build DSF
       - name: Build DSF packages
