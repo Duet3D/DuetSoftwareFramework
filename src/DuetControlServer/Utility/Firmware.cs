@@ -192,6 +192,11 @@ namespace DuetControlServer.Utility
         private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
 
         /// <summary>
+        /// How long to wait for an expansion board to report the firmware version it was updated to
+        /// </summary>
+        private static readonly TimeSpan ExpansionUpdateTimeout = TimeSpan.FromMinutes(3);
+
+        /// <summary>
         /// Update the firmware from this instance
         /// </summary>
         /// <returns>Asynchronous task</returns>
@@ -320,6 +325,7 @@ namespace DuetControlServer.Utility
                         Commands.Code updateCode = new()
                         {
                             Channel = DuetAPI.CodeChannel.Trigger,
+                            Flags = CodeFlags.IsInternal,
                             Type = CodeType.MCode,
                             MajorNumber = 997,
                             Parameters =
@@ -329,22 +335,30 @@ namespace DuetControlServer.Utility
                         };
                         Message result = await updateCode.Execute() ?? new Message();
 
-                        // Unlike with M997, we need to wait for RRF to complete the update process
-                        while (true)
+                        // Unlike with M997, we need to wait for RRF to complete the update process. The machine
+                        // status cannot be used for that because a package upgrade in progress pins it to
+                        // Updating, see SetUpdateStatus, so wait for the board to report the new version instead
+                        string? newVersion = firmwareVersions[board.FirmwareFileName!];
+                        DateTime updateTimeout = DateTime.Now.Add(ExpansionUpdateTimeout);
+                        bool updated = false;
+                        while (!updated && DateTime.Now < updateTimeout)
                         {
                             await Task.Delay(2000, Program.CancellationToken);
 
                             using (await Model.Provider.AccessReadOnlyAsync())
                             {
-                                if (Model.Provider.Get.State.Status != MachineStatus.Updating)
-                                {
-                                    // Update complete
-                                    break;
-                                }
+                                updated = Model.Provider.Get.Boards.Any(item => item.CanAddress == board.CanAddress && item.FirmwareVersion == newVersion);
                             }
                         }
 
-                        Console.WriteLine((result.Type == MessageType.Success) ? "Done!" : result.ToString());
+                        if (!updated)
+                        {
+                            Console.WriteLine("Timed out waiting for board #{0} to report version {1}", board.CanAddress, newVersion ?? "n/a");
+                        }
+                        else
+                        {
+                            Console.WriteLine((result.Type == MessageType.Success) ? "Done!" : result.ToString());
+                        }
                     }
                     catch (Exception e)
                     {
@@ -363,6 +377,7 @@ namespace DuetControlServer.Utility
                     Commands.Code updateCode = new()
                     {
                         Channel = DuetAPI.CodeChannel.Trigger,
+                        Flags = CodeFlags.IsInternal,
                         Type = CodeType.MCode,
                         MajorNumber = 997
                     };
@@ -383,6 +398,7 @@ namespace DuetControlServer.Utility
                     Commands.Code updateCode = new()
                     {
                         Channel = DuetAPI.CodeChannel.Trigger,
+                        Flags = CodeFlags.IsInternal,
                         Type = CodeType.MCode,
                         MajorNumber = 999
                     };
@@ -535,6 +551,7 @@ namespace DuetControlServer.Utility
                         // Start the update process
                         Code updateCode = new()
                         {
+                            Flags = CodeFlags.IsInternal,
                             Type = CodeType.MCode,
                             MajorNumber = 997,
                             Parameters =
@@ -544,22 +561,29 @@ namespace DuetControlServer.Utility
                         };
                         Message result = await commandConnection.PerformCode(updateCode);
 
-                        // Unlike with M997, we need to wait for RRF to complete the update process
-                        while (true)
+                        // Unlike with M997, we need to wait for RRF to complete the update process. The machine
+                        // status cannot be used for that because a package upgrade in progress pins it to
+                        // Updating, see SetUpdateStatus, so wait for the board to report the new version instead
+                        string? newVersion = firmwareVersions[board.FirmwareFileName!];
+                        DateTime updateTimeout = DateTime.Now.Add(ExpansionUpdateTimeout);
+                        bool updated = false;
+                        while (!updated && DateTime.Now < updateTimeout)
                         {
                             await Task.Delay(2000, Program.CancellationToken);
 
                             using JsonDocument patch = await subscribeConnection.GetObjectModelPatch();
                             objectModel.UpdateFromJson(patch.RootElement);
-
-                            if (objectModel.State.Status != MachineStatus.Updating)
-                            {
-                                // Update complete
-                                break;
-                            }
+                            updated = objectModel.Boards.Any(item => item.CanAddress == board.CanAddress && item.FirmwareVersion == newVersion);
                         }
 
-                        Console.WriteLine((result.Type == MessageType.Success) ? "Done!" : result.ToString());
+                        if (!updated)
+                        {
+                            Console.WriteLine("Timed out waiting for board #{0} to report version {1}", board.CanAddress, newVersion ?? "n/a");
+                        }
+                        else
+                        {
+                            Console.WriteLine((result.Type == MessageType.Success) ? "Done!" : result.ToString());
+                        }
                     }
                     catch (Exception e)
                     {
@@ -577,6 +601,7 @@ namespace DuetControlServer.Utility
                 {
                     Code updateCode = new()
                     {
+                        Flags = CodeFlags.IsInternal,
                         Type = CodeType.MCode,
                         MajorNumber = 997
                     };
@@ -597,6 +622,7 @@ namespace DuetControlServer.Utility
                 {
                     Code updateCode = new()
                     {
+                        Flags = CodeFlags.IsInternal,
                         Type = CodeType.MCode,
                         MajorNumber = 999
                     };

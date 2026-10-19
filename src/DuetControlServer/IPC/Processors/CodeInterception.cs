@@ -227,7 +227,7 @@ namespace DuetControlServer.IPC.Processors
         /// <returns>Whether the code may be intercepted</returns>
         private bool CanIntercept(Code code)
         {
-            if (!Connection.IsConnected || code.Connection == Connection ||
+            if (!Connection.IsConnected || code.Connection == Connection || code.Flags.HasFlag(CodeFlags.IsInternal) ||
                 code.Flags.HasFlag(CodeFlags.IsPrioritized) != _priorityCodes || !_channels.Contains(code.Channel))
             {
                 return false;
