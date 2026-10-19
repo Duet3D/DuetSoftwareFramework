@@ -40,7 +40,7 @@ public static class IconImageParser
     /// <returns>Asynchronous task</returns>
     public static async ValueTask ProcessAsync(Stream stream, CodeParserBuffer codeParserBuffer, GCodeFileInfo parsedFileInfo, Code code, bool readThumbnailContent, CancellationToken cancellationToken)
     {
-        _logger?.LogInformation($"Processing Image {parsedFileInfo.FileName}");
+        _logger?.LogDebug("Processing image {FileName}", parsedFileInfo.FileName);
         bool offsetAdjusted = false;
         long offset = codeParserBuffer.GetPosition(stream);
         code.Reset();
@@ -83,7 +83,7 @@ public static class IconImageParser
                     ThumbnailInfo thumbnail = ReadImage(imageBuffer.ToString(), readThumbnailContent);
                     thumbnail.Offset = offset;
                     parsedFileInfo.Thumbnails.Add(thumbnail);
-                    _logger?.LogInformation("Icon Thumbnails Found");
+                    _logger?.LogDebug("Icon Thumbnails Found");
                 }
                 catch
                 {
