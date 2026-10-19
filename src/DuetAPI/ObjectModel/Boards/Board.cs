@@ -11,9 +11,8 @@ namespace DuetAPI.ObjectModel
         /// Accelerometer of this board or null if unknown
         /// </summary>
         /// <remarks>
-        /// Deprecated, RepRapFirmware 3.7 reports accelerometers as sensors.accelerometers[] instead
+        /// RepRapFirmware 3.7 reports accelerometers as sensors.accelerometers[] instead
         /// </remarks>
-        [Obsolete("Use sensors.accelerometers instead")]
         public Accelerometer? Accelerometer
         {
             get => _accelerometer;
