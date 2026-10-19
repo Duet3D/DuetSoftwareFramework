@@ -29,6 +29,11 @@ namespace DuetControlServer.Utility;
 public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath, Model.ObjectModel model, IHostApplicationLifetime lifetime, ILogger<FirmwareUpdater> logger, IOptions<Settings> settings)
 {
     /// <summary>
+    /// How long to wait for an expansion board to report the firmware version it was updated to
+    /// </summary>
+    private static readonly TimeSpan ExpansionUpdateTimeout = TimeSpan.FromMinutes(3);
+
+    /// <summary>
     /// Update the firmware from this instance
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
@@ -157,6 +162,7 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
                     // Start the update process
                     Commands.Code updateCode = codeFactory.Create();
                     updateCode.Channel = DuetAPI.CodeChannel.Trigger;
+                    updateCode.Flags = CodeFlags.IsInternal;
                     updateCode.Type = CodeType.MCode;
                     updateCode.MajorNumber = 997;
                     updateCode.Parameters =
@@ -166,22 +172,30 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
 
                     Message result = await updateCode.ExecuteAsync(cancellationToken) ?? new Message();
 
-                    // Unlike with M997, we need to wait for RRF to complete the update process
-                    while (true)
+                    // Unlike with M997, we need to wait for RRF to complete the update process. The machine
+                    // status cannot be used for that because a package upgrade in progress pins it to
+                    // Updating, see SetUpdateStatus, so wait for the board to report the new version instead
+                    string? newVersion = firmwareVersions[board.FirmwareFileName!];
+                    DateTime updateTimeout = DateTime.Now.Add(ExpansionUpdateTimeout);
+                    bool updated = false;
+                    while (!updated && DateTime.Now < updateTimeout)
                     {
                         await Task.Delay(2000, cancellationToken);
 
                         using (await model.AccessReadOnlyAsync(cancellationToken))
                         {
-                            if (model.State.Status != MachineStatus.Updating)
-                            {
-                                // Update complete
-                                break;
-                            }
+                            updated = model.Boards.Any(item => item.CanAddress == board.CanAddress && item.FirmwareVersion == newVersion);
                         }
                     }
 
-                    Console.WriteLine((result.Type == MessageType.Success) ? "Done!" : result.ToString());
+                    if (!updated)
+                    {
+                        Console.WriteLine("Timed out waiting for board #{0} to report version {1}", board.CanAddress, newVersion ?? "n/a");
+                    }
+                    else
+                    {
+                        Console.WriteLine((result.Type == MessageType.Success) ? "Done!" : result.ToString());
+                    }
                 }
                 catch (Exception e)
                 {
@@ -199,6 +213,7 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
             {
                 Commands.Code updateCode = codeFactory.Create();
                 updateCode.Channel = DuetAPI.CodeChannel.Trigger;
+                updateCode.Flags = CodeFlags.IsInternal;
                 updateCode.Type = CodeType.MCode;
                 updateCode.MajorNumber = 997;
 
@@ -218,6 +233,7 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
             {
                 Commands.Code updateCode = codeFactory.Create();
                 updateCode.Channel = DuetAPI.CodeChannel.Trigger;
+                updateCode.Flags = CodeFlags.IsInternal;
                 updateCode.Type = CodeType.MCode;
                 updateCode.MajorNumber = 999;
 
@@ -370,6 +386,7 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
                     Code updateCode = new()
                     {
                         Channel = DuetAPI.CodeChannel.Trigger,
+                        Flags = CodeFlags.IsInternal,
                         Type = CodeType.MCode,
                         MajorNumber = 997,
                         Parameters =
@@ -379,22 +396,29 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
                     };
                     Message result = await commandConnection.PerformCodeAsync(updateCode, cancellationToken);
 
-                    // Unlike with M997, we need to wait for RRF to complete the update process
-                    while (true)
+                    // Unlike with M997, we need to wait for RRF to complete the update process. The machine
+                    // status cannot be used for that because a package upgrade in progress pins it to
+                    // Updating, see SetUpdateStatus, so wait for the board to report the new version instead
+                    string? newVersion = firmwareVersions[board.FirmwareFileName!];
+                    DateTime updateTimeout = DateTime.Now.Add(ExpansionUpdateTimeout);
+                    bool updated = false;
+                    while (!updated && DateTime.Now < updateTimeout)
                     {
                         await Task.Delay(2000, cancellationToken);
 
                         using JsonDocument patch = await subscribeConnection.GetObjectModelPatchAsync(cancellationToken);
                         objectModel.UpdateFromJson(patch.RootElement);
-
-                        if (objectModel.State.Status != MachineStatus.Updating)
-                        {
-                            // Update complete
-                            break;
-                        }
+                        updated = objectModel.Boards.Any(item => item.CanAddress == board.CanAddress && item.FirmwareVersion == newVersion);
                     }
 
-                    Console.WriteLine((result.Type == MessageType.Success) ? "Done!" : result.ToString());
+                    if (!updated)
+                    {
+                        Console.WriteLine("Timed out waiting for board #{0} to report version {1}", board.CanAddress, newVersion ?? "n/a");
+                    }
+                    else
+                    {
+                        Console.WriteLine((result.Type == MessageType.Success) ? "Done!" : result.ToString());
+                    }
                 }
                 catch (Exception e)
                 {
@@ -413,6 +437,7 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
                 Code updateCode = new()
                 {
                     Channel = DuetAPI.CodeChannel.Trigger,
+                    Flags = CodeFlags.IsInternal,
                     Type = CodeType.MCode,
                     MajorNumber = 997
                 };
@@ -433,6 +458,7 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
             {
                 Code updateCode = new()
                 {
+                    Flags = CodeFlags.IsInternal,
                     Type = CodeType.MCode,
                     MajorNumber = 999
                 };
