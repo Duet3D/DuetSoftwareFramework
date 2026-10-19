@@ -629,12 +629,19 @@ namespace DuetPiManagementPlugin
                                     if (code.TryGetString('V', out string? version))
                                     {
                                         // Install specific DSF/RRF version
-                                        result = await Command.Execute("install-dsf.sh", version);
+                                        (int installExitCode, string installOutput) = await Command.ExecuteWithExitCode("install-dsf.sh", version);
+                                        if (installExitCode != 0)
+                                        {
+                                            result = installOutput;
+                                        }
                                     }
                                     else
                                     {
                                         // Perform upgrade
-                                        await Command.ExecQuery("/usr/bin/unattended-upgrade", string.Empty);
+                                        if (!await Command.ExecQuery("/usr/bin/unattended-upgrade", string.Empty))
+                                        {
+                                            result = "Update failed, see /var/log/unattended-upgrades/unattended-upgrades.log";
+                                        }
                                     }
 
                                     // Done
