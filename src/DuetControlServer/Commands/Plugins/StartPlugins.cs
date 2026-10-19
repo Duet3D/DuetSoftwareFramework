@@ -66,7 +66,7 @@ public sealed class StartPlugins(CodeFactory codeFactory,
             if (File.Exists(settings.Value.PluginsFilename))
             {
                 await using FileStream fileStream = new(settings.Value.PluginsFilename, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
-                using StreamReader reader = new(fileStream, Encoding.UTF8, false, settings.Value.FileBufferSize);
+                using StreamReader reader = new(fileStream, Encoding.UTF8, true, settings.Value.FileBufferSize);
 
                 string? pluginName;
                 while ((pluginName = await reader.ReadLineAsync(cancellationToken)) is not null)
