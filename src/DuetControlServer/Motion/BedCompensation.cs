@@ -333,9 +333,12 @@ public sealed class BedCompensation(Model.ObjectModel model)
     /// <remarks>
     /// <para>
     /// RepRapFirmware's <c>InverseBedTransform</c>. There is exactly one caller and there should
-    /// remain exactly one: the interpreter keeps its own position, so what a move asked for is
-    /// already known everywhere except where the machine has ended up somewhere the interpreter did
-    /// not put it. That is homing and probing, and it is what <c>SyncInterpreterToMachine</c> is for.
+    /// remain exactly one, the interpreter's inverse of its axis and bed transform: the interpreter
+    /// keeps its own position, so what a move asked for is already known everywhere except where the
+    /// machine has ended up somewhere the interpreter did not put it. That is homing and probing, and
+    /// it is what <c>SyncInterpreterToMachine</c> and <c>SyncGeneratedMoveToMachine</c> are for - and
+    /// an axis a generated move leaves where the machine has it, because the tool transform gives it
+    /// no coordinate.
     /// </para>
     /// <para>
     /// It is an approximate inverse rather than an exact one, because the taper makes the correction

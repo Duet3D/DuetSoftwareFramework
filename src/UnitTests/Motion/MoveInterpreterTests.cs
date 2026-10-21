@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Link.Native;
 using DuetControlServer.Motion;
 using DuetControlServer.Motion.Kinematics;
 using DuetControlServer.Motion.Native;
@@ -29,7 +30,7 @@ public class MoveInterpreterTests
 {
     /// <summary>Everything a built move can be inspected through</summary>
     private sealed record Machine(DuetControlServer.Model.ObjectModel Model, MoveBuilder Builder,
-                                  MovementState State, MoveInterpreter Interpreter);
+                                  MovementState State, MoveInterpreter Interpreter, BedCompensation Bed);
 
     private static DuetControlServer.Model.ObjectModel NewModel()
         => new(null!, NullLogger<DuetControlServer.Model.ObjectModel>.Instance, Options.Create(new DuetControlServer.Settings()));
@@ -40,10 +41,11 @@ public class MoveInterpreterTests
     /// <param name="tool">The selected tool, or null if none is</param>
     /// <param name="kinematics">Geometry name</param>
     /// <param name="closedSwitches">Which switches of an endstop are already closed</param>
+    /// <param name="withU">Whether the machine has a U axis after Z, as an IDEX machine's second carriage</param>
     /// <returns>The machine and the interpreter that plans for it</returns>
     private static Machine NewMachine(Tool? tool = null, string kinematics = "cartesian",
                                       Func<int, uint>? closedSwitches = null, int numExtruders = 1,
-                                      bool withEndstops = false)
+                                      bool withEndstops = false, bool withU = false)
     {
         DuetControlServer.Model.ObjectModel model = NewModel();
         Move move = model.Move;
@@ -53,6 +55,10 @@ public class MoveInterpreterTests
         AddAxis(move, 'X', stepsPerMm: 80.0f, speedMmPerMin: 18000.0f, acceleration: 1000.0f, driver: 0);
         AddAxis(move, 'Y', stepsPerMm: 80.0f, speedMmPerMin: 18000.0f, acceleration: 1000.0f, driver: 1);
         AddAxis(move, 'Z', stepsPerMm: 400.0f, speedMmPerMin: 600.0f, acceleration: 100.0f, driver: 2);
+        if (withU)
+        {
+            AddAxis(move, 'U', stepsPerMm: 80.0f, speedMmPerMin: 18000.0f, acceleration: 1000.0f, driver: 10);
+        }
         for (int extruder = 0; extruder < numExtruders; extruder++)
         {
             move.Extruders.Add(new Extruder
@@ -96,10 +102,11 @@ public class MoveInterpreterTests
 
         MoveBuilder builder = new(KinematicsAxes.Snapshot(move));
         MovementState state = new();
-        MoveInterpreter interpreter = new(model, builder, state, new BedCompensation(model),
+        BedCompensation bed = new(model);
+        MoveInterpreter interpreter = new(model, builder, state, bed,
                                           new EndstopCorrection(null!, null!, NullLogger<EndstopCorrection>.Instance),
                                           () => tool, closedSwitches ?? (_ => 0));
-        return new Machine(model, builder, state, interpreter);
+        return new Machine(model, builder, state, interpreter, bed);
     }
 
     /// <summary>How fast a homing move runs here, in mm/sec, which only a stall endstop's arming reads</summary>
@@ -947,5 +954,331 @@ public class MoveInterpreterTests
         machine.Interpreter.PrepareSegment(raw, segments, 1);
 
         Assert.That(raw.Coords[0], Is.EqualTo(0.1f).Within(1e-4f), "X is corrected when Y moves, which is what CompensateXY defaults to");
+    }
+
+    // ---- Moves DSF generates itself ----------------------------------------------------------------
+
+    /// <summary>A tool that maps X onto U alone, as on the second carriage of an IDEX machine</summary>
+    /// <param name="uOffset">Its offset on U</param>
+    private static Tool XOnUTool(float uOffset = 0.0f)
+    {
+        Tool tool = NewTool();
+        tool.Axes.Add([3]);
+        tool.Axes.Add([1]);
+        tool.Axes.Add([2]);
+        tool.Offsets.Add(0.0f);
+        tool.Offsets.Add(0.0f);
+        tool.Offsets.Add(0.0f);
+        tool.Offsets.Add(uOffset);
+        return tool;
+    }
+
+    /// <summary>A height map tilted along X, reading 0.1 mm higher for every 10 mm of X from 0 at X0</summary>
+    private const string TiltedMap = """
+        RepRapFirmware height map file v2 generated at 2026-01-01 12:00
+        axis0,axis1,min0,max0,min1,max1,radius,spacing0,spacing1,num0,num1
+        X,Y,0.00,20.00,0.00,20.00,-1.00,10.00,10.00,3,3
+          0.000,  0.100,  0.200
+          0.000,  0.100,  0.200
+          0.000,  0.100,  0.200
+        """;
+
+    [Test]
+    public void AGeneratedMoveStartsWhereTheInterpreterIsThroughTheToolsOffsets()
+    {
+        Tool tool = NewTool();
+        foreach (float offset in new[] { 2.0f, -1.0f, 0.5f })
+        {
+            tool.Offsets.Add(offset);
+        }
+        Machine machine = NewMachine(tool);
+        new[] { 10.0f, 20.0f, 5.0f }.CopyTo(machine.State.CurrentUserPosition, 0);
+
+        RawMove raw = machine.Interpreter.StartGeneratedMove();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(raw.Coords[..3], Is.EqualTo(new[] { 8.0f, 21.0f, 4.5f }),
+                        "the interpreter's position less the tool's offsets, which is where a G1 starts too");
+            Assert.That(raw.InitialCoords[..3], Is.EqualTo(raw.Coords[..3]), "and that is where it starts");
+            Assert.That(raw.MoveType, Is.EqualTo(MoveType.Normal));
+        });
+    }
+
+    [Test]
+    public void AGeneratedMoveCountsTheAxesLetteredXAndYWhateverTheToolMaps()
+    {
+        Machine machine = NewMachine(XOnUTool(), withU: true);
+
+        RawMove raw = machine.Interpreter.StartGeneratedMove();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(raw.XAxes, Is.EqualTo(1u << 0), "X is the axis lettered X, not U");
+            Assert.That(raw.YAxes, Is.EqualTo(1u << 1));
+        });
+    }
+
+    [Test]
+    public void AnAxisTheToolMapsAwayFromStaysWhereTheMachineIs()
+    {
+        // The tool transform gives X no coordinate, so the move has to keep it where it is - with the
+        // skew it carries as the machine position taken off and put back on again
+        Machine machine = NewMachine(XOnUTool(), withU: true);
+        machine.Model.Move.Compensation.Skew.TanXY = 0.01f;
+        machine.Builder.SetAxisPosition(0, 7.3f);
+        machine.Builder.SetAxisPosition(1, 30.0f);
+        machine.State.CurrentUserPosition[1] = 30.0f;
+
+        RawMove raw = machine.Interpreter.StartGeneratedMove();
+        float started = raw.Coords[0];
+        machine.Interpreter.FinishGeneratedMove(raw);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(started, Is.EqualTo(7.0f).Within(1e-4f), "in the move's own coordinates, before the skew");
+            Assert.That(raw.Coords[0], Is.EqualTo(7.3f).Within(1e-4f), "and back where the machine has it once transformed");
+        });
+    }
+
+    [Test]
+    public void AGeneratedMoveIsSkewedWithNoTool()
+    {
+        // With the tool selected a G1 would correct U, the tool's X; a generated move corrects X
+        Machine machine = NewMachine(XOnUTool(), withU: true);
+        machine.Model.Move.Compensation.Skew.TanXY = 0.01f;
+
+        RawMove raw = machine.Interpreter.StartGeneratedMove();
+        raw.Coords[1] = 50.0f;
+        machine.Interpreter.FinishGeneratedMove(raw);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(raw.Coords[0], Is.EqualTo(0.5f).Within(1e-4f), "X by tanXY × Y");
+            Assert.That(raw.Coords[3], Is.Zero, "U is not corrected");
+        });
+    }
+
+    [Test]
+    public void AGeneratedMoveFollowsZWithTheSkewOfXAndY()
+    {
+        Machine machine = NewMachine();
+        machine.Model.Move.Compensation.Skew.TanXZ = 0.1f;
+        machine.Model.Move.Compensation.Skew.TanYZ = 0.05f;
+
+        RawMove raw = machine.Interpreter.StartGeneratedMove();
+        raw.Coords[2] = -101.0f;
+        machine.Interpreter.FinishGeneratedMove(raw);
+
+        Assert.That(raw.Coords[..3], Is.EqualTo(new[] { -10.1f, -5.05f, -101.0f }).Within(1e-4f));
+    }
+
+    [Test]
+    public void AGeneratedMoveCarriesTheHeightMapCorrection()
+    {
+        Machine machine = NewMachine();
+        Assert.That(machine.Bed.LoadAsync(new System.IO.StringReader(TiltedMap), "heightmap.csv", default)
+                                   .AsTask().GetAwaiter().GetResult(), Is.Null);
+
+        RawMove raw = machine.Interpreter.StartGeneratedMove();
+        raw.Coords[0] = 15.0f;
+        raw.Coords[2] = -1.0f;
+        machine.Interpreter.FinishGeneratedMove(raw);
+
+        Assert.That(raw.Coords[2], Is.EqualTo(-0.85f).Within(1e-4f), "Z raised by the map's 0.15 mm at X15");
+    }
+
+    [Test]
+    public void TheInterpreterFollowsWhereAGeneratedMoveStoppedWithItsTransformTakenOff()
+    {
+        // Where a skewed dive left the motors reads as the X and Y it was asked for
+        Machine machine = NewMachine();
+        machine.Model.Move.Compensation.Skew.TanXZ = 0.1f;
+        machine.Model.Move.Compensation.Skew.TanYZ = 0.05f;
+        machine.Builder.SetAxisPosition(0, -10.1f);
+        machine.Builder.SetAxisPosition(1, -5.05f);
+        machine.Builder.SetAxisPosition(2, -101.0f);
+
+        machine.Interpreter.SyncGeneratedMoveToMachine();
+
+        Assert.That(machine.State.CurrentUserPosition[..3], Is.EqualTo(new[] { 0.0f, 0.0f, -101.0f }).Within(1e-4f));
+    }
+
+    [Test]
+    public void TheInterpreterFollowsWhereAGeneratedMoveStoppedIntoTheToolsCoordinates()
+    {
+        // The skew came off the axis lettered X and not off U, and U and X are then the selected
+        // tool's coordinates: the machine position plus its offset
+        Machine machine = NewMachine(XOnUTool(uOffset: 3.0f), withU: true);
+        machine.Model.Move.Compensation.Skew.TanXZ = 0.1f;
+        machine.Builder.SetAxisPosition(2, -1.0f);
+        machine.Builder.SetAxisPosition(3, 15.0f);
+
+        machine.Interpreter.SyncGeneratedMoveToMachine();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(machine.State.CurrentUserPosition[3], Is.EqualTo(18.0f).Within(1e-4f), "U");
+            Assert.That(machine.State.CurrentUserPosition[0], Is.EqualTo(18.0f).Within(1e-4f), "X, which the tool maps onto U");
+            Assert.That(machine.State.CurrentUserPosition[2], Is.EqualTo(-1.0f).Within(1e-4f), "Z");
+        });
+    }
+
+    /// <summary>A tool that duplicates X onto X and U, U offset by <paramref name="uOffset"/></summary>
+    private static Tool DuplicatingTool(float uOffset)
+    {
+        Tool tool = NewTool();
+        tool.Axes.Add([0, 3]);
+        tool.Axes.Add([1]);
+        tool.Axes.Add([2]);
+        tool.Offsets.Add(0.0f);
+        tool.Offsets.Add(0.0f);
+        tool.Offsets.Add(0.0f);
+        tool.Offsets.Add(uOffset);
+        return tool;
+    }
+
+    /// <summary>
+    /// A machine with the <see cref="DuplicatingTool"/> selected, X at 0 and U at 20, which is where
+    /// the tool's map has them with the interpreter at X0
+    /// </summary>
+    private static Machine DuplicatingMachine()
+    {
+        Machine machine = NewMachine(DuplicatingTool(uOffset: -20.0f), withU: true);
+        machine.Builder.SetAxisPosition(3, 20.0f);
+        return machine;
+    }
+
+    /// <summary>Queue a generated move as the planner would, moving the builder on to its end</summary>
+    private static void Queue(Machine machine, RawMove raw)
+    {
+        machine.Interpreter.FinishGeneratedMove(raw);
+        raw.FeedRateMmPerSec = 50.0f;
+        raw.LinearAxesMentioned = true;
+        Assert.That(machine.Builder.Build(raw, new byte[MoveParams.Length(MotionLimits.MaxAxesPlusExtruders)]).Error,
+                    Is.EqualTo(NativeMovementError.Ok));
+    }
+
+    [Test]
+    public void AGeneratedMoveStartsWhereTheGeneratedMoveBeforeItLeftEveryAxis()
+    {
+        // The travel puts X at 20 and leaves U at 20. Going through the tool's map again would read
+        // X as the mean of what X and U say, 10, and drive both carriages there
+        Machine machine = DuplicatingMachine();
+        RawMove travel = machine.Interpreter.StartGeneratedMove();
+        travel.Coords[0] = 20.0f;
+        Queue(machine, travel);
+
+        RawMove dive = machine.Interpreter.StartGeneratedMove();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(dive.Coords[0], Is.EqualTo(20.0f), "X where the travel left it");
+            Assert.That(dive.Coords[3], Is.EqualTo(20.0f), "and U where it was");
+            Assert.That(machine.State.CurrentUserPosition[0], Is.Zero, "the interpreter is not moved by a probing move");
+        });
+    }
+
+    [Test]
+    public void AGeneratedMoveThePlannerDidNotTakeIsNotStartedFrom()
+    {
+        // A move the ring had no room for is built again from the move before it
+        Machine machine = DuplicatingMachine();
+        RawMove travel = machine.Interpreter.StartGeneratedMove();
+        travel.Coords[0] = 20.0f;
+        Queue(machine, travel);
+        RawMove refused = machine.Interpreter.StartGeneratedMove();
+        refused.Coords[2] = -1.0f;
+        machine.Interpreter.FinishGeneratedMove(refused);
+
+        RawMove retry = machine.Interpreter.StartGeneratedMove();
+
+        Assert.That(retry.Coords[..4], Is.EqualTo(new[] { 20.0f, 0.0f, 0.0f, 20.0f }));
+    }
+
+    [Test]
+    public void AGeneratedMoveAfterAnyOtherMoveStartsThroughTheToolsTransform()
+    {
+        // Once something else has put the machine somewhere, the generated move before is history,
+        // and the interpreter - which a G1 or G92 moves on - is where the move starts
+        Machine machine = DuplicatingMachine();
+        RawMove travel = machine.Interpreter.StartGeneratedMove();
+        travel.Coords[0] = 20.0f;
+        Queue(machine, travel);
+        machine.Builder.SetAxisPosition(1, 5.0f);
+        machine.State.CurrentUserPosition[1] = 5.0f;
+
+        RawMove next = machine.Interpreter.StartGeneratedMove();
+
+        Assert.That(next.Coords[..4], Is.EqualTo(new[] { 0.0f, 5.0f, 0.0f, 20.0f }),
+                    "X0 through the tool's map: X at 0 and U at 20");
+    }
+
+    [Test]
+    public void TheInterpreterFollowsTheLastGeneratedMoveOnceTheyAreDone()
+    {
+        Machine machine = DuplicatingMachine();
+        RawMove travel = machine.Interpreter.StartGeneratedMove();
+        travel.Coords[0] = 20.0f;
+        travel.Coords[1] = 10.0f;
+        Queue(machine, travel);
+
+        machine.Interpreter.SyncInterpreterToGeneratedMove();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(machine.State.CurrentUserPosition[0], Is.EqualTo(10.0f),
+                        "X is the mean of what the tool's carriages say, 20 on X and 20 - 20 on U");
+            Assert.That(machine.State.CurrentUserPosition[1], Is.EqualTo(10.0f));
+            Assert.That(machine.State.CurrentUserPosition[3], Is.Zero, "U is its own coordinate plus the tool's offset");
+        });
+    }
+
+    [Test]
+    public void TheInterpreterIsLeftAloneWhenTheLastMoveWasNotGenerated()
+    {
+        Machine machine = DuplicatingMachine();
+        machine.State.CurrentUserPosition[0] = 7.0f;
+
+        machine.Interpreter.SyncInterpreterToGeneratedMove();
+
+        Assert.That(machine.State.CurrentUserPosition[0], Is.EqualTo(7.0f));
+    }
+
+    [Test]
+    public void TheInterpreterIsLeftAloneWhenSomethingElseMovedAfterTheLastGeneratedMove()
+    {
+        // The travel would read as X10 Y0 through the tool's map, but a move since has put the machine
+        // somewhere else and the interpreter already follows that move
+        Machine machine = DuplicatingMachine();
+        RawMove travel = machine.Interpreter.StartGeneratedMove();
+        travel.Coords[0] = 20.0f;
+        Queue(machine, travel);
+        machine.Builder.SetAxisPosition(1, 5.0f);
+        machine.State.CurrentUserPosition[0] = 7.0f;
+        machine.State.CurrentUserPosition[1] = 5.0f;
+
+        machine.Interpreter.SyncInterpreterToGeneratedMove();
+
+        Assert.That(machine.State.CurrentUserPosition[..2], Is.EqualTo(new[] { 7.0f, 5.0f }));
+    }
+
+    [Test]
+    public void AGeneratedMoveAfterOneThatStoppedStartsWhereItStopped()
+    {
+        // The dive stopped at Z -0.5 with X skewed by tanXZ; the lift starts from there with the skew
+        // taken back off, and the carriages where the travel left them
+        Machine machine = DuplicatingMachine();
+        machine.Model.Move.Compensation.Skew.TanXZ = 0.1f;
+        RawMove travel = machine.Interpreter.StartGeneratedMove();
+        travel.Coords[0] = 20.0f;
+        Queue(machine, travel);
+        machine.Builder.SetAxisPosition(0, 19.95f);
+        machine.Builder.SetAxisPosition(2, -0.5f);
+
+        machine.Interpreter.SyncGeneratedMoveToMachine();
+        RawMove lift = machine.Interpreter.StartGeneratedMove();
+
+        Assert.That(lift.Coords[..4], Is.EqualTo(new[] { 20.0f, 0.0f, -0.5f, 20.0f }).Within(1e-4f));
     }
 }

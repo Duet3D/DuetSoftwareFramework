@@ -185,14 +185,21 @@ internal sealed class RawMove
     /// </summary>
     public MoveType MoveType { get; set; }
 
-    /// <summary>Axes the current tool maps X onto, as a bitmap</summary>
+    /// <summary>Axes that count as X for this move, as a bitmap</summary>
     /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>Tool::GetXAxes(movementTool)</c>: the selected tool's X map for a G0 or G1,
+    /// and the axis lettered X for a move DSF generates itself, which has no movement tool. It decides
+    /// whether the move is XY movement and how its length is measured.
+    /// </para>
+    /// <para>
     /// Set wherever a move is built, from <see cref="ToolTransform.AxisBitmap"/>: there is no default,
     /// because X is wherever M584 put it and may not exist at all
+    /// </para>
     /// </remarks>
     public uint XAxes { get; set; }
 
-    /// <summary>Axes the current tool maps Y onto, as a bitmap</summary>
+    /// <summary>Axes that count as Y for this move, as a bitmap</summary>
     /// <remarks>Set wherever a move is built, as <see cref="XAxes"/> is</remarks>
     public uint YAxes { get; set; }
 

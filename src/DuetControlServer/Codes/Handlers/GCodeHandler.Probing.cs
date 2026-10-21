@@ -355,22 +355,14 @@ internal sealed partial class GCodeHandler
             MoveSubmitResult result;
 
             using (await model.AccessReadWriteAsync(cancellationToken))
+            using (planner.Lock())
             {
-                RawMove raw = new()
-                {
-                    FeedRateMmPerSec = speed,
-                    LinearAxesMentioned = true,
-                    CheckEndstops = checkProbe,
-                    ReduceAcceleration = checkProbe,
-                    XAxes = ToolTransform.AxisBitmap(toolManager.Current, model.Move, 'X'),
-                    YAxes = ToolTransform.AxisBitmap(toolManager.Current, model.Move, 'Y')
-                };
-
-                // Everything else stays where it is, so the move is built from the current position
-                for (int axis = 0; axis < model.Move.Axes.Count; axis++)
-                {
-                    raw.Coords[axis] = model.Move.Axes[axis].MachinePosition ?? 0.0f;
-                }
+                // Everything but Z stays where it is
+                RawMove raw = moveInterpreter.StartGeneratedMove();
+                raw.FeedRateMmPerSec = speed;
+                raw.LinearAxesMentioned = true;
+                raw.CheckEndstops = checkProbe;
+                raw.ReduceAcceleration = checkProbe;
                 raw.Coords[zAxis] = target;
 
                 if (checkProbe)
@@ -396,10 +388,7 @@ internal sealed partial class GCodeHandler
                     // What stopped the last probing move says nothing about this one. A switch probe
                     // is read from its own input so it does not need this; a stall probe has no
                     // input, and the latch is the only record that the move was stopped at all
-                    using (planner.Lock())
-                    {
-                        planner.State.ArmEndstops();
-                    }
+                    planner.State.ArmEndstops();
                     for (int drive = 1; drive < raw.StopOnInput.Length; drive++)
                     {
                         raw.StopOnInput[drive].CopyFrom(raw.StopOnInput[0]);
@@ -409,7 +398,7 @@ internal sealed partial class GCodeHandler
                     moveInterpreter.ArmCorrection(raw);
                 }
 
-                result = planner.QueueMove(raw);
+                result = QueueProbingMove(raw);
             }
 
             switch (result)
@@ -781,19 +770,13 @@ internal sealed partial class GCodeHandler
         await planner.QueueAndWaitAsync(async () =>
         {
             using (await model.AccessReadWriteAsync(cancellationToken))
+            using (planner.Lock())
             {
-                RawMove move = new()
-                {
-                    FeedRateMmPerSec = settings.TravelSpeed,
-                    LinearAxesMentioned = true,
-                    XAxes = ToolTransform.AxisBitmap(toolManager.Current, model.Move, 'X'),
-                    YAxes = ToolTransform.AxisBitmap(toolManager.Current, model.Move, 'Y')
-                };
-
-                for (int axis = 0; axis < model.Move.Axes.Count; axis++)
-                {
-                    move.Coords[axis] = model.Move.Axes[axis].MachinePosition ?? 0.0f;
-                }
+                // The grid's axes are moved directly, whatever the selected tool maps them to: the
+                // probe is on the carriage, not on the tool
+                RawMove move = moveInterpreter.StartGeneratedMove();
+                move.FeedRateMmPerSec = settings.TravelSpeed;
+                move.LinearAxesMentioned = true;
                 move.Coords[axis0] = coord0;
                 move.Coords[axis1] = coord1;
 
@@ -801,8 +784,45 @@ internal sealed partial class GCodeHandler
                 // the nozzle clears the bed on the way across
                 move.Coords[settings.ZAxis] = ProbeStartHeight(settings, 0);
 
-                return planner.QueueMove(move);
+                return QueueProbingMove(move);
             }
         }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Queue a probing move
+    /// </summary>
+    /// <param name="raw">
+    /// The move, started by <see cref="MoveInterpreter.StartGeneratedMove"/> and given the probe
+    /// coordinates it moves to
+    /// </param>
+    /// <returns>What became of it</returns>
+    /// <remarks>
+    /// <para>
+    /// The coordinates are the probe's, written into the move with no tool transform, and the next
+    /// probing move starts from them rather than from the interpreter's position. Once the move is
+    /// queued the interpreter's position is brought into step with it, as a G1 brings it into step
+    /// with where the G1 goes: RepRapFirmware's <c>SetMoveBufferDefaults</c> marks the position for
+    /// re-reading, and the standstill that follows every probing move brings its user position into
+    /// step with the motors (<c>LockMovementSystemAndWaitForStandstill</c>). So a macro run between
+    /// probing moves, such as a BLTouch's <c>deployprobe.g</c>, and the <c>retractprobe.g</c> and the
+    /// code after a probing code however it ends, start from where the head is. A dive that stops
+    /// short is brought into step again where it stopped, by <c>RedefineMachinePosition</c>.
+    /// </para>
+    /// <para>
+    /// What is published is where the motors were told to go. The caller must hold the object model
+    /// write lock and the planner lock
+    /// </para>
+    /// </remarks>
+    private MoveSubmitResult QueueProbingMove(RawMove raw)
+    {
+        moveInterpreter.FinishGeneratedMove(raw);
+        MoveSubmitResult result = planner.QueueMove(raw);
+        if (result is MoveSubmitResult.Queued or MoveSubmitResult.NoMovement)
+        {
+            moveInterpreter.SyncInterpreterToGeneratedMove();
+            planner.PublishCommittedPosition();
+        }
+        return result;
     }
 }

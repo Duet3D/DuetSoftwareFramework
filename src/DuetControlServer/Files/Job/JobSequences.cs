@@ -40,7 +40,7 @@ namespace DuetControlServer.Files.Job;
 /// <param name="model">Object model</param>
 /// <param name="moveInterpreter">
 /// The interpreter position, which a stop that dropped queued moves has to bring back into step with
-/// the machine before the restore point is taken from it
+/// the machine before the restore point is taken from it, and what builds the move back on resume
 /// </param>
 /// <param name="planner">Where the restore point is saved from and the resume move is queued</param>
 /// <param name="spindleManager">The spindles, which an aborted job stops</param>
@@ -507,13 +507,12 @@ internal sealed class JobSequences(
                     int numAxes = planner.Parameters.SharedAxisCount(model.Move);
                     int zAxis = AxisIndices.IndexOf(model.Move, 'Z');
 
-                    RawMove move = new()
-                    {
-                        IsCoordinated = true,
-                        FeedRateMmPerSec = ResumeFeedRateMmPerSec,
-                        XAxes = ToolTransform.AxisBitmap(toolManager.Current, model.Move, 'X'),
-                        YAxes = ToolTransform.AxisBitmap(toolManager.Current, model.Move, 'Y')
-                    };
+                    // A generated move whose movement tool is the selected tool, so it is measured and
+                    // skewed as the job's own moves are (rrf-differences.md section 5.3)
+                    Tool? tool = toolManager.Current;
+                    RawMove raw = moveInterpreter.StartGeneratedMove(tool);
+                    raw.IsCoordinated = true;
+                    raw.FeedRateMmPerSec = ResumeFeedRateMmPerSec;
 
                     bool anythingToDo = false;
                     for (int axis = 0; axis < numAxes; axis++)
@@ -533,11 +532,11 @@ internal sealed class JobSequences(
                         anythingToDo = true;
                         if (model.Move.Axes[axis].Rotational)
                         {
-                            move.RotationalAxesMentioned = true;
+                            raw.RotationalAxesMentioned = true;
                         }
                         else
                         {
-                            move.LinearAxesMentioned = true;
+                            raw.LinearAxesMentioned = true;
                         }
                     }
 
@@ -546,8 +545,11 @@ internal sealed class JobSequences(
                         return null;
                     }
 
-                    ToolTransform.Apply(toolManager.Current, model.Move, planner.State, move.Coords, numAxes);
-                    MoveSubmitResult result = planner.QueueMove(move);
+                    // Through the tool transform, because this returns the tool to where the job left
+                    // it, and then through skew and mesh compensation as a G1 would be
+                    ToolTransform.Apply(tool, model.Move, planner.State, raw.Coords, numAxes);
+                    moveInterpreter.FinishGeneratedMove(raw, tool);
+                    MoveSubmitResult result = planner.QueueMove(raw);
                     if (result.IsSettled())
                     {
                         planner.PublishCommittedPosition();

@@ -372,6 +372,16 @@ RepRapFirmware creates X, Y and Z before config.g runs, so they are always its f
 
 `M584 P` hides the highest-numbered axes, which are the last ones created and not necessarily the letters after Z.
 
+### 5.2 A G30 dive makes its whole skew correction, and probing reads its position back with no tool
+
+`G30` and `G29` don't use tool axis mapping (as RRF), but they do apply skew and mesh compensation. In RRF skew correction is only applied for `G29` because of a bug in `G30` which doesn't apply skew correction for the move.
+
+Also fixes a bug in RRF that incorrectly removes the correction from the tools mapped axes after probing moves even though the mapped axes weren't used.
+
+### 5.3 The move back on resume is measured and skewed through the selected tool's map
+
+When a print is paused, if the tool position is moved then the restore move will use the axis mapping to apply `M204` acceleration limits correctly (regression case `m24-resume-with-tool-axis-mapping`: with the tool's `X3` mapping the move is held to U's 5000 mm/s² axis limit, and without it to the 100 mm/s² `M204` limit).
+
 ---
 
 ## 6. G-code and expressions
