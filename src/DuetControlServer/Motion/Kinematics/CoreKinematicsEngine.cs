@@ -102,14 +102,6 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
     /// </summary>
     private const string InvalidMatrixError = "Invalid kinematics matrix";
 
-    /// <inheritdoc />
-    /// <remarks>
-    /// The placed matrix cannot be inverted, so there is no way back from motor positions to axis
-    /// positions. RepRapFirmware reports this whenever it recalculates the matrix and carries on with
-    /// a zeroed forward matrix; here it is also why every move is refused
-    /// </remarks>
-    public override string? ConfigurationError => IsValid ? null : InvalidMatrixError;
-
     /// <summary>
     /// Create a geometry from its inverse matrix
     /// </summary>

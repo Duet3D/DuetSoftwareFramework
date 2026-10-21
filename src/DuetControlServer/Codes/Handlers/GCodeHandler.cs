@@ -329,14 +329,6 @@ internal sealed partial class GCodeHandler(
                                            "The motion configuration was not applied; no moves can be planned until it is");
                     }
 
-                    // A geometry that needs an axis the machine does not have - a delta with no Z - or
-                    // whose matrix is singular cannot transform any position, so nothing can be planned
-                    // through it
-                    if (planner.Parameters.Geometry.CannotPlanReason is string cannotPlan)
-                    {
-                        return new Message(MessageType.Error, cannotPlan);
-                    }
-
                     // Held across building and queueing, because the move is a delta from the state the
                     // planner holds: another channel building in between would measure from the wrong
                     // place. Building also advances that state, which is what makes the rollback below

@@ -70,7 +70,7 @@ public class KinematicsTests
     public void CartesianMovesOneMotorPerAxis()
     {
         KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, KinematicsAxes.NewMoveWithAxes());
-        Assert.That(engine.ConfigurationError, Is.Null);
+        Assert.That(((CoreKinematicsEngine)engine).IsValid, Is.True);
 
         int[] motorPos = ToMotorSteps(engine, [10.0f, 20.0f, 5.0f], 3);
         Assert.Multiple(() =>
@@ -86,7 +86,7 @@ public class KinematicsTests
     public void CoreXyMovesBothMotorsForEitherAxis()
     {
         KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.CoreXY, KinematicsAxes.NewMoveWithAxes());
-        Assert.That(engine.ConfigurationError, Is.Null);
+        Assert.That(((CoreKinematicsEngine)engine).IsValid, Is.True);
 
         // A = X + Y, B = X - Y. Moving X alone turns both motors the same way; moving Y alone turns
         // them opposite ways. That is the whole of CoreXY
@@ -148,7 +148,7 @@ public class KinematicsTests
     public void PositionsSurviveTheRoundTrip(KinematicsName name, int numAxes)
     {
         KinematicsEngine engine = KinematicsFactory.Create(name, KinematicsAxes.NewMoveWithAxes());
-        Assert.That(engine.ConfigurationError, Is.Null, "the forward matrix could be derived");
+        Assert.That(((CoreKinematicsEngine)engine).IsValid, Is.True, "the forward matrix could be derived");
 
         float[] machinePos = new float[NumDrives];
         for (int axis = 0; axis < numAxes; axis++)

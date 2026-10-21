@@ -384,7 +384,6 @@ public class AxisOrderTests
         Assert.Multiple(() =>
         {
             Assert.That(engine.MissingAxesError, Is.EqualTo(error));
-            Assert.That(engine.CannotPlanReason, Is.EqualTo(error));
             Assert.That(engine.CartesianToMotorSteps(Lay(letters, _ => 10.0f), Lay(letters, _ => 80.0f), letters.Length, letters.Length, motorPos),
                         Is.EqualTo(NativeMovementError.UnreachablePosition));
         });
@@ -654,8 +653,7 @@ public class AxisOrderTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(singular.ConfigurationError, Is.EqualTo("Invalid kinematics matrix"));
-            Assert.That(singular.CannotPlanReason, Is.EqualTo("Invalid kinematics matrix"));
+            Assert.That(((CoreKinematicsEngine)singular).IsValid, Is.False);
             Assert.That(singular.CartesianToMotorSteps(machinePos, stepsPerMm, 3, 3, motorPos),
                         Is.EqualTo(NativeMovementError.UnreachablePosition), "nothing is planned through it");
             Assert.That(position[..3], Is.EqualTo(new[] { -1.0f, -1.0f, -1.0f }),
@@ -666,7 +664,7 @@ public class AxisOrderTests
         KinematicsEngine corrected = KinematicsConfigurator.Apply(singular, KinematicsAxes.NewMoveWithAxes("XYZ"), new Code("M669 Y1:-1"), ref seen);
         Assert.Multiple(() =>
         {
-            Assert.That(corrected.CannotPlanReason, Is.Null);
+            Assert.That(((CoreKinematicsEngine)corrected).IsValid, Is.True);
             Assert.That(InverseRow(corrected, 1)[..3], Is.EqualTo(new[] { 1.0f, -1.0f, 0.0f }));
         });
     }
@@ -736,7 +734,7 @@ public class AxisOrderTests
             Assert.Multiple(() =>
             {
                 Assert.That(engine.MissingAxesError, Is.Null, order);
-                Assert.That(engine.ConfigurationError, Is.Null, order);
+                Assert.That(((CoreKinematicsEngine)engine).IsValid, Is.True, order);
                 for (int row = 0; row < rrfOrder.Length; row++)
                 {
                     float[] placed = InverseRow(engine, order.IndexOf(rrfOrder[row]));
@@ -792,7 +790,7 @@ public class AxisOrderTests
         Assert.Multiple(() =>
         {
             Assert.That(engine.Kind, Is.EqualTo(expected));
-            Assert.That(engine.CannotPlanReason, Is.Null);
+            Assert.That(engine.MissingAxesError, Is.Null);
         });
     }
 

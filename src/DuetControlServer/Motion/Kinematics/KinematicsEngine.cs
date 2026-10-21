@@ -264,27 +264,6 @@ internal abstract class KinematicsEngine
     }
 
     /// <summary>
-    /// Why this geometry's configuration does not describe a machine its motors can drive, now that
-    /// it is placed over the machine's axes, or null if it does
-    /// </summary>
-    /// <remarks>
-    /// M669 refuses a core matrix that cannot be inverted, so only a geometry that has come by its
-    /// configuration some other way - adopted from the object model at startup - can have one. This is
-    /// what refuses its moves
-    /// </remarks>
-    public virtual string? ConfigurationError => null;
-
-    /// <summary>
-    /// Why no move can be planned through this geometry, or null if one can
-    /// </summary>
-    /// <remarks>
-    /// Either an axis it needs is missing (<see cref="MissingAxesError"/>) or its configuration is
-    /// unusable (<see cref="ConfigurationError"/>). Every move and every homing is refused with this
-    /// rather than planned through a transform that cannot give the right answer
-    /// </remarks>
-    public string? CannotPlanReason => MissingAxesError ?? ConfigurationError;
-
-    /// <summary>
     /// The axes this geometry transforms, resolved against the machine's
     /// </summary>
     /// <remarks>
