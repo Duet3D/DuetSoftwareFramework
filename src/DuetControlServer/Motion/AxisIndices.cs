@@ -1,6 +1,8 @@
 using System;
+using System.Numerics;
 using System.Text;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Motion.Native;
 
 namespace DuetControlServer.Motion;
 
@@ -145,6 +147,18 @@ internal sealed class AxisIndices
     /// <param name="axis">The axis index, or -1</param>
     /// <returns>The bit, zero for -1</returns>
     public static uint Bit(int axis) => axis is >= 0 and < 32 ? 1u << axis : 0u;
+
+    /// <summary>
+    /// The lowest-numbered axis in a bitmap
+    /// </summary>
+    /// <param name="axes">The bitmap</param>
+    /// <param name="numAxes">Number of axes to consider</param>
+    /// <returns>The axis, or -1 if the bitmap names none of the first <paramref name="numAxes"/></returns>
+    public static int Lowest(uint axes, int numAxes)
+    {
+        uint considered = axes & ((1u << Math.Clamp(numAxes, 0, MotionLimits.MaxAxes)) - 1);
+        return considered == 0 ? -1 : BitOperations.TrailingZeroCount(considered);
+    }
 
     /// <summary>
     /// What a code that needs axes the machine does not have says

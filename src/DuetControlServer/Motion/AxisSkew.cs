@@ -60,12 +60,12 @@ internal static class AxisSkew
         uint xAxes = ToolTransform.AxisBitmap(tool, move, 'X');
         uint yAxes = ToolTransform.AxisBitmap(tool, move, 'Y');
 
-        int lowestY = LowestSetAxis(yAxes, numAxes);
+        int lowestY = AxisIndices.Lowest(yAxes, numAxes);
         if (lowestY < 0)
         {
             return;                             // no Y axis, so no pair to be out of square
         }
-        int lowestX = LowestSetAxis(xAxes, numAxes);
+        int lowestX = AxisIndices.Lowest(xAxes, numAxes);
 
         int zAxis = AxisIndices.IndexOf(move, 'Z');
         float z = zAxis >= 0 && zAxis < numAxes ? coords[zAxis] : 0.0f;
@@ -114,12 +114,12 @@ internal static class AxisSkew
         uint xAxes = ToolTransform.AxisBitmap(tool, move, 'X');
         uint yAxes = ToolTransform.AxisBitmap(tool, move, 'Y');
 
-        int lowestY = LowestSetAxis(yAxes, numAxes);
+        int lowestY = AxisIndices.Lowest(yAxes, numAxes);
         if (lowestY < 0)
         {
             return;
         }
-        int lowestX = LowestSetAxis(xAxes, numAxes);
+        int lowestX = AxisIndices.Lowest(xAxes, numAxes);
 
         int zAxis = AxisIndices.IndexOf(move, 'Z');
         float z = zAxis >= 0 && zAxis < numAxes ? coords[zAxis] : 0.0f;
@@ -141,24 +141,5 @@ internal static class AxisSkew
                 coords[axis] -= fromY + (skew.TanXZ * z);
             }
         }
-    }
-
-    /// <summary>
-    /// The lowest-numbered axis in a bitmap
-    /// </summary>
-    /// <param name="axes">The bitmap</param>
-    /// <param name="numAxes">Number of axes to consider</param>
-    /// <returns>The axis, or -1 if the bitmap names none that exists</returns>
-    /// TODO this can probably be refactored since it shouldn't belong here
-    public static int LowestSetAxis(uint axes, int numAxes)
-    {
-        for (int axis = 0; axis < numAxes && axis < MotionLimits.MaxAxes; axis++)
-        {
-            if ((axes & (1u << axis)) != 0)
-            {
-                return axis;
-            }
-        }
-        return -1;
     }
 }
