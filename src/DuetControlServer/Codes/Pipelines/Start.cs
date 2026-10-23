@@ -35,6 +35,7 @@ namespace DuetControlServer.Codes.Pipelines
                 if (code.Flags.HasFlag(CodeFlags.Unbuffered))
                 {
                     _unbufferedCodesCounter.AddCount(1);
+                    _ = code.Task.ContinueWith(_ => _unbufferedCodesCounter.Signal(), TaskContinuationOptions.ExecuteSynchronously);
                 }
 
                 // Log it

@@ -157,6 +157,13 @@ namespace DuetControlServer.Codes
             ChannelProcessor processor = _processors[(int)code.Channel];
             PipelineStage stage = PipelineStage.Start;
 
+            // M122 reports via multiple sub-functions and its reply spans several data transfers. No further code may be sent
+            // until it has been resolved, else a message box or macro request from the next code overtakes the missing chunks
+            if (code.Type == CodeType.MCode && code.MajorNumber == 122)
+            {
+                code.Flags |= CodeFlags.Unbuffered;
+            }
+
             // Deal with priority codes
             if (code.Flags.HasFlag(CodeFlags.IsPrioritized))
             {
