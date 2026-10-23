@@ -530,10 +530,16 @@ namespace DuetControlServer.SPI.Channel
             {
                 ResolvePendingReplies();
 
-                // RRF sends the empty reply for the M99 that requested this abort after the abort request if the SBC task had already flushed its replies
+                // The M99 that requested this abort has been executed, so complete it here. RRF sends no reply for it because that reply
+                // could overtake the abort request and then complete the code that started the macro being aborted
                 if (BufferedCodes.Count > 0 && BufferedCodes[0].Type == CodeType.MCode && BufferedCodes[0].MajorNumber == 99)
                 {
-                    _suppressEmptyReply = true;
+                    Code code = BufferedCodes[0];
+                    BytesBuffered -= code.BinarySize;
+                    BufferedCodes.RemoveAt(0);
+
+                    code.Result = new Message();
+                    Codes.Processor.CodeCompleted(code);
                 }
             }
 
