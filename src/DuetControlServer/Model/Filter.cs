@@ -360,6 +360,11 @@ public partial class Filter(ObjectModel model)
                                         result.Add(jsonPropertyName, subResult);
                                     }
                                 }
+                                else if (propertyValue is IModelDictionary && depth + 1 >= queryFlags.Value.MaxDepth)
+                                {
+                                    // Dictionary items are one level deeper, so report an empty object at the maximum depth
+                                    result.Add(jsonPropertyName, new Dictionary<string, object?>());
+                                }
                                 else if (propertyValue is not null || queryFlags.Value.IncludeNulls)
                                 {
                                     result.Add(jsonPropertyName, propertyValue);

@@ -711,35 +711,40 @@ public class MCodeHandler(
             // Query object model
             case 409:
                 {
-                    if (code.TryGetString('K', out string? key) && (!code.TryGetInt('R', out int rParam) || rParam == 0))
+                    if (code.TryGetInt('R', out int rParam) && rParam > 0)
                     {
-                        string trimmedKey = key.TrimStart('#');
-                        if (!trimmedKey.StartsWith("network") && !trimmedKey.StartsWith("plugins") && !trimmedKey.StartsWith("sbc") && !trimmedKey.StartsWith("volumes"))
-                        {
-                            // Only return query results for network/plugins/sbc/volume keys as part of M409
-                            break;
-                        }
-
-                        // Wait until pending codes have finished
-                        if (!await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
-                        {
-                            throw new OperationCanceledException();
-                        }
-
-                        // Query the object model using the new command
-                        code.TryGetString('F', out string? flags);
-                        Commands.QueryObjectModel queryCommand = commandFactory.Create<Commands.QueryObjectModel>();
-                        queryCommand.Key = key;
-                        queryCommand.Flags = flags ?? string.Empty;
-                        JsonElement queryResult = await queryCommand.ExecuteAsync(cancellationToken);
-
-                        string json = queryResult.GetRawText();
-                        return new Message(MessageType.Success, (code.ExplicitLineNumber != null) ? $"{{\"line\":{code.ExplicitLineNumber}," + json[1..] : json);
-                    }
-                    else
-                    {
+                        // R1 explicitly asks the firmware for its own object model
                         break;
                     }
+
+                    code.TryGetString('K', out string? key);
+                    if (key is not null && (key.StartsWith('#') || key.Contains('[')))
+                    {
+                        // The firmware reports array lengths and indexed keys as scalars whereas the model filter keeps the surrounding arrays
+                        break;
+                    }
+
+                    // Wait until pending codes have finished and the object model mirror is up-to-date
+                    if (!await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+                    {
+                        throw new OperationCanceledException();
+                    }
+                    await model.WaitForFullUpdateAsync(cancellationToken);
+
+                    // Query the object model mirror
+                    code.TryGetString('F', out string? flags);
+                    Commands.QueryObjectModel queryCommand = commandFactory.Create<Commands.QueryObjectModel>();
+                    queryCommand.Key = key ?? string.Empty;
+                    queryCommand.Flags = flags ?? string.Empty;
+                    JsonElement queryResult = await queryCommand.ExecuteAsync(cancellationToken);
+                    if (!string.IsNullOrEmpty(key) && queryResult.GetProperty("result").ValueKind == JsonValueKind.Null)
+                    {
+                        // Let the firmware answer keys that the model mirror cannot resolve, like arrays without an index
+                        break;
+                    }
+
+                    string json = queryResult.GetRawText();
+                    return new Message(MessageType.Success, (code.ExplicitLineNumber is not null) ? $"{{\"line\":{code.ExplicitLineNumber}," + json[1..] : json);
                 }
 
             // Create Directory on SD-Card

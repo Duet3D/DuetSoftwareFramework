@@ -43,6 +43,11 @@ public sealed class QueryObjectModel(Model.ObjectModel model, Filter filter) : D
 
         // Parse flags
         QueryFlags queryFlags = QueryFlags.Parse(flags);
+        if (string.IsNullOrEmpty(key) && !flags.Contains('d'))
+        {
+            // RRF reports the whole model only to the first level unless an explicit depth is requested, see ObjectModel::ReportAsJson
+            queryFlags = queryFlags with { MaxDepth = 1 };
+        }
         bool includeNulls = flags.Contains('n');
         JsonSerializerOptions jsonOptions = includeNulls ? JsonHelper.DefaultJsonOptions : JsonHelper.NoNullJsonOptions;
         JsonTypeInfo dictionaryTypeInfo = jsonOptions.GetTypeInfo(typeof(Dictionary<string, object?>));
@@ -57,17 +62,20 @@ public sealed class QueryObjectModel(Model.ObjectModel model, Filter filter) : D
 
             // Get down to the requested depth
             JsonElement result = queryResult.RootElement;
+            bool keyResolved = true;
             if (!string.IsNullOrEmpty(key))
             {
                 foreach (string depth in key.Split('.'))
                 {
                     if (result.ValueKind == JsonValueKind.Object)
                     {
-                        foreach (var subItem in result.EnumerateObject())
+                        JsonElement.ObjectEnumerator subItems = result.EnumerateObject();
+                        if (!subItems.MoveNext())
                         {
-                            result = subItem.Value;
+                            keyResolved = false;
                             break;
                         }
+                        result = subItems.Current.Value;
                     }
                 }
             }
@@ -98,7 +106,12 @@ public sealed class QueryObjectModel(Model.ObjectModel model, Filter filter) : D
             };
 
             // Add result with optional "next" for arrays
-            if (result.ValueKind == JsonValueKind.Array)
+            if (!keyResolved)
+            {
+                // RRF reports null if the key does not exist, see the M409 section of the G-code dictionary
+                response["result"] = null;
+            }
+            else if (result.ValueKind == JsonValueKind.Array)
             {
                 // Apply array pagination if 'a' flag was specified
                 if (queryFlags.StartElement > 0)
