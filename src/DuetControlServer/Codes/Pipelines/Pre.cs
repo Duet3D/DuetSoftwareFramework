@@ -14,9 +14,10 @@ namespace DuetControlServer.Codes.Pipelines
         /// <summary>
         /// Process an incoming code
         /// </summary>
+        /// <param name="stackItem">Stack item holding the code</param>
         /// <param name="code">Code to process</param>
         /// <returns>Asynchronous task</returns>
-        public override async Task ProcessCodeAsync(Commands.Code code)
+        public override async Task ProcessCodeAsync(PipelineStackItem stackItem, Commands.Code code)
         {
             if (!code.Flags.HasFlag(CodeFlags.IsPreProcessed))
             {

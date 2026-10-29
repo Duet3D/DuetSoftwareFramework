@@ -1,5 +1,4 @@
 ﻿using DuetAPI.Commands;
-using Nito.AsyncEx;
 using System;
 using System.Threading.Tasks;
 
@@ -12,30 +11,27 @@ namespace DuetControlServer.Codes.Pipelines
     public class Start(ChannelProcessor processor) : PipelineBase(PipelineStage.Start, processor)
     {
         /// <summary>
-        /// Counter for unbuffered codes
-        /// </summary>
-        private readonly AsyncCountdownEvent _unbufferedCodesCounter = new(0);
-
-        /// <summary>
         /// Process an incoming code
         /// </summary>
+        /// <param name="stackItem">Stack item holding the code</param>
         /// <param name="code">Code to process</param>
         /// <returns>Asynchronous task</returns>
-        public override async Task ProcessCodeAsync(Commands.Code code)
+        public override async Task ProcessCodeAsync(PipelineStackItem stackItem, Commands.Code code)
         {
             try
             {
-                // Wait for pending unbuffered codes to finish first unless we're dealing with a priority code
+                // Wait for pending unbuffered codes of this stack level to finish first unless we're dealing with a priority code.
+                // Deeper levels must not wait because their codes are executed first and the unbuffered code may be waiting for them
                 if (!code.Flags.HasFlag(CodeFlags.IsPrioritized))
                 {
-                    await _unbufferedCodesCounter.WaitAsync(code.CancellationToken);
+                    await stackItem.UnbufferedCodesCounter.WaitAsync(code.CancellationToken);
                 }
 
                 // Make sure other codes wait for this code to complete first if it is marked "Unbuffered"
                 if (code.Flags.HasFlag(CodeFlags.Unbuffered))
                 {
-                    _unbufferedCodesCounter.AddCount(1);
-                    _ = code.Task.ContinueWith(_ => _unbufferedCodesCounter.Signal(), TaskContinuationOptions.ExecuteSynchronously);
+                    stackItem.UnbufferedCodesCounter.AddCount(1);
+                    _ = code.Task.ContinueWith(_ => stackItem.UnbufferedCodesCounter.Signal());
                 }
 
                 // Log it

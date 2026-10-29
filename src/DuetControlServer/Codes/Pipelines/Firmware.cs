@@ -37,8 +37,9 @@ namespace DuetControlServer.Codes.Pipelines
         /// <summary>
         /// Process an incoming code
         /// </summary>
+        /// <param name="stackItem">Stack item holding the code</param>
         /// <param name="code">Code to process</param>
         /// <returns>Asynchronous task</returns>
-        public override Task ProcessCodeAsync(Code code) => Task.CompletedTask;
+        public override Task ProcessCodeAsync(PipelineStackItem stackItem, Code code) => Task.CompletedTask;
     }
 }

@@ -70,7 +70,7 @@ namespace DuetControlServer.Codes.Pipelines
                             }
                             else
                             {
-                                await pipeline.ProcessCodeAsync(code);
+                                await pipeline.ProcessCodeAsync(this, code);
                             }
                         }
                         catch (Exception e)
@@ -133,6 +133,12 @@ namespace DuetControlServer.Codes.Pipelines
         /// This is not applicable on the Firmware stage because we buffer multiple codes there
         /// </summary>
         public Code? CodeBeingExecuted;
+
+        /// <summary>
+        /// Counter for unbuffered codes on this stack level.
+        /// Used by the Start stage only, where it must not span stack levels because nested macros are executed first
+        /// </summary>
+        public readonly AsyncCountdownEvent UnbufferedCodesCounter = new(0);
 
         /// <summary>
         /// Wait for the pipeline state to finish processing codes
