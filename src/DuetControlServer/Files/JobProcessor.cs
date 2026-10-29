@@ -193,6 +193,19 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     public bool IsCancelled { get; private set; }
 
     /// <summary>
+    /// Indicates if the print has been stopped by M0/M1/M2, in which case RRF has already run stop.g
+    /// </summary>
+    /// <remarks>
+    /// This is volatile to allow fast access without locking the class first
+    /// </remarks>
+    public bool IsStoppedByCode
+    {
+        get => _isStoppedByCode;
+        private set => _isStoppedByCode = value;
+    }
+    private volatile bool _isStoppedByCode;
+
+    /// <summary>
     /// Indicates if the file print has been aborted
     /// </summary>
     public bool IsAborted { get; private set; }
@@ -286,12 +299,13 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// <param name="virtualFile">File to print</param>
     /// <param name="physicalFile">Physical file to print</param>
     /// <param name="simulating">Whether the file is being simulated</param>
+    /// <param name="fromJobFile">Whether the job file being printed is selecting this file</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
     /// <remarks>
     /// This class has to be locked when this method is called
     /// </remarks>
-    public async Task SelectFileAsync(string virtualFile, string physicalFile, bool simulating = false, CancellationToken cancellationToken = default)
+    public async Task SelectFileAsync(string virtualFile, string physicalFile, bool simulating = false, bool fromJobFile = false, CancellationToken cancellationToken = default)
     {
         // Analyze and open the file
         GCodeFileInfo info = await _fileInfoParser.ParseAsync(physicalFile, true);
@@ -301,11 +315,33 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
         if (IsFileSelected)
         {
             Cancel();
+            if (fromJobFile)
+            {
+                // The code selecting this file is still being executed by the job that was just cancelled, so waiting
+                // for that job here would deadlock. The print loop starts this file when the current print has ended
+                _pendingFile = file;
+                _pendingFileInfo = info;
+                _pendingFileSimulating = simulating;
+                return;
+            }
             await _finished.WaitAsync(_lifetime.ApplicationStopping);
         }
 
+        await ApplyFileSelectionAsync(file, info, simulating, cancellationToken);
+    }
+
+    /// <summary>
+    /// Apply a new file selection and tell the firmware about it
+    /// </summary>
+    /// <param name="file">File to print</param>
+    /// <param name="info">Information about the file</param>
+    /// <param name="simulating">Whether the file is being simulated</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    private async Task ApplyFileSelectionAsync(CodeFile file, GCodeFileInfo info, bool simulating, CancellationToken cancellationToken = default)
+    {
         // Update the state
-        IsCancelled = IsAborted = false;
+        IsCancelled = IsAborted = IsStoppedByCode = false;
         IsSimulating = simulating;
         _file = file;
         _pausePosition = _pausePosition2 = null;
@@ -318,8 +354,28 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
 
         // Notify RepRapFirmware and start processing the file in the background
         await _linkInterface.SetPrintFileInfo(cancellationToken);
-        _logger.LogInformation("Selected file {File}", virtualFile);
+        _logger.LogInformation("Selected file {File}", file.FilePath.Virtual);
     }
+
+    /// <summary>
+    /// File selected by the job file being printed, started when the current print has ended
+    /// </summary>
+    private CodeFile? _pendingFile;
+
+    /// <summary>
+    /// Information about the file waiting to be printed
+    /// </summary>
+    private GCodeFileInfo? _pendingFileInfo;
+
+    /// <summary>
+    /// Whether the file waiting to be printed is going to be simulated
+    /// </summary>
+    private bool _pendingFileSimulating;
+
+    /// <summary>
+    /// Whether the print loop may start the next print without waiting for a resume request
+    /// </summary>
+    private bool _startPendingFile;
 
     /// <summary>
     /// Fork the file being processed to execute concurrently
@@ -638,7 +694,12 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                 bool startingNewPrint;
                 using (await LockAsync(stoppingToken))
                 {
-                    await _resume.WaitAsync(stoppingToken);
+                    // A file selected by the previous job is already waiting to be printed
+                    if (!_startPendingFile)
+                    {
+                        await _resume.WaitAsync(stoppingToken);
+                    }
+                    _startPendingFile = false;
                     startingNewPrint = !_file!.IsClosed;
                     IsProcessing = startingNewPrint;
                 }
@@ -770,6 +831,14 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                     // End, un-forking the file input reader like RRF does when a print stops
                     _codeProcessor.SetFileStreamsForked(false);
                     IsProcessing = IsSimulating = IsPaused = false;
+
+                    // Select the file that the job just finished asked for with M23 or M32
+                    if (_pendingFile is not null)
+                    {
+                        await ApplyFileSelectionAsync(_pendingFile, _pendingFileInfo!, _pendingFileSimulating, stoppingToken);
+                        _pendingFile = null;
+                        _pendingFileInfo = null;
+                    }
                 }
             } while (!stoppingToken.IsCancellationRequested);
         }
@@ -806,6 +875,13 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// </summary>
     public void Resume()
     {
+        if (_pendingFile is not null)
+        {
+            // Still finishing the print that selected the next file, which the print loop starts once it is done
+            _startPendingFile = true;
+            return;
+        }
+
         if (IsFileSelected)
         {
             if (IsPaused)
@@ -824,7 +900,8 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// <summary>
     /// Cancel the current print (e.g. when M0/M1 is called)
     /// </summary>
-    public void Cancel()
+    /// <param name="stoppedByCode">Whether M0/M1/M2 is stopping the print, which RRF has already acted on</param>
+    public void Cancel(bool stoppedByCode = false)
     {
         if (IsFileSelected)
         {
@@ -836,6 +913,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
             _file2?.Close();
 
             IsCancelled = IsPaused;
+            IsStoppedByCode = stoppedByCode;
             Resume();
         }
     }
@@ -856,6 +934,8 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
             _file2?.Close();
 
             IsAborted = true;
+            _pendingFile = null;
+            _pendingFileInfo = null;
             Resume();
         }
     }

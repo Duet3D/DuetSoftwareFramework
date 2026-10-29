@@ -96,7 +96,7 @@ public class MCodeHandler(
                                 }
 
                                 // Invalidate the print file and make sure no more codes are read from it
-                                jobProcessor.Cancel();
+                                jobProcessor.Cancel(true);
                             }
                         }
                     }
@@ -241,7 +241,13 @@ public class MCodeHandler(
                             {
                                 return new Message(MessageType.Error, "Cannot set file to print, because a file is already being printed");
                             }
-                            await jobProcessor.SelectFileAsync(fileName, physicalFile, false, cancellationToken);
+                            await jobProcessor.SelectFileAsync(fileName, physicalFile, false, code.IsFromFileChannel, cancellationToken);
+                        }
+
+                        // Reassign the code's cancellation token so the job that just selected the next file still gets this code's reply
+                        if (code.IsFromFileChannel)
+                        {
+                            code.ResetCancellationToken();
                         }
                     }
 
@@ -494,7 +500,7 @@ public class MCodeHandler(
                                 return new Message(MessageType.Error, "Cannot set file to simulate, because a file is already being printed");
                             }
 
-                            await jobProcessor.SelectFileAsync(fileName, physicalFile, true, cancellationToken);
+                            await jobProcessor.SelectFileAsync(fileName, physicalFile, true, code.IsFromFileChannel, cancellationToken);
                             // F0 suppresses writing the simulated time back to the file; absent or F1 updates it, as in standalone mode
                             jobProcessor.UpdateSimulatedTime = code.GetInt('F', 1) == 1;
                             // Simulation is started when M37 has been processed by the firmware

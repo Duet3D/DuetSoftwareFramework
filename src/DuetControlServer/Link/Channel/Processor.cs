@@ -1029,11 +1029,6 @@ public sealed class Processor
     }
 
     /// <summary>
-    /// Indicates if the next empty response is supposed to be suppressed (e.g. because a print event just occurred)
-    /// </summary>
-    private bool _suppressEmptyReply;
-
-    /// <summary>
     /// Handle a G-code reply
     /// </summary>
     /// <param name="flags">Message flags</param>
@@ -1066,6 +1061,12 @@ public sealed class Processor
             }
             else if (_linkAdapter.ProtocolVersion >= 3)
             {
+                if (_waitingForPrintCompletion && string.IsNullOrEmpty(reply) && CurrentState.StartCode is null)
+                {
+                    // RRF writes the final reply before the request closing stop.g, so it may arrive first
+                    _waitingForPrintCompletion = false;
+                    return true;
+                }
                 PendingReplies.Enqueue(new Tuple<MessageTypeFlags, string>(flags, reply));
                 return true;
             }
@@ -1086,20 +1087,31 @@ public sealed class Processor
             }
         }
 
+        // Check for the final reply confirming that the print has been stopped
+        if (_waitingForPrintCompletion && string.IsNullOrEmpty(reply))
+        {
+            _waitingForPrintCompletion = false;
+            return true;
+        }
+
         // Unless this message comes from the file or code queue it is out-of-order...
         if (Channel != CodeChannel.Queue)
         {
-            if (!string.IsNullOrEmpty(reply) || !_suppressEmptyReply)
-            {
-                _logger.LogWarning("Out-of-order reply: '{Reply}'", reply);
-            }
-            else
-            {
-                _suppressEmptyReply = false;
-            }
+            _logger.LogWarning("Out-of-order reply (flags {Flags}): '{Reply}'", flags, reply);
         }
         return false;
     }
+
+    /// <summary>
+    /// Indicates if the firmware still has to confirm the end of the last print.
+    /// RRF replies once more when it has run stop.g, and no code of ours is waiting for that reply
+    /// </summary>
+    private bool _waitingForPrintCompletion;
+
+    /// <summary>
+    /// Called when the print stopped notification has been sent to the firmware
+    /// </summary>
+    public void WaitForPrintCompletion() => _waitingForPrintCompletion = true;
 
     /// <summary>
     /// Hold the flags of the last incomplete code reply
@@ -1345,7 +1357,6 @@ public sealed class Processor
         }
         BufferedCodes.Clear();
         BytesBuffered = 0;
-        _suppressEmptyReply = true;
 
         foreach (StackState state in Stack)
         {
@@ -1422,7 +1433,7 @@ public sealed class Processor
         }
         BufferedCodes.Clear();
         BytesBuffered = 0;
-        _suppressEmptyReply = true;
+        _waitingForPrintCompletion = false;
 
         // Clear codes that are still pending but have not been fed into the SPI interface yet
         _codeProcessor.CancelPending(Channel);
