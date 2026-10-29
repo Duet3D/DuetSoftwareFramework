@@ -73,7 +73,7 @@ public sealed class Executed : PipelineBase
     }
 
     /// <inheritdoc />
-    public override async ValueTask ProcessCodeAsync(Commands.Code code)
+    public override async ValueTask ProcessCodeAsync(PipelineStackItem stackItem, Commands.Code code)
     {
         if (code.Result is not null)
         {

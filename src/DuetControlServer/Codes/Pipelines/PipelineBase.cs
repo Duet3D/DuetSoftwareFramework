@@ -210,9 +210,10 @@ public abstract class PipelineBase
     /// <summary>
     /// Process a code from a given code channel
     /// </summary>
+    /// <param name="stackItem">Stack item holding the code</param>
     /// <param name="code">Code to process</param>
     /// <returns>Asynchronous task</returns>
-    public abstract ValueTask ProcessCodeAsync(Commands.Code code);
+    public abstract ValueTask ProcessCodeAsync(PipelineStackItem stackItem, Commands.Code code);
 
     /// <summary>
     /// Enqueue a given code on this pipeline state for execution.

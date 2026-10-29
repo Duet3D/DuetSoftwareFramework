@@ -44,5 +44,5 @@ public sealed class Firmware(
     }
 
     /// <inheritdoc />
-    public override ValueTask ProcessCodeAsync(Code code) => ValueTask.CompletedTask;
+    public override ValueTask ProcessCodeAsync(PipelineStackItem stackItem, Code code) => ValueTask.CompletedTask;
 }
