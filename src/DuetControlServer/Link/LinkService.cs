@@ -324,6 +324,7 @@ public sealed class LinkService(
             }
 
             // Check for changes of the print status
+            bool printStopped = false;
             using (linkInterface.PrintStateLock.Lock(stoppingToken))
             {
                 if (linkInterface.SetPrintInfoRequest is not null && linkAdapter.WritePrintFileInfo(model.Job.File))
@@ -336,9 +337,21 @@ public sealed class LinkService(
                 {
                     if (linkInterface.StopPrintRequest is not null && linkAdapter.WritePrintStopped(linkInterface.StopPrintReason))
                     {
+                        // Only a print that really ran to the end makes RRF execute stop.g and reply once more. A simulation exits
+                        // early in RRF's StopPrint, and after M0/M1/M2 it has run stop.g for that code long before this notification
+                        printStopped = (linkInterface.StopPrintReason == PrintStoppedReason.NormalCompletion) && !jobProcessor.IsSimulating && !jobProcessor.IsStoppedByCode;
                         linkInterface.StopPrintRequest.SetResult();
                         linkInterface.StopPrintRequest = null;
                     }
+                }
+            }
+
+            if (printStopped)
+            {
+                // Only the primary file channel runs stop.g, forked streams exit early in RRF's StopPrint
+                using (channels[CodeChannel.File].Lock())
+                {
+                    channels[CodeChannel.File].WaitForPrintCompletion();
                 }
             }
 
