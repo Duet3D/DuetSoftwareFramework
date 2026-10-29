@@ -948,6 +948,11 @@ namespace DuetControlServer.SPI.Channel
         private bool _suppressEmptyReply;
 
         /// <summary>
+        /// Expect one more empty reply, which RRF sends when it has run stop.g at the end of a print
+        /// </summary>
+        public void SuppressEmptyReply() => _suppressEmptyReply = true;
+
+        /// <summary>
         /// Handle a G-code reply
         /// </summary>
         /// <param name="flags">Message flags</param>
@@ -1003,7 +1008,7 @@ namespace DuetControlServer.SPI.Channel
             // Unless this message comes from the file or code queue it is out-of-order...
             if (Channel != CodeChannel.Queue)
             {
-                if (!_suppressEmptyReply)
+                if (!string.IsNullOrEmpty(reply) || !_suppressEmptyReply)
                 {
                     _logger.Warn("Out-of-order reply: '{0}'", reply);
                 }

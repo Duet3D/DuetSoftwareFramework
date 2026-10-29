@@ -281,7 +281,7 @@ namespace DuetControlServer.Files
         /// <remarks>
         /// This class has to be locked when this method is called
         /// </remarks>
-        public static async Task SelectFile(string fileName, string physicalFile, bool simulating = false)
+        public static async Task SelectFile(string fileName, string physicalFile, bool simulating = false, bool fromJobFile = false)
         {
             // Analyze and open the file
             GCodeFileInfo info = await InfoParser.Parse(physicalFile, true);
@@ -291,9 +291,30 @@ namespace DuetControlServer.Files
             if (IsFileSelected)
             {
                 Cancel();
+                if (fromJobFile)
+                {
+                    // The code selecting this file is still being executed by the job that was just cancelled, so waiting
+                    // for that job here would deadlock. The print loop starts this file when the current print has ended
+                    _pendingFile = file;
+                    _pendingFileInfo = info;
+                    _pendingFileSimulating = simulating;
+                    return;
+                }
                 await _finished.WaitAsync(Program.CancellationToken);
             }
 
+            await ApplyFileSelection(file, info, simulating);
+        }
+
+        /// <summary>
+        /// Apply a new file selection and tell the firmware about it
+        /// </summary>
+        /// <param name="file">File to print</param>
+        /// <param name="info">Information about the file</param>
+        /// <param name="simulating">Whether the file is being simulated</param>
+        /// <returns>Asynchronous task</returns>
+        private static async Task ApplyFileSelection(CodeFile file, GCodeFileInfo info, bool simulating)
+        {
             // Update the state
             IsCancelled = IsAborted = false;
             IsSimulating = simulating;
@@ -308,8 +329,28 @@ namespace DuetControlServer.Files
 
             // Notify RepRapFirmware and start processing the file in the background
             await SPI.Interface.SetPrintFileInfo();
-            _logger.Info("Selected file {0}", fileName);
+            _logger.Info("Selected file {0}", file.FileName);
         }
+
+        /// <summary>
+        /// File selected by the job file being printed, started when the current print has ended
+        /// </summary>
+        private static CodeFile? _pendingFile;
+
+        /// <summary>
+        /// Information about the file waiting to be printed
+        /// </summary>
+        private static GCodeFileInfo? _pendingFileInfo;
+
+        /// <summary>
+        /// Whether the file waiting to be printed is going to be simulated
+        /// </summary>
+        private static bool _pendingFileSimulating;
+
+        /// <summary>
+        /// Whether the print loop may start the next print without waiting for a resume request
+        /// </summary>
+        private static bool _startPendingFile;
 
         /// <summary>
         /// Fork the file being processed to execute concurrently
@@ -525,6 +566,7 @@ namespace DuetControlServer.Files
                             Code waitCode = new()
                             {
                                 Channel = file.Channel,
+                                File = file,			// the code pipeline routes codes by their file, so it must be the job file being finished
                                 Type = CodeType.MCode,
                                 MajorNumber = 400
                             };
@@ -597,7 +639,12 @@ namespace DuetControlServer.Files
                 bool startingNewPrint;
                 using (await LockAsync())
                 {
-                    await _resume.WaitAsync(Program.CancellationToken);
+                    // A file selected by the previous job is already waiting to be printed
+                    if (!_startPendingFile)
+                    {
+                        await _resume.WaitAsync(Program.CancellationToken);
+                    }
+                    _startPendingFile = false;
                     startingNewPrint = !_file!.IsClosed;
                     IsProcessing = startingNewPrint;
                 }
@@ -729,6 +776,14 @@ namespace DuetControlServer.Files
                     // End, un-forking the file input reader like RRF does when a print stops
                     Codes.Processor.SetFileStreamsForked(false);
                     IsProcessing = IsSimulating = IsPaused = false;
+
+                    // Select the file that the job just finished asked for with M23 or M32
+                    if (_pendingFile is not null)
+                    {
+                        await ApplyFileSelection(_pendingFile, _pendingFileInfo!, _pendingFileSimulating);
+                        _pendingFile = null;
+                        _pendingFileInfo = null;
+                    }
                 }
             }
             while (!Program.CancellationToken.IsCancellationRequested);
@@ -759,6 +814,13 @@ namespace DuetControlServer.Files
         /// </summary>
         public static void Resume()
         {
+            if (_pendingFile is not null)
+            {
+                // Still finishing the print that selected the next file, which the print loop starts once it is done
+                _startPendingFile = true;
+                return;
+            }
+
             if (IsFileSelected)
             {
                 if (IsPaused)
@@ -809,6 +871,8 @@ namespace DuetControlServer.Files
                 _file2?.Close();
 
                 IsAborted = true;
+                _pendingFile = null;
+                _pendingFileInfo = null;
                 Resume();
             }
         }

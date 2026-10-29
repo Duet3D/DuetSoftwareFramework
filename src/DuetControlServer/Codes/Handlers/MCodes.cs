@@ -207,7 +207,13 @@ namespace DuetControlServer.Codes.Handlers
                                 {
                                     return new Message(MessageType.Error, "Cannot set file to print, because a file is already being printed");
                                 }
-                                await JobProcessor.SelectFile(fileName, physicalFile);
+                                await JobProcessor.SelectFile(fileName, physicalFile, false, code.IsFromFileChannel);
+                            }
+
+                            // Reassign the code's cancellation token so the job that just selected the next file still gets this code's reply
+                            if (code.IsFromFileChannel)
+                            {
+                                code.ResetCancellationToken();
                             }
                         }
 
@@ -459,7 +465,7 @@ namespace DuetControlServer.Codes.Handlers
                                     return new Message(MessageType.Error, "Cannot set file to simulate, because a file is already being printed");
                                 }
 
-                                await JobProcessor.SelectFile(fileName, physicalFile, true);
+                                await JobProcessor.SelectFile(fileName, physicalFile, true, code.IsFromFileChannel);
                                 // F0 suppresses writing the simulated time back to the file; absent or F1 updates it, as in standalone mode
                                 JobProcessor.UpdateSimulatedTime = code.GetInt('F', 1) == 1;
                                 // Simulation is started when M37 has been processed by the firmware

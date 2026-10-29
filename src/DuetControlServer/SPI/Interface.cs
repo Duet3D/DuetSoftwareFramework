@@ -762,6 +762,7 @@ namespace DuetControlServer.SPI
                 }
 
                 // Check for changes of the print status
+                bool printStopped = false;
                 using (_printStateLock.Lock(Program.CancellationToken))
                 {
                     if (_setPrintInfoRequest is not null && DataTransfer.WritePrintFileInfo(Model.Provider.Get.Job.File))
@@ -774,9 +775,19 @@ namespace DuetControlServer.SPI
                     {
                         if (_stopPrintRequest is not null && DataTransfer.WritePrintStopped(_stopPrintReason))
                         {
+                            printStopped = _stopPrintReason == PrintStoppedReason.NormalCompletion;
                             _stopPrintRequest.SetResult();
                             _stopPrintRequest = null;
                         }
+                    }
+                }
+
+                if (printStopped)
+                {
+                    // RRF runs stop.g when a print ends and replies once more, and no code of ours is waiting for that reply
+                    using (_channels[CodeChannel.File].Lock())
+                    {
+                        _channels[CodeChannel.File].SuppressEmptyReply();
                     }
                 }
 
