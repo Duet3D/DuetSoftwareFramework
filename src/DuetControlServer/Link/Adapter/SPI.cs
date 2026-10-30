@@ -330,7 +330,10 @@ public class SPI : IDiagnostics, ILinkAdapter
                 }
 
                 _logger.LogDebug(e, "Lost connection to Duet");
+
+                // The TX header buffer may still hold a protocol version adopted from a bad header, so rewrite it as well
                 _txHeader.ProtocolVersion = Consts.ProtocolVersion;
+                WriteCRC();
                 _waitingForFirstTransfer = true;
 
                 // Without this the retry guard above keeps throwing without exchanging anything
