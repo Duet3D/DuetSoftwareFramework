@@ -89,9 +89,9 @@ internal sealed class HangprinterKinematicsEngine : KinematicsEngine
     /// the configured one. What the geometry does have is still projected, so the object model
     /// describes the constant-radius machine actually being planned for
     /// </remarks>
-    public override void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics)
+    public override void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics, Move move)
     {
-        base.WriteTo(kinematics);
+        base.WriteTo(kinematics, move);
 
         HangprinterKinematics hangprinter = (HangprinterKinematics)kinematics;
         hangprinter.PrintRadius = PrintRadius;

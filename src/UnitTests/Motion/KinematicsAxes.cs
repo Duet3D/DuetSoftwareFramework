@@ -80,11 +80,12 @@ internal static class KinematicsAxes
     /// </summary>
     /// <typeparam name="T">The node type its kind has</typeparam>
     /// <param name="engine">The geometry</param>
+    /// <param name="letters">The letter of each axis of the machine it reports for, in axis order</param>
     /// <returns>A fresh node the geometry has written itself into</returns>
-    public static T Reported<T>(KinematicsEngine engine) where T : DuetAPI.ObjectModel.Kinematics
+    public static T Reported<T>(KinematicsEngine engine, string letters = Canonical) where T : DuetAPI.ObjectModel.Kinematics
     {
         DuetAPI.ObjectModel.Kinematics kinematics = DuetAPI.ObjectModel.Kinematics.Create(engine.Kind);
-        engine.WriteTo(kinematics);
+        engine.WriteTo(kinematics, NewMoveWithAxes(letters));
         return (T)kinematics;
     }
 }

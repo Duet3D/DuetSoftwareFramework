@@ -124,7 +124,10 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
     /// The matrix a whole inverse matrix describes
     /// </summary>
     /// <param name="inverseMatrix">Rows are axes, columns are motors, both by index</param>
-    /// <returns>The matrix, the identity beyond the rows given</returns>
+    /// <returns>The matrix, the identity beyond the rows and columns given</returns>
+    /// <remarks>
+    /// The object model reports a row and a column for every axis, hidden ones included
+    /// </remarks>
     private static float[,] MatrixFrom(float[][] inverseMatrix)
     {
         float[,] matrix = Identity();
@@ -132,11 +135,11 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
         {
             float[] row = inverseMatrix[axis];
 
-            // A described row replaces the identity entry, so a row of all zeroes really does mean
+            // A described entry replaces the identity's, so a row of all zeroes really does mean
             // "no motor moves for this axis" rather than silently keeping the diagonal
-            for (int motor = 0; motor < MatrixSize; motor++)
+            for (int motor = 0; motor < row.Length && motor < MatrixSize; motor++)
             {
-                matrix[axis, motor] = motor < row.Length ? row[motor] : 0.0f;
+                matrix[axis, motor] = row[motor];
             }
         }
         return matrix;
@@ -323,24 +326,39 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
     }
 
     /// <inheritdoc />
-    public override void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics)
+    /// <remarks>
+    /// The matrices are reported as large as the machine's axes, hidden ones included, as
+    /// RepRapFirmware's <c>CoreKinematics::objectModelArrayTable</c> sizes them: each has a row and a
+    /// column for every axis and its motor. The rest of the matrix is the identity, which is what an
+    /// axis created later starts with, so M584 only has to write them again at the new size
+    /// </remarks>
+    public override void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics, Move move)
     {
-        base.WriteTo(kinematics);
+        base.WriteTo(kinematics, move);
+
+        int numAxes = Math.Min(move.Axes.Count, MatrixSize);
 
         CoreKinematics core = (CoreKinematics)kinematics;
         core.InverseMatrix.Clear();
-        core.ForwardMatrix.Clear();
-        for (int axis = 0; axis < MatrixSize; axis++)
+        for (int axis = 0; axis < numAxes; axis++)
         {
-            float[] inverse = new float[MatrixSize];
-            float[] forward = new float[MatrixSize];
-            for (int i = 0; i < MatrixSize; i++)
+            float[] row = new float[numAxes];
+            for (int motor = 0; motor < numAxes; motor++)
             {
-                inverse[i] = _inverse[axis, i];
-                forward[i] = _forward[axis, i];
+                row[motor] = _inverse[axis, motor];
             }
-            core.InverseMatrix.Add(inverse);
-            core.ForwardMatrix.Add(forward);
+            core.InverseMatrix.Add(row);
+        }
+
+        core.ForwardMatrix.Clear();
+        for (int motor = 0; motor < numAxes; motor++)
+        {
+            float[] row = new float[numAxes];
+            for (int axis = 0; axis < numAxes; axis++)
+            {
+                row[axis] = _forward[motor, axis];
+            }
+            core.ForwardMatrix.Add(row);
         }
     }
 

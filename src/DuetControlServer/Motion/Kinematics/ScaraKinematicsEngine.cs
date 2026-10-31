@@ -174,9 +174,9 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
     }
 
     /// <inheritdoc />
-    public override void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics)
+    public override void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics, Move move)
     {
-        base.WriteTo(kinematics);
+        base.WriteTo(kinematics, move);
 
         ScaraKinematics scara = (ScaraKinematics)kinematics;
         scara.ProximalLength = ProximalArmLength;

@@ -473,7 +473,6 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
     /// matrix [0.5,0.5,0], [0.5,-0.5,0], [0,0,1]. OM fields (name, forwardMatrix, inverseMatrix)
     /// from the CoreKinematics object model tables in the same file
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M669SelectsCoreXY()
     {

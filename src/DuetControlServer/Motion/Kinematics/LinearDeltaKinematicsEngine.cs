@@ -480,9 +480,9 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
     }
 
     /// <inheritdoc />
-    public override void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics)
+    public override void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics, Move move)
     {
-        base.WriteTo(kinematics);
+        base.WriteTo(kinematics, move);
 
         DeltaKinematics delta = (DeltaKinematics)kinematics;
         delta.DeltaRadius = Radius;

@@ -218,6 +218,6 @@ internal static class KinematicsConfigurator
         {
             move.Kinematics = DuetAPI.ObjectModel.Kinematics.Create(engine.Kind);
         }
-        engine.WriteTo(move.Kinematics);
+        engine.WriteTo(move.Kinematics, move);
     }
 }

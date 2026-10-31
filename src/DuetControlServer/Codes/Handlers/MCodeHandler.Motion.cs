@@ -676,15 +676,24 @@ internal partial class MCodeHandler
                 // the code goes on to fail
                 mappingChanged = seen;
 
+                // The axes are created before any driver is reset, so that what the object model sizes
+                // by the axes follows them even if a reset then fails
+                int numAxes = move.Axes.Count;
+                foreach ((char letter, _) in axisMapping)
+                {
+                    if (!move.Axes.Any(a => a.Letter == letter))
+                    {
+                        move.Axes.Add(CreateAxis(letter, seenWrapType ? wrapType : null, seenRotational ? rotational == 1 : null));
+                    }
+                }
+                if (move.Axes.Count != numAxes)
+                {
+                    KinematicsConfigurator.WriteTo(planner.Geometry, move);
+                }
+
                 foreach ((char letter, DriverId[] drivers) in axisMapping)
                 {
-                    Axis? axis = move.Axes.FirstOrDefault(a => a.Letter == letter);
-                    if (axis is null)
-                    {
-                        axis = CreateAxis(letter, seenWrapType ? wrapType : null, seenRotational ? rotational == 1 : null);
-                        move.Axes.Add(axis);
-                    }
-
+                    Axis axis = move.Axes.First(a => a.Letter == letter);
                     axis.Drivers.Clear();
                     foreach (DriverId driver in drivers)
                     {
@@ -726,9 +735,15 @@ internal partial class MCodeHandler
                     {
                         throw new GCodeException("Invalid number of visible axes");
                     }
+                    bool visibilityChanged = false;
                     for (int i = 0; i < move.Axes.Count; i++)
                     {
+                        visibilityChanged |= move.Axes[i].Visible != i < visibleAxes;
                         move.Axes[i].Visible = i < visibleAxes;
+                    }
+                    if (visibilityChanged)
+                    {
+                        KinematicsConfigurator.WriteTo(planner.Geometry, move);
                     }
                 }
 
@@ -2934,6 +2949,10 @@ internal partial class MCodeHandler
             MachinePosition = 0.0f,
             UserPosition = 0.0f
         };
+        for (int workplace = 0; workplace < Model.MachineLimits.NumWorkplaces; workplace++)
+        {
+            axis.WorkplaceOffsets.Add(0.0f);
+        }
 
         // Everything else an axis starts life with is the object model's, so that a bare Axis is a
         // movable one wherever it is constructed. Only the Z rule lives here, because it is selected

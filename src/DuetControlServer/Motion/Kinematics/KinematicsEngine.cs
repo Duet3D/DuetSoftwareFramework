@@ -370,6 +370,7 @@ internal abstract class KinematicsEngine
     /// <param name="kinematics">
     /// The node to write to, which the caller has already created for <see cref="KinematicsName"/>
     /// </param>
+    /// <param name="move">The move model, whose axes decide how much of a per-axis parameter is reported</param>
     /// <remarks>
     /// <para>
     /// The projection §14 is about: this geometry is what the machine moves by, and the object model
@@ -382,7 +383,7 @@ internal abstract class KinematicsEngine
     /// own, so that the geometry stays something a test can construct and assert on without a model
     /// </para>
     /// </remarks>
-    public virtual void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics)
+    public virtual void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics, Move move)
     {
         // Reported only while it is in use, as RepRapFirmware reports it
         kinematics.Segmentation = Segmentation.HasFlag(SegmentationType.Segment)

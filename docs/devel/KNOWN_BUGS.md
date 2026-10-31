@@ -18,7 +18,6 @@ Tracking known issues to keep Github issues from being spammed by issues for the
 
 ### Kinematics
 - [ ] Delta kinematics can't set `NumTowers` using gcode
-- [ ] OM kinematics matrices are not updated by `M584`
 
 ### Probing and the move transforms
 - [ ] `G30` without P first moves Z to the dive height above the axis minimum (`ProbeStartHeight`) and dives from there; RepRapFirmware dives from where the head is (`ExecuteG30` goes straight to `probingAtPoint2a`). On the regression bench, where Z's minimum is −100, that is a 99 mm move down before the dive. KnownGap scenario `GeneratedMoveTransformTests.G30WithoutPDivesFromWhereTheHeadIs`.

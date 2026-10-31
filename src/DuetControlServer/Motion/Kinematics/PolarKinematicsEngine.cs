@@ -132,9 +132,9 @@ internal sealed class PolarKinematicsEngine : KinematicsEngine
     }
 
     /// <inheritdoc />
-    public override void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics)
+    public override void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics, Move move)
     {
-        base.WriteTo(kinematics);
+        base.WriteTo(kinematics, move);
 
         PolarKinematics polar = (PolarKinematics)kinematics;
         polar.RadiusMin = MinRadius;
