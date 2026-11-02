@@ -11,9 +11,6 @@
  * where each drive ends up and how fast the move may go; InitFromParams picks the move up from
  * there, which is where upstream's InitStandardMove reaches step 7 and needs the moves either side
  * of it. Everything that fed the step interrupt is absent, because there is no local driver to step.
- *
- * What is not ported, and what each piece is waiting for, is recorded in
- * docs/devel/SBC_MOTION_CLEANUP.md rather than here.
  */
 
 #ifndef DDA_H_
@@ -38,8 +35,7 @@ namespace Duet::Sbc::Motion
 
 #if SUPPORT_S_CURVE
 // The 3rd-order planner. Declared rather than included: MovementProfile.h is not ported, so the
-// declarations below that take one by reference are as far as this side goes. See
-// docs/devel/SBC_MOTION_CLEANUP.md.
+// declarations below that take one by reference are as far as this side goes.
 class MovementProfile;
 #endif
 
@@ -194,8 +190,7 @@ class DDA final
 	}
 
 	// The limits this move is to be executed with, as they stood when DuetControlServer built it.
-	// Carried per move so that changing them cannot reach a move that is already queued; see
-	// docs/devel/MOTION_CONFIG_ORDERING.md.
+	// Carried per move so that changing them cannot reach a move that is already queued.
 	[[nodiscard]] const Duet::Sbc::Motion::MoveDriveTuning& DriveTuning(size_t drive) const noexcept
 	{
 		return m_tuning[drive];

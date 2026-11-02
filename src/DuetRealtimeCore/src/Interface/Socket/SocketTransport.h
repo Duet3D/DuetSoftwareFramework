@@ -1,7 +1,6 @@
 // Socket transport: the transfer protocol carried over a Unix domain stream socket to a virtual
 // controller instead of over SPI to a real one. This is the SBC side of the framing defined in
-// DuetSpiProtocol/SocketLinkFormats.h; the peer is the system test bench's fake controller today
-// and the Renode link peripheral in stage 2 of docs/devel/SYSTEM_EMULATION.md.
+// DuetSpiProtocol/SocketLinkFormats.h; the peer is the system test bench's fake controller.
 //
 // The transfer content, CRCs and recovery skeleton are FullDuplexExchangeTransport's; what this class supplies is
 // how the exchange crosses the link:

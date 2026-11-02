@@ -19,7 +19,7 @@
 - includes markdown from `articles/`, `index.md`, and the API landing pages;
 - writes the finished static site to `../../docs`.
 
-This project covers the generated API and article site. The hand-written developer architecture notes under `docs/devel/` and `docs/architecture/` live outside this project but sit alongside the DocFX output in the published tree.
+This project covers the generated API and article site. The hand-written developer plans under `docs/devel/` live outside this project but sit alongside the DocFX output in the published tree.
 
 ## Interfaces
 
@@ -43,5 +43,5 @@ If you are running DocFX directly, do so from this directory after the reference
 ## Related Docs
 
 - [../../docs/devel/README.md](../../docs/devel/README.md)
-- [../../docs/devel/BUILD_VARIANTS.md](../../docs/devel/BUILD_VARIANTS.md)
+- [articles/building.md](articles/building.md)
 - [../DocGen/README.md](../DocGen/README.md)

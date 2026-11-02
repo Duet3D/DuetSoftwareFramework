@@ -21,8 +21,7 @@ anything that names a `.cpp` file is DuetRealtimeCore; §10 is the full map.
 Related reading: [File management](file-management.md#print-jobs) covers the job loop and the seek
 this hangs off; [G-Code flow](gcode-flow.md) covers the pipeline whose codes a pause cancels;
 [Differences from RepRapFirmware](rrf-differences.md#8-a-pause-stops-the-machine-sooner-than-reprapfirmwares-does)
-covers the one deliberate deviation, which is §3 below. The reasoning behind the design, and what is
-still missing, is [JOB_LIFECYCLE.md](docs/devel/JOB_LIFECYCLE.md).
+covers the one deliberate deviation, which is §3 below.
 
 ---
 
@@ -392,9 +391,6 @@ not implemented (§9).
 | Power-fail resume | `resurrect.g`, `M911` and `M916`. `M26 P` and `C` are the half of it that exists |
 | A second motion system | Only ring 0 is stopped, and only the first file channel records or spends a fraction. `M596` and `M598` widen both together |
 | `M25.1` | A fraction on `M25` is accepted as `M25` rather than looked for as `sys/M25.1.g` |
-
-[JOB_LIFECYCLE.md](docs/devel/JOB_LIFECYCLE.md) tracks all of these, along with the reasoning behind
-the design above.
 
 Two of those rows are gaps on the native side and the rest are DuetControlServer's. The arc and
 retraction row is `DDA::IsRestartableBoundary` needing to be cleared for boundaries a print cannot be

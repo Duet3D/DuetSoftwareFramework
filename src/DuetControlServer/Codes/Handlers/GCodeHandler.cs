@@ -158,7 +158,7 @@ internal sealed partial class GCodeHandler(
         // M37 always names a file, which is RepRapFirmware's exitSimulationWhenFileComplete.
         // TODO add the dwell to the simulated time once DuetControlServer accumulates one. It
         // measures a simulation by the wall clock today, so a skipped dwell is time no estimate
-        // carries; see docs/devel/MCODE_MIGRATION.md section 18
+        // carries
         if (code.IsFromFileChannel && jobController.State.IsSimulating)
         {
             return new Message();

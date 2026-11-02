@@ -12,8 +12,7 @@ namespace DuetControlServer.Model;
 /// </para>
 /// <para>
 /// These four have no such home. Two of them bound features that are not ported yet, so the constant
-/// moves to whatever ends up enforcing it when they are - see <c>docs/devel/MCODE_MIGRATION.md</c>
-/// for M486 and <c>docs/devel/EVENTS_MIGRATION.md</c> for the triggers
+/// moves to whatever ends up enforcing it when they are
 /// </para>
 /// </remarks>
 internal static class MachineLimits

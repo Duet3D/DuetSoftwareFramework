@@ -608,8 +608,7 @@ namespace Duet::Sbc
 				std::memcpy(&header, bytes.data(), sizeof(header));
 
 				// A command that someone is waiting on is failed rather than merely forgotten. The rest
-				// carry no way to say so, which is what the acknowledgement work in section 4.1.2 of
-				// docs/devel/EVENTS_MIGRATION.md is for
+				// carry no way to say so yet
 				if (static_cast<OutboundCommandType>(header.type) == OutboundCommandType::EnableCan &&
 					bytes.size() >= sizeof(EnableCanCommand))
 				{

@@ -137,13 +137,11 @@ Each `CodeChannel` (HTTP, File, Daemon, Trigger, ...) has a `ChannelProcessor` r
 
 The object model (`src/DuetAPI/ObjectModel`) is the machine's configuration, not a cache of what the hardware is doing. It must hold enough to recreate the configuration of any expansion board that reconnects, so that DSF can reconfigure the board from the model alone. Sending a setting to a board over CAN without recording it in the model is not acceptable, even when the board is what acts on it. When a configuration code sets something the model does not represent yet, add the field or model class to the object model rather than keeping it in a private field. Transient state, such as driver enable or current position, is exempt.
 
-`DCS_INTERNALS.md`, `SPI_LINK.md` and `HTTP_API.md` in `docs/devel` describe the system as built; `docs/architecture/` covers the cross-repository picture from before the migration.
 
 ## Documentation conventions
 
 Two separate places, for two audiences:
 
-- **`docs/devel/`**: plans, design reasoning and migration tracking. Each workstream has a plan (`MCODE_MIGRATION.md` is the umbrella M-code inventory; `EVENTS_MIGRATION.md`, `STALL_DETECTION.md`, `JOB_LIFECYCLE.md`, `MOTION_SYNCHRONISED_ACTIONS.md` and others are carved out of it). `PROJECT_OVERVIEW.md` is a rollup whose counts and status are derived from the plans; when they disagree, the plan is right. `KNOWN_BUGS.md` and `GCODE_COVERAGE.md` track gaps. Read the plan covering an area before changing it: it records decisions already taken. A change that lands, closes or reopens something a plan describes updates that plan's status (✅/🟡/⬜) and then `PROJECT_OVERVIEW.md` in the same commit. Plans describe the current state, with no revision history.
 - **`src/Documentation/articles/`**: the published DSF wiki (docfx). Current behaviour only, with no history, plans or migration status. A change a user can observe (G/M-code semantics, object model, IPC, firmware link, REST API, file handling) updates the matching article in the same change. `rrf-differences.md` lists only deliberate, implemented deviations from RRF; unimplemented gaps belong in `docs/devel`. New articles need an entry in `toc.yml`.
 
 When writing Markdown, put each paragraph and each list item on a single line. Do not insert newlines to wrap prose at a column width. Blank lines between paragraphs, code blocks, tables and headings are unaffected.

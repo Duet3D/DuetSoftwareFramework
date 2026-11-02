@@ -11,7 +11,7 @@ namespace SystemTests;
 /// The SBC has no step clock of its own: it fits a model to these readings and schedules every move
 /// by absolute start time against it, and move retirement (with it deferred-code wake-up and
 /// feedhold outcomes) follows from that model. Owning this clock is therefore what makes the fake's
-/// motion timeline scriptable; see docs/devel/SYSTEM_EMULATION.md, stage 1
+/// motion timeline scriptable
 /// </remarks>
 internal interface IControllerClock
 {

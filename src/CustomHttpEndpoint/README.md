@@ -37,5 +37,5 @@ dotnet run --project CustomHttpEndpoint.csproj -- --help
 ## Related Docs
 
 - [../DuetWebServer/README.md](../DuetWebServer/README.md)
-- [../../docs/devel/HTTP_API.md](../../docs/devel/HTTP_API.md)
-- [../../docs/devel/IPC_PROTOCOL.md](../../docs/devel/IPC_PROTOCOL.md)
+- [../Documentation/articles/rest-api.md](../Documentation/articles/rest-api.md)
+- [../Documentation/articles/ipc.md](../Documentation/articles/ipc.md)

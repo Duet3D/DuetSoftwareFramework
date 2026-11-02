@@ -166,7 +166,7 @@ public class DwellCodeTests : SystemTests.Host.BenchFixture
     /// GCodes.cpp DoDwell adds the dwell to simulationTime and returns ok instead of waiting,
     /// unless the code comes from the daemon or a trigger. DuetControlServer measures a simulation
     /// by the wall clock rather than accumulating a simulated time, so the dwell is skipped and
-    /// nothing is added; see MCODE_MIGRATION.md section 18
+    /// nothing is added
     /// </remarks>
     [Test]
     public async Task G4DoesNotDwellWhileSimulatingAFile()

@@ -58,8 +58,7 @@ internal sealed class MoveBuilder(MotionParameters parameters)
     /// <remarks>
     /// A move carries these rather than the engine reading them from a shared machine description,
     /// which is what lets M572 and its like take effect between two moves without stopping the
-    /// machine and without reaching a move that is already queued. See
-    /// <c>docs/devel/MOTION_CONFIG_ORDERING.md</c>
+    /// machine and without reaching a move that is already queued
     /// </remarks>
     private readonly MoveDriveTuning[] _tuning = new MoveDriveTuning[NumDrives];
 
@@ -185,8 +184,7 @@ internal sealed class MoveBuilder(MotionParameters parameters)
 
         // Where the machine is, which the new endpoints are built on top of. Valid after a move that
         // was stopped short as well: the endstop correction writes the position the drives actually
-        // reached into `_endPoints` before the next move is built (§12 of
-        // docs/devel/MCODE_MIGRATION.md), so this is the corrected position rather than the planned one
+        // reached into `_endPoints` before the next move is built, so this is the corrected position rather than the planned one
         Array.Clear(_directionVector);
         _endPoints.CopyTo(_newEndPoints, 0);
 

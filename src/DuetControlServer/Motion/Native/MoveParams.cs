@@ -87,7 +87,7 @@ internal struct MoveParamsHeader
 /// <remarks>
 /// These were read from the shared machine description until moves began carrying their own. A move
 /// carries the values that were in force when it was built, so changing them cannot reach a move that
-/// is already queued - see <c>docs/devel/MOTION_CONFIG_ORDERING.md</c>
+/// is already queued
 /// </remarks>
 [StructLayout(LayoutKind.Sequential, Pack = 1, Size = 28)]
 internal struct MoveDriveTuning

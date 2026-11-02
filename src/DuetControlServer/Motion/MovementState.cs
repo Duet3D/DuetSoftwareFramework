@@ -247,8 +247,7 @@ internal sealed class MovementState
         rp.FanSpeed = VirtualFanSpeed;
 
         // TODO virtualExtruderPosition needs the extrusion totals RepRapFirmware keeps in
-        // ms.latestVirtualExtruderPosition, which ApplyExtrusion does not track yet - see
-        // MCODE_MIGRATION.md §15.2. It stays zero until it does. What has to be recorded here is the
+        // ms.latestVirtualExtruderPosition, which ApplyExtrusion does not track yet. It stays zero until it does. What has to be recorded here is the
         // extruder position at the *start* of the interrupted line, because a resume rewinds the
         // absolute-extrusion reference to it and then asks for 1 - ProportionDone of the line; see
         // the note on the scaling in MoveInterpreter.ApplyExtrusion

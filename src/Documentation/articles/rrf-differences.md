@@ -5,9 +5,7 @@ faithful there is nothing to say; this article is the other list — the places 
 to behave differently, and why.
 
 **This is not a list of gaps.** A feature that is not ported yet is missing, not different: those are
-tracked with their blockers in [MCODE_MIGRATION.md](docs/devel/MCODE_MIGRATION.md),
-[EVENTS_MIGRATION.md](docs/devel/EVENTS_MIGRATION.md) and
-[STALL_DETECTION.md](docs/devel/STALL_DETECTION.md). Everything below is present, works, and does
+tracked in the developer documentation. Everything below is present, works, and does
 something other than what RepRapFirmware does.
 
 The distinction is load-bearing, because the porting contract makes divergence expensive on purpose:
@@ -208,8 +206,7 @@ One thing RepRapFirmware gets from that round trip which DSF does not: a board t
 forgotten its monitors, and priming the axis fails loudly instead of the endstop silently never
 reporting again. DSF raises `expansion_reconnect` when a board re-announces, so `expansion-reconnect.g`
 is where a machine recovers, but nothing re-creates the monitors on its own and nothing fails if the
-macro does not. That is a gap rather than a difference — see
-[INPUT_MONITORS.md](https://github.com/Duet3D/DuetSoftwareFramework/blob/master/docs/devel/INPUT_MONITORS.md).
+macro does not. That is a gap rather than a difference.
 
 ### 2.4 A Z probe standing in for an endstop is armed, and a probe left alone is quiet
 
@@ -470,8 +467,8 @@ line for only the part of it that is left.
 
 RepRapFirmware gives every G-code channel its own state machine, so its job macros can overlap: an
 `M0` sent from one console runs `stop.g` on that channel while an `M24` from another starts
-`start.g` on the file channel. DSF's job is one actor with one macro sequence in flight at a time
-(JOB_CONTROL_CONCURRENCY.md §7), so a command that would start a job macro while one is running
+`start.g` on the file channel. DSF's job is one actor with one macro sequence in flight at a time,
+so a command that would start a job macro while one is running
 waits its turn: `M24` or a second `M0` arriving while an operator stop runs `stop.g` from idle is
 held and performed when the macro ends, so the macros run one after the other and every caller is
 answered. RepRapFirmware would run them concurrently on their two channels. This is the one job
@@ -504,8 +501,3 @@ because they explain why several of the entries are shaped the way they are:
 ## Further reading
 
 - [Endstops](endstops.md) — the endstop path as it stands, in the order it runs
-- [MCODE_MIGRATION.md](docs/devel/MCODE_MIGRATION.md) — the M-code inventory, the porting contract, and the
-  reasoning behind §2, §3 and §5 above
-- [EVENTS_MIGRATION.md](docs/devel/EVENTS_MIGRATION.md) — the event system, and §7 there for the decisions
-  summarised in §4 above
-- [STALL_DETECTION.md](docs/devel/STALL_DETECTION.md) — stall homing, and where §2.1's stop groups came from

@@ -41,5 +41,5 @@ dotnet run --project PluginManager.csproj -- --help
 ## Related Docs
 
 - [../DuetPluginService/README.md](../DuetPluginService/README.md)
-- [../../docs/devel/PLUGINS.md](../../docs/devel/PLUGINS.md)
-- [../../docs/devel/IPC_PROTOCOL.md](../../docs/devel/IPC_PROTOCOL.md)
+- [../Documentation/articles/plugins.md](../Documentation/articles/plugins.md)
+- [../Documentation/articles/ipc.md](../Documentation/articles/ipc.md)

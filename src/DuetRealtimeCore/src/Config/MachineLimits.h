@@ -38,8 +38,6 @@
 // Each of these marks work this side intends to do and has not finished. A switch that marked a
 // decision already taken - the SBC owns no drivers, so there is nothing local to step, monitor or
 // stall-detect - is not a switch, it is a fact, and is stated where it matters instead.
-//
-// What each disabled one is still waiting for is recorded in docs/devel/SBC_MOTION_CLEANUP.md.
 // ---------------------------------------------------------------------------------------------
 
 // Defaults rather than fixed values, so that a build can flip one with -D to check that the other

@@ -11,8 +11,7 @@
  *
  * The settings that can change mid-print are not here. Jerk limits, pressure advance, backlash,
  * nonlinear extrusion and input shaping travel on each move instead, so that changing one cannot
- * reach a move that is already queued and nothing has to stop. See
- * docs/devel/MOTION_CONFIG_ORDERING.md and Motion/MoveParams.h.
+ * reach a move that is already queued and nothing has to stop. See Motion/MoveParams.h.
  *
  * gracePeriodMs is the exception that proves the rule: it is ring behaviour rather than anything a
  * move carries, and it is safe to replace at any moment.

@@ -46,7 +46,7 @@ internal static class NativeTestClock
 /// loop and DuetControlServer get done in it is a property of the host's scheduler, so the same
 /// scenario still stops in different places between runs. Gating the advance on quiescence rather
 /// than on a sleep is what closes that, and is also what makes the bench fast enough to run
-/// constantly; see docs/devel/DETERMINISTIC_BENCH.md
+/// constantly
 /// </para>
 /// </remarks>
 internal sealed class SteppedTimeline : IDisposable

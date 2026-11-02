@@ -133,8 +133,7 @@ internal sealed class MovePlanner(
     /// <para>
     /// Unlike the rest of <see cref="Parameters"/>, this is not derived from the object model: it is
     /// where M665, M666 and M669 put what they were told, and the object model's
-    /// <c>move.kinematics</c> is written from it. See §14 of <c>docs/devel/MCODE_MIGRATION.md</c> for
-    /// why this one is the other way round.
+    /// <c>move.kinematics</c> is written from it.
     /// </para>
     /// <para>
     /// A machine that has not been configured is Cartesian, which is what RepRapFirmware starts as
@@ -261,7 +260,7 @@ internal sealed class MovePlanner(
     /// extrusion, input shaping. The engine holds no copy of those to update, so there is nothing to
     /// push and nothing to synchronise: the next move built takes the new value and the moves already
     /// queued keep the one they were built with. That is what lets M572 and its like take effect
-    /// mid-print without stopping the machine. See <c>docs/devel/MOTION_CONFIG_ORDERING.md</c>.
+    /// mid-print without stopping the machine.
     /// </para>
     /// <para>
     /// Not for anything that changes what a microstep means. Steps per mm, driver mapping and
@@ -784,7 +783,7 @@ internal sealed class MovePlanner(
     /// <remarks>
     /// The engine stops ring 0 only, which is what <c>DrainFeedholds</c> says, and
     /// <see cref="FeedholdOutcome"/> carries one survivor. TODO stopping every ring and reporting a
-    /// survivor per ring is the M596 work in <c>docs/devel/MOTION_SYNCHRONISED_ACTIONS.md</c>
+    /// survivor per ring is part of supporting M596
     /// </remarks>
     private const int StoppedRing = 0;
 
@@ -848,7 +847,7 @@ internal sealed class MovePlanner(
     /// if the boundary is taken from the purge count instead.
     /// </para>
     /// <para>
-    /// The four cases are §7.7 of <c>docs/devel/JOB_CONTROL_CONCURRENCY.md</c>, in order: the engine
+    /// The four cases, in order: the engine
     /// did not stop, so every submitted move runs and the point is the segment after the last one
     /// submitted; the survivor is one of the job's own moves, so the point is the segment after it;
     /// the survivor belongs to a macro the job invoked, so the point is the invocation and the

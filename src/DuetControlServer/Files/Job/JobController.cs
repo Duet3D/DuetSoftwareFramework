@@ -36,9 +36,6 @@ namespace DuetControlServer.Files.Job;
 /// what keeps single ownership while a pause takes seconds, and what lets an abort be ordered
 /// against a pause instead of racing it.
 /// </para>
-/// <para>
-/// <c>docs/devel/JOB_CONTROL_CONCURRENCY.md</c> §7 is the design and the reasoning
-/// </para>
 /// </remarks>
 [DiagnosticsPriority(-1)]
 internal sealed class JobController : BackgroundService, IAsyncDiagnostics

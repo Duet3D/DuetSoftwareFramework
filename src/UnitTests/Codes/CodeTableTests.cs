@@ -10,7 +10,7 @@ using NUnit.Framework;
 namespace UnitTests.Codes;
 
 /// <summary>
-/// The CodeTable mechanism from MOTION_SYNCHRONISED_ACTIONS.md §5.1, exercised on a table built
+/// The CodeTable mechanism, exercised on a table built
 /// for the test rather than the handlers' own tables. The handler tables are declarations; what
 /// needs proving is that a table classifies and dispatches the way the declarations mean:
 /// exact fractional lookup, resolver rows, the miss path, and the row lambdas deciding the minor

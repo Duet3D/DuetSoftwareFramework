@@ -10,8 +10,7 @@ namespace DuetControlServer.Motion.Kinematics;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The geometry is what the machine moves by and the object model describes it - see §14 of
-/// <c>docs/devel/MCODE_MIGRATION.md</c>. This is the one place the two are brought into step, so
+/// The geometry is what the machine moves by and the object model describes it. This is the one place the two are brought into step, so
 /// there is one thing to get right rather than one per code.
 /// </para>
 /// <para>

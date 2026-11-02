@@ -66,7 +66,7 @@ Functional testing usually means running DCS, starting DWS, then checking a brow
 
 ## Related Docs
 
-- [../../docs/devel/HTTP_API.md](../../docs/devel/HTTP_API.md)
-- [../../docs/devel/IPC_PROTOCOL.md](../../docs/devel/IPC_PROTOCOL.md)
-- [../../docs/devel/OBJECT_MODEL.md](../../docs/devel/OBJECT_MODEL.md)
-- [../../docs/devel/ARCHITECTURE.md](../../docs/devel/ARCHITECTURE.md)
+- [../Documentation/articles/rest-api.md](../Documentation/articles/rest-api.md)
+- [../Documentation/articles/ipc.md](../Documentation/articles/ipc.md)
+- [../Documentation/articles/object-model.md](../Documentation/articles/object-model.md)
+- [../Documentation/articles/components.md](../Documentation/articles/components.md)

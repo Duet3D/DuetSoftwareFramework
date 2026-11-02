@@ -339,7 +339,7 @@ const ExpansionBoardData& ExpansionManager::FindIndexedBoard(unsigned int index)
 
 // Nothing to do here. A board that stops reporting is noticed by the SBC, which receives the same
 // status reports this forwards and owns both the board state it would set and the event it would
-// raise; see ExpansionBoardManager and docs/devel/EVENTS_MIGRATION.md section 3.3.1.
+// raise; see ExpansionBoardManager.
 void ExpansionManager::Spin() noexcept
 {
 }

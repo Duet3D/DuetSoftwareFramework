@@ -98,7 +98,7 @@ namespace Duet::Sbc::Motion
 		// --- Tuning, machine-wide ---------------------------------------------------------------
 		//
 		// Carried by the move rather than read from a shared configuration, so that changing it
-		// cannot reach a move that was already queued. See docs/devel/MOTION_CONFIG_ORDERING.md.
+		// cannot reach a move that was already queued.
 
 		// M566 P. 0 allows a junction speed only between moves of the same kind. Read when this move
 		// is melded with the one before it, so it is the later move of that junction that governs
@@ -112,8 +112,8 @@ namespace Duet::Sbc::Motion
 	};
 
 	// What one drive of this move is to be executed with. Everything here was read from a shared
-	// MachineConfig until moves began carrying their own; see docs/devel/MOTION_CONFIG_ORDERING.md for
-	// why that could not be ordered against the moves around it.
+	// MachineConfig until moves began carrying their own, because that could not be ordered against
+	// the moves around it.
 	//
 	// Flat rather than a union of the axis and extruder halves. An axis never uses the extruder
 	// fields and an extruder never uses backlashSteps, so four bytes a drive could be saved, which is

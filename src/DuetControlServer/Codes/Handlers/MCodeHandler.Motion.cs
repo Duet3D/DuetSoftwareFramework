@@ -37,9 +37,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <para>
 /// The geometry is the exception, and is being made the rule: M665, M666 and M669 configure
 /// <see cref="Motion.MovePlanner.Geometry"/> and write <c>move.kinematics</c> from it, rather than
-/// writing the object model and having the geometry derived back out of it. §14 of
-/// <c>docs/devel/MCODE_MIGRATION.md</c> is why, and step 4 there applies the same shape to the axes
-/// and extruders.
+/// writing the object model and having the geometry derived back out of it.
 /// </para>
 /// <para>
 /// RepRapFirmware supports drivers on the main board and drivers on CAN-connected expansion boards,
@@ -97,8 +95,8 @@ internal partial class MCodeHandler
     /// <remarks>
     /// The engine refuses a description it cannot plan for, and a code that changed the configuration
     /// and reported success anyway leaves the machine running on the description it had before with
-    /// nothing said. §13.4 of <c>docs/devel/MCODE_MIGRATION.md</c> makes that visible at the next
-    /// move; returning this makes it visible at the code that caused it, in the same words
+    /// nothing said. The next move makes that visible; returning this makes it visible at the code
+    /// that caused it, in the same words
     /// </remarks>
     private static Message MotionConfigRejected
         => new(MessageType.Error, "The motion configuration was not applied; no moves can be planned until it is");
@@ -1737,8 +1735,7 @@ internal partial class MCodeHandler
         }
 
         // Nothing is pushed to the motion engine: the coefficient rides on each move built from here
-        // on, so the moves already queued keep the one they were built with. See
-        // docs/devel/MOTION_CONFIG_ORDERING.md
+        // on, so the moves already queued keep the one they were built with
         await planner.RefreshTuningAsync(cancellationToken);
 
         if (toUpdate.Count == 0)
@@ -2308,10 +2305,9 @@ internal partial class MCodeHandler
     /// <see cref="Motion.Kinematics.KinematicsConfigurator"/>.
     /// </para>
     /// <para>
-    /// The geometry is configured first and the object model written from it, which is the direction
-    /// §14 of <c>docs/devel/MCODE_MIGRATION.md</c> establishes. Configuring takes no locks, so the
-    /// model's write lock is held only for the projection - and the planner lock is taken inside it,
-    /// which is the order §13.1 fixes
+    /// The geometry is configured first and the object model written from it. Configuring takes no
+    /// locks, so the model's write lock is held only for the projection - and the planner lock is
+    /// taken inside it
     /// </para>
     /// </remarks>
     private async ValueTask<Message> HandleKinematicsAsync(Commands.Code code, CancellationToken cancellationToken)

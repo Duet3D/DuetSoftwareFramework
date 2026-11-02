@@ -70,13 +70,13 @@ dotnet build DuetControlServer.csproj
 dotnet run --project DuetControlServer.csproj -- --help
 ```
 
-End-to-end verification requires a reachable Duet board or a development setup that can satisfy the link layer. For local service debugging, the top-level [../../README.md](../../README.md) and [../../docs/devel/BUILD_VARIANTS.md](../../docs/devel/BUILD_VARIANTS.md) describe the usual `systemctl stop` plus direct-run workflow.
+End-to-end verification requires a reachable Duet board or a development setup that can satisfy the link layer. For local service debugging, the top-level [../../README.md](../../README.md) and [../Documentation/articles/building.md](../Documentation/articles/building.md) describe the usual `systemctl stop` plus direct-run workflow.
 
 ## Related Docs
 
-- [../../docs/devel/DCS_INTERNALS.md](../../docs/devel/DCS_INTERNALS.md)
-- [../../docs/devel/CODE_PIPELINE.md](../../docs/devel/CODE_PIPELINE.md)
-- [../../docs/devel/SPI_LINK.md](../../docs/devel/SPI_LINK.md)
-- [../../docs/devel/IPC_PROTOCOL.md](../../docs/devel/IPC_PROTOCOL.md)
-- [../../docs/devel/FILES.md](../../docs/devel/FILES.md)
-- [../../docs/devel/OBJECT_MODEL.md](../../docs/devel/OBJECT_MODEL.md)
+- [../Documentation/articles/components.md](../Documentation/articles/components.md)
+- [../Documentation/articles/gcode-flow.md](../Documentation/articles/gcode-flow.md)
+- [../Documentation/articles/firmware-link.md](../Documentation/articles/firmware-link.md)
+- [../Documentation/articles/ipc.md](../Documentation/articles/ipc.md)
+- [../Documentation/articles/file-management.md](../Documentation/articles/file-management.md)
+- [../Documentation/articles/object-model.md](../Documentation/articles/object-model.md)

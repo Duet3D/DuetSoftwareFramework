@@ -332,8 +332,7 @@ internal partial class MCodeHandler(
         { [569, (569, 1), (569, 2), (569, 4), (569, 5), (569, 6), (569, 7)], CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleDriverConfigAsync(c, ct) }, // TODO RRF doesn't always wait for standstill
         // Heater fault detection
         { 570, CodeClass.Immediate, (h, c, ct) => h.HandleHeaterFaultDetectionAsync(c, ct) },
-        // Set pressure advance. TODO the value already rides the move on the SBC side; the
-        // standstill remains until D3 of MOTION_SYNCHRONISED_ACTIONS.md is decided
+        // Set pressure advance.
         { 572, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandlePressureAdvanceAsync(c, ct) }, // TODO sync with motion
         // Configure the endstops
         { 574, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleEndstopConfigAsync(c, ct) },

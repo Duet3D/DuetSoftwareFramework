@@ -45,8 +45,7 @@ internal sealed class EventProcessor(EventQueue queue, MacroRunner macroRunner, 
     /// <remarks>
     /// RepRapFirmware's <c>Event::GetDefaultPauseReason</c>, and deliberately the same events.
     /// Which events pause is its decision to make and this is only reading it back - an event it does
-    /// not pause for still does not pause here. What differs is <em>how</em> the machine stops; see
-    /// JOB_LIFECYCLE.md §3.5.1
+    /// not pause for still does not pause here. What differs is <em>how</em> the machine stops
     /// </remarks>
     private static PrintPausedReason? DefaultPauseReason(EventType type) => type switch
     {
@@ -159,8 +158,7 @@ internal sealed class EventProcessor(EventQueue queue, MacroRunner macroRunner, 
     /// <para>
     /// The pause is a feedhold: nobody typed it, and the reasons an event pauses - a heater that has
     /// faulted, filament that has run out, a driver reporting an error - are all cases where running
-    /// the rest of the queue prints air or damages the part. JOB_LIFECYCLE.md §3.5.1 is the decision
-    /// and what it does not change.
+    /// the rest of the queue prints air or damages the part.
     /// </para>
     /// <para>
     /// A driver error runs no macro. RepRapFirmware routes it to <c>eventPausing2</c> rather than

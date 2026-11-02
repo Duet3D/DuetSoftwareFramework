@@ -65,5 +65,5 @@ Note that these tests write to `0:/sys` on the target machine (`unitTest.txt`, `
 
 - [../DuetControlServer/README.md](../DuetControlServer/README.md)
 - [../DuetHttpClient/README.md](../DuetHttpClient/README.md)
-- [../../docs/devel/SPI_LINK.md](../../docs/devel/SPI_LINK.md)
-- [../../docs/devel/OBJECT_MODEL.md](../../docs/devel/OBJECT_MODEL.md)
+- [../Documentation/articles/firmware-link.md](../Documentation/articles/firmware-link.md)
+- [../Documentation/articles/object-model.md](../Documentation/articles/object-model.md)

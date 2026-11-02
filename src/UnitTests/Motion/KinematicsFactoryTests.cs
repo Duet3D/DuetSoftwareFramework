@@ -22,8 +22,7 @@ namespace UnitTests.Motion;
 /// <para>
 /// So the first test here is not about any one geometry. It asserts that every property the object
 /// model's kinematics classes have is either read by the factory or explicitly recorded as not worth
-/// reading, and it fails when someone adds a property and classifies it as neither. See §14 of
-/// <c>docs/devel/MCODE_MIGRATION.md</c>
+/// reading, and it fails when someone adds a property and classifies it as neither
 /// </para>
 /// </remarks>
 [TestFixture]

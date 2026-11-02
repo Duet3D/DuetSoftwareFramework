@@ -22,8 +22,7 @@ namespace SystemTests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Every response the protocol expects has a default this class gives unprompted (see
-/// docs/devel/SYSTEM_EMULATION.md, stage 1): emergency stop and reset are acknowledged and then
+/// Every response the protocol expects has a default this class gives unprompted: emergency stop and reset are acknowledged and then
 /// behave like the reboot they cause, CAN configuration is acknowledged, scheduled moves are
 /// accepted and recorded, CAN sends are acknowledged with <see cref="CanStatus.Ok"/> and routed to
 /// any registered handler, IAP data is accepted and discarded. Tests override or inject at will.

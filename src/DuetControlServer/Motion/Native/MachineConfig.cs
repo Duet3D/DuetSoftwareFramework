@@ -209,7 +209,7 @@ internal struct UIntPerAxis
 /// <para>
 /// The settings that can change mid-print are not here - jerk limits, pressure advance, backlash,
 /// nonlinear extrusion and input shaping travel on each move instead, so that changing one cannot
-/// reach a move that is already queued. See <c>docs/devel/MOTION_CONFIG_ORDERING.md</c>.
+/// reach a move that is already queued.
 /// </para>
 /// <para>
 /// Two entries are kinematics results rather than configuration in the firmware's sense:

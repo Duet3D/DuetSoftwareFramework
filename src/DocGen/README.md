@@ -34,4 +34,4 @@ Review the generated `documentation.md` before publishing documentation changes.
 ## Related Docs
 
 - [../Documentation/README.md](../Documentation/README.md)
-- [../../docs/devel/OBJECT_MODEL.md](../../docs/devel/OBJECT_MODEL.md)
+- [../Documentation/articles/object-model.md](../Documentation/articles/object-model.md)

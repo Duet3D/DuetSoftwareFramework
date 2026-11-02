@@ -61,8 +61,7 @@ internal sealed class MotionParameters
     /// <remarks>
     /// The one part of this snapshot that is not derived from the object model. The planner owns it -
     /// M665, M666 and M669 configure it and <c>move.kinematics</c> is written from it - and this holds
-    /// the reference it had when the snapshot was taken. See §14 of
-    /// <c>docs/devel/MCODE_MIGRATION.md</c>
+    /// the reference it had when the snapshot was taken
     /// </remarks>
     public KinematicsEngine Geometry { get; private init; } = CoreKinematicsEngine.TryCreate(KinematicsName.Cartesian)!;
 
@@ -186,7 +185,7 @@ internal sealed class MotionParameters
     //
     // These are not in MachineConfig: the engine holds no copy to update. MoveBuilder reads them here
     // once per move and writes them into the submission, so a change takes effect on the next move
-    // built and cannot reach one that is already queued. See docs/devel/MOTION_CONFIG_ORDERING.md
+    // built and cannot reach one that is already queued
 
     /// <summary>Instantaneous speed change allowed at a junction where both moves extrude</summary>
     public float[] PrintingInstantDvs { get; } = new float[NumDrives];
@@ -366,7 +365,7 @@ internal sealed class MotionParameters
     /// </para>
     /// <para>
     /// This is the one thing the object model still configures on the geometry rather than the other
-    /// way round (§14.6 step 4c of <c>docs/devel/MCODE_MIGRATION.md</c>), and it is a call of its own
+    /// way round, and it is a call of its own
     /// rather than an assignment buried in <see cref="FromObjectModel"/> because it writes to the
     /// planner's geometry - taking a snapshot should not change the machine
     /// </para>

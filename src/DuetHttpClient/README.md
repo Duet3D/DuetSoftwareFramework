@@ -49,4 +49,4 @@ dotnet test ../UnitTests/UnitTests.csproj --filter HttpClient
 ## Related Docs
 
 - [../DuetWebServer/README.md](../DuetWebServer/README.md)
-- [../../docs/devel/HTTP_API.md](../../docs/devel/HTTP_API.md)
+- [../Documentation/articles/rest-api.md](../Documentation/articles/rest-api.md)

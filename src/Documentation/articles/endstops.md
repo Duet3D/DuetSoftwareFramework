@@ -17,11 +17,7 @@ interrupt. Here the work is split four ways and no component can see the whole o
 Everything below follows from that split. Where a decision looks oddly placed, it is almost always
 because it had to be made where the information was, or where the latency allowed.
 
-Related reading: §10 and §12 of [MCODE_MIGRATION.md](docs/devel/MCODE_MIGRATION.md) record how this
-arrangement was arrived at and what was tried first; §12.9 records the faults found commissioning it
-on hardware, which is the best guide to what breaks when one of the invariants below is violated.
-[STALL_DETECTION.md](docs/devel/STALL_DETECTION.md) covers the stall endstop, which rides on this
-path and is what forced the stop groups in §4; [Differences from RepRapFirmware](rrf-differences.md)
+Related reading: [Differences from RepRapFirmware](rrf-differences.md)
 collects the decisions here that were departures rather than ports.
 
 ---

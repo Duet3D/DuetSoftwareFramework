@@ -87,6 +87,6 @@ Package the contents of `zip/` into a plugin ZIP for installation. Because this 
 
 ## Related Docs
 
-- [../../docs/devel/PLUGINS.md](../../docs/devel/PLUGINS.md)
+- [../Documentation/articles/plugins.md](../Documentation/articles/plugins.md)
 - [../DuetPluginService/README.md](../DuetPluginService/README.md)
 - [../DuetControlServer/README.md](../DuetControlServer/README.md)
