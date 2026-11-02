@@ -443,11 +443,12 @@ public class USB : IDiagnostics, ILinkAdapter
             return null;
         }
 
-        // Header
-        _rxPointer += Protocol.Reader.ReadPacketHeader(_rxBuffer[_rxPointer..].Span, out _lastPacket);
+        // Header. Only the data of this transfer is valid, the rest of the buffer may hold data of an earlier one
+        ReadOnlyMemory<byte> transferData = _rxBuffer[.._rxHeader.DataLength];
+        _rxPointer += Protocol.Reader.ReadPacketHeader(transferData[_rxPointer..].Span, out _lastPacket);
 
         // Packet data
-        _packetData = _rxBuffer.Slice(_rxPointer, _lastPacket.Length);
+        _packetData = transferData.Slice(_rxPointer, _lastPacket.Length);
         int padding = 4 - (_lastPacket.Length % 4);
         _rxPointer += _lastPacket.Length + ((padding == 4) ? 0 : padding);
 
