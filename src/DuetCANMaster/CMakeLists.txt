@@ -3,9 +3,6 @@
 # one board, DUET_BOARD, as an executable target of the same name; Boards.cmake describes the
 # boards. Its image goes to the top of the build tree: the .elf, the .bin with its CRC appended,
 # and the .map.
-#
-# Its sources are linted by clang-tidy as they are compiled (see cmake/ClangTidy.cmake), with every
-# finding an error: DuetCANMaster is on DUET_CLANG_TIDY_ERRORS.
 
 cmake_minimum_required(VERSION 3.25)
 project(DuetCANMaster LANGUAGES C CXX)

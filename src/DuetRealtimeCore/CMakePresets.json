@@ -90,7 +90,7 @@
     {
       "name": "armhf-debug",
       "displayName": "Cross-compile for 32-bit armhf, unoptimised with full debug info",
-      "description": "As armhf. Every deployable preset has a -debug twin so that scripts/build_dsf.py --build-type Debug can pick one whatever the architecture.",
+      "description": "As armhf. Every deployable preset has a -debug twin so that scripts/build.py --debug can pick one whatever the architecture.",
       "inherits": ["debug", "armhf"]
     },
     {

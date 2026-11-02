@@ -2,8 +2,10 @@
 # pyright: strict
 """Create or update .vscode/settings.json with the settings the remote debugging tasks read.
 
-    scripts/create_settings.py                              add any setting that is missing
-    scripts/create_settings.py --target-ip 192.168.4.27     and set the Pi to debug on
+    scripts/internal/create_settings.py                             add any setting that is missing
+    scripts/internal/create_settings.py --target-ip 192.168.4.27    and set the Pi to debug on
+
+Run when the devcontainer is created, and by the "[DSF] Set Debug Target IP" task.
 
 Settings already in the file are kept. The file may be in VS Code's own syntax, with comments and
 trailing commas, but it is written back as plain JSON.
@@ -16,9 +18,13 @@ import json
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import cast
 
-from common.dsf import ROOT
+# Run as a file, so scripts/, where the shared modules are, is not on the path by itself
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from common.repo import ROOT  # noqa: E402
 
 SETTINGS = ROOT / '.vscode' / 'settings.json'
 DEFAULTS = {

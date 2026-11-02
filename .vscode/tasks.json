@@ -22,7 +22,7 @@
             "type": "pickString",
             "description": "Project name to build",
             "options": [
-                "All",
+                "dsf",
                 "DuetControlServer",
                 "DuetRealtimeCore",
                 "DuetPiManagementPlugin",
@@ -106,215 +106,6 @@
     ],
     "tasks": [
         {
-            "label": "[DSF] Clean Build Directory",
-            "command": "rm -rf build",
-            "type": "shell",
-            "args": [],
-            "problemMatcher": [],
-            "runOptions": {
-                "instanceLimit": 1
-            }
-        },
-        {
-            "label": "[DSF] Make Build Directory",
-            "command": "mkdir -p build",
-            "type": "shell",
-            "args": [],
-            "problemMatcher": [],
-            "runOptions": {
-                "instanceLimit": 1
-            },
-            "presentation": {
-                "reveal": "silent"
-            }
-        },
-        {
-            "label": "[DSF] Restore DSF Solution",
-            "type": "shell",
-            "command": "dotnet restore ./src/DuetSoftwareFramework.sln -r linux-arm64",
-            "args": [],
-            "problemMatcher": [
-                "$msCompile"
-            ],
-            "runOptions": {
-                "instanceLimit": 1
-            }
-        },
-        {
-            "label": "[DSF] Build CodeConsole",
-            "type": "shell",
-            "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/CodeConsole -o ./build",
-            "args": [],
-            "problemMatcher": [
-                "$msCompile"
-            ],
-            "runOptions": {
-                "instanceLimit": 1
-            },
-            "dependsOn": "[DSF] Make Build Directory",
-        },
-        {
-            "label": "[DSF] Build CodeLogger",
-            "type": "shell",
-            "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/CodeLogger -o ./build",
-            "args": [],
-            "problemMatcher": [
-                "$msCompile"
-            ],
-            "runOptions": {
-                "instanceLimit": 1
-            },
-            "dependsOn": "[DSF] Make Build Directory",
-        },
-        {
-            "label": "[DSF] Build CodeStream",
-            "type": "shell",
-            "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/CodeStream -o ./build",
-            "args": [],
-            "problemMatcher": [
-                "$msCompile"
-            ],
-            "runOptions": {
-                "instanceLimit": 1
-            },
-            "dependsOn": "[DSF] Make Build Directory",
-        },
-        {
-            "label": "[DSF] Build CustomHttpEndpoint",
-            "type": "shell",
-            "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/CustomHttpEndpoint -o ./build",
-            "args": [],
-            "problemMatcher": [
-                "$msCompile"
-            ],
-            "runOptions": {
-                "instanceLimit": 1
-            },
-            "dependsOn": "[DSF] Make Build Directory",
-        },
-        {
-            "label": "[DSF] Build DuetControlServer",
-            "type": "shell",
-            "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/DuetControlServer -o ./build",
-            "args": [],
-            "problemMatcher": [
-                "$msCompile"
-            ],
-            "runOptions": {
-                "instanceLimit": 1
-            },
-            // DCS P/Invokes into libduet_realtime_core.so and will not start without it
-            "dependsOn": [
-                "[DSF] Make Build Directory",
-                "[DSF] Build DuetRealtimeCore"
-            ],
-            "dependsOrder": "sequence",
-        },
-        {
-            "label": "[DSF] Build DuetPiManagementPlugin",
-            "type": "shell",
-            "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/DuetPiManagementPlugin -o ./build",
-            "args": [],
-            "problemMatcher": [
-                "$msCompile"
-            ],
-            "runOptions": {
-                "instanceLimit": 1
-            },
-            "dependsOn": "[DSF] Make Build Directory",
-        },
-        {
-            "label": "[DSF] Build DuetPluginService",
-            "type": "shell",
-            "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/DuetPluginService -o ./build",
-            "args": [],
-            "problemMatcher": [
-                "$msCompile"
-            ],
-            "runOptions": {
-                "instanceLimit": 1
-            },
-            "dependsOn": "[DSF] Make Build Directory",
-        },
-        {
-            "label": "[DSF] Build DuetWebServer",
-            "type": "shell",
-            "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/DuetWebServer -o ./build",
-            "args": [],
-            "problemMatcher": [
-                "$msCompile"
-            ],
-            "runOptions": {
-                "instanceLimit": 1
-            },
-            "dependsOn": "[DSF] Make Build Directory",
-        },
-        {
-            "label": "[DSF] Build ModelObserver",
-            "type": "shell",
-            "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/ModelObserver -o ./build",
-            "args": [],
-            "problemMatcher": [
-                "$msCompile"
-            ],
-            "runOptions": {
-                "instanceLimit": 1
-            },
-            "dependsOn": "[DSF] Make Build Directory",
-        },
-        {
-            "label": "[DSF] Build PluginManager",
-            "type": "shell",
-            "command": "dotnet build -r linux-arm64 --self-contained --no-restore ./src/PluginManager -o ./build",
-            "args": [],
-            "problemMatcher": [
-                "$msCompile"
-            ],
-            "runOptions": {
-                "instanceLimit": 1
-            },
-            "dependsOn": "[DSF] Make Build Directory",
-        },
-        {
-            "label": "[DSF] Build All",
-            "type": "shell",
-            "command": "echo Build Complete",
-            "args": [],
-            "problemMatcher": [],
-            "dependsOn": [
-                "[DSF] Build CodeConsole",
-                "[DSF] Build CodeLogger",
-                "[DSF] Build CodeStream",
-                "[DSF] Build CustomHttpEndpoint",
-                "[DSF] Build DuetRealtimeCore",
-                "[DSF] Build DuetControlServer",
-                "[DSF] Build DuetPiManagementPlugin",
-                "[DSF] Build DuetPluginService",
-                "[DSF] Build DuetWebServer",
-                "[DSF] Build ModelObserver",
-                "[DSF] Build PluginManager"
-            ],
-            "runOptions": {
-                "instanceLimit": 1
-            },
-            "dependsOrder": "sequence"
-        },
-        {
-            "label": "[DSF] Restore & Build All",
-            "type": "shell",
-            "command": "echo Build Complete",
-            "args": [],
-            "problemMatcher": [],
-            "dependsOn": [
-                "[DSF] Restore DSF Solution",
-                "[DSF] Build All",
-            ],
-            "runOptions": {
-                "instanceLimit": 1
-            },
-            "dependsOrder": "sequence"
-        },
-        {
             "label": "[DSF] Install vsdbg on Remote",
             "type": "shell",
             "command": "ssh -o StrictHostKeyChecking=no ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp} 'mkdir -p ~/vsdbg && curl -fsSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l ~/vsdbg && ~/vsdbg/vsdbg --version'",
@@ -323,7 +114,7 @@
         {
             "label": "[DSF] Deploy To",
             "type": "shell",
-            "command": "scripts/build_dsf.py $([ '${input:dotnet_aot}' = 'Yes' ] && echo --aot) --skip-build --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services ${input:project_name}",
+            "command": "scripts/deploy.py $([ '${input:dotnet_aot}' = 'Yes' ] && echo --aot) --debug -H ${config:dsf.debug.targetIp} -u ${config:dsf.debug.sshUser} --start-services ${input:project_name}",
             "problemMatcher": [],
             "runOptions": {
                 "instanceLimit": 1
@@ -332,7 +123,7 @@
         {
             "label": "[DSF] Deploy Local",
             "type": "shell",
-            "command": "scripts/build_dsf.py $([ '${input:dotnet_aot}' = 'Yes' ] && echo --aot) --skip-build --local ${input:project_name}",
+            "command": "scripts/deploy.py $([ '${input:dotnet_aot}' = 'Yes' ] && echo --aot) --debug --local ${input:project_name}",
             "problemMatcher": [],
             "runOptions": {
                 "instanceLimit": 1
@@ -341,7 +132,7 @@
         {
             "label": "[DSF] Build",
             "type": "shell",
-            "command": "scripts/build_dsf.py $([ '${input:dotnet_aot}' = 'Yes' ] && echo --aot) ${input:project_name}",
+            "command": "scripts/build.py $([ '${input:dotnet_aot}' = 'Yes' ] && echo --aot) --debug ${input:project_name}",
             "problemMatcher": [
                 "$msCompile"
             ],
@@ -352,7 +143,7 @@
         {
             "label": "[DSF] Build and Deploy To",
             "type": "shell",
-            "command": "scripts/build_dsf.py $([ '${input:dotnet_aot}' = 'Yes' ] && echo --aot) --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services ${input:project_name} && python3 ${workspaceFolder}/.vscode/scripts/get_remote_dsf_pid.py",
+            "command": "scripts/deploy.py $([ '${input:dotnet_aot}' = 'Yes' ] && echo --aot) --build --debug -H ${config:dsf.debug.targetIp} -u ${config:dsf.debug.sshUser} --start-services ${input:project_name}",
             "problemMatcher": [
                 "$msCompile"
             ],
@@ -370,7 +161,7 @@
         {
             "label": "[DSF] Build and Deploy Local",
             "type": "shell",
-            "command": "scripts/build_dsf.py $([ '${input:dotnet_aot}' = 'Yes' ] && echo --aot) --local ${input:project_name}",
+            "command": "scripts/deploy.py $([ '${input:dotnet_aot}' = 'Yes' ] && echo --aot) --build --debug --local ${input:project_name}",
             "problemMatcher": [
                 "$msCompile"
             ],
@@ -381,7 +172,7 @@
         {
             "label": "[DSF] Build and Deploy DCS to",
             "type": "shell",
-            "command": "scripts/build_dsf.py $([ '${input:dotnet_aot}' = 'Yes' ] && echo --aot) --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services DuetControlServer && python3 ${workspaceFolder}/.vscode/scripts/get_remote_dsf_pid.py",
+            "command": "scripts/deploy.py $([ '${input:dotnet_aot}' = 'Yes' ] && echo --aot) --build --debug -H ${config:dsf.debug.targetIp} -u ${config:dsf.debug.sshUser} --start-services DuetControlServer",
             "problemMatcher": [
                 "$msCompile"
             ],
@@ -401,7 +192,7 @@
             // devcontainer's glibc matches Raspberry Pi OS Bookworm's, so no sysroot is involved.
             "label": "[DSF] Build DuetRealtimeCore",
             "type": "shell",
-            "command": "scripts/build_dsf.py DuetRealtimeCore",
+            "command": "scripts/build.py --debug DuetRealtimeCore",
             "problemMatcher": [
                 "$gcc"
             ],
@@ -412,7 +203,7 @@
         {
             "label": "[DSF] Build and Deploy DuetRealtimeCore to",
             "type": "shell",
-            "command": "scripts/build_dsf.py --target ${config:dsf.debug.targetIp} --user ${config:dsf.debug.sshUser} --start-services DuetRealtimeCore",
+            "command": "scripts/deploy.py --build --debug -H ${config:dsf.debug.targetIp} -u ${config:dsf.debug.sshUser} --start-services DuetRealtimeCore",
             "problemMatcher": [
                 "$gcc"
             ],
@@ -435,7 +226,7 @@
             // The C# test suite (DCS, DuetAPI, DuetHttpClient). Runs natively for the host.
             "label": "[DSF] Run C# Unit Tests",
             "type": "shell",
-            "command": "dotnet test ./src/UnitTests/UnitTests.csproj --nologo",
+            "command": "scripts/test.py unit",
             "problemMatcher": [
                 "$msCompile"
             ],
@@ -448,7 +239,7 @@
             // The C# test suite. Runs DCS & DuetRealtimeCore natively for the host.
             "label": "[DSF] Run C# System Tests",
             "type": "shell",
-            "command": "dotnet test ./src/SystemTests/SystemTests.csproj --nologo",
+            "command": "scripts/test.py system",
             "problemMatcher": [
                 "$msCompile"
             ],
@@ -462,10 +253,7 @@
             // Builds natively for the host, so no Pi or sysroot is involved.
             "label": "[DSF] Run Native Tests",
             "type": "shell",
-            "command": "cmake --preset native && cmake --build --preset native -j && ctest --test-dir build/native --output-on-failure",
-            "options": {
-                "cwd": "${workspaceFolder}/src/DuetRealtimeCore"
-            },
+            "command": "scripts/test.py native",
             "problemMatcher": [
                 "$gcc"
             ],
@@ -493,7 +281,7 @@
         {
             "label": "[DSF] Get DuetControlServer PID",
             "type": "shell",
-            "command": "python3 ${workspaceFolder}/.vscode/scripts/get_remote_dsf_pid.py",
+            "command": "python3 ${workspaceFolder}/scripts/internal/get_remote_dsf_pid.py",
             "problemMatcher": [],
             "options": {
                 "env": {
@@ -518,7 +306,7 @@
         {
             "label": "[DSF] Restart DSF Services",
             "type": "shell",
-            "command": "ssh root@${config:dsf.debug.targetIp} 'systemctl restart duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root' && python3 ${workspaceFolder}/.vscode/scripts/get_remote_dsf_pid.py",
+            "command": "ssh root@${config:dsf.debug.targetIp} 'systemctl restart duetcontrolserver duetwebserver duetpluginservice duetpluginservice-root' && python3 ${workspaceFolder}/scripts/internal/get_remote_dsf_pid.py",
             "problemMatcher": [],
             "runOptions": {
                 "instanceLimit": 1
@@ -558,7 +346,7 @@
         {
             "label": "[DSF] Set Debug Target IP",
             "type": "shell",
-            "command": "python3 scripts/create_settings.py --target-ip ${input:debug_target_ip}",
+            "command": "python3 scripts/internal/create_settings.py --target-ip ${input:debug_target_ip}",
             "problemMatcher": [],
             "runOptions": {
                 "instanceLimit": 1
@@ -576,7 +364,7 @@
             "label": "[Firmware] Build Board",
             "type": "shell",
             // A shell, so that the empty Release build type adds no argument
-            "command": "python3 scripts/build.py ${input:firmware_board} ${input:firmware_build_type}",
+            "command": "scripts/build.py ${input:firmware_board} ${input:firmware_build_type}",
             "options": { "cwd": "${workspaceFolder}" },
             "problemMatcher": {
                 "base": "$gcc",
@@ -588,7 +376,7 @@
             "label": "[Firmware] Build All Boards",
             "type": "shell",
             // A shell, so that the empty Release build type adds no argument
-            "command": "python3 scripts/build.py --all --keep-going ${input:firmware_build_type}",
+            "command": "scripts/build.py firmware --keep-going ${input:firmware_build_type}",
             "options": { "cwd": "${workspaceFolder}" },
             "problemMatcher": {
                 "base": "$gcc",
@@ -647,7 +435,7 @@
             "label": "[Firmware] Deploy Release Firmware to Standalone Board",
             "type": "process",
             "command": "python3",
-            "args": ["scripts/deploy.py", "${input:duetHost}", "--password", "${input:duetPassword}"],
+            "args": ["scripts/deploy.py", "-H", "${input:duetHost}", "firmware", "--password", "${input:duetPassword}"],
             "options": { "cwd": "${workspaceFolder}" },
             "problemMatcher": []
         },
@@ -655,7 +443,7 @@
             "label": "[Firmware] Deploy Debug Firmware to Standalone Board",
             "type": "process",
             "command": "python3",
-            "args": ["scripts/deploy.py", "${input:duetHost}", "--password", "${input:duetPassword}", "--debug"],
+            "args": ["scripts/deploy.py", "-H", "${input:duetHost}", "firmware", "--password", "${input:duetPassword}", "--debug"],
             "options": { "cwd": "${workspaceFolder}" },
             "problemMatcher": []
         },
@@ -663,7 +451,7 @@
             "label": "[Firmware] Clean All Boards",
             "type": "process",
             "command": "python3",
-            "args": ["scripts/clean.py", "--all", "--purge"],
+            "args": ["scripts/clean.py", "firmware", "--purge"],
             "options": { "cwd": "${workspaceFolder}" },
             "problemMatcher": []
         },
@@ -694,7 +482,7 @@
             "label": "[Git] Check Submodules",
             "type": "process",
             "command": "python3",
-            "args": ["scripts/check_submodules.py"],
+            "args": ["scripts/doctor.py", "submodules"],
             "options": { "cwd": "${workspaceFolder}" },
             "problemMatcher": []
         },
@@ -736,7 +524,7 @@
             "label": "[Style] Generate Compile DB - Firmware Board",
             "type": "process",
             "command": "python3",
-            "args": ["scripts/gen_compile_commands.py", "${input:firmware_board}"],
+            "args": ["scripts/lint.py", "${input:firmware_board}", "--database-only"],
             "options": { "cwd": "${workspaceFolder}" },
             "problemMatcher": [],
             "presentation": {
@@ -749,24 +537,11 @@
             "detail": "Configure the board's preset, keep the C++ TUs the build lints (not third-party code), and rewrite them so clang can parse the bare-metal ARM flags. Writes build/<board>/clang-tidy/compile_commands.json."
         },
         {
-            "label": "[Style] Generate Compile DB - DuetRealtimeCore",
-            "type": "shell",
-            "command": "cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
-            "options": {
-                "cwd": "${workspaceFolder}/src/DuetRealtimeCore"
-            },
-            "problemMatcher": [
-                "$gcc"
-            ],
-            "group": "build",
-            "detail": "CMake exports compile_commands.json into build/."
-        },
-        {
             // The database is regenerated first so it always matches the board picked here; it is
             // a CMake configure, not a build, so this costs about a second.
             "label": "[Style] Tidy Firmware Board",
             "type": "shell",
-            "command": "python3 scripts/gen_compile_commands.py ${input:firmware_board} && run-clang-tidy -p build/${input:firmware_board}/clang-tidy -j $(nproc) -quiet 2>&1 | python3 scripts/tidy_report.py",
+            "command": "scripts/lint.py ${input:firmware_board}",
             "options": { "cwd": "${workspaceFolder}" },
             "problemMatcher": [
                 "$gcc"
@@ -777,10 +552,7 @@
         {
             "label": "[Style] Tidy DuetRealtimeCore",
             "type": "shell",
-            "command": "test -f build/compile_commands.json || { echo 'No build/compile_commands.json - run [Style] Generate Compile DB - DuetRealtimeCore first' >&2; exit 1; }; run-clang-tidy -p build -j $(nproc) -quiet '^.*/src/DuetRealtimeCore/(src|harness|tests)/.*\\.cpp$' 2>&1 | python3 ${workspaceFolder}/scripts/tidy_report.py",
-            "options": {
-                "cwd": "${workspaceFolder}/src/DuetRealtimeCore"
-            },
+            "command": "scripts/lint.py DuetRealtimeCore",
             "problemMatcher": [
                 "$gcc"
             ],

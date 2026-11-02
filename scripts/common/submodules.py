@@ -1,26 +1,19 @@
-#!/usr/bin/env python3
 # pyright: strict
-"""Check that every submodule points at a commit on the branch in .gitmodules.
-Commits behind the branch pass, and are listed with how far behind they are.
-
-    scripts/check_submodules.py                 the submodules as committed in HEAD
-    scripts/check_submodules.py origin/3.7-dev  as committed in another revision
-
-Fix a failure by merging the submodule's PR, then "git submodule update --remote <path>" and committing.
-"""
+"""Checking that every submodule points at a commit on the branch .gitmodules names for it: the
+submodules check of scripts/doctor.py. Commits behind the branch pass, and are listed with how far
+behind they are. A failure is fixed by merging the submodule's PR, then
+"git submodule update --remote <path>" and committing."""
 
 from __future__ import annotations
 
-import argparse
 import os
 import subprocess
 import sys
 import tempfile
-from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
-from common.firmware import ROOT
+from common.repo import ROOT
 
 
 @dataclass(frozen=True)
@@ -77,11 +70,8 @@ def check(s: Submodule) -> tuple[bool, str]:
     return True, f'on {s.branch}, ' + (f'{behind} commit{"s" if behind != 1 else ""} behind' if behind else 'up to date')
 
 
-def main(argv: Sequence[str]) -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('rev', nargs='?', default='HEAD', help='the superproject revision to check (default: HEAD)')
-    rev: str = parser.parse_args(argv).rev
-
+def check_submodules(rev: str) -> bool:
+    """Check the submodules a revision records, printing how each stands; whether all are on their branches."""
     found = submodules(rev)
     with ThreadPoolExecutor() as pool:
         results = list(pool.map(check, found))
@@ -91,15 +81,12 @@ def main(argv: Sequence[str]) -> int:
         print(f'  {s.path.ljust(width)}  {s.commit[:12]}  {status}')
     failed = [(s, status) for s, (ok, status) in zip(found, results) if not ok]
     if not failed:
-        return 0
+        return True
     if os.environ.get('GITHUB_ACTIONS') == 'true':
         for s, problem in failed:
             print(f'::error title=Submodule not on its tracked branch::{s.path} {s.commit[:12]} {problem}')
     print(f'\n{len(failed)} submodule(s) not on their tracked branch. Merge their PRs, then run\n'
           f'  git submodule update --remote {" ".join(s.path for s, _ in failed)}\n'
           'and commit the new pointers.')
-    return 1
+    return False
 
-
-if __name__ == '__main__':
-    sys.exit(main(sys.argv[1:]))

@@ -231,7 +231,7 @@
             "args": {
                 "key": "deployArgs",
                 "description": "deploy.py arguments (see scripts/deploy.py --help)",
-                "default": "duet3.local --upload-only"
+                "default": "-H duet3.local firmware --upload-only"
             }
         },
         {

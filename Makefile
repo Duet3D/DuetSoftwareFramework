@@ -23,18 +23,8 @@ Targets:
     debs:       $(DEBS)
     rpms:       $(RPMS)
 
-    Firmware:    Every board is a target, e.g. EXP3HC or bootloader-SAMC21;
-                 firmware builds them all. They are built by
-                 Makefile.firmware (make firmware.help lists them). The
-                 CMake build, scripts/build.py, is the default and the only
-                 one for DuetCANMaster; this one exists so CI can check that
-                 both produce the same images.
-
-    can-messages:        Regenerates the C++ and C# CAN message formats from
-                         src/DuetCanMessage.SourceGenerators/Schema/can-messages.json
-    can-messages-check:  Fails if the generated CAN message files are stale
-    can-messages-verify: Checks the generated C++ layouts against CANlib's
-                         hand-written CanMessageFormats.h
+    Firmware, CAN message generation, testing and deploying to a Pi are
+    done by the scripts in scripts/ (see scripts/list.py --help).
 
     clean:      Cleans the dotnet projects.
                 Cleans out the ./bin directory except for packages.
@@ -171,41 +161,6 @@ endif
 
 # build is the default unless you override it in your Makefile.local
 build: $(DIRS_BUILD) DuetWebControl.build
-
-# The CAN message formats are generated for both C++ (CANlib) and C# (DuetControlServer) from a single
-# neutral schema, so that the two can never drift apart. The generated files are checked in; re-run
-# `make can-messages` after editing the schema.
-CANMSG_GEN := src/DuetCanMessage.SourceGenerators
-
-can-messages:
-	$(ECHO_PREFIX)echo " [GENERATE ] CAN message formats"
-	$(CMD_PREFIX)dotnet run --project $(CANMSG_GEN) $(SUPPRESS_OUTPUT)
-
-# Fails if the checked-in output no longer matches the schema
-can-messages-check:
-	$(ECHO_PREFIX)echo " [CHECK    ] CAN message formats"
-	$(CMD_PREFIX)dotnet run --project $(CANMSG_GEN) -- --check
-
-# Compiles the generated layout probe against both CANlib's header and the generated one and runs it,
-# proving that every struct size, member offset and bitfield position is identical. Needs the CANlib,
-# RRFLibraries and CoreN2G submodules and a host C++ compiler.
-can-messages-verify:
-	$(ECHO_PREFIX)echo " [VERIFY   ] CAN message layouts"
-	$(CMD_PREFIX)$(CANMSG_GEN)/verify-cpp-layout.sh
-
-# The firmware is built by Makefile.firmware in a make of its own, which builds one project at a
-# time. Its boards are read from it so that they track the submodules; its all, clean, clean-all
-# and help are firmware, firmware.clean, firmware.clean-all and firmware.help here.
-FIRMWARE_TARGETS := $(shell $(MAKE) --no-print-directory -f Makefile.firmware print-targets CROSS_COMPILE=none 2>/dev/null)
-FIRMWARE_GOALS := $(FIRMWARE_TARGETS) $(addprefix clean-,$(FIRMWARE_TARGETS)) \
-	rrf d3e bootloader iap print-targets
-
-.PHONY: $(FIRMWARE_GOALS) firmware firmware.clean firmware.clean-all firmware.help
-$(FIRMWARE_GOALS):
-	$(CMD_PREFIX)$(MAKE) --no-print-directory -f Makefile.firmware $@
-
-firmware firmware.clean firmware.clean-all firmware.help:
-	$(CMD_PREFIX)$(MAKE) --no-print-directory -f Makefile.firmware $(or $(subst firmware.,,$(filter firmware.%,$@)),all)
 
 publish: $(DIRS_PUBLISH) DuetRuntime.publish DuetWebControl.publish
 

@@ -1,7 +1,6 @@
-# Builds DSF for every deployable architecture and runs its tests, builds every firmware target inside
-# the devcontainer image (with both make and CMake, one job per target so each board reports its own
-# pass/fail, checking the two builds' images are identical and linting the C++ with clang-tidy;
-# DuetCANMaster has only the CMake build), and type checks the Python scripts with pyright.
+# Builds DSF for every deployable architecture and runs its tests, builds every firmware board inside
+# the devcontainer image (one job per board so each reports its own pass/fail, linting the C++ with
+# clang-tidy as it goes), and type checks the Python scripts with pyright.
 
 name: Build and Test
 
@@ -16,9 +15,8 @@ concurrency:
 
 jobs:
   # Publish the devcontainer image to GHCR, tagged by a hash of the files that define it so it is
-  # only rebuilt when they change, and read the firmware targets from the Makefile and the presets
-  # so new boards are picked up automatically. PRs from forks cannot push packages, so they use the
-  # published image.
+  # only rebuilt when they change, and list the firmware boards so new ones are picked up
+  # automatically. PRs from forks cannot push packages, so they use the published image.
   image:
     runs-on: ubuntu-24.04
     permissions:
@@ -27,13 +25,10 @@ jobs:
     outputs:
       image: ${{ steps.meta.outputs.image }}
       targets: ${{ steps.list.outputs.targets }}
-      canmaster: ${{ steps.list.outputs.canmaster }}
     env:
       FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
     steps:
       - uses: actions/checkout@v6
-        with:
-          submodules: true
 
       - name: Compute image tag
         id: meta
@@ -68,17 +63,13 @@ jobs:
           cache-from: type=gha,scope=devcontainer
           cache-to: type=gha,mode=max,scope=devcontainer
 
-      # Only the target list is needed, so a dummy CROSS_COMPILE skips the toolchain check.
-      # DuetCANMaster has no make build, so its presets, Release and Debug, are read from CMakePresets.json
+      # Every board's Release build, and DuetCANMaster's Debug builds as well
       - name: List targets
         id: list
         run: |
-          targets=$(make --no-print-directory -f Makefile.firmware print-targets CROSS_COMPILE=none | jq -R . | jq -cs .)
+          targets=$( (scripts/list.py --names firmware; scripts/list.py --names --debug canmaster) | jq -R . | jq -cs .)
           echo "$targets"
           echo "targets=$targets" >> "$GITHUB_OUTPUT"
-          canmaster=$(jq -c '[.configurePresets[] | select((.hidden | not) and ((.inherits[0] == "DuetCANMaster") or (.name | startswith("canmaster-")))) | .name]' CMakePresets.json)
-          echo "$canmaster"
-          echo "canmaster=$canmaster" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build DSF (${{ matrix.arch }} ${{ matrix.mode }})
@@ -117,7 +108,7 @@ jobs:
         run: git submodule update --init --depth 1 lib/RRFLibraries
 
       - name: Build DSF (${{ matrix.arch }}, ${{ matrix.mode }})
-        run: scripts/build_dsf.py ${{ matrix.mode == 'aot' && '--aot' || '' }} --arch ${{ matrix.arch }} --all
+        run: scripts/build.py dsf ${{ matrix.mode == 'aot' && '--aot' || '' }} --arch ${{ matrix.arch }}
 
   firmware:
     needs: image
@@ -142,54 +133,8 @@ jobs:
         with:
           submodules: recursive
 
-      # Boards that embed the build date and time only match when both builds share it
-      - name: Set SOURCE_DATE_EPOCH
-        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
-
-      - name: Build ${{ matrix.target }} with make
-        run: make -j"$(nproc)" "${{ matrix.target }}"
-
-      # The CMake build also lints the C++ with clang-tidy, whose findings in these projects are
-      # warnings (see cmake/ClangTidy.cmake)
-      - name: Build ${{ matrix.target }} with CMake
-        run: |
-          cmake --preset "${{ matrix.target }}"
-          cmake --build --preset "${{ matrix.target }}" --parallel "$(nproc)"
-
-      - name: Compare make and CMake images
-        run: python3 scripts/compare_builds.py "${{ matrix.target }}"
-
-      # Puts the board's flash and RAM headroom on the run's summary page, so a change that eats into
-      # a board's budget is visible without downloading anything
-      - name: Report memory usage
-        run: python3 scripts/size.py "${{ matrix.target }}" --markdown "$GITHUB_STEP_SUMMARY"
-
-  canmaster:
-    needs: image
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      packages: read
-    container:
-      image: ${{ needs.image.outputs.image }}
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-    strategy:
-      fail-fast: false
-      matrix:
-        preset: ${{ fromJSON(needs.image.outputs.canmaster) }}
-    name: firmware (${{ matrix.preset }})
-    steps:
-      - run: git config --global --add safe.directory '*'
-
-      - uses: actions/checkout@v6
-        with:
-          submodules: recursive
-
-      # Linted by clang-tidy as it is compiled, with every finding an error (see cmake/ClangTidy.cmake)
-      - name: Build ${{ matrix.preset }}
-        run: python3 scripts/build.py "${{ matrix.preset }}" --markdown "$GITHUB_STEP_SUMMARY"
+      - name: Build ${{ matrix.target }}
+        run: scripts/build.py "${{ matrix.target }}" --markdown "$GITHUB_STEP_SUMMARY"
 
   # Uses the devcontainer image so the pyright and Python versions match local development
   pyright:
@@ -229,27 +174,27 @@ jobs:
       # The generated CAN message formats are checked in, so neither build depends on the generator.
       # That also means a schema edited without re-running it would ship silently, hence this check.
       - name: Check that the generated CAN message formats are up to date
-        run: make can-messages-check
+        run: scripts/codegen.py --check
 
-      # can-messages-verify compiles the layout probe against CANlib's own header, which is the only
+      # codegen.py --verify compiles the layout probe against CANlib's own header, which is the only
       # check that the schema still describes the real message formats rather than merely being
       # self-consistent. It needs these three submodules and a host compiler.
       - name: Check out the CAN libraries
         run: git submodule update --init --depth 1 lib/CANlib lib/RRFLibraries lib/CoreN2G
 
       - name: Verify the CAN message layouts against CANlib
-        run: make can-messages-verify
+        run: scripts/codegen.py --verify
 
       # Runs the tests with coverage and writes both UnitTests.trx and coverage.cobertura.xml into
       # test-results, which is uploaded below. The RequiresMachine category, which needs a real
       # Duet/SBC over HTTP, is excluded by the script.
       - name: Run C# unit tests with coverage
-        run: scripts/coverage.py --results-dir test-results | tee coverage.log
+        run: scripts/test.py unit --results-dir test-results | tee coverage.log
 
       # The script names each test as it starts and lists the failed names once the run is over.
       # Tests that are known to fail are temporarily ignored to prevent email spam
       - name: Run C# system tests
-        run: scripts/system_tests.py --skip-known-gaps --results-dir test-results
+        run: scripts/test.py system --skip-known-gaps --results-dir test-results
 
       # Surfaces the per-assembly table on the run's summary page so a coverage change is visible
       # without opening the log or downloading the artifact.
@@ -268,11 +213,7 @@ jobs:
       # The whole preset is built rather than named targets, so a test added later is run here
       # without this step having to be edited.
       - name: Build and run DuetRealtimeCore tests
-        working-directory: src/DuetRealtimeCore
-        run: |
-          cmake --preset native
-          cmake --build --preset native -j"$(nproc)"
-          ctest --test-dir build/native --output-on-failure
+        run: scripts/test.py native
 
       - name: Upload test results
         if: always()

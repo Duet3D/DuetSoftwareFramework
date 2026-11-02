@@ -11,4 +11,10 @@
 		<RepositoryUrl>https://github.com/Duet3D/DuetSoftwareFramework.git</RepositoryUrl>
 		<IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
 	</PropertyGroup>
+	<!-- Native AOT output goes in a tree of its own, so that an AOT publish and a runtime publish of the
+	     same configuration and runtime identifier do not overwrite each other; scripts/deploy.py deploys
+	     straight from the publish directories -->
+	<PropertyGroup Condition="'$(AotPublish)' == 'true'">
+		<BaseOutputPath>bin/aot/</BaseOutputPath>
+	</PropertyGroup>
 </Project>

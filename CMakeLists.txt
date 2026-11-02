@@ -1,6 +1,6 @@
 # The Duet3D firmware projects - DuetCANMaster, RepRapFirmware, Duet3Expansion, Duet3Bootloader and
 # DuetIAP - and the libraries they share. The SBC side (DuetRealtimeCore and the dotnet projects) is
-# built separately; see scripts/build_dsf.py.
+# built separately; scripts/build.py builds both.
 #
 # A build tree builds the project DUET_PROJECT for one hardware board, DUET_BOARD. Each build has a
 # preset (cmake --list-presets), which picks them, the MCU's toolchain file from cmake/toolchains,

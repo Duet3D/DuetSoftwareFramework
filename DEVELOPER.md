@@ -147,18 +147,33 @@ The first build can take several minutes. Later starts are usually much faster d
 
 ## First Build
 
-After the container finishes starting, open a new terminal in VS Code.
-
-Build the whole solution:
+After the container finishes starting, open a new terminal in VS Code and check that everything the builds need is there:
 
 ```bash
-cd src
-dotnet build DuetSoftwareFramework.sln
+scripts/doctor.py tools
 ```
 
-The solution file is [src/DuetSoftwareFramework.sln](src/DuetSoftwareFramework.sln).
+Then build every DSF project:
 
-If build succeeds, your environment is ready.
+```bash
+scripts/build.py dsf
+```
+
+The scripts in [scripts/](scripts/) are how everything is built, deployed, tested and linted, one script per task:
+
+| Script | Does |
+|---|---|
+| `scripts/list.py` | Lists the targets the others take |
+| `scripts/build.py` | Builds DSF projects and board firmware |
+| `scripts/deploy.py` | Deploys (and optionally builds) DSF projects and firmware |
+| `scripts/test.py` | Runs the unit, system or native tests |
+| `scripts/lint.py` | Runs clang-tidy over a whole build |
+| `scripts/clean.py` | Cleans or deletes build output |
+| `scripts/size.py` | Shows the memory the built firmware uses |
+| `scripts/codegen.py` | Generates, or checks, the CAN message formats |
+| `scripts/doctor.py` | Checks the tools, and that the submodules are checked out and on their branches |
+
+Each takes `--help`. They take the same targets: a DSF project (`DuetControlServer`, `DuetRealtimeCore`, ...), a firmware board named by its CMake preset (`EXP3HC`, `canmaster-Duet3_MB6HC`, with a `-debug` suffix for its Debug build), or a group (`dsf`, `firmware`, or a firmware project in full or as `canmaster`, `rrf`, `d3e`, `bootloader` or `iap`). `-x` leaves a target or group out, and builds are Release unless `--debug` is given.
 
 ## Build Using VS Code Tasks
 
@@ -170,28 +185,28 @@ To run a task:
 2. Run Tasks: Run Task.
 3. Select a task.
 
-Common tasks:
+Common tasks, which run the scripts above:
 
-- Build All
-- Build and Deploy
-- Restart DSF Services
-- Build individual components (for example Build DuetControlServer)
+- [DSF] Build, for one DSF project or all of them (`dsf`)
+- [DSF] Build and Deploy To, and Build and Deploy DCS to, for the Pi in the `dsf.debug` settings
+- [DSF] Restart DSF Services
+- [Firmware] Build Board
 
-The Build All task produces binaries under the local build/ directory.
+The DSF tasks build Debug, so that the debugger can be attached; each project's binaries are in its own `bin/Debug/<tfm>/linux-arm64/publish`.
 
 ## Run the Tests
 
 The unit tests run under coverage and print a per-assembly table:
 
 ```bash
-scripts/coverage.py
+scripts/test.py unit
 ```
 
 The system tests start a real DuetControlServer against a scripted CAN controller, so they take
 minutes rather than seconds:
 
 ```bash
-scripts/system_tests.py
+scripts/test.py system
 ```
 
 They run the real `libduet_realtime_core.so`, which the project builds from `src/DuetRealtimeCore` as part of
@@ -220,11 +235,17 @@ unimplemented or implemented incorrectly, so they fail until it is fixed and the
 off. The script leaves them out, as CI does; `--all` puts them back. To narrow a run:
 
 ```bash
-scripts/system_tests.py --filter 'FullyQualifiedName~JobControl'
-scripts/system_tests.py --help
+scripts/test.py system --filter 'FullyQualifiedName~JobControl'
+scripts/test.py system --help
 ```
 
-Running the project directly works, but the progress needs the console logger asked for by name,
+DuetRealtimeCore's own tests build it for this machine and run its ctest suite:
+
+```bash
+scripts/test.py native
+```
+
+Running the system test project directly works, but the progress needs the console logger asked for by name,
 because at its default verbosity it prints nothing until the run is over:
 
 ```bash
@@ -238,24 +259,25 @@ without it the same command behaves differently piped and interactively.
 
 ## Deploy to a Remote DuetPi/SBC
 
-The VS Code tasks include a deployment flow that uses SSH and rsync.
+`scripts/deploy.py` deploys DSF projects to a Pi over SSH and rsync, building them first with `--build`, and the [DSF] Build and Deploy tasks run it for the Pi in the `dsf.debug` settings ([DSF] Set Debug Target IP sets it):
 
-Typical sequence:
+```bash
+scripts/deploy.py -H <pi> dsf --start-services            # every DSF project, as last built
+scripts/deploy.py -H <pi> dsf --build --start-services    # build them first
+scripts/deploy.py -H <pi> DuetControlServer --build --debug  # build one as Debug, to debug it
+```
 
-1. Run Build and Deploy.
-2. Enter the target IP address when prompted.
+What it does:
 
-What the task flow does:
-
-1. Stops DSF services on the target.
-2. Builds components locally into build/.
-3. Copies build output to /opt/dsf/bin/ on the target via rsync.
+1. With --build, builds the projects locally, each into its own `bin/<config>/<tfm>/<arch>/publish` (`bin/aot/...` with --aot); --clean builds them from clean.
+2. Stops DSF services on the target.
+3. Copies the projects' publish directories, and `libduet_realtime_core.so` from its CMake build, to /opt/dsf/bin/ on the target in one rsync. Which build is deployed follows --debug, --aot and --arch, with or without --build.
 4. Copies DuetPiManagementPlugin to /opt/dsf/plugins/ on the target, manifest included.
 5. Starts DSF services again.
 
 Notes:
 
-- The remote commands use the root account by default.
+- The remote commands use the `root` account by default; `-u` names another.
 - DuetPiManagementPlugin is a plugin, not a service, so it is deployed to the plugin directory
   DuetPluginService runs it from rather than to /opt/dsf/bin/. Its manifest is regenerated from
   src/Directory.Build.props on every build, because DuetControlServer refuses to start a plugin
@@ -285,13 +307,13 @@ The firmware projects build from the repository root with one toolchain, against
 
 They need their submodules, including the nested ones: `git submodule update --init --recursive`.
 
-Each board is a CMake preset in [CMakePresets.json](CMakePresets.json), and its build tree is `build/<preset>/`. The easiest way to build is with the wrapper scripts (each takes `--help`):
+Each board is a CMake preset in [CMakePresets.json](CMakePresets.json), and its build tree is `build/<preset>/`. The easiest way to build is with the scripts:
 
 ```bash
-scripts/boards.py                          # list the boards, by project
+scripts/list.py firmware                   # list the boards, by project
 scripts/build.py canmaster-Duet3_MB6HC     # build one board
-scripts/build.py -p d3e                    # every board in a project (canmaster, rrf, d3e, bootloader, iap)
-scripts/build.py --all --debug             # every board, as Debug
+scripts/build.py d3e                       # every board of a project (canmaster, rrf, d3e, bootloader, iap)
+scripts/build.py firmware --debug          # every board, as Debug
 scripts/size.py                            # the memory each built board uses
 scripts/clean.py EXP3HC                    # clean a board's build trees (--purge deletes them)
 ```
@@ -305,20 +327,23 @@ cmake --build --preset canmaster-Duet3_MB6HC
 
 `-DDUET_DISASSEMBLY=ON` also writes the disassembly to `build/<preset>/<target>.lst`; it is on by default for DuetCANMaster, RepRapFirmware and Duet3Expansion, with the branch targets in each function labelled unless `-DDUET_DISASSEMBLY_LABELS=OFF`. In VS Code, the CMake Tools extension reads the presets: pick a board as the configure preset, then build. The **[Firmware] Build Board** task does the same through `scripts/build.py`.
 
-The CMake build also lints the C++ of every project and library with clang-tidy as it compiles it (`-DDUET_CLANG_TIDY=OFF` turns that off, for a faster build). The checks are in the root [.clang-tidy](.clang-tidy), which DuetCANMaster's and DuetRealtimeCore's own add their naming rules to. Third-party code is skipped: the device packs, CMSIS, tinyusb, mbedTLS, lwIP, MQTT-C and the vendored `src/libc` and `src/libcpp`. A project's findings are warnings until it is on `DUET_CLANG_TIDY_ERRORS` in [cmake/ClangTidy.cmake](cmake/ClangTidy.cmake), after which they fail the build; DuetCANMaster is on it. To lint a board's whole build by hand, or with `--fix`, write a compile database clang can use and run clang-tidy against it (the **[Style] Tidy Firmware Board** task does both). Renames from `readability-identifier-naming` must cover every board of a project at once, which `scripts/export_naming_fixes.py` does:
+The CMake build also lints DuetCANMaster's and the libraries' C++ with clang-tidy as it compiles it (`-DDUET_CLANG_TIDY=OFF` turns that off, for a faster build). The checks are in the root [.clang-tidy](.clang-tidy), which DuetCANMaster's and DuetRealtimeCore's own add their naming rules to. RepRapFirmware, Duet3Expansion, Duet3Bootloader and DuetIAP are not linted: their presets in [CMakePresets.json](CMakePresets.json) set `DUET_CLANG_TIDY` off, and `-DDUET_CLANG_TIDY=ON` lints them too. Third-party code is never linted: the device packs, CMSIS, tinyusb, mbedTLS, lwIP, MQTT-C and the vendored `src/libc` and `src/libcpp`. Every finding is an error, which fails the build. The libraries do not pass every check yet: [lib/.clang-tidy](lib/.clang-tidy) turns off the ones they fail, with how many findings each had, and the wrapper ([scripts/internal/clang_tidy_wrapper.py](scripts/internal/clang_tidy_wrapper.py)) skips the few library files clang cannot parse. Both lists are to shrink as the libraries are fixed. `scripts/lint.py` lints a board's whole build by hand, every header included, and can apply fixes (the **[Style] Tidy Firmware Board** task runs it). Renames from `readability-identifier-naming` must cover every board of a project at once, which `--naming-fixes` does:
 
 ```bash
-scripts/gen_compile_commands.py EXP3HC
-run-clang-tidy -p build/EXP3HC/clang-tidy -quiet src/Duet3Expansion/
+scripts/lint.py EXP3HC                                 # every project and library EXP3HC builds
+scripts/lint.py EXP3HC -f src/Duet3Expansion/src/Movement/Move.cpp
+scripts/lint.py canmaster --naming-fixes               # export renames across every DuetCANMaster board
 ```
 
-Every board except DuetCANMaster's also has a make build, which `Makefile.firmware` drives and the top-level Makefile forwards to (`make EXP3HC`, `make -j16 Duet3_MB6HC DEBUG=1`, `make firmware.help` for the list). Its output goes in `src/<project>/<config>/`. CI builds each board both ways and checks that the images are identical; to do the same locally:
+`scripts/deploy.py` also deploys the firmware of a main board and the CAN boards connected to it, building it first with `--build`. It uploads the files over the rr_ HTTP API, which RepRapFirmware serves on a standalone main board (as on the regression suite's `rrf` bench) and DSF serves on a Pi, then updates the boards with M997. On a Pi the main board's firmware is DuetCANMaster's.
 
 ```bash
-scripts/compare_builds.py EXP3HC --build
+scripts/deploy.py -H duet3.local firmware               # every connected board
+scripts/deploy.py -H duet3.local firmware --build       # build what they need first
+scripts/deploy.py -H duet3.local EXP1HCL --debug         # only the 1HCL boards, as Debug
+scripts/deploy.py -H duet3.local firmware --dry-run      # show what it would do
+scripts/deploy.py -H <pi> dsf firmware --build           # DSF, then the firmware through it, to a Pi
 ```
-
-`scripts/deploy.py` uploads the built firmware to a standalone (non-SBC) Duet 3 main board over HTTP and updates it and every connected CAN board that has a matching build, as on the regression suite's `rrf` bench. It does not deploy DuetCANMaster.
 
 ## Debug the Firmware
 
@@ -392,8 +417,8 @@ linked against a newer glibc than either the devcontainer or Raspberry Pi OS Boo
 built here instead:
 
 ```bash
-scripts/build_tracy_client.py                     # this machine, for the system tests
-scripts/build_tracy_client.py --arch linux-arm64  # a Pi
+scripts/build.py TracyClient                      # this machine, for the system tests
+scripts/build.py TracyClient --arch linux-arm64   # a Pi
 ```
 
 Install the Tracy GUI on the machine you will watch from. It must be the same release as the client,
@@ -408,10 +433,10 @@ dotnet test src/SystemTests/SystemTests.csproj --filter Name~PauseStopsMidMove -
 ### Profiling a Pi
 
 ```bash
-scripts/build_dsf.py --all --target <pi-ip> --start-services -p "Profiling=true"
+scripts/deploy.py -H <pi-ip> dsf --build --start-services -p "Profiling=true"
 ```
 
-`build_dsf.py -p` takes the property without the `-p:` prefix, which it adds itself.
+`-p` takes the property without the `-p:` prefix, which the script adds itself.
 
 ### Connecting
 
@@ -489,7 +514,7 @@ The firmware projects and libraries in `src/` and `lib/` are submodules, each tr
 - Change submodule code in its own repository first: branch, commit and open a PR there.
 - Submodules check out at a detached `HEAD`, where commits are easily lost. Before editing one, switch it to its tracked branch with the **[Git] Checkout Submodule Branches** task, then make a feature branch.
 - Push submodule commits **before** pushing the commit here that points at them, otherwise nobody else can check it out. `git config push.recurseSubmodules check` (below) enforces this.
-- Before merging, point the submodule at a commit on its tracked branch, not at an unmerged feature branch. CI enforces this on PRs; check it locally with the **[Git] Check Submodules** task (`scripts/check_submodules.py`).
+- Before merging, point the submodule at a commit on its tracked branch, not at an unmerged feature branch. CI enforces this on PRs; check it locally with the **[Git] Check Submodules** task (`scripts/doctor.py submodules`).
 - After pulling, run `git submodule update --init --recursive`, or set `submodule.recurse true`.
 - The **[Git] Update Submodules** task moves every submodule to the tip of its tracked branch (`git submodule update --remote --merge`), merging into local work rather than discarding it. Commit the new pointers.
 
@@ -558,9 +583,10 @@ ssh root@<target-ip> hostname
 
 ### build/ output looks stale
 
-Run the clean task first:
+Delete the build output and build again:
 
-1. Tasks: Run Task
-2. Clean Build Directory
-3. Build All
+```bash
+scripts/clean.py dsf --purge
+scripts/build.py dsf
+```
 

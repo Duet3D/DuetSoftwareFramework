@@ -4,49 +4,48 @@
 
     scripts/size.py                               every built board
     scripts/size.py EXP3HC --debug                one board's Debug build
-    scripts/size.py -p d3e --markdown summary.md  append a project's as a Markdown table, e.g. for a CI job summary
+    scripts/size.py d3e --markdown summary.md     append a project's as a Markdown table, e.g. for a CI job summary
 
-Boards are named as CMake presets (see scripts/boards.py); projects in full or as canmaster,
-rrf, d3e, bootloader or iap. --exclude takes boards or projects.
+Targets are firmware boards and groups of them (see scripts/list.py).
 """
 
 from __future__ import annotations
 
-import argparse
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from common.firmware import BUILD, add_board_arguments, load_boards, select
+from common.cli import parse, parser, typed
 from common.memory import Result, add_markdown_argument, built, print_summary
+from common.repo import BUILD
+from common.targets import FIRMWARE, add_target_arguments, select
 
 
 @dataclass(frozen=True)
 class Options:
     """The command line, typed."""
-    boards: list[str]
-    projects: list[str]
+    targets: list[str]
     all: bool
     exclude: list[str]
     debug: bool
     markdown: str | None
 
 
-def parse_options(argv: Sequence[str]) -> Options:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    add_board_arguments(parser)
-    parser.add_argument('-d', '--debug', action='store_true', help='the Debug variants')
-    add_markdown_argument(parser)
-    return Options(**vars(parser.parse_args(argv)))
+def parse_options(argv: Sequence[str] | None = None) -> Options:
+    p = parser(__doc__)
+    add_target_arguments(p, kinds=(FIRMWARE,))
+    p.add_argument('-d', '--debug', action='store_true', help='the Debug builds')
+    add_markdown_argument(p)
+    return typed(Options, parse(p, argv))
 
 
 def main() -> int:
-    options = parse_options(sys.argv[1:])
-    named = options.all or options.boards or options.projects
-    selected = select(load_boards(), options.boards, options.projects, options.all or not named, options.exclude)
+    options = parse_options()
+    named = bool(options.all or options.targets)
+    chosen = select(options.targets, options.all or not named, options.exclude, kinds=(FIRMWARE,))
     results: list[Result] = []
-    for board in selected:
-        preset = board.variant(options.debug)
+    for board in chosen.boards:
+        preset = chosen.preset(board, options.debug)
         if any((BUILD / preset).glob('*.elf')):
             results.append(built(preset, 'ok'))
         elif named:

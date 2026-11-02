@@ -10,7 +10,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from common.firmware import BUILD, read_elf
+from common.firmware import read_elf
+from common.repo import BUILD
 
 
 @dataclass(frozen=True)

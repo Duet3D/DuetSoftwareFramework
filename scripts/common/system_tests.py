@@ -1,14 +1,14 @@
-#!/usr/bin/env python3
 # pyright: strict
-"""Run the system tests, naming each test as it starts, then list the slow tests and the failed ones.
+"""Running the system tests, naming each test as it starts, then listing the slow tests and the failed
+ones: the system command of scripts/test.py.
 
-    scripts/system_tests.py                                             every scenario but the known gaps
-    scripts/system_tests.py --skip-long-running                         and not the slowest either
-    scripts/system_tests.py --all                                       every scenario
-    scripts/system_tests.py --filter 'FullyQualifiedName~JobControl'    the scenarios a filter names
-    scripts/system_tests.py --filter 'FullyQualifiedName~JobControl' --skip-long-running
-    scripts/system_tests.py --all --tag-long-running --slow 20          write LongRunning into the sources
-    scripts/system_tests.py -- -p:Profiling=true                        pass the rest to dotnet test
+    scripts/test.py system                                              every scenario but the known gaps
+    scripts/test.py system --skip-long-running                          and not the slowest either
+    scripts/test.py system --all                                        every scenario
+    scripts/test.py system --filter 'FullyQualifiedName~JobControl'     the scenarios a filter names
+    scripts/test.py system --filter 'FullyQualifiedName~JobControl' --skip-long-running
+    scripts/test.py system --all --tag-long-running --slow 20           write LongRunning into the sources
+    scripts/test.py system -- -p:Profiling=true                         pass the rest to dotnet test
 
 The results are written to <results-dir>/SystemTests.trx. The per-test progress comes from
 src/SystemTests/Host/TestProgress.cs; the summaries are this script's own, gathered from the TRX once
@@ -29,11 +29,11 @@ import argparse
 import re
 import sys
 import xml.etree.ElementTree as ElementTree
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from common.dsf import RESULTS, ROOT, call
+from common.repo import RESULTS, ROOT, call
 
 PROJECT = ROOT / 'src' / 'SystemTests' / 'SystemTests.csproj'
 SOURCES = ROOT / 'src' / 'SystemTests'
@@ -46,7 +46,7 @@ SLOW_SECONDS = 5.0
 
 @dataclass(frozen=True)
 class Options:
-    """The command line, typed."""
+    """The system command's options."""
     configuration: str
     results_dir: str
     filter: str | None
@@ -60,9 +60,7 @@ class Options:
     dotnet_args: list[str]
 
 
-def parse_options(argv: Sequence[str]) -> Options:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     usage='%(prog)s [options] [-- <dotnet test args>]')
+def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('-c', '--configuration', default='Debug', metavar='CFG',
                         help='build configuration (default: Debug)')
     parser.add_argument('-o', '--results-dir', default=str(RESULTS), metavar='DIR',
@@ -87,9 +85,7 @@ def parse_options(argv: Sequence[str]) -> Options:
     parser.add_argument('--tag-long-running', action='store_true',
                         help=f'write the {LONG_RUNNING} category into the sources to match the run: add it to the '
                              'tests over the slow threshold, remove it from the ones under')
-    # Everything after "--" goes to dotnet test as it is
-    split = argv.index('--') if '--' in argv else len(argv)
-    return Options(**vars(parser.parse_args(argv[:split])), dotnet_args=list(argv[split + 1:]))
+
 
 
 def test_filter(options: Options) -> str | None:
@@ -408,12 +404,11 @@ def summarise(options: Options, trx: Path) -> None:
         print('=== Failed tests ===')
         print('\n'.join(unexpected))
         print('\nRerun one of them with:')
-        print('  scripts/system_tests.py --filter "FullyQualifiedName~<test-name>"')
+        print('  scripts/test.py system --filter "FullyQualifiedName~<test-name>"')
     print(f'Results: {trx}')
 
 
-def main() -> int:
-    options = parse_options(sys.argv[1:])
+def run(options: Options) -> int:
     selection = test_filter(options)
 
     # The trx logger resolves its file name inside the results directory, so it is given the name alone
@@ -445,7 +440,3 @@ def main() -> int:
         return status
     summarise(options, trx)
     return status
-
-
-if __name__ == '__main__':
-    sys.exit(main())

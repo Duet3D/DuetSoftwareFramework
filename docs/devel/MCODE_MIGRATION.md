@@ -137,7 +137,7 @@ These rules come from the architecture already established on this branch — se
     because something went wrong, state the rule and the failure mode, not the incident.
 
 11. **A green `dotnet build` is not a green build.** Build the whole project with
-    `scripts/build_dsf.py --all` from the repo root. It builds every dotnet project *and*
+    `scripts/build.py dsf` from the repo root. It builds every dotnet project *and*
     cross-compiles the native `libduet_realtime_core.so` for aarch64 through CMake, which is the half a
     per-project `dotnet build` cannot see at all.
 
@@ -168,7 +168,7 @@ These rules come from the architecture already established on this branch — se
    `CanGenericTables.g.cs` already carries parameter tables for M111, M150, M308, M569
    (+ `.1`/`.2`/`.4`/`.6`/`.7`), M655, M915, M950 (heater/fan/gpio/led), M955 and M959.
 7. Report in RRF's format when no parameters are given.
-8. Build with `scripts/build_dsf.py --all` and run both test suites (§1.11).
+8. Build with `scripts/build.py dsf` and run both test suites (§1.11).
 9. Tick the box here.
 
 ### Status legend

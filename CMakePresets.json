@@ -52,6 +52,7 @@
             "hidden": true,
             "cacheVariables": {
                 "DUET_PROJECT": "RepRapFirmware",
+                "DUET_CLANG_TIDY": "OFF",
                 "DUET_DISASSEMBLY": "ON"
             }
         },
@@ -60,6 +61,7 @@
             "hidden": true,
             "cacheVariables": {
                 "DUET_PROJECT": "Duet3Expansion",
+                "DUET_CLANG_TIDY": "OFF",
                 "DUET_DISASSEMBLY": "ON"
             }
         },
@@ -67,14 +69,16 @@
             "name": "Duet3Bootloader",
             "hidden": true,
             "cacheVariables": {
-                "DUET_PROJECT": "Duet3Bootloader"
+                "DUET_PROJECT": "Duet3Bootloader",
+                "DUET_CLANG_TIDY": "OFF"
             }
         },
         {
             "name": "DuetIAP",
             "hidden": true,
             "cacheVariables": {
-                "DUET_PROJECT": "DuetIAP"
+                "DUET_PROJECT": "DuetIAP",
+                "DUET_CLANG_TIDY": "OFF"
             }
         },
         {

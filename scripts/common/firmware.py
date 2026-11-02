@@ -1,30 +1,16 @@
 # pyright: strict
-"""What the scripts share: the boards (CMake presets), choosing them from the command
-line, running commands and reading the ELF files the builds produce."""
+"""The firmware boards (CMake presets), building them, and reading the ELF files the builds produce."""
 
 from __future__ import annotations
 
-import argparse
 import bisect
 import json
 import struct
-import subprocess
-import sys
-from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple, cast
 
-ROOT = Path(__file__).resolve().parent.parent.parent
-BUILD = ROOT / 'build'
-ALIASES = {
-    'canmaster': 'DuetCANMaster',
-    'rrf': 'RepRapFirmware',
-    'd3e': 'Duet3Expansion',
-    'bootloader': 'Duet3Bootloader',
-    'iap': 'DuetIAP',
-}
-
+from common.repo import ROOT, run
 
 # Boards
 
@@ -60,65 +46,6 @@ def load_boards() -> list[Board]:
             name = str(p['name'])
             boards.append(Board(name, project, str(p.get('displayName', name))))
     return boards
-
-
-def project_name(name: str) -> str:
-    return ALIASES.get(name.lower(), name)
-
-
-def project_boards(project: str, boards: list[Board]) -> list[Board]:
-    matches = [b for b in boards if b.project == project]
-    if not matches:
-        known = ', '.join(sorted({b.project for b in boards}))
-        sys.exit(f'Unknown project "{project}"; projects: {known}')
-    return matches
-
-
-def board(name: str, boards: list[Board]) -> Board:
-    found = next((b for b in boards if b.preset == name.removesuffix('-debug')), None)
-    if found is None:
-        sys.exit(f'Unknown board "{name}"; run "scripts/boards.py" to see them')
-    return found
-
-
-def add_board_arguments(parser: argparse.ArgumentParser) -> None:
-    """The arguments that choose boards: names, --project, --all and --exclude."""
-    parser.add_argument('boards', nargs='*', help='board presets, e.g. EXP3HC or bootloader-SAMC21')
-    parser.add_argument('-p', '--project', dest='projects', action='append', default=[],
-                        help='every board of a project (repeatable)')
-    parser.add_argument('-a', '--all', action='store_true', help='every board of every project')
-    parser.add_argument('-x', '--exclude', action='append', default=[], metavar='BOARD_OR_PROJECT',
-                        help='leave out a board or a whole project (repeatable)')
-
-
-def select(boards: list[Board], names: list[str], projects: list[str], all: bool,
-           exclude: list[str]) -> list[Board]:
-    """The boards asked for, less the excluded ones, in CMakePresets.json order, each once."""
-    selected: list[Board] = []
-    if all:
-        selected = boards
-    else:
-        for project in map(project_name, projects):
-            selected += project_boards(project, boards)
-        selected += [board(name, boards) for name in names]
-        if not selected:
-            sys.exit('Name some boards, or use --project or --all')
-    known = {b.project for b in boards}
-    excluded: set[Board] = set()
-    for name in exclude:
-        if project_name(name) in known:
-            excluded.update(project_boards(project_name(name), boards))
-        else:
-            excluded.add(board(name, boards))
-    selected = [b for b in dict.fromkeys(selected) if b not in excluded]
-    if not selected:
-        sys.exit('Every board asked for is excluded')
-    return selected
-
-
-def run(command: Sequence[str], env: dict[str, str] | None = None) -> bool:
-    print('+', ' '.join(command), flush=True)
-    return subprocess.run(command, cwd=ROOT, env=env).returncode == 0
 
 
 def build(preset: str, clean: bool = False, fresh: bool = False, jobs: int | None = None,

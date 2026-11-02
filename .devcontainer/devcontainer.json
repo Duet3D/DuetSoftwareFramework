@@ -15,7 +15,6 @@
         "editorconfig.editorconfig",
         "ms-vscode.cpptools",
         "ms-vscode.cpp-devtools",
-        "ms-vscode.makefile-tools",
         "ms-vscode.cmake-tools",
         "mcu-debug.rtos-views",
         "ms-python.python",
@@ -35,19 +34,13 @@
           "${workspaceFolder}",
           "${workspaceFolder}/src/DuetRealtimeCore"
         ],
-        "makefile.makefilePath": "${workspaceFolder}/Makefile.firmware",
-        "makefile.configurations": [
-          { "name": "Release", "makeArgs": ["-j16"] },
-          { "name": "Debug", "makeArgs": ["-j16", "DEBUG=1"] }
-        ],
-        "makefile.dryrunSwitches": ["--always-make", "--keep-going", "--print-directory", "-j1"],
         "markdown.copyFiles.destination": {
           "**/*.md": "/docs/images/${fileName}"
         }
       }
     }
   },
-  "postCreateCommand": "dotnet --info && (cd src && dotnet restore DuetSoftwareFramework.sln) && python3 scripts/create_settings.py",
+  "postCreateCommand": "dotnet --info && (cd src && dotnet restore DuetSoftwareFramework.sln) && python3 scripts/internal/create_settings.py",
   "postStartCommand": ".devcontainer/claude-persist.sh && echo 'Ready: run the `Build and Deploy` task or `cd src && dotnet build DuetSoftwareFramework.sln`'",
 	"runArgs": [
 		"--add-host=host.docker.internal:host-gateway"

@@ -96,7 +96,7 @@ public static class Program
         {
             if (stale > 0)
             {
-                Console.Error.WriteLine($"{stale} generated file(s) do not match the schema; run 'make can-messages'");
+                Console.Error.WriteLine($"{stale} generated file(s) do not match the schema; run 'scripts/codegen.py'");
                 return 1;
             }
             Console.WriteLine($"all generated CAN message files are up to date ({facts.Count} structs)");

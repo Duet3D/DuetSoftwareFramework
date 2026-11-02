@@ -33,7 +33,7 @@ bld/
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*
 
-# scripts/coverage.py output
+# scripts/test.py output
 test-results/
 coverage.log
 coverage-report/

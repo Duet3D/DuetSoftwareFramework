@@ -135,7 +135,7 @@ Checks: >
 
 WarningsAsErrors: ''
 
-# For a hand run of clang-tidy over a compile database (scripts/gen_compile_commands.py): the headers
+# For a hand run of clang-tidy over a compile database (scripts/lint.py): the headers
 # of the projects and libraries. The build narrows this to the headers of the project a translation
 # unit belongs to, so that each header is reported when its own project is built.
 HeaderFilterRegex: '/(src|lib)/[^/]+/src/'

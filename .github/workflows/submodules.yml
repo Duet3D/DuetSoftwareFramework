@@ -25,4 +25,4 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Check submodules are on their tracked branches
-        run: python3 scripts/check_submodules.py
+        run: scripts/doctor.py submodules

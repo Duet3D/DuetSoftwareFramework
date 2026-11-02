@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
 # pyright: strict
-"""Run the C# unit tests under coverage and print line and branch coverage per assembly.
+"""Running the C# unit tests under coverage and printing line and branch coverage per assembly: the
+unit command of scripts/test.py.
 
-    scripts/coverage.py                           run them and summarise the coverage
-    scripts/coverage.py --threshold 35            and fail if total line coverage is under 35%
+    scripts/test.py unit                          run them and summarise the coverage
+    scripts/test.py unit --threshold 35           and fail if total line coverage is under 35%
 
 Coverage comes from the coverlet.collector package reference in UnitTests.csproj, so nothing has to be
 installed for this to work. What is measured, and what is left out, is configured in
@@ -23,11 +23,10 @@ import argparse
 import shutil
 import sys
 import xml.etree.ElementTree as ElementTree
-from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from common.dsf import RESULTS, ROOT, call
+from common.repo import RESULTS, ROOT, call
 
 PROJECT = ROOT / 'src' / 'UnitTests' / 'UnitTests.csproj'
 RUNSETTINGS = ROOT / 'src' / 'UnitTests' / 'coverlet.runsettings'
@@ -38,15 +37,14 @@ FILTER = 'TestCategory!=RequiresMachine'
 
 @dataclass(frozen=True)
 class Options:
-    """The command line, typed."""
+    """The unit command's options."""
     configuration: str
     results_dir: str
     threshold: float | None
     filter: str
 
 
-def parse_options(argv: Sequence[str]) -> Options:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('-c', '--configuration', default='Debug', metavar='CFG',
                         help='build configuration (default: Debug)')
     parser.add_argument('-o', '--results-dir', default=str(RESULTS), metavar='DIR',
@@ -54,15 +52,13 @@ def parse_options(argv: Sequence[str]) -> Options:
     parser.add_argument('--threshold', type=float, metavar='PCT',
                         help='exit non-zero if total line coverage is below this percentage')
     parser.add_argument('--filter', default=FILTER, metavar='EXPR', help=f'NUnit test filter (default: {FILTER})')
-    return Options(**vars(parser.parse_args(argv)))
 
 
 def percent(rate: str | None) -> str:
     return f'{float(rate or 0) * 100:.1f}'
 
 
-def main() -> int:
-    options = parse_options(sys.argv[1:])
+def run(options: Options) -> int:
     results_dir = Path(options.results_dir).resolve()
 
     # Each run writes into a fresh GUID directory under the results directory. Clearing them first means
@@ -107,7 +103,3 @@ def main() -> int:
             return 1
         print(f'Threshold:     {line_percent}% >= {options.threshold:g}%')
     return 0
-
-
-if __name__ == '__main__':
-    sys.exit(main())
