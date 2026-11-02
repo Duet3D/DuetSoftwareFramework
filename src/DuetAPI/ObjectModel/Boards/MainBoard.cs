@@ -6,6 +6,20 @@ namespace DuetAPI.ObjectModel;
 public partial class MainBoard : Board
 {
     /// <summary>
+    /// Lowest CAN address served by CAN0 or null if CAN0 has no expansion boards assigned
+    /// </summary>
+    /// <remarks>
+    /// Lower addresses and the firmware update address 126 stay on CAN1.
+    /// Only boards with two CAN buses (6HC and 6XD) support this
+    /// </remarks>
+    public int? CanSplitAddress
+    {
+        get => _canSplitAddress;
+        set => SetPropertyValue(ref _canSplitAddress, value);
+    }
+    private int? _canSplitAddress;
+
+    /// <summary>
     /// Details about a connected display or null if none is connected
     /// </summary>
     public DirectDisplay? DirectDisplay
