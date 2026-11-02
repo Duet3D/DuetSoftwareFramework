@@ -1,17 +1,24 @@
+# Builds DSF for every deployable architecture and runs its tests, builds every firmware target inside
+# the devcontainer image (with both make and CMake, one job per target so each board reports its own
+# pass/fail, checking the two builds' images are identical and linting the C++ with clang-tidy;
+# DuetCANMaster has only the CMake build), and type checks the Python scripts with pyright.
+
 name: Build and Test
 
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 concurrency:
-  group: build-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # The devcontainer image carries the cross toolchains, CMake and the .NET SDK the build needs.
-  # It is pushed to GHCR under a tag derived from its inputs, so it is only rebuilt when the
-  # Dockerfile or the toolchain install script changes.
+  # Publish the devcontainer image to GHCR, tagged by a hash of the files that define it so it is
+  # only rebuilt when they change, and read the firmware targets from the Makefile and the presets
+  # so new boards are picked up automatically. PRs from forks cannot push packages, so they use the
+  # published image.
   image:
     runs-on: ubuntu-24.04
     permissions:
@@ -19,34 +26,59 @@ jobs:
       packages: write
     outputs:
       image: ${{ steps.meta.outputs.image }}
+      targets: ${{ steps.list.outputs.targets }}
+      canmaster: ${{ steps.list.outputs.canmaster }}
+    env:
+      FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          submodules: true
 
-      - name: Compute image reference
+      - name: Compute image tag
         id: meta
-        run: |
-          repo="${GITHUB_REPOSITORY,,}"
-          tag="${{ hashFiles('.devcontainer/Dockerfile', 'scripts/install-arm-gcc.sh') }}"
-          echo "image=ghcr.io/${repo}/devcontainer:${tag}" >> "$GITHUB_OUTPUT"
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}/devcontainer:${{ hashFiles('.devcontainer/Dockerfile', '.devcontainer/install-arm-gcc.sh') }}" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check for published image
+        id: check
+        run: |
+          if docker manifest inspect "${{ steps.meta.outputs.image }}" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          elif [ "$FORK_PR" = "true" ]; then
+            echo "::error::${{ steps.meta.outputs.image }} is not published and PRs from forks cannot push it. A maintainer must push the .devcontainer changes to this repository first."
+            exit 1
+          fi
+
+      - uses: docker/setup-buildx-action@v4
+        if: steps.check.outputs.exists != 'true'
+
       - name: Build and push devcontainer image
-        uses: docker/build-push-action@v6
+        if: steps.check.outputs.exists != 'true'
+        uses: docker/build-push-action@v7
         with:
-          context: .
-          file: .devcontainer/Dockerfile
+          context: .devcontainer
           push: true
           tags: ${{ steps.meta.outputs.image }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=devcontainer
+          cache-to: type=gha,mode=max,scope=devcontainer
+
+      # Only the target list is needed, so a dummy CROSS_COMPILE skips the toolchain check.
+      # DuetCANMaster has no make build, so its presets, Release and Debug, are read from CMakePresets.json
+      - name: List targets
+        id: list
+        run: |
+          targets=$(make --no-print-directory -f Makefile.firmware print-targets CROSS_COMPILE=none | jq -R . | jq -cs .)
+          echo "$targets"
+          echo "targets=$targets" >> "$GITHUB_OUTPUT"
+          canmaster=$(jq -c '[.configurePresets[] | select((.hidden | not) and ((.inherits[0] == "DuetCANMaster") or (.name | startswith("canmaster-")))) | .name]' CMakePresets.json)
+          echo "$canmaster"
+          echo "canmaster=$canmaster" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build DSF (${{ matrix.arch }} ${{ matrix.mode }})
@@ -57,7 +89,6 @@ jobs:
       packages: read
     container:
       image: ${{ needs.image.outputs.image }}
-      # The image is private to the repository, so the job needs credentials to pull it
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -74,26 +105,21 @@ jobs:
           - aot
           - runtime
     steps:
-      - uses: actions/checkout@v6
+      # The checkout is owned by the runner user, not the container's root user
+      - run: git config --global --add safe.directory '*'
 
-      - name: Mark workspace as a safe git directory
-        run: git config --global --add safe.directory '*'
+      - uses: actions/checkout@v6
 
       # libduet_realtime_core.so compiles RRFLibraries for its host, so DuetRealtimeCore needs
       # that submodule and DuetControlServer needs it too because it builds the library in turn.
       # Nothing else in the matrix touches lib/, so the clone is skipped for the other projects.
       - name: Check out RRFLibraries
-        run: |
-          git config --global url."https://github.com/".insteadOf "git@github.com:"
-          git submodule update --init --depth 1 lib/RRFLibraries
+        run: git submodule update --init --depth 1 lib/RRFLibraries
 
       - name: Build DSF (${{ matrix.arch }}, ${{ matrix.mode }})
-        run: ./scripts/build.sh ${{ matrix.mode == 'aot' && '--aot' || '' }} --arch ${{ matrix.arch }} --all
+        run: scripts/build_dsf.py ${{ matrix.mode == 'aot' && '--aot' || '' }} --arch ${{ matrix.arch }} --all
 
-  # Bare-metal DuetCANMaster firmware (arm-none-eabi), built through its CMake presets.
-  # The per-board presets are built here so a break in any single board is visible on its own.
   firmware:
-    name: Build DuetCANMaster firmware (${{ matrix.preset }})
     needs: image
     runs-on: ubuntu-24.04
     permissions:
@@ -101,53 +127,44 @@ jobs:
       packages: read
     container:
       image: ${{ needs.image.outputs.image }}
-      # The image is private to the repository, so the job needs credentials to pull it
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - preset: release
-            configure: release
-          - preset: Duet3_MB6HC
-            configure: release
-          - preset: Duet3_MB6XD
-            configure: release
-          - preset: debug
-            configure: debug
-          - preset: Duet3_MB6HC-debug
-            configure: debug
-          - preset: Duet3_MB6XD-debug
-            configure: debug
+        target: ${{ fromJSON(needs.image.outputs.targets) }}
+    name: firmware (${{ matrix.target }})
     steps:
+      - run: git config --global --add safe.directory '*'
+
       - uses: actions/checkout@v6
+        with:
+          submodules: recursive
 
-      - name: Mark workspace as a safe git directory
-        run: git config --global --add safe.directory '*'
+      # Boards that embed the build date and time only match when both builds share it
+      - name: Set SOURCE_DATE_EPOCH
+        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
 
-      # LIBRARIES_DIR points at lib/, so the firmware needs those submodules. They are recorded with
-      # git@ URLs; rewriting to https lets the public repos be cloned without a key. Only
-      # LibTinyusb's nested tinyusb is compiled, so the other nested submodules are left alone.
-      - name: Check out firmware libraries
+      - name: Build ${{ matrix.target }} with make
+        run: make -j"$(nproc)" "${{ matrix.target }}"
+
+      # The CMake build also lints the C++ with clang-tidy, whose findings in these projects are
+      # warnings (see cmake/ClangTidy.cmake)
+      - name: Build ${{ matrix.target }} with CMake
         run: |
-          git config --global url."https://github.com/".insteadOf "git@github.com:"
-          git submodule update --init --depth 1 lib
-          git -C lib/LibTinyusb submodule update --init --depth 1 src/tinyusb
+          cmake --preset "${{ matrix.target }}"
+          cmake --build --preset "${{ matrix.target }}" --parallel "$(nproc)"
 
-      - name: Configure (${{ matrix.configure }})
-        working-directory: src/DuetCANMaster
-        run: cmake --preset ${{ matrix.configure }}
+      - name: Compare make and CMake images
+        run: python3 scripts/compare_builds.py "${{ matrix.target }}"
 
-      - name: Build ${{ matrix.preset }}
-        working-directory: src/DuetCANMaster
-        run: cmake --build --preset ${{ matrix.preset }} -j"$(nproc)"
+      # Puts the board's flash and RAM headroom on the run's summary page, so a change that eats into
+      # a board's budget is visible without downloading anything
+      - name: Report memory usage
+        run: python3 scripts/size.py "${{ matrix.target }}" --markdown "$GITHUB_STEP_SUMMARY"
 
-  # Bare-metal Duet3Expansion firmware (arm-none-eabi), built through its own recursive Makefile.
-  # All ten boards share the library builds, so they go in one make invocation rather than a matrix.
-  expansion-firmware:
-    name: Build Duet3Expansion firmware
+  canmaster:
     needs: image
     runs-on: ubuntu-24.04
     permissions:
@@ -155,33 +172,42 @@ jobs:
       packages: read
     container:
       image: ${{ needs.image.outputs.image }}
-      # The image is private to the repository, so the job needs credentials to pull it
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: ${{ fromJSON(needs.image.outputs.canmaster) }}
+    name: firmware (${{ matrix.preset }})
+    steps:
+      - run: git config --global --add safe.directory '*'
+
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      # Linted by clang-tidy as it is compiled, with every finding an error (see cmake/ClangTidy.cmake)
+      - name: Build ${{ matrix.preset }}
+        run: python3 scripts/build.py "${{ matrix.preset }}" --markdown "$GITHUB_STEP_SUMMARY"
+
+  # Uses the devcontainer image so the pyright and Python versions match local development
+  pyright:
+    needs: image
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ${{ needs.image.outputs.image }}
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v6
 
-      - name: Mark workspace as a safe git directory
-        run: git config --global --add safe.directory '*'
-
-      # The firmware itself is a submodule, and LIBRARIES_DIR points at lib/ so the boards link
-      # against the same libraries as the rest of the tree. Only these five are compiled.
-      - name: Check out the firmware and its libraries
-        run: |
-          git config --global url."https://github.com/".insteadOf "git@github.com:"
-          git submodule update --init --depth 1 src/Duet3Expansion \
-            lib/CANlib lib/CoreN2G lib/FreeRTOS lib/RRFLibraries lib/Qfplib-M0-full
-
-      - name: Build every expansion board
-        run: make Duet3Expansion -j"$(nproc)"
-
-      # Puts each board's flash and RAM headroom on the run's summary page, so a change that eats
-      # into a board's budget is visible without downloading anything.
-      - name: Report firmware memory usage
-        run: |
-          ./scripts/expansion-memory-report.py
-          ./scripts/expansion-memory-report.py --markdown >> "$GITHUB_STEP_SUMMARY"
+      - name: Run pyright
+        run: pyright
 
   test:
     name: Run unit tests
@@ -192,15 +218,13 @@ jobs:
       packages: read
     container:
       image: ${{ needs.image.outputs.image }}
-      # The image is private to the repository, so the job needs credentials to pull it
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v6
+      - run: git config --global --add safe.directory '*'
 
-      - name: Mark workspace as a safe git directory
-        run: git config --global --add safe.directory '*'
+      - uses: actions/checkout@v6
 
       # The generated CAN message formats are checked in, so neither build depends on the generator.
       # That also means a schema edited without re-running it would ship silently, hence this check.
@@ -211,9 +235,7 @@ jobs:
       # check that the schema still describes the real message formats rather than merely being
       # self-consistent. It needs these three submodules and a host compiler.
       - name: Check out the CAN libraries
-        run: |
-          git config --global url."https://github.com/".insteadOf "git@github.com:"
-          git submodule update --init --depth 1 lib/CANlib lib/RRFLibraries lib/CoreN2G
+        run: git submodule update --init --depth 1 lib/CANlib lib/RRFLibraries lib/CoreN2G
 
       - name: Verify the CAN message layouts against CANlib
         run: make can-messages-verify
@@ -222,12 +244,12 @@ jobs:
       # test-results, which is uploaded below. The RequiresMachine category, which needs a real
       # Duet/SBC over HTTP, is excluded by the script.
       - name: Run C# unit tests with coverage
-        run: ./scripts/coverage.sh --results-dir test-results | tee coverage.log
-      
-      # The script names each test as it starts and lists the failed names once the run is over,
+        run: scripts/coverage.py --results-dir test-results | tee coverage.log
+
+      # The script names each test as it starts and lists the failed names once the run is over.
       # Tests that are known to fail are temporarily ignored to prevent email spam
       - name: Run C# system tests
-        run: ./scripts/system-tests.sh --skip-known-gaps --results-dir test-results
+        run: scripts/system_tests.py --skip-known-gaps --results-dir test-results
 
       # Surfaces the per-assembly table on the run's summary page so a coverage change is visible
       # without opening the log or downloading the artifact.

@@ -1,7 +1,7 @@
 # Porting `GCodes::HandleMcode` into DuetControlServer
 
 Tracking document for migrating the M-code handling in
-[`lib/RepRapFirmware/src/GCodes/GCodes2.cpp`](lib/RepRapFirmware/src/GCodes/GCodes2.cpp)
+[`src/RepRapFirmware/src/GCodes/GCodes2.cpp`](src/RepRapFirmware/src/GCodes/GCodes2.cpp)
 (`GCodes::HandleMcode`, lines 617-4746) into
 [MCodeHandler.cs](src/DuetControlServer/Codes/Handlers/MCodeHandler.cs) and the subsystems it drives.
 
@@ -137,7 +137,7 @@ These rules come from the architecture already established on this branch — se
     because something went wrong, state the rule and the failure mode, not the incident.
 
 11. **A green `dotnet build` is not a green build.** Build the whole project with
-    `./scripts/build.sh --all` from the repo root. It builds every dotnet project *and*
+    `scripts/build_dsf.py --all` from the repo root. It builds every dotnet project *and*
     cross-compiles the native `libduet_realtime_core.so` for aarch64 through CMake, which is the half a
     per-project `dotnet build` cannot see at all.
 
@@ -168,7 +168,7 @@ These rules come from the architecture already established on this branch — se
    `CanGenericTables.g.cs` already carries parameter tables for M111, M150, M308, M569
    (+ `.1`/`.2`/`.4`/`.6`/`.7`), M655, M915, M950 (heater/fan/gpio/led), M955 and M959.
 7. Report in RRF's format when no parameters are given.
-8. Build with `./scripts/build.sh --all` and run both test suites (§1.11).
+8. Build with `scripts/build_dsf.py --all` and run both test suites (§1.11).
 9. Tick the box here.
 
 ### Status legend
@@ -286,7 +286,7 @@ of that work which the transforms already needed.
 
 ## 5. Inventory
 
-RRF line numbers refer to `lib/RepRapFirmware/src/GCodes/GCodes2.cpp`.
+RRF line numbers refer to `src/RepRapFirmware/src/GCodes/GCodes2.cpp`.
 
 ### 5.1 Motion — drives and axes
 
@@ -1723,7 +1723,7 @@ preparation can say so, and probes directly only if there is no such file.
 
 An audit of [BuildRawMove](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L200) and
 [ApplyExtrusion](src/DuetControlServer/Codes/Handlers/GCodeHandler.cs#L289) against
-`GCodes::DoStraightMove` (`lib/RepRapFirmware/src/GCodes/GCodes.cpp:2200-2754`),
+`GCodes::DoStraightMove` (`src/RepRapFirmware/src/GCodes/GCodes.cpp:2200-2754`),
 `GCodes::LoadFeedrateFromGCode` (`:1963-2002`) and `GCodes::LoadExtrusionFromGCode` (`:2006-2174`).
 
 The comparison is against a **Duet 3 MB6HC** build, because that is what decides which of RRF's
@@ -3708,7 +3708,7 @@ it answers the question a reader came with.
 
 ## 18. `G4`: the dwell
 
-`GCodes::DoDwell` ([GCodes.cpp](../../lib/RepRapFirmware/src/GCodes/GCodes.cpp)) is four decisions,
+`GCodes::DoDwell` ([GCodes.cpp](../../src/RepRapFirmware/src/GCodes/GCodes.cpp)) is four decisions,
 and three of them are ported whole. `S` is a dwell in seconds and `P` one in milliseconds; `S` is
 tested first, so `P` is never read when both are given; a dwell of zero or less is nothing to do and
 returns at once, which is also what a bare `G4` amounts to.

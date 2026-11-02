@@ -1,0 +1,162 @@
+---
+Checks: >
+  -*,
+  bugprone-*,
+  cppcoreguidelines-*,
+  misc-*,
+  modernize-*,
+  performance-*,
+  readability-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-narrowing-conversions,
+  -cppcoreguidelines-avoid-c-arrays,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-avoid-non-const-global-variables,
+  -cppcoreguidelines-macro-usage,
+  -cppcoreguidelines-narrowing-conversions,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-cstyle-cast,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-pro-type-union-access,
+  -cppcoreguidelines-pro-type-vararg,
+  -cppcoreguidelines-avoid-const-or-ref-data-members,
+  -cppcoreguidelines-macro-to-enum,
+  -modernize-macro-to-enum,
+  -misc-confusable-identifiers,
+  -misc-no-recursion,
+  -misc-use-internal-linkage,
+  -modernize-avoid-c-arrays,
+  -modernize-use-designated-initializers,
+  -modernize-use-trailing-return-type,
+  -readability-braces-around-statements,
+  -readability-else-after-return,
+  -readability-function-cognitive-complexity,
+  -readability-function-size,
+  -readability-identifier-length,
+  -readability-implicit-bool-conversion,
+  -readability-magic-numbers,
+  -readability-math-missing-parentheses,
+  -readability-qualified-auto,
+  -readability-uppercase-literal-suffix,
+  -misc-include-cleaner,
+  -misc-use-anonymous-namespace,
+  -misc-non-private-member-variables-in-classes,
+  -cppcoreguidelines-avoid-do-while,
+  -readability-avoid-unconditional-preprocessor-if,
+  -bugprone-unhandled-exception-at-new,
+  -bugprone-macro-parentheses,
+  -readability-redundant-declaration,
+  -bugprone-reserved-identifier,
+  -modernize-use-std-numbers,
+  -modernize-use-default-member-init,
+  -cppcoreguidelines-use-default-member-init,
+  -bugprone-dynamic-static-initializers,
+  -readability-identifier-naming
+
+# The shared checks for all of the firmware and DuetRealtimeCore, which the build runs on every C++
+# translation unit (cmake/ClangTidy.cmake). A project with a .clang-tidy of its own inherits these
+# (InheritParentConfig) and adds its own rules to them: identifier naming is off here, because the
+# projects do not share a naming style, and DuetCANMaster and DuetRealtimeCore each turn it on with
+# theirs.
+#
+# Checks switched off because they conflict with deliberate choices in the firmware rather than
+# flagging defects. The examples are DuetCANMaster's, where they were triaged:
+#   misc-include-cleaner            - demands a direct #include for build-system macros (SAME70),
+#                                     eCv annotations (_ecv_array) and toolchain typedefs; the
+#                                     include chain here is deliberate and order-sensitive
+#   misc-use-anonymous-namespace    - file-scope `static` is the established RepRapFirmware idiom
+#   misc-non-private-member-variables-in-classes - duplicate of the cppcoreguidelines check
+#                                     already disabled above
+#   cppcoreguidelines-avoid-do-while - do/while(0) is the standard multi-statement macro idiom
+#   readability-avoid-unconditional-preprocessor-if - `#if 0` guards debug-only code on purpose
+#   bugprone-unhandled-exception-at-new - the firmware runs without exceptions; allocation
+#                                     failure is handled by the fault path, not a catch
+#   readability-redundant-declaration - the forward declarations of the fault handlers in
+#                                     ExceptionHandlers.cpp are not redundant: they carry
+#                                     __attribute__((naked)) and (noreturn) that the definitions
+#                                     below them do not repeat, and the check deletes the whole
+#                                     declaration. Losing 'naked' makes GCC wrap hand-written
+#                                     assembly that reads MSP/PSP and r0/r1 in a prologue and
+#                                     epilogue. It happens to still work on GCC 15 -- the emitted
+#                                     epilogue is unreachable and no prologue is needed -- but the
+#                                     asm is only correct because of the attribute, and nothing
+#                                     would warn if a future compiler decided to save a register.
+#   modernize-use-default-member-init (and its cppcoreguidelines- alias, which has to be named
+#                                     separately or the wildcard re-enables it) - the diagnostic is
+#                                     sound but its fix-it produces code that does not compile, in
+#                                     two ways, across 9 of the constructors here:
+#                                       * when every initialiser moves to the declaration it deletes
+#                                         them but leaves the dangling ':', e.g. "RepRap() noexcept
+#                                         :\n{". That is a clang-tidy bug, not a property of this
+#                                         codebase.
+#                                       * its replacement ranges span preprocessor directives that
+#                                         are inactive in the configuration being analysed. In
+#                                         DataTransfer's constructor it deleted the whole
+#                                         "#if SAME5x ... #endif" arm -- initialisers for an MCU
+#                                         family this build never compiles -- and orphaned the
+#                                         "#endif" of the SUPPORTS_SBC_OVER_USB block.
+#                                     The second one silently removes code for other targets, so
+#                                     re-enable this only with a per-file review of the fix-it
+#                                     rather than a bulk clang-apply-replacements run.
+#   modernize-use-std-numbers       - it reports these as exact ("differs by 0.00e+00"), but that
+#                                     is measured without -fsingle-precision-constant, which the
+#                                     firmware does build with and scripts/common/clang.py
+#                                     has to drop because clang rejects it. Under the
+#                                     real flags 180.0 / 3.141592653589793 folds in single
+#                                     precision and std::numbers::pi (a double) does not, so
+#                                     RadiansToDegrees moves one ulp: 0x42652ee0 -> 0x42652ee1.
+#                                     The constants in RepRapFirmware.h are all constexpr, so
+#                                     there is no runtime benefit to trade against changing a
+#                                     motion constant.
+#   bugprone-macro-parentheses      - the only hits are the build's own command-line -D flags
+#                                     (-DMQTTC_PAL_FILE=Networking/MQTT/mqtt_pal.h); it fires once
+#                                     per TU with no source location, and parenthesising that
+#                                     value would break the `#include MQTTC_PAL_FILE` that uses it
+#   bugprone-dynamic-static-initializers - the check is inert unless the translation unit is built
+#                                     with -fno-threadsafe-statics, which the firmware passes
+#                                     (cmake/DuetFirmware.cmake), so it is on here purely as a
+#                                     side effect of that flag. It matches the *declaration* in the
+#                                     header and never looks at the definition, so it cannot tell
+#                                     dynamic initialisation from constant or zero initialisation:
+#                                     a plain `static unsigned n;` is reported identically to
+#                                     ExpansionManager's `static ReadWriteLock boardsLock;`, and
+#                                     giving the type a constexpr constructor does not silence it
+#                                     either -- hence the "may be" in the message. Every hit in
+#                                     this tree is a class static data member, which has exactly
+#                                     one definition in one .cpp; the per-TU duplication the check
+#                                     is aimed at cannot arise. That is 230 of the 1745 diagnostics
+#                                     in a full run, none of them actionable without moving the
+#                                     members out of their classes.
+
+WarningsAsErrors: ''
+
+# For a hand run of clang-tidy over a compile database (scripts/gen_compile_commands.py): the headers
+# of the projects and libraries. The build narrows this to the headers of the project a translation
+# unit belongs to, so that each header is reported when its own project is built.
+HeaderFilterRegex: '/(src|lib)/[^/]+/src/'
+
+# Third-party code the firmware builds but this repository does not maintain: the MCU vendors'
+# device packs and HALs (Microchip's ASF and ASF4/Atmel START code, ST's CubeMX), CMSIS, tinyusb, mbedTLS, lwIP, MQTT-C, and the newlib and GCC runtime
+# sources the projects carry in src/libc and src/libcpp. scripts/common/clang.py reads this pattern
+# too, to skip its sources and drop the diagnostics clang reports in it, so it has to stay on one
+# line and in the subset of regular expressions that both POSIX and Python understand.
+ExcludeHeaderFilterRegex: '/lib/CoreN2G/src/(atmel|arm|STMCubeMX|RP2040/pico-sdk|SAM4S_4E_E70/asf|SAME5x_C21/[^/]+/(Config|hal|hpl|hri|pukcc|usb))/|/lib/LibTinyusb/src/tinyusb/|/lib/LibMbedTls/(include|library|3rdparty|framework|tf-psa-crypto)/|/src/Networking/LwipEthernet/Lwip/|/src/Networking/MQTT/MQTT_C/|/src/lib(c|cpp)/'
+
+# The firmware is GCC-built; clang hits a handful of constexpr/overload divergences it cannot
+# resolve. Without this it stops at 20 errors and silently leaves the rest of the TU unanalysed.
+ExtraArgs: ['-ferror-limit=0']
+
+FormatStyle: file
+
+CheckOptions:
+  - key: modernize-loop-convert.MinConfidence
+    value: reasonable
+  - key: modernize-use-nullptr.NullMacros
+    value: 'NULL'
+  - key: performance-move-const-arg.CheckTriviallyCopyableMove
+    value: 'false'

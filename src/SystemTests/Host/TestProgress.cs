@@ -27,7 +27,7 @@ namespace SystemTests.Host;
 /// <para>
 /// The lines go to <see cref="TestContext.Progress"/>, which the runner streams as it is written,
 /// unlike <c>TestContext.Out</c> which it holds back until the test finishes. Reaching the terminal
-/// also needs the console logger at normal verbosity or above, which scripts/system-tests.sh asks
+/// also needs the console logger at normal verbosity or above, which scripts/system_tests.py asks
 /// for. That verbosity also prints the number of tests the run discovered, which is where the count
 /// each line counts towards comes from: the assembly knows how many tests it holds but not how many
 /// the filter selected.
@@ -36,7 +36,7 @@ namespace SystemTests.Host;
 /// <para>
 /// Failures are not summarised here. The runner prints each one where it happened, followed by the
 /// stack trace and the DuetControlServer log <see cref="BenchFixture"/> dumps, and anything written
-/// from inside the run lands above all of that rather than at the end. scripts/system-tests.sh
+/// from inside the run lands above all of that rather than at the end. scripts/system_tests.py
 /// lists the failed names after the runner has finished instead.
 /// </para>
 /// </remarks>

@@ -1,7 +1,7 @@
 # Porting RepRapFirmware's event system into DuetControlServer
 
 Tracking document for migrating RepRapFirmware's event mechanism —
-[`lib/RepRapFirmware/src/Platform/Event.cpp`](lib/RepRapFirmware/src/Platform/Event.cpp) plus its
+[`src/RepRapFirmware/src/Platform/Event.cpp`](src/RepRapFirmware/src/Platform/Event.cpp) plus its
 producers and its consumer in `GCodes` — into DuetControlServer, and for adding the two link events
 this architecture needs and RepRapFirmware has no equivalent of.
 
@@ -19,7 +19,7 @@ link to DuetCANMaster drops and comes back, running `sys/controller-disconnect.g
 ## 1. What an event is in RepRapFirmware
 
 > An event is an occurrence reported by a machine sensor that may need to be reported or may require
-> action to be taken. — [Event.h](lib/RepRapFirmware/src/Platform/Event.h)
+> action to be taken. — [Event.h](src/RepRapFirmware/src/Platform/Event.h)
 
 An event is not a trigger and not a message. It is a *queued* fact about the machine that has a macro
 file named after it, a default action if that file is absent, and a suppression rule so that a fault
@@ -27,7 +27,7 @@ reporting itself ten times a second produces one macro run rather than ten.
 
 ### 1.1 The queue
 
-[`Event`](lib/RepRapFirmware/src/Platform/Event.cpp) is a singly-linked list of heap-allocated
+[`Event`](src/RepRapFirmware/src/Platform/Event.cpp) is a singly-linked list of heap-allocated
 events, ordered by priority, where **priority is the numeric value of the event type** — lower is more
 urgent. Four properties matter to the port:
 
@@ -131,6 +131,8 @@ Severity comes from `GetTextDescription`, the pause from `GetDefaultPauseReason`
 | `mcu_temperature_warning` | warning | none | `MCU temperature warning from board %u: temperature %.1fC` |
 | `overvoltage` | warning | none | `overvoltage on board %u: voltage %.1fV` |
 | `undervoltage` | warning | none | `undervoltage on board %u: voltage %.1fV` |
+| `board_temperature_warning` | warning | none | `Board %u temperature warning: temperature %.1fC` |
+| `board_over_temperature` | error | `BoardOverTemperature`, **without** `pause.g` | `Board %u over temperature: temperature %.1fC, driver(s) disabled` |
 
 A pausing event with no macro also raises a **message box** (`SendSimpleAlert`, mode 1, no timeout),
 titled `Printing paused` while printing and `Event notification` otherwise. If the print is already
@@ -462,6 +464,8 @@ declaration, checked by the same validator, with no second list to drift. The or
 | 10 | `mcu_temperature_warning` | |
 | 11 | `overvoltage` | |
 | 12 | `undervoltage` | |
+| 13 | `board_temperature_warning` | |
+| 14 | `board_over_temperature` | |
 
 Declaration order would express the same thing without a new field, but only while the two orders
 happen to coincide: the values are grouped by CANlib's numbering and a priority change would mean
@@ -925,6 +929,8 @@ still has none.
 | `mcu_temperature_warning` | `mcu-temperature-warning.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ log |
 | `overvoltage` | `overvoltage.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ log |
 | `undervoltage` | `undervoltage.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ log |
+| `board_temperature_warning` | `board-temperature-warning.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ log |
+| `board_over_temperature` | `board-over-temperature.g` | 🟡 logged only | ⬜ | ⬜ | ⬜ pause: `PrintPausedReason` has no `BoardOverTemperature` |
 | `controller_disconnect` | `controller-disconnect.g` | ✅ §2.2 fixed | ✅ | ✅ | ✅ log |
 | `controller_reconnect` | `controller-reconnect.g` | ✅ §2.2 fixed | ✅ | ✅ | ✅ `config.g` |
 
@@ -1049,7 +1055,7 @@ this would be the third, which is the argument for doing it once rather than gro
 ### 9.2 `input`
 
 RepRapFirmware's `input` constant is the value entered in an `M291` message box
-([ExpressionParser.cpp:1836](lib/RepRapFirmware/src/GCodes/GCodeBuffer/ExpressionParser.cpp#L1836)).
+([ExpressionParser.cpp:1836](src/RepRapFirmware/src/GCodes/GCodeBuffer/ExpressionParser.cpp#L1836)).
 `M291` is not ported - it is what §3.5's message-box default action waits for - so `input` is left to
 forward. `result`, the other constant RRF has and this did not, is implemented: `LastCodeResult`
 records how the last code on each channel ended, set where the Executed stage handles the reply,

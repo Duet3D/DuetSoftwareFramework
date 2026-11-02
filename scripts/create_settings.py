@@ -1,157 +1,119 @@
-import json
-import os
+#!/usr/bin/env python3
+# pyright: strict
+"""Create or update .vscode/settings.json with the settings the remote debugging tasks read.
+
+    scripts/create_settings.py                              add any setting that is missing
+    scripts/create_settings.py --target-ip 192.168.4.27     and set the Pi to debug on
+
+Settings already in the file are kept. The file may be in VS Code's own syntax, with comments and
+trailing commas, but it is written back as plain JSON.
+"""
+
+from __future__ import annotations
+
 import argparse
+import json
+import sys
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import cast
 
-SETTINGS_PATH = os.path.join(os.path.dirname(__file__), '..', '.vscode', 'settings.json')
+from common.dsf import ROOT
 
-defaults = {
-    "dsf.debug.sshUser":     "root",
-    "dsf.debug.targetIp":    "",
-    "dsf.debug.debuggerPath": "/root/vsdbg/vsdbg",
+SETTINGS = ROOT / '.vscode' / 'settings.json'
+DEFAULTS = {
+    'dsf.debug.sshUser': 'root',
+    'dsf.debug.targetIp': '',
+    'dsf.debug.debuggerPath': '/root/vsdbg/vsdbg',
 }
 
-def _strip_jsonc(text):
-    # Support VS Code settings.json syntax (comments + trailing commas)
-    result = []
-    in_string = False
-    in_line_comment = False
-    in_block_comment = False
-    escaped = False
-    i = 0
 
+@dataclass(frozen=True)
+class Options:
+    """The command line, typed."""
+    target_ip: str | None
+
+
+def parse_options(argv: Sequence[str]) -> Options:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--target-ip', metavar='IP', help='set the target IP address for debugging')
+    return Options(**vars(parser.parse_args(argv)))
+
+
+def skip_string(text: str, i: int, out: list[str]) -> int:
+    """Copy the JSON string starting at text[i] to out, and return the index after it."""
+    end = i + 1
+    while end < len(text) and text[end] != '"':
+        end += 2 if text[end] == '\\' else 1
+    out.append(text[i:end + 1])
+    return end + 1
+
+
+def strip_comments(text: str) -> str:
+    """JSON with comments, as VS Code writes it, without the comments."""
+    out: list[str] = []
+    i = 0
     while i < len(text):
-        ch = text[i]
-        nxt = text[i + 1] if i + 1 < len(text) else ''
-
-        if in_line_comment:
-            if ch == '\n':
-                in_line_comment = False
-                result.append(ch)
+        if text[i] == '"':
+            i = skip_string(text, i, out)
+        elif text.startswith('//', i):
+            # The newline is kept, so the line numbers in any error stay right
+            end = text.find('\n', i)
+            i = len(text) if end < 0 else end
+        elif text.startswith('/*', i):
+            end = text.find('*/', i + 2)
+            i = len(text) if end < 0 else end + 2
+        else:
+            out.append(text[i])
             i += 1
-            continue
+    return ''.join(out)
 
-        if in_block_comment:
-            if ch == '*' and nxt == '/':
-                in_block_comment = False
-                i += 2
-            else:
-                i += 1
-            continue
 
-        if in_string:
-            result.append(ch)
-            if escaped:
-                escaped = False
-            elif ch == '\\':
-                escaped = True
-            elif ch == '"':
-                in_string = False
-            i += 1
-            continue
-
-        if ch == '"':
-            in_string = True
-            result.append(ch)
-            i += 1
-            continue
-
-        if ch == '/' and nxt == '/':
-            in_line_comment = True
-            i += 2
-            continue
-
-        if ch == '/' and nxt == '*':
-            in_block_comment = True
-            i += 2
-            continue
-
-        result.append(ch)
-        i += 1
-
-    no_comments = ''.join(result)
-
-    # Remove trailing commas before } or ] while respecting strings
-    cleaned = []
-    in_string = False
-    escaped = False
+def strip_trailing_commas(text: str) -> str:
+    """JSON without the commas VS Code allows before a closing bracket."""
+    out: list[str] = []
     i = 0
-
-    while i < len(no_comments):
-        ch = no_comments[i]
-        if in_string:
-            cleaned.append(ch)
-            if escaped:
-                escaped = False
-            elif ch == '\\':
-                escaped = True
-            elif ch == '"':
-                in_string = False
+    while i < len(text):
+        if text[i] == '"':
+            i = skip_string(text, i, out)
+            continue
+        if text[i] == ',' and text[i + 1:].lstrip(' \t\r\n')[:1] in (']', '}'):
             i += 1
             continue
-
-        if ch == '"':
-            in_string = True
-            cleaned.append(ch)
-            i += 1
-            continue
-
-        if ch == ',':
-            j = i + 1
-            while j < len(no_comments) and no_comments[j] in (' ', '\t', '\r', '\n'):
-                j += 1
-            if j < len(no_comments) and no_comments[j] in (']', '}'):
-                i += 1
-                continue
-
-        cleaned.append(ch)
+        out.append(text[i])
         i += 1
+    return ''.join(out)
 
-    return ''.join(cleaned)
 
-def _load_settings(path):
-    if not os.path.exists(path):
+def load_settings() -> dict[str, object]:
+    """The settings in the file, or none if it is missing, empty or cannot be read."""
+    if not SETTINGS.is_file():
         return {}
-
-    with open(path, 'r', encoding='utf-8') as f:
-        raw = f.read()
-
-    if not raw.strip():
-        return {}
-
-    try:
-        return json.loads(raw)
-    except (json.JSONDecodeError, ValueError):
+    raw = SETTINGS.read_text(encoding='utf-8')
+    for text in (raw, strip_trailing_commas(strip_comments(raw))):
         try:
-            return json.loads(_strip_jsonc(raw))
-        except (json.JSONDecodeError, ValueError):
-            return {}
+            settings = json.loads(text)
+        except ValueError:
+            continue
+        if isinstance(settings, dict):
+            return cast(dict[str, object], settings)
+    return {}
 
-def parse_args():
-    parser = argparse.ArgumentParser(description='Create or update settings.json for VS Code Remote Debugging')
-    parser.add_argument('--target-ip', type=str, help='Set the target IP address for debugging')
-    args = parser.parse_args()
-    return args
 
-def main():
-    args = parse_args()
-    target_ip = args.target_ip
+def main() -> int:
+    options = parse_options(sys.argv[1:])
+    settings = load_settings()
+    for key, value in DEFAULTS.items():
+        settings.setdefault(key, value)
+    if options.target_ip:
+        settings['dsf.debug.targetIp'] = options.target_ip
+        print(f'Target IP set to: {options.target_ip}')
 
-    settings = _load_settings(SETTINGS_PATH)
+    SETTINGS.parent.mkdir(parents=True, exist_ok=True)
+    SETTINGS.write_text(json.dumps(settings, indent=4) + '\n', encoding='utf-8')
+    print(f'Settings saved: {SETTINGS}')
+    return 0
 
-    for key, value in defaults.items():
-        if key not in settings:
-            settings[key] = value
 
-    if target_ip:
-        settings['dsf.debug.targetIp'] = target_ip
-        print(f"Target IP set to: {target_ip}")
-
-    os.makedirs(os.path.dirname(SETTINGS_PATH), exist_ok=True)
-    with open(SETTINGS_PATH, 'w', encoding='utf-8') as f:
-        json.dump(settings, f, indent=4)
-        f.write('\n')
-
-    print(f"Settings saved: {SETTINGS_PATH}")
-
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    sys.exit(main())

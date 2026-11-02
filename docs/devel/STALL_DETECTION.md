@@ -37,15 +37,15 @@ what that speed is. Three consequences follow, and all of the difficulty comes f
 
 ## 2. The reference: what RepRapFirmware does
 
-[StallDetectionEndstop](lib/RepRapFirmware/src/Endstops/StallDetectionEndstop.cpp) is an `Endstop`
+[StallDetectionEndstop](src/RepRapFirmware/src/Endstops/StallDetectionEndstop.cpp) is an `Endstop`
 subclass alongside `SwitchEndstop`, so the step interrupt treats the two alike.
 
 | Step | Where | What happens |
 |---|---|---|
-| Arm | [`PrimeAxis`](lib/RepRapFirmware/src/Endstops/StallDetectionEndstop.cpp#L55) | Asks the kinematics for the controlling drives, sets `stopAll` if drives other than the axis' own are involved, and sends `CanMessageEnableStallEndstop{driver, speed}` per remote driver at `abs(speed × stepsPerMm)`. Throws and disarms if any board refuses. |
-| Report | [`HandleStalledRemoteDrivers`](lib/RepRapFirmware/src/Endstops/StallDetectionEndstop.cpp#L293) | Fed from [CommandProcessor.cpp:194](lib/RepRapFirmware/src/CAN/CommandProcessor.cpp#L194) with the board address, **the reading as a bitmap of that board's stalled drivers**, and the trigger timestamp. Records only the drivers it is monitoring. |
-| Decide | [`GetResult`](lib/RepRapFirmware/src/Endstops/StallDetectionEndstop.cpp#L144) | Extruder endstop → `stopAll`; `stopAll` flag → `stopAll`; `individualMotors && numDriversLeft > 1` → `stopDriver`; otherwise → `stopAxis`. |
-| Escalate | [`Acknowledge`](lib/RepRapFirmware/src/Endstops/StallDetectionEndstop.cpp#L230) | After a `stopDriver`, drops that driver from the monitored set and decrements `numDriversLeft`, so the **last** remaining motor escalates to `stopAxis`. |
+| Arm | [`PrimeAxis`](src/RepRapFirmware/src/Endstops/StallDetectionEndstop.cpp#L55) | Asks the kinematics for the controlling drives, sets `stopAll` if drives other than the axis' own are involved, and sends `CanMessageEnableStallEndstop{driver, speed}` per remote driver at `abs(speed × stepsPerMm)`. Throws and disarms if any board refuses. |
+| Report | [`HandleStalledRemoteDrivers`](src/RepRapFirmware/src/Endstops/StallDetectionEndstop.cpp#L293) | Fed from [CommandProcessor.cpp:194](src/RepRapFirmware/src/CAN/CommandProcessor.cpp#L194) with the board address, **the reading as a bitmap of that board's stalled drivers**, and the trigger timestamp. Records only the drivers it is monitoring. |
+| Decide | [`GetResult`](src/RepRapFirmware/src/Endstops/StallDetectionEndstop.cpp#L144) | Extruder endstop → `stopAll`; `stopAll` flag → `stopAll`; `individualMotors && numDriversLeft > 1` → `stopDriver`; otherwise → `stopAxis`. |
+| Escalate | [`Acknowledge`](src/RepRapFirmware/src/Endstops/StallDetectionEndstop.cpp#L230) | After a `stopDriver`, drops that driver from the monitored set and decrements `numDriversLeft`, so the **last** remaining motor escalates to `stopAxis`. |
 | Disarm | `DisableRemoteStallEndstops` | One `CanMessageEnableStallEndstop{driverNumber = disableAll}` per board. |
 
 Three actions, and which one is taken depends on the geometry and on `M574 S3` vs `S4`:
@@ -55,7 +55,7 @@ Three actions, and which one is taken depends on the geometry and on `M574 S3` v
 | `S3` MotorStallAny | `stopAxis` — every motor of the axis stops | `stopAll` — the whole move stops |
 | `S4` MotorStallIndividual | `stopDriver` while more than one motor is left, then `stopAxis` | `stopAll` — `stopAll` outranks `individualMotors` |
 
-Separately, and nothing to do with endstops, [`Move::PollOneDriver`](lib/RepRapFirmware/src/Movement/Move.cpp#L3632)
+Separately, and nothing to do with endstops, [`Move::PollOneDriver`](src/RepRapFirmware/src/Movement/Move.cpp#L3632)
 raises a `driver_stall` event for drivers configured with `M915 R1`. That is the "stalled during a
 print" path.
 
@@ -289,11 +289,11 @@ A stall endstop was armed in `GCodeHandler.HandleMoveAsync` and a switch in
 `EndstopArming.TryArmAxis`, two files and two call sites apart. That is not RepRapFirmware's shape.
 
 **RepRapFirmware has one seam.** `PrimeAxis` is pure virtual on
-[`Endstop`](lib/RepRapFirmware/src/Endstops/Endstop.h#L107) and *both* subclasses do CAN work in it:
-[`SwitchEndstop::PrimeAxis`](lib/RepRapFirmware/src/Endstops/SwitchEndstop.cpp#L147) calls
+[`Endstop`](src/RepRapFirmware/src/Endstops/Endstop.h#L107) and *both* subclasses do CAN work in it:
+[`SwitchEndstop::PrimeAxis`](src/RepRapFirmware/src/Endstops/SwitchEndstop.cpp#L147) calls
 `CanInterface::EnableHandle` per remote port and refreshes each switch's state,
 `StallDetectionEndstop::PrimeAxis` calls `EnableRemoteStallEndstop`.
-[`EnableAxisEndstops`](lib/RepRapFirmware/src/Endstops/EndstopsManager.cpp#L195) loops the axes,
+[`EnableAxisEndstops`](src/RepRapFirmware/src/Endstops/EndstopsManager.cpp#L195) loops the axes,
 calls the virtual, and collects `ShouldReduceAcceleration`. One loop, one call, whatever the kind.
 
 **Why DSF cannot copy that literally.** [`MovePlanner.Lock()`](src/DuetControlServer/Motion/MovePlanner.cs#L138)
@@ -340,7 +340,7 @@ from the object model independently, at different moments, with nothing making t
 The speeds go into the plan with the drivers, so there is one estimate rather than one per phase.
 It is still taken from the code rather than from the built move, because the arming has to reach the
 boards before the move exists - RepRapFirmware does the same and calls its own calculation an
-approximation, in [GCodes.cpp:2498](lib/RepRapFirmware/src/GCodes/GCodes.cpp#L2498).
+approximation, in [GCodes.cpp:2498](src/RepRapFirmware/src/GCodes/GCodes.cpp#L2498).
 
 *Why a strategy type rather than methods on `Endstop`:* `DuetAPI.ObjectModel.Endstop` is a
 serialised, observed object-model class. Behaviour on it would cross the API boundary and be visible
@@ -545,7 +545,7 @@ G1 H1 X100 U100                                  ; Cannot home X and U together
 
 RepRapFirmware accepts that move and half-homes it. `EnableAxisEndstops` primes both endstops without
 complaint and both get `stopAll`, so whichever switch closes first runs
-[`Move::StopAllDrivers`](lib/RepRapFirmware/src/Movement/Move.cpp#L2973), which iterates *every*
+[`Move::StopAllDrivers`](src/RepRapFirmware/src/Movement/Move.cpp#L2973), which iterates *every*
 logical drive. X reaches its switch and is set from it; U and V stop wherever they are, unhomed, and
 U's endstop never fires. No error is reported.
 

@@ -210,7 +210,7 @@ Held by two mechanisms:
 `--no-build`, excluding `Slow` and `KnownGap`, sharded across processes, printing the ten slowest
 tests so the budget stays visible.
 
-`scripts/system-tests.sh` is the system test half of that, already in place: it excludes `KnownGap`,
+`scripts/system_tests.py` is the system test half of that, already in place: it excludes `KnownGap`,
 names each test as it starts and lists the failed names after the run. It has no sharding and does
 not time anything, so `test.sh` grows out of it rather than beside it.
 

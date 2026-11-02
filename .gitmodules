@@ -1,28 +1,48 @@
+[submodule "src/RepRapFirmware"]
+	path = src/RepRapFirmware
+	url = https://github.com/Duet3D/RepRapFirmware.git
+	branch = 3.7-dev
 [submodule "src/Duet3Expansion"]
 	path = src/Duet3Expansion
-	url = git@github.com:Duet3D/Duet3Expansion.git
-	branch = 3.7-docker
+	url = https://github.com/Duet3D/Duet3Expansion.git
+	branch = 3.7-dev
+[submodule "src/Duet3Bootloader"]
+	path = src/Duet3Bootloader
+	url = https://github.com/Duet3D/Duet3Bootloader.git
+	branch = dev
+[submodule "src/DuetIAP"]
+	path = src/DuetIAP
+	url = https://github.com/Duet3D/DuetIAP.git
+	branch = 3.7-dev
 [submodule "lib/CANlib"]
 	path = lib/CANlib
-	url = git@github.com:Duet3D/CANlib.git
+	url = https://github.com/Duet3D/CANlib.git
+	branch = 3.7-dev
 [submodule "lib/CoreN2G"]
 	path = lib/CoreN2G
-	url = git@github.com:Duet3D/CoreN2G.git
+	url = https://github.com/Duet3D/CoreN2G.git
+	branch = 3.7-dev
 [submodule "lib/FreeRTOS"]
 	path = lib/FreeRTOS
-	url = git@github.com:Duet3D/FreeRTOS.git
+	url = https://github.com/Duet3D/FreeRTOS.git
+	branch = 3.7-dev
 [submodule "lib/RRFLibraries"]
 	path = lib/RRFLibraries
-	url = git@github.com:Duet3D/RRFLibraries.git
+	url = https://github.com/Duet3D/RRFLibraries.git
+	branch = 3.7-dev
+[submodule "lib/WiFiSocketServerRTOS"]
+	path = lib/WiFiSocketServerRTOS
+	url = https://github.com/Duet3D/WiFiSocketServerRTOS.git
+	branch = master
 [submodule "lib/LibTinyusb"]
 	path = lib/LibTinyusb
-	url = git@github.com:Duet3D/LibTinyusb.git
+	url = https://github.com/Duet3D/LibTinyusb.git
+	branch = 3.7-dev
 [submodule "lib/LibMbedTls"]
 	path = lib/LibMbedTls
-	url = git@github.com:Duet3D/LibMbedTls.git
+	url = https://github.com/Duet3D/LibMbedTls.git
+	branch = master
 [submodule "lib/Qfplib-M0-full"]
 	path = lib/Qfplib-M0-full
-	url = git@github.com:Duet3D/Qfplib-M0-full.git
-[submodule "lib/RepRapFirmware"]
-	path = lib/RepRapFirmware
-	url = git@github.com:Duet3D/RepRapFirmware.git
+	url = https://github.com/Duet3D/Qfplib-M0-full.git
+	branch = 3.7-dev

@@ -37,6 +37,8 @@ public static class EventText
         [EventType.McuTemperatureWarning] = "mcu_temperature_warning",
         [EventType.Overvoltage] = "overvoltage",
         [EventType.Undervoltage] = "undervoltage",
+        [EventType.BoardTemperatureWarning] = "board_temperature_warning",
+        [EventType.BoardOverTemperature] = "board_over_temperature",
         [EventType.ControllerDisconnect] = "controller_disconnect",
         [EventType.ControllerReconnect] = "controller_reconnect"
     };
@@ -146,6 +148,12 @@ public static class EventText
 
             case EventType.Undervoltage:
                 return new Message(MessageType.Warning, $"undervoltage on board {machineEvent.BoardAddress}: voltage {machineEvent.Param / 10.0:F1}V");
+
+            case EventType.BoardTemperatureWarning:
+                return new Message(MessageType.Warning, $"Board {machineEvent.BoardAddress} temperature warning: temperature {machineEvent.Param / 10.0:F1}C");
+
+            case EventType.BoardOverTemperature:
+                return new Message(MessageType.Error, $"Board {machineEvent.BoardAddress} over temperature: temperature {machineEvent.Param / 10.0:F1}C, driver(s) disabled");
 
             case EventType.ExpansionTimeout:
                 return new Message(MessageType.Error, $"Expansion board {machineEvent.BoardAddress} stopped sending status");

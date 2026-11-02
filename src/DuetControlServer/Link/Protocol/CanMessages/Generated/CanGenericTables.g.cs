@@ -169,6 +169,7 @@ public static class CanGenericTables
         new('Y', CanParamType.UInt8Array, 3),
         new('T', CanParamType.FloatArray, 4),
         new('U', CanParamType.Int8, 0),
+        new('C', CanParamType.UInt32, 0),                                // added at 3.7.0-rc.2, was missing
     ];
 
     /// <summary>

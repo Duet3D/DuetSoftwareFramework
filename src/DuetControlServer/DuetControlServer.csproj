@@ -53,7 +53,7 @@
 
 		     GlobalPropertiesToRemove keeps DCS's target from reaching it. A tool that runs during the build
 		     has to be built for the machine doing the building, but `dotnet publish -r linux-arm64` (see
-		     scripts/build.sh) would otherwise cross-build it for the Pi, and CheckCanMessagesUpToDate would
+		     scripts/build_dsf.py) would otherwise cross-build it for the Pi, and CheckCanMessagesUpToDate would
 		     then try to execute an arm64 assembly on the host. The same goes for the AOT and self-contained
 		     switches, which would only slow the tool's build down. -->
 		<ProjectReference Include="..\DuetCanMessage.SourceGenerators\DuetCanMessage.SourceGenerators.csproj"
@@ -74,7 +74,7 @@
 	  why the packages are only referenced when the switch is on. See DEVELOPER.md.
 
 	  The native client the binding calls into is not the one the package ships (that one needs a
-	  glibc newer than Raspberry Pi OS Bookworm has); scripts/build-tracy-client.sh builds it, and
+	  glibc newer than Raspberry Pi OS Bookworm has); scripts/build_tracy_client.py builds it, and
 	  TracyClientLibrary is where that script leaves it.
 	-->
 	<PropertyGroup>
@@ -117,7 +117,7 @@
 		     is only read at run time, and a build that cannot find it is still a usable build -->
 		<Warning Condition="!Exists('$(TracyClientLibrary)')"
 		         Code="PROF002"
-		         Text="No Tracy client at $(TracyClientLibrary). Build one with 'scripts/build-tracy-client.sh --arch $(TracyClientArchitecture)', or set TRACY_CLIENT_LIBRARY when running." />
+		         Text="No Tracy client at $(TracyClientLibrary). Build one with 'scripts/build_tracy_client.py --arch $(TracyClientArchitecture)', or set TRACY_CLIENT_LIBRARY when running." />
 	</Target>
 
 	<!--
@@ -198,7 +198,7 @@
 
 	  Unlike the check, it cannot always run: it needs bash, python3, a host C++ compiler and the CANlib,
 	  RRFLibraries and CoreN2G submodules, none of which a plain `dotnet build` can assume - the release
-	  builds in scripts/build.sh run in containers without a C++ toolchain, and the submodules are only
+	  builds in scripts/build_dsf.py run in containers without a C++ toolchain, and the submodules are only
 	  checked out on demand. So a missing prerequisite skips the verification and says which one, on every
 	  build until it is resolved, rather than failing a build that never asked for a C++ compiler. Where
 	  the tooling is present the layouts really are compared, and a mismatch fails the build.

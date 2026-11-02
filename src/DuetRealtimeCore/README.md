@@ -61,7 +61,7 @@ Requires a C++17 compiler, CMake ≥ 3.21 (for presets) and Linux UAPI headers (
 | `arm64-sysroot` | aarch64 | the Pi's, from `pi-sysroot/` — for pre-Bookworm targets |
 
 Each uses its own build tree (`build/<preset>`), and
-`scripts/build.sh` picks between them the same way: `native` when it is already running on aarch64,
+`scripts/build_dsf.py` picks between them the same way: `native` when it is already running on aarch64,
 otherwise `arm64`, or `arm64-sysroot` when a sysroot is explicitly requested.
 
 ### Cross-compile in the devcontainer for a 64-bit Pi (recommended)
@@ -101,7 +101,7 @@ cmake --preset arm64-sysroot
 cmake --build --preset arm64-sysroot -j
 ```
 
-Use `-DDUET_REALTIME_CORE_SYSROOT=<dir>` to point it at a sysroot kept somewhere else. `scripts/build.sh`
+Use `-DDUET_REALTIME_CORE_SYSROOT=<dir>` to point it at a sysroot kept somewhere else. `scripts/build_dsf.py`
 never reaches for this on its own — pass `--sysroot <dir>` or `--fetch-sysroot`.
 
 ### Build natively on the Pi

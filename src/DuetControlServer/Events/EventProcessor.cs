@@ -43,7 +43,7 @@ internal sealed class EventProcessor(EventQueue queue, MacroRunner macroRunner, 
     /// <param name="type">Event type</param>
     /// <returns>The pause reason, or null</returns>
     /// <remarks>
-    /// RepRapFirmware's <c>Event::GetDefaultPauseReason</c>, and deliberately the same three events.
+    /// RepRapFirmware's <c>Event::GetDefaultPauseReason</c>, and deliberately the same events.
     /// Which events pause is its decision to make and this is only reading it back - an event it does
     /// not pause for still does not pause here. What differs is <em>how</em> the machine stops; see
     /// JOB_LIFECYCLE.md §3.5.1
@@ -53,6 +53,8 @@ internal sealed class EventProcessor(EventQueue queue, MacroRunner macroRunner, 
         EventType.HeaterFault => PrintPausedReason.HeaterFault,
         EventType.FilamentError => PrintPausedReason.Filament,
         EventType.DriverError => PrintPausedReason.DriverError,
+        // TODO: RepRapFirmware also pauses for EventType.BoardOverTemperature, without pause.g as for a
+        // driver error, with the pause reason boardOverTemperature, which PrintPausedReason does not have yet
         _ => null
     };
 

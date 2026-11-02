@@ -368,6 +368,13 @@ public struct CanMessageM569 : ICanGenericMessage<CanMessageM569>
         readonly get => (sbyte?)CanGenericParser.GetInt(Generic, ParamTable, 'U');
         set => CanGenericWriter.SetInt(ref Generic, ParamTable, 'U', value);
     }
+
+    /// <summary>The 'C' parameter, or null if the message does not carry it: added at 3.7.0-rc.2, was missing</summary>
+    public uint? C
+    {
+        readonly get => CanGenericParser.GetUInt(Generic, ParamTable, 'C');
+        set => CanGenericWriter.SetUInt(ref Generic, ParamTable, 'C', value);
+    }
 }
 
 /// <summary>

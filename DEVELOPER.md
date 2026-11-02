@@ -16,10 +16,11 @@ No prior knowledge of VS Code, Docker, or DSF is assumed.
 8. [Build Using VS Code Tasks](#build-using-vs-code-tasks)
 9. [Run the Tests](#run-the-tests)
 10. [Deploy to a Remote DuetPi/SBC](#deploy-to-a-remote-duetpisbc)
-11. [Optional: Build with Make](#optional-build-with-make)
-12. [Profiling with Tracy](#profiling-with-tracy)
-13. [Working with Git in the Dev Container](#working-with-git-in-the-dev-container)
-14. [Troubleshooting](#troubleshooting)
+11. [Build the Firmware](#build-the-firmware)
+12. [Debug the Firmware](#debug-the-firmware)
+13. [Profiling with Tracy](#profiling-with-tracy)
+14. [Working with Git in the Dev Container](#working-with-git-in-the-dev-container)
+15. [Troubleshooting](#troubleshooting)
 
 ## Overview
 
@@ -183,14 +184,14 @@ The Build All task produces binaries under the local build/ directory.
 The unit tests run under coverage and print a per-assembly table:
 
 ```bash
-./scripts/coverage.sh
+scripts/coverage.py
 ```
 
 The system tests start a real DuetControlServer against a scripted CAN controller, so they take
 minutes rather than seconds:
 
 ```bash
-./scripts/system-tests.sh
+scripts/system_tests.py
 ```
 
 They run the real `libduet_realtime_core.so`, which the project builds from `src/DuetRealtimeCore` as part of
@@ -219,8 +220,8 @@ unimplemented or implemented incorrectly, so they fail until it is fixed and the
 off. The script leaves them out, as CI does; `--all` puts them back. To narrow a run:
 
 ```bash
-./scripts/system-tests.sh --filter 'FullyQualifiedName~JobControl'
-./scripts/system-tests.sh --help
+scripts/system_tests.py --filter 'FullyQualifiedName~JobControl'
+scripts/system_tests.py --help
 ```
 
 Running the project directly works, but the progress needs the console logger asked for by name,
@@ -270,6 +271,105 @@ This installs Microsoft vsdbg on the remote machine for debugging scenarios.
 
 The task definitions are in [.vscode/tasks.json](.vscode/tasks.json) if you want to inspect or extend them.
 
+## Build the Firmware
+
+The firmware projects build from the repository root with one toolchain, against the shared libraries in `lib/`:
+
+| Project | Path | Builds |
+| --- | --- | --- |
+| DuetCANMaster | `src/DuetCANMaster` | The SPI-to-CAN-FD bridge on the main board an SBC drives (`canmaster-*`) |
+| Duet3Expansion | `src/Duet3Expansion` | Expansion and tool boards (EXP3HC, EXP1HCL, TOOL1LC, …) |
+| RepRapFirmware | `src/RepRapFirmware` | Standalone main boards (MB6HC, MB6XD, Mini 5+, …), as on the regression suite's `rrf` bench |
+| Duet3Bootloader | `src/Duet3Bootloader` | Bootloaders and CAN IAPs (`bootloader-*`) |
+| DuetIAP | `src/DuetIAP` | Firmware update IAPs (`iap-*`) |
+
+They need their submodules, including the nested ones: `git submodule update --init --recursive`.
+
+Each board is a CMake preset in [CMakePresets.json](CMakePresets.json), and its build tree is `build/<preset>/`. The easiest way to build is with the wrapper scripts (each takes `--help`):
+
+```bash
+scripts/boards.py                          # list the boards, by project
+scripts/build.py canmaster-Duet3_MB6HC     # build one board
+scripts/build.py -p d3e                    # every board in a project (canmaster, rrf, d3e, bootloader, iap)
+scripts/build.py --all --debug             # every board, as Debug
+scripts/size.py                            # the memory each built board uses
+scripts/clean.py EXP3HC                    # clean a board's build trees (--purge deletes them)
+```
+
+Or call CMake directly. Add `-debug` to a preset name for the Debug variant:
+
+```bash
+cmake --preset canmaster-Duet3_MB6HC
+cmake --build --preset canmaster-Duet3_MB6HC
+```
+
+`-DDUET_DISASSEMBLY=ON` also writes the disassembly to `build/<preset>/<target>.lst`; it is on by default for DuetCANMaster, RepRapFirmware and Duet3Expansion, with the branch targets in each function labelled unless `-DDUET_DISASSEMBLY_LABELS=OFF`. In VS Code, the CMake Tools extension reads the presets: pick a board as the configure preset, then build. The **[Firmware] Build Board** task does the same through `scripts/build.py`.
+
+The CMake build also lints the C++ of every project and library with clang-tidy as it compiles it (`-DDUET_CLANG_TIDY=OFF` turns that off, for a faster build). The checks are in the root [.clang-tidy](.clang-tidy), which DuetCANMaster's and DuetRealtimeCore's own add their naming rules to. Third-party code is skipped: the device packs, CMSIS, tinyusb, mbedTLS, lwIP, MQTT-C and the vendored `src/libc` and `src/libcpp`. A project's findings are warnings until it is on `DUET_CLANG_TIDY_ERRORS` in [cmake/ClangTidy.cmake](cmake/ClangTidy.cmake), after which they fail the build; DuetCANMaster is on it. To lint a board's whole build by hand, or with `--fix`, write a compile database clang can use and run clang-tidy against it (the **[Style] Tidy Firmware Board** task does both). Renames from `readability-identifier-naming` must cover every board of a project at once, which `scripts/export_naming_fixes.py` does:
+
+```bash
+scripts/gen_compile_commands.py EXP3HC
+run-clang-tidy -p build/EXP3HC/clang-tidy -quiet src/Duet3Expansion/
+```
+
+Every board except DuetCANMaster's also has a make build, which `Makefile.firmware` drives and the top-level Makefile forwards to (`make EXP3HC`, `make -j16 Duet3_MB6HC DEBUG=1`, `make firmware.help` for the list). Its output goes in `src/<project>/<config>/`. CI builds each board both ways and checks that the images are identical; to do the same locally:
+
+```bash
+scripts/compare_builds.py EXP3HC --build
+```
+
+`scripts/deploy.py` uploads the built firmware to a standalone (non-SBC) Duet 3 main board over HTTP and updates it and every connected CAN board that has a matching build, as on the regression suite's `rrf` bench. It does not deploy DuetCANMaster.
+
+## Debug the Firmware
+
+The **[Firmware] Build, Flash & Debug** launch configuration builds the Debug preset for the DuetCANMaster, RepRapFirmware or Duet3Expansion board you pick, flashes it through a GDB server, and starts debugging. **[Firmware] Debug Only** attaches without rebuilding. When either session ends, the board is reset and left running. The image is flashed from the `.bin` rather than the `.elf`, because only the `.bin` carries the CRC the bootloaders check.
+
+You start the GDB server yourself, normally on the host outside the devcontainer, because that is where the probe is plugged in. The launch configurations ask for its address, which defaults to `host.docker.internal:2331`; the commands below all listen on port 2331. They send `monitor reset` and `monitor halt`, which J-Link, OpenOCD and pyOCD all accept. When a session ends, the **[Firmware] Restart Firmware** task reconnects, sends `monitor reset`, then `monitor go` (J-Link, pyOCD) and `monitor resume` (OpenOCD) to let the board run, and detaches; the server rejects whichever of the two it does not know.
+
+On Linux, a connection from the container to `host.docker.internal` comes from the Docker bridge rather than from localhost, so the server must listen on all interfaces: that is what `-LocalhostOnly 0`, `bindto 0.0.0.0` and `--allow-remote` below are for. Docker Desktop on Windows and macOS delivers the connection to localhost, so those options are not needed there.
+
+Each tool names the MCU differently:
+
+| Board | MCU | J-Link `-device` | OpenOCD target | pyOCD `-t` |
+| --- | --- | --- | --- | --- |
+| canmaster-Duet3_MB6HC, canmaster-Duet3_MB6XD, Duet3_MB6HC, Duet3_MB6XD, Duet3_CAN0, Duet3_MB6HC_no_SD | SAME70Q20B | `ATSAME70Q20B` | `target/atsamv.cfg` | `atsame70q20b` |
+| Duet3Mini5plus | SAME54P20A | `ATSAME54P20A` | `target/atsame5x.cfg` | `atsame54p20a` |
+| EXP3HC | SAME51N19A | `ATSAME51N19A` | `target/atsame5x.cfg` | `atsame51n19a` |
+| EXP1HCL, M23CL, F3PTB, TOOL1RR | SAME51G19A | `ATSAME51G19A` | `target/atsame5x.cfg` | `atsame51g19a` |
+| TOOLINDX | SAME51J19A | `ATSAME51J19A` | `target/atsame5x.cfg` | `atsame51j19a` |
+| EXP1XD, TOOL1LC, SAMMYC21, SZP | SAMC21G18A | `ATSAMC21G18A` | `target/at91samdXX.cfg` | `atsamc21g18a` |
+| NodeTrix | STM32H523RE | `STM32H523RE` | `target/stm32h5x.cfg` | `stm32h523retx` |
+
+A board's bootloader and IAP builds run on the same MCU as its firmware.
+
+**SEGGER J-Link**: install the [J-Link Software and Documentation Pack](https://www.segger.com/downloads/jlink/), then run (on Windows, `JLinkGDBServerCL.exe` with the same arguments):
+
+```bash
+JLinkGDBServer -device ATSAME70Q20B -if SWD -speed 4000 -port 2331 -LocalhostOnly 0
+```
+
+**OpenOCD** supports most probes: `interface/stlink.cfg` for ST-LINK V2/V3, `interface/cmsis-dap.cfg` for Atmel-ICE, PICkit 4, MPLAB Snap, the Raspberry Pi Debug Probe and other CMSIS-DAP probes, and `interface/jlink.cfg` for J-Link. ST-LINK firmware older than V2J24 only works with STM32 targets, and `target/stm32h5x.cfg` needs OpenOCD 0.12 or newer.
+
+```bash
+openocd -f interface/cmsis-dap.cfg -c "transport select swd" -f target/atsamv.cfg \
+        -c "bindto 0.0.0.0" -c "gdb_port 2331"
+```
+
+**pyOCD** needs the device's CMSIS pack, which it installs once. `pyocd list` shows the connected probes; add `-u <unique id>` to choose one when there are several.
+
+```bash
+pip install pyocd
+pyocd pack install atsame70q20b
+pyocd gdbserver -t atsame70q20b --port 2331 --allow-remote
+```
+
+To check the server without VS Code, connect from a terminal in the devcontainer:
+
+```bash
+arm-none-eabi-gdb build/canmaster-Duet3_MB6HC-debug/vscode/firmware.elf \
+    -ex "target extended-remote host.docker.internal:2331" -ex "monitor halt" -ex "bt"
+```
+
 ## Profiling with Tracy
 
 `-p:Profiling=true` builds DuetControlServer with a Tracy zone around every method in the namespaces
@@ -292,8 +392,8 @@ linked against a newer glibc than either the devcontainer or Raspberry Pi OS Boo
 built here instead:
 
 ```bash
-./scripts/build-tracy-client.sh                     # this machine, for the system tests
-./scripts/build-tracy-client.sh --arch linux-arm64  # a Pi
+scripts/build_tracy_client.py                     # this machine, for the system tests
+scripts/build_tracy_client.py --arch linux-arm64  # a Pi
 ```
 
 Install the Tracy GUI on the machine you will watch from. It must be the same release as the client,
@@ -308,10 +408,10 @@ dotnet test src/SystemTests/SystemTests.csproj --filter Name~PauseStopsMidMove -
 ### Profiling a Pi
 
 ```bash
-./scripts/build.sh --all --target <pi-ip> --start-services -p "Profiling=true"
+scripts/build_dsf.py --all --target <pi-ip> --start-services -p "Profiling=true"
 ```
 
-`build.sh -p` takes the property without the `-p:` prefix, which it adds itself.
+`build_dsf.py -p` takes the property without the `-p:` prefix, which it adds itself.
 
 ### Connecting
 
@@ -381,6 +481,31 @@ If authentication fails when pushing:
 
 - Check your remote URL with git remote -v.
 - Use HTTPS with a token, or configure SSH keys on your host and ensure forwarding works in your setup.
+
+### Submodules
+
+The firmware projects and libraries in `src/` and `lib/` are submodules, each tracking the branch set in [.gitmodules](.gitmodules); this repository only records which commit of each to use.
+
+- Change submodule code in its own repository first: branch, commit and open a PR there.
+- Submodules check out at a detached `HEAD`, where commits are easily lost. Before editing one, switch it to its tracked branch with the **[Git] Checkout Submodule Branches** task, then make a feature branch.
+- Push submodule commits **before** pushing the commit here that points at them, otherwise nobody else can check it out. `git config push.recurseSubmodules check` (below) enforces this.
+- Before merging, point the submodule at a commit on its tracked branch, not at an unmerged feature branch. CI enforces this on PRs; check it locally with the **[Git] Check Submodules** task (`scripts/check_submodules.py`).
+- After pulling, run `git submodule update --init --recursive`, or set `submodule.recurse true`.
+- The **[Git] Update Submodules** task moves every submodule to the tip of its tracked branch (`git submodule update --remote --merge`), merging into local work rather than discarding it. Commit the new pointers.
+
+These settings make submodules easier to work with. Run them on the host to keep them across container rebuilds and for other projects, or leave out `--global` to set them for this repository only:
+
+```bash
+# Refuse to push if a submodule commit referenced here has not been pushed to its remote
+git config --global push.recurseSubmodules check
+# Make checkout, switch, pull and reset also update submodules to match
+git config --global submodule.recurse true
+# Fetch submodule commits when a fetched commit references new ones
+git config --global fetch.recurseSubmodules on-demand
+# Show a summary of submodule changes in git status, and their commits in git diff
+git config --global status.submoduleSummary true
+git config --global diff.submodule log
+```
 
 ## Troubleshooting
 

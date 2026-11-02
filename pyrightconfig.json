@@ -1,0 +1,6 @@
+{
+  "include": ["scripts", "cmake", ".vscode/scripts"],
+  "executionEnvironments": [{ "root": "scripts" }, { "root": ".vscode/scripts" }],
+  "pythonVersion": "3.11",
+  "typeCheckingMode": "strict"
+}

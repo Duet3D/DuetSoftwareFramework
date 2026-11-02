@@ -33,7 +33,7 @@
 		<!-- The native build takes RRFLibraries from the submodule, and says so as a CMake command it
 		     cannot find, which names neither the submodule nor the way to get it. A clone made
 		     without recursing, and every new git worktree, starts without it. -->
-		<Error Condition="!Exists('$(MSBuildThisFileDirectory)../../lib/RRFLibraries/RRFLibraries.cmake')"
+		<Error Condition="!Exists('$(MSBuildThisFileDirectory)../../lib/RRFLibraries/CMakeLists.txt')"
 		       Text="lib/RRFLibraries is not checked out, so libduet_realtime_core.so cannot be built. Check it out with 'git submodule update --init lib/RRFLibraries'." />
 
 		<!-- cmake_install.cmake rather than CMakeCache.txt: the cache is written when the configure

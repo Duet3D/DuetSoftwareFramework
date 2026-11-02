@@ -10,7 +10,7 @@ linked from each row.
 removed: DSF takes over everything RRF did, `DuetCANMaster` becomes a thin SPI-to-CAN bridge, and the
 expansion boards do the rest. In practice this means porting RepRapFirmware's G-code interpreter,
 motion planner, heat, tool, and event subsystems into DuetControlServer, one subsystem at a time,
-against the reference tree in `lib/RepRapFirmware`.
+against the reference tree in `src/RepRapFirmware`.
 
 ---
 
@@ -71,7 +71,7 @@ Recorded so the remaining list is read against what it sits on rather than as a 
 | **SBC motion engine cleanup** (WS2) | The RepRapFirmware compatibility scaffolding is gone from the SBC motion engine. One deliberate omission: the lint CI job (§6.2) was dropped by decision. |
 | **Input monitors** (WS3) | All five phases. Probes are told when they are probing, abandoned monitors release their pins, held input levels are cleared. The summary table at the head of that plan still shows ⬜ against every phase while the per-phase sections are all ✅; see §6. |
 | **Stall detection** (WS4) | `M574 S3`/`S4` work: stop groups, the three stop actions, per-driver stall attribution, the motor-stall Z probe, and inputs already active when a move starts. |
-| **Events migration** (WS5) | Variables and macro parameters; the event queue, processor, and all 13 event types; `M957`; the link-loss and reconnect events end to end. |
+| **Events migration** (WS5) | Variables and macro parameters; the event queue, processor, and all 15 event types (`board_over_temperature` does not pause yet); `M957`; the link-loss and reconnect events end to end. |
 | **Job lifecycle** (WS6) | Pause, resume, cancel, and stop; the restore points; `pause.g`, `resume.g`, `stop.g`, `cancel.g`, `start.g`; the feedhold (a controlled deceleration replacing RRF's search for a sufficiently slow junction); job progress and time estimates. |
 | **M-code migration** (WS7) | 109 of 187 in-scope M-codes fully ported. Motion, kinematics (all 7 geometries), compensation, probing, heat, fans, tools, and spindles are each essentially complete as subsystems. The G0/G1 audit's phases A to E, the endstop-correction move into DCS, the kinematics ownership inversion and the `G4` dwell have all landed. |
 | **CAN reply handling** (WS12) | Every handler judges a board's reply the same way: one predicate, three send shapes, and the six sites that discarded a warning fixed. |
@@ -257,7 +257,7 @@ nothing is runnable. The same change removes the dwell that is most of the runti
 | `DuetRT_StepMotion` and `DuetRT_StepLink`, the fake controller pumped by the test | S | |
 | `Settle()` replacing the dwell, with quiescence on the managed side | M | the two above |
 | Every scenario onto the timeline, `FreeRunningClock` deleted, a bench profile that starts fewer services | M | the settle |
-| `scripts/test.sh`, sharding across processes, the per-test budget and the slow-count guard, growing out of the `scripts/system-tests.sh` that already runs and summarises the suite | S | the settle |
+| `scripts/test.sh`, sharding across processes, the per-test budget and the slow-count guard, growing out of the `scripts/system_tests.py` that already runs and summarises the suite | S | the settle |
 | The single-threaded scheduler for DCS's tasks, then `IBenchGate` and the interleaving scenarios | L | the settle |
 | `StepTimer` state per handle, for in-process parallelism | M | |
 

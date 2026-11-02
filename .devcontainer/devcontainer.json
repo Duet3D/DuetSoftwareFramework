@@ -1,8 +1,7 @@
 {
   "name": "DuetSoftwareFramework Dev",
   "build": {
-    "dockerfile": "Dockerfile",
-    "context": ".."
+    "dockerfile": "Dockerfile"
   },
   "features": {
     "ghcr.io/devcontainers-extra/features/ripgrep": "latest",
@@ -15,17 +14,36 @@
         "ms-dotnettools.csdevkit",
         "editorconfig.editorconfig",
         "ms-vscode.cpptools",
+        "ms-vscode.cpp-devtools",
         "ms-vscode.makefile-tools",
         "ms-vscode.cmake-tools",
+        "mcu-debug.rtos-views",
         "ms-python.python",
+        "ms-python.autopep8",
+        "ms-python.pylint",
         "rioj7.command-variable",
-        "github.vscode-github-actions"
+        "aaron-bond.better-comments",
+        "everbright-it.sbomlens",
+        "github.vscode-github-actions",
+        "GitHub.vscode-pull-request-github"
       ],
       "settings": {
+        "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+        "cmake.useCMakePresets": "always",
+        // The firmware (every board a preset) and DuetRealtimeCore, the SBC's native library
         "cmake.sourceDirectory": [
-          "${workspaceFolder}/src/DuetCANMaster",
+          "${workspaceFolder}",
           "${workspaceFolder}/src/DuetRealtimeCore"
-        ]
+        ],
+        "makefile.makefilePath": "${workspaceFolder}/Makefile.firmware",
+        "makefile.configurations": [
+          { "name": "Release", "makeArgs": ["-j16"] },
+          { "name": "Debug", "makeArgs": ["-j16", "DEBUG=1"] }
+        ],
+        "makefile.dryrunSwitches": ["--always-make", "--keep-going", "--print-directory", "-j1"],
+        "markdown.copyFiles.destination": {
+          "**/*.md": "/docs/images/${fileName}"
+        }
       }
     }
   },
