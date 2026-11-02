@@ -12,7 +12,7 @@ namespace SystemTests.Scenarios.Codes;
 
 /// <summary>
 /// Drive and axis configuration M-codes and the object model fields each one must set. The expected
-/// behaviour is RepRapFirmware's (lib/RepRapFirmware), except where
+/// behaviour is RepRapFirmware's (src/RepRapFirmware), except where
 /// src/Documentation/articles/rrf-differences.md documents a deliberate deviation, which is then the
 /// behaviour asserted and cited.
 /// M569.6 is omitted: it runs a closed-loop tuning move whose outcome is judged by the driver, and the

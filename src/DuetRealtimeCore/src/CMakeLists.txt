@@ -42,7 +42,7 @@ target_include_directories(duet_motion PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 # duet_spi_protocol for the ScheduleMove wire structs the builder fills. It is header-only and has
 # no dependency of its own, so this does not tie the motion engine to the SPI transfer loop: the
 # packets go wherever the sink the caller installs takes them.
-target_link_libraries(duet_motion PUBLIC ${RRFLIBRARIES_TARGET} duet_spi_protocol)
+target_link_libraries(duet_motion PUBLIC Duet::RRFLibraries duet_spi_protocol)
 target_compile_options(duet_motion PRIVATE
     # float16_t is __fp16 in RRFLibraries' Portability.h, which does not exist on x86-64. See the
     # header for why this is forced in rather than #included.

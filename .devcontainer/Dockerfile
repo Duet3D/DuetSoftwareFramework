@@ -1,3 +1,5 @@
+# Debian Bookworm, whose glibc (2.36) is Raspberry Pi OS Bookworm's, so that libduet_realtime_core.so
+# cross-built here runs on the Pi without a sysroot
 ARG VARIANT=bookworm
 FROM mcr.microsoft.com/devcontainers/base:${VARIANT}
 
@@ -7,7 +9,7 @@ ENV PATH="${ARM_GNU_TOOLCHAIN_DIR}/bin:${PATH}"
 
 # ARG DEBIAN_FRONTEND=noninteractive
 
-COPY scripts/install-arm-gcc.sh /tmp/
+COPY ./install-arm-gcc.sh /tmp/
 
 RUN echo "Installing ARM GNU Toolchain version ${ARM_GNU_TOOLCHAIN_VERSION}..." \
     && sed -i 's/\r$//' /tmp/install-arm-gcc.sh \
@@ -42,7 +44,19 @@ RUN apt-get update \
         gdb \
         gdb-multiarch \
         crossbuild-essential-arm64 \
-        crossbuild-essential-armhf
+        crossbuild-essential-armhf \
+        default-jre \
+        tar \
+        xz-utils \
+        bear \
+        ccache \
+        ninja-build \
+        cmake-curses-gui \
+        python3 \
+        pipx \
+    && ln -s /usr/bin/python3 /usr/local/bin/python \
+    && ln -s /usr/bin/python3 /usr/local/bin/py \
+    && PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install 'pyright[nodejs]'
     # && rm -rf /var/lib/apt/lists/*
 
 # The AOT targets ask clang for the armv7-linux-gnueabihf triple, but Debian names its cross tools
@@ -55,7 +69,7 @@ RUN ln -s arm-linux-gnueabihf-ld /usr/bin/armv7-linux-gnueabihf-ld \
 # `clang-tidy` (find_program NAMES clang-tidy), so without these the default presets fail to build.
 RUN ln -s clang-tidy-19 /usr/bin/clang-tidy \
 	&& ln -s clang-format-19 /usr/bin/clang-format \
-    && ln -s run-clang-tidy-19 /usr/bin/run-clang-format
+    && ln -s run-clang-tidy-19 /usr/bin/run-clang-tidy
 
 RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh \
 	&& bash /tmp/dotnet-install.sh --channel 10.0 --install-dir /usr/share/dotnet \

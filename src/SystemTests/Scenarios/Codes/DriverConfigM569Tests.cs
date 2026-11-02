@@ -16,7 +16,7 @@ namespace SystemTests.Scenarios.Codes;
 /// holds, the CAN message it puts on the bus and the object model delta it leaves behind
 /// </summary>
 /// <remarks>
-/// The expected behaviour is RepRapFirmware's (lib/RepRapFirmware) except where
+/// The expected behaviour is RepRapFirmware's (src/RepRapFirmware) except where
 /// src/Documentation/articles/rrf-differences.md documents a deliberate deviation, which is then the
 /// behaviour asserted and cited. The one standing deviation in this folder is the object model:
 /// section 3 of that article keeps every M569 setting under <c>boards[].drivers[].config</c>, which

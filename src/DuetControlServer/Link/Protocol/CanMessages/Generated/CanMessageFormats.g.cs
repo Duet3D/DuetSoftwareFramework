@@ -2344,7 +2344,7 @@ public struct CanMessageHeaterFeedForwardV1 : ICanMessage<CanMessageHeaterFeedFo
     /// <summary>Reserved so that the heater number lands where SetRequestId expects it; set to 0</summary>
     [FieldOffset(0)] public ushort Zero;
 
-    /// <summary>Backing storage for the bitfields heaterNumber:8, zero2:8</summary>
+    /// <summary>Backing storage for the bitfields heaterNumber:8, fanOnly:1, nonPrintingExtruderMove:1, zero2:6</summary>
     [FieldOffset(2)] private ushort _bits0;
 
     /// <summary>Current PWM of the print cooling fan, 0 to 1, from which the extra heater power needed is worked out</summary>
@@ -2367,13 +2367,33 @@ public struct CanMessageHeaterFeedForwardV1 : ICanMessage<CanMessageHeaterFeedFo
     }
 
     /// <summary>
+    /// Added after 3.7.0-rc.1
+    /// (1-bit field, bit 24 of the message)
+    /// </summary>
+    public bool FanOnly
+    {
+        readonly get => ((((uint)_bits0) >> 8) & 1U) != 0;
+        set => _bits0 = (ushort)((((uint)_bits0) & ~(0x1U << 8)) | ((value ? 1U : 0U) << 8));
+    }
+
+    /// <summary>
+    /// Added after 3.7.0-rc.1
+    /// (1-bit field, bit 25 of the message)
+    /// </summary>
+    public bool NonPrintingExtruderMove
+    {
+        readonly get => ((((uint)_bits0) >> 9) & 1U) != 0;
+        set => _bits0 = (ushort)((((uint)_bits0) & ~(0x1U << 9)) | ((value ? 1U : 0U) << 9));
+    }
+
+    /// <summary>
     /// Reserved for future use; must be set to 0 so that a later firmware can use it
-    /// (8-bit field, bits 24-31 of the message)
+    /// (6-bit field, bits 26-31 of the message)
     /// </summary>
     public byte Zero2
     {
-        readonly get => (byte)((((uint)_bits0) >> 8) & 0xFFU);
-        set => _bits0 = (ushort)((((uint)_bits0) & ~(0xFFU << 8)) | ((unchecked((uint)value) & 0xFFU) << 8));
+        readonly get => (byte)((((uint)_bits0) >> 10) & 0x3FU);
+        set => _bits0 = (ushort)((((uint)_bits0) & ~(0x3FU << 10)) | ((unchecked((uint)value) & 0x3FU) << 10));
     }
 
     /// <summary>Clear the reserved fields of this message so that it stays compatible with future uses</summary>
@@ -3315,7 +3335,7 @@ public struct CanMessageAnnounceV1 : ICanMessage<CanMessageAnnounceV1>
     /// <summary>The unique ID of this board</summary>
     [FieldOffset(4)] public ByteArray16 UniqueId;
 
-    /// <summary>Backing storage for the bitfields numDrivers:4, usesUf2Binary:1, isReconnect:1, wasShutDown:1, zero:1</summary>
+    /// <summary>Backing storage for the bitfields numDrivers:4, usesUf2Binary:1, isReconnect:1, wasShutDown:1, noSmartDrivers:1</summary>
     [FieldOffset(20)] private byte _bits0;
 
     /// <summary>The short type name of this board followed by '|' and the firmware version</summary>
@@ -3372,13 +3392,13 @@ public struct CanMessageAnnounceV1 : ICanMessage<CanMessageAnnounceV1>
     }
 
     /// <summary>
-    /// Reserved for future use; must be set to 0 so that a later firmware can use it
+    /// Set if none of the drivers on this board is a smart driver, inverted so that older boards are taken to have smart drivers
     /// (1-bit field, bit 167 of the message)
     /// </summary>
-    public byte Zero
+    public bool NoSmartDrivers
     {
-        readonly get => (byte)((((uint)_bits0) >> 7) & 0x1U);
-        set => _bits0 = (byte)((((uint)_bits0) & ~(0x1U << 7)) | ((unchecked((uint)value) & 0x1U) << 7));
+        readonly get => ((((uint)_bits0) >> 7) & 1U) != 0;
+        set => _bits0 = (byte)((((uint)_bits0) & ~(0x1U << 7)) | ((value ? 1U : 0U) << 7));
     }
 
     /// <summary>Length of the message with the board type and firmware version truncated to their terminating null</summary>
@@ -3388,10 +3408,7 @@ public struct CanMessageAnnounceV1 : ICanMessage<CanMessageAnnounceV1>
     public static uint GetMaxTextLength(uint dataLength) => (uint)(dataLength - (4 + 16 + 1));
 
     /// <summary>Clear the reserved fields of this message so that it stays compatible with future uses</summary>
-    public void ClearReservedFields()
-    {
-        Zero = 0;
-    }
+    public void ClearReservedFields() { }
 }
 
 /// <summary>

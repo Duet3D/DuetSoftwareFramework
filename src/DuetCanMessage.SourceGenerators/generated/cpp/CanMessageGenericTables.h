@@ -86,6 +86,7 @@ constexpr ParamDescriptor M569Params[] =
 	{ 'Y', ParamDescriptor::uint8_array, 3 },
 	{ 'T', ParamDescriptor::float_array, 4 },
 	{ 'U', ParamDescriptor::int8, 0 },
+	{ 'C', ParamDescriptor::uint32, 0 },       // added at 3.7.0-rc.2, was missing
 	{ 0, ParamDescriptor::none, 0 }
 };
 

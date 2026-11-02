@@ -13,28 +13,31 @@ Duet Software Framework (DSF), a .NET 10 (C# 14) service stack for a Linux SBC, 
 
 Place new functionality accordingly: host-side concerns in DSF, motion and real-time control in Duet3Expansion, only SPI/CAN bridging and step timing in DuetCANMaster.
 
-`lib/RepRapFirmware` is a **read-only reference checkout** (gitignored, not a submodule, not a build dependency). Read `lib/RepRapFirmware/src` to see how RRF implements something being ported, and grep its call sites before claiming DSF diverges from RRF. Never edit it. Everything else under `lib/` (CANlib, CoreN2G, DuetSpiInterface, FreeRTOS, RRFLibraries, ...) and the three native projects under `src/` are owned by this project and should be fixed at the source rather than worked around.
+`src/RepRapFirmware` is upstream RRF, a submodule on its `3.7-dev` branch that is built (for the standalone main boards of the regression bench) but is **read-only here**: it is the reference for behaviour, not part of DSF. Read `src/RepRapFirmware/src` to see how RRF implements something being ported, and grep its call sites before claiming DSF diverges from RRF. Never edit it. `src/Duet3Bootloader` and `src/DuetIAP` are upstream submodules built alongside the firmware. Everything under `lib/` (CANlib, CoreN2G, DuetSpiInterface, FreeRTOS, RRFLibraries, ...), DuetCANMaster, Duet3Expansion and DuetRealtimeCore are owned by this project and should be fixed at the source rather than worked around. Each submodule tracks the branch `.gitmodules` names for it, which `scripts/check_submodules.py` (and CI on PRs) checks.
 
 ## Build
 
+The user-facing scripts are in `scripts/`, one per task: `list.py`, `build.py`, `deploy.py`, `test.py`, `lint.py`, `clean.py`, `size.py`, `codegen.py` and `doctor.py`. Each takes `--help`. Their shared code is in `scripts/common/`, and tools that CMake, CI or the devcontainer run, not people, are in `scripts/internal/`. They all take the same targets: a DSF project (`DuetControlServer`, `DuetRealtimeCore`, ...), a firmware board, named by its CMake preset (`EXP3HC`, `canmaster-Duet3_MB6HC`; a `-debug` suffix names its Debug build), or a group: `dsf`, `firmware`, or a firmware project in full or as `canmaster`, `rrf`, `d3e`, `bootloader` or `iap`. `scripts/list.py` lists them. Builds are Release unless `--debug` is given.
+
 ```bash
-./scripts/build.sh --all
+scripts/build.py dsf                        # every DSF project, each into its own bin/<config>/<tfm>/<arch>/publish
+scripts/build.py canmaster-Duet3_MB6HC      # one board, into build/<preset>/
+scripts/build.py canmaster d3e              # every DuetCANMaster and Duet3Expansion board
+scripts/deploy.py -H <pi> dsf --build --debug --start-services   # build every DSF project and deploy it to a Pi
 ```
 
-This publishes every dotnet project and cross-compiles `libduet_realtime_core.so` for aarch64 through CMake, collating output into `build/dotnet/`. Prefer it over `dotnet build` on a single project: DuetControlServer P/Invokes into the native library and cannot run without it, and a host `make` in `src/DuetRealtimeCore` builds for the wrong architecture. Do not pass `--local` or `--target` unless deployment is wanted; `--local` fails in the devcontainer after a successful build. `./scripts/build.sh --help` lists the rest (`--aot`, `--arch`, `--build-type`, `-p <msbuild prop>`).
+Prefer `scripts/build.py` over `dotnet build` on a single project: it cross-compiles `libduet_realtime_core.so` for aarch64, which DuetControlServer P/Invokes into and cannot run without. `deploy.py --local` fails in the devcontainer.
 
-A fresh clone or new git worktree needs the native submodule before the native build or system tests will work:
+A fresh clone or new git worktree needs the native submodule before the native build or system tests will work, and the rest of the submodules for the firmware; `scripts/doctor.py` checks for both:
 
 ```bash
 git submodule update --init lib/RRFLibraries
+git submodule update --init --recursive
 ```
 
-Firmware builds (top-level `Makefile`):
+Every firmware board is a preset in the root `CMakePresets.json`. DuetCANMaster's presets are prefixed `canmaster-` (and the bootloaders' and IAPs' `bootloader-` and `iap-`), because RRF builds the same main boards.
 
-```bash
-make Duet3Expansion            # every expansion board; or one board, e.g. make EXP3HC
-make DuetCANMaster             # CMake presets in src/DuetCANMaster; DEBUG=1 for debug
-```
+The CMake build lints DuetCANMaster's and the libraries' C++ with clang-tidy as it compiles it, using the root `.clang-tidy` plus a project's own where it has one (DuetCANMaster's and DuetRealtimeCore's add their naming rules). RepRapFirmware, Duet3Expansion, Duet3Bootloader and DuetIAP are not currently linted: their presets set `DUET_CLANG_TIDY` off, and third-party code (device packs, CMSIS, tinyusb, mbedTLS, lwIP, `src/libc`, ...) never is. Every finding is an error that fails the build.. The libraries are held to fewer checks for now: `lib/.clang-tidy` turns off those they still fail, and `SKIP` in `scripts/internal/clang_tidy_wrapper.py` lists the library files clang cannot parse. Take a check or a file off those lists once the libraries pass it; never add to them to get a change through. `scripts/lint.py <board>` lints a whole build by hand.
 
 Do not flash DuetCANMaster; build it and leave flashing to the user.
 
@@ -43,9 +46,9 @@ Do not flash DuetCANMaster; build it and leave flashing to the user.
 `src/DuetCanMessage.SourceGenerators/Schema/can-messages.json` is the single source for the CAN wire formats, generating both the C++ headers dropped into CANlib and the C# types under `src/DuetControlServer/Link/Protocol/CanMessages/Generated`. Edit the schema, never the generated files, then:
 
 ```bash
-make can-messages          # regenerate (output is checked in)
-make can-messages-check    # CI: fails if checked-in output is stale
-make can-messages-verify   # compile-time layout check against CANlib's header
+scripts/codegen.py            # regenerate (output is checked in)
+scripts/codegen.py --check    # CI: fails if checked-in output is stale
+scripts/codegen.py --verify   # compile-time layout check against CANlib's header
 ```
 
 `CANlib` messages are currently hand maintained for `RepRapFirmware`, ultimately the source generated files will replace these but for now the C++ generated files are just used for verification.
@@ -56,13 +59,13 @@ The SPI wire protocol shared by DuetRealtimeCore and DuetCANMaster lives in `lib
 
 | Suite | Command | Notes |
 |---|---|---|
-| Unit (NUnit) | `dotnet test src/UnitTests/UnitTests.csproj` | Run in full. `./scripts/coverage.sh` runs the same with coverage, as CI does |
-| System (NUnit) | `./scripts/system-tests.sh --filter 'FullyQualifiedName~JobControl'` | Always filter to the affected fixtures; the full suite takes many minutes |
-| Native | `cd src/DuetRealtimeCore && cmake --preset native && cmake --build --preset native -j && ctest --test-dir build/native --output-on-failure` | Host build, used only for tests |
+| Unit (NUnit) | `scripts/test.py unit` | Run in full; with coverage, as CI does |
+| System (NUnit) | `scripts/test.py system --filter 'FullyQualifiedName~JobControl'` | Always filter to the affected fixtures; the full suite takes many minutes |
+| Native | `scripts/test.py native` | DuetRealtimeCore's ctest suite, in a host build used only for tests |
 
 Single unit test: `dotnet test src/UnitTests/UnitTests.csproj --filter "FullyQualifiedName~ClassName.MethodName"`.
 
-System tests host the real DuetControlServer in-process (`src/SystemTests/Host/DcsTestHost.cs`) with the real `libduet_realtime_core.so`, talking over a socket transport to a scripted controller (`src/SystemTests/ScriptedCanMaster`) that records the link traffic. Scenarios under `src/SystemTests/Scenarios` drive G-code and assert on the object model and the captured packets. Use `system-tests.sh` rather than raw `dotnet test` on that project: it reports progress per test and splits failures into known and new.
+System tests host the real DuetControlServer in-process (`src/SystemTests/Host/DcsTestHost.cs`) with the real `libduet_realtime_core.so`, talking over a socket transport to a scripted controller (`src/SystemTests/ScriptedCanMaster`) that records the link traffic. Scenarios under `src/SystemTests/Scenarios` drive G-code and assert on the object model and the captured packets. Use `scripts/test.py system` rather than raw `dotnet test` on that project: it reports progress per test and splits failures into known and new.
 
 - `[Category("KnownGap")]` marks a scenario asserting behaviour the source does not produce yet. These are excluded by default; the category comes off when the source is fixed. `--tag-known-gaps` rewrites the categories to match a run.
 - `[Category("LongRunning")]` marks the slowest; `--skip-long-running` drops them.
@@ -82,7 +85,7 @@ The harness runs on the host machine, not in the devcontainer, because the CAN a
 It has two profiles, which are the two stacks on the same bench and CAN bus:
 
 - `rrf`: the MB6HC running RepRapFirmware standalone. The references are recorded from this profile.
-- `dsf`: the test Pi running this repository's build, driving DuetCANMaster. A run on this profile tests whatever is currently deployed, so deploy first (`./scripts/build.sh --all --target <ip> --start-services`, see `DEVELOPER.md`).
+- `dsf`: the test Pi running this repository's build, driving DuetCANMaster. A run on this profile tests whatever is currently deployed, so deploy first (`scripts/deploy.py -H <ip> dsf --build --start-services`, see `DEVELOPER.md`).
 
 #### Reading results (no hardware needed)
 
@@ -151,7 +154,7 @@ The aim is a well-structured DSF code base that follows consistent rules and con
 
 Three references describe RRF's behaviour. Check all that are available:
 
-- The RRF source in `lib/RepRapFirmware/src`.
+- The RRF source in `src/RepRapFirmware/src`.
 - The regression suite references, where a case covers the code (see the regression suite section above).
 - The G-code documentation in the Duet wiki source, https://github.com/Duet3D/wiki-content.
 

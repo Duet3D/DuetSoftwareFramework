@@ -1,0 +1,5 @@
+// Hint file for the C/C++ extension's tag parser (outline / Go To Symbol), which does not expand macros.
+// Without these, functions declared "Foo(...) THROWS(X)" are listed under the name "THROWS".
+#define THROWS(...)
+#define pre(...)
+#define post(...)

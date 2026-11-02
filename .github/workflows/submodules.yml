@@ -1,0 +1,28 @@
+# Checks each submodule points at a commit on the branch it tracks in .gitmodules. A PR may point
+# submodules at their unmerged PRs while they are tested together, but must point them at their
+# tracked branches before it is merged. Pushes to other branches are skipped, as they would fail for
+# the same reason while their PR is open.
+
+name: Submodules
+
+on:
+  pull_request:
+  push:
+    # The version branches, e.g. 3.7-dev
+    branches: ['*-dev']
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  submodules:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check submodules are on their tracked branches
+        run: scripts/doctor.py submodules

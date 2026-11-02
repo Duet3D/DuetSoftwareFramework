@@ -23,7 +23,7 @@ the board from the port string the user typed. Neither has a counterpart that ch
 it created.
 
 RepRapFirmware wraps each action in a named `CanInterface` call
-([CanInterface.cpp#L1435](lib/RepRapFirmware/src/CAN/CanInterface.cpp#L1435) onwards), and there are
+([CanInterface.cpp#L1435](src/RepRapFirmware/src/CAN/CanInterface.cpp#L1435) onwards), and there are
 only six call sites in the whole of it. They are the evidence for everything below:
 
 | RRF call | Action | Called from | DSF |
@@ -43,7 +43,7 @@ passes `true`.
 ## 2. A probe is never told anything after `M558`
 
 RepRapFirmware pushes two things to the board every time probing starts and stops, in
-[`RemoteZProbe::SetProbing`](lib/RepRapFirmware/src/Endstops/RemoteZProbe.cpp#L64):
+[`RemoteZProbe::SetProbing`](src/RepRapFirmware/src/Endstops/RemoteZProbe.cpp#L64):
 
 ```cpp
 if (isProbing && (type == ZProbeType::scanningAnalog || type == ZProbeType::analog))
@@ -200,7 +200,7 @@ purely a tidy-up.
 ## 4. `actionDoMonitor` is a deliberate divergence
 
 RRF calls `EnableHandle(board, handle, true, &states[i], ...)` once, in
-[`SwitchEndstop::PrimeAxis`](lib/RepRapFirmware/src/Endstops/SwitchEndstop.cpp#L136), with the
+[`SwitchEndstop::PrimeAxis`](src/RepRapFirmware/src/Endstops/SwitchEndstop.cpp#L136), with the
 comment *"check that the expansion board knows about it, and make sure we have an up-to-date state"*.
 The enable is incidental - nothing ever disables a handle, and `actionDontMonitor` is dead in RRF.
 What the call is for is the **out parameter**: it refreshes `states[i]`, the endstop's cached level,
@@ -272,7 +272,7 @@ honest answer may be both. Deferred rather than guessed.
 
 Despite the name, two of RRF's three callers use it for its *other* return value - the current level,
 in the same `&states[i]` out parameter `EnableHandle` fills. Only
-[`RemoteZProbe`](lib/RepRapFirmware/src/Endstops/RemoteZProbe.cpp#L43) wants the name alone.
+[`RemoteZProbe`](src/RepRapFirmware/src/Endstops/RemoteZProbe.cpp#L43) wants the name alone.
 
 DSF needs neither half:
 

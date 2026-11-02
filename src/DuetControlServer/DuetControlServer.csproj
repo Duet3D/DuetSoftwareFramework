@@ -53,7 +53,7 @@
 
 		     GlobalPropertiesToRemove keeps DCS's target from reaching it. A tool that runs during the build
 		     has to be built for the machine doing the building, but `dotnet publish -r linux-arm64` (see
-		     scripts/build.sh) would otherwise cross-build it for the Pi, and CheckCanMessagesUpToDate would
+		     scripts/build.py) would otherwise cross-build it for the Pi, and CheckCanMessagesUpToDate would
 		     then try to execute an arm64 assembly on the host. The same goes for the AOT and self-contained
 		     switches, which would only slow the tool's build down. -->
 		<ProjectReference Include="..\DuetCanMessage.SourceGenerators\DuetCanMessage.SourceGenerators.csproj"
@@ -74,7 +74,7 @@
 	  why the packages are only referenced when the switch is on. See DEVELOPER.md.
 
 	  The native client the binding calls into is not the one the package ships (that one needs a
-	  glibc newer than Raspberry Pi OS Bookworm has); scripts/build-tracy-client.sh builds it, and
+	  glibc newer than Raspberry Pi OS Bookworm has); scripts/build.py TracyClient builds it, and
 	  TracyClientLibrary is where that script leaves it.
 	-->
 	<PropertyGroup>
@@ -117,14 +117,14 @@
 		     is only read at run time, and a build that cannot find it is still a usable build -->
 		<Warning Condition="!Exists('$(TracyClientLibrary)')"
 		         Code="PROF002"
-		         Text="No Tracy client at $(TracyClientLibrary). Build one with 'scripts/build-tracy-client.sh --arch $(TracyClientArchitecture)', or set TRACY_CLIENT_LIBRARY when running." />
+		         Text="No Tracy client at $(TracyClientLibrary). Build one with 'scripts/build.py TracyClient --arch $(TracyClientArchitecture)', or set TRACY_CLIENT_LIBRARY when running." />
 	</Target>
 
 	<!--
 	  The CAN message files under Link/Protocol are generated from the schema and checked in, so a build does
 	  not rewrite them: editing can-messages.json otherwise leaves them stale, and nothing says so until CI
-	  runs `make can-messages-check`. Running that same check here turns it into a build failure instead,
-	  naming the files and telling you to run `make can-messages`. It deliberately does not regenerate: a
+	  runs the check of `scripts/codegen.py`. Running that same check here turns it into a build failure instead,
+	  naming the files and telling you to run `scripts/codegen.py`. It deliberately does not regenerate: a
 	  build that rewrites tracked source files would do so during every publish and deploy too, and the point
 	  of checking the output in is that neither this build nor CANlib's needs the generator to have run.
 
@@ -193,12 +193,12 @@
 	<!--
 	  The check above only proves the checked-in output still matches the schema. It cannot prove the
 	  schema still matches CANlib: schema and output would agree happily on a message format the firmware
-	  never used. verify-cpp-layout.sh (`make can-messages-verify`) closes that gap by compiling the
+	  never used. verify-cpp-layout.sh (the verification of `scripts/codegen.py`) closes that gap by compiling the
 	  generated layout probe against CANlib's own hand-written headers, so building DCS runs it too.
 
 	  Unlike the check, it cannot always run: it needs bash, python3, a host C++ compiler and the CANlib,
 	  RRFLibraries and CoreN2G submodules, none of which a plain `dotnet build` can assume - the release
-	  builds in scripts/build.sh run in containers without a C++ toolchain, and the submodules are only
+	  builds in scripts/build.py run in containers without a C++ toolchain, and the submodules are only
 	  checked out on demand. So a missing prerequisite skips the verification and says which one, on every
 	  build until it is resolved, rather than failing a build that never asked for a C++ compiler. Where
 	  the tooling is present the layouts really are compared, and a mismatch fails the build.

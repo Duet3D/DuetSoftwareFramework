@@ -406,7 +406,7 @@ void CanInterface::Init() noexcept
 #	endif
 #  endif
 
-	can0dev = CanDevice::Init(0, CanDeviceNumber, can0Config, can0Memory, timing, nullptr);
+	can0dev = CanDevice::Init(0, CanDeviceNumber, can0Config, can0Memory, timing, nullptr, nullptr);
 	InitReceiveFilters();
 	can0dev->Enable();
 
@@ -424,7 +424,7 @@ void CanInterface::Init() noexcept
 
 #  if DUAL_CAN
 	timing.SetDefaults(250'000);
-	can1dev = CanDevice::Init(1, SecondaryCanDeviceNumber, can1Config, can1Memory, timing, nullptr);
+	can1dev = CanDevice::Init(1, SecondaryCanDeviceNumber, can1Config, can1Memory, timing, nullptr, nullptr);
 	can1dev->SetShortFilterElement(
 		0, CanDevice::RxBufferNumber::fifo0, 0, 0); // set up a filter to receive all messages in FIFO 0
 	can1dev->SetExtendedFilterElement(0, CanDevice::RxBufferNumber::fifo0, 0, 0);

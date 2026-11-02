@@ -1,0 +1,42 @@
+---
+# The libraries are linted with the shared checks of the repository's root .clang-tidy, less those
+# below, which they do not pass yet
+InheritParentConfig: true
+
+Checks: >
+  -bugprone-assignment-in-if-condition,
+  -bugprone-switch-missing-default-case,
+  -bugprone-signed-char-misuse,
+  -cppcoreguidelines-init-variables,
+  -cppcoreguidelines-pro-type-member-init,
+  -cppcoreguidelines-special-member-functions,
+  -cppcoreguidelines-prefer-member-initializer,
+  -cppcoreguidelines-pro-type-const-cast,
+  -cppcoreguidelines-missing-std-forward,
+  -performance-enum-size,
+  -performance-no-int-to-ptr,
+  -misc-const-correctness,
+  -misc-unused-parameters,
+  -misc-misplaced-const,
+  -modernize-use-nodiscard,
+  -modernize-use-using,
+  -modernize-use-auto,
+  -modernize-type-traits,
+  -modernize-use-equals-default,
+  -modernize-redundant-void-arg,
+  -modernize-use-bool-literals,
+  -modernize-use-nullptr,
+  -modernize-return-braced-init-list,
+  -readability-redundant-casting,
+  -readability-redundant-inline-specifier,
+  -readability-convert-member-functions-to-static,
+  -readability-use-std-min-max,
+  -readability-make-member-function-const,
+  -readability-avoid-nested-conditional-operator,
+  -readability-enum-initial-value,
+  -readability-isolate-declaration,
+  -readability-named-parameter,
+  -readability-simplify-boolean-expr,
+  -readability-avoid-const-params-in-decls,
+  -readability-inconsistent-declaration-parameter-name,
+  -readability-non-const-parameter

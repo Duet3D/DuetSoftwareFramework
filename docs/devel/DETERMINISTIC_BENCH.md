@@ -206,13 +206,13 @@ Held by two mechanisms:
 - a guard test asserting the number of slow-categorised tests against a recorded figure, so adding
   one is a deliberate act with a review attached.
 
-`scripts/test.sh` is the entry point: build once, then run the unit tests and the system tests with
+`scripts/test.py` is the entry point, to grow into: build once, then run the unit tests and the system tests with
 `--no-build`, excluding `Slow` and `KnownGap`, sharded across processes, printing the ten slowest
 tests so the budget stays visible.
 
-`scripts/system-tests.sh` is the system test half of that, already in place: it excludes `KnownGap`,
-names each test as it starts and lists the failed names after the run. It has no sharding and does
-not time anything, so `test.sh` grows out of it rather than beside it.
+Its `unit` and `system` commands are in place: `system` excludes `KnownGap`, names each test as it
+starts and lists the slow and the failed tests after the run. What it lacks is a command running both
+from one build, the sharding, and the budget and guard above.
 
 ## 9. The slow category, as a last resort
 
@@ -233,7 +233,7 @@ are pumped.
    speed arrive here.**
 4. Every scenario onto the timeline; `FreeRunningClock` deleted. A bench profile that starts only the
    services a scenario needs.
-5. `scripts/test.sh`, the sharding, the per-test budget and the slow-count guard.
+5. `scripts/test.py` running both suites from one build, the sharding, the per-test budget and the slow-count guard.
 6. The single-threaded scheduler, then `IBenchGate` and the scenarios that need it.
 7. `StepTimer` per handle, if in-process parallelism is still wanted after sharding.
 

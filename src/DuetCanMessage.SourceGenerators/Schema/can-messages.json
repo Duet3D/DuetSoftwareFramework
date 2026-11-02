@@ -624,19 +624,7 @@
       ],
       "methods": [
         {
-          "name": "GetActualDataLength", "returnType": "usize", "static": true, "emit": ["cpp"],
-          "doc": [
-            "Length of the message when values for numDrivers drivers are sent.",
-            "TODO: every RepRapFirmware and Duet3Expansion call site passes the number of set bits of driversToUpdate,",
-            "which the message already carries, so numDrivers can be dropped and the count taken from the bitmap as",
-            "DuetControlServer now does. CANlib's own header and those call sites have to change in step, because",
-            "RepRapFirmware is built against the same header."
-          ],
-          "params": [ { "name": "numDrivers", "type": "usize" } ],
-          "body": [ { "return": "sizeof(u16) * 2 + numDrivers * sizeof(T)" } ]
-        },
-        {
-          "name": "GetActualDataLength", "returnType": "usize", "emit": ["csharp"],
+          "name": "GetActualDataLength", "returnType": "usize", "constexpr": true,
           "doc": "Length of the message when a value is sent for each driver named by driversToUpdate",
           "body": [ { "return": "sizeof(u16) * 2 + (popcount(driversToUpdate) * sizeof(T))" } ]
         },
@@ -1275,7 +1263,9 @@
           "kind": "bitfield", "storage": "u16",
           "fields": [
             { "name": "heaterNumber", "width": 8, "doc": "Number of the heater this feedforward is for" },
-            { "name": "zero2", "width": 8, "reserved": true }
+            { "name": "fanOnly", "width": 1, "bool": true, "doc": "Added after 3.7.0-rc.1" },
+            { "name": "nonPrintingExtruderMove", "width": 1, "bool": true, "doc": "Added after 3.7.0-rc.1" },
+            { "name": "zero2", "width": 6, "reserved": true }
           ]
         },
         { "kind": "field", "name": "fanPwmFraction", "type": "f32", "doc": "Current PWM of the print cooling fan, 0 to 1, from which the extra heater power needed is worked out" },
@@ -1770,7 +1760,7 @@
             { "name": "usesUf2Binary", "width": 1, "bool": true, "doc": "Set if this board takes a main firmware binary in .uf2 format" },
             { "name": "isReconnect", "width": 1, "bool": true, "doc": "Set if this board did not reset but is re-announcing after losing and regaining time sync" },
             { "name": "wasShutDown", "width": 1, "bool": true, "doc": "Set if this board switched its heaters off because time sync was lost for longer than the connection timeout" },
-            { "name": "zero", "width": 1, "reserved": true }
+            { "name": "noSmartDrivers", "width": 1, "bool": true, "doc": "Set if none of the drivers on this board is a smart driver, inverted so that older boards are taken to have smart drivers" }
           ]
         },
         { "kind": "array", "name": "boardTypeAndFirmwareVersion", "type": "char", "length": "43", "doc": "The short type name of this board followed by '|' and the firmware version" }
@@ -2688,7 +2678,7 @@
     "output": "src/DuetControlServer/Link/Protocol/Shared/EventType.g.cs",
     "doc": [
       "What happened, in an event message sent by an expansion board.",
-      "Values 0-10 mirror EventType in CANlib's RRF3Common.h. They travel on the wire as the 8-bit",
+      "Values 0-12 mirror EventType in CANlib's RRF3Common.h. They travel on the wire as the 8-bit",
       "eventType of an event message, so expansion board firmware already in the field decides them and",
       "they cannot move. Values from 128 up are raised by DuetControlServer about itself and never reach",
       "the wire, which is why they start clear of anything CANlib may add.",
@@ -2708,6 +2698,8 @@
       { "name": "mcu_temperature_warning", "value": 8, "priority": 10, "doc": "not currently used" },
       { "name": "overvoltage", "value": 9, "priority": 11, "doc": "the VIN supply rose above the safe limit" },
       { "name": "undervoltage", "value": 10, "priority": 12, "doc": "the VIN supply fell below the safe limit" },
+      { "name": "board_temperature_warning", "value": 11, "priority": 13, "doc": "a board's temperature approached its limit" },
+      { "name": "board_over_temperature", "value": 12, "priority": 14, "doc": "a board's temperature exceeded its limit" },
 
       { "section": "Raised by DuetControlServer about its own link, never sent over CAN" },
       { "name": "controller_disconnect", "value": 128, "priority": 0, "emit": ["csharp"], "doc": "the SPI link to the controller stopped responding, or the controller reset" },
@@ -2889,7 +2881,8 @@
         { "letter": "V", "type": "uint16" },
         { "letter": "Y", "type": "uint8Array", "maxLength": 3 },
         { "letter": "T", "type": "floatArray", "maxLength": 4 },
-        { "letter": "U", "type": "int8" }
+        { "letter": "U", "type": "int8" },
+        { "letter": "C", "type": "uint32", "doc": "added at 3.7.0-rc.2, was missing" }
       ]
     },
     {

@@ -216,7 +216,7 @@ public class CanGenericTableLayout
     public void M569Params_Entries()
     {
         ImmutableArray<CanParamDescriptor> table = CanGenericTables.M569Params;
-        Assert.That(table.Length, Is.EqualTo(11), "number of entries in M569Params");
+        Assert.That(table.Length, Is.EqualTo(12), "number of entries in M569Params");
         Assert.That(table[0], Is.EqualTo(new CanParamDescriptor('P', CanParamType.LocalDriver, 0)), "M569Params[0]");
         Assert.That(table[1], Is.EqualTo(new CanParamDescriptor('S', CanParamType.UInt8, 0)), "M569Params[1]");
         Assert.That(table[2], Is.EqualTo(new CanParamDescriptor('R', CanParamType.Int8, 0)), "M569Params[2]");
@@ -228,6 +228,7 @@ public class CanGenericTableLayout
         Assert.That(table[8], Is.EqualTo(new CanParamDescriptor('Y', CanParamType.UInt8Array, 3)), "M569Params[8]");
         Assert.That(table[9], Is.EqualTo(new CanParamDescriptor('T', CanParamType.FloatArray, 4)), "M569Params[9]");
         Assert.That(table[10], Is.EqualTo(new CanParamDescriptor('U', CanParamType.Int8, 0)), "M569Params[10]");
+        Assert.That(table[11], Is.EqualTo(new CanParamDescriptor('C', CanParamType.UInt32, 0)), "M569Params[11]");
     }
 
     [Test]

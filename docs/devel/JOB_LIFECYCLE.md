@@ -9,9 +9,9 @@ in. It records *what* the lifecycle has to do; how the code that does it is sche
 actor that now runs it, are [JOB_CONTROL_CONCURRENCY.md](JOB_CONTROL_CONCURRENCY.md).
 
 The reference is `GCodes::DoSynchronousPause` / `DoAsynchronousPause`
-([GCodes.cpp:1000, :1064](../../lib/RepRapFirmware/src/GCodes/GCodes.cpp)), the pause/resume state
-machine in [GCodes4.cpp:558-760](../../lib/RepRapFirmware/src/GCodes/GCodes4.cpp), and the M-codes
-that drive them in [GCodes2.cpp](../../lib/RepRapFirmware/src/GCodes/GCodes2.cpp) — M0/M1/M2 at :755,
+([GCodes.cpp:1000, :1064](../../src/RepRapFirmware/src/GCodes/GCodes.cpp)), the pause/resume state
+machine in [GCodes4.cpp:558-760](../../src/RepRapFirmware/src/GCodes/GCodes4.cpp), and the M-codes
+that drive them in [GCodes2.cpp](../../src/RepRapFirmware/src/GCodes/GCodes2.cpp) — M0/M1/M2 at :755,
 M24 at :1160, M226/M600/M601 at :1249, M25 at :1281.
 
 How the paths below are scheduled across the tasks and threads that run them, the races that
@@ -102,7 +102,7 @@ document and on M291. The trigger row is blocked on nothing running `trigger<n>.
 ### 2.3 There is no pause *state*, only paused and not paused
 
 RepRapFirmware's `PauseState` has five values — `notPaused`, `pausing`, `paused`, `resuming`,
-`cancelling` ([GCodes.h:68](../../lib/RepRapFirmware/src/GCodes/GCodes.h)) — and the ordering is load
+`cancelling` ([GCodes.h:68](../../src/RepRapFirmware/src/GCodes/GCodes.h)) — and the ordering is load
 bearing: `notPaused < pausing < {paused, resuming, cancelling}`. `JobProcessor` has a single
 `IsPaused` bool, so the three transitional states cannot be represented.
 
@@ -122,7 +122,7 @@ closed.
 `ms.SavePosition(PauseRestorePointNumber, ...)` fills a `RestorePoint` with the user coordinates, the
 feed rate, the virtual extruder position, the file position, the modal G0/G1/G2/G3 number, the active
 tool and the fan speed
-([RestorePoint.h](../../lib/RepRapFirmware/src/GCodes/RestorePoint.h)). `resuming1`/`resuming2` move
+([RestorePoint.h](../../src/RepRapFirmware/src/GCodes/RestorePoint.h)). `resuming1`/`resuming2` move
 the head back to `moveCoords` — Z last, so the nozzle does not drag across the print — and
 `resuming3` restores the feed rate and restarts the file from `filePos`.
 
@@ -132,14 +132,14 @@ DSF has the object model classes (`state.restorePoints[]`,
 no feed rate or tool tracking for one.
 
 RRF numbers them: 1 is the pause point, 2 the tool change point, then the simulation and
-resume-object points ([RawMove.h:86-91](../../lib/RepRapFirmware/src/Movement/RawMove.h)). G60 saves
+resume-object points ([RawMove.h:86-91](../../src/RepRapFirmware/src/Movement/RawMove.h)). G60 saves
 a user one, and is also not implemented (`GCodeHandler.ProcessAsync` has no case 60).
 
 ### 2.5 The motion queue cannot be paused part-way through
 
 MCODE_MIGRATION §11.6 records `DDARing::PauseMoves` and `LowPowerOrStallPause` as deliberately not
 ported. They are what make an asynchronous pause stop at a sensible place: `PauseMoves`
-([DDARing.cpp:592](../../lib/RepRapFirmware/src/Movement/DDARing.cpp)) walks the ring for the first
+([DDARing.cpp:592](../../src/RepRapFirmware/src/Movement/DDARing.cpp)) walks the ring for the first
 move it can pause *before* — a move whose predecessor has `CanPauseAfter` — frees everything from
 there on, and hands back the end coordinates of the last move that will run plus the file position,
 feed rate and proportion-done of the first move that will not.
@@ -188,7 +188,7 @@ motors idle — belongs to subsystems that are not ported yet". Those subsystems
 `HeatManager`, `SpindleManager` and the M18/M84 driver path are all present — so the comment is now
 out of date and the work is unblocked.
 
-What is missing against `GCodes::StopPrint` ([GCodes.cpp:4700](../../lib/RepRapFirmware/src/GCodes/GCodes.cpp)):
+What is missing against `GCodes::StopPrint` ([GCodes.cpp:4700](../../src/RepRapFirmware/src/GCodes/GCodes.cpp)):
 
 - the distinction between `normalCompletion` (M0 from inside the file), `userCancelled` (M0 from
   elsewhere while paused) and `abort`. `JobProcessor` collapses this to `IsCancelled = IsPaused`,
@@ -221,7 +221,7 @@ and read by nothing. In RepRapFirmware the flag is the whole basis of two behavi
   the stack and returns false if any level is a macro that is not restartable; M25 then stashes
   `"M226"` (or `"M226 P0"`) in `deferredPauseCommandPending` and `CheckForDeferredPause` injects it
   once the file channel is back out of macros and not mid-tool-change
-  ([GCodes.cpp:1223](../../lib/RepRapFirmware/src/GCodes/GCodes.cpp)). Nothing here does this, so a
+  ([GCodes.cpp:1223](../../src/RepRapFirmware/src/GCodes/GCodes.cpp)). Nothing here does this, so a
   pause requested during, say, a tool change would either be lost or would tear the tool change in
   half.
 
@@ -249,7 +249,7 @@ keeping from the deleted SPI path, because both are non-obvious and both were de
   *queued*, so a job file's last code completes seconds before the machine reaches the end of the
   job. The controller therefore waits for standstill before it treats a stream that ran out of codes
   as a finished print, which is where RepRapFirmware waits too and for the same two reasons
-  ([GCodes.cpp:706](../../lib/RepRapFirmware/src/GCodes/GCodes.cpp)): an asynchronous pause may
+  ([GCodes.cpp:706](../../src/RepRapFirmware/src/GCodes/GCodes.cpp)): an asynchronous pause may
   still arrive while the machine works through what the file queued last, and `state.status` has to
   keep reporting the job until the job has really ended. The wait is skipped once the job is
   pausing, cancelling or aborting - the pause sequence does its own waiting, and `pause.g` may
@@ -262,7 +262,7 @@ covers most of this, but the "only if the macro can be restarted" half needs §2
 
 ### 2.10 Nothing tracks job progress
 
-RepRapFirmware's `PrintMonitor` ([PrintMonitor.cpp](../../lib/RepRapFirmware/src/PrintMonitor/PrintMonitor.cpp))
+RepRapFirmware's `PrintMonitor` ([PrintMonitor.cpp](../../src/RepRapFirmware/src/PrintMonitor/PrintMonitor.cpp))
 produces `job.duration`, `job.warmUpDuration`, `job.pauseDuration`, `job.layer`, `job.layerTime`,
 `job.timesLeft` (file, filament and slicer estimates), `job.rawExtrusion` and `job.lastFileName`.
 None of these is written anywhere in DuetControlServer: the only class that ever did is
@@ -328,7 +328,7 @@ polling, and it is recorded here so the next reader does not go looking for the 
 
 The two things the state machine buys that an `await` does not, and how each is kept:
 
-- **`PauseSequenceAborted`** ([GCodes.cpp:3492](../../lib/RepRapFirmware/src/GCodes/GCodes.cpp)): if
+- **`PauseSequenceAborted`** ([GCodes.cpp:3492](../../src/RepRapFirmware/src/GCodes/GCodes.cpp)): if
   `pause.g` is aborted mid-way, the frame that would have advanced `pausing` to `paused` goes with
   it, and the machine hangs reporting "pausing" forever. The `await` equivalent is a `finally` that
   settles the state to `Paused` however the macro ended.
@@ -342,7 +342,7 @@ and first when it has to go up, so the nozzle never drags across the print on it
 pause point. `ResumeSequenceAsync` keeps both moves and the condition that orders them.
 
 Only the single-motion-system branch of `resuming1` is ported — the `#else` at
-[GCodes4.cpp:665](../../lib/RepRapFirmware/src/GCodes/GCodes4.cpp). The `SUPPORT_ASYNC_MOVES` branch
+[GCodes4.cpp:665](../../src/RepRapFirmware/src/GCodes/GCodes4.cpp). The `SUPPORT_ASYNC_MOVES` branch
 above it allocates each axis to whichever motion system owns it before restoring it, which needs
 axis ownership that does not exist here yet. That is a `// TODO` at the point of use naming M596, not
 a silent simplification, and it has to be revisited when multiple motion systems land: with two
@@ -377,14 +377,14 @@ does — see the end of this section for why there is nothing else they could do
 
 #### What RepRapFirmware does
 
-`DDARing::PauseMoves` ([DDARing.cpp:592](../../lib/RepRapFirmware/src/Movement/DDARing.cpp)) does not
+`DDARing::PauseMoves` ([DDARing.cpp:592](../../src/RepRapFirmware/src/Movement/DDARing.cpp)) does not
 *create* a stopping point. It **searches for one that already exists**: it walks the ring for the
 first DDA whose predecessor returns `CanPauseAfter()`, frees everything from there on, and reports
 the endpoint of the last move that will run.
 
 `CanPauseAfter` is true only when both of these hold
-([DDA.cpp:1092](../../lib/RepRapFirmware/src/Movement/DDA.cpp),
-[DDA.h:367](../../lib/RepRapFirmware/src/Movement/DDA.h)):
+([DDA.cpp:1092](../../src/RepRapFirmware/src/Movement/DDA.cpp),
+[DDA.h:367](../../src/RepRapFirmware/src/Movement/DDA.h)):
 
 - the move's end speed, projected onto every drive, is at or below that drive's instantaneous speed
   change — i.e. the toolpath already happens to slow to a full stop's worth of jerk at that junction;
@@ -398,7 +398,7 @@ essentially every junction in the ring. `PauseMoves` then finds nothing, returns
 ring drains**. The head carries on to the end of everything queued before it stops.
 
 RRF accepts that because the alternative it has is the emergency path, `LowPowerOrStallPause`
-([DDARing.cpp:687](../../lib/RepRapFirmware/src/Movement/DDARing.cpp)), which stops abruptly by
+([DDARing.cpp:687](../../src/RepRapFirmware/src/Movement/DDARing.cpp)), which stops abruptly by
 cancelling the step interrupt mid-move. That is a correct response to a power failure and the wrong
 one to a user pressing pause, so a normal pause gets the conservative search and lives with the
 overshoot.
@@ -451,7 +451,7 @@ would have to pay for first:
 
 - (b) reopens the correctness exclusions `canPauseAfter` encodes. It is cleared for arc segments
   ("the arc centre gets recomputed incorrectly when we resume",
-  [GCodes.cpp:3213](../../lib/RepRapFirmware/src/GCodes/GCodes.cpp)), for retractions ("that could
+  [GCodes.cpp:3213](../../src/RepRapFirmware/src/GCodes/GCodes.cpp)), for retractions ("that could
   cause too much retraction", GCodes.cpp:4557) and for endstop, probing and `G1 H` moves. Stopping at
   a boundary lets those exclusions be honoured by choosing the next permitted boundary; stopping
   inside a move has to argue each case afresh;
@@ -550,7 +550,7 @@ maps them back to the file itself:
 The endpoints are the ring's own, read after the purge — `m_addPointer->GetPrevious()`, which is the
 last move the stop left standing, and so where the machine will come to rest. RepRapFirmware fills
 its pause restore point from exactly that
-([DDARing.cpp:647](../../lib/RepRapFirmware/src/Movement/DDARing.cpp)). The motor position snapshot
+([DDARing.cpp:647](../../src/RepRapFirmware/src/Movement/DDARing.cpp)). The motor position snapshot
 is the wrong source and cannot be made right by reading it later: it advances a segment at a time, so
 while the moves the stop could not recall are still running it reads somewhere the machine is passing
 through, and by the time the machine has stopped `pause.g` may have parked it somewhere else again.
@@ -613,7 +613,7 @@ read under, the feed rate it was read with unscaled by M220, the fraction the bu
 from, how many segments that build produced, and how many of them have gone to the ring. That is
 RepRapFirmware's `ms.raw` together with `ms.totalSegments` and `ms.segmentsLeft`, which is the set
 `DoAsynchronousPause` reads in its `segmentsLeft != 0` branch
-([GCodes.cpp:1092](../../lib/RepRapFirmware/src/GCodes/GCodes.cpp)). `MovementState` holds the
+([GCodes.cpp:1092](../../src/RepRapFirmware/src/GCodes/GCodes.cpp)). `MovementState` holds the
 current one, as `MovementState` holds `raw` there, and `JobMoveIndex` maps each queued move id to
 that record and to the move's own index within it. A file position and a fraction read from one
 record cannot describe different codes, which is what the arrangement is for.
@@ -630,7 +630,7 @@ resume point:
 | No job code was in flight | Nothing. The last completed code is the pause point, which is every synchronous pause |
 
 Those are RepRapFirmware's three branches of `DoAsynchronousPause`
-([GCodes.cpp:1086](../../lib/RepRapFirmware/src/GCodes/GCodes.cpp)), each of which fills in the file
+([GCodes.cpp:1086](../../src/RepRapFirmware/src/GCodes/GCodes.cpp)), each of which fills in the file
 position and the proportion together and then calls `ClearMove`. The result is one nullable value
 carrying a file position, a fraction, a G command number and a feed rate, so a fraction that names no
 position cannot be expressed. Three things read it, and all three read that one value: the position
@@ -658,7 +658,7 @@ it was made, so the resume asks for the rest of that code and no more. RepRapFir
 in the branch above, discarding the waiting move after recording it.
 
 The one race left is RepRapFirmware's own, and it notes it at the same place
-([GCodes.cpp:1112](../../lib/RepRapFirmware/src/GCodes/GCodes.cpp)): a submission that ends for its
+([GCodes.cpp:1112](../../src/RepRapFirmware/src/GCodes/GCodes.cpp)): a submission that ends for its
 own reasons in the same instant as the take leaves nothing to take, and the resume re-reads the code
 from its start. Here that costs one code re-run rather than a wrong fraction, because a record is
 never left behind for another pause to adopt.
@@ -728,7 +728,7 @@ stops it*.
 | `expansion_reconnect`, `expansion_timeout` | — | Likewise |
 
 Stating it this way rather than as "an event should stop as soon as it can" is the point.
-`Event::GetDefaultPauseReason` ([Event.cpp:115](../../lib/RepRapFirmware/src/Platform/Event.cpp))
+`Event::GetDefaultPauseReason` ([Event.cpp:115](../../src/RepRapFirmware/src/Platform/Event.cpp))
 stays the one place that decides whether an event pauses at all, and the feedhold is one more
 property hanging off that decision rather than a reason to revisit it. A rule phrased around urgency
 would invite exactly that revisiting — someone would notice that an undervoltage warning is urgent
@@ -736,7 +736,7 @@ too — and the deviation would grow a new pause RepRapFirmware does not have, i
 [EVENTS_MIGRATION.md](EVENTS_MIGRATION.md) §1.5 is the only record of which events pause.
 
 **Trigger 1 is an inference, not an event.** It is a separate call site
-([GCodes.cpp:954](../../lib/RepRapFirmware/src/GCodes/GCodes.cpp)), not one of `Event.cpp`'s types,
+([GCodes.cpp:954](../../src/RepRapFirmware/src/GCodes/GCodes.cpp)), not one of `Event.cpp`'s types,
 so "where RRF would pause for an event" does not literally reach it. It is included because it is the
 same kind of pause — asynchronous, nobody typed it, RRF pauses — and excluding it would leave one
 async pause source on the faithful path for no reason anyone could reconstruct later. If trigger 1
@@ -748,7 +748,7 @@ Three things this does **not** change, each easy to assume otherwise:
   macro and pauses nothing (EVENTS_MIGRATION §1.5), and that is the path machines actually configure.
   The feedhold applies only where RepRapFirmware would have paused by itself.
 - **`driver_error` still skips `pause.g`.** RRF routes it to `eventPausing2` rather than
-  `eventPausing1` ([GCodes4.cpp:1981](../../lib/RepRapFirmware/src/GCodes/GCodes4.cpp)), because
+  `eventPausing1` ([GCodes4.cpp:1981](../../src/RepRapFirmware/src/GCodes/GCodes4.cpp)), because
   `pause.g` typically lifts and parks the head and a driver in error cannot be trusted to move.
   "Stop by a controlled deceleration" and "then run `pause.g`" are separate flags on the pause
   sequence and stay separate — a feedhold does not imply the macro. The feedhold is still the right
@@ -915,7 +915,7 @@ when the head is at or below the pause height, and only splits the move - travel
       flag of its own, kept as DuetControlServer sent it
 - [ ] Only ring 0 is stopped; a `// TODO` in `DrainFeedholds` names M596
 - [ ] **`M25` with a fraction is silently accepted as `M25`.** RepRapFirmware guards this centrally
-      ([GCodes2.cpp:737](../../lib/RepRapFirmware/src/GCodes/GCodes2.cpp)): an M-code carrying a
+      ([GCodes2.cpp:737](../../src/RepRapFirmware/src/GCodes/GCodes2.cpp)): an M-code carrying a
       fraction that is not in its allow-list goes to `TryMacroFile`, and M25 is not in that list — so
       `M25.1` there looks for `sys/M25.1.g` and otherwise reports the code unsupported. Here it now
       reaches `HandlePausePrintAsync` and pauses. The fix is one line, throwing

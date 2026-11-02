@@ -62,7 +62,7 @@ would.
 ## 2. What RepRapFirmware does
 
 RepRapFirmware defers whole codes through `GCodeQueue`
-([GCodes/GCodeQueue.cpp](../../lib/RepRapFirmware/src/GCodes/GCodeQueue.cpp)). The mechanism, verified
+([GCodes/GCodeQueue.cpp](../../src/RepRapFirmware/src/GCodes/GCodeQueue.cpp)). The mechanism, verified
 against the source:
 
 - A `QueuedCode` is the raw command bytes (up to `BufferSizePerQueueItem` = 64) plus one number:
@@ -264,7 +264,7 @@ post-interception, then `TryRunCodeMacroAsync`, which builds `<letter><major>.<m
 passes the code's parameters as `param.*`, then `Command is not supported`. That fallback used to
 be dead code, because the `NotSupportedException` catch resolved unknown codes first; the order is
 what RepRapFirmware's `default:` case does
-([GCodes2.cpp:4789](../../lib/RepRapFirmware/src/GCodes/GCodes2.cpp)).
+([GCodes2.cpp:4789](../../src/RepRapFirmware/src/GCodes/GCodes2.cpp)).
 `MCodeHandler.FlushAndWaitForStandstillAsync` and its 12 call sites are deleted, along with the
 first-thing standstill waits of M451-453 and M563 and the invalid-minor guards of M36, M201, M505,
 M558, M569, M581 and M586. The mid-sequence waits of multi-phase codes (G28, G29, G30, the
