@@ -9,11 +9,11 @@ if(DUET_DISASSEMBLY)
 endif()
 
 # CrcAppender stamps a CRC on a firmware image (and can append a filesystem image to it). It is a
-# host tool shipped with RepRapFirmware, taken from PATH if it is there.
+# prebuilt host tool kept in scripts/internal, taken from PATH if it is there.
 string(TOLOWER "${CMAKE_HOST_SYSTEM_NAME}" _duet_host_os)
 string(REPLACE "darwin" "macos" _duet_host_os "${_duet_host_os}")
 find_program(CRC_APPENDER CrcAppender
-    PATHS "${CMAKE_CURRENT_LIST_DIR}/../src/RepRapFirmware/Tools/CrcAppender/${_duet_host_os}-${CMAKE_HOST_SYSTEM_PROCESSOR}"
+    PATHS "${CMAKE_CURRENT_LIST_DIR}/../scripts/internal/CrcAppender/${_duet_host_os}-${CMAKE_HOST_SYSTEM_PROCESSOR}"
     REQUIRED)
 
 # duet_compiled_targets(<directory> <out-var>)
