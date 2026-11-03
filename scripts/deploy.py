@@ -12,6 +12,8 @@
     scripts/deploy.py -H duet3.local EXP1HCL --debug                     only the 1HCL boards, as Debug
     scripts/deploy.py -H duet3.local firmware -b 0 -b 121                the main board and CAN address 121
     scripts/deploy.py -H duet3.local firmware --build --dry-run          show what that would do
+    scripts/deploy.py -H duet3.local firmware --bootloader               update the expansion boards' bootloaders
+    scripts/deploy.py -H duet3.local EXP3HC --bootloader --build         build the 3HCs' bootloader and update theirs
     scripts/deploy.py -H 192.168.4.27 --all --build --dry-run           every DSF project and board, shown only
 
 Targets are DSF projects and firmware boards, and groups of them (see scripts/list.py). With --build,
@@ -24,9 +26,11 @@ projects' publish directories synced into /opt/dsf/bin and DuetPiManagementPlugi
 /opt/dsf/plugins, and the projects' postinst scripts run. Deploying every DSF project also deletes
 binaries the build no longer makes.
 
-Firmware goes to the main board through the rr_ HTTP API. Its object model says which boards are connected
-and which firmware file each needs; those files are uploaded with the main board's IAP, M997 updates the
-expansion boards one at a time, and finally the main board.
+Firmware goes to the main board through its HTTP API: DSF's REST API on an SBC, else the rr_ requests
+of a standalone board. Its object model says which boards are connected and which firmware file each
+needs; those files are uploaded with the main board's IAP, M997 updates the expansion boards one at a
+time, and finally the main board. --bootloader updates the expansion boards' bootloaders over CAN
+instead (M997 S3); see common/firmware_deploy.py for what it can and cannot update.
 
 Deploying DSF and firmware together deploys DSF first, then starts its services and updates the
 firmware through them.
@@ -39,11 +43,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from common import firmware_deploy
-from common.cli import parse, parser, typed
+from common.cli import complete_with, parse, parser, typed
 from common.dsf import (TRACY, BuildOptions, DeployOptions, add_build_arguments, build_options, build_projects,
                         deploy, plan)
 from common.firmware import load_boards
-from common.targets import add_target_arguments, select
+from common.targets import add_target_arguments, board_names, select
 
 
 @dataclass(frozen=True)
@@ -66,6 +70,7 @@ class Options:
     addresses: list[int]
     main: str | None
     upload_only: bool
+    bootloader: bool
     dry_run: bool
 
 
@@ -88,8 +93,12 @@ def parse_options(argv: Sequence[str] | None = None) -> Options:
     firmware.add_argument('-b', '--board', dest='addresses', type=int, action='append', default=[],
                           metavar='ADDRESS', help='only update the board at this CAN address (repeatable; the '
                                                   'main board is 0; boards matching a target are updated too)')
-    firmware.add_argument('-m', '--main', metavar='PRESET', help="the build to use for the main board's firmware")
+    complete_with(firmware.add_argument('-m', '--main', metavar='PRESET',
+                                        help="the build to use for the main board's firmware"), board_names)
     firmware.add_argument('--upload-only', action='store_true', help='upload the files but do not update the boards')
+    firmware.add_argument('--bootloader', action='store_true',
+                          help="update the expansion boards' bootloaders over CAN instead of the boards' firmware "
+                               '(see common/firmware_deploy.py)')
     namespace = parse(p, argv)
     return typed(Options, namespace, dsf=build_options(namespace))
 
@@ -120,7 +129,7 @@ def deploy_firmware(options: Options, presets: list[str], every: bool, debug: bo
         main = chosen.preset(chosen.boards[0], debug)
     return firmware_deploy.deploy_firmware(firmware_deploy.Options(
         host=options.host or 'localhost', password=options.password, debug=debug, addresses=options.addresses,
-        types=[] if every else presets, main=main, upload_only=options.upload_only,
+        types=[] if every else presets, main=main, upload_only=options.upload_only, bootloader=options.bootloader,
         build=options.build or options.clean, clean=options.clean, dry_run=options.dry_run, wait=after_dsf and not options.dry_run), boards)
 
 

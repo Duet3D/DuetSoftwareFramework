@@ -23,9 +23,9 @@ import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from common.cli import parse, parser, typed
+from common.cli import complete_with, parse, parser, typed
 from common.repo import ROOT
-from common.submodules import check_submodules
+from common import submodules
 
 CHECKS = ('tools', 'submodules')
 
@@ -54,7 +54,8 @@ class Options:
 
 def parse_options(argv: Sequence[str] | None = None) -> Options:
     p = parser(__doc__)
-    p.add_argument('checks', nargs='*', metavar='CHECK', help=f'the checks to run: {", ".join(CHECKS)} (default: all)')
+    complete_with(p.add_argument('checks', nargs='*', metavar='CHECK',
+                                 help=f'the checks to run: {", ".join(CHECKS)} (default: all)'), lambda: CHECKS)
     p.add_argument('--rev', default='HEAD', help='the revision whose submodules to check (default: HEAD)')
     options = typed(Options, parse(p, argv))
     if unknown := [c for c in options.checks if c not in CHECKS]:
@@ -89,7 +90,7 @@ def main() -> int:
         ok = check_tools() and ok
     if 'submodules' in checks:
         print(f'Submodule branches ({options.rev})')
-        ok = check_submodules(options.rev) and ok
+        ok = submodules.check(options.rev) and ok
     return 0 if ok else 1
 
 

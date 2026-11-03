@@ -87,6 +87,54 @@
             "args": { "key": "gdbServer" }
         },
         {
+            // The GDB server the debug session used, which launch.json remembers
+            "id": "gdbServerType",
+            "type": "command",
+            "command": "extension.commandvariable.remember",
+            "args": { "key": "gdbServerType" }
+        },
+        {
+            "id": "bootloader",
+            "type": "command",
+            "command": "extension.commandvariable.remember",
+            "args": { "key": "bootloader" }
+        },
+        {
+            // The bootloaders are the Duet3Bootloader presets in CMakePresets.json, less the main boards' CAN IAPs, as in
+            // launch.json and scripts/flash_bootloader.py. Shares its remembered pick with launch.json's bootloader input
+            "id": "bootloaderPick",
+            "type": "command",
+            "command": "extension.commandvariable.pickStringRemember",
+            "args": {
+                "description": "Bootloader to flash",
+                "key": "bootloader",
+                "addLabelToTop": "${remember:bootloader}",
+                "fileName": "${workspaceFolder}/CMakePresets.json",
+                "fileFormat": "json",
+                "jsonOption": {
+                    "label": "content.configurePresets.filter(p => !p.hidden && !p.name.endsWith('-debug') && p.inherits[0] === 'Duet3Bootloader' && !p.displayName.includes('CAN IAP'))[__itemIdx__].name",
+                    "description": "content.configurePresets.filter(p => !p.hidden && !p.name.endsWith('-debug') && p.inherits[0] === 'Duet3Bootloader' && !p.displayName.includes('CAN IAP'))[__itemIdx__].displayName",
+                    "value": "content.configurePresets.filter(p => !p.hidden && !p.name.endsWith('-debug') && p.inherits[0] === 'Duet3Bootloader' && !p.displayName.includes('CAN IAP'))[__itemIdx__].name"
+                }
+            }
+        },
+        {
+            // Shares its remembered value with the debug launch configurations' gdbServer input
+            "id": "gdbServerPrompt",
+            "type": "command",
+            "command": "extension.commandvariable.promptStringRemember",
+            "args": {
+                "key": "gdbServer",
+                "description": "GDB server host:port (use host.docker.internal for a server running on the host outside the devcontainer)",
+                "default": "host.docker.internal:2331"
+            }
+        },
+        {
+            "id": "submoduleBranch",
+            "type": "promptString",
+            "description": "Branch to switch submodules to where it exists, e.g. 3.7-ch"
+        },
+        {
             "id": "duetHost",
             "type": "command",
             "command": "extension.commandvariable.promptStringRemember",
@@ -193,9 +241,20 @@
             "label": "[DSF] Build DuetRealtimeCore",
             "type": "shell",
             "command": "scripts/build.py --debug DuetRealtimeCore",
-            "problemMatcher": [
-                "$gcc"
-            ],
+            // gcc's problem matcher, written out because $gcc only exists once the C/C++ extension is installed
+            "problemMatcher": {
+                "owner": "gcc",
+                "source": "gcc",
+                "fileLocation": ["autoDetect", "${workspaceFolder}"],
+                "pattern": {
+                    "regexp": "^(.*?):(\\d+):(\\d*):?\\s+(?:fatal\\s+)?(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                }
+            },
             "runOptions": {
                 "instanceLimit": 1
             }
@@ -204,9 +263,19 @@
             "label": "[DSF] Build and Deploy DuetRealtimeCore to",
             "type": "shell",
             "command": "scripts/deploy.py --build --debug -H ${config:dsf.debug.targetIp} -u ${config:dsf.debug.sshUser} --start-services DuetRealtimeCore",
-            "problemMatcher": [
-                "$gcc"
-            ],
+            "problemMatcher": {
+                "owner": "gcc",
+                "source": "gcc",
+                "fileLocation": ["autoDetect", "${workspaceFolder}"],
+                "pattern": {
+                    "regexp": "^(.*?):(\\d+):(\\d*):?\\s+(?:fatal\\s+)?(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                }
+            },
             "runOptions": {
                 "instanceLimit": 1
             }
@@ -254,9 +323,19 @@
             "label": "[DSF] Run Native Tests",
             "type": "shell",
             "command": "scripts/test.py native",
-            "problemMatcher": [
-                "$gcc"
-            ],
+            "problemMatcher": {
+                "owner": "gcc",
+                "source": "gcc",
+                "fileLocation": ["autoDetect", "${workspaceFolder}"],
+                "pattern": {
+                    "regexp": "^(.*?):(\\d+):(\\d*):?\\s+(?:fatal\\s+)?(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                }
+            },
             "group": "test",
             "runOptions": {
                 "instanceLimit": 1
@@ -271,9 +350,19 @@
             "options": {
                 "cwd": "${workspaceFolder}"
             },
-            "problemMatcher": [
-                "$gcc"
-            ],
+            "problemMatcher": {
+                "owner": "gcc",
+                "source": "gcc",
+                "fileLocation": ["autoDetect", "${workspaceFolder}"],
+                "pattern": {
+                    "regexp": "^(.*?):(\\d+):(\\d*):?\\s+(?:fatal\\s+)?(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                }
+            },
             "runOptions": {
                 "instanceLimit": 1
             }
@@ -367,8 +456,17 @@
             "command": "scripts/build.py ${input:firmware_board} ${input:firmware_build_type}",
             "options": { "cwd": "${workspaceFolder}" },
             "problemMatcher": {
-                "base": "$gcc",
-                "fileLocation": ["autoDetect", "${workspaceFolder}"]
+                "owner": "gcc",
+                "source": "gcc",
+                "fileLocation": ["autoDetect", "${workspaceFolder}"],
+                "pattern": {
+                    "regexp": "^(.*?):(\\d+):(\\d*):?\\s+(?:fatal\\s+)?(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                }
             },
             "group": "build"
         },
@@ -379,8 +477,17 @@
             "command": "scripts/build.py firmware --keep-going ${input:firmware_build_type}",
             "options": { "cwd": "${workspaceFolder}" },
             "problemMatcher": {
-                "base": "$gcc",
-                "fileLocation": ["autoDetect", "${workspaceFolder}"]
+                "owner": "gcc",
+                "source": "gcc",
+                "fileLocation": ["autoDetect", "${workspaceFolder}"],
+                "pattern": {
+                    "regexp": "^(.*?):(\\d+):(\\d*):?\\s+(?:fatal\\s+)?(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                }
             },
             "group": "build"
         },
@@ -400,8 +507,39 @@
             "command": "cmake --preset ${input:board}-debug && cmake --build --preset ${input:board}-debug",
             "options": { "cwd": "${workspaceFolder}" },
             "problemMatcher": {
-                "base": "$gcc",
-                "fileLocation": ["autoDetect", "${workspaceFolder}/build/${input:board}-debug"]
+                "owner": "gcc",
+                "source": "gcc",
+                "fileLocation": ["autoDetect", "${workspaceFolder}/build/${input:board}-debug"],
+                "pattern": {
+                    "regexp": "^(.*?):(\\d+):(\\d*):?\\s+(?:fatal\\s+)?(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                }
+            },
+            "hide": true
+        },
+        {
+            // Run by "[Firmware] Flash & Debug Bootloader" for the bootloader picked there
+            "label": "[Firmware] Build & Flash Debug Bootloader",
+            "type": "process",
+            "command": "python3",
+            "args": ["scripts/flash_bootloader.py", "${input:bootloader}", "--debug", "--build", "--server", "${input:gdbServer}"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": {
+                "owner": "gcc",
+                "source": "gcc",
+                "fileLocation": ["autoDetect", "${workspaceFolder}/build/${input:bootloader}-debug"],
+                "pattern": {
+                    "regexp": "^(.*?):(\\d+):(\\d*):?\\s+(?:fatal\\s+)?(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                }
             },
             "hide": true
         },
@@ -415,12 +553,9 @@
                 "-batch",
                 // Connect to the GDB server the debug session used, which halts the target
                 "-ex", "target extended-remote ${input:gdbServer}",
-                // Reset the MCU; J-Link leaves it halted afterwards, OpenOCD lets it run
-                "-ex", "monitor reset",
-                // Let it run on J-Link and pyOCD; OpenOCD rejects this
-                "-ex", "monitor go",
-                // Let it run on OpenOCD; J-Link rejects this
-                "-ex", "monitor resume",
+                // Reset the MCU and let it run, with the commands for that GDB server
+                "-ex", "source ${workspaceFolder}/.vscode/gdb/${input:gdbServerType}.gdb",
+                "-ex", "duet-reset-run",
                 // Disconnect, leaving the target running
                 "-ex", "detach"
             ],
@@ -448,6 +583,24 @@
             "problemMatcher": []
         },
         {
+            // Update the expansion boards' bootloaders over CAN through a main board (see scripts/deploy.py --bootloader)
+            "label": "[Firmware] Deploy Bootloaders (CAN)",
+            "type": "process",
+            "command": "python3",
+            "args": ["scripts/deploy.py", "-H", "${input:duetHost}", "firmware", "--password", "${input:duetPassword}", "--bootloader"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": []
+        },
+        {
+            // Flash a bootloader over SWD through OpenOCD's GDB server (see scripts/flash_bootloader.py)
+            "label": "[Firmware] Flash Bootloader (SWD)",
+            "type": "process",
+            "command": "python3",
+            "args": ["scripts/flash_bootloader.py", "${input:bootloaderPick}", "--server", "${input:gdbServerPrompt}", "--build"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": []
+        },
+        {
             "label": "[Firmware] Clean All Boards",
             "type": "process",
             "command": "python3",
@@ -463,8 +616,8 @@
             // A submodule on a detached HEAD stays detached
             "label": "[Git] Update Submodules",
             "type": "process",
-            "command": "git",
-            "args": ["submodule", "update", "--remote", "--merge"],
+            "command": "python3",
+            "args": ["scripts/submodule.py", "update"],
             "options": { "cwd": "${workspaceFolder}" },
             "problemMatcher": []
         },
@@ -472,8 +625,28 @@
             // Check out each submodule's tracked branch (see .gitmodules), so changes made there are committed to a branch
             "label": "[Git] Checkout Submodule Branches",
             "type": "process",
-            "command": "git",
-            "args": ["submodule", "foreach", "git switch $(git config -f $toplevel/.gitmodules submodule.$name.branch)"],
+            "command": "python3",
+            "args": ["scripts/submodule.py", "checkout"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": []
+        },
+        {
+            // Put each submodule on a branch whose tip is the commit it has checked out, preferring the tracked branch,
+            // so its files are unchanged
+            "label": "[Git] Attach Submodules to Branches",
+            "type": "process",
+            "command": "python3",
+            "args": ["scripts/submodule.py", "attach"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": []
+        },
+        {
+            // Switch each submodule that has the given branch to it and fast-forward it from origin, which can change the
+            // commit. The others are attached as above, and pulled too
+            "label": "[Git] Pull Submodules to Branch",
+            "type": "process",
+            "command": "python3",
+            "args": ["scripts/submodule.py", "attach", "--branch", "${input:submoduleBranch}", "--pull"],
             "options": { "cwd": "${workspaceFolder}" },
             "problemMatcher": []
         },
@@ -482,7 +655,7 @@
             "label": "[Git] Check Submodules",
             "type": "process",
             "command": "python3",
-            "args": ["scripts/doctor.py", "submodules"],
+            "args": ["scripts/submodule.py", "check"],
             "options": { "cwd": "${workspaceFolder}" },
             "problemMatcher": []
         },
@@ -512,9 +685,19 @@
             "label": "[Style] Check Formatting (both projects)",
             "type": "shell",
             "command": "cd ${workspaceFolder}/src/DuetCANMaster && clang-format --dry-run --Werror --style=file $(find src -name '*.cpp' -o -name '*.h' | grep -vE '^src/(libc|libcpp)/') && cd ${workspaceFolder}/src/DuetRealtimeCore && clang-format --dry-run --Werror --style=file $(find src harness tests -name '*.cpp' -o -name '*.h') && echo 'Formatting OK'",
-            "problemMatcher": [
-                "$gcc"
-            ],
+            "problemMatcher": {
+                "owner": "gcc",
+                "source": "gcc",
+                "fileLocation": ["autoDetect", "${workspaceFolder}"],
+                "pattern": {
+                    "regexp": "^(.*?):(\\d+):(\\d*):?\\s+(?:fatal\\s+)?(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                }
+            },
             "group": "test",
             "detail": "Non-mutating check; exits non-zero if anything would be reformatted. Suitable for CI."
         },
@@ -543,9 +726,19 @@
             "type": "shell",
             "command": "scripts/lint.py ${input:firmware_board}",
             "options": { "cwd": "${workspaceFolder}" },
-            "problemMatcher": [
-                "$gcc"
-            ],
+            "problemMatcher": {
+                "owner": "gcc",
+                "source": "gcc",
+                "fileLocation": ["autoDetect", "${workspaceFolder}"],
+                "pattern": {
+                    "regexp": "^(.*?):(\\d+):(\\d*):?\\s+(?:fatal\\s+)?(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                }
+            },
             "group": "test",
             "detail": "Regenerates the compile DB for the chosen board, then lints every project and library it builds. Report only. Do not add -fix: per-file fixing corrupts shared headers; see scripts/export_naming_fixes.py."
         },
@@ -553,9 +746,19 @@
             "label": "[Style] Tidy DuetRealtimeCore",
             "type": "shell",
             "command": "scripts/lint.py DuetRealtimeCore",
-            "problemMatcher": [
-                "$gcc"
-            ],
+            "problemMatcher": {
+                "owner": "gcc",
+                "source": "gcc",
+                "fileLocation": ["autoDetect", "${workspaceFolder}"],
+                "pattern": {
+                    "regexp": "^(.*?):(\\d+):(\\d*):?\\s+(?:fatal\\s+)?(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                }
+            },
             "group": "test",
             "detail": "Report only. Do not add -fix: per-file fixing corrupts shared headers."
         }

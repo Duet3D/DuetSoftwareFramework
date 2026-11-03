@@ -53,6 +53,7 @@ RUN apt-get update \
         ninja-build \
         cmake-curses-gui \
         python3 \
+        python3-argcomplete \
         pipx \
     && ln -s /usr/bin/python3 /usr/local/bin/python \
     && ln -s /usr/bin/python3 /usr/local/bin/py \

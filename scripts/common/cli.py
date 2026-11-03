@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any, TypeVar
 
 T = TypeVar('T')
@@ -17,8 +17,36 @@ def parser(doc: str | None, **kwargs: object) -> argparse.ArgumentParser:
                                    **kwargs)  # pyright: ignore[reportArgumentType]
 
 
+def complete(p: argparse.ArgumentParser) -> None:
+    """Answer a shell's completion request if argcomplete is installed (see scripts/completions/), which
+    exits; otherwise do nothing."""
+    try:
+        import argcomplete  # pyright: ignore[reportMissingTypeStubs]
+    except ImportError:
+        return
+    argcomplete.autocomplete(p)
+
+
+def complete_with(action: argparse.Action, values: Callable[[], Sequence[str]]) -> argparse.Action:
+    """Have argcomplete offer these values for an argument, worked out only when asked for."""
+    def completer(**_: object) -> Sequence[str]:
+        return values()
+    setattr(action, 'completer', completer)
+    return action
+
+
+def complete_with_prefix(action: argparse.Action,
+                         values: Callable[[str, argparse.Namespace], Sequence[str]]) -> argparse.Action:
+    """Have argcomplete offer values that depend on the word being completed and the arguments before it."""
+    def completer(prefix: str, parsed_args: argparse.Namespace, **_: object) -> Sequence[str]:
+        return values(prefix, parsed_args)
+    setattr(action, 'completer', completer)
+    return action
+
+
 def parse(p: argparse.ArgumentParser, argv: Sequence[str] | None = None) -> argparse.Namespace:
-    """Parse the command line, or the arguments given."""
+    """Parse the command line, or the arguments given, after answering any completion request."""
+    complete(p)
     return p.parse_args(argv)
 
 

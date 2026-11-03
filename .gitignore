@@ -288,6 +288,7 @@ src/LinuxApi/LinuxApi.xml
 !.vscode/launch.json
 !.vscode/tasks.json
 !.vscode/scripts
+!.vscode/gdb/
 
 # Source Generators
 src/DuetAPI/Generated

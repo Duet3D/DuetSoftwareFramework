@@ -22,6 +22,7 @@ class Board:
     preset: str
     project: str
     display: str
+    mcu: str  # the preset that selects its MCU's toolchain, e.g. SAME5x
 
     def variant(self, debug: bool) -> str:
         """The preset of the board's Release or Debug build."""
@@ -39,6 +40,7 @@ def load_boards() -> list[Board]:
     # DuetRealtimeCore's presets are in the same file, but it is a DSF project (see common/dsf.py)
     projects = {str(p['name']) for p in presets
                 if 'DUET_PROJECT' in cache_variables(p) and cache_variables(p)['DUET_PROJECT'] != REALTIME_CORE}
+    mcus = {str(p['name']) for p in presets if 'toolchainFile' in p}
     boards: list[Board] = []
     for p in presets:
         if p.get('hidden'):
@@ -47,7 +49,8 @@ def load_boards() -> list[Board]:
         project = next((i for i in inherits if i in projects), None)
         if project:
             name = str(p['name'])
-            boards.append(Board(name, project, str(p.get('displayName', name))))
+            mcu = next((i for i in inherits if i in mcus), '')
+            boards.append(Board(name, project, str(p.get('displayName', name)), mcu))
     return boards
 
 

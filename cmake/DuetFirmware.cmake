@@ -3,10 +3,13 @@
 include_guard(GLOBAL)
 
 # Run by duet_firmware_images to write an image's disassembly
-set(_duet_disassemble_script "${CMAKE_CURRENT_LIST_DIR}/disassemble.py")
+set(_duet_disassemble_script "${CMAKE_CURRENT_LIST_DIR}/../scripts/internal/disassemble.py")
 if(DUET_DISASSEMBLY)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
 endif()
+
+# Searched by duet_firmware_images for the SVD file describing the MCU's peripherals
+set(_duet_svd_dir "${CMAKE_CURRENT_LIST_DIR}/../lib/CoreN2G/src")
 
 # CrcAppender stamps a CRC on a firmware image (and can append a filesystem image to it). It is a
 # prebuilt host tool kept in scripts/internal, taken from PATH if it is there.
@@ -147,7 +150,8 @@ endfunction()
 # appended if CRC is given (after the files in <dir>, embedded as a filesystem image, if FILES is),
 # and <name>.hex if HEX is given, and its disassembly <name>.lst if DUET_DISASSEMBLY is on. Then print
 # the image's size. Also link them as vscode/firmware.elf and vscode/firmware.bin in the build tree,
-# the fixed paths the VS Code launch configurations debug and flash whichever board it builds.
+# the fixed paths the VS Code launch configurations debug and flash whichever board it builds, and
+# the SVD file for DUET_PART_DEFINE as vscode/device.svd, which they give the peripheral viewer.
 function(duet_firmware_images TARGET)
     cmake_parse_arguments(PARSE_ARGV 1 ARG "CRC;HEX" "FILES" "")
     if(ARG_UNPARSED_ARGUMENTS)
@@ -163,6 +167,21 @@ function(duet_firmware_images TARGET)
         file(RELATIVE_PATH _target "${CMAKE_BINARY_DIR}/vscode" "${_base}.${_ext}")
         file(CREATE_LINK "${_target}" "${CMAKE_BINARY_DIR}/vscode/firmware.${_ext}" SYMBOLIC)
     endforeach()
+    # The device packs name the SVD files after the part (__SAME51G19A__ is ATSAME51G19A.svd), and
+    # STM32CubeMX after the line. CoreN2G has none for the SAME70
+    if(DUET_PART_DEFINE STREQUAL "STM32H523xx")
+        set(_svd_name STM32H523.svd)
+    else()
+        string(REGEX REPLACE "^__(.+)__$" "AT\\1.svd" _svd_name "${DUET_PART_DEFINE}")
+    endif()
+    file(GLOB_RECURSE _svd "${_duet_svd_dir}/${_svd_name}")
+    if(_svd)
+        list(GET _svd 0 _svd)
+        file(RELATIVE_PATH _target "${CMAKE_BINARY_DIR}/vscode" "${_svd}")
+        file(CREATE_LINK "${_target}" "${CMAKE_BINARY_DIR}/vscode/device.svd" SYMBOLIC)
+    else()
+        file(REMOVE "${CMAKE_BINARY_DIR}/vscode/device.svd")
+    endif()
     set(_commands COMMAND "${CMAKE_OBJCOPY}" -O binary "${_elf}" "${_base}.bin")
     set(_images "${_base}.bin")
     if(ARG_HEX)

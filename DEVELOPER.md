@@ -172,8 +172,13 @@ The scripts in [scripts/](scripts/) are how everything is built, deployed, teste
 | `scripts/size.py` | Shows the memory the built firmware uses |
 | `scripts/codegen.py` | Generates, or checks, the CAN message formats |
 | `scripts/doctor.py` | Checks the tools, and that the submodules are checked out and on their branches |
+| `scripts/flash_bootloader.py` | Flashes a bootloader to an expansion or tool board over SWD |
+| `scripts/remote_control.py` | Runs codes, queries the object model and handles files on a board over HTTP, standalone or with an SBC |
+| `scripts/submodule.py` | Checks the submodules are on their tracked branches, and updates, checks out or attaches them |
 
 Each takes `--help`. They take the same targets: a DSF project (`DuetControlServer`, `DuetRealtimeCore`, ...), a firmware board named by its CMake preset (`EXP3HC`, `canmaster-Duet3_MB6HC`, with a `-debug` suffix for its Debug build), or a group (`dsf`, `firmware`, or a firmware project in full or as `canmaster`, `rrf`, `d3e`, `bootloader` or `iap`). `-x` leaves a target or group out, and builds are Release unless `--debug` is given.
+
+With [argcomplete](https://github.com/kislyuk/argcomplete) installed, the scripts tab-complete their options and the target names. Source the file for your shell from its startup file: `scripts/completions/dsf.fish` from `config.fish`, `scripts/completions/dsf.zsh` from `.zshrc` after `compinit`, or `scripts/completions/dsf.bash` from `.bashrc`. The devcontainer does this for all three.
 
 ## Build Using VS Code Tasks
 
@@ -293,6 +298,15 @@ This installs Microsoft vsdbg on the remote machine for debugging scenarios.
 
 The task definitions are in [.vscode/tasks.json](.vscode/tasks.json) if you want to inspect or extend them.
 
+`scripts/remote_control.py` drives a board over HTTP:
+
+```bash
+scripts/remote_control.py -H <pi> info                  # board, firmware and connection summary
+scripts/remote_control.py -H <pi> code M122             # run a code and print its reply
+scripts/remote_control.py -H <pi> model boards          # query the object model
+scripts/remote_control.py -H <pi> put test.gcode        # upload a file to /gcodes
+```
+
 ## Build the Firmware
 
 The firmware projects build from the repository root with one toolchain, against the shared libraries in `lib/`:
@@ -335,7 +349,7 @@ scripts/lint.py EXP3HC -f src/Duet3Expansion/src/Movement/Move.cpp
 scripts/lint.py canmaster --naming-fixes               # export renames across every DuetCANMaster board
 ```
 
-`scripts/deploy.py` also deploys the firmware of a main board and the CAN boards connected to it, building it first with `--build`. It uploads the files over the rr_ HTTP API, which RepRapFirmware serves on a standalone main board (as on the regression suite's `rrf` bench) and DSF serves on a Pi, then updates the boards with M997. On a Pi the main board's firmware is DuetCANMaster's.
+`scripts/deploy.py` also deploys the firmware of a main board and the CAN boards connected to it, building it first with `--build`. It uploads the files over the REST API, then updates the boards with M997.
 
 ```bash
 scripts/deploy.py -H duet3.local firmware               # every connected board
@@ -345,11 +359,36 @@ scripts/deploy.py -H duet3.local firmware --dry-run      # show what it would do
 scripts/deploy.py -H <pi> dsf firmware --build           # DSF, then the firmware through it, to a Pi
 ```
 
+### Bootloaders
+
+The expansion and tool boards' bootloaders can be deployed two ways.
+
+**Over CAN**, for a board that already has a working bootloader and is running Release firmware. `--bootloader` uploads the bootloader each expansion board asks for and updates it with `M997 B<address> S3`. The boards' firmware and the main board are left alone:
+
+```bash
+scripts/deploy.py -H duet3.local firmware --bootloader           # every expansion board
+scripts/deploy.py -H duet3.local EXP3HC --bootloader             # only the 3HCs
+scripts/deploy.py -H duet3.local firmware --bootloader --build   # build the bootloaders they need first
+```
+
+The STM32 boards (NodeTrix) cannot update their bootloader over CAN yet. A main board running as an expansion board has no bootloader. Its firmware is updated by its CAN IAP (`Duet3_CANiap32_<board>.bin`, built by the `bootloader-Duet3_*` presets), which it loads from its own SD card, so copy that file to its `/firmware` directory yourself.
+
+**Over SWD**, for a new or broken board, or an STM32 one. `scripts/flash_bootloader.py` flashes a bootloader through OpenOCD's GDB server (see [Debug the Firmware](#debug-the-firmware)). It checks that the board has the right MCU, has OpenOCD clear the BOOTPROT protection the firmware puts on the bootloader, writes the bootloader with GDB, reads it back to check it, and restarts the board. GDB prints each command as it runs it:
+
+```bash
+scripts/flash_bootloader.py bootloader-SAME5x --build                        # EXP3HC, EXP1HCL, TOOL1RR, M23CL, …
+scripts/flash_bootloader.py bootloader-SAMC21 -s host.docker.internal:3333   # TOOL1LC, EXP1XD, SZP, on another port
+```
+
+A board with a bootloader but no firmware fetches its firmware from the main board over CAN when it starts, so `scripts/deploy.py` can then update it as usual. The **[Firmware] Deploy Bootloaders (CAN)** and **[Firmware] Flash Bootloader (SWD)** tasks run these.
+
 ## Debug the Firmware
 
-The **[Firmware] Build, Flash & Debug** launch configuration builds the Debug preset for the DuetCANMaster, RepRapFirmware or Duet3Expansion board you pick, flashes it through a GDB server, and starts debugging. **[Firmware] Debug Only** attaches without rebuilding. When either session ends, the board is reset and left running. The image is flashed from the `.bin` rather than the `.elf`, because only the `.bin` carries the CRC the bootloaders check.
+The **[Firmware] Build, Flash & Debug** launch configuration builds the Debug preset for the DuetCANMaster, RepRapFirmware or Duet3Expansion board you pick, flashes it through a GDB server, and starts debugging, through the [Cortex-Debug](https://marketplace.visualstudio.com/items?itemName=marus25.cortex-debug) extension. **[Firmware] Debug Only** attaches without rebuilding, and **[Firmware] Flash & Debug Bootloader** flashes the Debug build of a bootloader with `scripts/flash_bootloader.py` and debugs it. The image is flashed from the `.bin` rather than the `.elf`, because only the `.bin` carries the CRC the bootloaders check.
 
-You start the GDB server yourself, normally on the host outside the devcontainer, because that is where the probe is plugged in. The launch configurations ask for its address, which defaults to `host.docker.internal:2331`; the commands below all listen on port 2331. They send `monitor reset` and `monitor halt`, which J-Link, OpenOCD and pyOCD all accept. When a session ends, the **[Firmware] Restart Firmware** task reconnects, sends `monitor reset`, then `monitor go` (J-Link, pyOCD) and `monitor resume` (OpenOCD) to let the board run, and detaches; the server rejects whichever of the two it does not know.
+You start the GDB server yourself, normally on the host outside the devcontainer, because that is where the probe is plugged in. The launch configurations ask for its address, which defaults to `host.docker.internal:2331`, and which server it is: `jlink`, `openocd` or `pyocd`. The commands below all listen on port 2331, so the default works for each of them. The launch configurations stop the board at its reset vector, before the bootloader runs, so that breakpoints in the startup code are hit. Each server resets differently, so they run the commands in that server's script in [.vscode/gdb](.vscode/gdb). When a session ends, the **[Firmware] Restart Firmware** task resets the board with the same script and leaves it running.
+
+The **XPERIPHERALS** view shows the MCU's registers, from the SVD file that configuring a board links as `vscode/device.svd` in its build tree. CoreN2G has no SVD file for the SAME70, so the view is empty for the main boards.
 
 On Linux, a connection from the container to `host.docker.internal` comes from the Docker bridge rather than from localhost, so the server must listen on all interfaces: that is what `-LocalhostOnly 0`, `bindto 0.0.0.0` and `--allow-remote` below are for. Docker Desktop on Windows and macOS delivers the connection to localhost, so those options are not needed there.
 
@@ -357,36 +396,84 @@ Each tool names the MCU differently:
 
 | Board | MCU | J-Link `-device` | OpenOCD target | pyOCD `-t` |
 | --- | --- | --- | --- | --- |
-| canmaster-Duet3_MB6HC, canmaster-Duet3_MB6XD, Duet3_MB6HC, Duet3_MB6XD, Duet3_CAN0, Duet3_MB6HC_no_SD | SAME70Q20B | `ATSAME70Q20B` | `target/atsamv.cfg` | `atsame70q20b` |
-| Duet3Mini5plus | SAME54P20A | `ATSAME54P20A` | `target/atsame5x.cfg` | `atsame54p20a` |
-| EXP3HC | SAME51N19A | `ATSAME51N19A` | `target/atsame5x.cfg` | `atsame51n19a` |
-| EXP1HCL, M23CL, F3PTB, TOOL1RR | SAME51G19A | `ATSAME51G19A` | `target/atsame5x.cfg` | `atsame51g19a` |
-| TOOLINDX | SAME51J19A | `ATSAME51J19A` | `target/atsame5x.cfg` | `atsame51j19a` |
-| EXP1XD, TOOL1LC, SAMMYC21, SZP | SAMC21G18A | `ATSAMC21G18A` | `target/at91samdXX.cfg` | `atsamc21g18a` |
-| NodeTrix | STM32H523RE | `STM32H523RE` | `target/stm32h5x.cfg` | `stm32h523retx` |
+| canmaster-Duet3_MB6HC, canmaster-Duet3_MB6XD, Duet3_MB6HC, Duet3_MB6XD, Duet3_CAN0, Duet3_MB6HC_no_SD | SAME70Q20B | `ATSAME70Q20B` | `target/atsamv.cfg`* | `atsame70q20b`* |
+| Duet3Mini5plus | SAME54P20A | `ATSAME54P20A`* | `target/atsame5x.cfg`* | `atsame54p20a`* |
+| EXP3HC | SAME51N19A | `ATSAME51N19A` | `target/atsame5x.cfg` | `atsame51n19a`* |
+| EXP1HCL, M23CL, F3PTB, TOOL1RR | SAME51G19A | `ATSAME51G19A` | `target/atsame5x.cfg` | `atsame51g19a`* |
+| TOOLINDX | SAME51J19A | `ATSAME51J19A`* | `target/atsame5x.cfg`* | `atsame51j19a`* |
+| EXP1XD, TOOL1LC, SAMMYC21, SZP | SAMC21G18A | `ATSAMC21G18A`* | `target/at91samdXX.cfg`* | `atsamc21g18a`* |
+| NodeTrix | STM32H523RE | `STM32H523RE`* | `target/stm32h5x.cfg`* | `stm32h523retx`* |
 
-A board's bootloader and IAP builds run on the same MCU as its firmware.
+_\* These boards have not been tested yet with that tool._
 
-**SEGGER J-Link**: install the [J-Link Software and Documentation Pack](https://www.segger.com/downloads/jlink/), then run (on Windows, `JLinkGDBServerCL.exe` with the same arguments):
+A board's bootloader and IAP builds run on the same MCU as its firmware. `scripts/flash_bootloader.py` and **[Firmware] Flash & Debug Bootloader** only work through OpenOCD, which clears the BOOTPROT protection the firmware puts on the bootloader, so use OpenOCD for them whatever the probe, a J-Link included.
+
+### OpenOCD (recommended)
+
+OpenOCD supports most probes. Pick the interface file for the probe and the target file from the table above:
+
+| Probe | Interface file |
+| --- | --- |
+| ST-LINK V2/V3 | `interface/stlink-dap.cfg` |
+| Atmel-ICE, Microchip PICkit 4, MPLAB Snap | `interface/cmsis-dap.cfg` |
+| Raspberry Pi Debug Probe, DAPLink, other CMSIS-DAP | `interface/cmsis-dap.cfg` |
+| J-Link | `interface/jlink.cfg` |
+
+```bash
+openocd -f <interface_file> -c "transport select swd" -f <target_file> -c "bindto 0.0.0.0" -c "gdb_port 2331"
+```
+
+For example, an Atmel-ICE debugging an EXP1HCL:
+
+```bash
+openocd -f interface/cmsis-dap.cfg -c "transport select swd" -f target/atsame5x.cfg \
+        -c "bindto 0.0.0.0" -c "gdb_port 2331"
+```
+
+`interface/stlink-dap.cfg` drives the ST-LINK as a plain debug probe, which needs ST-LINK firmware V2J24 or newer; update older firmware with STM32CubeProgrammer. `interface/stlink.cfg` selects the ST-LINK's older high-level mode instead, which fails on `target/stm32h5x.cfg` with "The selected transport doesn't support this target". `target/stm32h5x.cfg` needs OpenOCD 0.12 or newer. Depending on the OpenOCD version, `gdb port` may be needed instead of `gdb_port`.
+
+If OpenOCD stops at `Error connecting DP: cannot read IDR` although the probe sees the board, the code running on it may block a normal connection, for example by driving LEDs from the SWD pins (see below). Connect while holding the board in reset instead, which needs the probe's reset line connected to the board. OpenOCD releases the reset once it is ready, so the code runs again before GDB connects; make OpenOCD halt the board at its reset vector when GDB connects, or it rejects the connection. Add this after the target file:
+
+```bash
+-c "reset_config srst_only srst_nogate connect_assert_srst" -c "[target current] configure -event gdb-attach { reset halt }"
+```
+
+The `target/stm32h5x.cfg` in STMicroelectronics' OpenOCD (tested with 0.12.0+dev-00664) reads registers with `mem2array`, which that OpenOCD rejects on the target it uses, so its setup after connecting fails with `Error executing event examine-end`. That setup keeps the debugger working while the MCU is in a low-power mode and stops the watchdogs while it is halted. Add this after the target file to replace the failing command:
+
+```bash
+-c 'proc stm32h5x_mrw {used_target reg} { return [$used_target read_memory $reg 32 1] }'
+```
+
+### Boards with LEDs on the SWD pins
+
+Most Duet 3 boards drive their status LEDs from the SWD pins, and a Release build of the firmware takes those pins over as soon as it runs, which locks a debugger out:
+
+- Main boards: Duet3_MB6HC, Duet3_MB6XD, Duet3Mini5plus
+- Expansion and tool boards: EXP1HCL, F3PTB, TOOL1RR, TOOLINDX, SZP, NodeTrix, and EXP3HC from v1.03 and TOOL1LC from v1.1 unless a debugger is attached when they start
+
+Debug builds leave the SWD pins alone. So **[Firmware] Build, Flash & Debug** and **[Firmware] Flash & Debug Bootloader** need the connect under reset above whenever the board may be running a Release build, and **[Firmware] Debug Only** reaches a running Debug build without it.
+
+Expansion and tool boards start their bootloader after every reset, before the firmware. A current bootloader leaves the SWD pins alone in a Debug build or, on the SAME5x and SAMC21, when a debugger is attached as the board starts, and on the STM32H5 it gives them back before starting the firmware. Older bootloaders keep the LEDs on the SWD pins, so the firmware cannot be debugged behind them: update the bootloader first (see [Bootloaders](#bootloaders)). Over CAN, which a Debug build of the firmware ignores, the board must be running a Release build. A Release bootloader on the NodeTrix still drives its LEDs until it starts the firmware, so the debugger loses the board for that moment after each reset.
+
+### SEGGER J-Link
+
+Install the [J-Link Software and Documentation Pack](https://www.segger.com/downloads/jlink/), then run (on Windows, `JLinkGDBServerCL.exe` with the same arguments, or the J-Link GDB Server GUI):
 
 ```bash
 JLinkGDBServer -device ATSAME70Q20B -if SWD -speed 4000 -port 2331 -LocalhostOnly 0
 ```
 
-**OpenOCD** supports most probes: `interface/stlink.cfg` for ST-LINK V2/V3, `interface/cmsis-dap.cfg` for Atmel-ICE, PICkit 4, MPLAB Snap, the Raspberry Pi Debug Probe and other CMSIS-DAP probes, and `interface/jlink.cfg` for J-Link. ST-LINK firmware older than V2J24 only works with STM32 targets, and `target/stm32h5x.cfg` needs OpenOCD 0.12 or newer.
+### pyOCD
 
-```bash
-openocd -f interface/cmsis-dap.cfg -c "transport select swd" -f target/atsamv.cfg \
-        -c "bindto 0.0.0.0" -c "gdb_port 2331"
-```
-
-**pyOCD** needs the device's CMSIS pack, which it installs once. `pyocd list` shows the connected probes; add `-u <unique id>` to choose one when there are several.
+pyOCD is untested here. It needs the device's CMSIS pack, which it installs once. `pyocd list` shows the connected probes; add `-u <unique id>` to choose one when there are several.
 
 ```bash
 pip install pyocd
 pyocd pack install atsame70q20b
 pyocd gdbserver -t atsame70q20b --port 2331 --allow-remote
 ```
+
+### Checking the connection
 
 To check the server without VS Code, connect from a terminal in the devcontainer:
 
@@ -514,9 +601,10 @@ The firmware projects and libraries in `src/` and `lib/` are submodules, each tr
 - Change submodule code in its own repository first: branch, commit and open a PR there.
 - Submodules check out at a detached `HEAD`, where commits are easily lost. Before editing one, switch it to its tracked branch with the **[Git] Checkout Submodule Branches** task, then make a feature branch.
 - Push submodule commits **before** pushing the commit here that points at them, otherwise nobody else can check it out. `git config push.recurseSubmodules check` (below) enforces this.
-- Before merging, point the submodule at a commit on its tracked branch, not at an unmerged feature branch. CI enforces this on PRs; check it locally with the **[Git] Check Submodules** task (`scripts/doctor.py submodules`).
+- Before merging, point the submodule at a commit on its tracked branch, not at an unmerged feature branch. CI enforces this on PRs; check it locally with the **[Git] Check Submodules** task (`scripts/submodule.py check`, which `scripts/doctor.py submodules` also runs).
 - After pulling, run `git submodule update --init --recursive`, or set `submodule.recurse true`.
-- The **[Git] Update Submodules** task moves every submodule to the tip of its tracked branch (`git submodule update --remote --merge`), merging into local work rather than discarding it. Commit the new pointers.
+- The **[Git] Update Submodules** task moves every submodule to the tip of its tracked branch (`scripts/submodule.py update`), merging into local work rather than discarding it. Commit the new pointers.
+- **[Git] Attach Submodules to Branches** (`scripts/submodule.py attach`) puts each submodule on a branch ending at the commit it has checked out, without changing its files, and **[Git] Pull Submodules to Branch** (`attach --branch <name> --pull`) switches those that have the branch to it and fast-forwards it from origin.
 
 These settings make submodules easier to work with. Run them on the host to keep them across container rebuilds and for other projects, or leave out `--global` to set them for this repository only:
 

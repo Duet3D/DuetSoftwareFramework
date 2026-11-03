@@ -130,56 +130,69 @@
         // Firmware: any DuetCANMaster, RepRapFirmware or Duet3Expansion board, picked from CMakePresets.json
         // ---------------------------------------------------------------
         {
+            // The GDB server runs on the host, outside the devcontainer, so cortex-debug connects to it as an external
+            // server and leaves out the commands it would send to one it started itself. The script for the server
+            // picked defines duet-reset-halt, which halts the MCU at its reset vector, before the bootloader runs, so
+            // that breakpoints in the startup code are hit
             "name": "[Firmware] Build, Flash & Debug",
-            "type": "cppdbg",
+            "type": "cortex-debug",
             "request": "launch",
-            "program": "${workspaceFolder}/build/${input:board}-debug/vscode/firmware.elf",
+            "servertype": "external",
+            "gdbTarget": "${input:gdbServer}",
+            "executable": "${workspaceFolder}/build/${input:board}-debug/vscode/firmware.elf",
+            "svdFile": "${workspaceFolder}/build/${input:board}-debug/vscode/device.svd",
             "cwd": "${workspaceFolder}",
-            "MIMode": "gdb",
-            "miDebuggerPath": "arm-none-eabi-gdb",
-            "miDebuggerServerAddress": "${input:gdbServer}",
             "preLaunchTask": "[Firmware] Build Debug Firmware",
-            "launchCompleteCommand": "exec-continue",
             "postDebugTask": "[Firmware] Restart Firmware",
-            "setupCommands": [
-                {
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                }
+            // Flash the .bin rather than the .elf: only the .bin has the CRC that the bootloaders check before starting
+            // the firmware
+            "overrideLaunchCommands": [
+                "source ${workspaceFolder}/.vscode/gdb/${input:gdbServerType}.gdb",
+                "duet-reset-halt",
+                "set gnutarget binary",
+                "eval \"load ${workspaceFolder}/build/${input:board}-debug/vscode/firmware.bin 0x%x\", &_sfixed",
+                "set gnutarget auto",
+                "duet-reset-halt"
             ],
-            // Flash the .bin rather than the .elf: only the .bin has the CRC that the bootloaders check before starting the firmware
-            "postRemoteConnectCommands": [
-                { "text": "monitor reset" },
-                { "text": "monitor halt" },
-                { "text": "set gnutarget binary" },
-                { "text": "eval \"load ${workspaceFolder}/build/${input:board}-debug/vscode/firmware.bin 0x%x\", &_sfixed" },
-                { "text": "set gnutarget auto" },
-                { "text": "monitor reset" },
-                { "text": "monitor halt" }
-            ]
+            "overrideRestartCommands": ["duet-reset-halt"]
         },
         {
-            // Debugs the image already built in the board's Debug build tree.
+            // Debugs the image already built in the board's Debug build tree, restarting it from the reset vector as
+            // Build, Flash & Debug does
             "name": "[Firmware] Debug Only",
-            "type": "cppdbg",
+            "type": "cortex-debug",
             "request": "launch",
-            "program": "${workspaceFolder}/build/${input:board}-debug/vscode/firmware.elf",
+            "servertype": "external",
+            "gdbTarget": "${input:gdbServer}",
+            "executable": "${workspaceFolder}/build/${input:board}-debug/vscode/firmware.elf",
+            "svdFile": "${workspaceFolder}/build/${input:board}-debug/vscode/device.svd",
             "cwd": "${workspaceFolder}",
-            "MIMode": "gdb",
-            "miDebuggerPath": "arm-none-eabi-gdb",
-            "miDebuggerServerAddress": "${input:gdbServer}",
-            "launchCompleteCommand": "None",
             "postDebugTask": "[Firmware] Restart Firmware",
-            "setupCommands": [
-                {
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                }
+            "overrideLaunchCommands": [
+                "source ${workspaceFolder}/.vscode/gdb/${input:gdbServerType}.gdb",
+                "duet-reset-halt"
             ],
-            "postRemoteConnectCommands": [
-                { "text": "monitor reset" },
-                { "text": "monitor halt" }
-            ]
+            "overrideRestartCommands": ["duet-reset-halt"]
+        },
+        {
+            // Flashes the bootloader with scripts/flash_bootloader.py, as GDB's load cannot write it while the
+            // firmware has it protected, then restarts the board and halts it before the bootloader runs.
+            // Like the script, it needs OpenOCD as the GDB server
+            "name": "[Firmware] Flash & Debug Bootloader",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "external",
+            "gdbTarget": "${input:gdbServer}",
+            "executable": "${workspaceFolder}/build/${input:bootloader}-debug/vscode/firmware.elf",
+            "svdFile": "${workspaceFolder}/build/${input:bootloader}-debug/vscode/device.svd",
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "[Firmware] Build & Flash Debug Bootloader",
+            "postDebugTask": "[Firmware] Restart Firmware",
+            "overrideLaunchCommands": [
+                "source ${workspaceFolder}/.vscode/gdb/${input:openocdServerType}.gdb",
+                "duet-reset-halt"
+            ],
+            "overrideRestartCommands": ["duet-reset-halt"]
         },
         {
             "name": "[Firmware] Debug deploy.py",
@@ -211,6 +224,53 @@
                     "description": "content.configurePresets.filter(p => !p.hidden && !p.name.endsWith('-debug') && ['DuetCANMaster', 'RepRapFirmware', 'Duet3Expansion'].includes(p.inherits[0]))[__itemIdx__].displayName",
                     "value": "content.configurePresets.filter(p => !p.hidden && !p.name.endsWith('-debug') && ['DuetCANMaster', 'RepRapFirmware', 'Duet3Expansion'].includes(p.inherits[0]))[__itemIdx__].name"
                 }
+            }
+        },
+        {
+            // The bootloaders are the Duet3Bootloader presets in CMakePresets.json, less the main boards' CAN IAPs, as in
+            // tasks.json and scripts/flash_bootloader.py; the pick is remembered for the flash task, and shared with the
+            // [Firmware] Flash Bootloader (SWD) task
+            "id": "bootloader",
+            "type": "command",
+            "command": "extension.commandvariable.pickStringRemember",
+            "args": {
+                "description": "Bootloader to debug",
+                "key": "bootloader",
+                "addLabelToTop": "${remember:bootloader}",
+                "fileName": "${workspaceFolder}/CMakePresets.json",
+                "fileFormat": "json",
+                "jsonOption": {
+                    "label": "content.configurePresets.filter(p => !p.hidden && !p.name.endsWith('-debug') && p.inherits[0] === 'Duet3Bootloader' && !p.displayName.includes('CAN IAP'))[__itemIdx__].name",
+                    "description": "content.configurePresets.filter(p => !p.hidden && !p.name.endsWith('-debug') && p.inherits[0] === 'Duet3Bootloader' && !p.displayName.includes('CAN IAP'))[__itemIdx__].displayName",
+                    "value": "content.configurePresets.filter(p => !p.hidden && !p.name.endsWith('-debug') && p.inherits[0] === 'Duet3Bootloader' && !p.displayName.includes('CAN IAP'))[__itemIdx__].name"
+                }
+            }
+        },
+        {
+            // Names the script in .vscode/gdb with the commands for the GDB server
+            "id": "gdbServerType",
+            "type": "command",
+            "command": "extension.commandvariable.pickStringRemember",
+            "args": {
+                "description": "GDB server",
+                "key": "gdbServerType",
+                "addLabelToTop": "${remember:gdbServerType}",
+                "options": [
+                    { "label": "jlink", "description": "SEGGER J-Link GDB Server", "value": "jlink" },
+                    { "label": "openocd", "description": "OpenOCD", "value": "openocd" },
+                    { "label": "pyocd", "description": "pyOCD", "value": "pyocd" }
+                ]
+            }
+        },
+        {
+            // For [Firmware] Flash & Debug Bootloader, which always uses OpenOCD: remembers it as the GDB server, for the
+            // [Firmware] Restart Firmware task, without asking
+            "id": "openocdServerType",
+            "type": "command",
+            "command": "extension.commandvariable.remember",
+            "args": {
+                "store": { "gdbServerType": "openocd" },
+                "key": "gdbServerType"
             }
         },
         {

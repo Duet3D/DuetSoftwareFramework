@@ -15,6 +15,7 @@ import argparse
 import sys
 from dataclasses import dataclass, field
 
+from common.cli import complete_with
 from common.dsf import PROJECTS, TRACY
 from common.firmware import Board, load_boards
 
@@ -55,15 +56,28 @@ def groups(boards: list[Board]) -> dict[str, list[str]]:
     return found
 
 
+def names() -> list[str]:
+    """Every name a target can be given by, for completion: the groups, the DSF projects, and each board's
+    Release and Debug presets."""
+    boards = load_boards()
+    return [*groups(boards), *PROJECTS, TRACY, *(b.variant(debug) for b in boards for debug in (False, True))]
+
+
+def board_names() -> list[str]:
+    """The boards' Release presets, for completion."""
+    return [b.preset for b in load_boards()]
+
+
 def add_target_arguments(parser: argparse.ArgumentParser, kinds: tuple[str, ...] = (DSF, FIRMWARE),
                          every: bool = True) -> None:
     """The arguments that choose targets: names and groups, --all and --exclude."""
     what = ' or '.join({DSF: 'DSF projects', FIRMWARE: 'firmware boards'}[k] for k in kinds)
-    parser.add_argument('targets', nargs='*', metavar='TARGET', help=f'{what}, or groups of them (see scripts/list.py)')
+    complete_with(parser.add_argument('targets', nargs='*', metavar='TARGET',
+                                      help=f'{what}, or groups of them (see scripts/list.py)'), names)
     if every:
         parser.add_argument('-a', '--all', action='store_true', help=f'every one of the {what}')
-    parser.add_argument('-x', '--exclude', action='append', default=[], metavar='TARGET',
-                        help='leave out a target or a group (repeatable)')
+    complete_with(parser.add_argument('-x', '--exclude', action='append', default=[], metavar='TARGET',
+                                      help='leave out a target or a group (repeatable)'), names)
 
 
 def _resolve(name: str, boards: list[Board], found: dict[str, list[str]]) -> list[str]:

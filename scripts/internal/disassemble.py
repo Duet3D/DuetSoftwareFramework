@@ -7,8 +7,8 @@ marks the instruction it lands on. So each function's targets are numbered .L1, 
 order, a line with the label is put before the target instruction, and the branches name the label
 in place of the offset. The addresses are kept, to match those in software reset data.
 
-    cmake/disassemble.py <objdump> <image>.elf <image>.lst
-    cmake/disassemble.py <objdump> <image>.elf <image>.lst --no-labels    objdump's output as it is
+    scripts/internal/disassemble.py <objdump> <image>.elf <image>.lst
+    scripts/internal/disassemble.py <objdump> <image>.elf <image>.lst --no-labels    objdump's output as it is
 
 The build runs this after linking when it is configured with -DDUET_DISASSEMBLY=ON, without the
 labels if also with -DDUET_DISASSEMBLY_LABELS=OFF.
