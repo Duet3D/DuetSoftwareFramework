@@ -31,7 +31,13 @@ namespace DuetControlServer.Motion.Kinematics;
 /// effective spool radius grows as line winds onto it and steps per mm therefore vary with position;
 /// this engine uses the constant-radius model, which is the branch RepRapFirmware itself takes when
 /// the buildup factor is zero. The second is flex compensation, which needs the mover's weight and the
-/// lines' spring constants; RepRapFirmware leaves it off unless it has been given those
+/// lines' spring constants; RepRapFirmware leaves it off unless it has been given those.
+/// </para>
+/// <para>
+/// The effector position is in the axes lettered X, Y and Z, and the first three anchors' motors are
+/// those axes' drives, wherever M584 put them. The fourth and later anchors' motors are the drives of
+/// the axes lettered U, V, W, A and B in turn, which is where RepRapFirmware's fourth axis onwards are
+/// when config.g creates them in one M584: the wiki's four-anchor config.g creates U for the D anchor
 /// </para>
 /// </remarks>
 internal sealed class HangprinterKinematicsEngine : KinematicsEngine
@@ -61,7 +67,7 @@ internal sealed class HangprinterKinematicsEngine : KinematicsEngine
     private readonly float[] _distancesOrigin = new float[MaxAnchors];
 
     /// <summary>Number of anchors, which is the number of line motors</summary>
-    public int NumAnchors { get; }
+    private int NumAnchors { get; }
 
     /// <summary>How far from the centre the effector may go, mm</summary>
     public float PrintRadius { get; }
@@ -71,14 +77,21 @@ internal sealed class HangprinterKinematicsEngine : KinematicsEngine
 
     /// <inheritdoc />
     /// <remarks>
+    /// One per anchor: X, Y and Z for the first three, then U, V, W, A and B. These are the axes whose
+    /// drives wind the lines, not the letters M669 names the anchors by
+    /// </remarks>
+    protected override string KinematicAxisLetters => FirstAxisLetters(NumAnchors);
+
+    /// <inheritdoc />
+    /// <remarks>
     /// M669 is not ported for this geometry - the object model cannot express the line buildup and
     /// flex compensation its parameters carry, so a partial port would describe a machine that is not
     /// the configured one. What the geometry does have is still projected, so the object model
     /// describes the constant-radius machine actually being planned for
     /// </remarks>
-    public override void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics)
+    public override void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics, Move move)
     {
-        base.WriteTo(kinematics);
+        base.WriteTo(kinematics, move);
 
         HangprinterKinematics hangprinter = (HangprinterKinematics)kinematics;
         hangprinter.PrintRadius = PrintRadius;
@@ -104,7 +117,7 @@ internal sealed class HangprinterKinematicsEngine : KinematicsEngine
     /// </remarks>
     public override uint MustBeHomedAxes(uint axesMoving, bool disallowMovesBeforeHoming)
     {
-        const uint xyzAxes = 0b111;             // X, Y and Z, which the four lines position together
+        uint xyzAxes = Axes.XyzBitmap;          // X, Y and Z, which the four lines position together
         return (axesMoving & xyzAxes) != 0 ? axesMoving | xyzAxes : axesMoving;
     }
 
@@ -112,20 +125,17 @@ internal sealed class HangprinterKinematicsEngine : KinematicsEngine
     /// <inheritdoc />
     /// <remarks>
     /// Naming X, Y and Z pins every spool motor down, the anchors beyond the third included;
-    /// naming fewer pins none of them
+    /// naming fewer pins none of them, and a machine missing one of the three can never name them all
     /// </remarks>
     public override uint AxesAssumedHomed(uint g92Axes)
     {
-        const uint xyzAxes = 0b111;
-        if ((g92Axes & xyzAxes) != xyzAxes)
+        KinematicAxes kinematic = Kinematic;
+        uint xyzAxes = kinematic.Machine.XyzBitmap;
+        if (!kinematic.IsComplete || (g92Axes & xyzAxes) != xyzAxes)
         {
             return g92Axes & ~xyzAxes;
         }
-        for (int anchor = 3; anchor < NumAnchors; anchor++)
-        {
-            g92Axes |= 1u << anchor;
-        }
-        return g92Axes;
+        return g92Axes | kinematic.Bitmap;
     }
 
 
@@ -163,17 +173,6 @@ internal sealed class HangprinterKinematicsEngine : KinematicsEngine
     public static HangprinterKinematicsEngine CreateDefault()
         => new([[0.0f, -2000.0f, -100.0f], [2000.0f, 1000.0f, -100.0f], [-2000.0f, 1000.0f, -100.0f], [0.0f, 0.0f, 3000.0f]]);
 
-    /// <summary>Where an anchor is, mm</summary>
-    /// <param name="anchor">Anchor number</param>
-    /// <param name="axis">0 for X, 1 for Y, 2 for Z</param>
-    /// <returns>The coordinate</returns>
-    public float GetAnchor(int anchor, int axis) => _anchors[anchor, axis];
-
-    /// <summary>How long a line is when the effector is at the origin, mm</summary>
-    /// <param name="anchor">Anchor number</param>
-    /// <returns>The length</returns>
-    public float GetDistanceAtOrigin(int anchor) => _distancesOrigin[anchor];
-
     /// <inheritdoc />
     /// <remarks>
     /// Only the line motors are converted. RepRapFirmware does the same: on a hangprinter the drives
@@ -187,20 +186,28 @@ internal sealed class HangprinterKinematicsEngine : KinematicsEngine
         Span<int> motorPos,
         bool isCoordinated = false)
     {
-        if (machinePos.Length < 3)
+        KinematicAxes kinematic = Kinematic;
+        AxisIndices axes = kinematic.Machine;
+        if (!kinematic.IsComplete || !axes.XyzFitIn(machinePos.Length))
         {
             return NativeMovementError.UnreachablePosition;
         }
 
         NativeMovementError result = NativeMovementError.Ok;
-        int limit = Math.Min(NumAnchors, Math.Min(motorPos.Length, stepsPerMm.Length));
+        float x = machinePos[axes.X], y = machinePos[axes.Y], z = machinePos[axes.Z];
 
-        for (int anchor = 0; anchor < limit; anchor++)
+        for (int anchor = 0; anchor < NumAnchors; anchor++)
         {
-            float linePos = DistanceToAnchor(machinePos[0], machinePos[1], machinePos[2], anchor) - _distancesOrigin[anchor];
-            if (TryRoundToInt32(linePos * stepsPerMm[anchor], out int steps))
+            int drive = kinematic.Roles[anchor];
+            if (drive < 0 || drive >= motorPos.Length || drive >= stepsPerMm.Length)
             {
-                motorPos[anchor] = steps;
+                continue;
+            }
+
+            float linePos = DistanceToAnchor(x, y, z, anchor) - _distancesOrigin[anchor];
+            if (TryRoundToInt32(linePos * stepsPerMm[drive], out int steps))
+            {
+                motorPos[drive] = steps;
             }
             else
             {
@@ -223,37 +230,38 @@ internal sealed class HangprinterKinematicsEngine : KinematicsEngine
         int numTotalAxes,
         Span<float> machinePos)
     {
-        if (machinePos.Length < 3 || motorPos.Length < NumAnchors || stepsPerMm.Length < NumAnchors)
+        KinematicAxes kinematic = Kinematic;
+        AxisIndices axes = kinematic.Machine;
+        if (!kinematic.IsComplete || !axes.XyzFitIn(machinePos.Length) || !kinematic.FitIn(motorPos.Length)
+            || !kinematic.FitIn(stepsPerMm.Length))
         {
+            // Every line is needed to solve for the effector, so one whose motor the machine does not
+            // have leaves nothing to solve
             return;
         }
 
         Span<float> linePositions = stackalloc float[MaxAnchors];
         for (int anchor = 0; anchor < NumAnchors; anchor++)
         {
-            linePositions[anchor] = motorPos[anchor] / stepsPerMm[anchor];
+            int drive = kinematic.Roles[anchor];
+            linePositions[anchor] = motorPos[drive] / stepsPerMm[drive];
         }
 
         if (TrySolve(linePositions, out float x, out float y, out float z))
         {
-            machinePos[0] = x;
-            machinePos[1] = y;
-            machinePos[2] = z;
+            machinePos[axes.X] = x;
+            machinePos[axes.Y] = y;
+            machinePos[axes.Z] = z;
         }
     }
 
     /// <inheritdoc />
     /// <remarks>Every line takes part in holding the effector still, whichever axis is asked about</remarks>
     public override uint GetControllingDrives(int axis)
-        => (axis >= 0 && axis < NumAnchors) ? LowestDrives(NumAnchors) : base.GetControllingDrives(axis);
-
-    /// <summary>
-    /// Whether the effector is inside the printable cylinder
-    /// </summary>
-    /// <param name="x">X coordinate in mm</param>
-    /// <param name="y">Y coordinate in mm</param>
-    /// <returns>True if it is within the print radius</returns>
-    public bool IsReachable(float x, float y) => (x * x) + (y * y) <= PrintRadius * PrintRadius;
+    {
+        uint lines = Kinematic.Bitmap;
+        return (lines & AxisIndices.Bit(axis)) != 0 ? lines : base.GetControllingDrives(axis);
+    }
 
     /// <summary>
     /// How far a point is from an anchor

@@ -76,7 +76,7 @@ public class EndstopPlannerTests
 
     private static List<EndstopPlan> Plan((Move Move, Sensors Sensors) machine, Code code,
                                           KinematicsName kinematics = KinematicsName.Cartesian)
-        => EndstopPlanner.Plan(code, machine.Move, machine.Sensors, KinematicsFactory.Create(kinematics),
+        => EndstopPlanner.Plan(code, machine.Move, machine.Sensors, KinematicsFactory.Create(kinematics, machine.Move),
                                NumAxes, StepsPerMm, FeedRateMmPerSec);
 
     [Test]
@@ -152,8 +152,8 @@ public class EndstopPlannerTests
     [Test]
     public void MotorStallIndividualIsPlannedTheSameWayAsMotorStallAny()
     {
-        // They are not told apart yet, which is the defect §4.3 of the plan describes. Recorded so
-        // that the phase which does tell them apart changes a test rather than adding one
+        // Both watch the same drivers. What S3 and S4 stop is decided when the move is armed, which
+        // EndstopArmingTests covers
         List<EndstopPlan> any = Plan(Machine(EndstopType.MotorStallAny, xDrivers: 2), Homing('X'));
         List<EndstopPlan> individual = Plan(Machine(EndstopType.MotorStallIndividual, xDrivers: 2), Homing('X'));
 
@@ -177,7 +177,7 @@ public class EndstopPlannerTests
         _ = sensors;
 
         IReadOnlyList<WatchedDriver> drivers =
-            EndstopPlanner.DriversMoving(move, KinematicsFactory.Create(KinematicsName.CoreXZ), NumAxes, 2,
+            EndstopPlanner.DriversMoving(move, KinematicsFactory.Create(KinematicsName.CoreXZ, move), NumAxes, 2,
                                          StepsPerMm, FeedRateMmPerSec);
 
         Assert.Multiple(() =>
@@ -197,7 +197,7 @@ public class EndstopPlannerTests
         _ = sensors;
 
         IReadOnlyList<WatchedDriver> drivers =
-            EndstopPlanner.DriversMoving(move, KinematicsFactory.Create(KinematicsName.Cartesian), NumAxes, 2,
+            EndstopPlanner.DriversMoving(move, KinematicsFactory.Create(KinematicsName.Cartesian, move), NumAxes, 2,
                                          StepsPerMm, FeedRateMmPerSec);
 
         Assert.That(drivers.Select(d => d.Driver.Board), Is.EqualTo(new[] { 3 }));

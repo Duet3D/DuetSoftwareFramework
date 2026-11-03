@@ -20,6 +20,9 @@ using Duet::Sbc::Motion::MoveProfile;
 
 namespace
 {
+	// The axis the backlash tests drive. The test machine's first axis; which letter it carries is
+	// DuetControlServer's business, and nothing here depends on it
+	constexpr size_t xAxis = 0;
 
 	// A three-axis, one-extruder Cartesian machine with one driver per axis.
 	// The backlash values a test wants; a move carries them, so FreshSystem records them for the

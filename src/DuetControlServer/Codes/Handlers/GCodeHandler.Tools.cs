@@ -85,7 +85,8 @@ internal sealed partial class GCodeHandler
                     // The offsets just moved, so where the interpreter thinks the nozzle is has moved
                     // with them. The machine has not moved, so it is the user position that has to
                     // follow - which is the direction the inverse transform exists for
-                    SyncInterpreterToMachine();
+                    moveInterpreter.SyncInterpreterToCoords();
+                    planner.PublishCommittedPosition();
                 }
             }
 

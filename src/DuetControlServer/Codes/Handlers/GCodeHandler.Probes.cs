@@ -7,7 +7,6 @@ using System.Globalization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using static DuetControlServer.Motion.AxisIndices;
 
 namespace DuetControlServer.Codes.Handlers;
 
@@ -78,7 +77,7 @@ internal sealed partial class GCodeHandler
 
             // Whichever way round they were given, the two have to agree: the offset is what a move
             // is corrected by and the trigger height is what a user reads back
-            int zAxis = ZAxisIndex(model.Move);
+            int zAxis = AxisIndices.IndexOf(model.Move, 'Z');
             if (zAxis >= 0 && zAxis < probe.Offsets.Count)
             {
                 probe.Offsets[zAxis] = -probe.TriggerHeight;

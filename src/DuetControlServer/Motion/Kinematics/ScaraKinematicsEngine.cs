@@ -6,7 +6,6 @@ using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
 
 using Code = DuetAPI.Commands.Code;
-using static DuetControlServer.Motion.AxisIndices;
 
 namespace DuetControlServer.Motion.Kinematics;
 
@@ -30,12 +29,18 @@ namespace DuetControlServer.Motion.Kinematics;
 /// <para>
 /// Crosstalk covers machines where turning one joint drags another: proximal onto distal, and either
 /// arm onto Z. It is a fixed linear coupling, so it goes in as a correction on the way out and comes
-/// back off on the way in
+/// back off on the way in.
+/// </para>
+/// <para>
+/// The X, Y and Z motors are the drives of the axes lettered X, Y and Z, wherever M584 put them. Only
+/// the two joints are needed: a machine without Z, such as a pen plotter, has nothing for the
+/// crosstalk to drag
 /// </para>
 /// </remarks>
 internal sealed class ScaraKinematicsEngine : KinematicsEngine
 {
-    private const int XyzAxes = 3;
+    /// <summary>Positions in <see cref="KinematicsEngine.KinematicAxes.Roles"/>; Lift is -1 without Z</summary>
+    private const int Proximal = 0, Distal = 1, Lift = 2;
 
     private const float DegreesToRadians = MathF.PI / 180.0f;
     private const float RadiansToDegrees = 180.0f / MathF.PI;
@@ -72,11 +77,16 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
     /// <summary>Where bed Y zero is relative to the proximal joint, mm</summary>
     public float YOffset { get; }
 
+    // TODO: RepRapFirmware's ScaraKinematics::LimitPosition pulls a target the arms cannot reach onto the
+    // annulus these two bound, and reports a straight line that passes inside MinRadius as unreachable
+    // along the way. Its IsReachable tells G29 which probe points the arms can reach within their joint
+    // limits. Neither is ported yet
+
     /// <summary>Closest the head may come to the pillar, mm</summary>
-    public float MinRadius { get; }
+    private float MinRadius { get; }
 
     /// <summary>Furthest the head may go from the pillar, mm</summary>
-    public float MaxRadius { get; }
+    private float MaxRadius { get; }
 
     /// <summary>
     /// The minimum radius M669 R asked for, before the mechanics had their say
@@ -90,6 +100,14 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
 
     /// <inheritdoc />
     public override KinematicsName Kind => KinematicsName.Scara;
+
+    /// <inheritdoc />
+    /// <remarks>The proximal joint and the distal joint, in that order</remarks>
+    protected override string KinematicAxisLetters => "XY";
+
+    /// <inheritdoc />
+    /// <remarks>The lift, which the arms drag through the crosstalk</remarks>
+    protected override string OptionalKinematicAxisLetters => "Z";
 
     /// <summary>
     /// A SCARA with RepRapFirmware's defaults, for before M669 has been seen
@@ -156,9 +174,9 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
     }
 
     /// <inheritdoc />
-    public override void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics)
+    public override void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics, Move move)
     {
-        base.WriteTo(kinematics);
+        base.WriteTo(kinematics, move);
 
         ScaraKinematics scara = (ScaraKinematics)kinematics;
         scara.ProximalLength = ProximalArmLength;
@@ -222,17 +240,21 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
     /// </remarks>
     public override uint MustBeHomedAxes(uint axesMoving, bool disallowMovesBeforeHoming)
     {
-        const uint xyAxes = (1u << XAxis) | (1u << YAxis);
+        uint xyAxes = Axes.XyBitmap;
         return (axesMoving & xyAxes) != 0 ? axesMoving | xyAxes : axesMoving;
     }
 
 
     /// <inheritdoc />
-    /// <remarks>Both arm motors are pinned down only when X and Y are both named</remarks>
+    /// <remarks>
+    /// Both arm motors are pinned down only when X and Y are both named, which a machine missing an axis
+    /// this geometry needs can never do
+    /// </remarks>
     public override uint AxesAssumedHomed(uint g92Axes)
     {
-        const uint xyAxes = (1u << XAxis) | (1u << YAxis);
-        return (g92Axes & xyAxes) == xyAxes ? g92Axes : g92Axes & ~xyAxes;
+        KinematicAxes kinematic = Kinematic;
+        uint xyAxes = kinematic.Machine.XyBitmap;
+        return kinematic.IsComplete && (g92Axes & xyAxes) == xyAxes ? g92Axes : g92Axes & ~xyAxes;
     }
 
 
@@ -246,19 +268,21 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
     public override float GetEndstopPosition(int drive, bool highEnd, float axisMin, float axisMax,
                                              ReadOnlySpan<int> endPoints, ReadOnlySpan<float> stepsPerMm)
     {
-        switch (drive)
+        KinematicAxes kinematic = Kinematic;
+        int[] roles = kinematic.Roles;
+        switch (kinematic.IsComplete ? kinematic.RoleOf(drive) : -1)
         {
-            case XAxis:                 // proximal joint, which nothing else drags
+            case Proximal:              // proximal joint, which nothing else drags
                 return highEnd ? _thetaLimits[1] : _thetaLimits[0];
 
-            case YAxis:                 // distal joint, dragged by the proximal one
+            case Distal:                // distal joint, dragged by the proximal one
                 return (highEnd ? _psiLimits[1] : _psiLimits[0])
-                    - Crosstalk(endPoints, stepsPerMm, XAxis, YAxis, _crosstalk[0]);
+                    - Crosstalk(endPoints, stepsPerMm, roles[Proximal], roles[Distal], _crosstalk[0]);
 
-            case ZAxis:                 // dragged by both arms
+            case Lift:                  // dragged by both arms, and only there when the machine has Z
                 return (highEnd ? axisMax : axisMin)
-                    - Crosstalk(endPoints, stepsPerMm, XAxis, ZAxis, _crosstalk[1])
-                    - Crosstalk(endPoints, stepsPerMm, YAxis, ZAxis, _crosstalk[2]);
+                    - Crosstalk(endPoints, stepsPerMm, roles[Proximal], roles[Lift], _crosstalk[1])
+                    - Crosstalk(endPoints, stepsPerMm, roles[Distal], roles[Lift], _crosstalk[2]);
 
             default:
                 return base.GetEndstopPosition(drive, highEnd, axisMin, axisMax, endPoints, stepsPerMm);
@@ -287,7 +311,14 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
 
     /// <inheritdoc />
     public override uint ContinuousRotationAxes
-        => (_supportsContinuousRotation[0] ? 1u << XAxis : 0u) | (_supportsContinuousRotation[1] ? 1u << YAxis : 0u);
+    {
+        get
+        {
+            AxisIndices axes = Axes;
+            return (_supportsContinuousRotation[0] ? AxisIndices.Bit(axes.X) : 0u)
+                   | (_supportsContinuousRotation[1] ? AxisIndices.Bit(axes.Y) : 0u);
+        }
+    }
 
     /// <summary>Proximal arm length RepRapFirmware assumes until M669 says otherwise, mm</summary>
     public const float DefaultProximalArmLength = 100.0f;
@@ -366,15 +397,6 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
         MaxRadius = maxRadius * 0.995f;
     }
 
-    /// <summary>
-    /// Which way the elbow is currently bent
-    /// </summary>
-    /// <remarks>
-    /// False is anticlockwise relative to the proximal arm, true is clockwise. Exposed so that a test
-    /// or a diagnostic can see the choice the engine made, since it is not visible in the motor positions
-    /// </remarks>
-    public bool CurrentArmMode => _currentArmMode;
-
     /// <inheritdoc />
     public override NativeMovementError CartesianToMotorSteps(
         ReadOnlySpan<float> machinePos,
@@ -384,13 +406,18 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
         Span<int> motorPos,
         bool isCoordinated = false)
     {
-        if (machinePos.Length < XyzAxes || motorPos.Length < XyzAxes || stepsPerMm.Length < XyzAxes)
+        KinematicAxes kinematic = Kinematic;
+        if (!kinematic.IsComplete || !kinematic.FitIn(machinePos.Length) || !kinematic.FitIn(motorPos.Length)
+            || !kinematic.FitIn(stepsPerMm.Length))
         {
             return NativeMovementError.UnreachablePosition;
         }
 
+        int xAxis = kinematic.Roles[Proximal], yAxis = kinematic.Roles[Distal], zAxis = kinematic.Roles[Lift];
+        float x = machinePos[xAxis], y = machinePos[yAxis];
+
         float theta, psi;
-        if (machinePos[XAxis] == _cachedX && machinePos[YAxis] == _cachedY)
+        if (x == _cachedX && y == _cachedY)
         {
             // Already solved, and reusing the answer keeps the arm mode stable at a point the caller
             // asked about twice - which is what a probe move does
@@ -401,7 +428,7 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
         else
         {
             bool armMode = _currentArmMode;
-            if (!TryCalculateThetaAndPsi(machinePos, isCoordinated, out theta, out psi, ref armMode))
+            if (!TryCalculateThetaAndPsi(x, y, isCoordinated, out theta, out psi, ref armMode))
             {
                 return NativeMovementError.UnreachablePosition;
             }
@@ -410,35 +437,38 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
 
         NativeMovementError result = NativeMovementError.Ok;
 
-        if (TryRoundToInt32(theta * stepsPerMm[XAxis], out int thetaSteps))
+        if (TryRoundToInt32(theta * stepsPerMm[xAxis], out int thetaSteps))
         {
-            motorPos[XAxis] = thetaSteps;
+            motorPos[xAxis] = thetaSteps;
         }
         else
         {
             result = NativeMovementError.MicrostepPositionTooLarge;
         }
 
-        if (TryRoundToInt32((psi - (_crosstalk[0] * theta)) * stepsPerMm[YAxis], out int psiSteps))
+        if (TryRoundToInt32((psi - (_crosstalk[0] * theta)) * stepsPerMm[yAxis], out int psiSteps))
         {
-            motorPos[YAxis] = psiSteps;
+            motorPos[yAxis] = psiSteps;
         }
         else
         {
             result = NativeMovementError.MicrostepPositionTooLarge;
         }
 
-        float z = machinePos[ZAxis] - (_crosstalk[1] * theta) - (_crosstalk[2] * psi);
-        if (TryRoundToInt32(z * stepsPerMm[ZAxis], out int zSteps))
+        if (zAxis >= 0)
         {
-            motorPos[ZAxis] = zSteps;
-        }
-        else
-        {
-            result = NativeMovementError.MicrostepPositionTooLarge;
+            float z = machinePos[zAxis] - (_crosstalk[1] * theta) - (_crosstalk[2] * psi);
+            if (TryRoundToInt32(z * stepsPerMm[zAxis], out int zSteps))
+            {
+                motorPos[zAxis] = zSteps;
+            }
+            else
+            {
+                result = NativeMovementError.MicrostepPositionTooLarge;
+            }
         }
 
-        NativeMovementError linearResult = LinearAxesToMotorSteps(machinePos, stepsPerMm, XyzAxes, numVisibleAxes, motorPos);
+        NativeMovementError linearResult = LinearAxesToMotorSteps(machinePos, stepsPerMm, kinematic.Bitmap, numVisibleAxes, motorPos);
         return result != NativeMovementError.Ok ? result : linearResult;
     }
 
@@ -450,71 +480,64 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
         int numTotalAxes,
         Span<float> machinePos)
     {
-        if (machinePos.Length < XyzAxes || motorPos.Length < XyzAxes || stepsPerMm.Length < XyzAxes)
+        KinematicAxes kinematic = Kinematic;
+        if (kinematic.IsComplete && kinematic.FitIn(machinePos.Length) && kinematic.FitIn(motorPos.Length)
+            && kinematic.FitIn(stepsPerMm.Length))
         {
-            return;
+            int xAxis = kinematic.Roles[Proximal], yAxis = kinematic.Roles[Distal], zAxis = kinematic.Roles[Lift];
+            float theta = motorPos[xAxis] / stepsPerMm[xAxis];
+            float psi = (motorPos[yAxis] / stepsPerMm[yAxis]) + (_crosstalk[0] * theta);
+
+            // A negative distal motor position means the elbow is bent the other way, which is the only
+            // place the arm mode can be recovered from once the machine has moved on its own
+            _currentArmMode = _cachedArmMode = motorPos[yAxis] >= 0;
+            _cachedTheta = theta;
+            _cachedPsi = psi;
+
+            _cachedX = machinePos[xAxis] = (MathF.Cos(theta * DegreesToRadians) * ProximalArmLength)
+                                           + (MathF.Cos((psi + theta) * DegreesToRadians) * DistalArmLength)
+                                           - XOffset;
+            _cachedY = machinePos[yAxis] = (MathF.Sin(theta * DegreesToRadians) * ProximalArmLength)
+                                           + (MathF.Sin((psi + theta) * DegreesToRadians) * DistalArmLength)
+                                           - YOffset;
+
+            if (zAxis >= 0)
+            {
+                machinePos[zAxis] = (motorPos[zAxis] / stepsPerMm[zAxis]) + (_crosstalk[1] * theta) + (_crosstalk[2] * psi);
+            }
         }
 
-        float theta = motorPos[XAxis] / stepsPerMm[XAxis];
-        float psi = (motorPos[YAxis] / stepsPerMm[YAxis]) + (_crosstalk[0] * theta);
-
-        // A negative distal motor position means the elbow is bent the other way, which is the only
-        // place the arm mode can be recovered from once the machine has moved on its own
-        _currentArmMode = _cachedArmMode = motorPos[YAxis] >= 0;
-        _cachedTheta = theta;
-        _cachedPsi = psi;
-
-        _cachedX = machinePos[XAxis] = (MathF.Cos(theta * DegreesToRadians) * ProximalArmLength)
-                                       + (MathF.Cos((psi + theta) * DegreesToRadians) * DistalArmLength)
-                                       - XOffset;
-        _cachedY = machinePos[YAxis] = (MathF.Sin(theta * DegreesToRadians) * ProximalArmLength)
-                                       + (MathF.Sin((psi + theta) * DegreesToRadians) * DistalArmLength)
-                                       - YOffset;
-
-        machinePos[ZAxis] = (motorPos[ZAxis] / stepsPerMm[ZAxis]) + (_crosstalk[1] * theta) + (_crosstalk[2] * psi);
-
-        LinearMotorStepsToCartesian(motorPos, stepsPerMm, XyzAxes, numVisibleAxes, machinePos);
+        LinearMotorStepsToCartesian(motorPos, stepsPerMm, kinematic.Bitmap, numVisibleAxes, machinePos);
     }
 
     /// <inheritdoc />
     /// <remarks>
-    /// Both arm motors move for either X or Y. Z joins them only on a machine with arm-to-Z crosstalk,
-    /// where turning an arm lifts the head as well
+    /// Both arm motors move for either X or Y. Z joins them only on a machine that has Z and arm-to-Z
+    /// crosstalk, where turning an arm lifts the head as well
     /// </remarks>
     public override uint GetControllingDrives(int axis)
     {
-        int numCoupledAxes = (_crosstalk[1] != 0.0f || _crosstalk[2] != 0.0f) ? 3 : 2;
-        return (axis >= 0 && axis < numCoupledAxes) ? LowestDrives(numCoupledAxes) : base.GetControllingDrives(axis);
-    }
-
-    /// <summary>
-    /// Whether the head can be put at the given XY position
-    /// </summary>
-    /// <param name="x">X coordinate in mm</param>
-    /// <param name="y">Y coordinate in mm</param>
-    /// <returns>True if it is within the annulus the arms sweep</returns>
-    public bool IsReachable(float x, float y)
-    {
-        float dx = x + XOffset, dy = y + YOffset;
-        float radiusSquared = (dx * dx) + (dy * dy);
-        return radiusSquared >= MinRadius * MinRadius && radiusSquared <= MaxRadius * MaxRadius;
+        KinematicAxes kinematic = Kinematic;
+        uint coupledAxes = (_crosstalk[1] != 0.0f || _crosstalk[2] != 0.0f) ? kinematic.Bitmap : kinematic.Machine.XyBitmap;
+        return (coupledAxes & AxisIndices.Bit(axis)) != 0 ? coupledAxes : base.GetControllingDrives(axis);
     }
 
     /// <summary>
     /// Work out the two joint angles that put the head at the given position
     /// </summary>
-    /// <param name="machinePos">Axis coordinates in mm</param>
+    /// <param name="machineX">X coordinate in mm</param>
+    /// <param name="machineY">Y coordinate in mm</param>
     /// <param name="isCoordinated">Whether the arm mode must be left alone</param>
     /// <param name="theta">Proximal joint angle in degrees</param>
     /// <param name="psi">Distal joint angle in degrees</param>
     /// <param name="armMode">Which way the elbow is bent, updated if it had to change</param>
     /// <returns>False if the position is out of reach in an allowed pose</returns>
-    private bool TryCalculateThetaAndPsi(ReadOnlySpan<float> machinePos, bool isCoordinated, out float theta, out float psi, ref bool armMode)
+    private bool TryCalculateThetaAndPsi(float machineX, float machineY, bool isCoordinated, out float theta, out float psi, ref bool armMode)
     {
         theta = float.NaN;
 
-        float x = machinePos[XAxis] + XOffset;
-        float y = machinePos[YAxis] + YOffset;
+        float x = machineX + XOffset;
+        float y = machineY + YOffset;
 
         // The cosine rule on the triangle pillar-elbow-head gives the distal joint angle directly
         float cosPsi = ((x * x) + (y * y) - _proximalArmLengthSquared - _distalArmLengthSquared) / _twoPd;
@@ -579,8 +602,8 @@ internal sealed class ScaraKinematicsEngine : KinematicsEngine
         }
 
         // Remember the answer so that being asked about the same point again gives the same pose
-        _cachedX = machinePos[XAxis];
-        _cachedY = machinePos[YAxis];
+        _cachedX = machineX;
+        _cachedY = machineY;
         _cachedTheta = theta;
         _cachedPsi = psi;
         _cachedArmMode = armMode;

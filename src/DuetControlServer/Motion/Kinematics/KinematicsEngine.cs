@@ -6,7 +6,6 @@ using DuetControlServer.Link.Native;
 using DuetControlServer.Motion.Native;
 
 using Code = DuetAPI.Commands.Code;
-using static DuetControlServer.Motion.AxisIndices;
 
 namespace DuetControlServer.Motion.Kinematics;
 
@@ -158,6 +157,186 @@ internal abstract class KinematicsEngine
     public abstract KinematicsName Kind { get; }
 
     /// <summary>
+    /// The letters of the axes this geometry needs and transforms, in the order it uses them
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A delta's towers A, B and C are the drives of X, Y and Z; a SCARA's proximal and distal arms are
+    /// the drives of X and Y; CoreXY couples the X and Y motors. RepRapFirmware can take these to be its
+    /// first axes because its first three axes are always X, Y and Z, and its further ones are U, V, W
+    /// and so on when config.g creates them in that order. DSF creates axes in whatever order M584
+    /// names them, so a geometry says which letters it needs and <see cref="SetAxes"/> finds where they
+    /// are. Every letter here is required: M669, M665 and M666 refuse to select or configure a geometry
+    /// whose letters the machine does not have (<see cref="KinematicsConfigurator"/>), and a geometry
+    /// that has come by its axes some other way refuses to plan (<see cref="MissingAxesError"/>).
+    /// </para>
+    /// <para>
+    /// Every axis not listed here or in <see cref="OptionalKinematicAxisLetters"/> is an ordinary axis
+    /// with a motor of its own
+    /// </para>
+    /// </remarks>
+    protected virtual string KinematicAxisLetters => string.Empty;
+
+    /// <summary>
+    /// The letters of further axes this geometry transforms when the machine has them, in the order
+    /// it uses them after <see cref="KinematicAxisLetters"/>
+    /// </summary>
+    /// <remarks>
+    /// A SCARA's crosstalk drags Z, so it transforms Z when there is one, but a machine without Z - a
+    /// pen plotter - is still a SCARA. A letter here the machine does not have is left out of
+    /// <see cref="KinematicAxes.Roles"/> (-1) rather than counted as missing
+    /// </remarks>
+    protected virtual string OptionalKinematicAxisLetters => string.Empty;
+
+    /// <summary>
+    /// The letters RepRapFirmware's first axes carry when config.g creates them in one M584
+    /// </summary>
+    /// <param name="count">How many</param>
+    /// <returns>The first <paramref name="count"/> of X, Y, Z, U, V, W, A, B and so on</returns>
+    /// <remarks>
+    /// For the geometries with a variable number of lettered axes - a delta's fourth to sixth towers,
+    /// a Hangprinter's fourth and later anchors - which RepRapFirmware drives from its fourth axis
+    /// onwards. DSF names those axes by the letters they carry there
+    /// </remarks>
+    protected static string FirstAxisLetters(int count) => new(Axis.Letters, 0, Math.Clamp(count, 0, Axis.Letters.Length));
+
+    /// <summary>
+    /// The machine's axes as this geometry last saw them
+    /// </summary>
+    /// <remarks>
+    /// <see cref="AxisIndices.None"/> until <see cref="SetAxes"/> has been called, so a geometry built
+    /// before M584 has created anything knows of no axes rather than assuming some. The geometry's own:
+    /// code outside it holds the object model lock and looks letters up in <c>move.axes[]</c>
+    /// </remarks>
+    protected AxisIndices Axes => Kinematic.Machine;
+
+    /// <summary>
+    /// Follow a change to the machine's axes
+    /// </summary>
+    /// <param name="move">The move model, whose axes are the machine's. The caller holds the object model lock</param>
+    /// <returns>True if they differed from what this geometry had, so that anything derived from it changed</returns>
+    /// <remarks>
+    /// <para>
+    /// Called whenever the axes may have changed - M584 creating one, a reconfiguration - and a no-op
+    /// when they have not. This is where the geometry resolves the letters it needs to indices, once,
+    /// rather than on every move.
+    /// </para>
+    /// <para>
+    /// Like <see cref="SetAxisLimits"/>, this updates the geometry in place rather than returning a new
+    /// one. What it resolves is swapped in as a single reference, so a reader without a lock - the
+    /// endstop correction, the live position publisher - sees either the old axes or the new ones
+    /// </para>
+    /// </remarks>
+    public bool SetAxes(Move move) => SetAxes(AxisIndices.From(move));
+
+    /// <summary>
+    /// Follow a change to the machine's axes, already resolved
+    /// </summary>
+    /// <param name="axes">The axes as they are now</param>
+    /// <returns>True if they differed from what this geometry had</returns>
+    /// <remarks>For a geometry handing the axes it holds to an instance it builds from itself</remarks>
+    protected bool SetAxes(AxisIndices axes)
+    {
+        if (_kinematicAxes is not null && _kinematicAxes.Machine.SameAs(axes))
+        {
+            return false;
+        }
+
+        _kinematicAxes = new KinematicAxes(axes, KinematicAxisLetters, OptionalKinematicAxisLetters);
+        return true;
+    }
+
+    /// <summary>
+    /// Why this geometry cannot plan for the machine's axes, or null if it can
+    /// </summary>
+    public string? MissingAxesError
+    {
+        get
+        {
+            string missing = Kinematic.Missing;
+            return missing.Length == 0 ? null : $"{AxisIndices.NoAxisMessage(missing)}, which {Name} kinematics needs";
+        }
+    }
+
+    /// <summary>
+    /// The axes this geometry transforms, resolved against the machine's
+    /// </summary>
+    /// <remarks>
+    /// Read once at the top of a method that needs it, so that a whole calculation sees one set of
+    /// axes even if <see cref="SetAxes"/> runs meanwhile
+    /// </remarks>
+    protected KinematicAxes Kinematic => _kinematicAxes ??= new KinematicAxes(AxisIndices.None, KinematicAxisLetters, OptionalKinematicAxisLetters);
+    private KinematicAxes? _kinematicAxes;
+
+    /// <summary>
+    /// Where the axes a geometry transforms are in the machine's axis list
+    /// </summary>
+    protected sealed class KinematicAxes
+    {
+        /// <summary>The machine's axes</summary>
+        public AxisIndices Machine { get; }
+
+        /// <summary>
+        /// The axis index of each axis the geometry transforms, in the geometry's order, or -1 where
+        /// the machine does not have it
+        /// </summary>
+        public int[] Roles { get; }
+
+        /// <summary>Every transformed axis the machine has, as a bitmap</summary>
+        public uint Bitmap { get; }
+
+        /// <summary>
+        /// The letters the geometry needs and the machine does not have, empty if none. An optional
+        /// letter the machine does not have is not among them
+        /// </summary>
+        public string Missing { get; }
+
+        /// <summary>Whether every letter the geometry needs is there</summary>
+        public bool IsComplete => Missing.Length == 0;
+
+        /// <summary>
+        /// Whether every transformed axis the machine has can be indexed in a span of the given length
+        /// </summary>
+        /// <param name="length">Length of the coordinate, step or motor position span</param>
+        /// <returns>True if none of them is past its end</returns>
+        public bool FitIn(int length) => _highestAxis < length;
+        private readonly int _highestAxis = -1;
+
+        /// <summary>
+        /// Resolve a geometry's axes
+        /// </summary>
+        /// <param name="machine">The machine's axes</param>
+        /// <param name="required">The letters the geometry needs, in its order</param>
+        /// <param name="optional">The letters it uses after those when the machine has them</param>
+        public KinematicAxes(AxisIndices machine, string required, string optional)
+        {
+            string letters = required + optional;
+            Machine = machine;
+            Roles = new int[letters.Length];
+
+            StringBuilder missing = new();
+            for (int role = 0; role < letters.Length; role++)
+            {
+                Roles[role] = machine.IndexOf(letters[role]);
+                if (Roles[role] < 0 && role < required.Length)
+                {
+                    missing.Append(letters[role]);
+                }
+                Bitmap |= AxisIndices.Bit(Roles[role]);
+                _highestAxis = Math.Max(_highestAxis, Roles[role]);
+            }
+            Missing = missing.ToString();
+        }
+
+        /// <summary>
+        /// Which of the geometry's axes an axis is
+        /// </summary>
+        /// <param name="axis">Axis index, which is also its drive number</param>
+        /// <returns>Its position in <see cref="Roles"/>, or -1 if the geometry does not transform it</returns>
+        public int RoleOf(int axis) => axis >= 0 ? Array.IndexOf(Roles, axis) : -1;
+    }
+
+    /// <summary>
     /// Apply the parameters of an M-code that configures this geometry
     /// </summary>
     /// <param name="code">The code, an M665, M666 or M669</param>
@@ -185,10 +364,11 @@ internal abstract class KinematicsEngine
     /// <param name="kinematics">
     /// The node to write to, which the caller has already created for <see cref="KinematicsName"/>
     /// </param>
+    /// <param name="move">The move model, whose axes decide how much of a per-axis parameter is reported</param>
     /// <remarks>
     /// <para>
-    /// The projection §14 is about: this geometry is what the machine moves by, and the object model
-    /// is what describes it to everything else. Every parameter <see cref="Configure"/> reads has to
+    /// This geometry is what the machine moves by, and the object model is the projection of it that
+    /// describes it to everything else. Every parameter <see cref="Configure"/> reads has to
     /// be written back here, or the object model would describe a machine that is not the one being
     /// planned for - which is the failure this arrangement is meant to make loud rather than silent.
     /// </para>
@@ -197,7 +377,7 @@ internal abstract class KinematicsEngine
     /// own, so that the geometry stays something a test can construct and assert on without a model
     /// </para>
     /// </remarks>
-    public virtual void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics)
+    public virtual void WriteTo(DuetAPI.ObjectModel.Kinematics kinematics, Move move)
     {
         // Reported only while it is in use, as RepRapFirmware reports it
         kinematics.Segmentation = Segmentation.HasFlag(SegmentationType.Segment)
@@ -336,7 +516,8 @@ internal abstract class KinematicsEngine
     /// This default is RepRapFirmware's <c>Kinematics::LimitSpeedAndAcceleration</c>: hold the
     /// combined XY speed down to the lower of the two axis limits. It suits every geometry whose X
     /// and Y motors do not move independently, which is all of them except the matrix-driven ones -
-    /// and those override it
+    /// and those override it. X and Y are the axes with those letters; without both there is no XY
+    /// speed to limit
     /// </para>
     /// </remarks>
     public virtual void LimitSpeedAndAcceleration(
@@ -345,21 +526,24 @@ internal abstract class KinematicsEngine
         ReadOnlySpan<float> maxFeedrates,
         ReadOnlySpan<float> accelerations)
     {
-        if (move.NormalisedDirectionVector.Length < 2 || maxFeedrates.Length < 2 || accelerations.Length < 2)
+        AxisIndices axes = Axes;
+        int x = axes.X, y = axes.Y;
+        int length = Math.Min(move.NormalisedDirectionVector.Length, Math.Min(maxFeedrates.Length, accelerations.Length));
+        if (x < 0 || y < 0 || x >= length || y >= length)
         {
             return;
         }
 
-        float dx = move.NormalisedDirectionVector[XAxis];
-        float dy = move.NormalisedDirectionVector[YAxis];
+        float dx = move.NormalisedDirectionVector[x];
+        float dy = move.NormalisedDirectionVector[y];
         float xySum = dx + dy;
         if (xySum > MinXyComponent)
         {
             // Interpolate between the X and Y limits by how much of the move each contributes, then
             // scale by the length of the XY part: a move that is mostly Z has little XY in it and so
             // is barely restricted by what X and Y can do
-            float maxSpeedTimesXySum = (maxFeedrates[XAxis] * dx) + (maxFeedrates[YAxis] * dy);
-            float maxAccelerationTimesXySum = (accelerations[XAxis] * dx) + (accelerations[YAxis] * dy);
+            float maxSpeedTimesXySum = (maxFeedrates[x] * dx) + (maxFeedrates[y] * dy);
+            float maxAccelerationTimesXySum = (accelerations[x] * dx) + (accelerations[y] * dy);
             float xyFactor = xySum * MathF.Sqrt((dx * dx) + (dy * dy));
             limits.Limit(maxSpeedTimesXySum / xyFactor, maxAccelerationTimesXySum / xyFactor);
         }
@@ -378,11 +562,16 @@ internal abstract class KinematicsEngine
     public virtual uint GetControllingDrives(int axis) => axis >= 0 ? 1u << axis : 0u;
 
     /// <summary>
-    /// Bed tilt correction to apply to Z for a unit of movement along the given axis
+    /// Add the bed tilt correction to a move's direction vector
     /// </summary>
-    /// <param name="axis">Axis number</param>
-    /// <returns>Correction factor, zero if this geometry has none</returns>
-    public virtual float GetTiltCorrection(int axis) => 0.0f;
+    /// <param name="directionVector">Movement of each axis, before it is normalised</param>
+    /// <param name="numAxes">Number of axes the vector covers</param>
+    /// <remarks>
+    /// Z moves by a fixed fraction of each unit of X and Y movement, which only a geometry with a
+    /// tilted bed has. Here rather than in the move builder because X, Y and Z are the axes with those
+    /// letters, which only the geometry has resolved
+    /// </remarks>
+    public virtual void ApplyTiltCorrection(Span<float> directionVector, int numAxes) { }
 
     /// <summary>
     /// Axes that wrap at 360 degrees, so a move may take the short way round
@@ -416,11 +605,11 @@ internal abstract class KinematicsEngine
 
     /// <summary>Segments per second before M669 has said otherwise</summary>
     /// <remarks>RepRapFirmware's <c>Kinematics::DefaultSegmentsPerSecond</c></remarks>
-    public const float DefaultSegmentsPerSecond = 100.0f;
+    private const float DefaultSegmentsPerSecond = 100.0f;
 
     /// <summary>Shortest segment worth producing before M669 has said otherwise, in mm</summary>
     /// <remarks>RepRapFirmware's <c>Kinematics::DefaultMinSegmentLength</c></remarks>
-    public const float DefaultMinSegmentLength = 0.2f;
+    private const float DefaultMinSegmentLength = 0.2f;
 
     /// <summary>
     /// Whether this geometry needs a straight move broken into short ones, and along which axes,
@@ -558,7 +747,7 @@ internal abstract class KinematicsEngine
     public virtual LimitPositionResult LimitPosition(Span<float> finalCoords, ReadOnlySpan<float> initialCoords,
                                                      int numVisibleAxes, uint axesToLimit, bool isCoordinated,
                                                      bool applyM208Limits)
-        => applyM208Limits && LimitToAxisRange(finalCoords, 0, numVisibleAxes, axesToLimit)
+        => applyM208Limits && LimitToAxisRange(finalCoords, numVisibleAxes, axesToLimit)
             ? LimitPositionResult.Adjusted
             : LimitPositionResult.Ok;
 
@@ -566,9 +755,11 @@ internal abstract class KinematicsEngine
     /// Clamp axes to their configured minimum and maximum
     /// </summary>
     /// <param name="coords">Coordinates, adjusted in place</param>
-    /// <param name="firstAxis">First axis to consider, for geometries that handle the lower ones themselves</param>
     /// <param name="numVisibleAxes">Number of axes to consider</param>
-    /// <param name="axesToLimit">Axes that may be adjusted, as a bitmap</param>
+    /// <param name="axesToLimit">
+    /// Axes that may be adjusted, as a bitmap. A geometry that limits its own axes some other way
+    /// leaves them out
+    /// </param>
     /// <returns>True if anything was adjusted</returns>
     /// <remarks>
     /// RepRapFirmware's <c>LimitPositionFromAxis</c>, tolerance included. Homing converts an axis
@@ -576,10 +767,10 @@ internal abstract class KinematicsEngine
     /// when the steps per mm is not a whole number. Without the tolerance an axis would be reported
     /// out of range the moment it was homed to its own maximum
     /// </remarks>
-    protected bool LimitToAxisRange(Span<float> coords, int firstAxis, int numVisibleAxes, uint axesToLimit)
+    protected bool LimitToAxisRange(Span<float> coords, int numVisibleAxes, uint axesToLimit)
     {
         bool limited = false;
-        for (int axis = firstAxis; axis < numVisibleAxes && axis < coords.Length; axis++)
+        for (int axis = 0; axis < numVisibleAxes && axis < coords.Length; axis++)
         {
             if ((axesToLimit & (1u << axis)) == 0)
             {
@@ -604,13 +795,13 @@ internal abstract class KinematicsEngine
     /// How far outside its limit an axis may be before it counts as out of range, mm
     /// </summary>
     /// <remarks>RepRapFirmware's <c>AxisRoundingError</c></remarks>
-    public const float AxisRoundingError = 0.02f;
+    private const float AxisRoundingError = 0.02f;
 
     /// <summary>Configured minimum of each axis, mm</summary>
-    public float[] AxisMinima { get; } = new float[MotionLimits.MaxAxes];
+    protected float[] AxisMinima { get; } = new float[MotionLimits.MaxAxes];
 
     /// <summary>Configured maximum of each axis, mm</summary>
-    public float[] AxisMaxima { get; } = new float[MotionLimits.MaxAxes];
+    private float[] AxisMaxima { get; } = new float[MotionLimits.MaxAxes];
 
     /// <summary>
     /// Set one axis' travel limits
@@ -683,7 +874,8 @@ internal abstract class KinematicsEngine
     /// <para>
     /// Asking for every axis runs <c>homeall.g</c>; asking for some runs <c>home&lt;letter&gt;.g</c>
     /// for the lowest of them. The exception is a Z axis homed with a probe, which cannot be homed
-    /// until the probe can be positioned over the bed - that is what the returned bitmap says
+    /// until the probe can be positioned over the bed - that is what the returned bitmap says. Z is
+    /// the axis lettered Z wherever it sits, and a machine without one has nothing to hold back
     /// </para>
     /// </remarks>
     public virtual uint GetHomingFileName(uint toBeHomed, uint alreadyHomed, ReadOnlySpan<char> axisLetters,
@@ -698,7 +890,8 @@ internal abstract class KinematicsEngine
 
         // Homing Z with a probe means driving the nozzle at the bed, so it is only safe once the
         // probe can be put somewhere the bed actually is
-        bool homeZLast = (toBeHomed & (1u << ZAxis)) != 0 && HomesZWithProbe;
+        int zAxis = Axes.Z;
+        bool homeZLast = (toBeHomed & AxisIndices.Bit(zAxis)) != 0 && HomesZWithProbe;
         uint homeFirst = AxesToHomeBeforeProbing;
 
         for (int axis = 0; axis < axisLetters.Length; axis++)
@@ -708,7 +901,7 @@ internal abstract class KinematicsEngine
                 continue;
             }
 
-            if (axis == ZAxis && homeZLast && (alreadyHomed & homeFirst) != homeFirst)
+            if (axis == zAxis && homeZLast && (alreadyHomed & homeFirst) != homeFirst)
             {
                 continue;
             }
@@ -757,9 +950,10 @@ internal abstract class KinematicsEngine
     /// </summary>
     /// <remarks>
     /// X and Y on most machines: the probe has to be somewhere over the bed before it is driven down.
-    /// A delta has to home all three towers first, because none of its axes moves a motor of its own
+    /// A delta has to home all three towers first, because none of its axes moves a motor of its own.
+    /// The axes are found by letter, and one the machine does not have is not waited for
     /// </remarks>
-    public virtual uint AxesToHomeBeforeProbing => 0b011;
+    public virtual uint AxesToHomeBeforeProbing => Axes.XyBitmap;
 
     /// <summary>
     /// Round a millimetre position to microsteps, reporting a position too far from the origin
@@ -788,26 +982,31 @@ internal abstract class KinematicsEngine
     /// </summary>
     /// <param name="machinePos">Axis coordinates in mm</param>
     /// <param name="stepsPerMm">Microsteps per mm for each drive</param>
-    /// <param name="firstAxis">First axis to convert</param>
+    /// <param name="transformedAxes">The axes the geometry transforms itself, as a bitmap, which are skipped</param>
     /// <param name="numVisibleAxes">Axes the user can refer to</param>
     /// <param name="motorPos">Filled in with the motor position in microsteps</param>
     /// <returns>Ok, or MicrostepPositionTooLarge</returns>
     /// <remarks>
-    /// Every non-Cartesian geometry describes the first two or three axes and leaves the rest alone,
-    /// so they all end their forward transform with this loop
+    /// Every non-Cartesian geometry describes two or three axes and leaves the rest alone, so they all
+    /// end their forward transform with this loop
     /// </remarks>
     protected static NativeMovementError LinearAxesToMotorSteps(
         ReadOnlySpan<float> machinePos,
         ReadOnlySpan<float> stepsPerMm,
-        int firstAxis,
+        uint transformedAxes,
         int numVisibleAxes,
         Span<int> motorPos)
     {
         NativeMovementError result = NativeMovementError.Ok;
         int limit = Math.Min(numVisibleAxes, Math.Min(machinePos.Length, Math.Min(stepsPerMm.Length, motorPos.Length)));
 
-        for (int axis = firstAxis; axis < limit; axis++)
+        for (int axis = 0; axis < limit; axis++)
         {
+            if ((transformedAxes & (1u << axis)) != 0)
+            {
+                continue;
+            }
+
             if (TryRoundToInt32(machinePos[axis] * stepsPerMm[axis], out int steps))
             {
                 motorPos[axis] = steps;
@@ -825,27 +1024,23 @@ internal abstract class KinematicsEngine
     /// </summary>
     /// <param name="motorPos">Motor position in microsteps</param>
     /// <param name="stepsPerMm">Microsteps per mm for each drive</param>
-    /// <param name="firstAxis">First axis to convert</param>
+    /// <param name="transformedAxes">The axes the geometry transforms itself, as a bitmap, which are skipped</param>
     /// <param name="numVisibleAxes">Axes the user can refer to</param>
     /// <param name="machinePos">Filled in with the axis coordinates in mm</param>
     protected static void LinearMotorStepsToCartesian(
         ReadOnlySpan<int> motorPos,
         ReadOnlySpan<float> stepsPerMm,
-        int firstAxis,
+        uint transformedAxes,
         int numVisibleAxes,
         Span<float> machinePos)
     {
         int limit = Math.Min(numVisibleAxes, Math.Min(machinePos.Length, Math.Min(stepsPerMm.Length, motorPos.Length)));
-        for (int axis = firstAxis; axis < limit; axis++)
+        for (int axis = 0; axis < limit; axis++)
         {
-            machinePos[axis] = motorPos[axis] / stepsPerMm[axis];
+            if ((transformedAxes & (1u << axis)) == 0)
+            {
+                machinePos[axis] = motorPos[axis] / stepsPerMm[axis];
+            }
         }
     }
-
-    /// <summary>
-    /// The lowest <paramref name="count"/> drives, as a bitmap
-    /// </summary>
-    /// <param name="count">Number of drives</param>
-    /// <returns>Logical drive bitmap</returns>
-    protected static uint LowestDrives(int count) => count >= 32 ? uint.MaxValue : (1u << count) - 1;
 }

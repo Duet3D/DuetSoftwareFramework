@@ -1,5 +1,4 @@
 using System;
-using DuetControlServer.Motion.Native;
 
 namespace DuetControlServer.Motion;
 
@@ -21,21 +20,6 @@ namespace DuetControlServer.Motion;
 /// </remarks>
 internal static class MoveVector
 {
-    /// <summary>
-    /// Length of a vector measured over every drive
-    /// </summary>
-    /// <param name="v">The vector</param>
-    /// <returns>Its magnitude</returns>
-    public static float Magnitude(ReadOnlySpan<float> v)
-    {
-        float magnitudeSquared = 0.0f;
-        foreach (float component in v)
-        {
-            magnitudeSquared += component * component;
-        }
-        return MathF.Sqrt(magnitudeSquared);
-    }
-
     /// <summary>
     /// Length of a vector measured over the given orthogonal axes only
     /// </summary>
@@ -94,22 +78,6 @@ internal static class MoveVector
     public static float Normalise(Span<float> v, uint unitLengthAxes)
     {
         float magnitude = Magnitude(v, unitLengthAxes);
-        if (magnitude <= 0.0f)
-        {
-            return 0.0f;
-        }
-        Scale(v, 1.0f / magnitude);
-        return magnitude;
-    }
-
-    /// <summary>
-    /// Scale a vector to unit length over every drive, returning what its length was
-    /// </summary>
-    /// <param name="v">Vector to normalise in place</param>
-    /// <returns>The magnitude before normalising, or 0 if the vector was empty</returns>
-    public static float Normalise(Span<float> v)
-    {
-        float magnitude = Magnitude(v);
         if (magnitude <= 0.0f)
         {
             return 0.0f;
@@ -209,19 +177,5 @@ internal static class MoveVector
             }
         }
         return magnitude;
-    }
-
-    /// <summary>
-    /// A bitmap with the lowest <paramref name="count"/> bits set
-    /// </summary>
-    /// <param name="count">Number of bits</param>
-    /// <returns>The bitmap</returns>
-    public static uint LowestBits(int count)
-    {
-        if (count <= 0)
-        {
-            return 0;
-        }
-        return count >= MotionLimits.MaxAxesPlusExtruders ? uint.MaxValue : (1u << count) - 1;
     }
 }

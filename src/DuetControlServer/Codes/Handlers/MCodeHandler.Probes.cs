@@ -494,14 +494,12 @@ internal partial class MCodeHandler
                 return new Message(MessageType.Success, $"Z probe offset is {-probe.TriggerHeight:F2}mm");
             }
 
-            // TODO RRF hardcodes this to axis index 2
+            // RepRapFirmware writes axis index 2, which is always its Z; here Z is wherever M584 put it
             probe.TriggerHeight = -offset;
-            for (int axis = 0; axis < model.Move.Axes.Count && axis < probe.Offsets.Count; axis++)
+            int zAxis = AxisIndices.IndexOf(model.Move, 'Z');
+            if (zAxis >= 0 && zAxis < probe.Offsets.Count)
             {
-                if (model.Move.Axes[axis].Letter == 'Z')
-                {
-                    probe.Offsets[axis] = offset;
-                }
+                probe.Offsets[zAxis] = offset;
             }
         }
         return new Message();

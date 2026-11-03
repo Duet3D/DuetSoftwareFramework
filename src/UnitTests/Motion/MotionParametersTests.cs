@@ -20,23 +20,6 @@ namespace UnitTests.Motion;
 [TestFixture]
 public class MotionParametersTests
 {
-
-    /// <summary>
-    /// Snapshot a machine, building its geometry from the object model as the factory does
-    /// </summary>
-    /// <param name="move">The move subsystem</param>
-    /// <returns>The snapshot</returns>
-    /// <remarks>
-    /// The planner owns its geometry rather than deriving it (§14), so the snapshot is handed one.
-    /// These tests describe a machine as an object model and want the geometry that describes, which
-    /// is what KinematicsFactory.Create is for
-    /// </remarks>
-    private static MotionParameters Snapshot(Move move)
-    {
-        KinematicsEngine geometry = KinematicsFactory.Create(move.Kinematics);
-        MotionParameters.ApplyAxisLimits(move, geometry);
-        return MotionParameters.FromObjectModel(move, geometry);
-    }
     private const float StepClockRate = MotionLimits.StepClockRate;
     private const int NumDrives = MotionLimits.MaxAxesPlusExtruders;
 
@@ -89,10 +72,25 @@ public class MotionParametersTests
         return move;
     }
 
+    /// <summary>
+    /// The same machine with X, Y, Z and U axes, for the geometries that find X, Y and Z by letter
+    /// and drive a fourth anchor from the axis after them
+    /// </summary>
+    private static Move MachineWithXyzu()
+    {
+        Move move = MachineWithOneOfEach();
+        move.Axes.RemoveAt(1);
+        foreach (char letter in "YZU")
+        {
+            move.Axes.Add(new Axis { Letter = letter, StepsPerMm = 80.0f });
+        }
+        return move;
+    }
+
     [Test]
     public void SpeedsAreConvertedFromMmPerMinuteToStepClocks()
     {
-        MotionParameters parameters = Snapshot(MachineWithOneOfEach());
+        MotionParameters parameters = KinematicsAxes.Snapshot(MachineWithOneOfEach());
 
         Assert.Multiple(() =>
         {
@@ -106,7 +104,7 @@ public class MotionParametersTests
     [Test]
     public void AccelerationsAreConvertedFromMmPerSecondSquared()
     {
-        MotionParameters parameters = Snapshot(MachineWithOneOfEach());
+        MotionParameters parameters = KinematicsAxes.Snapshot(MachineWithOneOfEach());
         float clockSquared = StepClockRate * StepClockRate;
 
         Assert.Multiple(() =>
@@ -126,14 +124,14 @@ public class MotionParametersTests
         Move move = MachineWithOneOfEach();
         move.Axes[0].ReducedAcceleration = 0.0f;
 
-        MotionParameters parameters = Snapshot(move);
+        MotionParameters parameters = KinematicsAxes.Snapshot(move);
         Assert.That(parameters.ReducedAccelerations[0], Is.EqualTo(parameters.Accelerations[0]));
     }
 
     [Test]
     public void RotationalAxesAreSeparatedFromLinearOnes()
     {
-        MotionParameters parameters = Snapshot(MachineWithOneOfEach());
+        MotionParameters parameters = KinematicsAxes.Snapshot(MachineWithOneOfEach());
 
         Assert.Multiple(() =>
         {
@@ -145,15 +143,13 @@ public class MotionParametersTests
     [Test]
     public void ExtrudersOccupyTheTopOfTheDriveSpace()
     {
-        MotionParameters parameters = Snapshot(MachineWithOneOfEach());
+        MotionParameters parameters = KinematicsAxes.Snapshot(MachineWithOneOfEach());
 
         Assert.Multiple(() =>
         {
             Assert.That(MotionParameters.ExtruderToDrive(0), Is.EqualTo(NumDrives - 1));
             Assert.That(parameters.FirstExtruderDrive, Is.EqualTo(NumDrives - 1));
             Assert.That(parameters.StepsPerMm[NumDrives - 1], Is.EqualTo(420.0f));
-            Assert.That(parameters.DriveToExtruder(NumDrives - 1), Is.EqualTo(0));
-            Assert.That(parameters.DriveToExtruder(0), Is.EqualTo(-1), "an axis is not an extruder");
         });
     }
 
@@ -162,7 +158,7 @@ public class MotionParametersTests
     {
         // The endstop path turns the drivers a stop names back into the axes they move, and does it
         // through this. Answering for an extruder drive would latch an axis that does not exist
-        MotionParameters parameters = Snapshot(MachineWithOneOfEach());
+        MotionParameters parameters = KinematicsAxes.Snapshot(MachineWithOneOfEach());
 
         Assert.Multiple(() =>
         {
@@ -183,7 +179,7 @@ public class MotionParametersTests
         Move move = MachineWithOneOfEach();
         move.Axes[0].Drivers.Add(new OmDriverId(1, 4));
 
-        MotionParameters parameters = Snapshot(move);
+        MotionParameters parameters = KinematicsAxes.Snapshot(move);
 
         Assert.Multiple(() =>
         {
@@ -210,7 +206,7 @@ public class MotionParametersTests
         Move move = MachineWithOneOfEach();
         move.Extruders[0].Driver = new OmDriverId(1, 2);        // the same driver X is on
 
-        MotionParameters parameters = Snapshot(move);
+        MotionParameters parameters = KinematicsAxes.Snapshot(move);
 
         Assert.Multiple(() =>
         {
@@ -225,7 +221,7 @@ public class MotionParametersTests
     {
         // This divides when converting motor steps back to a position, so a zero would turn an
         // untouched drive's position into an infinity
-        MotionParameters parameters = Snapshot(MachineWithOneOfEach());
+        MotionParameters parameters = KinematicsAxes.Snapshot(MachineWithOneOfEach());
         for (int drive = 0; drive < NumDrives; drive++)
         {
             Assert.That(parameters.StepsPerMm[drive], Is.Not.Zero, $"drive {drive}");
@@ -235,7 +231,7 @@ public class MotionParametersTests
     [Test]
     public void PressureAdvanceIsConvertedFromSecondsToStepClocks()
     {
-        MotionParameters parameters = Snapshot(MachineWithOneOfEach());
+        MotionParameters parameters = KinematicsAxes.Snapshot(MachineWithOneOfEach());
 
         // A time multiplies by the clock rate rather than dividing by it, which is the conversion
         // most easily got backwards
@@ -247,7 +243,7 @@ public class MotionParametersTests
     public void TheNativeConfigurationCarriesTheConvertedLimits()
     {
         Move move = MachineWithOneOfEach();
-        MotionParameters parameters = Snapshot(move);
+        MotionParameters parameters = KinematicsAxes.Snapshot(move);
         MachineConfig config = parameters.Config;
 
         Assert.Multiple(() =>
@@ -273,7 +269,7 @@ public class MotionParametersTests
     public void TheRingConfigurationComesFromTheQueue()
     {
         Move move = MachineWithOneOfEach();
-        MachineConfig config = Snapshot(move).Config;
+        MachineConfig config = KinematicsAxes.Snapshot(move).Config;
 
         Assert.Multiple(() =>
         {
@@ -288,7 +284,7 @@ public class MotionParametersTests
         Move move = MachineWithOneOfEach();
         move.Axes[0].ContinuousRotation = true;         // X is linear, so this must be ignored
 
-        MachineConfig config = Snapshot(move).Config;
+        MachineConfig config = KinematicsAxes.Snapshot(move).Config;
         Assert.That(config.ContinuousRotationAxes, Is.EqualTo(0b10u), "only the rotational C axis");
     }
 
@@ -301,7 +297,7 @@ public class MotionParametersTests
         move.Axes.Add(new Axis { Letter = 'Z', StepsPerMm = 400.0f });
         move.Kinematics = new PolarKinematics { RadiusMax = 150.0f };
 
-        MachineConfig config = Snapshot(move).Config;
+        MachineConfig config = KinematicsAxes.Snapshot(move).Config;
 
         // Bit 1 is the turntable, which the polar geometry contributes; the C axis at bit 1 declares
         // it as well, so this is really a check that neither source is lost
@@ -317,7 +313,7 @@ public class MotionParametersTests
         move.Axes.Add(new Axis { Letter = 'X', StepsPerMm = 80.0f });
         move.Kinematics = new PolarKinematics { RadiusMax = 150.0f };
 
-        MachineConfig config = Snapshot(move).Config;
+        MachineConfig config = KinematicsAxes.Snapshot(move).Config;
         Assert.That(config.ContinuousRotationAxes, Is.EqualTo(0u));
     }
 
@@ -325,7 +321,7 @@ public class MotionParametersTests
     public void DriversAreCarriedThroughWithTheirBoardAddress()
     {
         Move move = MachineWithOneOfEach();
-        MachineConfig config = Snapshot(move).Config;
+        MachineConfig config = KinematicsAxes.Snapshot(move).Config;
 
         Assert.Multiple(() =>
         {
@@ -343,7 +339,7 @@ public class MotionParametersTests
         // Board 0 is the main board, so a default driver id would address an unconfigured axis to a
         // real board
         Move move = MachineWithOneOfEach();
-        MachineConfig config = Snapshot(move).Config;
+        MachineConfig config = KinematicsAxes.Snapshot(move).Config;
 
         Assert.That(config.AxisDrivers[1].NumDrivers, Is.EqualTo(0), "the C axis has no driver");
         Assert.That(config.AxisDrivers[1].DriverNumbers[0].BoardAddress, Is.EqualTo(DriverId.NoCanAddress));
@@ -364,7 +360,7 @@ public class MotionParametersTests
             move.Extruders.Add(new Extruder());
         }
 
-        MotionParameters parameters = Snapshot(move);
+        MotionParameters parameters = KinematicsAxes.Snapshot(move);
 
         Assert.Multiple(() =>
         {
@@ -386,7 +382,7 @@ public class MotionParametersTests
         kinematics.InverseMatrix.Add([0, 0, 1]);
         move.Kinematics = kinematics;
 
-        MotionParameters parameters = Snapshot(move);
+        MotionParameters parameters = KinematicsAxes.Snapshot(move);
 
         // CoreXY: holding X still needs both motors
         Assert.That(parameters.Geometry.GetControllingDrives(0), Is.EqualTo(0b011u));
@@ -395,7 +391,7 @@ public class MotionParametersTests
     [Test]
     public void ADeltaInTheObjectModelBuildsADeltaEngine()
     {
-        Move move = MachineWithOneOfEach();
+        Move move = MachineWithXyzu();
         DeltaKinematics kinematics = new() { DeltaRadius = 105.6f, HomedHeight = 240.0f, PrintRadius = 80.0f };
         for (int tower = 0; tower < 3; tower++)
         {
@@ -403,7 +399,7 @@ public class MotionParametersTests
         }
         move.Kinematics = kinematics;
 
-        MotionParameters parameters = Snapshot(move);
+        MotionParameters parameters = KinematicsAxes.Snapshot(move);
 
         Assert.Multiple(() =>
         {
@@ -419,10 +415,10 @@ public class MotionParametersTests
     {
         // Before M665 has run the object model has zeroes in it. A delta radius of zero would put all
         // three towers on top of each other, which is not a machine - so the defaults stand in
-        Move move = MachineWithOneOfEach();
+        Move move = MachineWithXyzu();
         move.Kinematics = new DeltaKinematics();
 
-        MotionParameters parameters = Snapshot(move);
+        MotionParameters parameters = KinematicsAxes.Snapshot(move);
         float[] machinePos = new float[NumDrives];
         int[] motorPos = new int[NumDrives];
 
@@ -433,7 +429,7 @@ public class MotionParametersTests
     [Test]
     public void AScaraInTheObjectModelBuildsAScaraEngine()
     {
-        Move move = MachineWithOneOfEach();
+        Move move = MachineWithXyzu();
         ScaraKinematics kinematics = new() { ProximalLength = 100.0f, DistalLength = 100.0f };
         kinematics.ThetaLimits[0] = -90.0f;
         kinematics.ThetaLimits[1] = 90.0f;
@@ -441,7 +437,7 @@ public class MotionParametersTests
         kinematics.PsiLimits[1] = 135.0f;
         move.Kinematics = kinematics;
 
-        MotionParameters parameters = Snapshot(move);
+        MotionParameters parameters = KinematicsAxes.Snapshot(move);
 
         Assert.Multiple(() =>
         {
@@ -453,30 +449,46 @@ public class MotionParametersTests
     [Test]
     public void APolarInTheObjectModelCarriesItsTurntableLimitsInStepClocks()
     {
-        Move move = MachineWithOneOfEach();
+        Move move = MachineWithXyzu();
         move.Kinematics = new PolarKinematics { RadiusMin = 20.0f, RadiusMax = 150.0f, TTSpeedMax = 30.0f, TTAccMax = 60.0f };
 
-        MotionParameters parameters = Snapshot(move);
+        MotionParameters parameters = KinematicsAxes.Snapshot(move);
         float clockSquared = StepClockRate * StepClockRate;
 
         Assert.That(parameters.Geometry, Is.InstanceOf<DuetControlServer.Motion.Kinematics.PolarKinematicsEngine>());
 
-        var polar = (DuetControlServer.Motion.Kinematics.PolarKinematicsEngine)parameters.Geometry;
+        // A whole degree of turntable per mm of travel, so the turntable's own limits are the move's
+        float[] stepsPerDegree = new float[NumDrives];
+        Array.Fill(stepsPerDegree, 100.0f);
+        int[] start = new int[NumDrives], end = new int[NumDrives];
+        end[1] = 100;
+        MoveLimits limits = new() { RequestedSpeed = 100.0f, MaxAcceleration = 1000.0f };
+        PlannedMove planned = new()
+        {
+            NormalisedDirectionVector = new float[NumDrives],
+            StartMotorPos = start,
+            EndMotorPos = end,
+            StepsPerMm = stepsPerDegree,
+            NumVisibleAxes = parameters.NumAxes,
+            TotalDistance = 1.0f
+        };
+        parameters.Geometry.LimitSpeedAndAcceleration(ref limits, planned, new float[NumDrives], new float[NumDrives]);
+
         Assert.Multiple(() =>
         {
-            Assert.That(polar.MaxTurntableSpeed, Is.EqualTo(30.0f / StepClockRate).Within(1e-10f));
-            Assert.That(polar.MaxTurntableAcceleration, Is.EqualTo(60.0f / clockSquared).Within(1e-16f));
-            Assert.That(polar.ContinuousRotationAxes, Is.EqualTo(0b010u));
+            Assert.That(limits.RequestedSpeed, Is.EqualTo(30.0f / StepClockRate).Within(1e-10f));
+            Assert.That(limits.MaxAcceleration, Is.EqualTo(60.0f / clockSquared).Within(1e-16f));
+            Assert.That(parameters.Geometry.ContinuousRotationAxes, Is.EqualTo(0b010u));
         });
     }
 
     [Test]
     public void AHangprinterInTheObjectModelCarriesItsAnchors()
     {
-        Move move = MachineWithOneOfEach();
+        Move move = MachineWithXyzu();
         move.Kinematics = new HangprinterKinematics();
 
-        MotionParameters parameters = Snapshot(move);
+        MotionParameters parameters = KinematicsAxes.Snapshot(move);
 
         Assert.Multiple(() =>
         {
@@ -493,7 +505,7 @@ public class MotionParametersTests
         Move move = MachineWithOneOfEach();
         move.Kinematics = new Kinematics();
 
-        MotionParameters parameters = Snapshot(move);
+        MotionParameters parameters = KinematicsAxes.Snapshot(move);
         Assert.That(parameters.Geometry.GetControllingDrives(0), Is.EqualTo(0b001u));
     }
 
@@ -515,7 +527,7 @@ public class MotionParametersTests
     public void ASnapshotMatchesTheMachineItWasTakenFrom()
     {
         Move move = MachineWithOneOfEach();
-        Assert.That(Snapshot(move).MatchesObjectModel(move), Is.True);
+        Assert.That(KinematicsAxes.Snapshot(move).MatchesObjectModel(move), Is.True);
     }
 
     [Test]
@@ -537,7 +549,7 @@ public class MotionParametersTests
         // snapshot describes a machine that no longer exists, and every drive above the new axis has
         // moved in the drive space
         Move move = MachineWithOneOfEach();
-        MotionParameters parameters = Snapshot(move);
+        MotionParameters parameters = KinematicsAxes.Snapshot(move);
 
         move.Axes.Add(new Axis { Letter = 'Y', StepsPerMm = 80.0f });
 
@@ -552,7 +564,7 @@ public class MotionParametersTests
     public void AnAxisRemovedAfterTheSnapshotIsADivergence()
     {
         Move move = MachineWithOneOfEach();
-        MotionParameters parameters = Snapshot(move);
+        MotionParameters parameters = KinematicsAxes.Snapshot(move);
 
         move.Axes.RemoveAt(1);
 
@@ -567,7 +579,7 @@ public class MotionParametersTests
     public void AnExtruderChangeAfterTheSnapshotIsADivergence()
     {
         Move move = MachineWithOneOfEach();
-        MotionParameters parameters = Snapshot(move);
+        MotionParameters parameters = KinematicsAxes.Snapshot(move);
 
         move.Extruders.Add(new Extruder());
 
@@ -587,28 +599,43 @@ public class MotionParametersTests
         move.Axes[0].Min = -5.0f;
         move.Axes[0].Max = 200.0f;
 
-        MotionParameters parameters = Snapshot(move);
-        Assert.That(parameters.Geometry.AxisMaxima[0], Is.EqualTo(200.0f));
+        MotionParameters parameters = KinematicsAxes.Snapshot(move);
+        Assert.That(ClampedTo(parameters, 0, 1000.0f), Is.EqualTo(200.0f));
 
         parameters.SetAxisLimits(0, -5.0f, 187.5f);
 
         Assert.Multiple(() =>
         {
-            Assert.That(parameters.Geometry.AxisMinima[0], Is.EqualTo(-5.0f));
-            Assert.That(parameters.Geometry.AxisMaxima[0], Is.EqualTo(187.5f));
+            Assert.That(ClampedTo(parameters, 0, -1000.0f), Is.EqualTo(-5.0f));
+            Assert.That(ClampedTo(parameters, 0, 1000.0f), Is.EqualTo(187.5f));
         });
     }
 
     [Test]
     public void SettingTheLimitOfAnAxisThatDoesNotExistDoesNothing()
     {
-        MotionParameters parameters = Snapshot(MachineWithOneOfEach());
+        MotionParameters parameters = KinematicsAxes.Snapshot(MachineWithOneOfEach());
 
         Assert.DoesNotThrow(() =>
         {
             parameters.SetAxisLimits(-1, 0.0f, 100.0f);
             parameters.SetAxisLimits(parameters.NumAxes, 0.0f, 100.0f);
         });
-        Assert.That(parameters.Geometry.AxisMaxima[parameters.NumAxes], Is.Zero);
+        Assert.That(ClampedTo(parameters, parameters.NumAxes, 50.0f), Is.Zero, "the geometry's box there is still empty");
+    }
+
+    /// <summary>
+    /// Where the geometry's M208 box puts a target for one axis
+    /// </summary>
+    /// <param name="parameters">The snapshot whose geometry it is</param>
+    /// <param name="axis">The axis</param>
+    /// <param name="target">Where the move asks it to go</param>
+    /// <returns>Where the geometry lets it go</returns>
+    private static float ClampedTo(MotionParameters parameters, int axis, float target)
+    {
+        float[] coords = new float[axis + 1];
+        coords[axis] = target;
+        parameters.Geometry.LimitPosition(coords, [], axis + 1, 1u << axis, isCoordinated: true, applyM208Limits: true);
+        return coords[axis];
     }
 }

@@ -100,6 +100,11 @@ def check(rev: str) -> bool:
     for s in found:
         if s.path not in commits:
             sys.exit(f'.gitmodules lists {s.path}, but {rev} has no submodule there')
+    # A gitlink with no entry has no URL, so "git submodule update --init" stops at it for every submodule
+    unlisted = sorted(commits.keys() - {s.path for s in found})
+    if unlisted:
+        sys.exit(f'{rev} records submodules .gitmodules does not list: {", ".join(unlisted)}\n'
+                 f'Add them to .gitmodules, or remove them with: git rm --cached {" ".join(unlisted)}')
     with ThreadPoolExecutor() as pool:
         results = list(pool.map(check_one, found, (commits[s.path] for s in found)))
 

@@ -7,7 +7,6 @@ using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Motion.Kinematics;
 using DuetControlServer.Motion.Native;
-using static DuetControlServer.Motion.AxisIndices;
 
 namespace DuetControlServer.Motion;
 
@@ -130,25 +129,16 @@ internal sealed class MoveInterpreter(
 
         if (moveType == MoveType.Normal)
         {
-            // Where the move starts from, taken before the axis words below move the interpreter on.
-            // It is the same forward transform the target goes through, which is what keeps the two
-            // ends of the line in one coordinate space however many terms that transform grows.
-            // RepRapFirmware captures ms.initialCoords at the same instant and for the same reason.
+            // The move starts where the last one left the axes, which is RepRapFirmware's ms.initialCoords
+            // taken from ms.raw.coords. A transform that has changed since, such as M290 during a print,
+            // is therefore spread across this move's segments rather than landing on the first.
             //
-            // TODO RepRapFirmware copies its initialCoords from ms.raw.coords, which persists from
-            // the previous move, where this evaluates the transform afresh. The two differ whenever a
-            // term of the transform changed since - and M290 during a print is exactly that, so this
-            // is reachable now rather than theoretical. RRF interpolates from the old babystep to the
-            // new one across the move; here the whole change lands on the first segment. Closing it
-            // means carrying the previous move's coords rather than re-deriving them
-            ToolTransform.Apply(tool, model.Move, state, raw.InitialCoords, numAxes);
-
-            // The axes start where the last move left them, which is what an axis the code does not
-            // mention is being commanded to. RepRapFirmware gets this for free - ms.raw.coords is a
-            // member of a long-lived MovementState and simply carries over, which is also how an
-            // extruder-only move leaves the axes alone. A RawMove here is constructed per move, so
-            // "not written" would mean zero rather than unchanged, and zero is a dive to the origin
-            raw.InitialCoords.AsSpan(0, numAxes).CopyTo(raw.Coords);
+            // It is also what an axis the code does not mention is commanded to, because the coordinates
+            // of a move carry over. That is how an extruder-only move leaves the axes alone, and how an
+            // axis the tool's map moves away from stays where it is: the tool transform below gives it no
+            // coordinate of its own
+            state.Coords.AsSpan(0, numAxes).CopyTo(raw.InitialCoords);
+            state.Coords.AsSpan(0, numAxes).CopyTo(raw.Coords);
 
             for (int axis = 0; axis < numAxes; axis++)
             {
@@ -406,7 +396,7 @@ internal sealed class MoveInterpreter(
 
         if (raw.MoveType == MoveType.Normal)
         {
-            AxisAndBedTransform(raw, segments.NumAxes);
+            AxisAndBedTransform(raw, currentTool(), segments.NumAxes);
         }
 
         // Each segment is its own move to the engine, so it needs its own correlation id
@@ -417,19 +407,44 @@ internal sealed class MoveInterpreter(
     /// Apply the corrections that turn a nominal machine position into the one the machine is driven to
     /// </summary>
     /// <param name="raw">The move being built</param>
+    /// <param name="movementTool">
+    /// The tool whose axis map names X and Y for the skew: the selected tool for a G0 or G1, and none
+    /// for a move DSF generates itself
+    /// </param>
     /// <param name="numAxes">Number of axes to consider</param>
     /// <remarks>
     /// The skew first and the height map second, which is RepRapFirmware's
-    /// <c>AxisAndBedTransform</c>: the map is indexed by coordinates the skew has already moved
+    /// <c>AxisAndBedTransform</c>: the map is indexed by coordinates the skew has already moved.
+    /// <see cref="RemoveAxisAndBedTransform"/> is the inverse
     /// </remarks>
-    public void AxisAndBedTransform(RawMove raw, int numAxes)
+    private void AxisAndBedTransform(RawMove raw, Tool? movementTool, int numAxes)
     {
-        AxisSkew.Apply(currentTool(), model.Move, raw.Coords, numAxes);
+        raw.Coords.AsSpan(0, numAxes).CopyTo(raw.UntransformedCoords);
+        raw.UntransformedAxes = numAxes;
+
+        AxisSkew.Apply(movementTool, model.Move, raw.Coords, numAxes);
 
         if (bedCompensation.AppliesTo(raw, numAxes))
         {
             bedCompensation.Apply(raw, numAxes);
         }
+    }
+
+    /// <summary>
+    /// Take the corrections <see cref="AxisAndBedTransform"/> applies back off a machine position
+    /// </summary>
+    /// <param name="coords">Machine coordinates in, the coordinates the move was built in out</param>
+    /// <param name="movementTool">The tool the transform was applied with</param>
+    /// <param name="numAxes">Number of axes to consider</param>
+    /// <remarks>
+    /// The bed transform first and the axis transform second, which is the order RepRapFirmware's
+    /// <c>InverseAxisAndBedTransform</c> uses - the mirror of applying the axis transform before the
+    /// bed one, because the map is indexed by coordinates the skew has already moved
+    /// </remarks>
+    private void RemoveAxisAndBedTransform(Span<float> coords, Tool? movementTool, int numAxes)
+    {
+        bedCompensation.Remove(coords, numAxes);
+        AxisSkew.Remove(movementTool, model.Move, coords, numAxes);
     }
 
     /// <summary>
@@ -578,7 +593,7 @@ internal sealed class MoveInterpreter(
         for (int axis = 0; axis < numAxes; axis++)
         {
             Axis axisConfig = model.Move.Axes[axis];
-            if (char.ToUpperInvariant(axisConfig.Letter) != 'Z' && code.HasParameter(axisConfig.Letter))
+            if (axisConfig.Letter != 'Z' && code.HasParameter(axisConfig.Letter))
             {
                 return true;
             }
@@ -618,16 +633,15 @@ internal sealed class MoveInterpreter(
         // two would count one mesh correction as movement
         ReadOnlySpan<float> start = raw.InitialCoords;
 
-        // How far the move goes, counting the axes this geometry's error depends on
-        float lengthSquared = 0.0f;
-        for (int axis = 0; axis < numAxes && axis < 3; axis++)
+        // How far the move goes, counting the axes this geometry's error depends on: X and Y, and Z
+        // where the geometry says so. They are the axes with those letters, and one the machine does
+        // not have adds nothing
+        Move move = model.Move;
+        float lengthSquared = SquaredDelta(raw, start, AxisIndices.IndexOf(move, 'X'), numAxes)
+                              + SquaredDelta(raw, start, AxisIndices.IndexOf(move, 'Y'), numAxes);
+        if (geometry.Segmentation.HasFlag(SegmentationType.IncludeZ))
         {
-            bool counts = axis < 2 || geometry.Segmentation.HasFlag(SegmentationType.IncludeZ);
-            if (counts)
-            {
-                float delta = raw.Coords[axis] - start[axis];
-                lengthSquared += delta * delta;
-            }
+            lengthSquared += SquaredDelta(raw, start, AxisIndices.IndexOf(move, 'Z'), numAxes);
         }
         float length = MathF.Sqrt(lengthSquared);
 
@@ -667,6 +681,24 @@ internal sealed class MoveInterpreter(
         }
 
         return Math.Max(1, segments);
+    }
+
+    /// <summary>
+    /// How far one axis moves in a move, squared
+    /// </summary>
+    /// <param name="raw">The move</param>
+    /// <param name="start">Where it starts</param>
+    /// <param name="axis">The axis, or -1 for one the machine does not have</param>
+    /// <param name="numAxes">Number of axes the move covers</param>
+    /// <returns>The squared distance in mm², zero for an axis that is not there</returns>
+    private static float SquaredDelta(RawMove raw, ReadOnlySpan<float> start, int axis, int numAxes)
+    {
+        if (axis < 0 || axis >= numAxes)
+        {
+            return 0.0f;
+        }
+        float delta = raw.Coords[axis] - start[axis];
+        return delta * delta;
     }
 
     /// <summary>
@@ -845,11 +877,12 @@ internal sealed class MoveInterpreter(
     /// </summary>
     /// <remarks>
     /// <para>
-    /// RepRapFirmware's <c>ToolOffsetInverseTransform</c> after a homing or probing move, and the
-    /// only place the whole transform is inverted. Everywhere else the interpreter is authoritative
-    /// and the machine follows it; here the machine is somewhere the interpreter did not put it.
-    /// That is homing, probing, and a feedhold, which stops the machine before the moves the
-    /// interpreter had already built have run.
+    /// RepRapFirmware's <c>ToolOffsetInverseTransform</c> after a homing move, and one of the two
+    /// places the whole transform is inverted. Everywhere else the interpreter is authoritative and
+    /// the machine follows it; here the machine is somewhere the interpreter did not put it. That is
+    /// homing, and a feedhold, which stops the machine before the moves the interpreter had already
+    /// built have run. Probing is the other place, and is <see cref="SyncGeneratedMoveToMachine"/>,
+    /// because its moves were transformed with no tool.
     /// </para>
     /// <para>
     /// The bed transform is undone first, as RepRapFirmware's <c>InverseBedTransform</c> is before
@@ -862,16 +895,151 @@ internal sealed class MoveInterpreter(
     /// </remarks>
     public void SyncInterpreterToMachine()
     {
-        int numAxes = Parameters.SharedAxisCount(model.Move);
-        builder.StartCoordinates[..numAxes].CopyTo(state.CurrentUserPosition);
+        ReadCoordsFromMachine(currentTool());
+        SyncInterpreterToCoords();
+    }
 
-        // The bed transform first and the axis transform second, which is the order RepRapFirmware's
-        // InverseAxisAndBedTransform uses - the mirror of applying the axis transform before the bed
-        // one, because the map is indexed by coordinates the skew has already moved
-        bedCompensation.Remove(state.CurrentUserPosition, numAxes);
-        AxisSkew.Remove(currentTool(), model.Move, state.CurrentUserPosition, numAxes);
+    /// <summary>
+    /// Take where a generated move left the machine from the builder, after the move stopped short or
+    /// its position was redefined, and bring the interpreter's position into step with it
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's re-read of the position at a standstill
+    /// (<c>GCodes::LockMovementSystemAndWaitForStandstill</c>): <c>raw.coords</c> are taken from the
+    /// motors with <c>InverseAxisAndBedTransform</c>, and the user position from those with
+    /// <c>ToolOffsetInverseTransform</c>. The skew is taken off with no tool, because the moves were
+    /// transformed with none, so a reported X and Y do not move by a skew correction the motors never
+    /// made, and a probing move that stopped short reads where its motors stopped on the line the
+    /// transform put them on. RepRapFirmware takes it off with the selected tool's axis map, which
+    /// differs only with a tool that maps X or Y elsewhere and skew or a height map set
+    /// (rrf-differences.md section 5.2).
+    /// </para>
+    /// <para>
+    /// The caller must hold the object model write lock and the planner lock, and is what publishes
+    /// the result
+    /// </para>
+    /// </remarks>
+    public void SyncGeneratedMoveToMachine()
+    {
+        ReadCoordsFromMachine(movementTool: null);
+        SyncInterpreterToCoords();
+    }
+
+    /// <summary>
+    /// Bring the interpreter's position into step with where the last move left the axes
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>ToolOffsetInverseTransform(ms)</c>. For when the coordinates are right and the
+    /// user position is not: a generated move writes its coordinates straight into the move, so the
+    /// interpreter does not follow it as it follows a G1, and a change to the selected tool's offsets
+    /// changes what the same coordinates are called.
+    /// </para>
+    /// <para>
+    /// The caller must hold the object model lock and the planner lock, and is what publishes the result
+    /// </para>
+    /// </remarks>
+    public void SyncInterpreterToCoords()
+    {
+        int numAxes = Parameters.SharedAxisCount(model.Move);
+        state.Coords.AsSpan(0, numAxes).CopyTo(state.CurrentUserPosition);
         ToolTransform.Remove(currentTool(), model.Move, state.CurrentUserPosition, numAxes);
     }
+
+    /// <summary>
+    /// Re-derive where the axes are from the machine position
+    /// </summary>
+    /// <param name="movementTool">The tool whose axis map names X and Y for the skew</param>
+    /// <remarks>
+    /// For when the machine is somewhere no queued move put it. It is not done after every move
+    /// because the mesh correction's inverse is approximate, so what comes back is not exactly what
+    /// the move was given
+    /// </remarks>
+    private void ReadCoordsFromMachine(Tool? movementTool)
+    {
+        int numAxes = Parameters.SharedAxisCount(model.Move);
+        builder.StartCoordinates[..numAxes].CopyTo(state.Coords);
+        RemoveAxisAndBedTransform(state.Coords, movementTool, numAxes);
+    }
+
+    /// <summary>
+    /// Start a move DSF generates itself rather than reading from a G0 or G1
+    /// </summary>
+    /// <param name="movementTool">
+    /// The tool whose X and Y the move is measured by, or null for none: null for a probing move,
+    /// the selected tool for the move back on resume
+    /// </param>
+    /// <returns>
+    /// The move, with every axis where the last move left it and X and Y the movement tool's
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>SetMoveBufferDefaults</c>, which every move it makes by itself starts from:
+    /// the moves of a probing code, and the move back to where a paused job stopped. Its coordinates
+    /// are what the caller writes into it, and <see cref="FinishGeneratedMove"/> puts them through
+    /// skew and mesh compensation with the same movement tool, as <c>Move::MoveLoop</c> does with
+    /// <c>AxisAndBedTransform</c>. The movement tool decides which axes are X and Y: whether the move
+    /// is XY movement, how its length is measured, and which axes skew corrects. A probing move has
+    /// none, as in RepRapFirmware, so X and Y are the axes lettered X and Y whatever the selected
+    /// tool maps them to, because it positions the probe on its carriage. RepRapFirmware gives the
+    /// move back on resume no movement tool either, although its coordinates go through the tool:
+    /// a carriage reached through the tool's map is then neither held to M204 nor skewed as the
+    /// job's own moves put it there. DSF gives it the selected tool, so it is measured and skewed as
+    /// the job's G1 moves are, as RepRapFirmware's <c>TravelToStartPoint</c> does for the same kind of
+    /// move back after a cancelled object (rrf-differences.md section 5.3).
+    /// </para>
+    /// <para>
+    /// The move starts at <see cref="MovementState.Coords"/>, RepRapFirmware's <c>raw.coords</c> as the
+    /// last move left them, so a sequence of these moves carries each axis on: a probing move writes
+    /// one carriage of a tool that maps X onto two and leaves the other where it was.
+    /// </para>
+    /// <para>
+    /// The caller writes only the axes it moves. A probing move writes probe coordinates as they are,
+    /// with no tool transform, because the probe is on the carriage and not on the tool; the move back
+    /// on resume puts the restore point through <see cref="ToolTransform.Apply"/>, because it returns
+    /// the tool to where the job left it. The caller must hold the object model write lock and the
+    /// planner lock
+    /// </para>
+    /// </remarks>
+    public RawMove StartGeneratedMove(Tool? movementTool = null)
+    {
+        int numAxes = Parameters.SharedAxisCount(model.Move);
+        RawMove raw = new()
+        {
+            XAxes = ToolTransform.AxisBitmap(movementTool, model.Move, 'X'),
+            YAxes = ToolTransform.AxisBitmap(movementTool, model.Move, 'Y')
+        };
+
+        state.Coords.AsSpan(0, numAxes).CopyTo(raw.Coords);
+        state.Coords.AsSpan(0, numAxes).CopyTo(raw.InitialCoords);
+        return raw;
+    }
+
+    /// <summary>
+    /// Turn the coordinates of a move started by <see cref="StartGeneratedMove"/> into the ones the
+    /// machine is driven to
+    /// </summary>
+    /// <param name="raw">The move, with the coordinates its caller wrote</param>
+    /// <param name="movementTool">The movement tool the move was started with, see <see cref="StartGeneratedMove"/></param>
+    /// <remarks>
+    /// <para>
+    /// Skew and mesh compensation with the move's movement tool, exactly as a G1 segment gets them with
+    /// the selected tool - RepRapFirmware's <c>Move::MoveLoop</c> applies <c>AxisAndBedTransform</c> to
+    /// every move of type 0 whoever built it.
+    /// </para>
+    /// <para>
+    /// Every generated move is one segment, with the mesh correction applied at its end, which on a
+    /// Cartesian machine is what RepRapFirmware does: it cuts a move into segments to follow the
+    /// height map only in <c>DoStraightMove</c>, and <c>NewSegmentableMoveAvailable</c>, which the
+    /// travel to a probe point and the move back on resume go through, segments only a geometry that
+    /// asks for segmentation (M669 S and T, which delta, SCARA, polar, rotary delta and hangprinter
+    /// start with). TODO segment these moves on such a geometry by building them through
+    /// <see cref="SegmentedMove"/> as <c>SubmitMoveAsync</c> does
+    /// </para>
+    /// </remarks>
+    public void FinishGeneratedMove(RawMove raw, Tool? movementTool = null)
+        => AxisAndBedTransform(raw, movementTool, Parameters.SharedAxisCount(model.Move));
 
     /// <summary>
     /// Fill in where a special move starts from
@@ -1002,7 +1170,7 @@ internal sealed class MoveInterpreter(
             //
             // TODO that rewind does not happen yet, because nothing tracks the absolute extruder
             // position at all: RawPosition is only ever written by G92 E and
-            // RestorePoint.VirtualExtruderPosition is hardwired to zero (§15.2). Whoever lands that
+            // RestorePoint.VirtualExtruderPosition is hardwired to zero. Whoever lands that
             // tracking has to restore it here to the value at the start of the interrupted line, not
             // to where the machine stopped - restoring the stop point would count the same filament
             // twice, once in the difference and once in this scale factor
@@ -1025,7 +1193,7 @@ internal sealed class MoveInterpreter(
                 raw.ApplyM220M221 ? movement * extruderConfig.Factor : movement;
 
             // TODO track rawExtruderTotal and the virtual extruder position, which is what print
-            // progress and move.motionSystems[].virtualEPos report - §15.2
+            // progress and move.motionSystems[].virtualEPos report
         }
 
         // TODO extruder endstops (G1 H1 E), which need the per-extruder speed calculation

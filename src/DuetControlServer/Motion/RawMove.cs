@@ -34,8 +34,9 @@ internal sealed class RawMove
     /// <para>
     /// RepRapFirmware's <c>ms.initialCoords</c>, and the distinction it draws is the reason this
     /// exists separately from <see cref="MoveBuilder.StartCoordinates"/>. Both say where the last
-    /// move left the machine, but in different coordinates: this one has the tool transform applied
-    /// and <em>not</em> the bed transform, while the builder's has both, because the builder's job is
+    /// move left the machine, but in different coordinates: this one is
+    /// <see cref="MovementState.Coords"/>, with the tool transform applied and <em>not</em> the bed
+    /// transform, while the builder's has both, because the builder's job is
     /// to difference one commanded position against the next and the bed correction is part of what
     /// was commanded.
     /// </para>
@@ -49,6 +50,20 @@ internal sealed class RawMove
     /// </para>
     /// </remarks>
     public float[] InitialCoords { get; } = new float[MotionLimits.MaxAxes];
+
+    /// <summary>
+    /// The axis coordinates as they were before skew and mesh compensation
+    /// </summary>
+    /// <remarks>
+    /// Taken as the compensation overwrites <see cref="Coords"/>, and what
+    /// <see cref="MovementState.Coords"/> becomes if this move is taken
+    /// </remarks>
+    public float[] UntransformedCoords { get; } = new float[MotionLimits.MaxAxes];
+
+    /// <summary>
+    /// How many of <see cref="UntransformedCoords"/> are set, which is none for a special move
+    /// </summary>
+    public int UntransformedAxes { get; set; }
 
     /// <summary>Requested speed in mm/sec, meaningless when <see cref="InverseTimeMode"/> is set</summary>
     public float FeedRateMmPerSec { get; set; } = 50.0f;
@@ -185,16 +200,28 @@ internal sealed class RawMove
     /// </summary>
     public MoveType MoveType { get; set; }
 
-    /// <summary>Axes the current tool maps X onto, as a bitmap</summary>
-    public uint XAxes { get; set; } = 1;
+    /// <summary>Axes that count as X for this move, as a bitmap</summary>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>Tool::GetXAxes(movementTool)</c>: the selected tool's X map for a G0 or G1,
+    /// and the axis lettered X for a move DSF generates itself, which has no movement tool. It decides
+    /// whether the move is XY movement and how its length is measured.
+    /// </para>
+    /// <para>
+    /// Set wherever a move is built, from <see cref="ToolTransform.AxisBitmap"/>: there is no default,
+    /// because X is wherever M584 put it and may not exist at all
+    /// </para>
+    /// </remarks>
+    public uint XAxes { get; set; }
 
-    /// <summary>Axes the current tool maps Y onto, as a bitmap</summary>
-    public uint YAxes { get; set; } = 2;
+    /// <summary>Axes that count as Y for this move, as a bitmap</summary>
+    /// <remarks>Set wherever a move is built, as <see cref="XAxes"/> is</remarks>
+    public uint YAxes { get; set; }
 
     /// <summary>Logical drives this move is allowed to touch, as a bitmap</summary>
     /// <remarks>
     /// TODO never set: every drive is owned, which is right with one motion system and wrong with two.
-    /// The builder already honours it, so this waits on M596 - §15.2
+    /// The builder already honours it, so this waits on M596
     /// </remarks>
     public uint OwnedDrives { get; set; } = uint.MaxValue;
 

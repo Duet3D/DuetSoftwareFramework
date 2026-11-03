@@ -351,10 +351,33 @@ the first move.
 | `G93` inverse time is carried as `RawMove.DurationSec` | Deliberately not a second meaning for `FeedRateMmPerSec`; the quantity is a duration, which is also why the speed factor divides rather than multiplies |
 | `inputs[].feedRate` holds the raw `F` value | The inch conversion depends on which axes the move mentions, which is not known when `F` is read — and this is what the field's documentation already said |
 | M906, M913 and M917 are one handler; M665, M666 and M669 are another | They differ only in which quantity they address, which is true in RRF too. Which parameters mean what is the geometry's business |
-| `M669 K` numbers are mapped explicitly | RRF's `KinematicsType` is ordered differently from the object model's `KinematicsName`, and the mapping is part of the interface a config.g depends on |
 | Rotary delta and five-bar SCARA are built with defaults | Nothing in the object model configures them yet, so the engines take RRF's and the M669 documentation's values rather than inventing a home for the settings |
 | Hangprinter uses the constant-spool-radius model | Line buildup and flex compensation need `move.kinematics` fields that do not exist; this is the branch RRF itself takes when the buildup factor is zero |
 | The interpreter state stack is capped at 10, macro nesting at 10 | RRF caps its own stack; a macro looping over `M120` without `M121` would otherwise grow it without bound |
+
+### 5.1 There are no default axes, so X, Y and Z are found by letter
+
+RepRapFirmware creates X, Y and Z before config.g runs, so they are always its first three axes and its code treats axis numbers 0, 1 and 2 as X, Y and Z. DSF creates no axes of its own: `move.axes[]` starts empty and M584 creates each axis the first time it names the letter. One M584 creates its new axes in letter order, but config.g can create them across several M584 codes in any order (`M584 Y..` then `M584 X..`, or `M584 X.. Y.. U..` then `M584 Z..`), and it need not create X, Y or Z at all. Everything that means X, Y or Z therefore means the axis carrying that letter, wherever it is in `move.axes[]`:
+
+- **Kinematics need their axes by letter, and M584 comes before M669.** RepRapFirmware's geometries take their axes by position: a delta's towers and a Hangprinter's anchors are its first axes, and a CoreXYU's U and V motors are its fourth and fifth axes, whatever letters those carry, so `M584 X.. Y.. Z.. A..` followed by `M669 K5` makes A the U axis. DSF matches the letters instead. Each geometry needs these axes, and every other axis is an ordinary one with a motor of its own: CoreXY and MarkForged need X and Y; CoreXZ X and Z; CoreXYU and CoreXYUV X, Y, U and V; a linear delta X, Y and Z for towers A, B and C, and U, V and W for a fourth, fifth and sixth tower; a rotary delta X, Y and Z; a Hangprinter X, Y and Z for its first three anchors and then U, V, W, A and B for the fourth anchor onwards; a SCARA X and Y for its proximal and distal joints, with its crosstalk acting on Z only when there is a Z; a five-bar SCARA and a polar machine X and Y. Cartesian needs none. These are the letters RepRapFirmware's axes carry when config.g creates them in one M584, so a config.g written that way behaves as it does in RepRapFirmware.
+- **`M669`, `M665` and `M666` refuse a geometry whose axes do not exist yet.** Selecting a geometry with `M669 K`, switching to a delta with `M665 L`, or configuring a geometry with any of the three is an error naming the missing axes, for example `The machine has no U or V axis, which coreXYU kinematics needs`, and the geometry that was there stays. config.g therefore creates the axes a geometry needs with M584 before it selects the geometry. Only those have to exist: an axis M584 creates after `M669` is an ordinary axis with a motor of its own, which is the identity in the matrices, as is any other axis the geometry does not need. The exception is Z on a SCARA, which the geometry picks up when it is created so that its crosstalk can act on it.
+- **Core matrices.** The named matrices are RepRapFirmware's, written by letter and placed at the indices of the axes with those letters, and `move.kinematics.inverseMatrix` shows them where they are placed. An `M669` row parameter replaces the row of the axis carrying that letter, and its values are the motors of the machine's axes in axis order, so a row can have no more values than the machine has axes (`array too long for parameter 'X'`, as in RepRapFirmware). A row for a letter the machine has no axis for is an error, `The machine has no A axis`, where RepRapFirmware ignores it; nothing of the code is applied. A matrix that cannot be inverted is reported with RepRapFirmware's `Invalid kinematics matrix`, but where RepRapFirmware reports it as a message and carries on with the singular matrix, `M669` refuses it and keeps the geometry it had.
+- **Tools.** `M563` maps X, Y and Z by default to the axes carrying those letters at the time it runs, and a letter the machine does not have to no axis at all. The tool transform reads each coordinate from, and writes it back to, the axis with that letter, and the Z hop applies to the tool's Z map.
+- **Moves and homing.** The X and Y axes of a move, the axes that count towards a segment's length, the default XY speed limit, the delta bed tilt, Z being homed after X and Y when it homes with the probe, and the axes homed before probing are all found by letter. Where the letter is missing the step is skipped: a machine without Z has nothing to home last.
+- **`M290 S`** babysteps the axis lettered Z. On a machine without Z it is an error, `The machine has no Z axis`, rather than a value quietly dropped.
+- **`M851 Z`** writes the probe offset of the axis lettered Z, where RepRapFirmware writes axis 2.
+
+`M584 P` hides the highest-numbered axes, which are the last ones created and not necessarily the letters after Z.
+
+### 5.2 A G30 dive makes its whole skew correction, and probing reads its position back with no tool
+
+`G30` and `G29` don't use tool axis mapping (as RRF), but they do apply skew and mesh compensation. In RRF skew correction is only applied for `G29` because of a bug in `G30` which doesn't apply skew correction for the move.
+
+Also fixes a bug in RRF that incorrectly removes the correction from the tools mapped axes after probing moves even though the mapped axes weren't used.
+
+### 5.3 The move back on resume is measured and skewed through the selected tool's map
+
+When a print is paused, if the tool position is moved then the restore move will use the axis mapping to apply `M204` acceleration limits correctly (regression case `m24-resume-with-tool-axis-mapping`: with the tool's `X3` mapping the move is held to U's 5000 mm/s² axis limit, and without it to the 100 mm/s² `M204` limit).
 
 ---
 

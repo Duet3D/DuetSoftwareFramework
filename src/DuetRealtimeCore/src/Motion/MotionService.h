@@ -73,6 +73,7 @@ namespace Duet::Sbc
 
 		// True if `ring` has room for another move. Advisory: by the time the caller acts the ring
 		// may have retired a move and made more room, which is the harmless direction to be wrong in.
+		// False until Init has built the rings.
 		[[nodiscard]] bool CanAddMove(unsigned int ring) const;
 
 		// Queue a move. Copies the record, so the caller's buffer is free on return. False means the
@@ -327,7 +328,10 @@ namespace Duet::Sbc
 
 		std::thread m_thread;
 		std::atomic<bool> m_stop{false};
-		bool m_initialised = false;
+
+		// Set once Init has built the rings, and read from the managed side, which asks for room in
+		// a ring from its own threads and can do so before the engine has been started
+		std::atomic<bool> m_initialised{false};
 	};
 }
 

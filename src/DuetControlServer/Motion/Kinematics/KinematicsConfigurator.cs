@@ -1,3 +1,4 @@
+using System;
 using DuetAPI;
 using DuetAPI.ObjectModel;
 using Code = DuetAPI.Commands.Code;
@@ -26,31 +27,31 @@ internal static class KinematicsConfigurator
     /// Apply a configuring M-code to a geometry
     /// </summary>
     /// <param name="current">The geometry as it is now</param>
+    /// <param name="move">The move model, whose axes the geometry is configured against. The caller holds the object model write lock</param>
     /// <param name="code">An M665, M666 or M669</param>
     /// <param name="seen">Set when the code carried a parameter that configured something</param>
     /// <returns>The geometry the code leaves behind, which is <paramref name="current"/> if nothing changed</returns>
-    /// <exception cref="GCodeException">The code asked for something this geometry cannot do</exception>
-    /// <remarks>
-    /// Takes no locks and touches no object model. The caller applies the result and then projects it
-    /// with <see cref="WriteTo"/>, which is what keeps the lock order in §14.4
-    /// </remarks>
-    public static KinematicsEngine Apply(KinematicsEngine current, Code code, ref bool seen)
+    /// <exception cref="GCodeException">
+    /// The code asked for something this geometry cannot do, or for a geometry the machine does not
+    /// have the axes for. The caller keeps the geometry it had
+    /// </exception>
+    public static KinematicsEngine Apply(KinematicsEngine current, Move move, Code code, ref bool seen)
     {
+        // What the code needs and what it configures are judged against the axes as they are now. The
+        // installed geometry already has them, from the reconfiguration every M584 ends with, and a
+        // geometry built here is given them from the move model
         KinematicsEngine engine = current;
 
-        if (code.MajorNumber == 669 && code.TryGetInt('K', out int kinematicsType))
+        if (code.MajorNumber == 669 && code.TryGetValuedParameter('K', out CodeParameter? kinematicsParameter))
         {
-            KinematicsName? name = NameFor(kinematicsType);
-            if (name is null)
-            {
-                throw new GCodeException($"Unknown kinematics type {kinematicsType}");
-            }
-
-            if (name.Value != engine.Kind)
+            KinematicsName name = KinematicsFrom(kinematicsParameter);
+            if (name != engine.Kind)
             {
                 // A new geometry starts from its own defaults, including its segmentation, which is
-                // what constructing a new Kinematics does in RepRapFirmware
-                engine = KinematicsFactory.Create(name.Value);
+                // what constructing a new Kinematics does in RepRapFirmware. It is built for the
+                // machine's axes: a core geometry places its matrix by them, and the rest of this code
+                // may configure it
+                engine = KinematicsFactory.Create(name, move);
             }
             seen = true;
         }
@@ -59,8 +60,14 @@ internal static class KinematicsConfigurator
         {
             // M665 with a rod length switches the machine to a delta if it is not one already, which
             // is how a delta config.g is usually written
-            engine = KinematicsFactory.Create(KinematicsName.LinearDelta);
+            engine = KinematicsFactory.Create(KinematicsName.LinearDelta, move);
             seen = true;
+        }
+
+        // A geometry just selected has to have its axes before anything configures it
+        if (seen)
+        {
+            RequireAxes(engine);
         }
 
         if (engine is HangprinterKinematicsEngine && HasConfiguringParameters(code))
@@ -69,10 +76,15 @@ internal static class KinematicsConfigurator
         }
 
         KinematicsEngine configured = engine.Configure(code, ref seen);
-        if (!ReferenceEquals(configured, engine) && ReferenceEquals(engine, current))
+        if (!ReferenceEquals(configured, engine))
         {
-            // The geometry itself did not change, so what M669 S and T had already set carries over
-            configured.InheritSegmentationFrom(current);
+            // Configuring builds a new instance, which has to know the machine's axes as well
+            configured.SetAxes(move);
+            if (ReferenceEquals(engine, current))
+            {
+                // The geometry itself did not change, so what M669 S and T had already set carries over
+                configured.InheritSegmentationFrom(current);
+            }
         }
         engine = configured;
 
@@ -99,7 +111,66 @@ internal static class KinematicsConfigurator
             seen = true;
         }
 
+        // Configuring a geometry the machine lacks the axes for is refused as selecting one is: the
+        // axes come first in config.g, and a code that left such a geometry behind would leave every
+        // move to be refused instead
+        if (seen)
+        {
+            RequireAxes(engine);
+        }
         return engine;
+    }
+
+    /// <summary>
+    /// Refuse a geometry that needs an axis the machine does not have
+    /// </summary>
+    /// <param name="engine">The geometry, told the machine's axes</param>
+    /// <exception cref="GCodeException">An axis it needs is missing</exception>
+    /// <remarks>
+    /// RepRapFirmware's geometries take their first axes to be X, Y, Z, U and so on, which its axes
+    /// always are when config.g creates them in one M584. DSF finds them by letter, so the letters
+    /// have to be there when the code runs; the caller then keeps the geometry it had
+    /// </remarks>
+    private static void RequireAxes(KinematicsEngine engine)
+    {
+        if (engine.MissingAxesError is string missing)
+        {
+            throw new GCodeException(missing);
+        }
+    }
+
+    /// <summary>
+    /// The geometry an M669 K parameter selects
+    /// </summary>
+    /// <param name="parameter">The K parameter</param>
+    /// <returns>The geometry</returns>
+    /// <exception cref="GCodeException">The parameter names no geometry</exception>
+    /// <remarks>
+    /// Either RepRapFirmware's <c>KinematicsType</c> number, which <see cref="KinematicsName"/> follows,
+    /// or the geometry's name as a quoted string, which <see cref="KinematicsNameConverter.Parse"/> reads
+    /// </remarks>
+    private static KinematicsName KinematicsFrom(CodeParameter parameter)
+    {
+        KinematicsName name;
+        if (parameter.Type == typeof(string))
+        {
+            string text = (string)parameter;
+            name = KinematicsNameConverter.Parse(text);
+            if (name == KinematicsName.Unknown)
+            {
+                throw new GCodeException($"Unknown kinematics type \"{text}\"");
+            }
+        }
+        else
+        {
+            long number = (long)parameter;
+            name = (KinematicsName)number;
+            if (!Enum.IsDefined(name) || name == KinematicsName.Unknown)
+            {
+                throw new GCodeException($"Unknown kinematics type {number}");
+            }
+        }
+        return name;
     }
 
     /// <summary>
@@ -146,30 +217,6 @@ internal static class KinematicsConfigurator
         {
             move.Kinematics = DuetAPI.ObjectModel.Kinematics.Create(engine.Kind);
         }
-        engine.WriteTo(move.Kinematics);
+        engine.WriteTo(move.Kinematics, move);
     }
-
-    /// <summary>
-    /// The geometry an M669 K number selects
-    /// </summary>
-    /// <param name="kinematicsType">The K parameter</param>
-    /// <returns>The geometry, or null if the number names none</returns>
-    /// <remarks>RepRapFirmware's <c>KinematicsType</c> enumeration, in its declaration order</remarks>
-    public static KinematicsName? NameFor(int kinematicsType)
-        => kinematicsType switch
-        {
-            0 => KinematicsName.Cartesian,
-            1 => KinematicsName.CoreXY,
-            2 => KinematicsName.CoreXZ,
-            3 => KinematicsName.LinearDelta,
-            4 => KinematicsName.Scara,
-            5 => KinematicsName.CoreXYU,
-            6 => KinematicsName.Hangprinter,
-            7 => KinematicsName.Polar,
-            8 => KinematicsName.CoreXYUV,
-            9 => KinematicsName.FiveBarScara,
-            10 => KinematicsName.RotaryDelta,
-            11 => KinematicsName.MarkForged,
-            _ => null
-        };
 }

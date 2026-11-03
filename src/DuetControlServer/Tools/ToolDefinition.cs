@@ -9,7 +9,8 @@ namespace DuetControlServer.Tools;
 /// <remarks>
 /// A record rather than a long parameter list, because M563 carries nine independent things and the
 /// order of nine <c>int</c>s and <c>List</c>s at a call site is not something a reader can check.
-/// Defaults are RepRapFirmware's: X maps to X, Y to Y, Z to Z, and fan 0 to fan 0
+/// Fan 0 is RepRapFirmware's default. The axis maps have no default here: X maps to the axis lettered
+/// X, which is wherever M584 put it, so M563 works them out from the axes it finds
 /// </remarks>
 public sealed record ToolDefinition
 {
@@ -29,13 +30,13 @@ public sealed record ToolDefinition
     public IReadOnlyList<int> Fans { get; init; } = [0];
 
     /// <summary>Axes the tool's X coordinate drives, from X</summary>
-    public IReadOnlyList<int> XMap { get; init; } = [0];
+    public required IReadOnlyList<int> XMap { get; init; }
 
     /// <summary>Axes the tool's Y coordinate drives, from Y</summary>
-    public IReadOnlyList<int> YMap { get; init; } = [1];
+    public required IReadOnlyList<int> YMap { get; init; }
 
     /// <summary>Axes the tool's Z coordinate drives, from Z</summary>
-    public IReadOnlyList<int> ZMap { get; init; } = [2];
+    public required IReadOnlyList<int> ZMap { get; init; }
 
     /// <summary>
     /// Extruder whose filament is tracked, from L

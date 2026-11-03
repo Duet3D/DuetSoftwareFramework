@@ -41,6 +41,10 @@ target_link_libraries(move_params_layout_tests PRIVATE duet_motion)
 duet_realtime_core_add_test(machine_config_layout_tests MachineConfigLayoutTests.cpp)
 target_link_libraries(machine_config_layout_tests PRIVATE duet_motion)
 
+# Through the C ABI, as DuetControlServer drives it, so this links the shared library it loads
+duet_realtime_core_add_test(motion_lifecycle_tests MotionLifecycleTests.cpp)
+target_link_libraries(motion_lifecycle_tests PRIVATE duet_realtime_core_shared)
+
 # The rule DuetCANMaster matches an input change against. It lives in the shared protocol headers
 # rather than in the controller so that it can be tested at all: the controller is built for an ARM
 # target and reaches the rule through a firmware task. Links the protocol headers alone - the rule

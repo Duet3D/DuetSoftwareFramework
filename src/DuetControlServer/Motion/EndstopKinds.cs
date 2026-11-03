@@ -59,8 +59,7 @@ internal interface IEndstopKind
     /// <returns>True if it does</returns>
     /// <remarks>
     /// A predicate rather than a property because one kind may cover more than one type. Motor stall
-    /// is currently one kind for both <c>S3</c> and <c>S4</c>, which is the defect §4.3 of the plan
-    /// describes; splitting them is splitting this
+    /// is one kind for both <c>S3</c> and <c>S4</c>, which differ only in what it stops when armed
     /// </remarks>
     bool Handles(EndstopType type);
 

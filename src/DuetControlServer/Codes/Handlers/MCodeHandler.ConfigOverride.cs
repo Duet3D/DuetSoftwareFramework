@@ -15,20 +15,6 @@ namespace DuetControlServer.Codes.Handlers;
 /// <summary>
 /// M500: write the settings a machine calibrates for itself into config-override.g
 /// </summary>
-/// <remarks>
-/// <para>
-/// Ported from RepRapFirmware's <c>WriteConfigOverrideFile</c>, and deliberately no wider than it.
-/// config-override.g holds the values a machine <em>discovers</em> - what its heaters turned out to
-/// behave like, where its probe actually triggers, how far its axes really travel - so that a
-/// re-flashed machine does not have to be re-tuned. It is not a dump of the configuration: config.g
-/// is that, and it is written by hand.
-/// </para>
-/// <para>
-/// Writing the whole object model back out is a different feature and belongs after the migration,
-/// not inside it. Doing it now would mean deciding the format of every setting before the code that
-/// sets it has been ported, which is the order that produces a format nothing quite fits
-/// </para>
-/// </remarks>
 internal partial class MCodeHandler
 {
     /// <summary>
@@ -113,7 +99,7 @@ internal partial class MCodeHandler
     /// A delta's calibration is the whole point of config-override.g: the tower positions and endstop
     /// corrections G32 works out cannot be known in advance, so config.g cannot contain them. The
     /// geometry reports itself in the form M665 and M666 take, which is the same report a bare M665
-    /// gives - reporting from the authoritative side, as §14.4 requires
+    /// gives - reporting from the authoritative side
     /// </remarks>
     private void AppendKinematicsCalibration(StringBuilder builder)
     {

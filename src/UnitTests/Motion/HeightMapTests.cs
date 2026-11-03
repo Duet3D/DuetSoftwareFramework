@@ -9,8 +9,8 @@ namespace UnitTests.Motion;
 /// Tests for the bed height map
 /// </summary>
 /// <remarks>
-/// The file is RepRapFirmware's own <c>heightmap.csv</c>, so a machine that was mapped before this
-/// migration has to reload the same map afterwards. That is what most of these check
+/// The file is RepRapFirmware's own <c>heightmap.csv</c>, so a map RepRapFirmware wrote has to load
+/// here as the same map. That is what most of these check
 /// </remarks>
 [TestFixture]
 public class HeightMapTests

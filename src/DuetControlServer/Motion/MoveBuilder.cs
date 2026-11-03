@@ -2,7 +2,6 @@ using System;
 using DuetControlServer.Link.Native;
 using DuetControlServer.Motion.Kinematics;
 using DuetControlServer.Motion.Native;
-using static DuetControlServer.Motion.AxisIndices;
 
 namespace DuetControlServer.Motion;
 
@@ -11,11 +10,7 @@ namespace DuetControlServer.Motion;
 /// </summary>
 /// <param name="Error">Ok, NoMovement, or why it could not be built</param>
 /// <param name="Length">Bytes written to the destination buffer, 0 unless Error is Ok</param>
-internal readonly record struct MoveBuildResult(NativeMovementError Error, int Length)
-{
-    /// <summary>Whether a submission was produced</summary>
-    public bool HasMove => Error == NativeMovementError.Ok && Length > 0;
-}
+internal readonly record struct MoveBuildResult(NativeMovementError Error, int Length);
 
 /// <summary>
 /// Turns a <see cref="RawMove"/> into the submission the native motion engine takes
@@ -377,14 +372,14 @@ internal sealed class MoveBuilder(MotionParameters parameters)
         if (raw.SharesSwitchesAcrossDrives) { flags |= MoveFlags.SharedSwitches; }
         if (raw.UsingStandardFeedrate) { flags |= MoveFlags.UsingStandardFeedrate; }
         if (raw.UsePressureAdvance) { flags |= MoveFlags.UsePressureAdvance; }
-        // TODO RRF has a scanningProbeMove flag; MoveFlags has no such bit yet - §15.2
+        // TODO RRF has a scanningProbeMove flag; MoveFlags has no such bit yet
         if (xyMoving) { flags |= MoveFlags.XyMoving; }
         if (isPrintingMove) { flags |= MoveFlags.IsPrintingMove; }
         if (extrudersMoving && !isPrintingMove) { flags |= MoveFlags.IsNonPrintingExtruderMove; }
         if (hasForwardExtrusion) { flags |= MoveFlags.HasForwardExtrusion; }
         if (raw.CheckEndstops || raw.MoveType != MoveType.Normal) { flags |= MoveFlags.IsolatedMove; }
         if (raw.MoveType == MoveType.Normal) { flags |= MoveFlags.ContinuousRotationShortcut; }
-        // TODO RRF has a `controlLaserOrIoBits` flag; MoveFlags has no such bit yet - §15.2
+        // TODO RRF has a `controlLaserOrIoBits` flag; MoveFlags has no such bit yet
 
         // --- 4. Normalise the direction vector and get the distance ------------------------------------
 
@@ -395,13 +390,8 @@ internal sealed class MoveBuilder(MotionParameters parameters)
         {
             // There is some linear axis movement, so normalise the direction vector so that the total linear movement has unit length and 'totalDistance' is the linear distance moved.
             // This means that the user gets the feed rate that he asked for. It also makes the delta calculations simpler.
-            // First do the bed tilt compensation for deltas.
-            float tiltX = Parameters.Geometry.GetTiltCorrection(XAxis);
-            float tiltY = Parameters.Geometry.GetTiltCorrection(YAxis);
-            if ((tiltX != 0.0f || tiltY != 0.0f) && numAxes > ZAxis)
-            {
-                _directionVector[ZAxis] += (_directionVector[XAxis] * tiltX) + (_directionVector[YAxis] * tiltY);
-            }
+            // First do the bed tilt compensation for deltas
+            Parameters.Geometry.ApplyTiltCorrection(_directionVector, numAxes);
 
             totalDistance = MoveVector.NormaliseLinearMotion(_directionVector, Parameters.LinearAxes, raw.XAxes, raw.YAxes);
         }

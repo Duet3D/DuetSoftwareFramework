@@ -174,9 +174,9 @@ public class AxisSkewTests
     {
         Assert.Multiple(() =>
         {
-            Assert.That(AxisSkew.LowestSetAxis(0b1010u, 4), Is.EqualTo(1));
-            Assert.That(AxisSkew.LowestSetAxis(0b1000u, 3), Is.EqualTo(-1), "past the axes the machine has");
-            Assert.That(AxisSkew.LowestSetAxis(0u, 4), Is.EqualTo(-1));
+            Assert.That(AxisIndices.Lowest(0b1010u, 4), Is.EqualTo(1));
+            Assert.That(AxisIndices.Lowest(0b1000u, 3), Is.EqualTo(-1), "past the axes the machine has");
+            Assert.That(AxisIndices.Lowest(0u, 4), Is.EqualTo(-1));
         });
     }
 }

@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
@@ -391,13 +393,97 @@ public class DriverMappingTests : BenchFixture
                         "and the main board's default standstill percentage (Pins_Duet3_MB6HC.h)");
             Assert.That(created.PhaseStep, Is.False, "not phase stepping");
             Assert.That(created.Homed, Is.False);
+            Assert.That(created.WorkplaceOffsets, Is.EqualTo(new float[9]),
+                        "a zero offset in each of the nine workplaces (RRF NumCoordinateSystems)");
         });
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Select(axis => axis.WorkplaceOffsets.Count).ToArray()),
+                    Is.EqualTo(new[] { 9, 9, 9, 9 }), "as every axis has");
 
         await bench.Host.ExecuteCodeAsync("M584 V1.4 R1 S1");
         Assert.That((await bench.Host.ExecuteCodeAsync("M584")).TrimEnd(),
                     Is.EqualTo("Driver assignments: X1.0 Y1.1 Z1.2 U1.3 (r)(c)V1.4 E2.0, 5 axes visible"),
                     "the report marks a rotational axis (r) and a continuous one (c) before its "
                     + "drivers (RRF GCodes3.cpp DoDriveMapping report branch)");
+    }
+
+    /// <summary>
+    /// The kinematics matrices are as large as the machine's axes, and M584 resizes them
+    /// </summary>
+    /// <remarks>
+    /// <c>testcases/drivers/m584-create-additional-axis.yaml</c>: creating U adds row and column 3 to
+    /// both matrices, the identity there. RepRapFirmware sizes them from the total axis count as they
+    /// are read (<c>CoreKinematics::objectModelArrayTable</c>, 3.7-dev), so hiding an axis with M584 P
+    /// leaves both matrices square over every axis
+    /// </remarks>
+    [Test]
+    public async Task M584ResizesTheKinematicsMatrices()
+    {
+        await using JobBench bench = await DriversBench.StartAsync();
+
+        async Task<(float[][] Inverse, float[][] Forward)> ReadMatricesAsync() => await bench.Host.ReadModelAsync(model =>
+        {
+            CoreKinematics core = (CoreKinematics)model.Move.Kinematics;
+            return (core.InverseMatrix.Select(row => row.ToArray()).ToArray(), core.ForwardMatrix.Select(row => row.ToArray()).ToArray());
+        });
+        static float[][] Identity(int rows, int columns)
+            => [.. Enumerable.Range(0, rows).Select(row => Enumerable.Range(0, columns).Select(column => row == column ? 1.0f : 0.0f).ToArray())];
+
+        (float[][] inverse, float[][] forward) = await ReadMatricesAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(inverse, Is.EqualTo(Identity(3, 3)), "X, Y and Z, each on a motor of its own");
+            Assert.That(forward, Is.EqualTo(Identity(3, 3)));
+        });
+
+        await bench.Host.ExecuteCodeAsync("M584 U1.3");
+        (inverse, forward) = await ReadMatricesAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(inverse, Is.EqualTo(Identity(4, 4)), "U adds a row and a column, and a motor of its own");
+            Assert.That(forward, Is.EqualTo(Identity(4, 4)));
+        });
+
+        await bench.Host.ExecuteCodeAsync("M584 P3");
+        (inverse, forward) = await ReadMatricesAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(inverse, Is.EqualTo(Identity(4, 4)), "a hidden axis keeps its row and column");
+            Assert.That(forward, Is.EqualTo(Identity(4, 4)));
+        });
+    }
+
+    /// <summary>
+    /// An M584 that creates an axis and then fails on a later parameter still leaves the axis, and the
+    /// planner moves it
+    /// </summary>
+    /// <remarks>
+    /// The axis loop writes the mapping before P is read, so the axis exists whether P is out of range
+    /// or has no value. No other code runs
+    /// between that M584 and the move, because any configuring code would bring the planner up to date
+    /// on its own
+    /// </remarks>
+    [TestCase("M584 U1.4 P9")]
+    [TestCase("M584 U1.4 P")]
+    public async Task M584ThatFailsAfterCreatingAnAxisStillLetsItMove(string code)
+    {
+        await using JobBench bench = await ScheduleMoveBench.StartAsync(ScheduleMoveBench.CartesianConfig + "\nM569 P1.4 S1");
+
+        string reply = await bench.Host.ExecuteCodeAsync(code);
+        float stepsPerMm = await bench.Host.ReadModelAsync(model => model.Move.Axes[3].StepsPerMm);
+        Assert.Multiple(async () =>
+        {
+            Assert.That(reply, Does.StartWith("Error: "), "the code fails");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[3].Letter), Is.EqualTo('U'),
+                        "but the axis it created stays");
+        });
+
+        await bench.Host.ExecuteCodeAsync("G91");
+        IReadOnlyList<ScheduledMove> move = await bench.RunMoveAsync("G1 U5 F600");
+        Assert.Multiple(() =>
+        {
+            Assert.That(move.DriversMoved(), Is.EqualTo(new[] { (ScheduleMoveBench.DriverBoard, (byte)4) }));
+            Assert.That(move.Steps(4), Is.EqualTo((int)MathF.Round(5 * stepsPerMm)));
+        });
     }
 
     /// <summary>

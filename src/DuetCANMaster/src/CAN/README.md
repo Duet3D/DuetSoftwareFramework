@@ -1,40 +1,35 @@
 # CAN
 
-`src/CAN/` is the main-board CAN-FD subsystem. It turns RepRapFirmware into the bus master for Duet3Expansion boards, handling board discovery, time synchronisation, remote motion, remote heaters and sensors, and the command/reply traffic that makes expansion boards look like extensions of the main firmware.
+`src/CAN/` is the main-board CAN-FD subsystem. It makes this board the bus master for Duet3Expansion boards: it carries DSF's moves and messages onto the bus, distributes the time, and reports what comes back.
 
 ## Key Files
 
 | File | Purpose |
 |---|---|
-| [CanInterface.cpp](CanInterface.cpp) | Core CAN-FD transport and queue ownership on the main board. |
-| [ExpansionManager.cpp](ExpansionManager.cpp) | Tracks known remote boards and their reported state. |
-| [CanMotion.cpp](CanMotion.cpp) | Packs motion fragments for remote execution. |
-| [CommandProcessor.h](CommandProcessor.h) | Declares the handling surface for higher-level CAN messages. |
+| [CanInterface.cpp](CanInterface.cpp) | CAN-FD transport, the sender and receiver tasks, and the time sync broadcast. |
+| [CanMotion.cpp](CanMotion.cpp) | Turns `ScheduleMove` packets into per-board movement messages, and stops drivers when an endstop fires. |
+| [CommandProcessor.cpp](CommandProcessor.cpp) | Handles received messages and forwards them to DSF. |
+| [ExpansionManager.cpp](ExpansionManager.cpp) | Tracks known boards from their announcements and status reports. |
 
 ## How It Works
 
-RRF owns the only full machine view. When a configuration or motion decision involves a remote board, this module turns that decision into CANlib-defined messages and sends them to the right address. The reverse direction is equally important: expansion boards stream back replies, sensor data, input changes, board announcements, and status updates that `ExpansionManager` folds into the main board's state.
+DSF owns the machine view. It plans each move and sends the result as `ScheduleMove` packets, which `CanMotion` fans out to the boards the move's drivers are on. Configuration reaches the boards as `SendCANMessage` packets, which this module puts on the bus without interpreting them, and each one's outcome is reported to DSF.
 
-The other crucial job is time alignment. Remote moves only work because the main board distributes the timing information needed for expansion boards to schedule their own step output in lockstep with local drivers.
+Received messages are forwarded to DSF, and some are also handled here:
 
-## Interfaces Within RepRapFirmware
+- input changes, because a stop has to be decided here: a round trip to the SBC would let the axis overrun the endstop. A move says which input stops which driver, using the matching rules in `lib/DuetSpiInterface/include/DuetSpiProtocol/StopRules.h`, and the stopped drivers are reported to DSF, which works out the position correction;
+- board announcements, which are acknowledged only once DSF has been given them, and board status reports.
 
-- [../Movement/README.md](../Movement/README.md) uses this module to split motion between local and remote drivers.
-- [../Heating/README.md](../Heating/README.md), [../Fans/README.md](../Fans/README.md), and [../InputMonitors/README.md](../InputMonitors/README.md) use it to reach remote devices.
-- [../ObjectModel/README.md](../ObjectModel/README.md) exposes remote-board state via the `boards[]` and related subtrees.
-- [../GCodes/README.md](../GCodes/README.md) is the user-facing entry path for configuration that ultimately creates remote resources.
+The other job is time alignment. Moves only stay in step across boards because this board broadcasts the time from its step timer, which the boards use to schedule their own step output.
 
-## DSF And Duet3Expansion Interfaces
+## Interfaces
 
-- **DSF**: no direct CAN ownership. DSF only sees CAN-derived machine state after RRF merges it into the object model or returns it through diagnostics.
-- **Duet3Expansion**: this module is the master-side peer of Duet3Expansion's `src/CAN/` and `src/CommandProcessing/` modules. The shared on-wire contract lives in CANlib.
-
-## Standalone Vs SBC
-
-CAN expansion is orthogonal to standalone vs SBC mode. The same CAN subsystem runs in both; the only difference is whether the control surface above RRF is local networking or DSF over SPI.
+- [../SBC/README.md](../SBC/README.md) delivers the packets from DSF and carries the replies and reports back.
+- [../Movement](../Movement) provides the step clock the time sync messages carry.
+- [../Platform/README.md](../Platform/README.md) spins `ExpansionManager` in the main task.
+- **Duet3Expansion**: this module is the master-side peer of its CAN handling. The on-wire contract is in `lib/CANlib`.
 
 ## Related Docs
 
-- [../../docs/devel/CAN_BUS.md](../../docs/devel/CAN_BUS.md)
-- [../../docs/devel/ARCHITECTURE.md](../../docs/devel/ARCHITECTURE.md)
-- [Duet3Expansion/docs/devel/CAN_PROTOCOL.md](https://github.com/Duet3D/Duet3Expansion/blob/3.7-docker/docs/devel/CAN_PROTOCOL.md)
+- [CAN messages](../../../Documentation/articles/can-messages.md)
+- [Firmware link](../../../Documentation/articles/firmware-link.md)

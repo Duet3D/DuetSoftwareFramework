@@ -156,7 +156,7 @@ public class KinematicsFactoryTests
         DeltaKinematics delta = (DeltaKinematics)OmKinematics.Create(KinematicsName.LinearDelta);
         delta.Segmentation = new MoveSegmentation { SegmentsPerSec = 250.0f, MinSegLength = 0.05f };
 
-        KinematicsEngine engine = KinematicsFactory.Create(delta);
+        KinematicsEngine engine = KinematicsFactory.Create(delta, KinematicsAxes.NewMoveWithAxes());
 
         Assert.Multiple(() =>
         {
@@ -169,13 +169,14 @@ public class KinematicsFactoryTests
     [Test]
     public void AGeometryThatSegmentsStartsWithRepRapFirmwaresDefaults()
     {
-        // Nothing has configured it, so it segments the way an unconfigured delta does in RRF
-        KinematicsEngine engine = KinematicsFactory.Create(OmKinematics.Create(KinematicsName.LinearDelta));
+        // Nothing has configured it, so it segments the way an unconfigured delta does in RRF: 100
+        // segments per second, none shorter than 0.2mm
+        KinematicsEngine engine = KinematicsFactory.Create(OmKinematics.Create(KinematicsName.LinearDelta), KinematicsAxes.NewMoveWithAxes());
 
         Assert.Multiple(() =>
         {
-            Assert.That(engine.SegmentsPerSecond, Is.EqualTo(KinematicsEngine.DefaultSegmentsPerSecond));
-            Assert.That(engine.MinSegmentLength, Is.EqualTo(KinematicsEngine.DefaultMinSegmentLength));
+            Assert.That(engine.SegmentsPerSecond, Is.EqualTo(100.0f));
+            Assert.That(engine.MinSegmentLength, Is.EqualTo(0.2f));
             Assert.That(engine.Segmentation, Is.EqualTo(SegmentationType.Segment | SegmentationType.IncludeG0));
         });
     }
@@ -193,12 +194,12 @@ public class KinematicsFactoryTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(KinematicsFactory.Create(noRate).Segmentation.HasFlag(SegmentationType.Segment), Is.False);
-            Assert.That(KinematicsFactory.Create(noLength).Segmentation.HasFlag(SegmentationType.Segment), Is.False);
+            Assert.That(KinematicsFactory.Create(noRate, KinematicsAxes.NewMoveWithAxes()).Segmentation.HasFlag(SegmentationType.Segment), Is.False);
+            Assert.That(KinematicsFactory.Create(noLength, KinematicsAxes.NewMoveWithAxes()).Segmentation.HasFlag(SegmentationType.Segment), Is.False);
 
             // The rest of the geometry's segmentation is not configuration and does not go away with
             // it: which axes count towards a segment's length is a property of the machine
-            Assert.That(KinematicsFactory.Create(noRate).Segmentation.HasFlag(SegmentationType.IncludeG0), Is.True);
+            Assert.That(KinematicsFactory.Create(noRate, KinematicsAxes.NewMoveWithAxes()).Segmentation.HasFlag(SegmentationType.IncludeG0), Is.True);
         });
     }
 
@@ -210,10 +211,10 @@ public class KinematicsFactoryTests
         // fixed by the geometry
         CoreKinematics cartesian = (CoreKinematics)OmKinematics.Create(KinematicsName.Cartesian);
 
-        Assert.That(KinematicsFactory.Create(cartesian).Segmentation, Is.EqualTo(SegmentationType.None));
+        Assert.That(KinematicsFactory.Create(cartesian, KinematicsAxes.NewMoveWithAxes()).Segmentation, Is.EqualTo(SegmentationType.None));
 
         cartesian.Segmentation = new MoveSegmentation { SegmentsPerSec = 200.0f, MinSegLength = 0.1f };
-        Assert.That(KinematicsFactory.Create(cartesian).Segmentation, Is.EqualTo(SegmentationType.Segment));
+        Assert.That(KinematicsFactory.Create(cartesian, KinematicsAxes.NewMoveWithAxes()).Segmentation, Is.EqualTo(SegmentationType.Segment));
     }
 
     [Test]
@@ -228,11 +229,11 @@ public class KinematicsFactoryTests
             {
                 // Not a geometry: it is what an unrecognised name deserialises to, and an
                 // unconfigured machine is Cartesian
-                Assert.That(KinematicsFactory.Create(name).Kind, Is.EqualTo(KinematicsName.Cartesian));
+                Assert.That(KinematicsFactory.Create(name, KinematicsAxes.NewMoveWithAxes()).Kind, Is.EqualTo(KinematicsName.Cartesian));
                 continue;
             }
 
-            Assert.That(KinematicsFactory.Create(name).Kind, Is.EqualTo(name), $"{name} builds a different geometry");
+            Assert.That(KinematicsFactory.Create(name, KinematicsAxes.NewMoveWithAxes()).Kind, Is.EqualTo(name), $"{name} builds a different geometry");
         }
     }
 
@@ -243,11 +244,11 @@ public class KinematicsFactoryTests
         // M-code has run - must still build the geometry it names rather than a Cartesian one
         Assert.Multiple(() =>
         {
-            Assert.That(KinematicsFactory.Create(OmKinematics.Create(KinematicsName.RotaryDelta)),
+            Assert.That(KinematicsFactory.Create(OmKinematics.Create(KinematicsName.RotaryDelta), KinematicsAxes.NewMoveWithAxes()),
                         Is.TypeOf<RotaryDeltaKinematicsEngine>(), "a rotary delta shares the delta node with a linear one");
-            Assert.That(KinematicsFactory.Create(OmKinematics.Create(KinematicsName.FiveBarScara)),
+            Assert.That(KinematicsFactory.Create(OmKinematics.Create(KinematicsName.FiveBarScara), KinematicsAxes.NewMoveWithAxes()),
                         Is.TypeOf<FiveBarScaraKinematicsEngine>(), "both SCARAs share one node");
-            Assert.That(KinematicsFactory.Create(OmKinematics.Create(KinematicsName.MarkForged)).Kind,
+            Assert.That(KinematicsFactory.Create(OmKinematics.Create(KinematicsName.MarkForged), KinematicsAxes.NewMoveWithAxes()).Kind,
                         Is.EqualTo(KinematicsName.MarkForged));
         });
     }

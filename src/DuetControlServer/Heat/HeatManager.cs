@@ -16,7 +16,7 @@ namespace DuetControlServer.Heat;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Ported from the parts of RepRapFirmware's <c>Heat</c> that survive §1's fourth rule. Every heater
+/// Ported from the parts of RepRapFirmware's <c>Heat</c> that deal with remote heaters. Every heater
 /// is on a CAN-connected expansion board, which runs the PID loop and owns the fault detection, so
 /// this side does not control temperature - it says what the setpoint is and hears back what the
 /// temperature became. What is left is therefore smaller than RepRapFirmware's <c>Heat</c>: the

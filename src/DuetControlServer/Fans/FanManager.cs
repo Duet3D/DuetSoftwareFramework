@@ -13,7 +13,7 @@ namespace DuetControlServer.Fans;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Ported from the parts of RepRapFirmware's <c>FansManager</c> that survive §1's fourth rule. A fan
+/// Ported from the parts of RepRapFirmware's <c>FansManager</c> that deal with remote fans. A fan
 /// is a PWM output on an expansion board, and the board is what drives it - including thermostatic
 /// control, which is a rule the board applies to sensors it already reads rather than something this
 /// side polls and acts on.

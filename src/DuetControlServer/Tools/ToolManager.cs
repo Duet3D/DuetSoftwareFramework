@@ -21,9 +21,9 @@ namespace DuetControlServer.Tools;
 /// axis mapping and gets numbers.
 /// </para>
 /// <para>
-/// The object model is authoritative, as §1's first rule requires and as §14 step 4 concluded for
-/// anything that is a flat list of values with no derived state. There is no second copy of a tool
-/// here; this is the operations on <c>tools[]</c>, not a mirror of it
+/// The object model is authoritative, as it is for anything that is a flat list of values with no
+/// derived state. There is no second copy of a tool here; this is the operations on <c>tools[]</c>,
+/// not a mirror of it
 /// </para>
 /// </remarks>
 /// <param name="model">Object model</param>

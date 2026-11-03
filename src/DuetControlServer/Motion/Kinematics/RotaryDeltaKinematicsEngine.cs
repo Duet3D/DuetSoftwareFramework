@@ -3,7 +3,6 @@ using System.Globalization;
 using System.Text;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Native;
-using static DuetControlServer.Motion.AxisIndices;
 
 namespace DuetControlServer.Motion.Kinematics;
 
@@ -24,13 +23,16 @@ namespace DuetControlServer.Motion.Kinematics;
 /// </para>
 /// <para>
 /// The forward transform trilaterates from the three rod-end positions, exactly as the linear delta
-/// does, only here those ends move on circles rather than straight up and down
+/// does, only here those ends move on circles rather than straight up and down.
+/// </para>
+/// <para>
+/// Arms A, B and C are driven by the X, Y and Z axes' drives, found by letter wherever M584 put them
 /// </para>
 /// </remarks>
 internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
 {
     /// <summary>Number of arms, which is not configurable</summary>
-    public const int DeltaAxes = 3;
+    private const int DeltaAxes = 3;
 
     private const int TowerA = 0, TowerB = 1, TowerC = 2;
 
@@ -56,17 +58,26 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
     /// <summary>Distance from the centre of the bed to each bearing, mm</summary>
     public float Radius { get; }
 
-    /// <summary>How far from the centre the effector may go, mm</summary>
-    public float PrintRadius { get; }
+    // TODO: RepRapFirmware's RotaryDeltaKinematics::LimitPosition keeps a target inside the print radius
+    // and Z inside its M208 limits, and RoundBedKinematics::IsReachable tells G29 which probe points are
+    // inside the print radius. Neither is ported yet
 
-    /// <summary>Lowest arm angle the machine allows, degrees</summary>
-    public float MinArmAngle { get; }
+    /// <summary>How far from the centre the effector may go, mm</summary>
+    private float PrintRadius { get; }
+
+    /// <summary>Lowest arm angle, degrees</summary>
+    /// <remarks>RepRapFirmware only reports this (M669 A, and M500); no move is limited by it</remarks>
+    private float MinArmAngle { get; }
 
     /// <summary>Highest arm angle the machine allows, degrees</summary>
-    public float MaxArmAngle { get; }
+    private float MaxArmAngle { get; }
 
     /// <inheritdoc />
     public override KinematicsName Kind => KinematicsName.RotaryDelta;
+
+    /// <inheritdoc />
+    /// <remarks>Arms A, B and C, in that order</remarks>
+    protected override string KinematicAxisLetters => "XYZ";
 
     /// <summary>
     /// A rotary delta with RepRapFirmware's defaults, for before M669 has been seen
@@ -89,26 +100,33 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
     /// </remarks>
     public override uint MustBeHomedAxes(uint axesMoving, bool disallowMovesBeforeHoming)
     {
-        const uint xyzAxes = (1u << XAxis) | (1u << YAxis) | (1u << ZAxis);
+        uint xyzAxes = Axes.XyzBitmap;
         return (axesMoving & xyzAxes) != 0 ? axesMoving | xyzAxes : axesMoving;
     }
 
 
     /// <inheritdoc />
-    /// <remarks>All three arm motors are pinned down only when X, Y and Z are all named</remarks>
+    /// <remarks>
+    /// All three arm motors are pinned down only when X, Y and Z are all named, which a machine
+    /// missing one of them can never do
+    /// </remarks>
     public override uint AxesAssumedHomed(uint g92Axes)
     {
-        const uint xyzAxes = (1u << XAxis) | (1u << YAxis) | (1u << ZAxis);
-        return (g92Axes & xyzAxes) == xyzAxes ? g92Axes : g92Axes & ~xyzAxes;
+        KinematicAxes kinematic = Kinematic;
+        uint xyzAxes = kinematic.Machine.XyzBitmap;
+        return kinematic.IsComplete && (g92Axes & xyzAxes) == xyzAxes ? g92Axes : g92Axes & ~xyzAxes;
     }
 
 
     /// <inheritdoc />
-    /// <remarks>An arm's switch is at the top of its swing, adjusted per tower by M666</remarks>
+    /// <remarks>
+    /// An arm's switch is at the top of its swing, adjusted per tower by M666. The drive is an arm's
+    /// when it belongs to the axis that arm is driven by
+    /// </remarks>
     public override float GetEndstopPosition(int drive, bool highEnd, float axisMin, float axisMax,
                                              ReadOnlySpan<int> endPoints, ReadOnlySpan<float> stepsPerMm)
-        => drive < DeltaAxes && highEnd
-            ? MaxArmAngle + GetEndstopAdjustment(drive)
+        => Kinematic.RoleOf(drive) is int tower and >= 0 && highEnd
+            ? MaxArmAngle + GetEndstopAdjustment(tower)
             : base.GetEndstopPosition(drive, highEnd, axisMin, axisMax, endPoints, stepsPerMm);
 
 
@@ -176,7 +194,7 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
     /// <summary>How far each endstop is from where it ought to be, degrees</summary>
     /// <param name="tower">Tower number</param>
     /// <returns>The adjustment</returns>
-    public float GetEndstopAdjustment(int tower) => _endstopAdjustments[tower];
+    private float GetEndstopAdjustment(int tower) => _endstopAdjustments[tower];
 
     /// <inheritdoc />
     public override NativeMovementError CartesianToMotorSteps(
@@ -187,25 +205,35 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
         Span<int> motorPos,
         bool isCoordinated = false)
     {
-        if (machinePos.Length < DeltaAxes)
+        KinematicAxes kinematic = Kinematic;
+        AxisIndices axes = kinematic.Machine;
+        if (!kinematic.IsComplete || !kinematic.FitIn(machinePos.Length))
         {
             return NativeMovementError.UnreachablePosition;
         }
 
         NativeMovementError result = NativeMovementError.Ok;
-        int towerLimit = Math.Min(Math.Min(numVisibleAxes, DeltaAxes), Math.Min(motorPos.Length, stepsPerMm.Length));
+        float x = machinePos[axes.X], y = machinePos[axes.Y], z = machinePos[axes.Z];
 
-        for (int tower = 0; tower < towerLimit; tower++)
+        for (int tower = 0; tower < DeltaAxes; tower++)
         {
-            float angle = Transform(machinePos, tower);
+            // An arm whose axis the user cannot refer to is left where it is, as RepRapFirmware's
+            // numVisibleAxes bound on the same loop does
+            int drive = kinematic.Roles[tower];
+            if (drive >= numVisibleAxes || drive >= motorPos.Length || drive >= stepsPerMm.Length)
+            {
+                continue;
+            }
+
+            float angle = Transform(x, y, z, tower);
             if (float.IsNaN(angle) || float.IsInfinity(angle))
             {
                 // The rod cannot reach the effector from anywhere on the arm's circle
                 result = NativeMovementError.UnreachablePosition;
             }
-            else if (TryRoundToInt32(angle * stepsPerMm[tower], out int steps))
+            else if (TryRoundToInt32(angle * stepsPerMm[drive], out int steps))
             {
-                motorPos[tower] = steps;
+                motorPos[drive] = steps;
             }
             else
             {
@@ -213,7 +241,7 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
             }
         }
 
-        NativeMovementError linearResult = LinearAxesToMotorSteps(machinePos, stepsPerMm, DeltaAxes, numVisibleAxes, motorPos);
+        NativeMovementError linearResult = LinearAxesToMotorSteps(machinePos, stepsPerMm, kinematic.Bitmap, numVisibleAxes, motorPos);
         return result != NativeMovementError.Ok ? result : linearResult;
     }
 
@@ -225,58 +253,37 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
         int numTotalAxes,
         Span<float> machinePos)
     {
-        if (machinePos.Length < DeltaAxes || motorPos.Length < DeltaAxes || stepsPerMm.Length < DeltaAxes)
+        KinematicAxes kinematic = Kinematic;
+        AxisIndices axes = kinematic.Machine;
+        if (kinematic.IsComplete && kinematic.FitIn(machinePos.Length) && kinematic.FitIn(motorPos.Length)
+            && kinematic.FitIn(stepsPerMm.Length))
         {
-            return;
+            (float x, float y, float z) = ForwardTransform(
+                motorPos[axes.X] / stepsPerMm[axes.X],
+                motorPos[axes.Y] / stepsPerMm[axes.Y],
+                motorPos[axes.Z] / stepsPerMm[axes.Z]);
+            machinePos[axes.X] = x;
+            machinePos[axes.Y] = y;
+            machinePos[axes.Z] = z;
         }
 
-        ForwardTransform(
-            motorPos[TowerA] / stepsPerMm[TowerA],
-            motorPos[TowerB] / stepsPerMm[TowerB],
-            motorPos[TowerC] / stepsPerMm[TowerC],
-            machinePos);
-
-        LinearMotorStepsToCartesian(motorPos, stepsPerMm, DeltaAxes, numVisibleAxes, machinePos);
+        LinearMotorStepsToCartesian(motorPos, stepsPerMm, kinematic.Bitmap, numVisibleAxes, machinePos);
     }
 
     /// <inheritdoc />
     /// <remarks>All three arms swing for any XYZ movement, so all three motors have to be energised</remarks>
     public override uint GetControllingDrives(int axis)
-        => (axis >= 0 && axis <= ZAxis) ? LowestDrives(DeltaAxes) : base.GetControllingDrives(axis);
-
-    /// <summary>
-    /// Whether a position is inside the printable cylinder and within the arms' angular range
-    /// </summary>
-    /// <param name="machinePos">Axis coordinates in mm</param>
-    /// <returns>True if the effector can be put there</returns>
-    public bool IsReachable(ReadOnlySpan<float> machinePos)
     {
-        if (machinePos.Length < DeltaAxes)
-        {
-            return false;
-        }
-
-        float radiusSquared = (machinePos[XAxis] * machinePos[XAxis]) + (machinePos[YAxis] * machinePos[YAxis]);
-        if (radiusSquared > PrintRadius * PrintRadius)
-        {
-            return false;
-        }
-
-        for (int tower = 0; tower < DeltaAxes; tower++)
-        {
-            float angle = Transform(machinePos, tower);
-            if (float.IsNaN(angle) || angle < MinArmAngle || angle > MaxArmAngle)
-            {
-                return false;
-            }
-        }
-        return true;
+        KinematicAxes kinematic = Kinematic;
+        return (kinematic.Bitmap & AxisIndices.Bit(axis)) != 0 ? kinematic.Bitmap : base.GetControllingDrives(axis);
     }
 
     /// <summary>
     /// The angle one arm must be swung to for the effector to be at the given position
     /// </summary>
-    /// <param name="machinePos">Axis coordinates in mm</param>
+    /// <param name="effectorX">Effector X in mm</param>
+    /// <param name="effectorY">Effector Y in mm</param>
+    /// <param name="effectorZ">Effector Z in mm</param>
     /// <param name="tower">Tower number</param>
     /// <returns>The angle in degrees, or NaN if the rod cannot reach</returns>
     /// <remarks>
@@ -293,19 +300,14 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
     /// its bearings, so RepRapFirmware takes the lower root unconditionally and so does this
     /// </para>
     /// </remarks>
-    private float Transform(ReadOnlySpan<float> machinePos, int tower)
+    private float Transform(float effectorX, float effectorY, float effectorZ, int tower)
     {
-        if (tower >= DeltaAxes)
-        {
-            return machinePos[tower];
-        }
-
         // Rotate so that +X points along this arm and +Y is 90 degrees anticlockwise from it
-        float x = (machinePos[XAxis] * _armAngleCosines[tower]) + (machinePos[YAxis] * _armAngleSines[tower]);
-        float y = (machinePos[YAxis] * _armAngleCosines[tower]) - (machinePos[XAxis] * _armAngleSines[tower]);
+        float x = (effectorX * _armAngleCosines[tower]) + (effectorY * _armAngleSines[tower]);
+        float y = (effectorY * _armAngleCosines[tower]) - (effectorX * _armAngleSines[tower]);
 
         float rMinusX = Radius - x;
-        float hMinusZ = _bearingHeights[tower] - machinePos[ZAxis];
+        float hMinusZ = _bearingHeights[tower] - effectorZ;
         float a = _twiceU[tower] * rMinusX;
         float b = _twiceU[tower] * hMinusZ;
         float c = _rodSquaredMinusArmSquared[tower] - ((hMinusZ * hMinusZ) + (rMinusX * rMinusX) + (y * y));
@@ -320,12 +322,12 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
     /// <param name="ha">Angle of the A arm, degrees</param>
     /// <param name="hb">Angle of the B arm, degrees</param>
     /// <param name="hc">Angle of the C arm, degrees</param>
-    /// <param name="machinePos">Filled in with X, Y and Z in mm</param>
+    /// <returns>X, Y and Z in mm</returns>
     /// <remarks>
     /// The arm angles put the three rod ends at known points; the effector is then the one point at
     /// the right rod length from each of them, which is trilateration as for the linear delta
     /// </remarks>
-    private void ForwardTransform(float ha, float hb, float hc, Span<float> machinePos)
+    private (float X, float Y, float Z) ForwardTransform(float ha, float hb, float hc)
     {
         // Where each rod's upper end has been swung to. Note that RepRapFirmware indexes the arm
         // length with the A tower in all three Z terms here; that is a typo, and using each tower's
@@ -368,11 +370,9 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
         float c = (s * s) + (t * t) + (((t * posAY) - (s * posAX)) * p * 2.0f) + ((da2 - _rodSquared[TowerA]) * p2);
 
         float z = (-halfB - MathF.Sqrt((halfB * halfB) - (a * c))) / a;
-
-        machinePos[XAxis] = ((q * z) + s) / p;
-        machinePos[YAxis] = -((r * z) + t) / p;
-        machinePos[ZAxis] = z;
+        return (((q * z) + s) / p, -((r * z) + t) / p, z);
     }
+
 
     /// <summary>
     /// Work out the arm directions and the constants both transforms need
@@ -405,8 +405,7 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
     public override uint GetHomingFileName(uint toBeHomed, uint alreadyHomed, ReadOnlySpan<char> axisLetters,
                                            out string fileName)
     {
-        const uint xyz = 0b111;
-        if ((toBeHomed & xyz) != 0)
+        if ((toBeHomed & Axes.XyzBitmap) != 0)
         {
             fileName = "homedelta.g";
             return 0;
@@ -416,5 +415,5 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
 
     /// <inheritdoc />
     /// <remarks>All three towers, because a delta has no axis that moves a motor of its own</remarks>
-    public override uint AxesToHomeBeforeProbing => 0b111;
+    public override uint AxesToHomeBeforeProbing => Axes.XyzBitmap;
 }

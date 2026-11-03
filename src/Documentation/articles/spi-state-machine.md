@@ -567,4 +567,4 @@ desyncs directly. Two things are deliberately left alone:
 ## See also
 
 - [Firmware link](firmware-link.md) - the layer above these state machines
-- `src/DuetCANMaster/docs/devel/SBC_INTERFACE.md` - controller-side interface overview
+- `src/DuetCANMaster/src/SBC/README.md` - controller-side interface overview

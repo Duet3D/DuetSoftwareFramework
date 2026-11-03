@@ -25,7 +25,7 @@ internal enum MoveSubmitResult
     /// <summary>The engine has no room; the caller should retry</summary>
     Busy,
 
-    /// <summary>The move could not be built</summary>
+    /// <summary>The move could not be built, or the engine failed to start and will never run it</summary>
     Rejected
 }
 
@@ -139,7 +139,7 @@ internal sealed class MovePlanner(
     /// A machine that has not been configured is Cartesian, which is what RepRapFirmware starts as
     /// </para>
     /// </remarks>
-    public KinematicsEngine Geometry { get; private set; } = KinematicsFactory.Create(KinematicsName.Cartesian);
+    public KinematicsEngine Geometry { get; private set; } = KinematicsFactory.Create(KinematicsName.Cartesian, new Move());
 
     /// <summary>
     /// Adopt a geometry a configuring M-code has produced
@@ -165,8 +165,8 @@ internal sealed class MovePlanner(
     /// Where the interpreter thinks the machine is going, in user coordinates
     /// </summary>
     /// <remarks>
-    /// One per motion system once M596 is ported; one for now. It lives here rather than on a code
-    /// channel because it is a property of the machine's motion, not of who is commanding it: two
+    /// TODO one per motion system, which needs M596.
+    /// It lives here rather than on a code channel because it is a property of the machine's motion, not of who is commanding it: two
     /// channels feeding the same motion system have to agree about where the head is. Read and
     /// written under <see cref="Lock"/>, for the same reason <see cref="Builder"/> is
     /// </remarks>
@@ -188,8 +188,9 @@ internal sealed class MovePlanner(
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <param name="adoptGeometryFromObjectModel">
-    /// Take the geometry from the object model rather than keeping the one this planner holds. Only
-    /// for the first configuration, before any M-code has selected one
+    /// Take the geometry from the object model rather than keeping the one this planner holds, and
+    /// write it back so that the object model describes the geometry the machine runs with. Only for
+    /// the first configuration, before any M-code has selected one
     /// </param>
     /// <returns>True if the engine accepted it</returns>
     /// <remarks>
@@ -204,19 +205,24 @@ internal sealed class MovePlanner(
         byte[] configBuffer = new byte[MachineConfig.SerializedLength];
         int length;
 
-        using (await model.AccessReadOnlyAsync(cancellationToken))
+        using (adoptGeometryFromObjectModel ? await model.AccessReadWriteAsync(cancellationToken)
+                                            : await model.AccessReadOnlyAsync(cancellationToken))
         {
             if (adoptGeometryFromObjectModel)
             {
                 // Before any code has configured a geometry, whatever the object model already
                 // describes is the best description of the machine there is - which matters when the
-                // model was populated by something other than this process's M-codes
-                Geometry = KinematicsFactory.Create(model.Move.Kinematics);
+                // model was populated by something other than this process's M-codes. A model that
+                // describes none gets the geometry the machine falls back to, Cartesian, which is
+                // what RepRapFirmware boots as
+                Geometry = KinematicsFactory.Create(model.Move.Kinematics, model.Move);
+                KinematicsConfigurator.WriteTo(Geometry, model.Move);
             }
 
-            // The geometry keeps its own copy of M208's box, and this is where it follows the object
-            // model. Separate from taking the snapshot, because it writes to the geometry
-            MotionParameters.ApplyAxisLimits(model.Move, Geometry);
+            // The geometry finds its axes by letter and keeps its own copy of M208's box, and this is
+            // where both follow the object model. Separate from taking the snapshot, because it writes
+            // to the geometry
+            MotionParameters.ApplyAxes(model.Move, Geometry);
 
             parameters = MotionParameters.FromObjectModel(model.Move, Geometry);
             length = parameters.Config.Serialize(configBuffer);
@@ -273,7 +279,7 @@ internal sealed class MovePlanner(
         MotionParameters parameters;
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            MotionParameters.ApplyAxisLimits(model.Move, Geometry);
+            MotionParameters.ApplyAxes(model.Move, Geometry);
             parameters = MotionParameters.FromObjectModel(model.Move, Geometry);
         }
 
@@ -441,6 +447,28 @@ internal sealed class MovePlanner(
     }
 
     /// <summary>
+    /// Whether the engine failed to start, so that it will never have room for a move
+    /// </summary>
+    /// <remarks>Read and written under <see cref="Lock"/></remarks>
+    private bool _engineFailed;
+
+    /// <summary>
+    /// Say that the engine failed to start, so that moves are refused from now on
+    /// </summary>
+    /// <remarks>
+    /// The engine reports no room until it has started, which <see cref="QueueMove"/> treats as a full
+    /// ring so that a move offered while it comes up waits for it. Nothing starts the engine after a
+    /// failure, so without this every move would wait for ever with no reply
+    /// </remarks>
+    public void ReportEngineFailed()
+    {
+        using (_lock.EnterScope())
+        {
+            _engineFailed = true;
+        }
+    }
+
+    /// <summary>
     /// Build a move and hand it to the engine
     /// </summary>
     /// <param name="move">The move to queue</param>
@@ -453,6 +481,11 @@ internal sealed class MovePlanner(
     {
         using (_lock.EnterScope())
         {
+            if (_engineFailed)
+            {
+                return MoveSubmitResult.Rejected;
+            }
+
             if (State.PurgePending)
             {
                 // A stop is between its request and its report. A move accepted now may or may not
@@ -482,6 +515,8 @@ internal sealed class MovePlanner(
             switch (built.Error)
             {
                 case NativeMovementError.NoMovement:
+                    // The builder still moves on to the coordinates of a move that rounds to no steps
+                    State.CommitCoords(move);
                     return MoveSubmitResult.NoMovement;
 
                 case NativeMovementError.Ok:
@@ -507,6 +542,7 @@ internal sealed class MovePlanner(
                 return MoveSubmitResult.Busy;
             }
 
+            State.CommitCoords(move);
             _lastSubmittedMoveId[move.RingNumber] = move.MoveId;
             PublishCommittedPosition();
             return MoveSubmitResult.Queued;
@@ -533,7 +569,7 @@ internal sealed class MovePlanner(
     /// <para>
     /// Both locks have to be held on entry - the object model's for writing and the planner's for
     /// reading the state this projects. <c>AsyncReaderWriterLock</c> is non-reentrant with no way to
-    /// ask whether it is held (§13.1), so that is a precondition rather than something this can check
+    /// ask whether it is held, so that is a precondition rather than something this can check
     /// </para>
     /// </remarks>
     public void PublishCommittedPosition()

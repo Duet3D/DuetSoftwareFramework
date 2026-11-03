@@ -31,7 +31,7 @@ public class MoveVectorTests
         Assert.Multiple(() =>
         {
             Assert.That(MoveVector.Magnitude(v, Bit(0) | Bit(1)), Is.EqualTo(5.0f).Within(1e-5f));
-            Assert.That(MoveVector.Magnitude(v), Is.EqualTo(MathF.Sqrt(9 + 16 + 10000)).Within(1e-3f));
+            Assert.That(MoveVector.Magnitude(v, uint.MaxValue), Is.EqualTo(MathF.Sqrt(9 + 16 + 10000)).Within(1e-3f));
         });
     }
 
@@ -159,16 +159,5 @@ public class MoveVectorTests
         float[] v = [1.0f, -2.0f, 3.0f];
         MoveVector.Scale(v, 2.0f);
         Assert.That(v, Is.EqualTo(new[] { 2.0f, -4.0f, 6.0f }));
-    }
-
-    [Test]
-    public void LowestBitsCoversTheRequestedCount()
-    {
-        Assert.Multiple(() =>
-        {
-            Assert.That(MoveVector.LowestBits(0), Is.EqualTo(0u));
-            Assert.That(MoveVector.LowestBits(3), Is.EqualTo(0b111u));
-            Assert.That(MoveVector.LowestBits(MotionLimits.MaxAxesPlusExtruders), Is.EqualTo(uint.MaxValue));
-        });
     }
 }

@@ -1,4 +1,3 @@
-using System;
 using DuetControlServer.Motion.Native;
 
 namespace DuetControlServer.Motion;
@@ -125,20 +124,4 @@ internal sealed class RestorePoint
     /// Last speed set by an M106 addressing the current tool's fans, 0..1
     /// </summary>
     public float FanSpeed { get; set; }
-
-    /// <summary>
-    /// Forget the point
-    /// </summary>
-    public void Reset()
-    {
-        Array.Clear(Coords);
-        FeedRate = 0.0f;
-        VirtualExtruderPosition = 0.0f;
-        ProportionDone = 0.0f;
-        FilePosition = null;
-        GCommandNumber = -1;
-        InitialUserC0 = InitialUserC1 = 0.0f;
-        ToolNumber = -1;
-        FanSpeed = 0.0f;
-    }
 }

@@ -15,7 +15,6 @@ using DuetControlServer.Motion.Native;
 using DuetControlServer.Motion.Kinematics;
 using Microsoft.Extensions.Logging;
 using DuetAPI;
-using static DuetControlServer.Motion.AxisIndices;
 
 namespace DuetControlServer.Codes.Handlers;
 
@@ -585,6 +584,7 @@ internal sealed partial class GCodeHandler(
                     foreach (int axis in axesIncluded)
                     {
                         planner.Builder.SetAxisPosition(axis, state.CurrentUserPosition[axis]);
+                        state.Coords[axis] = state.CurrentUserPosition[axis];
                     }
 
                     // The engine holds its own idea of where the motors are and plans the next move
@@ -654,10 +654,11 @@ internal sealed partial class GCodeHandler(
     /// <param name="axis">Axis to redefine</param>
     /// <param name="machinePosition">Its machine position in mm</param>
     /// <remarks>
-    /// For homing and probing, where the machine turns out to be somewhere other than the interpreter
-    /// commanded it to. This is the one direction the inverse transform is for: the position is known
-    /// in machine coordinates and the interpreter's own position has to be brought back into step with
-    /// it. The caller must hold the object model write lock and the planner lock
+    /// For probing, where the machine turns out to be somewhere other than the interpreter commanded
+    /// it to. This is the one direction the inverse transform is for: the position is known in machine
+    /// coordinates and the interpreter's own position has to be brought back into step with it. The
+    /// probing moves are generated moves, built with no movement tool, so the inverse is theirs. The
+    /// caller must hold the object model write lock and the planner lock
     /// </remarks>
     private void RedefineMachinePosition(int axis, float machinePosition)
     {
@@ -666,7 +667,7 @@ internal sealed partial class GCodeHandler(
         // The engine measures the next move from the position it holds, so redefining one here and
         // not there would have the machine travel the difference
         planner.PushPositionsToEngine();
-        SyncInterpreterToMachine();
+        moveInterpreter.SyncGeneratedMoveToMachine();
 
         // Nothing was queued, so nothing else will say where the machine ended up: what a client
         // reads would still be the coordinate the probing move was sent to
