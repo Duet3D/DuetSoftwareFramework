@@ -1,0 +1,19 @@
+<Project>
+	<!--
+		Builds of a commit that is not tagged append its short hash to the informational version as SemVer build
+		metadata (3.7.0-beta.1+f29bd9a5), so a development build can be traced back to its source. Tagged builds and
+		builds outside a git checkout keep the plain version.
+	-->
+	<Target Name="AddGitCommitToInformationalVersion" AfterTargets="GetAssemblyVersion" Condition="!$(InformationalVersion.Contains('+'))">
+		<Exec Command="git describe --exact-match --tags HEAD" WorkingDirectory="$(MSBuildProjectDirectory)" EchoOff="true" IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" StandardOutputImportance="low" StandardErrorImportance="low">
+			<Output TaskParameter="ExitCode" PropertyName="_GitTagExitCode" />
+		</Exec>
+		<Exec Command="git rev-parse --short HEAD" Condition="'$(_GitTagExitCode)' != '0'" WorkingDirectory="$(MSBuildProjectDirectory)" EchoOff="true" ConsoleToMSBuild="true" IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" StandardOutputImportance="low" StandardErrorImportance="low">
+			<Output TaskParameter="ConsoleOutput" PropertyName="_GitCommitHash" />
+			<Output TaskParameter="ExitCode" PropertyName="_GitCommitExitCode" />
+		</Exec>
+		<PropertyGroup Condition="'$(_GitTagExitCode)' != '0' and '$(_GitCommitExitCode)' == '0' and '$(_GitCommitHash)' != ''">
+			<InformationalVersion>$(InformationalVersion)+$(_GitCommitHash.Trim())</InformationalVersion>
+		</PropertyGroup>
+	</Target>
+</Project>

@@ -1,0 +1,9 @@
+{
+  "include": ["scripts", "tests/scripts"],
+  "executionEnvironments": [
+    { "root": "scripts" },
+    { "root": "tests/scripts", "extraPaths": ["scripts"] }
+  ],
+  "pythonVersion": "3.11",
+  "typeCheckingMode": "strict"
+}

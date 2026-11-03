@@ -49,7 +49,7 @@ public class KinematicsCompensationCodeTests : SystemTests.Host.BenchFixture
     /// </summary>
     /// <remarks>
     /// Format from HeightMap::SaveToFile and HeightMap::LoadFromFile in
-    /// lib/RepRapFirmware/src/Movement/BedProbing/Grid.cpp; the header comment prefix is
+    /// src/RepRapFirmware/src/Movement/BedProbing/Grid.cpp; the header comment prefix is
     /// GridDefinition::HeightMapComment and the label line is HeightMapLabelLines[2]
     /// </remarks>
     private const string HeightMapCsv = """

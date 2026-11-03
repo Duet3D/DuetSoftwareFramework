@@ -127,7 +127,6 @@ option(DUET_REALTIME_CORE_STATIC "Statically link the standalone harness binary"
 find_package(Threads REQUIRED)
 
 # The wire protocol lives outside this project because DuetCANMaster consumes the same headers.
-# DUET_LIBRARIES_DIR mirrors the LIBRARIES_DIR variable DuetCANMaster's Makefile uses.
 set(DUET_LIBRARIES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../lib" CACHE PATH
     "Path to the shared Duet libraries directory")
 add_subdirectory("${DUET_LIBRARIES_DIR}/DuetSpiInterface" duet_spi_protocol)
@@ -135,23 +134,13 @@ add_subdirectory("${DUET_LIBRARIES_DIR}/DuetSpiInterface" duet_spi_protocol)
 # RRFLibraries, built for this host rather than for a Duet MCU. The motion code imported from
 # RepRapFirmware uses its portable pieces - Bitmap, StringRef, SimpleMath, Isqrt, and the ecv_*
 # annotation headers that make _ecv_null/pre()/THROWS disappear off-target - so building them here
-# is what lets those sources keep their original #include lines. lib/<Name>/<Name>.cmake is the
-# established way to consume a Duet library from CMake; MCU HOST is the hosted variant of it.
-#
-# LIBRARIES_DIR is the name those modules use internally to find each other.
-set(LIBRARIES_DIR "${DUET_LIBRARIES_DIR}")
-include("${DUET_LIBRARIES_DIR}/DuetArch.cmake")
-include("${DUET_LIBRARIES_DIR}/RRFLibraries/RRFLibraries.cmake")
-duet_arch_target(HOST DUET_ARCH_HOST)
-# The interface target carries the include directory and must exist first: rrflibraries_add_library
-# links its own interface target publicly, which is how a consumer picks that directory up.
-rrflibraries_add_interface(RRFLIBRARIES_INTERFACE MCU HOST)
-rrflibraries_add_library(RRFLIBRARIES_TARGET
-    MCU HOST
-    ARCH ${DUET_ARCH_HOST}
-    EXTRA_COMPILE_OPTIONS -include "${CMAKE_CURRENT_SOURCE_DIR}/src/Config/Float16Compat.h")
+# is what lets those sources keep their original #include lines. DUET_MCU HOST is the library's
+# hosted variant (see its CMakeLists.txt).
+set(DUET_MCU HOST)
+add_subdirectory("${DUET_LIBRARIES_DIR}/RRFLibraries" RRFLibraries)
+target_compile_options(RRFLibraries PRIVATE -include "${CMAKE_CURRENT_SOURCE_DIR}/src/Config/Float16Compat.h")
 # Imported upstream source: linted by its own project, not by this one.
-set_target_properties(${RRFLIBRARIES_TARGET} PROPERTIES CXX_CLANG_TIDY "")
+set_target_properties(RRFLibraries PROPERTIES CXX_CLANG_TIDY "")
 
 # No CANlib here. It was pulled in for one message: the SBC used to build CanMessageRevertPosition
 # itself, which made this the only CAN message that did not originate in DuetControlServer. That

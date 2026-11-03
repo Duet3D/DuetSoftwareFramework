@@ -287,12 +287,8 @@ template<class T> struct __attribute__((packed)) CanMessageMultipleDrivesRequest
 	// The values, one per set bit of driversToUpdate in ascending driver number order
 	T values[MaxLinearDriversPerCanSlave];
 
-	// Length of the message when values for numDrivers drivers are sent.
-	// TODO: every RepRapFirmware and Duet3Expansion call site passes the number of set bits of driversToUpdate,
-	// which the message already carries, so numDrivers can be dropped and the count taken from the bitmap as
-	// DuetControlServer now does. CANlib's own header and those call sites have to change in step, because
-	// RepRapFirmware is built against the same header.
-	static constexpr size_t GetActualDataLength(size_t numDrivers) noexcept { return sizeof(uint16_t) * 2 + numDrivers * sizeof(T); }
+	// Length of the message when a value is sent for each driver named by driversToUpdate
+	constexpr size_t GetActualDataLength() const noexcept { return sizeof(uint16_t) * 2 + (Bitmap<uint32_t>(driversToUpdate).CountSetBits() * sizeof(T)); }
 	// How many drivers' values fit in one 64-byte message
 	static constexpr size_t MaxDrivesPerMessage() noexcept { return (64 - 2 * sizeof(uint16_t)) / sizeof(T); }
 	// Set the request ID of this message and clear its reserved fields
@@ -925,7 +921,9 @@ struct __attribute__((packed)) CanMessageHeaterFeedForwardV1
 	// Reserved so that the heater number lands where SetRequestId expects it; set to 0
 	uint16_t zero;
 	uint16_t heaterNumber : 8,		// Number of the heater this feedforward is for
-	         zero2 : 8;
+	         fanOnly : 1,		// Added after 3.7.0-rc.1
+	         nonPrintingExtruderMove : 1,		// Added after 3.7.0-rc.1
+	         zero2 : 6;
 	// Current PWM of the print cooling fan, 0 to 1, from which the extra heater power needed is worked out
 	float fanPwmFraction;
 	// Extra heater PWM to allow for the current extrusion rate
@@ -1342,7 +1340,7 @@ struct __attribute__((packed)) CanMessageAnnounceV1
 	        usesUf2Binary : 1,		// Set if this board takes a main firmware binary in .uf2 format
 	        isReconnect : 1,		// Set if this board did not reset but is re-announcing after losing and regaining time sync
 	        wasShutDown : 1,		// Set if this board switched its heaters off because time sync was lost for longer than the connection timeout
-	        zero : 1;
+	        noSmartDrivers : 1;		// Set if none of the drivers on this board is a smart driver, inverted so that older boards are taken to have smart drivers
 	// The short type name of this board followed by '|' and the firmware version
 	char boardTypeAndFirmwareVersion[43];
 
@@ -1351,7 +1349,9 @@ struct __attribute__((packed)) CanMessageAnnounceV1
 	// How much of a message of the given length is board type and firmware version
 	static constexpr size_t GetMaxTextLength(size_t dataLength) noexcept { return dataLength - (sizeof(uint32_t) + 16 + sizeof(uint8_t)); }
 	// Clear the reserved fields of this message so that it stays compatible with future uses
-	void ClearReservedFields() noexcept { zero = 0; }
+	void ClearReservedFields() noexcept
+	{
+	}
 };
 static_assert(sizeof(CanMessageAnnounceV1) == 64);
 

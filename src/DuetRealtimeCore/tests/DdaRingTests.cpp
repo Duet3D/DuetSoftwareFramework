@@ -208,7 +208,7 @@ namespace
 	// The point of carrying tuning on the move: a value changed between two moves takes effect on the
 	// move after it and not on the moves already queued, without the ring ever having to be empty.
 	//
-	// This is the M572 case from docs/devel/MOTION_CONFIG_ORDERING.md, using backlash because it
+	// This is the M572 case, using backlash because it
 	// shows up directly in the steps the controller is told to take. Pressure advance and the rest
 	// travel the same way.
 	void TestTuningAppliesFromTheMoveThatCarriesIt(DDARing& ring, RecordingSink& sink) noexcept

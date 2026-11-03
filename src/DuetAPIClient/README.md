@@ -25,7 +25,7 @@ Licensed under LGPL-3.0-or-later.
 
 ## How It Works
 
-Each connection type starts from [BaseConnection.cs](BaseConnection.cs), which opens the UNIX socket and performs the IPC initialization handshake defined in [../../docs/devel/IPC_PROTOCOL.md](../../docs/devel/IPC_PROTOCOL.md). Derived classes then expose behavior tailored to one mode:
+Each connection type starts from [BaseConnection.cs](BaseConnection.cs), which opens the UNIX socket and performs the IPC initialization handshake defined in [../Documentation/articles/ipc.md](../Documentation/articles/ipc.md). Derived classes then expose behavior tailored to one mode:
 
 - `CommandConnection` for request/response commands;
 - `InterceptConnection` for observing or resolving codes in the DCS pipeline;
@@ -66,5 +66,5 @@ The second command is a quick smoke test that a consumer of the library still bu
 
 ## Related Docs
 
-- [../../docs/devel/IPC_PROTOCOL.md](../../docs/devel/IPC_PROTOCOL.md)
+- [../Documentation/articles/ipc.md](../Documentation/articles/ipc.md)
 - [../DuetAPI/README.md](../DuetAPI/README.md)

@@ -14,7 +14,7 @@ namespace DuetControlServer.Profiling;
 /// <remarks>
 /// Only compiled into a build made with -p:Profiling=true, and called only from the calls the Fody
 /// weaver in src/DuetProfiling.Fody puts into the profiled methods. The client library it talks to
-/// listens for the Tracy GUI on TCP port 8086 and, built on demand by scripts/build-tracy-client.sh,
+/// listens for the Tracy GUI on TCP port 8086 and, built on demand by scripts/build.py TracyClient,
 /// records nothing until the GUI connects.
 /// </remarks>
 internal static unsafe class TracyProfiler
@@ -188,7 +188,7 @@ internal static unsafe class TracyProfiler
 
         throw new DllNotFoundException(
             $"The Tracy client has not been built for {architecture}. Build it with:\n" +
-            $"  scripts/build-tracy-client.sh --arch {architecture}\n" +
+            $"  scripts/build.py TracyClient --arch {architecture}\n" +
             $"or point {LibraryPathEnvironmentVariable} at a client library to use instead");
     }
 }

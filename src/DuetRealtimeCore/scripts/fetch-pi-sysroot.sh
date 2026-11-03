@@ -7,9 +7,9 @@
 # Usage:
 #   scripts/fetch-pi-sysroot.sh <user@pi-host> [dest-dir]
 #
-# Then configure with the sysroot:
-#   cmake --preset arm64-sysroot
-#   cmake --build --preset arm64-sysroot
+# Then configure with the sysroot, from the repository root:
+#   cmake --preset rtc-arm64-sysroot
+#   cmake --build --preset rtc-arm64-sysroot
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then

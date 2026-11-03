@@ -351,8 +351,7 @@ internal abstract class KinematicsEngine
     /// <para>
     /// Ported from each geometry's <c>Configure</c>. RepRapFirmware mutates its <c>Kinematics</c>
     /// object in place; this returns a new one instead, because the geometry is read without a lock
-    /// by the endstop correction and the live position publisher (§13.1 of
-    /// <c>docs/devel/MCODE_MIGRATION.md</c>) and swapping a reference is atomic where mutating
+    /// by the endstop correction and the live position publisher, and swapping a reference is atomic where mutating
     /// several fields is not. The values the code did not give are carried over from the instance
     /// this is called on, so successive codes accumulate as they do in RepRapFirmware.
     /// </para>

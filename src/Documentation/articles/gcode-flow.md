@@ -208,8 +208,7 @@ flowchart TD
   [object model](object-model.md) and, where a board needs telling, sends the matching
   [CAN message](can-messages.md).
 
-  A sample of the range, rather than a full list -
-  [MCODE_MIGRATION.md](docs/devel/MCODE_MIGRATION.md) has the complete inventory with status:
+  A sample of the range, rather than a full list:
 
   | M-code | What it does here |
   | --- | --- |

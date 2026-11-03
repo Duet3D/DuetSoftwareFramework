@@ -33,5 +33,5 @@ dotnet run --project ModelObserver.csproj -- --help
 
 - [../DuetControlServer/README.md](../DuetControlServer/README.md)
 - [../DuetWebServer/README.md](../DuetWebServer/README.md)
-- [../../docs/devel/OBJECT_MODEL.md](../../docs/devel/OBJECT_MODEL.md)
-- [../../docs/devel/IPC_PROTOCOL.md](../../docs/devel/IPC_PROTOCOL.md)
+- [../Documentation/articles/object-model.md](../Documentation/articles/object-model.md)
+- [../Documentation/articles/ipc.md](../Documentation/articles/ipc.md)

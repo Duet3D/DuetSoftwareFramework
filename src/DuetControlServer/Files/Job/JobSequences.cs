@@ -25,10 +25,6 @@ namespace DuetControlServer.Files.Job;
 /// the job while a pause takes seconds.
 /// </para>
 /// <para>
-/// The bodies are ported step for step from RepRapFirmware, which
-/// <c>docs/devel/JOB_LIFECYCLE.md</c> records: which macros run and on which channel, the feedhold,
-/// the two-move return to the restore point, the modal state a resumed line is read with, and every
-/// refusal message
 /// </para>
 /// </remarks>
 /// <param name="codeProcessor">Code processor</param>

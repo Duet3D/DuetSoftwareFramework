@@ -41,5 +41,5 @@ dotnet run --project CodeConsole.csproj -- exec M115
 ## Related Docs
 
 - [../DuetControlServer/README.md](../DuetControlServer/README.md)
-- [../../docs/devel/CODE_PIPELINE.md](../../docs/devel/CODE_PIPELINE.md)
-- [../../docs/devel/IPC_PROTOCOL.md](../../docs/devel/IPC_PROTOCOL.md)
+- [../Documentation/articles/gcode-flow.md](../Documentation/articles/gcode-flow.md)
+- [../Documentation/articles/ipc.md](../Documentation/articles/ipc.md)

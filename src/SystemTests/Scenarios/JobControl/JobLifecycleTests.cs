@@ -11,8 +11,7 @@ namespace SystemTests.Scenarios;
 
 /// <summary>
 /// The job lifecycle end to end against the real motion engine: select a file, print, pause with a
-/// real feedhold, run the pause macros, resume. What docs/devel/JOB_LIFECYCLE.md marks for hardware
-/// verification gets its first automated home here
+/// real feedhold, run the pause macros, resume
 /// </summary>
 [TestFixture]
 public class JobLifecycleTests : SystemTests.Host.BenchFixture

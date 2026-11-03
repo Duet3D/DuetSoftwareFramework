@@ -33,7 +33,7 @@ bld/
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*
 
-# scripts/coverage.sh output
+# scripts/test.py output
 test-results/
 coverage.log
 coverage-report/
@@ -287,8 +287,8 @@ src/LinuxApi/LinuxApi.xml
 .vscode/*
 !.vscode/launch.json
 !.vscode/tasks.json
-!.vscode/c_cpp_properties.json
 !.vscode/scripts
+!.vscode/gdb/
 
 # Source Generators
 src/DuetAPI/Generated
@@ -306,3 +306,6 @@ lib/DuetRegressionTesting/
 
 # Schema Fody generates next to FodyWeavers.xml in a -p:Profiling=true build
 FodyWeavers.xsd
+
+# Personal CMake presets, alongside CMakePresets.json
+CMakeUserPresets.json

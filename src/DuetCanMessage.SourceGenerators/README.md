@@ -25,26 +25,26 @@ Schema/can-messages.json
 ## Usage
 
 ```sh
-make can-messages          # regenerate everything from the schema
-make can-messages-check    # fail if the checked-in output is stale (for CI)
-make can-messages-verify   # check the generated C++ layouts against CANlib's own header
+scripts/codegen.py            # regenerate everything from the schema
+scripts/codegen.py --check    # fail if the checked-in output is stale (for CI)
+scripts/codegen.py --verify   # check the generated C++ layouts against CANlib's own header
 ```
 
 The generated files are checked in, so neither the DSF build nor the CANlib build *runs* this tool.
-Re-run `make can-messages` after editing the schema and commit the result.
+Re-run `scripts/codegen.py` after editing the schema and commit the result.
 
 DuetControlServer does carry a `ProjectReference` to it, with `ReferenceOutputAssembly="false"` and
 `Private="false"`, so that the generator is compiled alongside the code it generates — a schema or emitter
-change that no longer builds is caught by an ordinary DCS build rather than by the next `make can-messages`.
+change that no longer builds is caught by an ordinary DCS build rather than by the next `scripts/codegen.py`.
 Nothing from the tool is referenced by or copied into DCS.
 
 A DCS build also runs `--check` before compiling and fails if the checked-in output no longer matches the
 schema, so an edit to `can-messages.json` cannot quietly leave the generated files behind. It only reports;
-regenerating stays a deliberate `make can-messages`, because a build that rewrote tracked source files would
+regenerating stays a deliberate `scripts/codegen.py`, because a build that rewrote tracked source files would
 do it during every publish and deploy as well. The check is skipped when nothing it depends on has changed,
 and `-p:SkipCanMessageCheck=true` turns it off.
 
-`make can-messages-verify` needs a host C++ compiler and the `CANlib`, `RRFLibraries` and `CoreN2G`
+`scripts/codegen.py --verify` needs a host C++ compiler and the `CANlib`, `RRFLibraries` and `CoreN2G`
 submodules (`git submodule update --init lib/CANlib lib/RRFLibraries lib/CoreN2G`).
 
 ## How the layouts are guaranteed to match
@@ -101,7 +101,7 @@ back into a visible error. It also pins down which numeric-looking values are wr
 constant's `value`, an array's `length` — since the loader reads those as strings and rejects a number.
 
 The generator validates the document against it on every run, before reading anything, and stops with the
-offending locations if it does not conform, so `make can-messages` and `make can-messages-check` both enforce
+offending locations if it does not conform, so `scripts/codegen.py` and `scripts/codegen.py --check` both enforce
 it. Errors are reported as `/structs/11: Some additional properties did not match the required schema:
 ["requestIdFeild"]`, naming the path through the document. Where a value has to be one of several forms — a
 statement, an enum entry — only the form it came closest to matching is reported, since the others describe

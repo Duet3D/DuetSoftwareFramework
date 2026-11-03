@@ -16,10 +16,11 @@ No prior knowledge of VS Code, Docker, or DSF is assumed.
 8. [Build Using VS Code Tasks](#build-using-vs-code-tasks)
 9. [Run the Tests](#run-the-tests)
 10. [Deploy to a Remote DuetPi/SBC](#deploy-to-a-remote-duetpisbc)
-11. [Optional: Build with Make](#optional-build-with-make)
-12. [Profiling with Tracy](#profiling-with-tracy)
-13. [Working with Git in the Dev Container](#working-with-git-in-the-dev-container)
-14. [Troubleshooting](#troubleshooting)
+11. [Build the Firmware](#build-the-firmware)
+12. [Debug the Firmware](#debug-the-firmware)
+13. [Profiling with Tracy](#profiling-with-tracy)
+14. [Working with Git in the Dev Container](#working-with-git-in-the-dev-container)
+15. [Troubleshooting](#troubleshooting)
 
 ## Overview
 
@@ -146,18 +147,38 @@ The first build can take several minutes. Later starts are usually much faster d
 
 ## First Build
 
-After the container finishes starting, open a new terminal in VS Code.
-
-Build the whole solution:
+After the container finishes starting, open a new terminal in VS Code and check that everything the builds need is there:
 
 ```bash
-cd src
-dotnet build DuetSoftwareFramework.sln
+scripts/doctor.py tools
 ```
 
-The solution file is [src/DuetSoftwareFramework.sln](src/DuetSoftwareFramework.sln).
+Then build every DSF project:
 
-If build succeeds, your environment is ready.
+```bash
+scripts/build.py dsf
+```
+
+The scripts in [scripts/](scripts/) are how everything is built, deployed, tested and linted, one script per task:
+
+| Script | Does |
+|---|---|
+| `scripts/list.py` | Lists the targets the others take |
+| `scripts/build.py` | Builds DSF projects and board firmware |
+| `scripts/deploy.py` | Deploys (and optionally builds) DSF projects and firmware |
+| `scripts/test.py` | Runs the unit, system or native tests |
+| `scripts/lint.py` | Runs clang-tidy over a whole build |
+| `scripts/clean.py` | Cleans or deletes build output |
+| `scripts/size.py` | Shows the memory the built firmware uses |
+| `scripts/codegen.py` | Generates, or checks, the CAN message formats |
+| `scripts/doctor.py` | Checks the tools, and that the submodules are checked out and on their branches |
+| `scripts/flash_bootloader.py` | Flashes a bootloader to an expansion or tool board over SWD |
+| `scripts/remote_control.py` | Runs codes, queries the object model and handles files on a board over HTTP, standalone or with an SBC |
+| `scripts/submodule.py` | Checks the submodules are on their tracked branches, and updates, checks out or attaches them |
+
+Each takes `--help`. They take the same targets: a DSF project (`DuetControlServer`, `DuetRealtimeCore`, ...), a firmware board named by its CMake preset (`EXP3HC`, `canmaster-Duet3_MB6HC`, with a `-debug` suffix for its Debug build), or a group (`dsf`, `firmware`, or a firmware project in full or as `canmaster`, `rrf`, `d3e`, `bootloader` or `iap`). `-x` leaves a target or group out, and builds are Release unless `--debug` is given.
+
+With [argcomplete](https://github.com/kislyuk/argcomplete) installed, the scripts tab-complete their options and the target names. Source the file for your shell from its startup file: `scripts/completions/dsf.fish` from `config.fish`, `scripts/completions/dsf.zsh` from `.zshrc` after `compinit`, or `scripts/completions/dsf.bash` from `.bashrc`. The devcontainer does this for all three.
 
 ## Build Using VS Code Tasks
 
@@ -169,28 +190,28 @@ To run a task:
 2. Run Tasks: Run Task.
 3. Select a task.
 
-Common tasks:
+Common tasks, which run the scripts above:
 
-- Build All
-- Build and Deploy
-- Restart DSF Services
-- Build individual components (for example Build DuetControlServer)
+- [DSF] Build, for one DSF project or all of them (`dsf`)
+- [DSF] Build and Deploy To, and Build and Deploy DCS to, for the Pi in the `dsf.debug` settings
+- [DSF] Restart DSF Services
+- [Firmware] Build Board
 
-The Build All task produces binaries under the local build/ directory.
+The DSF tasks build Debug, so that the debugger can be attached; each project's binaries are in its own `bin/Debug/<tfm>/linux-arm64/publish`.
 
 ## Run the Tests
 
 The unit tests run under coverage and print a per-assembly table:
 
 ```bash
-./scripts/coverage.sh
+scripts/test.py unit
 ```
 
 The system tests start a real DuetControlServer against a scripted CAN controller, so they take
 minutes rather than seconds:
 
 ```bash
-./scripts/system-tests.sh
+scripts/test.py system
 ```
 
 They run the real `libduet_realtime_core.so`, which the project builds from `src/DuetRealtimeCore` as part of
@@ -219,11 +240,24 @@ unimplemented or implemented incorrectly, so they fail until it is fixed and the
 off. The script leaves them out, as CI does; `--all` puts them back. To narrow a run:
 
 ```bash
-./scripts/system-tests.sh --filter 'FullyQualifiedName~JobControl'
-./scripts/system-tests.sh --help
+scripts/test.py system --filter 'FullyQualifiedName~JobControl'
+scripts/test.py system --help
 ```
 
-Running the project directly works, but the progress needs the console logger asked for by name,
+DuetRealtimeCore's own tests build it for this machine and run its ctest suite:
+
+```bash
+scripts/test.py native
+```
+
+The scripts in `scripts/` have tests of their own in `tests/scripts`, which drive each script's command line with the builds, git and the boards faked, so they need no toolchain, build or hardware. After changing the scripts, run them and pyright, as CI does:
+
+```bash
+scripts/test.py scripts
+pyright
+```
+
+Running the system test project directly works, but the progress needs the console logger asked for by name,
 because at its default verbosity it prints nothing until the run is over:
 
 ```bash
@@ -237,24 +271,25 @@ without it the same command behaves differently piped and interactively.
 
 ## Deploy to a Remote DuetPi/SBC
 
-The VS Code tasks include a deployment flow that uses SSH and rsync.
+`scripts/deploy.py` deploys DSF projects to a Pi over SSH and rsync, building them first with `--build`, and the [DSF] Build and Deploy tasks run it for the Pi in the `dsf.debug` settings ([DSF] Set Debug Target IP sets it):
 
-Typical sequence:
+```bash
+scripts/deploy.py -H <pi> dsf --start-services            # every DSF project, as last built
+scripts/deploy.py -H <pi> dsf --build --start-services    # build them first
+scripts/deploy.py -H <pi> DuetControlServer --build --debug  # build one as Debug, to debug it
+```
 
-1. Run Build and Deploy.
-2. Enter the target IP address when prompted.
+What it does:
 
-What the task flow does:
-
-1. Stops DSF services on the target.
-2. Builds components locally into build/.
-3. Copies build output to /opt/dsf/bin/ on the target via rsync.
+1. With --build, builds the projects locally, each into its own `bin/<config>/<tfm>/<arch>/publish` (`bin/aot/...` with --aot); --clean builds them from clean.
+2. Stops DSF services on the target.
+3. Copies the projects' publish directories, and `libduet_realtime_core.so` from its CMake build, to /opt/dsf/bin/ on the target in one rsync. Which build is deployed follows --debug, --aot and --arch, with or without --build.
 4. Copies DuetPiManagementPlugin to /opt/dsf/plugins/ on the target, manifest included.
 5. Starts DSF services again.
 
 Notes:
 
-- The remote commands use the root account by default.
+- The remote commands use the `root` account by default; `-u` names another.
 - DuetPiManagementPlugin is a plugin, not a service, so it is deployed to the plugin directory
   DuetPluginService runs it from rather than to /opt/dsf/bin/. Its manifest is regenerated from
   src/Directory.Build.props on every build, because DuetControlServer refuses to start a plugin
@@ -269,6 +304,190 @@ Optional helper task:
 This installs Microsoft vsdbg on the remote machine for debugging scenarios.
 
 The task definitions are in [.vscode/tasks.json](.vscode/tasks.json) if you want to inspect or extend them.
+
+`scripts/remote_control.py` drives a board over HTTP:
+
+```bash
+scripts/remote_control.py -H <pi> info                  # board, firmware and connection summary
+scripts/remote_control.py -H <pi> code M122             # run a code and print its reply
+scripts/remote_control.py -H <pi> model boards          # query the object model
+scripts/remote_control.py -H <pi> put test.gcode        # upload a file to /gcodes
+```
+
+## Build the Firmware
+
+The firmware projects build from the repository root with one toolchain, against the shared libraries in `lib/`:
+
+| Project | Path | Builds |
+| --- | --- | --- |
+| DuetCANMaster | `src/DuetCANMaster` | The SPI-to-CAN-FD bridge on the main board an SBC drives (`canmaster-*`) |
+| Duet3Expansion | `src/Duet3Expansion` | Expansion and tool boards (EXP3HC, EXP1HCL, TOOL1LC, …) |
+| RepRapFirmware | `src/RepRapFirmware` | Standalone main boards (MB6HC, MB6XD, Mini 5+, …), as on the regression suite's `rrf` bench |
+| Duet3Bootloader | `src/Duet3Bootloader` | Bootloaders and CAN IAPs (`bootloader-*`) |
+| DuetIAP | `src/DuetIAP` | Firmware update IAPs (`iap-*`) |
+
+They need their submodules, including the nested ones: `git submodule update --init --recursive`.
+
+Each board is a CMake preset in [CMakePresets.json](CMakePresets.json), and its build tree is `build/<preset>/`. The easiest way to build is with the scripts:
+
+```bash
+scripts/list.py firmware                   # list the boards, by project
+scripts/build.py canmaster-Duet3_MB6HC     # build one board
+scripts/build.py d3e                       # every board of a project (canmaster, rrf, d3e, bootloader, iap)
+scripts/build.py firmware --debug          # every board, as Debug
+scripts/size.py                            # the memory each built board uses
+scripts/clean.py EXP3HC                    # clean a board's build trees (--purge deletes them)
+```
+
+Or call CMake directly. Add `-debug` to a preset name for the Debug variant:
+
+```bash
+cmake --preset canmaster-Duet3_MB6HC
+cmake --build --preset canmaster-Duet3_MB6HC
+```
+
+`-DDUET_DISASSEMBLY=ON` also writes the disassembly to `build/<preset>/<target>.lst`; it is on by default for DuetCANMaster, RepRapFirmware and Duet3Expansion, with the branch targets in each function labelled unless `-DDUET_DISASSEMBLY_LABELS=OFF`. In VS Code, the CMake Tools extension reads the presets: pick a board as the configure preset, then build. The **[Firmware] Build Board** task does the same through `scripts/build.py`.
+
+The CMake build also lints DuetCANMaster's and the libraries' C++ with clang-tidy as it compiles it (`-DDUET_CLANG_TIDY=OFF` turns that off, for a faster build). The checks are in the root [.clang-tidy](.clang-tidy), which DuetCANMaster's and DuetRealtimeCore's own add their naming rules to. RepRapFirmware, Duet3Expansion, Duet3Bootloader and DuetIAP are not linted: their presets in [CMakePresets.json](CMakePresets.json) set `DUET_CLANG_TIDY` off, and `-DDUET_CLANG_TIDY=ON` lints them too. Third-party code is never linted: the device packs, CMSIS, tinyusb, mbedTLS, lwIP, MQTT-C and the vendored `src/libc` and `src/libcpp`. Every finding is an error, which fails the build. The libraries do not pass every check yet: [lib/.clang-tidy](lib/.clang-tidy) turns off the ones they fail, with how many findings each had, and the wrapper ([scripts/internal/clang_tidy_wrapper.py](scripts/internal/clang_tidy_wrapper.py)) skips the few library files clang cannot parse. Both lists are to shrink as the libraries are fixed. `scripts/lint.py` lints a board's whole build by hand, every header included, and can apply fixes (the **[Style] Tidy Firmware Board** task runs it). Renames from `readability-identifier-naming` must cover every board of a project at once, which `--naming-fixes` does:
+
+```bash
+scripts/lint.py EXP3HC                                 # every project and library EXP3HC builds
+scripts/lint.py EXP3HC -f src/Duet3Expansion/src/Movement/Move.cpp
+scripts/lint.py canmaster --naming-fixes               # export renames across every DuetCANMaster board
+```
+
+`scripts/deploy.py` also deploys the firmware of a main board and the CAN boards connected to it, building it first with `--build`. It uploads the files over the REST API, then updates the boards with M997.
+
+```bash
+scripts/deploy.py -H duet3.local firmware               # every connected board
+scripts/deploy.py -H duet3.local firmware --build       # build what they need first
+scripts/deploy.py -H duet3.local EXP1HCL --debug         # only the 1HCL boards, as Debug
+scripts/deploy.py -H duet3.local firmware --dry-run      # show what it would do
+scripts/deploy.py -H <pi> dsf firmware --build           # DSF, then the firmware through it, to a Pi
+```
+
+### Bootloaders
+
+The expansion and tool boards' bootloaders can be deployed two ways.
+
+**Over CAN**, for a board that already has a working bootloader and is running Release firmware. `--bootloader` uploads the bootloader each expansion board asks for and updates it with `M997 B<address> S3`. The boards' firmware and the main board are left alone:
+
+```bash
+scripts/deploy.py -H duet3.local firmware --bootloader           # every expansion board
+scripts/deploy.py -H duet3.local EXP3HC --bootloader             # only the 3HCs
+scripts/deploy.py -H duet3.local firmware --bootloader --build   # build the bootloaders they need first
+```
+
+The STM32 boards (NodeTrix) cannot update their bootloader over CAN yet. A main board running as an expansion board has no bootloader. Its firmware is updated by its CAN IAP (`Duet3_CANiap32_<board>.bin`, built by the `bootloader-Duet3_*` presets), which it loads from its own SD card, so copy that file to its `/firmware` directory yourself.
+
+**Over SWD**, for a new or broken board, or an STM32 one. `scripts/flash_bootloader.py` flashes a bootloader through OpenOCD's GDB server (see [Debug the Firmware](#debug-the-firmware)). It checks that the board has the right MCU, has OpenOCD clear the BOOTPROT protection the firmware puts on the bootloader, writes the bootloader with GDB, reads it back to check it, and restarts the board. GDB prints each command as it runs it:
+
+```bash
+scripts/flash_bootloader.py bootloader-SAME5x --build                        # EXP3HC, EXP1HCL, TOOL1RR, M23CL, …
+scripts/flash_bootloader.py bootloader-SAMC21 -s host.docker.internal:3333   # TOOL1LC, EXP1XD, SZP, on another port
+```
+
+A board with a bootloader but no firmware fetches its firmware from the main board over CAN when it starts, so `scripts/deploy.py` can then update it as usual. The **[Firmware] Deploy Bootloaders (CAN)** and **[Firmware] Flash Bootloader (SWD)** tasks run these.
+
+## Debug the Firmware
+
+The **[Firmware] Build, Flash & Debug** launch configuration builds the Debug preset for the DuetCANMaster, RepRapFirmware or Duet3Expansion board you pick, flashes it through a GDB server, and starts debugging, through the [Cortex-Debug](https://marketplace.visualstudio.com/items?itemName=marus25.cortex-debug) extension. **[Firmware] Debug Only** attaches without rebuilding, and **[Firmware] Flash & Debug Bootloader** flashes the Debug build of a bootloader with `scripts/flash_bootloader.py` and debugs it. The image is flashed from the `.bin` rather than the `.elf`, because only the `.bin` carries the CRC the bootloaders check.
+
+You start the GDB server yourself, normally on the host outside the devcontainer, because that is where the probe is plugged in. The launch configurations ask for its address, which defaults to `host.docker.internal:2331`, and which server it is: `jlink`, `openocd` or `pyocd`. The commands below all listen on port 2331, so the default works for each of them. The launch configurations stop the board at its reset vector, before the bootloader runs, so that breakpoints in the startup code are hit. Each server resets differently, so they run the commands in that server's script in [.vscode/gdb](.vscode/gdb). When a session ends, the **[Firmware] Restart Firmware** task resets the board with the same script and leaves it running.
+
+The **XPERIPHERALS** view shows the MCU's registers, from the SVD file that configuring a board links as `vscode/device.svd` in its build tree. CoreN2G has no SVD file for the SAME70, so the view is empty for the main boards.
+
+On Linux, a connection from the container to `host.docker.internal` comes from the Docker bridge rather than from localhost, so the server must listen on all interfaces: that is what `-LocalhostOnly 0`, `bindto 0.0.0.0` and `--allow-remote` below are for. Docker Desktop on Windows and macOS delivers the connection to localhost, so those options are not needed there.
+
+Each tool names the MCU differently:
+
+| Board | MCU | J-Link `-device` | OpenOCD target | pyOCD `-t` |
+| --- | --- | --- | --- | --- |
+| canmaster-Duet3_MB6HC, canmaster-Duet3_MB6XD, Duet3_MB6HC, Duet3_MB6XD, Duet3_CAN0, Duet3_MB6HC_no_SD | SAME70Q20B | `ATSAME70Q20B` | `target/atsamv.cfg`* | `atsame70q20b`* |
+| Duet3Mini5plus | SAME54P20A | `ATSAME54P20A`* | `target/atsame5x.cfg`* | `atsame54p20a`* |
+| EXP3HC | SAME51N19A | `ATSAME51N19A` | `target/atsame5x.cfg` | `atsame51n19a`* |
+| EXP1HCL, M23CL, F3PTB, TOOL1RR | SAME51G19A | `ATSAME51G19A` | `target/atsame5x.cfg` | `atsame51g19a`* |
+| TOOLINDX | SAME51J19A | `ATSAME51J19A`* | `target/atsame5x.cfg`* | `atsame51j19a`* |
+| EXP1XD, TOOL1LC, SAMMYC21, SZP | SAMC21G18A | `ATSAMC21G18A`* | `target/at91samdXX.cfg`* | `atsamc21g18a`* |
+| NodeTrix | STM32H523RE | `STM32H523RE`* | `target/stm32h5x.cfg`* | `stm32h523retx`* |
+
+_\* These boards have not been tested yet with that tool._
+
+A board's bootloader and IAP builds run on the same MCU as its firmware. `scripts/flash_bootloader.py` and **[Firmware] Flash & Debug Bootloader** only work through OpenOCD, which clears the BOOTPROT protection the firmware puts on the bootloader, so use OpenOCD for them whatever the probe, a J-Link included.
+
+### OpenOCD (recommended)
+
+OpenOCD supports most probes. Pick the interface file for the probe and the target file from the table above:
+
+| Probe | Interface file |
+| --- | --- |
+| ST-LINK V2/V3 | `interface/stlink-dap.cfg` |
+| Atmel-ICE, Microchip PICkit 4, MPLAB Snap | `interface/cmsis-dap.cfg` |
+| Raspberry Pi Debug Probe, DAPLink, other CMSIS-DAP | `interface/cmsis-dap.cfg` |
+| J-Link | `interface/jlink.cfg` |
+
+```bash
+openocd -f <interface_file> -c "transport select swd" -f <target_file> -c "bindto 0.0.0.0" -c "gdb_port 2331"
+```
+
+For example, an Atmel-ICE debugging an EXP1HCL:
+
+```bash
+openocd -f interface/cmsis-dap.cfg -c "transport select swd" -f target/atsame5x.cfg \
+        -c "bindto 0.0.0.0" -c "gdb_port 2331"
+```
+
+`interface/stlink-dap.cfg` drives the ST-LINK as a plain debug probe, which needs ST-LINK firmware V2J24 or newer; update older firmware with STM32CubeProgrammer. `interface/stlink.cfg` selects the ST-LINK's older high-level mode instead, which fails on `target/stm32h5x.cfg` with "The selected transport doesn't support this target". `target/stm32h5x.cfg` needs OpenOCD 0.12 or newer. Depending on the OpenOCD version, `gdb port` may be needed instead of `gdb_port`.
+
+If OpenOCD stops at `Error connecting DP: cannot read IDR` although the probe sees the board, the code running on it may block a normal connection, for example by driving LEDs from the SWD pins (see below). Connect while holding the board in reset instead, which needs the probe's reset line connected to the board. OpenOCD releases the reset once it is ready, so the code runs again before GDB connects; make OpenOCD halt the board at its reset vector when GDB connects, or it rejects the connection. Add this after the target file:
+
+```bash
+-c "reset_config srst_only srst_nogate connect_assert_srst" -c "[target current] configure -event gdb-attach { reset halt }"
+```
+
+The `target/stm32h5x.cfg` in STMicroelectronics' OpenOCD (tested with 0.12.0+dev-00664) reads registers with `mem2array`, which that OpenOCD rejects on the target it uses, so its setup after connecting fails with `Error executing event examine-end`. That setup keeps the debugger working while the MCU is in a low-power mode and stops the watchdogs while it is halted. Add this after the target file to replace the failing command:
+
+```bash
+-c 'proc stm32h5x_mrw {used_target reg} { return [$used_target read_memory $reg 32 1] }'
+```
+
+### Boards with LEDs on the SWD pins
+
+Most Duet 3 boards drive their status LEDs from the SWD pins, and a Release build of the firmware takes those pins over as soon as it runs, which locks a debugger out:
+
+- Main boards: Duet3_MB6HC, Duet3_MB6XD, Duet3Mini5plus
+- Expansion and tool boards: EXP1HCL, F3PTB, TOOL1RR, TOOLINDX, SZP, NodeTrix, and EXP3HC from v1.03 and TOOL1LC from v1.1 unless a debugger is attached when they start
+
+Debug builds leave the SWD pins alone. So **[Firmware] Build, Flash & Debug** and **[Firmware] Flash & Debug Bootloader** need the connect under reset above whenever the board may be running a Release build, and **[Firmware] Debug Only** reaches a running Debug build without it.
+
+Expansion and tool boards start their bootloader after every reset, before the firmware. A current bootloader leaves the SWD pins alone in a Debug build or, on the SAME5x and SAMC21, when a debugger is attached as the board starts, and on the STM32H5 it gives them back before starting the firmware. Older bootloaders keep the LEDs on the SWD pins, so the firmware cannot be debugged behind them: update the bootloader first (see [Bootloaders](#bootloaders)). Over CAN, which a Debug build of the firmware ignores, the board must be running a Release build. A Release bootloader on the NodeTrix still drives its LEDs until it starts the firmware, so the debugger loses the board for that moment after each reset.
+
+### SEGGER J-Link
+
+Install the [J-Link Software and Documentation Pack](https://www.segger.com/downloads/jlink/), then run (on Windows, `JLinkGDBServerCL.exe` with the same arguments, or the J-Link GDB Server GUI):
+
+```bash
+JLinkGDBServer -device ATSAME70Q20B -if SWD -speed 4000 -port 2331 -LocalhostOnly 0
+```
+
+### pyOCD
+
+pyOCD is untested here. It needs the device's CMSIS pack, which it installs once. `pyocd list` shows the connected probes; add `-u <unique id>` to choose one when there are several.
+
+```bash
+pip install pyocd
+pyocd pack install atsame70q20b
+pyocd gdbserver -t atsame70q20b --port 2331 --allow-remote
+```
+
+### Checking the connection
+
+To check the server without VS Code, connect from a terminal in the devcontainer:
+
+```bash
+arm-none-eabi-gdb build/canmaster-Duet3_MB6HC-debug/vscode/firmware.elf \
+    -ex "target extended-remote host.docker.internal:2331" -ex "monitor halt" -ex "bt"
+```
 
 ## Profiling with Tracy
 
@@ -292,8 +511,8 @@ linked against a newer glibc than either the devcontainer or Raspberry Pi OS Boo
 built here instead:
 
 ```bash
-./scripts/build-tracy-client.sh                     # this machine, for the system tests
-./scripts/build-tracy-client.sh --arch linux-arm64  # a Pi
+scripts/build.py TracyClient                      # this machine, for the system tests
+scripts/build.py TracyClient --arch linux-arm64   # a Pi
 ```
 
 Install the Tracy GUI on the machine you will watch from. It must be the same release as the client,
@@ -308,10 +527,10 @@ dotnet test src/SystemTests/SystemTests.csproj --filter Name~PauseStopsMidMove -
 ### Profiling a Pi
 
 ```bash
-./scripts/build.sh --all --target <pi-ip> --start-services -p "Profiling=true"
+scripts/deploy.py -H <pi-ip> dsf --build --start-services -p "Profiling=true"
 ```
 
-`build.sh -p` takes the property without the `-p:` prefix, which it adds itself.
+`-p` takes the property without the `-p:` prefix, which the script adds itself.
 
 ### Connecting
 
@@ -382,6 +601,32 @@ If authentication fails when pushing:
 - Check your remote URL with git remote -v.
 - Use HTTPS with a token, or configure SSH keys on your host and ensure forwarding works in your setup.
 
+### Submodules
+
+The firmware projects and libraries in `src/` and `lib/` are submodules, each tracking the branch set in [.gitmodules](.gitmodules); this repository only records which commit of each to use.
+
+- Change submodule code in its own repository first: branch, commit and open a PR there.
+- Submodules check out at a detached `HEAD`, where commits are easily lost. Before editing one, switch it to its tracked branch with the **[Git] Checkout Submodule Branches** task, then make a feature branch.
+- Push submodule commits **before** pushing the commit here that points at them, otherwise nobody else can check it out. `git config push.recurseSubmodules check` (below) enforces this.
+- Before merging, point the submodule at a commit on its tracked branch, not at an unmerged feature branch. CI enforces this on PRs; check it locally with the **[Git] Check Submodules** task (`scripts/submodule.py check`, which `scripts/doctor.py submodules` also runs).
+- After pulling, run `git submodule update --init --recursive`, or set `submodule.recurse true`.
+- The **[Git] Update Submodules** task moves every submodule to the tip of its tracked branch (`scripts/submodule.py update`), merging into local work rather than discarding it. Commit the new pointers.
+- **[Git] Attach Submodules to Branches** (`scripts/submodule.py attach`) puts each submodule on a branch ending at the commit it has checked out, without changing its files, and **[Git] Pull Submodules to Branch** (`attach --branch <name> --pull`) switches those that have the branch to it and fast-forwards it from origin.
+
+These settings make submodules easier to work with. Run them on the host to keep them across container rebuilds and for other projects, or leave out `--global` to set them for this repository only:
+
+```bash
+# Refuse to push if a submodule commit referenced here has not been pushed to its remote
+git config --global push.recurseSubmodules check
+# Make checkout, switch, pull and reset also update submodules to match
+git config --global submodule.recurse true
+# Fetch submodule commits when a fetched commit references new ones
+git config --global fetch.recurseSubmodules on-demand
+# Show a summary of submodule changes in git status, and their commits in git diff
+git config --global status.submoduleSummary true
+git config --global diff.submodule log
+```
+
 ## Troubleshooting
 
 ### Docker is not running
@@ -433,9 +678,10 @@ ssh root@<target-ip> hostname
 
 ### build/ output looks stale
 
-Run the clean task first:
+Delete the build output and build again:
 
-1. Tasks: Run Task
-2. Clean Build Directory
-3. Build All
+```bash
+scripts/clean.py dsf --purge
+scripts/build.py dsf
+```
 

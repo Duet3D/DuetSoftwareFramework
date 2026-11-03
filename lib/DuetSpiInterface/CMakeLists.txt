@@ -3,8 +3,8 @@
 # See README.md for how each side consumes it.
 #
 # Header-only: the protocol is pure declarations, and each side brings its own CRC implementation
-# (they compute identical values, but the firmware's is tuned for its hardware). The device side is
-# built by DuetCANMaster's Makefile rather than CMake, so this target exists purely for the SBC side.
+# (they compute identical values, but the firmware's is tuned for its hardware). lib/CMakeLists.txt
+# also exposes this target as Duet::DuetSpiInterface for the firmware build.
 cmake_minimum_required(VERSION 3.16)
 project(DuetSpiInterface LANGUAGES CXX)
 

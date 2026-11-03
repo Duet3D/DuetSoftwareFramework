@@ -14,8 +14,7 @@ namespace UnitTests.Motion;
 /// <remarks>
 /// <para>
 /// The geometry is what the machine moves by; the object model is what describes it to DuetWebControl,
-/// to the APIs and to M500. §14 of <c>docs/devel/MCODE_MIGRATION.md</c> makes the second a projection
-/// of the first, and a projection that drops a parameter describes a machine that is not the one being
+/// to the APIs and to M500. The second is a projection of the first, and a projection that drops a parameter describes a machine that is not the one being
 /// planned for.
 /// </para>
 /// <para>

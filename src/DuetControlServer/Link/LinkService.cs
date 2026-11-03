@@ -329,8 +329,7 @@ internal sealed class LinkService(
         if (_controllerDown)
         {
             // Coming back rather than starting up. The macro decides what that means for this machine,
-            // and running config.g is what happens when it has nothing to say - see §4.3 of
-            // docs/devel/EVENTS_MIGRATION.md for why the recovery does not live in the macro alone
+            // and running config.g is what happens when it has nothing to say
             _controllerDown = false;
             events.Raise(new MachineEvent(EventType.ControllerReconnect, connectionEvent.HadReset,
                                           CanId.MasterAddress, 0, string.Empty));

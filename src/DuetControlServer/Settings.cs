@@ -148,8 +148,7 @@ public sealed class Settings
     /// <summary>
     /// Transport that carries the link to the controller. "Spi" is the real controller over
     /// <see cref="SpiDevice"/>; "Socket" speaks the same transfer protocol over the Unix domain
-    /// socket at <see cref="SbcSocketPath"/> to a virtual controller (the system test bench, see
-    /// docs/devel/SYSTEM_EMULATION.md)
+    /// socket at <see cref="SbcSocketPath"/> to a virtual controller (the system test bench)
     /// </summary>
     public string SbcTransport { get; set; } = "Spi";
 

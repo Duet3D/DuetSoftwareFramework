@@ -5,7 +5,7 @@
 # Bookworm-compatible libduet_realtime_core.so either build on the Pi or point this toolchain at a Bookworm
 # sysroot via -DDUET_REALTIME_CORE_SYSROOT=/path/to/pi-sysroot (see scripts/fetch-pi-sysroot.sh).
 #
-# The toolchain itself comes from crossbuild-essential-armhf (see scripts/install-arm-gcc.sh).
+# The toolchain itself comes from crossbuild-essential-armhf (see .devcontainer/Dockerfile).
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR arm)
 

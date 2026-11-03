@@ -1,12 +1,17 @@
 {
   "name": "DuetSoftwareFramework Dev",
   "build": {
-    "dockerfile": "Dockerfile",
-    "context": ".."
+    "dockerfile": "Dockerfile"
   },
   "features": {
-    "ghcr.io/devcontainers-extra/features/ripgrep": "latest",
-    "ghcr.io/devcontainers/features/github-cli": "latest"
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "installDirectlyFromGitHubRelease": true,
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers-extra/features/fish-apt-get:1": {},
+    "ghcr.io/devcontainers-extra/features/ripgrep:1": {
+      "version": "latest"
+    }
   },
   "customizations": {
     "vscode": {
@@ -15,22 +20,48 @@
         "ms-dotnettools.csdevkit",
         "editorconfig.editorconfig",
         "ms-vscode.cpptools",
-        "ms-vscode.makefile-tools",
+        "ms-vscode.cpp-devtools",
         "ms-vscode.cmake-tools",
+        "marus25.cortex-debug",
+        "mcu-debug.rtos-views",
         "ms-python.python",
+        "ms-python.autopep8",
+        "ms-python.pylint",
         "rioj7.command-variable",
-        "github.vscode-github-actions"
+        "aaron-bond.better-comments",
+        "everbright-it.sbomlens",
+        "github.vscode-github-actions",
+        "GitHub.vscode-pull-request-github"
       ],
       "settings": {
-        "cmake.sourceDirectory": [
-          "${workspaceFolder}/src/DuetCANMaster",
-          "${workspaceFolder}/src/DuetRealtimeCore"
+        "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+        "cmake.useCMakePresets": "always",
+        // One project: every firmware board and DuetRealtimeCore, the SBC's native library, is a preset
+        "cmake.sourceDirectory": "${workspaceFolder}",
+        "markdown.copyFiles.destination": {
+          "**/*.md": "/docs/images/${fileName}"
+        },
+        // The scripts' tests in tests/scripts (see scripts/test.py scripts)
+        "python.testing.unittestEnabled": true,
+        "python.testing.pytestEnabled": false,
+        "python.testing.unittestArgs": [
+          "-v",
+          "-s",
+          "./tests",
+          "-p",
+          "test_*.py"
         ]
       }
     }
   },
-  "postCreateCommand": "dotnet --info && (cd src && dotnet restore DuetSoftwareFramework.sln) && python3 scripts/create_settings.py",
-  "postStartCommand": ".devcontainer/claude-persist.sh && echo 'Ready: run the `Build and Deploy` task or `cd src && dotnet build DuetSoftwareFramework.sln`'",
+  "postCreateCommand": "dotnet --info && (cd src && dotnet restore DuetSoftwareFramework.sln) && python3 scripts/internal/create_settings.py",
+  "postStartCommand": {
+    "claude": ".devcontainer/claude-persist.sh && echo 'Ready: run the `Build and Deploy` task or `cd src && dotnet build DuetSoftwareFramework.sln`'",
+    // Tab completion for scripts/*.py, see scripts/completions/dsf.bash
+    "fish": "mkdir -p ~/.config/fish/conf.d && ln -sf ${containerWorkspaceFolder}/scripts/completions/dsf.fish ~/.config/fish/conf.d/dsf.fish",
+    "zsh": "grep -qs scripts/completions/dsf.zsh ~/.zshrc || echo 'source ${containerWorkspaceFolder}/scripts/completions/dsf.zsh' >> ~/.zshrc",
+    "bash": "grep -qs scripts/completions/dsf.bash ~/.bashrc || echo 'source ${containerWorkspaceFolder}/scripts/completions/dsf.bash' >> ~/.bashrc"
+  },
 	"runArgs": [
 		"--add-host=host.docker.internal:host-gateway"
 	],

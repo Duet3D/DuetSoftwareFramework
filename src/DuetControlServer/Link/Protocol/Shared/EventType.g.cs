@@ -8,7 +8,7 @@ namespace DuetControlServer.Link.Protocol.Shared;
 
 /// <summary>
 /// What happened, in an event message sent by an expansion board.
-/// Values 0-10 mirror EventType in CANlib's RRF3Common.h. They travel on the wire as the 8-bit
+/// Values 0-12 mirror EventType in CANlib's RRF3Common.h. They travel on the wire as the 8-bit
 /// eventType of an event message, so expansion board firmware already in the field decides them and
 /// they cannot move. Values from 128 up are raised by DuetControlServer about itself and never reach
 /// the wire, which is why they start clear of anything CANlib may add.
@@ -51,6 +51,12 @@ public enum EventType : byte
     /// <summary>the VIN supply fell below the safe limit</summary>
     Undervoltage = 10,
 
+    /// <summary>a board's temperature approached its limit</summary>
+    BoardTemperatureWarning = 11,
+
+    /// <summary>a board's temperature exceeded its limit</summary>
+    BoardOverTemperature = 12,
+
     // Raised by DuetControlServer about its own link, never sent over CAN
     /// <summary>the SPI link to the controller stopped responding, or the controller reset</summary>
     ControllerDisconnect = 128,
@@ -78,6 +84,8 @@ public static class EventTypePriority
         EventType.McuTemperatureWarning => 10,
         EventType.Overvoltage => 11,
         EventType.Undervoltage => 12,
+        EventType.BoardTemperatureWarning => 13,
+        EventType.BoardOverTemperature => 14,
         _ => int.MaxValue
     };
 }

@@ -303,7 +303,7 @@ extern "C"
 	// Pin the local time base the step-clock model is fitted against to a caller-controlled value,
 	// instead of CLOCK_MONOTONIC. With the master clock a test bench reports also frozen, the whole
 	// motion timeline stands still until the test advances both together - which is what makes move
-	// retirement deterministic on the virtual bench (docs/devel/SYSTEM_EMULATION.md, stage 1).
+	// retirement deterministic on the virtual bench.
 	// Process-wide, like the clock it replaces. Never call this against a real controller: the model
 	// would fit real ticks against a clock that does not move.
 	void DuetRT_PinLocalClock(int64_t ns);

@@ -10,7 +10,7 @@ namespace SystemTests.Scenarios.Codes;
 
 /// <summary>
 /// G4, the dwell, asserted against RepRapFirmware's <c>GCodes::DoDwell</c>
-/// (lib/RepRapFirmware/src/GCodes/GCodes.cpp): S is seconds and P is milliseconds, S wins where
+/// (src/RepRapFirmware/src/GCodes/GCodes.cpp): S is seconds and P is milliseconds, S wins where
 /// both are given, a dwell of zero or less is nothing to do, the machine is brought to a
 /// standstill first but only for a channel that has commanded motion since it last waited, and a
 /// simulated job does not spend the time it is measuring
@@ -166,7 +166,7 @@ public class DwellCodeTests : SystemTests.Host.BenchFixture
     /// GCodes.cpp DoDwell adds the dwell to simulationTime and returns ok instead of waiting,
     /// unless the code comes from the daemon or a trigger. DuetControlServer measures a simulation
     /// by the wall clock rather than accumulating a simulated time, so the dwell is skipped and
-    /// nothing is added; see MCODE_MIGRATION.md section 18
+    /// nothing is added
     /// </remarks>
     [Test]
     public async Task G4DoesNotDwellWhileSimulatingAFile()

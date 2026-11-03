@@ -85,7 +85,7 @@ int main()
 	CheckEntry("M308V1Params", 13, M308V1Params[13], 'V', 0x42, 0);
 
 	// M569Params
-	CheckLength("M569Params", M569Params, 11);
+	CheckLength("M569Params", M569Params, 12);
 	CheckEntry("M569Params", 0, M569Params[0], 'P', 0x41, 0);
 	CheckEntry("M569Params", 1, M569Params[1], 'S', 0x01, 0);
 	CheckEntry("M569Params", 2, M569Params[2], 'R', 0x11, 0);
@@ -97,6 +97,7 @@ int main()
 	CheckEntry("M569Params", 8, M569Params[8], 'Y', 0x81, 3);
 	CheckEntry("M569Params", 9, M569Params[9], 'T', 0xa4, 4);
 	CheckEntry("M569Params", 10, M569Params[10], 'U', 0x11, 0);
+	CheckEntry("M569Params", 11, M569Params[11], 'C', 0x04, 0);
 
 	// M569Point1Params
 	CheckLength("M569Point1Params", M569Point1Params, 14);

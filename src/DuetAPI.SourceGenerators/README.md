@@ -45,4 +45,4 @@ That build exercises the generator because `DuetAPI` includes it as an analyzer.
 ## Related Docs
 
 - [../DuetAPI/README.md](../DuetAPI/README.md)
-- [../../docs/devel/OBJECT_MODEL.md](../../docs/devel/OBJECT_MODEL.md)
+- [../Documentation/articles/object-model.md](../Documentation/articles/object-model.md)

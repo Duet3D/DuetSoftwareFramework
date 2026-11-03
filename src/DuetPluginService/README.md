@@ -66,6 +66,6 @@ Meaningful end-to-end verification requires DCS plus a plugin directory or ZIP t
 
 ## Related Docs
 
-- [../../docs/devel/PLUGINS.md](../../docs/devel/PLUGINS.md)
-- [../../docs/devel/IPC_PROTOCOL.md](../../docs/devel/IPC_PROTOCOL.md)
+- [../Documentation/articles/plugins.md](../Documentation/articles/plugins.md)
+- [../Documentation/articles/ipc.md](../Documentation/articles/ipc.md)
 - [../PluginManager/README.md](../PluginManager/README.md)

@@ -27,8 +27,7 @@ add_subdirectory("${DUET_LIBRARIES_DIR}/DuetSpiInterface" duet_spi_protocol)
 target_link_libraries(<target> PUBLIC duet_spi_protocol)
 ```
 
-**`src/DuetCANMaster`** (RepRapFirmware) consumes the headers only — it has its own Makefile-based
-bare-metal build and does not build the CMake target. Its board makefiles add:
+**`src/DuetCANMaster`** consumes the headers only.
 
 ```make
 -I$(LIBRARIES_DIR)/DuetSpiInterface/include

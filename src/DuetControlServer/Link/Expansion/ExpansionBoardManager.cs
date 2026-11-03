@@ -762,9 +762,7 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
     /// General-purpose inputs and endstops are applied. A Z probe handle is not: M558 has not been
     /// ported, so nothing has created the probe it would refer to.
     /// <para>
-    /// This only records the state. Stopping a move on an endstop is decided by the controller,
-    /// which is the only place close enough to the bus for the latency - see section 10 of
-    /// docs/devel/MCODE_MIGRATION.md
+    /// This only records the state. Stopping a move on an endstop is decided by the controller.
     /// </para>
     /// </remarks>
     private async ValueTask ApplyInputChangedAsync(ushort states, byte numHandles, Func<uint, RemoteInputHandle> getHandle,
@@ -875,8 +873,7 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
     /// <remarks>
     /// <para>
     /// The controller used to do this and no longer does: nothing there acted on the result, the event
-    /// it raised had no consumer, and the object model this belongs in is here. See §3.3.1 of
-    /// docs/devel/EVENTS_MIGRATION.md.
+    /// it raised had no consumer, and the object model this belongs in is here.
     /// </para>
     /// <para>
     /// The one thing the controller's timer had that this does not is independence from the SPI link.

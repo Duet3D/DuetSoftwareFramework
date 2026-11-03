@@ -109,15 +109,15 @@ standalone C# tool. It emits:
 | `src/UnitTests/Link/CanMessageLayout.g.cs`, `CanGenericTableLayout.g.cs`, and the C++ layout probes | Conformance harnesses asserting the emitted layouts are what both sides compute |
 
 ```sh
-make can-messages          # regenerate everything from the schema
-make can-messages-check    # fail if the checked-in output is stale
-make can-messages-verify   # check the generated C++ layouts against CANlib's own header
+scripts/codegen.py            # regenerate everything from the schema
+scripts/codegen.py --check    # fail if the checked-in output is stale
+scripts/codegen.py --verify   # check the generated C++ layouts against CANlib's own header
 ```
 
 The generated files are checked in, so neither the DSF build nor the CANlib build runs the tool. A
 DCS build does run `--check` first and fails if the checked-in output no longer matches the schema,
 so editing the schema cannot quietly leave the generated files behind; regenerating stays a
-deliberate `make can-messages`, because a build that rewrote tracked source during every publish and
+deliberate `scripts/codegen.py`, because a build that rewrote tracked source during every publish and
 deploy would be worse than the problem.
 
 The [`lib/CANlib`](lib/CANlib) submodule is the validation oracle rather than the source:

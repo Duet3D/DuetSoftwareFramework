@@ -17,8 +17,11 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it. Tags are fetched
+      # because the build only leaves the commit hash out of the version when HEAD is tagged
       - uses: actions/checkout@v6
+        with:
+          fetch-tags: true
 
       # Install NodeJS environment
       - name: Set up NodeJS

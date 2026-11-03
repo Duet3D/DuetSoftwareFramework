@@ -33,7 +33,7 @@ Tracking known issues to keep Github issues from being spammed by issues for the
 ## DuetWebServer
 
 ### The HTTP API stayed dead after a deploy, once
-- [ ] After `scripts/build.sh --all --target <pi> --start-services`: DuetControlServer came up and ran config.g normally, `systemctl is-active duetwebserver` said active, and every request to it was refused at the socket. `systemctl restart duetwebserver` fixed it. The cause is not known.
+- [ ] After `scripts/deploy.py -H <pi> dsf --build --start-services`: DuetControlServer came up and ran config.g normally, `systemctl is-active duetwebserver` said active, and every request to it was refused at the socket. `systemctl restart duetwebserver` fixed it. The cause is not known.
 
 ## DuetCANMaster
 

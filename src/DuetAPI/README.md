@@ -65,6 +65,6 @@ When changing the object model or command contracts, regenerate and review the d
 
 ## Related Docs
 
-- [../../docs/devel/OBJECT_MODEL.md](../../docs/devel/OBJECT_MODEL.md)
-- [../../docs/devel/IPC_PROTOCOL.md](../../docs/devel/IPC_PROTOCOL.md)
+- [../Documentation/articles/object-model.md](../Documentation/articles/object-model.md)
+- [../Documentation/articles/ipc.md](../Documentation/articles/ipc.md)
 - [../DuetAPI.SourceGenerators/README.md](../DuetAPI.SourceGenerators/README.md)
