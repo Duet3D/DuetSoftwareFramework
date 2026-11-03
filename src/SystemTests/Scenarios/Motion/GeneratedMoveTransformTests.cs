@@ -522,6 +522,70 @@ public class GeneratedMoveTransformTests : BenchFixture
         });
     }
 
+    /// <summary>
+    /// A plain G30 zeroes the height map at the point the head is really over
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>Move::SetZeroHeightError</c> takes <c>raw.coords</c>, before the skew, and
+    /// skews them with no tool. The head is at X0 Y25, which tanXY 0.1 puts at X2.5, and the map reads
+    /// 0.05 mm for every mm of X. Skewing coordinates that already carry the skew looks the map up at X5
+    /// instead, so the shift would be 0.125 mm out and Z would not end up where the next move sends it
+    /// </remarks>
+    [Test]
+    public async Task G30ZeroesTheHeightMapAtTheSkewedPointOnce()
+    {
+        const string steepMesh = """
+            RepRapFirmware height map file v2 generated at 2025-01-01 00:00, min error 0.000, max error 0.000, mean 0.000, deviation 0.000
+            axis0,axis1,min0,max0,min1,max1,radius,spacing0,spacing1,num0,num1
+            X,Y,-50.00,50.00,-50.00,50.00,-1.00,50.00,50.00,3,3
+             -2.500,  0.000,  2.500
+             -2.500,  0.000,  2.500
+             -2.500,  0.000,  2.500
+
+            """;
+        await using JobBench bench = await ScheduleMoveBench.StartAsync(XyzMachine + "\nM556 S100 X10 Y0 Z0", sd => sd.WriteSys(MeshFile, steepMesh));
+        await RunAsync(bench, $"G90\nG92 X0 Y25 Z0\nM375 P\"{MeshFile}\"");
+        int before = bench.CanMaster.ScheduledMoves().Count;
+
+        Task<string> probing = bench.Host.ExecuteCodeAsync("G30");
+        await bench.CanMaster.WaitUntilAsync(() => Dives(bench, before).Length >= 1, 20_000, "the dive");
+        bench.CanMaster.InjectInputChange(ScheduleMoveBench.DriverBoard, RemoteProbes.HandleFor(0), active: true);
+        bench.StopMove(Dives(bench, before)[0]);
+        await probing;
+        bench.CanMaster.InjectInputChange(ScheduleMoveBench.DriverBoard, RemoteProbes.HandleFor(0), active: false);
+
+        await RunAsync(bench, "G1 Z1 F600\nM400");
+
+        Assert.That(await ReadAxisAsync(bench, 'Z', axis => axis.StepPos), Is.EqualTo(1 * ZStepsPerMm).Within(1),
+                    "the map reads zero at the probed point, so Z goes to exactly where it was sent");
+    }
+
+    // ---- G1 ------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// A G1 leaves an axis the selected tool maps X away from where it is
+    /// </summary>
+    /// <remarks>
+    /// With the tool's map X3, X is not driven by this tool at all, so it keeps the coordinate the last
+    /// move gave it: RepRapFirmware's <c>ToolOffsetTransform</c> skips it, and <c>raw.coords</c> holds
+    /// what it held
+    /// </remarks>
+    [Test]
+    public async Task AG1LeavesAnAxisTheToolMapsAwayFromWhereItIs()
+    {
+        await using JobBench bench = await ScheduleMoveBench.StartAsync(XyzMachine + "\nM569 P2.0 S1\nM584 U2.0\nM92 U80\nM208 U-100:100");
+        await RunAsync(bench, "G90\nG92 X20 Y0 Z0 U0\nM563 P0 S\"xmap\" X3\nT0 P0");
+
+        (string reply, IReadOnlyList<ScheduledMove> moves) = await RunCodeAsync(bench, "G1 X10 F6000");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply, Is.Empty);
+            Assert.That(moves.Sum(move => StepsOf(move, XDriver)), Is.Zero, "X stays at 20");
+            Assert.That(moves.Sum(move => StepsOf(move, UBoard, UDriver)), Is.EqualTo(10 * XyuStepsPerMm), "and U goes to the 10 asked for");
+        });
+    }
+
     // ---- Resume ----------------------------------------------------------------------------------
 
     /// <summary>

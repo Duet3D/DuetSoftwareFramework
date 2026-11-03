@@ -371,7 +371,8 @@ public class MoveInterpreterTests
     public void AnExtruderOnlyMoveLeavesTheAxesAlone()
     {
         Machine machine = NewMachine(NewTool());
-        Build(machine, G("G1 X10"), NewInput(), isCoordinated: true, MoveType.Normal);
+        RawMove g1 = Build(machine, G("G1 X10 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
+        Queue(machine, g1);
 
         RawMove raw = Build(machine, G("G1 E2"), NewInput(), isCoordinated: true, MoveType.Normal);
 
@@ -984,22 +985,16 @@ public class MoveInterpreterTests
         """;
 
     [Test]
-    public void AGeneratedMoveStartsWhereTheInterpreterIsThroughTheToolsOffsets()
+    public void AGeneratedMoveStartsWhereTheLastMoveLeftTheAxes()
     {
-        Tool tool = NewTool();
-        foreach (float offset in new[] { 2.0f, -1.0f, 0.5f })
-        {
-            tool.Offsets.Add(offset);
-        }
-        Machine machine = NewMachine(tool);
-        new[] { 10.0f, 20.0f, 5.0f }.CopyTo(machine.State.CurrentUserPosition, 0);
+        Machine machine = NewMachine(NewTool());
+        new[] { 8.0f, 21.0f, 4.5f }.CopyTo(machine.State.Coords, 0);
 
         RawMove raw = machine.Interpreter.StartGeneratedMove();
 
         Assert.Multiple(() =>
         {
-            Assert.That(raw.Coords[..3], Is.EqualTo(new[] { 8.0f, 21.0f, 4.5f }),
-                        "the interpreter's position less the tool's offsets, which is where a G1 starts too");
+            Assert.That(raw.Coords[..3], Is.EqualTo(new[] { 8.0f, 21.0f, 4.5f }));
             Assert.That(raw.InitialCoords[..3], Is.EqualTo(raw.Coords[..3]), "and that is where it starts");
             Assert.That(raw.MoveType, Is.EqualTo(MoveType.Normal));
         });
@@ -1028,7 +1023,7 @@ public class MoveInterpreterTests
         machine.Model.Move.Compensation.Skew.TanXY = 0.01f;
         machine.Builder.SetAxisPosition(0, 7.3f);
         machine.Builder.SetAxisPosition(1, 30.0f);
-        machine.State.CurrentUserPosition[1] = 30.0f;
+        machine.Interpreter.SyncGeneratedMoveToMachine();
 
         RawMove raw = machine.Interpreter.StartGeneratedMove();
         float started = raw.Coords[0];
@@ -1146,6 +1141,7 @@ public class MoveInterpreterTests
     {
         Machine machine = NewMachine(DuplicatingTool(uOffset: -20.0f), withU: true);
         machine.Builder.SetAxisPosition(3, 20.0f);
+        machine.State.Coords[3] = 20.0f;
         return machine;
     }
 
@@ -1157,6 +1153,7 @@ public class MoveInterpreterTests
         raw.LinearAxesMentioned = true;
         Assert.That(machine.Builder.Build(raw, new byte[MoveParams.Length(MotionLimits.MaxAxesPlusExtruders)]).Error,
                     Is.EqualTo(NativeMovementError.Ok));
+        machine.State.CommitCoords(raw);
     }
 
     [Test]
@@ -1197,21 +1194,18 @@ public class MoveInterpreterTests
     }
 
     [Test]
-    public void AGeneratedMoveAfterAnyOtherMoveStartsThroughTheToolsTransform()
+    public void AGeneratedMoveAfterAG1StartsWhereTheG1LeftEveryAxis()
     {
-        // Once something else has put the machine somewhere, the generated move before is history,
-        // and the interpreter - which a G1 or G92 moves on - is where the move starts
+        // The G1 comes through the tool's map, so it puts both carriages where that says, and the
+        // generated move carries on from there rather than from the interpreter's own idea of X
         Machine machine = DuplicatingMachine();
-        RawMove travel = machine.Interpreter.StartGeneratedMove();
-        travel.Coords[0] = 20.0f;
-        Queue(machine, travel);
-        machine.Builder.SetAxisPosition(1, 5.0f);
-        machine.State.CurrentUserPosition[1] = 5.0f;
 
+        RawMove g1 = Build(machine, G("G1 X5 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
+        Queue(machine, g1);
         RawMove next = machine.Interpreter.StartGeneratedMove();
 
-        Assert.That(next.Coords[..4], Is.EqualTo(new[] { 0.0f, 5.0f, 0.0f, 20.0f }),
-                    "X0 through the tool's map: X at 0 and U at 20");
+        Assert.That(next.Coords[..4], Is.EqualTo(new[] { 5.0f, 0.0f, 0.0f, 25.0f }),
+                    "X5 through the tool's map: X at 5 and U 20 further on");
     }
 
     [Test]
@@ -1223,7 +1217,7 @@ public class MoveInterpreterTests
         travel.Coords[1] = 10.0f;
         Queue(machine, travel);
 
-        machine.Interpreter.SyncInterpreterToGeneratedMove();
+        machine.Interpreter.SyncInterpreterToCoords();
 
         Assert.Multiple(() =>
         {
@@ -1232,35 +1226,6 @@ public class MoveInterpreterTests
             Assert.That(machine.State.CurrentUserPosition[1], Is.EqualTo(10.0f));
             Assert.That(machine.State.CurrentUserPosition[3], Is.Zero, "U is its own coordinate plus the tool's offset");
         });
-    }
-
-    [Test]
-    public void TheInterpreterIsLeftAloneWhenTheLastMoveWasNotGenerated()
-    {
-        Machine machine = DuplicatingMachine();
-        machine.State.CurrentUserPosition[0] = 7.0f;
-
-        machine.Interpreter.SyncInterpreterToGeneratedMove();
-
-        Assert.That(machine.State.CurrentUserPosition[0], Is.EqualTo(7.0f));
-    }
-
-    [Test]
-    public void TheInterpreterIsLeftAloneWhenSomethingElseMovedAfterTheLastGeneratedMove()
-    {
-        // The travel would read as X10 Y0 through the tool's map, but a move since has put the machine
-        // somewhere else and the interpreter already follows that move
-        Machine machine = DuplicatingMachine();
-        RawMove travel = machine.Interpreter.StartGeneratedMove();
-        travel.Coords[0] = 20.0f;
-        Queue(machine, travel);
-        machine.Builder.SetAxisPosition(1, 5.0f);
-        machine.State.CurrentUserPosition[0] = 7.0f;
-        machine.State.CurrentUserPosition[1] = 5.0f;
-
-        machine.Interpreter.SyncInterpreterToGeneratedMove();
-
-        Assert.That(machine.State.CurrentUserPosition[..2], Is.EqualTo(new[] { 7.0f, 5.0f }));
     }
 
     [Test]
@@ -1280,5 +1245,162 @@ public class MoveInterpreterTests
         RawMove lift = machine.Interpreter.StartGeneratedMove();
 
         Assert.That(lift.Coords[..4], Is.EqualTo(new[] { 20.0f, 0.0f, -0.5f, 20.0f }).Within(1e-4f));
+    }
+
+    // ---- Where each move starts --------------------------------------------------------------------
+
+    [Test]
+    public void AG1LeavesAnAxisTheToolMapsAwayFromWhereItWas()
+    {
+        // X has no coordinate from the tool transform, so it keeps the one the last move gave it. The
+        // move has to command that, or X would be driven to zero
+        Machine machine = NewMachine(XOnUTool(), withU: true);
+        machine.State.Coords[0] = 7.0f;
+
+        RawMove raw = Build(machine, G("G1 X30 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(raw.InitialCoords[0], Is.EqualTo(7.0f));
+            Assert.That(raw.Coords[0], Is.EqualTo(7.0f), "X stays where it is");
+            Assert.That(raw.Coords[3], Is.EqualTo(30.0f), "and U goes to the X the code asked for");
+        });
+    }
+
+    [Test]
+    public void AMoveStartsWhereTheLastOneLeftTheAxesAfterAToolOffsetChanged()
+    {
+        // The offset is part of where this move ends, not of where the machine is now
+        Tool tool = NewTool();
+        tool.Offsets.Add(5.0f);
+        tool.Offsets.Add(0.0f);
+        tool.Offsets.Add(0.0f);
+        Machine machine = NewMachine(tool);
+        machine.State.Coords[0] = 10.0f;
+        machine.State.CurrentUserPosition[0] = 10.0f;
+
+        RawMove raw = Build(machine, G("G1 X20 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(raw.InitialCoords[0], Is.EqualTo(10.0f));
+            Assert.That(raw.Coords[0], Is.EqualTo(15.0f));
+        });
+    }
+
+    [Test]
+    public void AnExtruderOnlyMoveLeavesTheAxesWhereTheyWereAfterAToolOffsetChanged()
+    {
+        // RepRapFirmware defers a changed offset to the next move that names an axis, so that it does
+        // not come out as motion on a pure extrusion
+        Tool tool = NewTool();
+        tool.Offsets.Add(5.0f);
+        tool.Offsets.Add(0.0f);
+        tool.Offsets.Add(0.0f);
+        Machine machine = NewMachine(tool);
+        machine.State.Coords[0] = 10.0f;
+
+        RawMove raw = Build(machine, G("G1 E1 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
+
+        Assert.That(raw.Coords[0], Is.EqualTo(10.0f));
+    }
+
+    [Test]
+    public void ABabystepIsSpreadAcrossTheNextMoveRatherThanLandingOnItsStart()
+    {
+        // The move starts where the last one left Z and ends with the babystep, so its segments carry
+        // Z across as RepRapFirmware's do
+        Machine machine = NewMachine(NewTool());
+        machine.Model.Move.Axes[2].Babystep = 0.2f;
+
+        RawMove raw = Build(machine, G("G1 X30 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(raw.InitialCoords[2], Is.Zero, "the move starts without it");
+            Assert.That(raw.Coords[2], Is.EqualTo(0.2f), "and ends with it");
+        });
+    }
+
+    [Test]
+    public void AMoveThatIsNotTakenLeavesTheCoordinatesAlone()
+    {
+        // Building and transforming a move changes nothing until the planner has taken it, however
+        // the builder has been left
+        Machine machine = NewMachine();
+        machine.State.Coords[0] = 3.0f;
+
+        RawMove refused = machine.Interpreter.StartGeneratedMove();
+        refused.Coords[0] = 50.0f;
+        machine.Interpreter.FinishGeneratedMove(refused);
+
+        Assert.That(machine.State.Coords[0], Is.EqualTo(3.0f));
+    }
+
+    [Test]
+    public void TheCoordinatesAreTheOnesBeforeSkewAndMesh()
+    {
+        Machine machine = NewMachine();
+        machine.Model.Move.Compensation.Skew.TanXY = 0.1f;
+
+        RawMove raw = machine.Interpreter.StartGeneratedMove();
+        raw.Coords[1] = 50.0f;
+        Queue(machine, raw);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(machine.State.Coords[0], Is.Zero, "not the 5 mm the skew added");
+            Assert.That(machine.Builder.StartCoordinates[0], Is.EqualTo(5.0f).Within(1e-4f), "which is what the machine was told");
+        });
+    }
+
+    [Test]
+    public void ASpecialMoveLeavesTheCoordinatesAlone()
+    {
+        // It bypasses the transforms, so what it says is not in these coordinates at all
+        Machine machine = NewMachine();
+        machine.State.Coords[0] = 3.0f;
+        RawMove raw = new() { MoveType = MoveType.Homing };
+        raw.Coords[0] = 50.0f;
+
+        machine.State.CommitCoords(raw);
+
+        Assert.That(machine.State.Coords[0], Is.EqualTo(3.0f));
+    }
+
+    [Test]
+    public void TheInterpreterFollowsTheCoordinatesWhenTheToolsOffsetsChange()
+    {
+        // The machine has not moved, so the coordinates are unchanged and what they are called is not.
+        // Going by the machine position would take the mesh's approximate inverse for no reason
+        Tool tool = NewTool();
+        tool.Offsets.Add(5.0f);
+        tool.Offsets.Add(0.0f);
+        tool.Offsets.Add(0.0f);
+        Machine machine = NewMachine(tool);
+        machine.State.Coords[0] = 10.0f;
+
+        machine.Interpreter.SyncInterpreterToCoords();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(machine.State.CurrentUserPosition[0], Is.EqualTo(15.0f));
+            Assert.That(machine.State.Coords[0], Is.EqualTo(10.0f));
+        });
+    }
+
+    [Test]
+    public void AStopTakesTheCoordinatesFromTheMachineWithTheSelectedToolsMap()
+    {
+        // A stop or homing puts the machine somewhere no move did. The skew comes off U, the tool's X
+        Machine machine = NewMachine(XOnUTool(), withU: true);
+        machine.Model.Move.Compensation.Skew.TanXY = 0.1f;
+        machine.Builder.SetAxisPosition(0, 7.0f);
+        machine.Builder.SetAxisPosition(1, 50.0f);
+        machine.Builder.SetAxisPosition(3, 15.0f);
+
+        machine.Interpreter.SyncInterpreterToMachine();
+
+        Assert.That(machine.State.Coords[..4], Is.EqualTo(new[] { 7.0f, 50.0f, 0.0f, 10.0f }).Within(1e-4f));
     }
 }

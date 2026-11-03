@@ -563,9 +563,10 @@ internal sealed partial class GCodeHandler
     /// <param name="settings">What the probe is configured to do</param>
     /// <remarks>
     /// RepRapFirmware's <c>Move::SetZeroHeightError</c> call after a plain G30. The coordinates it
-    /// wants are the probe's rather than the nozzle's, so the probe's offsets are added first and the
-    /// axis skew applied, exactly as RepRapFirmware does before looking the point up. The caller must
-    /// hold the object model write lock and the planner lock
+    /// wants are the probe's rather than the nozzle's, so the probe's offsets are added to where the
+    /// axes are before skew and mesh, and the skew then applied with no tool, exactly as
+    /// RepRapFirmware does before looking the point up. The caller must hold the object model write
+    /// lock and the planner lock
     /// </remarks>
     private void ZeroTheHeightMapHere(Probe probe, ProbeSettings settings)
     {
@@ -576,7 +577,7 @@ internal sealed partial class GCodeHandler
 
         int numAxes = planner.Parameters.SharedAxisCount(model.Move);
         float[] probePosition = new float[MotionLimits.MaxAxes];
-        planner.Builder.StartCoordinates[..numAxes].CopyTo(probePosition);
+        planner.State.Coords.AsSpan(0, numAxes).CopyTo(probePosition);
 
         for (int axis = 0; axis < numAxes && axis < probe.Offsets.Count; axis++)
         {
@@ -585,7 +586,7 @@ internal sealed partial class GCodeHandler
                 probePosition[axis] += probe.Offsets[axis];
             }
         }
-        AxisSkew.Apply(toolManager.Current, model.Move, probePosition, numAxes);
+        AxisSkew.Apply(null, model.Move, probePosition, numAxes);
 
         (float axis0, float axis1) = bedCompensation.GridCoordinates(probePosition, numAxes);
         bedCompensation.SetZeroHeightError(axis0, axis1);
@@ -799,8 +800,7 @@ internal sealed partial class GCodeHandler
     /// <returns>What became of it</returns>
     /// <remarks>
     /// <para>
-    /// The coordinates are the probe's, written into the move with no tool transform, and the next
-    /// probing move starts from them rather than from the interpreter's position. Once the move is
+    /// The coordinates are the probe's, written into the move with no tool transform. Once the move is
     /// queued the interpreter's position is brought into step with it, as a G1 brings it into step
     /// with where the G1 goes: RepRapFirmware's <c>SetMoveBufferDefaults</c> marks the position for
     /// re-reading, and the standstill that follows every probing move brings its user position into
@@ -820,7 +820,7 @@ internal sealed partial class GCodeHandler
         MoveSubmitResult result = planner.QueueMove(raw);
         if (result is MoveSubmitResult.Queued or MoveSubmitResult.NoMovement)
         {
-            moveInterpreter.SyncInterpreterToGeneratedMove();
+            moveInterpreter.SyncInterpreterToCoords();
             planner.PublishCommittedPosition();
         }
         return result;

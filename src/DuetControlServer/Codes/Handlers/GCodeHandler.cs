@@ -584,6 +584,7 @@ internal sealed partial class GCodeHandler(
                     foreach (int axis in axesIncluded)
                     {
                         planner.Builder.SetAxisPosition(axis, state.CurrentUserPosition[axis]);
+                        state.Coords[axis] = state.CurrentUserPosition[axis];
                     }
 
                     // The engine holds its own idea of where the motors are and plans the next move

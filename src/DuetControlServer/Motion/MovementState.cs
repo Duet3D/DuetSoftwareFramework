@@ -42,6 +42,38 @@ internal sealed class MovementState
     public float[] CurrentUserPosition { get; } = new float[MotionLimits.MaxAxes];
 
     /// <summary>
+    /// Where the last move left each axis, with the tool transform applied but not skew or mesh
+    /// compensation
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>ms.raw.coords</c> between moves, which every move starts from. It sits
+    /// between the two other descriptions of the position: <see cref="CurrentUserPosition"/> is before
+    /// the tool transform, and <see cref="MoveBuilder.StartCoordinates"/> is after skew and mesh too.
+    /// Neither can stand in for it, because the transforms on either side cannot be undone exactly. An
+    /// axis a tool maps X away from has no user coordinate at all, and a move that is not a G0 or G1 can
+    /// leave the axes of a tool's map disagreeing about what X is.
+    /// </para>
+    /// <para>
+    /// A move sets it once it has been taken (<see cref="CommitCoords"/>), so one the engine refused
+    /// leaves it alone. Whatever puts the machine somewhere without queueing a move has to set it too:
+    /// a stopped move and homing re-derive it from the machine position, and G92 writes it directly
+    /// </para>
+    /// </remarks>
+    public float[] Coords { get; } = new float[MotionLimits.MaxAxes];
+
+    /// <summary>
+    /// Record where a move that has been taken leaves the axes
+    /// </summary>
+    /// <param name="move">The move</param>
+    /// <remarks>
+    /// A special move carries no such coordinates, because it bypasses the transforms altogether, and
+    /// changes nothing here. What follows it re-derives them from where it stopped
+    /// </remarks>
+    public void CommitCoords(RawMove move)
+        => move.UntransformedCoords.AsSpan(0, move.UntransformedAxes).CopyTo(Coords);
+
+    /// <summary>
     /// Segments of the move being submitted that have not gone out yet
     /// </summary>
     /// <remarks>

@@ -34,8 +34,9 @@ internal sealed class RawMove
     /// <para>
     /// RepRapFirmware's <c>ms.initialCoords</c>, and the distinction it draws is the reason this
     /// exists separately from <see cref="MoveBuilder.StartCoordinates"/>. Both say where the last
-    /// move left the machine, but in different coordinates: this one has the tool transform applied
-    /// and <em>not</em> the bed transform, while the builder's has both, because the builder's job is
+    /// move left the machine, but in different coordinates: this one is
+    /// <see cref="MovementState.Coords"/>, with the tool transform applied and <em>not</em> the bed
+    /// transform, while the builder's has both, because the builder's job is
     /// to difference one commanded position against the next and the bed correction is part of what
     /// was commanded.
     /// </para>
@@ -49,6 +50,20 @@ internal sealed class RawMove
     /// </para>
     /// </remarks>
     public float[] InitialCoords { get; } = new float[MotionLimits.MaxAxes];
+
+    /// <summary>
+    /// The axis coordinates as they were before skew and mesh compensation
+    /// </summary>
+    /// <remarks>
+    /// Taken as the compensation overwrites <see cref="Coords"/>, and what
+    /// <see cref="MovementState.Coords"/> becomes if this move is taken
+    /// </remarks>
+    public float[] UntransformedCoords { get; } = new float[MotionLimits.MaxAxes];
+
+    /// <summary>
+    /// How many of <see cref="UntransformedCoords"/> are set, which is none for a special move
+    /// </summary>
+    public int UntransformedAxes { get; set; }
 
     /// <summary>Requested speed in mm/sec, meaningless when <see cref="InverseTimeMode"/> is set</summary>
     public float FeedRateMmPerSec { get; set; } = 50.0f;

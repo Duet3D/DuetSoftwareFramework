@@ -515,6 +515,8 @@ internal sealed class MovePlanner(
             switch (built.Error)
             {
                 case NativeMovementError.NoMovement:
+                    // The builder still moves on to the coordinates of a move that rounds to no steps
+                    State.CommitCoords(move);
                     return MoveSubmitResult.NoMovement;
 
                 case NativeMovementError.Ok:
@@ -540,6 +542,7 @@ internal sealed class MovePlanner(
                 return MoveSubmitResult.Busy;
             }
 
+            State.CommitCoords(move);
             _lastSubmittedMoveId[move.RingNumber] = move.MoveId;
             PublishCommittedPosition();
             return MoveSubmitResult.Queued;
