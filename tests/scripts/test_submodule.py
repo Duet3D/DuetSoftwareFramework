@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import io
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from unittest import TestCase
 from unittest.mock import patch
 
 import submodule
+from common import submodules
+from common.submodules import Submodule
 
 
 class SubmoduleTest(TestCase):
@@ -42,3 +44,21 @@ class SubmoduleTest(TestCase):
         self.assertEqual([s.path for s in submodule.submodules(paths=['lib/CANlib/'])], ['lib/CANlib'])
         with self.assertRaisesRegex(SystemExit, 'Not submodules: not/a/submodule'):
             submodule.submodules(paths=['lib/CANlib', 'not/a/submodule'])
+
+    def test_check_refuses_a_submodule_gitmodules_does_not_list(self) -> None:
+        listed = [Submodule('lib/CANlib', 'https://example.com/CANlib.git', '3.7-dev')]
+        recorded = {'lib/CANlib': 'a' * 40, 'lib/Stray': 'b' * 40, 'lib/Other': 'c' * 40}
+        with (patch.object(submodules, 'submodules', return_value=listed),
+              patch.object(submodules, 'committed', return_value=recorded),
+              patch.object(submodules, 'check_one') as check_one,
+              self.assertRaisesRegex(SystemExit, r'HEAD records submodules .gitmodules does not list: lib/Other, lib/Stray')):
+            submodules.check('HEAD')
+        check_one.assert_not_called()
+
+    def test_check_passes_when_gitmodules_lists_every_submodule(self) -> None:
+        listed = [Submodule('lib/CANlib', 'https://example.com/CANlib.git', '3.7-dev')]
+        with (patch.object(submodules, 'submodules', return_value=listed),
+              patch.object(submodules, 'committed', return_value={'lib/CANlib': 'a' * 40}),
+              patch.object(submodules, 'check_one', return_value=(True, 'on 3.7-dev, up to date')),
+              redirect_stdout(io.StringIO())):
+            self.assertTrue(submodules.check('HEAD'))

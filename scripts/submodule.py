@@ -2,8 +2,8 @@
 # pyright: strict
 """Work with the submodules and the branches they track in .gitmodules.
 
-    scripts/submodule.py check [REV]    check that each submodule committed in REV (default HEAD) is on its
-                                        tracked branch, and how far behind it is
+    scripts/submodule.py check [REV]    check that each submodule committed in REV (default HEAD) is in
+                                        .gitmodules and on its tracked branch, and how far behind it is
     scripts/submodule.py update         pull each tracked branch and merge it into the submodule's checkout
     scripts/submodule.py checkout       switch each submodule to its tracked branch
     scripts/submodule.py attach         put each submodule on a branch ending at the commit it has checked out
