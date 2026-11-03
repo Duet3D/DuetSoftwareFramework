@@ -409,17 +409,18 @@ namespace DuetWebServer.Controllers
         }
 
         /// <summary>
-        /// GET /rr_delete?name={filename}
+        /// GET /rr_delete?name={filename}&amp;recursive={recursive}
         /// Delete the given file or directory.
         /// </summary>
         /// <param name="name">File or directory to delete</param>
+        /// <param name="recursive">Delete directories recursively (optional, default "no")</param>
         /// <returns>
         /// HTTP status code:
         /// (200) JSON response
         /// </returns>
         [Authorize(Policy = Authorization.Policies.ReadWrite)]
         [HttpGet("rr_delete")]
-        public async Task<IActionResult> DeleteFileOrDirectory(string? name)
+        public async Task<IActionResult> DeleteFileOrDirectory(string? name, string? recursive = "no")
         {
             try
             {
@@ -429,7 +430,7 @@ namespace DuetWebServer.Controllers
 
                     if (Directory.Exists(resolvedPath))
                     {
-                        Directory.Delete(resolvedPath);
+                        Directory.Delete(resolvedPath, recursive == "yes");
                         return Content("{\"err\":0}", "application/json");
                     }
 
