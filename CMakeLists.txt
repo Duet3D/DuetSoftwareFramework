@@ -1,6 +1,6 @@
 # The Duet3D firmware projects - DuetCANMaster, RepRapFirmware, Duet3Expansion, Duet3Bootloader and
-# DuetIAP - and the libraries they share. The SBC side (DuetRealtimeCore and the dotnet projects) is
-# built separately; scripts/build.py builds both.
+# DuetIAP - and the libraries they share, and DuetRealtimeCore, the SBC's native library. The dotnet
+# projects are built separately; scripts/build.py builds both.
 #
 # A build tree builds the project DUET_PROJECT for one hardware board, DUET_BOARD. Each build has a
 # preset (cmake --list-presets), which picks them, the MCU's toolchain file from cmake/toolchains,
@@ -12,6 +12,21 @@
 # Each board's -debug preset builds it with debug symbols and reduced optimisation.
 
 cmake_minimum_required(VERSION 3.25)
+
+# DuetRealtimeCore is an ordinary hosted build for the SBC, with its own toolchains, flags and linting,
+# so it shares none of the firmware's setup below. Its presets (rtc-*) set DUET_PROJECT to it. Its
+# outputs go to the top of the build tree, as an image does, and its tests are registered from here
+# because ctest only finds the ones enable_testing() reaches from the top-level directory.
+if(DUET_PROJECT STREQUAL "DuetRealtimeCore")
+    project(DuetRealtimeCore LANGUAGES CXX)
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+    if(NOT CMAKE_CROSSCOMPILING)
+        enable_testing()
+    endif()
+    add_subdirectory(src/DuetRealtimeCore)
+    return()
+endif()
 
 # The firmware's optimised builds keep their assertions (no NDEBUG), and Debug builds define DEBUG.
 # Set before project() so these replace CMake's defaults instead of being initialised from them.

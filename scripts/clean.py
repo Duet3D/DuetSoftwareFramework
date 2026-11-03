@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from common.cli import parse, parser, typed
-from common.dsf import PLUGIN_BUILD_DIR, PROJECTS, REALTIME_CORE, REALTIME_CORE_DIR, TRACY
+from common.dsf import PLUGIN_BUILD_DIR, PROJECTS, REALTIME_CORE, TRACY
 from common.repo import BUILD, ROOT, run
 from common.targets import add_target_arguments, select
 
@@ -60,7 +60,7 @@ def clean_dsf(project: str, purge: bool) -> bool:
     if project == TRACY:
         return clean_cmake(BUILD / 'tracy', True) if purge else True
     if project == REALTIME_CORE:
-        trees = sorted(p for p in (REALTIME_CORE_DIR / 'build').glob('*') if p.is_dir())
+        trees = sorted(p for p in BUILD.glob('rtc-*') if p.is_dir())
         return all([clean_cmake(tree, purge) for tree in trees])
     if purge:
         for output in ('bin', 'obj'):

@@ -89,6 +89,44 @@
                 "DUET_DISASSEMBLY": "ON"
             }
         },
+        {
+            "name": "DuetRealtimeCore",
+            "hidden": true,
+            "description": "The SBC's native library: an ordinary hosted build, compiled for this machine unless a toolchain preset is inherited too. Its own CMakeLists.txt lints it, so the clang-tidy wiring of the firmware is not used.",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "DUET_PROJECT": "DuetRealtimeCore",
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "DUET_REALTIME_CORE_CLANG_TIDY": "OFF"
+            }
+        },
+        {
+            "name": "aarch64-linux-gnu",
+            "hidden": true,
+            "description": "Cross-compile DuetRealtimeCore for aarch64 against this container's libraries. The devcontainer is Debian Bookworm, so its cross toolchain targets the same glibc 2.36 as Raspberry Pi OS Bookworm and the library loads there as-is.",
+            "toolchainFile": "${sourceDir}/src/DuetRealtimeCore/cmake/aarch64-linux-gnu.cmake",
+            "cacheVariables": {
+                "DUET_REALTIME_CORE_SYSROOT": ""
+            }
+        },
+        {
+            "name": "arm-linux-gnueabihf",
+            "hidden": true,
+            "description": "As aarch64-linux-gnu, for a 32-bit Raspberry Pi OS install.",
+            "toolchainFile": "${sourceDir}/src/DuetRealtimeCore/cmake/arm-linux-gnueabihf.cmake",
+            "cacheVariables": {
+                "DUET_REALTIME_CORE_SYSROOT": ""
+            }
+        },
+        {
+            "name": "pi-sysroot",
+            "hidden": true,
+            "description": "Link against a sysroot copied from the Pi, to target a glibc older than the container's 2.36. Requires src/DuetRealtimeCore/pi-sysroot/: fetch it with src/DuetRealtimeCore/scripts/fetch-pi-sysroot.sh <user>@<pi-host>, or override the path with -DDUET_REALTIME_CORE_SYSROOT=...",
+            "cacheVariables": {
+                "DUET_REALTIME_CORE_SYSROOT": "${sourceDir}/src/DuetRealtimeCore/pi-sysroot"
+            }
+        },
 
         { "name": "Duet3_MB6HC",                        "displayName": "Duet 3 MB6HC", "inherits": ["RepRapFirmware", "SAME70"], "cacheVariables": { "DUET_BOARD": "Duet3_MB6HC" } },
         { "name": "Duet3_MB6HC-debug",                  "displayName": "Duet 3 MB6HC (Debug)", "inherits": ["debug", "Duet3_MB6HC"] },
@@ -155,7 +193,17 @@
         { "name": "canmaster-Duet3_MB6HC",              "displayName": "DuetCANMaster Duet 3 MB6HC", "inherits": ["DuetCANMaster", "SAME70"], "cacheVariables": { "DUET_BOARD": "Duet3_MB6HC" } },
         { "name": "canmaster-Duet3_MB6HC-debug",        "displayName": "DuetCANMaster Duet 3 MB6HC (Debug)", "inherits": ["debug", "canmaster-Duet3_MB6HC"] },
         { "name": "canmaster-Duet3_MB6XD",              "displayName": "DuetCANMaster Duet 3 MB6XD", "inherits": ["DuetCANMaster", "SAME70"], "cacheVariables": { "DUET_BOARD": "Duet3_MB6XD" } },
-        { "name": "canmaster-Duet3_MB6XD-debug",        "displayName": "DuetCANMaster Duet 3 MB6XD (Debug)", "inherits": ["debug", "canmaster-Duet3_MB6XD"] }
+        { "name": "canmaster-Duet3_MB6XD-debug",        "displayName": "DuetCANMaster Duet 3 MB6XD (Debug)", "inherits": ["debug", "canmaster-Duet3_MB6XD"] },
+        { "name": "rtc-native",                         "displayName": "DuetRealtimeCore native", "inherits": ["DuetRealtimeCore"] },
+        { "name": "rtc-native-debug",                   "displayName": "DuetRealtimeCore native (Debug)", "inherits": ["debug", "rtc-native"] },
+        { "name": "rtc-arm64",                          "displayName": "DuetRealtimeCore aarch64", "inherits": ["DuetRealtimeCore", "aarch64-linux-gnu"] },
+        { "name": "rtc-arm64-debug",                    "displayName": "DuetRealtimeCore aarch64 (Debug)", "inherits": ["debug", "rtc-arm64"] },
+        { "name": "rtc-arm64-sysroot",                  "displayName": "DuetRealtimeCore aarch64 Pi sysroot", "inherits": ["pi-sysroot", "DuetRealtimeCore", "aarch64-linux-gnu"] },
+        { "name": "rtc-arm64-sysroot-debug",            "displayName": "DuetRealtimeCore aarch64 Pi sysroot (Debug)", "inherits": ["debug", "rtc-arm64-sysroot"] },
+        { "name": "rtc-armhf",                          "displayName": "DuetRealtimeCore armhf", "inherits": ["DuetRealtimeCore", "arm-linux-gnueabihf"] },
+        { "name": "rtc-armhf-debug",                    "displayName": "DuetRealtimeCore armhf (Debug)", "inherits": ["debug", "rtc-armhf"] },
+        { "name": "rtc-armhf-sysroot",                  "displayName": "DuetRealtimeCore armhf Pi sysroot", "inherits": ["pi-sysroot", "DuetRealtimeCore", "arm-linux-gnueabihf"] },
+        { "name": "rtc-armhf-sysroot-debug",            "displayName": "DuetRealtimeCore armhf Pi sysroot (Debug)", "inherits": ["debug", "rtc-armhf-sysroot"] }
     ],
     "buildPresets": [
         { "name": "Duet3_MB6HC",                        "configurePreset": "Duet3_MB6HC" },
@@ -223,6 +271,16 @@
         { "name": "canmaster-Duet3_MB6HC",              "configurePreset": "canmaster-Duet3_MB6HC" },
         { "name": "canmaster-Duet3_MB6HC-debug",        "configurePreset": "canmaster-Duet3_MB6HC-debug" },
         { "name": "canmaster-Duet3_MB6XD",              "configurePreset": "canmaster-Duet3_MB6XD" },
-        { "name": "canmaster-Duet3_MB6XD-debug",        "configurePreset": "canmaster-Duet3_MB6XD-debug" }
+        { "name": "canmaster-Duet3_MB6XD-debug",        "configurePreset": "canmaster-Duet3_MB6XD-debug" },
+        { "name": "rtc-native",                         "configurePreset": "rtc-native" },
+        { "name": "rtc-native-debug",                   "configurePreset": "rtc-native-debug" },
+        { "name": "rtc-arm64",                          "configurePreset": "rtc-arm64" },
+        { "name": "rtc-arm64-debug",                    "configurePreset": "rtc-arm64-debug" },
+        { "name": "rtc-arm64-sysroot",                  "configurePreset": "rtc-arm64-sysroot" },
+        { "name": "rtc-arm64-sysroot-debug",            "configurePreset": "rtc-arm64-sysroot-debug" },
+        { "name": "rtc-armhf",                          "configurePreset": "rtc-armhf" },
+        { "name": "rtc-armhf-debug",                    "configurePreset": "rtc-armhf-debug" },
+        { "name": "rtc-armhf-sysroot",                  "configurePreset": "rtc-armhf-sysroot" },
+        { "name": "rtc-armhf-sysroot-debug",            "configurePreset": "rtc-armhf-sysroot-debug" }
     ]
 }

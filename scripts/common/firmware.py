@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple, cast
 
+from common.dsf import REALTIME_CORE
 from common.repo import ROOT, run
 
 # Boards
@@ -35,7 +36,9 @@ def load_boards() -> list[Board]:
     def cache_variables(preset: dict[str, object]) -> dict[str, str]:
         return cast(dict[str, str], preset.get('cacheVariables', {}))
 
-    projects = {str(p['name']) for p in presets if 'DUET_PROJECT' in cache_variables(p)}
+    # DuetRealtimeCore's presets are in the same file, but it is a DSF project (see common/dsf.py)
+    projects = {str(p['name']) for p in presets
+                if 'DUET_PROJECT' in cache_variables(p) and cache_variables(p)['DUET_PROJECT'] != REALTIME_CORE}
     boards: list[Board] = []
     for p in presets:
         if p.get('hidden'):

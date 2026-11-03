@@ -4,8 +4,14 @@
     "dockerfile": "Dockerfile"
   },
   "features": {
-    "ghcr.io/devcontainers-extra/features/ripgrep": "latest",
-    "ghcr.io/devcontainers/features/github-cli": "latest"
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "installDirectlyFromGitHubRelease": true,
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers-extra/features/fish-apt-get:1": {},
+    "ghcr.io/devcontainers-extra/features/ripgrep:1": {
+      "version": "latest"
+    }
   },
   "customizations": {
     "vscode": {
@@ -29,11 +35,8 @@
       "settings": {
         "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
         "cmake.useCMakePresets": "always",
-        // The firmware (every board a preset) and DuetRealtimeCore, the SBC's native library
-        "cmake.sourceDirectory": [
-          "${workspaceFolder}",
-          "${workspaceFolder}/src/DuetRealtimeCore"
-        ],
+        // One project: every firmware board and DuetRealtimeCore, the SBC's native library, is a preset
+        "cmake.sourceDirectory": "${workspaceFolder}",
         "markdown.copyFiles.destination": {
           "**/*.md": "/docs/images/${fileName}"
         }

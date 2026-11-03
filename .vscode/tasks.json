@@ -46,7 +46,7 @@
             ]
         },
         {
-            // The boards are the CMake presets; the pick is remembered for "[Firmware] Build Debug Firmware",
+            // The boards are the CMake presets but DuetRealtimeCore's (rtc-*); the pick is remembered for "[Firmware] Build Debug Firmware",
             // which the firmware launch configurations run
             "id": "firmware_board",
             "type": "command",
@@ -58,9 +58,9 @@
                 "fileName": "${workspaceFolder}/CMakePresets.json",
                 "fileFormat": "json",
                 "jsonOption": {
-                    "label": "content.configurePresets.filter(p => !p.hidden && !p.name.endsWith('-debug'))[__itemIdx__].name",
-                    "description": "content.configurePresets.filter(p => !p.hidden && !p.name.endsWith('-debug'))[__itemIdx__].displayName",
-                    "value": "content.configurePresets.filter(p => !p.hidden && !p.name.endsWith('-debug'))[__itemIdx__].name"
+                    "label": "content.configurePresets.filter(p => !p.hidden && !p.name.endsWith('-debug') && !p.name.startsWith('rtc-'))[__itemIdx__].name",
+                    "description": "content.configurePresets.filter(p => !p.hidden && !p.name.endsWith('-debug') && !p.name.startsWith('rtc-'))[__itemIdx__].displayName",
+                    "value": "content.configurePresets.filter(p => !p.hidden && !p.name.endsWith('-debug') && !p.name.startsWith('rtc-'))[__itemIdx__].name"
                 }
             }
         },
@@ -267,9 +267,9 @@
             // latency without the .NET runtime. Statically linked, so it needs no sysroot.
             "label": "[DSF] Build and Deploy Jitter Harness to",
             "type": "shell",
-            "command": "cmake --preset arm64 && cmake --build --preset arm64 --target realtime_core_jitter_test -j && scp build/arm64/harness/realtime_core_jitter_test ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp}:~/",
+            "command": "cmake --preset rtc-arm64 && cmake --build --preset rtc-arm64 --target realtime_core_jitter_test -j && scp build/rtc-arm64/realtime_core_jitter_test ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp}:~/",
             "options": {
-                "cwd": "${workspaceFolder}/src/DuetRealtimeCore"
+                "cwd": "${workspaceFolder}"
             },
             "problemMatcher": [
                 "$gcc"

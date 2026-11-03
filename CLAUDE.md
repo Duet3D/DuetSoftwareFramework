@@ -35,7 +35,7 @@ git submodule update --init lib/RRFLibraries
 git submodule update --init --recursive
 ```
 
-Every firmware board is a preset in the root `CMakePresets.json`. DuetCANMaster's presets are prefixed `canmaster-` (and the bootloaders' and IAPs' `bootloader-` and `iap-`), because RRF builds the same main boards.
+Every firmware board is a preset in the root `CMakePresets.json`. DuetCANMaster's presets are prefixed `canmaster-` (and the bootloaders' and IAPs' `bootloader-` and `iap-`), because RRF builds the same main boards. DuetRealtimeCore's presets are in the same file, prefixed `rtc-` (`rtc-native`, `rtc-arm64`, ...), and build into `build/<preset>/` too.
 
 The CMake build lints DuetCANMaster's and the libraries' C++ with clang-tidy as it compiles it, using the root `.clang-tidy` plus a project's own where it has one (DuetCANMaster's and DuetRealtimeCore's add their naming rules). RepRapFirmware, Duet3Expansion, Duet3Bootloader and DuetIAP are not currently linted: their presets set `DUET_CLANG_TIDY` off, and third-party code (device packs, CMSIS, tinyusb, mbedTLS, lwIP, `src/libc`, ...) never is. Every finding is an error that fails the build.. The libraries are held to fewer checks for now: `lib/.clang-tidy` turns off those they still fail, and `SKIP` in `scripts/internal/clang_tidy_wrapper.py` lists the library files clang cannot parse. Take a check or a file off those lists once the libraries pass it; never add to them to get a change through. `scripts/lint.py <board>` lints a whole build by hand.
 

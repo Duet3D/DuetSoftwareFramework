@@ -27,7 +27,7 @@
 	     also skips this, because a pinned library must not be rebuilt underneath the pin). -->
 	<PropertyGroup>
 		<BuildNativeLink Condition="'$(BuildNativeLink)' == '' and '$(DUET_REALTIME_CORE_LIBRARY)' == ''">true</BuildNativeLink>
-		<NativeLinkDir>$(MSBuildThisFileDirectory)../DuetRealtimeCore</NativeLinkDir>
+		<RepositoryRoot>$(MSBuildThisFileDirectory)../..</RepositoryRoot>
 	</PropertyGroup>
 	<Target Name="BuildNativeLinkLibrary" BeforeTargets="Build" Condition="'$(BuildNativeLink)' == 'true'">
 		<!-- The native build takes RRFLibraries from the submodule, and says so as a CMake command it
@@ -40,8 +40,8 @@
 		     starts, so a configure that failed leaves one behind and every later build then skips
 		     straight to a build tree that was never generated. This file is written when the
 		     configure finishes, so a failed one is retried instead of being taken for a good tree. -->
-		<Exec Command="cmake --preset native-debug" WorkingDirectory="$(NativeLinkDir)"
-		      Condition="!Exists('$(NativeLinkDir)/build/native-debug/cmake_install.cmake')" />
-		<Exec Command="cmake --build --preset native-debug --target duet_realtime_core_shared --parallel" WorkingDirectory="$(NativeLinkDir)" />
+		<Exec Command="cmake --preset rtc-native-debug" WorkingDirectory="$(RepositoryRoot)"
+		      Condition="!Exists('$(RepositoryRoot)/build/rtc-native-debug/cmake_install.cmake')" />
+		<Exec Command="cmake --build --preset rtc-native-debug --target duet_realtime_core_shared --parallel" WorkingDirectory="$(RepositoryRoot)" />
 	</Target>
 </Project>

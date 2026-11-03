@@ -11,7 +11,8 @@ parallelises it); otherwise the selected projects are published concurrently.
 
 DuetRealtimeCore is the native SPI transfer loop (libduet_realtime_core.so) that DuetControlServer
 P/Invokes into. DCS cannot run without it, so selecting DuetControlServer builds and deploys it too.
-It is deployed from its CMake build tree, src/DuetRealtimeCore/build/<preset>.
+It is built from the root CMakePresets.json, whose rtc-* presets are its, and deployed from its CMake
+build tree, build/<preset>.
 
 DuetPiManagementPlugin is a plugin rather than a service. It is staged into
 build/plugins/<arch>-<config>[-aot] in the layout it is installed in, and deployed to /opt/dsf/plugins,
@@ -74,10 +75,10 @@ REALTIME_CORE = 'DuetRealtimeCore'
 REALTIME_CORE_DIR = ROOT / 'src' / 'DuetRealtimeCore'
 REALTIME_CORE_LIB = 'libduet_realtime_core.so'
 DEFAULT_SYSROOT = REALTIME_CORE_DIR / 'pi-sysroot'
-# Each architecture's cross-compiling preset in src/DuetRealtimeCore/CMakePresets.json, and the host
-# machines that are that architecture already. There is no x86_64 cross toolchain in the container, so
+# Each architecture's cross-compiling preset in the root CMakePresets.json, and the host machines
+# that are that architecture already. There is no x86_64 cross toolchain in the container, so
 # linux-x64 is host-only.
-CROSS_PRESETS = {'linux-arm64': 'arm64', 'linux-arm': 'armhf', 'linux-x64': None}
+CROSS_PRESETS = {'linux-arm64': 'rtc-arm64', 'linux-arm': 'rtc-armhf', 'linux-x64': None}
 NATIVE_MACHINES = {'linux-arm64': ('aarch64',), 'linux-arm': ('armv7l', 'armv6l'), 'linux-x64': ('x86_64',)}
 
 # DuetPiManagementPlugin is a DSF plugin, not a service: DuetPluginService runs it out of the plugin
@@ -256,7 +257,7 @@ def resolve_sysroot(options: BuildOptions) -> Path | None:
 
 
 def realtime_core_preset(options: BuildOptions) -> str:
-    """The preset in src/DuetRealtimeCore/CMakePresets.json that builds the library for these options.
+    """The preset in the root CMakePresets.json that builds the library for these options.
 
     Already on the target architecture (e.g. building on the Pi itself with --local) needs no
     toolchain and no sysroot, and gets glibc right by construction. Otherwise the library is
@@ -266,7 +267,7 @@ def realtime_core_preset(options: BuildOptions) -> str:
     machine = platform.machine()
     cross_preset = CROSS_PRESETS[options.arch]
     if machine in NATIVE_MACHINES[options.arch]:
-        preset = 'native'
+        preset = 'rtc-native'
     elif cross_preset is None:
         sys.exit(f'Error: cannot build {REALTIME_CORE_LIB} for {options.arch} on {machine}; no cross toolchain')
     elif options.sysroot or options.fetch_sysroot:
@@ -278,7 +279,7 @@ def realtime_core_preset(options: BuildOptions) -> str:
 
 def realtime_core_library(options: BuildOptions) -> Path:
     """Where the build for these options puts libduet_realtime_core.so."""
-    return REALTIME_CORE_DIR / 'build' / realtime_core_preset(options) / 'src' / REALTIME_CORE_LIB
+    return BUILD / realtime_core_preset(options) / REALTIME_CORE_LIB
 
 
 def build_realtime_core(options: BuildOptions) -> None:
@@ -296,13 +297,12 @@ def build_realtime_core(options: BuildOptions) -> None:
         # The preset defaults to pi-sysroot/; --sysroot may point somewhere else
         cmake_args.append(f'-DDUET_REALTIME_CORE_SYSROOT={sysroot}')
 
-    # --preset must be run from the project directory, where CMakePresets.json is. Only the shared
-    # library is built; the harness and the tests are not part of a deployment.
-    run_checked(['cmake', '--preset', preset, *cmake_args], cwd=REALTIME_CORE_DIR)
+    # Only the shared library is built; the harness and the tests are not part of a deployment
+    run_checked(['cmake', '--preset', preset, *cmake_args])
     run_checked(['cmake', '--build', '--preset', preset, '--target', 'duet_realtime_core_shared', f'-j{jobs()}',
-                 *(['--clean-first'] if options.clean else [])], cwd=REALTIME_CORE_DIR)
+                 *(['--clean-first'] if options.clean else [])])
     library = realtime_core_library(options)
-    verify_elf_arch(library, options.arch, library.parent.parent)
+    verify_elf_arch(library, options.arch, library.parent)
 
 
 # The dotnet projects

@@ -27,7 +27,7 @@ from pathlib import Path
 from common.clang import cross_compile, own_diagnostics, posix_escape, project_dir, sanitise_database, skipped
 from common.repo import BUILD, ROOT, jobs
 
-REALTIME_CORE_BUILD = ROOT / 'src' / 'DuetRealtimeCore' / 'build' / 'native'
+REALTIME_CORE_PRESET = 'rtc-native'
 
 # The line run-clang-tidy starts each translation unit's output with: "[3/78][1.5s] clang-tidy ... <file>"
 PROGRESS = re.compile(r'^\[\s*\d+/\d+\](\[[\d.]+s\])? .* (?P<source>\S+)$')
@@ -50,9 +50,8 @@ def board_database(preset: str) -> Path:
 
 def realtime_core_database() -> Path:
     """Configure DuetRealtimeCore's native preset, whose database clang-tidy can read as it is."""
-    subprocess.run(['cmake', '--preset', 'native', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON'],
-                   cwd=REALTIME_CORE_BUILD.parent.parent, check=True, stdout=subprocess.DEVNULL)
-    return REALTIME_CORE_BUILD
+    subprocess.run(['cmake', '--preset', REALTIME_CORE_PRESET], cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
+    return BUILD / REALTIME_CORE_PRESET
 
 
 def sources(directory: Path) -> list[str]:

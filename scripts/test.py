@@ -24,15 +24,13 @@ from collections.abc import Sequence
 
 from common import coverage, system_tests
 from common.cli import parse, parser, typed
-from common.repo import ROOT, call, jobs
-
-REALTIME_CORE_DIR = ROOT / 'src' / 'DuetRealtimeCore'
+from common.repo import BUILD, call, jobs
 
 
 def native() -> int:
-    for command in (['cmake', '--preset', 'native'], ['cmake', '--build', '--preset', 'native', f'-j{jobs()}'],
-                    ['ctest', '--test-dir', 'build/native', '--output-on-failure']):
-        if status := call(command, cwd=REALTIME_CORE_DIR):
+    for command in (['cmake', '--preset', 'rtc-native'], ['cmake', '--build', '--preset', 'rtc-native', f'-j{jobs()}'],
+                    ['ctest', '--test-dir', str(BUILD / 'rtc-native'), '--output-on-failure']):
+        if status := call(command):
             return status
     return 0
 

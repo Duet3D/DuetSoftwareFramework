@@ -17,7 +17,7 @@ them. Builds are Release unless --debug is given, and --clean cleans what is bui
 
 Each DSF project publishes to its own output directory, bin/<config>/<tfm>/<arch>/publish (bin/aot/...
 with --aot), which scripts/deploy.py installs on a Pi from. Selecting DuetControlServer builds
-DuetRealtimeCore, the native library it P/Invokes into, too, into src/DuetRealtimeCore/build/<preset>. That library links glibc dynamically, so it must not need a newer glibc than the
+DuetRealtimeCore, the native library it P/Invokes into, too, into build/rtc-<arch>[-debug]. That library links glibc dynamically, so it must not need a newer glibc than the
 Pi has: the devcontainer matches Raspberry Pi OS Bookworm, and --sysroot or --fetch-sysroot build
 against an older Pi's own libraries instead.
 
