@@ -56,7 +56,7 @@ namespace Duet::Sbc
 
 	bool MotionService::Init()
 	{
-		if (m_initialised)
+		if (m_initialised.load(std::memory_order_acquire))
 		{
 			return true;
 		}
@@ -77,7 +77,8 @@ namespace Duet::Sbc
 			m_retirementContext[i] = RetirementContext{this, i};
 			m_rings[i].SetRetirementCallback(&MotionService::OnMoveRetired, &m_retirementContext[i]);
 		}
-		m_initialised = true;
+		// Released after the rings are built, so a caller that sees it set sees closed rings
+		m_initialised.store(true, std::memory_order_release);
 		return true;
 	}
 
@@ -462,7 +463,10 @@ namespace Duet::Sbc
 
 	bool MotionService::CanAddMove(unsigned int ring) const
 	{
-		return ring < numRings && m_rings[ring].CanAddMove();
+		// DuetControlServer starts the engine on a thread of its own while the G-code channels are
+		// already running, so a move can be offered before the rings exist. No room is the answer
+		// it already retries on
+		return ring < numRings && m_initialised.load(std::memory_order_acquire) && m_rings[ring].CanAddMove();
 	}
 
 	bool MotionService::SubmitMove(std::span<const uint8_t> params)

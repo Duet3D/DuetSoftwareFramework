@@ -146,7 +146,8 @@ extern "C"
 	int32_t DuetRT_MotionStart(DuetRTHandle* h, int32_t rtPriority);
 	void DuetRT_MotionStop(DuetRTHandle* h);
 
-	// 1 if the ring has room for another move. Advisory: it may have room again a moment later.
+	// 1 if the ring has room for another move. Advisory: it may have room again a moment later. 0
+	// until DuetRT_MotionStart has built the rings.
 	int32_t DuetRT_MotionCanAddMove(DuetRTHandle* h, int32_t ring);
 
 	// Queue a move. `moveParams` is a MoveParamsHeader followed by its two arrays; see
