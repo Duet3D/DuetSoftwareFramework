@@ -909,7 +909,7 @@ internal sealed class ScriptedCanMaster : IDisposable
             switch ((SocketFrameType)frame.Type)
             {
                 case SocketFrameType.IapData:
-                    // Accept and discard; flashing against emulated flash is stage 2's to test
+                    // Accept and discard; flashing is not emulated
                     Interlocked.Increment(ref _flashedSegments);
                     continue;
 

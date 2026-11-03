@@ -165,8 +165,8 @@ internal sealed class MovePlanner(
     /// Where the interpreter thinks the machine is going, in user coordinates
     /// </summary>
     /// <remarks>
-    /// One per motion system once M596 is ported; one for now. It lives here rather than on a code
-    /// channel because it is a property of the machine's motion, not of who is commanding it: two
+    /// TODO one per motion system, which needs M596.
+    /// It lives here rather than on a code channel because it is a property of the machine's motion, not of who is commanding it: two
     /// channels feeding the same motion system have to agree about where the head is. Read and
     /// written under <see cref="Lock"/>, for the same reason <see cref="Builder"/> is
     /// </remarks>
@@ -539,7 +539,7 @@ internal sealed class MovePlanner(
     /// <para>
     /// Both locks have to be held on entry - the object model's for writing and the planner's for
     /// reading the state this projects. <c>AsyncReaderWriterLock</c> is non-reentrant with no way to
-    /// ask whether it is held (§13.1), so that is a precondition rather than something this can check
+    /// ask whether it is held, so that is a precondition rather than something this can check
     /// </para>
     /// </remarks>
     public void PublishCommittedPosition()

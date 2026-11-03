@@ -42,8 +42,8 @@ namespace Duet::Sbc
 		// --- IAP over the framed link ---
 		//
 		// The packet-borne WriteIap/StartIap half is FullDuplexExchangeTransport's. These carry the bare-transfer
-		// half as IapData/IapVerify frames, each gated by Ready like any exchange. The stage 1 fake
-		// accepts and discards them; real flashing against emulated flash is stage 2's to test.
+		// half as IapData/IapVerify frames, each gated by Ready like any exchange. The scripted
+		// controller accepts and discards them, so flashing is not tested over this link.
 		bool FlashFirmwareSegment(std::span<const uint8_t> segment) override;
 		bool VerifyFirmwareChecksum(uint32_t firmwareLength, uint16_t crc16) override;
 		void WaitForIapReset() override;

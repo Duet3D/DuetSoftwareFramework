@@ -152,8 +152,8 @@ public class EndstopPlannerTests
     [Test]
     public void MotorStallIndividualIsPlannedTheSameWayAsMotorStallAny()
     {
-        // They are not told apart yet, which is the defect §4.3 of the plan describes. Recorded so
-        // that the phase which does tell them apart changes a test rather than adding one
+        // Both watch the same drivers. What S3 and S4 stop is decided when the move is armed, which
+        // EndstopArmingTests covers
         List<EndstopPlan> any = Plan(Machine(EndstopType.MotorStallAny, xDrivers: 2), Homing('X'));
         List<EndstopPlan> individual = Plan(Machine(EndstopType.MotorStallIndividual, xDrivers: 2), Homing('X'));
 

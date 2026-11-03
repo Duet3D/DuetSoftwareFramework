@@ -13,7 +13,8 @@ namespace DuetControlServer.Motion;
 /// <remarks>
 /// <para>
 /// The file format is RepRapFirmware's, because it is the same file: a machine's <c>heightmap.csv</c>
-/// has to survive this migration, and Duet Web Control reads it directly to draw the mesh.
+/// written by RepRapFirmware has to load here, and Duet Web Control reads it directly to draw the
+/// mesh.
 /// </para>
 /// <para>
 /// A point that was never probed is written as a bare <c>0</c> with no decimal point, which is how

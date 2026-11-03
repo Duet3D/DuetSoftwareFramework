@@ -249,7 +249,7 @@ internal partial class MCodeHandler(
         // Set jerk, in mm/sec (M205) or mm/min (M566)
         { [205, 566], CodeClass.Immediate, (h, c, ct) => h.HandleJerkAsync(c, ct) },
         // Set axis limits
-        { 208, CodeClass.Immediate, (h, c, ct) => h.HandleAxisLimitsAsync(c, ct) }, // open decision (§5.1): §1 argues a standstill, but no handler ever waited
+        { 208, CodeClass.Immediate, (h, c, ct) => h.HandleAxisLimitsAsync(c, ct) },
         // Set the speed factor
         { 220, CodeClass.Immediate, (h, c, ct) => h.HandleSpeedFactorAsync(c, ct) },
         // Set the extrusion factor
@@ -375,7 +375,7 @@ internal partial class MCodeHandler(
         // Send a custom request to a CAN-connected board
         { 655, CodeClass.Immediate, (h, c, ct) => h.HandleCustomCanRequestAsync(c, ct) },
         // Create a heater, fan or other I/O device
-        { 950, CodeClass.Immediate, (h, c, ct) => h.HandleCreateDeviceAsync(c, ct) }, // open decision (§5.1): reassigning a live driver or port argues a standstill
+        { 950, CodeClass.Immediate, (h, c, ct) => h.HandleCreateDeviceAsync(c, ct) },
         // Configure CAN: it changes the bus the moves travel on
         { 952, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleConfigureCanAsync(c, ct) },
         // Enable CAN

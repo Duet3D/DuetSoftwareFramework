@@ -372,8 +372,8 @@ internal abstract class KinematicsEngine
     /// <param name="move">The move model, whose axes decide how much of a per-axis parameter is reported</param>
     /// <remarks>
     /// <para>
-    /// The projection §14 is about: this geometry is what the machine moves by, and the object model
-    /// is what describes it to everything else. Every parameter <see cref="Configure"/> reads has to
+    /// This geometry is what the machine moves by, and the object model is the projection of it that
+    /// describes it to everything else. Every parameter <see cref="Configure"/> reads has to
     /// be written back here, or the object model would describe a machine that is not the one being
     /// planned for - which is the failure this arrangement is meant to make loud rather than silent.
     /// </para>

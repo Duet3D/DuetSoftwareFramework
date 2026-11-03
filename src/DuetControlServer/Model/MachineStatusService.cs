@@ -22,10 +22,9 @@ namespace DuetControlServer.Model;
 /// that changes a condition is what makes several writers race to describe one machine.
 /// </para>
 /// <para>
-/// So this is the single writer, and everything else sets a condition it reads. That is §14's
-/// conclusion applied to <c>state.status</c>: where there are two representations, one is
-/// authoritative and the other is a projection. The conditions are authoritative; this is the
-/// projection.
+/// So this is the single writer, and everything else sets a condition it reads. Where there are two
+/// representations, one is authoritative and the other is a projection. The conditions are
+/// authoritative; this is the projection.
 /// </para>
 /// <para>
 /// The order the conditions are tested in is the order RepRapFirmware tests them, and it is not

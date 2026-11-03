@@ -269,7 +269,7 @@ internal sealed class JobMonitor(
     /// <remarks>
     /// TODO Nothing maintains <c>job.layer</c> yet, so the guard below keeps this from recording
     /// anything. RepRapFirmware's PrintMonitor derives the current layer from the Z height and the
-    /// layer height the file info reported; when that lands, these statistics come back to life
+    /// layer height the file info reported
     /// </remarks>
     private void UpdateLayers(Model.ObjectModel model)
     {

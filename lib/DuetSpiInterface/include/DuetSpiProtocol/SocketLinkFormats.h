@@ -37,8 +37,8 @@
 // Firmware update: WriteIap and StartIap are ordinary packets and need nothing here. Once IAP would
 // be running, each firmware segment is an IapData frame gated by Ready like any exchange, the
 // verification request is an IapVerify frame, and the flasher answers with a single-byte IapVerdict
-// frame (FlashVerifyOk on success). The stage 1 fake accepts and discards the data; flashing
-// against emulated flash is stage 2's to test.
+// frame (FlashVerifyOk on success). The scripted controller accepts and discards the data, so
+// flashing is not tested over this link.
 #pragma once
 
 #include <cstddef>

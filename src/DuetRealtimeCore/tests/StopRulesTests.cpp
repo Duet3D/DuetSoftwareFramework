@@ -85,8 +85,8 @@ void TestASwitchMatchesOnBoardAndHandle() noexcept
 // as homed wherever it happened to be.
 void TestAStallMatchesOnlyTheDriverThatStalled() noexcept
 {
-	// Two drivers of a move, both on board 3, both watching for their own stall. Phase 2 guarantees
-	// the input board of a stall watch is the board carrying the driver
+	// Two drivers of a move, both on board 3, both watching for their own stall. The input board of
+	// a stall watch is always the board carrying the driver
 	constexpr DriverStopWatch x{ 3, 0, 3, stallHandle, 2, StopAction::group, true };
 	constexpr DriverStopWatch y{ 3, 2, 3, stallHandle, 2, StopAction::group, true };
 

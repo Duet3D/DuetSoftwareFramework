@@ -206,7 +206,7 @@ internal sealed class RawMove
     /// <summary>Logical drives this move is allowed to touch, as a bitmap</summary>
     /// <remarks>
     /// TODO never set: every drive is owned, which is right with one motion system and wrong with two.
-    /// The builder already honours it, so this waits on M596 - §15.2
+    /// The builder already honours it, so this waits on M596
     /// </remarks>
     public uint OwnedDrives { get; set; } = uint.MaxValue;
 

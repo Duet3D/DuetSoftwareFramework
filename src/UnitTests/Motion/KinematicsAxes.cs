@@ -64,7 +64,7 @@ internal static class KinematicsAxes
     /// <param name="move">The move subsystem</param>
     /// <returns>The snapshot</returns>
     /// <remarks>
-    /// The planner owns its geometry rather than deriving it (MCODE_MIGRATION §14), so the snapshot is
+    /// The planner owns its geometry rather than deriving it, so the snapshot is
     /// handed one. A test that describes a machine as an object model wants the geometry it describes,
     /// which is what <see cref="KinematicsFactory.Create(DuetAPI.ObjectModel.Kinematics, Move)"/> is for
     /// </remarks>

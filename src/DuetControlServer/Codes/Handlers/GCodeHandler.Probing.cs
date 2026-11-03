@@ -15,7 +15,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <remarks>
 /// <para>
 /// A probing move is a homing move that stops on a probe instead of an endstop, so the mechanism is
-/// the one phase 5 already built: the controller watches the input and cuts the move short, and the
+/// the same: the controller watches the input and cuts the move short, and the
 /// engine corrects the position for the latency of the report.
 /// </para>
 /// <para>

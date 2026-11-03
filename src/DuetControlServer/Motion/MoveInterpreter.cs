@@ -1279,7 +1279,7 @@ internal sealed class MoveInterpreter(
             //
             // TODO that rewind does not happen yet, because nothing tracks the absolute extruder
             // position at all: RawPosition is only ever written by G92 E and
-            // RestorePoint.VirtualExtruderPosition is hardwired to zero (§15.2). Whoever lands that
+            // RestorePoint.VirtualExtruderPosition is hardwired to zero. Whoever lands that
             // tracking has to restore it here to the value at the start of the interrupted line, not
             // to where the machine stopped - restoring the stop point would count the same filament
             // twice, once in the difference and once in this scale factor
@@ -1302,7 +1302,7 @@ internal sealed class MoveInterpreter(
                 raw.ApplyM220M221 ? movement * extruderConfig.Factor : movement;
 
             // TODO track rawExtruderTotal and the virtual extruder position, which is what print
-            // progress and move.motionSystems[].virtualEPos report - §15.2
+            // progress and move.motionSystems[].virtualEPos report
         }
 
         // TODO extruder endstops (G1 H1 E), which need the per-extruder speed calculation

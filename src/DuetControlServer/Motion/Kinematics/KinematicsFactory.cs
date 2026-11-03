@@ -16,9 +16,9 @@ namespace DuetControlServer.Motion.Kinematics;
 /// that kind rather than as some other kind of machine.
 /// </para>
 /// <para>
-/// Since §14.6 step 3 the geometry is authoritative and <c>KinematicsEngine.WriteTo</c> is what keeps
-/// the object model in step with it, so reading in the other direction is no longer how a machine is
-/// configured. It is still how one is adopted: <c>MovePlanner.ReconfigureAsync</c> takes the object
+/// The geometry is authoritative and <c>KinematicsEngine.WriteTo</c> is what keeps the object model
+/// in step with it, so reading in the other direction is not how a machine is configured. It is how
+/// one is adopted: <c>MovePlanner.ReconfigureAsync</c> takes the object
 /// model's description at startup, before any code has selected a geometry, and it is the inverse the
 /// round-trip test needs to show that the projection loses nothing
 /// </para>

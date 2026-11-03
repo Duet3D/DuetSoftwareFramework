@@ -18,8 +18,8 @@ public enum CodeClass
     Flush,
 
     /// <summary>
-    /// The physical effect belongs at a point in the path. Until a deferral implementation lands,
-    /// the pipeline dispatches these immediately, which is today's behaviour
+    /// The physical effect belongs at a point in the path: a code from the job is held back until the
+    /// move queued before it has retired, and any other flushes and applies now
     /// </summary>
     Deferred,
 

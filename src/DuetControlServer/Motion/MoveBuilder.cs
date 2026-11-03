@@ -372,14 +372,14 @@ internal sealed class MoveBuilder(MotionParameters parameters)
         if (raw.SharesSwitchesAcrossDrives) { flags |= MoveFlags.SharedSwitches; }
         if (raw.UsingStandardFeedrate) { flags |= MoveFlags.UsingStandardFeedrate; }
         if (raw.UsePressureAdvance) { flags |= MoveFlags.UsePressureAdvance; }
-        // TODO RRF has a scanningProbeMove flag; MoveFlags has no such bit yet - §15.2
+        // TODO RRF has a scanningProbeMove flag; MoveFlags has no such bit yet
         if (xyMoving) { flags |= MoveFlags.XyMoving; }
         if (isPrintingMove) { flags |= MoveFlags.IsPrintingMove; }
         if (extrudersMoving && !isPrintingMove) { flags |= MoveFlags.IsNonPrintingExtruderMove; }
         if (hasForwardExtrusion) { flags |= MoveFlags.HasForwardExtrusion; }
         if (raw.CheckEndstops || raw.MoveType != MoveType.Normal) { flags |= MoveFlags.IsolatedMove; }
         if (raw.MoveType == MoveType.Normal) { flags |= MoveFlags.ContinuousRotationShortcut; }
-        // TODO RRF has a `controlLaserOrIoBits` flag; MoveFlags has no such bit yet - §15.2
+        // TODO RRF has a `controlLaserOrIoBits` flag; MoveFlags has no such bit yet
 
         // --- 4. Normalise the direction vector and get the distance ------------------------------------
 

@@ -54,7 +54,7 @@ internal static class ToolTransform
                              int numAxes, uint explicitAxes = 0)
     {
         // TODO apply the axis scale factors (M579) here, which is where RepRapFirmware multiplies
-        // them in - move.axes[].scale does not exist yet, see §6
+        // them in - move.axes[].scale does not exist yet
         if (tool is null)
         {
             for (int axis = 0; axis < numAxes; axis++)
