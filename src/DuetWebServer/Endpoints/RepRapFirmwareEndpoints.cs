@@ -344,14 +344,15 @@ public class RepRapFirmwareEndpoints
     }
 
     /// <summary>
-    /// GET /rr_delete?name={filename}
+    /// GET /rr_delete?name={filename}&amp;recursive={recursive}
     /// Delete the given file or directory
     /// </summary>
     /// <param name="logger">Logger instance</param>
     /// <param name="settingsMonitor">Application settings</param>
     /// <param name="name">File or directory to delete</param>
+    /// <param name="recursive">Delete directories recursively (optional, default "no")</param>
     /// <returns>HTTP result</returns>
-    private static async Task<IResult> DeleteFileOrDirectory(ILogger<RepRapFirmwareEndpoints> logger, IOptionsMonitor<Settings> settingsMonitor, string? name)
+    private static async Task<IResult> DeleteFileOrDirectory(ILogger<RepRapFirmwareEndpoints> logger, IOptionsMonitor<Settings> settingsMonitor, string? name, string? recursive = "no")
     {
         Settings settings = settingsMonitor.CurrentValue;
         try
@@ -362,7 +363,7 @@ public class RepRapFirmwareEndpoints
 
                 if (Directory.Exists(resolvedPath))
                 {
-                    Directory.Delete(resolvedPath);
+                    Directory.Delete(resolvedPath, recursive == "yes");
                     return Results.Text("{\"err\":0}", "application/json");
                 }
 
