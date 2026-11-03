@@ -40,7 +40,17 @@
         "cmake.sourceDirectory": "${workspaceFolder}",
         "markdown.copyFiles.destination": {
           "**/*.md": "/docs/images/${fileName}"
-        }
+        },
+        // The scripts' tests in tests/scripts (see scripts/test.py scripts)
+        "python.testing.unittestEnabled": true,
+        "python.testing.pytestEnabled": false,
+        "python.testing.unittestArgs": [
+          "-v",
+          "-s",
+          "./tests",
+          "-p",
+          "test_*.py"
+        ]
       }
     }
   },

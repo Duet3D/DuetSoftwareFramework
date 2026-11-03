@@ -149,7 +149,7 @@ def parse_options(argv: Sequence[str] | None = None) -> Options:
     chosen = select([ns.preset], kinds=(FIRMWARE,))
     known = bootloaders(load_boards())
     if len(chosen.boards) != 1 or chosen.boards[0] not in known:
-        p.error(f'"{ns.preset}" is not a bootloader; the bootloaders are {", ".join(b.preset for b in known)}')
+        p.error(f'{ns.preset} is not a bootloader; the bootloaders are {", ".join(b.preset for b in known)}')
     b = chosen.boards[0]
     return Options(board=b, server=ns.server, debug=ns.debug or b.preset in chosen.debug_boards,
                    build=ns.build or ns.clean, clean=ns.clean)

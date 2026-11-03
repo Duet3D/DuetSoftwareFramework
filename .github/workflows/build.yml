@@ -1,6 +1,6 @@
 # Builds DSF for every deployable architecture and runs its tests, builds every firmware board inside
 # the devcontainer image (one job per board so each reports its own pass/fail, linting the C++ with
-# clang-tidy as it goes), and type checks the Python scripts with pyright.
+# clang-tidy as it goes), and type checks and tests the Python scripts.
 
 name: Build and Test
 
@@ -153,6 +153,10 @@ jobs:
 
       - name: Run pyright
         run: pyright
+
+      # The scripts' command lines, with the builds, git and the boards faked
+      - name: Test the scripts
+        run: scripts/test.py scripts
 
   test:
     name: Run unit tests

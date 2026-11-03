@@ -250,6 +250,13 @@ DuetRealtimeCore's own tests build it for this machine and run its ctest suite:
 scripts/test.py native
 ```
 
+The scripts in `scripts/` have tests of their own in `tests/scripts`, which drive each script's command line with the builds, git and the boards faked, so they need no toolchain, build or hardware. After changing the scripts, run them and pyright, as CI does:
+
+```bash
+scripts/test.py scripts
+pyright
+```
+
 Running the system test project directly works, but the progress needs the console logger asked for by name,
 because at its default verbosity it prints nothing until the run is over:
 

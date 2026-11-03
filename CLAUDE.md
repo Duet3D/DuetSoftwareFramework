@@ -62,6 +62,7 @@ The SPI wire protocol shared by DuetRealtimeCore and DuetCANMaster lives in `lib
 | Unit (NUnit) | `scripts/test.py unit` | Run in full; with coverage, as CI does |
 | System (NUnit) | `scripts/test.py system --filter 'FullyQualifiedName~JobControl'` | Always filter to the affected fixtures; the full suite takes many minutes |
 | Native | `scripts/test.py native` | DuetRealtimeCore's ctest suite, in a host build used only for tests |
+| Scripts | `scripts/test.py scripts` | The Python scripts' tests (`tests/scripts`), with builds, git and boards faked; run with `pyright` after changing `scripts/` |
 
 Single unit test: `dotnet test src/UnitTests/UnitTests.csproj --filter "FullyQualifiedName~ClassName.MethodName"`.
 
