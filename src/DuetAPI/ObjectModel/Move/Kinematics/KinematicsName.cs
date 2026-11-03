@@ -89,15 +89,16 @@ public class KinematicsNameConverter : JsonConverter<KinematicsName>
     /// <summary>
     /// Resolve a kinematics name as RepRapFirmware spells it
     /// </summary>
-    /// <param name="name">The name, case-insensitive</param>
+    /// <param name="name">The name, ignoring case, hyphens and underscores</param>
     /// <returns>The kinematics, or <see cref="KinematicsName.Unknown"/></returns>
     /// <remarks>
     /// The same spellings M669 accepts and the object model reports, so a name that arrives as text -
-    /// from JSON, from a code, from a report - resolves the same way wherever it came from
+    /// from JSON, from a code, from a report - resolves the same way wherever it came from. Case,
+    /// hyphens and underscores do not count, as in RepRapFirmware's <c>ReducedStringEquals</c>
     /// </remarks>
     public static KinematicsName Parse(string? name)
     {
-        return name?.ToLowerInvariant() switch
+        return name?.Replace("-", null).Replace("_", null).ToLowerInvariant() switch
         {
             "cartesian" => KinematicsName.Cartesian,
             "corexy" => KinematicsName.CoreXY,
