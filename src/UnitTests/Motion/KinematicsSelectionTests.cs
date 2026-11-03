@@ -43,16 +43,23 @@ public class KinematicsSelectionTests
     [TestCase("cartesian", KinematicsName.Cartesian)]
     [TestCase("corexy", KinematicsName.CoreXY)]
     [TestCase("CoreXY", KinematicsName.CoreXY)]
+    [TestCase("core-xy", KinematicsName.CoreXY)]
+    [TestCase("core_xy", KinematicsName.CoreXY)]
     [TestCase("corexz", KinematicsName.CoreXZ)]
     [TestCase("delta", KinematicsName.LinearDelta)]
+    [TestCase("linear-delta", KinematicsName.LinearDelta)]
     [TestCase("scara", KinematicsName.Scara)]
     [TestCase("corexyu", KinematicsName.CoreXYU)]
+    [TestCase("Core-XY_U", KinematicsName.CoreXYU)]
     [TestCase("hangprinter", KinematicsName.Hangprinter)]
     [TestCase("polar", KinematicsName.Polar)]
     [TestCase("corexyuv", KinematicsName.CoreXYUV)]
     [TestCase("fivebarscara", KinematicsName.FiveBarScara)]
+    [TestCase("five-bar-scara", KinematicsName.FiveBarScara)]
     [TestCase("Rotary delta", KinematicsName.RotaryDelta)]
+    [TestCase("rotary_delta", KinematicsName.RotaryDelta)]
     [TestCase("markforged", KinematicsName.MarkForged)]
+    [TestCase("mark_forged", KinematicsName.MarkForged)]
     public void ANameSelectsTheGeometryItNames(string name, KinematicsName expected)
         => Assert.That(Select($"M669 K\"{name}\"").Kind, Is.EqualTo(expected));
 

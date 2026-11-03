@@ -590,15 +590,90 @@ public class AxisOrderTests
         Assert.That(refused!.Message, Is.EqualTo("array too long for parameter 'X'"));
     }
 
-    [Test]
-    public void AShortMatrixRowLeavesTheRestOfTheRowAsItWas()
+    [TestCase("M669 Z1", "XYZ", 2, new[] { 1.0f, 0.0f, 0.0f })]
+    [TestCase("M669 Z1:0", "XYZ", 2, new[] { 1.0f, 0.0f, 0.0f })]
+    [TestCase("M669 X1:1", "XYZU", 0, new[] { 1.0f, 1.0f, 0.0f, 0.0f })]
+    public void AShortMatrixRowLeavesTheMotorsItDoesNotNameAtZero(string m669, string letters, int row, float[] expected)
     {
-        // Z's own motor is the third, and the row given stops at the second
-        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.CoreXZ, KinematicsAxes.NewMoveWithAxes("XYZ"));
+        // CoreXZ has values in the columns these rows stop short of, so what was there would show.
+        // CoreKinematics::Configure sets inverseMatrix(axis, m) to zero from the last value it read
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.CoreXZ, KinematicsAxes.NewMoveWithAxes(letters));
         bool seen = false;
-        KinematicsEngine configured = KinematicsConfigurator.Apply(engine, KinematicsAxes.NewMoveWithAxes("XYZ"), new Code("M669 Z1"), ref seen);
+        KinematicsEngine configured = KinematicsConfigurator.Apply(engine, KinematicsAxes.NewMoveWithAxes(letters), new Code(m669), ref seen);
 
-        Assert.That(InverseRow(configured, 2)[..3], Is.EqualTo(new[] { 1.0f, 0.0f, -3.0f }));
+        Assert.That(InverseRow(configured, row)[..letters.Length], Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void AShortMatrixRowCanLeaveAMatrixThatCannotBeInverted()
+    {
+        // U's own motor is the one the row leaves out, so U is now the same as X. DSF refuses that
+        // matrix however it came about (rrf-differences.md section 5.1)
+        Move move = KinematicsAxes.NewMoveWithAxes("XYZU");
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, move);
+        bool seen = false;
+
+        GCodeException? refused = Assert.Throws<GCodeException>(() => KinematicsConfigurator.Apply(engine, move, new Code("M669 U1"), ref seen));
+        Assert.Multiple(() =>
+        {
+            Assert.That(refused!.Message, Is.EqualTo("Invalid kinematics matrix"));
+            Assert.That(InverseRow(engine, 3)[..4], Is.EqualTo(new[] { 0.0f, 0.0f, 0.0f, 1.0f }), "the geometry is as it was");
+        });
+    }
+
+    [Test]
+    public void AMatrixRowCoversEveryAxisHiddenOnesIncluded()
+    {
+        // A row's values are the motors of every axis, and M584 P hides an axis without removing it
+        Move move = KinematicsAxes.NewMoveWithAxes("XYZU");
+        move.Axes[3].Visible = false;
+        KinematicsEngine engine = KinematicsFactory.Create(KinematicsName.Cartesian, move);
+        bool seen = false;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(InverseRow(KinematicsConfigurator.Apply(engine, move, new Code("M669 X1:1:0:0"), ref seen), 0)[..4],
+                        Is.EqualTo(new[] { 1.0f, 1.0f, 0.0f, 0.0f }));
+            Assert.Throws<GCodeException>(() => KinematicsConfigurator.Apply(engine, move, new Code("M669 X1:1:0:0:0"), ref seen));
+        });
+    }
+
+    [Test]
+    public void AnAxisCreatedAfterTheGeometryWasSelectedHasAMotorOfItsOwn()
+    {
+        // Only the letters the geometry needs have to exist when M669 runs, so Z and U can follow it
+        Move move = KinematicsAxes.NewMoveWithAxes("XY");
+        bool seen = false;
+        KinematicsEngine engine = KinematicsConfigurator.Apply(
+            KinematicsFactory.Create(KinematicsName.Cartesian, move), move, new Code("M669 K1"), ref seen);
+
+        engine.SetAxes(KinematicsAxes.NewMoveWithAxes("XYZU"));
+
+        float[][] expected = [[1, 1, 0, 0], [1, -1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]];
+        Assert.Multiple(() =>
+        {
+            Assert.That(engine.MissingAxesError, Is.Null);
+            for (int axis = 0; axis < expected.Length; axis++)
+            {
+                Assert.That(InverseRow(engine, axis)[..4], Is.EqualTo(expected[axis]), $"row {axis}");
+            }
+        });
+    }
+
+    [Test]
+    public void ARowCanCoverAnAxisCreatedAfterTheGeometryWasSelected()
+    {
+        // The row is judged against the axes there are when M669 runs, not when the geometry was selected
+        Move move = KinematicsAxes.NewMoveWithAxes("XY");
+        bool seen = false;
+        KinematicsEngine engine = KinematicsConfigurator.Apply(
+            KinematicsFactory.Create(KinematicsName.Cartesian, move), move, new Code("M669 K1"), ref seen);
+
+        Move grown = KinematicsAxes.NewMoveWithAxes("XYZ");
+        engine.SetAxes(grown);
+        KinematicsEngine configured = KinematicsConfigurator.Apply(engine, grown, new Code("M669 Z1:0:2"), ref seen);
+
+        Assert.That(InverseRow(configured, 2)[..3], Is.EqualTo(new[] { 1.0f, 0.0f, 2.0f }));
     }
 
     [Test]

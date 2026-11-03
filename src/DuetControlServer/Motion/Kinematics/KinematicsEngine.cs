@@ -249,11 +249,6 @@ internal abstract class KinematicsEngine
     /// <summary>
     /// Why this geometry cannot plan for the machine's axes, or null if it can
     /// </summary>
-    /// <remarks>
-    /// A geometry that needs an axis the machine does not have - a delta with no Z, a SCARA with no Y -
-    /// cannot transform any position at all, so every move and every homing is refused with this
-    /// rather than planned for the axes that do exist
-    /// </remarks>
     public string? MissingAxesError
     {
         get

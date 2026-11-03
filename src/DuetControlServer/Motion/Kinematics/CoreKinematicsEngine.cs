@@ -250,22 +250,6 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
         };
 
     /// <inheritdoc />
-    /// <remarks>
-    /// <para>
-    /// Ported from <c>CoreKinematics::Configure</c>, which only M669 reaches. Each axis letter carries
-    /// that axis' row of the inverse matrix, which is how a machine that is none of the named
-    /// arrangements is described. The row goes to the axis carrying the letter, wherever it is, and its
-    /// values are the motors of the machine's axes in axis order, so it can be no longer than the
-    /// machine has axes. A row shorter than that leaves the rest of that row as it was, so a parameter
-    /// can correct the motors it mentions without restating the ones it does not.
-    /// </para>
-    /// <para>
-    /// A row for a letter the machine has no axis for is refused, where RepRapFirmware only looks for
-    /// the letters of axes that exist and ignores the rest: M584 comes before M669, so the axis the row
-    /// is for has to exist already. A matrix that cannot be inverted is refused with RepRapFirmware's
-    /// message, and in both cases the geometry that was there stays
-    /// </para>
-    /// </remarks>
     /// <exception cref="GCodeException">A row is for an axis the machine does not have, or the matrix cannot be inverted</exception>
     public override KinematicsEngine Configure(Code code, ref bool seen)
     {
@@ -306,9 +290,9 @@ internal sealed class CoreKinematicsEngine : KinematicsEngine
             if (code.TryGetFloatArray(letter, axes.Count, out float[]? values))
             {
                 int axis = axes.IndexOf(letter);
-                for (int motor = 0; motor < values.Length; motor++)
+                for (int motor = 0; motor < MatrixSize; motor++)
                 {
-                    inverse[axis, motor] = values[motor];
+                    inverse[axis, motor] = motor < values.Length ? values[motor] : 0.0f;
                 }
             }
         }

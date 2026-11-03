@@ -25,7 +25,7 @@ internal enum MoveSubmitResult
     /// <summary>The engine has no room; the caller should retry</summary>
     Busy,
 
-    /// <summary>The move could not be built</summary>
+    /// <summary>The move could not be built, or the engine failed to start and will never run it</summary>
     Rejected
 }
 
@@ -447,6 +447,28 @@ internal sealed class MovePlanner(
     }
 
     /// <summary>
+    /// Whether the engine failed to start, so that it will never have room for a move
+    /// </summary>
+    /// <remarks>Read and written under <see cref="Lock"/></remarks>
+    private bool _engineFailed;
+
+    /// <summary>
+    /// Say that the engine failed to start, so that moves are refused from now on
+    /// </summary>
+    /// <remarks>
+    /// The engine reports no room until it has started, which <see cref="QueueMove"/> treats as a full
+    /// ring so that a move offered while it comes up waits for it. Nothing starts the engine after a
+    /// failure, so without this every move would wait for ever with no reply
+    /// </remarks>
+    public void ReportEngineFailed()
+    {
+        using (_lock.EnterScope())
+        {
+            _engineFailed = true;
+        }
+    }
+
+    /// <summary>
     /// Build a move and hand it to the engine
     /// </summary>
     /// <param name="move">The move to queue</param>
@@ -459,6 +481,11 @@ internal sealed class MovePlanner(
     {
         using (_lock.EnterScope())
         {
+            if (_engineFailed)
+            {
+                return MoveSubmitResult.Rejected;
+            }
+
             if (State.PurgePending)
             {
                 // A stop is between its request and its report. A move accepted now may or may not

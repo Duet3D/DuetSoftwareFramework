@@ -147,7 +147,7 @@ internal static class KinematicsConfigurator
     /// <exception cref="GCodeException">The parameter names no geometry</exception>
     /// <remarks>
     /// Either RepRapFirmware's <c>KinematicsType</c> number, which <see cref="KinematicsName"/> follows,
-    /// or the geometry's name as a quoted string, spelled as the object model reports it
+    /// or the geometry's name as a quoted string, which <see cref="KinematicsNameConverter.Parse"/> reads
     /// </remarks>
     private static KinematicsName KinematicsFrom(CodeParameter parameter)
     {

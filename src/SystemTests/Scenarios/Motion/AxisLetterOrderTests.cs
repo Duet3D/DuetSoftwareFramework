@@ -374,6 +374,57 @@ public class AxisLetterOrderTests : BenchFixture
                     "RepRapFirmware's words, pointing at the value there is no motor for");
     }
 
+    [TestCase("M669 X1")]
+    [TestCase("M669 X1:0")]
+    public async Task M669ZeroesTheMotorsAShortRowLeavesOut(string code)
+    {
+        // X drives its own motor and Y's on CoreXY, so a row that kept what it did not name would still
+        // turn Y's motor. CoreKinematics::Configure zeroes everything after the last value it read
+        await using JobBench bench = await StartAsync("XYZU", after: "M669 K1");
+
+        string reply = await bench.Host.ExecuteCodeAsync(code);
+        await bench.Host.ExecuteCodeAsync("G91");
+        IReadOnlyList<ScheduledMove> move = await bench.RunMoveAsync("G1 X10 F6000");
+
+        float[][] inverse = await bench.Host.ReadModelAsync(
+            model => ((CoreKinematics)model.Move.Kinematics).InverseMatrix.Select(row => row.ToArray()).ToArray());
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply.Trim(), Is.Empty);
+            Assert.That(inverse[0], Is.EqualTo(new[] { 1.0f, 0.0f, 0.0f, 0.0f }), "the motors the row leaves out are zero");
+            Assert.That(inverse[1], Is.EqualTo(new[] { 1.0f, -1.0f, 0.0f, 0.0f }), "and Y's row is as it was");
+            Assert.That(move.DriversMoved(), Is.EqualTo(new[] { (ScheduleMoveBench.DriverBoard, XDriver) }), "so X moves its own motor alone");
+        });
+    }
+
+    [Test]
+    public async Task AnAxisCreatedAfterM669HasAMotorOfItsOwn()
+    {
+        // M669 K1 only needs X and Y, so Z and U can be created after it. Each joins the matrices as
+        // the identity, and X and Y stay coupled
+        await using JobBench bench = await ScheduleMoveBench.StartAsync(
+            $"M953\nM569 P1.0 S1\nM569 P1.1 S1\nM569 P1.2 S1\nM569 P1.3 S1\nM569 P1.4 S1\nM584 X1.0 Y1.1\nM669 K1\nM584 Z1.{ZDriver} U1.{UDriver} E1.3\n{Configuration}");
+        await bench.Host.ExecuteCodeAsync("G91");
+
+        IReadOnlyList<ScheduledMove> x = await bench.RunMoveAsync("G1 X10 F6000");
+        IReadOnlyList<ScheduledMove> z = await bench.RunMoveAsync("G1 Z1 F600");
+        IReadOnlyList<ScheduledMove> u = await bench.RunMoveAsync("G1 U5 F6000");
+
+        float[][] inverse = await bench.Host.ReadModelAsync(
+            model => ((CoreKinematics)model.Move.Kinematics).InverseMatrix.Select(row => row.ToArray()).ToArray());
+        float[][] expected = [[1, 1, 0, 0], [1, -1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]];
+        Assert.Multiple(() =>
+        {
+            Assert.That(inverse, Is.EqualTo(expected), "CoreXY's coupling and the identity for Z and U");
+            Assert.That(x.DriversMoved(), Is.EquivalentTo(new[] { (ScheduleMoveBench.DriverBoard, XDriver), (ScheduleMoveBench.DriverBoard, YDriver) }),
+                        "X still drives both CoreXY motors");
+            Assert.That(z.DriversMoved(), Is.EqualTo(new[] { (ScheduleMoveBench.DriverBoard, ZDriver) }));
+            Assert.That(z.Steps(ZDriver), Is.EqualTo(1 * ZStepsPerMm));
+            Assert.That(u.DriversMoved(), Is.EqualTo(new[] { (ScheduleMoveBench.DriverBoard, UDriver) }));
+            Assert.That(u.Steps(UDriver), Is.EqualTo(5 * XyuStepsPerMm));
+        });
+    }
+
     // ---- Geometries that need more than X, Y and Z ----------------------------------------------
 
     /// <summary>X, Y, Z, U and V on drivers 1.0, 1.1, 1.2, 1.4 and 1.5, created in the order given</summary>

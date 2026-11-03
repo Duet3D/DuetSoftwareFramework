@@ -172,12 +172,14 @@ internal sealed class MotionService(
         if (!planner.ReconfigureAsync(stoppingToken, adoptGeometryFromObjectModel: true).AsTask().GetAwaiter().GetResult())
         {
             logger.LogError("Could not configure the native motion engine; no moves will be executed");
+            planner.ReportEngineFailed();
             return;
         }
 
         if (!linkInterface.Native.StartMotion(settings.Value.UseRealtimeScheduling ? settings.Value.MotionRtPriority : 0))
         {
-            logger.LogWarning("Native motion engine did not start; no moves will be executed");
+            logger.LogError("Native motion engine did not start; no moves will be executed");
+            planner.ReportEngineFailed();
             return;
         }
 
