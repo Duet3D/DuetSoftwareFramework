@@ -1838,11 +1838,13 @@ public class SPI : IDiagnostics, ILinkAdapter
                 {
                     _logger.LogWarning("Bad data CRC32 (expected 0x{ExpectedChecksum:x8}, got 0x{ActualChecksum:x8})", _rxHeader.ChecksumData32, crc32);
                     responseCode = ExchangeResponse(TransferResponse.BadDataChecksum);
+
+                    // RRF sends its data again when either side reports a bad data checksum, so exchange the data again whether RRF got ours or not
                     if (responseCode == TransferResponse.BadDataChecksum)
                     {
                         _logger.LogWarning("Note: RepRapFirmware didn't receive valid data either (code 0x{0:x8})", responseCode);
                     }
-                    else
+                    else if (responseCode != TransferResponse.Success)
                     {
                         if (responseCode == TransferResponse.BadResponse)
                         {
