@@ -1493,7 +1493,7 @@ public struct CanMessageUpdateYourFirmware : ICanMessage<CanMessageUpdateYourFir
     }
 
     /// <summary>
-    /// 0 = main firmware, 1 = bootloader, 2 and 3 reserved
+    /// 0 = main firmware, 3 = bootloader, 1 and 2 reserved
     /// (2-bit field, bits 12-13 of the message)
     /// </summary>
     public byte Module

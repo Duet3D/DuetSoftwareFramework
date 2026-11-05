@@ -772,7 +772,8 @@ void SbcInterface::ExchangeData() noexcept
 			buf.marker = 0;
 			buf.extId = 1;
 			buf.fdMode = 1;
-			buf.useBrs = 1;
+			// The bootloader that a firmware block goes to is not expected to be using BRS
+			buf.useBrs = (msgType == CanMessageType::firmwareBlockResponse) ? 0 : 1;
 			buf.remote = 0;
 			buf.reportInFifo = 0;
 			buf.spare = 0;

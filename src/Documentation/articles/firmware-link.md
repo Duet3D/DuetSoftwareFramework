@@ -111,6 +111,28 @@ follow in the same order, with `param.P` = 1 on the disconnect to say that a res
 Both events are DSF's own - RepRapFirmware has no equivalent because it *is* the controller. See
 [Differences from RepRapFirmware](rrf-differences.md#4-events).
 
+## Updating an expansion board
+
+`M997 B<address>` updates the main firmware of an expansion board, and `M997 B<address> S3` its bootloader. Any other module number is refused. The firmware is taken from the firmware directory, and the code fails without touching the board if the file is not there:
+
+| Module | File | Named after |
+| --- | --- | --- |
+| Main firmware | `Duet3Firmware_<type>.bin`, or `.uf2` if the board takes one | The board type the board reports |
+| Bootloader | `Duet3Bootloader-<class>.bin` | The bootloader class the board reports |
+
+The code only starts the update. The board restarts into its bootloader and fetches the file a block at a time with `firmwareBlockRequest` messages, which arrive unsolicited through the controller. DCS answers each with as many `firmwareBlockResponse` messages as the block takes, and the controller sends those without bit rate switching. `boards[].state` follows the update from there:
+
+| State | Meaning |
+| --- | --- |
+| `flashing` | The board agreed to update. `state.status` is `updating` while any board is in this state |
+| `resetting` | The end of the file has been served, and the board is writing it and restarting |
+| `flashFailed` | The file could not be served, for example because the file is missing or the board asked for an offset past its end. The board restarts, and goes back to `running` if it still has firmware to announce itself with |
+| `running` | The board announced itself, normally with its new firmware |
+
+A flashing board leaves that state only through one of the others, so a board that stops responding after agreeing to update keeps `state.status` at `updating` until it next announces itself.
+
+Updating a board does not restore its configuration. It restarts with none, as after `M999 B`, so the machine needs resetting once its boards are up to date.
+
 ## The wire format
 
 A transfer carries one `SpiTransferHeader` followed by a sequence of packets, each an 8-byte

@@ -11,11 +11,13 @@ using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Events;
 using DuetControlServer.Files;
+using DuetControlServer.Link.Expansion;
 using DuetControlServer.Link.Native;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Utility;
+using DuetSharedLibrary;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -760,7 +762,7 @@ internal sealed class LinkService(
         switch (msgType)
         {
             case CanMessageType.FirmwareBlockRequest:
-                HandleFirmwareBlockRequestAsync(CanMessageSerializer.Deserialize<CanMessageFirmwareUpdateRequest>(payload), srcAddress);
+                _ = ServeFirmwareBlockAsync(CanMessageSerializer.Deserialize<CanMessageFirmwareUpdateRequest>(payload), srcAddress, lifetime.ApplicationStopping);
                 break;
             default:
                 logger.LogWarning("No unsolicited CAN handler implemented for message type {MsgType}", msgType);
@@ -768,109 +770,138 @@ internal sealed class LinkService(
         }
     }
 
-    private async void HandleFirmwareBlockRequestAsync(CanMessageFirmwareUpdateRequest request, byte srcAddress, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Send an expansion board part of the firmware file it asked for
+    /// </summary>
+    /// <param name="request">What it asked for</param>
+    /// <param name="srcAddress">CAN address of the board</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    /// <remarks>
+    /// HandleFirmwareBlockRequest (CAN/CommandProcessor.cpp). Every way this can fail still answers the
+    /// board, because its bootloader gives up and restarts as soon as it is told, where a board with no
+    /// answer has to wait out a timeout first. Serving the end of the file is what ends the update on
+    /// this side, because nothing is heard from the board again until it announces its new firmware.
+    /// A bad offset ends here with the one answer that says so, where RepRapFirmware goes on to report
+    /// a missing file
+    /// </remarks>
+    private async Task ServeFirmwareBlockAsync(CanMessageFirmwareUpdateRequest request, byte srcAddress, CancellationToken cancellationToken)
     {
-        logger.LogInformation("Received firmware block request: FileOffset={FileOffset}, BootloaderVersion={BootloaderVersion}, Uf2Format={Uf2Format}, FileWanted={FileWanted}, LengthRequested={LengthRequested}, BoardType={BoardType}", request.FileOffset, request.BootloaderVersion, request.Uf2Format, request.FileWanted, request.LengthRequested, request.BoardType);
-
-        if (request.BootloaderVersion == CanMessageFirmwareUpdateRequest.BootloaderVersion0 && (request.FileWanted == 0 || request.FileWanted == 3))
+        logger.LogDebug("Firmware block request from board {Board}: FileOffset={FileOffset}, BootloaderVersion={BootloaderVersion}, Uf2Format={Uf2Format}, FileWanted={FileWanted}, LengthRequested={LengthRequested}, BoardType={BoardType}",
+                        srcAddress, request.FileOffset, request.BootloaderVersion, request.Uf2Format, request.FileWanted, request.LengthRequested, request.BoardTypeString);
+        try
         {
-            // Firmware or bootloader requested
-            string filename = request.FileWanted switch
+            FirmwareModule module = (FirmwareModule)request.FileWanted;
+            if (request.BootloaderVersion != CanMessageFirmwareUpdateRequest.BootloaderVersion0 ||
+                module is not (FirmwareModule.Main or FirmwareModule.Bootloader))
             {
-                0 => settings.Value.FirmwareFilePrefix,
-                3 => settings.Value.BootloaderFilePrefix,
-                _ => throw new InvalidOperationException($"Invalid FileWanted value: {request.FileWanted}")
-            };
-
-            // Add board type suffix
-            filename += request.BoardTypeString;
-
-            // Add file extension
-            filename += request.Uf2Format ? ".uf2" : ".bin";
-            uint fileOffset = request.FileOffset;
-            uint lengthRequested = request.LengthRequested;
-
-            string filepath = await filePathResolver.ToPhysicalAsync(filename, FileDirectory.Firmware, cancellationToken);
-
-            if (!File.Exists(filepath))
-            {
-                logger.LogError("Requested firmware file does not exist: {Filepath}", filepath);
+                await SendFirmwareBlockErrorAsync(srcAddress, CanMessageFirmwareUpdateResponse.ErrOther, 0, cancellationToken);
+                eventLogger.LogOutput(MessageType.Error, $"Can't satisfy request for firmware file {request.FileWanted} from bootloader version {request.BootloaderVersion}");
                 return;
             }
 
-            using FileStream fs = new(filepath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            if (fileOffset >= fs.Length)
+            string filename = expansionBoardManager.GetFirmwareFileName(module, request.BoardTypeString, request.Uf2Format);
+            string filepath = await filePathResolver.ToPhysicalAsync(filename, FileDirectory.Firmware, cancellationToken);
+            if (!File.Exists(filepath))
             {
-                logger.LogError("Requested file offset {FileOffset} is beyond the end of the file {Filepath} (length {Length})", fileOffset, filepath, fs.Length);
-                await linkInterface.SendCanMessageAsync(srcAddress, new CanMessageFirmwareUpdateResponse
-                {
-                    FileOffset = fileOffset,
-                    DataLength = 0,
-                    Err = (byte)CanMessageFirmwareUpdateResponse.ErrBadOffset,
-                    FileLength = (uint)fs.Length,
-                    Data = new ByteArray56()
-                },
-                isResponse: true,
-                cancellationToken: cancellationToken);
+                await SendFirmwareBlockErrorAsync(srcAddress, CanMessageFirmwareUpdateResponse.ErrNoFile, 0, cancellationToken);
+                eventLogger.LogOutput(MessageType.Error, $"Received firmware update request for missing file '{filename}'");
+                await expansionBoardManager.SetUpdateStateAsync(srcAddress, BoardState.FlashFailed, cancellationToken);
+                return;
+            }
+
+            await using FileStream fs = new(filepath, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize, useAsync: true);
+            uint fileLength = (uint)fs.Length;
+            uint fileOffset = request.FileOffset;
+            if (fileOffset >= fileLength)
+            {
+                await SendFirmwareBlockErrorAsync(srcAddress, CanMessageFirmwareUpdateResponse.ErrBadOffset, fileLength, cancellationToken);
+                eventLogger.LogOutput(MessageType.Error, $"Received firmware update request with bad file offset, actual {fileOffset} max {fileLength}");
+                await expansionBoardManager.SetUpdateStateAsync(srcAddress, BoardState.FlashFailed, cancellationToken);
                 return;
             }
 
             fs.Seek(fileOffset, SeekOrigin.Begin);
-            if (fs.Length - fileOffset < lengthRequested)
+            uint lengthRequested = Math.Min(request.LengthRequested, fileLength - fileOffset);
+            byte[] buffer = new byte[ByteArray56.Length];
+            do
             {
-                lengthRequested = (uint)(fs.Length - fileOffset);
-            }
-
-            for (;;)
-            {
-                uint lengthToSend = Math.Min(lengthRequested, ByteArray56.Length);
-
-                byte[] buffer = new byte[lengthToSend];
-                int bytesRead = fs.Read(buffer, 0, buffer.Length);
-
-                if (bytesRead != lengthToSend)
+                int lengthToSend = (int)Math.Min(lengthRequested, ByteArray56.Length);
+                if (!await TryReadFirmwareBlockAsync(fs, buffer.AsMemory(0, lengthToSend), cancellationToken))
                 {
-                    logger.LogError("Read {BytesRead} bytes from firmware file {Filepath} but expected {LengthToSend} bytes", bytesRead, filepath, lengthToSend);
-                    await linkInterface.SendCanMessageAsync(srcAddress, new CanMessageFirmwareUpdateResponse
-                    {
-                        DataLength = 0,
-                        Err = (byte)CanMessageFirmwareUpdateResponse.ErrOther,
-                        FileLength = (uint)fs.Length,
-                        FileOffset = 0,
-                        Data = new ByteArray56()
-                    },
-                    isResponse: true,
-                    cancellationToken: cancellationToken);
-                    // TODO update OM that the firmware update failed
+                    await SendFirmwareBlockErrorAsync(srcAddress, CanMessageFirmwareUpdateResponse.ErrOther, fileLength, cancellationToken);
+                    eventLogger.LogOutput(MessageType.Error, $"Error reading firmware update file '{filename}'");
+                    await expansionBoardManager.SetUpdateStateAsync(srcAddress, BoardState.FlashFailed, cancellationToken);
                     return;
                 }
 
-                // Send the requested block back to the firmware
                 CanMessageFirmwareUpdateResponse response = new()
                 {
-                    DataLength = (byte)bytesRead,
+                    DataLength = (byte)lengthToSend,
                     Err = (byte)CanMessageFirmwareUpdateResponse.ErrNone,
-                    FileLength = (uint)fs.Length,
-                    FileOffset = fileOffset,
-                    Data = new ByteArray56()
+                    FileLength = fileLength,
+                    FileOffset = fileOffset
                 };
-                buffer.AsSpan(0, bytesRead).CopyTo(response.Data);
+                buffer.AsSpan(0, lengthToSend).CopyTo(response.Data);
+                await linkInterface.SendCanMessageAsync(srcAddress, response, isResponse: true, cancellationToken: cancellationToken);
 
-                await linkInterface.SendCanMessageAsync(srcAddress, response, CanMessageType.NoReply, isResponse: true, cancellationToken: cancellationToken);
+                fileOffset += (uint)lengthToSend;
+                lengthRequested -= (uint)lengthToSend;
+            }
+            while (lengthRequested != 0);
 
-                fileOffset += (uint)bytesRead;
-                lengthRequested -= (uint)bytesRead;
-                if (lengthRequested == 0)
-                {
-                    break;
-                }
+            if (fileOffset == fileLength)
+            {
+                await expansionBoardManager.SetUpdateStateAsync(srcAddress, BoardState.Resetting, cancellationToken);
             }
         }
-        else
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            logger.LogWarning("Unsupported firmware update request: BootloaderVersion={BootloaderVersion}, FileWanted={FileWanted}", request.BootloaderVersion, request.FileWanted);
+            logger.LogDebug("Stopped serving firmware to board {Board}", srcAddress);
+        }
+        catch (Exception e)
+        {
+            // The link went or the file could not be opened. Nothing else is waiting on this task, and
+            // the board's own timeout deals with whatever it did not get
+            logger.LogError(e, "Failed to serve firmware to board {Board}", srcAddress);
         }
     }
+
+    /// <summary>
+    /// Read the next part of a firmware file
+    /// </summary>
+    /// <param name="file">The file</param>
+    /// <param name="buffer">Where to put it, which is as long as the part wanted</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>True if all of it could be read</returns>
+    private static async ValueTask<bool> TryReadFirmwareBlockAsync(FileStream file, Memory<byte> buffer, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await file.ReadAtLeastAsync(buffer, buffer.Length, throwOnEndOfStream: false, cancellationToken) == buffer.Length;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Tell an expansion board why it cannot have the part of a firmware file it asked for
+    /// </summary>
+    /// <param name="board">CAN address of the board</param>
+    /// <param name="error">One of the <c>Err</c> codes of <see cref="CanMessageFirmwareUpdateResponse"/></param>
+    /// <param name="fileLength">Length of the file, or 0 if there is none</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    private Task SendFirmwareBlockErrorAsync(byte board, uint error, uint fileLength, CancellationToken cancellationToken)
+        => linkInterface.SendCanMessageAsync(board, new CanMessageFirmwareUpdateResponse
+        {
+            Err = (byte)error,
+            FileLength = fileLength
+        },
+        isResponse: true,
+        cancellationToken: cancellationToken);
 
     /// <summary>
     /// Partial incoming message (if any)

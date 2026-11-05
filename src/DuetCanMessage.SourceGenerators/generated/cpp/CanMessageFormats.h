@@ -563,7 +563,7 @@ struct __attribute__((packed)) CanMessageUpdateYourFirmware
 	static constexpr CanMessageType messageType = CanMessageType::updateFirmware;
 
 	uint16_t requestId : 12,		// Identifies this request, so that the reply can be matched to it
-	         module : 2,		// 0 = main firmware, 1 = bootloader, 2 and 3 reserved
+	         module : 2,		// 0 = main firmware, 3 = bootloader, 1 and 2 reserved
 	         zero : 2;
 	// The address of the board that is to update itself. A board whose address differs ignores the message.
 	uint8_t boardId;

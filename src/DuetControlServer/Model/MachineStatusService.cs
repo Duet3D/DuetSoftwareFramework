@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
@@ -110,7 +111,7 @@ internal sealed class MachineStatusService(
         {
             return MachineStatus.Disconnected;
         }
-        if (model.IsUpdating)
+        if (model.IsUpdating || model.Boards.Any(board => board.State == BoardState.Flashing))
         {
             return MachineStatus.Updating;
         }

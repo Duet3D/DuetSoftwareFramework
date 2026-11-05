@@ -228,7 +228,8 @@ internal sealed class ScriptedCanMaster : IDisposable
     /// </remarks>
     public void InjectStandardReply(SendCanMessageHeader request,
                                     CodeResult result = CodeResult.Ok,
-                                    string text = "")
+                                    string text = "",
+                                    byte extra = 0)
     {
         byte[] utf8 = Encoding.UTF8.GetBytes(text);
         int fragments = Math.Max(1, (utf8.Length + StandardReplyTextLength - 1) / StandardReplyTextLength);
@@ -241,6 +242,7 @@ internal sealed class ScriptedCanMaster : IDisposable
             reply.ResultCode = result;
             reply.FragmentNumber = (byte)fragment;
             reply.MoreFollows = fragment < fragments - 1;
+            reply.Extra = extra;
             byte[] whole = new byte[64];
             MemoryMarshal.Write(whole, in reply);
             utf8.AsSpan(offset, length).CopyTo(whole.AsSpan((int)reply.GetActualDataLength(0)));
@@ -416,6 +418,39 @@ internal sealed class ScriptedCanMaster : IDisposable
         });
         payload.CopyTo(data, 12);
         InjectPacket(FirmwareRequest.CANResponse, data);
+    }
+
+    /// <summary>
+    /// Ask for a chunk of a firmware file, as a board's bootloader does once it has been told to update
+    /// </summary>
+    /// <param name="srcAddress">Board asking</param>
+    /// <param name="boardType">Board type, or bootloader class for the bootloader</param>
+    /// <param name="fileOffset">Where in the file the chunk starts</param>
+    /// <param name="length">How long it is</param>
+    /// <param name="fileWanted">0 for the main firmware, 3 for the bootloader</param>
+    /// <param name="uf2">Whether the board wants a .uf2 rather than a .bin</param>
+    /// <param name="bootloaderVersion">Protocol version of the bootloader asking</param>
+    /// <remarks>
+    /// Transmitted only as far as the board type, without a terminator, as
+    /// <c>CanMessageFirmwareUpdateRequest::GetActualDataLength</c> has it
+    /// </remarks>
+    public void InjectFirmwareBlockRequest(byte srcAddress, string boardType, uint fileOffset, uint length,
+                                           byte fileWanted = 0, bool uf2 = false, byte bootloaderVersion = 0)
+    {
+        CanMessageFirmwareUpdateRequest request = new()
+        {
+            BoardTypeString = boardType,
+            FileOffset = fileOffset,
+            LengthRequested = length,
+            FileWanted = fileWanted,
+            Uf2Format = uf2,
+            BootloaderVersion = bootloaderVersion
+        };
+        byte[] payload = new byte[8 + Encoding.ASCII.GetByteCount(boardType)];
+        byte[] whole = new byte[Marshal.SizeOf<CanMessageFirmwareUpdateRequest>()];
+        CanMessageSerializer.Serialize(in request, whole);
+        whole.AsSpan(0, payload.Length).CopyTo(payload);
+        InjectCanResponse(LinkInterface.UnsolicitedTxToken, (ushort)CanMessageType.FirmwareBlockRequest, srcAddress, payload);
     }
 
     /// <summary>
