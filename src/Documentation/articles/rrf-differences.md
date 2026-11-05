@@ -397,6 +397,10 @@ A `GCodeException` is thrown if the value is below the minimum (`0.0f`)
 
 An expansion board that asks for a firmware block past the end of the file gets one `ErrBadOffset` response, and the bad offset is reported. RepRapFirmware's `HandleFirmwareBlockRequest` goes on to answer the same request with `ErrNoFile` and to report a missing file, because the request is still unserved when it reaches that test. The file exists, so DSF stops at the first answer. The update fails in both.
 
+## 6.2 G-code responses
+
+There are some improvements to warning and error messages for some gcodes, for example gcodes which take an int enum parameter now report the valid range of values in the error message instead of just reporting too high / low.
+
 ## 6.2 Meta G-code
 
 **A variable cannot hold an object model reference.** `var a = move.axes` and `global a = move` are
