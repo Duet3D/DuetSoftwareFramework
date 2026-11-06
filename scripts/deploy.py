@@ -32,8 +32,9 @@ needs; those files are uploaded with the main board's IAP, M997 updates the expa
 time, and finally the main board. --bootloader updates the expansion boards' bootloaders over CAN
 instead (M997 S3); see common/firmware_deploy.py for what it can and cannot update.
 
-Deploying DSF and firmware together deploys DSF first, then starts its services and updates the
-firmware through them.
+Deploying DSF and firmware together builds DSF first, updates the firmware through the DSF services
+already running on the Pi, then deploys the new DSF and starts its services. If the firmware update
+fails, DSF is not deployed.
 """
 
 from __future__ import annotations
@@ -44,8 +45,8 @@ from dataclasses import dataclass
 
 from common import firmware_deploy
 from common.cli import complete_with, parse, parser, typed
-from common.dsf import (TRACY, BuildOptions, DeployOptions, add_build_arguments, build_options, build_projects,
-                        deploy, plan)
+from common.dsf import (TRACY, Build, BuildOptions, DeployOptions, add_build_arguments, binary_sources, build_options,
+                        build_projects, deploy, plan)
 from common.firmware import load_boards
 from common.targets import add_target_arguments, board_names, select
 
@@ -103,7 +104,8 @@ def parse_options(argv: Sequence[str] | None = None) -> Options:
     return typed(Options, namespace, dsf=build_options(namespace))
 
 
-def deploy_dsf(options: Options, projects: list[str], start_services: bool) -> int:
+def build_dsf(options: Options, projects: list[str]) -> Build | None:
+    """What is to be deployed, built first if asked; None if building it failed."""
     if TRACY in projects:
         sys.exit(f'{TRACY} is not deployed: a -p:Profiling=true build of DuetControlServer carries it')
     build = plan(options.dsf, projects)
@@ -112,14 +114,19 @@ def deploy_dsf(options: Options, projects: list[str], start_services: bool) -> i
             print(f'Would build {", ".join(build.selected)} ({build.options.variant})'
                   + (' from clean' if options.clean else ''), flush=True)
         elif not build_projects(build):
-            return 1
+            return None
+    binary_sources(build, options.dry_run)
+    return build
+
+
+def deploy_dsf(options: Options, build: Build, start_services: bool) -> int:
     if not deploy(build, DeployOptions(options.host, options.user, start_services, options.dry_run)):
         return 1
     print('=== DSF dry run complete ===' if options.dry_run else '=== DSF deploy complete ===', flush=True)
     return 0
 
 
-def deploy_firmware(options: Options, presets: list[str], every: bool, debug: bool, after_dsf: bool) -> int:
+def deploy_firmware(options: Options, presets: list[str], every: bool, debug: bool) -> int:
     boards = load_boards()
     main = None
     if options.main is not None:
@@ -130,7 +137,7 @@ def deploy_firmware(options: Options, presets: list[str], every: bool, debug: bo
     return firmware_deploy.deploy_firmware(firmware_deploy.Options(
         host=options.host or 'localhost', password=options.password, debug=debug, addresses=options.addresses,
         types=[] if every else presets, main=main, upload_only=options.upload_only, bootloader=options.bootloader,
-        build=options.build or options.clean, clean=options.clean, dry_run=options.dry_run, wait=after_dsf and not options.dry_run), boards)
+        build=options.build or options.clean, clean=options.clean, dry_run=options.dry_run), boards)
 
 
 def main() -> int:
@@ -138,19 +145,20 @@ def main() -> int:
     chosen = select(options.targets, options.all, options.exclude)
     if options.local == (options.host is not None):
         sys.exit('Give the machine to deploy to with --host, or --local for this one')
-    if chosen.dsf:
-        # The firmware is deployed through DSF's own HTTP API, so its services have to be running
-        if status := deploy_dsf(options, chosen.dsf, options.start_services or bool(chosen.boards)):
-            if chosen.boards:
-                print('Not deploying the firmware, as deploying DSF failed', file=sys.stderr)
+    # DSF is built before the firmware is touched, so that a failure leaves the machine as it was
+    build = build_dsf(options, chosen.dsf) if chosen.dsf else None
+    if chosen.dsf and build is None:
+        return 1
+    if chosen.boards:
+        print(f'=== Deploying firmware through {options.host or "localhost"} ===', flush=True)
+        every = len(chosen.boards) == len(load_boards())
+        # A board named with -debug deploys the Debug builds, as --debug does: one main board updates the rest
+        debug = options.debug or bool(chosen.debug_boards)
+        if status := deploy_firmware(options, [b.preset for b in chosen.boards], every, debug):
+            if build:
+                print('Not deploying DSF, as deploying the firmware failed', file=sys.stderr)
             return status
-    if not chosen.boards:
-        return 0
-    print(f'=== Deploying firmware through {options.host or "localhost"} ===', flush=True)
-    every = len(chosen.boards) == len(load_boards())
-    # A board named with -debug deploys the Debug builds, as --debug does: one main board updates the rest
-    debug = options.debug or bool(chosen.debug_boards)
-    return deploy_firmware(options, [b.preset for b in chosen.boards], every, debug, after_dsf=bool(chosen.dsf))
+    return deploy_dsf(options, build, options.start_services or bool(chosen.boards)) if build else 0
 
 
 if __name__ == '__main__':

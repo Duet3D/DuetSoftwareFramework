@@ -6,7 +6,8 @@ from __future__ import annotations
 
 import re
 import time
-from unittest.mock import patch
+from collections.abc import Callable
+from unittest.mock import MagicMock, patch
 
 import deploy
 from common import firmware_deploy
@@ -232,6 +233,54 @@ class DeployTest(ScriptTest):
         _, out = self.deploy('-n')
         self.assertIn('Skipping Duet 3 MB6HC (MB6HC) at CAN address 2: Duet3Firmware_MB6HC.bin has not been built', out)
         self.assertNotIn('to 0:/firmware/Duet3Firmware_MB6HC.bin', out)
+
+    def deploy_both(self, *argv: str, firmware: int = 0, built: bool = True) -> tuple[int, str, list[str]]:
+        """deploy.py of DSF and the firmware, with what it did in order: its status, output and steps."""
+        steps: list[str] = []
+
+        def step(name: str, result: object) -> Callable[..., object]:
+            def run(*_: object, **__: object) -> object:
+                steps.append(name)
+                return result
+            return run
+
+        with (patch.object(deploy, 'plan', return_value=MagicMock()),
+              patch.object(deploy, 'binary_sources', return_value=[]),
+              patch.object(deploy, 'build_projects', side_effect=step('build DSF', built)),
+              patch.object(deploy, 'deploy', side_effect=step('deploy DSF', True)) as deploy_dsf,
+              patch.object(firmware_deploy, 'deploy_firmware', side_effect=step('deploy firmware', firmware))):
+            status, out = self.deploy(*argv, targets=('dsf', 'firmware'))
+        self.deploy_options = deploy_dsf.call_args.args[1] if deploy_dsf.called else None
+        return status, out, steps
+
+    def test_firmware_goes_before_dsf(self) -> None:
+        """The DSF that is running updates the firmware, and the new DSF is left running. It is built
+        first, as a failure then leaves the firmware alone."""
+        status, _, steps = self.deploy_both('--build')
+        self.assertEqual(status, 0)
+        self.assertEqual(steps, ['build DSF', 'deploy firmware', 'deploy DSF'])
+        assert self.deploy_options is not None
+        self.assertTrue(self.deploy_options.start_services)
+
+    def test_dsf_build_failure_leaves_the_firmware_alone(self) -> None:
+        status, _, steps = self.deploy_both('--build', built=False)
+        self.assertEqual(status, 1)
+        self.assertEqual(steps, ['build DSF'])
+
+    def test_firmware_failure_leaves_dsf_alone(self) -> None:
+        """DSF is what updates the firmware, so it has to stay in place to try again."""
+        status, out, steps = self.deploy_both('--build', firmware=1)
+        self.assertEqual(status, 1)
+        self.assertEqual(steps, ['build DSF', 'deploy firmware'])
+        self.assertIn('Not deploying DSF', out)
+
+    def test_dsf_not_built_leaves_the_firmware_alone(self) -> None:
+        with patch.object(deploy, 'binary_sources', side_effect=SystemExit('not built')):
+            with patch.object(deploy, 'plan', return_value=MagicMock()):
+                status, out = self.deploy(targets=('dsf', 'firmware'))
+        self.assertNotEqual(status, 0)
+        self.assertIn('not built', out)
+        self.open_session.assert_not_called()
 
     def test_host_or_local(self) -> None:
         status, out = run_main(deploy.main, 'firmware')

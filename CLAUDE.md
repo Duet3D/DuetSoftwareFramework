@@ -168,3 +168,6 @@ When a feature depends on another feature that is not implemented yet, write the
 - Look for an existing setting, config value or parameter before writing a numeric literal.
 - Refactor to a shared base instead of duplicating functionality.
 - Comments describe the code as it is; never narrate what was removed or moved.
+- Keep comments short: one line by default, saying what the code is for or the one fact a reader cannot get from the code.
+- A comment is not a record of the investigation. Scenarios, chains of cause and effect and arguments that the code is safe go in the commit message.
+- Name what a comment refers to. If "this one", "that board" or "it" could mean more than one thing, use the actual name.

@@ -366,7 +366,7 @@ scripts/deploy.py -H duet3.local firmware                       # every connecte
 scripts/deploy.py -H duet3.local firmware --build               # build what they need first
 scripts/deploy.py -H duet3.local Duet3Firmware_EXP1HCL --debug  # only the 1HCL boards, as Debug
 scripts/deploy.py -H duet3.local firmware --dry-run             # show what it would do
-scripts/deploy.py -H <pi> dsf firmware --build                  # DSF, then the firmware through it, to a Pi
+scripts/deploy.py -H <pi> dsf firmware --build                  # the firmware through the running DSF, then the new DSF, to a Pi
 ```
 
 ### Moving between DSF 3 and DSF 4

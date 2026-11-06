@@ -43,7 +43,6 @@ REQUEST_TIMEOUT = 10  # seconds for a request other than an upload or a code
 EXPANSION_UPDATE_TIMEOUT = 180  # seconds for an expansion board to flash and restart
 MAIN_UPDATE_TIMEOUT = 120  # seconds for the main board to flash and come back on the network
 START_TIMEOUT = 30  # seconds for an update to start before it is assumed to have failed
-CONNECT_TIMEOUT = 60  # seconds for the HTTP API to come up, after deploying DSF has restarted it
 EXPANSION_CONFIGS = ROOT / 'src/Duet3Expansion/src/Config'  # the expansion boards' configuration headers
 DIAGNOSTICS_DELAY = 2  # seconds for an expansion board's diagnostics to reach the main board
 ANNOUNCE_TIMEOUT = 2  # seconds for the expansion boards to announce themselves to a restarted main board
@@ -64,7 +63,6 @@ class Options:
     build: bool
     clean: bool
     dry_run: bool
-    wait: bool  # the HTTP API may still be starting, so keep trying to log in for a while
 
 
 # The main board's HTTP API
@@ -388,9 +386,7 @@ def build_firmware(connected: list[dict[str, object]], main_address: int, option
 
 
 def _deploy(options: Options, boards: list[Board]) -> int:
-    if options.wait:
-        print(f'Waiting up to {CONNECT_TIMEOUT}s for the HTTP API to come up', flush=True)
-    duet = open_when_up(options.host, options.password, CONNECT_TIMEOUT if options.wait else 0)
+    duet = open_when_up(options.host, options.password, 0)
     sbc = duet.sbc
     try:
         connected = connected_boards(duet)
