@@ -376,12 +376,15 @@ DSF 4 only talks to DuetCANMaster on board 0 and DSF 3 only to RepRapFirmware, s
 ```bash
 scripts/migrate.py upgrade -H <pi> --build      # build DSF 4 and DuetCANMaster, flash through DSF 3, deploy DSF 4
 scripts/migrate.py downgrade -H <pi>            # flash RepRapFirmware through DSF 4, reinstall the DSF 3 packages
-scripts/migrate.py downgrade -H <pi> --dry-run  # check the machine and show what would be done
+scripts/migrate.py <up|down>grade -H <pi> --dry-run  # check the machine and show what would be done
+scripts/migrate.py <up|down>grade -H <pi> --expansion-boards  # flash the expansion boards too, before the main board
 ```
 
 Before flashing it checks that what it moves to has been built (upgrade) or can be downloaded from the package repository (downgrade). Afterwards the machine has to report the new stack, connected to the main board.
 
-A downgrade goes back to the DSF packages dpkg has installed, which `scripts/deploy.py`, and takes RepRapFirmware from the matching `reprapfirmware` package rather than from the firmware directory. Files in `/opt/dsf/bin` that the packages do not own are deleted.
+A downgrade goes back to the DSF packages dpkg has installed, which `scripts/deploy.py`, and takes the firmware from the matching `reprapfirmware` package rather than from the firmware directory. Files in `/opt/dsf/bin` that the packages do not own are deleted.
+
+A downgrade puts all the firmware packaged in `reprapfirmware` in the firmware directory.
 
 If it stops after the flash, DSF cannot reach the main board, so finish with the same command and `--dsf-only`. Expansion boards keep their firmware either way; update them with `scripts/deploy.py`.
 

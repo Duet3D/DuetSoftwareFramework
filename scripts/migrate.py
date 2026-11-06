@@ -6,6 +6,7 @@
     scripts/migrate.py upgrade -H 192.168.4.27              the same, with what was last built
     scripts/migrate.py downgrade -H 192.168.4.27            back to the DSF 3 packages and their RepRapFirmware
     scripts/migrate.py downgrade -H 192.168.4.27 --dry-run  check the machine and show what would be done
+    scripts/migrate.py upgrade -H 192.168.4.27 -e           flash the expansion boards as well
     scripts/migrate.py upgrade -H 192.168.4.27 --dsf-only   finish a move whose firmware update went through
 
 The order matters. DSF 4 only talks to DuetCANMaster on board 0 and DSF 3 only to RepRapFirmware, so the
@@ -15,10 +16,15 @@ once the firmware has changed, DSF has lost the main board and cannot update it 
     upgrade    DSF 3 flashes DuetCANMaster, then DSF 4 is deployed as scripts/deploy.py would
     downgrade  DSF 4 flashes RepRapFirmware, then the DSF 3 packages are reinstalled over it
 
+A downgrade puts all the firmware packaged with that RepRapFirmware in the firmware directory, so that
+DSF 3 can update any expansion board. With --expansion-boards the stack that is leaving also flashes the
+connected expansion boards, one at a time, before it flashes the main board, as a board that fails can
+then still be flashed again by running the same command.
+
 Deploying DSF 4 overwrites the installed DSF 3 packages' files without telling dpkg, so dpkg goes on
 reporting the DSF 3 versions, and those are what a downgrade reinstalls. They are installed from the
-package repository, as are the files they restore. The RepRapFirmware is the one packaged for that
-version, unpacked from reprapfirmware, because the firmware directory cannot be trusted to hold it:
+package repository, as are the files they restore. The firmware is the one packaged for that version,
+unpacked from reprapfirmware, because the firmware directory cannot be trusted to hold it:
 deploy.py --main uploads an image under the name of the firmware the board is running. The package
 itself is not reinstalled, because its postinst updates every board that differs from it.
 
@@ -28,8 +34,7 @@ built or can be downloaded. Afterwards the machine has to report the new stack, 
 board, within VERIFY_TIMEOUT.
 
 If the move stops between the two steps, DSF cannot reach the main board, so run the same command with
---dsf-only to do the second step alone. Only the main board and DSF are moved: expansion boards keep
-their firmware; update them with scripts/deploy.py.
+--dsf-only to do the second step alone.
 """
 
 from __future__ import annotations
@@ -40,14 +45,16 @@ import sys
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
+from typing import cast
 
 from common.cli import parse, parser, typed
 from common.dsf import (PROJECTS, Build, BuildOptions, DeployOptions, add_build_arguments, binary_sources, build_options,
                         build_projects, deploy, dsf_version, plan, services)
 from common.duet import Connector, DuetError, TransportError
-from common.firmware import Board, build, image_path, load_boards
-from common.firmware_deploy import (FIRMWARE_DIRECTORY, board_for, check_reply, connected_boards, main_board_state,
-                                    open_when_up)
+from common.firmware import Board, image_path, load_boards
+from common.firmware_deploy import (Target, board_for, board_name, build_presets, check_reply, connected_boards,
+                                    main_board_state, open_when_up, preset_for, update_expansion_board, upload_images)
 
 VERIFY_TIMEOUT = 120  # seconds for the new stack to come up and connect to the main board
 IDLE_STATES = ('idle', 'off')  # what state.status may be for the machine to be moved
@@ -109,6 +116,7 @@ class Options:
     build: bool
     clean: bool
     dsf_only: bool
+    expansion_boards: bool
     dry_run: bool
     dsf: BuildOptions
 
@@ -125,6 +133,8 @@ def parse_options(argv: Sequence[str] | None = None) -> Options:
     p.add_argument('-P', '--password', default='reprap', help="the main board's password (default: reprap)")
     p.add_argument('--dsf-only', action='store_true',
                    help='the main board has been flashed already: only move DSF')
+    p.add_argument('-e', '--expansion-boards', action='store_true',
+                   help='flash the expansion boards too, before the main board')
     p.add_argument('-n', '--dry-run', action='store_true',
                    help='check the machine and show what would be done, without doing it')
     upgrade_only = p.add_argument_group('upgrade')
@@ -133,6 +143,8 @@ def parse_options(argv: Sequence[str] | None = None) -> Options:
     upgrade_only.add_argument('-c', '--clean', action='store_true', help='rebuild from clean first (implies --build)')
     add_build_arguments(upgrade_only)
     namespace = parse(p, argv)
+    if namespace.dsf_only and namespace.expansion_boards:
+        p.error('--dsf-only cannot be used with --expansion-boards')
     return typed(Options, namespace, dsf=build_options(namespace))
 
 
@@ -202,6 +214,45 @@ def wait_for(options: Options, target: Stack) -> None:
     raise DuetError(f'{options.host} has not come up on {target.name}: {machine or "it does not answer"}')
 
 
+# The expansion boards
+
+
+def connected_expansion_boards(duet: Connector) -> list[Target]:
+    """The connected expansion boards, main boards in expansion mode included, each with the name of the
+    file it asks for as its image, which is empty for a board that has not announced itself."""
+    return [Target(cast(int, b.get('canAddress')), board_name(b), Path(str(b.get('firmwareFileName') or '')))
+            for b in connected_boards(duet)[1:]]
+
+
+def boards_to_upload_for(duet: Connector, boards: list[Board]) -> list[Target]:
+    """The connected expansion boards there is a build for. A board that has not announced itself stops
+    the move, as what has to be uploaded for it cannot be told."""
+    targets: list[Target] = []
+    connected = connected_expansion_boards(duet)
+    unidentified = [str(t.address) for t in connected if not t.image.name]
+    if unidentified:
+        raise DuetError(f'the expansion boards at CAN addresses {", ".join(unidentified)} have not announced '
+                        'themselves, so their firmware is not known; nothing has been changed. Get them to '
+                        'announce themselves, or leave out --expansion-boards')
+    for target in connected:
+        if board_for(target.image.name, boards) is None:
+            print(f'Skipping {target.name} at CAN address {target.address}: no preset is known to build '
+                  f'{target.image.name}')
+        else:
+            targets.append(target)
+    return targets
+
+
+def flash_expansion_boards(duet: Connector, targets: list[Target], options: Options) -> None:
+    """Have the stack that is leaving flash the expansion boards, if asked, while it can still reach them."""
+    if not options.expansion_boards:
+        return
+    # The web server drops a session that has been idle for a few seconds, as it has if anything was prepared
+    duet.connect()
+    for target in targets:
+        update_expansion_board(duet, target, False, options.dry_run)
+
+
 # The main board
 
 
@@ -235,22 +286,27 @@ def require(ok: bool, what: str) -> None:
 # Upgrading
 
 
-def main_board_presets(short_name: str, options: Options, boards: list[Board]) -> tuple[str, str]:
-    """The presets of DuetCANMaster and of the IAP that flashes it. The IAP is always a Release build."""
-    firmware = board_for(dsf4().firmware_file(short_name), boards)
-    iap = board_for(f'Duet3_SBCiap32_{short_name}.bin', boards)
-    if firmware is None or iap is None:
-        raise DuetError(f'DuetCANMaster is not built for a {short_name}')
-    return firmware.variant(options.debug), iap.preset
+def firmware_images(short_name: str, expansion: list[Target], options: Options,
+                    boards: list[Board]) -> dict[str, Path]:
+    """The images to put in the firmware directory by preset: DuetCANMaster, the IAP that flashes it, which
+    is always a Release build, and the expansion boards' firmware."""
+    main_board = [dsf4().firmware_file(short_name), f'Duet3_SBCiap32_{short_name}.bin']
+    images: dict[str, Path] = {}
+    for file_name in (*main_board, *(t.image.name for t in expansion)):
+        preset = preset_for(file_name, options.debug, boards)
+        if preset is None:
+            raise DuetError(f'DuetCANMaster is not built for a {short_name}')
+        images[preset] = image_path(preset, Path(file_name).suffix)
+    return images
 
 
-def check_built(dsf: Build, images: list[str]) -> None:
+def check_built(dsf: Build, images: dict[str, Path]) -> None:
     """Refuse to start a move that could not be finished, as DSF 3 cannot follow DuetCANMaster."""
     binary_sources(dsf)
     if not dsf.plugin_stage_dir.is_dir():
         sys.exit(f'Error: {dsf.plugin_stage_dir} has not been staged; run with --build')
-    for preset in images:
-        if not image_path(preset, '.bin').is_file():
+    for preset, image in images.items():
+        if not image.is_file():
             sys.exit(f'Error: {preset} has not been built; run with --build')
 
 
@@ -259,41 +315,35 @@ def upgrade(options: Options, boards: list[Board]) -> int:
     dsf = plan(options.dsf, list(PROJECTS))
     remote_output(options, 'true')
     opened = None
-    presets: tuple[str, str] | None = None
+    expansion: list[Target] = []
+    images: dict[str, Path] = {}
     if not options.dsf_only:
         opened = open_source(options, source, target)
         if opened is None:
             return 0
-        presets = main_board_presets(opened[1].short_name, options, boards)
+        if options.expansion_boards:
+            expansion = boards_to_upload_for(opened[0], boards)
+        images = firmware_images(opened[1].short_name, expansion, options, boards)
 
     building = options.build or options.clean
     if building:
         if opened is not None:
             opened[0].disconnect()  # the session times out while building
-        for preset in presets or ():
-            if options.dry_run:
-                print(f'Would build {preset}' + (' from clean' if options.clean else ''))
-            elif not build(preset, clean=options.clean):
-                print(f'Building {preset} failed', file=sys.stderr)
-                return 1
+        if not build_presets(images, options.clean, options.dry_run):
+            return 1
         if options.dry_run:
             print(f'Would build {", ".join(dsf.selected)} ({dsf.options.variant})')
         elif not build_projects(dsf):
             return 1
     if not (options.dry_run and building):
-        check_built(dsf, list(presets or ()))
+        check_built(dsf, images)
 
-    if opened is not None and presets is not None:
-        duet = opened[0]
+    if opened is not None:
+        duet, machine = opened
         duet.connect()  # the session may have timed out while building
-        for preset in presets:
-            image = image_path(preset, '.bin')
-            if options.dry_run:
-                print(f'Would upload {preset} to {FIRMWARE_DIRECTORY}{image.name}')
-            else:
-                print(f'Uploading {preset} to {FIRMWARE_DIRECTORY}{image.name}', flush=True)
-                duet.upload(FIRMWARE_DIRECTORY + image.name, image.read_bytes())
-        flash_main_board(duet, image_path(presets[0], '.bin').name, options)
+        upload_images(duet, [(image.name, image) for image in images.values()], options.dry_run)
+        flash_expansion_boards(duet, expansion, options)
+        flash_main_board(duet, target.firmware_file(machine.short_name), options)
         duet.disconnect()
 
     require(deploy(dsf, options.to), f'Deploying {target.name}')
@@ -328,14 +378,15 @@ def download_packages(options: Options, installed: dict[str, str]) -> bool:
                            f'--download-only {pinned(installed)}'])
 
 
-def install_firmware(options: Options, version: str, file_name: str) -> bool:
-    """Unpack the main board's firmware from the package, which leaves the package's postinst out of it."""
+def install_firmware(options: Options, version: str, main_board_file: str) -> bool:
+    """Unpack the package's firmware files, which leaves its postinst out of it, as long as it has the
+    main board's. A file an expansion board lacks is reported when it is flashed."""
     package = shlex.quote(f'{RRF_PACKAGE}={version}')
-    name = shlex.quote(file_name)
+    name = shlex.quote(main_board_file)
     return options.to.run(['ssh', options.to.remote,
                            f'work=$(mktemp -d) && cd "$work" && apt-get download {package} '
-                           f'&& dpkg-deb --fsys-tarfile {RRF_PACKAGE}_*.deb | tar -xO .{SD_FIRMWARE}/{name} > {name} '
-                           f'&& test -s {name} && install -o dsf -g dsf -m 644 {name} {SD_FIRMWARE}/{name}; '
+                           f'&& dpkg-deb -x {RRF_PACKAGE}_*.deb . && cd .{SD_FIRMWARE} && test -s {name} '
+                           f'&& install -o dsf -g dsf -m 644 * {SD_FIRMWARE}/; '
                            'status=$?; cd / && rm -rf "$work"; exit $status'])
 
 
@@ -357,10 +408,13 @@ def downgrade(options: Options) -> int:
     source, target = dsf4(), dsf3()
     installed = installed_packages(options)
     opened = None
+    expansion: list[Target] = []
     if not options.dsf_only:
         opened = open_source(options, source, target)
         if opened is None:
             return 0
+        if options.expansion_boards:
+            expansion = connected_expansion_boards(opened[0])  # now, as the session times out while downloading
     if not download_packages(options, installed):
         raise DuetError(f'The DSF {installed["duetcontrolserver"]} packages cannot be downloaded')
 
@@ -369,6 +423,7 @@ def downgrade(options: Options) -> int:
         firmware = target.firmware_file(machine.short_name)
         if not install_firmware(options, installed[RRF_PACKAGE], firmware):
             raise DuetError(f'{firmware} cannot be unpacked from {RRF_PACKAGE} {installed[RRF_PACKAGE]}')
+        flash_expansion_boards(duet, expansion, options)
         flash_main_board(duet, firmware, options)
         duet.disconnect()
 

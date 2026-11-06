@@ -35,6 +35,8 @@ class FakePi(Connector):
         self.unreachable = False
         self.refused = False
         self.session = True
+        self.expansion: list[dict[str, object]] = []  # the boards after the main board
+        self.flash_result = 'running'  # what an expansion board goes to once it has flashed
         self.actions: list[str] = []
 
     def connect(self) -> None:
@@ -55,16 +57,26 @@ class FakePi(Connector):
             raise TransportError('POST /machine/code timed out after 180s')
         if self.refused or not self.session:
             raise TransportError('POST /machine/code: HTTP 401 Unauthorized')
-        if 'Error' not in self.reply:
+        if gcode.startswith('M997 B'):
+            board = next(b for b in self.expansion if b['canAddress'] == int(gcode.removeprefix('M997 B')))
+            board['state'] = 'flashing'
+        elif 'Error' not in self.reply:
             self.firmware = gcode.split('"')[1]
         return self.reply
 
     def model(self, key: str, flags: str | None = None) -> object:
+        if not self.session:
+            raise TransportError('GET /machine/model: HTTP 401 Unauthorized')
         if key == 'sbc.dsf.version':
             return self.version
         if key == 'state':
             return {'status': self.status, 'upTime': 100}
-        return [{'canAddress': 0, 'shortName': 'MB6HC', 'firmwareFileName': self.firmware}]
+        boards = [{'canAddress': 0, 'shortName': 'MB6HC', 'firmwareFileName': self.firmware},
+                  *(dict(b) for b in self.expansion)]
+        for board in self.expansion:
+            if board['state'] == 'flashing':
+                board['state'] = self.flash_result
+        return boards
 
     def upload(self, name: str, data: bytes, modified: str | None = None) -> None:
         self.actions.append(f'upload {name}')
@@ -80,7 +92,7 @@ class MigrateTest(ScriptTest):
         self.enterContext(patch.object(subprocess, 'run', side_effect=self.ssh_output))
         self.enterContext(patch.object(dsf, 'run', side_effect=self.ssh))
         self.enterContext(patch.object(migrate, 'deploy', side_effect=self.deploy))
-        self.build_preset = self.enterContext(patch.object(migrate, 'build', return_value=True))
+        self.build_preset = self.enterContext(patch.object(firmware_deploy, 'build', return_value=True))
         self.build_dsf = self.enterContext(patch.object(migrate, 'build_projects', return_value=True))
         self.failing = ''  # what a command must contain to fail
         self.packages = PACKAGES
@@ -109,6 +121,11 @@ class MigrateTest(ScriptTest):
 
     def migrate(self, direction: str, *argv: str) -> tuple[int, str]:
         return run_main(migrate.main, direction, '-H', 'pi', *argv)
+
+    def add_board(self, address: int, short_name: str, file_name: str | None = None) -> None:
+        self.pi.expansion.append({'canAddress': address, 'name': f'Duet 3 Expansion {short_name}',
+                                  'shortName': short_name, 'state': 'running', 'firmwareVersion': '3.7.0',
+                                  'firmwareFileName': file_name or f'Duet3Firmware_{short_name}.bin'})
 
     def on_dsf4(self) -> None:
         self.pi.version = '4.0.0-alpha.1+a85e7147'
@@ -175,7 +192,8 @@ class Upgrade(MigrateTest):
         self.built('DuetCANMaster_MB6HC-debug', 'DuetCANMaster_MB6HC.bin')
         status, out = self.migrate('upgrade', '--debug')
         self.assertEqual(status, 0, out)
-        self.assertIn('Uploading DuetCANMaster_MB6HC-debug to 0:/firmware/DuetCANMaster_MB6HC.bin', out)
+        self.assertIn('Uploading DuetCANMaster_MB6HC-debug/DuetCANMaster_MB6HC.bin to '
+                      '0:/firmware/DuetCANMaster_MB6HC.bin', out)
         self.assertTrue(self.has('M997 P"DuetCANMaster_MB6HC.bin"'))
 
     def test_a_board_duetcanmaster_is_not_built_for_is_refused(self) -> None:
@@ -208,6 +226,184 @@ class Upgrade(MigrateTest):
             status, out = self.migrate('upgrade')
         self.assertEqual(status, 1)
         self.assertIn('has not come up', out)
+
+
+class UpgradeExpansionBoards(MigrateTest):
+    def setUp(self) -> None:
+        super().setUp()
+        self.add_board(1, 'EXP3HC')
+        self.add_board(2, 'EXP3HC')
+        self.add_board(121, 'TOOL1LC')
+        self.built('Duet3Firmware_EXP3HC', 'Duet3Firmware_EXP3HC.bin')
+        self.built('Duet3Firmware_TOOL1LC', 'Duet3Firmware_TOOL1LC.bin')
+
+    def test_they_are_left_alone_unless_asked(self) -> None:
+        (self.build / 'Duet3Firmware_TOOL1LC/Duet3Firmware_TOOL1LC.bin').unlink()
+        status, out = self.migrate('upgrade', '--build')
+        self.assertEqual(status, 0, out)
+        self.assertEqual([c.args[0] for c in self.build_preset.call_args_list],
+                         ['DuetCANMaster_MB6HC', 'Duet3_SBCiap32_MB6HC'])
+        self.assertEqual(self.pi.actions, ['upload 0:/firmware/DuetCANMaster_MB6HC.bin',
+                                           'upload 0:/firmware/Duet3_SBCiap32_MB6HC.bin',
+                                           'M997 P"DuetCANMaster_MB6HC.bin"', 'deploy DSF'])
+
+    def test_they_are_uploaded_once_each_and_flashed_through_dsf3_before_the_main_board_when_asked(self) -> None:
+        status, out = self.migrate('upgrade', '--expansion-boards')
+        self.assertEqual(status, 0, out)
+        self.assertEqual(self.pi.actions, ['upload 0:/firmware/DuetCANMaster_MB6HC.bin',
+                                           'upload 0:/firmware/Duet3_SBCiap32_MB6HC.bin',
+                                           'upload 0:/firmware/Duet3Firmware_EXP3HC.bin',
+                                           'upload 0:/firmware/Duet3Firmware_TOOL1LC.bin',
+                                           'M997 B1', 'M997 B2', 'M997 B121',
+                                           'M997 P"DuetCANMaster_MB6HC.bin"', 'deploy DSF'])
+
+    def test_a_failed_flash_leaves_the_main_board_and_dsf3_alone(self) -> None:
+        self.pi.flash_result = 'flashFailed'
+        status, out = self.migrate('upgrade', '--expansion-boards')
+        self.assertEqual(status, 1)
+        self.assertIn('failed to flash', out)
+        self.assertFalse(self.has('M997 P'))
+        self.assertFalse(self.has('deploy DSF'))
+
+    def test_builds_them_first_when_asked(self) -> None:
+        status, out = self.migrate('upgrade', '--expansion-boards', '--build')
+        self.assertEqual(status, 0, out)
+        self.assertEqual([c.args[0] for c in self.build_preset.call_args_list],
+                         ['DuetCANMaster_MB6HC', 'Duet3_SBCiap32_MB6HC', 'Duet3Firmware_EXP3HC', 'Duet3Firmware_TOOL1LC'])
+
+    def test_firmware_not_built_stops_it_before_the_main_board_is_touched(self) -> None:
+        (self.build / 'Duet3Firmware_TOOL1LC/Duet3Firmware_TOOL1LC.bin').unlink()
+        status, out = self.migrate('upgrade', '--expansion-boards')
+        self.assertEqual(status, 1)
+        self.assertIn('Duet3Firmware_TOOL1LC has not been built', out)
+        self.assertEqual(self.pi.actions, [])
+
+    def test_the_debug_build_is_uploaded_under_the_name_the_board_asks_for(self) -> None:
+        self.built('DuetCANMaster_MB6HC-debug', 'DuetCANMaster_MB6HC.bin')
+        self.built('Duet3Firmware_EXP3HC-debug', 'Duet3Firmware_EXP3HC.bin')
+        self.built('Duet3Firmware_TOOL1LC-debug', 'Duet3Firmware_TOOL1LC.bin')
+        status, out = self.migrate('upgrade', '--expansion-boards', '--debug')
+        self.assertEqual(status, 0, out)
+        self.assertIn('Uploading Duet3Firmware_EXP3HC-debug/Duet3Firmware_EXP3HC.bin to '
+                      '0:/firmware/Duet3Firmware_EXP3HC.bin', out)
+
+    def test_a_main_board_in_expansion_mode_is_given_what_it_asks_for(self) -> None:
+        self.add_board(3, 'MB6HC')
+        self.built('Duet3Firmware_MB6HC', 'Duet3Firmware_MB6HC.bin')
+        status, out = self.migrate('upgrade', '--expansion-boards')
+        self.assertEqual(status, 0, out)
+        steps = [self.index('upload 0:/firmware/Duet3Firmware_MB6HC.bin'), self.index('M997 B3'),
+                 self.index('M997 P"DuetCANMaster_MB6HC.bin"')]
+        self.assertEqual(steps, sorted(steps))
+
+    def test_a_board_no_preset_builds_for_is_skipped(self) -> None:
+        self.add_board(4, 'Mystery')
+        status, out = self.migrate('upgrade', '--expansion-boards')
+        self.assertEqual(status, 0, out)
+        self.assertIn('Skipping Duet 3 Expansion Mystery (Mystery) at CAN address 4', out)
+        self.assertFalse(self.has('M997 B4'))
+
+    def test_a_dry_run_says_what_it_would_flash(self) -> None:
+        status, out = self.migrate('upgrade', '--expansion-boards', '--dry-run')
+        self.assertEqual(status, 0, out)
+        self.assertIn('at CAN address 121 (M997 B121)', out)
+        self.assertEqual(self.pi.actions, ['deploy DSF'])
+
+    def test_dsf_only_cannot_flash_them(self) -> None:
+        status, out = self.migrate('upgrade', '--dsf-only', '--expansion-boards')
+        self.assertEqual(status, 2)
+        self.assertIn('--dsf-only', out)
+        self.assertEqual(self.pi.actions, [])
+
+
+class UnannouncedExpansionBoards(MigrateTest):
+    def setUp(self) -> None:
+        super().setUp()
+        self.add_board(2, 'EXP3HC')
+        self.pi.expansion[0].update(name='', shortName='', firmwareFileName='')
+
+    def test_stop_an_upgrade_that_is_to_flash_them_before_anything_is_touched(self) -> None:
+        status, out = self.migrate('upgrade', '--expansion-boards')
+        self.assertEqual(status, 1)
+        self.assertIn('CAN addresses 2 have not announced themselves', out)
+        self.assertEqual(self.pi.actions, [])
+
+    def test_do_not_matter_to_an_upgrade_that_leaves_them_alone(self) -> None:
+        status, out = self.migrate('upgrade')
+        self.assertEqual(status, 0, out)
+
+    def test_are_flashed_by_a_downgrade_as_they_say_what_they_need_when_asked(self) -> None:
+        self.on_dsf4()
+        status, out = self.migrate('downgrade', '--expansion-boards')
+        self.assertEqual(status, 0, out)
+        self.assertIn('Updating an unidentified board at CAN address 2', out)
+        self.assertLess(self.index('M997 B2'), self.index('M997 P"Duet3Firmware_MB6HC.bin"'))
+
+
+class DowngradeExpansionBoards(MigrateTest):
+    def setUp(self) -> None:
+        super().setUp()
+        self.on_dsf4()
+        self.add_board(1, 'EXP3HC')
+        self.add_board(2, 'EXP3HC')
+        self.add_board(121, 'TOOL1LC')
+
+    def test_all_the_packaged_firmware_is_installed_and_they_are_left_alone(self) -> None:
+        status, out = self.migrate('downgrade')
+        self.assertEqual(status, 0, out)
+        unpack = self.pi.actions[self.index('dpkg-deb')]
+        self.assertIn('install -o dsf -g dsf -m 644 * /opt/dsf/sd/firmware/', unpack)
+        self.assertIn('test -s Duet3Firmware_MB6HC.bin', unpack)
+        self.assertFalse(self.has('M997 B'))
+
+    def test_a_board_no_preset_builds_for_is_flashed_all_the_same(self) -> None:
+        self.add_board(4, 'Mystery')
+        status, out = self.migrate('downgrade', '--expansion-boards')
+        self.assertEqual(status, 0, out)
+        self.assertTrue(self.has('M997 B4'))
+
+    def test_a_file_the_package_lacks_leaves_the_main_board_and_dsf4_alone(self) -> None:
+        self.pi.reply = 'Error: Firmware file Duet3Firmware_EXP3HC.bin not found'
+        status, out = self.migrate('downgrade', '--expansion-boards')
+        self.assertEqual(status, 1)
+        self.assertIn('not found', out)
+        self.assertFalse(self.has('M997 P'))
+        self.assertFalse(self.has('--force-confold'))
+
+    def test_they_are_flashed_through_dsf4_before_the_main_board_when_asked(self) -> None:
+        status, out = self.migrate('downgrade', '--expansion-boards')
+        self.assertEqual(status, 0, out)
+        steps = [self.index('dpkg-deb'), self.index('M997 B1'), self.index('M997 B2'), self.index('M997 B121'),
+                 self.index('M997 P"Duet3Firmware_MB6HC.bin"'), self.index('--force-confold')]
+        self.assertEqual(steps, sorted(steps))
+
+    def test_a_main_board_in_expansion_mode_shares_the_main_boards_file(self) -> None:
+        self.add_board(3, 'MB6HC')
+        status, out = self.migrate('downgrade', '--expansion-boards')
+        self.assertEqual(status, 0, out)
+        self.assertEqual(self.pi.actions[self.index('dpkg-deb')].count('Duet3Firmware_MB6HC.bin'), 1)
+        self.assertLess(self.index('M997 B3'), self.index('M997 P"Duet3Firmware_MB6HC.bin"'))
+
+    def test_a_failed_flash_leaves_the_main_board_and_dsf4_alone(self) -> None:
+        self.pi.flash_result = 'flashFailed'
+        status, out = self.migrate('downgrade', '--expansion-boards')
+        self.assertEqual(status, 1)
+        self.assertIn('failed to flash', out)
+        self.assertFalse(self.has('M997 P'))
+        self.assertFalse(self.has('--force-confold'))
+
+    def test_firmware_that_cannot_be_unpacked_stops_it_before_the_boards_are_flashed(self) -> None:
+        self.failing = 'dpkg-deb'
+        status, out = self.migrate('downgrade', '--expansion-boards')
+        self.assertEqual(status, 1)
+        self.assertIn('cannot be unpacked', out)
+        self.assertFalse(self.has('M997'))
+
+    def test_a_dry_run_says_what_it_would_flash(self) -> None:
+        status, out = self.migrate('downgrade', '--expansion-boards', '--dry-run')
+        self.assertEqual(status, 0, out)
+        self.assertIn('at CAN address 121 (M997 B121)', out)
+        self.assertEqual(self.pi.actions, [])
 
 
 class Downgrade(MigrateTest):

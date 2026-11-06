@@ -29,6 +29,7 @@ from __future__ import annotations
 import re
 import sys
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -86,6 +87,11 @@ def open_when_up(host: str, password: str, timeout: float, mode: str = 'auto') -
 def connected_boards(duet: Connector) -> list[dict[str, object]]:
     """The boards in the object model, main board first; verbose for the file names."""
     return [as_dict(b) for b in as_list(duet.model('boards', 'd99v'))]
+
+
+def board_name(b: dict[str, object]) -> str:
+    """A board in the object model, as it is named to the user."""
+    return f'{b.get("name")} ({b.get("shortName")})' if b.get('name') else 'an unidentified board'
 
 
 def main_board_state(duet: Connector) -> tuple[str, int]:
@@ -189,11 +195,15 @@ def bootloader_id(duet: Connector, address: int) -> str | None:
     return found[1].strip() if found else None
 
 
-def update_expansion_board(duet: Connector, target: Target, bootloader: bool) -> None:
+def update_expansion_board(duet: Connector, target: Target, bootloader: bool, dry_run: bool = False) -> None:
     """Update an expansion board's firmware or bootloader and wait for it to restart. The main board
     reports it as flashing, then resetting, and it may then drop out of the object model until it is
     running again."""
     what = 'the bootloader of ' if bootloader else ''
+    if dry_run:
+        print(f'Would update {what}{target.name} at CAN address {target.address} '
+              f'({update_command(target, bootloader)})')
+        return
     print(f'Updating {what}{target.name} at CAN address {target.address}', flush=True)
     if bootloader:
         print(f'  bootloader {bootloader_id(duet, target.address) or "not reported"}')
@@ -317,14 +327,41 @@ def is_selected(b: dict[str, object], main_address: int, options: Options, board
     return found is not None and found.preset in options.types
 
 
-def file_preset(file_name: str, is_main: bool, options: Options, boards: list[Board]) -> str | None:
-    """The preset that builds a file for a board: --main's for the main board's firmware, the
-    Release one for an IAP or a bootloader, else the one that builds it in the build type asked for."""
-    is_firmware = file_name.startswith(FIRMWARE_PREFIXES)
-    if is_main and is_firmware and options.main is not None:
-        return options.main
+def preset_for(file_name: str, debug: bool, boards: list[Board]) -> str | None:
+    """The preset that builds a file: the Release one for an IAP or a bootloader, else the one of the
+    build type asked for."""
     found = board_for(file_name, boards)
-    return found.variant(options.debug and is_firmware) if found else None
+    return found.variant(debug and file_name.startswith(FIRMWARE_PREFIXES)) if found else None
+
+
+def file_preset(file_name: str, is_main: bool, options: Options, boards: list[Board]) -> str | None:
+    """The preset that builds a file for a board: --main's for the main board's firmware, else
+    preset_for's."""
+    if is_main and file_name.startswith(FIRMWARE_PREFIXES) and options.main is not None:
+        return options.main
+    return preset_for(file_name, options.debug, boards)
+
+
+def build_presets(presets: Iterable[str], clean: bool, dry_run: bool) -> bool:
+    """Build each preset once, stopping at the first that fails."""
+    for preset in dict.fromkeys(presets):
+        if dry_run:
+            print(f'Would build {preset}' + (' from clean' if clean else ''))
+        elif not build(preset, clean=clean):
+            print(f'Building {preset} failed', file=sys.stderr)
+            return False
+    return True
+
+
+def upload_images(duet: Connector, uploads: Iterable[tuple[str, Path]], dry_run: bool) -> None:
+    """Upload each image once to the firmware directory, under the name the main board looks for."""
+    for remote, image in dict.fromkeys(uploads):
+        source = image.relative_to(BUILD)
+        if dry_run:
+            print(f'Would upload {source} to {FIRMWARE_DIRECTORY}{remote}')
+            continue
+        print(f'Uploading {source} to {FIRMWARE_DIRECTORY}{remote}', flush=True)
+        duet.upload(FIRMWARE_DIRECTORY + remote, image.read_bytes())
 
 
 def build_firmware(connected: list[dict[str, object]], main_address: int, options: Options,
@@ -347,13 +384,7 @@ def build_firmware(connected: list[dict[str, object]], main_address: int, option
                 presets.append(preset)
             else:
                 print(f'Not building {file_name}: no preset is known to build it')
-    for preset in dict.fromkeys(presets):
-        if options.dry_run:
-            print(f'Would build {preset}' + (' from clean' if options.clean else ''))
-        elif not build(preset, clean=options.clean):
-            print(f'Building {preset} failed', file=sys.stderr)
-            return False
-    return True
+    return build_presets(presets, options.clean, options.dry_run)
 
 
 def _deploy(options: Options, boards: list[Board]) -> int:
@@ -389,7 +420,7 @@ def _deploy(options: Options, boards: list[Board]) -> int:
         bootloaders = bootloader_names()
         for b in connected:
             address = cast(int, b.get('canAddress', main_address))
-            name = f'{b.get("name")} ({b.get("shortName")})'
+            name = board_name(b)
             file_name = cast(str | None, b.get('firmwareFileName'))
             if options.bootloader:
                 file_name, problem = bootloader_file(b, bootloaders, boards)
@@ -412,13 +443,7 @@ def _deploy(options: Options, boards: list[Board]) -> int:
             print('Nothing to deploy')
             return 1
 
-        for remote, image in dict.fromkeys(uploads):
-            source = image.relative_to(BUILD)
-            if options.dry_run:
-                print(f'Would upload {source} to {FIRMWARE_DIRECTORY}{remote}')
-                continue
-            print(f'Uploading {source} to {FIRMWARE_DIRECTORY}{remote}', flush=True)
-            duet.upload(FIRMWARE_DIRECTORY + remote, image.read_bytes())
+        upload_images(duet, uploads, options.dry_run)
         if options.upload_only:
             return 0
 
@@ -429,12 +454,8 @@ def _deploy(options: Options, boards: list[Board]) -> int:
                     print(f'Would update {target.name} (M997)')
                 else:
                     update_main_board(duet, target)
-            elif options.dry_run:
-                what = 'the bootloader of ' if options.bootloader else ''
-                print(f'Would update {what}{target.name} at CAN address {target.address} '
-                      f'({update_command(target, options.bootloader)})')
             else:
-                update_expansion_board(duet, target, options.bootloader)
+                update_expansion_board(duet, target, options.bootloader, options.dry_run)
         return 0
     finally:
         duet.disconnect()
