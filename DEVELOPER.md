@@ -166,6 +166,7 @@ The scripts in [scripts/](scripts/) are how everything is built, deployed, teste
 | `scripts/list.py` | Lists the targets the others take |
 | `scripts/build.py` | Builds DSF projects and board firmware |
 | `scripts/deploy.py` | Deploys (and optionally builds) DSF projects and firmware |
+| `scripts/migrate.py` | Moves a Pi and its main board between DSF 3 with RepRapFirmware and DSF 4 with DuetCANMaster |
 | `scripts/test.py` | Runs the unit, system or native tests |
 | `scripts/lint.py` | Runs clang-tidy over a whole build |
 | `scripts/clean.py` | Cleans or deletes build output |
@@ -367,6 +368,22 @@ scripts/deploy.py -H duet3.local Duet3Firmware_EXP1HCL --debug  # only the 1HCL 
 scripts/deploy.py -H duet3.local firmware --dry-run             # show what it would do
 scripts/deploy.py -H <pi> dsf firmware --build                  # DSF, then the firmware through it, to a Pi
 ```
+
+### Moving between DSF 3 and DSF 4
+
+DSF 4 only talks to DuetCANMaster on board 0 and DSF 3 only to RepRapFirmware, so the migration order is important. The mainboard needs to be updated first, and once its firmware has changed, DSF cannot reach it to update it. `scripts/migrate.py` does the two in that order, having the stack that is leaving flash the main board with `M997 P"<file>"`.
+
+```bash
+scripts/migrate.py upgrade -H <pi> --build      # build DSF 4 and DuetCANMaster, flash through DSF 3, deploy DSF 4
+scripts/migrate.py downgrade -H <pi>            # flash RepRapFirmware through DSF 4, reinstall the DSF 3 packages
+scripts/migrate.py downgrade -H <pi> --dry-run  # check the machine and show what would be done
+```
+
+Before flashing it checks that what it moves to has been built (upgrade) or can be downloaded from the package repository (downgrade). Afterwards the machine has to report the new stack, connected to the main board.
+
+A downgrade goes back to the DSF packages dpkg has installed, which `scripts/deploy.py`, and takes RepRapFirmware from the matching `reprapfirmware` package rather than from the firmware directory. Files in `/opt/dsf/bin` that the packages do not own are deleted.
+
+If it stops after the flash, DSF cannot reach the main board, so finish with the same command and `--dsf-only`. Expansion boards keep their firmware either way; update them with `scripts/deploy.py`.
 
 ### Bootloaders
 

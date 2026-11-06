@@ -69,13 +69,13 @@ class Options:
 # The main board's HTTP API
 
 
-def open_when_up(options: Options, timeout: float) -> Connector:
+def open_when_up(host: str, password: str, timeout: float, mode: str = 'auto') -> Connector:
     """Log in, retrying while the HTTP API is not up yet or cannot reach the main board. Each code is
     given as long as an update can take, because over DSF's REST API M997 returns once it is done."""
     start = time.monotonic()
     while True:
         try:
-            return open_session(options.host, options.password, 'auto', REQUEST_TIMEOUT,
+            return open_session(host, password, mode, REQUEST_TIMEOUT,
                                 max(EXPANSION_UPDATE_TIMEOUT, MAIN_UPDATE_TIMEOUT))
         except DuetError:
             if time.monotonic() - start > timeout:
@@ -359,7 +359,7 @@ def build_firmware(connected: list[dict[str, object]], main_address: int, option
 def _deploy(options: Options, boards: list[Board]) -> int:
     if options.wait:
         print(f'Waiting up to {CONNECT_TIMEOUT}s for the HTTP API to come up', flush=True)
-    duet = open_when_up(options, CONNECT_TIMEOUT if options.wait else 0)
+    duet = open_when_up(options.host, options.password, CONNECT_TIMEOUT if options.wait else 0)
     sbc = duet.sbc
     try:
         connected = connected_boards(duet)
