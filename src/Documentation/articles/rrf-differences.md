@@ -403,6 +403,8 @@ An expansion board that asks for a firmware block past the end of the file gets 
 
 There are some improvements to warning and error messages for some gcodes, for example gcodes which take an int enum parameter now report the valid range of values in the error message instead of just reporting too high / low.
 
+`M115` and `M115 B0` describe DSF and DuetCANMaster.
+
 ## 6.2 Meta G-code
 
 **A variable cannot hold an object model reference.** `var a = move.axes` and `global a = move` are

@@ -8,7 +8,7 @@
 #define BOARD_SHORT_NAME "MB6XD"
 #define BOARD_NAME "Duet 3 MB6XD"
 #define DEFAULT_BOARD_TYPE BoardType::Auto
-#define FIRMWARE_NAME "RepRapFirmware for Duet 3 MB6XD"
+#define FIRMWARE_NAME "DuetCANMaster for " BOARD_NAME
 #define IAP_FIRMWARE_FILE "DuetCANMaster_" BOARD_SHORT_NAME ".bin"
 
 #define IAP_UPDATE_FILE "Duet3_SDiap32_" BOARD_SHORT_NAME ".bin"

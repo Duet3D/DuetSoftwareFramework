@@ -41,7 +41,7 @@ public class ConnectionTests : SystemTests.Host.BenchFixture
 
         // And the machine is responsive end to end
         string reply = await host.ExecuteCodeAsync("M115");
-        Assert.That(reply, Does.Contain("firmware"));
+        Assert.That(reply, Does.Contain("FIRMWARE_NAME:"));
 
         Assert.That(host.Services.GetRequiredService<NativeLink>().ResyncCount, Is.Zero);
     }
@@ -87,7 +87,7 @@ public class ConnectionTests : SystemTests.Host.BenchFixture
 
         // And the machine is responsive again
         string reply = await host.ExecuteCodeAsync("M115");
-        Assert.That(reply, Does.Contain("firmware"));
+        Assert.That(reply, Does.Contain("FIRMWARE_NAME:"));
     }
 
     /// <summary>
@@ -190,7 +190,7 @@ public class ConnectionTests : SystemTests.Host.BenchFixture
         Assert.That(fake.Accepts, Is.GreaterThanOrEqualTo(2), "recovery re-dials the socket");
 
         string reply = await host.ExecuteCodeAsync("M115");
-        Assert.That(reply, Does.Contain("firmware"));
+        Assert.That(reply, Does.Contain("FIRMWARE_NAME:"));
     }
 
     [Test]

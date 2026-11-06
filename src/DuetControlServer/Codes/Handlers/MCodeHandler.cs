@@ -1250,7 +1250,7 @@ internal partial class MCodeHandler(
     }
 
     /// <summary>
-    /// M115: report the firmware version of this program or of an expansion board
+    /// M115: report the firmware of the controller and the version of DSF, or the firmware of an expansion board
     /// </summary>
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
@@ -1262,8 +1262,17 @@ internal partial class MCodeHandler(
         byte board = GetBoardAddress(code, allowMainBoard: true, defaultAddress: CanId.MasterAddress);
         if (board == CanId.MasterAddress)
         {
-            // TODO reply with DSF firmware info
-            return new Message(MessageType.Success, "DSF firmware version");
+            using (await model.AccessReadOnlyAsync(cancellationToken))
+            {
+                // boards[0] always exists, but its strings stay empty until the controller reports them
+                static string OrUnknown(string? value) => string.IsNullOrEmpty(value) ? "unknown" : value;
+
+                Board mainBoard = model.Boards[0];
+                return new Message(MessageType.Success,
+                    $"DSF_VERSION: {model.SBC!.DSF.Version} DSF_DATE: {model.SBC.DSF.BuildDateTime}\n" +
+                    $"FIRMWARE_NAME: {OrUnknown(mainBoard.FirmwareName)} FIRMWARE_VERSION: {OrUnknown(mainBoard.FirmwareVersion)} " +
+                    $"ELECTRONICS: {OrUnknown(mainBoard.Name)} FIRMWARE_DATE: {OrUnknown(mainBoard.FirmwareDate)}");
+            }
         }
         else if (board > CanId.MasterAddress && board <= CanId.BroadcastAddress)
         {

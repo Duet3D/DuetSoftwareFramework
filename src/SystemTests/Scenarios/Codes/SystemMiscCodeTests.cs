@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
@@ -208,27 +207,62 @@ public class SystemMiscCodeTests : SystemTests.Host.BenchFixture
     }
 
     /// <summary>
-    /// M115 reports the firmware name and version in RepRapFirmware's format, and the version it
-    /// names is the one boards[0] reports.
+    /// M115 and M115 B0 both describe the controller in RepRapFirmware's format and then DSF on a line
+    /// of its own, without asking anything of the CAN bus.
     /// </summary>
     /// <remarks>
-    /// RRF GCodes2.cpp case 115: "FIRMWARE_NAME: %s FIRMWARE_VERSION: %s ELECTRONICS: %s". The
-    /// same firmware describes itself in the object model as boards[0].firmwareName and
-    /// boards[0].firmwareVersion (Platform.cpp objectModelTable)
+    /// RRF GCodes2.cpp case 115: "FIRMWARE_NAME: %s FIRMWARE_VERSION: %s ELECTRONICS: %s" followed by
+    /// " FIRMWARE_DATE: %s", and a B parameter naming this board answers the same as no B. The same
+    /// firmware describes itself in the object model as boards[0] (Platform.cpp objectModelTable).
+    /// The DSF line is DSF's own and is recorded in rrf-differences.md
     /// </remarks>
-    [Category("KnownGap")]
-    [Test]
-    public async Task M115ReportsTheFirmwareVersion()
+    [TestCase("M115")]
+    [TestCase("M115 B0")]
+    public async Task M115ReportsTheControllerAndDsf(string code)
     {
         await using JobBench bench = await JobControlBench.StartAsync();
-        string reply = await bench.Host.ExecuteCodeAsync("M115");
-        Assert.That(reply, Does.Contain("FIRMWARE_NAME:"), "M115 names the firmware (RRF GCodes2.cpp case 115)");
-        Assert.That(reply, Does.Contain("FIRMWARE_VERSION:"), "M115 names the firmware version (RRF GCodes2.cpp case 115)");
+        bench.CanMaster.InjectControllerBoardInfo("Duet 3 MB6HC", "MB6HC", "DuetCANMaster for Duet 3 MB6HC", "4.0.0-alpha.1", "2026-11-05");
+        await bench.Host.WaitForModelAsync(model => model.Boards[0].ShortName, "MB6HC", "the controller's identity");
+        (string dsfVersion, string dsfDate) = await bench.Host.ReadModelAsync(model => (model.SBC!.DSF.Version, model.SBC.DSF.BuildDateTime));
 
-        Match version = Regex.Match(reply, @"FIRMWARE_VERSION: (\S+)");
-        Assert.That(version.Success, Is.True, "M115 reports a version token after FIRMWARE_VERSION:");
-        Assert.That(await bench.Host.ReadModelAsync(model => model.Boards[0].FirmwareVersion), Is.EqualTo(version.Groups[1].Value),
-                    "M115's version matches boards[0].firmwareVersion (RRF Platform.cpp firmwareVersion)");
+        bench.CanMaster.ClearCapture();
+        string reply = await bench.Host.ExecuteCodeAsync(code);
+
+        string[] lines = reply.TrimEnd().Split('\n');
+        Assert.That(lines, Has.Length.EqualTo(2), "one line for the controller and one for DSF");
+        Assert.Multiple(() =>
+        {
+            Assert.That(lines[0], Is.EqualTo($"DSF_VERSION: {dsfVersion} DSF_DATE: {dsfDate}"),
+                        "DSF's line comes from sbc.dsf");
+            Assert.That(lines[1], Is.EqualTo("FIRMWARE_NAME: DuetCANMaster for Duet 3 MB6HC FIRMWARE_VERSION: 4.0.0-alpha.1 "
+                                             + "ELECTRONICS: Duet 3 MB6HC FIRMWARE_DATE: 2026-11-05"),
+                        "the controller's line is RRF's, filled in from boards[0] (RRF GCodes2.cpp case 115)");
+            Assert.That(bench.CanMaster.CanMessages<CanMessageReturnInfo>(), Is.Empty,
+                        "board 0 is answered here, not asked for over CAN");
+        });
+    }
+
+    /// <summary>
+    /// M115 still reports DSF before the controller has said what it is
+    /// </summary>
+    /// <remarks>
+    /// boards[0] always exists but its strings stay empty until the controller's BoardInfo arrives,
+    /// and a reply with gaps where the values go would read each key as the value of the one before.
+    /// RRF cannot get here, because its firmware is the program answering
+    /// </remarks>
+    [Test]
+    public async Task M115SaysWhatItDoesNotKnowAboutTheController()
+    {
+        await using JobBench bench = await JobControlBench.StartAsync();
+        string dsfVersion = await bench.Host.ReadModelAsync(model => model.SBC!.DSF.Version);
+
+        string reply = await bench.Host.ExecuteCodeAsync("M115");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply, Does.Contain($"DSF_VERSION: {dsfVersion} "));
+            Assert.That(reply, Does.Contain("FIRMWARE_NAME: unknown FIRMWARE_VERSION: unknown ELECTRONICS: unknown FIRMWARE_DATE: unknown"));
+        });
     }
 
     /// <summary>
