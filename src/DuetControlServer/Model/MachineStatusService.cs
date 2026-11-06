@@ -105,13 +105,18 @@ internal sealed class MachineStatusService(
     /// <remarks>The caller must hold the object model lock</remarks>
     private MachineStatus Derive(bool moving)
     {
-        // The overriding conditions first, most overriding first. A machine with no link is
-        // disconnected whatever it was doing, and a halted one stays halted until it is reset
+        // The overriding conditions first, most overriding first. Updating the main firmware comes
+        // before the link because it is what takes the link down. Otherwise a machine with no link
+        // is disconnected whatever it was doing, and a halted one stays halted until it is reset
+        if (model.IsUpdating)
+        {
+            return MachineStatus.Updating;
+        }
         if (model.IsDisconnected)
         {
             return MachineStatus.Disconnected;
         }
-        if (model.IsUpdating || model.Boards.Any(board => board.State == BoardState.Flashing))
+        if (model.Boards.Any(board => board.State == BoardState.Flashing))
         {
             return MachineStatus.Updating;
         }

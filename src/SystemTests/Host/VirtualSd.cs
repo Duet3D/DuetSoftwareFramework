@@ -24,7 +24,7 @@ internal sealed class VirtualSd
     public void WriteSys(string name, string content)
         => File.WriteAllText(Path.Combine(Root, "sys", name), content);
 
-    /// <summary>Write a firmware binary (0:/firmware), which is where an expansion board's update comes from</summary>
+    /// <summary>Write a firmware binary (0:/firmware), which is where a firmware update comes from</summary>
     public void WriteFirmware(string name, byte[] content)
         => File.WriteAllBytes(Path.Combine(Root, "firmware", name), content);
 

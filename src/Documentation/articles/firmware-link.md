@@ -111,6 +111,27 @@ follow in the same order, with `param.P` = 1 on the disconnect to say that a res
 Both events are DSF's own - RepRapFirmware has no equivalent because it *is* the controller. See
 [Differences from RepRapFirmware](rrf-differences.md#4-events).
 
+## Updating the main board
+
+`M997` or `M997 B0` updates DuetCANMaster, which is module 0, so an `S` list has to include `0`. A list without it is refused. DuetCANMaster cannot write its own flash while it runs from it, so the in-application programmer (IAP) does that from RAM. Both files are looked for in the firmware directory and then in the system directory, and the code fails without touching the controller if either is not there:
+
+| File | Named after |
+| --- | --- |
+| `DuetCANMaster_<board>.bin`, or the file `P` names | `boards[0].firmwareFileName` |
+| `Duet3_SBCiap32_<board>.bin` | `boards[0].iapFileNameSBC` |
+
+The update then runs in this order, and takes the link over completely once it has started:
+
+1. `state.status` becomes `updating`, stays that way while the link is down, and everything waiting on the link is cancelled.
+2. The first `WriteIap` packet stops the machine as an emergency stop does, which restarts the expansion boards and shuts down CAN. The controller then does nothing but load the rest of the IAP into the last 32 KB of its RAM.
+3. `StartIap` starts the IAP. The controller no longer speaks the packet protocol from here on, and each transfer is one bare segment of 2 KB. The last segment is filled with `0xFF`. The IAP inverts the transfer ready pin each time it is ready for another transfer. This differs from DuetCANMaster, which holds the pin high while it is ready.
+4. The IAP checks what it wrote against the length and CRC16 of the file. It erases the image after a bad checksum, so a retry sends all of it again, up to 3 times in all.
+5. The IAP restarts the controller, DCS stops once the code has answered, and systemd starts it again to connect to the new firmware.
+
+The flash is erased as the firmware is written, so the controller has no firmware if the update fails after step 3. After 3 bad checksums the code fails, the IAP leaves the board in its ROM bootloader, and `state.status` stops saying `updating`. The firmware then has to be installed over USB.
+
+Updating the main board does not update its expansion boards. They restart with no configuration and announce themselves to the new firmware.
+
 ## Updating an expansion board
 
 `M997 B<address>` updates the main firmware of an expansion board, and `M997 B<address> S3` its bootloader. Any other module number is refused. The firmware is taken from the firmware directory, and the code fails without touching the board if the file is not there:

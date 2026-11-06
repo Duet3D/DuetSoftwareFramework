@@ -2005,7 +2005,7 @@ internal partial class MCodeHandler(
 
         if (!code.GetEnumArray('S', Enum.GetValues<FirmwareModule>().Length, defaultValue: [FirmwareModule.Main]).Contains(FirmwareModule.Main))
         {
-            return new Message(MessageType.Error, $"S{FirmwareModule.Main} required to update DuetCANMaster");
+            return new Message(MessageType.Error, $"S{(byte)FirmwareModule.Main} required to update DuetCANMaster");
         }
 
         // Get the IAP and Firmware files for DuetCANMaster.

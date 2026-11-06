@@ -15,6 +15,10 @@ target_link_libraries(ring_buffer_tests PRIVATE duet_realtime_core)
 # The socket transport against an in-process peer speaking the SocketLinkFormats framing. That peer
 # is the executable specification the C# fake endpoint in src/SystemTests follows.
 duet_realtime_core_add_test(socket_transport_tests SocketTransportTests.cpp)
+
+# The handshake with the IAP program, which the socket transport has no equivalent of
+duet_realtime_core_add_test(iap_ready_line_tests IapReadyLineTests.cpp)
+target_link_libraries(iap_ready_line_tests PRIVATE duet_realtime_core)
 target_link_libraries(socket_transport_tests PRIVATE duet_realtime_core)
 
 duet_realtime_core_add_test(step_timer_tests StepTimerTests.cpp)

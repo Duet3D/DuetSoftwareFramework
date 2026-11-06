@@ -9,7 +9,7 @@
 #define BOARD_NAME "Duet 3 MB6HC"
 #define DEFAULT_BOARD_TYPE BoardType::Auto
 #define FIRMWARE_NAME "RepRapFirmware for Duet 3 MB6HC"
-#define IAP_FIRMWARE_FILE "Duet3Firmware_" BOARD_SHORT_NAME ".bin"
+#define IAP_FIRMWARE_FILE "DuetCANMaster_" BOARD_SHORT_NAME ".bin"
 
 #define IAP_UPDATE_FILE "Duet3_SDiap32_" BOARD_SHORT_NAME ".bin"
 #define IAP_UPDATE_FILE_SBC "Duet3_SBCiap32_" BOARD_SHORT_NAME ".bin"

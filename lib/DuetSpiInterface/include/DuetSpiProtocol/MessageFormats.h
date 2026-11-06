@@ -46,7 +46,7 @@ static_assert(BufferSize <= UINT16_MAX, "BufferSize must fit in the uint16_t dat
 inline constexpr size_t IapSegmentSize = 1536;
 // Time to wait for the IAP program to raise TfrRdy (ms). IAP erases flash between segments, so this
 // is far longer than a regular transfer timeout.
-inline constexpr int IapTimeout = 8000;
+inline constexpr int IapTimeout = 15000;
 // Size of a single firmware chunk clocked out to the running IAP program
 inline constexpr size_t FirmwareSegmentSize = 2048;
 // Time to wait after the last firmware segment before sending the verification request (ms)

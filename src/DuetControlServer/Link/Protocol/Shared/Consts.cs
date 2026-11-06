@@ -76,7 +76,7 @@ public static class Consts
     /// <summary>
     /// Timeout when waiting for a response from IAP
     /// </summary>
-    public const int IapTimeout = 8000;
+    public const int IapTimeout = 15000;
 
     /// <summary>
     /// Size of each transmitted firmware binary segment (must be equal to blockReadSize in the IAP project)

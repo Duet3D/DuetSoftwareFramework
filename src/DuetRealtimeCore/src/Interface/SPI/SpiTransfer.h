@@ -13,6 +13,7 @@
 #include <Hardware/OutputGpioPin.h>
 #include <Hardware/SpiDevice.h>
 #include <Interface/FullDuplexExchangeTransport.h>
+#include <Interface/SPI/IapReadyLine.h>
 
 #include <cstdint>
 #include <memory>
@@ -43,9 +44,9 @@ namespace Duet::Sbc
 		// --- IAP / firmware update (SPI.cs FlashFirmwareSegment .. WaitForIapReset) ---
 		//
 		// These run the flashing handshake, which bypasses the regular header/data protocol: once IAP is
-		// running, each segment is a bare full-duplex SPI transfer gated only by the TfrRdy pin. While
-		// `m_updating` is set the pin waits use the much longer IapTimeout, because IAP erases flash
-		// between segments.
+		// running, each segment is a bare full-duplex SPI transfer gated only by the TfrRdy pin, which
+		// IAP drives differently (see IapReadyLine). While `m_updating` is set the pin waits use the much
+		// longer IapTimeout, because IAP erases flash before the first segment.
 
 		// Clock out one firmware chunk to the running IAP program. Chunks shorter than
 		// FirmwareSegmentSize are padded with 0xFF, as IAP itself does once complete.
@@ -82,6 +83,7 @@ namespace Duet::Sbc
 
 		std::unique_ptr<GpioInputPin> m_transferReadyPin;
 		std::unique_ptr<GpioInputPin> m_dataAvailablePin;
+		IapReadyLine m_iapReadyLine;
 		// Optional scope trigger: high while data is staged, low once the transfer completes
 		std::unique_ptr<OutputGpioPin> m_sbcDataAvailablePin;
 

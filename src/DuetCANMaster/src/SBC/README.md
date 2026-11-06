@@ -46,10 +46,10 @@ The [SPI state machine](../../../Documentation/articles/spi-state-machine.md) ar
 | `EnableCAN` | Enables or disables the CAN interface. |
 | `ScheduleMove` | Hands a move DSF has planned to `CanMotion`. |
 | `SendCANMessage` | Sends a CAN message for DSF. A timing message addressed to this board configures its own CAN timing instead of reaching the bus. |
-| `WriteIap` | Accepted and ignored: loading the in-application programmer is not implemented. |
+| `WriteIap` | Stops the machine, and hands over to `ReceiveAndStartIap`, which loads the in-application programmer into RAM. |
 | `Message` | Delivers a message from DSF. |
 
-`ConfigCAN` and `StartIap` have no handler, so their content is skipped. A packet that cannot be processed yet is requested again with `ResendPacket`.
+`ConfigCAN` has no handler, so its content is skipped, and `StartIap` is only acted on by `ReceiveAndStartIap`. A packet that cannot be processed yet is requested again with `ResendPacket`.
 
 ## Outgoing Requests (Firmware -> DSF)
 

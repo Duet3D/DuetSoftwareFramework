@@ -78,12 +78,8 @@ class RepRap final
 	[[nodiscard]] bool IsProcessingConfig() const noexcept { return m_processingConfig; }
 
 	// Firmware update operations
-	bool CheckFirmwareUpdatePrerequisites(const StringRef& reply, const StringRef& filenameRef) noexcept;
-#if HAS_MASS_STORAGE
-	void UpdateFirmware(c_string iapFilename, c_string iapParam) noexcept;
-#endif
 	void PrepareToLoadIap() noexcept;
-	[[noreturn]] void StartIap(c_string _ecv_null filename) noexcept;
+	[[noreturn]] void StartIap() noexcept;
 
 	void ReportInternalError(c_string file, c_string func, int line) const noexcept; // report an internal error
 

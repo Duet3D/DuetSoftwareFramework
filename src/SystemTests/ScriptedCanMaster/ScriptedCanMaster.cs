@@ -59,6 +59,8 @@ internal sealed class ScriptedCanMaster : IDisposable
     private int _stagedGeneration;
     private readonly Dictionary<ushort, CanMessageHandler> _canHandlers = [];
     private readonly Queue<CanStatus> _scriptedCanSendStatus = [];
+    private readonly List<byte[]> _flashedSegments = [];
+    private readonly List<FlashVerify> _flashVerifications = [];
     private ushort _sequenceNumber;
     private bool _canEnabled;
     private bool _corruptNextHeaderCrc;
@@ -67,7 +69,7 @@ internal sealed class ScriptedCanMaster : IDisposable
     private bool _rebootPending;
     private int _accepts;
     private int _completedExchanges;
-    private int _flashedSegments;
+    private int _failingFlashVerifications;
 
     /// <summary>Path of the Unix domain socket this controller listens on</summary>
     public string SocketPath { get; }
@@ -827,8 +829,33 @@ internal sealed class ScriptedCanMaster : IDisposable
     /// <summary>Number of times the SBC (re)connected to this controller</summary>
     public int Accepts => Volatile.Read(ref _accepts);
 
-    /// <summary>Number of bare firmware segments received (and discarded) while flashing</summary>
-    public int FlashedSegments => Volatile.Read(ref _flashedSegments);
+    /// <summary>The bare firmware segments the flasher has received, in order</summary>
+    public IReadOnlyList<byte[]> FlashedSegments
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _flashedSegments.ToArray();
+            }
+        }
+    }
+
+    /// <summary>The verification requests the flasher has received, in order</summary>
+    public IReadOnlyList<FlashVerify> FlashVerifications
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _flashVerifications.ToArray();
+            }
+        }
+    }
+
+    /// <summary>Report a bad checksum for the next verification requests, then <see cref="FlashVerdict"/> again</summary>
+    /// <param name="count">How many requests to fail</param>
+    public void FailNextFlashVerifications(int count) => Volatile.Write(ref _failingFlashVerifications, count);
 
     /// <summary>Render the whole capture as a readable exchange log</summary>
     public string DumpCapture() => CapturedTransfer.Dump(Transfers);
@@ -944,12 +971,20 @@ internal sealed class ScriptedCanMaster : IDisposable
             switch ((SocketFrameType)frame.Type)
             {
                 case SocketFrameType.IapData:
-                    // Accept and discard; flashing is not emulated
-                    Interlocked.Increment(ref _flashedSegments);
+                    // Recorded for the test; flashing is not emulated
+                    lock (_lock)
+                    {
+                        _flashedSegments.Add(payload);
+                    }
                     continue;
 
                 case SocketFrameType.IapVerify:
-                    WriteFrame(connection, SocketFrameType.IapVerdict, [FlashVerdict]);
+                    lock (_lock)
+                    {
+                        _flashVerifications.Add(Wire.Read<FlashVerify>(payload));
+                    }
+                    bool fail = Interlocked.Decrement(ref _failingFlashVerifications) >= 0;
+                    WriteFrame(connection, SocketFrameType.IapVerdict, [fail ? (byte)0 : FlashVerdict]);
                     continue;
 
                 case SocketFrameType.Response:

@@ -392,6 +392,99 @@ void RepRap::Tick() noexcept
 	}
 }
 
+// Stop whatever could disturb the IAP being loaded into RAM over the link, or the jump to it. This is
+// called from the SBC task, which carries on loading the IAP and is all that runs from here on.
+void RepRap::PrepareToLoadIap() noexcept
+{
+	EmergencyStop(); // the machine is unresponsive until the new firmware runs. This also shuts down CAN
+
+	Tasks::TerminateMainTask();
+
+#if HAS_SBC_INTERFACE && SUPPORTS_SBC_OVER_USB
+	// USB has to stay up if the SBC is on the end of it: ReceiveAndStartIap shuts it down once it has
+	// received the IAP
+	if (m_sbcInterface->GetDataTransfer().GetTransportType() != SbcTransportType::Usb)
+#endif
+	{
+		SERIAL_USB_DEVICE.end();
+#ifdef SERIAL_USB2_DEVICE
+		SERIAL_USB2_DEVICE.end();
+#endif
+		StopUsbTask();
+	}
+
+	Cache::Disable(); // it interferes with flash memory access
+#if USE_MPU
+	ARM_MPU_Disable(); // make sure we can execute from RAM
+#endif
+}
+
+// Run the IAP, which PrepareToLoadIap has made ready for and which is now in RAM. This does essentially
+// what the Atmel AT02333 paper suggests (see 3.2.2 ff).
+[[noreturn]] void RepRap::StartIap() noexcept
+{
+	// Disable all IRQs
+	SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk; // disable the system tick exception
+	IrqDisable();
+	for (size_t i = 0; i < 8; i++)
+	{
+		NVIC->ICER[i] = 0xFFFFFFFFU; // disable IRQs
+		NVIC->ICPR[i] = 0xFFFFFFFFU; // clear pending IRQs
+	}
+
+	// Disable all PIO IRQs, because the core assumes they are all disabled when setting them up
+	PIOA->PIO_IDR = 0xFFFFFFFFU;
+	PIOB->PIO_IDR = 0xFFFFFFFFU;
+	PIOC->PIO_IDR = 0xFFFFFFFFU;
+	PIOD->PIO_IDR = 0xFFFFFFFFU;
+	PIOE->PIO_IDR = 0xFFFFFFFFU;
+
+	// Tell the IAP how to reach the SBC. This goes above its stack, the top of which is the first word
+	// of its vector table.
+	// NOLINTNEXTLINE(performance-no-int-to-ptr) - IAP_IMAGE_START is a fixed RAM address
+	const uint32_t topOfStack = *reinterpret_cast<const uint32_t*>(IAP_IMAGE_START);
+	// NOLINTNEXTLINE(performance-no-int-to-ptr) - the first word of a vector table is an address
+	auto* const info = reinterpret_cast<IapInfo*>(topOfStack);
+	info->magic = IapInfo::MagicValue;
+	info->auxBaudRate = 0; // this firmware does not use the aux port, so the IAP has no baud rate to keep
+#if SUPPORTS_SBC_OVER_USB
+	info->transport = (m_sbcInterface->GetDataTransfer().GetTransportType() == SbcTransportType::Usb)
+						  ? IapInfo::TransportUsb
+						  : IapInfo::TransportSpi;
+#else
+	info->transport = IapInfo::TransportSpi;
+#endif
+	info->firmwareFilename[0] = 0;
+
+	WatchdogReset(); // kick the watchdog one last time
+	WatchdogResetSecondary();
+
+	// Modify vector table location
+	__DSB();
+	__ISB();
+	SCB->VTOR = (IAP_IMAGE_START & SCB_VTOR_TBLOFF_Msk);
+	__DSB();
+	__ISB();
+
+	IrqEnable();
+
+	__asm volatile("mov r3, %0" : : "r"(IAP_IMAGE_START) : "r3");
+
+	// We are using separate process and handler stacks. Put the process stack 1K bytes below the handler stack.
+	__asm volatile("ldr r1, [r3]");
+	__asm volatile("msr msp, r1");
+	__asm volatile("sub r1, #1024");
+	__asm volatile("mov sp, r1");
+
+	__asm volatile("isb");
+	__asm volatile("ldr r1, [r3, #4]");
+	__asm volatile("orr r1, r1, #1");
+	__asm volatile("bx r1");
+	for (;;)
+	{
+	}
+}
+
 // Return true if we are close to timeout
 bool RepRap::SpinTimeoutImminent() const noexcept
 {

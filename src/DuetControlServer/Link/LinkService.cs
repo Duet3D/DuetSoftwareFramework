@@ -1025,6 +1025,10 @@ internal sealed class LinkService(
         {
             eventLogger.LogOutput(MessageType.Error, "Failed to update firmware. Please install it manually.");
             logger.LogError(e, "Failed to update firmware");
+            using (model.AccessReadWrite())
+            {
+                model.IsUpdating = false;
+            }
             throw;
         }
 

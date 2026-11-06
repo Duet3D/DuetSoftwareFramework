@@ -925,6 +925,7 @@ namespace Duet::Sbc
 			{
 				finish(RequestResult::Failed,
 					   "Could not update firmware after 3 attempts. Please install it manually.");
+				m_transport->ResetConnection();
 				return;
 			}
 
