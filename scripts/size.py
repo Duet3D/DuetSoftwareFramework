@@ -3,7 +3,7 @@
 """Show the memory the built firmware images use: flash, RAM and any other linker region.
 
     scripts/size.py                               every built board
-    scripts/size.py EXP3HC --debug                one board's Debug build
+    scripts/size.py Duet3Firmware_EXP3HC --debug  one board's Debug build
     scripts/size.py d3e --markdown summary.md     append a project's as a Markdown table, e.g. for a CI job summary
 
 Targets are firmware boards and groups of them (see scripts/list.py).
@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 from common.cli import parse, parser, typed
 from common.memory import Result, add_markdown_argument, built, print_summary
-from common.repo import BUILD
+from common.firmware import built_image
 from common.targets import FIRMWARE, add_target_arguments, select
 
 
@@ -46,7 +46,7 @@ def main() -> int:
     results: list[Result] = []
     for board in chosen.boards:
         preset = chosen.preset(board, options.debug)
-        if any((BUILD / preset).glob('*.elf')):
+        if built_image(preset, '.elf'):
             results.append(built(preset, 'ok'))
         elif named:
             results.append(Result(preset, 'not built'))

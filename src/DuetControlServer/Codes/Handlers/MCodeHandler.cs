@@ -411,13 +411,6 @@ internal partial class MCodeHandler(
     private const string ReservedForManagementPlugin = "requires DuetPiManagementPlugin";
 
     /// <summary>
-    /// Modules M997 S may name at once
-    /// </summary>
-    /// <remarks>RepRapFirmware reads them into <c>uint32_t modulesToUpdate[5]</c> and checks each
-    /// against <c>FirmwareUpdater::NumUpdateModules</c> (GCodes3.cpp <c>UpdateFirmware</c>)</remarks>
-    private const int MaxUpdateModules = 5;
-
-    /// <summary>
     /// Answer a code this program deliberately leaves to something else
     /// </summary>
     /// <param name="code">The code</param>
@@ -2004,101 +1997,107 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleFirmwareUpdateAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (code.GetIntArray('S', MaxUpdateModules, defaultValue: [0]).Contains(0) && code.GetInt('B', defaultValue: 0) == 0)
+        byte board = GetBoardAddress(code, allowMainBoard: true, defaultAddress: CanId.MasterAddress);
+        if (board != CanId.MasterAddress)
         {
-            // Get the IAP and Firmware files
-            string? iapFile, firmwareFile;
-            using (await model.AccessReadOnlyAsync(cancellationToken))
-            {
-                // The main board is boards[0] and is always there, but it only names its firmware
-                // files once it has reported them, so what decides this is whether one has
-                Board mainBoard = model.Boards[0];
-                if (string.IsNullOrEmpty(mainBoard.IapFileNameSBC) && string.IsNullOrEmpty(mainBoard.FirmwareFileName))
-                {
-                    return new Message(MessageType.Error, "No boards have been detected");
-                }
+            return await UpdateRemoteFirmwareAsync(code, board, cancellationToken);
+        }
 
-                // There are now two different IAP binaries, check which one to use
-                iapFile = mainBoard.IapFileNameSBC;
-                if (!code.TryGetString('P', out firmwareFile))
-                {
-                    firmwareFile = mainBoard.FirmwareFileName;
-                }
+        if (!code.GetEnumArray('S', Enum.GetValues<FirmwareModule>().Length, defaultValue: [FirmwareModule.Main]).Contains(FirmwareModule.Main))
+        {
+            return new Message(MessageType.Error, $"S{(byte)FirmwareModule.Main} required to update DuetCANMaster");
+        }
+
+        // Get the IAP and Firmware files for DuetCANMaster.
+        string? iapFile, firmwareFile;
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            // The main board is boards[0] and is always there, but it only names its firmware
+            // files once it has reported them, so what decides this is whether one has
+            Board mainBoard = model.Boards[0];
+            if (string.IsNullOrEmpty(mainBoard.IapFileNameSBC) && string.IsNullOrEmpty(mainBoard.FirmwareFileName))
+            {
+                return new Message(MessageType.Error, "No boards have been detected");
             }
 
-            if (string.IsNullOrEmpty(iapFile) || string.IsNullOrEmpty(firmwareFile))
+            // There are now two different IAP binaries, check which one to use
+            iapFile = mainBoard.IapFileNameSBC;
+            if (!code.TryGetString('P', out firmwareFile))
             {
-                return new Message(MessageType.Error, "Cannot update firmware because IAP and firmware filenames are unknown");
+                firmwareFile = mainBoard.FirmwareFileName;
             }
+        }
 
-            string physicalIapFile = await filePathResolver.ToPhysicalAsync(iapFile, FileDirectory.Firmware, cancellationToken);
-            if (!File.Exists(physicalIapFile))
+        if (string.IsNullOrEmpty(iapFile) || string.IsNullOrEmpty(firmwareFile))
+        {
+            return new Message(MessageType.Error, "Cannot update firmware because IAP and firmware filenames are unknown");
+        }
+
+        string physicalIapFile = await filePathResolver.ToPhysicalAsync(iapFile, FileDirectory.Firmware, cancellationToken);
+        if (!File.Exists(physicalIapFile))
+        {
+            string fallbackIapFile = await filePathResolver.ToPhysicalAsync($"0:/firmware/{iapFile}", cancellationToken: cancellationToken);
+            if (!File.Exists(fallbackIapFile))
             {
-                string fallbackIapFile = await filePathResolver.ToPhysicalAsync($"0:/firmware/{iapFile}", cancellationToken: cancellationToken);
+                fallbackIapFile = await filePathResolver.ToPhysicalAsync(iapFile, FileDirectory.System, cancellationToken);
                 if (!File.Exists(fallbackIapFile))
                 {
-                    fallbackIapFile = await filePathResolver.ToPhysicalAsync(iapFile, FileDirectory.System, cancellationToken);
-                    if (!File.Exists(fallbackIapFile))
-                    {
-                        return new Message(MessageType.Error, $"Failed to find IAP file {iapFile}");
-                    }
+                    return new Message(MessageType.Error, $"Failed to find IAP file {iapFile}");
                 }
-                logger.LogWarning("Using fallback IAP file {File}", fallbackIapFile);
-                physicalIapFile = fallbackIapFile;
             }
+            logger.LogWarning("Using fallback IAP file {File}", fallbackIapFile);
+            physicalIapFile = fallbackIapFile;
+        }
 
-            string physicalFirmwareFile = await filePathResolver.ToPhysicalAsync(firmwareFile, FileDirectory.Firmware, cancellationToken);
-            if (!File.Exists(physicalFirmwareFile))
+        string physicalFirmwareFile = await filePathResolver.ToPhysicalAsync(firmwareFile, FileDirectory.Firmware, cancellationToken);
+        if (!File.Exists(physicalFirmwareFile))
+        {
+            string fallbackFirmwareFile = await filePathResolver.ToPhysicalAsync($"0:/firmware/{firmwareFile}", cancellationToken: cancellationToken);
+            if (!File.Exists(fallbackFirmwareFile))
             {
-                string fallbackFirmwareFile = await filePathResolver.ToPhysicalAsync($"0:/firmware/{firmwareFile}", cancellationToken: cancellationToken);
+                fallbackFirmwareFile = await filePathResolver.ToPhysicalAsync(firmwareFile, FileDirectory.System, cancellationToken);
                 if (!File.Exists(fallbackFirmwareFile))
                 {
-                    fallbackFirmwareFile = await filePathResolver.ToPhysicalAsync(firmwareFile, FileDirectory.System, cancellationToken);
-                    if (!File.Exists(fallbackFirmwareFile))
-                    {
-                        return new Message(MessageType.Error, $"Failed to find firmware file {firmwareFile}");
-                    }
+                    return new Message(MessageType.Error, $"Failed to find firmware file {firmwareFile}");
                 }
-                logger.LogWarning("Using fallback firmware file {File}", fallbackFirmwareFile);
-                physicalFirmwareFile = fallbackFirmwareFile;
             }
-
-            // Stop all the plugins
-            Commands.StopPlugins stopCommand = commandFactory.Create<Commands.StopPlugins>();
-            await stopCommand.ExecuteAsync(cancellationToken);
-
-            // Update the firmware
-            await using FileStream iapStream = new(physicalIapFile, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
-            await using FileStream firmwareStream = new(physicalFirmwareFile, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
-            if (Path.GetExtension(firmwareFile) == ".uf2")
-            {
-                await using MemoryStream unpackedFirmwareStream = await Firmware.UnpackUF2Async(firmwareStream);
-                await linkInterface.UpdateFirmware(iapStream, unpackedFirmwareStream, lifetime.ApplicationStopped);
-            }
-            else
-            {
-                await linkInterface.UpdateFirmware(iapStream, firmwareStream, lifetime.ApplicationStopped);
-            }
-
-            // Updating the firmware resets the controller, which invalidates every channel and cancels
-            // this very code. Reassign its cancellation token so it can report success instead of cancelled
-            code.ResetCancellationToken();
-
-            // Terminate the program once this code has finished. Give the success response a
-            // moment to propagate through DWS to the clients first - stopping immediately tears
-            // down the IPC connections, which lets the reply race against the shutdown
-            _ = code.Task.ContinueWith(async task =>
-            {
-                await task;
-                await Task.Delay(1000);
-                lifetime.StopApplication();
-            }, TaskContinuationOptions.RunContinuationsAsynchronously);
-
-            // Done
-            return new Message();
+            logger.LogWarning("Using fallback firmware file {File}", fallbackFirmwareFile);
+            physicalFirmwareFile = fallbackFirmwareFile;
         }
-        // TODO this used to fallthrough to RRF
-        return new Message(MessageType.Warning, "Fallthrough not implemented");
+
+        // Stop all the plugins
+        Commands.StopPlugins stopCommand = commandFactory.Create<Commands.StopPlugins>();
+        await stopCommand.ExecuteAsync(cancellationToken);
+
+        // Update the firmware
+        await using FileStream iapStream = new(physicalIapFile, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
+        await using FileStream firmwareStream = new(physicalFirmwareFile, FileMode.Open, FileAccess.Read, FileShare.Read, settings.Value.FileBufferSize);
+        if (Path.GetExtension(firmwareFile) == ".uf2")
+        {
+            await using MemoryStream unpackedFirmwareStream = await Firmware.UnpackUF2Async(firmwareStream);
+            await linkInterface.UpdateFirmware(iapStream, unpackedFirmwareStream, lifetime.ApplicationStopped);
+        }
+        else
+        {
+            await linkInterface.UpdateFirmware(iapStream, firmwareStream, lifetime.ApplicationStopped);
+        }
+
+        // Updating the firmware resets the controller, which invalidates every channel and cancels
+        // this very code. Reassign its cancellation token so it can report success instead of cancelled
+        code.ResetCancellationToken();
+
+        // Terminate the program once this code has finished. Give the success response a
+        // moment to propagate through DWS to the clients first - stopping immediately tears
+        // down the IPC connections, which lets the reply race against the shutdown
+        _ = code.Task.ContinueWith(async task =>
+        {
+            await task;
+            await Task.Delay(1000);
+            lifetime.StopApplication();
+        }, TaskContinuationOptions.RunContinuationsAsynchronously);
+
+        // Done
+        return new Message();
     }
 
     /// <summary>

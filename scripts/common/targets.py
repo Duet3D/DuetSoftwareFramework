@@ -3,7 +3,7 @@
 
 A target is one of
     a DSF project          DuetControlServer, DuetRealtimeCore, ... (common/dsf.py), or TracyClient
-    a firmware board       its CMake preset, e.g. EXP3HC or canmaster-Duet3_MB6HC; a -debug suffix
+    a firmware board       its CMake preset, e.g. Duet3Firmware_EXP3HC or DuetCANMaster_MB6HC; a -debug suffix
                            names its Debug build, as --debug does for every board
     a group                dsf (every DSF project), firmware (every board), or one firmware project's
                            boards, in full or as canmaster, rrf, d3e, bootloader or iap
@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 
 from common.cli import complete_with
 from common.dsf import PROJECTS, TRACY
-from common.firmware import Board, load_boards
+from common.firmware import DEBUG, Board, load_boards
 
 DSF = 'dsf'
 FIRMWARE = 'firmware'
@@ -28,7 +28,6 @@ ALIASES = {
     'bootloader': 'Duet3Bootloader',
     'iap': 'DuetIAP',
 }
-DEBUG = '-debug'
 
 
 @dataclass(frozen=True)

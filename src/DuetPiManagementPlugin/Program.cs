@@ -4,6 +4,7 @@ using DuetAPI.Connection;
 using DuetAPI.ObjectModel;
 using DuetAPIClient;
 using DuetPiManagementPlugin.Network;
+using DuetSharedLibrary;
 using System;
 using System.Diagnostics;
 using System.Globalization;
@@ -655,7 +656,8 @@ namespace DuetPiManagementPlugin
 
                         // Perform update
                         case 997:
-                            if (code.GetInt('S', defaultValue: 0) == 2)
+                            // S2 means this machine's packages
+                            if (!code.HasParameter('B') && code.GetEnum<FirmwareModule>('S', defaultValue: FirmwareModule.Main) == FirmwareModule.SbcPackages)
                             {
                                 // Check if we need to change the package feed
                                 if (code.TryGetString('F', out string? packageFeed))

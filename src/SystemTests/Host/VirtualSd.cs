@@ -14,7 +14,7 @@ internal sealed class VirtualSd
     public VirtualSd(string root)
     {
         Root = root;
-        foreach (string subdir in new[] { "sys", "gcodes", "macros" })
+        foreach (string subdir in new[] { "sys", "gcodes", "macros", "firmware" })
         {
             Directory.CreateDirectory(Path.Combine(root, subdir));
         }
@@ -23,6 +23,10 @@ internal sealed class VirtualSd
     /// <summary>Write a system file (0:/sys), e.g. config.g or the pause/resume macros</summary>
     public void WriteSys(string name, string content)
         => File.WriteAllText(Path.Combine(Root, "sys", name), content);
+
+    /// <summary>Write a firmware binary (0:/firmware), which is where a firmware update comes from</summary>
+    public void WriteFirmware(string name, byte[] content)
+        => File.WriteAllBytes(Path.Combine(Root, "firmware", name), content);
 
     /// <summary>Write a job file (0:/gcodes)</summary>
     public void WriteGCode(string name, string content)

@@ -66,6 +66,8 @@ RepRapFirmware reports the main board's own hardware. `timeout` goes the other w
 it is how long an expansion board may go unheard from before it is given up on, and the main board is
 reached over SPI rather than over the bus, so the link watches itself instead.
 
+**`boards[0].firmwareFileName` is `DuetCANMaster_<board>.bin`, not `Duet3Firmware_<board>.bin`.** This is to help prevent flashing the incorrect firmware to the MB6HC while that board is used as a stand in for the future CAN board.
+
 **`boards[0].state` is the state of that link.** It is the one field with no RepRapFirmware
 counterpart at all: there the object model and the main board are the same program, so `boards[0]`
 cannot be absent and a state would say nothing. Here the controller is a separate board at the far end
@@ -394,6 +396,12 @@ Added minimum array limits to the following gcodes:
 - `M572` - pressure advance
 - `M906`/`M913`/`M917` - motor current & standstill current
 A `GCodeException` is thrown if the value is below the minimum (`0.0f`)
+
+An expansion board that asks for a firmware block past the end of the file gets one `ErrBadOffset` response, and the bad offset is reported. RepRapFirmware's `HandleFirmwareBlockRequest` goes on to answer the same request with `ErrNoFile` and to report a missing file, because the request is still unserved when it reaches that test. The file exists, so DSF stops at the first answer. The update fails in both.
+
+## 6.2 G-code responses
+
+There are some improvements to warning and error messages for some gcodes, for example gcodes which take an int enum parameter now report the valid range of values in the error message instead of just reporting too high / low.
 
 ## 6.2 Meta G-code
 

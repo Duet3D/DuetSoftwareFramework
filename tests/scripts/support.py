@@ -14,9 +14,7 @@ from unittest.mock import patch
 
 import clean
 import flash_bootloader
-import list as list_script  # scripts/list.py, named so as not to hide the builtin
-import size
-from common import firmware_deploy, memory, repo
+from common import firmware, firmware_deploy, repo
 
 
 class ScriptTest(unittest.TestCase):
@@ -26,7 +24,7 @@ class ScriptTest(unittest.TestCase):
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.build = self.root / 'build'
         self.build.mkdir()
-        for module in (repo, memory, list_script, clean, size, firmware_deploy, flash_bootloader):
+        for module in (repo, firmware, clean, firmware_deploy, flash_bootloader):
             self.enterContext(patch.object(module, 'BUILD', self.build))
 
     def built(self, preset: str, *files: str, data: bytes = b'image') -> None:

@@ -140,11 +140,20 @@ namespace Duet::Sbc
 	void SpiTransfer::WaitForTransfer(bool inTransfer)
 	{
 		const bool needFreshEdge = inTransfer && !m_waitingForFirstTransfer;
+		if (m_waitingForFirstTransfer)
+		{
+			m_iapReadyLine.Restart();
+		}
 
 		// Sub-exchanges require a rising edge newer than the one consumed for the previous exchange;
-		// the header and the first transfer run against the steady "ready" high level.
+		// the header and the first transfer run against the steady "ready" high level. IAP has a
+		// handshake of its own, which is neither.
 		auto isReady = [&]() -> bool
 		{
+			if (m_updating)
+			{
+				return m_iapReadyLine.IsReady(m_transferReadyPin->Read());
+			}
 			if (needFreshEdge)
 			{
 				const auto diff =
@@ -235,6 +244,10 @@ namespace Duet::Sbc
 		// Record the rising edge consumed for this exchange so the next sub-exchange waits for a newer one
 		m_consumedRisingEdgeSeq = m_transferReadyPin->RisingSequenceNumber();
 		m_waitingForFirstTransfer = false;
+		if (m_updating)
+		{
+			m_iapReadyLine.Consume();
+		}
 	}
 
 	// ---------------------------------------------------------------------------

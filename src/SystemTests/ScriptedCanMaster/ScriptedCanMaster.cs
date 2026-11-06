@@ -59,6 +59,8 @@ internal sealed class ScriptedCanMaster : IDisposable
     private int _stagedGeneration;
     private readonly Dictionary<ushort, CanMessageHandler> _canHandlers = [];
     private readonly Queue<CanStatus> _scriptedCanSendStatus = [];
+    private readonly List<byte[]> _flashedSegments = [];
+    private readonly List<FlashVerify> _flashVerifications = [];
     private ushort _sequenceNumber;
     private bool _canEnabled;
     private bool _corruptNextHeaderCrc;
@@ -67,7 +69,7 @@ internal sealed class ScriptedCanMaster : IDisposable
     private bool _rebootPending;
     private int _accepts;
     private int _completedExchanges;
-    private int _flashedSegments;
+    private int _failingFlashVerifications;
 
     /// <summary>Path of the Unix domain socket this controller listens on</summary>
     public string SocketPath { get; }
@@ -228,7 +230,8 @@ internal sealed class ScriptedCanMaster : IDisposable
     /// </remarks>
     public void InjectStandardReply(SendCanMessageHeader request,
                                     CodeResult result = CodeResult.Ok,
-                                    string text = "")
+                                    string text = "",
+                                    byte extra = 0)
     {
         byte[] utf8 = Encoding.UTF8.GetBytes(text);
         int fragments = Math.Max(1, (utf8.Length + StandardReplyTextLength - 1) / StandardReplyTextLength);
@@ -241,6 +244,7 @@ internal sealed class ScriptedCanMaster : IDisposable
             reply.ResultCode = result;
             reply.FragmentNumber = (byte)fragment;
             reply.MoreFollows = fragment < fragments - 1;
+            reply.Extra = extra;
             byte[] whole = new byte[64];
             MemoryMarshal.Write(whole, in reply);
             utf8.AsSpan(offset, length).CopyTo(whole.AsSpan((int)reply.GetActualDataLength(0)));
@@ -416,6 +420,39 @@ internal sealed class ScriptedCanMaster : IDisposable
         });
         payload.CopyTo(data, 12);
         InjectPacket(FirmwareRequest.CANResponse, data);
+    }
+
+    /// <summary>
+    /// Ask for a chunk of a firmware file, as a board's bootloader does once it has been told to update
+    /// </summary>
+    /// <param name="srcAddress">Board asking</param>
+    /// <param name="boardType">Board type, or bootloader class for the bootloader</param>
+    /// <param name="fileOffset">Where in the file the chunk starts</param>
+    /// <param name="length">How long it is</param>
+    /// <param name="fileWanted">0 for the main firmware, 3 for the bootloader</param>
+    /// <param name="uf2">Whether the board wants a .uf2 rather than a .bin</param>
+    /// <param name="bootloaderVersion">Protocol version of the bootloader asking</param>
+    /// <remarks>
+    /// Transmitted only as far as the board type, without a terminator, as
+    /// <c>CanMessageFirmwareUpdateRequest::GetActualDataLength</c> has it
+    /// </remarks>
+    public void InjectFirmwareBlockRequest(byte srcAddress, string boardType, uint fileOffset, uint length,
+                                           byte fileWanted = 0, bool uf2 = false, byte bootloaderVersion = 0)
+    {
+        CanMessageFirmwareUpdateRequest request = new()
+        {
+            BoardTypeString = boardType,
+            FileOffset = fileOffset,
+            LengthRequested = length,
+            FileWanted = fileWanted,
+            Uf2Format = uf2,
+            BootloaderVersion = bootloaderVersion
+        };
+        byte[] payload = new byte[8 + Encoding.ASCII.GetByteCount(boardType)];
+        byte[] whole = new byte[Marshal.SizeOf<CanMessageFirmwareUpdateRequest>()];
+        CanMessageSerializer.Serialize(in request, whole);
+        whole.AsSpan(0, payload.Length).CopyTo(payload);
+        InjectCanResponse(LinkInterface.UnsolicitedTxToken, (ushort)CanMessageType.FirmwareBlockRequest, srcAddress, payload);
     }
 
     /// <summary>
@@ -792,8 +829,33 @@ internal sealed class ScriptedCanMaster : IDisposable
     /// <summary>Number of times the SBC (re)connected to this controller</summary>
     public int Accepts => Volatile.Read(ref _accepts);
 
-    /// <summary>Number of bare firmware segments received (and discarded) while flashing</summary>
-    public int FlashedSegments => Volatile.Read(ref _flashedSegments);
+    /// <summary>The bare firmware segments the flasher has received, in order</summary>
+    public IReadOnlyList<byte[]> FlashedSegments
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _flashedSegments.ToArray();
+            }
+        }
+    }
+
+    /// <summary>The verification requests the flasher has received, in order</summary>
+    public IReadOnlyList<FlashVerify> FlashVerifications
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _flashVerifications.ToArray();
+            }
+        }
+    }
+
+    /// <summary>Report a bad checksum for the next verification requests, then <see cref="FlashVerdict"/> again</summary>
+    /// <param name="count">How many requests to fail</param>
+    public void FailNextFlashVerifications(int count) => Volatile.Write(ref _failingFlashVerifications, count);
 
     /// <summary>Render the whole capture as a readable exchange log</summary>
     public string DumpCapture() => CapturedTransfer.Dump(Transfers);
@@ -909,12 +971,20 @@ internal sealed class ScriptedCanMaster : IDisposable
             switch ((SocketFrameType)frame.Type)
             {
                 case SocketFrameType.IapData:
-                    // Accept and discard; flashing is not emulated
-                    Interlocked.Increment(ref _flashedSegments);
+                    // Recorded for the test; flashing is not emulated
+                    lock (_lock)
+                    {
+                        _flashedSegments.Add(payload);
+                    }
                     continue;
 
                 case SocketFrameType.IapVerify:
-                    WriteFrame(connection, SocketFrameType.IapVerdict, [FlashVerdict]);
+                    lock (_lock)
+                    {
+                        _flashVerifications.Add(Wire.Read<FlashVerify>(payload));
+                    }
+                    bool fail = Interlocked.Decrement(ref _failingFlashVerifications) >= 0;
+                    WriteFrame(connection, SocketFrameType.IapVerdict, [fail ? (byte)0 : FlashVerdict]);
                     continue;
 
                 case SocketFrameType.Response:

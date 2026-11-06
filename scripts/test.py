@@ -26,12 +26,13 @@ from collections.abc import Sequence
 
 from common import coverage, system_tests
 from common.cli import parse, parser, typed
+from common.dsf import REALTIME_CORE
 from common.repo import BUILD, ROOT, call, jobs
 
 
 def native() -> int:
-    for command in (['cmake', '--preset', 'rtc-native'], ['cmake', '--build', '--preset', 'rtc-native', f'-j{jobs()}'],
-                    ['ctest', '--test-dir', str(BUILD / 'rtc-native'), '--output-on-failure']):
+    for command in (['cmake', '--preset', f'{REALTIME_CORE}-native'], ['cmake', '--build', '--preset', f'{REALTIME_CORE}-native', f'-j{jobs()}'],
+                    ['ctest', '--test-dir', str(BUILD / f'{REALTIME_CORE}-native'), '--output-on-failure']):
         if status := call(command):
             return status
     return 0

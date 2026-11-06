@@ -285,6 +285,7 @@ namespace Duet::Sbc
 		m_packetId = 0;
 		m_packetsBeingResent.clear();
 		m_numResyncs++;
+		m_updating = false;
 		PrepareReconnect("Connection reset");
 	}
 

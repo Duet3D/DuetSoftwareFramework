@@ -724,26 +724,37 @@ public partial class Code : Command<Message?>
     /// </remarks>
     private static class EnumBounds<T> where T : struct, Enum
     {
+        /// <summary>Every member <typeparamref name="T"/> declares</summary>
+        public static readonly T[] Declared = ReadDeclared();
+
         /// <summary>Lowest value <typeparamref name="T"/> declares</summary>
         public static readonly long Lowest = LowestDeclared();
 
         /// <summary>
         /// Read the enumeration's members once, when it is first asked about
         /// </summary>
-        /// <returns>The lowest value declared, or zero if it declares none</returns>
+        /// <returns>The members declared</returns>
         /// <remarks>
         /// The generic overload is the one that survives AOT compilation, which cannot always build an
         /// array of an enumeration's type at run time (IL3050). It arrived in .NET 5, and DuetAPI also
         /// targets netstandard2.0, which is what the other arm is for
         /// </remarks>
-        private static long LowestDeclared()
+        private static T[] ReadDeclared()
         {
 #if NET5_0_OR_GREATER
-            IEnumerable<T> declared = Enum.GetValues<T>();
+            return Enum.GetValues<T>();
 #else
-            IEnumerable<T> declared = Enum.GetValues(typeof(T)).Cast<T>();
+            return Enum.GetValues(typeof(T)).Cast<T>().ToArray();
 #endif
-            return declared.Select(value => Convert.ToInt64(value, CultureInfo.InvariantCulture))
+        }
+
+        /// <summary>
+        /// Find the lowest of the declared members
+        /// </summary>
+        /// <returns>The lowest value declared, or zero if it declares none</returns>
+        private static long LowestDeclared()
+        {
+            return Declared.Select(value => Convert.ToInt64(value, CultureInfo.InvariantCulture))
                            .DefaultIfEmpty(0)
                            .Min();
         }
@@ -779,8 +790,9 @@ public partial class Code : Command<Message?>
         {
             // TODO this error message is misleading for an enum which has gaps in valid values
             // it is kept for consistent error messages with RRF but should be changed ultimately
+            string validValues = string.Join(", ", EnumBounds<T>.Declared.Select(v => v.ToString("D")));
             throw new GCodeException(errorString?.Invoke(value)
-                                     ?? $"parameter '{letter}' too {(value < EnumBounds<T>.Lowest ? "low" : "high")}");
+                                     ?? $"valid parameter values for '{letter}' are {validValues}");
         }
         return member;
     }

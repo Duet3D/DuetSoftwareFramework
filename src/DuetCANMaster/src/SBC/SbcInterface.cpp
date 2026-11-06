@@ -772,7 +772,8 @@ void SbcInterface::ExchangeData() noexcept
 			buf.marker = 0;
 			buf.extId = 1;
 			buf.fdMode = 1;
-			buf.useBrs = 1;
+			// The bootloader that a firmware block goes to is not expected to be using BRS
+			buf.useBrs = (msgType == CanMessageType::firmwareBlockResponse) ? 0 : 1;
 			buf.remote = 0;
 			buf.reportInFifo = 0;
 			buf.spare = 0;
@@ -785,12 +786,8 @@ void SbcInterface::ExchangeData() noexcept
 
 		// Write the first chunk of the IAP binary
 		case SbcRequest::WriteIap:
-		{
-			// TODO may want to implement this?
-			// reprap.PrepareToLoadIap();
-			// ReceiveAndStartIap(transfer.ReadData(packet->length), packet->length);
-			break;
-		}
+			reprap.PrepareToLoadIap();
+			ReceiveAndStartIap(m_transfer.ReadData(packet->length), packet->length);
 
 		// Send a firmware message, typically a response to a command that has been passed to DSF.
 		// These responses can get quite long (e.g. responses to M20) so receive it into an OutputBuffer.
@@ -894,9 +891,7 @@ void SbcInterface::ExchangeData() noexcept
 		{
 			switch (m_transfer.DoTransfer())
 			{
-#  if SAME5x
-			case TransferState::connectionTimeout:
-#  endif
+			case TransferState::ConnectionTimeout:
 			case TransferState::ConnectionReset:
 				// Perform a firmware reset, we're in an unsafe state to resume regular operation
 				SoftwareReset(SoftwareResetReason::User);
@@ -924,7 +919,7 @@ void SbcInterface::ExchangeData() noexcept
 			}
 			case SbcRequest::StartIap: // Start the IAP binary
 #  if SUPPORTS_SBC_OVER_USB
-									   // Cleanly shut down TinyUSB before IAP re-initializes the USB peripheral
+				// Cleanly shut down TinyUSB before IAP re-initializes the USB peripheral
 				// with its own bare-metal driver
 				if (m_transfer.GetTransportType() == SbcTransportType::Usb)
 				{
@@ -932,7 +927,7 @@ void SbcInterface::ExchangeData() noexcept
 					StopUsbTask();
 				}
 #  endif
-				reprap.StartIap(nullptr);
+				reprap.StartIap();
 				break;
 			default: // Other packet types are not supported while IAP is being written
 				// do nothing

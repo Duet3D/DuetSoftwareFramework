@@ -397,7 +397,7 @@ public sealed class Settings
     /// Prefix of the bootloader file an expansion board is served, made up the same way as
     /// <see cref="FirmwareFilePrefix" />
     /// </summary>
-    public string BootloaderFilePrefix { get; set; } = "Duet3Bootloader_";
+    public string BootloaderFilePrefix { get; set; } = "Duet3Bootloader-";
 
     /// <summary>
     /// Maximum lock time of the object model. If this time is exceeded, a deadlock is reported and the application is terminated.

@@ -946,7 +946,7 @@
           "kind": "bitfield", "storage": "u16",
           "fields": [
             { "name": "requestId", "width": 12, "doc": "Identifies this request, so that the reply can be matched to it" },
-            { "name": "module", "width": 2, "doc": "0 = main firmware, 1 = bootloader, 2 and 3 reserved" },
+            { "name": "module", "width": 2, "doc": "0 = main firmware, 3 = bootloader, 1 and 2 reserved" },
             { "name": "zero", "width": 2, "reserved": true }
           ]
         },

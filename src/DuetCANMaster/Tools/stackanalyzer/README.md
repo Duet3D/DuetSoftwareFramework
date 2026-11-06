@@ -20,7 +20,7 @@ Usage of linux/stackanalyzer:
 Note that for failures of this type the line starting with "Last software reset at " has to be present in the input.
 
 ```
-$ stackanalyzer -m122 m122AssertionFailed.txt -mapFile Duet3Firmware_MB6HC.map
+$ stackanalyzer -m122 m122AssertionFailed.txt -mapFile DuetCANMaster_MB6HC.map
 Faulted at:
 .rodata.prvTaskExitError.str1.4
                 0x004886b0        0xf C:\Eclipse\Firmware\FreeRTOS\SAME70\libFreeRTOS.a(queue.o)
@@ -32,7 +32,7 @@ at line 1433. The user needs to look up that location and check which assertion 
 ### `MemoryProtectionFault`
 
 ```
-$ linux/stackanalyzer -m122 m122MemoryProtectionFault.txt -mapFile ../../Duet3/Duet3Firmware_MB6HC.map
+$ linux/stackanalyzer -m122 m122MemoryProtectionFault.txt -mapFile ../../Duet3/DuetCANMaster_MB6HC.map
 Faulted at:
 .text._ZN9FileStore5StoreEPKcjPj
                 0x0000000000404bb8       0xe8 ./src/Storage/FileStore.o

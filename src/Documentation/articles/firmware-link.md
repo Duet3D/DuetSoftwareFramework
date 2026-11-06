@@ -111,6 +111,49 @@ follow in the same order, with `param.P` = 1 on the disconnect to say that a res
 Both events are DSF's own - RepRapFirmware has no equivalent because it *is* the controller. See
 [Differences from RepRapFirmware](rrf-differences.md#4-events).
 
+## Updating the main board
+
+`M997` or `M997 B0` updates DuetCANMaster, which is module 0, so an `S` list has to include `0`. A list without it is refused. DuetCANMaster cannot write its own flash while it runs from it, so the in-application programmer (IAP) does that from RAM. Both files are looked for in the firmware directory and then in the system directory, and the code fails without touching the controller if either is not there:
+
+| File | Named after |
+| --- | --- |
+| `DuetCANMaster_<board>.bin`, or the file `P` names | `boards[0].firmwareFileName` |
+| `Duet3_SBCiap32_<board>.bin` | `boards[0].iapFileNameSBC` |
+
+The update then runs in this order, and takes the link over completely once it has started:
+
+1. `state.status` becomes `updating`, stays that way while the link is down, and everything waiting on the link is cancelled.
+2. The first `WriteIap` packet stops the machine as an emergency stop does, which restarts the expansion boards and shuts down CAN. The controller then does nothing but load the rest of the IAP into the last 32 KB of its RAM.
+3. `StartIap` starts the IAP. The controller no longer speaks the packet protocol from here on, and each transfer is one bare segment of 2 KB. The last segment is filled with `0xFF`. The IAP inverts the transfer ready pin each time it is ready for another transfer. This differs from DuetCANMaster, which holds the pin high while it is ready.
+4. The IAP checks what it wrote against the length and CRC16 of the file. It erases the image after a bad checksum, so a retry sends all of it again, up to 3 times in all.
+5. The IAP restarts the controller, DCS stops once the code has answered, and systemd starts it again to connect to the new firmware.
+
+The flash is erased as the firmware is written, so the controller has no firmware if the update fails after step 3. After 3 bad checksums the code fails, the IAP leaves the board in its ROM bootloader, and `state.status` stops saying `updating`. The firmware then has to be installed over USB.
+
+Updating the main board does not update its expansion boards. They restart with no configuration and announce themselves to the new firmware.
+
+## Updating an expansion board
+
+`M997 B<address>` updates the main firmware of an expansion board, and `M997 B<address> S3` its bootloader. Any other module number is refused. The firmware is taken from the firmware directory, and the code fails without touching the board if the file is not there:
+
+| Module | File | Named after |
+| --- | --- | --- |
+| Main firmware | `Duet3Firmware_<type>.bin`, or `.uf2` if the board takes one | The board type the board reports |
+| Bootloader | `Duet3Bootloader-<class>.bin` | The bootloader class the board reports |
+
+The code only starts the update. The board restarts into its bootloader and fetches the file a block at a time with `firmwareBlockRequest` messages, which arrive unsolicited through the controller. DCS answers each with as many `firmwareBlockResponse` messages as the block takes, and the controller sends those without bit rate switching. `boards[].state` follows the update from there:
+
+| State | Meaning |
+| --- | --- |
+| `flashing` | The board agreed to update. `state.status` is `updating` while any board is in this state |
+| `resetting` | The end of the file has been served, and the board is writing it and restarting |
+| `flashFailed` | The file could not be served, for example because the file is missing or the board asked for an offset past its end. The board restarts, and goes back to `running` if it still has firmware to announce itself with |
+| `running` | The board announced itself, normally with its new firmware |
+
+A flashing board leaves that state only through one of the others, so a board that stops responding after agreeing to update keeps `state.status` at `updating` until it next announces itself.
+
+Updating a board does not restore its configuration. It restarts with none, as after `M999 B`, so the machine needs resetting once its boards are up to date.
+
 ## The wire format
 
 A transfer carries one `SpiTransferHeader` followed by a sequence of packets, each an 8-byte

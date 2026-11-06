@@ -3,16 +3,6 @@
     // Hover to view descriptions of existing attributes.
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
-    "compounds": [
-        {
-            // This doesn't work because C# breakpoints trigger the cppdbg to stop
-            "name": "[DSF] Attach Remote DuetControlServer + DuetRealtimeCore",
-            "configurations": [
-                "[DSF] Attach Native (lib*.so)",
-                "[DSF] Attach Remote DuetControlServer",
-            ]
-        }
-    ],
     "configurations": [
         {
             "name": "[DSF] Launch Remote DuetControlServer",
@@ -195,12 +185,13 @@
             "overrideRestartCommands": ["duet-reset-halt"]
         },
         {
-            "name": "[Firmware] Debug deploy.py",
+            // Prompts for any script in scripts/, then its arguments
+            "name": "[Scripts] Debug Python Script",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/scripts/deploy.py",
+            "program": "${input:pythonScript}",
             // A string rather than a list, so the arguments are split as a shell would
-            "args": "${input:deployArgs}",
+            "args": "${input:pythonScriptArgs}",
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "justMyCode": true
@@ -285,13 +276,25 @@
             }
         },
         {
-            "id": "deployArgs",
+            // Every root script is runnable; the modules they share are in scripts/common
+            "id": "pythonScript",
+            "type": "command",
+            "command": "extension.commandvariable.file.pickFile",
+            "args": {
+                "description": "Script to debug",
+                "include": "scripts/*.py",
+                "display": "fileName",
+                "keyRemember": "pythonScript"
+            }
+        },
+        {
+            "id": "pythonScriptArgs",
             "type": "command",
             "command": "extension.commandvariable.promptStringRemember",
             "args": {
-                "key": "deployArgs",
-                "description": "deploy.py arguments (see scripts/deploy.py --help)",
-                "default": "-H duet3.local firmware --upload-only"
+                "key": "pythonScriptArgs",
+                "description": "Script arguments (blank for none, --help for usage)",
+                "default": ""
             }
         },
         {

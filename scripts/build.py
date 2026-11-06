@@ -2,22 +2,22 @@
 # pyright: strict
 """Build DSF projects and firmware boards.
 
-    scripts/build.py dsf                                  every DSF project, for linux-arm64
-    scripts/build.py DuetControlServer --debug            one, as Debug (it brings DuetRealtimeCore)
-    scripts/build.py dsf --aot --arch linux-arm           Native AOT, for 32-bit ARM
-    scripts/build.py dsf --clean                          every DSF project, from clean
-    scripts/build.py EXP3HC TOOL1LC                       firmware boards
-    scripts/build.py canmaster-Duet3_MB6HC-debug          a board's Debug build
-    scripts/build.py d3e -x EXP1XD --keep-going           a firmware project's boards, less one
-    scripts/build.py --all --debug                        everything, as Debug
-    scripts/build.py TracyClient --arch linux-arm64       the profiling client, for a Pi
+    scripts/build.py dsf                                         every DSF project, for linux-arm64
+    scripts/build.py DuetControlServer --debug                   one, as Debug (it brings DuetRealtimeCore)
+    scripts/build.py dsf --aot --arch linux-arm                  Native AOT, for 32-bit ARM
+    scripts/build.py dsf --clean                                 every DSF project, from clean
+    scripts/build.py Duet3Firmware_EXP3HC Duet3Firmware_TOOL1LC  firmware boards
+    scripts/build.py DuetCANMaster_MB6HC-debug                   a board's Debug build
+    scripts/build.py d3e -x Duet3Firmware_EXP1XD --keep-going    a firmware project's boards, less one
+    scripts/build.py --all --debug                               everything, as Debug
+    scripts/build.py TracyClient --arch linux-arm64              the profiling client, for a Pi
 
 Targets are DSF projects, firmware boards (CMake presets) and groups of them; scripts/list.py lists
 them. Builds are Release unless --debug is given, and --clean cleans what is built first.
 
 Each DSF project publishes to its own output directory, bin/<config>/<tfm>/<arch>/publish (bin/aot/...
 with --aot), which scripts/deploy.py installs on a Pi from. Selecting DuetControlServer builds
-DuetRealtimeCore, the native library it P/Invokes into, too, into build/rtc-<arch>[-debug]. That library links glibc dynamically, so it must not need a newer glibc than the
+DuetRealtimeCore, the native library it P/Invokes into, too, into build/DuetRealtimeCore-<arch>[-debug]. That library links glibc dynamically, so it must not need a newer glibc than the
 Pi has: the devcontainer matches Raspberry Pi OS Bookworm, and --sysroot or --fetch-sysroot build
 against an older Pi's own libraries instead.
 

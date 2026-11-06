@@ -55,13 +55,13 @@ Requires a C++20 compiler, CMake ≥ 3.25 and Linux UAPI headers (`linux/gpio.h`
 
 | Preset | Builds for | glibc it links against |
 | --- | --- | --- |
-| `rtc-native` | this machine | this machine's |
-| `rtc-arm64` | aarch64 | this container's (2.36) — deployable to Bookworm |
-| `rtc-arm64-sysroot` | aarch64 | the Pi's, from `pi-sysroot/` — for pre-Bookworm targets |
-| `rtc-armhf` | 32-bit armhf | this container's (2.36) — deployable to Bookworm |
-| `rtc-armhf-sysroot` | 32-bit armhf | the Pi's, from `pi-sysroot/` — for pre-Bookworm targets |
+| `DuetRealtimeCore-native` | this machine | this machine's |
+| `DuetRealtimeCore-arm64` | aarch64 | this container's (2.36) — deployable to Bookworm |
+| `DuetRealtimeCore-arm64-sysroot` | aarch64 | the Pi's, from `pi-sysroot/` — for pre-Bookworm targets |
+| `DuetRealtimeCore-armhf` | 32-bit armhf | this container's (2.36) — deployable to Bookworm |
+| `DuetRealtimeCore-armhf-sysroot` | 32-bit armhf | the Pi's, from `pi-sysroot/` — for pre-Bookworm targets |
 
-Each uses its own build tree, `build/<preset>` at the repository root, with the library, the harness and the tests at its top. `scripts/build.py` picks between them the same way: `rtc-native` when it is already running on the target architecture, otherwise the cross preset, or its `-sysroot` variant when a sysroot is explicitly requested.
+Each uses its own build tree, `build/<preset>` at the repository root, with the library, the harness and the tests at its top. `scripts/build.py` picks between them the same way: `DuetRealtimeCore-native` when it is already running on the target architecture, otherwise the cross preset, or its `-sysroot` variant when a sysroot is explicitly requested.
 
 ### Cross-compile in the devcontainer for a 64-bit Pi (recommended)
 
@@ -71,32 +71,32 @@ Bookworm and everything it builds is deployable as-is. Both aarch64 presets addi
 **statically link** the test binary, so it runs on any Pi OS release:
 
 ```sh
-cmake --preset rtc-arm64
-cmake --build --preset rtc-arm64 -j
+cmake --preset DuetRealtimeCore-arm64
+cmake --build --preset DuetRealtimeCore-arm64 -j
 
 # copy the (static, self-contained) binary to the Pi
-scp build/rtc-arm64/realtime_core_jitter_test pi@raspberrypi:~/
+scp build/DuetRealtimeCore-arm64/realtime_core_jitter_test pi@raspberrypi:~/
 ```
 
-`file build/rtc-arm64/realtime_core_jitter_test` should report `ARM aarch64 ... statically linked`.
+`file build/DuetRealtimeCore-arm64/realtime_core_jitter_test` should report `ARM aarch64 ... statically linked`.
 
 `libduet_realtime_core.so` cannot be statically self-contained, so it links glibc dynamically and its
-requirements have to be satisfiable on the target. Under `rtc-arm64` the highest version it asks for is
+requirements have to be satisfiable on the target. Under `DuetRealtimeCore-arm64` the highest version it asks for is
 `GLIBC_2.17`, comfortably below Bookworm's 2.36, so it loads on the Pi unchanged. Check with:
 
 ```sh
-aarch64-linux-gnu-objdump -p build/rtc-arm64/libduet_realtime_core.so | grep -o 'GLIBC_[0-9.]*' | sort -uV
+aarch64-linux-gnu-objdump -p build/DuetRealtimeCore-arm64/libduet_realtime_core.so | grep -o 'GLIBC_[0-9.]*' | sort -uV
 ```
 
 #### Targeting an older Pi OS release
 
-`rtc-arm64-sysroot` exists for the case where the target's glibc is *older* than the container's. It links
+`DuetRealtimeCore-arm64-sysroot` exists for the case where the target's glibc is *older* than the container's. It links
 against a copy of the Pi's own libraries and refuses to configure if that copy is missing:
 
 ```sh
 src/DuetRealtimeCore/scripts/fetch-pi-sysroot.sh pi@raspberrypi   # one-off, into src/DuetRealtimeCore/pi-sysroot/
-cmake --preset rtc-arm64-sysroot
-cmake --build --preset rtc-arm64-sysroot -j
+cmake --preset DuetRealtimeCore-arm64-sysroot
+cmake --build --preset DuetRealtimeCore-arm64-sysroot -j
 ```
 
 Use `-DDUET_REALTIME_CORE_SYSROOT=<dir>` to point it at a sysroot kept somewhere else. `scripts/build.py`
@@ -107,8 +107,8 @@ never reaches for this on its own — pass `--sysroot <dir>` or `--fetch-sysroot
 ```sh
 sudo apt install -y build-essential cmake linux-libc-dev   # one-time
 git submodule update --init lib/RRFLibraries               # the only submodule it needs
-cmake --preset rtc-native
-cmake --build --preset rtc-native -j
+cmake --preset DuetRealtimeCore-native
+cmake --build --preset DuetRealtimeCore-native -j
 ```
 
 ### Linting
@@ -132,12 +132,12 @@ libstdc++ inside the Pi sysroot, where GCC never looks for it).
 
 > **P/Invoke `.so` note:** a shared library must link glibc dynamically, so the cross-built
 > `libduet_realtime_core.so` needs the target's glibc to be no older than what it was linked against. The
-> container and Raspberry Pi OS Bookworm both ship glibc 2.36, so the `rtc-arm64` build deploys as-is.
+> container and Raspberry Pi OS Bookworm both ship glibc 2.36, so the `DuetRealtimeCore-arm64` build deploys as-is.
 > Only for an older Pi OS release do you need a sysroot:
 > ```sh
 > src/DuetRealtimeCore/scripts/fetch-pi-sysroot.sh pi@raspberrypi
-> cmake --preset rtc-arm64-sysroot -DDUET_REALTIME_CORE_STATIC=OFF
-> cmake --build --preset rtc-arm64-sysroot
+> cmake --preset DuetRealtimeCore-arm64-sysroot -DDUET_REALTIME_CORE_STATIC=OFF
+> cmake --build --preset DuetRealtimeCore-arm64-sysroot
 > ```
 > The standalone jitter test never needs this — it is statically linked.
 
@@ -148,7 +148,7 @@ GPIO access require privileges (`CAP_SYS_NICE` for SCHED_FIFO, and access to the
 nodes), so run under `sudo` or grant the capabilities.
 
 ```sh
-sudo ./build/rtc-native/realtime_core_jitter_test \
+sudo ./build/DuetRealtimeCore-native/realtime_core_jitter_test \
     --spi-dev /dev/spidev0.0 --spi-hz 8000000 \
     --gpiochip /dev/gpiochip0 --tfr-pin 25 --dap-pin 24 \
     --core 3 --rate 1000

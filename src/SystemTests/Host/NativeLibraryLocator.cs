@@ -58,12 +58,12 @@ public sealed class NativeLibraryLocator
         string buildTree = Path.Combine(dir.FullName, "build");
         string[] candidates =
         [
-            Path.Combine(buildTree, "rtc-native-debug", "libduet_realtime_core.so"),
-            Path.Combine(buildTree, "rtc-native", "libduet_realtime_core.so"),
+            Path.Combine(buildTree, "DuetRealtimeCore-native-debug", "libduet_realtime_core.so"),
+            Path.Combine(buildTree, "DuetRealtimeCore-native", "libduet_realtime_core.so"),
         ];
         string? newest = candidates.Where(File.Exists).OrderByDescending(File.GetLastWriteTimeUtc).FirstOrDefault();
         return newest ?? throw new InvalidOperationException(
             "libduet_realtime_core.so has not been built for the host. Build it with:\n" +
-            "  cmake --preset rtc-native-debug && cmake --build --preset rtc-native-debug --target duet_realtime_core_shared");
+            "  cmake --preset DuetRealtimeCore-native-debug && cmake --build --preset DuetRealtimeCore-native-debug --target duet_realtime_core_shared");
     }
 }

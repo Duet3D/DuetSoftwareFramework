@@ -26,8 +26,9 @@ from pathlib import Path
 
 from common.clang import cross_compile, own_diagnostics, posix_escape, project_dir, sanitise_database, skipped
 from common.repo import BUILD, ROOT, jobs
+from common.dsf import REALTIME_CORE
 
-REALTIME_CORE_PRESET = 'rtc-native'
+REALTIME_CORE_PRESET = f'{REALTIME_CORE}-native'
 
 # The line run-clang-tidy starts each translation unit's output with: "[3/78][1.5s] clang-tidy ... <file>"
 PROGRESS = re.compile(r'^\[\s*\d+/\d+\](\[[\d.]+s\])? .* (?P<source>\S+)$')

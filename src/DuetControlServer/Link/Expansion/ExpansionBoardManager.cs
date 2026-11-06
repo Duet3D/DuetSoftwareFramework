@@ -2,6 +2,7 @@ using DuetAPI.ObjectModel;
 using DuetControlServer.Events;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
+using DuetSharedLibrary;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -373,7 +374,7 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             Board board = GetOrCreateBoard(source);
-            board.State = BoardState.Running;
+            NoteBoardIsReporting(board);
 
             // A report carrying a movement delay is reporting that instead of its free memory
             if (!status.HasMovementDelay)
@@ -390,6 +391,23 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
 
             ApplyBoardFeatures(board, status.HasAccelerometer, status.HasClosedLoop, status.HasInductiveSensor);
             ApplyAnalogHandles(status, payload);
+        }
+    }
+
+    /// <summary>
+    /// Record that a board sent a status report, which puts it back to running
+    /// </summary>
+    /// <param name="board">The board</param>
+    /// <remarks>
+    /// Other than one that is flashing, as in ExpansionManager::ProcessBoardStatusReport: a board goes
+    /// on reporting for a moment after it agrees to update, and that is not it having finished.
+    /// The caller must hold the object model write lock
+    /// </remarks>
+    private static void NoteBoardIsReporting(Board board)
+    {
+        if (board.State != BoardState.Flashing)
+        {
+            board.State = BoardState.Running;
         }
     }
 
@@ -453,7 +471,7 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             Board board = GetOrCreateBoard(source);
-            board.State = BoardState.Running;
+            NoteBoardIsReporting(board);
 
             int index = 0;
             board.VIn = status.HasVin ? ToMinMaxCurrent(status.Values[index++]) : null;
@@ -940,6 +958,26 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
     /// <inheritdoc cref="Model.ObjectModel.FindBoard" />
     public Board? FindBoard(byte address) => model.FindBoard(address);
 
+    /// <summary>
+    /// Record how a board's firmware update is going
+    /// </summary>
+    /// <param name="address">CAN address of the board</param>
+    /// <param name="state">The state the update has put it in</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    /// <remarks>
+    /// The board need not be known here. One with no valid firmware fetches it from its bootloader
+    /// without announcing itself first, and it has an entry from then on as in RepRapFirmware, where
+    /// any state other than unknown is what makes a board an entry
+    /// </remarks>
+    public async ValueTask SetUpdateStateAsync(byte address, BoardState state, CancellationToken cancellationToken)
+    {
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            GetOrCreateBoard(address).State = state;
+        }
+    }
+
     /// <inheritdoc cref="Model.ObjectModel.GetOrCreateBoard" />
     /// <remarks>
     /// The object model owns where the entry goes, which is in CAN address order; this adds only the
@@ -1077,25 +1115,16 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
     private const string ExpansionBoardNamePrefix = "Duet 3 Expansion ";
 
     /// <summary>
-    /// Prefix and extensions of the firmware binary a Duet 3 board takes
+    /// Extensions of the firmware binary a Duet 3 board takes
     /// </summary>
     /// <remarks>
     /// <c>ExpressionValue::ExtractRequestedPart</c>, <c>ExpansionDetail::firmwareFileNameBin</c>. This
     /// is derived rather than reported: an expansion board names its type and nothing else, and what
-    /// it is flashed with follows from that type by convention
+    /// it is flashed with follows from that type by convention. The prefix is a setting, see
+    /// <see cref="GetFirmwareFileName"/>
     /// </remarks>
-    private const string FirmwareFileNamePrefix = "Duet3Firmware_";
     private const string BinFirmwareExtension = ".bin";
     private const string Uf2FirmwareExtension = ".uf2";
-
-    /// <summary>
-    /// The one board whose firmware is a .uf2 without its announcement saying so
-    /// </summary>
-    /// <remarks>
-    /// RepRapFirmware special-cases the same name in the same place, because the Mini 5+ predates the
-    /// <c>usesUf2Binary</c> flag and still announces itself without it
-    /// </remarks>
-    private const string Uf2BoardWithoutTheFlag = "Mini5plus";
 
     /// <summary>
     /// The full name of an expansion board, from the short name it announced
@@ -1116,11 +1145,30 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
     /// a board up by: a board with no type has no binary to check, and <c>Duet3Firmware_.bin</c> is
     /// a file that does not exist rather than a board that is up to date
     /// </remarks>
-    private static string ExpansionFirmwareFileName(string shortName, bool usesUf2Binary)
+    private string ExpansionFirmwareFileName(string shortName, bool usesUf2Binary)
         => string.IsNullOrEmpty(shortName)
             ? string.Empty
-            : FirmwareFileNamePrefix + shortName +
-              (usesUf2Binary || shortName == Uf2BoardWithoutTheFlag ? Uf2FirmwareExtension : BinFirmwareExtension);
+            : GetFirmwareFileName(FirmwareModule.Main, shortName, TakesUf2Binary(shortName, usesUf2Binary));
+
+    /// <summary>
+    /// Whether a board's main firmware is a .uf2
+    /// </summary>
+    /// <param name="shortName">Board type</param>
+    /// <param name="usesUf2Binary">Whether the board said its binary is a .uf2</param>
+    /// <returns>True if it is, false if it is a .bin</returns>
+    public static bool TakesUf2Binary(string shortName, bool usesUf2Binary)
+        => usesUf2Binary || (shortName == "Mini5plus");
+
+    /// <summary>
+    /// The file a firmware module of an expansion board comes from, in the firmware directory
+    /// </summary>
+    /// <param name="module">The main firmware or the bootloader</param>
+    /// <param name="type">Board type for the main firmware, bootloader class for the bootloader</param>
+    /// <param name="uf2">Whether the file is a .uf2 rather than a .bin</param>
+    /// <returns>The file name</returns>
+    public string GetFirmwareFileName(FirmwareModule module, string type, bool uf2)
+        => (module == FirmwareModule.Bootloader ? settings.Value.BootloaderFilePrefix : settings.Value.FirmwareFilePrefix)
+           + type + (uf2 ? Uf2FirmwareExtension : BinFirmwareExtension);
 
     /// <summary>
     /// Format a board's unique id the way it is shown everywhere else

@@ -1,12 +1,16 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Threading;
 using DuetAPI.ObjectModel;
+using DuetAPI.Commands;
+using DuetControlServer.Link.Expansion;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
+using DuetSharedLibrary;
 using DuetControlServer.Link;
 using DuetAPI;
 
@@ -42,6 +46,68 @@ internal partial class MCodeHandler
     {
         int address = code.GetInt('B', defaultValue: defaultAddress);
         return CanAddresses.CheckAddressIsValid(address, allowMainBoard);
+    }
+
+    /// <summary>
+    /// Tell an expansion board to update its firmware, as M997 B does
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="board">CAN address of the board</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>What the board said</returns>
+    /// <remarks>
+    /// ExpansionManager::UpdateRemoteFirmware (ExpansionManager.cpp). This only starts the update: the
+    /// board restarts into its bootloader and asks for the file a block at a time, which is
+    /// <see cref="LinkService"/>'s to answer, so the code has finished long before the board has and
+    /// <c>boards[].state</c> says how it goes from here. The file is checked for first so that a
+    /// board is not restarted only to be told there is nothing for it
+    /// </remarks>
+    private async ValueTask<Message> UpdateRemoteFirmwareAsync(Commands.Code code, byte board, CancellationToken cancellationToken)
+    {
+        FirmwareModule module = code.GetEnum<FirmwareModule>('S', defaultValue: FirmwareModule.Main);
+        byte type;
+        switch (module)
+        {
+            case FirmwareModule.Main:
+                type = CanMessageReturnInfo.TypeBoardName;
+                break;
+            case FirmwareModule.Bootloader:
+                type = CanMessageReturnInfo.TypeBootloaderName;
+                break;
+            default:
+                return new Message(MessageType.Error, $"Only main (S0) and bootloader (S3) modules are supported, not S{(int)module}");
+        }
+
+        CanMessageReturnInfo info = new()
+        {
+            Type = type
+        };
+        CanResponse typeResponse = await linkInterface.SendCanMessageAsync(board, in info, CanMessageType.StandardReply, cancellationToken: cancellationToken);
+        if (!typeResponse.Succeeded)
+        {
+            return typeResponse.ToMessage();
+        }
+
+        // Bit 0 of the reply's extra byte says the board takes a .uf2, which is only ever its main firmware
+        string firmwareFile = expansionBoardManager.GetFirmwareFileName(module, typeResponse.Text,
+            module == FirmwareModule.Main && ExpansionBoardManager.TakesUf2Binary(typeResponse.Text, (typeResponse.Extra & 0x01) != 0));
+        if (!File.Exists(await filePathResolver.ToPhysicalAsync(firmwareFile, FileDirectory.Firmware, cancellationToken)))
+        {
+            return new Message(MessageType.Error, $"Firmware file {firmwareFile} not found");
+        }
+
+        CanMessageUpdateYourFirmware update = new()
+        {
+            BoardId = board,
+            InvertedBoardId = (byte)~board,
+            Module = (byte)module
+        };
+        CanResponse result = await linkInterface.SendCanMessageAsync(board, in update, CanMessageType.StandardReply, cancellationToken: cancellationToken);
+        if (result.Succeeded)
+        {
+            await expansionBoardManager.SetUpdateStateAsync(board, BoardState.Flashing, cancellationToken);
+        }
+        return result.ToMessage();
     }
 
     /// <summary>

@@ -1,5 +1,5 @@
 # pyright: strict
-"""The firmware boards (CMake presets), building them, and reading the ELF files the builds produce."""
+"""The firmware boards (CMake presets), building them, what they build, and reading the ELF files."""
 
 from __future__ import annotations
 
@@ -11,9 +11,11 @@ from pathlib import Path
 from typing import NamedTuple, cast
 
 from common.dsf import REALTIME_CORE
-from common.repo import ROOT, run
+from common.repo import BUILD, ROOT, run
 
 # Boards
+
+DEBUG = '-debug'  # ends the name of a board's Debug preset
 
 
 @dataclass(frozen=True)
@@ -26,7 +28,7 @@ class Board:
 
     def variant(self, debug: bool) -> str:
         """The preset of the board's Release or Debug build."""
-        return self.preset + ('-debug' if debug else '')
+        return self.preset + (DEBUG if debug else '')
 
 
 def load_boards() -> list[Board]:
@@ -66,6 +68,21 @@ def build(preset: str, clean: bool = False, fresh: bool = False, jobs: int | Non
     if verbose:
         command.append('--verbose')
     return run(configure) and run(command)
+
+
+# What the builds produce
+
+
+def image_path(preset: str, suffix: str) -> Path:
+    """The file of a preset's image with this extension, built or not. CMake requires a preset to be
+    named after its image (see duet_firmware_executable)."""
+    return BUILD / preset / (preset.removesuffix(DEBUG) + suffix)
+
+
+def built_image(preset: str, suffix: str) -> Path | None:
+    """The file of a preset's image with this extension, if it has been built."""
+    path = image_path(preset, suffix)
+    return path if path.is_file() else None
 
 
 # ELF files

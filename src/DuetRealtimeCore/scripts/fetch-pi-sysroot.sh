@@ -8,8 +8,8 @@
 #   scripts/fetch-pi-sysroot.sh <user@pi-host> [dest-dir]
 #
 # Then configure with the sysroot, from the repository root:
-#   cmake --preset rtc-arm64-sysroot
-#   cmake --build --preset rtc-arm64-sysroot
+#   cmake --preset DuetRealtimeCore-arm64-sysroot
+#   cmake --build --preset DuetRealtimeCore-arm64-sysroot
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then

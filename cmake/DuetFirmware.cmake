@@ -64,11 +64,18 @@ endfunction()
 #
 # A firmware image: <name>.elf and its <name>.map at the top of the build tree, linked with the
 # linker script <path>. Its sources are compiled as C99 and C++20, with __FILE__ relative to the
-# calling project's root so that the image does not depend on where the tree is checked out.
+# calling project's root so that the image does not depend on where the tree is checked out. <name>
+# must be the name of the preset, less any -debug: CMake refuses two presets of the same name, so no
+# two presets can build the same file, and scripts/common/firmware.py can tell a preset from its file.
 function(duet_firmware_executable TARGET)
     cmake_parse_arguments(PARSE_ARGV 1 ARG "" "OUTPUT_NAME;LINKER_SCRIPT" "SOURCES")
     if(ARG_UNPARSED_ARGUMENTS)
         message(FATAL_ERROR "duet_firmware_executable: unknown arguments: ${ARG_UNPARSED_ARGUMENTS}")
+    endif()
+
+    string(REGEX REPLACE "-debug$" "" _preset "${DUET_PRESET}")
+    if(NOT ARG_OUTPUT_NAME STREQUAL _preset)
+        message(FATAL_ERROR "This builds ${ARG_OUTPUT_NAME}, so its preset must be called that, not '${_preset}'")
     endif()
 
     add_executable(${TARGET} ${ARG_SOURCES})
