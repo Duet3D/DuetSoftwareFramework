@@ -2,10 +2,10 @@
 # pyright: strict
 """Clean the build output of DSF projects and firmware boards, Release and Debug alike.
 
-    scripts/clean.py EXP3HC                       clean a board's build trees
-    scripts/clean.py d3e                          clean every board of a firmware project
-    scripts/clean.py DuetControlServer            clean a DSF project
-    scripts/clean.py --all --purge                delete every build tree and output directory
+    scripts/clean.py Duet3Firmware_EXP3HC  clean a board's build trees
+    scripts/clean.py d3e                   clean every board of a firmware project
+    scripts/clean.py DuetControlServer     clean a DSF project
+    scripts/clean.py --all --purge         delete every build tree and output directory
 
 Targets are DSF projects, firmware boards and groups of them (see scripts/list.py). Cleaning runs each
 build's own clean; --purge deletes the build trees instead, and with any DSF project, the staged
@@ -60,7 +60,7 @@ def clean_dsf(project: str, purge: bool) -> bool:
     if project == TRACY:
         return clean_cmake(BUILD / 'tracy', True) if purge else True
     if project == REALTIME_CORE:
-        trees = sorted(p for p in BUILD.glob('rtc-*') if p.is_dir())
+        trees = sorted(p for p in BUILD.glob(f'{REALTIME_CORE}-*') if p.is_dir())
         return all([clean_cmake(tree, purge) for tree in trees])
     if purge:
         for output in ('bin', 'obj'):

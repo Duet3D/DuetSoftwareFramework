@@ -2,12 +2,12 @@
 # pyright: strict
 """Run clang-tidy over the whole of a build, and tally what it finds.
 
-    scripts/lint.py EXP3HC                                every project and library EXP3HC builds
-    scripts/lint.py EXP3HC -f src/Duet3Expansion/src/Movement/Move.cpp
+    scripts/lint.py Duet3Firmware_EXP3HC  every project and library EXP3HC builds
+    scripts/lint.py Duet3Firmware_EXP3HC -f src/Duet3Expansion/src/Movement/Move.cpp
                                                           one file of it
-    scripts/lint.py DuetRealtimeCore                      DuetRealtimeCore, built for this machine
-    scripts/lint.py canmaster-Duet3_MB6HC --database-only just write the compile database
-    scripts/lint.py canmaster --naming-fixes              export naming fixes over every board of a project
+    scripts/lint.py DuetRealtimeCore                     DuetRealtimeCore, built for this machine
+    scripts/lint.py DuetCANMaster_MB6HC --database-only  just write the compile database
+    scripts/lint.py canmaster --naming-fixes             export naming fixes over every board of a project
 
 The build already lints each file as it compiles it, reporting a header's findings once (see
 cmake/ClangTidy.cmake). This lints everything in one go from the build's compile database, which

@@ -2,19 +2,19 @@
 # pyright: strict
 """Deploy DSF projects and firmware, building them first if asked.
 
-    scripts/deploy.py -H 192.168.4.27 dsf --start-services             every DSF project as last built, to a Pi
+    scripts/deploy.py -H 192.168.4.27 dsf --start-services                      every DSF project as last built, to a Pi
     scripts/deploy.py -H 192.168.4.27 DuetControlServer --build --debug build one as Debug, then deploy it
-    scripts/deploy.py -H 192.168.4.27 dsf --clean                      rebuild every DSF project from clean
-    scripts/deploy.py -H 192.168.4.27 dsf firmware --build             DSF and the firmware of every board, to a Pi
-    scripts/deploy.py --local dsf                                        every DSF project, to this machine
-    scripts/deploy.py -H duet3.local firmware                            every connected board's firmware
-    scripts/deploy.py -H duet3.local firmware --build                    build what the boards need first
-    scripts/deploy.py -H duet3.local EXP1HCL --debug                     only the 1HCL boards, as Debug
-    scripts/deploy.py -H duet3.local firmware -b 0 -b 121                the main board and CAN address 121
-    scripts/deploy.py -H duet3.local firmware --build --dry-run          show what that would do
-    scripts/deploy.py -H duet3.local firmware --bootloader               update the expansion boards' bootloaders
-    scripts/deploy.py -H duet3.local EXP3HC --bootloader --build         build the 3HCs' bootloader and update theirs
-    scripts/deploy.py -H 192.168.4.27 --all --build --dry-run           every DSF project and board, shown only
+    scripts/deploy.py -H 192.168.4.27 dsf --clean                               rebuild every DSF project from clean
+    scripts/deploy.py -H 192.168.4.27 dsf firmware --build                      DSF and the firmware of every board, to a Pi
+    scripts/deploy.py --local dsf                                               every DSF project, to this machine
+    scripts/deploy.py -H duet3.local firmware                                   every connected board's firmware
+    scripts/deploy.py -H duet3.local firmware --build                           build what the boards need first
+    scripts/deploy.py -H duet3.local Duet3Firmware_EXP1HCL --debug              only the 1HCL boards, as Debug
+    scripts/deploy.py -H duet3.local firmware -b 0 -b 121                       the main board and CAN address 121
+    scripts/deploy.py -H duet3.local firmware --build --dry-run                 show what that would do
+    scripts/deploy.py -H duet3.local firmware --bootloader                      update the expansion boards' bootloaders
+    scripts/deploy.py -H duet3.local Duet3Firmware_EXP3HC --bootloader --build  build the 3HCs' bootloader and update theirs
+    scripts/deploy.py -H 192.168.4.27 --all --build --dry-run                   every DSF project and board, shown only
 
 Targets are DSF projects and firmware boards, and groups of them (see scripts/list.py). With --build,
 what is deployed is built first, as scripts/build.py would, and with --clean, from clean; otherwise

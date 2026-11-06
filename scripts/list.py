@@ -20,7 +20,7 @@ from dataclasses import dataclass
 
 from common.cli import parse, parser, typed
 from common.dsf import TRACY
-from common.repo import BUILD
+from common.firmware import built_image
 from common.targets import ALIASES, DSF, FIRMWARE, add_target_arguments, select
 
 
@@ -65,7 +65,7 @@ def main() -> int:
         if b.project != project:
             print(f'\n{b.project}')
             project = b.project
-        built = ' (built)' if (BUILD / b.preset).is_dir() else ''
+        built = ' (built)' if built_image(b.preset, '.elf') else ''
         print(f'  {b.preset:32} {b.display}{built}')
     return 0
 

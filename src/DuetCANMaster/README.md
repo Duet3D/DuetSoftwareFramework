@@ -9,8 +9,8 @@ The supported boards are the Duet 3 MB6HC and MB6XD, both SAME70.
 The boards are CMake presets in the repository's root `CMakePresets.json`, built with `scripts/build.py`:
 
 ```bash
-scripts/build.py canmaster-Duet3_MB6HC      # one board, into build/<preset>/
-scripts/build.py canmaster                  # every DuetCANMaster board
+scripts/build.py DuetCANMaster_MB6HC  # one board, into build/<preset>/
+scripts/build.py canmaster            # every DuetCANMaster board
 ```
 
 # Documentation

@@ -10,9 +10,8 @@ finally the main board, which restarts.
 
 It will upload/flash the CMake preset for whichever firmware file the OM reports for each board.
 
-Boards whose firmware has not been built are left alone. When several builds produce the main
-board's firmware file (Duet3_MB6HC and Duet3_MB6HC_no_SD both make Duet3Firmware_MB6HC.bin), the
-board's own preset (Duet3_MB6HC) is used unless --main names another.
+Boards whose firmware has not been built are left alone. A main board stays on the variant of its
+firmware that it is running, as each reports its own file, unless --main names another.
 
 With bootloader set, the expansion boards' bootloaders are updated instead, over CAN (M997 S3), leaving
 their firmware and the main board alone. Each board asks for the bootloader its firmware was built for,
@@ -35,7 +34,7 @@ from pathlib import Path
 from typing import cast
 
 from common.duet import Connector, DuetError, TransportError, as_dict, as_list, open_session
-from common.firmware import Board, build
+from common.firmware import Board, build, image_path
 from common.repo import BUILD, ROOT
 
 FIRMWARE_DIRECTORY = '0:/firmware/'
@@ -57,7 +56,7 @@ class Options:
     password: str
     debug: bool
     addresses: list[int]
-    types: list[str]  # presets, or the short names the boards report; none for every board
+    types: list[str]  # presets; none for every board
     main: str | None
     upload_only: bool
     bootloader: bool  # update the expansion boards' bootloaders instead of the boards' firmware
@@ -97,7 +96,6 @@ def main_board_state(duet: Connector) -> tuple[str, int]:
 
 # Firmware files
 
-IAP = re.compile(r'^Duet3_(SD|SBC)iap32_')
 FIRMWARE_PREFIXES = ('Duet3Firmware_', 'DuetCANMaster_')  # the main firmware of a board
 FIRMWARE_PROJECTS = ('DuetCANMaster', 'RepRapFirmware', 'Duet3Expansion')
 
@@ -107,71 +105,9 @@ def iap_key(sbc: bool) -> str:
     return 'iapFileNameSBC' if sbc else 'iapFileNameSD'
 
 
-@dataclass(frozen=True)
-class Image:
-    """A firmware file from a build tree."""
-    path: Path
-    preset: str
-
-
-def built_images(boards: list[Board], debug: bool) -> dict[str, list[Image]]:
-    """The firmware files the builds have produced, by file name. The firmware is from the Release or
-    Debug builds; the IAPs and bootloaders are always Release, as the IAPs are only used to write the
-    firmware and a bootloader has to fit in the space the firmware leaves for it."""
-    images: dict[str, list[Image]] = {}
-    for b in boards:
-        if b.project not in (*FIRMWARE_PROJECTS, 'DuetIAP', 'Duet3Bootloader'):
-            continue
-        preset = b.variant(debug and b.project in FIRMWARE_PROJECTS)
-        for path in sorted((BUILD / preset).glob('*.bin')) + sorted((BUILD / preset).glob('*.uf2')):
-            images.setdefault(path.name, []).append(Image(path, preset))
-    return images
-
-
-def find_image(name: str, images: dict[str, list[Image]], preset: str | None) -> Image | None:
-    """The build of a firmware file: the named preset's file of that name if given, else its image of
-    that type, whatever the build calls it (Duet3_CAN0 builds Duet3Firmware_MB6HC_CAN0.bin for the
-    MB6HC). With no preset, the build whose preset has the shortest name, being likely the plain variant."""
-    if preset is not None:
-        if (BUILD / preset / name).is_file():
-            return Image(BUILD / preset / name, preset)
-        return next((Image(p, preset) for p in sorted((BUILD / preset).glob('*' + Path(name).suffix))), None)
-    return min(images.get(name, []), key=lambda i: len(i.preset), default=None)
-
-
-def preset_for(file_name: str, boards: list[Board]) -> Board | None:
-    """The preset that builds a file a board asks for, to build it before it is looked for. The files
-    are named after the board's short name: DuetCANMaster_<name> is built by the DuetCANMaster preset of
-    that name less its prefix (canmaster-Duet3_MB6HC), Duet3Firmware_<name> by the RepRapFirmware or
-    Duet3Expansion one (Duet3_MB6HC, Duet3Mini5plus, EXP3HC), and Duet3_SDiap32_<name> or Duet3_SBCiap32_<name> by
-    the DuetIAP _SD or _SBC preset whose name, so shortened, is or starts it (iap-Duet3_MB6HC_SD,
-    iap-Duet3Mini_SBC for Mini5plus), Duet3Bootloader-<name> by the Duet3Bootloader preset
-    bootloader-<name>, and Duet3_CANiap32_<name> by bootloader-Duet3_<name>."""
-
-    def short(b: Board) -> str:
-        name = b.preset.removeprefix('canmaster-').removeprefix('iap-').removesuffix('_SD').removesuffix('_SBC')
-        return name.removeprefix('Duet3_').removeprefix('Duet3')
-
-    stem = Path(file_name).stem
-    if stem.startswith('DuetCANMaster_'):
-        name = stem.removeprefix('DuetCANMaster_')
-        return next((b for b in boards if b.project == 'DuetCANMaster' and short(b) == name), None)
-    if stem.startswith('Duet3Firmware_'):
-        name = stem.removeprefix('Duet3Firmware_')
-        return next((b for b in boards if b.project in ('RepRapFirmware', 'Duet3Expansion') and short(b) == name),
-                    None)
-    if iap := IAP.match(stem):
-        name = stem[iap.end():]
-        iaps = [b for b in boards
-                if b.project == 'DuetIAP' and b.preset.endswith(f'_{iap[1]}') and name.startswith(short(b))]
-        return max(iaps, key=lambda b: len(short(b)), default=None)
-    if stem.startswith('Duet3Bootloader-'):
-        preset = 'bootloader-' + stem.removeprefix('Duet3Bootloader-')
-    elif stem.startswith('Duet3_CANiap32_'):
-        preset = 'bootloader-Duet3_' + stem.removeprefix('Duet3_CANiap32_')
-    else:
-        return None
-    return next((b for b in boards if b.project == 'Duet3Bootloader' and b.preset == preset), None)
+def board_for(file_name: str, boards: list[Board]) -> Board | None:
+    """The board whose preset builds a file a board asks for: presets are named after their images."""
+    return next((b for b in boards if b.preset == Path(file_name).stem), None)
 
 
 def bootloader_names() -> dict[str, str]:
@@ -191,7 +127,7 @@ def can_iap_file(b: dict[str, object], boards: list[Board]) -> str | None:
     """The CAN IAP of a main board in expansion mode, which has no bootloader to update (M997 S3). Its
     firmware is updated by its CAN IAP, which it loads from its own SD card, as files cannot be sent to it
     over CAN. None for an expansion board."""
-    firmware = preset_for(cast(str, b.get('firmwareFileName', '')), boards)
+    firmware = board_for(cast(str, b.get('firmwareFileName', '')), boards)
     if firmware is None or firmware.project == 'Duet3Expansion':
         return None
     return f'Duet3_CANiap32_{b.get("shortName", "")}.bin'
@@ -202,7 +138,7 @@ def bootloader_file(b: dict[str, object], bootloaders: dict[str, str],
     """The bootloader file an expansion board asks for, or None and why it cannot be updated."""
     short_name = str(b.get('shortName', ''))
     if (iap := can_iap_file(b, boards)) is not None:
-        found = preset_for(iap, boards)
+        found = board_for(iap, boards)
         if found is None:
             where = f'{iap}, which no preset builds'
         elif (path := BUILD / found.preset / iap).exists():
@@ -213,7 +149,7 @@ def bootloader_file(b: dict[str, object], bootloaders: dict[str, str],
     if short_name not in bootloaders:
         return None, f'the bootloader of a {short_name} board is not known'
     file_name = f'Duet3Bootloader-{bootloaders[short_name]}.bin'
-    found = preset_for(file_name, boards)
+    found = board_for(file_name, boards)
     if found is None:
         return None, f'no preset builds {file_name}'
     if found.mcu == 'STM32H5':
@@ -230,7 +166,7 @@ class Target:
     """A connected board and the firmware it is to be given."""
     address: int
     name: str
-    image: Image
+    image: Path
 
 
 def check_reply(reply: str, what: str) -> None:
@@ -372,24 +308,22 @@ def update_main_board(duet: Connector, target: Target) -> None:
 
 def is_selected(b: dict[str, object], main_address: int, options: Options, boards: list[Board]) -> bool:
     """Whether a connected board is to be updated: every board, unless some are chosen by CAN address
-    or by type, given as the short name it reports or the preset that builds its firmware."""
+    or by the preset that builds their firmware."""
     if not options.addresses and not options.types:
         return True
     if cast(int, b.get('canAddress', main_address)) in options.addresses:
         return True
-    names = {str(b.get('shortName', '')).lower()}
-    if (file_name := cast(str | None, b.get('firmwareFileName'))) and (found := preset_for(file_name, boards)):
-        names.add(found.preset.lower())
-    return any(t.lower() in names for t in options.types)
+    found = board_for(cast(str, b.get('firmwareFileName', '')), boards)
+    return found is not None and found.preset in options.types
 
 
 def file_preset(file_name: str, is_main: bool, options: Options, boards: list[Board]) -> str | None:
     """The preset that builds a file for a board: --main's for the main board's firmware, the
-    Release one for an IAP or a bootloader, else the preset_for() it in the build type asked for."""
+    Release one for an IAP or a bootloader, else the one that builds it in the build type asked for."""
     is_firmware = file_name.startswith(FIRMWARE_PREFIXES)
     if is_main and is_firmware and options.main is not None:
         return options.main
-    found = preset_for(file_name, boards)
+    found = board_for(file_name, boards)
     return found.variant(options.debug and is_firmware) if found else None
 
 
@@ -443,19 +377,15 @@ def _deploy(options: Options, boards: list[Board]) -> int:
             if not build_firmware(connected, main_address, options, boards, sbc):
                 return 1
             duet.connect()
-        images = built_images(boards, options.debug)
 
-        def image_for(file_name: str, is_main: bool) -> Image | None:
-            # The board's own preset, so another that happens to leave a file of that name is not used
+        def image_for(file_name: str, is_main: bool) -> Path | None:
             preset = file_preset(file_name, is_main, options, boards)
-            image = find_image(file_name, images, preset)
-            if image is None and options.dry_run and options.build and preset is not None:
-                # Not built yet, but it would have been by now
-                return Image(BUILD / preset / file_name, preset)
-            return image
+            path = image_path(preset, Path(file_name).suffix) if preset else None
+            # On a dry run it is not built yet, but it would have been by now
+            return path if path and (path.is_file() or (options.dry_run and options.build)) else None
 
         targets: list[Target] = []
-        uploads: list[tuple[str, Image]] = []  # with the name the main board looks for
+        uploads: list[tuple[str, Path]] = []  # with the name the main board looks for
         bootloaders = bootloader_names()
         for b in connected:
             address = cast(int, b.get('canAddress', main_address))
@@ -483,12 +413,12 @@ def _deploy(options: Options, boards: list[Board]) -> int:
             return 1
 
         for remote, image in dict.fromkeys(uploads):
-            source = image.path.relative_to(BUILD)
+            source = image.relative_to(BUILD)
             if options.dry_run:
                 print(f'Would upload {source} to {FIRMWARE_DIRECTORY}{remote}')
                 continue
             print(f'Uploading {source} to {FIRMWARE_DIRECTORY}{remote}', flush=True)
-            duet.upload(FIRMWARE_DIRECTORY + remote, image.path.read_bytes())
+            duet.upload(FIRMWARE_DIRECTORY + remote, image.read_bytes())
         if options.upload_only:
             return 0
 

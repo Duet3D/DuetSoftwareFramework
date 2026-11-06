@@ -176,7 +176,7 @@ The scripts in [scripts/](scripts/) are how everything is built, deployed, teste
 | `scripts/remote_control.py` | Runs codes, queries the object model and handles files on a board over HTTP, standalone or with an SBC |
 | `scripts/submodule.py` | Checks the submodules are on their tracked branches, and updates, checks out or attaches them |
 
-Each takes `--help`. They take the same targets: a DSF project (`DuetControlServer`, `DuetRealtimeCore`, ...), a firmware board named by its CMake preset (`EXP3HC`, `canmaster-Duet3_MB6HC`, with a `-debug` suffix for its Debug build), or a group (`dsf`, `firmware`, or a firmware project in full or as `canmaster`, `rrf`, `d3e`, `bootloader` or `iap`). `-x` leaves a target or group out, and builds are Release unless `--debug` is given.
+Each takes `--help`. They take the same targets: a DSF project (`DuetControlServer`, `DuetRealtimeCore`, ...), a firmware board named by its CMake preset (`Duet3Firmware_EXP3HC`, `DuetCANMaster_MB6HC`, with a `-debug` suffix for its Debug build), or a group (`dsf`, `firmware`, or a firmware project in full or as `canmaster`, `rrf`, `d3e`, `bootloader` or `iap`). `-x` leaves a target or group out, and builds are Release unless `--debug` is given.
 
 With [argcomplete](https://github.com/kislyuk/argcomplete) installed, the scripts tab-complete their options and the target names. Source the file for your shell from its startup file: `scripts/completions/dsf.fish` from `config.fish`, `scripts/completions/dsf.zsh` from `.zshrc` after `compinit`, or `scripts/completions/dsf.bash` from `.bashrc`. The devcontainer does this for all three.
 
@@ -320,50 +320,52 @@ The firmware projects build from the repository root with one toolchain, against
 
 | Project | Path | Builds |
 | --- | --- | --- |
-| DuetCANMaster | `src/DuetCANMaster` | The SPI-to-CAN-FD bridge on the main board an SBC drives (`canmaster-*`) |
+| DuetCANMaster | `src/DuetCANMaster` | The SPI-to-CAN-FD bridge on the main board an SBC drives (`DuetCANMaster_*`) |
 | Duet3Expansion | `src/Duet3Expansion` | Expansion and tool boards (EXP3HC, EXP1HCL, TOOL1LC, …) |
 | RepRapFirmware | `src/RepRapFirmware` | Standalone main boards (MB6HC, MB6XD, Mini 5+, …), as on the regression suite's `rrf` bench |
-| Duet3Bootloader | `src/Duet3Bootloader` | Bootloaders and CAN IAPs (`bootloader-*`) |
-| DuetIAP | `src/DuetIAP` | Firmware update IAPs (`iap-*`) |
+| Duet3Bootloader | `src/Duet3Bootloader` | Bootloaders and CAN IAPs (`Duet3Bootloader-*`, `Duet3_CANiap32_*`) |
+| DuetIAP | `src/DuetIAP` | Firmware update IAPs (`Duet3_SDiap32_*`, `Duet3_SBCiap32_*`) |
 
 They need their submodules, including the nested ones: `git submodule update --init --recursive`.
 
 Each board is a CMake preset in [CMakePresets.json](CMakePresets.json), and its build tree is `build/<preset>/`. The easiest way to build is with the scripts:
 
 ```bash
-scripts/list.py firmware                   # list the boards, by project
-scripts/build.py canmaster-Duet3_MB6HC     # build one board
-scripts/build.py d3e                       # every board of a project (canmaster, rrf, d3e, bootloader, iap)
-scripts/build.py firmware --debug          # every board, as Debug
-scripts/size.py                            # the memory each built board uses
-scripts/clean.py EXP3HC                    # clean a board's build trees (--purge deletes them)
+scripts/list.py firmware               # list the boards, by project
+scripts/build.py DuetCANMaster_MB6HC   # build one board
+scripts/build.py d3e                   # every board of a project (canmaster, rrf, d3e, bootloader, iap)
+scripts/build.py firmware --debug      # every board, as Debug
+scripts/size.py                        # the memory each built board uses
+scripts/clean.py Duet3Firmware_EXP3HC  # clean a board's build trees (--purge deletes them)
 ```
 
 Or call CMake directly. Add `-debug` to a preset name for the Debug variant:
 
 ```bash
-cmake --preset canmaster-Duet3_MB6HC
-cmake --build --preset canmaster-Duet3_MB6HC
+cmake --preset DuetCANMaster_MB6HC
+cmake --build --preset DuetCANMaster_MB6HC
 ```
+
+A firmware preset is named after the image it builds, so `Duet3Firmware_EXP3HC` builds `build/Duet3Firmware_EXP3HC/Duet3Firmware_EXP3HC.bin`, and configuring fails if the two differ. That keeps every image's file name unique, and the scripts find the preset for a file a board asks for by its name.
 
 `-DDUET_DISASSEMBLY=ON` also writes the disassembly to `build/<preset>/<target>.lst`; it is on by default for DuetCANMaster, RepRapFirmware and Duet3Expansion, with the branch targets in each function labelled unless `-DDUET_DISASSEMBLY_LABELS=OFF`. In VS Code, the CMake Tools extension reads the presets: pick a board as the configure preset, then build. The **[Firmware] Build Board** task does the same through `scripts/build.py`.
 
 The CMake build also lints DuetCANMaster's and the libraries' C++ with clang-tidy as it compiles it (`-DDUET_CLANG_TIDY=OFF` turns that off, for a faster build). The checks are in the root [.clang-tidy](.clang-tidy), which DuetCANMaster's and DuetRealtimeCore's own add their naming rules to. RepRapFirmware, Duet3Expansion, Duet3Bootloader and DuetIAP are not linted: their presets in [CMakePresets.json](CMakePresets.json) set `DUET_CLANG_TIDY` off, and `-DDUET_CLANG_TIDY=ON` lints them too. Third-party code is never linted: the device packs, CMSIS, tinyusb, mbedTLS, lwIP, MQTT-C and the vendored `src/libc` and `src/libcpp`. Every finding is an error, which fails the build. The libraries do not pass every check yet: [lib/.clang-tidy](lib/.clang-tidy) turns off the ones they fail, with how many findings each had, and the wrapper ([scripts/internal/clang_tidy_wrapper.py](scripts/internal/clang_tidy_wrapper.py)) skips the few library files clang cannot parse. Both lists are to shrink as the libraries are fixed. `scripts/lint.py` lints a board's whole build by hand, every header included, and can apply fixes (the **[Style] Tidy Firmware Board** task runs it). Renames from `readability-identifier-naming` must cover every board of a project at once, which `--naming-fixes` does:
 
 ```bash
-scripts/lint.py EXP3HC                                 # every project and library EXP3HC builds
-scripts/lint.py EXP3HC -f src/Duet3Expansion/src/Movement/Move.cpp
+scripts/lint.py Duet3Firmware_EXP3HC  # every project and library EXP3HC builds
+scripts/lint.py Duet3Firmware_EXP3HC -f src/Duet3Expansion/src/Movement/Move.cpp
 scripts/lint.py canmaster --naming-fixes               # export renames across every DuetCANMaster board
 ```
 
 `scripts/deploy.py` also deploys the firmware of a main board and the CAN boards connected to it, building it first with `--build`. It uploads the files over the REST API, then updates the boards with M997.
 
 ```bash
-scripts/deploy.py -H duet3.local firmware               # every connected board
-scripts/deploy.py -H duet3.local firmware --build       # build what they need first
-scripts/deploy.py -H duet3.local EXP1HCL --debug         # only the 1HCL boards, as Debug
-scripts/deploy.py -H duet3.local firmware --dry-run      # show what it would do
-scripts/deploy.py -H <pi> dsf firmware --build           # DSF, then the firmware through it, to a Pi
+scripts/deploy.py -H duet3.local firmware                       # every connected board
+scripts/deploy.py -H duet3.local firmware --build               # build what they need first
+scripts/deploy.py -H duet3.local Duet3Firmware_EXP1HCL --debug  # only the 1HCL boards, as Debug
+scripts/deploy.py -H duet3.local firmware --dry-run             # show what it would do
+scripts/deploy.py -H <pi> dsf firmware --build                  # DSF, then the firmware through it, to a Pi
 ```
 
 ### Bootloaders
@@ -373,18 +375,18 @@ The expansion and tool boards' bootloaders can be deployed two ways.
 **Over CAN**, for a board that already has a working bootloader and is running Release firmware. `--bootloader` uploads the bootloader each expansion board asks for and updates it with `M997 B<address> S3`. The boards' firmware and the main board are left alone:
 
 ```bash
-scripts/deploy.py -H duet3.local firmware --bootloader           # every expansion board
-scripts/deploy.py -H duet3.local EXP3HC --bootloader             # only the 3HCs
-scripts/deploy.py -H duet3.local firmware --bootloader --build   # build the bootloaders they need first
+scripts/deploy.py -H duet3.local firmware --bootloader              # every expansion board
+scripts/deploy.py -H duet3.local Duet3Firmware_EXP3HC --bootloader  # only the 3HCs
+scripts/deploy.py -H duet3.local firmware --bootloader --build      # build the bootloaders they need first
 ```
 
-The STM32 boards (NodeTrix) cannot update their bootloader over CAN yet. A main board running as an expansion board has no bootloader. Its firmware is updated by its CAN IAP (`Duet3_CANiap32_<board>.bin`, built by the `bootloader-Duet3_*` presets), which it loads from its own SD card, so copy that file to its `/firmware` directory yourself.
+The STM32 boards (NodeTrix) cannot update their bootloader over CAN yet. A main board running as an expansion board has no bootloader. Its firmware is updated by its CAN IAP (`Duet3_CANiap32_<board>.bin`, built by the `Duet3_CANiap32_*` presets), which it loads from its own SD card, so copy that file to its `/firmware` directory yourself.
 
 **Over SWD**, for a new or broken board, or an STM32 one. `scripts/flash_bootloader.py` flashes a bootloader through OpenOCD's GDB server (see [Debug the Firmware](#debug-the-firmware)). It checks that the board has the right MCU, has OpenOCD clear the BOOTPROT protection the firmware puts on the bootloader, writes the bootloader with GDB, reads it back to check it, and restarts the board. GDB prints each command as it runs it:
 
 ```bash
-scripts/flash_bootloader.py bootloader-SAME5x --build                        # EXP3HC, EXP1HCL, TOOL1RR, M23CL, …
-scripts/flash_bootloader.py bootloader-SAMC21 -s host.docker.internal:3333   # TOOL1LC, EXP1XD, SZP, on another port
+scripts/flash_bootloader.py Duet3Bootloader-SAME5x --build                       # EXP3HC, EXP1HCL, TOOL1RR, M23CL, …
+scripts/flash_bootloader.py Duet3Bootloader-SAMC21 -s host.docker.internal:3333  # TOOL1LC, EXP1XD, SZP, on another port
 ```
 
 A board with a bootloader but no firmware fetches its firmware from the main board over CAN when it starts, so `scripts/deploy.py` can then update it as usual. The **[Firmware] Deploy Bootloaders (CAN)** and **[Firmware] Flash Bootloader (SWD)** tasks run these.
@@ -403,7 +405,7 @@ Each tool names the MCU differently:
 
 | Board | MCU | J-Link `-device` | OpenOCD target | pyOCD `-t` |
 | --- | --- | --- | --- | --- |
-| canmaster-Duet3_MB6HC, canmaster-Duet3_MB6XD, Duet3_MB6HC, Duet3_MB6XD, Duet3_CAN0, Duet3_MB6HC_no_SD | SAME70Q20B | `ATSAME70Q20B` | `target/atsamv.cfg`* | `atsame70q20b`* |
+| MB6HC, MB6XD | SAME70Q20B | `ATSAME70Q20B` | `target/atsamv.cfg`* | `atsame70q20b`* |
 | Duet3Mini5plus | SAME54P20A | `ATSAME54P20A`* | `target/atsame5x.cfg`* | `atsame54p20a`* |
 | EXP3HC | SAME51N19A | `ATSAME51N19A` | `target/atsame5x.cfg` | `atsame51n19a`* |
 | EXP1HCL, M23CL, F3PTB, TOOL1RR | SAME51G19A | `ATSAME51G19A` | `target/atsame5x.cfg` | `atsame51g19a`* |
@@ -485,7 +487,7 @@ pyocd gdbserver -t atsame70q20b --port 2331 --allow-remote
 To check the server without VS Code, connect from a terminal in the devcontainer:
 
 ```bash
-arm-none-eabi-gdb build/canmaster-Duet3_MB6HC-debug/vscode/firmware.elf \
+arm-none-eabi-gdb build/DuetCANMaster_MB6HC-debug/vscode/firmware.elf \
     -ex "target extended-remote host.docker.internal:2331" -ex "monitor halt" -ex "bt"
 ```
 

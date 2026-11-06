@@ -7,10 +7,10 @@ Firmware" in DEVELOPER.md); it drives J-Link probes too. This script writes a GD
 arm-none-eabi-gdb on it, so that each step is a GDB or OpenOCD command that can be tried by hand. GDB
 prints each command as it runs it, and stops at the first that fails.
 
-    scripts/flash_bootloader.py bootloader-SAME5x                     flash the SAME5x bootloader
-    scripts/flash_bootloader.py bootloader-SAMC21 --build             build it first
-    scripts/flash_bootloader.py bootloader-SAME5x -s localhost:3333   use this GDB server
-    scripts/flash_bootloader.py bootloader-STM32H5 --debug            flash the Debug build
+    scripts/flash_bootloader.py Duet3Bootloader-SAME5x                    flash the SAME5x bootloader
+    scripts/flash_bootloader.py Duet3Bootloader-SAMC21 --build            build it first
+    scripts/flash_bootloader.py Duet3Bootloader-SAME5x -s localhost:3333  use this GDB server
+    scripts/flash_bootloader.py Duet3Bootloader-STM32H5 --debug           flash the Debug build
 
 It first checks that the board's MCU is the one the bootloader is built for. The expansion firmware
 protects its bootloader with the BOOTPROT fuse, which also stops a probe from writing it, so on the SAM
@@ -33,7 +33,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from common.cli import complete_with, parse, parser
-from common.firmware import Board, build, load_boards, read_elf
+from common.firmware import Board, build, built_image, load_boards, read_elf
 from common.repo import BUILD, run
 from common.targets import FIRMWARE, select
 
@@ -86,13 +86,12 @@ def bootloaders(boards: list[Board]) -> list[Board]:
 def bootloader_image(b: Board, mcu: Mcu, debug: bool) -> tuple[Path, int]:
     """The bootloader's .bin, which has the CRC the firmware checks, and where its .elf says it goes."""
     preset = b.variant(debug)
-    elves = sorted((BUILD / preset).glob('*.elf'))
-    if not elves:
+    elf, path = built_image(preset, '.elf'), built_image(preset, '.bin')
+    if elf is None or path is None:
         sys.exit(f'{preset} has not been built; build it, or add --build')
-    address = read_elf(elves[0]).load_address()
-    path = elves[0].with_suffix('.bin')
-    if address is None or not path.exists():
-        sys.exit(f'{path.relative_to(BUILD)} has not been built; build it, or add --build')
+    address = read_elf(elf).load_address()
+    if address is None:
+        sys.exit(f'{elf.relative_to(BUILD)} has nothing to flash')
     end = address + path.stat().st_size
     if not mcu.flash <= address < end <= mcu.flash + BOOTLOADER_SIZE:
         sys.exit(f'{path.name} occupies {address:#010x}-{end:#010x}, outside the '
@@ -137,7 +136,7 @@ def gdb_commands(server: str, b: Board, mcu: Mcu, image: Path, address: int, wor
 
 def parse_options(argv: Sequence[str] | None = None) -> Options:
     p = parser(__doc__)
-    complete_with(p.add_argument('preset', help='the bootloader preset, e.g. bootloader-SAME5x; a -debug suffix '
+    complete_with(p.add_argument('preset', help='the bootloader preset, e.g. Duet3Bootloader-SAME5x; a -debug suffix '
                                                 'names its Debug build'),
                   lambda: [b.variant(debug) for b in bootloaders(load_boards()) for debug in (False, True)])
     p.add_argument('-s', '--server', default=DEFAULT_SERVER,

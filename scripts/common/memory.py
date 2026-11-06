@@ -10,8 +10,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from common.firmware import read_elf
-from common.repo import BUILD
+from common.firmware import built_image, read_elf
 
 
 @dataclass(frozen=True)
@@ -62,13 +61,10 @@ def memory_usage(elf: Path, map_file: Path, image: Path | None) -> tuple[Region,
 
 def built(preset: str, status: str, seconds: float | None = None) -> Result:
     """The result of a build, with its image's memory usage if it succeeded."""
-    tree = BUILD / preset
-    elves = sorted(tree.glob('*.elf'))
-    if status != 'ok' or len(elves) != 1:
+    elf = built_image(preset, '.elf')
+    if status != 'ok' or elf is None:
         return Result(preset, status, seconds)
-    elf = elves[0]
-    image = elf.with_suffix('.bin')
-    image = image if image.is_file() else None
+    image = built_image(preset, '.bin')
     try:
         regions = memory_usage(elf, elf.with_suffix('.map'), image)
     except (OSError, ValueError, struct.error) as e:

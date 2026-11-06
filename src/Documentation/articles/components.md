@@ -47,7 +47,7 @@ them.
 
 `src/DuetCANMaster/` runs on the Duet 3 mainboard and `src/Duet3Expansion/` on each expansion board.
 Neither is part of the .NET solution; both are cross-compiled firmware, built with CMake from the
-repository root by `scripts/build.py`, where each board is a preset (`canmaster-Duet3_MB6HC`, `EXP3HC`, ...).
+repository root by `scripts/build.py`, where each board is a preset (`DuetCANMaster_MB6HC`, `Duet3Firmware_EXP3HC`, ...).
 
 - **DuetCANMaster** bridges the SPI link to the CAN bus. It carries one piece of machine knowledge and
   no more: which input stops which driver, so a move can be cut short in time

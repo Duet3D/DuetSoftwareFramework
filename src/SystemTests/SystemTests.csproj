@@ -40,8 +40,8 @@
 		     starts, so a configure that failed leaves one behind and every later build then skips
 		     straight to a build tree that was never generated. This file is written when the
 		     configure finishes, so a failed one is retried instead of being taken for a good tree. -->
-		<Exec Command="cmake --preset rtc-native-debug" WorkingDirectory="$(RepositoryRoot)"
-		      Condition="!Exists('$(RepositoryRoot)/build/rtc-native-debug/cmake_install.cmake')" />
-		<Exec Command="cmake --build --preset rtc-native-debug --target duet_realtime_core_shared --parallel" WorkingDirectory="$(RepositoryRoot)" />
+		<Exec Command="cmake --preset DuetRealtimeCore-native-debug" WorkingDirectory="$(RepositoryRoot)"
+		      Condition="!Exists('$(RepositoryRoot)/build/DuetRealtimeCore-native-debug/cmake_install.cmake')" />
+		<Exec Command="cmake --build --preset DuetRealtimeCore-native-debug --target duet_realtime_core_shared --parallel" WorkingDirectory="$(RepositoryRoot)" />
 	</Target>
 </Project>

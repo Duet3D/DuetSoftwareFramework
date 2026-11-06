@@ -71,14 +71,15 @@ class DeployTest(ScriptTest):
         self.enterContext(patch.object(firmware_deploy, 'bootloader_names',
                                        return_value={'EXP3HC': 'SAME5x', 'TOOL1LC': 'SAMC21'}))
         self.enterContext(patch.object(time, 'sleep'))
-        for preset in ('Duet3_MB6HC', 'Duet3_MB6HC-debug', 'Duet3_MB6HC_no_SD'):
+        for preset in ('Duet3Firmware_MB6HC', 'Duet3Firmware_MB6HC-debug'):
             self.built(preset, 'Duet3Firmware_MB6HC.bin', data=preset.encode())
-        self.built('EXP3HC', 'Duet3Firmware_EXP3HC.bin', data=b'EXP3HC')
-        self.built('EXP3HC-debug', 'Duet3Firmware_EXP3HC.bin', data=b'EXP3HC-debug')
-        self.built('iap-Duet3_MB6HC_SD', 'Duet3_SDiap32_MB6HC.bin')
-        self.built('bootloader-SAME5x', 'Duet3Bootloader-SAME5x.bin')
-        self.built('canmaster-Duet3_MB6HC', 'DuetCANMaster_MB6HC.bin', data=b'canmaster')
-        self.built('iap-Duet3_MB6HC_SBC', 'Duet3_SBCiap32_MB6HC.bin')
+        self.built('Duet3Firmware_MB6HC_no_SD', 'Duet3Firmware_MB6HC_no_SD.bin')
+        self.built('Duet3Firmware_EXP3HC', 'Duet3Firmware_EXP3HC.bin', data=b'Duet3Firmware_EXP3HC')
+        self.built('Duet3Firmware_EXP3HC-debug', 'Duet3Firmware_EXP3HC.bin', data=b'Duet3Firmware_EXP3HC-debug')
+        self.built('Duet3_SDiap32_MB6HC', 'Duet3_SDiap32_MB6HC.bin')
+        self.built('Duet3Bootloader-SAME5x', 'Duet3Bootloader-SAME5x.bin')
+        self.built('DuetCANMaster_MB6HC', 'DuetCANMaster_MB6HC.bin', data=b'canmaster')
+        self.built('Duet3_SBCiap32_MB6HC', 'Duet3_SBCiap32_MB6HC.bin')
 
     def deploy(self, *argv: str, targets: tuple[str, ...] = ('firmware',)) -> tuple[int, str]:
         """deploy.py through the fake board, of every board unless other targets are given."""
@@ -91,9 +92,9 @@ class DeployTest(ScriptTest):
         status, out = self.deploy('-n')
         self.assertEqual(status, 0)
         self.assertEqual(self.open_session.call_args.args[:2], ('duet3.local', 'reprap'))
-        self.assertIn('Would upload Duet3_MB6HC/Duet3Firmware_MB6HC.bin to 0:/firmware/Duet3Firmware_MB6HC.bin', out)
-        self.assertIn('Would upload iap-Duet3_MB6HC_SD/Duet3_SDiap32_MB6HC.bin', out)
-        self.assertIn('Would upload EXP3HC/Duet3Firmware_EXP3HC.bin', out)
+        self.assertIn('Would upload Duet3Firmware_MB6HC/Duet3Firmware_MB6HC.bin to 0:/firmware/Duet3Firmware_MB6HC.bin', out)
+        self.assertIn('Would upload Duet3_SDiap32_MB6HC/Duet3_SDiap32_MB6HC.bin', out)
+        self.assertIn('Would upload Duet3Firmware_EXP3HC/Duet3Firmware_EXP3HC.bin', out)
         self.assertIn('Skipping Duet 3 Toolboard 1LC (TOOL1LC) at CAN address 20: Duet3Firmware_TOOL1LC.bin has not been built', out)
         self.assertEqual(self.updated(out), ['Duet 3 Expansion 3HC (EXP3HC) at CAN address 1 (M997 B1)',
                                              'Duet 3 MB6HC (MB6HC) (M997)'])
@@ -104,9 +105,9 @@ class DeployTest(ScriptTest):
         status, out = self.deploy('-P', 'secret', '-d', '-n')
         self.assertEqual(status, 0)
         self.assertEqual(self.open_session.call_args.args[:2], ('duet3.local', 'secret'))
-        self.assertIn('Would upload Duet3_MB6HC-debug/Duet3Firmware_MB6HC.bin', out)
-        self.assertIn('Would upload EXP3HC-debug/Duet3Firmware_EXP3HC.bin', out)
-        self.assertIn('Would upload iap-Duet3_MB6HC_SD/', out)  # the IAP is always Release
+        self.assertIn('Would upload Duet3Firmware_MB6HC-debug/Duet3Firmware_MB6HC.bin', out)
+        self.assertIn('Would upload Duet3Firmware_EXP3HC-debug/Duet3Firmware_EXP3HC.bin', out)
+        self.assertIn('Would upload Duet3_SDiap32_MB6HC/', out)  # the IAP is always Release
         self.deploy('--password', 'other', '--debug', '-n')
         self.assertEqual(self.open_session.call_args.args[1], 'other')
 
@@ -114,28 +115,46 @@ class DeployTest(ScriptTest):
         main = 'Duet 3 MB6HC (MB6HC) (M997)'
         exp = 'Duet 3 Expansion 3HC (EXP3HC) at CAN address 1 (M997 B1)'
         for argv, targets, expected in ((['-b', '0'], ('firmware',), [main]), (['--board', '1'], ('firmware',), [exp]),
-                                        ([], ('exp3hc',), [exp]), ([], ('Duet3_MB6HC',), [main]),
-                                        (['-b', '1'], ('Duet3_MB6HC',), [exp, main])):
+                                        ([], ('Duet3Firmware_EXP3HC',), [exp]), ([], ('Duet3Firmware_MB6HC',), [main]),
+                                        (['-b', '1'], ('Duet3Firmware_MB6HC',), [exp, main])):
             with self.subTest(argv=argv, targets=targets):
                 self.assertEqual(self.updated(self.deploy('-n', *argv, targets=targets)[1]), expected)
-        status, out = self.deploy('-n', targets=('EXP1XD',))
+        status, out = self.deploy('-n', targets=('Duet3Firmware_EXP1XD',))
         self.assertEqual(status, 1)
         self.assertIn('No connected board matches the boards asked for\n', out)
 
     def test_main_preset(self) -> None:
-        self.assertIn('Would upload Duet3_MB6HC_no_SD/Duet3Firmware_MB6HC.bin', self.deploy('-n', '-m', 'Duet3_MB6HC_no_SD')[1])
-        self.built('Duet3_MB6HC_no_SD-debug', 'Duet3Firmware_MB6HC.bin')
-        self.assertIn('Would upload Duet3_MB6HC_no_SD-debug/Duet3Firmware_MB6HC.bin',
-                      self.deploy('-n', '--main', 'Duet3_MB6HC_no_SD', '-d')[1])
+        self.assertIn('Would upload Duet3Firmware_MB6HC_no_SD/Duet3Firmware_MB6HC_no_SD.bin to 0:/firmware/Duet3Firmware_MB6HC.bin',
+                      self.deploy('-n', '-m', 'Duet3Firmware_MB6HC_no_SD')[1])
+        self.built('Duet3Firmware_MB6HC_no_SD-debug', 'Duet3Firmware_MB6HC_no_SD.bin')
+        self.assertIn('Would upload Duet3Firmware_MB6HC_no_SD-debug/Duet3Firmware_MB6HC_no_SD.bin',
+                      self.deploy('-n', '--main', 'Duet3Firmware_MB6HC_no_SD', '-d')[1])
         self.assertIn('Unknown target "NOPE"', self.deploy('-m', 'NOPE')[1])
+
+    def test_main_preset_with_an_image_of_another_name(self) -> None:
+        self.built('Duet3Firmware_MB6HC_CAN0', 'Duet3Firmware_MB6HC_CAN0.bin')
+        self.assertIn('Would upload Duet3Firmware_MB6HC_CAN0/Duet3Firmware_MB6HC_CAN0.bin to 0:/firmware/Duet3Firmware_MB6HC.bin',
+                      self.deploy('-n', '-m', 'Duet3Firmware_MB6HC_CAN0')[1])
+
+    def test_finds_a_variant_by_the_file_it_builds(self) -> None:
+        for preset in ('Duet3Firmware_MB6HC_CAN0', 'Duet3Firmware_MB6HC_no_SD'):
+            with self.subTest(preset=preset):
+                image = preset + '.bin'
+                self.duet.boards[0]['firmwareFileName'] = image
+                self.built(preset, image)
+                self.assertIn(f'Would upload {preset}/{image} to 0:/firmware/{image}', self.deploy('-n')[1])
+
+    def test_a_file_left_by_an_earlier_build_is_not_used(self) -> None:
+        self.built('Duet3Firmware_TOOL1LC', 'Duet3Firmware_TOOL1LC_old.bin')
+        self.assertIn('Duet3Firmware_TOOL1LC.bin has not been built', self.deploy('-n')[1])
 
     def test_upload_only(self) -> None:
         for flag in ('--upload-only',):
             self.duet.uploads.clear()
             self.assertEqual(self.deploy(flag)[0], 0)
-            self.assertEqual(self.duet.uploads, {'0:/firmware/Duet3Firmware_MB6HC.bin': b'Duet3_MB6HC',
+            self.assertEqual(self.duet.uploads, {'0:/firmware/Duet3Firmware_MB6HC.bin': b'Duet3Firmware_MB6HC',
                                                  '0:/firmware/Duet3_SDiap32_MB6HC.bin': b'image',
-                                                 '0:/firmware/Duet3Firmware_EXP3HC.bin': b'EXP3HC'})
+                                                 '0:/firmware/Duet3Firmware_EXP3HC.bin': b'Duet3Firmware_EXP3HC'})
             self.assertEqual(self.duet.sent, [])
 
     def test_updates_an_expansion_board(self) -> None:
@@ -148,31 +167,31 @@ class DeployTest(ScriptTest):
     def test_bootloader(self) -> None:
         status, out = self.deploy('--bootloader', '-n')
         self.assertEqual(status, 0)
-        self.assertIn('Would upload bootloader-SAME5x/Duet3Bootloader-SAME5x.bin to 0:/firmware/Duet3Bootloader-SAME5x.bin', out)
+        self.assertIn('Would upload Duet3Bootloader-SAME5x/Duet3Bootloader-SAME5x.bin to 0:/firmware/Duet3Bootloader-SAME5x.bin', out)
         self.assertIn('TOOL1LC) at CAN address 20: Duet3Bootloader-SAMC21.bin has not been built', out)
         self.assertEqual(self.updated(out), ['the bootloader of Duet 3 Expansion 3HC (EXP3HC) at CAN address 1 (M997 B1 S3)'])
 
     def test_build_and_clean(self) -> None:
-        expected = ['Duet3_MB6HC', 'iap-Duet3_MB6HC_SD', 'EXP3HC', 'TOOL1LC']
+        expected = ['Duet3Firmware_MB6HC', 'Duet3_SDiap32_MB6HC', 'Duet3Firmware_EXP3HC', 'Duet3Firmware_TOOL1LC']
         out = self.deploy('--build', '-n')[1]
         self.assertEqual(re.findall(r'Would build (\S+)\n', out), expected)
         self.build_preset.assert_not_called()
         self.assertEqual(re.findall(r'Would build (\S+) from clean', self.deploy('-c', '-n')[1]), expected)
         self.assertEqual(re.findall(r'Would build (\S+)', self.deploy('--build', '--bootloader', '-n')[1]),
-                         ['bootloader-SAME5x', 'bootloader-SAMC21'])
+                         ['Duet3Bootloader-SAME5x', 'Duet3Bootloader-SAMC21'])
 
         for flag, clean in (('--build', False), ('--clean', True)):
             with self.subTest(flag=flag):
                 self.build_preset.reset_mock()
                 self.assertEqual(self.deploy(flag, '-d', '--upload-only')[0], 0)
                 self.assertEqual([(c.args[0], c.kwargs['clean']) for c in self.build_preset.call_args_list],
-                                 [(p, clean) for p in ('Duet3_MB6HC-debug', 'iap-Duet3_MB6HC_SD', 'EXP3HC-debug', 'TOOL1LC-debug')])
+                                 [(p, clean) for p in ('Duet3Firmware_MB6HC-debug', 'Duet3_SDiap32_MB6HC', 'Duet3Firmware_EXP3HC-debug', 'Duet3Firmware_TOOL1LC-debug')])
 
     def test_build_failure(self) -> None:
         self.build_preset.return_value = False
         status, out = self.deploy('--build')
         self.assertEqual(status, 1)
-        self.assertIn('Building Duet3_MB6HC failed', out)
+        self.assertIn('Building Duet3Firmware_MB6HC failed', out)
         self.assertEqual(self.duet.uploads, {})
 
     def test_sbc(self) -> None:
@@ -181,12 +200,12 @@ class DeployTest(ScriptTest):
         self.duet.boards[0]['firmwareFileName'] = 'DuetCANMaster_MB6HC.bin'
         status, out = self.deploy('-n')
         self.assertEqual(status, 0)
-        self.assertIn('Would upload canmaster-Duet3_MB6HC/DuetCANMaster_MB6HC.bin to 0:/firmware/DuetCANMaster_MB6HC.bin', out)
-        self.assertIn('Would upload iap-Duet3_MB6HC_SBC/Duet3_SBCiap32_MB6HC.bin', out)
-        self.assertNotIn('Duet3_MB6HC/', out.replace('canmaster-Duet3_MB6HC/', ''))
+        self.assertIn('Would upload DuetCANMaster_MB6HC/DuetCANMaster_MB6HC.bin to 0:/firmware/DuetCANMaster_MB6HC.bin', out)
+        self.assertIn('Would upload Duet3_SBCiap32_MB6HC/Duet3_SBCiap32_MB6HC.bin', out)
+        self.assertNotIn('Duet3Firmware_MB6HC/', out.replace('DuetCANMaster_MB6HC/', ''))
         self.assertEqual(re.findall(r'Would build (\S+)\n', self.deploy('--build', '-n')[1]),
-                         ['canmaster-Duet3_MB6HC', 'iap-Duet3_MB6HC_SBC', 'EXP3HC', 'TOOL1LC'])
-        self.assertIn('Would upload canmaster-Duet3_MB6HC/', self.deploy('-n', targets=('canmaster-Duet3_MB6HC',))[1])
+                         ['DuetCANMaster_MB6HC', 'Duet3_SBCiap32_MB6HC', 'Duet3Firmware_EXP3HC', 'Duet3Firmware_TOOL1LC'])
+        self.assertIn('Would upload DuetCANMaster_MB6HC/', self.deploy('-n', targets=('DuetCANMaster_MB6HC',))[1])
 
     def test_sbc_with_a_main_board_in_expansion_mode(self) -> None:
         """A main board on the bus runs RepRapFirmware on an SBC as anywhere else. Given DuetCANMaster, which
@@ -197,10 +216,10 @@ class DeployTest(ScriptTest):
                                  'firmwareFileName': 'Duet3Firmware_MB6HC.bin'})
         status, out = self.deploy('-n')
         self.assertEqual(status, 0)
-        self.assertIn('Would upload Duet3_MB6HC/Duet3Firmware_MB6HC.bin to 0:/firmware/Duet3Firmware_MB6HC.bin', out)
-        self.assertIn('Would upload canmaster-Duet3_MB6HC/DuetCANMaster_MB6HC.bin to 0:/firmware/DuetCANMaster_MB6HC.bin', out)
+        self.assertIn('Would upload Duet3Firmware_MB6HC/Duet3Firmware_MB6HC.bin to 0:/firmware/Duet3Firmware_MB6HC.bin', out)
+        self.assertIn('Would upload DuetCANMaster_MB6HC/DuetCANMaster_MB6HC.bin to 0:/firmware/DuetCANMaster_MB6HC.bin', out)
         self.assertEqual(self.deploy('--upload-only')[0], 0)
-        self.assertEqual(self.duet.uploads['0:/firmware/Duet3Firmware_MB6HC.bin'], b'Duet3_MB6HC')
+        self.assertEqual(self.duet.uploads['0:/firmware/Duet3Firmware_MB6HC.bin'], b'Duet3Firmware_MB6HC')
         self.assertEqual(self.duet.uploads['0:/firmware/DuetCANMaster_MB6HC.bin'], b'canmaster')
 
     def test_sbc_with_nothing_built_for_an_expansion_mode_main_board(self) -> None:
@@ -209,7 +228,7 @@ class DeployTest(ScriptTest):
         self.duet.boards[0]['firmwareFileName'] = 'DuetCANMaster_MB6HC.bin'
         self.duet.boards.append({'canAddress': 2, 'name': 'Duet 3 MB6HC', 'shortName': 'MB6HC', 'state': 'running',
                                  'firmwareFileName': 'Duet3Firmware_MB6HC.bin'})
-        (firmware_deploy.BUILD / 'Duet3_MB6HC' / 'Duet3Firmware_MB6HC.bin').unlink()
+        (firmware_deploy.BUILD / 'Duet3Firmware_MB6HC' / 'Duet3Firmware_MB6HC.bin').unlink()
         _, out = self.deploy('-n')
         self.assertIn('Skipping Duet 3 MB6HC (MB6HC) at CAN address 2: Duet3Firmware_MB6HC.bin has not been built', out)
         self.assertNotIn('to 0:/firmware/Duet3Firmware_MB6HC.bin', out)

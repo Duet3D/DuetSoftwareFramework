@@ -6,15 +6,16 @@
 # preset (cmake --list-presets), which picks them, the MCU's toolchain file from cmake/toolchains,
 # and the cache variables that select a variant of the board, which the project's Boards.cmake
 # declares (such as RRF_CAN0 or IAP_SBC):
-#     cmake --preset EXP3HC
-#     cmake --build --preset EXP3HC
-# or, for one or more boards or a whole project, scripts/build.py EXP3HC
-# Each board's -debug preset builds it with debug symbols and reduced optimisation.
+#  cmake --preset Duet3Firmware_EXP3HC
+#  cmake --build --preset Duet3Firmware_EXP3HC
+# or, for one or more boards or a whole project, scripts/build.py Duet3Firmware_EXP3HC
+# Each board's -debug preset builds it with debug symbols and reduced optimisation. A preset is named
+# after the image it builds, which duet_firmware_executable checks.
 
 cmake_minimum_required(VERSION 3.25)
 
 # DuetRealtimeCore is an ordinary hosted build for the SBC, with its own toolchains, flags and linting,
-# so it shares none of the firmware's setup below. Its presets (rtc-*) set DUET_PROJECT to it. Its
+# so it shares none of the firmware's setup below. Its presets (DuetRealtimeCore-*) set DUET_PROJECT to it. Its
 # outputs go to the top of the build tree, as an image does, and its tests are registered from here
 # because ctest only finds the ones enable_testing() reaches from the top-level directory.
 if(DUET_PROJECT STREQUAL "DuetRealtimeCore")

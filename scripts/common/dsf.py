@@ -11,7 +11,7 @@ parallelises it); otherwise the selected projects are published concurrently.
 
 DuetRealtimeCore is the native SPI transfer loop (libduet_realtime_core.so) that DuetControlServer
 P/Invokes into. DCS cannot run without it, so selecting DuetControlServer builds and deploys it too.
-It is built from the root CMakePresets.json, whose rtc-* presets are its, and deployed from its CMake
+It is built from the root CMakePresets.json, whose DuetRealtimeCore-* presets are its, and deployed from its CMake
 build tree, build/<preset>.
 
 DuetPiManagementPlugin is a plugin rather than a service. It is staged into
@@ -78,7 +78,7 @@ DEFAULT_SYSROOT = REALTIME_CORE_DIR / 'pi-sysroot'
 # Each architecture's cross-compiling preset in the root CMakePresets.json, and the host machines
 # that are that architecture already. There is no x86_64 cross toolchain in the container, so
 # linux-x64 is host-only.
-CROSS_PRESETS = {'linux-arm64': 'rtc-arm64', 'linux-arm': 'rtc-armhf', 'linux-x64': None}
+CROSS_PRESETS = {'linux-arm64': f'{REALTIME_CORE}-arm64', 'linux-arm': f'{REALTIME_CORE}-armhf', 'linux-x64': None}
 NATIVE_MACHINES = {'linux-arm64': ('aarch64',), 'linux-arm': ('armv7l', 'armv6l'), 'linux-x64': ('x86_64',)}
 
 # DuetPiManagementPlugin is a DSF plugin, not a service: DuetPluginService runs it out of the plugin
@@ -267,7 +267,7 @@ def realtime_core_preset(options: BuildOptions) -> str:
     machine = platform.machine()
     cross_preset = CROSS_PRESETS[options.arch]
     if machine in NATIVE_MACHINES[options.arch]:
-        preset = 'rtc-native'
+        preset = f'{REALTIME_CORE}-native'
     elif cross_preset is None:
         sys.exit(f'Error: cannot build {REALTIME_CORE_LIB} for {options.arch} on {machine}; no cross toolchain')
     elif options.sysroot or options.fetch_sysroot:

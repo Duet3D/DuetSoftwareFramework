@@ -17,13 +17,13 @@ Place new functionality accordingly: host-side concerns in DSF, motion and real-
 
 ## Build
 
-The user-facing scripts are in `scripts/`, one per task: `list.py`, `build.py`, `deploy.py`, `test.py`, `lint.py`, `clean.py`, `size.py`, `codegen.py` and `doctor.py`, plus `submodule.py`, `remote_control.py` and `flash_bootloader.py`. Each takes `--help`. Their shared code is in `scripts/common/`, and tools that CMake, CI or the devcontainer run, not people, are in `scripts/internal/`. Those that act on builds take the same targets: a DSF project (`DuetControlServer`, `DuetRealtimeCore`, ...), a firmware board, named by its CMake preset (`EXP3HC`, `canmaster-Duet3_MB6HC`; a `-debug` suffix names its Debug build), or a group: `dsf`, `firmware`, or a firmware project in full or as `canmaster`, `rrf`, `d3e`, `bootloader` or `iap`. `scripts/list.py` lists them. Builds are Release unless `--debug` is given.
+The user-facing scripts are in `scripts/`, one per task: `list.py`, `build.py`, `deploy.py`, `test.py`, `lint.py`, `clean.py`, `size.py`, `codegen.py` and `doctor.py`, plus `submodule.py`, `remote_control.py` and `flash_bootloader.py`. Each takes `--help`. Their shared code is in `scripts/common/`, and tools that CMake, CI or the devcontainer run, not people, are in `scripts/internal/`. Those that act on builds take the same targets: a DSF project (`DuetControlServer`, `DuetRealtimeCore`, ...), a firmware board, named by its CMake preset (`Duet3Firmware_EXP3HC`, `DuetCANMaster_MB6HC`; a `-debug` suffix names its Debug build), or a group: `dsf`, `firmware`, or a firmware project in full or as `canmaster`, `rrf`, `d3e`, `bootloader` or `iap`. `scripts/list.py` lists them. Builds are Release unless `--debug` is given.
 
 ```bash
-scripts/build.py dsf                        # every DSF project, each into its own bin/<config>/<tfm>/<arch>/publish
-scripts/build.py canmaster-Duet3_MB6HC      # one board, into build/<preset>/
-scripts/build.py canmaster d3e              # every DuetCANMaster and Duet3Expansion board
-scripts/deploy.py -H <pi> dsf --build --debug --start-services   # build every DSF project and deploy it to a Pi
+scripts/build.py dsf                                            # every DSF project, each into its own bin/<config>/<tfm>/<arch>/publish
+scripts/build.py DuetCANMaster_MB6HC                            # one board, into build/<preset>/
+scripts/build.py canmaster d3e                                  # every DuetCANMaster and Duet3Expansion board
+scripts/deploy.py -H <pi> dsf --build --debug --start-services  # build every DSF project and deploy it to a Pi
 ```
 
 Prefer `scripts/build.py` over `dotnet build` on a single project: it cross-compiles `libduet_realtime_core.so` for aarch64, which DuetControlServer P/Invokes into and cannot run without. `deploy.py --local` fails in the devcontainer.
@@ -35,7 +35,7 @@ git submodule update --init lib/RRFLibraries
 git submodule update --init --recursive
 ```
 
-Every firmware board is a preset in the root `CMakePresets.json`. DuetCANMaster's presets are prefixed `canmaster-` (and the bootloaders' and IAPs' `bootloader-` and `iap-`), because RRF builds the same main boards. DuetRealtimeCore's presets are in the same file, prefixed `rtc-` (`rtc-native`, `rtc-arm64`, ...), and build into `build/<preset>/` too.
+Every firmware board is a preset in the root `CMakePresets.json`. A firmware preset is named after the image it builds (`Duet3Firmware_EXP3HC`, `DuetCANMaster_MB6HC`, `Duet3Bootloader-SAME5x`, `Duet3_SBCiap32_MB6HC`), with `-debug` added for its Debug build. Configuring fails if the two differ, so each image's file name is unique and is how the scripts find its preset. DuetRealtimeCore's presets are in the same file, prefixed `DuetRealtimeCore-` (`DuetRealtimeCore-native`, `DuetRealtimeCore-arm64`, ...), and build into `build/<preset>/` too.
 
 The CMake build lints DuetCANMaster's and the libraries' C++ with clang-tidy as it compiles it, using the root `.clang-tidy` plus a project's own where it has one (DuetCANMaster's and DuetRealtimeCore's add their naming rules). RepRapFirmware, Duet3Expansion, Duet3Bootloader and DuetIAP are not currently linted: their presets set `DUET_CLANG_TIDY` off, and third-party code (device packs, CMSIS, tinyusb, mbedTLS, lwIP, `src/libc`, ...) never is. Every finding is an error that fails the build.. The libraries are held to fewer checks for now: `lib/.clang-tidy` turns off those they still fail, and `SKIP` in `scripts/internal/clang_tidy_wrapper.py` lists the library files clang cannot parse. Take a check or a file off those lists once the libraries pass it; never add to them to get a change through. `scripts/lint.py <board>` lints a whole build by hand.
 
