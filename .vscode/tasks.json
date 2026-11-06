@@ -565,9 +565,8 @@
             "hide": true
         },
         {
-            // Upload the built firmware to a standalone (no SBC) main board and update it and the boards connected
-            // to it, as on the regression suite's rrf bench (see scripts/deploy.py)
-            "label": "[Firmware] Deploy Release Firmware to Standalone Board",
+            // Upload the built firmware over HTTP
+            "label": "[Firmware] Deploy Release Firmware",
             "type": "process",
             "command": "python3",
             "args": ["scripts/deploy.py", "-H", "${input:duetHost}", "firmware", "--password", "${input:duetPassword}"],
@@ -575,7 +574,7 @@
             "problemMatcher": []
         },
         {
-            "label": "[Firmware] Deploy Debug Firmware to Standalone Board",
+            "label": "[Firmware] Deploy Debug Firmware",
             "type": "process",
             "command": "python3",
             "args": ["scripts/deploy.py", "-H", "${input:duetHost}", "firmware", "--password", "${input:duetPassword}", "--debug"],
