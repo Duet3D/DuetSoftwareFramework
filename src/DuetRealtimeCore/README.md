@@ -39,7 +39,6 @@ src/                 duet_realtime_core(.a/.so)
   Storage/           CRC16/CRC32
 harness/             realtime_core_jitter_test — standalone latency/jitter test program
 tests/               host-side unit tests (no hardware required)
-scripts/             fetch-pi-sysroot.sh
 cmake/               cross-compilation toolchain files
 ```
 
@@ -57,17 +56,15 @@ Requires a C++20 compiler, CMake ≥ 3.25 and Linux UAPI headers (`linux/gpio.h`
 | --- | --- | --- |
 | `DuetRealtimeCore-native` | this machine | this machine's |
 | `DuetRealtimeCore-arm64` | aarch64 | this container's (2.36) — deployable to Bookworm |
-| `DuetRealtimeCore-arm64-sysroot` | aarch64 | the Pi's, from `pi-sysroot/` — for pre-Bookworm targets |
 | `DuetRealtimeCore-armhf` | 32-bit armhf | this container's (2.36) — deployable to Bookworm |
-| `DuetRealtimeCore-armhf-sysroot` | 32-bit armhf | the Pi's, from `pi-sysroot/` — for pre-Bookworm targets |
 
-Each uses its own build tree, `build/<preset>` at the repository root, with the library, the harness and the tests at its top. `scripts/build.py` picks between them the same way: `DuetRealtimeCore-native` when it is already running on the target architecture, otherwise the cross preset, or its `-sysroot` variant when a sysroot is explicitly requested.
+Each uses its own build tree, `build/<preset>` at the repository root, with the library, the harness and the tests at its top. `scripts/build.py` picks between them the same way: `DuetRealtimeCore-native` when it is already running on the target architecture, otherwise the cross preset.
 
 ### Cross-compile in the devcontainer for a 64-bit Pi (recommended)
 
 The devcontainer ships the `aarch64-linux-gnu` cross toolchain (`crossbuild-essential-arm64`). It is
 based on Debian Bookworm, so that toolchain targets the same glibc (2.36) as Raspberry Pi OS
-Bookworm and everything it builds is deployable as-is. Both aarch64 presets additionally
+Bookworm and everything it builds is deployable as-is. The cross presets additionally
 **statically link** the test binary, so it runs on any Pi OS release:
 
 ```sh
@@ -88,20 +85,6 @@ requirements have to be satisfiable on the target. Under `DuetRealtimeCore-arm64
 aarch64-linux-gnu-objdump -p build/DuetRealtimeCore-arm64/libduet_realtime_core.so | grep -o 'GLIBC_[0-9.]*' | sort -uV
 ```
 
-#### Targeting an older Pi OS release
-
-`DuetRealtimeCore-arm64-sysroot` exists for the case where the target's glibc is *older* than the container's. It links
-against a copy of the Pi's own libraries and refuses to configure if that copy is missing:
-
-```sh
-src/DuetRealtimeCore/scripts/fetch-pi-sysroot.sh pi@raspberrypi   # one-off, into src/DuetRealtimeCore/pi-sysroot/
-cmake --preset DuetRealtimeCore-arm64-sysroot
-cmake --build --preset DuetRealtimeCore-arm64-sysroot -j
-```
-
-Use `-DDUET_REALTIME_CORE_SYSROOT=<dir>` to point it at a sysroot kept somewhere else. `scripts/build.py`
-never reaches for this on its own — pass `--sysroot <dir>` or `--fetch-sysroot <pi>`.
-
 ### Build natively on the Pi
 
 ```sh
@@ -118,11 +101,10 @@ Every source is run through `clang-tidy` as it is compiled, and any check left e
 clang-tidy` (already present in the devcontainer); if it is missing, CMake warns at configure time
 and builds without linting. Pass `-DDUET_REALTIME_CORE_CLANG_TIDY=OFF` for a plain, roughly 3x faster build.
 
-This applies to every preset, sysroot builds included. A cross build needs two things the plain
-`clang-tidy` command line does not carry, both of which CMake works out at configure time by asking
-the compiler: the target triple (`-dumpmachine`, otherwise clang analyses aarch64 code as x86-64),
-and the compiler's real include search path (`-E -v`, otherwise `--sysroot` sends clang looking for
-libstdc++ inside the Pi sysroot, where GCC never looks for it).
+This applies to every preset. A cross build needs two things the plain `clang-tidy` command line
+does not carry, both of which CMake works out at configure time by asking the compiler: the target
+triple (`-dumpmachine`, otherwise clang analyses aarch64 code as x86-64), and the compiler's real
+include search path (`-E -v`, otherwise clang cannot find the cross GCC's libstdc++ headers).
 
 ### Artifacts
 
@@ -133,13 +115,6 @@ libstdc++ inside the Pi sysroot, where GCC never looks for it).
 > **P/Invoke `.so` note:** a shared library must link glibc dynamically, so the cross-built
 > `libduet_realtime_core.so` needs the target's glibc to be no older than what it was linked against. The
 > container and Raspberry Pi OS Bookworm both ship glibc 2.36, so the `DuetRealtimeCore-arm64` build deploys as-is.
-> Only for an older Pi OS release do you need a sysroot:
-> ```sh
-> src/DuetRealtimeCore/scripts/fetch-pi-sysroot.sh pi@raspberrypi
-> cmake --preset DuetRealtimeCore-arm64-sysroot -DDUET_REALTIME_CORE_STATIC=OFF
-> cmake --build --preset DuetRealtimeCore-arm64-sysroot
-> ```
-> The standalone jitter test never needs this — it is statically linked.
 
 ## Run the jitter test
 
@@ -258,9 +233,7 @@ make ARCH=arm64 CONFIG=Release publish
 
 > **glibc:** a `.so` must link glibc dynamically, so a cross-built one must not need a newer glibc
 > than the target has. The devcontainer is Debian Bookworm and targets the same glibc 2.36 as
-> Raspberry Pi OS Bookworm, so no sysroot is needed. To target an older release, pass one:
-> `make ARCH=arm64 DUET_REALTIME_CORE_SYSROOT=/path/to/pi-sysroot publish`
-> (see `scripts/fetch-pi-sysroot.sh`).
+> Raspberry Pi OS Bookworm, so the `.so` it builds loads there as-is.
 
 ## Sharing with DuetCANMaster
 

@@ -22,8 +22,7 @@ than the one it is running.
 
 Because a shared library links glibc dynamically, the .so must not need a newer glibc than the target
 has. The devcontainer is Debian Bookworm and so targets the same glibc 2.36 as Raspberry Pi OS
-Bookworm, meaning a plain cross-build is deployable and no sysroot is involved. To target an older
-release, build against the Pi's own libraries with a sysroot."""
+Bookworm, meaning a plain cross-build is deployable."""
 
 from __future__ import annotations
 
@@ -72,9 +71,7 @@ OBJCOPY = {
 # DuetRealtimeCore is native (CMake), not a dotnet project: it builds libduet_realtime_core.so, the SPI
 # transfer loop that DuetControlServer P/Invokes into. It is built separately from the rest.
 REALTIME_CORE = 'DuetRealtimeCore'
-REALTIME_CORE_DIR = ROOT / 'src' / 'DuetRealtimeCore'
 REALTIME_CORE_LIB = 'libduet_realtime_core.so'
-DEFAULT_SYSROOT = REALTIME_CORE_DIR / 'pi-sysroot'
 # Each architecture's cross-compiling preset in the root CMakePresets.json, and the host machines
 # that are that architecture already. There is no x86_64 cross toolchain in the container, so
 # linux-x64 is host-only.
@@ -163,8 +160,6 @@ class BuildOptions:
     debug: bool
     aot: bool
     arch: str
-    sysroot: str | None
-    fetch_sysroot: str | None  # USER@HOST to fetch a sysroot from
     publish_args: str | None
     clean: bool  # clean the selected projects' build output before building them
 
@@ -186,11 +181,6 @@ def add_build_arguments(group: argparse._ArgumentGroup) -> None:  # pyright: ign
     """The options of a build of the DSF projects, besides --debug and --clean, which every build takes."""
     group.add_argument('--aot', action='store_true', help='build ahead-of-time (Native AOT) binaries')
     group.add_argument('--arch', choices=list(OBJCOPY), help=f'architecture to build for (default: {DEFAULT_ARCH})')
-    group.add_argument('--sysroot', metavar='DIR',
-                       help=f'sysroot to link {REALTIME_CORE_LIB} against, to target a glibc older than the '
-                            "container's 2.36")
-    group.add_argument('--fetch-sysroot', metavar='[USER@]HOST',
-                       help='fetch a sysroot from a Pi and link against it (the user defaults to root)')
     group.add_argument('-p', '--publish-args', metavar='PROPERTY',
                        help='an MSBuild property, without the -p: prefix, e.g. Profiling=true')
 
@@ -199,7 +189,6 @@ def build_options(namespace: argparse.Namespace) -> BuildOptions:
     """The options add_build_arguments() parsed, and --debug and --clean."""
     values = vars(namespace)
     return BuildOptions(debug=values['debug'], aot=values['aot'], arch=values['arch'] or DEFAULT_ARCH,
-                        sysroot=values['sysroot'], fetch_sysroot=values['fetch_sysroot'],
                         publish_args=values['publish_args'], clean=values['clean'])
 
 @dataclass(frozen=True)
@@ -241,37 +230,20 @@ def plan(options: BuildOptions, projects: list[str]) -> Build:
 # DuetRealtimeCore
 
 
-def resolve_sysroot(options: BuildOptions) -> Path | None:
-    """The sysroot to link against: --sysroot's, one fetched from the Pi --fetch-sysroot names, or none."""
-    if options.sysroot:
-        sysroot = Path(options.sysroot)
-        if not sysroot.is_dir():
-            sys.exit(f"Error: sysroot '{sysroot}' does not exist")
-        return sysroot
-    if not options.fetch_sysroot:
-        return None
-    remote = options.fetch_sysroot if '@' in options.fetch_sysroot else f'root@{options.fetch_sysroot}'
-    print(f'=== Fetching sysroot from {remote} (--fetch-sysroot) ===')
-    run_checked([REALTIME_CORE_DIR / 'scripts' / 'fetch-pi-sysroot.sh', remote, DEFAULT_SYSROOT])
-    return DEFAULT_SYSROOT
-
-
 def realtime_core_preset(options: BuildOptions) -> str:
     """The preset in the root CMakePresets.json that builds the library for these options.
 
     Already on the target architecture (e.g. building on the Pi itself with --local) needs no
-    toolchain and no sysroot, and gets glibc right by construction. Otherwise the library is
-    cross-compiled, against a sysroot if one is given. Every preset has a -debug twin that differs only
-    in CMAKE_BUILD_TYPE, so --debug picks the same configuration for the native library as it does for
-    the managed assemblies: an optimised .so is not steppable."""
+    toolchain and gets glibc right by construction. Otherwise the library is cross-compiled. Every
+    preset has a -debug twin that differs only in CMAKE_BUILD_TYPE, so --debug picks the same
+    configuration for the native library as it does for the managed assemblies: an optimised .so is
+    not steppable."""
     machine = platform.machine()
     cross_preset = CROSS_PRESETS[options.arch]
     if machine in NATIVE_MACHINES[options.arch]:
         preset = f'{REALTIME_CORE}-native'
     elif cross_preset is None:
         sys.exit(f'Error: cannot build {REALTIME_CORE_LIB} for {options.arch} on {machine}; no cross toolchain')
-    elif options.sysroot or options.fetch_sysroot:
-        preset = f'{cross_preset}-sysroot'
     else:
         preset = cross_preset
     return preset + '-debug' if options.debug else preset
@@ -287,18 +259,11 @@ def build_realtime_core(options: BuildOptions) -> None:
 
     It is cross-compiled here rather than on the Pi so a deploy needs no toolchain on the target. The
     devcontainer is Debian Bookworm, so its cross toolchain targets the same glibc 2.36 as Raspberry Pi
-    OS Bookworm and a plain cross build produces a .so that loads on the Pi. A sysroot is only needed to
-    target something older, and is opt-in."""
+    OS Bookworm and a plain cross build produces a .so that loads on the Pi."""
     preset = realtime_core_preset(options)
     print(f'=== Building {REALTIME_CORE} ({REALTIME_CORE_LIB}, preset {preset}) ===')
-    cmake_args: list[str] = []
-    if '-sysroot' in preset and (sysroot := resolve_sysroot(options)) is not None:
-        print(f'    Linking against sysroot: {sysroot}')
-        # The preset defaults to pi-sysroot/; --sysroot may point somewhere else
-        cmake_args.append(f'-DDUET_REALTIME_CORE_SYSROOT={sysroot}')
-
     # Only the shared library is built; the harness and the tests are not part of a deployment
-    run_checked(['cmake', '--preset', preset, *cmake_args])
+    run_checked(['cmake', '--preset', preset])
     run_checked(['cmake', '--build', '--preset', preset, '--target', 'duet_realtime_core_shared', f'-j{jobs()}',
                  *(['--clean-first'] if options.clean else [])])
     library = realtime_core_library(options)

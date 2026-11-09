@@ -26,8 +26,8 @@ TRACY_VERSION = 'v0.13.1'
 TRACY_REPO = 'https://github.com/wolfpld/tracy.git'
 SOURCE_DIR = BUILD / 'tracy' / 'src'
 
-# The toolchain files live with libduet_realtime_core.so and carry the reasoning about glibc versions
-# and sysroots; the same cross compilers produce a client the deployed DuetControlServer can load
+# The toolchain files live with libduet_realtime_core.so and carry the reasoning about glibc versions;
+# the same cross compilers produce a client the deployed DuetControlServer can load
 TOOLCHAINS = {
     'linux-arm64': ROOT / 'src' / 'DuetRealtimeCore' / 'cmake' / 'aarch64-linux-gnu.cmake',
     'linux-arm': ROOT / 'src' / 'DuetRealtimeCore' / 'cmake' / 'arm-linux-gnueabihf.cmake',

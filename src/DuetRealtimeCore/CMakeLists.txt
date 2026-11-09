@@ -43,14 +43,12 @@ option(DUET_REALTIME_CORE_CLANG_TIDY "Run clang-tidy on the sources during the b
 # A cross build needs help, because clang-tidy is not the cross compiler and does not pretend to be
 # one. CMake hands it the GCC command line, but the tool itself is plain `clang-tidy`, so nothing
 # tells clang which target it is analysing for - it falls back to the host and analyses aarch64 code
-# as x86-64. On top of that, --sysroot means "resolve every include under here" to clang while to
-# GCC it means only the C library: GCC keeps taking libstdc++ and its own headers from the toolchain
-# installed in this container. Left alone, clang-tidy then fails on <cstddef>, parses the rest of
-# the TU into error-recovery stubs, and reports against the wreckage (uninitialised members,
-# can-be-static) rather than against the code.
+# as x86-64. Nor does clang know where the cross GCC keeps libstdc++ and its own headers. Left
+# alone, clang-tidy then fails on <cstddef>, parses the rest of the TU into error-recovery stubs, and
+# reports against the wreckage (uninitialised members, can-be-static) rather than against the code.
 #
 # Both are fixed by asking the compiler what it actually does - its target triple, and the include
-# search path it really uses for this sysroot - and telling clang the same thing.
+# search path it really uses - and telling clang the same thing.
 function(_duet_realtime_core_cross_tidy_args OUT)
     set(_args)
 
@@ -63,12 +61,8 @@ function(_duet_realtime_core_cross_tidy_args OUT)
     endif()
     list(APPEND _args "--extra-arg-before=--target=${_triple}")
 
-    set(_sysroot_arg)
-    if(CMAKE_SYSROOT)
-        set(_sysroot_arg "--sysroot=${CMAKE_SYSROOT}")
-    endif()
     execute_process(
-        COMMAND "${CMAKE_CXX_COMPILER}" ${_sysroot_arg} -E -x c++ - -v
+        COMMAND "${CMAKE_CXX_COMPILER}" -E -x c++ - -v
         INPUT_FILE /dev/null
         OUTPUT_QUIET
         ERROR_VARIABLE _verbose

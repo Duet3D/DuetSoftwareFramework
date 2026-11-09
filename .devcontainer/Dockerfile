@@ -1,5 +1,5 @@
 # Debian Bookworm, whose glibc (2.36) is Raspberry Pi OS Bookworm's, so that libduet_realtime_core.so
-# cross-built here runs on the Pi without a sysroot
+# cross-built here runs on the Pi
 ARG VARIANT=bookworm
 FROM mcr.microsoft.com/devcontainers/base:${VARIANT}
 

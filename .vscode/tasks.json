@@ -237,7 +237,7 @@
         },
         {
             // Native SPI transfer loop (libduet_realtime_core.so). Cross-compiled for aarch64. The
-            // devcontainer's glibc matches Raspberry Pi OS Bookworm's, so no sysroot is involved.
+            // devcontainer's glibc matches Raspberry Pi OS Bookworm's.
             "label": "[DSF] Build DuetRealtimeCore",
             "type": "shell",
             "command": "scripts/build.py --debug DuetRealtimeCore",
@@ -281,17 +281,6 @@
             }
         },
         {
-            // Fetch a sysroot from the Pi. Not needed for Bookworm targets; only for cross-building
-            // against a glibc older than the container's 2.36.
-            "label": "[DSF] Fetch Pi Sysroot",
-            "type": "shell",
-            "command": "./src/DuetRealtimeCore/scripts/fetch-pi-sysroot.sh ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp} ./src/DuetRealtimeCore/pi-sysroot",
-            "problemMatcher": [],
-            "runOptions": {
-                "instanceLimit": 1
-            }
-        },
-        {
             // The C# test suite (DCS, DuetAPI, DuetHttpClient). Runs natively for the host.
             "label": "[DSF] Run C# Unit Tests",
             "type": "shell",
@@ -319,7 +308,7 @@
         },
         {
             // Host-side unit tests for the native interface (ring buffer framing/concurrency).
-            // Builds natively for the host, so no Pi or sysroot is involved.
+            // Builds natively for the host, so no Pi is involved.
             "label": "[DSF] Run Native Tests",
             "type": "shell",
             "command": "scripts/test.py native",
@@ -343,7 +332,7 @@
         },
         {
             // Builds and deploys the jitter harness, which measures RequestTransfer -> transfer
-            // latency without the .NET runtime. Statically linked, so it needs no sysroot.
+            // latency without the .NET runtime. Statically linked, so it runs on any Pi OS release.
             "label": "[DSF] Build and Deploy Jitter Harness to",
             "type": "shell",
             "command": "cmake --preset DuetRealtimeCore-arm64 && cmake --build --preset DuetRealtimeCore-arm64 --target realtime_core_jitter_test -j && scp build/DuetRealtimeCore-arm64/realtime_core_jitter_test ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp}:~/",

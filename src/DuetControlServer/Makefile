@@ -12,10 +12,7 @@ include ../../Makefile.components
 #
 # NOTE ON GLIBC: a shared library must link glibc dynamically, so a cross-built .so must not require
 # a newer glibc than the target has. The devcontainer is Debian Bookworm and its cross toolchain
-# targets the same glibc 2.36 as Raspberry Pi OS Bookworm, so a cross-built .so loads on the Pi as-is
-# and no sysroot is involved. To target an older release, pass one:
-#
-#     make DUET_REALTIME_CORE_SYSROOT=/path/to/pi-sysroot   (see src/DuetRealtimeCore/scripts/fetch-pi-sysroot.sh)
+# targets the same glibc 2.36 as Raspberry Pi OS Bookworm, so a cross-built .so loads on the Pi as-is.
 # ---------------------------------------------------------------------------
 
 REALTIME_CORE_SRC_DIR := ../DuetRealtimeCore
@@ -34,9 +31,6 @@ endif
 REALTIME_CORE_CMAKE_ARGS := -DCMAKE_BUILD_TYPE=Release
 ifneq ($(REALTIME_CORE_TOOLCHAIN),)
     REALTIME_CORE_CMAKE_ARGS += -DCMAKE_TOOLCHAIN_FILE=$(abspath $(REALTIME_CORE_TOOLCHAIN))
-endif
-ifneq ($(DUET_REALTIME_CORE_SYSROOT),)
-    REALTIME_CORE_CMAKE_ARGS += -DDUET_REALTIME_CORE_SYSROOT=$(abspath $(DUET_REALTIME_CORE_SYSROOT))
 endif
 
 .PHONY: native-lib

@@ -106,29 +106,25 @@
             "name": "aarch64-linux-gnu",
             "hidden": true,
             "description": "Cross-compile DuetRealtimeCore for aarch64 against this container's libraries. The devcontainer is Debian Bookworm, so its cross toolchain targets the same glibc 2.36 as Raspberry Pi OS Bookworm and the library loads there as-is.",
-            "toolchainFile": "${sourceDir}/src/DuetRealtimeCore/cmake/aarch64-linux-gnu.cmake",
-            "cacheVariables": {
-                "DUET_REALTIME_CORE_SYSROOT": ""
-            }
+            "toolchainFile": "${sourceDir}/src/DuetRealtimeCore/cmake/aarch64-linux-gnu.cmake"
         },
         {
             "name": "arm-linux-gnueabihf",
             "hidden": true,
             "description": "As aarch64-linux-gnu, for a 32-bit Raspberry Pi OS install.",
-            "toolchainFile": "${sourceDir}/src/DuetRealtimeCore/cmake/arm-linux-gnueabihf.cmake",
-            "cacheVariables": {
-                "DUET_REALTIME_CORE_SYSROOT": ""
-            }
+            "toolchainFile": "${sourceDir}/src/DuetRealtimeCore/cmake/arm-linux-gnueabihf.cmake"
         },
-        {
-            "name": "pi-sysroot",
-            "hidden": true,
-            "description": "Link against a sysroot copied from the Pi, to target a glibc older than the container's 2.36. Requires src/DuetRealtimeCore/pi-sysroot/: fetch it with src/DuetRealtimeCore/scripts/fetch-pi-sysroot.sh <user>@<pi-host>, or override the path with -DDUET_REALTIME_CORE_SYSROOT=...",
-            "cacheVariables": {
-                "DUET_REALTIME_CORE_SYSROOT": "${sourceDir}/src/DuetRealtimeCore/pi-sysroot"
-            }
-        },
-
+        
+        { "name": "DuetCANMaster_MB6HC",                    "displayName": "DuetCANMaster Duet 3 MB6HC", "inherits": ["DuetCANMaster", "SAME70"], "cacheVariables": { "DUET_BOARD": "Duet3_MB6HC" } },
+        { "name": "DuetCANMaster_MB6HC-debug",              "displayName": "DuetCANMaster Duet 3 MB6HC (Debug)", "inherits": ["debug", "DuetCANMaster_MB6HC"] },
+        { "name": "DuetCANMaster_MB6XD",                    "displayName": "DuetCANMaster Duet 3 MB6XD", "inherits": ["DuetCANMaster", "SAME70"], "cacheVariables": { "DUET_BOARD": "Duet3_MB6XD" } },
+        { "name": "DuetCANMaster_MB6XD-debug",              "displayName": "DuetCANMaster Duet 3 MB6XD (Debug)", "inherits": ["debug", "DuetCANMaster_MB6XD"] },
+        { "name": "DuetRealtimeCore-native",                "displayName": "DuetRealtimeCore native", "inherits": ["DuetRealtimeCore"] },
+        { "name": "DuetRealtimeCore-native-debug",          "displayName": "DuetRealtimeCore native (Debug)", "inherits": ["debug", "DuetRealtimeCore-native"] },
+        { "name": "DuetRealtimeCore-arm64",                 "displayName": "DuetRealtimeCore aarch64", "inherits": ["DuetRealtimeCore", "aarch64-linux-gnu"] },
+        { "name": "DuetRealtimeCore-arm64-debug",           "displayName": "DuetRealtimeCore aarch64 (Debug)", "inherits": ["debug", "DuetRealtimeCore-arm64"] },
+        { "name": "DuetRealtimeCore-armhf",                 "displayName": "DuetRealtimeCore armhf", "inherits": ["DuetRealtimeCore", "arm-linux-gnueabihf"] },
+        { "name": "DuetRealtimeCore-armhf-debug",           "displayName": "DuetRealtimeCore armhf (Debug)", "inherits": ["debug", "DuetRealtimeCore-armhf"] },
         { "name": "Duet3Firmware_MB6HC",                    "displayName": "Duet 3 MB6HC", "inherits": ["RepRapFirmware", "SAME70"], "cacheVariables": { "DUET_BOARD": "Duet3_MB6HC" } },
         { "name": "Duet3Firmware_MB6HC-debug",              "displayName": "Duet 3 MB6HC (Debug)", "inherits": ["debug", "Duet3Firmware_MB6HC"] },
         { "name": "Duet3Firmware_MB6XD",                    "displayName": "Duet 3 MB6XD", "inherits": ["RepRapFirmware", "SAME70"], "cacheVariables": { "DUET_BOARD": "Duet3_MB6XD" } },
@@ -190,23 +186,19 @@
         { "name": "Duet3_SBCiap32_MB6XD",                   "displayName": "SBC IAP Duet 3 MB6XD", "inherits": ["DuetIAP", "SAME70"], "cacheVariables": { "DUET_BOARD": "Duet3_MB6XD", "IAP_SBC": "ON" } },
         { "name": "Duet3_SBCiap32_MB6XD-debug",             "displayName": "SBC IAP Duet 3 MB6XD (Debug)", "inherits": ["debug", "Duet3_SBCiap32_MB6XD"] },
         { "name": "Duet3_SBCiap32_Mini5plus",               "displayName": "SBC IAP Duet 3 Mini 5+", "inherits": ["DuetIAP", "SAME5x"], "cacheVariables": { "DUET_BOARD": "Duet3Mini5plus", "IAP_SBC": "ON" } },
-        { "name": "Duet3_SBCiap32_Mini5plus-debug",         "displayName": "SBC IAP Duet 3 Mini 5+ (Debug)", "inherits": ["debug", "Duet3_SBCiap32_Mini5plus"] },
-        { "name": "DuetCANMaster_MB6HC",                    "displayName": "DuetCANMaster Duet 3 MB6HC", "inherits": ["DuetCANMaster", "SAME70"], "cacheVariables": { "DUET_BOARD": "Duet3_MB6HC" } },
-        { "name": "DuetCANMaster_MB6HC-debug",              "displayName": "DuetCANMaster Duet 3 MB6HC (Debug)", "inherits": ["debug", "DuetCANMaster_MB6HC"] },
-        { "name": "DuetCANMaster_MB6XD",                    "displayName": "DuetCANMaster Duet 3 MB6XD", "inherits": ["DuetCANMaster", "SAME70"], "cacheVariables": { "DUET_BOARD": "Duet3_MB6XD" } },
-        { "name": "DuetCANMaster_MB6XD-debug",              "displayName": "DuetCANMaster Duet 3 MB6XD (Debug)", "inherits": ["debug", "DuetCANMaster_MB6XD"] },
-        { "name": "DuetRealtimeCore-native",                "displayName": "DuetRealtimeCore native", "inherits": ["DuetRealtimeCore"] },
-        { "name": "DuetRealtimeCore-native-debug",          "displayName": "DuetRealtimeCore native (Debug)", "inherits": ["debug", "DuetRealtimeCore-native"] },
-        { "name": "DuetRealtimeCore-arm64",                 "displayName": "DuetRealtimeCore aarch64", "inherits": ["DuetRealtimeCore", "aarch64-linux-gnu"] },
-        { "name": "DuetRealtimeCore-arm64-debug",           "displayName": "DuetRealtimeCore aarch64 (Debug)", "inherits": ["debug", "DuetRealtimeCore-arm64"] },
-        { "name": "DuetRealtimeCore-arm64-sysroot",         "displayName": "DuetRealtimeCore aarch64 Pi sysroot", "inherits": ["pi-sysroot", "DuetRealtimeCore", "aarch64-linux-gnu"] },
-        { "name": "DuetRealtimeCore-arm64-sysroot-debug",   "displayName": "DuetRealtimeCore aarch64 Pi sysroot (Debug)", "inherits": ["debug", "DuetRealtimeCore-arm64-sysroot"] },
-        { "name": "DuetRealtimeCore-armhf",                 "displayName": "DuetRealtimeCore armhf", "inherits": ["DuetRealtimeCore", "arm-linux-gnueabihf"] },
-        { "name": "DuetRealtimeCore-armhf-debug",           "displayName": "DuetRealtimeCore armhf (Debug)", "inherits": ["debug", "DuetRealtimeCore-armhf"] },
-        { "name": "DuetRealtimeCore-armhf-sysroot",         "displayName": "DuetRealtimeCore armhf Pi sysroot", "inherits": ["pi-sysroot", "DuetRealtimeCore", "arm-linux-gnueabihf"] },
-        { "name": "DuetRealtimeCore-armhf-sysroot-debug",   "displayName": "DuetRealtimeCore armhf Pi sysroot (Debug)", "inherits": ["debug", "DuetRealtimeCore-armhf-sysroot"] }
+        { "name": "Duet3_SBCiap32_Mini5plus-debug",         "displayName": "SBC IAP Duet 3 Mini 5+ (Debug)", "inherits": ["debug", "Duet3_SBCiap32_Mini5plus"] }
     ],
     "buildPresets": [
+        { "name": "DuetCANMaster_MB6HC",                    "configurePreset": "DuetCANMaster_MB6HC" },
+        { "name": "DuetCANMaster_MB6HC-debug",              "configurePreset": "DuetCANMaster_MB6HC-debug" },
+        { "name": "DuetCANMaster_MB6XD",                    "configurePreset": "DuetCANMaster_MB6XD" },
+        { "name": "DuetCANMaster_MB6XD-debug",              "configurePreset": "DuetCANMaster_MB6XD-debug" },
+        { "name": "DuetRealtimeCore-native",                "configurePreset": "DuetRealtimeCore-native" },
+        { "name": "DuetRealtimeCore-native-debug",          "configurePreset": "DuetRealtimeCore-native-debug" },
+        { "name": "DuetRealtimeCore-arm64",                 "configurePreset": "DuetRealtimeCore-arm64" },
+        { "name": "DuetRealtimeCore-arm64-debug",           "configurePreset": "DuetRealtimeCore-arm64-debug" },
+        { "name": "DuetRealtimeCore-armhf",                 "configurePreset": "DuetRealtimeCore-armhf" },
+        { "name": "DuetRealtimeCore-armhf-debug",           "configurePreset": "DuetRealtimeCore-armhf-debug" },
         { "name": "Duet3Firmware_MB6HC",                    "configurePreset": "Duet3Firmware_MB6HC" },
         { "name": "Duet3Firmware_MB6HC-debug",              "configurePreset": "Duet3Firmware_MB6HC-debug" },
         { "name": "Duet3Firmware_MB6XD",                    "configurePreset": "Duet3Firmware_MB6XD" },
@@ -268,20 +260,6 @@
         { "name": "Duet3_SBCiap32_MB6XD",                   "configurePreset": "Duet3_SBCiap32_MB6XD" },
         { "name": "Duet3_SBCiap32_MB6XD-debug",             "configurePreset": "Duet3_SBCiap32_MB6XD-debug" },
         { "name": "Duet3_SBCiap32_Mini5plus",               "configurePreset": "Duet3_SBCiap32_Mini5plus" },
-        { "name": "Duet3_SBCiap32_Mini5plus-debug",         "configurePreset": "Duet3_SBCiap32_Mini5plus-debug" },
-        { "name": "DuetCANMaster_MB6HC",                    "configurePreset": "DuetCANMaster_MB6HC" },
-        { "name": "DuetCANMaster_MB6HC-debug",              "configurePreset": "DuetCANMaster_MB6HC-debug" },
-        { "name": "DuetCANMaster_MB6XD",                    "configurePreset": "DuetCANMaster_MB6XD" },
-        { "name": "DuetCANMaster_MB6XD-debug",              "configurePreset": "DuetCANMaster_MB6XD-debug" },
-        { "name": "DuetRealtimeCore-native",                "configurePreset": "DuetRealtimeCore-native" },
-        { "name": "DuetRealtimeCore-native-debug",          "configurePreset": "DuetRealtimeCore-native-debug" },
-        { "name": "DuetRealtimeCore-arm64",                 "configurePreset": "DuetRealtimeCore-arm64" },
-        { "name": "DuetRealtimeCore-arm64-debug",           "configurePreset": "DuetRealtimeCore-arm64-debug" },
-        { "name": "DuetRealtimeCore-arm64-sysroot",         "configurePreset": "DuetRealtimeCore-arm64-sysroot" },
-        { "name": "DuetRealtimeCore-arm64-sysroot-debug",   "configurePreset": "DuetRealtimeCore-arm64-sysroot-debug" },
-        { "name": "DuetRealtimeCore-armhf",                 "configurePreset": "DuetRealtimeCore-armhf" },
-        { "name": "DuetRealtimeCore-armhf-debug",           "configurePreset": "DuetRealtimeCore-armhf-debug" },
-        { "name": "DuetRealtimeCore-armhf-sysroot",         "configurePreset": "DuetRealtimeCore-armhf-sysroot" },
-        { "name": "DuetRealtimeCore-armhf-sysroot-debug",   "configurePreset": "DuetRealtimeCore-armhf-sysroot-debug" }
+        { "name": "Duet3_SBCiap32_Mini5plus-debug",         "configurePreset": "Duet3_SBCiap32_Mini5plus-debug" }
     ]
 }
