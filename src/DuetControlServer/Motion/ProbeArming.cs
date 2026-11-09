@@ -66,6 +66,7 @@ internal static class ProbeArming
         // Only an analog probe has a threshold to compare against. A digital probe was created with
         // zero, which is what tells the board to read the pin digitally, and sending it a nonzero
         // threshold would switch it to analog reads and stop it reporting at all
+        // TODO a load cell probe needs its threshold too, as RRF's RemoteZProbe::HandleG31 sends it
         uint? threshold = probe.Type is ProbeType.Analog or ProbeType.ScanningAnalog
                           ? (uint)Math.Max(probe.Threshold, 0)
                           : null;

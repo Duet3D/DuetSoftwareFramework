@@ -268,6 +268,8 @@ internal sealed class JobSequences(
 
         await RunPauseMacroAsync(request.Channel, request.Macro, cancellationToken);
 
+        // TODO RRF writes resurrect.g here and reports "Resume state saved" before the paused-at line
+        // (GCodes::SaveResumeInfo, regression case m25-pause-print)
         Message reply = await PausedAtMessageAsync(request.Macro, cancellationToken);
         return new SequenceOutcome(request.ReportPosition ? reply : new Message(), Failed: false, Rewinds: rewinds);
     }

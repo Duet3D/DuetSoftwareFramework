@@ -461,6 +461,8 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
             case JobPhase.Running:
             case JobPhase.Pausing:
             case JobPhase.Resuming:
+                // TODO RRF ignores M24 only while pausing or resuming. While starting or running, StartPrinting
+                // has moved fileToPrint into the file reader, so M24 is refused "Cannot print, because no file is selected!"
                 // RepRapFirmware ignores a resume of a job that is already going where it was asked
                 command.Reply(new Message());
                 return ValueTask.CompletedTask;
@@ -589,9 +591,9 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
                 return;
 
             case JobPhase.Idle:
-                // No job to stop, so this is the operator putting the machine down for the night.
-                // RepRapFirmware runs stop.g here too, and it must work every time it is given -
-                // including when another stop is already running its macro, so this one waits
+                // TODO RRF refuses this with "Pause the print before attempting to cancel it" and runs no macro
+                // (GCodes2.cpp case 0, regression case m0-m1-m2-cancel-guard); see M0M1AndM2OutsideAJobAreRefused
+                // A stop that arrives while another is running its macro waits for it
                 if (_sequence is not null)
                 {
                     _deferredCommands.Enqueue(command);

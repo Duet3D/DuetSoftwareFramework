@@ -28,11 +28,7 @@ internal sealed partial class GCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleProbeParametersAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        int probeNumber = code.GetInt('K', defaultValue: 0);
-        if (probeNumber < 0 || probeNumber >= RemoteProbes.MaxProbes)
-        {
-            return new Message(MessageType.Error, $"Z probe number out of range (0..{RemoteProbes.MaxProbes - 1})");
-        }
+        int probeNumber = code.GetInt('K', defaultValue: 0, min: 0, max: RemoteProbes.MaxProbes - 1);
 
         List<Message> reports = [];
         ProbeArming.ProbeMonitor thresholdMonitor = default;
@@ -100,6 +96,9 @@ internal sealed partial class GCodeHandler
                 seen = true;
             }
 
+            // TODO RRF's ZProbe::HandleG31 checks sensor H when T is given: an unknown sensor zeroes the
+            // coefficients and warns "Temperature coefficients ignored due to invalid sensor number %d"
+
             // One coefficient per term the probe corrects with (RRF ZProbe.cpp, numValues =
             // ARRAY_SIZE(temperatureCoefficients))
             if (code.TryGetFloatArray('T', probe.TemperatureCoefficients.Count, out float[]? coefficients))
@@ -111,6 +110,8 @@ internal sealed partial class GCodeHandler
                 seen = true;
             }
 
+            // TODO RRF reads S only with T, and T without S takes the sensor's current temperature, or the
+            // default with a warning if the sensor has no reading after 500 ms
             if (code.TryGetFloat('S', out float calibrationTemperature))
             {
                 probe.CalibrationTemperature = calibrationTemperature;
@@ -147,6 +148,8 @@ internal sealed partial class GCodeHandler
     {
         StringBuilder builder = new();
         int reading = probe.Value.Count > 0 ? probe.Value[0] : 0;
+        // TODO RRF follows the reading with the secondary value, " (%d)", when the probe has one
+        // TODO a load cell probe reports "current tared reading %d (baseline %d), force %.1fg, threshold %dg" instead (RRF ZProbe::HandleG31)
         builder.Append(CultureInfo.InvariantCulture, $"Z probe {probeNumber}: current reading {reading}");
         builder.Append(CultureInfo.InvariantCulture, $", threshold {probe.Threshold}");
         builder.Append(CultureInfo.InvariantCulture, $", trigger height {probe.TriggerHeight:F3}");

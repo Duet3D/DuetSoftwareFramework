@@ -190,10 +190,7 @@ internal partial class MCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleServoAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (!code.TryGetInt('P', out int portNumber))
-        {
-            return new Message(MessageType.Error, "Missing servo number");
-        }
+        int portNumber = code.GetInt('P', min: 0, max: GpioManager.MaxGpInPorts - 1);
         if (!code.TryGetFloat('S', out float value))
         {
             return await ReportOutputAsync(portNumber, cancellationToken);

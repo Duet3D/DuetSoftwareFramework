@@ -437,7 +437,7 @@ internal sealed class MotionParameters
             Geometry = geometry,
             MaxPrintingAcceleration = MotionUnits.AccelerationFromMmPerSecSquared(motionSystem?.PrintingAcceleration ?? DefaultAcceleration),
             MaxTravelAcceleration = MotionUnits.AccelerationFromMmPerSecSquared(motionSystem?.TravelAcceleration ?? DefaultAcceleration),
-            MinFeedrate = MotionUnits.SpeedFromMmPerSec(move.MinimumMovementSpeed)
+            MinFeedrate = MotionUnits.SpeedFromMmPerSec(move.MinSpeed)
         };
 
         uint linearAxes = 0, rotationalAxes = 0, continuousRotationAxes = 0;

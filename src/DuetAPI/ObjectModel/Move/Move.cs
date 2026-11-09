@@ -117,12 +117,12 @@ public partial class Move : ModelObject, IStaticModelObject
     /// A floor rather than a preference: the planner's timing arithmetic overflows for a move slow
     /// enough to take more than about 2^31 step clocks
     /// </remarks>
-    public float MinimumMovementSpeed
+    public float MinSpeed
     {
-        get => _minimumMovementSpeed;
-        set => SetPropertyValue(ref _minimumMovementSpeed, value);
+        get => _minSpeed;
+        set => SetPropertyValue(ref _minSpeed, value);
     }
-    private float _minimumMovementSpeed = 0.5F;
+    private float _minSpeed = 0.5F;
 
     /// <summary>
     /// List of configured keep-out zones

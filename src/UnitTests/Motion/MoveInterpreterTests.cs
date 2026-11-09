@@ -49,7 +49,7 @@ public class MoveInterpreterTests
     {
         DuetControlServer.Model.ObjectModel model = NewModel();
         Move move = model.Move;
-        move.MinimumMovementSpeed = 0.5f;
+        move.MinSpeed = 0.5f;
         move.MotionSystems.Add(new MotionSystem { PrintingAcceleration = 10000.0f, TravelAcceleration = 10000.0f });
 
         AddAxis(move, 'X', stepsPerMm: 80.0f, speedMmPerMin: 18000.0f, acceleration: 1000.0f, driver: 0);

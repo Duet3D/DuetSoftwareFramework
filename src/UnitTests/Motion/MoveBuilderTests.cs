@@ -36,7 +36,7 @@ public class MoveBuilderTests
     {
         Move move = new()
         {
-            MinimumMovementSpeed = 0.5f
+            MinSpeed = 0.5f
         };
 
         // The move-wide acceleration caps live on the motion system, which is where M204 writes them

@@ -242,7 +242,7 @@ internal partial class MCodeHandler
     }
 
     /// <summary>
-    /// M104 / M109 / M140 / M141 / M144 / M190 / M191: set a temperature, and wait for it where asked
+    /// M104 / M109 / M140 / M141 / M190 / M191: set a temperature, and wait for it where asked
     /// </summary>
     /// <param name="code">The code</param>
     /// <param name="heaters">Heaters the code addresses</param>
@@ -257,6 +257,8 @@ internal partial class MCodeHandler
     private async ValueTask<Message> SetTemperaturesAsync(Commands.Code code, IReadOnlyList<int> heaters, bool wait,
                                                           CancellationToken cancellationToken)
     {
+        // TODO RRF M140 with no bed heater refuses S > 0 and R but accepts S <= 0; M104/M109 on a tool with no
+        // heaters still completes (and M109 still selects the tool)
         if (heaters.Count == 0)
         {
             return new Message(MessageType.Warning, "No heater to set");
@@ -269,6 +271,15 @@ internal partial class MCodeHandler
             return await ReportTemperaturesAsync(cancellationToken);
         }
 
+        // TODO behaviour RRF has that this does not:
+        // - M104/M109: R takes precedence over S, the one value sets both active and standby (and the tool's
+        //   active[]/standby[]), and R makes M109 wait while cooling. M140: R alone only stores standby and
+        //   does not switch the heater on
+        // - only S <= -273 switches off, leaving active unchanged; S0 sets 0 and switches the heater on
+        // - a temperature outside the heater's limits, or a heater in fault, is refused before anything changes
+        // - M104/M109 on a tool other than the current one puts that tool on standby, and a heater shared
+        //   with the current tool is left alone
+        // As written, R alone marks the heater active but leaves Active, so the M109 wait reads the old setpoint
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             foreach (int heaterNumber in heaters)
@@ -357,6 +368,9 @@ internal partial class MCodeHandler
         List<int> heaters = [];
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
+            // TODO RRF M116: S is the tolerance (must be > 0); P takes a list, a bare P means every tool, and a
+            // missing tool is skipped; H waits for heaters and C for chamber slots; P, H and C combine; with
+            // none of them only tool, bed and chamber heaters are waited for, not every heater
             if (code.TryGetInt('P', out int toolNumber))
             {
                 if (toolManager.Find(toolNumber) is not Tool tool)
@@ -408,6 +422,10 @@ internal partial class MCodeHandler
                 seen = true;
             }
 
+            // TODO RRF keeps P as a flag beside the two minimums, which it reports as 0 only while P1 is in force:
+            // P0 brings the stored minimums back, and S/R under P1 are stored without forbidding anything. Zeroing
+            // them here loses them, so P0 after P1 leaves cold extrusion allowed. The minimums need somewhere in the
+            // object model to live while P1 hides them. RRF also waits for standstill before changing any of these
             if (code.TryGetInt('P', out int allow))
             {
                 // P is the blunt form: allowing cold extrusion is the same as saying it is permitted
@@ -442,6 +460,10 @@ internal partial class MCodeHandler
     private async ValueTask<List<int>> BedOrChamberHeatersAsync(Commands.Code code, bool chamber,
                                                                 CancellationToken cancellationToken)
     {
+        // TODO RRF: no P means slot 0, not every slot, and P is range-checked; H takes a list, refuses invalid
+        // heaters and heaters already used by a tool or the other kind of slot, switches off the slot's old
+        // heaters, and sets the new ones' default bed/chamber model and over-temperature monitor
+        // (Heat::SetFunction); heat.bedHeaters/chamberHeaters are never written
         int index = code.TryGetInt('P', out int given) ? given : -1;
         if (code.TryGetInt('H', out int heaterNumber))
         {

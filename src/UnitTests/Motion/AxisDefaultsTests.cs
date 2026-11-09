@@ -77,7 +77,7 @@ public class AxisDefaultsTests
     public void EveryDefaultIsAboveTheFloorItsCodeClampsTo()
     {
         Move move = new();
-        float minSpeed = move.MinimumMovementSpeed * 60.0f;      // the floor M203 applies, in mm/min
+        float minSpeed = move.MinSpeed * 60.0f;      // the floor M203 applies, in mm/min
 
         Assert.Multiple(() =>
         {

@@ -185,7 +185,7 @@ public class DriveConfigCodeTests : SystemTests.Host.BenchFixture
                     "M203 Y100 S1 is 100 mm/s, reported as 6000 mm/min in move.axes[1].speed (RRF GCodes2.cpp case 203 usingMmPerSec)");
 
         await bench.Host.ExecuteCodeAsync("M203 I10 S1");
-        Assert.That(bench.Host.ReadModelAsync(model => model.Move.MinimumMovementSpeed).Result, Is.EqualTo(10).Within(1e-2),
+        Assert.That(bench.Host.ReadModelAsync(model => model.Move.MinSpeed).Result, Is.EqualTo(10).Within(1e-2),
                     "M203 I10 S1 sets the minimum movement speed to 10 mm/s");
 
 

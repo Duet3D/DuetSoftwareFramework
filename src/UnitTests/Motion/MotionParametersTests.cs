@@ -27,7 +27,7 @@ public class MotionParametersTests
     {
         Move move = new()
         {
-            MinimumMovementSpeed = 0.5f,
+            MinSpeed = 0.5f,
             JerkPolicy = 1,
             BacklashFactor = 7
         };

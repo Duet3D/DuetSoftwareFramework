@@ -104,6 +104,9 @@ internal sealed partial class GCodeHandler(
         { 30, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleProbeAsync(c, ct) },
         // Set or report the Z probe trigger height, offsets and threshold
         { 31, CodeClass.Immediate, (h, c, ct) => h.HandleProbeParametersAsync(c, ct) }, // read by probing sequences, which run at standstill
+        // TODO G32: run bed.g at standstill, warning "Macro file bed.g not found" if it is missing (RRF GCodes2.cpp case 32);
+        // useful only once G30 P records probe points and FinishedBedProbing works out the bed transform
+        // TODO G53 on a line of its own: RRF accepts it silently (GCodes2.cpp case 53), and G54-G59 later on the line cancel it
         // Save the current position to a restore point
         { 60, CodeClass.Immediate, (h, c, ct) => h.HandleSavePositionAsync(c, ct) }, // snapshots the current planned position, as RRF does
         // Absolute / relative positioning
@@ -561,7 +564,7 @@ internal sealed partial class GCodeHandler(
     /// <returns>The result</returns>
     private async ValueTask<Message> HandleSetPositionAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        // TODO validate this against RRF
+        // TODO RRF waits for standstill when an axis is named, and refuses X/Y while G68 rotation is in effect
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             float unitScale = MoveInterpreter.UnitScale(model.Inputs[code.Channel]);
@@ -592,7 +595,8 @@ internal sealed partial class GCodeHandler(
                 {
                     // The planner keeps its own machine position, and this changes what that
                     // position is called without moving anything
-                    // TODO apply tool offsets?
+                    // TODO run the user position through ToolOffsetTransform (tool offsets, axis mapping, bed
+                    // compensation), then LimitPosition to the M208 limits and back, as RRF's SetPositions does
                     foreach (int axis in axesIncluded)
                     {
                         planner.Builder.SetAxisPosition(axis, state.CurrentUserPosition[axis]);
@@ -618,6 +622,7 @@ internal sealed partial class GCodeHandler(
                         {
                             g92Axes |= 1u << axis;
                         }
+                        // TODO naming Z clears RRF's zDatumSetByProbing, which G29 S1 warns about when it is unset
                         uint assumedHomed = planner.Parameters.Geometry.AxesAssumedHomed(g92Axes);
                         for (int axis = 0; axis < model.Move.Axes.Count; axis++)
                         {
@@ -629,6 +634,8 @@ internal sealed partial class GCodeHandler(
                     }
                 }
 
+                // TODO RRF sets the virtual extruder position (move.virtualEPos) rather than every extruder's
+                // position, and clears the current tool's pending extrusion
                 if (code.TryGetFloat('E', out float extruderPosition))
                 {
                     foreach (Extruder extruder in model.Move.Extruders)

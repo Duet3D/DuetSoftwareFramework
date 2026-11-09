@@ -70,7 +70,8 @@ internal sealed partial class GCodeHandler
         }
         if (sValue == SetToolOffset)
         {
-            return new Message(MessageType.Error, "G30 S-2 needs a tool, and tools are not supported yet");
+            // TODO support G30 S-2
+            return new Message(MessageType.Error, "G30 S-2 not implemented yet");
         }
 
         float heightOffset = code.GetFloat('H', defaultValue: 0.0f);
@@ -158,6 +159,7 @@ internal sealed partial class GCodeHandler
                 probe.TravelSpeed / MinuteInSeconds,
                 Math.Max(1, probe.MaxProbeCount),
                 probe.Tolerance,
+                // TODO apply temperatureCoefficients about calibrationTemperature, as RRF's ZProbe::GetTriggerHeightCompensation does
                 probe.TriggerHeight,
                 probe.RecoveryTime,
                 model.Move.Axes[zAxis].Min,

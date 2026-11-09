@@ -108,6 +108,8 @@ internal partial class MCodeHandler(
     /// </remarks>
     public async ValueTask<Message> ProcessAsync(Commands.Code code, CancellationToken cancellationToken)
     {
+        // TODO RRF skips M-codes while simulating on every channel, and still runs M20-M37, M82/M83, M98/M99,
+        // M111, M112, M120/M121, M200, M204, M205, M207, M572, M593, M997 and M999 (GCodes2.cpp HandleMcode)
         if (code.IsFromFileChannel && jobController.State.IsSimulating && code.MajorNumber is not 0 and not 1 and not 2)
         {
             // Ignore most M-codes from files in simulation mode...
@@ -200,12 +202,14 @@ internal partial class MCodeHandler(
         { 92, FlushAndStandstillWhenSettingDrives, (h, c, ct) => h.HandleStepsPerMmAsync(c, ct) },
         // Flag current macro file as (not) pausable
         { 98, CodeClass.Immediate, (h, c, ct) => h.HandleMacroPausableAsync(c, ct) }, // M98 P starts the macro on its own stack level; the handler flushes inline first
+        // TODO M99: return from the current macro, and do nothing outside one (RRF FileMacroCyclesReturn, regression case m99-return-from-macro)
         // Set extruder temperature without waiting
         { 104, CodeClass.Deferred, async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.CurrentToolHeatersAsync(c, ct), wait: false, ct) },
         // Report temperatures
         { 105, CodeClass.Immediate, (h, c, ct) => h.ReportTemperaturesAsync(ct) },
         // Set fan speed
         { 106, CodeClass.Deferred, (h, c, ct) => h.HandleFanSpeedAsync(c, ct) },
+        // TODO M108: end every M109/M116/M190/M191 wait, which then completes OK (RRF CancelWaitForTemperatures)
         // Fan off
         { 107, CodeClass.Deferred, (h, c, ct) => h.HandleFanOffAsync(c, ct) },
         // Set extruder temperature and wait: the target must be in force before the wait begins
@@ -235,6 +239,7 @@ internal partial class MCodeHandler(
         { 141, CodeClass.Deferred, async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.BedOrChamberHeatersAsync(c, chamber: true, ct), wait: false, ct) },
         // Heater monitors
         { 143, CodeClass.Immediate, (h, c, ct) => h.HandleHeaterMonitorAsync(c, ct) },
+        // TODO M144: put the bed heaters of slot P (default 0) on standby, or active with S1 (RRF Heat::SetActiveOrStandby)
         // Set bed temperature and wait
         { 190, CodeClass.FlushAndStandstill, async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.BedOrChamberHeatersAsync(c, chamber: false, ct), wait: true, ct) },
         // Set chamber temperature and wait
@@ -623,6 +628,8 @@ internal partial class MCodeHandler(
             return new Message();
         }
 
+        // TODO RRF refuses to start or resume while M911 auto-save is on and VIN is below its threshold:
+        // "Cannot start a print while power voltage is low" / "Cannot resume while power voltage is low"
         // P0 skips resume.g, as it does in RepRapFirmware
         bool runMacro = code.GetInt('P', defaultValue: 1) != 0;
         return await StartOrResumeAsync(code, runMacro, cancellationToken);
@@ -1127,6 +1134,8 @@ internal partial class MCodeHandler(
                 throw new OperationCanceledException();
             }
 
+            // TODO RRF also sets inputs[].macroRestartable (even outside a macro, as m98-macro-pause-flag records),
+            // and R1 releases a held pause at once (CheckForDeferredPause) rather than when the macro ends
             if (codeProcessor.GetCurrentFile(code.Channel) is MacroFile currentMacro)
             {
                 using (await currentMacro.LockAsync(cancellationToken))

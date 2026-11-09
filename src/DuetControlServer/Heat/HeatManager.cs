@@ -71,7 +71,7 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
     /// RepRapFirmware's <c>TEMPERATURE_CLOSE_ENOUGH</c>. A heater never settles exactly, so waiting
     /// for equality would wait forever
     /// </remarks>
-    public const float TemperatureCloseEnough = 2.5f;
+    public const float TemperatureCloseEnough = 1.5f;
 
     /// <summary>
     /// How often to re-read the temperature while waiting for a heater
@@ -136,7 +136,7 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
             if (!TryGetBoard(heater, out board))
             {
                 return new Message(MessageType.Error,
-                                   $"Heater {heaterNumber} has no sensor, so nothing knows how hot it is");
+                                   $"Heater {heaterNumber} has no sensor");
             }
         }
 
@@ -144,7 +144,9 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
         {
             HeaterNumber = (byte)heaterNumber,
             SetPoint = setPoint,
-            Function = command
+            Command = command,
+            // TODO: set Function as the heater's role (tool 0, bed 1, chamber 2)
+            // Function = command
         };
 
         return await linkInterface.SendCanRequestAsync(board, in message, cancellationToken);
@@ -215,6 +217,10 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
                         continue;               // nothing to wait for, and a fault will not resolve itself
                     }
 
+                    // TODO RRF's Heat::HeaterAtSetTemperature: only Active and Standby heaters are waited for (not
+                    // Tuning or Offline), a target below 40C is not waited for, cooling devices are handled separately,
+                    // the test is |current - target| <= tolerance with cooling waited for when the caller asks
+                    // (M116, M109 R), and a faulted heater keeps the file channel waiting
                     float target = heater.State == HeaterState.Standby ? heater.Standby : heater.Active;
                     if (heater.Current < target - TemperatureCloseEnough)
                     {

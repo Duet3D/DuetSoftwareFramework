@@ -137,7 +137,7 @@ internal partial class MCodeHandler
                 }
             }
 
-            if (code.TryGetFloatArray('E', move.Extruders.Count, out float[]? extruderValues, pad: true, min: 0.0f))
+            if (code.TryGetFloatArray('E', move.Extruders.Count, out float[]? extruderValues, pad: true, min: 0.01f))
             {
                 for (int i = 0; i < extruderValues.Length; i++)
                 {
@@ -204,8 +204,9 @@ internal partial class MCodeHandler
 
             if (code.TryGetFloatArray('E', move.Extruders.Count, out float[]? extruderValues, pad: true, min: 0.0f))
             {
-                // An extruder has no reduced acceleration of its own in the object model; probing and
-                // stall homing moves do not extrude, so M201.1 has nothing to set for one
+                // TODO RRF stores M201.1 E as each extruder's reduced acceleration, reports it, and uses it for
+                // reduced-acceleration moves such as extruder stall-endstop moves; it needs an
+                // Extruder.ReducedAcceleration in the object model
                 if (!reduced)
                 {
                     for (int i = 0; i < extruderValues.Length; i++)
@@ -215,6 +216,9 @@ internal partial class MCodeHandler
                 }
                 seen = true;
             }
+
+            // TODO M201 T (not M201.1): the S-curve acceleration time, set at standstill with all movement locks held
+            // and must be >= 0; move.accelerationTime starts at 0 and the report ends with it (RRF GCodes2.cpp case 201)
 
             if (!seen)
             {
@@ -232,6 +236,8 @@ internal partial class MCodeHandler
         // Accelerations are not held by the engine at all - every move carries its own in
         // MoveParamsHeader - so this only has to bring the snapshot the next move is built from up to
         // date. RepRapFirmware takes no lock here either, except for the S-curve T parameter
+        // TODO an E that throws after the axes were written skips this refresh, so the object model shows the
+        // new accelerations and moves keep the old ones; RRF's axis values take effect (same in M203, M205/M566)
         await planner.RefreshTuningAsync(cancellationToken);
         return new Message();
     }
@@ -258,11 +264,11 @@ internal partial class MCodeHandler
             // The minimum first, because the maximum rates are held at or above it
             if (code.TryGetFloat('I', out float minimumSpeed))
             {
-                move.MinimumMovementSpeed = MathF.Max(minimumSpeed * toMmPerMin / SecondsPerMinute, AbsoluteMinFeedrateMmPerSec);
+                move.MinSpeed = MathF.Max(minimumSpeed * toMmPerMin / SecondsPerMinute, AbsoluteMinFeedrateMmPerSec);
                 seen = true;
             }
 
-            float minimumMmPerMin = move.MinimumMovementSpeed * SecondsPerMinute;
+            float minimumMmPerMin = move.MinSpeed * SecondsPerMinute;
             foreach (Axis axis in move.Axes)
             {
                 if (code.TryGetFloat(axis.Letter, out float value))
@@ -288,7 +294,7 @@ internal partial class MCodeHandler
                                         axis => (axis.Speed * fromMmPerMin).ToString("F1", CultureInfo.InvariantCulture),
                                         extruder => (extruder.Speed * fromMmPerMin).ToString("F1", CultureInfo.InvariantCulture))
                          + ", min. speed "
-                         + (move.MinimumMovementSpeed * SecondsPerMinute * fromMmPerMin).ToString("F2", CultureInfo.InvariantCulture);
+                         + (move.MinSpeed * SecondsPerMinute * fromMmPerMin).ToString("F2", CultureInfo.InvariantCulture);
             }
         }
 
@@ -431,7 +437,7 @@ internal partial class MCodeHandler
             return new Message(MessageType.Success, report);
         }
 
-        if (seenAxis)
+        if (seenAxis || seenExtruder)
         {
             await planner.RefreshTuningAsync(cancellationToken);
         }
@@ -483,6 +489,8 @@ internal partial class MCodeHandler
                     return new Message(MessageType.Error, $"{axis.Letter} axis maximum must be greater than minimum");
                 }
 
+                // TODO RRF marks a limit set from config-override.g as probed (minProbed/maxProbed, via runningM501),
+                // which is what makes M500 write it back; CodeFlags.IsFromConfigOverride says when
                 axis.Min = min;
                 axis.Max = max;
             }
@@ -500,6 +508,9 @@ internal partial class MCodeHandler
             }
         }
 
+        // TODO the planner's geometry keeps its own copy of the limits and nothing here refreshes it, so moves stay
+        // clamped to the old box until another code rebuilds the snapshot; RRF's LimitPosition reads the new limits
+        // at once. MotionParameters.SetAxisLimits and GCodeHandler.RecordAxisLength assume M208 reconfigures the planner
         return seen ? new Message() : new Message(MessageType.Success, report!);
     }
 
@@ -899,9 +910,9 @@ internal partial class MCodeHandler
             // An S parameter is a drive named as much as an axis letter is: it makes the code
             // something other than a request to disable everything
             bool named = false;
-            if (code.TryGetFloat('S', out float idleTimeout, min: 0.0f))
+            if (code.HasParameter('S'))
             {
-                move.Idle.Timeout = idleTimeout;
+                move.Idle.Timeout = code.GetPositiveFloat('S');
                 named = true;
             }
 
