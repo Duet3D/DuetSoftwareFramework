@@ -597,7 +597,7 @@ internal partial class MCodeHandler(
                 // the run after this one, which is started by the teardown rather than from here
                 if (code.MajorNumber == 32 && !code.IsFromFileChannel)
                 {
-                    return await jobController.StartOrResumeAsync(code.Channel, runMacro: true, cancellationToken);
+                    return await StartOrResumeAsync(code, runMacro: true, cancellationToken);
                 }
             }
 
@@ -625,7 +625,28 @@ internal partial class MCodeHandler(
 
         // P0 skips resume.g, as it does in RepRapFirmware
         bool runMacro = code.GetInt('P', defaultValue: 1) != 0;
-        return await jobController.StartOrResumeAsync(code.Channel, runMacro, cancellationToken);
+        return await StartOrResumeAsync(code, runMacro, cancellationToken);
+    }
+
+    /// <summary>
+    /// Start or resume the job, and wait for start.g or the resume sequence to finish
+    /// </summary>
+    /// <param name="code">M24, M32 or M37</param>
+    /// <param name="runMacro">Whether to run start.g or resume.g</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>The File channel moves meanwhile, so this code's channel suspends its movement lock</remarks>
+    private async ValueTask<Message> StartOrResumeAsync(Commands.Code code, bool runMacro, CancellationToken cancellationToken)
+    {
+        MovementLock.Suspension suspension = code.SuspendMovementLock();
+        try
+        {
+            return await jobController.StartOrResumeAsync(code.Channel, runMacro, cancellationToken);
+        }
+        finally
+        {
+            await suspension.RestoreAsync(cancellationToken);
+        }
     }
 
     /// <summary>
@@ -969,7 +990,7 @@ internal partial class MCodeHandler(
                 await SaveSimulationRestorePointAsync(code, cancellationToken);
 
                 // Starting a simulation is starting a job, so it goes through the same call M24 makes
-                return await jobController.StartOrResumeAsync(code.Channel, runMacro: true, cancellationToken);
+                return await StartOrResumeAsync(code, runMacro: true, cancellationToken);
             }
 
             return new Message();

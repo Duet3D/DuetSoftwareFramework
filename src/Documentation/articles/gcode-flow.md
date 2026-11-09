@@ -167,6 +167,16 @@ pipeline for that channel. To support nested files and macros, every stage keeps
 once; ending it pops them. Each stack item has its own processor task, so a macro nested on top of a
 print runs concurrently with - but logically above - the codes beneath it.
 
+### Motion between channels
+
+Only one channel at a time may command motion. A move (`G0`/`G1`), and any code that waits for the machine to reach standstill before it acts (`G28`, `G29`, `G30`, `M400`, `T`, motion configuration, ...), takes the movement lock for its channel. It takes the lock before waiting for standstill and holds it until the code completes. The lock belongs to the channel rather than the code: the macros a code runs, such as `G28`'s homing files or a tool change's `tpre`/`tpost`, use the lock their caller holds. Channels waiting for the lock get it in the order they asked.
+
+A few codes hand their own lock back for a long wait once the machine has stopped, so that other channels can move meanwhile: `G4` before it dwells, and `M109`, `M116`, `M190` and `M191` before they wait for the heaters. A lock held by an outer code on the same channel is kept, so a tool change or homing file that waits for heaters is still not interleaved with moves from other channels.
+
+A code that waits for motion another channel has to make gives up every hold its channel has, including those of outer codes, and takes them back when the wait is over, queueing behind any channel that asked meanwhile. `M24`, `M32` and `M37` do this while `start.g` or the resume sequence runs on the File channel, so a job can be started or resumed from a macro whose caller holds the lock.
+
+Prioritised codes (`M108`, `M112`, `M122`, `M292`, `M999`) never take the lock.
+
 ## Internal processing
 
 `code.ProcessInternally()` (`src/DuetControlServer/Commands/Generic/Code.cs`) dispatches by code type

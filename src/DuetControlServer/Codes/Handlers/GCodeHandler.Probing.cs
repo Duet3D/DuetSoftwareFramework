@@ -140,6 +140,8 @@ internal sealed partial class GCodeHandler
             }
             if (probe.Type == ProbeType.None)
             {
+                // TODO manual probing, which has to suspend the channel's movement lock while the user jogs Z
+                // from another channel (RepRapFirmware's UnlockAll in GCodes4.cpp before DoManualBedProbe)
                 return new ProbeSettings($"Z probe {probeNumber} cannot stop a move", 0, [], [], 0, 0, 0, 0, 0, 0);
             }
 

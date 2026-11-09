@@ -36,6 +36,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="model">Object model</param>
 /// <param name="codeProcessor">Code processor, for the standstill a dwell waits for</param>
 /// <param name="planner">Where G-codes become queued moves</param>
+/// <param name="movementLock">Which channel may command motion</param>
 /// <param name="bedCompensation">Height map correction</param>
 /// <param name="macroRunner">Runs the machine's own macro files</param>
 /// <param name="linkInterface">Link interface, for the endstops a move has to arm over CAN</param>
@@ -48,6 +49,7 @@ internal sealed partial class GCodeHandler(
     Model.ObjectModel model,
     CodeProcessor codeProcessor,
     MovePlanner planner,
+    MovementLock movementLock,
     BedCompensation bedCompensation,
     Files.MacroRunner macroRunner,
     Files.Job.JobController jobController,
@@ -136,11 +138,17 @@ internal sealed partial class GCodeHandler(
         // it last waited. That is what lets a G4 in a trigger or daemon macro dwell without stopping
         // a print when the macro commands no motion of its own: such a channel has nothing of its
         // own to wait for. The condition is about the channel rather than the code, which no
-        // CodeClass expresses, so the wait is here rather than declared in the table
-        if (planner.WasMotionCommanded(code.Channel) &&
-            !await codeProcessor.WaitForStandstillAsync(code.Channel, cancellationToken))
+        // CodeClass expresses, so the wait is here rather than declared in the table. The movement
+        // lock is held for the wait and not for the dwell, as RepRapFirmware unlocks before it delays
+        if (planner.WasMotionCommanded(code.Channel))
         {
-            throw new OperationCanceledException();
+            using (await movementLock.AcquireAsync(code, cancellationToken))
+            {
+                if (!await codeProcessor.WaitForStandstillAsync(code.Channel, cancellationToken))
+                {
+                    throw new OperationCanceledException();
+                }
+            }
         }
 
         int dwell = code.TryGetFloat('S', out float seconds) ? (int)(seconds * 1000.0)
@@ -222,6 +230,10 @@ internal sealed partial class GCodeHandler(
         // combination anything below here is written for. RepRapFirmware refuses the same values with
         // gb.TryGetLimitedUIValue('H', moveType, dummy, 5), and reports it the same way
         MoveType moveType = code.GetEnum<MoveType>('H', MoveType.Normal);
+
+        // No other channel may queue a move until this one is in the queue, or a special move has
+        // finished
+        using IDisposable movementHold = await movementLock.AcquireAsync(code, cancellationToken);
 
         // A special move is planned against the motor positions rather than the axis positions, so
         // the machine has to have settled before it is built - as in RepRapFirmware, which locks and

@@ -308,9 +308,14 @@ internal partial class MCodeHandler
             return reply;
         }
 
-        if (wait && !await heatManager.WaitForTemperaturesAsync(heaters, cancellationToken))
+        if (wait)
         {
-            throw new System.OperationCanceledException();
+            // Another channel may move while the heaters come up
+            code.ReleaseMovementLock();
+            if (!await heatManager.WaitForTemperaturesAsync(heaters, cancellationToken))
+            {
+                throw new System.OperationCanceledException();
+            }
         }
         return reply;
     }
@@ -375,6 +380,8 @@ internal partial class MCodeHandler
             }
         }
 
+        // Another channel may move while the heaters come up
+        code.ReleaseMovementLock();
         if (!await heatManager.WaitForTemperaturesAsync(heaters, cancellationToken))
         {
             throw new System.OperationCanceledException();

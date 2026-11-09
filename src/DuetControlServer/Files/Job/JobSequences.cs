@@ -39,6 +39,7 @@ namespace DuetControlServer.Files.Job;
 /// the machine before the restore point is taken from it, and what builds the move back on resume
 /// </param>
 /// <param name="planner">Where the restore point is saved from and the resume move is queued</param>
+/// <param name="movementLock">Taken for the job's channel while the resume move is queued</param>
 /// <param name="spindleManager">The spindles, which an aborted job stops</param>
 /// <param name="toolManager">The selected tool, whose offsets the resume move goes through</param>
 /// <param name="logger">Logger</param>
@@ -52,6 +53,7 @@ internal sealed class JobSequences(
     Model.ObjectModel model,
     MoveInterpreter moveInterpreter,
     MovePlanner planner,
+    MovementLock movementLock,
     Spindles.SpindleManager spindleManager,
     Tools.ToolManager toolManager,
     ILogger<JobSequences> logger)
@@ -443,6 +445,9 @@ internal sealed class JobSequences(
     /// </remarks>
     private async ValueTask MoveBackToRestorePointAsync(CancellationToken cancellationToken)
     {
+        // From reading where the head is until both legs are queued
+        using IDisposable movementHold = await movementLock.AcquireAsync(CodeChannel.File, cancellationToken);
+
         bool headIsAbovePausePoint;
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {

@@ -381,6 +381,10 @@ Also fixes a bug in RRF that incorrectly removes the correction from the tools m
 
 When a print is paused, if the tool position is moved then the restore move will use the axis mapping to apply `M204` acceleration limits correctly (regression case `m24-resume-with-tool-axis-mapping`: with the tool's `X3` mapping the move is held to U's 5000 mm/s² axis limit, and without it to the 100 mm/s² `M204` limit).
 
+### 5.4 A temperature wait inside a macro keeps the movement lock of the code that ran the macro
+
+`M116`, `M190` and `M191` release only the movement lock they took themselves. A lock held by an outer code on the same channel, such as a `T` code running `tpost.g` or a `G28` running a homing file, is kept while the heaters come up, so no other channel can move in the middle of the tool change or homing. RepRapFirmware releases it for these three codes but keeps it for `M109` and `G4`; `M109` was changed to keep it because releasing it made homing fail when `M109` was used in a homing file, and DSF applies the same rule to all of them.
+
 ---
 
 ## 6. G-code and expressions

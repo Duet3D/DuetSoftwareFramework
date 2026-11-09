@@ -27,6 +27,8 @@ public static partial class ServiceCollectionExtensions
             // Where G-codes become queued moves. Shared with the code handlers, which is the whole
             // point of it: every move has to be built in the order it was commanded
             .AddSingleton<MovePlanner>()
+            // Which channel may command motion, taken by moves and by codes that wait for standstill
+            .AddSingleton<MovementLock>()
             // Reported in M122: when a homing move ends somewhere unexpected, this is the only place
             // that says how far along the chain from the switch to the machine position it got
             .AddSingleton<EndstopCorrection>()

@@ -34,6 +34,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     private readonly KeywordHandler _keywords;
     private readonly IHostApplicationLifetime _lifetime;
     private readonly MacroRunner _macroRunner;
+    private readonly Motion.MovementLock _movementLock;
     private readonly ILogger<Code> _logger;
     private readonly Settings _settings;
 
@@ -48,6 +49,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <param name="keywords">Keyword handler</param>
     /// <param name="lifetime">Host application lifetime</param>
     /// <param name="macroRunner">Runs macro files</param>
+    /// <param name="movementLock">Which channel may command motion</param>
     /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
     public Code(Codes.CodeProcessor codeProcessor,
@@ -58,6 +60,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         [FromKeyedServices(Keys.Keywords)] ICodeHandler keywords,
         IHostApplicationLifetime lifetime,
         MacroRunner macroRunner,
+        Motion.MovementLock movementLock,
         ILogger<Code> logger,
         IOptions<Settings> settings) : base()
     {
@@ -69,6 +72,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         _keywords = (KeywordHandler)keywords;
         _lifetime = lifetime;
         _macroRunner = macroRunner;
+        _movementLock = movementLock;
         _logger = logger;
         _settings = settings.Value;
     }
@@ -85,6 +89,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <param name="keywords">Keyword handler</param>
     /// <param name="lifetime">Host application lifetime</param>
     /// <param name="macroRunner">Runs macro files</param>
+    /// <param name="movementLock">Which channel may command motion</param>
     /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
     public Code(string code,
@@ -96,6 +101,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         [FromKeyedServices(Keys.Keywords)] ICodeHandler keywords,
         IHostApplicationLifetime lifetime,
         MacroRunner macroRunner,
+        Motion.MovementLock movementLock,
         ILogger<Code> logger,
         IOptions<Settings> settings) : base(code)
     {
@@ -107,6 +113,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         _keywords = (KeywordHandler)keywords;
         _lifetime = lifetime;
         _macroRunner = macroRunner;
+        _movementLock = movementLock;
         _logger = logger;
         _settings = settings.Value;
     }
@@ -388,9 +395,15 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
                             break;
                         case Codes.CodeClass.FlushAndStandstill:
                             // The code changes what a queued move means, or needs the board's
-                            // reply: nothing may be moving when the handler runs
-                            if (!await _codeProcessor.FlushAsync(this, cancellationToken: CancellationToken) ||
-                                !await _codeProcessor.WaitForStandstillAsync(Channel, CancellationToken))
+                            // reply: nothing may be moving when the handler runs. The movement lock
+                            // is taken before the wait, so no other channel can queue a move between
+                            // the standstill and the handler
+                            if (!await _codeProcessor.FlushAsync(this, cancellationToken: CancellationToken))
+                            {
+                                throw new OperationCanceledException();
+                            }
+                            _movementHold = await _movementLock.AcquireAsync(Channel, CancellationToken);
+                            if (!await _codeProcessor.WaitForStandstillAsync(Channel, CancellationToken))
                             {
                                 throw new OperationCanceledException();
                             }
@@ -444,6 +457,10 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
             Result = new(MessageType.Error, e.Message);
             return true;
         }
+        finally
+        {
+            ReleaseMovementLock();
+        }
 
         // If the code could not be interpreted internally, post-process it
         if (!Flags.HasFlag(CodeFlags.IsPostProcessed))
@@ -476,6 +493,29 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         ResolveAsUnsupported();
         return true;
     }
+
+    /// <summary>
+    /// Movement lock this code's class took before its handler, held until the handler returns
+    /// </summary>
+    private IDisposable? _movementHold;
+
+    /// <summary>
+    /// Release the movement lock this code's class took, before a wait unrelated to motion
+    /// </summary>
+    /// <remarks>
+    /// An outer code's hold on the same channel is kept. This is a difference from RRF.
+    /// </remarks>
+    internal void ReleaseMovementLock()
+    {
+        _movementHold?.Dispose();
+        _movementHold = null;
+    }
+
+    /// <summary>
+    /// Give up every movement lock hold this code's channel has, for a wait on motion another channel makes
+    /// </summary>
+    /// <returns>The suspended holds, to be restored when the wait is over</returns>
+    internal Motion.MovementLock.Suspension SuspendMovementLock() => _movementLock.Suspend(this);
 
     /// <summary>
     /// Run the macro file named after this code, if there is one
