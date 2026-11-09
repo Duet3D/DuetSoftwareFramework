@@ -326,11 +326,6 @@ internal sealed partial class GCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleHomeAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (!await planner.StandstillAsync(cancellationToken))
-        {
-            throw new OperationCanceledException();
-        }
-
         uint toBeHomed = 0;
         char[] axisLetters;
 

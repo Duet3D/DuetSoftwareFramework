@@ -43,13 +43,6 @@ internal sealed partial class GCodeHandler
             return new Message(MessageType.Error, "Missing tool number");
         }
 
-        // The offsets are part of the transform every queued move was planned against, so they must
-        // not change while one is in flight
-        if (!await planner.StandstillAsync(cancellationToken))
-        {
-            throw new System.OperationCanceledException();
-        }
-
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             Tool? tool = toolManager.Find(toolNumber);

@@ -75,11 +75,6 @@ internal sealed partial class GCodeHandler
 
         float heightOffset = code.GetFloat('H', defaultValue: 0.0f);
 
-        if (!await planner.StandstillAsync(cancellationToken))
-        {
-            throw new OperationCanceledException();
-        }
-
         ProbeSettings settings = await ReadProbeSettingsAsync(probeNumber, cancellationToken);
         if (settings.Refusal is not null)
         {
@@ -656,11 +651,6 @@ internal sealed partial class GCodeHandler
         if (probeNumber < 0 || probeNumber >= RemoteProbes.MaxProbes)
         {
             return new Message(MessageType.Error, $"Z probe number out of range (0..{RemoteProbes.MaxProbes - 1})");
-        }
-
-        if (!await planner.StandstillAsync(cancellationToken))
-        {
-            throw new OperationCanceledException();
         }
 
         ProbeSettings settings = await ReadProbeSettingsAsync(probeNumber, cancellationToken);
