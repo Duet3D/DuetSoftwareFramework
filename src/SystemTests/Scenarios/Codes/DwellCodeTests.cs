@@ -51,7 +51,7 @@ public class DwellCodeTests : SystemTests.Host.BenchFixture
         await using JobBench bench = await JobControlBench.StartAsync();
 
         TimeSpan elapsed = await TimeAsync(() => bench.Host.ExecuteCodeAsync(code));
-        Assert.That(elapsed, Is.LessThan(TimeSpan.FromSeconds(1)),
+        Assert.That(elapsed, Is.LessThan(Slack),
                     $"\"{code}\" is a dwell of zero or less and returns ok without waiting (GCodes.cpp DoDwell)");
     }
 
@@ -63,7 +63,7 @@ public class DwellCodeTests : SystemTests.Host.BenchFixture
         await using JobBench bench = await JobControlBench.StartAsync();
 
         TimeSpan elapsed = await TimeAsync(() => bench.Host.ExecuteCodeAsync("G4 P400"));
-        Assert.That(elapsed, Is.GreaterThan(TimeSpan.FromMilliseconds(400) - Slack),
+        Assert.That(elapsed, Is.InRange(TimeSpan.FromMilliseconds(400) - Slack, TimeSpan.FromMilliseconds(400) + Slack),
                     "G4 P400 waits 400 ms (GCodes.cpp DoDwell)");
     }
 
@@ -77,7 +77,7 @@ public class DwellCodeTests : SystemTests.Host.BenchFixture
         await using JobBench bench = await JobControlBench.StartAsync();
 
         TimeSpan elapsed = await TimeAsync(() => bench.Host.ExecuteCodeAsync("G4 S0.4"));
-        Assert.That(elapsed, Is.GreaterThan(TimeSpan.FromMilliseconds(400) - Slack),
+        Assert.That(elapsed, Is.InRange(TimeSpan.FromMilliseconds(400) - Slack, TimeSpan.FromMilliseconds(400) + Slack),
                     "G4 S0.4 waits 0.4 s (GCodes.cpp DoDwell)");
     }
 
@@ -94,10 +94,8 @@ public class DwellCodeTests : SystemTests.Host.BenchFixture
         TimeSpan elapsed = await TimeAsync(() => bench.Host.ExecuteCodeAsync("G4 S0.4 P10000"));
         Assert.Multiple(() =>
         {
-            Assert.That(elapsed, Is.GreaterThan(TimeSpan.FromMilliseconds(400) - Slack),
+            Assert.That(elapsed, Is.InRange(TimeSpan.FromMilliseconds(400) - Slack, TimeSpan.FromMilliseconds(400) + Slack),
                         "S0.4 is the dwell that is taken (GCodes.cpp DoDwell)");
-            Assert.That(elapsed, Is.LessThan(TimeSpan.FromSeconds(5)),
-                        "P10000 is not read at all when S is present (GCodes.cpp DoDwell)");
         });
     }
 
