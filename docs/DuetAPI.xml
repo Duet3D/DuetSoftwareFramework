@@ -16570,7 +16570,7 @@
         </member>
         <member name="F:DuetAPI.ObjectModel.MachineStatus.Resuming">
             <summary>
-            The machine is about to resume a paused file job
+            The machine is about to resume a paused file job or is moving back to the position where a feed hold stopped it
             </summary>
         </member>
         <member name="F:DuetAPI.ObjectModel.MachineStatus.Cancelling">
