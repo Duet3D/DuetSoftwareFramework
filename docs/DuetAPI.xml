@@ -16553,6 +16553,11 @@
             The machine has encountered an emergency stop and is ready to reset
             </summary>
         </member>
+        <member name="F:DuetAPI.ObjectModel.MachineStatus.Held">
+            <summary>
+            A feed hold has stopped all motion and keeps the queued moves until M24 releases it
+            </summary>
+        </member>
         <member name="F:DuetAPI.ObjectModel.MachineStatus.Pausing">
             <summary>
             The machine is about to pause a file job
