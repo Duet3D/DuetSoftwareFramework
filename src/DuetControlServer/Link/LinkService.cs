@@ -715,8 +715,9 @@ internal sealed class LinkService(
                 return;
             }
 
-            // The reply type must match what we expected when sending the request
-            if (msgType != request.ReplyType)
+            // The reply type must match what we expected when sending the request, except that a board may refuse any
+            // request with a standard reply, as RepRapFirmware's CanInterface::SendRequestAndGetCustomReply accepts
+            if (msgType != request.ReplyType && msgType != CanMessageType.StandardReply)
             {
                 logger.LogError("Received CAN response of type {MsgType} but expected {ReplyType}", msgType, request.ReplyType);
                 request.SetException(new InvalidOperationException($"Expected CAN reply of type {request.ReplyType} but received {msgType}"));
@@ -728,7 +729,7 @@ internal sealed class LinkService(
             // controller took off the bus, so there is no transport outcome to read here: a request the
             // controller could not send, or gave up waiting on, is answered on the acknowledgement ring
             // instead and never reaches this point
-            CanFragment fragment = CanFragmentation.Parse(request.ReplyType, payload);
+            CanFragment fragment = CanFragmentation.Parse(msgType, payload);
             logger.LogDebug("Received CAN response fragment {FragmentNumber} of type {MsgType} from address {SrcAddress} ({Length} bytes, result {ResultCode}, more follows: {MoreFollows})", fragment.Number, msgType, srcAddress, fragment.Content.Length, fragment.ResultCode, fragment.MoreFollows);
             request.AddFragment(in fragment);
             if (!fragment.MoreFollows)

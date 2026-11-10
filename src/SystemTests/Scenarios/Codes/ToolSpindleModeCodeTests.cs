@@ -134,7 +134,6 @@ public class ToolSpindleModeCodeTests : SystemTests.Host.BenchFixture
     /// mix 1:0:0, no spindle, zero offsets, and active/standby temperatures of ABS_ZERO
     /// (-273.15 C); the reported fields are Tool's object model table (Tool.cpp)
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M563CreatesToolWithMappedComponents()
     {

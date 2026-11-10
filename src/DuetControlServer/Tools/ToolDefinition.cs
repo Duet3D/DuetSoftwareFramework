@@ -76,3 +76,19 @@ public enum ToolChangeParameters
     /// <summary>All three, which is what a bare T-code does</summary>
     All = RunFree | RunPre | RunPost
 }
+
+/// <summary>
+/// What M568 A switches a tool's heaters to
+/// </summary>
+/// <remarks>RepRapFirmware's M568 A values, which <see cref="DuetAPI.ObjectModel.ToolState"/> does not number the same</remarks>
+public enum ToolHeaterState
+{
+    /// <summary>Switch the heaters off</summary>
+    Off = 0,
+
+    /// <summary>Switch the heaters to their standby temperatures</summary>
+    Standby = 1,
+
+    /// <summary>Switch the heaters to their active temperatures</summary>
+    Active = 2
+}

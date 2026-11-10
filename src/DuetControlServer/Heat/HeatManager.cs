@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
+using DuetControlServer.Link.Requests;
 using DuetControlServer.Motion;
 using Microsoft.Extensions.Logging;
 
@@ -31,8 +34,10 @@ namespace DuetControlServer.Heat;
 /// </remarks>
 /// <param name="model">Object model</param>
 /// <param name="linkInterface">Link interface, for the CAN messages a heater is configured with</param>
+/// <param name="eventLogger">Writes out what a board said outside the reply to a code</param>
 /// <param name="logger">Logger</param>
-public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInterface, ILogger<HeatManager> logger)
+public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInterface, Utility.EventLogger eventLogger,
+                                ILogger<HeatManager> logger)
 {
     /// <summary>
     /// Highest heater number a machine may have
@@ -106,14 +111,79 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
 
         Heater heater = new();
         FopDt.Reset(heater.Model);
+        for (int monitor = 0; monitor < CanLimits.MaxMonitorsPerHeater; monitor++)
+        {
+            heater.Monitors.Add(new HeaterMonitor());
+        }
+        UpdateTemperatureLimits(heater);
         model.Heat.Heaters[heaterNumber] = heater;
+        _modelSetByUser[heaterNumber] = _monitorsSetByUser[heaterNumber] = false;
+        _lastStandbyTool[heaterNumber] = -1;
         return heater;
     }
+
+    /// <summary>
+    /// Whether M307 has set a heater's model, which giving the heater a function then leaves alone
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>Heater::modelSetByUser</c></remarks>
+    private readonly bool[] _modelSetByUser = new bool[MaxHeaters];
+
+    /// <summary>
+    /// Whether M143 has set a heater's monitors, which giving the heater a function then leaves alone
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>Heater::monitorsSetByUser</c></remarks>
+    private readonly bool[] _monitorsSetByUser = new bool[MaxHeaters];
+
+    /// <summary>
+    /// The tool that last put each heater on standby, or -1 for none
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>Heat::lastStandbyTools</c></remarks>
+    private readonly int[] _lastStandbyTool = Enumerable.Repeat(-1, MaxHeaters).ToArray();
+
+    /// <summary>
+    /// The tool that last put a heater on standby, or -1 for none
+    /// </summary>
+    public int GetLastStandbyTool(int heaterNumber) => _lastStandbyTool[heaterNumber];
+
+    /// <summary>
+    /// Record that M307 has set a heater's model
+    /// </summary>
+    public void SetModelSetByUser(int heaterNumber) => _modelSetByUser[heaterNumber] = true;
+
+    /// <summary>
+    /// Record that M143 has set a heater's monitors
+    /// </summary>
+    public void SetMonitorsSetByUser(int heaterNumber) => _monitorsSetByUser[heaterNumber] = true;
 
     /// <summary>
     /// RepRapFirmware's <c>BadErrorTemperature</c>, the highest limit of a heater with no over-temperature monitor
     /// </summary>
     public const float BadErrorTemperature = 2000.0f;
+
+    /// <summary>
+    /// RepRapFirmware's <c>ABS_ZERO</c>, the lowest limit of a heater with no under-temperature monitor
+    /// </summary>
+    public const float AbsoluteZero = -273.15f;
+
+    /// <summary>
+    /// RepRapFirmware's <c>NEARLY_ABS_ZERO</c>: a temperature at or below this switches a heater off
+    /// </summary>
+    public const float NearlyAbsoluteZero = -273.0f;
+
+    /// <summary>
+    /// RepRapFirmware's <c>DefaultHotEndTemperatureLimit</c>, a tool heater's default over-temperature limit
+    /// </summary>
+    public const float DefaultHotEndTemperatureLimit = 285.0f;
+
+    /// <summary>
+    /// RepRapFirmware's <c>DefaultBedTemperatureLimit</c>, a bed heater's default over-temperature limit
+    /// </summary>
+    public const float DefaultBedTemperatureLimit = 125.0f;
+
+    /// <summary>
+    /// RepRapFirmware's <c>DefaultChamberTemperatureLimit</c>, a chamber heater's default over-temperature limit
+    /// </summary>
+    public const float DefaultChamberTemperatureLimit = 100.0f;
 
     /// <summary>
     /// Highest temperature any of a heater's over-temperature monitors allows
@@ -134,6 +204,34 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
     }
 
     /// <summary>
+    /// Lowest temperature any of a heater's under-temperature monitors allows
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>Heater::GetLowestTemperatureLimit</c></remarks>
+    public static float GetLowestTemperatureLimit(Heater heater)
+    {
+        float limit = AbsoluteZero;
+        foreach (HeaterMonitor? monitor in heater.Monitors)
+        {
+            if (monitor is { Condition: HeaterMonitorCondition.TooLow, Limit: float t }
+                && (limit == AbsoluteZero || t < limit))
+            {
+                limit = t;
+            }
+        }
+        return limit;
+    }
+
+    /// <summary>
+    /// Set a heater's <c>max</c> and <c>min</c> from its monitors
+    /// </summary>
+    /// <remarks>The caller must hold the object model write lock</remarks>
+    public static void UpdateTemperatureLimits(Heater heater)
+    {
+        heater.Max = GetHighestTemperatureLimit(heater);
+        heater.Min = GetLowestTemperatureLimit(heater);
+    }
+
+    /// <summary>
     /// Tell the board carrying a heater what to do with it
     /// </summary>
     /// <param name="heaterNumber">The heater</param>
@@ -150,6 +248,7 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
                                                         CancellationToken cancellationToken)
     {
         byte board;
+        HeaterFunction function;
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
             Heater? heater = Find(heaterNumber);
@@ -162,6 +261,7 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
                 return new Message(MessageType.Error,
                                    $"Heater {heaterNumber} has no sensor");
             }
+            function = GetHeaterFunction(heaterNumber);
         }
 
         CanMessageSetHeaterTemperatureV1 message = new()
@@ -169,8 +269,7 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
             HeaterNumber = (byte)heaterNumber,
             SetPoint = setPoint,
             Command = command,
-            // TODO: set Function as the heater's role (tool 0, bed 1, chamber 2)
-            // Function = command
+            Function = (byte)function,
         };
 
         return await linkInterface.SendCanRequestAsync(board, in message, cancellationToken);
@@ -203,69 +302,85 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
     }
 
     /// <summary>
+    /// RepRapFirmware's <c>TemperatureSoLowDontCare</c>: a heating target below this is not waited for
+    /// </summary>
+    public const float TemperatureSoLowDontCare = 40.0f;
+
+    /// <summary>
+    /// RepRapFirmware's <c>TemperatureSoHighDontCare</c>: a cooling device's target above this is not waited for
+    /// </summary>
+    public const float TemperatureSoHighDontCare = 20.0f;
+
+    /// <summary>
     /// Wait for heaters to reach what they were asked to reach
     /// </summary>
     /// <param name="heaters">Heaters to wait for</param>
+    /// <param name="waitWhenCooling">Whether a heater above its target is waited for until it has cooled</param>
+    /// <param name="tolerance">How close to the target counts as there</param>
+    /// <param name="waitOnFault">Whether a heater in a fault is waited for, which only a file channel does</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True if they all got there, false if the wait was cancelled</returns>
-    /// <remarks>
-    /// <para>
-    /// RepRapFirmware's <c>HeaterAtSetTemperature</c> loop. A heater that is off is not waited for -
-    /// it will never arrive - and neither is one in a fault, which is what stops M109 hanging a print
-    /// on a heater that has already given up.
-    /// </para>
-    /// <para>
-    /// Only heating is waited for, not cooling: RepRapFirmware waits for a heater to come *up* to
-    /// temperature and treats one above its setpoint as ready, because a print does not have to wait
-    /// for a nozzle to cool before it can move
-    /// </para>
-    /// </remarks>
-    public async ValueTask<bool> WaitForTemperaturesAsync(IReadOnlyList<int> heaters,
-                                                          CancellationToken cancellationToken)
+    public async ValueTask<bool> WaitForTemperaturesAsync(IReadOnlyList<int> heaters, bool waitWhenCooling, float tolerance,
+                                                          bool waitOnFault, CancellationToken cancellationToken)
     {
         // Counted rather than flagged, because several channels may be waiting at once and a flag
         // would be cleared by whichever finished first
         Interlocked.Increment(ref _waitingForTemperatures);
         try
         {
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            bool allReady = true;
-            using (await model.AccessReadOnlyAsync(cancellationToken))
+            while (!cancellationToken.IsCancellationRequested)
             {
-                foreach (int heaterNumber in heaters)
+                bool allReady = true;
+                using (await model.AccessReadOnlyAsync(cancellationToken))
                 {
-                    Heater? heater = Find(heaterNumber);
-                    if (heater is null || heater.State is HeaterState.Off or HeaterState.Fault)
+                    foreach (int heaterNumber in heaters)
                     {
-                        continue;               // nothing to wait for, and a fault will not resolve itself
-                    }
-
-                    // TODO RRF's Heat::HeaterAtSetTemperature: only Active and Standby heaters are waited for (not
-                    // Tuning or Offline), a target below 40C is not waited for, cooling devices are handled separately,
-                    // the test is |current - target| <= tolerance with cooling waited for when the caller asks
-                    // (M116, M109 R), and a faulted heater keeps the file channel waiting
-                    float target = heater.State == HeaterState.Standby ? heater.Standby : heater.Active;
-                    if (heater.Current < target - TemperatureCloseEnough)
-                    {
-                        allReady = false;
-                        break;
+                        if (!HeaterAtSetTemperature(heaterNumber, waitWhenCooling, tolerance, waitOnFault))
+                        {
+                            allReady = false;
+                            break;
+                        }
                     }
                 }
-            }
 
-            if (allReady)
-            {
-                return true;
+                if (allReady)
+                {
+                    return true;
+                }
+                await Task.Delay(WaitPollInterval, cancellationToken);
             }
-            await Task.Delay(WaitPollInterval, cancellationToken);
-        }
-        return false;
+            return false;
         }
         finally
         {
             Interlocked.Decrement(ref _waitingForTemperatures);
         }
+    }
+
+    /// <summary>
+    /// Whether a heater is close enough to its target, which it is if it does not exist or is not on
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>Heat::HeaterAtSetTemperature</c>. The caller must hold the object model lock</remarks>
+    private bool HeaterAtSetTemperature(int heaterNumber, bool waitWhenCooling, float tolerance, bool waitOnFault)
+    {
+        if (Find(heaterNumber) is not Heater heater)
+        {
+            return true;
+        }
+        if (waitOnFault && heater.State == HeaterState.Fault)
+        {
+            return false;
+        }
+        if (heater.State is HeaterState.Active or HeaterState.Standby)
+        {
+            float target = (heater.State == HeaterState.Active) ? heater.Active : heater.Standby;
+            bool cooling = heater.Model.Inverted;
+            return (!cooling && target < TemperatureSoLowDontCare)
+                || (cooling && target > TemperatureSoHighDontCare)
+                || MathF.Abs(heater.Current - target) <= tolerance
+                || (target < heater.Current && !waitWhenCooling);
+        }
+        return true;
     }
 
     /// <summary>
@@ -280,49 +395,356 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
     private int _waitingForTemperatures;
 
     /// <summary>
-    /// The heaters M140 or M141 addresses
+    /// RepRapFirmware's <c>MaxHeatersPerBed</c> for a Duet 3 MB6HC
     /// </summary>
-    /// <param name="chamber">True for the chamber heaters, false for the bed</param>
-    /// <param name="index">Which bed or chamber, or -1 for all of them</param>
-    /// <returns>The heater numbers</returns>
-    /// <remarks>
-    /// A machine may have several beds and each bed several heaters, which is what the mapping
-    /// expresses: entry <c>i</c> is the heaters of bed <c>i</c>. So M140 with no P addresses every
-    /// bed heater and M140 P1 addresses the second bed's. The caller must hold the object model lock
-    /// </remarks>
-    public List<int> BedOrChamberHeaters(bool chamber, int index)
+    public const int MaxHeatersPerBed = 4;
+
+    /// <summary>
+    /// RepRapFirmware's <c>MaxHeatersPerChamber</c> for a Duet 3 MB6HC
+    /// </summary>
+    public const int MaxHeatersPerChamber = 4;
+
+    /// <summary>
+    /// The heaters of one bed or chamber slot
+    /// </summary>
+    /// <param name="chamber">True for a chamber slot, false for a bed slot</param>
+    /// <param name="slot">The slot</param>
+    /// <returns>The heater numbers, which may include heaters that do not exist</returns>
+    /// <remarks>RepRapFirmware's <c>HeaterCollection</c>. The caller must hold the object model lock</remarks>
+    public int[] BedOrChamberHeaters(bool chamber, int slot)
     {
         IReadOnlyList<int[]> mapping = chamber ? model.Heat.ChamberHeaterMapping : model.Heat.BedHeaterMapping;
-        List<int> heaters = [];
-        for (int which = 0; which < mapping.Count; which++)
-        {
-            if (index < 0 || index == which)
-            {
-                heaters.AddRange(mapping[which]);
-            }
-        }
-        return heaters;
+        return slot < mapping.Count ? mapping[slot] : [];
     }
 
     /// <summary>
-    /// Make a heater the bed or chamber heater, or remove it from that role
+    /// Make heaters the heaters of a bed or chamber slot: the slot's old heaters are switched off, and the new ones are
+    /// given their function
     /// </summary>
-    /// <param name="chamber">True for a chamber, false for a bed</param>
-    /// <param name="index">Which bed or chamber</param>
-    /// <param name="heaterNumber">The heater, or negative to leave it with none</param>
+    /// <param name="chamber">True for a chamber slot, false for a bed slot</param>
+    /// <param name="slot">The slot</param>
+    /// <param name="heaterNumbers">The heaters</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <remarks>
-    /// Each entry of the mapping is the heaters of one bed, so this replaces that bed's set rather
-    /// than adding to it - which is what makes a re-run config.g idempotent. The caller must hold the
-    /// object model write lock
+    /// RepRapFirmware's <c>Heat::SetBedHeaters</c> and <c>Heat::SetChamberHeaters</c>. The caller must not hold the
+    /// object model lock
     /// </remarks>
-    public void AssignBedOrChamberHeater(bool chamber, int index, int heaterNumber)
+    public async ValueTask SetBedOrChamberHeatersAsync(bool chamber, int slot, int[] heaterNumbers,
+                                                       CancellationToken cancellationToken)
     {
-        var mapping = chamber ? model.Heat.ChamberHeaterMapping : model.Heat.BedHeaterMapping;
-        while (mapping.Count <= index)
+        await ClearBedOrChamberHeatersAsync(chamber, slot, cancellationToken);
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            WriteSlot(chamber, slot, heaterNumbers);
+        }
+
+        foreach (int heaterNumber in heaterNumbers)
+        {
+            await SetFunctionAsync(heaterNumber, chamber ? HeaterFunction.Chamber : HeaterFunction.Bed, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Switch off the heaters of a bed or chamber slot and empty it
+    /// </summary>
+    /// <param name="chamber">True for a chamber slot, false for a bed slot</param>
+    /// <param name="slot">The slot</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <remarks>
+    /// RepRapFirmware's <c>Heat::ClearBedHeaters</c> and <c>Heat::ClearChamberHeaters</c>. The caller must not hold the
+    /// object model lock
+    /// </remarks>
+    public async ValueTask ClearBedOrChamberHeatersAsync(bool chamber, int slot, CancellationToken cancellationToken)
+    {
+        int[] heaterNumbers;
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            heaterNumbers = BedOrChamberHeaters(chamber, slot);
+        }
+
+        foreach (int heaterNumber in heaterNumbers)
+        {
+            await SwitchOffAsync(heaterNumber, cancellationToken);
+        }
+
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            WriteSlot(chamber, slot, []);
+        }
+    }
+
+    /// <summary>
+    /// Store the heaters of a slot in <c>heat.bedHeaterMapping</c> or <c>heat.chamberHeaterMapping</c>, and the first heater
+    /// of every slot in the obsolete <c>heat.bedHeaters</c> or <c>heat.chamberHeaters</c>
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>Heat</c> object model table: the mapping reports up to the last slot that has a heater, and the
+    /// obsolete array every slot, -1 where it is empty. The caller must hold the object model write lock
+    /// </remarks>
+    private void WriteSlot(bool chamber, int slot, int[] heaterNumbers)
+    {
+        ObservableCollection<int[]> mapping = chamber ? model.Heat.ChamberHeaterMapping : model.Heat.BedHeaterMapping;
+        while (mapping.Count <= slot)
         {
             mapping.Add([]);
         }
-        mapping[index] = heaterNumber >= 0 ? [heaterNumber] : [];
+        mapping[slot] = heaterNumbers;
+        while (mapping.Count > 0 && mapping[^1].Length == 0)
+        {
+            mapping.RemoveAt(mapping.Count - 1);
+        }
+
+#pragma warning disable CS0618
+        ObservableCollection<int> firstHeaters = chamber ? model.Heat.ChamberHeaters : model.Heat.BedHeaters;
+#pragma warning restore CS0618
+        int slots = chamber ? MaxChamberHeaters : MaxBedHeaters;
+        while (firstHeaters.Count < slots)
+        {
+            firstHeaters.Add(-1);
+        }
+        for (int index = 0; index < slots; index++)
+        {
+            int first = (index < mapping.Count && mapping[index].Length > 0) ? mapping[index][0] : -1;
+            if (firstHeaters[index] != first)
+            {
+                firstHeaters[index] = first;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Give a heater a function: the board's default model for that function unless M307 has set the model, and the
+    /// default over-temperature monitor for it unless M143 has set the monitors
+    /// </summary>
+    /// <param name="heaterNumber">The heater, which need not exist</param>
+    /// <param name="function">What the heater is for</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <remarks>
+    /// RepRapFirmware's <c>Heater::SetFunction</c> and <c>RemoteHeater::SetDefaultModel</c>, which ignores a board that
+    /// does not answer with a model. The monitor is not sent to the board. The caller must not hold the object model lock
+    /// </remarks>
+    public async ValueTask SetFunctionAsync(int heaterNumber, HeaterFunction function, CancellationToken cancellationToken)
+    {
+        byte board = 0;
+        bool askForModel;
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            if (Find(heaterNumber) is not Heater heater)
+            {
+                return;
+            }
+            askForModel = !_modelSetByUser[heaterNumber] && TryGetBoard(heater, out board);
+        }
+
+        CanMessageHeaterModelReport? report = null;
+        if (askForModel)
+        {
+            CanMessageSetDefaultHeaterModel request = new() { Heater = (byte)heaterNumber, HeaterFunction = function };
+            CanResponse response = await linkInterface.SendCanMessageAsync(board, in request, CanMessageType.HeaterModelReport,
+                                                                           cancellationToken: cancellationToken);
+            if (response.ResponseType == CanMessageType.HeaterModelReport)
+            {
+                report = response.AsCanMessage<CanMessageHeaterModelReport>();
+            }
+        }
+
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (Find(heaterNumber) is not Heater heater)
+            {
+                return;
+            }
+
+            if (report is CanMessageHeaterModelReport defaultModel)
+            {
+                FopDt.SetDefaultModel(heater.Model, defaultModel.Model);
+            }
+
+            if (!_monitorsSetByUser[heaterNumber] && heater.Sensor >= 0 && heater.Sensor < CanLimits.MaxSensors
+                && heater.Monitors.Count > 0 && heater.Monitors[0] is HeaterMonitor monitor)
+            {
+                monitor.Sensor = heater.Sensor;
+                monitor.Limit = function switch
+                {
+                    HeaterFunction.Bed => DefaultBedTemperatureLimit,
+                    HeaterFunction.Chamber => DefaultChamberTemperatureLimit,
+                    _ => DefaultHotEndTemperatureLimit,
+                };
+                monitor.Action = HeaterMonitorAction.GenerateFault;
+                monitor.Condition = HeaterMonitorCondition.TooHigh;
+                UpdateTemperatureLimits(heater);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Set a heater's active or standby temperature, and pass it on to the board if the heater is on in that mode
+    /// </summary>
+    /// <param name="heaterNumber">The heater, which need not exist</param>
+    /// <param name="temperature">The temperature</param>
+    /// <param name="active">True for the active temperature, false for the standby temperature</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>An error if the temperature is outside the heater's limits or the board refused it</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>Heat::SetTemperature</c> and <c>Heater::SetTemperature</c>, which recalculates the PID constants
+    /// at the active temperature once the board has it. The caller must not hold the object model lock
+    /// </remarks>
+    public async ValueTask<Message> SetActiveOrStandbyTemperatureAsync(int heaterNumber, float temperature, bool active,
+                                                                       CancellationToken cancellationToken)
+    {
+        bool update;
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (Find(heaterNumber) is not Heater heater)
+            {
+                return new Message();
+            }
+            if (temperature > GetHighestTemperatureLimit(heater))
+            {
+                return new Message(MessageType.Error, $"Temperature too high for heater {heaterNumber}");
+            }
+            if (temperature < GetLowestTemperatureLimit(heater))
+            {
+                return new Message(MessageType.Error, $"Temperature too low for heater {heaterNumber}");
+            }
+
+            if (active)
+            {
+                heater.Active = temperature;
+            }
+            else
+            {
+                heater.Standby = temperature;
+            }
+            update = heater.State == (active ? HeaterState.Active : HeaterState.Standby);
+        }
+
+        if (!update)
+        {
+            return new Message();
+        }
+
+        Message reply = await SwitchOnAsync(heaterNumber, cancellationToken);
+        if (reply.Succeeded())
+        {
+            using (await model.AccessReadWriteAsync(cancellationToken))
+            {
+                if (Find(heaterNumber) is Heater heater)
+                {
+                    FopDt.CalcPidConstants(heater.Model, GetHeaterFunction(heaterNumber), heater.Active);
+                }
+            }
+        }
+        return reply;
+    }
+
+    /// <summary>
+    /// Switch a heater on at its active or standby temperature
+    /// </summary>
+    /// <param name="heaterNumber">The heater</param>
+    /// <param name="active">True for the active temperature, false for the standby temperature</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <param name="toolNumber">Tool putting the heater on standby, or -1 for none</param>
+    /// <returns>What the board said, or an error if the heater does not exist or is in a fault</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>Heat::SetActiveOrStandby</c> and <c>Heater::SetActiveOrStandby</c>. The caller must not hold
+    /// the object model lock
+    /// </remarks>
+    public async ValueTask<Message> SetActiveOrStandbyAsync(int heaterNumber, bool active, CancellationToken cancellationToken,
+                                                            int toolNumber = -1)
+    {
+        HeaterState state = active ? HeaterState.Active : HeaterState.Standby;
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (Find(heaterNumber) is not Heater heater)
+            {
+                return new Message(MessageType.Error, $"Heater {heaterNumber} not found");
+            }
+            if (heater.State == HeaterState.Fault)
+            {
+                return new Message(MessageType.Error, $"Can't turn heater {heaterNumber} on while in fault state");
+            }
+
+            // Whether the heater is in active or standby mode is kept in its state while it is on
+            if (heater.State is HeaterState.Active or HeaterState.Standby)
+            {
+                heater.State = state;
+            }
+        }
+
+        Message reply = await SwitchOnAsync(heaterNumber, cancellationToken, state);
+        if (reply.Succeeded())
+        {
+            using (await model.AccessReadWriteAsync(cancellationToken))
+            {
+                if (Find(heaterNumber) is Heater { State: HeaterState.Off or HeaterState.Active or HeaterState.Standby } heater)
+                {
+                    heater.State = state;
+                }
+            }
+        }
+        if (reply.Type == MessageType.Success && !active)
+        {
+            _lastStandbyTool[heaterNumber] = toolNumber;
+        }
+        return reply;
+    }
+
+    /// <summary>
+    /// Tell a heater's board to run it at its target temperature
+    /// </summary>
+    /// <param name="heaterNumber">The heater</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <param name="state">Mode whose temperature is the target, or null for the mode the heater is in</param>
+    /// <returns>What the board said</returns>
+    /// <remarks>RepRapFirmware's <c>RemoteHeater::SwitchOn</c>. The caller must not hold the object model lock</remarks>
+    private async ValueTask<Message> SwitchOnAsync(int heaterNumber, CancellationToken cancellationToken, HeaterState? state = null)
+    {
+        float target;
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            if (Find(heaterNumber) is not Heater heater)
+            {
+                return new Message(MessageType.Error, $"Heater {heaterNumber} not found");
+            }
+            target = ((state ?? heater.State) == HeaterState.Standby) ? heater.Standby : heater.Active;
+        }
+        return await SetTemperatureAsync(heaterNumber, target, CanMessageSetHeaterTemperatureV1.CommandOn, cancellationToken);
+    }
+
+    /// <summary>
+    /// Switch a heater off, leaving its temperatures as they are
+    /// </summary>
+    /// <param name="heaterNumber">The heater, which need not exist</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <remarks>
+    /// RepRapFirmware's <c>Heat::SwitchOff</c> and <c>RemoteHeater::SwitchOff</c>, which reports a board's refusal as a
+    /// message of its own rather than as the result of the code that switched the heater off. The caller must not hold
+    /// the object model lock
+    /// </remarks>
+    public async ValueTask SwitchOffAsync(int heaterNumber, CancellationToken cancellationToken)
+    {
+        float target;
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (Find(heaterNumber) is not Heater heater)
+            {
+                return;
+            }
+            target = (heater.State == HeaterState.Standby) ? heater.Standby : heater.Active;
+            if (heater.State != HeaterState.Fault)
+            {
+                heater.State = HeaterState.Off;
+            }
+            _lastStandbyTool[heaterNumber] = -1;
+        }
+
+        Message reply = await SetTemperatureAsync(heaterNumber, target, CanMessageSetHeaterTemperatureV1.CommandOff, cancellationToken);
+        if (!reply.Succeeded())
+        {
+            await eventLogger.LogOutputAsync(MessageType.Error, $"Failed to switch off remote heater {heaterNumber}: {reply.Content}",
+                                             cancellationToken);
+        }
     }
 
     /// <summary>
@@ -367,60 +789,6 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
             }
         }
         return true;
-    }
-
-    /// <summary>
-    /// Bring a tool's heaters to its active or standby temperatures
-    /// </summary>
-    /// <param name="tool">The tool</param>
-    /// <param name="state">What the tool is becoming</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>An awaitable task</returns>
-    /// <remarks>
-    /// A tool that is put down goes to standby rather than off, which is what lets it be picked up
-    /// again without waiting for it to reheat. The caller must not hold the object model lock
-    /// </remarks>
-    public async ValueTask ApplyToolStateAsync(Tool tool, ToolState state, CancellationToken cancellationToken)
-    {
-        List<(int Heater, float Target)> targets = [];
-        using (await model.AccessReadWriteAsync(cancellationToken))
-        {
-            for (int index = 0; index < tool.Heaters.Count; index++)
-            {
-                int heaterNumber = tool.Heaters[index];
-                Heater? heater = Find(heaterNumber);
-                if (heater is null)
-                {
-                    continue;
-                }
-
-                float active = index < tool.Active.Count ? tool.Active[index] : 0.0f;
-                float standby = index < tool.Standby.Count ? tool.Standby[index] : 0.0f;
-
-                heater.Active = active;
-                heater.Standby = standby;
-                heater.State = state switch
-                {
-                    ToolState.Active => HeaterState.Active,
-                    ToolState.Standby => HeaterState.Standby,
-                    _ => HeaterState.Off
-                };
-                targets.Add((heaterNumber, state == ToolState.Active ? active : standby));
-            }
-        }
-
-        foreach ((int heaterNumber, float target) in targets)
-        {
-            byte command = state == ToolState.Off
-                ? CanMessageSetHeaterTemperatureV1.CommandOff
-                : CanMessageSetHeaterTemperatureV1.CommandOn;
-            Message reply = await SetTemperatureAsync(heaterNumber, target, command, cancellationToken);
-            if (!reply.Succeeded())
-            {
-                logger.LogWarning("Could not set heater {Heater} for tool {Tool}: {Error}",
-                                  heaterNumber, tool.Number, reply.Content);
-            }
-        }
     }
 
     /// <summary>

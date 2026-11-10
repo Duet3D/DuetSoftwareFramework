@@ -257,93 +257,154 @@ internal partial class MCodeHandler
     }
 
     /// <summary>
-    /// M104 / M109 / M140 / M141 / M190 / M191: set a temperature, and wait for it where asked
+    /// Whether a code came from a file channel, which keeps waiting for a heater that is in a fault
+    /// </summary>
+    private static bool IsFileChannel(Commands.Code code) => code.Channel is DuetAPI.CodeChannel.File or DuetAPI.CodeChannel.File2;
+
+    /// <summary>
+    /// The target temperature of M104, M109, M190 or M191: R, which also waits while cooling, or else S
+    /// </summary>
+    /// <returns>False if neither is given</returns>
+    private static bool TryGetTargetTemperature(Commands.Code code, out float temperature, out bool waitWhenCooling)
+    {
+        waitWhenCooling = code.TryGetFloat('R', out temperature);
+        return waitWhenCooling || code.TryGetFloat('S', out temperature);
+    }
+
+    /// <summary>
+    /// M104 / M109: set a tool's active and standby temperatures, and for M109 select it if no tool is selected and wait
     /// </summary>
     /// <param name="code">The code</param>
-    /// <param name="heaters">Heaters the code addresses</param>
-    /// <param name="wait">Whether to wait for them to get there</param>
+    /// <param name="wait">True for M109</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
     /// <remarks>
-    /// The setpoint and the on/off decision go to the board together, because a heater told to reach
-    /// a temperature is not heating until it is also told to switch on. A setpoint of zero switches
-    /// it off, which is what M104 S0 means and what a slicer emits at the end of a print
+    /// RepRapFirmware's GCodes2.cpp case 104/109 and <c>GCodes::SetToolHeaters</c>. The tool is T, or the selected tool,
+    /// or the lowest-numbered tool. Both temperatures are set because slicers do not know there are two. A tool that is
+    /// not selected goes on standby, and the selected tool is switched to active again. M109 waits for the selected tool
     /// </remarks>
-    private async ValueTask<Message> SetTemperaturesAsync(Commands.Code code, IReadOnlyList<int> heaters, bool wait,
-                                                          CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleToolTemperatureAsync(Commands.Code code, bool wait, CancellationToken cancellationToken)
     {
-        // TODO RRF M140 with no bed heater refuses S > 0 and R but accepts S <= 0; M104/M109 on a tool with no
-        // heaters still completes (and M109 still selects the tool)
-        if (heaters.Count == 0)
+        if (!TryGetTargetTemperature(code, out float temperature, out bool waitWhenCooling))
         {
-            return new Message(MessageType.Warning, "No heater to set");
+            return new Message();
         }
 
-        bool hasActive = code.TryGetFloat('S', out float active);
-        bool hasStandby = code.TryGetFloat('R', out float standby);
-        if (!hasActive && !hasStandby)
+        int toolNumber, heaterCount;
+        bool noToolSelected;
+        using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            return await ReportTemperaturesAsync(cancellationToken);
-        }
-
-        // TODO behaviour RRF has that this does not:
-        // - M104/M109: R takes precedence over S, the one value sets both active and standby (and the tool's
-        //   active[]/standby[]), and R makes M109 wait while cooling. M140: R alone only stores standby and
-        //   does not switch the heater on
-        // - only S <= -273 switches off, leaving active unchanged; S0 sets 0 and switches the heater on
-        // - a temperature outside the heater's limits, or a heater in fault, is refused before anything changes
-        // - M104/M109 on a tool other than the current one puts that tool on standby, and a heater shared
-        //   with the current tool is left alone
-        // As written, R alone marks the heater active but leaves Active, so the M109 wait reads the old setpoint
-        using (await model.AccessReadWriteAsync(cancellationToken))
-        {
-            foreach (int heaterNumber in heaters)
+            Tool? tool = code.TryGetInt('T', out int given) ? toolManager.Find(given) : toolManager.CurrentOrDefault;
+            if (tool is null)
             {
-                if (heatManager.Find(heaterNumber) is Heater heater)
+                return new Message(MessageType.Error, "Invalid tool number");
+            }
+            toolNumber = tool.Number;
+            heaterCount = tool.Heaters.Count;
+            noToolSelected = toolManager.Current is null;
+        }
+
+        for (int index = 0; index < heaterCount; index++)
+        {
+            foreach (bool active in (bool[])[true, false])
+            {
+                Message reply = await toolManager.SetToolHeaterTemperatureAsync(toolNumber, index, temperature, active, cancellationToken);
+                if (!reply.Succeeded())
                 {
-                    if (hasActive)
-                    {
-                        heater.Active = active;
-                    }
-                    if (hasStandby)
-                    {
-                        heater.Standby = standby;
-                    }
-                    heater.State = !hasActive || active > 0.0f ? HeaterState.Active : HeaterState.Off;
+                    return reply;
                 }
             }
         }
 
-        // Every heater the code named is told, whether or not an earlier one refused. RepRapFirmware's
-        // SetToolHeaters (GCodes.cpp) walks the whole tool without testing anything, and stopping half
-        // way here would leave the rest of a tool's heaters at whatever they were while the object
-        // model said otherwise. What every heater said is reported together
-        List<Message> replies = [];
-        foreach (int heaterNumber in heaters)
+        if (wait && noToolSelected)
         {
-            float target = hasActive ? active : standby;
-            byte command = hasActive && active <= 0.0f
-                ? CanMessageSetHeaterTemperatureV1.CommandOff
-                : CanMessageSetHeaterTemperatureV1.CommandOn;
-            replies.Add(await heatManager.SetTemperatureAsync(heaterNumber, target, command, cancellationToken));
+            Message selected = await toolManager.SelectAsync(code.Channel, toolNumber, Tools.ToolChangeParameters.All, code, cancellationToken);
+            if (!selected.Succeeded())
+            {
+                return selected;
+            }
         }
-
-        Message reply = replies.ToMessage();
-        if (!reply.Succeeded())
+        else
         {
-            return reply;
+            bool isCurrent;
+            using (await model.AccessReadOnlyAsync(cancellationToken))
+            {
+                isCurrent = toolManager.Current?.Number == toolNumber;
+            }
+            if (isCurrent)
+            {
+                // The tool is selected but its heaters may have been switched off, e.g. by a heater fault that was cleared
+                await toolManager.ActivateAsync(toolNumber, cancellationToken);
+            }
+            else
+            {
+                await toolManager.StandbyAsync(toolNumber, cancellationToken);
+            }
         }
 
         if (wait)
         {
+            List<int> heaters;
+            using (await model.AccessReadOnlyAsync(cancellationToken))
+            {
+                heaters = [.. toolManager.Current?.Heaters ?? []];
+            }
+
             // Another channel may move while the heaters come up
             code.ReleaseMovementLock();
-            if (!await heatManager.WaitForTemperaturesAsync(heaters, cancellationToken))
+            if (!await heatManager.WaitForTemperaturesAsync(heaters, waitWhenCooling, HeatManager.TemperatureCloseEnough,
+                                                             IsFileChannel(code), cancellationToken))
             {
                 throw new System.OperationCanceledException();
             }
         }
-        return reply;
+        return new Message();
+    }
+
+    /// <summary>
+    /// M190 / M191: set the active temperature of a bed or chamber slot's heaters, switch them on and wait for them
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="chamber">True for M191, false for M190</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// RepRapFirmware's GCodes2.cpp case 190/191. A slot with no heaters, or a code with neither S nor R, does nothing.
+    /// Every heater of the slot is set before any is waited for, and the replies of all are reported together
+    /// (rrf-differences.md)
+    /// </remarks>
+    private async ValueTask<Message> HandleBedOrChamberWaitAsync(Commands.Code code, bool chamber, CancellationToken cancellationToken)
+    {
+        int slot = BedOrChamberSlot(code, chamber);
+        int[] heaters;
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            heaters = heatManager.BedOrChamberHeaters(chamber, slot);
+        }
+        if (heaters.Length == 0 || !TryGetTargetTemperature(code, out float temperature, out bool waitWhenCooling))
+        {
+            return new Message();
+        }
+
+        List<Message> replies = [];
+        foreach (int heaterNumber in heaters)
+        {
+            Message set = await heatManager.SetActiveOrStandbyTemperatureAsync(heaterNumber, temperature, true, cancellationToken);
+            if (!set.Succeeded())
+            {
+                return set;
+            }
+            replies.Add(await heatManager.SetActiveOrStandbyAsync(heaterNumber, true, cancellationToken));
+        }
+
+        // Another channel may move while the heaters come up
+        code.ReleaseMovementLock();
+        if (!await heatManager.WaitForTemperaturesAsync(heaters, waitWhenCooling, HeatManager.TemperatureCloseEnough,
+                                                         IsFileChannel(code), cancellationToken))
+        {
+            throw new System.OperationCanceledException();
+        }
+        return replies.ToMessage();
     }
 
     /// <summary>
@@ -380,12 +441,13 @@ internal partial class MCodeHandler
     /// </summary>
     private async ValueTask<Message> HandleWaitForTemperaturesAsync(Commands.Code code, CancellationToken cancellationToken)
     {
+        float tolerance = code.TryGetPositiveFloat('S', out float given) ? given : HeatManager.TemperatureCloseEnough;
         List<int> heaters = [];
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            // TODO RRF M116: S is the tolerance (must be > 0); P takes a list, a bare P means every tool, and a
-            // missing tool is skipped; H waits for heaters and C for chamber slots; P, H and C combine; with
-            // none of them only tool, bed and chamber heaters are waited for, not every heater
+            // TODO RRF M116: P takes a list, a bare P means every tool, and a missing tool is skipped; H waits for
+            // heaters and C for chamber slots; P, H and C combine; with none of them only tool, bed and chamber
+            // heaters are waited for, not every heater
             if (code.TryGetInt('P', out int toolNumber))
             {
                 if (toolManager.Find(toolNumber) is not Tool tool)
@@ -411,7 +473,7 @@ internal partial class MCodeHandler
 
         // Another channel may move while the heaters come up
         code.ReleaseMovementLock();
-        if (!await heatManager.WaitForTemperaturesAsync(heaters, cancellationToken))
+        if (!await heatManager.WaitForTemperaturesAsync(heaters, true, tolerance, IsFileChannel(code), cancellationToken))
         {
             throw new System.OperationCanceledException();
         }
@@ -464,55 +526,132 @@ internal partial class MCodeHandler
     }
 
     /// <summary>
-    /// The heaters M140 or M141 addresses, assigning one first where H says which
+    /// The bed or chamber slot a code addresses: P, or slot 0 without it
     /// </summary>
-    /// <remarks>
-    /// <c>M140 H0</c> is what makes heater 0 the bed, and without it the mapping is empty and M140
-    /// has nothing to address. RepRapFirmware treats the assignment and the temperature as one code
-    /// for that reason: a config.g says which heater the bed is and a job says how hot it should be,
-    /// and both are M140
-    /// </remarks>
-    private async ValueTask<List<int>> BedOrChamberHeatersAsync(Commands.Code code, bool chamber,
-                                                                CancellationToken cancellationToken)
-    {
-        // TODO RRF: no P means slot 0, not every slot, and P is range-checked; H takes a list, refuses invalid
-        // heaters and heaters already used by a tool or the other kind of slot, switches off the slot's old
-        // heaters, and sets the new ones' default bed/chamber model and over-temperature monitor
-        // (Heat::SetFunction); heat.bedHeaters/chamberHeaters are never written
-        int index = code.TryGetInt('P', out int given) ? given : -1;
-        if (code.TryGetInt('H', out int heaterNumber))
-        {
-            using (await model.AccessReadWriteAsync(cancellationToken))
-            {
-                heatManager.AssignBedOrChamberHeater(chamber, index < 0 ? 0 : index, heaterNumber);
-            }
-        }
-
-        using (await model.AccessReadOnlyAsync(cancellationToken))
-        {
-            return heatManager.BedOrChamberHeaters(chamber, index);
-        }
-    }
+    private static int BedOrChamberSlot(Commands.Code code, bool chamber)
+        => code.GetInt('P', defaultValue: 0, min: 0,
+                       max: (chamber ? HeatManager.MaxChamberHeaters : HeatManager.MaxBedHeaters) - 1);
 
     /// <summary>
-    /// The heaters M104 or M109 addresses
+    /// M140 / M141: assign the heaters of a bed or chamber slot, set their temperatures, or report them
     /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="chamber">True for M141, false for M140</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
     /// <remarks>
-    /// The tool named by T, or the selected one. A heater is a property of a tool, so a temperature
-    /// with no tool to apply it to has nowhere to go - RepRapFirmware reports the same
+    /// RepRapFirmware's GCodes2.cpp case 140/141. A refused H changes nothing and ends the code, and the replies of every
+    /// heater switched on are reported together (rrf-differences.md)
     /// </remarks>
-    private async ValueTask<List<int>> CurrentToolHeatersAsync(Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask<Message> HandleBedOrChamberHeatersAsync(Commands.Code code, bool chamber,
+                                                                    CancellationToken cancellationToken)
     {
-        List<int> heaters = [];
-        using (await model.AccessReadOnlyAsync(cancellationToken))
+        string kind = chamber ? "chamber" : "bed";
+        int slot = BedOrChamberSlot(code, chamber);
+        bool seen = false;
+
+        if (code.TryGetIntArray('H', chamber ? HeatManager.MaxHeatersPerChamber : HeatManager.MaxHeatersPerBed,
+                                out int[]? heaterNumbers))
         {
-            Tool? tool = code.TryGetInt('T', out int toolNumber) ? toolManager.Find(toolNumber) : toolManager.Current;
-            if (tool is not null)
+            seen = true;
+            if (heaterNumbers.Length == 1 && heaterNumbers[0] < 0)
             {
-                heaters.AddRange(tool.Heaters);
+                await heatManager.ClearBedOrChamberHeatersAsync(chamber, slot, cancellationToken);
+            }
+            else
+            {
+                using (await model.AccessReadOnlyAsync(cancellationToken))
+                {
+                    foreach (int heaterNumber in heaterNumbers)
+                    {
+                        if (heaterNumber < 0 || heaterNumber >= HeatManager.MaxHeaters)
+                        {
+                            return new Message(MessageType.Error, $"Invalid heater number '{heaterNumber}'");
+                        }
+                        if (toolManager.IsHeaterAssignedToTool(heaterNumber))
+                        {
+                            return new Message(MessageType.Error, $"Heater {heaterNumber} is already assigned to a tool");
+                        }
+                        HeaterFunction function = heatManager.GetHeaterFunction(heaterNumber);
+                        if ((!chamber && function == HeaterFunction.Chamber) || (chamber && function == HeaterFunction.Bed))
+                        {
+                            return new Message(MessageType.Error,
+                                $"Heater {heaterNumber} is already assigned as a {(function == HeaterFunction.Bed ? "bed" : "chamber")} heater");
+                        }
+                    }
+                }
+                await heatManager.SetBedOrChamberHeatersAsync(chamber, slot, heaterNumbers, cancellationToken);
             }
         }
-        return heaters;
+
+        int[] heaters;
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            heaters = heatManager.BedOrChamberHeaters(chamber, slot);
+        }
+
+        bool hasActive = code.TryGetFloat('S', out float active);
+        bool hasStandby = code.TryGetFloat('R', out float standby);
+        if (heaters.Length == 0 && ((hasActive && active > 0.0f) || hasStandby))
+        {
+            // Turning off a bed or chamber heater that does not exist is not an error
+            return new Message(MessageType.Error, $"No {kind} heater has been configured for slot {slot}");
+        }
+
+        List<Message> replies = [];
+        if (hasActive)
+        {
+            seen = true;
+            foreach (int heaterNumber in heaters)
+            {
+                if (active <= HeatManager.NearlyAbsoluteZero)
+                {
+                    await heatManager.SwitchOffAsync(heaterNumber, cancellationToken);
+                    continue;
+                }
+
+                Message set = await heatManager.SetActiveOrStandbyTemperatureAsync(heaterNumber, active, true, cancellationToken);
+                if (!set.Succeeded())
+                {
+                    return set;
+                }
+                replies.Add(await heatManager.SetActiveOrStandbyAsync(heaterNumber, true, cancellationToken));
+            }
+        }
+
+        if (hasStandby)
+        {
+            seen = true;
+            foreach (int heaterNumber in heaters)
+            {
+                Message set = await heatManager.SetActiveOrStandbyTemperatureAsync(heaterNumber, standby, false, cancellationToken);
+                if (!set.Succeeded())
+                {
+                    return set;
+                }
+            }
+        }
+
+        if (!seen)
+        {
+            if (heaters.Length == 0)
+            {
+                return new Message(MessageType.Success, $"No {kind} heater has been configured for slot {slot}");
+            }
+
+            StringBuilder report = new();
+            report.Append(CultureInfo.InvariantCulture, $"{(chamber ? "Chamber" : "Bed")} heaters for slot {slot}:");
+            using (await model.AccessReadOnlyAsync(cancellationToken))
+            {
+                foreach (int heaterNumber in heaters)
+                {
+                    float temperature = heatManager.Find(heaterNumber)?.Current ?? HeatManager.AbsoluteZero;
+                    report.Append(CultureInfo.InvariantCulture, $" {heaterNumber} ({temperature:F1}°C)");
+                }
+            }
+            return new Message(MessageType.Success, report.ToString());
+        }
+        return replies.ToMessage();
     }
 
     /// <summary>
@@ -558,9 +697,9 @@ internal partial class MCodeHandler
                 monitor.Limit = limit;
                 monitor.Sensor = code.GetInt('T', defaultValue: heater.Sensor);
                 monitor.Action = code.GetEnum<HeaterMonitorAction>('A', HeaterMonitorAction.GenerateFault);
-                monitor.Condition = code.TryGetInt('C', out int condition)
-                                    ? (HeaterMonitorCondition)condition
-                                    : HeaterMonitorCondition.TooHigh;
+                monitor.Condition = code.GetEnum<HeaterMonitorCondition>('C', HeaterMonitorCondition.TooHigh);
+
+                HeatManager.UpdateTemperatureLimits(heater);
             }
             else
             {
@@ -575,12 +714,22 @@ internal partial class MCodeHandler
                     Limit = monitor.Limit ?? 0.0f,
                     Sensor = (sbyte)monitor.Sensor,
                     Action = (byte)(monitor.Action ?? HeaterMonitorAction.GenerateFault),
-                    Trigger = (sbyte)monitor.Condition
+                    Trigger = monitor.Condition switch
+                    {
+                        HeaterMonitorCondition.TooHigh => 0,
+                        HeaterMonitorCondition.TooLow => 1,
+                        _ => -1,
+                    }
                 };
             }
         }
 
-        return await linkInterface.SendCanRequestAsync(board, in message, cancellationToken);
+        Message reply = await linkInterface.SendCanRequestAsync(board, in message, cancellationToken);
+        if (reply.Succeeded())
+        {
+            heatManager.SetMonitorsSetByUser(heaterNumber);
+        }
+        return reply;
     }
 
     /// <summary>
@@ -793,8 +942,6 @@ internal partial class MCodeHandler
                 return new Message(MessageType.Error, $"bad model parameters: {error}");
             }
 
-            // TODO record that the user set this model once Heat::SetFunction's default models are ported, so that
-            // giving the heater a function does not replace it
             FopDt.Apply(message, heater.Model, FopDt.SetModelPidTemperature);
             highestTemperatureLimit = HeatManager.GetHighestTemperatureLimit(heater);
         }
@@ -802,6 +949,7 @@ internal partial class MCodeHandler
         Message reply = await linkInterface.SendCanRequestAsync(board, in message, cancellationToken);
         if (reply.Succeeded())
         {
+            heatManager.SetModelSetByUser(heaterNumber);
             float predictedMaxTemp = message.BasicModel.EstimateMaxTemperatureRise() + FopDt.NormalAmbientTemperature;
             float noWarnTemp = (highestTemperatureLimit - FopDt.NormalAmbientTemperature) * 1.5f + 50.0f;
             if (predictedMaxTemp > noWarnTemp)

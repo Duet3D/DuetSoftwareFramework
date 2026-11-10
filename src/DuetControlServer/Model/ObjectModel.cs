@@ -87,6 +87,18 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
         Network.Name = Environment.MachineName;
         SetLimits();
 
+        // RepRapFirmware reports every bed and chamber slot in the obsolete arrays, -1 where it is empty
+#pragma warning disable CS0618
+        for (int slot = 0; slot < HeatManager.MaxBedHeaters; slot++)
+        {
+            Heat.BedHeaters.Add(-1);
+        }
+        for (int slot = 0; slot < HeatManager.MaxChamberHeaters; slot++)
+        {
+            Heat.ChamberHeaters.Add(-1);
+        }
+#pragma warning restore CS0618
+
         // Nothing has been heard from the controller yet, which is what unknown means for any board
         AddMainBoard(BoardState.Unknown);
     }

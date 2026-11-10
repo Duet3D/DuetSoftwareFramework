@@ -139,13 +139,12 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
     /// and S below NEARLY_ABS_ZERO calls SwitchOff. heat.bedHeaters[] is Heat.cpp's obsolete
     /// bed heaters array, reporting the first heater of the slot
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M140AssignsAndDrivesBedHeater()
     {
         await using JobBench bench = await JobControlBench.StartAsync(configExtra: HeatConfig);
 
-        Heater? heater = await bench.Host.ReadModelAsync(model => model.Heat.Heaters[3]);
+        Heater? heater = await bench.Host.ReadModelAsync(model => model.Heat.Heaters[0]);
         Assert.Multiple(async () =>
         {
 #pragma warning disable CS0618
@@ -191,7 +190,6 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
     /// RRF truth: GCodes2.cpp case 140 calls Heat::ClearBedHeaters for H-1, and the obsolete
     /// bedHeaters array reports HeaterCollection::GetFirstHeater, which is -1 for an empty slot
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M140HMinusOneClearsBedMapping()
     {
@@ -213,7 +211,6 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
     /// Heater::SetFunction with DefaultChamberTemperatureLimit (100); heat.chamberHeaters[] is
     /// Heat.cpp's obsolete chamber heaters array
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M141AssignsAndDrivesChamberHeater()
     {
@@ -255,7 +252,6 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
     /// Tool::SetToolHeaterActiveOrStandbyTemperature (Tool.cpp). The tool default monitor from
     /// M563 is DefaultHotEndTemperatureLimit (285, Heater.cpp SetFunction)
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M104SetsToolTemperaturesWithoutSelecting()
     {
@@ -302,7 +298,6 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
     /// the applicable tool when none is selected (GCodeState::m109ToolChange0) and a wait in
     /// GCodeState::m109WaitForTemperature until ToolHeatersAtSetTemperatures
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M109SelectsToolAndWaitsForTemperature()
     {
@@ -584,7 +579,6 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
     /// (action as integer, condition via HeaterMonitor::GetTriggerName), and max/min are
     /// GetHighestTemperatureLimit and GetLowestTemperatureLimit over the monitors
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M143ConfiguresHeaterMonitors()
     {

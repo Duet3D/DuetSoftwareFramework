@@ -204,7 +204,7 @@ internal partial class MCodeHandler(
         { 98, CodeClass.Immediate, (h, c, ct) => h.HandleMacroPausableAsync(c, ct) }, // M98 P starts the macro on its own stack level; the handler flushes inline first
         // TODO M99: return from the current macro, and do nothing outside one (RRF FileMacroCyclesReturn, regression case m99-return-from-macro)
         // Set extruder temperature without waiting
-        { 104, CodeClass.Deferred, async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.CurrentToolHeatersAsync(c, ct), wait: false, ct) },
+        { 104, CodeClass.Deferred, (h, c, ct) => h.HandleToolTemperatureAsync(c, wait: false, ct) },
         // Report temperatures
         { 105, CodeClass.Immediate, (h, c, ct) => h.ReportTemperaturesAsync(ct) },
         // Set fan speed
@@ -213,7 +213,7 @@ internal partial class MCodeHandler(
         // Fan off
         { 107, CodeClass.Deferred, (h, c, ct) => h.HandleFanOffAsync(c, ct) },
         // Set extruder temperature and wait: the target must be in force before the wait begins
-        { 109, CodeClass.FlushAndStandstill, async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.CurrentToolHeatersAsync(c, ct), wait: true, ct) },
+        { 109, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleToolTemperatureAsync(c, wait: true, ct) },
         // Set debug level
         { 111, CodeClass.Immediate, (h, c, ct) => h.HandleDebugLevelAsync(c, ct) },
         // Emergency stop
@@ -234,16 +234,16 @@ internal partial class MCodeHandler(
         // Immediate DSF diagnostics
         { 122, CodeClass.Immediate, (h, c, ct) => h.HandleDiagnosticsAsync(c, ct) },
         // Set bed temperature without waiting
-        { 140, CodeClass.Deferred, async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.BedOrChamberHeatersAsync(c, chamber: false, ct), wait: false, ct) },
+        { 140, CodeClass.Deferred, (h, c, ct) => h.HandleBedOrChamberHeatersAsync(c, chamber: false, ct) },
         // Set chamber temperature without waiting
-        { 141, CodeClass.Deferred, async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.BedOrChamberHeatersAsync(c, chamber: true, ct), wait: false, ct) },
+        { 141, CodeClass.Deferred, (h, c, ct) => h.HandleBedOrChamberHeatersAsync(c, chamber: true, ct) },
         // Heater monitors
         { 143, CodeClass.Immediate, (h, c, ct) => h.HandleHeaterMonitorAsync(c, ct) },
         // TODO M144: put the bed heaters of slot P (default 0) on standby, or active with S1 (RRF Heat::SetActiveOrStandby)
         // Set bed temperature and wait
-        { 190, CodeClass.FlushAndStandstill, async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.BedOrChamberHeatersAsync(c, chamber: false, ct), wait: true, ct) },
+        { 190, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleBedOrChamberWaitAsync(c, chamber: false, ct) },
         // Set chamber temperature and wait
-        { 191, CodeClass.FlushAndStandstill, async (h, c, ct) => await h.SetTemperaturesAsync(c, await h.BedOrChamberHeatersAsync(c, chamber: true, ct), wait: true, ct) },
+        { 191, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleBedOrChamberWaitAsync(c, chamber: true, ct) },
         // Set axis and extruder accelerations; M201.1 sets the reduced set
         { 201, CodeClass.Immediate, (h, c, ct) => h.HandleAccelerationsAsync(c, reduced: false, ct) },
         { (201, 1), CodeClass.Immediate, (h, c, ct) => h.HandleAccelerationsAsync(c, reduced: true, ct) },

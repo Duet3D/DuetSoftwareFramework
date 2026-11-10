@@ -12,15 +12,15 @@ public enum HeaterMonitorCondition
     /// <summary>
     /// Heater monitor is disabled
     /// </summary>
-    Disabled,
+    Disabled = -1,
 
     /// <summary>
     /// Limit temperature has been exceeded
     /// </summary>
-    TooHigh,
+    TooHigh = 0,
 
     /// <summary>
     /// Limit temperature is too low
     /// </summary>
-    TooLow
+    TooLow = 1
 }

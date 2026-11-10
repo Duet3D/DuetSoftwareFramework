@@ -5,6 +5,8 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Link.Protocol.Shared;
+using DuetControlServer.Link;
 using DuetControlServer.Motion;
 using DuetControlServer.Tools;
 
@@ -37,6 +39,7 @@ internal partial class MCodeHandler
             return await ReportToolsAsync(cancellationToken);
         }
 
+        IReadOnlyList<int> toolHeaters = [];
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             int axesCount = model.Move.Axes.Count;
@@ -77,9 +80,15 @@ internal partial class MCodeHandler
                 {
                     return new Message(MessageType.Error, error);
                 }
+                toolHeaters = definition.Heaters;
             }
         }
 
+        // RRF's Tool::Create gives each heater the tool function (Heat::SetAsToolHeater)
+        foreach (int heaterNumber in toolHeaters)
+        {
+            await heatManager.SetFunctionAsync(heaterNumber, HeaterFunction.Tool, cancellationToken);
+        }
         return new Message();
     }
 
@@ -237,39 +246,35 @@ internal partial class MCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleToolSettingsAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        Tool? tool;
-        ToolState state;
-        bool apply = false;
+        int toolNumber;
+        float[]? active = null, standby = null;
+        ToolHeaterState? heaterState = null;
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
-            tool = code.TryGetInt('P', out int toolNumber) ? toolManager.Find(toolNumber) : toolManager.Current;
+            Tool? tool = code.TryGetInt('P', out int given) ? toolManager.Find(given) : toolManager.Current;
             if (tool is null)
             {
                 return new Message(MessageType.Error, "No tool selected");
             }
+            toolNumber = tool.Number;
 
             bool seen = false;
             int hCount = tool.Heaters.Count;
-            // One temperature per heater of the tool, and a single value stands for all of them
-            // (RRF GCodes.cpp SetOrReportToolTemperatures, hCount = tool->HeaterCount())
-            if (code.TryGetFloatArray('S', hCount, out float[]? active, pad: true))
+            if (hCount > 0)
             {
-                Assign(tool.Active, active);
-                seen = true;
-            }
-            if (code.TryGetFloatArray('R', hCount, out float[]? standby, pad: true))
-            {
-                Assign(tool.Standby, standby);
-                seen = true;
+                // One temperature per heater of the tool, and a single value stands for all of them
+                // (RRF GCodes.cpp SetOrReportOffsets, hCount = tool->HeaterCount())
+                seen |= code.TryGetFloatArray('R', hCount, out standby, pad: true);
+                seen |= code.TryGetFloatArray('S', hCount, out active, pad: true);
             }
             if (code.TryGetInt('F', out int spindleRpm))
             {
                 tool.SpindleRpm = spindleRpm;
                 seen = true;
             }
-            if (code.TryGetEnum('A', out ToolState requested))
+            if (code.TryGetEnum('A', out ToolHeaterState requested))
             {
-                tool.State = requested;
+                heaterState = requested;
                 seen = true;
             }
 
@@ -277,37 +282,42 @@ internal partial class MCodeHandler
             {
                 return ReportToolSettings(tool);
             }
-
-            state = tool.State;
-            apply = tool.Heaters.Count > 0;
         }
 
-        if (apply)
+        for (int index = 0; standby is not null && index < standby.Length; index++)
         {
-            await heatManager.ApplyToolStateAsync(tool, state, cancellationToken);
+            Message reply = await toolManager.SetToolHeaterTemperatureAsync(toolNumber, index, standby[index], false, cancellationToken);
+            if (!reply.Succeeded())
+            {
+                return reply;
+            }
+        }
+        for (int index = 0; active is not null && index < active.Length; index++)
+        {
+            Message reply = await toolManager.SetToolHeaterTemperatureAsync(toolNumber, index, active[index], true, cancellationToken);
+            if (!reply.Succeeded())
+            {
+                return reply;
+            }
+        }
+
+        // A sets the heaters, not the tool's state (RRF GCodes.cpp SetOrReportOffsets)
+        switch (heaterState)
+        {
+            case ToolHeaterState.Off:
+                await toolManager.HeatersToOffAsync(toolNumber, cancellationToken);
+                break;
+            case ToolHeaterState.Standby:
+                await toolManager.HeatersToActiveOrStandbyAsync(toolNumber, false, cancellationToken);
+                break;
+            case ToolHeaterState.Active:
+                await toolManager.HeatersToActiveOrStandbyAsync(toolNumber, true, cancellationToken);
+                break;
         }
 
         // The spindle speed is applied when the spindle is started rather than now, which is what
         // lets M568 F set it up before an M3 that carries no S
         return new Message();
-    }
-
-    /// <summary>
-    /// Copy values into a tool's per-heater list, leaving entries the code did not give
-    /// </summary>
-    private static void Assign(System.Collections.ObjectModel.ObservableCollection<float> target, float[] values)
-    {
-        for (int index = 0; index < values.Length; index++)
-        {
-            if (index < target.Count)
-            {
-                target[index] = values[index];
-            }
-            else
-            {
-                target.Add(values[index]);
-            }
-        }
     }
 
     /// <summary>

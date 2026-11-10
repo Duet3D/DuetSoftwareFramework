@@ -253,7 +253,7 @@ That adds fields RepRapFirmware does not keep, does not report, or both:
 | `move.axes[].phaseStepKv` and `.phaseStepKa`, and the same on `move.extruders[]` | M970.1 and M970.2 send the phase stepping feedforward gains to the board that applies them. RepRapFirmware keeps its own copy in `DriveMovement` and answers a bare M970.1 from it; here the board is the only other place they exist, so without these a restart would lose them and the bare form would have nothing to report |
 | `move.axes[].rotational` and `.continuousRotation` | M584's R and S say what kind of axis is being created, which RepRapFirmware keeps in bitmaps of its own and prints as `(r)` and `(c)` in the M584 report without reporting anywhere a client can read |
 
-Three further differences follow from the same rule.
+**`HeaterMonitorCondition` enum value matches the `C` param values of `M143`.** This removes the need to have converters between the OM and gcode parameter and makes error messages more clear and consistent.
 
 **The kinematics engine is authoritative and the object model is a projection of it.** Kinematics is
 the one place where two objects genuinely have to exist: `KinematicsEngine` holds precomputed state —
@@ -400,6 +400,10 @@ Added minimum array limits to the following gcodes:
 - `M572` - pressure advance
 - `M906`/`M913`/`M917` - motor current & standstill current
 A `GCodeException` is thrown if the value is below the minimum (`0.0f`)
+
+`M140` and `M141` stop at a refused `H` (an invalid heater number, a heater a tool uses, or a heater of the other kind of slot) and leave the slot and its heaters as they were. RepRapFirmware reports the refusal but goes on to apply `S` and `R` to the slot's existing heaters, and a heater switched on successfully there replaces the error with success.
+
+When `M140`, `M141`, `M190` or `M191` switches on several heaters of a slot, every heater's reply is reported, with the worst result. RepRapFirmware reports only the last heater's result, so a heater that failed to switch on is not reported if a later one succeeds.
 
 An expansion board that asks for a firmware block past the end of the file gets one `ErrBadOffset` response, and the bad offset is reported. RepRapFirmware's `HandleFirmwareBlockRequest` goes on to answer the same request with `ErrNoFile` and to report a missing file, because the request is still unserved when it reaches that test. The file exists, so DSF stops at the first answer. The update fails in both.
 

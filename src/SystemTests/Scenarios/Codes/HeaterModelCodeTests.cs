@@ -328,8 +328,8 @@ public class HeaterModelCodeTests : BenchFixture
         Assert.Multiple(async () =>
         {
             Assert.That((await bench.Host.ExecuteCodeAsync("M307 H2")).TrimEnd(), Does.StartWith(
-                "Heater 2: heating rate 0.500, cooling rate 0.150, dead time 10.00, max PWM 1.00, mode PID\n"),
-                "a bed heater's report has no calibration voltage");
+                "Heater 2: heating rate 0.500, cooling rate 0.150, dead time 10.00, max PWM 1.00, mode bang-bang\n"),
+                "a bed heater's report has no calibration voltage, and B keeps the default bed model's bang-bang");
             Assert.That(bench.CanMaster.LastCanMessage<CanMessageHeaterModelV3>().Message.BasicModel.TypicalTemperature,
                         Is.EqualTo(60.0).Within(1e-6), "a bed heater's model carries DefaultBedHeaterModel's typical temperature");
         });

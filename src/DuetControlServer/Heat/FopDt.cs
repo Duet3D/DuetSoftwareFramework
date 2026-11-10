@@ -60,6 +60,23 @@ public static class FopDt
     }
 
     /// <summary>
+    /// Store a default model a board reported, enabled, with its PID constants at the model's typical temperature
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>FopDt::SetDefaultModel</c></remarks>
+    public static void SetDefaultModel(DuetAPI.ObjectModel.HeaterModel model, in HeaterModel basicModel)
+    {
+        CanMessageHeaterModelV3 message = new() { BasicModel = basicModel, MaxPwm = 1.0f, Enabled = true };
+        Apply(message, model, basicModel.TypicalTemperature);
+    }
+
+    /// <summary>
+    /// Recalculate the PID constants of a model for a target temperature
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>FopDt::CalcPidConstants</c></remarks>
+    public static void CalcPidConstants(DuetAPI.ObjectModel.HeaterModel model, HeaterFunction function, float targetTemperature)
+        => Apply(ToCanMessage(0, function, model), model, targetTemperature);
+
+    /// <summary>
     /// Why a model cannot be used, or null if it can
     /// </summary>
     /// <remarks>

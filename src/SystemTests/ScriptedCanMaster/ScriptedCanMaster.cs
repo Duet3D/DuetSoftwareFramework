@@ -166,18 +166,44 @@ internal sealed class ScriptedCanMaster : IDisposable
 
     /// <summary>
     /// Answer every CAN message that expects a StandardReply with an empty success, like a healthy
-    /// board with nothing to say. This is what lets configuration codes (M569, M906, ...) succeed
-    /// against the fake; requests expecting any other reply type stay for the test to script
+    /// board with nothing to say, and every SetDefaultHeaterModel with the default model a board applies.
+    /// This is what lets configuration codes (M569, M906, M140 H, ...) succeed against the fake; requests
+    /// expecting any other reply type stay for the test to script
     /// </summary>
     public void AckCanRequestsWithStandardReplies()
     {
-        DefaultCanHandler = static (fake, header, _) =>
+        DefaultCanHandler = static (fake, header, payload) =>
         {
             if (header.ReplyType == (ushort)CanMessageType.StandardReply)
             {
                 fake.InjectStandardReply(header);
             }
+            else if (header.MsgType == (ushort)CanMessageType.SetDefaultHeaterModel)
+            {
+                fake.InjectHeaterModelReport(header, CanMessageSerializer.Deserialize<CanMessageSetDefaultHeaterModel>(payload));
+            }
         };
+    }
+
+    /// <summary>
+    /// Answer a SetDefaultHeaterModel with CANlib's default model for the heater function it names
+    /// </summary>
+    /// <remarks>Duet3Expansion's <c>LocalHeater::SetDefaultHeaterModel</c></remarks>
+    public void InjectHeaterModelReport(SendCanMessageHeader request, CanMessageSetDefaultHeaterModel message)
+    {
+        CanMessageHeaterModelReport report = default;
+        report.HeaterNumber = message.Heater;
+        report.ResultCode = CodeResult.Ok;
+        report.Model = message.HeaterFunction switch
+        {
+            HeaterFunction.Bed => DuetControlServer.Link.Protocol.CanMessages.HeaterModel.DefaultBedHeaterModel,
+            HeaterFunction.Chamber => DuetControlServer.Link.Protocol.CanMessages.HeaterModel.DefaultChamberHeaterModel,
+            _ => DuetControlServer.Link.Protocol.CanMessages.HeaterModel.DefaultToolHeaterModel,
+        };
+
+        byte[] payload = new byte[Marshal.SizeOf<CanMessageHeaterModelReport>()];
+        CanMessageSerializer.Serialize(in report, payload);
+        InjectCanResponse(request.TxToken, (ushort)CanMessageType.HeaterModelReport, request.DstAddress, payload);
     }
 
     /// <summary>
