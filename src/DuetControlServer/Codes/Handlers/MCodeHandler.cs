@@ -362,6 +362,8 @@ internal partial class MCodeHandler(
         { 593, c => c.Parameters.Count > 0 ? CodeClass.FlushAndStandstill : CodeClass.Immediate, (h, c, ct) => h.HandleInputShapingAsync(c, ct) },
         // Fork input reader
         { 606, CodeClass.Flush, (h, c, ct) => h.HandleForkInputReaderAsync(c, ct) }, // the fork point is the settled file position of the pending codes
+        // Send a custom request to a CAN-connected board
+        { 655, CodeClass.Immediate, (h, c, ct) => h.HandleCustomCanRequestAsync(c, ct) },
         // Delta configuration and endstop adjustments, and selecting and configuring kinematics
         { [665, 666, 669], CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleKinematicsAsync(c, ct) },
         // Retired in RepRapFirmware in favour of M669
@@ -377,18 +379,16 @@ internal partial class MCodeHandler(
         { 915, CodeClass.Immediate, (h, c, ct) => h.HandleStallDetectionAsync(c, ct) },
         // Start/stop event logging to SD card
         { 929, CodeClass.Flush, (h, c, ct) => h.HandleEventLoggingAsync(c, ct) }, // log entries are written as codes complete; start and stop order with them
-        // Send a custom request to a CAN-connected board
-        { 655, CodeClass.Immediate, (h, c, ct) => h.HandleCustomCanRequestAsync(c, ct) },
         // Create a heater, fan or other I/O device
         { 950, CodeClass.Immediate, (h, c, ct) => h.HandleCreateDeviceAsync(c, ct) },
         // Configure CAN: it changes the bus the moves travel on
         { 952, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleConfigureCanAsync(c, ct) },
         // Enable CAN
         { 953, CodeClass.Immediate, (h, c, ct) => h.HandleEnableCanAsync(c, ct) },
-        // How long a board may be silent before it is taken to have gone away
-        { 959, CodeClass.Immediate, (h, c, ct) => h.HandleConnectionTimeoutAsync(c, ct) },
         // Raise an event
         { 957, CodeClass.Immediate, (h, c, ct) => new ValueTask<Message>(h.HandleRaiseEvent(c)) },
+        // How long a board may be silent before it is taken to have gone away
+        { 959, CodeClass.Immediate, (h, c, ct) => h.HandleConnectionTimeoutAsync(c, ct) },
         // Configure phase stepping
         // A change of step mode or of a feedforward gain reaches a motor that may be moving, so it
         // waits for standstill as RepRapFirmware's LockAllMovementSystemsAndWaitForStandstill does
