@@ -50,7 +50,7 @@ public enum MachineStatus
     Paused,
     
     /// <summary>
-    /// The machine is about to resume a paused file job
+    /// The machine is about to resume a paused file job or is moving back to the position where a feed hold stopped it
     /// </summary>
     Resuming,
 
