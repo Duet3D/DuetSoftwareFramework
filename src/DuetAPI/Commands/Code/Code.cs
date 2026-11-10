@@ -427,6 +427,7 @@ public partial class Code : Command<Message?>
     /// Get a float parameter value that has to be greater than zero
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>
+    /// <param name="defaultValue">Value to return if the letter is not in the code, or null to require it</param>
     /// <returns>Parameter value</returns>
     /// <exception cref="MissingParameterException">Parameter not found</exception>
     /// <exception cref="GCodeException">The letter carries no value, or one that is not greater than zero</exception>
@@ -436,11 +437,11 @@ public partial class Code : Command<Message?>
     /// zero would make meaningless rather than merely unusual - steps per millimetre, a timeout -
     /// which is why it is refused where it stands instead of being stored
     /// </remarks>
-    public float GetPositiveFloat(char letter)
+    public float GetPositiveFloat(char letter, float? defaultValue = null)
     {
-        CodeParameter parameter = GetValuedParameter(letter);
-        float value = (float)parameter;
-        return (value > 0.0f) ? value : throw new GCodeException("value must be greater than zero", parameter.Column);
+        CodeParameter? parameter = FindValuedParameter(letter);
+        float value = parameter is not null ? (float)parameter : defaultValue ?? throw new MissingParameterException(letter);
+        return (value > 0.0f) ? value : throw new GCodeException("value must be greater than zero", parameter?.Column ?? 0);
     }
 
     /// <summary>

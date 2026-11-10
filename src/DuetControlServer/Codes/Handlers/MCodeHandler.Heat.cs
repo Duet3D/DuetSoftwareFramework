@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -447,47 +448,85 @@ internal partial class MCodeHandler
     }
 
     /// <summary>
-    /// M116: wait for every heater that matters to reach its temperature
+    /// M116: wait for the heaters of the tools P, the heaters H and the chamber slots C, or without any of them for every
+    /// tool, bed and chamber heater, to reach their temperatures
     /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's GCodes2.cpp case 116. A bare P means every tool and a bare C every chamber slot, while a bare H
+    /// means no heater. A tool, heater or slot that does not exist is skipped. Every wait includes cooling down
+    /// </remarks>
     private async ValueTask<Message> HandleWaitForTemperaturesAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        float tolerance = code.TryGetPositiveFloat('S', out float given) ? given : HeatManager.TemperatureCloseEnough;
-        List<int> heaters = [];
+        float tolerance = code.GetPositiveFloat('S', defaultValue: HeatManager.TemperatureCloseEnough);
+        HashSet<int> heaters = [];
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            // TODO RRF M116: P takes a list, a bare P means every tool, and a missing tool is skipped; H waits for
-            // heaters and C for chamber slots; P, H and C combine; with none of them only tool, bed and chamber
-            // heaters are waited for, not every heater
-            if (code.TryGetInt('P', out int toolNumber))
+            bool seen = false;
+            if (code.TryGetUIntArray('P', Tools.ToolManager.MaxTools, out uint[]? toolNumbers, allowZeroLength: true))
             {
-                if (toolManager.Find(toolNumber) is not Tool tool)
+                seen = true;
+                if (toolNumbers.Length == 0)
                 {
-                    return new Message(MessageType.Error, $"Tool {toolNumber} not found");
+                    AddToolHeaters(heaters, model.Tools);
                 }
-                heaters.AddRange(tool.Heaters);
-            }
-            else
-            {
-                // Every heater that is on. RepRapFirmware waits for all of them rather than only the
-                // current tool's, which is what makes a bare M116 the "wait until the machine is
-                // ready" a start.g ends with
-                for (int heaterNumber = 0; heaterNumber < model.Heat.Heaters.Count; heaterNumber++)
+                else
                 {
-                    if (model.Heat.Heaters[heaterNumber] is not null)
-                    {
-                        heaters.Add(heaterNumber);
-                    }
+                    AddToolHeaters(heaters, toolNumbers.Select(toolNumber => toolManager.Find((int)toolNumber)));
+                }
+            }
+
+            if (code.TryGetUIntArray('H', HeatManager.MaxHeaters, out uint[]? heaterNumbers, allowZeroLength: true))
+            {
+                seen = true;
+                heaters.UnionWith(heaterNumbers.Select(heaterNumber => (int)heaterNumber));
+            }
+
+            if (code.TryGetUIntArray('C', HeatManager.MaxChamberHeaters, out uint[]? chamberSlots, allowZeroLength: true))
+            {
+                seen = true;
+                IEnumerable<int> slots = (chamberSlots.Length == 0)
+                    ? Enumerable.Range(0, HeatManager.MaxChamberHeaters)
+                    : chamberSlots.Where(slot => slot < HeatManager.MaxChamberHeaters).Select(slot => (int)slot);
+                foreach (int slot in slots)
+                {
+                    heaters.UnionWith(heatManager.BedOrChamberHeaters(chamber: true, slot));
+                }
+            }
+
+            if (!seen)
+            {
+                // TODO RRF skips the tools selected in another motion system once there is more than one
+                AddToolHeaters(heaters, model.Tools);
+                for (int slot = 0; slot < HeatManager.MaxBedHeaters; slot++)
+                {
+                    heaters.UnionWith(heatManager.BedOrChamberHeaters(chamber: false, slot));
+                }
+                for (int slot = 0; slot < HeatManager.MaxChamberHeaters; slot++)
+                {
+                    heaters.UnionWith(heatManager.BedOrChamberHeaters(chamber: true, slot));
                 }
             }
         }
 
         // Another channel may move while the heaters come up
         code.ReleaseMovementLock();
-        if (!await heatManager.WaitForTemperaturesAsync(heaters, true, tolerance, IsFileChannel(code), cancellationToken))
+        if (!await heatManager.WaitForTemperaturesAsync([.. heaters], true, tolerance, IsFileChannel(code), cancellationToken))
         {
             throw new System.OperationCanceledException();
         }
         return new Message();
+
+        // Add the heaters of tools, skipping a tool that does not exist
+        static void AddToolHeaters(HashSet<int> heaters, IEnumerable<Tool?> tools)
+        {
+            foreach (Tool? tool in tools)
+            {
+                if (tool is not null)
+                {
+                    heaters.UnionWith(tool.Heaters);
+                }
+            }
+        }
     }
 
     /// <summary>
