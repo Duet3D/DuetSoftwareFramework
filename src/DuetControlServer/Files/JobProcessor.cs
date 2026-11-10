@@ -777,9 +777,11 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                         isAborted = true;
                     }
 
-                    // Update special fields that are not available in RRF
+                    // Update special fields that are not available in RRF. The file name goes too: RRF reports null for it once the job has
+                    // ended, which the non-nullable model property cannot take, so without this the previous job stays visible as the current one
                     using (await _model.AccessReadWriteAsync(stoppingToken))
                     {
+                        _model.Job.File.FileName = string.Empty;
                         _model.Job.File.CustomInfo.Clear();
                         _model.Job.LastFileAborted = isAborted;
                         _model.Job.LastFileCancelled = isCancelled;
@@ -901,7 +903,8 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// Cancel the current print (e.g. when M0/M1 is called)
     /// </summary>
     /// <param name="stoppedByCode">Whether M0/M1/M2 is stopping the print, which RRF has already acted on</param>
-    public void Cancel(bool stoppedByCode = false)
+    /// <param name="cancelledWhileHeld">Whether the user cancelled a job that a feed hold had stopped, which counts as a cancellation like one from the paused state</param>
+    public void Cancel(bool stoppedByCode = false, bool cancelledWhileHeld = false)
     {
         if (IsFileSelected)
         {
@@ -912,7 +915,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
             _file!.Close();
             _file2?.Close();
 
-            IsCancelled = IsPaused;
+            IsCancelled = IsPaused || cancelledWhileHeld;
             IsStoppedByCode = stoppedByCode;
             Resume();
         }

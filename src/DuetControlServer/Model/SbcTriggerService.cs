@@ -295,10 +295,12 @@ public sealed class SbcTriggerService(
 
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
+            // A feed hold hides the print state behind MachineStatus.Held, so a held machine counts as printing while a job file is loaded
             bool isPrinting = model.State.Status is MachineStatus.Processing
                 or MachineStatus.Pausing
                 or MachineStatus.Paused
-                or MachineStatus.Resuming;
+                or MachineStatus.Resuming
+                || (model.State.Status is MachineStatus.Held && !string.IsNullOrEmpty(model.Job.File.FileName));
             return condition == 1 ? isPrinting : !isPrinting;
         }
     }

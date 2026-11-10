@@ -85,18 +85,37 @@ public class MCodeHandler(
                     // Attempt to cancel the print from any channel other than File2
                     if (code.Channel != CodeChannel.File2)
                     {
+                        bool fileSelected, jobPaused;
                         using (await jobProcessor.LockAsync(cancellationToken))
                         {
-                            if (jobProcessor.IsFileSelected)
+                            fileSelected = jobProcessor.IsFileSelected;
+                            jobPaused = jobProcessor.IsPaused;
+                        }
+
+                        if (fileSelected)
+                        {
+                            // M0/M1/M2 is permitted from inside a job file, but only permitted from elsewhere if the job is already paused or a feed hold has stopped it
+                            bool cancelledWhileHeld = false;
+                            if (!code.IsFromFileChannel && !jobPaused)
                             {
-                                // M0/M1/M2 is permitted from inside a job file, but only permitted from elsewhere if the job is already paused
-                                if (!code.IsFromFileChannel && !jobProcessor.IsPaused)
+                                await model.WaitForFullUpdateAsync(cancellationToken);
+                                using (await model.AccessReadOnlyAsync(cancellationToken))
                                 {
-                                    return new Message(MessageType.Error, "Pause the print before attempting to cancel it");
+                                    if (model.State.Status != MachineStatus.Held)
+                                    {
+                                        return new Message(MessageType.Error, "Pause the print before attempting to cancel it");
+                                    }
                                 }
 
-                                // Invalidate the print file and make sure no more codes are read from it
-                                jobProcessor.Cancel(true);
+                                // A pause has already resolved what the job channels had in flight, a feed hold has not
+                                await linkInterface.InvalidateJobChannelsAsync(cancellationToken);
+                                cancelledWhileHeld = true;
+                            }
+
+                            // Invalidate the print file and make sure no more codes are read from it
+                            using (await jobProcessor.LockAsync(cancellationToken))
+                            {
+                                jobProcessor.Cancel(true, cancelledWhileHeld);
                             }
                         }
                     }
@@ -262,16 +281,27 @@ public class MCodeHandler(
                 {
                     if (code.Channel != CodeChannel.File2)
                     {
+                        bool fileSelected;
                         using (await jobProcessor.LockAsync(cancellationToken))
                         {
-                            if (!jobProcessor.IsFileSelected)
+                            fileSelected = jobProcessor.IsFileSelected;
+                        }
+
+                        if (!fileSelected)
+                        {
+                            // M24 also releases a feed hold, which needs no file. Wait for the object model so a hold requested a moment ago is visible
+                            await model.WaitForFullUpdateAsync(cancellationToken);
+                            using (await model.AccessReadOnlyAsync(cancellationToken))
                             {
-                                return new Message(MessageType.Error, "Cannot print, because no file is selected!");
+                                if (model.State.Status != MachineStatus.Held)
+                                {
+                                    return new Message(MessageType.Error, "Cannot print, because no file is selected!");
+                                }
                             }
                         }
                     }
 
-                    // Let RepRapFirmware process this request so it can invoke resume.g. When M24 completes, the file is resumed
+                    // Let RepRapFirmware process this request so it can invoke resume.g or release the feed hold. When M24 completes, the file is resumed
                     break;
                 }
                 throw new OperationCanceledException();

@@ -554,6 +554,23 @@ public sealed partial class LinkInterface(
     }
 
     /// <summary>
+    /// Resolve the pending and buffered codes of the job channels and leave their macros, as a pause notification does.
+    /// Used when a job is cancelled while a feed hold has stopped it, because no pause has cleaned up before
+    /// </summary>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public async Task InvalidateJobChannelsAsync(CancellationToken cancellationToken = default)
+    {
+        foreach (CodeChannel channel in new[] { CodeChannel.File, CodeChannel.File2 })
+        {
+            using (await channels[channel].LockAsync(cancellationToken))
+            {
+                channels[channel].PrintPaused();
+            }
+        }
+    }
+
+    /// <summary>
     /// Send a pending code to the firmware
     /// </summary>
     /// <param name="code">Code to send</param>
