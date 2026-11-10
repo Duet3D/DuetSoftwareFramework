@@ -385,6 +385,10 @@ When a print is paused, if the tool position is moved then the restore move will
 
 `M116`, `M190` and `M191` release only the movement lock they took themselves. A lock held by an outer code on the same channel, such as a `T` code running `tpost.g` or a `G28` running a homing file, is kept while the heaters come up, so no other channel can move in the middle of the tool change or homing. RepRapFirmware releases it for these three codes but keeps it for `M109` and `G4`; `M109` was changed to keep it because releasing it made homing fail when `M109` was used in a homing file, and DSF applies the same rule to all of them.
 
+### 5.5 M108 ends a temperature wait from the input that is waiting
+
+`M108` ends a temperature wait from any input, including the one the wait was sent from, because DSF runs it on an idle channel as it does `M112`. In RepRapFirmware only the USB and serial inputs see `M108` while the input is blocked; from Duet Web Control's console, `M108` waits behind the `M109` or `M190` it was meant to end.
+
 ---
 
 ## 6. G-code and expressions

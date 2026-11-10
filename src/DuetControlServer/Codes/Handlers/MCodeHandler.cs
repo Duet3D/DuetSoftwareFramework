@@ -209,9 +209,10 @@ internal partial class MCodeHandler(
         { 105, CodeClass.Immediate, (h, c, ct) => h.ReportTemperaturesAsync(ct) },
         // Set fan speed
         { 106, CodeClass.Deferred, (h, c, ct) => h.HandleFanSpeedAsync(c, ct) },
-        // TODO M108: end every M109/M116/M190/M191 wait, which then completes OK (RRF CancelWaitForTemperatures)
         // Fan off
         { 107, CodeClass.Deferred, (h, c, ct) => h.HandleFanOffAsync(c, ct) },
+        // Cancel heating: end every M109/M116/M190/M191 wait
+        { 108, CodeClass.Immediate, (h, c, ct) => h.HandleCancelHeatingWaitAsync() }, // prioritised, so it never waits behind the wait it ends
         // Set extruder temperature and wait: the target must be in force before the wait begins
         { 109, CodeClass.FlushAndStandstill, (h, c, ct) => h.HandleToolTemperatureAsync(c, wait: true, ct) },
         // Set debug level

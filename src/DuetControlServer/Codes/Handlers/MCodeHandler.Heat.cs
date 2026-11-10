@@ -437,6 +437,16 @@ internal partial class MCodeHandler
     }
 
     /// <summary>
+    /// M108: end every M109, M116, M190 and M191 wait in progress on any channel, each of which completes successfully
+    /// </summary>
+    /// <remarks>RepRapFirmware's GCodes2.cpp case 108. Nothing waiting is not an error</remarks>
+    private ValueTask<Message> HandleCancelHeatingWaitAsync()
+    {
+        heatManager.EndTemperatureWaits();
+        return ValueTask.FromResult(new Message());
+    }
+
+    /// <summary>
     /// M116: wait for every heater that matters to reach its temperature
     /// </summary>
     private async ValueTask<Message> HandleWaitForTemperaturesAsync(Commands.Code code, CancellationToken cancellationToken)

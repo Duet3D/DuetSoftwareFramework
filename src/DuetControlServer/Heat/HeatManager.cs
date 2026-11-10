@@ -319,10 +319,13 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
     /// <param name="tolerance">How close to the target counts as there</param>
     /// <param name="waitOnFault">Whether a heater in a fault is waited for, which only a file channel does</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>True if they all got there, false if the wait was cancelled</returns>
+    /// <returns>True if they all got there or M108 ended the wait, false if the wait was cancelled</returns>
     public async ValueTask<bool> WaitForTemperaturesAsync(IReadOnlyList<int> heaters, bool waitWhenCooling, float tolerance,
                                                           bool waitOnFault, CancellationToken cancellationToken)
     {
+        // Only an M108 that comes after the wait has started ends it
+        Task waitEnded = Volatile.Read(ref _endWaits).Task;
+
         // Counted rather than flagged, because several channels may be waiting at once and a flag
         // would be cleared by whichever finished first
         Interlocked.Increment(ref _waitingForTemperatures);
@@ -330,6 +333,11 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
         {
             while (!cancellationToken.IsCancellationRequested)
             {
+                if (waitEnded.IsCompleted)
+                {
+                    return true;
+                }
+
                 bool allReady = true;
                 using (await model.AccessReadOnlyAsync(cancellationToken))
                 {
@@ -347,7 +355,7 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
                 {
                     return true;
                 }
-                await Task.Delay(WaitPollInterval, cancellationToken);
+                await Task.WhenAny(Task.Delay(WaitPollInterval, cancellationToken), waitEnded);
             }
             return false;
         }
@@ -356,6 +364,15 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
             Interlocked.Decrement(ref _waitingForTemperatures);
         }
     }
+
+    /// <summary>
+    /// M108: end every temperature wait in progress on any channel, each of which then completes as if its heaters had
+    /// got there
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>GCodes::CancelWaitForTemperatures(false)</c></remarks>
+    public void EndTemperatureWaits()
+        => Interlocked.Exchange(ref _endWaits, new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)).TrySetResult();
+    private TaskCompletionSource _endWaits = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     /// <summary>
     /// Whether a heater is close enough to its target, which it is if it does not exist or is not on
