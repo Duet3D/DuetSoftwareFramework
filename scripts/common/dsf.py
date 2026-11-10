@@ -97,8 +97,9 @@ POSTINST = {
     'DuetWebServer': 'pkg/deb/duetwebserver/DEBIAN/postinst',
 }
 SERVICES = ['duetcontrolserver', 'duetwebserver', 'duetpluginservice', 'duetpluginservice-root']
-# Debug symbols and documentation are no use on the target
-DEPLOY_EXCLUDES = ('*.dbg', '*.pdb', '*.xml')
+# Documentation is no use on the target, nor are debug symbols except in a Debug build, which is deployed to be debugged
+DOCUMENTATION = ('*.xml',)
+DEBUG_SYMBOLS = ('*.dbg', '*.pdb')
 
 # The Tracy client library a -p:Profiling=true build of DuetControlServer P/Invokes into (common/tracy.py).
 # It is a target of its own rather than a project: it is only built when asked for.
@@ -167,6 +168,11 @@ class BuildOptions:
     def configuration(self) -> str:
         """The build configuration of the dotnet projects."""
         return 'Debug' if self.debug else 'Release'
+
+    @property
+    def deploy_excludes(self) -> tuple[str, ...]:
+        """The files of the publish output that are not deployed."""
+        return DOCUMENTATION if self.debug else DOCUMENTATION + DEBUG_SYMBOLS
 
     @property
     def variant(self) -> str:
@@ -367,7 +373,7 @@ def stage_plugin(build: Build) -> None:
     stage = build.plugin_stage_dir
     shutil.rmtree(stage, ignore_errors=True)
     build.plugin_manifest.unlink(missing_ok=True)
-    shutil.copytree(source, stage / 'dsf', symlinks=True, ignore=shutil.ignore_patterns(*DEPLOY_EXCLUDES))
+    shutil.copytree(source, stage / 'dsf', symlinks=True, ignore=shutil.ignore_patterns(*build.options.deploy_excludes))
     shutil.copytree(PLUGIN_COMMON_DIR / PLUGIN_ID, stage, symlinks=True, dirs_exist_ok=True)
     for executable in PLUGIN_EXECUTABLES:
         path = stage / 'dsf' / executable
@@ -520,7 +526,7 @@ def deploy(build: Build, to: DeployOptions) -> bool:
     # The publish directories overlap, sharing the runtime and the DSF assemblies, and rsync merges them,
     # taking each file from the first that has it. --delete removes what none of them has, so only when
     # every project is selected, to keep the binaries of the unselected ones.
-    rsync = ['rsync', '-rav', *(f'--exclude={pattern}' for pattern in DEPLOY_EXCLUDES)]
+    rsync = ['rsync', '-rav', *(f'--exclude={pattern}' for pattern in build.options.deploy_excludes)]
     if build.every:
         rsync.append('--delete')
     # The publish directories' contents, not the directories themselves

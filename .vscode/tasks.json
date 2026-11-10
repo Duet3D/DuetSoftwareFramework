@@ -156,7 +156,7 @@
         {
             "label": "[DSF] Install vsdbg on Remote",
             "type": "shell",
-            "command": "ssh -o StrictHostKeyChecking=no ${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp} 'mkdir -p ~/vsdbg && curl -fsSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l ~/vsdbg && ~/vsdbg/vsdbg --version'",
+            "command": "python3 ${workspaceFolder}/scripts/internal/install_remote_vsdbg.py -H ${config:dsf.debug.targetIp} -u ${config:dsf.debug.sshUser} --debugger-path ${config:dsf.debug.debuggerPath}",
             "problemMatcher": []
         },
         {

@@ -15,9 +15,11 @@
             "pipeTransport": {
                 "pipeCwd": "${workspaceFolder}",
                 "pipeProgram": "ssh",
+                // The service's UMask, so that DuetWebServer, running as dsf, can connect to the IPC socket DCS creates
                 "pipeArgs": [
                     "-T",
-                    "${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp}"
+                    "${config:dsf.debug.sshUser}@${config:dsf.debug.targetIp}",
+                    "umask 0002;"
                 ],
                 "debuggerPath": "${config:dsf.debug.debuggerPath}",
                 "quoteArgs": false
@@ -26,6 +28,9 @@
                 "/workspaces/DuetSoftwareFramework": "${workspaceFolder}"
             },
             "justMyCode": false,
+            // Otherwise the C# extension sends SHA384 and SHA512 source checksums, for which the remote vsdbg can reject
+            // every breakpoint
+            "requireExactSource": false,
             "preLaunchTask": "[DSF] Stop Remote DuetControlServer",
             "postDebugTask": "[DSF] Start Remote DuetControlServer"
         },
@@ -44,7 +49,9 @@
                 "debuggerPath": "${config:dsf.debug.debuggerPath}",
                 "quoteArgs": true
             },
-            "justMyCode": false
+            "justMyCode": false,
+            // As in the launch configuration above
+            "requireExactSource": false
         },
         {
             "name": "[DSF] Attach Native (lib*.so)",
