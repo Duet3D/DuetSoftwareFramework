@@ -91,13 +91,56 @@ public struct RemoteInputHandle
 }
 
 /// <summary>
-/// Heater model used by RRF. Declared in CANlib's HeaterModel.h, so only the C# mirror is generated.
+/// This struct defines the heater model used by RRF.
+/// CAUTION! This struct is sent as-is in CanMessageHeaterModelReport, therefore if it is changed then that message must be replaced.
 ///
 /// Mirrors HeaterModel in CANlib's HeaterModel.h. This layout is 40 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 40)]
 public struct HeaterModel
 {
+    /// <summary>These parameters are about right for an E3Dv6 hot end with 30W heater, cooling time constant is about 140 seconds with the fan off</summary>
+    public static HeaterModel DefaultToolHeaterModel => new()
+    {
+        HeatingRate = 2.43f,
+        BasicCoolingRate = 0.56f,
+        FanCoolingRate = 0.0f,
+        CoolingRateExponent = 1.35f,
+        DeadTime = 5.5f,
+        TemperatureCoefficient = 0.0f,
+        TypicalTemperature = 220.0f,
+        StandardVoltage = 0.0f,
+        UsePid = true,
+    };
+
+    /// <summary>These parameters are about right for a typical PCB bed heater that maxes out at 110C and has a cooling time constant of 700 seconds</summary>
+    public static HeaterModel DefaultBedHeaterModel => new()
+    {
+        HeatingRate = 0.13f,
+        BasicCoolingRate = 0.15f,
+        FanCoolingRate = 0.0f,
+        CoolingRateExponent = 1.35f,
+        DeadTime = 10.0f,
+        TemperatureCoefficient = 0.0f,
+        TypicalTemperature = 60.0f,
+        StandardVoltage = 0.0f,
+        UsePid = false,
+    };
+
+    /// <summary>These parameters are copied from the bed heater parameters, except that the dead time is increased</summary>
+    public static HeaterModel DefaultChamberHeaterModel => new()
+    {
+        HeatingRate = 0.13f,
+        BasicCoolingRate = 0.15f,
+        FanCoolingRate = 0.0f,
+        CoolingRateExponent = 1.35f,
+        DeadTime = 30.0f,
+        TemperatureCoefficient = 0.0f,
+        TypicalTemperature = 60.0f,
+        StandardVoltage = 0.0f,
+        UsePid = false,
+    };
+
     /// <summary>Rate at which the heater heats up at 25C and full PWM with no cooling</summary>
     [FieldOffset(0)] public float HeatingRate;
 
@@ -147,6 +190,51 @@ public struct HeaterModel
         readonly get => (uint)((((uint)_bits0) >> 1) & 0x7FFFFFFFU);
         set => _bits0 = (uint)((((uint)_bits0) & ~(0x7FFFFFFFU << 1)) | ((unchecked((uint)value) & 0x7FFFFFFFU) << 1));
     }
+
+    /// <summary>Calculate the cooling rate excluding the fan contribution</summary>
+    public readonly float GetBasicCoolingRate(float temperatureRise)
+    {
+        float scaledRise = (float)(temperatureRise * 0.01f);
+        float adjustedTemperatureRise = (float)((scaledRise < 0.0f) ? -MathF.Pow(-scaledRise, CoolingRateExponent) : MathF.Pow(scaledRise, CoolingRateExponent));
+        return (float)(BasicCoolingRate * adjustedTemperatureRise);
+    }
+
+    /// <summary>Calculate the extra cooling rate provided by the part cooling fan</summary>
+    public readonly float GetFanCoolingRate(float temperatureRise, float fanPwm) => (float)(temperatureRise * 0.01f * FanCoolingRate * fanPwm);
+
+    /// <summary>Calculate the total cooling rate, excluding cooling caused by the filament</summary>
+    public readonly float GetTotalCoolingRate(float temperatureRise, float fanPwm) => (float)(GetBasicCoolingRate(temperatureRise) + GetFanCoolingRate(temperatureRise, fanPwm));
+
+    /// <summary>Calculate the expected heating rate. The result may be negative.</summary>
+    public readonly float GetExpectedHeatingRate(float temperatureRise, float fanPwm, float heaterPwm, float actualVoltage, float filamentPwm)
+    {
+        float virtualPwm = (float)((StandardVoltage < 10.0f || actualVoltage < 10.0f) ? heaterPwm : heaterPwm * CanMath.Square(actualVoltage / StandardVoltage));
+        return (float)(HeatingRate * (virtualPwm - filamentPwm) - GetTotalCoolingRate(temperatureRise, fanPwm));
+    }
+
+    /// <summary>Calculate the PWM needed to maintain the temperature rise. It may be below 0 if the rise is negative, or above 1 if the heater cannot maintain it.</summary>
+    public readonly float GetExpectedPwm(float temperatureRise, float fanPwm, float actualVoltage, float filamentPwm)
+    {
+        float coolingRate = (float)(GetTotalCoolingRate(temperatureRise, fanPwm));
+        float virtualPwm = (float)(coolingRate / HeatingRate + filamentPwm);
+        return (float)((StandardVoltage < 10.0f || actualVoltage < 10.0f) ? virtualPwm : virtualPwm * CanMath.Square(StandardVoltage / actualVoltage));
+    }
+
+    /// <summary>Calculate the change in heating power required to compensate for a change in fan speed</summary>
+    public readonly float GetPwmCorrectionForFan(float temperatureRise, float oldFanPwm, float newFanPwm) => (float)(temperatureRise * 0.01f * FanCoolingRate * (newFanPwm - oldFanPwm) / HeatingRate);
+
+    /// <summary>Estimate the maximum temperature rise that this heater will produce at full power</summary>
+    public readonly float EstimateMaxTemperatureRise() => (float)(100.0f * MathF.Pow(HeatingRate / BasicCoolingRate, 1.0f / CoolingRateExponent));
+
+    /// <summary>Calculate the basic cooling rate from measurements. This is the inverse of GetBasicCoolingRate for a positive temperature rise.</summary>
+    public readonly float CalculateBasicCoolingRate(float temperatureRise, float coolingRate)
+    {
+        float adjustedTemperatureRise = (float)(MathF.Pow(temperatureRise * 0.01f, CoolingRateExponent));
+        return (float)(coolingRate / adjustedTemperatureRise);
+    }
+
+    /// <summary>Calculate the fan cooling rate from measurements. This is the inverse of GetFanCoolingRate.</summary>
+    public readonly float CalculateFanCoolingRate(float temperatureRise, float coolingRate, float fanPwm) => (float)((coolingRate * 100.0f) / (temperatureRise * fanPwm));
 }
 
 /// <summary>
@@ -203,7 +291,7 @@ public struct ShortPressureAdvanceParameters
 /// <summary>
 /// CAN bit timing parameters, declared in CANlib's CanSettings.h.
 ///
-/// Mirrors CanTiming in CANlib's CanMessageFormats.h. This layout is 10 bytes.
+/// Mirrors CanTiming in CANlib's CanSettings.h. This layout is 10 bytes.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 10)]
 public struct CanTiming

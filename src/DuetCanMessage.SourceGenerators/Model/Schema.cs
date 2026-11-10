@@ -227,6 +227,9 @@ public sealed class StructDef : IEmittable
     public List<MethodDef> Methods = [];
     public List<string> CppStaticAsserts = [];
 
+    /// <summary>Named values of this struct, emitted as constants in both languages.</summary>
+    public List<ValueDef> Values = [];
+
     /// <summary>Name of the request ID field, if this message carries one. Drives generation of SetRequestId.</summary>
     public string? RequestIdField;
 
@@ -485,6 +488,39 @@ public sealed class CppHeaderDef
 
     /// <summary>Lines emitted after the types, for anything that has to be sized from one of them.</summary>
     public List<string> Postamble = [];
+
+    /// <summary>
+    /// The C++ source file that defines the methods of this header's structs, as CANlib's own source does,
+    /// or null to define them inline in the header.
+    /// </summary>
+    public CppSourceDef? Source;
+}
+
+/// <summary>
+/// A generated C++ source file holding the method definitions of one generated header.
+/// </summary>
+public sealed class CppSourceDef
+{
+    /// <summary>File name, which must be CANlib's own so the generated source stays a drop-in.</summary>
+    public string Name = "";
+
+    /// <summary>Where the source is written, relative to the repository root.</summary>
+    public string OutputPath = "";
+
+    /// <summary>Includes, each written with its own quotes or angle brackets.</summary>
+    public List<string> Includes = [];
+}
+
+/// <summary>
+/// A named value of a struct, such as CANlib's default heater models.
+/// </summary>
+public sealed class ValueDef
+{
+    public string Name = "";
+    public string? Doc;
+
+    /// <summary>The value of every non-reserved field and bitfield, by name, as expressions.</summary>
+    public Dictionary<string, string> Fields = [];
 }
 
 /// <summary>
@@ -702,7 +738,15 @@ public sealed class CanSchema
                 Includes = StrList(h, "includes"),
                 OutputPath = Str(h, "output") ?? "",
                 Preamble = StrList(h, "preamble"),
-                Postamble = StrList(h, "postamble")
+                Postamble = StrList(h, "postamble"),
+                Source = h["source"] is JsonObject source
+                    ? new CppSourceDef
+                    {
+                        Name = Str(source, "name") ?? throw new InvalidDataException($"the source of {Str(h, "name")} has no name"),
+                        OutputPath = Str(source, "output") ?? throw new InvalidDataException($"the source of {Str(h, "name")} has no output path"),
+                        Includes = StrList(source, "includes")
+                    }
+                    : null
             });
         }
 
@@ -766,6 +810,7 @@ public sealed class CanSchema
         }
         ValidateGenericTableSizes(schema);
         ValidateStructCppHeaders(schema);
+        ValidateValues(schema);
         return schema;
     }
 
@@ -783,6 +828,34 @@ public sealed class CanSchema
             if (s.CppHeader is not null && !headerNames.Contains(s.CppHeader))
             {
                 throw new InvalidDataException($"{s.Name} has cppHeader \"{s.CppHeader}\", which is not one of the declared cppHeaders");
+            }
+        }
+    }
+
+    /// <summary>
+    /// A named value has to give every field that is not reserved, so that a field added to the struct
+    /// cannot leave a value silently zeroing it, and may give nothing else. Reserved fields are always zero.
+    /// </summary>
+    private static void ValidateValues(CanSchema schema)
+    {
+        foreach (StructDef s in schema.Structs.Where(s => s.Values.Count > 0))
+        {
+            if (s.FlatMembers.Any(m => m.Kind is not (MemberKind.Field or MemberKind.Bitfield)))
+            {
+                throw new InvalidDataException($"{s.Name} declares values but has members other than fields and bitfields");
+            }
+            HashSet<string> required = [.. s.FlatMembers.Where(m => m.Kind == MemberKind.Field && !m.Reserved).Select(m => m.Name),
+                                        .. s.AllBitFields.Where(f => !f.Reserved).Select(f => f.Name)];
+            foreach (ValueDef v in s.Values)
+            {
+                List<string> missing = [.. required.Where(name => !v.Fields.ContainsKey(name))];
+                List<string> unknown = [.. v.Fields.Keys.Where(name => !required.Contains(name))];
+                if (missing.Count > 0 || unknown.Count > 0)
+                {
+                    throw new InvalidDataException(
+                        $"value {v.Name} of {s.Name} has to give exactly the non-reserved fields; "
+                        + $"missing: [{string.Join(", ", missing)}], not a non-reserved field: [{string.Join(", ", unknown)}]");
+                }
             }
         }
     }
@@ -892,6 +965,18 @@ public sealed class CanSchema
         foreach (JsonNode? node in o["constructors"]?.AsArray() ?? [])
         {
             s.Methods.Add(ParseConstructor(node!.AsObject(), s.Name));
+        }
+
+        foreach (JsonNode? node in o["values"]?.AsArray() ?? [])
+        {
+            JsonObject v = node!.AsObject();
+            s.Values.Add(new ValueDef
+            {
+                Name = Str(v, "name") ?? throw new InvalidDataException($"a value of {s.Name} has no name"),
+                Doc = Doc(v),
+                Fields = (v["fields"] as JsonObject ?? throw new InvalidDataException($"value {Str(v, "name")} of {s.Name} has no fields"))
+                    .ToDictionary(field => field.Key, field => field.Value!.GetValue<string>())
+            });
         }
         return s;
     }

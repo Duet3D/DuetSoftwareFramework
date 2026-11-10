@@ -444,6 +444,28 @@ public partial class Code : Command<Message?>
     }
 
     /// <summary>
+    /// Try to get a float parameter value that has to be greater than zero
+    /// </summary>
+    /// <param name="letter"></param>
+    /// <param name="parameter"></param>
+    /// <param name="max"></param>
+    /// <returns></returns>
+    public bool TryGetPositiveFloat(char letter, out float parameter, float? max = null)
+    {
+        if (TryGetValuedParameter(letter, out CodeParameter? param))
+        {
+            if ((float)param <= 0.0f)
+            {
+                throw new GCodeException("value must be greater than zero", param.Column);
+            }
+            parameter = CheckLimits((float)param, min: null, max: max, param, null);
+            return true;
+        }
+        parameter = default;
+        return false;
+    }
+
+    /// <summary>
     /// Try to get a float parameter value by letter
     /// </summary>
     /// <param name="letter">Letter of the parameter to find</param>

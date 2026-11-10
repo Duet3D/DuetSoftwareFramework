@@ -80,11 +80,30 @@ for source in CanMessageFormats CanMessageBuffer CanMessageGenericParser CanSett
 	echo "    $source.cpp OK"
 done
 
+# The layout probe cannot see what a method computes or what a named value holds, so the behaviour probe prints
+# both. Built with CANlib's header and source, with the generated ones, and with the generated header linked to
+# CANlib's source (which only links if the declarations match CANlib's definitions), all three must agree
+echo "==> Comparing behaviour"
+"$CXX" "${FLAGS[@]}" "${INCLUDES[@]}" -o "$WORK/behaviour-canlib" \
+	"$GENERATED/CanMessageBehaviourProbe.cpp" "$ROOT/lib/CANlib/src/HeaterModel.cpp"
+"$CXX" "${FLAGS[@]}" -I "$GENERATED" "${INCLUDES[@]}" -o "$WORK/behaviour-generated" \
+	"$GENERATED/CanMessageBehaviourProbe.cpp" "$GENERATED/HeaterModel.cpp"
+"$CXX" "${FLAGS[@]}" -I "$GENERATED" "${INCLUDES[@]}" -o "$WORK/behaviour-mixed" \
+	"$GENERATED/CanMessageBehaviourProbe.cpp" "$ROOT/lib/CANlib/src/HeaterModel.cpp"
+"$WORK/behaviour-canlib" > "$WORK/behaviour-canlib.txt"
+"$WORK/behaviour-generated" > "$WORK/behaviour-generated.txt"
+"$WORK/behaviour-mixed" > "$WORK/behaviour-mixed.txt"
+diff "$WORK/behaviour-canlib.txt" "$WORK/behaviour-generated.txt"
+diff "$WORK/behaviour-canlib.txt" "$WORK/behaviour-mixed.txt"
+echo "    $(wc -l < "$WORK/behaviour-canlib.txt") values and results match"
+
 echo "==> Comparing method surfaces"
 python3 "$ROOT/src/DuetCanMessage.SourceGenerators/compare-method-surface.py" \
 	"$ROOT/lib/CANlib/src/CanMessageFormats.h" "$GENERATED/CanMessageFormats.h"
 python3 "$ROOT/src/DuetCanMessage.SourceGenerators/compare-method-surface.py" \
 	"$ROOT/lib/CANlib/src/CanSettings.h" "$GENERATED/CanSettings.h"
+python3 "$ROOT/src/DuetCanMessage.SourceGenerators/compare-method-surface.py" \
+	"$ROOT/lib/CANlib/src/HeaterModel.h" "$GENERATED/HeaterModel.h"
 
 # The layout probe proves where every field sits and is blind to what any of them is worth, so the protocol
 # magic numbers are checked separately

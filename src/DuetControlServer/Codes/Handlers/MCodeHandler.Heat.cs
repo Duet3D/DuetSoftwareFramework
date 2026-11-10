@@ -36,6 +36,7 @@ internal partial class MCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleConfigureSensorAsync(Commands.Code code, CancellationToken cancellationToken)
     {
+        // TODO RRF has no list form: S is required, and S >= MaxSensors is "Sensor number out of range"
         if (!code.TryGetInt('S', out int sensorNumber) || sensorNumber < 0)
         {
             return await ReportSensorsAsync(cancellationToken);
@@ -46,6 +47,13 @@ internal partial class MCodeHandler
 
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
+            // TODO RRF's Heat::ConfigureSensor:
+            // - P"nil" (with or without a board) deletes the sensor: P"nil" goes to the board it was on and the
+            //   entry becomes null
+            // - Y always deletes the old sensor first (P"nil" to its board) and starts from a fresh one
+            // - P without Y is "Sensor N does not exist" for a new sensor, and an error when it moves the sensor
+            //   to another board
+            // - a new sensor starts notReady at 2000C and times out without reports
             AnalogSensor? sensor = sensorNumber < model.Sensors.Analog.Count ? model.Sensors.Analog[sensorNumber] : null;
             if (port is not null)
             {
@@ -75,6 +83,8 @@ internal partial class MCodeHandler
             // message carries Y as the operator wrote it, and which types a board supports is the
             // board's business. The object model keeps whatever it had, which is worse than nothing
             // only for a sensor type this side does not know the name of
+            // TODO this misses the hyphenated RRF names (mcu-temp, linear-analog, rtd-max31865, ...);
+            // AnalogSensorTypeConverter already maps the reduced forms
             if (code.TryGetString('Y', out string? type)
                 && System.Enum.TryParse(type, ignoreCase: true, out AnalogSensorType parsed))
             {
@@ -85,6 +95,9 @@ internal partial class MCodeHandler
                 sensor.Name = name;
             }
 
+            // TODO which fields a parameter sets depends on the type in RRF: a linear-analog sensor's B and C are its
+            // low and high readings, a thermistor's L and H are ADC corrections and B without C resets C, and F/W/K
+            // are not recorded. RRF also refuses U outside +-20 and V outside +-0.2
             // The board is what turns a resistance into a temperature, but the constants it does
             // that with are how the machine is built - a thermistor's beta is a property of the part
             // that was fitted. Storing only the port would leave the model unable to describe it
@@ -124,6 +137,8 @@ internal partial class MCodeHandler
 
         // The board is what reads the sensor, so it is what has to be told how. The parameter table
         // is the message, which is what makes this a repackaging rather than a reimplementation
+        // TODO the model was changed before the board answered; RRF only keeps a new sensor the board accepted,
+        // and deletes it again (P"nil") when the board refuses it
         return await linkInterface.SendCodeRequestAsync<CanMessageM308V1>(board, code, cancellationToken);
     }
 
@@ -678,19 +693,16 @@ internal partial class MCodeHandler
     /// M307: set or report a heater's process model
     /// </summary>
     /// <remarks>
-    /// The model is what the board's controller is tuned to - gain, time constant, dead time - so it
-    /// goes to the board and is kept here so the machine can be rebuilt from the object model
+    /// RepRapFirmware's <c>Heater::SetOrReportModel</c> and <c>Heater::SetModel</c>. Parameters not given keep
+    /// their current values, except I, which is off unless given. The model is kept here as well as on the
+    /// board, as RepRapFirmware keeps it on the main board, and is kept even if the board refuses it
     /// </remarks>
     private async ValueTask<Message> HandleHeaterModelAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (!code.TryGetInt('H', out int heaterNumber))
-        {
-            return new Message(MessageType.Error, "Missing heater number");
-        }
-
+        int heaterNumber = code.GetInt('H', min: 0, max: HeatManager.MaxHeaters - 1);
         byte board;
-        CanMessageHeaterModelV3 message = new() { Heater = (byte)heaterNumber };
-        bool seen = false;
+        float highestTemperatureLimit;
+        CanMessageHeaterModelV3 message;
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             if (heatManager.Find(heaterNumber) is not Heater heater)
@@ -702,54 +714,102 @@ internal partial class MCodeHandler
                 return new Message(MessageType.Error, $"Heater {heaterNumber} is not on an expansion board");
             }
 
-            DuetAPI.ObjectModel.HeaterModel heaterModel = heater.Model;
-            if (code.TryGetFloat('R', out float gain))
+            HeaterFunction function = heatManager.GetHeaterFunction(heaterNumber);
+            message = FopDt.ToCanMessage(heaterNumber, function, heater.Model);
+            ref Link.Protocol.CanMessages.HeaterModel basicModel = ref message.BasicModel;
+            bool seen = false;
+
+            if (code.TryGetFloatArray('K', 2, out float[]? coolingRates))
             {
-                heaterModel.HeatingRate = gain;
                 seen = true;
+                basicModel.BasicCoolingRate = coolingRates[0];
+                basicModel.FanCoolingRate = (coolingRates.Length == 2) ? coolingRates[1] : 0.0f;
+                if (code.TryGetFloat('E', out float exponent))
+                {
+                    basicModel.CoolingRateExponent = exponent;
+                }
             }
-            if (code.TryGetFloat('C', out float timeConstant))
+            else if (code.TryGetFloatArray('C', 2, out float[]? timeConstants, pad: true))
             {
-                heaterModel.CoolingRate = timeConstant > 0.0f ? 1.0f / timeConstant : 0.0f;
                 seen = true;
+                basicModel.BasicCoolingRate = 100.0f / timeConstants[0];
+                basicModel.FanCoolingRate = 100.0f / timeConstants[1] - basicModel.BasicCoolingRate;
+                basicModel.CoolingRateExponent = 1.0f;
             }
+
+            if (code.TryGetPositiveFloat('R', out float heatingRate))
+            {
+                seen = true;
+                basicModel.HeatingRate = heatingRate;
+            }
+            else if (code.TryGetFloat('A', out float gain))
+            {
+                seen = true;
+                basicModel.HeatingRate = gain * basicModel.BasicCoolingRate * 0.01f;
+            }
+
             if (code.TryGetFloat('D', out float deadTime))
             {
-                heaterModel.DeadTime = deadTime;
                 seen = true;
+                basicModel.DeadTime = deadTime;
+            }
+            if (code.TryGetInt('B', out int dontUsePid))
+            {
+                seen = true;
+                basicModel.UsePid = dontUsePid == 0;
             }
             if (code.TryGetFloat('S', out float maxPwm))
             {
-                heaterModel.MaxPwm = maxPwm;
                 seen = true;
+                message.MaxPwm = maxPwm;
             }
             if (code.TryGetFloat('V', out float voltage))
             {
-                heaterModel.StandardVoltage = voltage;
                 seen = true;
+                basicModel.StandardVoltage = voltage;
             }
-            if (code.TryGetInt('B', out int bangBang))
+            int inversion = 0;
+            if (code.TryGetInt('I', out int givenInversion))
             {
-                heaterModel.PID.Used = bangBang == 0;
                 seen = true;
+                inversion = givenInversion;
             }
 
             if (!seen)
             {
-                return new Message(MessageType.Success, string.Create(CultureInfo.InvariantCulture,
-                    $"Heater {heaterNumber} model: heating rate {heaterModel.HeatingRate:F3}, "
-                    + $"cooling rate {heaterModel.CoolingRate:F3}, dead time {heaterModel.DeadTime:F1}s, "
-                    + $"max PWM {heaterModel.MaxPwm:F2}, mode {(heaterModel.PID.Used ? "PID" : "bang-bang")}"));
+                if (!message.Enabled)
+                {
+                    return new Message(MessageType.Success, $"Heater {heaterNumber} is disabled because its model is undefined");
+                }
+                StringBuilder report = new();
+                FopDt.AppendModelParameters(report, message, function == HeaterFunction.Tool, FopDt.SetModelPidTemperature);
+                return new Message(MessageType.Success, report.ToString());
             }
 
-            message.BasicModel.HeatingRate = heaterModel.HeatingRate;
-            message.BasicModel.BasicCoolingRate = heaterModel.CoolingRate;
-            message.BasicModel.DeadTime = heaterModel.DeadTime;
-            message.BasicModel.StandardVoltage = heaterModel.StandardVoltage;
-            message.BasicModel.UsePid = heaterModel.PID.Used;
-            message.MaxPwm = heaterModel.MaxPwm;
+            message.Inverted = inversion is 1 or 3;
+            message.Enabled = true;
+            if (FopDt.Validate(message) is string error)
+            {
+                return new Message(MessageType.Error, $"bad model parameters: {error}");
+            }
+
+            // TODO record that the user set this model once Heat::SetFunction's default models are ported, so that
+            // giving the heater a function does not replace it
+            FopDt.Apply(message, heater.Model, FopDt.SetModelPidTemperature);
+            highestTemperatureLimit = HeatManager.GetHighestTemperatureLimit(heater);
         }
 
-        return await linkInterface.SendCanRequestAsync(board, in message, cancellationToken);
+        Message reply = await linkInterface.SendCanRequestAsync(board, in message, cancellationToken);
+        if (reply.Succeeded())
+        {
+            float predictedMaxTemp = message.BasicModel.EstimateMaxTemperatureRise() + FopDt.NormalAmbientTemperature;
+            float noWarnTemp = (highestTemperatureLimit - FopDt.NormalAmbientTemperature) * 1.5f + 50.0f;
+            if (predictedMaxTemp > noWarnTemp)
+            {
+                return new Message(MessageType.Warning,
+                                   $"Heater {heaterNumber} predicted maximum temperature at full power is {(int)predictedMaxTemp}°C");
+            }
+        }
+        return reply;
     }
 }

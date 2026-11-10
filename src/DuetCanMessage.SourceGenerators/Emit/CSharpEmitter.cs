@@ -170,6 +170,17 @@ public sealed class CSharpEmitter(CanSchema schema)
         }
         writer.Line();
 
+        writer.XmlDoc("The functions of RRFLibraries' SimpleMath.h that the schema's method bodies call");
+        using (writer.Block("public static class CanMath", "}"))
+        {
+            writer.Outdent();
+            writer.Line("{");
+            writer.Indent();
+            writer.XmlDoc("RRFLibraries' fsquare: the square of a float");
+            writer.Line("public static float Square(float arg) => arg * arg;");
+        }
+        writer.Line();
+
         writer.XmlDoc("""
             Read and write bitfields that span a byte buffer.
             A few CANlib messages declare bitfield runs that neither start nor end on a boundary that a
@@ -333,6 +344,16 @@ public sealed class CSharpEmitter(CanSchema schema)
                 needsBlank = true;
             }
 
+            foreach (ValueDef value in s.Values)
+            {
+                if (needsBlank)
+                {
+                    writer.Line();
+                }
+                EmitValue(writer, s, value);
+                needsBlank = true;
+            }
+
             _stringAccessors.Clear();
             EmitFields(writer, s, ref needsBlank);
             EmitStringAccessors(writer, ref needsBlank);
@@ -342,14 +363,30 @@ public sealed class CSharpEmitter(CanSchema schema)
         writer.Line();
     }
 
+    /// <summary>
+    /// Emit a named value as a static property that builds it, so that no caller can change the value itself.
+    /// Reserved fields are left at zero.
+    /// </summary>
+    private void EmitValue(CodeWriter writer, StructDef s, ValueDef value)
+    {
+        CSharpExprEmitter expressions = new(new EmitContext(schema, s, Language.CSharp, []));
+        writer.XmlDoc(value.Doc);
+        writer.Line($"public static {s.Name} {Naming.Pascal(value.Name)} => new()");
+        using (writer.Block("{", "};"))
+        {
+            foreach ((string field, string given) in value.Fields)
+            {
+                writer.Line($"{Naming.Pascal(field)} = {expressions.Render(ExprParser.Parse(given))},");
+            }
+        }
+    }
+
     private string Describe(StructDef s)
     {
         string doc = s.Doc ?? s.Name;
         string origin = s.TemplateOf is not null
             ? $"Instantiation of CANlib's {s.TemplateOf}&lt;{Types.Cpp(schema, s.TemplateArg!)}&gt;."
-            : s.Existing?.CppHeader is not null
-                ? $"Mirrors {s.Name} in CANlib's {s.Existing.CppHeader}."
-                : $"Mirrors {s.Name} in CANlib's CanMessageFormats.h.";
+            : $"Mirrors {s.Name} in CANlib's {s.Existing?.CppHeader ?? s.CppHeader ?? "CanMessageFormats.h"}.";
         return $"{doc}\n\n{origin} This layout is {Math.Max(s.Size, 1)} bytes.";
     }
 

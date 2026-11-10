@@ -83,6 +83,12 @@ public sealed class CSharpExprEmitter(EmitContext context)
             case "elem":
                 return $"{Render(c.Args[0])}[0]";
 
+            case "pow":
+                return $"MathF.Pow({Render(c.Args[0])}, {Render(c.Args[1])})";
+
+            case "fsquare":
+                return $"CanMath.Square({Render(c.Args[0])})";
+
             // These take the result type as their first argument: C++ needs it to pick the template
             // instantiation, and C# needs every argument cast to the same type
             case "min":

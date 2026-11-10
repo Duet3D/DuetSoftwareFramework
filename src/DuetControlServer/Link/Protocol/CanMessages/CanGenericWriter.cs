@@ -221,6 +221,8 @@ public static partial class CanGenericWriter
 
         if (descriptor.Type == CanParamType.ReducedString)
         {
+            // TODO RRF sends a reduced string lowercased with '-' and '_' removed (GetReducedString); the board
+            // accepts either, but the frame bytes differ from RRF's (M308 Y"linear-analog" goes as "linearanalog")
             IoPorts.RemoveBoardAddress(value, out value);
         }
 

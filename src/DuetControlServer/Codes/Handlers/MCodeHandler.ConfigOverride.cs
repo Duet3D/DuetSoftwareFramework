@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
 using DuetAPI.Commands;
 using DuetControlServer.Files;
+using DuetControlServer.Link.Protocol.Shared;
 using Microsoft.Extensions.Logging;
 
 namespace DuetControlServer.Codes.Handlers;
@@ -123,28 +124,18 @@ internal partial class MCodeHandler
     /// <summary>
     /// The heater models, which is what M303 tuning produced
     /// </summary>
+    /// <remarks>RepRapFirmware's <c>Heat::WriteModelParameters</c>, which writes enabled models only</remarks>
     private void AppendHeaterModels(StringBuilder builder)
     {
-        bool any = false;
+        builder.AppendLine("; Heater model parameters");
         for (int heaterNumber = 0; heaterNumber < model.Heat.Heaters.Count; heaterNumber++)
         {
-            if (model.Heat.Heaters[heaterNumber] is not Heater heater)
+            if (model.Heat.Heaters[heaterNumber] is Heater { Model.Enabled: true } heater)
             {
-                continue;
+                HeaterFunction function = heatManager.GetHeaterFunction(heaterNumber);
+                Heat.FopDt.AppendM307Command(builder, Heat.FopDt.ToCanMessage(heaterNumber, function, heater.Model),
+                                             function == HeaterFunction.Tool);
             }
-
-            if (!any)
-            {
-                builder.AppendLine("; Heater model parameters");
-                any = true;
-            }
-
-            HeaterModel heaterModel = heater.Model;
-            builder.AppendLine(CultureInfo.InvariantCulture,
-                $"M307 H{heaterNumber} R{heaterModel.HeatingRate:F3} "
-                + $"C{(heaterModel.CoolingRate > 0.0f ? 1.0f / heaterModel.CoolingRate : 0.0f):F1} "
-                + $"D{heaterModel.DeadTime:F2} S{heaterModel.MaxPwm:F2} "
-                + $"V{heaterModel.StandardVoltage:F1} B{(heaterModel.PID.Used ? 0 : 1)}");
         }
     }
 

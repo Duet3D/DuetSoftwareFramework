@@ -105,8 +105,32 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
         }
 
         Heater heater = new();
+        FopDt.Reset(heater.Model);
         model.Heat.Heaters[heaterNumber] = heater;
         return heater;
+    }
+
+    /// <summary>
+    /// RepRapFirmware's <c>BadErrorTemperature</c>, the highest limit of a heater with no over-temperature monitor
+    /// </summary>
+    public const float BadErrorTemperature = 2000.0f;
+
+    /// <summary>
+    /// Highest temperature any of a heater's over-temperature monitors allows
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>Heater::GetHighestTemperatureLimit</c></remarks>
+    public static float GetHighestTemperatureLimit(Heater heater)
+    {
+        float limit = BadErrorTemperature;
+        foreach (HeaterMonitor? monitor in heater.Monitors)
+        {
+            if (monitor is { Condition: HeaterMonitorCondition.TooHigh, Limit: float t }
+                && (limit == BadErrorTemperature || t > limit))
+            {
+                limit = t;
+            }
+        }
+        return limit;
     }
 
     /// <summary>
@@ -444,19 +468,24 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
     }
 
     /// <summary>
-    /// Whether a heater is neither a bed nor a chamber heater
+    /// What a heater is for: a bed or chamber heater if a bed or chamber mapping claims it, otherwise a tool heater
     /// </summary>
     /// <param name="heaterNumber">The heater</param>
-    /// <returns>True if nothing has claimed it as a bed or chamber heater</returns>
+    /// <returns>The heater's function</returns>
     /// <remarks>
-    /// RepRapFirmware's <c>HeaterFunction::tool</c>, which it stores on the heater. Here the
-    /// assignment lives in the bed and chamber mappings, so the question is asked of those - a
-    /// machine may have several beds and each bed several heaters. The caller must hold the object
-    /// model lock
+    /// RepRapFirmware's <c>Heat::GetHeaterFunction</c>. The assignment lives in the bed and chamber mappings, and a
+    /// machine may have several beds and each bed several heaters. The caller must hold the object model lock
     /// </remarks>
-    private bool IsToolHeater(int heaterNumber)
-        => !IsMapped(model.Heat.BedHeaterMapping, heaterNumber)
-           && !IsMapped(model.Heat.ChamberHeaterMapping, heaterNumber);
+    public HeaterFunction GetHeaterFunction(int heaterNumber)
+        => IsMapped(model.Heat.BedHeaterMapping, heaterNumber) ? HeaterFunction.Bed
+         : IsMapped(model.Heat.ChamberHeaterMapping, heaterNumber) ? HeaterFunction.Chamber
+         : HeaterFunction.Tool;
+
+    /// <summary>
+    /// Whether a heater is neither a bed nor a chamber heater
+    /// </summary>
+    /// <remarks>The caller must hold the object model lock</remarks>
+    public bool IsToolHeater(int heaterNumber) => GetHeaterFunction(heaterNumber) == HeaterFunction.Tool;
 
     /// <summary>
     /// Whether a bed or chamber mapping claims a heater

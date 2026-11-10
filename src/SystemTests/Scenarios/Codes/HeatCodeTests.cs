@@ -536,7 +536,6 @@ public class HeatCodeTests : SystemTests.Host.BenchFixture
     /// objectModelTable (FOPDT.cpp) reports heatingRate, coolingRate, fanCoolingRate, coolingExp,
     /// deadTime, maxPwm, standardVoltage, and pid.used from usePid
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M307SetsHeaterProcessModel()
     {

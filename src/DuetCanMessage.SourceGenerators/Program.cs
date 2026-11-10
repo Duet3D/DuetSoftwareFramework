@@ -50,6 +50,8 @@ public static class Program
             .. schema.CppHeaders.Select((h, index) =>
                 (Path.Combine(repoRoot, index == 0 ? options.GetValueOrDefault("cpp-out") ?? h.OutputPath : h.OutputPath),
                  new CppEmitter(schema).Emit(h, index == 0))),
+            .. schema.CppHeaders.Select((h, index) => (h, index)).Where(x => x.h.Source is not null).Select(x =>
+                (Path.Combine(repoRoot, x.h.Source!.OutputPath), new CppEmitter(schema).EmitSource(x.h, x.index == 0))),
             (options.GetValueOrDefault("cpp-tables-out") ?? Path.Combine(repoRoot, "src/DuetCanMessage.SourceGenerators/generated/cpp/CanMessageGenericTables.h"),
              cppTables.Emit()),
             (Path.Combine(csharpDir, "CanMessageFormats.g.cs"), csharp.EmitStructs()),
@@ -64,6 +66,8 @@ public static class Program
             (Path.Combine(csharpDir, "CanGenericMessages.g.cs"), csharpTables.EmitMessages()),
             (options.GetValueOrDefault("probe-out") ?? Path.Combine(repoRoot, "src/DuetCanMessage.SourceGenerators/generated/cpp/CanMessageLayoutProbe.cpp"),
              conformance.EmitCppProbe(facts)),
+            (Path.Combine(repoRoot, "src/DuetCanMessage.SourceGenerators/generated/cpp/CanMessageBehaviourProbe.cpp"),
+             conformance.EmitCppBehaviourProbe()),
             (options.GetValueOrDefault("tables-probe-out") ?? Path.Combine(repoRoot, "src/DuetCanMessage.SourceGenerators/generated/cpp/CanMessageGenericTablesProbe.cpp"),
              conformance.EmitCppTablesProbe()),
             (Path.Combine(testDir, "CanMessageLayout.g.cs"), conformance.EmitCSharpTests(facts, "UnitTests.Link")),

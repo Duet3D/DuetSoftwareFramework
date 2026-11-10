@@ -56,6 +56,12 @@ public sealed class CppExprEmitter(EmitContext context)
             case "elem":
                 return $"{Render(c.Args[0])}[0]";
 
+            case "pow":
+                return $"powf({Render(c.Args[0])}, {Render(c.Args[1])})";
+
+            case "fsquare":
+                return $"fsquare({Render(c.Args[0])})";
+
             // The first argument names the result type, which is the template argument on this side
             case "min":
                 return $"min<{TypeArg(c)}>({Render(c.Args[1])}, {Render(c.Args[2])})";

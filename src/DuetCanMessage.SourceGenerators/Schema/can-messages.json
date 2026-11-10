@@ -48,6 +48,17 @@
         "constexpr uint32_t CanUserAreaDataOffset_SAME5x = 512 - sizeof(CanUserAreaData);",
         "constexpr uint32_t CanUserAreaDataOffset_SAMC21 = 256 - sizeof(CanUserAreaData);"
       ]
+    },
+    {
+      "name": "HeaterModel.h",
+      "guard": "SRC_HEATERMODEL_H_",
+      "output": "src/DuetCanMessage.SourceGenerators/generated/cpp/HeaterModel.h",
+      "includes": [ "<cstdint>" ],
+      "source": {
+        "name": "HeaterModel.cpp",
+        "output": "src/DuetCanMessage.SourceGenerators/generated/cpp/HeaterModel.cpp",
+        "includes": [ "\"HeaterModel.h\"", "<General/SimpleMath.h>", "<cmath>" ]
+      }
     }
   ],
   "csharpNamespace": "DuetControlServer.Link.Protocol.CanMessages",
@@ -155,10 +166,12 @@
 
     {
       "name": "HeaterModel",
-      "doc": "Heater model used by RRF. Declared in CANlib's HeaterModel.h, so only the C# mirror is generated.",
-      "emit": ["csharp"],
+      "doc": [
+        "This struct defines the heater model used by RRF.",
+        "CAUTION! This struct is sent as-is in CanMessageHeaterModelReport, therefore if it is changed then that message must be replaced."
+      ],
+      "cppHeader": "HeaterModel.h",
       "packed": false,
-      "existing": { "cpp": { "header": "HeaterModel.h" } },
       "members": [
         { "kind": "field", "name": "heatingRate", "type": "f32", "doc": "Rate at which the heater heats up at 25C and full PWM with no cooling" },
         { "kind": "field", "name": "basicCoolingRate", "type": "f32", "doc": "Rate at which the heater cools when 100C above ambient with the print cooling fan off" },
@@ -175,6 +188,100 @@
             { "name": "usePid", "width": 1, "bool": true, "doc": "Set if the heater is controlled by PID, clear if it is controlled bang-bang" },
             { "name": "zero", "width": 31, "reserved": true }
           ]
+        }
+      ],
+      "methods": [
+        {
+          "name": "GetBasicCoolingRate", "returnType": "f32", "doc": "Calculate the cooling rate excluding the fan contribution",
+          "params": [ { "name": "temperatureRise", "type": "f32" } ],
+          "body": [
+            { "let": "scaledRise", "type": "f32", "value": "temperatureRise * 0.01" },
+            { "let": "adjustedTemperatureRise", "type": "f32", "value": "(scaledRise < 0.0) ? -pow(-scaledRise, coolingRateExponent) : pow(scaledRise, coolingRateExponent)" },
+            { "return": "basicCoolingRate * adjustedTemperatureRise" }
+          ]
+        },
+        {
+          "name": "GetFanCoolingRate", "returnType": "f32", "doc": "Calculate the extra cooling rate provided by the part cooling fan",
+          "params": [ { "name": "temperatureRise", "type": "f32" }, { "name": "fanPwm", "type": "f32" } ],
+          "body": [ { "return": "temperatureRise * 0.01 * fanCoolingRate * fanPwm" } ]
+        },
+        {
+          "name": "GetTotalCoolingRate", "returnType": "f32", "doc": "Calculate the total cooling rate, excluding cooling caused by the filament",
+          "params": [ { "name": "temperatureRise", "type": "f32" }, { "name": "fanPwm", "type": "f32" } ],
+          "body": [ { "return": "GetBasicCoolingRate(temperatureRise) + GetFanCoolingRate(temperatureRise, fanPwm)" } ]
+        },
+        {
+          "name": "GetExpectedHeatingRate", "returnType": "f32", "doc": "Calculate the expected heating rate. The result may be negative.",
+          "params": [
+            { "name": "temperatureRise", "type": "f32" }, { "name": "fanPwm", "type": "f32" }, { "name": "heaterPwm", "type": "f32" },
+            { "name": "actualVoltage", "type": "f32" }, { "name": "filamentPwm", "type": "f32" }
+          ],
+          "body": [
+            { "let": "virtualPwm", "type": "f32", "value": "(standardVoltage < 10.0 || actualVoltage < 10.0) ? heaterPwm : heaterPwm * fsquare(actualVoltage/standardVoltage)" },
+            { "return": "heatingRate * (virtualPwm - filamentPwm) - GetTotalCoolingRate(temperatureRise, fanPwm)" }
+          ]
+        },
+        {
+          "name": "GetExpectedPwm", "returnType": "f32",
+          "doc": "Calculate the PWM needed to maintain the temperature rise. It may be below 0 if the rise is negative, or above 1 if the heater cannot maintain it.",
+          "params": [
+            { "name": "temperatureRise", "type": "f32" }, { "name": "fanPwm", "type": "f32" },
+            { "name": "actualVoltage", "type": "f32" }, { "name": "filamentPwm", "type": "f32" }
+          ],
+          "body": [
+            { "let": "coolingRate", "type": "f32", "value": "GetTotalCoolingRate(temperatureRise, fanPwm)" },
+            { "let": "virtualPwm", "type": "f32", "value": "coolingRate/heatingRate + filamentPwm" },
+            { "return": "(standardVoltage < 10.0 || actualVoltage < 10.0) ? virtualPwm : virtualPwm * fsquare(standardVoltage/actualVoltage)" }
+          ]
+        },
+        {
+          "name": "GetPwmCorrectionForFan", "returnType": "f32", "doc": "Calculate the change in heating power required to compensate for a change in fan speed",
+          "params": [ { "name": "temperatureRise", "type": "f32" }, { "name": "oldFanPwm", "type": "f32" }, { "name": "newFanPwm", "type": "f32" } ],
+          "body": [ { "return": "temperatureRise * 0.01 * fanCoolingRate * (newFanPwm - oldFanPwm) / heatingRate" } ]
+        },
+        {
+          "name": "EstimateMaxTemperatureRise", "returnType": "f32", "doc": "Estimate the maximum temperature rise that this heater will produce at full power",
+          "body": [ { "return": "100.0 * pow(heatingRate/basicCoolingRate, 1.0/coolingRateExponent)" } ]
+        },
+        {
+          "name": "CalculateBasicCoolingRate", "returnType": "f32",
+          "doc": "Calculate the basic cooling rate from measurements. This is the inverse of GetBasicCoolingRate for a positive temperature rise.",
+          "params": [ { "name": "temperatureRise", "type": "f32" }, { "name": "coolingRate", "type": "f32" } ],
+          "body": [
+            { "let": "adjustedTemperatureRise", "type": "f32", "value": "pow(temperatureRise * 0.01, coolingRateExponent)" },
+            { "return": "coolingRate/adjustedTemperatureRise" }
+          ]
+        },
+        {
+          "name": "CalculateFanCoolingRate", "returnType": "f32", "doc": "Calculate the fan cooling rate from measurements. This is the inverse of GetFanCoolingRate.",
+          "params": [ { "name": "temperatureRise", "type": "f32" }, { "name": "coolingRate", "type": "f32" }, { "name": "fanPwm", "type": "f32" } ],
+          "body": [ { "return": "(coolingRate * 100.0)/(temperatureRise * fanPwm)" } ]
+        }
+      ],
+      "values": [
+        {
+          "name": "DefaultToolHeaterModel",
+          "doc": "These parameters are about right for an E3Dv6 hot end with 30W heater, cooling time constant is about 140 seconds with the fan off",
+          "fields": {
+            "heatingRate": "2.43", "basicCoolingRate": "0.56", "fanCoolingRate": "0.0", "coolingRateExponent": "1.35", "deadTime": "5.5",
+            "temperatureCoefficient": "0.0", "typicalTemperature": "220.0", "standardVoltage": "0.0", "usePid": "true"
+          }
+        },
+        {
+          "name": "DefaultBedHeaterModel",
+          "doc": "These parameters are about right for a typical PCB bed heater that maxes out at 110C and has a cooling time constant of 700 seconds",
+          "fields": {
+            "heatingRate": "0.13", "basicCoolingRate": "0.15", "fanCoolingRate": "0.0", "coolingRateExponent": "1.35", "deadTime": "10.0",
+            "temperatureCoefficient": "0.0", "typicalTemperature": "60.0", "standardVoltage": "0.0", "usePid": "false"
+          }
+        },
+        {
+          "name": "DefaultChamberHeaterModel",
+          "doc": "These parameters are copied from the bed heater parameters, except that the dead time is increased",
+          "fields": {
+            "heatingRate": "0.13", "basicCoolingRate": "0.15", "fanCoolingRate": "0.0", "coolingRateExponent": "1.35", "deadTime": "30.0",
+            "temperatureCoefficient": "0.0", "typicalTemperature": "60.0", "standardVoltage": "0.0", "usePid": "false"
+          }
         }
       ]
     },

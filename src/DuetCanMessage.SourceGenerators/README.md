@@ -14,9 +14,11 @@ Schema/can-messages.json
         +--> generated/cpp/CanMessageFormats.h                                  (drop-in for CANlib)
         +--> generated/cpp/CanMessageGenericTables.h                            (drop-in for CANlib)
         +--> generated/cpp/CanSettings.h                                        (drop-in for CANlib)
+        +--> generated/cpp/HeaterModel.h, HeaterModel.cpp                       (drop-in for CANlib)
         +--> src/DuetControlServer/Link/Protocol/CanMessages/Generated/*.cs     (DuetControlServer)
         +--> generated/cpp/CanMessageLayoutProbe.cpp                            (C++ conformance harness)
         +--> generated/cpp/CanMessageGenericTablesProbe.cpp                     (C++ conformance harness)
+        +--> generated/cpp/CanMessageBehaviourProbe.cpp                         (C++ conformance harness)
         +--> src/UnitTests/Link/CanMessageLayout.g.cs                           (C# conformance harness)
         +--> src/UnitTests/Link/CanGenericTableLayout.g.cs                      (C# conformance harness)
         +--> src/DuetControlServer/Link/Protocol/Shared/CanMessageType.g.cs     (DuetControlServer)
@@ -92,6 +94,8 @@ more than one and a generated header only stays a drop-in if it holds exactly wh
 `CanSettings.h` carries `CanUserAreaData` and the flash offsets alongside `CanTiming` for that reason, and
 `verify-cpp-layout.sh` compiles CANlib's `CanSettings.cpp` against it to prove the point.
 
+A header can also name a `source`, for a type whose methods CANlib defines out of line. `HeaterModel.h` is one: its methods are declared in the generated header and defined in the generated `HeaterModel.cpp`, so the pair replaces CANlib's pair. Layout checks cannot see what a method computes or what a named value holds, so `CanMessageBehaviourProbe.cpp` prints every value of those structs and the result of every method on each value, and on an instance with every field set so that no branch hides behind a zero, for a fixed set of arguments. `verify-cpp-layout.sh` builds it three times — with CANlib's header and source, with the generated ones, and with the generated header linked to CANlib's source, which only links if the declarations match CANlib's definitions — and the three outputs have to be identical.
+
 ## Schema
 
 `Schema/can-messages.schema.json` describes the whole file as JSON Schema, and `can-messages.json` points at
@@ -133,6 +137,7 @@ Other struct-level keys:
 | `setRequestIdAlsoClears` / `clearAlsoClears` | Non-reserved fields those helpers also zero. |
 | `clearReservedFields` | Forces `ClearReservedFields` on a struct that is not itself a message. |
 | `cppStaticAsserts` | Extra `static_assert`s copied into the C++ header verbatim. |
+| `values` | Named values of the struct, such as CANlib's default heater models: `constexpr` variables after it in C++, static properties of it in C#. Each gives every non-reserved field as an expression, so a field added later cannot be left out silently; reserved fields are zero. |
 
 ### Members
 
@@ -194,6 +199,8 @@ Statements are `return`, `set`/`to`, `orWith`/`value`, `storeLE`/`to`, `incr`, `
 | `loadLE(f)` / `storeLE` | `LoadLEF32(&f)` etc. | direct field access (`Pack = 1` handles it) |
 | `u8(x)`, `u32(x)`, … | C-style cast | C# cast, with `bool` mapped to 0/1 |
 | `self` | `*this` | the enclosing struct |
+| `pow(x, y)` | `powf(x, y)` | `MathF.Pow(x, y)` |
+| `fsquare(x)` | `fsquare(x)` (RRFLibraries' `SimpleMath.h`) | `CanMath.Square(x)` |
 
 `SetRequestId` and `ClearReservedFields` are **not** written in the schema. They are derived from which
 fields are marked `reserved`, so the two languages can never disagree about what gets zeroed.

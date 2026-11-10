@@ -653,6 +653,7 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
             foreach (int sensor in SetBits(report.WhichSensors, CanSensorReportArray11.Length))
             {
                 CanSensorReport sensorReport = report.TemperatureReports[slot++];
+                // TODO RRF applies a report only from the board the sensor is on (RemoteSensor::UpdateRemoteTemperature)
                 if (Find(model.Sensors.Analog, sensor) is AnalogSensor analogSensor)
                 {
                     analogSensor.LastReading = sensorReport.GetTemperature();

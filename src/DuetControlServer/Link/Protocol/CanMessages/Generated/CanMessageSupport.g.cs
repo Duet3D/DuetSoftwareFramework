@@ -72,6 +72,13 @@ public static class CanText
     }
 }
 
+/// <summary>The functions of RRFLibraries' SimpleMath.h that the schema's method bodies call</summary>
+public static class CanMath
+{
+    /// <summary>RRFLibraries' fsquare: the square of a float</summary>
+    public static float Square(float arg) => arg * arg;
+}
+
 /// <summary>
 /// Read and write bitfields that span a byte buffer.
 /// A few CANlib messages declare bitfield runs that neither start nor end on a boundary that a

@@ -168,6 +168,29 @@
           "type": "array",
           "description": "Lines emitted after the types, for anything that has to be sized from one of them.",
           "items": { "type": "string" }
+        },
+        "source": {
+          "type": "object",
+          "description": "A generated C++ source file that defines the methods of this header's structs, as CANlib's own source does. Without one they are defined inline in the header.",
+          "required": ["name", "output"],
+          "additionalProperties": false,
+          "properties": {
+            "$comment": { "$ref": "#/$defs/docText" },
+            "name": {
+              "type": "string",
+              "description": "File name, which must be CANlib's own so the generated source stays a drop-in.",
+              "examples": ["HeaterModel.cpp"]
+            },
+            "output": {
+              "type": "string",
+              "description": "Where the source is written, relative to the repository root."
+            },
+            "includes": {
+              "type": "array",
+              "description": "Includes, each written with its own quotes or angle brackets.",
+              "items": { "type": "string" }
+            }
+          }
         }
       }
     },
@@ -530,6 +553,25 @@
           "type": "boolean",
           "description": "Emit the C# struct as partial, so hand-written code can add what the expression language cannot express. The generated half still owns the layout, which is what the probe checks.",
           "default": false
+        },
+        "values": {
+          "type": "array",
+          "description": "Named values of the struct: constexpr variables after it in C++, static properties of it in C#. Each gives every non-reserved field, and reserved fields are zero.",
+          "items": {
+            "type": "object",
+            "required": ["name", "fields"],
+            "additionalProperties": false,
+            "properties": {
+              "$comment": { "$ref": "#/$defs/docText" },
+              "name": { "type": "string" },
+              "doc": { "$ref": "#/$defs/docText" },
+              "fields": {
+                "type": "object",
+                "description": "The value of each non-reserved field and bitfield, as an expression.",
+                "additionalProperties": { "type": "string" }
+              }
+            }
+          }
         }
       }
     },
