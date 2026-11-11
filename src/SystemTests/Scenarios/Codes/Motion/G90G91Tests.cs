@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.ObjectModel;
 using NUnit.Framework;
-using static SystemTests.Scenarios.Codes.Motion.InputChannels;
 
 namespace SystemTests.Scenarios.Codes.Motion;
 
@@ -25,7 +24,7 @@ public class G90G91Tests : BenchFixture
     public async Task G90AndG91ToggleAxesRelative()
     {
         await using Bench bench = await Bench.StartAsync(Machines.Xye);
-        int http = await HttpInputIndexAsync(bench.Host);
+        int http = await bench.Host.InputIndexAsync();
         InputChannel? httpChannel = await bench.Host.ReadModelAsync(model => model.Inputs[http]);
         Axis axis = await bench.Host.ReadModelAsync(model => model.Move.Axes[0]);
 

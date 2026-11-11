@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.ObjectModel;
 using NUnit.Framework;
-using static SystemTests.Scenarios.Codes.Motion.InputChannels;
 
 namespace SystemTests.Scenarios.Codes.Motion;
 
@@ -29,7 +28,7 @@ public class M120M121Tests : BenchFixture
     public async Task M120AndM121PushAndPopInputState()
     {
         await using Bench bench = await Bench.StartAsync(Machines.Xye);
-        int http = await HttpInputIndexAsync(bench.Host);
+        int http = await bench.Host.InputIndexAsync();
 
         // A known baseline, then push it
         await bench.Host.ExecuteCodeAsync("G90");

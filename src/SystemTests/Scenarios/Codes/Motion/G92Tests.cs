@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.ObjectModel;
 using NUnit.Framework;
-using static SystemTests.Scenarios.Codes.Motion.InputChannels;
 
 namespace SystemTests.Scenarios.Codes.Motion;
 
@@ -40,7 +39,7 @@ public class G92Tests : BenchFixture
             Assert.That(axis1.UserPosition, Is.EqualTo(0.0).Within(1e-3),
                         "G92 X50 leaves move.axes[1].userPosition alone (RRF GCodes3.cpp SetPositions)");
         });
-        await WaitForMachinePositionAsync(bench, 0, 50.0);
+        await bench.WaitForMachinePositionAsync(0, 50.0);
         Assert.That(axis0.MachinePosition, Is.EqualTo(50.0).Within(1e-3),
                     "with no offsets G92 X50 sets move.axes[0].machinePosition too (RRF Move.cpp machinePosition)");
     }

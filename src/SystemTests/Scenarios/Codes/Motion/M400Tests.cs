@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.ObjectModel;
 using NUnit.Framework;
-using static SystemTests.Scenarios.Codes.Motion.InputChannels;
 
 namespace SystemTests.Scenarios.Codes.Motion;
 
@@ -35,7 +34,7 @@ public class M400Tests : BenchFixture
                     "after M400 the whole 5 mm move has been sent (RRF GCodes2.cpp case 400)");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].UserPosition), Is.EqualTo(5.0).Within(1e-3),
                     "after M400 move.axes[0].userPosition is at the target (RRF Move.cpp userPosition)");
-        await WaitForMachinePositionAsync(bench, 0, 5.0);
+        await bench.WaitForMachinePositionAsync(0, 5.0);
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].MachinePosition), Is.EqualTo(5.0).Within(1e-3),
                     "after M400 move.axes[0].machinePosition settles at the target (RRF Move.cpp machinePosition)");
     }

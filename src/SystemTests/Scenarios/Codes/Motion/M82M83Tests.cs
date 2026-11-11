@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.ObjectModel;
 using NUnit.Framework;
-using static SystemTests.Scenarios.Codes.Motion.InputChannels;
 
 namespace SystemTests.Scenarios.Codes.Motion;
 
@@ -23,7 +22,7 @@ public class M82M83Tests : BenchFixture
     public async Task DrivesRelativeDefaultsToAbsolute()
     {
         await using Bench bench = await Bench.StartAsync();
-        int http = await HttpInputIndexAsync(bench.Host);
+        int http = await bench.Host.InputIndexAsync();
 
         Assert.That(await bench.Host.ReadModelAsync(model => model.Inputs[http]?.DrivesRelative), Is.False,
                     "the initial inputs[].drivesRelative is false (RRF GCodeMachineState.cpp constructor)");
@@ -41,7 +40,7 @@ public class M82M83Tests : BenchFixture
     {
         // Extrusion needs a selected tool; tool 0 drives extruder 0 and has no heater
         await using Bench bench = await Bench.StartAsync(Machines.Xye, "M563 P0 D0");
-        int http = await HttpInputIndexAsync(bench.Host);
+        int http = await bench.Host.InputIndexAsync();
         InputChannel? httpChannel = await bench.Host.ReadModelAsync(model => model.Inputs[http]);
         await bench.Host.ExecuteCodeAsync("T0");
 

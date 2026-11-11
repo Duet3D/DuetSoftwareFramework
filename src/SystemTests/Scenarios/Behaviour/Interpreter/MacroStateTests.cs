@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.ObjectModel;
 using NUnit.Framework;
-using static SystemTests.Scenarios.Codes.Motion.InputChannels;
 
 namespace SystemTests.Scenarios.Behaviour.Interpreter;
 
@@ -49,7 +48,7 @@ public class MacroStateTests : BenchFixture
             }).StartAsync();
 
         // config.g ran at boot on the Trigger channel; its state and its sub-macro's state stand
-        int trigger = await ChannelInputIndexAsync(bench.Host, CodeChannel.Trigger);
+        int trigger = await bench.Host.InputIndexAsync(CodeChannel.Trigger);
         InputChannel triggerChannel = (await bench.Host.ReadModelAsync(model => model.Inputs[trigger]))!;
         Assert.Multiple(() =>
         {
@@ -60,7 +59,7 @@ public class MacroStateTests : BenchFixture
             Assert.That(triggerChannel.DistanceUnit, Is.EqualTo(DistanceUnit.Inch), "the G20 in config.g's sub-macro is retained");
         });
 
-        int http = await HttpInputIndexAsync(bench.Host);
+        int http = await bench.Host.InputIndexAsync();
         InputChannel httpChannel = (await bench.Host.ReadModelAsync(model => model.Inputs[http]))!;
 
         // config-override.g via M501, on the HTTP channel: its feed rate and its sub-macro's state
@@ -124,7 +123,7 @@ public class MacroStateTests : BenchFixture
                 G94
                 G1 F6000
                 """)).StartAsync();
-        int http = await HttpInputIndexAsync(bench.Host);
+        int http = await bench.Host.InputIndexAsync();
         InputChannel? httpChannel = await bench.Host.ReadModelAsync(model => model.Inputs[http]);
 
         // The caller's state: the feed rate first, while still in the default non-inverse-time mode,

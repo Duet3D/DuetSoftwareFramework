@@ -1,7 +1,9 @@
 using System;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
+using DuetAPI;
 using DuetAPI.ObjectModel;
 using NUnit.Framework;
 
@@ -13,6 +15,41 @@ internal static class ModelReads
     /// <summary>Where an axis has got to, in mm</summary>
     public static Task<double> MachinePositionAsync(this DcsTestHost host, int axis)
         => host.ReadModelAsync(model => (double)(model.Move.Axes[axis].MachinePosition ?? 0.0f));
+
+    /// <summary>
+    /// Wait until an axis' live machine position reaches the expected value. The position is read
+    /// outside the model lock, as the controller's reports update it
+    /// </summary>
+    public static Task WaitForMachinePositionAsync(this Bench bench, int axis, double expected)
+        => bench.CanMaster.WaitUntilAsync(
+            () => bench.Host.Model.Move.Axes.Count > axis
+                  && bench.Host.Model.Move.Axes[axis].MachinePosition is float position
+                  && Math.Abs(position - expected) < 1e-3,
+            what: $"move.axes[{axis}].machinePosition reaching {expected}");
+
+    /// <summary>
+    /// The index of a channel in inputs[], for a macro that reads it as <c>inputs[n]</c>. Found by
+    /// name because the channel order is not part of any contract under test. HTTP by default, as
+    /// that is the channel <see cref="DcsTestHost.ExecuteCodeAsync"/> runs codes on
+    /// </summary>
+    public static async Task<int> InputIndexAsync(this DcsTestHost host, CodeChannel channel = CodeChannel.HTTP)
+    {
+        using (await host.Model.AccessReadOnlyAsync(CancellationToken.None))
+        {
+            for (int i = 0; i < host.Model.Inputs.Count; i++)
+            {
+                if (host.Model.Inputs[i]?.Name == channel)
+                {
+                    return i;
+                }
+            }
+        }
+        throw new AssertionException($"inputs[] does not contain the {channel} channel");
+    }
+
+    /// <summary>Read part of a channel's inputs[] entry, the HTTP channel's by default</summary>
+    public static Task<T> ReadInputAsync<T>(this DcsTestHost host, Func<InputChannel, T> read, CodeChannel channel = CodeChannel.HTTP)
+        => host.ReadModelAsync(model => read(model.Inputs[channel] ?? throw new AssertionException($"inputs[] does not contain the {channel} channel")));
 
     /// <summary>Read one axis' value by its letter</summary>
     public static Task<T> ReadAxisAsync<T>(this DcsTestHost host, char letter, Func<Axis, T> read)

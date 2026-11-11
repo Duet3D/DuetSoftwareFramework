@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.ObjectModel;
 using NUnit.Framework;
-using static SystemTests.Scenarios.Codes.Motion.InputChannels;
 
 namespace SystemTests.Scenarios.Codes.Motion;
 
@@ -31,7 +30,7 @@ public class G0G1Tests : BenchFixture
     public async Task G0AndG1SetFeedRateAndUserPosition()
     {
         await using Bench bench = await Bench.StartAsync(Machines.Xye);
-        int http = await HttpInputIndexAsync(bench.Host);
+        int http = await bench.Host.InputIndexAsync();
 
         InputChannel? httpChannel = await bench.Host.ReadModelAsync(model => model.Inputs[http]);
         Axis axis0 = await bench.Host.ReadModelAsync(model => model.Move.Axes[0]);
@@ -51,7 +50,7 @@ public class G0G1Tests : BenchFixture
             Assert.That(axis1.UserPosition, Is.EqualTo(5.0).Within(1e-3),
                         "G1 Y5 sets move.axes[1].userPosition (RRF Move.cpp userPosition)");
         });
-        await WaitForMachinePositionAsync(bench, 0, 10.0);
+        await bench.WaitForMachinePositionAsync(0, 10.0);
 
         await bench.Host.ExecuteCodeAsync("G0 X20 F2400");
         await bench.Host.ExecuteCodeAsync("M400");

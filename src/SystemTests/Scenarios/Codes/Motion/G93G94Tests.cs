@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.ObjectModel;
 using NUnit.Framework;
-using static SystemTests.Scenarios.Codes.Motion.InputChannels;
 
 namespace SystemTests.Scenarios.Codes.Motion;
 
@@ -29,7 +28,7 @@ public class G93G94Tests : BenchFixture
     public async Task G93AndG94ToggleInverseTimeMode()
     {
         await using Bench bench = await Bench.StartAsync(Machines.Xye);
-        int http = await HttpInputIndexAsync(bench.Host);
+        int http = await bench.Host.InputIndexAsync();
         InputChannel? httpChannel = await bench.Host.ReadModelAsync(model => model.Inputs[http]);
         Axis axis0 = await bench.Host.ReadModelAsync(model => model.Move.Axes[0]);
 
