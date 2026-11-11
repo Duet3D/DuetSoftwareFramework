@@ -46,9 +46,7 @@ public class M568Tests : BenchFixture
     /// The heater's reported state combines the board-reported mode with the local active flag
     /// (Heater::GetStatus, Heater.cpp), so the test plays the board's status reports
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
-    [Category("LongRunning")]
     public async Task M568SetsTemperaturesAndHeaterStates()
     {
         await using Bench bench = await Bench.StartAsync(Machines.Xye, HeaterToolConfig);
@@ -81,7 +79,7 @@ public class M568Tests : BenchFixture
         Assert.Multiple(() =>
         {
             Assert.That(reply, Does.StartWith("Tool 0"), "bare M568 reports the tool (RRF SetOrReportOffsets)");
-            Assert.That(reply, Does.Contain("active/standby temperature(s) 210.0/180.0"), "bare M568 reports the model temperatures (RRF SetOrReportOffsets)");
+            Assert.That(reply, Does.Contain("Tool 0 is Off, active temperatures: 210.0, standby temperatures: 180.0"), "bare M568 reports the model temperatures (RRF SetOrReportOffsets)");
         });
     }
 }
