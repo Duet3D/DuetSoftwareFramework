@@ -5,6 +5,7 @@
     scripts/test.py unit                                          the C# unit tests, with coverage
     scripts/test.py system --filter 'FullyQualifiedName~JobControl'
                                                                   the system tests a filter names
+    scripts/test.py system --code M140                            the system tests of one code
     scripts/test.py system                                        every system test but the known gaps
     scripts/test.py system -- -p:Profiling=true                   pass the rest to dotnet test
     scripts/test.py native                                        DuetRealtimeCore's host-side tests

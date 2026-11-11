@@ -87,6 +87,9 @@ internal sealed class ScriptedCanMaster : IDisposable
     /// <summary>Verdict the flasher returns for firmware verification requests</summary>
     public byte FlashVerdict { get; set; } = SpiWire.FlashVerifyOk;
 
+    /// <summary>A socket path no other test's controller uses</summary>
+    public static string NewSocketPath() => Path.Combine(Path.GetTempPath(), $"dsf-fake-{Guid.NewGuid():N}.sock");
+
     public ScriptedCanMaster(string socketPath, IControllerClock? clock = null)
     {
         VerifyLayouts();

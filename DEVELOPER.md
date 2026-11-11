@@ -227,7 +227,7 @@ Each test is named on the console as it starts, with its position in the run and
 has been going:
 
 ```
-[  42  03:17] SystemTests.Scenarios.DeferredPauseTests.PauseDuringToolChange
+[  42  03:17] SystemTests.Scenarios.Behaviour.JobControl.DeferredPauseTests.PauseDuringToolChange
   Passed PauseDuringToolChange [2 s]
 ```
 
@@ -241,9 +241,34 @@ unimplemented or implemented incorrectly, so they fail until it is fixed and the
 off. The script leaves them out, as CI does; `--all` puts them back. To narrow a run:
 
 ```bash
+scripts/test.py system --code M140                       # every scenario of one code, wherever it is
 scripts/test.py system --filter 'FullyQualifiedName~JobControl'
 scripts/test.py system --help
 ```
+
+### Writing system scenarios
+
+The scenarios in `src/SystemTests/Scenarios` are laid out so that the scenarios of a code are easy to find:
+
+- `Codes/<Subsystem>/` holds one fixture per code or family of codes documented together, named after them: `Codes/Heat/M140M141Tests.cs`, `Codes/Drivers/M569Tests.cs`, `Codes/Tools/TTests.cs`. The subsystem folders follow the handler partials in `src/DuetControlServer/Codes/Handlers`.
+- `Behaviour/<Area>/` holds what is not one code's: the job lifecycle, the moves the planner sends over the link, the link itself and the interpreter.
+
+Every fixture names the codes it specifies with `[GCode("M140", "M141")]`, which makes them test categories, so `--code` finds a code's scenarios in `Behaviour/` as well. Name only the codes a scenario is about, not the G1 that gets the machine somewhere or the M32 that starts the job a scenario is really testing.
+
+A scenario starts a `Bench`: the scripted controller and a DuetControlServer booted from a `config.g` that enables CAN and nothing else. It adds only what it needs, from the shared parts in `src/SystemTests/Host/Config` or as its own lines: Once `config.g` has finished the bench empties the controller's capture, so what a scenario reads back is only the traffic it caused; `KeepingConfigTraffic()` keeps the start-up traffic for a scenario about that.
+
+```csharp
+await using Bench bench = await Bench.StartAsync();                                   // no machine at all
+await using Bench bench = await Bench.StartAsync(Machines.Xye, "M140 H0");            // X, Y and an extruder, and a line of its own
+await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.Xye.Homed)
+                                     .WithSd(sd => sd.WriteGCode("job.gcode", job))
+                                     .WithController(controller => controller.NeverAnswer<CanMessageM970>())
+                                     .StartAsync();
+```
+
+`Machines` has the machines a move needs, each with a `Homed` part that comes last in `config.g` whatever order it is given in, and every machine puts each axis letter on the same driver (`Machines.XDriver`, ...). `DriversRig` is the board layout the regression suite's driver cases are recorded on. `JobMacros.Instrumented` writes the job macros with counters a job control scenario reads. The helpers that read the object model, the captured moves and the job are in `ModelReads`, `MoveCapture`, `BoardReports` and `JobDriving`.
+
+A config string names its boards, drivers and ports through `Expansion` (`Expansion.Driver(Machines.DriverBoard, Machines.XDriver)`, `Expansion.Temp(Machines.DriverBoard, 0)`, `Expansion.Out(Machines.DriverBoard, 3)`, `Expansion.GpioIn(Machines.DriverBoard, 1)`) or `DriversRig` (`DriversRig.MainDriver(0)`), and interpolates the values its assertions depend on from the constants that hold them, so the configuration and the assertions cannot drift apart. A `[TestCase]` argument has to be a constant, so a case naming a driver or port goes in a `[TestCaseSource]` array instead.
 
 DuetRealtimeCore's own tests build it for this machine and run its ctest suite:
 

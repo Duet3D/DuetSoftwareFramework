@@ -7,6 +7,7 @@ ones: the system command of scripts/test.py.
     scripts/test.py system --all                                        every scenario
     scripts/test.py system --filter 'FullyQualifiedName~JobControl'     the scenarios a filter names
     scripts/test.py system --filter 'FullyQualifiedName~JobControl' --skip-long-running
+    scripts/test.py system --code M140 --code M141                      the scenarios of the codes named
     scripts/test.py system --all --tag-long-running --slow 20           write LongRunning into the sources
     scripts/test.py system -- -p:Profiling=true                         pass the rest to dotnet test
 
@@ -21,6 +22,9 @@ is reported against them: failures are split into the ones already marked KnownG
 are not, tests marked KnownGap that passed are listed on their own, and the slow list is split and
 followed by the tests marked LongRunning that came in under the threshold. --tag-known-gaps and
 --tag-long-running write the differences into the sources instead.
+
+--code selects the scenarios of a G-, M- or T-code wherever they are: each scenario names the codes it
+specifies with [GCode], which makes them test categories.
 """
 
 from __future__ import annotations
@@ -50,6 +54,7 @@ class Options:
     configuration: str
     results_dir: str
     filter: str | None
+    code: list[str]
     skip_known_gaps: bool | None
     skip_long_running: bool | None
     all: bool
@@ -68,6 +73,9 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('--filter', metavar='EXPR',
                         help='test filter, in place of the one the skips below compose. A skip that was asked for '
                              'narrows it further')
+    parser.add_argument('--code', action='append', default=[], metavar='CODE',
+                        help='the scenarios that specify this code, e.g. M140 or M569.5; may be repeated, and narrows '
+                             '--filter when both are given')
     parser.add_argument('--skip-known-gaps', action='store_true', default=None,
                         help=f'leave out the {KNOWN_GAP} scenarios, which fail until the source they describe is '
                              'fixed. On by default for a run that named no filter')
@@ -88,28 +96,41 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 
+def named_filter(options: Options) -> str | None:
+    """The filter --filter and --code name between them: the scenarios of any of the codes, within the
+    filter. Each part is parenthesised because it may be a disjunction, which the conjunction joining
+    them would otherwise bind tighter than."""
+    parts = [options.filter] if options.filter else []
+    if options.code:
+        parts.append('|'.join(f'TestCategory={code}' for code in options.code))
+    if len(parts) < 2:
+        return parts[0] if parts else None
+    return '&'.join(f'({part})' for part in parts)
+
+
 def test_filter(options: Options) -> str | None:
     """The filter the run is given. A skip that was asked for narrows the filter whether or not one was
     named, while the default skip of the KnownGap scenarios applies only to a run that named none: a
     filter states which tests the run is about, and a skip it did not ask for has no say in that."""
+    named = named_filter(options)
     skip_gaps = options.skip_known_gaps
     skip_long = options.skip_long_running
     if options.all:
         skip_gaps = skip_long = False
     # A category cannot be taken off a test that never ran, so asking to tag the KnownGap scenarios is
     # asking to run them, unless the run was told otherwise
-    if options.tag_known_gaps and options.filter is None and skip_gaps is None:
+    if options.tag_known_gaps and named is None and skip_gaps is None:
         skip_gaps = False
         print(f'--tag-known-gaps runs the {KNOWN_GAP} scenarios as well, so the category can be taken off the '
               'ones that pass')
-    if skip_gaps is None and options.filter is None:
+    if skip_gaps is None and named is None:
         skip_gaps = True
     skips = [f'TestCategory!={c}' for c, skip in ((KNOWN_GAP, skip_gaps), (LONG_RUNNING, skip_long)) if skip]
     if not skips:
-        return options.filter
+        return named
     # The named filter is parenthesised because it may be a disjunction, which the conjunction joining
     # the two would otherwise bind tighter than
-    return '&'.join(([f'({options.filter})'] if options.filter else []) + skips)
+    return '&'.join(([f'({named})'] if named else []) + skips)
 
 
 # The results
