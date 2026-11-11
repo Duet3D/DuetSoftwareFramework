@@ -84,6 +84,18 @@ public class M104M109Tests : BenchFixture
         });
     }
 
+    /// <summary>A heater M104 put on standby still reads standby when its board reports it heating</summary>
+    /// <remarks>RRF truth: Heater::GetStatus reports standby for a heater in a PID mode that is not active</remarks>
+    [Test]
+    public async Task StandbyHeaterStaysStandbyWhenBoardReportsHeating()
+    {
+        await using Bench bench = await Bench.StartAsync(ToolConfig);
+
+        await bench.Host.ExecuteCodeAsync("M104 S40");
+        await bench.ReportHeaterAsync(3, HeaterMode.Heating, 25.0f);
+        Assert.That((await ReadHeaterAsync(bench, 3)).State, Is.EqualTo(HeaterState.Standby), "heaters[3].state");
+    }
+
     /// <summary>M104 T addresses that tool, and R is a synonym for S</summary>
     /// <remarks>Regression: m104-select-tool-with-t, m104-undocumented-r-parameter</remarks>
     [TestCase("M104 S40 T1", 1, 4, 40.0f)]
@@ -221,6 +233,37 @@ public class M104M109Tests : BenchFixture
             Assert.That((await ReadToolAsync(bench, 0)).State, Is.EqualTo(ToolState.Active), "tools[0].state");
             Assert.That((await ReadHeaterAsync(bench, 3)).State, Is.EqualTo(HeaterState.Active), "heaters[3].state");
         });
+    }
+
+    /// <summary>
+    /// M109 with no tool selected sets the temperatures, selects the tool and then waits for its heater to reach a
+    /// target of 40C or more
+    /// </summary>
+    /// <remarks>RRF truth: GCodeState::m109ToolChange0, then GCodeState::m109WaitForTemperature</remarks>
+    [Test]
+    public async Task SelectsToolThenWaitsWhenNoneIsSelected()
+    {
+        await using Bench bench = await Bench.StartAsync(ToolConfig);
+        HeatManager heat = bench.Host.Services.GetRequiredService<HeatManager>();
+        await bench.ReportHeaterAsync(3, HeaterMode.Heating, 25.0f);
+
+        Task<string> waiting = bench.Host.ExecuteCodeAsync("M109 S50");
+        await bench.CanMaster.WaitUntilAsync(() => heat.IsWaitingForTemperatures, what: "M109 waiting");
+        Tool tool = await ReadToolAsync(bench, 0);
+        Heater heater = await ReadHeaterAsync(bench, 3);
+        Assert.Multiple(async () =>
+        {
+            Assert.That(waiting.IsCompleted, Is.False, "the cold heater is waited for");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(0), "tool 0 is selected before the wait");
+            Assert.That(tool.State, Is.EqualTo(ToolState.Active), "tools[0].state");
+            Assert.That(tool.Active[0], Is.EqualTo(50.0f), "tools[0].active[0]");
+            Assert.That(tool.Standby[0], Is.EqualTo(50.0f), "tools[0].standby[0]");
+            Assert.That(heater.Active, Is.EqualTo(50.0f), "heaters[3].active");
+            Assert.That(heater.State, Is.EqualTo(HeaterState.Active), "heaters[3].state");
+        });
+
+        await bench.ReportHeaterAsync(3, HeaterMode.Stable, 50.0f);
+        Assert.That((await waiting).Trim(), Is.Empty, "reaching the target ends the wait");
     }
 
     /// <summary>M109 S waits for the selected tool to come up to temperature, and not for it to cool down</summary>
