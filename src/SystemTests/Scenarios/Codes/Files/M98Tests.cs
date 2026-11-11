@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Codes;
 using NUnit.Framework;
 
 namespace SystemTests.Scenarios.Codes.Files;
@@ -116,12 +117,14 @@ public class M98Tests : BenchFixture
         const string text = "alpha";
         const int integer = 42;
         const float fraction = 1.25f;
+        float[] array = [1.0f, 2.0f, 3.0f];
 
         await using Bench bench = await Bench.StartAsync("""
             global text = ""
             global hasP = true
             global integer = 0
             global fraction = 0
+            global array = null
             global expr = 0
             global depth = -1
             """);
@@ -131,11 +134,12 @@ public class M98Tests : BenchFixture
             set global.hasP = exists(param.P)
             set global.integer = param.S
             set global.fraction = param.X
+            set global.array = param.Y
             set global.expr = param.B
             set global.depth = inputs[{http}].stackDepth
             """);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M98 P\"drt-m98-params.g\" A\"{text}\" S{integer} X{fraction.ToString(CultureInfo.InvariantCulture)} B{{3+4}}")).Trim(), Is.Empty);
+        Assert.That((await bench.Host.ExecuteCodeAsync($"M98 P\"drt-m98-params.g\" A\"{text}\" S{integer} X{fraction.ToString(CultureInfo.InvariantCulture)} Y{{{string.Join(",", array)}}} B{{3+4}}")).Trim(), Is.Empty);
         await Assert.MultipleAsync(async () =>
         {
             Assert.That(await bench.Host.GlobalTextAsync("text"), Is.EqualTo(text), "a quoted string arrives as a string");
@@ -143,6 +147,7 @@ public class M98Tests : BenchFixture
             Assert.That(await bench.Host.GlobalAsync("integer"), Is.EqualTo(integer), "an integer arrives as a number");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Global["fraction"]!.Value.GetDouble()), Is.EqualTo(fraction).Within(1e-6),
                         "a float arrives as a number");
+            Assert.That(await bench.Host.GlobalAsync("array"), Is.EqualTo(array), "an array arrives as an array");
             Assert.That(await bench.Host.GlobalAsync("expr"), Is.EqualTo(7), "an expression is evaluated before the macro starts");
             Assert.That(await bench.Host.GlobalAsync("depth"), Is.EqualTo(1), "the macro ran one stack level deep");
             Assert.That(await bench.Host.ReadInputAsync(input => (int)input.StackDepth), Is.Zero, "the stack is back at its base once the macro returned");
@@ -174,11 +179,68 @@ public class M98Tests : BenchFixture
         });
     }
 
+    /// <summary>
+    /// A macro nested deeper than the stack holds is an error that aborts every macro on the channel, so a recursion stops
+    /// at the limit and nothing after any of its calls runs
+    /// </summary>
+    /// <remarks>
+    /// RRF truth: DoFileMacro reports the failed Push and calls AbortPrint, which unwinds every file on the channel. RRF
+    /// reports the overflow as a message and replies OK to the M98 that overflowed; DSF refuses that M98 with an error,
+    /// which a macro reports as a message
+    /// </remarks>
+    [Category("KnownGap")]
+    [Test]
+    public async Task NestingBeyondTheStackLimitAbortsEveryMacro()
+    {
+        await using Bench bench = await Bench.StartAsync("global calls = 0\nglobal deepest = -1\nglobal unwound = 0");
+        int http = await bench.Host.InputIndexAsync();
+        bench.Host.Sd.WriteSys("drt-recurse.g", $"""
+            set global.calls = global.calls + 1
+            set global.deepest = inputs[{http}].stackDepth
+            M98 P"drt-recurse.g"
+            set global.unwound = global.unwound + 1
+            """);
+
+        Assert.That((await bench.Host.ExecuteCodeAsync("M98 P\"drt-recurse.g\"")).Trim(), Is.Empty,
+                    "the overflow is reported where it happened, not again by the M98 that started the recursion");
+        string error = await bench.Host.WaitForMessageAsync(MessageType.Error, "stack overflow");
+        await Assert.MultipleAsync(async () =>
+        {
+            Assert.That(error, Does.Contain("M98"), "the error names the M98 that overflowed");
+            Assert.That(await bench.Host.GlobalAsync("calls"), Is.EqualTo(InterpreterStateStack.MaxDepth), "every level up to the limit ran");
+            Assert.That(await bench.Host.GlobalAsync("deepest"), Is.EqualTo(InterpreterStateStack.MaxDepth), "the deepest macro was at the limit");
+            Assert.That(await bench.Host.GlobalAsync("unwound"), Is.Zero, "no macro ran on after the overflow");
+            Assert.That(await bench.Host.ReadInputAsync(input => (int)input.StackDepth), Is.Zero, "every macro's level was popped");
+            Assert.That(await bench.Host.ReadInputAsync(input => input.InMacro), Is.False);
+        });
+    }
+
+    /// <summary>A macro starts with inverse time mode off whatever its caller uses, and the caller's mode is restored after it</summary>
+    /// <remarks>RRF truth: the GCodeMachineState copy constructor keeps inverseTimeMode only when withinSameFile</remarks>
+    [Category("KnownGap")]
+    [Test]
+    public async Task AMacroStartsWithInverseTimeModeOff()
+    {
+        await using Bench bench = await Bench.StartAsync("global inverseTime = true");
+        int http = await bench.Host.InputIndexAsync();
+        bench.Host.Sd.WriteSys("drt-g93.g", $"set global.inverseTime = inputs[{http}].inverseTimeMode");
+
+        await bench.Host.ExecuteCodeAsync("G93");
+        await bench.Host.ExecuteCodeAsync("M98 P\"drt-g93.g\"");
+        await Assert.MultipleAsync(async () =>
+        {
+            Assert.That(await bench.Host.GlobalFlagAsync("inverseTime"), Is.False, "the macro started in G94");
+            Assert.That(await bench.Host.ReadInputAsync(input => input.InverseTimeMode), Is.True, "the caller is back in G93");
+        });
+    }
+
     /// <summary>A macro that is not there is an error, quoting the name as it was given</summary>
     /// <remarks>
     /// RRF truth: GCodes2.cpp case 98 calls DoFileMacroWithParameters with reportMissing false and turns the failure into
     /// GCodeResult::error, before DoFileMacro pushes a machine state. Regression: error-missing-macro
     /// </remarks>
+    [TestCase("/sys/drt-does-not-exist.g")]
+    [TestCase("missing.g")]
     public async Task MissingMacroIsAnError(string fileName)
     {
         await using Bench bench = await Bench.StartAsync();

@@ -102,6 +102,31 @@ public class M99Tests : BenchFixture
         });
     }
 
+    /// <summary>The M120 levels a macro has open when it reaches M99 are discarded with it, and the caller's state is restored</summary>
+    /// <remarks>RRF truth: FileMacroCyclesReturn pops every machine state down to and including the macro's own</remarks>
+    [Category("KnownGap")]
+    [Test]
+    public async Task DiscardsTheMacrosOpenM120Levels()
+    {
+        await using Bench bench = await Bench.StartAsync("global depth = -1");
+        int http = await bench.Host.InputIndexAsync();
+        bench.Host.Sd.WriteSys("drt-m99-m120.g", $"""
+            M120
+            G91
+            set global.depth = inputs[{http}].stackDepth
+            M99
+            """);
+
+        await bench.Host.ExecuteCodeAsync("G90");
+        Assert.That((await bench.Host.ExecuteCodeAsync("M98 P\"drt-m99-m120.g\"")).Trim(), Is.Empty);
+        await Assert.MultipleAsync(async () =>
+        {
+            Assert.That(await bench.Host.GlobalAsync("depth"), Is.EqualTo(2), "the macro had a level of its own open");
+            Assert.That(await bench.Host.ReadInputAsync(input => (int)input.StackDepth), Is.Zero, "it was discarded with the macro");
+            Assert.That(await bench.Host.ReadInputAsync(input => input.AxesRelative), Is.False, "the caller's G90 is restored");
+        });
+    }
+
     /// <summary>M99 outside a macro does nothing and replies nothing</summary>
     /// <remarks>RRF truth: FileMacroCyclesReturn acts only if IsDoingFileMacro</remarks>
     [Category("KnownGap")]

@@ -51,6 +51,14 @@ internal static class ModelReads
     public static Task<T> ReadInputAsync<T>(this DcsTestHost host, Func<InputChannel, T> read, CodeChannel channel = CodeChannel.HTTP)
         => host.ReadModelAsync(model => read(model.Inputs[channel] ?? throw new AssertionException($"inputs[] does not contain the {channel} channel")));
 
+    /// <summary>
+    /// Wait for a message of the given type containing the given text, and return it. A code run from a macro or a job
+    /// reports its reply as a message rather than to a caller
+    /// </summary>
+    public static async Task<string> WaitForMessageAsync(this DcsTestHost host, MessageType type, string containing, int timeoutMs = 10_000)
+        => (await host.WaitForModelAsync(model => model.Messages.FirstOrDefault(message => message.Type == type && message.Content.Contains(containing))?.Content,
+                                         content => content is not null, $"a {type} message containing \"{containing}\"", timeoutMs))!;
+
     /// <summary>Read one axis' value by its letter</summary>
     public static Task<T> ReadAxisAsync<T>(this DcsTestHost host, char letter, Func<Axis, T> read)
         => host.ReadModelAsync(model => read(model.Move.Axes.First(axis => axis.Letter == letter)));
