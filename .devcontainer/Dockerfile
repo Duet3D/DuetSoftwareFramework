@@ -6,10 +6,12 @@ FROM mcr.microsoft.com/devcontainers/base:${VARIANT}
 ENV ARM_GNU_TOOLCHAIN_VERSION="15.2.rel1"
 ENV ARM_GNU_TOOLCHAIN_DIR="/opt/arm-gnu-toolchain-${ARM_GNU_TOOLCHAIN_VERSION}"
 ENV PATH="${ARM_GNU_TOOLCHAIN_DIR}/bin:${PATH}"
+# The emulator the emulation tests run the firmware images in (src/DuetEmulation)
+ENV RENODE_VERSION="1.17.0"
 
 # ARG DEBIAN_FRONTEND=noninteractive
 
-COPY ./install-arm-gcc.sh /tmp/
+COPY ./install-arm-gcc.sh ./install-renode.sh /tmp/
 
 RUN echo "Installing ARM GNU Toolchain version ${ARM_GNU_TOOLCHAIN_VERSION}..." \
     && sed -i 's/\r$//' /tmp/install-arm-gcc.sh \
@@ -55,10 +57,18 @@ RUN apt-get update \
         python3 \
         python3-argcomplete \
         pipx \
+        dosfstools \
+        mtools \
     && ln -s /usr/bin/python3 /usr/local/bin/python \
     && ln -s /usr/bin/python3 /usr/local/bin/py \
     && PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install 'pyright[nodejs]'
     # && rm -rf /var/lib/apt/lists/*
+
+RUN echo "Installing Renode version ${RENODE_VERSION}..." \
+    && sed -i 's/\r$//' /tmp/install-renode.sh \
+    && chmod +x /tmp/install-renode.sh \
+    && /tmp/install-renode.sh \
+    && rm -f /tmp/install-renode.sh
 
 # The AOT targets ask clang for the armv7-linux-gnueabihf triple, but Debian names its cross tools
 # arm-linux-gnueabihf-*. Without matching names clang silently falls back to the host x86 linker
