@@ -19,6 +19,7 @@ using System.Collections.Generic;
 using System.Globalization;
 
 using Antmicro.Renode.Core;
+using Antmicro.Renode.Duet;
 using Antmicro.Renode.Logging;
 using Antmicro.Renode.Peripherals.Bus;
 using Antmicro.Renode.Peripherals.Timers;
@@ -26,7 +27,7 @@ using Antmicro.Renode.Time;
 
 namespace Antmicro.Renode.Peripherals.Analog
 {
-    public class SAME5x_Adc : IBytePeripheral, IWordPeripheral, IDoubleWordPeripheral, IKnownSize
+    public class SAME5x_Adc : IBytePeripheral, IWordPeripheral, IDoubleWordPeripheral, IKnownSize, IDuetAnalogInputs
     {
         // internalChannels are the MCU's own inputs (its platform file sets them), channels the board's
         public SAME5x_Adc(IMachine machine, string channels = "", string internalChannels = "", double conversionTime = 0.0004)

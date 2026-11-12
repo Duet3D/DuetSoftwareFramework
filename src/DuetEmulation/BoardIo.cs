@@ -1,8 +1,10 @@
 using System;
+using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetEmulation.Boards;
 using DuetEmulation.Emulator;
+using DuetEmulation.Traces;
 
 namespace DuetEmulation;
 
@@ -60,6 +62,43 @@ public sealed class BoardIo(EmulatedSystem system)
         return SetAnalogAsync(address, port, resistance / (resistance + series), cancellationToken);
     }
 
+    /// <summary>What a board's output port drives now, such as <c>out0</c></summary>
+    public async Task<PinOutput> OutputAsync(int address, string port, CancellationToken cancellationToken = default)
+    {
+        EmulatedBoard board = system.Board(address);
+        (string gpio, int number) = board.Type.Gpio(board.Type.PinTable[port].Pin);
+        string[] fields = (await system.ExecuteAsync(board, $"{gpio} Output {number}", cancellationToken)).Split(' ');
+        return new PinOutput(Enum.Parse<PinMode>(fields[0], ignoreCase: true),
+                             double.Parse(fields[1], CultureInfo.InvariantCulture), double.Parse(fields[2], CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>
+    /// Model a heater: the heater output <paramref name="heaterPort"/> heats a mass whose temperature the
+    /// thermistor on <paramref name="thermistorPort"/> reads, as an NTC of the given resistance at 25C
+    /// and B value against the board's series resistor. The model runs in the board's emulated time
+    /// </summary>
+    public Task AttachThermalModelAsync(int address, string heaterPort, string thermistorPort, ThermalModel model,
+                                       double r25 = 100000, double beta = 4725, CancellationToken cancellationToken = default)
+    {
+        EmulatedBoard board = system.Board(address);
+        (string gpio, int number) = board.Type.Gpio(board.Type.PinTable[heaterPort].Pin);
+        string adcInput = board.Type.PinTable[thermistorPort].AdcInput
+            ?? throw new ArgumentException($"{thermistorPort} on board {address} is not an analogue input", nameof(thermistorPort));
+        (string adc, int channel) = board.Type.Adc(adcInput);
+        return system.ExecuteAsync(board,
+            $"{gpio} AttachThermalModel {number} {adc} {channel} {MonitorSyntax.Decimal(model.HeatingRate)} {MonitorSyntax.Decimal(model.TimeConstant)} " +
+            $"{MonitorSyntax.Decimal(model.DeadTime)} {MonitorSyntax.Decimal(model.Ambient)} {MonitorSyntax.Decimal(r25)} {MonitorSyntax.Decimal(beta)} " +
+            $"{MonitorSyntax.Decimal(board.Type.ThermistorSeriesResistance)}", cancellationToken);
+    }
+
+    /// <summary>The temperature of the mass a heater model on <paramref name="heaterPort"/> heats</summary>
+    public async Task<double> ThermalModelTemperatureAsync(int address, string heaterPort, CancellationToken cancellationToken = default)
+    {
+        EmulatedBoard board = system.Board(address);
+        (string gpio, int number) = board.Type.Gpio(board.Type.PinTable[heaterPort].Pin);
+        return double.Parse(await system.ExecuteAsync(board, $"{gpio} ThermalModelTemperature {number}", cancellationToken), CultureInfo.InvariantCulture);
+    }
+
     /// <summary>How many step pulses a driver has been sent: the rising edges on its STEP pin since the machine started</summary>
     public async Task<ulong> StepCountAsync(int address, int driver, CancellationToken cancellationToken = default)
     {
@@ -71,6 +110,30 @@ public sealed class BoardIo(EmulatedSystem system)
         (string gpio, int number) = board.Type.Gpio(board.Type.StepPins[driver]);
         return await system.Renode.ExecuteForNumberAsync($"{gpio} RisingEdges {number}", board.Machine, cancellationToken);
     }
+}
+
+/// <summary>
+/// A heater as a first-order model with dead time, as RepRapFirmware models one (M307):
+/// dT/dt = heatingRate * duty(t - deadTime) - (T - ambient) / timeConstant
+/// </summary>
+/// <param name="HeatingRate">The rate of rise at full power and ambient temperature, in K/s</param>
+/// <param name="TimeConstant">The cooling time constant, in s</param>
+/// <param name="DeadTime">The delay before a change of power starts to change the temperature, in s</param>
+/// <param name="Ambient">The temperature of the surroundings, in C</param>
+public sealed record ThermalModel(double HeatingRate, double TimeConstant, double DeadTime, double Ambient = 25)
+{
+    /// <summary>
+    /// A heater that heats and settles in a few seconds of emulated time, for tests of a control loop
+    /// that would otherwise take minutes: 425C at full power, 63% of the way there in 20s
+    /// </summary>
+    public static ThermalModel Fast { get; } = new(20, 20, 1);
+
+    /// <summary>
+    /// The M307 that gives RepRapFirmware this model for a heater: K is the cooling rate 100K above
+    /// ambient, and a cooling rate exponent of 1 makes the cooling linear, as it is here
+    /// </summary>
+    public string M307(int heater) => string.Create(CultureInfo.InvariantCulture,
+        $"M307 H{heater} R{HeatingRate:0.###} K{100 / TimeConstant:0.###} D{DeadTime:0.###} E1 S1.0 V0");
 }
 
 /// <summary>NTC thermistor arithmetic, with the B-parameter equation the firmware uses</summary>

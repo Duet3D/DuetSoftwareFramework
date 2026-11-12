@@ -10,8 +10,17 @@
 // Every output pin counts its rising edges, so a test can count the step pulses a driver received
 // without tracing every edge.
 //
+// Each pin's output - what it drives - is low, high, the PWM of a timer output it is muxed to, a
+// peripheral function the model knows nothing more about, or nothing (an input). Changes are recorded
+// in the I/O trace (Common/DuetIoTrace.cs) except for pins excluded from it, such as STEP pins, and
+// raised as OutputChanged for models that react to an output (a heater's thermal model). The bench
+// tells the model which timer output each PWM-capable pin is on (MapPwm) and which EXTINT line each
+// pin is on (MapExtInt), from the firmware's pin table; the level of a pin with a line is reported to
+// the EIC, which interrupts when the pin is muxed to it (function A).
+//
 //     port: GPIOPort.SAME5x_Port @ sysbus 0x41008000
 //         groups: 4
+//         eic: eic
 //         drivenLow: "PC18"
 //
 using System;
@@ -20,17 +29,27 @@ using System.Collections.ObjectModel;
 using System.Linq;
 
 using Antmicro.Renode.Core;
+using Antmicro.Renode.Duet;
 using Antmicro.Renode.Exceptions;
 using Antmicro.Renode.Logging;
 using Antmicro.Renode.Peripherals.Bus;
+using Antmicro.Renode.Peripherals.Miscellaneous;
 
 namespace Antmicro.Renode.Peripherals.GPIOPort
 {
-    public class SAME5x_Port : IBytePeripheral, IWordPeripheral, IDoubleWordPeripheral, IKnownSize, INumberedGPIOOutput, IGPIOReceiver
+    public class SAME5x_Port : IBytePeripheral, IWordPeripheral, IDoubleWordPeripheral, IKnownSize, INumberedGPIOOutput, IGPIOReceiver, IDuetPinOutputs
     {
-        public SAME5x_Port(IMachine machine, int groups = 4, string drivenLow = "", string drivenHigh = "")
+        public SAME5x_Port(IMachine machine, int groups = 4, SAME5x_Eic eic = null, string drivenLow = "", string drivenHigh = "")
         {
             this.machine = machine;
+            this.eic = eic;
+            outputs = new PinOutput[groups * PinsPerGroup];
+            excluded = new bool[groups * PinsPerGroup];
+            extIntLines = new int[groups * PinsPerGroup];
+            for(var i = 0; i < extIntLines.Length; i++)
+            {
+                extIntLines[i] = -1;
+            }
             this.groups = new Group[groups];
             for(var i = 0; i < groups; i++)
             {
@@ -62,6 +81,10 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
                 group.Reset();
             }
             Array.Clear(risingEdges, 0, risingEdges.Length);
+            for(var index = 0; index < groups.Length; index++)
+            {
+                PinsChanged(index, 0xFFFFFFFF);
+            }
         }
 
         public uint ReadDoubleWord(long offset)
@@ -111,16 +134,16 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
             switch(offset % GroupSize)
             {
                 case Dir:
-                    g.Dir = value;
+                    SetDir(index, value);
                     break;
                 case DirClr:
-                    g.Dir &= ~value;
+                    SetDir(index, g.Dir & ~value);
                     break;
                 case DirSet:
-                    g.Dir |= value;
+                    SetDir(index, g.Dir | value);
                     break;
                 case DirTgl:
-                    g.Dir ^= value;
+                    SetDir(index, g.Dir ^ value);
                     break;
                 case Out:
                     SetOut(index, value);
@@ -138,7 +161,7 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
                     g.Ctrl = value;
                     break;
                 case WrConfig:
-                    WriteConfiguration(g, value);
+                    PinsChanged(index, WriteConfiguration(g, value));
                     break;
                 case EvCtrl:
                     g.EvCtrl = value;
@@ -199,14 +222,17 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
             }
             var g = groups[offset / GroupSize];
             var reg = offset % GroupSize;
+            var index = (int)(offset / GroupSize);
             if(reg >= PinCfgBase && reg < PinCfgBase + PinsPerGroup)
             {
                 g.PinCfg[reg - PinCfgBase] = (byte)(value & PinCfgMask);
+                PinsChanged(index, 1u << (int)(reg - PinCfgBase));
                 return;
             }
             if(reg >= PmuxBase && reg < PmuxBase + PinsPerGroup / 2)
             {
                 g.Pmux[reg - PmuxBase] = value;
+                PinsChanged(index, 3u << (int)(2 * (reg - PmuxBase)));
                 return;
             }
             var shift = (int)((offset & 3) * 8);
@@ -233,6 +259,7 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
             var bit = 1u << (pin % PinsPerGroup);
             g.Driven |= bit;
             g.DrivenLevels = level ? g.DrivenLevels | bit : g.DrivenLevels & ~bit;
+            PinsChanged(pin / PinsPerGroup, bit);
         }
 
         public void Drive(string pin, bool level) => Drive(PinNumber(pin), level);
@@ -240,6 +267,56 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
         public void Release(int pin)
         {
             groups[pin / PinsPerGroup].Driven &= ~(1u << (pin % PinsPerGroup));
+            PinsChanged(pin / PinsPerGroup, 1u << (pin % PinsPerGroup));
+        }
+
+        // The timer output a pin produces when muxed to peripheral function `function` (0 = A, 4 = E...)
+        public void MapPwm(int pin, int function, IPeripheral timer, int output)
+        {
+            var source = timer as IDuetPwmSource ?? throw new RecoverableException($"{timer} does not produce PWM");
+            pwmMaps[pin] = new PwmMap { Function = function, Source = source, Output = output };
+            if(!subscribedSources.Contains(source))
+            {
+                subscribedSources.Add(source);
+                source.PwmChanged += () => SourceChanged(source);
+            }
+            PinsChanged(pin / PinsPerGroup, 1u << (pin % PinsPerGroup));
+        }
+
+        public void MapPwm(string pin, int function, IPeripheral timer, int output) => MapPwm(PinNumber(pin), function, timer, output);
+
+        // The EIC's EXTINT line of a pin
+        public void MapExtInt(int pin, int line)
+        {
+            extIntLines[pin] = line;
+            PinsChanged(pin / PinsPerGroup, 1u << (pin % PinsPerGroup));
+        }
+
+        public void MapExtInt(string pin, int line) => MapExtInt(PinNumber(pin), line);
+
+        // Leave a pin out of the I/O trace, for a pin that toggles too often to trace (a STEP pin)
+        public void ExcludeFromTrace(int pin) => excluded[pin] = true;
+
+        public void ExcludeFromTrace(string pin) => ExcludeFromTrace(PinNumber(pin));
+
+        // What a pin drives now, as "mode duty frequency"
+        public string Output(int pin)
+        {
+            var output = ComputeOutput(pin);
+            return string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0} {1:R} {2:R}", output.Mode.ToString().ToLowerInvariant(), output.Duty, output.Frequency);
+        }
+
+        public string Output(string pin) => Output(PinNumber(pin));
+
+        // Raised when what a pin drives changes: pin number, mode, duty and frequency
+        public event Action<int, DuetPinMode, double, double> OutputChanged;
+
+        public void GetOutput(int pin, out DuetPinMode mode, out double duty, out double frequency)
+        {
+            var output = ComputeOutput(pin);
+            mode = output.Mode;
+            duty = output.Duty;
+            frequency = output.Frequency;
         }
 
         public void Release(string pin) => Release(PinNumber(pin));
@@ -294,6 +371,89 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
                  | (inputs & ~g.Driven & pullUps);
         }
 
+        private void SetDir(int index, uint value)
+        {
+            var g = groups[index];
+            var changed = g.Dir ^ value;
+            g.Dir = value;
+            PinsChanged(index, changed);
+        }
+
+        private void SourceChanged(IDuetPwmSource source)
+        {
+            foreach(var entry in pwmMaps)
+            {
+                if(entry.Value.Source == source)
+                {
+                    PinsChanged(entry.Key / PinsPerGroup, 1u << (entry.Key % PinsPerGroup));
+                }
+            }
+        }
+
+        // Report what changed about the pins of a group in `mask`: their outputs, and the inputs of pins with an EXTINT line
+        private void PinsChanged(int index, uint mask)
+        {
+            if(mask == 0)
+            {
+                return;
+            }
+            var g = groups[index];
+            var levels = InputLevels(g);
+            for(var pin = 0; pin < PinsPerGroup; pin++)
+            {
+                var bit = 1u << pin;
+                if((mask & bit) == 0)
+                {
+                    continue;
+                }
+                var number = index * PinsPerGroup + pin;
+                if(eic != null && extIntLines[number] >= 0)
+                {
+                    var connected = (g.PinCfg[pin] & PinCfgPmuxEn) != 0 && PmuxOf(g, pin) == FunctionEic;
+                    eic.OnPinLevel(extIntLines[number], (levels & bit) != 0, connected);
+                }
+                var output = ComputeOutput(number);
+                if(!output.Equals(outputs[number]))
+                {
+                    outputs[number] = output;
+                    if(!excluded[number])
+                    {
+                        DuetIoTrace.Record(machine, PinName(number), output.Mode, output.Duty, output.Frequency);
+                    }
+                    OutputChanged?.Invoke(number, output.Mode, output.Duty, output.Frequency);
+                }
+            }
+        }
+
+        private PinOutput ComputeOutput(int number)
+        {
+            var g = groups[number / PinsPerGroup];
+            var pin = number % PinsPerGroup;
+            var bit = 1u << pin;
+            if((g.PinCfg[pin] & PinCfgPmuxEn) != 0)
+            {
+                if(pwmMaps.TryGetValue(number, out var map) && map.Function == PmuxOf(g, pin))
+                {
+                    if(map.Source.TryGetPwm(map.Output, out var duty, out var frequency))
+                    {
+                        return new PinOutput { Mode = DuetPinMode.Pwm, Duty = duty, Frequency = frequency };
+                    }
+                    // A timer output that is not running holds its pin low
+                    return new PinOutput { Mode = DuetPinMode.Low };
+                }
+                return new PinOutput { Mode = DuetPinMode.Peripheral };
+            }
+            if((g.Dir & bit) != 0)
+            {
+                return (g.Out & bit) != 0 ? new PinOutput { Mode = DuetPinMode.High, Duty = 1 } : new PinOutput { Mode = DuetPinMode.Low };
+            }
+            return new PinOutput { Mode = DuetPinMode.Input };
+        }
+
+        private static int PmuxOf(Group g, int pin) => (g.Pmux[pin / 2] >> (4 * (pin & 1))) & 0xF;
+
+        private static string PinName(int number) => $"P{(char)('A' + number / PinsPerGroup)}{number % PinsPerGroup:D2}";
+
         private void SetOut(int index, uint value)
         {
             var g = groups[index];
@@ -304,6 +464,7 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
             {
                 return;
             }
+            PinsChanged(index, changed);
             for(var pin = 0; pin < PinsPerGroup; pin++)
             {
                 var bit = 1u << pin;
@@ -319,7 +480,8 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
             }
         }
 
-        private static void WriteConfiguration(Group g, uint value)
+        // Returns the pins it changed
+        private static uint WriteConfiguration(Group g, uint value)
         {
             var mask = value & 0xFFFF;
             var first = (value & WrConfigHwSel) != 0 ? 16 : 0;
@@ -341,6 +503,7 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
                     g.Pmux[pin / 2] = (pin & 1) != 0 ? (byte)((current & 0x0F) | (pmux << 4)) : (byte)((current & 0xF0) | pmux);
                 }
             }
+            return first == 0 ? mask : mask << 16;
         }
 
         private static bool IsSetClearToggle(long reg) => reg == DirClr || reg == DirSet || reg == DirTgl || reg == OutClr || reg == OutSet || reg == OutTgl;
@@ -352,8 +515,14 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
         }
 
         private readonly IMachine machine;
+        private readonly SAME5x_Eic eic;
         private readonly Group[] groups;
         private readonly ulong[] risingEdges;
+        private readonly PinOutput[] outputs;
+        private readonly bool[] excluded;
+        private readonly int[] extIntLines;
+        private readonly Dictionary<int, PwmMap> pwmMaps = new Dictionary<int, PwmMap>();
+        private readonly HashSet<IDuetPwmSource> subscribedSources = new HashSet<IDuetPwmSource>();
 
         private const int PinsPerGroup = 32;
         private const long GroupSize = 0x80;
@@ -371,11 +540,27 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
         private const long EvCtrl = 0x2C;
         private const long PmuxBase = 0x30;
         private const long PinCfgBase = 0x40;
+        private const byte PinCfgPmuxEn = 0x01;
         private const byte PinCfgPullEn = 0x04;
+        private const int FunctionEic = 0;
         private const byte PinCfgMask = 0x47;        // PMUXEN, INEN, PULLEN, DRVSTR
         private const uint WrConfigWrPmux = 1u << 28;
         private const uint WrConfigWrPinCfg = 1u << 30;
         private const uint WrConfigHwSel = 1u << 31;
+
+        private struct PinOutput
+        {
+            public DuetPinMode Mode;
+            public double Duty;
+            public double Frequency;
+        }
+
+        private class PwmMap
+        {
+            public int Function;
+            public IDuetPwmSource Source;
+            public int Output;
+        }
 
         private class Group
         {

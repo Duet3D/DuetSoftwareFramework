@@ -18,6 +18,22 @@ public sealed record CodeReply(string Text, MessageType Severity)
     public override string ToString() => Severity == MessageType.Success ? Text : $"{Severity}: {Text}";
 }
 
+/// <summary>A code that has been sent and may not have finished</summary>
+/// <param name="Bench">The bench it was sent to</param>
+/// <param name="Code">The code</param>
+/// <param name="Reply">Its reply, which completes when it has finished</param>
+public sealed record PendingCode(Bench Bench, string Code, Task<CodeReply> Reply)
+{
+    /// <summary>Let emulated time pass until the code has finished, and return its reply</summary>
+    /// <exception cref="TimeoutException">It did not finish within <paramref name="timeout"/> of emulated time</exception>
+    public async Task<CodeReply> WaitAsync(TimeSpan? timeout = null, CancellationToken cancellationToken = default)
+    {
+        await Bench.WaitUntilAsync(() => Task.FromResult(Reply.IsCompleted), timeout ?? Bench.DefaultCodeTimeout, $"\"{Code}\" to finish",
+                                   cancellationToken);
+        return await Reply;
+    }
+}
+
 /// <summary>
 /// An emulated machine under test: the boards in Renode and the stack that drives them, with what a
 /// test needs to send codes and observe the result (replies, the object model, the CAN bus and the
@@ -47,8 +63,13 @@ public abstract class Bench : IAsyncDisposable
         Io = new BoardIo(system);
     }
 
+    /// <summary>Send one code without waiting for it to finish</summary>
+    public abstract Task<PendingCode> StartCodeAsync(string code, CancellationToken cancellationToken = default);
+
     /// <summary>Send one code and return its reply once it has finished</summary>
-    public abstract Task<CodeReply> SendCodeAsync(string code, TimeSpan? timeout = null, CancellationToken cancellationToken = default);
+    /// <exception cref="TimeoutException">It did not finish within <paramref name="timeout"/> of emulated time</exception>
+    public async Task<CodeReply> SendCodeAsync(string code, TimeSpan? timeout = null, CancellationToken cancellationToken = default) =>
+        await (await StartCodeAsync(code, cancellationToken)).WaitAsync(timeout, cancellationToken);
 
     /// <summary>The object model at <paramref name="key"/>, or the whole of it for an empty key</summary>
     public abstract Task<JsonNode?> GetObjectModelAsync(string key = "", CancellationToken cancellationToken = default);

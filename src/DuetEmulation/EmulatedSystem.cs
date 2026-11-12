@@ -8,6 +8,7 @@ using DuetEmulation.Boards;
 using DuetEmulation.Can;
 using DuetEmulation.Emulator;
 using DuetEmulation.Storage;
+using DuetEmulation.Traces;
 
 namespace DuetEmulation;
 
@@ -40,6 +41,9 @@ public sealed class EmulatedSystem : IAsyncDisposable
     /// <summary>The frames on the CAN bus</summary>
     public CanTrace Can { get; }
 
+    /// <summary>What the boards' output pins have driven</summary>
+    public IoTrace Io { get; }
+
     /// <summary>Where the run's logs, traces and images are</summary>
     public string WorkDirectory { get; }
 
@@ -52,6 +56,7 @@ public sealed class EmulatedSystem : IAsyncDisposable
         _boards = boards;
         WorkDirectory = workDirectory;
         Can = new CanTrace(Path.Combine(workDirectory, "can.jsonl"));
+        Io = new IoTrace(Path.Combine(workDirectory, "io.jsonl"), boards);
     }
 
     /// <summary>Create the machines and load their firmware, without running them</summary>
@@ -111,6 +116,7 @@ public sealed class EmulatedSystem : IAsyncDisposable
         string models = PeripheralModels.Combine(_boards.SelectMany(b => b.Type.Models));
         await Renode.ExecuteAsync($"include {MonitorSyntax.PathArgument(models)}", cancellationToken: cancellationToken);
 
+        await Renode.ExecuteAsync($"emulation LogIoToFile {MonitorSyntax.Quote(Io.Path)}", cancellationToken: cancellationToken);
         await Renode.ExecuteAsync($"emulation CreateCANHub {MonitorSyntax.Quote(CanHub)}", cancellationToken: cancellationToken);
         await Renode.ExecuteAsync($"{CanHub} LogFramesToFile {MonitorSyntax.Quote(Can.Path)}", cancellationToken: cancellationToken);
         await Renode.ExecuteAsync($"emulation SetGlobalQuantum {MonitorSyntax.Seconds(options.Quantum)}", cancellationToken: cancellationToken);
@@ -139,6 +145,10 @@ public sealed class EmulatedSystem : IAsyncDisposable
         }
         string platform = Path.Combine(RepositoryPaths.Renode, "Platforms", board.Type.Platform);
         await ExecuteAsync(board, $"machine LoadPlatformDescription {MonitorSyntax.PathArgument(platform)}", cancellationToken);
+        foreach (string command in PinWiring.Commands(board.Type))
+        {
+            await ExecuteAsync(board, command, cancellationToken);
+        }
 
         for (int bit = 0; bit < board.Type.AddressSwitches.Count; bit++)
         {

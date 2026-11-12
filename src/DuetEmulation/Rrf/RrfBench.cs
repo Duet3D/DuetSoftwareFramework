@@ -88,8 +88,11 @@ public sealed class RrfBench : Bench
     }
 
     /// <inheritdoc/>
-    public override async Task<CodeReply> SendCodeAsync(string code, TimeSpan? timeout = null, CancellationToken cancellationToken = default) =>
-        ParseReply(await _console.CommandAsync(code, timeout ?? DefaultCodeTimeout, cancellationToken));
+    public override async Task<PendingCode> StartCodeAsync(string code, CancellationToken cancellationToken = default)
+    {
+        Task<string> reply = await _console.SendAsync(code, cancellationToken);
+        return new PendingCode(this, code, reply.ContinueWith(r => ParseReply(r.Result), TaskContinuationOptions.ExecuteSynchronously));
+    }
 
     /// <summary>A console reply as text and severity: RepRapFirmware prefixes errors and warnings with their severity</summary>
     public static CodeReply ParseReply(string reply)
@@ -139,6 +142,9 @@ public sealed class RrfBench : Bench
     }
 
     /// <inheritdoc/>
-    public override Task WaitAsync(TimeSpan time, CancellationToken cancellationToken = default) =>
-        System.RunForAsync(time, cancellationToken);
+    public override async Task WaitAsync(TimeSpan time, CancellationToken cancellationToken = default)
+    {
+        await System.RunForAsync(time, cancellationToken);
+        _console.Poll();
+    }
 }

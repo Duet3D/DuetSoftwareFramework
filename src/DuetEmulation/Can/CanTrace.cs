@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Threading;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
+using DuetEmulation.Traces;
 
 namespace DuetEmulation.Can;
 
@@ -23,12 +24,12 @@ namespace DuetEmulation.Can;
 public sealed class CanTrace(string path)
 {
     private readonly Lock _lock = new();
+    private readonly JsonLinesFile _file = new(path);
     private readonly List<CanFrame> _frames = [];
-    private long _offset;
     private int _mark;
 
     /// <summary>The file the bus logger writes</summary>
-    public string Path { get; } = path;
+    public string Path => _file.Path;
 
     /// <summary>Every frame recorded so far</summary>
     public IReadOnlyList<CanFrame> All
@@ -103,23 +104,7 @@ public sealed class CanTrace(string path)
 
     private void Update()
     {
-        if (!File.Exists(Path))
-        {
-            return;
-        }
-
-        byte[] data;
-        using (FileStream stream = new(Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-        {
-            stream.Seek(_offset, SeekOrigin.Begin);
-            data = new byte[stream.Length - _offset];
-            stream.ReadExactly(data);
-        }
-
-        // The logger may be part way through a line; that one is read next time
-        int complete = Array.LastIndexOf(data, (byte)'\n') + 1;
-        _offset += complete;
-        foreach (string line in Encoding.UTF8.GetString(data, 0, complete).Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        foreach (string line in _file.ReadNewLines())
         {
             _frames.Add(Parse(line));
         }

@@ -15,7 +15,9 @@ namespace DuetEmulation.Boards;
 /// <param name="AdcInput">Its ADC input as the firmware names it (<c>adc1_9</c>), or null</param>
 /// <param name="TimerOutput">Its timer output as the firmware names it (<c>tc0_1</c>, <c>tioa6</c>), or null</param>
 /// <param name="PwmOutput">Its PWM output as the firmware names it (<c>tcc1_2F</c>, <c>pwm0h3_b</c>), or null</param>
-public sealed record PinTableEntry(McuPin Pin, IReadOnlyList<string> Names, string? AdcInput, string? TimerOutput, string? PwmOutput);
+/// <param name="ExternalInterrupt">Its EXTINT line, for an MCU whose table gives one, or null</param>
+public sealed record PinTableEntry(McuPin Pin, IReadOnlyList<string> Names, string? AdcInput, string? TimerOutput, string? PwmOutput,
+                                   int? ExternalInterrupt);
 
 /// <summary>
 /// A board's pin table, read from its firmware's configuration header, so that the bench addresses pins
@@ -58,13 +60,17 @@ public sealed partial class PinTable
                 continue;
             }
             McuPin pin = McuPin.Parse(row.Groups["pin"].Value);
-            string[] columns = row.Groups["columns"].Value.Split(',').Select(c => c.Trim()).ToArray();
+            // The names are last and may hold commas, so the other columns are split without them
+            string text = row.Groups["columns"].Value;
+            Match names = NamesPattern().Match(text);
+            string[] columns = (names.Success ? text[..names.Index] : text).Split(',').Select(c => c.Trim()).Where(c => c.Length > 0).ToArray();
             entries.Add(new PinTableEntry(
                 pin,
-                ParseNames(row.Groups["columns"].Value),
+                names.Success ? [.. names.Groups[1].Value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)] : [],
                 EnumValue(columns, "AdcInput"),
                 EnumValue(columns, "TcOutput"),
-                EnumValue(columns, "TccOutput") ?? EnumValue(columns, "PwmOutput")));
+                EnumValue(columns, "TccOutput") ?? EnumValue(columns, "PwmOutput"),
+                ExternalInterrupt(columns, names.Success)));
         }
         if (entries.Count == 0)
         {
@@ -85,12 +91,12 @@ public sealed partial class PinTable
     /// <summary>The row of a pin, if it is in the table</summary>
     public PinTableEntry? Find(McuPin pin) => Entries.FirstOrDefault(e => e.Pin == pin);
 
-    private static List<string> ParseNames(string columns)
+    // Duet3Expansion's tables give the EXTINT line just before the names, as a number or Nx for none
+    private static int? ExternalInterrupt(string[] columns, bool namesRemoved)
     {
-        Match names = NamesPattern().Match(columns);
-        return names.Success
-            ? [.. names.Groups[1].Value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)]
-            : [];
+        // Without a names string the last column is nullptr or a name macro, and the line is before it
+        int index = namesRemoved ? columns.Length - 1 : columns.Length - 2;
+        return index >= 0 && int.TryParse(columns[index], out int line) ? line : null;
     }
 
     private static string? EnumValue(string[] columns, string type)
@@ -104,6 +110,6 @@ public sealed partial class PinTable
     [GeneratedRegex(@"^\s*\{(?<columns>[^{}]*)\}\s*,?\s*//\s*(?<pin>P[A-H]\d{1,2})\b")]
     private static partial Regex RowPattern();
 
-    [GeneratedRegex("\"([^\"]*)\"")]
+    [GeneratedRegex("\"([^\"]*)\"\\s*$")]
     private static partial Regex NamesPattern();
 }

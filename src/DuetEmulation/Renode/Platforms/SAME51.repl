@@ -71,10 +71,10 @@ supc: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x40001800
     size: 0x400
     forceSet: "0x08:0x505,0x0C:0x505"
 
-// CTRLA.SWRST self-clears and SYNCBUSY (0x04) is never busy
-gclk: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x40001C00
-    size: 0x400
-    forceClear: "0x00:0x1,0x04:0xFFFFFFFF"
+// Generic clocks. CoreN2G (SAME5x/Startup.cpp) runs the DFLL at 48MHz, DPLL0 at 120MHz and DPLL1 at
+// 96MHz; the generators and the peripheral channels they feed are whatever the firmware writes.
+gclk: Miscellaneous.SAME5x_Gclk @ sysbus 0x40001C00
+    sources: "6:48000000,7:120000000,8:96000000"
 
 // SYNCBUSY (0x08)
 wdt: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x40002000
@@ -86,10 +86,9 @@ rtc: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x40002400
     size: 0x400
     forceClear: "0x00:0x1,0x10:0xFFFFFFFF"
 
-// CTRLA.SWRST and SYNCBUSY (0x04)
-eic: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x40002800
-    size: 0x400
-    forceClear: "0x00:0x1,0x04:0xFFFFFFFF"
+// External interrupts: one NVIC vector per EXTINT line (EIC_0_IRQn = 12)
+eic: Miscellaneous.SAME5x_Eic @ sysbus 0x40002800
+    [0-15] -> nvic@[12-27]
 
 // Frequency meter. The bootloader and CoreN2G's startup use it to tell a 12MHz crystal from a 25MHz one,
 // counting crystal cycles over 240 cycles of the 48MHz oscillator: VALUE (0x10) = 125 is a 25MHz
@@ -118,6 +117,7 @@ cmcc: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x41006000
 
 port: GPIOPort.SAME5x_Port @ sysbus 0x41008000
     groups: 4
+    eic: eic
 
 // DMA controller and its CRC unit, which the bootloader uses to check the firmware's CRC
 dmac: DMA.SAME5x_Dmac @ sysbus 0x4100A000
@@ -164,40 +164,62 @@ sercom7: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x43000C00
     forceSet: "0x18:0x3"
     forceClear: "0x00:0x1,0x1C:0xFFFFFFFF"
 
-// Timer/counters. All are clocked from the 48MHz GCLK in Duet3Expansion.
+// Timer/counters, each clocked by its GCLK channel (TCn_GCLK_ID)
 tc0: Timers.SAME5x_TimerCounter @ sysbus 0x40003800
+    gclk: gclk
+    gclkChannel: 9
     IRQ -> nvic@107
 tc1: Timers.SAME5x_TimerCounter @ sysbus 0x40003C00
+    gclk: gclk
+    gclkChannel: 9
     IRQ -> nvic@108
 tc2: Timers.SAME5x_TimerCounter @ sysbus 0x4101A000
+    gclk: gclk
+    gclkChannel: 26
     IRQ -> nvic@109
 tc3: Timers.SAME5x_TimerCounter @ sysbus 0x4101C000
+    gclk: gclk
+    gclkChannel: 26
     IRQ -> nvic@110
 tc4: Timers.SAME5x_TimerCounter @ sysbus 0x42001400
+    gclk: gclk
+    gclkChannel: 30
     IRQ -> nvic@111
 tc5: Timers.SAME5x_TimerCounter @ sysbus 0x42001800
+    gclk: gclk
+    gclkChannel: 30
     IRQ -> nvic@112
 tc6: Timers.SAME5x_TimerCounter @ sysbus 0x43001400
+    gclk: gclk
+    gclkChannel: 39
     IRQ -> nvic@113
 tc7: Timers.SAME5x_TimerCounter @ sysbus 0x43001800
+    gclk: gclk
+    gclkChannel: 39
     IRQ -> nvic@114
 
-// TCCs (PWM outputs): CTRLA.SWRST and SYNCBUSY (0x08)
-tcc0: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x41016000
-    size: 0x400
-    forceClear: "0x00:0x1,0x08:0xFFFFFFFF"
-tcc1: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x41018000
-    size: 0x400
-    forceClear: "0x00:0x1,0x08:0xFFFFFFFF"
-tcc2: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x42000C00
-    size: 0x400
-    forceClear: "0x00:0x1,0x08:0xFFFFFFFF"
-tcc3: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x42001000
-    size: 0x400
-    forceClear: "0x00:0x1,0x08:0xFFFFFFFF"
-tcc4: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x43001000
-    size: 0x400
-    forceClear: "0x00:0x1,0x08:0xFFFFFFFF"
+// TCCs: PWM outputs (SAME5x_Tcc), each clocked by its GCLK channel (TCCn_GCLK_ID). The number of
+// compare channels differs between them.
+tcc0: Timers.SAME5x_Tcc @ sysbus 0x41016000
+    channels: 6
+    gclk: gclk
+    gclkChannel: 25
+tcc1: Timers.SAME5x_Tcc @ sysbus 0x41018000
+    channels: 4
+    gclk: gclk
+    gclkChannel: 25
+tcc2: Timers.SAME5x_Tcc @ sysbus 0x42000C00
+    channels: 3
+    gclk: gclk
+    gclkChannel: 29
+tcc3: Timers.SAME5x_Tcc @ sysbus 0x42001000
+    channels: 2
+    gclk: gclk
+    gclkChannel: 29
+tcc4: Timers.SAME5x_Tcc @ sysbus 0x43001000
+    channels: 2
+    gclk: gclk
+    gclkChannel: 38
 
 // ADCs. The board's file says what its inputs read (channels). Both have the MCU's temperature sensors: PTAT
 // (0x1C) and CTAT (0x1D) read 600 and 800 of 4095, which with the calibration words below is 25C.

@@ -6,28 +6,38 @@
 // on CC0 (the step interrupt) and CC1 (the software timers), which raise MC0/MC1. The counter is read
 // with the READSYNC command, which the model completes at once.
 //
-// The other TCs are only configured as PWM outputs, which nothing here observes; their registers are
-// stored so that what is written reads back.
+// The other TCs are PWM outputs in COUNT16 mode (CoreN2G AnalogOut.cpp, AnalogWriteTc): NPWM, whose
+// top is the counter's maximum, or MPWM, whose top is CC0. The duty and frequency of each output, from
+// CCx, the top, the prescaler and the GCLK frequency, are what the GPIO model reads for a pin muxed to
+// the output. Buffered writes (CCBUF) take effect at once rather than at the next update: the
+// difference is at most one PWM period.
+//
+// The counter is clocked by its GCLK channel, at the frequency the GCLK model reports for it.
 //
 //     tc6: Timers.SAME5x_TimerCounter @ sysbus 0x43001400
-//         frequency: 48000000
+//         gclk: gclk
+//         gclkChannel: 39
 //         IRQ -> nvic@113
 //
 using System;
 using System.Collections.Generic;
 
 using Antmicro.Renode.Core;
+using Antmicro.Renode.Duet;
 using Antmicro.Renode.Logging;
 using Antmicro.Renode.Peripherals.Bus;
+using Antmicro.Renode.Peripherals.Miscellaneous;
 using Antmicro.Renode.Time;
 
 namespace Antmicro.Renode.Peripherals.Timers
 {
-    public class SAME5x_TimerCounter : IBytePeripheral, IWordPeripheral, IDoubleWordPeripheral, IKnownSize
+    public class SAME5x_TimerCounter : IBytePeripheral, IWordPeripheral, IDoubleWordPeripheral, IKnownSize, IDuetPwmSource
     {
-        public SAME5x_TimerCounter(IMachine machine, ulong frequency = 48000000)
+        public SAME5x_TimerCounter(IMachine machine, SAME5x_Gclk gclk = null, int gclkChannel = -1, ulong frequency = 48000000)
         {
-            inputFrequency = frequency;
+            this.gclk = gclk;
+            this.gclkChannel = gclkChannel;
+            defaultFrequency = frequency;
             IRQ = new GPIO();
             counter = new LimitTimer(machine.ClockSource, frequency, this, "count", Max32, Direction.Ascending, false, WorkMode.Periodic, true, true);
             counter.LimitReached += () => SetFlags(IntOvf);
@@ -54,6 +64,28 @@ namespace Antmicro.Renode.Peripherals.Timers
             intEnable = 0;
             intFlags = 0;
             UpdateInterrupt();
+            PwmChanged?.Invoke();
+        }
+
+        public event Action PwmChanged;
+
+        public bool TryGetPwm(int output, out double duty, out double frequency)
+        {
+            duty = 0;
+            frequency = 0;
+            var waveGen = storage[Wave] & WaveGenMask;
+            if(!Enabled || output < 0 || output >= NumCompares || (waveGen != WaveGenNpwm && waveGen != WaveGenMpwm))
+            {
+                return false;
+            }
+            if(waveGen == WaveGenMpwm && output == 0)
+            {
+                return false;           // CC0 is the top, not an output
+            }
+            var top = (waveGen == WaveGenMpwm ? cc[0] : CountMax) + 1;
+            duty = Math.Min(1.0, cc[output] / (double)top);
+            frequency = InputFrequency / (double)prescalerValue / top;
+            return true;
         }
 
         public byte ReadByte(long offset) => (byte)Read(offset, 1);
@@ -152,16 +184,27 @@ namespace Antmicro.Renode.Peripherals.Timers
             {
                 SetCount(StoredValue(CountOffset, CountBytes));
             }
+            var pwmChanged = (offset <= CtrlA && end > CtrlA) || (offset <= Wave && end > Wave);
             for(var channel = 0; channel < NumCompares; channel++)
             {
+                var buffer = CompareBufferOffset(channel);
+                if(offset < buffer + CountBytes && end > buffer)
+                {
+                    Array.Copy(storage, buffer, storage, CompareOffset(channel), CountBytes);
+                }
                 var start = CompareOffset(channel);
-                if(offset < start + CountBytes && end > start)
+                if((offset < start + CountBytes && end > start) || (offset < buffer + CountBytes && end > buffer))
                 {
                     cc[channel] = StoredValue(start, CountBytes) & CountMax;
                     ArmCompare(channel);
+                    pwmChanged = true;
                 }
             }
             UpdateInterrupt();
+            if(pwmChanged)
+            {
+                PwmChanged?.Invoke();
+            }
         }
 
         private void WriteCtrlA()
@@ -175,11 +218,13 @@ namespace Antmicro.Renode.Peripherals.Timers
             var mode = (ctrla >> 2) & 3;
             var prescaler = Prescalers[(ctrla >> 8) & 7];
             var enable = (ctrla & CtrlAEnable) != 0;
-            if(mode != modeValue || prescaler != prescalerValue)
+            var input = InputFrequency;
+            if(mode != modeValue || prescaler != prescalerValue || input != clockedAt)
             {
                 modeValue = mode;
                 prescalerValue = prescaler;
-                var frequency = inputFrequency / prescaler;
+                clockedAt = input;
+                var frequency = input / prescaler;
                 counter.Frequency = frequency;
                 counter.Limit = CountMax;
                 foreach(var compare in compares)
@@ -286,13 +331,28 @@ namespace Antmicro.Renode.Peripherals.Timers
 
         private long CompareOffset(int channel) => CcOffset + channel * CountBytes;
 
+        private long CompareBufferOffset(int channel) => CcBufOffset + channel * CountBytes;
+
         private bool Enabled => (storage[CtrlA] & CtrlAEnable) != 0;
 
         // COUNT and CCx are 8, 16 or 32 bits wide according to CTRLA.MODE
         private int CountBytes => modeValue == ModeCount32 ? 4 : modeValue == ModeCount8 ? 1 : 2;
         private ulong CountMax => modeValue == ModeCount32 ? Max32 : modeValue == ModeCount8 ? 0xFFUL : 0xFFFFUL;
 
-        private readonly ulong inputFrequency;
+        // The GCLK channel's frequency, or the platform's when there is no GCLK model
+        private ulong InputFrequency
+        {
+            get
+            {
+                var frequency = gclk != null && gclkChannel >= 0 ? gclk.ChannelFrequency(gclkChannel) : 0;
+                return frequency != 0 ? frequency : defaultFrequency;
+            }
+        }
+
+        private readonly SAME5x_Gclk gclk;
+        private readonly int gclkChannel;
+        private readonly ulong defaultFrequency;
+        private ulong clockedAt;
         private readonly LimitTimer counter;
         private readonly LimitTimer[] compares;
         private readonly byte[] storage = new byte[0x40];
@@ -317,6 +377,11 @@ namespace Antmicro.Renode.Peripherals.Timers
         private const long SyncBusy = 0x10;
         private const long CountOffset = 0x14;
         private const long CcOffset = 0x1C;
+        private const long CcBufOffset = 0x30;
+        private const long Wave = 0x0C;
+        private const byte WaveGenMask = 0x3;
+        private const byte WaveGenNpwm = 2;
+        private const byte WaveGenMpwm = 3;
         private const uint CtrlASwRst = 0x1;
         private const uint CtrlAEnable = 0x2;
         private const byte CtrlBCmdMask = 0xE0;

@@ -8,7 +8,7 @@ namespace DuetEmulation.Boards;
 /// <summary>The boards the bench can emulate</summary>
 public static class BoardTypes
 {
-    private static readonly string[] CommonModels = ["Common/CanBusLogger.cs", "Common/DuetMCAN.cs"];
+    private static readonly string[] CommonModels = ["Common/CanBusLogger.cs", "Common/DuetMCAN.cs", "Common/DuetIoTrace.cs", "Common/DuetThermalModel.cs"];
 
     private static readonly string[] Same70Models =
     [
@@ -18,8 +18,8 @@ public static class BoardTypes
 
     private static readonly string[] Same5xModels =
     [
-        "SAME5x/SAME5x_RegisterFile.cs", "SAME5x/SAME5x_Port.cs", "SAME5x/SAME5x_TimerCounter.cs",
-        "SAME5x/SAME5x_Dmac.cs", "SAME5x/SAME5x_Adc.cs"
+        "SAME5x/SAME5x_RegisterFile.cs", "SAME5x/SAME5x_Gclk.cs", "SAME5x/SAME5x_Port.cs", "SAME5x/SAME5x_Eic.cs", "SAME5x/SAME5x_TimerCounter.cs",
+        "SAME5x/SAME5x_Tcc.cs", "SAME5x/SAME5x_Dmac.cs", "SAME5x/SAME5x_Adc.cs"
     ];
 
     private static string Same5xSvd(string part) =>
