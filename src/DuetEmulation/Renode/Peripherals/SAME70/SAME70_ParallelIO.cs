@@ -158,6 +158,20 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
         // Current output state, for tests that want to sample rather than parse the log.
         public uint OutputState => outputData;
 
+        // Drive an input pin to a level from outside the chip, as a switch or another chip would
+        public void Drive(int pin, bool level)
+        {
+            var bit = 1u << pin;
+            DrivenInputs |= bit;
+            DrivenLevels = level ? DrivenLevels | bit : DrivenLevels & ~bit;
+        }
+
+        // Stop driving a pin, leaving it to its pull-up
+        public void Release(int pin)
+        {
+            DrivenInputs &= ~(1u << pin);
+        }
+
         // Rising edges of each pin while it was an output: the step pulses a driver received
         public ulong RisingEdges(int pin) => risingEdges[pin];
 

@@ -7,30 +7,31 @@ using DuetControlServer.Link.Protocol.Shared;
 using DuetEmulation;
 using DuetEmulation.Boards;
 using DuetEmulation.Can;
-using DuetEmulation.Rrf;
 using NUnit.Framework;
 
-namespace EmulationTests.Rrf;
+namespace EmulationTests.Scenarios;
 
 /// <summary>
 /// Two EXP3HCs on one bus at addresses set by their switches. Each must be enumerated, configured and
 /// moved on its own, with the traffic for one board going only to that board
 /// </summary>
-[TestFixture]
+[TestFixture(Stack.Rrf)]
+[TestFixture(Stack.Dsf)]
 [Category("Emulation")]
-public class MultipleExpansionBoardTests
+public class MultipleExpansionBoardTests(Stack stack)
 {
     private const int First = 2;
     private const int Second = 5;
     private const int StepsPerMm = 80;
 
-    private RrfBench _bench = null!;
+    private Bench _bench = null!;
 
     [OneTimeSetUp]
     public async Task StartAsync() =>
-        _bench = await RrfBench.StartAsync(
+        _bench = await Bench.StartAsync(
+            stack,
             new Dictionary<int, BoardType> { [First] = BoardTypes.Exp3hc, [Second] = BoardTypes.Exp3hc },
-            $"M564 H0 S0\nM584 X{First}.0 Y{Second}.0 Z0.2\nM92 X{StepsPerMm} Y{StepsPerMm} Z400\n",
+            $"M564 H0 S0\nM584 X{First}.0 Y{Second}.0 Z{First}.2\nM92 X{StepsPerMm} Y{StepsPerMm} Z400\n",
             Runs.Directory(this));
 
     [OneTimeTearDown]

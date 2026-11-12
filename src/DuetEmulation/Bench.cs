@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading;
@@ -14,8 +15,47 @@ namespace DuetEmulation;
 /// <param name="Severity">Whether it is a success, a warning or an error</param>
 public sealed record CodeReply(string Text, MessageType Severity)
 {
+    /// <summary>
+    /// A reply as text and severity: RepRapFirmware and DuetControlServer prefix each error and warning
+    /// line with its severity
+    /// </summary>
+    public static CodeReply Parse(string reply)
+    {
+        const string errorPrefix = "Error: ";
+        const string warningPrefix = "Warning: ";
+        string[] lines = [.. reply.Split('\n').Select(l => l.TrimEnd('\r'))];
+        MessageType severity = MessageType.Success;
+        for (int i = 0; i < lines.Length; i++)
+        {
+            if (lines[i].StartsWith(errorPrefix, StringComparison.Ordinal))
+            {
+                lines[i] = lines[i][errorPrefix.Length..];
+                severity = MessageType.Error;
+            }
+            else if (lines[i].StartsWith(warningPrefix, StringComparison.Ordinal))
+            {
+                lines[i] = lines[i][warningPrefix.Length..];
+                if (severity == MessageType.Success)
+                {
+                    severity = MessageType.Warning;
+                }
+            }
+        }
+        return new CodeReply(string.Join('\n', lines).Trim(), severity);
+    }
+
     /// <inheritdoc/>
     public override string ToString() => Severity == MessageType.Success ? Text : $"{Severity}: {Text}";
+}
+
+/// <summary>The software that drives the boards</summary>
+public enum Stack
+{
+    /// <summary>RepRapFirmware on the main board, standalone</summary>
+    Rrf,
+
+    /// <summary>DuetCANMaster on the main board, driven by DuetControlServer</summary>
+    Dsf
 }
 
 /// <summary>A code that has been sent and may not have finished</summary>
@@ -62,6 +102,25 @@ public abstract class Bench : IAsyncDisposable
         System = system;
         Io = new BoardIo(system);
     }
+
+    /// <summary>
+    /// Create the boards with <paramref name="config"/> as config.g (after whatever line the stack needs
+    /// first), start the stack, and boot them
+    /// </summary>
+    /// <param name="stack">The software that drives the boards</param>
+    /// <param name="expansionBoards">The expansion boards, by CAN address</param>
+    /// <param name="config">config.g, less the stack's own first line</param>
+    /// <param name="workDirectory">Where the run's files go</param>
+    /// <param name="files">Further files for the SD card, by path on the card</param>
+    /// <param name="cancellationToken">Cancels starting</param>
+    public static async Task<Bench> StartAsync(Stack stack, IReadOnlyDictionary<int, BoardType> expansionBoards, string config, string workDirectory,
+                                               IReadOnlyDictionary<string, string>? files = null, CancellationToken cancellationToken = default) =>
+        stack switch
+        {
+            Stack.Rrf => await Rrf.RrfBench.StartAsync(expansionBoards, config, workDirectory, files, cancellationToken),
+            Stack.Dsf => await Dsf.DsfBench.StartAsync(expansionBoards, config, workDirectory, files, cancellationToken),
+            _ => throw new ArgumentOutOfRangeException(nameof(stack))
+        };
 
     /// <summary>Send one code without waiting for it to finish</summary>
     public abstract Task<PendingCode> StartCodeAsync(string code, CancellationToken cancellationToken = default);

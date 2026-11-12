@@ -130,6 +130,15 @@ public sealed class EmulatedSystem : IAsyncDisposable
 
         // Warnings include every access to a register that nothing models, which is what to model next
         await Renode.ExecuteAsync("logLevel 2", cancellationToken: cancellationToken);
+        foreach (string entry in options.DebugLog)
+        {
+            string[] parts = entry.Split('/', 2);
+            if (parts.Length != 2)
+            {
+                throw new ArgumentException($"\"{entry}\" is not machine/peripheral, such as main/spi1", nameof(options));
+            }
+            await Renode.ExecuteAsync($"logLevel 0 {parts[1]}", parts[0], cancellationToken);
+        }
     }
 
     private async Task CreateMachineAsync(EmulatedBoard board, SystemOptions options, CancellationToken cancellationToken)

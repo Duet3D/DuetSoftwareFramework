@@ -5,27 +5,28 @@ using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
 using DuetEmulation;
 using DuetEmulation.Boards;
-using DuetEmulation.Rrf;
 using DuetEmulation.Traces;
 using NUnit.Framework;
 
-namespace EmulationTests.Rrf;
+namespace EmulationTests.Scenarios;
 
 /// <summary>
 /// An expansion board's pins as the bench sees them: the outputs its firmware drives, digital or PWM,
 /// and the inputs the bench drives, read by polling or through the EIC
 /// </summary>
-[TestFixture]
+[TestFixture(Stack.Rrf)]
+[TestFixture(Stack.Dsf)]
 [Category("Emulation")]
-public class BoardIoTests
+public class BoardIoTests(Stack stack)
 {
     private const int Address = 1;
 
-    private RrfBench _bench = null!;
+    private Bench _bench = null!;
 
     [OneTimeSetUp]
     public async Task StartAsync() =>
-        _bench = await RrfBench.StartAsync(
+        _bench = await Bench.StartAsync(
+            stack,
             new Dictionary<int, BoardType> { [Address] = BoardTypes.Exp3hc },
             $"M564 H0 S0\nM584 X{Address}.0 Y{Address}.1 Z{Address}.2\nM92 X80 Y80 Z80\n",
             Runs.Directory(this));
@@ -93,6 +94,7 @@ public class BoardIoTests
     [Test]
     public async Task AGpioInputFollowsWhatDrivesIt()
     {
+        KnownGap.On(stack, Stack.Dsf, "M950 J is not ported to DuetControlServer yet");
         await AssertSuccessAsync($"M950 J1 C\"{Address}.io1.in\"");
 
         await _bench.Io.DriveAsync(Address, "io1.in", true);

@@ -87,37 +87,13 @@ public sealed class RrfBench : Bench
         }
     }
 
+    private static async Task<CodeReply> ParseAsync(Task<string> reply) => CodeReply.Parse(await reply);
+
     /// <inheritdoc/>
     public override async Task<PendingCode> StartCodeAsync(string code, CancellationToken cancellationToken = default)
     {
         Task<string> reply = await _console.SendAsync(code, cancellationToken);
-        return new PendingCode(this, code, reply.ContinueWith(r => ParseReply(r.Result), TaskContinuationOptions.ExecuteSynchronously));
-    }
-
-    /// <summary>A console reply as text and severity: RepRapFirmware prefixes errors and warnings with their severity</summary>
-    public static CodeReply ParseReply(string reply)
-    {
-        const string errorPrefix = "Error: ";
-        const string warningPrefix = "Warning: ";
-        string[] lines = reply.Split('\n').Select(l => l.TrimEnd('\r')).ToArray();
-        MessageType severity = MessageType.Success;
-        for (int i = 0; i < lines.Length; i++)
-        {
-            if (lines[i].StartsWith(errorPrefix, StringComparison.Ordinal))
-            {
-                lines[i] = lines[i][errorPrefix.Length..];
-                severity = MessageType.Error;
-            }
-            else if (lines[i].StartsWith(warningPrefix, StringComparison.Ordinal))
-            {
-                lines[i] = lines[i][warningPrefix.Length..];
-                if (severity == MessageType.Success)
-                {
-                    severity = MessageType.Warning;
-                }
-            }
-        }
-        return new CodeReply(string.Join('\n', lines).Trim(), severity);
+        return new PendingCode(this, code, ParseAsync(reply));
     }
 
     /// <inheritdoc/>

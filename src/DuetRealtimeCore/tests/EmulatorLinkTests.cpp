@@ -1,9 +1,11 @@
 // The emulator link: the SBC's SPI bus and input lines carried over a socket to an emulated
 // controller (Hardware/Emulator). The peer here plays the emulator's side of EmulatorLinkFormats.h,
-// as the Renode SbcPortBridge does, so these check the frames and the edge bookkeeping SpiTransfer
-// relies on without an emulator.
+// as the SBC link of the Renode SPI model does, so these check the frames, the edge bookkeeping
+// SpiTransfer relies on and the emulated time base without an emulator.
 
+#include <Hardware/Emulator/EmulatedTimeBase.h>
 #include <Hardware/Emulator/EmulatorLink.h>
+#include <Motion/StepTimer.h>
 
 #include <TestSupport.h>
 
@@ -17,6 +19,7 @@
 #include <string>
 #include <system_error>
 #include <thread>
+#include <utility>
 #include <vector>
 
 using namespace Duet::Sbc::Emulator;
@@ -73,9 +76,12 @@ namespace
 			}
 		}
 
+		// The emulated time the fake stamps its frames with
+		uint64_t emulatedTimeNs = 0;
+
 		void SendLine(Line line, bool level)
 		{
-			const FrameHeader header{static_cast<uint8_t>(FrameType::LineLevel), {}, sizeof(LineLevelPayload)};
+			const FrameHeader header{static_cast<uint8_t>(FrameType::LineLevel), 0, 0, sizeof(LineLevelPayload), emulatedTimeNs};
 			const LineLevelPayload payload{static_cast<uint8_t>(line), static_cast<uint8_t>(level ? 1 : 0)};
 			Send(&header, sizeof(header));
 			Send(&payload, sizeof(payload));
@@ -93,10 +99,33 @@ namespace
 			{
 				b = static_cast<uint8_t>(~b);
 			}
-			const FrameHeader replyHeader{static_cast<uint8_t>(FrameType::ExchangeResult), {}, header.length};
+			const FrameHeader replyHeader{static_cast<uint8_t>(FrameType::ExchangeResult), 0, header.sequence, header.length, emulatedTimeNs};
 			Send(&replyHeader, sizeof(replyHeader));
 			Send(reply.data(), reply.size());
 			return data;
+		}
+
+		// Take one exchange without answering it
+		std::pair<FrameHeader, std::vector<uint8_t>> ReceiveExchange()
+		{
+			FrameHeader header{};
+			Receive(&header, sizeof(header));
+			std::vector<uint8_t> data(header.length);
+			Receive(data.data(), data.size());
+			return {header, data};
+		}
+
+		void SendResult(uint16_t sequence, const std::vector<uint8_t>& data)
+		{
+			const FrameHeader header{static_cast<uint8_t>(FrameType::ExchangeResult), 0, sequence, static_cast<uint32_t>(data.size()), emulatedTimeNs};
+			Send(&header, sizeof(header));
+			Send(data.data(), data.size());
+		}
+
+		void SendTime()
+		{
+			const FrameHeader header{static_cast<uint8_t>(FrameType::Time), 0, 0, 0, emulatedTimeNs};
+			Send(&header, sizeof(header));
 		}
 
 	  private:
@@ -235,6 +264,82 @@ namespace
 		CHECK(threw, "an unanswered exchange times out");
 	}
 
+	void ALateResultIsNotTakenForTheNextExchange()
+	{
+		const std::string path = SocketPath("late-result");
+		FakeEmulator emulator(path);
+		std::thread accept([&] { emulator.Accept(); });
+		auto link = std::make_shared<EmulatorLink>(path, connectTimeoutMs, 100);
+		accept.join();
+		EmulatedSpiBus bus(link);
+
+		const std::vector<uint8_t> tx{1, 2};
+		std::vector<uint8_t> rx(tx.size());
+		std::pair<FrameHeader, std::vector<uint8_t>> first;
+		std::thread peer([&] { first = emulator.ReceiveExchange(); });
+		bool timedOut = false;
+		try
+		{
+			bus.TransferFullDuplex(tx.data(), rx.data(), tx.size());
+		}
+		catch (const std::system_error&)
+		{
+			timedOut = true;
+		}
+		peer.join();
+		CHECK(timedOut, "the first exchange times out");
+
+		std::thread answer(
+			[&]
+			{
+				// The first exchange's result arrives late, then the second's
+				emulator.SendResult(first.first.sequence, {0xEE, 0xEE});
+				const auto second = emulator.ReceiveExchange();
+				emulator.SendResult(second.first.sequence, {0x55, 0xAA});
+			});
+		bus.TransferFullDuplex(tx.data(), rx.data(), tx.size());
+		answer.join();
+		CHECK(rx == (std::vector<uint8_t>{0x55, 0xAA}), "the second exchange gets its own result, not the late one");
+	}
+
+	void TheStepTimerFollowsEmulatedTime()
+	{
+		const std::string path = SocketPath("time");
+		FakeEmulator emulator(path);
+		std::thread accept([&] { emulator.Accept(); });
+		auto link = std::make_shared<EmulatorLink>(path, connectTimeoutMs, exchangeTimeoutMs);
+		accept.join();
+
+		constexpr int64_t emulatedNs = 5000000000;
+		emulator.emulatedTimeNs = emulatedNs;
+		emulator.SendTime();
+		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+		while (::StepTimer::GetLocalTimeNs() < emulatedNs && std::chrono::steady_clock::now() < deadline)
+		{
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+		const int64_t local = ::StepTimer::GetLocalTimeNs();
+		CHECK(local >= emulatedNs && local < emulatedNs + 100000000, "the local time base is the emulated time of the last frame");
+	}
+
+	void TheTimeBaseExtrapolatesAtTheEmulatorsRate()
+	{
+		EmulatedTimeBase timeBase;
+		CHECK(timeBase.At(1000) == 0, "the time is 0 before the first frame");
+
+		// A third of real time: 10ms of emulated time in 30ms
+		timeBase.OnSample(0, 0);
+		timeBase.OnSample(10000000, 30000000);
+		CHECK(timeBase.At(30000000) == 10000000, "a frame's own time is read at once");
+		const int64_t later = timeBase.At(45000000);
+		CHECK(later > 14900000 && later < 15100000, "15ms later, 5ms more has passed");
+		CHECK(timeBase.At(10000000000) == 10000000 + 20000000, "it runs no more than 20ms ahead of the last frame");
+
+		// A frame that says less time has passed than was extrapolated does not take the time back
+		timeBase.OnSample(12000000, 46000000);
+		CHECK(timeBase.At(46000000) == 30000000, "the time never goes backwards");
+	}
+
 	void TheLinkWaitsForAnEmulatorThatIsStillStarting()
 	{
 		const std::string path = SocketPath("late");
@@ -279,6 +384,9 @@ int main()
 	LineChangesAreEdgesThatPollWaitsFor();
 	AnExchangeFailsOnceTheEmulatorHasGone();
 	AnExchangeTheEmulatorDoesNotAnswerTimesOut();
+	ALateResultIsNotTakenForTheNextExchange();
+	TheStepTimerFollowsEmulatedTime();
+	TheTimeBaseExtrapolatesAtTheEmulatorsRate();
 	TheLinkWaitsForAnEmulatorThatIsStillStarting();
 	return TestSupport::Summarise("emulator link");
 }

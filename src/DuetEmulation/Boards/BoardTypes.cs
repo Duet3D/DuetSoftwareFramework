@@ -13,7 +13,8 @@ public static class BoardTypes
     private static readonly string[] Same70Models =
     [
         "SAME70/SAME70_TimerCounter.cs", "SAME70/SAME70_ParallelIO.cs", "SAME70/SAME70_AnalogFrontEnd.cs",
-        "SAME70/SAME70_Xdmac.cs", "SAME70/SAME70_Hsmci.cs", "SAME70/SAME70_ResetController.cs", "SAME70/SAME70_UsartSpi.cs"
+        "SAME70/SAME70_Xdmac.cs", "SAME70/SAME70_Hsmci.cs", "SAME70/SAME70_ResetController.cs", "SAME70/SAME70_UsartSpi.cs",
+        "SAME70/SAME70_SbcSpi.cs"
     ];
 
     private static readonly string[] Same5xModels =

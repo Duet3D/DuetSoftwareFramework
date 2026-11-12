@@ -10,6 +10,12 @@
 // destination incrementing through RAM, so repeatedly reading that one address and writing onward is
 // exactly right, and XDMAC needs to know nothing about HSMCI.
 //
+// A peripheral whose transfers must be paced by the peripheral, as an SPI slave's are by the master's
+// clock, registers its peripheral IDs as request sources. A peripheral-synchronised channel with such
+// an ID then moves one element per Request from the peripheral rather than all at once, and CUBC
+// counts down the elements left, as on the part. The peripheral is told when such a channel is
+// enabled, so that it can raise the requests it already has (a transmitter with an empty TDR).
+//
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -129,7 +135,16 @@ namespace Antmicro.Renode.Peripherals.DMA
                 case GlobalChannelEnable:
                     for(var i = 0; i < NumChannels; i++)
                     {
-                        if((value & (1u << i)) != 0)
+                        if((value & (1u << i)) == 0)
+                        {
+                            continue;
+                        }
+                        if(IsPaced(channels[i], out var source))
+                        {
+                            enabledMask |= 1u << i;
+                            source();
+                        }
+                        else
                         {
                             RunChannel(i);
                         }
@@ -149,6 +164,68 @@ namespace Antmicro.Renode.Peripherals.DMA
 
         // Number of microblocks completed, so a test can assert that a transfer actually happened.
         public ulong CompletedTransfers { get; private set; }
+
+        // Pace the channels of a peripheral ID by its requests; `onChannelEnabled` is called when one is enabled
+        public void RegisterRequestSource(int peripheralId, Action onChannelEnabled)
+        {
+            requestSources[peripheralId] = onChannelEnabled;
+        }
+
+        // A request from a peripheral: move one element on its enabled channel. False if it has none.
+        public bool Request(int peripheralId)
+        {
+            for(var i = 0; i < NumChannels; i++)
+            {
+                var channel = channels[i];
+                if((enabledMask & (1u << i)) == 0 || PeripheralId(channel.Configuration) != peripheralId || channel.MicroblockLength == 0)
+                {
+                    continue;
+                }
+                // The channel moves on before the element is written, because writing it to a
+                // peripheral can make that peripheral request the next one
+                var width = WidthInBytes(channel.Configuration);
+                var source = channel.SourceAddress;
+                var destination = channel.DestinationAddress;
+                if(((channel.Configuration >> SourceAddressingModeShift) & 0x3) != AddressingFixed)
+                {
+                    channel.SourceAddress += width;
+                }
+                if(((channel.Configuration >> DestAddressingModeShift) & 0x3) != AddressingFixed)
+                {
+                    channel.DestinationAddress += width;
+                }
+                var finished = --channel.MicroblockLength == 0;
+                if(finished)
+                {
+                    enabledMask &= ~(1u << i);
+                }
+
+                var bus = machine.GetSystemBus(this);
+                switch(width)
+                {
+                    case 1: bus.WriteByte(destination, bus.ReadByte(source)); break;
+                    case 2: bus.WriteWord(destination, bus.ReadWord(source)); break;
+                    default: bus.WriteDoubleWord(destination, bus.ReadDoubleWord(source)); break;
+                }
+                if(finished)
+                {
+                    channel.InterruptStatus |= InterruptEndOfBlock;
+                    CompletedTransfers++;
+                    UpdateInterrupt();
+                }
+                return true;
+            }
+            return false;
+        }
+
+        private bool IsPaced(Channel channel, out Action onChannelEnabled)
+        {
+            onChannelEnabled = null;
+            return (channel.Configuration & ConfigurationTypePeripheral) != 0 &&
+                   requestSources.TryGetValue(PeripheralId(channel.Configuration), out onChannelEnabled);
+        }
+
+        private static int PeripheralId(uint configuration) => (int)((configuration >> PeripheralIdShift) & 0x7F);
 
         private void RunChannel(int index)
         {
@@ -218,6 +295,7 @@ namespace Antmicro.Renode.Peripherals.DMA
 
         private readonly IMachine machine;
         private readonly Channel[] channels;
+        private readonly Dictionary<int, Action> requestSources = new Dictionary<int, Action>();
         private uint enabledMask;
         private uint globalInterruptMask;
 
@@ -268,5 +346,7 @@ namespace Antmicro.Renode.Peripherals.DMA
         private const int DestAddressingModeShift = 18;
         private const uint AddressingFixed = 0;
         private const uint InterruptEndOfBlock = 1u << 0;
+        private const uint ConfigurationTypePeripheral = 1u << 0;
+        private const int PeripheralIdShift = 24;
     }
 }

@@ -28,4 +28,12 @@ public sealed record SystemOptions
     /// bus, so it does not disturb the boards' clock sync
     /// </summary>
     public TimeSpan Quantum { get; init; } = TimeSpan.FromMilliseconds(1);
+
+    /// <summary>
+    /// Peripherals whose debug log goes to emulation.log, as machine/peripheral (main/spi1). By default
+    /// the comma-separated list in <c>$DUET_EMULATION_DEBUG_LOG</c>
+    /// </summary>
+    public IReadOnlyList<string> DebugLog { get; init; } =
+        (Environment.GetEnvironmentVariable("DUET_EMULATION_DEBUG_LOG") ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 }

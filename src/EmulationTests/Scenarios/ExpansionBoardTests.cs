@@ -8,30 +8,31 @@ using DuetControlServer.Link.Protocol.Shared;
 using DuetEmulation;
 using DuetEmulation.Boards;
 using DuetEmulation.Can;
-using DuetEmulation.Rrf;
 using NUnit.Framework;
 
-namespace EmulationTests.Rrf;
+namespace EmulationTests.Scenarios;
 
 /// <summary>
-/// An MB6HC running RepRapFirmware standalone with an EXP3HC at CAN address 1, booted through its
+/// An MB6HC with an EXP3HC at CAN address 1, booted through its
 /// bootloader. Codes sent to the main board must produce the right CAN requests, the expansion board's
 /// replies, and the right object model
 /// </summary>
-[TestFixture]
+[TestFixture(Stack.Rrf)]
+[TestFixture(Stack.Dsf)]
 [Category("Emulation")]
-public class ExpansionBoardTests
+public class ExpansionBoardTests(Stack stack)
 {
     private const int Address = 1;
     private const int XyStepsPerMm = 80;
 
-    private RrfBench _bench = null!;
+    private Bench _bench = null!;
 
     [OneTimeSetUp]
     public async Task StartAsync() =>
-        _bench = await RrfBench.StartAsync(
+        _bench = await Bench.StartAsync(
+            stack,
             new Dictionary<int, BoardType> { [Address] = BoardTypes.Exp3hc },
-            $"M564 H0 S0\nM584 X{Address}.0 Y{Address}.1 Z0.2\nM92 X{XyStepsPerMm} Y{XyStepsPerMm} Z400\n",
+            $"M564 H0 S0\nM584 X{Address}.0 Y{Address}.1 Z{Address}.2\nM92 X{XyStepsPerMm} Y{XyStepsPerMm} Z400\n",
             Runs.Directory(this));
 
     [OneTimeTearDown]
@@ -50,7 +51,11 @@ public class ExpansionBoardTests
         Assert.That(expansion["shortName"]!.GetValue<string>(), Is.EqualTo("EXP3HC"));
         Assert.That(expansion["state"]!.GetValue<string>(), Is.EqualTo("running"));
         Assert.That(expansion["firmwareFileName"]!.GetValue<string>(), Is.EqualTo("Duet3Firmware_EXP3HC.bin"));
-        Assert.That(expansion["firmwareVersion"]!.GetValue<string>(), Is.EqualTo(boards[0]!["firmwareVersion"]!.GetValue<string>()));
+        if (stack == Stack.Rrf)
+        {
+            // Under DSF the main board's version is DuetControlServer's
+            Assert.That(expansion["firmwareVersion"]!.GetValue<string>(), Is.EqualTo(boards[0]!["firmwareVersion"]!.GetValue<string>()));
+        }
         Assert.That(expansion["drivers"]!.AsArray(), Has.Count.EqualTo(BoardTypes.Exp3hc.StepPins.Count));
     }
 

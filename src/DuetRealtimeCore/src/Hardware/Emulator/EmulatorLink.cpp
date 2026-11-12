@@ -1,5 +1,7 @@
 #include "EmulatorLink.h"
 
+#include <Hardware/Emulator/EmulatedTimeBase.h>
+
 #include <sys/eventfd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -8,6 +10,7 @@
 #include <cerrno>
 #include <chrono>
 #include <cstring>
+#include <ctime>
 #include <system_error>
 
 namespace Duet::Sbc::Emulator
@@ -18,6 +21,13 @@ namespace Duet::Sbc::Emulator
 
 		// Pause between attempts to connect to an emulator that is not listening yet
 		constexpr auto connectRetryInterval = std::chrono::milliseconds(20);
+
+		int64_t MonotonicNs() noexcept
+		{
+			timespec ts{};
+			clock_gettime(CLOCK_MONOTONIC, &ts);
+			return (int64_t)ts.tv_sec * 1000000000 + ts.tv_nsec;
+		}
 
 		// Read exactly `length` bytes. False on end of stream or a socket error.
 		bool ReadExact(int fd, void* data, size_t length) noexcept
@@ -105,11 +115,15 @@ namespace Duet::Sbc::Emulator
 			}
 			throw;
 		}
+		// The step clock is timed by emulated time from here on (EmulatedTimeBase.h)
+		EmulatedTimeBase::Instance().Reset();
+		EmulatedTimeBase::Install();
 		m_reader = std::thread([this] { ReaderLoop(); });
 	}
 
 	EmulatorLink::~EmulatorLink()
 	{
+		EmulatedTimeBase::Uninstall();
 		// Unblocks the reader, which then sees the end of the stream
 		::shutdown(m_socketFd, SHUT_RDWR);
 		if (m_reader.joinable())
@@ -159,7 +173,12 @@ namespace Duet::Sbc::Emulator
 			m_haveResult = false;
 		}
 
-		const FrameHeader header{static_cast<uint8_t>(FrameType::Exchange), {}, static_cast<uint32_t>(length)};
+		uint16_t sequence = 0;
+		{
+			const std::lock_guard lock(m_resultMutex);
+			sequence = ++m_sequence;
+		}
+		const FrameHeader header{static_cast<uint8_t>(FrameType::Exchange), 0, sequence, static_cast<uint32_t>(length), 0};
 		SendAll(&header, sizeof(header));
 		SendAll(tx, length);
 
@@ -205,11 +224,20 @@ namespace Duet::Sbc::Emulator
 				return;
 			}
 
+			EmulatedTimeBase::Instance().OnSample((int64_t)header.emulatedTimeNs, MonotonicNs());
 			switch (static_cast<FrameType>(header.type))
 			{
+			case FrameType::Time:
+				break;
+
 			case FrameType::ExchangeResult:
 			{
 				const std::lock_guard lock(m_resultMutex);
+				if (header.sequence != m_sequence)
+				{
+					// The result of an exchange that timed out: nobody is waiting for it
+					break;
+				}
 				m_result.swap(payload);
 				m_haveResult = true;
 				m_resultReady.notify_all();

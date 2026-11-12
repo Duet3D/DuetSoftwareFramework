@@ -86,6 +86,7 @@ namespace Duet::Sbc::Emulator
 		std::condition_variable m_resultReady;
 		std::vector<uint8_t> m_result;
 		bool m_haveResult = false;
+		uint16_t m_sequence = 0; // of the exchange in progress or last made
 		bool m_failed = false;
 		std::string m_failure;
 

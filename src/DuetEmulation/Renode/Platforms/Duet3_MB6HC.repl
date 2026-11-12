@@ -103,6 +103,21 @@ hsmci: SD.SAME70_Hsmci @ sysbus 0x40000000
 // DMA. RepRapFirmware moves SD data with XDMAC rather than through HSMCI itself, so the card is
 // unusable without this.
 xdmac: DMA.SAME70_Xdmac @ sysbus 0x40078000
+
+// The SBC's SPI port (SPI1, Config/Pins_Duet3_MB6HC.h), a slave paced by XDMAC (peripheral IDs 3 and 4,
+// CoreN2G's DmaTrigSource), with its chip select on PC25 and the TfrRdy and DataAvailable outputs on
+// PE02 and PE01. It also carries the link to DuetControlServer when the board runs DuetCANMaster.
+spi1: SPI.SAME70_SbcSpi @ sysbus 0x40058000
+    dma: xdmac
+    txPeripheralId: 3
+    rxPeripheralId: 4
+    chipSelect: pioc
+    chipSelectPin: 25
+    IRQ -> nvic@42
+
+pioe:
+    2 -> spi1@0
+    1 -> spi1@1
 // Step clock. Channel 0 is the low 16 bits and channel 2 the high 16, chained; see the model.
 // Only channel 0's interrupt is wired because that is the only one RepRapFirmware enables (ID_TC0 = 23).
 tc0: Timers.SAME70_TimerCounter @ sysbus 0x4000C000

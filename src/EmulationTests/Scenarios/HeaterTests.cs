@@ -5,30 +5,31 @@ using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
 using DuetEmulation;
 using DuetEmulation.Boards;
-using DuetEmulation.Rrf;
 using DuetEmulation.Traces;
 using NUnit.Framework;
 
-namespace EmulationTests.Rrf;
+namespace EmulationTests.Scenarios;
 
 /// <summary>
 /// A heater on an expansion board controlling a thermal model: the board's control loop drives the
 /// heater output, the model heats, and the thermistor input reads the result
 /// </summary>
-[TestFixture]
+[TestFixture(Stack.Rrf)]
+[TestFixture(Stack.Dsf)]
 [Category("Emulation")]
-public class HeaterTests
+public class HeaterTests(Stack stack)
 {
     private const int Address = 1;
     private const int Heater = 1;
     private const int Sensor = 1;
     private const double Target = 80;
 
-    private RrfBench _bench = null!;
+    private Bench _bench = null!;
 
     [OneTimeSetUp]
     public async Task StartAsync() =>
-        _bench = await RrfBench.StartAsync(
+        _bench = await Bench.StartAsync(
+            stack,
             new Dictionary<int, BoardType> { [Address] = BoardTypes.Exp3hc },
             $"M308 S{Sensor} P\"{Address}.temp0\" Y\"thermistor\" T100000 B4725\n" +
             $"M950 H{Heater} C\"{Address}.out0\" T{Sensor}\n" +

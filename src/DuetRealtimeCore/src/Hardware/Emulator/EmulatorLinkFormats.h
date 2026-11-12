@@ -1,21 +1,28 @@
 // Wire format of the emulator link: the SBC's SPI bus and the controller's TfrRdy and DataAvailable
 // lines, carried over a Unix domain stream socket to an emulated controller.
 //
-// The peer is the SbcPortBridge peripheral in Renode (src/DuetEmulation/Renode/Peripherals/SAME70/
-// SAME70_SbcPortBridge.cs), which mirrors these definitions. Only the physical layer crosses the link:
-// the transfer protocol on top of it is SpiTransfer's on this side and the firmware's on the other, so
+// The peer is the SBC link of the SPI model in Renode (src/DuetEmulation/Renode/Peripherals/SAME70/
+// SAME70_SbcSpi.cs), which mirrors these definitions. Only the physical layer crosses the link: the
+// transfer protocol on top of it is SpiTransfer's on this side and the firmware's on the other, so
 // both run as they do on real hardware.
 //
-// Every frame starts with an EmulatorFrameHeader. Integers are little-endian.
+// Every frame starts with a FrameHeader. Integers are little-endian.
 //
 //   Exchange        SBC -> emulator  The bytes the master clocks out (MOSI), one chip-select cycle.
-//   ExchangeResult  emulator -> SBC  The bytes the slave clocked back (MISO), as many as were sent.
+//   ExchangeResult  emulator -> SBC  The bytes the slave clocked back (MISO), as many as were sent,
+//                                    with the Exchange's sequence number, so that the result of an
+//                                    exchange the SBC gave up waiting for is not taken for a later one.
 //   LineLevel       emulator -> SBC  An input line's level: payload is the line, then 0 or 1. The
 //                                    emulator sends one for each line when the SBC connects and one
 //                                    each time a line changes.
+//   Time            emulator -> SBC  Nothing but the header's time. The emulator sends one every
+//                                    TimeFrameIntervalNs of emulated time, so that the SBC's clock
+//                                    follows emulated time while the link is otherwise idle.
 //
 // Frames from the emulator are in the order things happened on the emulated controller, so a
-// LineLevel that follows an ExchangeResult happened after that exchange.
+// LineLevel that follows an ExchangeResult happened after that exchange, and each carries the
+// emulated time at which it was sent. The emulator runs slower than real time, and not at a steady
+// rate, so the SBC times what it does against the controller's clock by that time (EmulatedTimeBase).
 #pragma once
 
 #include <cstddef>
@@ -29,6 +36,7 @@ namespace Duet::Sbc::Emulator
 		Exchange = 1,
 		ExchangeResult = 2,
 		LineLevel = 3,
+		Time = 4,
 	};
 
 	enum class Line : uint8_t
@@ -43,8 +51,10 @@ namespace Duet::Sbc::Emulator
 	struct FrameHeader
 	{
 		uint8_t type; // FrameType
-		uint8_t reserved[3];
-		uint32_t length; // payload bytes that follow
+		uint8_t reserved;
+		uint16_t sequence;		 // Exchange: numbered by the SBC; ExchangeResult: that of its Exchange
+		uint32_t length;		 // payload bytes that follow
+		uint64_t emulatedTimeNs; // emulator -> SBC: emulated time when sent; SBC -> emulator: 0
 	};
 
 	struct LineLevelPayload
@@ -54,10 +64,13 @@ namespace Duet::Sbc::Emulator
 	};
 #pragma pack(pop)
 
-	static_assert(sizeof(FrameHeader) == 8, "FrameHeader must be 8 bytes");
+	static_assert(sizeof(FrameHeader) == 16, "FrameHeader must be 16 bytes");
 	static_assert(sizeof(LineLevelPayload) == 2, "LineLevelPayload must be 2 bytes");
 
 	// The longest exchange either side accepts. SpiTransfer's largest is one data block.
 	inline constexpr uint32_t MaxExchangeLength = 65536;
+
+	// Emulated time between the emulator's Time frames
+	inline constexpr uint64_t TimeFrameIntervalNs = 1000000;
 
 } // namespace Duet::Sbc::Emulator
