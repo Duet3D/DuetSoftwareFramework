@@ -1,0 +1,173 @@
+// Duet 3 Mainboard 6HC - ATSAME70Q20B
+//
+// Self-contained on purpose: Renode's stock platforms/cpus/sam_e70.repl declares 256MB catch-all
+// memories at 0x0 and 0x20000000, which boots but silently absorbs every stray access - exactly the
+// class of bug an emulator exists to catch. This uses the real Q20B map instead.
+//
+// Only what RepRapFirmware has been observed to need is modelled. Everything else is left to the SVD
+// fallback, which returns reset values and logs the access; that log is the to-do list.
+
+cpu: CPU.CortexM @ sysbus
+    cpuType: "cortex-m7"
+    nvic: nvic
+    // The SAME70's Cortex-M7 has 16 MPU regions. Renode defaults to 8, and that is not a detail:
+    // RepRapFirmware configures region 8 during init and the CPU aborts on a non-existent region.
+    numberOfMPURegions: 16
+nvic: IRQControllers.NVIC @ sysbus 0xE000E000
+    priorityMask: 0xE0
+    systickFrequency: 300000000
+    IRQ -> cpu@0
+
+// 1MB internal flash. The firmware image is linked here and the reset vector points into it.
+flash: Memory.MappedMemory @ sysbus 0x00400000
+    size: 0x100000
+
+// 384KB main SRAM. RepRapFirmware's initial stack pointer is 0x20460000, i.e. the top of this.
+sram: Memory.MappedMemory @ sysbus 0x20400000
+    size: 0x60000
+
+// Tightly coupled memories. Disabled by default on real silicon, but map them so that a stray
+// access shows up as data rather than as a bus fault we would have to chase.
+itcm: Memory.MappedMemory @ sysbus 0x00000000
+    size: 0x20000
+
+dtcm: Memory.MappedMemory @ sysbus 0x20000000
+    size: 0x20000
+
+// SAM-BA boot ROM.
+rom: Memory.MappedMemory @ sysbus 0x00800000
+    size: 0x20000
+
+usart0: UART.SAM_USART @ sysbus 0x40024000
+    IRQ -> nvic@13
+
+// USART1 is not a UART on this board: the six TMC5160s hang off it in SPI mode. Modelled as SPI so
+// driver reads return real register contents instead of nothing.
+usart1: SPI.SAME70_UsartSpi @ sysbus 0x40028000
+    numberOfDrivers: 6
+    IRQ -> nvic@14
+
+usart2: UART.SAM_USART @ sysbus 0x4002c000
+    IRQ -> nvic@15
+
+gem: Network.CadenceGEM @ sysbus 0x40050000
+    IRQ -> nvic@39
+
+// KSZ8081RNA, which is what the 6HC has. The identity is not cosmetic: ethernet_phy_find_valid
+// (Hardware/SAME70/Ethernet/ksz8081rna/ethernet_phy.c) reads PHYID1 and demands GMII_OUI_MSB =
+// 0x0022. Renode's stock 0x0007 makes ethernet_phy_init return GMAC_INVALID, and the object model
+// then reports network state "initFailed".
+phy: Network.EthernetPhysicalLayer @ gem 0
+    Id1: 0x0022
+    Id2: 0x1572
+    AutoNegotiationAdvertisement: 0x00A1
+    AutoNegotiationLinkPartnerBasePageAbility: 0x0001
+
+// Parallel IO. All six STEP pins live on PIOC, so that one traces by default; the trace mask is
+// pins 18, 16, 28, 1, 4, 9 (drivers 0-5) from Config/Pins_Duet3_MB6HC.h. DIR pins are spread over
+// PIOA, PIOB, PIOC and PIOD, so add those masks when direction matters too.
+pioa: GPIOPort.SAME70_ParallelIO @ sysbus 0x400E0E00
+    // PA29 is SD card detect and is active low (MassStorage.cpp treats a high read as "no card").
+    // Holding it low is what tells RepRapFirmware a card is in slot 0.
+    DrivenInputs: 0x20000000
+    DrivenLevels: 0x00000000
+piob: GPIOPort.SAME70_ParallelIO @ sysbus 0x400E1000
+pioc: GPIOPort.SAME70_ParallelIO @ sysbus 0x400E1200
+    TraceMask: 0x10050212
+piod: GPIOPort.SAME70_ParallelIO @ sysbus 0x400E1400
+pioe: GPIOPort.SAME70_ParallelIO @ sysbus 0x400E1600
+
+// Analogue inputs. These values are how the board pretends hardware is attached: without them
+// RepRapFirmware sees no completed conversions at all, reports no temperatures, and has no supply
+// voltage to enable drivers for. Channel map is from Pins_Duet3_MB6HC.h; readings are 14-bit.
+afec0: Analog.SAME70_AnalogFrontEnd @ sysbus 0x4003C000
+    // ch4 = 12V rail at 12.0V, ch9 = VIN at 24.0V, ch11 = MCU temperature sensor at 25C: 0.72V, which is
+    // 3575 of 16384 at the 3.3V reference (Platform::GetCpuTemperature)
+    Channels: "4:4301,9:8602,11:3575"
+
+afec1: Analog.SAME70_AnalogFrontEnd @ sysbus 0x40064000
+    // ch1 = VSSA sense (0V), ch9 = VREF sense (full scale). Thermistor::TryGetTemperature computes
+    // R = seriesR * (temp - vssa) / (vref - temp), so those two are not optional - without them the
+    // thermistor readings are meaningless regardless of what the thermistor channels say.
+    // ch2, 4, 5, 6 = thermistors 0-3 at 16031, which is 100k against the 2200R series resistor, i.e. 25C.
+    Channels: "1:0,9:65535,2:64124,4:64124,5:64124,6:64124"
+
+// SD card. Renode's SDCard model does the card side; this is only the SAME70 controller. Attach an
+// image at run time with:  machine SdCardFromFile @sdcard.img hsmci 0x8000000 false "sd"
+// Reset controller. Without this a software reset (M999, or DWC's reboot button) is silently
+// discarded and the firmware wedges in ResetProcessor's for(;;) loop with the network stack dead.
+rstc: Miscellaneous.SAME70_ResetController @ sysbus 0x400E1800
+
+hsmci: SD.SAME70_Hsmci @ sysbus 0x40000000
+
+// DMA. RepRapFirmware moves SD data with XDMAC rather than through HSMCI itself, so the card is
+// unusable without this.
+xdmac: DMA.SAME70_Xdmac @ sysbus 0x40078000
+// Step clock. Channel 0 is the low 16 bits and channel 2 the high 16, chained; see the model.
+// Only channel 0's interrupt is wired because that is the only one RepRapFirmware enables (ID_TC0 = 23).
+tc0: Timers.SAME70_TimerCounter @ sysbus 0x4000C000
+    0 -> nvic@23
+
+// Flash controller status. efc_perform_read_sequence (reading the chip's unique identifier) issues a
+// command, waits for FRDY to clear, reads, then waits for FRDY to set again. A constant value hangs
+// one of those two waits, so alternate ready and not-ready with no error bits. Note the unique ID
+// this yields is whatever the flash image holds at that address, i.e. deterministic but meaningless.
+EFC_FSR: Python.PythonPeripheral @ sysbus 0x400E0C08
+    size: 0x4
+    initable: true
+    script: '''
+if request.IsInit:
+    lastVal = 0
+else:
+    lastVal = 1 - lastVal
+    request.Value = lastVal
+'''
+
+// CAN. Bosch M_CAN with timestamps (Peripherals/Common/DuetMCAN.cs). Its message RAM lives in system
+// SRAM: the controller's 16-bit offsets are relative to the top half of MATRIX CCFG_CAN0/SYSIO, which
+// CanDevice::Init sets to that of its buffer (.CanMessage, in SRAM at 0x2040xxxx), so the SRAM itself
+// is the message RAM. MCAN1 is the board's CAN bus; CoreN2G uses interrupt line 0 only. The SAME70's
+// timestamps come from TC0, which is the low 16 bits of the step clock (CanDevice.cpp, TSCC).
+mcan0: CAN.DuetMCAN @ sysbus <0x40030000, +0x4000>
+    messageRAM: sram
+    externalTimestamp: tc0
+    externalTimestampFrequency: 750000
+    Line0 -> nvic@35
+
+mcan1: CAN.DuetMCAN @ sysbus <0x40034000, +0x4000>
+    messageRAM: sram
+    externalTimestamp: tc0
+    externalTimestampFrequency: 750000
+    Line0 -> nvic@37
+
+// USB device controller status. TinyUSB's dcd_connect spins waiting for UTMI CLKUSABLE before it
+// will bring the device up, and without USB there is no console on this board. This reports the clock
+// as permanently usable and models nothing else; a real USBHS model is a project of its own.
+USBHS_SR: Python.PythonPeripheral @ sysbus 0x40038804
+    size: 0x4
+    initable: true
+    script: "request.Value = 0x4000"
+
+trng: Miscellaneous.SAM_TRNG @ sysbus 0x40070000
+
+// PMC status register. Clock setup busy-waits on bits here (MOSCXTS, LOCKA, MCKRDY); alternating
+// all-ones and all-zeros satisfies both wait-for-set and wait-for-clear loops. A real PMC model
+// replaces this once clock rates start to matter.
+PMC_SR: Python.PythonPeripheral @ sysbus 0x400E0668
+    size: 0x4
+    initable: true
+    script: '''
+if request.IsInit:
+    lastVal = 0
+else:
+    lastVal = 1 - lastVal
+    request.Value = lastVal * 0xFFFFFFFF
+'''
+
+sysbus:
+    init:
+        Tag <0x400E0940 0x4> "CIDR" 0xa1020e00
+        # Local copy rather than the URL: Renode re-downloads it on every fresh start, which is slow
+        # and made the emulator die mid-download in the Lima guest. The home directory is mounted at
+        # the same path in the guest, so one absolute path works on both sides.
+        ApplySVD $svd_same70

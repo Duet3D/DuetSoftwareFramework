@@ -1,0 +1,21 @@
+// Duet 3 Expansion 3HC, version 1.03 (SAME51N19A).
+using "SAME51.repl"
+
+//
+// The board's CAN bus is CAN1 (Config/EXP3HC.h, CanParams). Its address comes from the four switches
+// on PC11, PC12, PC14 and PC15, which read low when on; the harness sets them for the address a test
+// gives the board, because all off means "load new firmware" to the bootloader.
+
+// Board revision straps (Platform::EstablishBoardVariant): version 1.03 has a pulldown on PC18 only
+port:
+    drivenLow: "PC18"
+
+// Analogue inputs, as fractions of the 3.3V reference (Config/EXP3HC.h, the pin table):
+//   ADC0 AIN10 VIN: 24V through the 100k/5.1k divider of version 1.02 and later
+//   ADC1 AIN7 V12: 12V through 60.4k/4.7k
+//   ADC1 AIN6 VREF and AIN8 VSSA monitors: the thermistors' reference and ground
+//   ADC1 AIN5, AIN0, AIN9 temp0-2: 100k thermistors at 25C against the 2.2k series resistors
+adc0:
+    channels: "10:0.352910"
+adc1:
+    channels: "7:0.262529,6:1.0,8:0.0,5:0.978474,0:0.978474,9:0.978474"

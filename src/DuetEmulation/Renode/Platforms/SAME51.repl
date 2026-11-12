@@ -1,0 +1,240 @@
+// SAME51 (Cortex-M4F at 120MHz), as used by the SAME5x Duet 3 expansion boards. A board's own file
+// (e.g. EXP3HC.repl) is loaded after this one and sets what differs between parts and boards: the
+// device ID, the CAN instance, the pins that the board's switches and resistors hold.
+//
+// Peripherals that the firmware only configures and then polls for "ready" are register files whose
+// status bits read as ready (SAME5x_RegisterFile). Anything not listed is left to the SVD fallback,
+// which returns reset values and logs the access: that log is the list of what to model next.
+// Offsets and bits are from the SAME51 datasheet (DS60001507) register summaries.
+
+cpu: CPU.CortexM @ sysbus
+    cpuType: "cortex-m4f"
+    nvic: nvic
+
+nvic: IRQControllers.NVIC @ sysbus 0xE000E000
+    priorityMask: 0xE0
+    systickFrequency: 120000000
+    IRQ -> cpu@0
+
+dwt: Miscellaneous.DWT @ sysbus 0xE0001000
+    frequency: 120000000
+
+flash: Memory.MappedMemory @ sysbus 0x00000000
+    size: 0x80000
+
+// The NVM auxiliary space: calibration words at 0x00800080, the user page at 0x00804000 (where an
+// expansion board keeps its CAN address), the serial number at 0x00806000+. Erased flash reads 0xFF;
+// the harness writes what a board needs into it.
+nvmAux: Memory.MappedMemory @ sysbus 0x00800000
+    size: 0x8000
+
+sram: Memory.MappedMemory @ sysbus 0x20000000
+    size: 0x30000
+
+backupSram: Memory.MappedMemory @ sysbus 0x47000000
+    size: 0x2000
+
+// SmartEEPROM window
+seeprom: Memory.MappedMemory @ sysbus 0x44000000
+    size: 0x10000
+
+pac: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x40000000
+    size: 0x400
+
+pm: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x40000400
+    size: 0x400
+
+// INTFLAG.CKRDY (bit 0 of the byte at 0x03)
+mclk: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x40000800
+    size: 0x400
+    forceSet: "0x00:0x01000000"
+
+// RCAUSE = POR
+rstc: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x40000C00
+    size: 0x400
+    resetValues: "0x00:0x01"
+
+// STATUS (0x10) and INTFLAG (0x0C): XOSCRDY0/1, DFLLRDY, DFLLLCKF/C, DPLL0/1 LCKR. DFLLSYNC (0x1C)
+// and the DPLLs' SYNCBUSY (0x3C, 0x50) never busy; their DPLLSTATUS (0x40, 0x54) LOCK and CLKRDY.
+oscctrl: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x40001000
+    size: 0x400
+    forceSet: "0x0C:0x01010D03,0x10:0x01010D03,0x40:0x3,0x54:0x3"
+    forceClear: "0x1C:0xFFFFFFFF,0x3C:0xFFFFFFFF,0x50:0xFFFFFFFF"
+
+// STATUS (0x0C) and INTFLAG (0x08): XOSC32KRDY
+osc32kctrl: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x40001400
+    size: 0x400
+    forceSet: "0x08:0x1,0x0C:0x1"
+
+// STATUS (0x0C) and INTFLAG (0x08): BOD33RDY, B33SRDY, VREGRDY, VCORERDY
+supc: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x40001800
+    size: 0x400
+    forceSet: "0x08:0x505,0x0C:0x505"
+
+// CTRLA.SWRST self-clears and SYNCBUSY (0x04) is never busy
+gclk: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x40001C00
+    size: 0x400
+    forceClear: "0x00:0x1,0x04:0xFFFFFFFF"
+
+// SYNCBUSY (0x08)
+wdt: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x40002000
+    size: 0x400
+    forceClear: "0x08:0xFFFFFFFF"
+
+// SYNCBUSY (0x10)
+rtc: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x40002400
+    size: 0x400
+    forceClear: "0x00:0x1,0x10:0xFFFFFFFF"
+
+// CTRLA.SWRST and SYNCBUSY (0x04)
+eic: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x40002800
+    size: 0x400
+    forceClear: "0x00:0x1,0x04:0xFFFFFFFF"
+
+// Frequency meter. The bootloader and CoreN2G's startup use it to tell a 12MHz crystal from a 25MHz one,
+// counting crystal cycles over 240 cycles of the 48MHz oscillator: VALUE (0x10) = 125 is a 25MHz
+// crystal. CTRLA.SWRST, STATUS (byte 0x0B) BUSY and OVF, and SYNCBUSY (0x0C) read clear.
+freqm: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x40002C00
+    size: 0x400
+    resetValues: "0x10:125"
+    forceClear: "0x00:0x1,0x08:0x03000000,0x0C:0xFFFFFFFF"
+
+// DID: SAME51N19A, revision D. A board's file overrides it for other parts.
+dsu: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x41002000
+    size: 0x2000
+    resetValues: "0x18:0x61810301"
+
+// INTFLAG.DONE (bit 0 at 0x10) and STATUS.READY (bit 0 at 0x12); SEESTAT (0x2C) never BUSY.
+// PARAM (0x08): 1024 pages of 512 bytes, SmartEEPROM supported.
+nvmctrl: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x41004000
+    size: 0x400
+    resetValues: "0x08:0x80030400"
+    forceSet: "0x10:0x00010001"
+    forceClear: "0x2C:0x4"
+
+// Cache controller: SR.CSTS reads as the cache being enabled once it is
+cmcc: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x41006000
+    size: 0x400
+
+port: GPIOPort.SAME5x_Port @ sysbus 0x41008000
+    groups: 4
+
+// DMA controller and its CRC unit, which the bootloader uses to check the firmware's CRC
+dmac: DMA.SAME5x_Dmac @ sysbus 0x4100A000
+    [0-4] -> nvic@[31-35]
+
+evsys: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x4100E000
+    size: 0x400
+    forceClear: "0x00:0x1"
+
+ramecc: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x41020000
+    size: 0x400
+
+// SERCOMs: CTRLA.SWRST self-clears, SYNCBUSY (0x1C) is never busy, INTFLAG (0x18) DRE and TXC set
+sercom0: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x40003000
+    size: 0x400
+    forceSet: "0x18:0x3"
+    forceClear: "0x00:0x1,0x1C:0xFFFFFFFF"
+sercom1: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x40003400
+    size: 0x400
+    forceSet: "0x18:0x3"
+    forceClear: "0x00:0x1,0x1C:0xFFFFFFFF"
+sercom2: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x41012000
+    size: 0x400
+    forceSet: "0x18:0x3"
+    forceClear: "0x00:0x1,0x1C:0xFFFFFFFF"
+sercom3: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x41014000
+    size: 0x400
+    forceSet: "0x18:0x3"
+    forceClear: "0x00:0x1,0x1C:0xFFFFFFFF"
+sercom4: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x43000000
+    size: 0x400
+    forceSet: "0x18:0x3"
+    forceClear: "0x00:0x1,0x1C:0xFFFFFFFF"
+sercom5: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x43000400
+    size: 0x400
+    forceSet: "0x18:0x3"
+    forceClear: "0x00:0x1,0x1C:0xFFFFFFFF"
+sercom6: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x43000800
+    size: 0x400
+    forceSet: "0x18:0x3"
+    forceClear: "0x00:0x1,0x1C:0xFFFFFFFF"
+sercom7: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x43000C00
+    size: 0x400
+    forceSet: "0x18:0x3"
+    forceClear: "0x00:0x1,0x1C:0xFFFFFFFF"
+
+// Timer/counters. All are clocked from the 48MHz GCLK in Duet3Expansion.
+tc0: Timers.SAME5x_TimerCounter @ sysbus 0x40003800
+    IRQ -> nvic@107
+tc1: Timers.SAME5x_TimerCounter @ sysbus 0x40003C00
+    IRQ -> nvic@108
+tc2: Timers.SAME5x_TimerCounter @ sysbus 0x4101A000
+    IRQ -> nvic@109
+tc3: Timers.SAME5x_TimerCounter @ sysbus 0x4101C000
+    IRQ -> nvic@110
+tc4: Timers.SAME5x_TimerCounter @ sysbus 0x42001400
+    IRQ -> nvic@111
+tc5: Timers.SAME5x_TimerCounter @ sysbus 0x42001800
+    IRQ -> nvic@112
+tc6: Timers.SAME5x_TimerCounter @ sysbus 0x43001400
+    IRQ -> nvic@113
+tc7: Timers.SAME5x_TimerCounter @ sysbus 0x43001800
+    IRQ -> nvic@114
+
+// TCCs (PWM outputs): CTRLA.SWRST and SYNCBUSY (0x08)
+tcc0: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x41016000
+    size: 0x400
+    forceClear: "0x00:0x1,0x08:0xFFFFFFFF"
+tcc1: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x41018000
+    size: 0x400
+    forceClear: "0x00:0x1,0x08:0xFFFFFFFF"
+tcc2: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x42000C00
+    size: 0x400
+    forceClear: "0x00:0x1,0x08:0xFFFFFFFF"
+tcc3: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x42001000
+    size: 0x400
+    forceClear: "0x00:0x1,0x08:0xFFFFFFFF"
+tcc4: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x43001000
+    size: 0x400
+    forceClear: "0x00:0x1,0x08:0xFFFFFFFF"
+
+// ADCs. The board's file says what its inputs read (channels). Both have the MCU's temperature sensors: PTAT
+// (0x1C) and CTAT (0x1D) read 600 and 800 of 4095, which with the calibration words below is 25C.
+adc0: Analog.SAME5x_Adc @ sysbus 0x43001C00
+    internalChannels: "0x1C:0.146520,0x1D:0.195360"
+    ResultReady -> nvic@119
+    Other -> nvic@118
+adc1: Analog.SAME5x_Adc @ sysbus 0x43002000
+    internalChannels: "0x1C:0.146520,0x1D:0.195360"
+    ResultReady -> nvic@121
+    Other -> nvic@120
+
+// CAN. Bosch M_CAN with timestamps (Peripherals/Common/DuetMCAN.cs), clocked at 48MHz, whose timestamp
+// counter counts CAN bit times. The message RAM is system SRAM: the controller's 16-bit start
+// addresses are offsets from 0x20000000.
+can0: CAN.DuetMCAN @ sysbus <0x42000000, +0x400>
+    messageRAM: sram
+    canClockFrequency: 48000000
+    Line0 -> nvic@78
+can1: CAN.DuetMCAN @ sysbus <0x42000400, +0x400>
+    messageRAM: sram
+    canClockFrequency: 48000000
+    Line0 -> nvic@79
+
+// INTFLAG.DATARDY (bit 0 of the byte at 0x0A)
+trng: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x42002800
+    size: 0x400
+    forceSet: "0x08:0x10000"
+
+// Temperature sensor calibration (NVMCTRL_TEMP_LOG, the "Temperature Log Row" of the SAME51 datasheet),
+// written by the init block below: TL = 25C, TH = 85C, PTAT VPL/VPH = 600/780 and CTAT VCL/VCH =
+// 800/640. Real parts have similar values; these are round numbers that keep the integer arithmetic of
+// Duet3Expansion in range. The init block is monitor script, so it holds commands only.
+sysbus:
+    init:
+        ApplySVD $svd_same51
+        WriteDoubleWord 0x00800100 0x55019
+        WriteDoubleWord 0x00800104 0x30c25800
+        WriteDoubleWord 0x00800108 0x280320
+        WriteDoubleWord 0x0080010C 0x0
