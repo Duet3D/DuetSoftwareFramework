@@ -190,21 +190,7 @@ rootCommand.SetAction(async (parserResult) =>
 
                 services
                     .AddSettings(context.Configuration, updateOnlyValue, logLevelValue, configFileValue, socketDirectoryValue, socketFileValue, baseDirectoryValue, out startErrorFile)
-                    .AddCodes()
-                    .AddCommands()
-                    .AddEvents()
-                    .AddFiles()
-                    .AddIPC()
-                    .AddLink()
-                    .AddModel()
-                    .AddLinkAdapter()
-                    .AddMotion()
-                    .AddPorts()
-                    .AddSpindles()
-                    .AddFans()
-                    .AddHeat()
-                    .AddTools()
-                    .AddUtility();
+                    .AddDuetControlServer();
             })
             .Build();
 

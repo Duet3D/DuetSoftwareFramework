@@ -18,6 +18,9 @@
 		<InternalsVisibleTo Include="EmulationTests" />
 	</ItemGroup>
 
+	<!-- The DSF bench runs DuetControlServer in-process, with the real libduet_realtime_core.so -->
+	<Import Project="..\DuetRealtimeCore\dotnet\HostLibrary.targets" />
+
 	<ItemGroup>
 		<ProjectReference Include="..\DuetAPI\DuetAPI.csproj" />
 		<ProjectReference Include="..\DuetControlServer\DuetControlServer.csproj" />

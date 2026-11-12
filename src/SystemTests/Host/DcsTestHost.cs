@@ -102,21 +102,7 @@ internal sealed class DcsTestHost : IAsyncDisposable
                              configFile: new FileInfo(Path.Combine(tempRoot, "config.json")),
                              socketDirectory: null, socketFile: null, baseDirectory: null,
                              startErrorFile: out _)
-                .AddCodes()
-                .AddCommands()
-                .AddEvents()
-                .AddFiles()
-                .AddIPC()
-                .AddLink()
-                .AddModel()
-                .AddLinkAdapter()
-                .AddMotion()
-                .AddPorts()
-                .AddSpindles()
-                .AddFans()
-                .AddHeat()
-                .AddTools()
-                .AddUtility())
+                .AddDuetControlServer())
             .Build();
 
         try

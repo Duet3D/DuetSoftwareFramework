@@ -20,28 +20,6 @@
 		<ProjectReference Include="..\DuetControlServer\DuetControlServer.csproj" />
 	</ItemGroup>
 
-	<!-- The scenarios run the real libduet_realtime_core.so, so building this project keeps the native
-	     library current: a one-off CMake configure, then an incremental build that is a no-op when
-	     nothing changed. Host/NativeLibraryLocator.cs resolves the result at run time. Opt out
-	     with -p:BuildNativeLink=false, or pin a specific library by setting DUET_REALTIME_CORE_LIBRARY (which
-	     also skips this, because a pinned library must not be rebuilt underneath the pin). -->
-	<PropertyGroup>
-		<BuildNativeLink Condition="'$(BuildNativeLink)' == '' and '$(DUET_REALTIME_CORE_LIBRARY)' == ''">true</BuildNativeLink>
-		<RepositoryRoot>$(MSBuildThisFileDirectory)../..</RepositoryRoot>
-	</PropertyGroup>
-	<Target Name="BuildNativeLinkLibrary" BeforeTargets="Build" Condition="'$(BuildNativeLink)' == 'true'">
-		<!-- The native build takes RRFLibraries from the submodule, and says so as a CMake command it
-		     cannot find, which names neither the submodule nor the way to get it. A clone made
-		     without recursing, and every new git worktree, starts without it. -->
-		<Error Condition="!Exists('$(MSBuildThisFileDirectory)../../lib/RRFLibraries/CMakeLists.txt')"
-		       Text="lib/RRFLibraries is not checked out, so libduet_realtime_core.so cannot be built. Check it out with 'git submodule update --init lib/RRFLibraries'." />
-
-		<!-- cmake_install.cmake rather than CMakeCache.txt: the cache is written when the configure
-		     starts, so a configure that failed leaves one behind and every later build then skips
-		     straight to a build tree that was never generated. This file is written when the
-		     configure finishes, so a failed one is retried instead of being taken for a good tree. -->
-		<Exec Command="cmake --preset DuetRealtimeCore-native-debug" WorkingDirectory="$(RepositoryRoot)"
-		      Condition="!Exists('$(RepositoryRoot)/build/DuetRealtimeCore-native-debug/cmake_install.cmake')" />
-		<Exec Command="cmake --build --preset DuetRealtimeCore-native-debug --target duet_realtime_core_shared --parallel" WorkingDirectory="$(RepositoryRoot)" />
-	</Target>
+	<!-- The scenarios run the real libduet_realtime_core.so, built for the host -->
+	<Import Project="..\DuetRealtimeCore\dotnet\HostLibrary.targets" />
 </Project>
