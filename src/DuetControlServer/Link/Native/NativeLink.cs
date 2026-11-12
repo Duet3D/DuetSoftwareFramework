@@ -125,11 +125,15 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
         NativeTransport transport = settings.Value.SbcTransport.Equals("Socket", StringComparison.OrdinalIgnoreCase)
             ? NativeTransport.Socket
             : NativeTransport.Spi;
+        NativeSpiHardware spiHardware = settings.Value.SpiHardware.Equals("Emulator", StringComparison.OrdinalIgnoreCase)
+            ? NativeSpiHardware.Emulator
+            : NativeSpiHardware.Linux;
 
         // The config carries raw UTF-8 pointers, so they must stay alive across the Create call
         IntPtr spiDevice = Marshal.StringToCoTaskMemUTF8(settings.Value.SpiDevice);
         IntPtr gpioChipDevice = Marshal.StringToCoTaskMemUTF8(settings.Value.GpioChipDevice);
         IntPtr socketPath = Marshal.StringToCoTaskMemUTF8(settings.Value.SbcSocketPath);
+        IntPtr emulatorSocketPath = Marshal.StringToCoTaskMemUTF8(settings.Value.SpiEmulatorSocketPath);
         try
         {
             NativeConfig config = new()
@@ -158,7 +162,9 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
                 MaxSbcRetries = settings.Value.MaxSbcRetries,
                 UpdateOnly = settings.Value.UpdateOnly ? 1 : 0,
                 Transport = (int)transport,
-                SocketPath = socketPath
+                SocketPath = socketPath,
+                SpiHardware = (int)spiHardware,
+                EmulatorSocketPath = emulatorSocketPath
             };
 
             byte[] errorBuffer = new byte[ErrorBufferSize];
@@ -185,6 +191,7 @@ public sealed class NativeLink(ILogger<NativeLink> logger, IOptions<Settings> se
             Marshal.FreeCoTaskMem(spiDevice);
             Marshal.FreeCoTaskMem(gpioChipDevice);
             Marshal.FreeCoTaskMem(socketPath);
+            Marshal.FreeCoTaskMem(emulatorSocketPath);
         }
     }
 

@@ -42,25 +42,11 @@ namespace Duet::Sbc
 	SpiTransfer::SpiTransfer(const Config& config)
 		: FullDuplexExchangeTransport(config)
 	{
-		// GPIO lines. The interface thread waits on these fds directly with poll(); there is no separate
-		// monitor thread, so a pin edge wakes the interface thread in a single hop.
-		m_dataAvailablePin = std::make_unique<GpioInputPin>(
-			config.gpioChipDevice, config.dataAvailablePin, "sbc-dap-" + std::to_string(config.dataAvailablePin));
-		m_transferReadyPin = std::make_unique<GpioInputPin>(
-			config.gpioChipDevice, config.transferReadyPin, "sbc-trp-" + std::to_string(config.transferReadyPin));
-
-		// Optional scope-trigger output line (low = idle)
-		if (config.sbcDataAvailablePin >= 0)
-		{
-			m_sbcDataAvailablePin =
-				std::make_unique<OutputGpioPin>(config.gpioChipDevice,
-												config.sbcDataAvailablePin,
-												"sbc-sbcdap-" + std::to_string(config.sbcDataAvailablePin),
-												false);
-		}
-
-		// Open the SPI device
-		m_spiDevice = std::make_unique<SpiDevice>(config.spiDevice, config.spiFrequency, config.spiTransferMode);
+		SbcHardware hardware = CreateSbcHardware(config);
+		m_spiBus = std::move(hardware.spi);
+		m_transferReadyPin = std::move(hardware.transferReady);
+		m_dataAvailablePin = std::move(hardware.dataAvailable);
+		m_sbcDataAvailablePin = std::move(hardware.sbcDataAvailable);
 	}
 
 	SpiTransfer::~SpiTransfer()
@@ -268,7 +254,7 @@ namespace Duet::Sbc
 			const size_t headerLen = (m_txHeader.protocolVersion >= 4)
 				? sizeof(proto::SpiTransferHeader)
 				: proto::LegacyTransferHeaderSize;
-			m_spiDevice->TransferFullDuplex(txHdr, rxHdr, headerLen);
+			m_spiBus->TransferFullDuplex(txHdr, rxHdr, headerLen);
 
 			// Check for a possible response code. BadResponse always means "abandon this transfer and start
 			// over", and DuetCANMaster only ever sends it on its way back to a header exchange. Restart the
@@ -390,7 +376,7 @@ namespace Duet::Sbc
 		uint32_t tx = response;
 		uint32_t rx = 0;
 		WaitForTransfer();
-		m_spiDevice->TransferFullDuplex(
+		m_spiBus->TransferFullDuplex(
 			reinterpret_cast<const uint8_t*>(&tx), reinterpret_cast<uint8_t*>(&rx), sizeof(uint32_t));
 		return rx;
 	}
@@ -404,7 +390,7 @@ namespace Duet::Sbc
 		for (int retry = 0; retry < config.maxSbcRetries; retry++)
 		{
 			WaitForTransfer();
-			m_spiDevice->TransferFullDuplex(CurrentTxBuffer().data(), m_rxBuffer.data(), bytesToTransfer);
+			m_spiBus->TransferFullDuplex(CurrentTxBuffer().data(), m_rxBuffer.data(), bytesToTransfer);
 
 			// Check for a possible response code
 			const uint32_t responseCode = ReadU32(m_rxBuffer.data());
@@ -594,7 +580,7 @@ namespace Duet::Sbc
 		}
 
 		WaitForTransfer();
-		m_spiDevice->TransferFullDuplex(writeBuffer, readBuffer, proto::FirmwareSegmentSize);
+		m_spiBus->TransferFullDuplex(writeBuffer, readBuffer, proto::FirmwareSegmentSize);
 		return true;
 	}
 
@@ -614,12 +600,12 @@ namespace Duet::Sbc
 		uint8_t transferData[sizeof(proto::FlashVerify)];
 		std::memcpy(transferData, &verifyRequest, sizeof(verifyRequest));
 		WaitForTransfer();
-		m_spiDevice->TransferFullDuplex(transferData, transferData, sizeof(transferData));
+		m_spiBus->TransferFullDuplex(transferData, transferData, sizeof(transferData));
 
 		// Check whether IAP can confirm our CRC16 checksum
 		uint8_t writeOk[1] = {0};
 		WaitForTransfer();
-		m_spiDevice->TransferFullDuplex(writeOk, writeOk, sizeof(writeOk));
+		m_spiBus->TransferFullDuplex(writeOk, writeOk, sizeof(writeOk));
 		return writeOk[0] == proto::FlashVerifyOk;
 	}
 

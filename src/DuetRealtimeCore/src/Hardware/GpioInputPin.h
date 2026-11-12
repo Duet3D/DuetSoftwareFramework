@@ -7,18 +7,20 @@
 // hop from the latency path while still sleeping (0% CPU) when idle.
 #pragma once
 
+#include <Hardware/SbcHardware.h>
+
 #include <cstdint>
 #include <string>
 
 namespace Duet::Sbc
 {
 
-	class GpioInputPin
+	class GpioInputPin final : public InputLine
 	{
 	  public:
 		// Open a GPIO line for both-edge monitoring (non-blocking fd). Throws std::system_error on failure.
 		GpioInputPin(const std::string& devNode, int line, const std::string& consumerLabel);
-		~GpioInputPin();
+		~GpioInputPin() override;
 
 		GpioInputPin(const GpioInputPin&) = delete;
 		GpioInputPin& operator=(const GpioInputPin&) = delete;
@@ -26,22 +28,22 @@ namespace Duet::Sbc
 		GpioInputPin& operator=(GpioInputPin&&) = delete;
 
 		// Event fd to pass to poll()/ppoll(). Readable when an edge event is queued.
-		[[nodiscard]] int Fd() const noexcept { return m_reqFd; }
+		[[nodiscard]] int Fd() const noexcept override { return m_reqFd; }
 
 		// Read the current level of the line directly from the kernel (ioctl). Throws on failure.
-		[[nodiscard]] bool Read() const;
+		[[nodiscard]] bool Read() const override;
 
 		// Consume one queued edge event (non-blocking). Updates the level and, on a rising edge, the
 		// rising-edge sequence number. Returns true if an event was read, false if none were pending.
 		// Throws std::system_error on a real read error.
-		bool ReadEvent();
+		bool ReadEvent() override;
 
 		// Sequence number of the most recently observed rising edge (kernel per-line seqno on v2, or a
 		// running rising-edge count on v1).
-		[[nodiscard]] uint32_t RisingSequenceNumber() const noexcept { return m_lastRisingSeqno; }
+		[[nodiscard]] uint32_t RisingSequenceNumber() const noexcept override { return m_lastRisingSeqno; }
 
 		// Number of edges the kernel dropped before they could be read (v2 event buffer overruns).
-		[[nodiscard]] int MissedEdges() const noexcept { return m_missedEdges; }
+		[[nodiscard]] int MissedEdges() const noexcept override { return m_missedEdges; }
 
 		[[nodiscard]] bool SupportsSequenceNumbers() const noexcept { return m_useV2; }
 

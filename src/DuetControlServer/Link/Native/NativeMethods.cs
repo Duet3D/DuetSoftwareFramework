@@ -74,6 +74,12 @@ internal struct NativeConfig
 
     /// <summary>Socket transport only: path of the socket the virtual controller listens on (UTF-8, NUL-terminated)</summary>
     public IntPtr SocketPath;
+
+    /// <summary>SPI transport only: what carries the bus and lines (<see cref="NativeSpiHardware"/>)</summary>
+    public int SpiHardware;
+
+    /// <summary>Emulator hardware only: path of the socket the emulated controller listens on (UTF-8, NUL-terminated)</summary>
+    public IntPtr EmulatorSocketPath;
 }
 
 /// <summary>
@@ -87,6 +93,19 @@ internal enum NativeTransport
 
     /// <summary>A virtual controller over a Unix domain socket (see DuetSpiProtocol/SocketLinkFormats.h)</summary>
     Socket = 1
+}
+
+/// <summary>
+/// Values for <see cref="NativeConfig.SpiHardware"/>. Mirrors <c>SpiHardwareKind</c> in
+/// <c>DuetRealtimeCore/src/Config/Configuration.h</c>
+/// </summary>
+internal enum NativeSpiHardware
+{
+    /// <summary>spidev and the GPIO character device</summary>
+    Linux = 0,
+
+    /// <summary>An emulated controller over the emulator link (see Hardware/Emulator/EmulatorLinkFormats.h)</summary>
+    Emulator = 1
 }
 
 /// <summary>

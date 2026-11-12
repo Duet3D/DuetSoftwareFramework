@@ -1,8 +1,9 @@
 // Socket framing for the SBC link: the transfer protocol of MessageFormats.h carried over a stream
 // socket instead of SPI. This is what connects DuetControlServer to a virtual controller - the
-// scriptable fake endpoint of the system test bench, and later the Renode link peripheral - so the
-// framing is defined here, beside the wire structs it carries, where both sides of the link and the
-// C# mirror can share it.
+// scriptable fake endpoint of the system test bench - so the framing is defined here, beside the wire
+// structs it carries, where both sides of the link and the C# mirror can share it. An emulated
+// controller is reached over SPI instead, through the emulator link (DuetRealtimeCore's
+// Hardware/Emulator), so that its firmware's own SPI interface is what runs.
 //
 // The mapping from the SPI exchange (see Interface/Transport.h for the three problems it names):
 //

@@ -16,6 +16,11 @@ target_link_libraries(ring_buffer_tests PRIVATE duet_realtime_core)
 # is the executable specification the C# fake endpoint in src/SystemTests follows.
 duet_realtime_core_add_test(socket_transport_tests SocketTransportTests.cpp)
 
+# The emulator link that carries the SPI transport's bus and lines to an emulated controller,
+# against an in-process peer playing the emulator's side of EmulatorLinkFormats.h
+duet_realtime_core_add_test(emulator_link_tests EmulatorLinkTests.cpp)
+target_link_libraries(emulator_link_tests PRIVATE duet_realtime_core)
+
 # The handshake with the IAP program, which the socket transport has no equivalent of
 duet_realtime_core_add_test(iap_ready_line_tests IapReadyLineTests.cpp)
 target_link_libraries(iap_ready_line_tests PRIVATE duet_realtime_core)

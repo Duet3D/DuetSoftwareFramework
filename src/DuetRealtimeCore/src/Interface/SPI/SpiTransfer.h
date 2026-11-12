@@ -2,16 +2,15 @@
 // DuetControlServer/Link/Adapter/SPI.cs (SPI transport only, no USB).
 //
 // The packet buffers, CRC bookkeeping and retry/recovery skeleton live in FullDuplexExchangeTransport; this class
-// owns what is SPI about the link: the TfrRdy/DataAvailable GPIO lines, the spidev device, the
+// owns what is SPI about the link: the TfrRdy/DataAvailable lines, the SPI bus, the
 // header/data/response exchange state machine against the controller, and the bare-transfer IAP
-// flashing handshake.
+// flashing handshake. The bus and lines are the configured SbcHardware: Linux devices for a real
+// controller, the emulator link for an emulated one.
 #pragma once
 
 #include <Config/Configuration.h>
 #include <DuetSpiProtocol/MessageFormats.h>
-#include <Hardware/GpioInputPin.h>
-#include <Hardware/OutputGpioPin.h>
-#include <Hardware/SpiDevice.h>
+#include <Hardware/SbcHardware.h>
 #include <Interface/FullDuplexExchangeTransport.h>
 #include <Interface/SPI/IapReadyLine.h>
 
@@ -81,17 +80,17 @@ namespace Duet::Sbc
 		bool ExchangeData();
 		bool ExchangeDataResponse(bool& success);
 
-		std::unique_ptr<GpioInputPin> m_transferReadyPin;
-		std::unique_ptr<GpioInputPin> m_dataAvailablePin;
+		std::unique_ptr<InputLine> m_transferReadyPin;
+		std::unique_ptr<InputLine> m_dataAvailablePin;
 		IapReadyLine m_iapReadyLine;
 		// Optional scope trigger: high while data is staged, low once the transfer completes
-		std::unique_ptr<OutputGpioPin> m_sbcDataAvailablePin;
+		std::unique_ptr<OutputLine> m_sbcDataAvailablePin;
 
 		// The rising-edge sequence number already consumed for the previous exchange. A sub-exchange must
 		// wait for a rising edge newer than this rather than trusting a possibly stale high level.
 		uint32_t m_consumedRisingEdgeSeq = 0;
 
-		std::unique_ptr<SpiDevice> m_spiDevice;
+		std::unique_ptr<SpiBus> m_spiBus;
 
 		int m_numTfrPinGlitches = 0;
 	};

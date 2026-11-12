@@ -11,12 +11,20 @@ namespace Duet::Sbc
 
 	// Which transport carries the link. Spi is the real controller over spidev; Socket speaks the
 	// same transfer protocol over a Unix domain stream socket to a virtual controller (the system
-	// test bench's fake endpoint, or the Renode link peripheral). See Interface/Transport.h and
+	// test bench's fake endpoint). See Interface/Transport.h and
 	// DuetSpiProtocol/SocketLinkFormats.h.
 	enum class TransportKind : uint8_t
 	{
 		Spi = 0,
 		Socket = 1
+	};
+
+	// What the SPI transport's bus and lines are. Linux uses spidev and the GPIO character device;
+	// Emulator uses the emulator link to an emulated controller (Hardware/Emulator/EmulatorLinkFormats.h).
+	enum class SpiHardwareKind : uint8_t
+	{
+		Linux = 0,
+		Emulator = 1
 	};
 
 	struct Config
@@ -31,6 +39,11 @@ namespace Duet::Sbc
 
 		// Socket transport: path of the Unix domain socket the virtual controller listens on
 		std::string socketPath = "/run/dsf/sbc.sock";
+
+		// SPI transport: what carries its bus and lines
+		SpiHardwareKind spiHardware = SpiHardwareKind::Linux;
+		// Emulator hardware only: path of the Unix domain socket the emulated controller listens on
+		std::string emulatorSocketPath = "/run/dsf/emulator.sock";
 
 		// GPIO
 		std::string gpioChipDevice = "/dev/gpiochip0";

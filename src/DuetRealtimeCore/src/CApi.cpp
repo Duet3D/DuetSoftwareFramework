@@ -75,6 +75,9 @@ namespace
 		cfg.transport = static_cast<Duet::Sbc::TransportKind>(c->transport);
 		if (c->socketPath)
 			cfg.socketPath = c->socketPath;
+		cfg.spiHardware = static_cast<Duet::Sbc::SpiHardwareKind>(c->spiHardware);
+		if (c->emulatorSocketPath)
+			cfg.emulatorSocketPath = c->emulatorSocketPath;
 		return cfg;
 	}
 
@@ -109,6 +112,7 @@ extern "C"
 		config->maxSbcRetries = def.maxSbcRetries;
 		config->updateOnly = def.updateOnly ? 1 : 0;
 		config->transport = static_cast<int32_t>(def.transport);
+		config->spiHardware = static_cast<int32_t>(def.spiHardware);
 	}
 
 	DuetRTHandle* DuetRT_Create(const DuetRTConfig* config, char* errorBuf, int32_t errorBufLen)

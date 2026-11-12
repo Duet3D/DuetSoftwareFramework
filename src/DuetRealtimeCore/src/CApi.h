@@ -58,6 +58,13 @@ extern "C"
 		int32_t transport;
 		// Socket transport only: path of the Unix domain socket the virtual controller listens on
 		const char* socketPath;
+
+		// SPI transport only: what carries the bus and lines, 0 = Linux (spidev and the GPIO character
+		// device), 1 = emulator (the emulator link; see Hardware/Emulator/EmulatorLinkFormats.h). Mirrors
+		// duet::sbc::SpiHardwareKind.
+		int32_t spiHardware;
+		// Emulator hardware only: path of the Unix domain socket the emulated controller listens on
+		const char* emulatorSocketPath;
 	};
 
 	// Fill `config` with the default values.

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<IsPackable>false</IsPackable>
+		<IsPublishable>false</IsPublishable>
+		<Nullable>enable</Nullable>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+	</PropertyGroup>
+
+	<!-- Renode compiles the peripheral models itself, against its own assemblies, when a bench
+	     includes them; they are not part of this assembly -->
+	<ItemGroup>
+		<Compile Remove="Renode/**" />
+		<None Include="Renode/**" CopyToOutputDirectory="Never" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="EmulationTests" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\DuetAPI\DuetAPI.csproj" />
+		<ProjectReference Include="..\DuetControlServer\DuetControlServer.csproj" />
+	</ItemGroup>
+</Project>

@@ -3,13 +3,15 @@
 // trigger that goes high while the SBC has data to transfer and low once the transfer completes.
 #pragma once
 
+#include <Hardware/SbcHardware.h>
+
 #include <cstdint>
 #include <string>
 
 namespace Duet::Sbc
 {
 
-	class OutputGpioPin
+	class OutputGpioPin final : public OutputLine
 	{
 	  public:
 		// Open a GPIO line for output and drive it to initialValue. Throws std::system_error on failure.
@@ -17,7 +19,7 @@ namespace Duet::Sbc
 					  int line,
 					  const std::string& consumerLabel,
 					  bool initialValue = false);
-		~OutputGpioPin();
+		~OutputGpioPin() override;
 
 		OutputGpioPin(const OutputGpioPin&) = delete;
 		OutputGpioPin& operator=(const OutputGpioPin&) = delete;
@@ -25,7 +27,7 @@ namespace Duet::Sbc
 		OutputGpioPin& operator=(OutputGpioPin&&) = delete;
 
 		// Drive the line to the given level. Throws std::system_error on failure.
-		void Write(bool value);
+		void Write(bool value) override;
 
 		[[nodiscard]] bool Value() const noexcept { return m_value; }
 

@@ -159,6 +159,19 @@ public sealed class Settings
     public string SbcSocketPath { get; set; } = "/run/dsf/sbc.sock";
 
     /// <summary>
+    /// What carries the SPI transport's bus and lines. "Linux" is <see cref="SpiDevice"/> and the
+    /// GPIO lines of <see cref="GpioChipDevice"/>; "Emulator" is an emulated controller listening at
+    /// <see cref="SpiEmulatorSocketPath"/> (the emulation test bench)
+    /// </summary>
+    public string SpiHardware { get; set; } = "Linux";
+
+    /// <summary>
+    /// Path of the Unix domain socket the emulated controller listens on when
+    /// <see cref="SpiHardware"/> is "Emulator"
+    /// </summary>
+    public string SpiEmulatorSocketPath { get; set; } = "/run/dsf/emulator.sock";
+
+    /// <summary>
     /// SPI device that is connected to RepRapFirmware
     /// </summary>
     public string SpiDevice { get; set; } = "/dev/spidev0.0";
