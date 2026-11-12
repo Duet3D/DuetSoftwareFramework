@@ -48,7 +48,11 @@ public sealed partial class PinTable
     }
 
     /// <summary>Read a board's pin table from its configuration header</summary>
-    /// <exception cref="InvalidDataException">The header has no pin table this can read</exception>
+    /// <exception cref="InvalidDataException">
+    /// The header has no pin table this can read, or a row's comment names a pin other than the one
+    /// at its position: the firmware indexes the table by pin, so the comment is only trusted where
+    /// the two agree
+    /// </exception>
     public static PinTable Load(string headerPath)
     {
         List<PinTableEntry> entries = [];
@@ -75,6 +79,14 @@ public sealed partial class PinTable
         if (entries.Count == 0)
         {
             throw new InvalidDataException($"No pin table found in {headerPath}");
+        }
+        for (int i = 0; i < entries.Count; i++)
+        {
+            if (entries[i].Pin.Index != i)
+            {
+                throw new InvalidDataException(
+                    $"Row {i} of the pin table in {headerPath} says it is {entries[i].Pin}, but row {i} is {new McuPin(i / 32, i % 32)}");
+            }
         }
         return new PinTable(entries);
     }

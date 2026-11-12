@@ -61,7 +61,7 @@ extern "C"
 
 		// SPI transport only: what carries the bus and lines, 0 = Linux (spidev and the GPIO character
 		// device), 1 = emulator (the emulator link; see Hardware/Emulator/EmulatorLinkFormats.h). Mirrors
-		// duet::sbc::SpiHardwareKind.
+		// Duet::Sbc::SpiHardwareKind.
 		int32_t spiHardware;
 		// Emulator hardware only: path of the Unix domain socket the emulated controller listens on
 		const char* emulatorSocketPath;

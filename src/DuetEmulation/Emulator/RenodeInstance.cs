@@ -54,12 +54,9 @@ public sealed class RenodeInstance : IAsyncDisposable
             candidates.Add(fromEnvironment);
         }
         candidates.Add("/opt/renode/renode");
-        foreach (string directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty).Split(Path.PathSeparator))
+        if (FindOnPath("renode") is string onPath)
         {
-            if (directory.Length > 0)
-            {
-                candidates.Add(Path.Combine(directory, "renode"));
-            }
+            candidates.Add(onPath);
         }
         foreach (string candidate in candidates)
         {
@@ -81,13 +78,23 @@ public sealed class RenodeInstance : IAsyncDisposable
         for (int attempt = 1; ; attempt++)
         {
             int port = FreePort();
-            ProcessStartInfo startInfo = new(executable)
+            // setpriv has the kernel kill Renode when the thread that started it dies, which is the
+            // launcher's, which lives as long as this process: a test run that is killed does not leave
+            // emulators running
+            string? setpriv = FindOnPath("setpriv");
+            ProcessStartInfo startInfo = new(setpriv ?? executable)
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 RedirectStandardInput = true,
                 UseShellExecute = false
             };
+            if (setpriv is not null)
+            {
+                startInfo.ArgumentList.Add("--pdeathsig");
+                startInfo.ArgumentList.Add("KILL");
+                startInfo.ArgumentList.Add(executable);
+            }
             foreach (string argument in new[] { "--disable-gui", "--plain", "--hide-log", "--port", "-1", "--robot-server-port", port.ToString() })
             {
                 startInfo.ArgumentList.Add(argument);
@@ -96,7 +103,7 @@ public sealed class RenodeInstance : IAsyncDisposable
             // while it writes (the console, the CAN and I/O traces)
             startInfo.Environment["DOTNET_SYSTEM_IO_DISABLEFILELOCKING"] = "1";
 
-            Process process = Process.Start(startInfo) ?? throw new RenodeException($"Could not start {executable}");
+            Process process = await ProcessLauncher.StartAsync(startInfo);
             LogSink log = new(logPath, append: attempt > 1);
             process.OutputDataReceived += (_, e) => log.Write(e.Data);
             process.ErrorDataReceived += (_, e) => log.Write(e.Data);
@@ -104,14 +111,24 @@ public sealed class RenodeInstance : IAsyncDisposable
             process.BeginErrorReadLine();
 
             XmlRpcClient client = new(new Uri($"http://127.0.0.1:{port}/"), CommandTimeout);
-            if (await WaitForServerAsync(process, client, cancellationToken))
+            bool started = false;
+            try
+            {
+                started = await WaitForServerAsync(process, client, cancellationToken);
+            }
+            finally
+            {
+                if (!started)
+                {
+                    client.Dispose();
+                    Kill(process);
+                    log.Dispose();
+                }
+            }
+            if (started)
             {
                 return new RenodeInstance(process, log, client, logPath);
             }
-
-            client.Dispose();
-            Kill(process);
-            log.Dispose();
             if (attempt == attempts)
             {
                 throw new RenodeException($"Renode did not open its robot server; see {logPath}");
@@ -130,15 +147,32 @@ public sealed class RenodeInstance : IAsyncDisposable
             }
             try
             {
-                await client.CallAsync("get_keyword_names", [], cancellationToken);
+                using CancellationTokenSource attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                attempt.CancelAfter(TimeSpan.FromSeconds(5));
+                await client.CallAsync("get_keyword_names", [], attempt.Token);
                 return true;
             }
-            catch (HttpRequestException)
+            catch (Exception e) when (!cancellationToken.IsCancellationRequested &&
+                                      e is HttpRequestException or OperationCanceledException or System.Xml.XmlException or XmlRpcFaultException)
             {
+                // Not up yet, or something else answered on the port
                 await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
             }
         }
         return false;
+    }
+
+    private static string? FindOnPath(string name)
+    {
+        foreach (string directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty).Split(Path.PathSeparator))
+        {
+            string candidate = Path.Combine(directory, name);
+            if (directory.Length > 0 && File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     private static int FreePort()
@@ -205,7 +239,12 @@ public sealed class RenodeInstance : IAsyncDisposable
     /// <inheritdoc/>
     public async ValueTask DisposeAsync()
     {
-        await _lock.WaitAsync();
+        // A command that hangs holds the lock; Renode is killed rather than waited for
+        if (!await _lock.WaitAsync(TimeSpan.FromSeconds(10)))
+        {
+            Kill(_process);
+            await _lock.WaitAsync();
+        }
         try
         {
             if (_disposed)

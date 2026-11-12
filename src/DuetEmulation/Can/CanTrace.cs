@@ -88,11 +88,26 @@ public sealed class CanTrace(string path)
         Find(T.MessageType, source, destination, response);
 
     /// <summary>
-    /// The standard reply to a request, once every fragment of it has been recorded, or null until then
+    /// The standard reply to a request, once every fragment of it has been recorded, or null until then.
+    /// Only frames recorded after the request count, because request ids repeat
     /// </summary>
     public StandardReply? ReplyTo(CanFrame request)
     {
-        List<CanFrame> fragments = [.. All
+        IReadOnlyList<CanFrame> all = All;
+        int index = -1;
+        for (int i = all.Count - 1; i >= 0; i--)
+        {
+            if (ReferenceEquals(all[i], request))
+            {
+                index = i;
+                break;
+            }
+        }
+        if (index < 0)
+        {
+            throw new ArgumentException("The request is not a frame of this trace", nameof(request));
+        }
+        List<CanFrame> fragments = [.. all.Skip(index + 1)
             .Where(f => f.Is<CanMessageStandardReply>() && f.IsResponse && f.Source == request.Destination &&
                         f.Destination == request.Source && f.RequestId == request.RequestId)
             .OrderBy(f => f.AsStandardReply().FragmentNumber)];

@@ -85,10 +85,7 @@ namespace Antmicro.Renode.Peripherals.DMA
                 case GlobalType: return NumChannels - 1;
                 case GlobalInterruptMask: return globalInterruptMask;
                 case GlobalStatus: return enabledMask;
-                // The handler reads this first to find which channels interrupted, and only then reads
-                // each channel's CIS to clear it. Returning 0 here meant no channel was ever serviced,
-                // so the flag was never cleared and the interrupt re-entered forever - the firmware
-                // wedged after exactly one DMA completion, with no error anywhere.
+                // Channels with an unmasked pending interrupt, which the handler reads before clearing each channel's CIS
                 case GlobalInterruptStatus:
                 {
                     var pending = 0u;

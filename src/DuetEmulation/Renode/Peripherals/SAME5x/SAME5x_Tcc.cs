@@ -5,7 +5,9 @@
 // and which is computed from PER, CCx, the prescaler and the GCLK frequency.
 //
 // Output WO[x] is compared against CC[x % channels], as on the part with WEXCTRL.OTMX = 0, which is
-// how CoreN2G uses an output that has no compare channel of its own. Buffered writes (PERBUF, CCBUF)
+// how CoreN2G uses an output that has no compare channel of its own. Other output matrix settings and
+// output inversion (WAVE.POLx, DRVCTRL.INVENx) are not modelled: CoreN2G uses them only for a beeper
+// driven differentially from two outputs. Buffered writes (PERBUF, CCBUF)
 // take effect at once rather than at the next update: the difference is at most one PWM period.
 //
 // It is clocked by its GCLK channel, at the frequency the GCLK model reports for it.
@@ -156,7 +158,7 @@ namespace Antmicro.Renode.Peripherals.Timers
         private readonly SAME5x_Gclk gclk;
         private readonly int gclkChannel;
         private readonly ulong defaultFrequency;
-        private readonly byte[] storage = new byte[0x80];
+        private readonly byte[] storage = new byte[CcBufBase + 4 * MaxChannels];
 
         private static readonly uint[] Prescalers = { 1, 2, 4, 8, 16, 64, 256, 1024 };
 

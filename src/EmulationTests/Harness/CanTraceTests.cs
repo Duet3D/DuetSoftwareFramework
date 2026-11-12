@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
@@ -89,8 +90,9 @@ public class CanTraceTests
     public void AReplyIsCompleteOnceItsLastFragmentArrives()
     {
         CanTrace trace = new(_path);
-        CanFrame request = Frame(1, CanMessageType.M569, 0, 1, false, [0x07, 0x00]);
-        Append(request, Frame(1.1, CanMessageType.StandardReply, 1, 0, true, Reply(7, CodeResult.Ok, 0, true, "Driver 1.0 runs ")));
+        Append(Frame(1, CanMessageType.M569, 0, 1, false, [0x07, 0x00]),
+               Frame(1.1, CanMessageType.StandardReply, 1, 0, true, Reply(7, CodeResult.Ok, 0, true, "Driver 1.0 runs ")));
+        CanFrame request = trace.Find<CanMessageM569>().Single();
         Assert.That(trace.ReplyTo(request), Is.Null, "the reply is not complete while more fragments follow");
 
         // A reply to another request, which must not be mixed in
@@ -103,6 +105,20 @@ public class CanTraceTests
             Assert.That(reply!.Text, Is.EqualTo("Driver 1.0 runs forwards"));
             Assert.That(reply.Result, Is.EqualTo(CodeResult.Warning));
         });
+    }
+
+    [Test]
+    public void AnEarlierReplyWithTheSameRequestIdIsNotTheReply()
+    {
+        CanTrace trace = new(_path);
+        // Request ids are 12 bits and wrap, so an old reply can carry the id of a new request
+        Append(Frame(1, CanMessageType.StandardReply, 1, 0, true, Reply(9, CodeResult.Error, 0, false, "old")),
+               Frame(2, CanMessageType.M569, 0, 1, false, [0x09, 0x00]));
+        CanFrame request = trace.Find<CanMessageM569>().Single();
+        Assert.That(trace.ReplyTo(request), Is.Null);
+
+        Append(Frame(2.1, CanMessageType.StandardReply, 1, 0, true, Reply(9, CodeResult.Ok, 0, false, "new")));
+        Assert.That(trace.ReplyTo(request)?.Text, Is.EqualTo("new"));
     }
 
     [Test]

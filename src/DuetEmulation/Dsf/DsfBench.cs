@@ -17,7 +17,11 @@ namespace DuetEmulation.Dsf;
 /// DuetControlServer runs in real time, so the emulation runs continuously rather than only while a
 /// call waits: a pump lets emulated time pass a slice at a time for as long as the bench is up. What a
 /// test sees is therefore not repeatable to the emulated microsecond as it is on the RepRapFirmware
-/// bench, though waits are still measured in emulated time
+/// bench, though waits are still measured in emulated time.
+/// <para>
+/// One DSF bench runs in a process at a time: DuetRealtimeCore's step clock and the time base it is
+/// timed against are process-wide
+/// </para>
 /// </remarks>
 public sealed class DsfBench : Bench
 {
@@ -29,6 +33,8 @@ public sealed class DsfBench : Bench
 
     // How much emulated time each step of the pump lets pass
     private static readonly TimeSpan PumpSlice = TimeSpan.FromMilliseconds(5);
+
+    private static int s_running;
 
     private readonly CancellationTokenSource _stop = new();
     private readonly string _socketDirectory;
@@ -52,16 +58,39 @@ public sealed class DsfBench : Bench
     public static async Task<DsfBench> StartAsync(IReadOnlyDictionary<int, BoardType> expansionBoards, string config, string workDirectory,
                                                   IReadOnlyDictionary<string, string>? files = null, CancellationToken cancellationToken = default)
     {
-        EmulatedSystem system = await EmulatedSystem.CreateAsync(new SystemOptions
+        if (Interlocked.CompareExchange(ref s_running, 1, 0) != 0)
         {
-            MainBoard = BoardTypes.Mb6hcCanMaster,
-            ExpansionBoards = expansionBoards,
-            WorkDirectory = workDirectory
-        }, cancellationToken);
+            throw new InvalidOperationException("Another DSF bench is running in this process, and DuetRealtimeCore's step clock is process-wide");
+        }
+        EmulatedSystem system;
+        try
+        {
+            system = await EmulatedSystem.CreateAsync(new SystemOptions
+            {
+                MainBoard = BoardTypes.Mb6hcCanMaster,
+                ExpansionBoards = expansionBoards,
+                WorkDirectory = workDirectory
+            }, cancellationToken);
+        }
+        catch
+        {
+            Volatile.Write(ref s_running, 0);
+            throw;
+        }
 
         // A Unix socket path is limited to 107 bytes, which a run directory can exceed, so the sockets
         // (the SBC link's and DuetControlServer's IPC socket) go in a short directory of their own
-        string socketDirectory = Directory.CreateTempSubdirectory("duet-emulation-").FullName;
+        string socketDirectory;
+        try
+        {
+            socketDirectory = Directory.CreateTempSubdirectory("duet-emulation-").FullName;
+        }
+        catch
+        {
+            await system.DisposeAsync();
+            Volatile.Write(ref s_running, 0);
+            throw;
+        }
         string socketPath = Path.Combine(socketDirectory, "sbc.sock");
         DsfBench bench = new(system, socketDirectory);
         try
@@ -142,23 +171,35 @@ public sealed class DsfBench : Bench
     /// <inheritdoc/>
     public override async ValueTask DisposeAsync()
     {
-        if (_dcs is not null)
-        {
-            await _dcs.DisposeAsync();
-        }
-        await _stop.CancelAsync();
         try
         {
-            await _pump;
+            if (_dcs is not null)
+            {
+                await _dcs.DisposeAsync();
+            }
         }
-        catch (OperationCanceledException)
+        finally
         {
+            await _stop.CancelAsync();
+            try
+            {
+                // A run that hangs is ended by disposing Renode, which kills it
+                await _pump.WaitAsync(TimeSpan.FromSeconds(10));
+            }
+            catch (Exception e) when (e is OperationCanceledException or TimeoutException or Emulator.RenodeException or InvalidOperationException)
+            {
+                // The pump stops when cancelled, or ended earlier because the emulation failed
+            }
+            try
+            {
+                await base.DisposeAsync();
+            }
+            finally
+            {
+                Directory.Delete(_socketDirectory, recursive: true);
+                _stop.Dispose();
+                Volatile.Write(ref s_running, 0);
+            }
         }
-        catch (Emulator.RenodeException)
-        {
-        }
-        await base.DisposeAsync();
-        Directory.Delete(_socketDirectory, recursive: true);
-        _stop.Dispose();
     }
 }

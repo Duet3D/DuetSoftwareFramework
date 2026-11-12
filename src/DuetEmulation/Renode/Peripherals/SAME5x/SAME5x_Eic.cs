@@ -49,18 +49,32 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
 
         public IReadOnlyDictionary<int, IGPIO> Connections { get; }
 
-        // The pin of EXTINT line `line` is now at `level`. Only a pin muxed to the EIC (`connected`)
-        // interrupts, but the level is tracked either way so that muxing a pin is not an edge.
-        public void OnPinLevel(int line, bool level, bool connected)
+        // A pin has been muxed to EXTINT line `line` (or unmuxed, `connected` false) while at `level`.
+        // Several pins share a line, and only the one muxed to the EIC drives it; connecting a pin
+        // takes its level without that being an edge.
+        public void ConnectPin(int line, bool connected, bool level)
         {
             if(line < 0 || line >= NumLines)
             {
                 return;
             }
             var bit = 1u << line;
+            connectedLines = connected ? connectedLines | bit : connectedLines & ~bit;
+            pinState = level ? pinState | bit : pinState & ~bit;
+            ReassertLevelFlags();
+        }
+
+        // The pin muxed to EXTINT line `line` is now at `level`
+        public void OnPinLevel(int line, bool level)
+        {
+            if(line < 0 || line >= NumLines || (connectedLines & (1u << line)) == 0)
+            {
+                return;
+            }
+            var bit = 1u << line;
             var was = (pinState & bit) != 0;
             pinState = level ? pinState | bit : pinState & ~bit;
-            if(connected && Enabled && Triggers(line, was, level))
+            if(Enabled && Triggers(line, was, level))
             {
                 SetFlag(bit);
             }
@@ -99,6 +113,10 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             uint flags = 0;
             for(var line = 0; line < NumLines; line++)
             {
+                if((connectedLines & (1u << line)) == 0)
+                {
+                    continue;
+                }
                 var level = (pinState & (1u << line)) != 0;
                 var sense = Sense(line);
                 if((sense == SenseHigh && level) || (sense == SenseLow && !level))
@@ -193,6 +211,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
 
         private readonly byte[] storage = new byte[0x40];
         private uint pinState;
+        private uint connectedLines;
 
         private const int NumLines = 16;
         private const long CtrlA = 0x00;

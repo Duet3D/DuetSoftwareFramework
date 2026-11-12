@@ -27,6 +27,7 @@ public sealed class RrfConsole
     private readonly EmulatedBoard _board;
     private readonly string _uart;
     private readonly Lock _lock = new();
+    private readonly SemaphoreSlim _sendLock = new(1, 1);
     private readonly Decoder _decoder = Encoding.UTF8.GetDecoder();
     private readonly StringBuilder _transcript = new();
     private readonly StringBuilder _unclaimed = new();
@@ -79,15 +80,24 @@ public sealed class RrfConsole
         }
 
         TaskCompletionSource<string> reply = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        string marker;
-        lock (_lock)
+        // A line and its marker go out together, so that lines sent at once cannot interleave
+        await _sendLock.WaitAsync(cancellationToken);
+        try
         {
-            ReadNewOutput();
-            marker = $"<<{++_marker}>>";
-            _pending.Enqueue((marker, reply));
+            string marker;
+            lock (_lock)
+            {
+                ReadNewOutput();
+                marker = $"<<{++_marker}>>";
+                _pending.Enqueue((marker, reply));
+            }
+            await WriteLineAsync(line, cancellationToken);
+            await WriteLineAsync($"echo \"{marker}\"", cancellationToken);
         }
-        await WriteLineAsync(line, cancellationToken);
-        await WriteLineAsync($"echo \"{marker}\"", cancellationToken);
+        finally
+        {
+            _sendLock.Release();
+        }
         return reply.Task;
     }
 

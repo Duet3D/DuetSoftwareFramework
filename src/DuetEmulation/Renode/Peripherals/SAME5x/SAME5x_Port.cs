@@ -46,6 +46,7 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
             outputs = new PinOutput[groups * PinsPerGroup];
             excluded = new bool[groups * PinsPerGroup];
             extIntLines = new int[groups * PinsPerGroup];
+            connectedToEic = new bool[groups * PinsPerGroup];
             for(var i = 0; i < extIntLines.Length; i++)
             {
                 extIntLines[i] = -1;
@@ -114,9 +115,9 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
                 case EvCtrl:
                     return g.EvCtrl;
                 default:
-                    if(reg < PmuxBase)
+                    if(reg < PmuxBase || reg >= PinCfgBase + PinsPerGroup)
                     {
-                        return 0;           // WRCONFIG is write-only
+                        return 0;           // WRCONFIG is write-only, and the rest of the group is reserved
                     }
                     var aligned = offset & ~3L;
                     return (uint)(ReadByte(aligned) | ReadByte(aligned + 1) << 8 | ReadByte(aligned + 2) << 16 | ReadByte(aligned + 3) << 24);
@@ -166,7 +167,13 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
                 case EvCtrl:
                     g.EvCtrl = value;
                     break;
+                case In:
+                    break;                  // read-only
                 default:
+                    if(offset % GroupSize >= PinCfgBase + PinsPerGroup)
+                    {
+                        break;              // reserved
+                    }
                     for(var i = 0; i < 4; i++)
                     {
                         WriteByte((offset & ~3L) + i, (byte)(value >> (8 * i)));
@@ -409,8 +416,17 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
                 var number = index * PinsPerGroup + pin;
                 if(eic != null && extIntLines[number] >= 0)
                 {
-                    var connected = (g.PinCfg[pin] & PinCfgPmuxEn) != 0 && PmuxOf(g, pin) == FunctionEic;
-                    eic.OnPinLevel(extIntLines[number], (levels & bit) != 0, connected);
+                    var connected = IsConnectedToEic(g, pin, number);
+                    var level = (levels & bit) != 0;
+                    if(connected != connectedToEic[number])
+                    {
+                        connectedToEic[number] = connected;
+                        eic.ConnectPin(extIntLines[number], connected, level);
+                    }
+                    else if(connected)
+                    {
+                        eic.OnPinLevel(extIntLines[number], level);
+                    }
                 }
                 var output = ComputeOutput(number);
                 if(!output.Equals(outputs[number]))
@@ -430,6 +446,10 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
             var g = groups[number / PinsPerGroup];
             var pin = number % PinsPerGroup;
             var bit = 1u << pin;
+            if(IsConnectedToEic(g, pin, number))
+            {
+                return new PinOutput { Mode = DuetPinMode.Input };
+            }
             if((g.PinCfg[pin] & PinCfgPmuxEn) != 0)
             {
                 if(pwmMaps.TryGetValue(number, out var map) && map.Function == PmuxOf(g, pin))
@@ -451,6 +471,9 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
         }
 
         private static int PmuxOf(Group g, int pin) => (g.Pmux[pin / 2] >> (4 * (pin & 1))) & 0xF;
+
+        private bool IsConnectedToEic(Group g, int pin, int number) =>
+            extIntLines[number] >= 0 && (g.PinCfg[pin] & PinCfgPmuxEn) != 0 && PmuxOf(g, pin) == FunctionEic;
 
         private static string PinName(int number) => $"P{(char)('A' + number / PinsPerGroup)}{number % PinsPerGroup:D2}";
 
@@ -521,6 +544,7 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
         private readonly PinOutput[] outputs;
         private readonly bool[] excluded;
         private readonly int[] extIntLines;
+        private readonly bool[] connectedToEic;
         private readonly Dictionary<int, PwmMap> pwmMaps = new Dictionary<int, PwmMap>();
         private readonly HashSet<IDuetPwmSource> subscribedSources = new HashSet<IDuetPwmSource>();
 

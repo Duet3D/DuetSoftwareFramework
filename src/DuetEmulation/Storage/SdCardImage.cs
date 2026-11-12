@@ -4,17 +4,23 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace DuetEmulation.Storage;
 
 /// <summary>
 /// An SD card image: a FAT32 filesystem holding the files a main board finds on its card
-/// (sys/config.g and so on), made with mkfs.vfat and mtools
+/// (sys/config.g and so on), made with mkfs.vfat and mtools. The same files make the same image, byte
+/// for byte: the volume ID and every timestamp are fixed, so a run does not depend on when it was made
 /// </summary>
 public static class SdCardImage
 {
     /// <summary>The image size. FAT32 needs at least 65525 clusters, which at one 512-byte sector each is 32MiB</summary>
     public const long Size = 64L * 1024 * 1024;
+
+    // The volume ID and the time every file and directory carries: 2000-01-01, which FAT can hold
+    private const string VolumeId = "44554554";
+    private static readonly DateTimeOffset Timestamp = new(2000, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
     /// <summary>Write an image holding <paramref name="files"/>, which maps paths on the card ("sys/config.g") to their contents</summary>
     /// <exception cref="InvalidOperationException">A tool failed or is not installed</exception>
@@ -25,7 +31,7 @@ public static class SdCardImage
         {
             image.SetLength(Size);
         }
-        Run("mkfs.vfat", "-F", "32", "-n", "DUET", imagePath);
+        Run("mkfs.vfat", "-F", "32", "-n", "DUET", "--invariant", "-i", VolumeId, imagePath);
 
         HashSet<string> made = [];
         foreach ((string path, byte[] contents) in files.OrderBy(f => f.Key, StringComparer.Ordinal))
@@ -42,9 +48,11 @@ public static class SdCardImage
 
             string staged = Path.Combine(Path.GetDirectoryName(imagePath)!, $".sd-{Guid.NewGuid():N}");
             File.WriteAllBytes(staged, contents);
+            File.SetLastWriteTimeUtc(staged, Timestamp.UtcDateTime);
             try
             {
-                Run("mcopy", "-i", imagePath, staged, "::/" + string.Join('/', parts));
+                // -m keeps the staged file's time
+                Run("mcopy", "-m", "-i", imagePath, staged, "::/" + string.Join('/', parts));
             }
             finally
             {
@@ -69,8 +77,10 @@ public static class SdCardImage
         {
             startInfo.ArgumentList.Add(argument);
         }
-        // mtools refuses an image whose geometry it does not recognise
+        // mtools refuses an image whose geometry it does not recognise, and stamps directories it makes
+        // with this time rather than the time now
         startInfo.Environment["MTOOLS_SKIP_CHECK"] = "1";
+        startInfo.Environment["SOURCE_DATE_EPOCH"] = Timestamp.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
 
         Process process;
         try
@@ -83,8 +93,10 @@ public static class SdCardImage
         }
         using (process)
         {
+            // Both streams are read at once, so that neither can fill its pipe and stall the tool
+            Task<string> output = process.StandardOutput.ReadToEndAsync();
             string error = process.StandardError.ReadToEnd();
-            process.StandardOutput.ReadToEnd();
+            output.Wait();
             process.WaitForExit();
             if (process.ExitCode != 0)
             {

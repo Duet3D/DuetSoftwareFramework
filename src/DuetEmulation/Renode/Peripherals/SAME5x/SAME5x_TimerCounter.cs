@@ -39,7 +39,8 @@ namespace Antmicro.Renode.Peripherals.Timers
             this.gclkChannel = gclkChannel;
             defaultFrequency = frequency;
             IRQ = new GPIO();
-            counter = new LimitTimer(machine.ClockSource, frequency, this, "count", Max32, Direction.Ascending, false, WorkMode.Periodic, true, true);
+            // A limit timer starts again from 0 on reaching its limit, so the limit is the counter's period
+            counter = new LimitTimer(machine.ClockSource, frequency, this, "count", Max32 + 1, Direction.Ascending, false, WorkMode.Periodic, true, true);
             counter.LimitReached += () => SetFlags(IntOvf);
             compares = new LimitTimer[NumCompares];
             for(var i = 0; i < NumCompares; i++)
@@ -226,7 +227,7 @@ namespace Antmicro.Renode.Peripherals.Timers
                 clockedAt = input;
                 var frequency = input / prescaler;
                 counter.Frequency = frequency;
-                counter.Limit = CountMax;
+                counter.Limit = CountMax + 1;
                 foreach(var compare in compares)
                 {
                     compare.Frequency = frequency;
@@ -255,6 +256,10 @@ namespace Antmicro.Renode.Peripherals.Timers
                     break;
                 case CmdStop:
                     counter.Enabled = false;
+                    foreach(var compare in compares)
+                    {
+                        compare.Enabled = false;
+                    }
                     break;
                 default:
                     this.Log(LogLevel.Debug, "Command {0} ignored", command);

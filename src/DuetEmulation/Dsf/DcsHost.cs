@@ -27,6 +27,7 @@ public sealed class DcsHost : IAsyncDisposable
     });
 
     private readonly IHost _host;
+    private readonly FileLoggerProvider _log;
 
     /// <summary>The directory DuetControlServer treats as its SD card</summary>
     public string SdDirectory { get; }
@@ -37,9 +38,10 @@ public sealed class DcsHost : IAsyncDisposable
     /// <summary>The live object model</summary>
     public DuetControlServer.Model.ObjectModel Model => Services.GetRequiredService<DuetControlServer.Model.ObjectModel>();
 
-    private DcsHost(IHost host, string sdDirectory)
+    private DcsHost(IHost host, FileLoggerProvider log, string sdDirectory)
     {
         _host = host;
+        _log = log;
         SdDirectory = sdDirectory;
     }
 
@@ -92,9 +94,11 @@ public sealed class DcsHost : IAsyncDisposable
         };
 
         IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
+        // The logging builder does not dispose a provider it is given, so the host does
+        FileLoggerProvider log = new(Path.Combine(workDirectory, "dcs.log"));
         IHost host = new HostBuilder()
             .ConfigureLogging(logging => logging.ClearProviders()
-                .AddProvider(new FileLoggerProvider(Path.Combine(workDirectory, "dcs.log")))
+                .AddProvider(log)
                 .SetMinimumLevel(LogLevel.Debug))
             .ConfigureServices(services => services
                 .AddSettings(configuration, updateOnly: false, logLevel: LogLevel.Debug,
@@ -110,9 +114,10 @@ public sealed class DcsHost : IAsyncDisposable
         catch
         {
             host.Dispose();
+            log.Dispose();
             throw;
         }
-        return new DcsHost(host, sd);
+        return new DcsHost(host, log, sd);
     }
 
     /// <summary>Run codes as if entered on the HTTP input, and return the reply once they have finished</summary>
@@ -144,6 +149,7 @@ public sealed class DcsHost : IAsyncDisposable
         finally
         {
             _host.Dispose();
+            _log.Dispose();
         }
     }
 }
