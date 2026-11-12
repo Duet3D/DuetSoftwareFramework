@@ -14,6 +14,7 @@ namespace EmulationTests.Rrf;
 /// </summary>
 [TestFixture]
 [Category("Emulation")]
+[Category(nameof(Stack.Rrf))]
 public class MainBoardTests
 {
     private RrfBench _bench = null!;

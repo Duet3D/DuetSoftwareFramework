@@ -289,6 +289,17 @@ Run the tests only with `scripts/test.py`, never with `dotnet test`. Arguments a
 scripts/test.py system --filter 'Name~PauseStopsMidMove' -- -p:Profiling=true
 ```
 
+### Emulation tests
+
+The emulation tests run the firmware images this repository builds in the Renode emulator, with expansion boards on an emulated CAN bus, and observe the replies, the object model, the CAN traffic and the boards' pins as the regression bench does on hardware. Each scenario runs both on RepRapFirmware standalone and on DuetControlServer driving DuetCANMaster:
+
+```bash
+scripts/test.py emulation --build            # build the firmware images, then run the tests
+scripts/test.py emulation --stack dsf        # only on DuetControlServer
+```
+
+A run takes several minutes, most of it booting the emulated boards. [src/DuetEmulation/README.md](src/DuetEmulation/README.md) describes the bench, how to write tests for it and what it does not model yet.
+
 ## Deploy to a Remote DuetPi/SBC
 
 `scripts/deploy.py` deploys DSF projects to a Pi over SSH and rsync, building them first with `--build`, and the [DSF] Build and Deploy tasks run it for the Pi in the `dsf.debug` settings ([DSF] Set Debug Target IP sets it):

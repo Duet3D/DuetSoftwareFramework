@@ -49,8 +49,15 @@ public sealed partial class BoardType
     /// <summary>Its CAN controller on the board's CAN bus</summary>
     public required string CanController { get; init; }
 
-    /// <summary>An expansion board's address switches, bit 0 first, which read low when on; empty for a main board</summary>
+    /// <summary>An expansion board's address switches, bit 0 first, which read low when on; empty if it has none</summary>
     public IReadOnlyList<McuPin> AddressSwitches { get; init; } = [];
+
+    /// <summary>
+    /// The address of an expansion board without switches, which it takes when none has been stored in
+    /// its user area (CANlib's CanId::...DefaultAddress), or null
+    /// </summary>
+    // TODO: store an address in the user area, as M954 does, so that such a board can be at any address
+    public int? DefaultAddress { get; init; }
 
     /// <summary>Where the part keeps its 128-bit serial number, which the firmware reports as its unique ID</summary>
     public IReadOnlyList<ulong> SerialNumberWords { get; init; } = [];
@@ -64,8 +71,11 @@ public sealed partial class BoardType
     /// <summary>The name of the array in <see cref="ConfigurationHeader"/> listing the drivers' DIR pins</summary>
     public required string DirectionPinsArray { get; init; }
 
-    /// <summary>The resistor in series with each thermistor input, which with the thermistor divides the reference</summary>
-    public double ThermistorSeriesResistance { get; init; } = 2200.0;
+    /// <summary>
+    /// The resistor in series with each thermistor input, which with the thermistor divides the
+    /// reference: the firmware's DefaultThermistorSeriesR
+    /// </summary>
+    public double ThermistorSeriesResistance => _thermistorSeriesResistance.Value;
 
     /// <summary>The UART carrying a main board's G-code console, or null</summary>
     public string? ConsoleUart { get; init; }
@@ -76,11 +86,12 @@ public sealed partial class BoardType
     /// <summary>The controller's SBC SPI bridge, for a main board run with an SBC, or null</summary>
     public string? SbcBridge { get; init; }
 
-    /// <summary>Whether it sits on the CAN bus at an address set by its switches</summary>
-    public bool IsExpansion => AddressSwitches.Count > 0;
+    /// <summary>Whether it is an expansion board, at an address set by its switches or its default one</summary>
+    public bool IsExpansion => AddressSwitches.Count > 0 || DefaultAddress is not null;
 
-    /// <summary>The largest address its switches can set</summary>
-    public int MaxAddress => (1 << AddressSwitches.Count) - 1;
+    /// <summary>Whether the bench can put it at a CAN address</summary>
+    public bool CanHaveAddress(int address) =>
+        DefaultAddress is int fixedAddress ? address == fixedAddress : address >= 1 && address < 1 << AddressSwitches.Count;
 
     /// <summary>Its pin table</summary>
     public PinTable PinTable => _pinTable.Value;
@@ -94,6 +105,7 @@ public sealed partial class BoardType
     private readonly Lazy<PinTable> _pinTable;
     private readonly Lazy<IReadOnlyList<McuPin>> _stepPins;
     private readonly Lazy<IReadOnlyList<McuPin>> _directionPins;
+    private readonly Lazy<double> _thermistorSeriesResistance;
 
     /// <summary>Create a board type; its header is read when first needed</summary>
     public BoardType()
@@ -101,6 +113,7 @@ public sealed partial class BoardType
         _pinTable = new(() => PinTable.Load(HeaderPath));
         _stepPins = new(() => ReadPinArray(StepPinsArray!));
         _directionPins = new(() => ReadPinArray(DirectionPinsArray!));
+        _thermistorSeriesResistance = new(() => ReadConstant("DefaultThermistorSeriesR"));
     }
 
     private string HeaderPath => Path.Combine(RepositoryPaths.Root, ConfigurationHeader);
@@ -143,6 +156,14 @@ public sealed partial class BoardType
             throw new InvalidDataException($"{arrayName} in {ConfigurationHeader} lists no pins");
         }
         return pins;
+    }
+
+    private double ReadConstant(string name)
+    {
+        Match constant = Regex.Match(File.ReadAllText(HeaderPath), $@"\b{Regex.Escape(name)}\s*=\s*([0-9.]+)");
+        return constant.Success
+            ? double.Parse(constant.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture)
+            : throw new InvalidDataException($"{ConfigurationHeader} does not define {name}");
     }
 
     [GeneratedRegex(@"^adc(\d)_(\d+)$")]

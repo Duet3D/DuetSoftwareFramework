@@ -15,6 +15,7 @@ namespace EmulationTests.Dsf;
 /// </summary>
 [TestFixture]
 [Category("Emulation")]
+[Category(nameof(Stack.Dsf))]
 public class MainBoardTests
 {
     private DsfBench _bench = null!;

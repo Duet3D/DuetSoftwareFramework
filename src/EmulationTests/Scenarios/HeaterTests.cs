@@ -14,8 +14,8 @@ namespace EmulationTests.Scenarios;
 /// A heater on an expansion board controlling a thermal model: the board's control loop drives the
 /// heater output, the model heats, and the thermistor input reads the result
 /// </summary>
-[TestFixture(Stack.Rrf)]
-[TestFixture(Stack.Dsf)]
+[TestFixture(Stack.Rrf, Category = nameof(Stack.Rrf))]
+[TestFixture(Stack.Dsf, Category = nameof(Stack.Dsf))]
 [Category("Emulation")]
 public class HeaterTests(Stack stack)
 {

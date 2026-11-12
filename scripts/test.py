@@ -8,13 +8,15 @@
     scripts/test.py system --code M140                            the system tests of one code
     scripts/test.py system                                        every system test but the known gaps
     scripts/test.py system -- -p:Profiling=true                   pass the rest to dotnet test
+    scripts/test.py emulation --build                             the firmware on emulated boards, in Renode
     scripts/test.py native                                        DuetRealtimeCore's host-side tests
     scripts/test.py scripts                                       the tests of these scripts
 
 unit runs src/UnitTests under coverage and prints line and branch coverage per assembly. system runs
 src/SystemTests, which host the real DuetControlServer and libduet_realtime_core.so against a scripted
 controller, naming each test as it starts and listing the slow and the failed ones afterwards; the
-full suite takes many minutes. native builds DuetRealtimeCore for this machine and runs its ctest
+full suite takes many minutes. emulation runs src/EmulationTests, which run the firmware images in
+Renode, on RepRapFirmware and on DuetControlServer with DuetCANMaster. native builds DuetRealtimeCore for this machine and runs its ctest
 suite. scripts runs tests/scripts, which test the scripts' command lines with the builds, git and the
 boards faked, so they need no toolchain, build or hardware. `scripts/test.py <command> --help` describes each command's options.
 """
@@ -25,7 +27,7 @@ import argparse
 import sys
 from collections.abc import Sequence
 
-from common import coverage, system_tests
+from common import coverage, emulation_tests, system_tests
 from common.cli import parse, parser, typed
 from common.dsf import REALTIME_CORE
 from common.repo import BUILD, ROOT, call, jobs
@@ -58,6 +60,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter,
                                  usage='%(prog)s [options] [-- <dotnet test args>]')
     system_tests.add_arguments(system)
+    emulation = commands.add_parser('emulation', help='the emulation tests, which run the firmware in Renode',
+                                    description=emulation_tests.__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
+                                    usage='%(prog)s [options] [-- <dotnet test args>]')
+    emulation_tests.add_arguments(emulation)
     commands.add_parser('native', help="DuetRealtimeCore's host-side tests")
     commands.add_parser('scripts', help="the tests of these scripts, which need no build or hardware")
     namespace = parse(p, args[:split])
@@ -66,6 +72,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return coverage.run(typed(coverage.Options, namespace))
     if namespace.command == 'system':
         return system_tests.run(typed(system_tests.Options, namespace, dotnet_args=passthrough))
+    if namespace.command == 'emulation':
+        return emulation_tests.run(typed(emulation_tests.Options, namespace, dotnet_args=passthrough))
     if namespace.command == 'scripts':
         return scripts()
     return native()

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using DuetEmulation;
 using DuetEmulation.Boards;
 using DuetEmulation.Rrf;
 using NUnit.Framework;
@@ -14,6 +15,7 @@ namespace EmulationTests.Rrf;
 /// </summary>
 [TestFixture]
 [Category("Emulation")]
+[Category(nameof(Stack.Rrf))]
 public class DeterminismTests
 {
     [Test]

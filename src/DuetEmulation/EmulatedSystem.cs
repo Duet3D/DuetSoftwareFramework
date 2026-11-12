@@ -28,6 +28,8 @@ public sealed class EmulatedSystem : IAsyncDisposable
     private readonly List<EmulatedBoard> _boards;
     private readonly SemaphoreSlim _timeLock = new(1, 1);
     private long _elapsedTicks;
+    private TimeSpan _quantum;
+    private Exception? _timeFailure;
 
     /// <summary>The Renode instance the machines run in</summary>
     public RenodeInstance Renode { get; }
@@ -74,9 +76,11 @@ public sealed class EmulatedSystem : IAsyncDisposable
             {
                 throw new ArgumentException($"{type.Name} is not an expansion board", nameof(options));
             }
-            if (address < 1 || address > type.MaxAddress)
+            if (!type.CanHaveAddress(address))
             {
-                throw new ArgumentException($"A {type.Name}'s switches cannot set address {address}", nameof(options));
+                throw new ArgumentException(type.DefaultAddress is int fixedAddress
+                    ? $"A {type.Name} can only be at its default address {fixedAddress}"
+                    : $"A {type.Name}'s switches cannot set address {address}", nameof(options));
             }
             boards.Add(Describe(type, address, EmulatedBoard.ExpansionMachine(address), options.Debug));
         }
@@ -84,6 +88,12 @@ public sealed class EmulatedSystem : IAsyncDisposable
         string workDirectory = Path.GetFullPath(options.WorkDirectory);
         if (Directory.Exists(workDirectory))
         {
+            // Emptying a directory that is not the bench's own could destroy anything, so only those
+            string emulation = Path.GetFullPath(RepositoryPaths.Emulation) + Path.DirectorySeparatorChar;
+            if (!workDirectory.StartsWith(emulation, StringComparison.Ordinal) && Directory.EnumerateFileSystemEntries(workDirectory).Any())
+            {
+                throw new ArgumentException($"{workDirectory} is not empty and not under {emulation}, so the bench will not empty it", nameof(options));
+            }
             Directory.Delete(workDirectory, recursive: true);
         }
         Directory.CreateDirectory(workDirectory);
@@ -112,6 +122,7 @@ public sealed class EmulatedSystem : IAsyncDisposable
 
     private async Task BuildAsync(SystemOptions options, CancellationToken cancellationToken)
     {
+        _quantum = options.Quantum;
         await Renode.ExecuteAsync($"logFile {MonitorSyntax.PathArgument(Path.Combine(WorkDirectory, "emulation.log"))} true", cancellationToken: cancellationToken);
         string models = PeripheralModels.Combine(_boards.SelectMany(b => b.Type.Models));
         await Renode.ExecuteAsync($"include {MonitorSyntax.PathArgument(models)}", cancellationToken: cancellationToken);
@@ -218,38 +229,37 @@ public sealed class EmulatedSystem : IAsyncDisposable
         (uint)await Renode.ExecuteForNumberAsync($"sysbus ReadDoubleWord {MonitorSyntax.Hex(address)}", board.Machine, cancellationToken);
 
     /// <summary>Let <paramref name="time"/> of emulated time pass, on every board</summary>
+    /// <exception cref="ArgumentException">The time is not a whole number of quanta, which Renode would round</exception>
+    /// <exception cref="InvalidOperationException">An earlier run failed part way, so the emulated time is not known</exception>
     public async Task RunForAsync(TimeSpan time, CancellationToken cancellationToken = default)
     {
+        if (time <= TimeSpan.Zero || time.Ticks % _quantum.Ticks != 0)
+        {
+            throw new ArgumentException($"{time.TotalMilliseconds}ms is not a whole number of {_quantum.TotalMilliseconds}ms quanta", nameof(time));
+        }
         await _timeLock.WaitAsync(cancellationToken);
         try
         {
-            await Renode.ExecuteAsync($"emulation RunFor {MonitorSyntax.Seconds(time)}", cancellationToken: cancellationToken);
+            if (_timeFailure is not null)
+            {
+                throw new InvalidOperationException("An earlier run of the emulation failed, so its time is not known", _timeFailure);
+            }
+            try
+            {
+                await Renode.ExecuteAsync($"emulation RunFor {MonitorSyntax.Seconds(time)}");
+            }
+            catch (Exception e)
+            {
+                // The run may have got part way, so Time no longer says how far the machines are
+                _timeFailure = e;
+                throw;
+            }
             Interlocked.Add(ref _elapsedTicks, time.Ticks);
         }
         finally
         {
             _timeLock.Release();
         }
-    }
-
-    /// <summary>
-    /// Run until <paramref name="condition"/> holds, checking it every <paramref name="step"/> of
-    /// emulated time, and return the emulated time that passed
-    /// </summary>
-    /// <exception cref="TimeoutException"><paramref name="timeout"/> of emulated time passed first</exception>
-    public async Task<TimeSpan> RunUntilAsync(Func<Task<bool>> condition, TimeSpan timeout, TimeSpan step, string what,
-                                              CancellationToken cancellationToken = default)
-    {
-        TimeSpan start = Time;
-        while (!await condition())
-        {
-            if (Time - start >= timeout)
-            {
-                throw new TimeoutException($"Timed out after {timeout.TotalSeconds:0.###}s of emulated time waiting for {what}");
-            }
-            await RunForAsync(step, cancellationToken);
-        }
-        return Time - start;
     }
 
     /// <inheritdoc/>

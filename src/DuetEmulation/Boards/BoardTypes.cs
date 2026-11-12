@@ -82,8 +82,28 @@ public static class BoardTypes
         DirectionPinsArray = "DirectionPins_v103"
     };
 
+    /// <summary>The Duet 3 Expansion 1HCL, version 2.0 (Duet3Expansion's Config/EXP1HCL.h), at its default address</summary>
+    public static readonly BoardType Exp1hcl = new()
+    {
+        Name = "EXP1HCL",
+        FirmwarePreset = "Duet3Firmware_EXP1HCL",
+        Mcu = McuFamily.Same5x,
+        Platform = "EXP1HCL.repl",
+        Models = [.. CommonModels, .. Same5xModels],
+        Svds = new Dictionary<string, string> { ["svd_same51"] = Same5xSvd("ATSAME51G19A") },
+        ApplicationAddress = 0x10000,
+        BootloaderPreset = "Duet3Bootloader-SAME5x",
+        CanController = "can0",
+        // CANlib's CanId::Exp1HCLBoardDefaultAddress
+        DefaultAddress = 123,
+        SerialNumberWords = [0x008061FC, 0x00806010, 0x00806014, 0x00806018],
+        ConfigurationHeader = "src/Duet3Expansion/src/Config/EXP1HCL.h",
+        StepPinsArray = "StepPins",
+        DirectionPinsArray = "DirectionPins"
+    };
+
     /// <summary>Every board type, main boards first</summary>
-    public static IReadOnlyList<BoardType> All { get; } = [Mb6hcStandalone, Mb6hcCanMaster, Exp3hc];
+    public static IReadOnlyList<BoardType> All { get; } = [Mb6hcStandalone, Mb6hcCanMaster, Exp3hc, Exp1hcl];
 
     /// <summary>The expansion board of a name, as the regression suite names them (EXP3HC)</summary>
     /// <exception cref="ArgumentException">The bench cannot emulate it</exception>

@@ -14,8 +14,8 @@ namespace EmulationTests.Scenarios;
 /// An expansion board's pins as the bench sees them: the outputs its firmware drives, digital or PWM,
 /// and the inputs the bench drives, read by polling or through the EIC
 /// </summary>
-[TestFixture(Stack.Rrf)]
-[TestFixture(Stack.Dsf)]
+[TestFixture(Stack.Rrf, Category = nameof(Stack.Rrf))]
+[TestFixture(Stack.Dsf, Category = nameof(Stack.Dsf))]
 [Category("Emulation")]
 public class BoardIoTests(Stack stack)
 {

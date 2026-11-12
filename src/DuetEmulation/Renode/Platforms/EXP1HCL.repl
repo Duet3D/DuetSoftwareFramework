@@ -1,0 +1,19 @@
+// Duet 3 Expansion 1HCL, version 2.0 (SAME51G19A).
+using "SAME51.repl"
+
+//
+// The board's CAN bus is CAN0 (Config/EXP1HCL.h, CanParams). It has no address switches: its address is
+// CanId::Exp1HCLBoardDefaultAddress unless one has been stored in its user area.
+
+// DID: SAME51G19A, revision D
+dsu:
+    resetValues: "0x18:0x61810305"
+
+// Analogue inputs, as fractions of the 3.3V reference (Config/EXP1HCL.h, the pin table), all on ADC0:
+//   AIN0 VIN: 24V through the 100k/5.1k divider
+//   AIN1 board type strap: version 2.0 has 25.5k below 16k (Platform::EstablishBoardVariant)
+//   AIN2 temp0, AIN7 temp1: 100k thermistors at 25C against the 2.2k series resistors
+//   AIN3 VSSA and AIN4 VREF monitors: the thermistors' ground and reference
+//   AIN6 V12: 12V through 60.4k/4.7k
+adc0:
+    channels: "0:0.352910,1:0.614458,2:0.978474,3:0.0,4:1.0,6:0.262529,7:0.978474"

@@ -15,8 +15,8 @@ namespace EmulationTests.Scenarios;
 /// Two EXP3HCs on one bus at addresses set by their switches. Each must be enumerated, configured and
 /// moved on its own, with the traffic for one board going only to that board
 /// </summary>
-[TestFixture(Stack.Rrf)]
-[TestFixture(Stack.Dsf)]
+[TestFixture(Stack.Rrf, Category = nameof(Stack.Rrf))]
+[TestFixture(Stack.Dsf, Category = nameof(Stack.Dsf))]
 [Category("Emulation")]
 public class MultipleExpansionBoardTests(Stack stack)
 {

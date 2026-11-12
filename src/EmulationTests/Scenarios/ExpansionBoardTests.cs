@@ -17,8 +17,8 @@ namespace EmulationTests.Scenarios;
 /// bootloader. Codes sent to the main board must produce the right CAN requests, the expansion board's
 /// replies, and the right object model
 /// </summary>
-[TestFixture(Stack.Rrf)]
-[TestFixture(Stack.Dsf)]
+[TestFixture(Stack.Rrf, Category = nameof(Stack.Rrf))]
+[TestFixture(Stack.Dsf, Category = nameof(Stack.Dsf))]
 [Category("Emulation")]
 public class ExpansionBoardTests(Stack stack)
 {

@@ -64,6 +64,7 @@ Always run tests with `scripts/test.py`, never `dotnet test`, including a single
 | Unit (NUnit) | `scripts/test.py unit` | Run in full; with coverage, as CI does |
 | System (NUnit) | `scripts/test.py system --filter 'FullyQualifiedName~JobControl'` | Always filter to the affected fixtures; the full suite takes many minutes |
 | Native | `scripts/test.py native` | DuetRealtimeCore's ctest suite, in a host build used only for tests |
+| Emulation | `scripts/test.py emulation --build` | The firmware images in Renode, on both stacks (`src/DuetEmulation/README.md`); several minutes |
 | Scripts | `scripts/test.py scripts` | The Python scripts' tests (`tests/scripts`), with builds, git and boards faked; run with `pyright` after changing `scripts/` |
 
 Single unit test: `scripts/test.py unit --filter "FullyQualifiedName~ClassName.MethodName"`.
