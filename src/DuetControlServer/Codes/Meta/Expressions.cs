@@ -455,13 +455,15 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Va
         if (code.Parameters.Any(parameter => parameter.IsExpression))
         {
             List<CodeParameter> newParameters = [];
+            Dictionary<char, object?> values = [];
             foreach (CodeParameter parameter in code.Parameters)
             {
                 if (parameter.IsExpression)
                 {
                     string trimmedExpression = ((string)parameter).Trim();
-                    string parameterValue = await EvaluateExpressionToStringAsync(code, trimmedExpression, false, cancellationToken);
-                    newParameters.Add(new CodeParameter(parameter.Letter, parameterValue, false, false));
+                    object? value = await EvaluateExpressionToValueAsync(code, trimmedExpression, cancellationToken);
+                    values[parameter.Letter] = value;
+                    newParameters.Add(new CodeParameter(parameter.Letter, ObjectToString(value, false, false, code), false, false));
                 }
                 else
                 {
@@ -472,6 +474,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Va
             lock (code)
             {
                 code.Parameters = newParameters;
+                code.ExpressionValues = values;
                 code.ConvertDriverIds();
             }
         }

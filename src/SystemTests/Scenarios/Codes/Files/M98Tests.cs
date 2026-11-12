@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using System.Threading.Tasks;
 using DuetAPI;
@@ -101,27 +102,33 @@ public class M98Tests : BenchFixture
     }
 
     /// <summary>
-    /// Every parameter of M98 but P reaches the macro as param.&lt;letter&gt;, keeping its type: a quoted string stays a
-    /// string, an integer and a float are numbers, and an expression is evaluated before the macro starts
+    /// Every parameter of M98 but P reaches the macro as param.&lt;letter&gt;, as the value it reads as an expression: a
+    /// quoted string is a string, a whole number an integer and a decimal a float, and an expression keeps the type it
+    /// evaluated to, so a string stays a string even when it holds digits and an array stays an array
     /// </summary>
     /// <remarks>
-    /// RRF truth: StringParser::AddParameters skips P only when codeRunning is 98, and parses every other value as an
-    /// expression. Regression: m98-call-macro-with-parameters
+    /// RRF truth: StringParser::AddParameters skips P only when codeRunning is 98, and parses every other value with
+    /// ExpressionParser::Parse. Regression:
+    /// m98-call-macro-with-parameters
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task PassesItsParametersToTheMacro()
     {
         const string text = "alpha";
         const int integer = 42;
+        const int negative = -5;
         const float fraction = 1.25f;
-        float[] array = [1.0f, 2.0f, 3.0f];
+        const string digits = "42";
+        int[] array = [1, 2, 3];
 
         await using Bench bench = await Bench.StartAsync("""
             global text = ""
             global hasP = true
-            global integer = 0
-            global fraction = 0
+            global integer = ""
+            global negative = 0
+            global fraction = ""
+            global digits = 0
+            global flag = false
             global array = null
             global expr = 0
             global depth = -1
@@ -130,25 +137,73 @@ public class M98Tests : BenchFixture
         bench.Host.Sd.WriteSys("drt-m98-params.g", $"""
             set global.text = param.A
             set global.hasP = exists(param.P)
-            set global.integer = param.S
-            set global.fraction = param.X
+            set global.integer = param.S ^ ""
+            set global.negative = param.C
+            set global.fraction = param.X ^ ""
+            set global.digits = param.E
+            set global.flag = param.V
             set global.array = param.Y
             set global.expr = param.B
             set global.depth = inputs[{http}].stackDepth
             """);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M98 P\"drt-m98-params.g\" A\"{text}\" S{integer} X{fraction.ToString(CultureInfo.InvariantCulture)} Y{{{string.Join(",", array)}}} B{{3+4}}")).Trim(), Is.Empty);
+        string fractionText = fraction.ToString(CultureInfo.InvariantCulture);
+        Assert.That((await bench.Host.ExecuteCodeAsync($"M98 P\"drt-m98-params.g\" A\"{text}\" S{integer} C{negative} X{fractionText} E{{\"{digits}\"}} V{{true}} Y{{{string.Join(",", array)}}} B{{3+4}}")).Trim(), Is.Empty);
         await Assert.MultipleAsync(async () =>
         {
             Assert.That(await bench.Host.GlobalTextAsync("text"), Is.EqualTo(text), "a quoted string arrives as a string");
             Assert.That(await bench.Host.GlobalFlagAsync("hasP"), Is.False, "P names the file and is not passed on");
-            Assert.That(await bench.Host.GlobalAsync("integer"), Is.EqualTo(integer), "an integer arrives as a number");
-            Assert.That(await bench.Host.ReadModelAsync(model => model.Global["fraction"]!.Value.GetDouble()), Is.EqualTo(fraction).Within(1e-6),
-                        "a float arrives as a number");
-            Assert.That(await bench.Host.GlobalAsync("array"), Is.EqualTo(array), "an array arrives as an array");
+            Assert.That(await bench.Host.GlobalTextAsync("integer"), Is.EqualTo(integer.ToString(CultureInfo.InvariantCulture)), "a whole number arrives as an integer");
+            Assert.That(await bench.Host.GlobalAsync("negative"), Is.EqualTo(negative), "a signed number arrives as a number");
+            Assert.That(await bench.Host.GlobalTextAsync("fraction"), Is.EqualTo(fractionText), "a decimal arrives as a float");
+            Assert.That(await bench.Host.GlobalTextAsync("digits"), Is.EqualTo(digits), "a string expression stays a string though it holds digits");
+            Assert.That(await bench.Host.GlobalFlagAsync("flag"), Is.True, "a boolean expression arrives as a boolean");
+            Assert.That(await bench.Host.GlobalArrayAsync("array"), Is.EqualTo(array), "an array expression arrives as an array");
             Assert.That(await bench.Host.GlobalAsync("expr"), Is.EqualTo(7), "an expression is evaluated before the macro starts");
             Assert.That(await bench.Host.GlobalAsync("depth"), Is.EqualTo(1), "the macro ran one stack level deep");
             Assert.That(await bench.Host.ReadInputAsync(input => (int)input.StackDepth), Is.Zero, "the stack is back at its base once the macro returned");
+        });
+    }
+
+    /// <summary>A colon-separated list is not an array: the macro gets its first item, typed as that item reads</summary>
+    /// <remarks>
+    /// RRF truth: StringParser::AddParameters reads one expression from where the value starts, and
+    /// ExpressionParser::ParseInternal stops at the colon, which is not an operator
+    /// </remarks>
+    [TestCase("1:2:3", "1")]
+    [TestCase("1.5:2", "1.5")]
+    public async Task AColonListGivesItsFirstItem(string list, string first)
+    {
+        await using Bench bench = await Bench.StartAsync("global first = \"\"");
+        bench.Host.Sd.WriteSys("drt-m98-list.g", "set global.first = param.F ^ \"\"");
+
+        Assert.That((await bench.Host.ExecuteCodeAsync($"M98 P\"drt-m98-list.g\" F{list}")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.GlobalTextAsync("first"), Is.EqualTo(first));
+    }
+
+    /// <summary>
+    /// A parameter with no value is an error quoting where the value should have started, and the macro does not run
+    /// </summary>
+    /// <remarks>
+    /// RRF truth: StringParser::AddParameters throws "invalid value for parameter" when the value does not start with a
+    /// digit, a quote, a brace, a point or a sign, before DoFileMacro pushes a machine state. RRF names the character it
+    /// found rather than the letter
+    /// </remarks>
+    [TestCase("S")]
+    [TestCase("S X1")]
+    public async Task AParameterWithoutAValueIsAnError(string parameters)
+    {
+        await using Bench bench = await Bench.StartAsync("global ran = 0");
+        bench.Host.Sd.WriteSys("drt-m98-empty.g", "set global.ran = 1");
+
+        string line = $"M98 P\"drt-m98-empty.g\" {parameters}";
+        int column = line.IndexOf(" S", StringComparison.Ordinal) + 3;
+        Assert.That((await bench.Host.ExecuteCodeAsync(line)).TrimEnd(),
+                    Is.EqualTo($"Error: at column {column}: M98: invalid value for parameter 'S'"));
+        await Assert.MultipleAsync(async () =>
+        {
+            Assert.That(await bench.Host.GlobalAsync("ran"), Is.Zero, "the macro did not run");
+            Assert.That(await bench.Host.ReadInputAsync(input => (int)input.StackDepth), Is.Zero, "nothing was pushed");
         });
     }
 
@@ -237,8 +292,8 @@ public class M98Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync("global ran = 0\nglobal depth = -1");
         int file = await bench.Host.InputIndexAsync(CodeChannel.File);
         bench.Host.Sd.WriteSys("drt-sim.g", $"""
-            set global.ran = global.ran + 1
             set global.depth = inputs[{file}].stackDepth
+            set global.ran = global.ran + 1
             """);
         bench.Host.Sd.WriteGCode("sim.gcode", "M98 P\"drt-sim.g\"\n");
 

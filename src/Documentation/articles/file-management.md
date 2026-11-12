@@ -110,8 +110,7 @@ Codes from a macro are flagged `IsFromMacro`, plus `IsNestedMacro`, `IsFromConfi
 system macro's moves are not given the workplace offset, because `homeall.g` and friends work in
 machine coordinates.
 
-A macro can take parameters - `MacroRunner.TryRunAsync` seeds the macro's variable set, which is how
-an event macro reads `param.D`/`B`/`P`/`S`, how `M1234 X5` reaches `param.X` in `sys/M1234.g`, and how `M98 P"macro.g" A"text" S42` reaches `param.A` and `param.S`. M98 passes on every parameter but `P`, which names the file; a parameter keeps its type, so a quoted string stays a string and a number stays a number.
+A macro can take parameters - `MacroRunner.TryRunAsync` seeds the macro's variable set, which is how an event macro reads `param.D`/`B`/`P`/`S`, how `M1234 X5` reaches `param.X` in `sys/M1234.g`, and how `M98 P"macro.g" A"text" S42` reaches `param.A` and `param.S` (M98 keeps `P`). Each value is read as an expression and keeps its type, so `E{"42"}` is a string and `Y{1,2,3}` an array, while `F1:2:3` is just `1`. A parameter with no value is an error.
 
 `M98 R1` marks the level it runs on as restartable, and `M98 R0` clears the mark; with `P` present, `R` is a parameter for the macro instead. Every macro starts unmarked, and the mark of the level that called it comes back when it ends. The mark of the current level is published as `inputs[].macroRestartable`, and a pause interrupts a macro only if it and every macro below it on the stack are marked (see [Pausing and resuming a job](pause-and-resume.md)).
 

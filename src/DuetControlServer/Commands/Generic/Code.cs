@@ -239,6 +239,12 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     internal int ErrorColumn { get; set; } = CodeParameter.NoColumn;
 
     /// <summary>
+    /// Values the expression parameters evaluated to by letter, with the types the parameters lost when they were
+    /// replaced by their text
+    /// </summary>
+    internal IReadOnlyDictionary<char, object?>? ExpressionValues { get; set; }
+
+    /// <summary>
     /// Id of the anchor: the last move submitted on the channel's ring when this code was read.
     /// The code's effect belongs after the end of that move
     /// </summary>
@@ -556,35 +562,49 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// </summary>
     /// <param name="excluded">Letter that is not passed on, as M98 keeps P for the file name</param>
     /// <returns>Parameters by letter</returns>
+    /// <exception cref="GCodeException">A value cannot start an expression</exception>
     /// <remarks>
-    /// Each keeps the type the parser gave it, so that <c>param.S</c> is a string and <c>param.X</c>
-    /// is a number. RepRapFirmware's <c>StringParser::AddParameters</c>
+    /// RepRapFirmware's <c>StringParser::AddParameters</c>, which reads each value as one expression from where it
+    /// starts: an expression keeps the type it evaluated to, a number is typed as the expression parser types it, and
+    /// a colon-separated list gives only its first item
     /// </remarks>
     internal Dictionary<string, object?> GetMacroParameters(char? excluded = null)
     {
-        // TODO: pass array parameters too, once a variable can hold an array
         Dictionary<string, object?> parameters = [];
         foreach (CodeParameter parameter in Parameters)
         {
-            if (parameter.Letter == excluded)
+            if (parameter.Letter != excluded)
             {
-                continue;
-            }
-
-            object? value =
-                parameter.IsNull ? null :
-                parameter.Type == typeof(string) ? (string?)parameter :
-                parameter.Type == typeof(int) ? (int)parameter :
-                parameter.Type == typeof(uint) ? (uint)parameter :
-                parameter.Type == typeof(long) ? (long)parameter :
-                parameter.Type == typeof(float) ? (float)parameter :
-                null;
-            if (value is not null || parameter.IsNull)
-            {
-                parameters[parameter.Letter.ToString()] = value;
+                parameters[parameter.Letter.ToString()] = GetMacroParameterValue(parameter);
             }
         }
         return parameters;
+    }
+
+    /// <summary>
+    /// The value a macro reads for one of this code's parameters
+    /// </summary>
+    /// <param name="parameter">Parameter of this code</param>
+    /// <returns>Value of the parameter</returns>
+    /// <exception cref="GCodeException">The value cannot start an expression</exception>
+    private object? GetMacroParameterValue(CodeParameter parameter)
+    {
+        if (ExpressionValues is not null && ExpressionValues.TryGetValue(parameter.Letter, out object? value))
+        {
+            return value;
+        }
+        if (parameter.Type == typeof(string))
+        {
+            return (string)parameter;
+        }
+
+        // What follows the letter as written, which an unquoted value is read from
+        string text = parameter.ToString()[1..];
+        if (text.Length == 0 || !(char.IsAsciiDigit(text[0]) || text[0] is '.' or '-' or '+'))
+        {
+            throw new GCodeException($"invalid value for parameter '{parameter.Letter}'", parameter.Column);
+        }
+        return new Codes.Meta.Parsing.MetaExpressionParser(text).Parse();
     }
 
     /// <summary>
@@ -645,5 +665,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         BinarySize = 0;
         ErrorColumn = DuetAPI.Commands.CodeParameter.NoColumn;
+        ExpressionValues = null;
     }
 }

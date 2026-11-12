@@ -96,6 +96,10 @@ internal static class ModelReads
     public static Task<string> GlobalTextAsync(this DcsTestHost host, string name)
         => host.ReadModelAsync(model => GlobalValue(model, name).GetString() ?? string.Empty);
 
+    /// <summary>Read a global holding an array of whole numbers</summary>
+    public static Task<int[]> GlobalArrayAsync(this DcsTestHost host, string name)
+        => host.ReadModelAsync(model => GlobalValue(model, name).EnumerateArray().Select(item => item.GetInt32()).ToArray());
+
     /// <summary>
     /// One global variable, as the object model holds it. The globals are JSON rather than typed
     /// fields, so this fails naming the variable when it is not set at all, which is a different
