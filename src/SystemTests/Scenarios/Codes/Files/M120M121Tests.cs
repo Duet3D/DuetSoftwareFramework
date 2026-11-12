@@ -123,7 +123,6 @@ public class M120M121Tests : BenchFixture
     /// on, and the caller's M121 still pops the caller's level
     /// </summary>
     /// <remarks>RRF pops the macro's own level instead, which ends the macro but leaves its buffered lines to run</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M121InAMacroCannotPopTheCallersLevel()
     {
@@ -161,7 +160,6 @@ public class M120M121Tests : BenchFixture
 
     /// <summary>An M120 and M121 pair inside a macro push and pop a level above the macro's own</summary>
     /// <remarks>RRF truth: PushState(true) stacks on the macro's machine state and PopState(true) pops back to it</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M120AndM121InAMacroPushAndPopAboveTheMacro()
     {
@@ -202,7 +200,6 @@ public class M120M121Tests : BenchFixture
     /// RRF truth: GetStackDepth counts every machine state above the base, and the GCodeMachineState copy constructor
     /// copies doingFileMacro into an M120 level
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task StackDepthCountsMacroAndM120LevelsTogether()
     {
@@ -246,7 +243,6 @@ public class M120M121Tests : BenchFixture
     /// level left for an M121 to pop
     /// </summary>
     /// <remarks>RRF truth: the end of a macro pops every machine state down to and including the macro's own</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M120LeftOpenInAMacroIsDiscardedWhenItEnds()
     {
@@ -274,7 +270,6 @@ public class M120M121Tests : BenchFixture
 
     /// <summary>M121 restores the macro restartable flag M120 saved, undoing an M98 R between them</summary>
     /// <remarks>RRF truth: the GCodeMachineState copy constructor copies macroRestartable when withinSameFile</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M121RestoresTheRestartableFlag()
     {
@@ -316,7 +311,6 @@ public class M120M121Tests : BenchFixture
     /// than failing on every pass. The levels the macros pushed go with them; those of the channel's own level stay
     /// </summary>
     /// <remarks>RRF truth: GCodes::Push reports the overflow and calls AbortPrint, which unwinds every file on the channel</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task OverflowInAMacroAbortsIt()
     {
@@ -343,7 +337,6 @@ public class M120M121Tests : BenchFixture
 
     /// <summary>An overflow in a job file aborts the job, and the levels the job pushed go with it</summary>
     /// <remarks>RRF truth: AbortPrint stops the print when the overflow is on the file channel</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task OverflowInAJobAbortsTheJob()
     {
@@ -369,11 +362,10 @@ public class M120M121Tests : BenchFixture
         });
     }
 
-    /// <summary>The levels a job leaves open are discarded when it finishes, and the state it ended with stands</summary>
-    /// <remarks>RRF pushes no level for the job file itself, so there is no state from before the job to restore</remarks>
-    [Category("KnownGap")]
+    /// <summary>The levels a job leaves open are popped when it finishes, restoring the state from before them</summary>
+    /// <remarks>RRF truth: GCodes::DoFilePrint pops the file channel's levels before it stops the print</remarks>
     [Test]
-    public async Task LevelsOpenWhenAJobFinishesAreDiscarded()
+    public async Task LevelsOpenWhenAJobFinishesArePopped()
     {
         await using Bench bench = await Bench.StartAsync("global depth = -1\nglobal done = 0");
         int file = await bench.Host.InputIndexAsync(CodeChannel.File);
@@ -392,21 +384,22 @@ public class M120M121Tests : BenchFixture
         {
             Assert.That(await bench.Host.GlobalAsync("depth"), Is.EqualTo(1));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Job.LastFileAborted), Is.False, "leaving a level open is not an error");
-            Assert.That(await bench.Host.ReadInputAsync(input => (int)input.StackDepth, CodeChannel.File), Is.Zero, "the open level was discarded");
-            Assert.That(await bench.Host.ReadInputAsync(input => input.AxesRelative, CodeChannel.File), Is.True, "without restoring the G90 it held");
+            Assert.That(await bench.Host.ReadInputAsync(input => (int)input.StackDepth, CodeChannel.File), Is.Zero, "the open level was popped");
+            Assert.That(await bench.Host.ReadInputAsync(input => input.AxesRelative, CodeChannel.File), Is.False, "restoring the G90 it held");
         });
     }
 
-    /// <summary>The levels a job leaves open are discarded when it is aborted</summary>
-    /// <remarks>RRF truth: GCodes::AbortPrint pops every machine state while the file channel is doing a file</remarks>
-    [Category("KnownGap")]
+    /// <summary>The levels a job leaves open are popped when it is aborted, restoring the state from before them</summary>
+    /// <remarks>RRF truth: GCodeBuffer::AbortFile pops every machine state while the file channel is doing a file</remarks>
     [Test]
-    public async Task LevelsOpenWhenAJobIsAbortedAreDiscarded()
+    public async Task LevelsOpenWhenAJobIsAbortedArePopped()
     {
         await using Bench bench = await Bench.StartAsync("global depth = -1\nglobal after = 0");
         int file = await bench.Host.InputIndexAsync(CodeChannel.File);
         bench.Host.Sd.WriteGCode("job.gcode", $"""
+            G90
             M120
+            G91
             M120
             set global.depth = inputs[{file}].stackDepth
             abort "drt"
@@ -420,7 +413,8 @@ public class M120M121Tests : BenchFixture
         {
             Assert.That(await bench.Host.GlobalAsync("depth"), Is.EqualTo(2));
             Assert.That(await bench.Host.GlobalAsync("after"), Is.Zero);
-            Assert.That(await bench.Host.ReadInputAsync(input => (int)input.StackDepth, CodeChannel.File), Is.Zero, "both open levels were discarded");
+            Assert.That(await bench.Host.ReadInputAsync(input => (int)input.StackDepth, CodeChannel.File), Is.Zero, "both open levels were popped");
+            Assert.That(await bench.Host.ReadInputAsync(input => input.AxesRelative, CodeChannel.File), Is.False, "restoring the G90 the lower one held");
         });
     }
 }

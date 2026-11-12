@@ -159,30 +159,6 @@ public sealed class ChannelProcessor
     public CodeFile? CurrentFile => _pipelines.Value[(int)PipelineStage.Start].CurrentStackItem.File;
 
     /// <summary>
-    /// Whether every macro running on this channel can be restarted from its beginning
-    /// </summary>
-    /// <remarks>
-    /// RepRapFirmware's <c>GCodeMachineState::CanRestartMacro</c>, which walks its stack and returns
-    /// false if any level is a macro that has not said it is restartable. A pause abandons the macros
-    /// it unwinds, so one that cannot be restarted must not be interrupted part-way - the pause waits
-    /// until the channel is back out of it instead. <c>M98 R1</c> is what marks one restartable
-    /// </remarks>
-    public bool CanRestartMacros
-    {
-        get
-        {
-            foreach (CodeFile? file in _pipelines.Value[(int)PipelineStage.Start].StackedFiles())
-            {
-                if (file is MacroFile macro && !macro.IsPausable)
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-    }
-
-    /// <summary>
     /// Whether the macro this channel is executing was restarted after a pause
     /// </summary>
     /// <remarks>

@@ -41,11 +41,6 @@ public sealed class MacroFile : CodeFile, IDisposable
     public bool IsNested { get; }
 
     /// <summary>
-    /// Indicates if this macro can be aborted on a pause request
-    /// </summary>
-    public bool IsPausable { get; set; }
-
-    /// <summary>
     /// Indicates if the firmware asked for this macro rather than the user invoking it
     /// </summary>
     /// <remarks>
@@ -100,7 +95,7 @@ public sealed class MacroFile : CodeFile, IDisposable
     private volatile bool _isExecuting;
 
     /// <summary>
-    /// Indicates if the macro file has been aborted
+    /// Indicates if the macro file has been aborted or returned from
     /// </summary>
     public bool IsAborted { get; private set; }
 
@@ -217,7 +212,6 @@ public sealed class MacroFile : CodeFile, IDisposable
         SourceConnection = copyFrom.SourceConnection;
         InvokingJobCode = copyFrom.InvokingJobCode;
         IsNested = copyFrom.IsNested;
-        IsPausable = copyFrom.IsPausable;
         IsSystemMacro = copyFrom.IsSystemMacro;
         IsConfig = copyFrom.IsConfig;
         IsConfigOverride = copyFrom.IsConfigOverride;
@@ -252,15 +246,41 @@ public sealed class MacroFile : CodeFile, IDisposable
     /// <returns>Asynchronous task</returns>
     public void Abort()
     {
+        if (Stop())
+        {
+            _logger.LogInformation("Aborted macro file {File}", FilePath.Virtual);
+        }
+    }
+
+    /// <summary>
+    /// End this macro early, as M99 does: the codes read past the M99 are cancelled and nothing more is read
+    /// </summary>
+    /// <remarks>
+    /// The caller carries on as it does when a macro reaches its end. Codes deferred by this macro
+    /// are not cancelled, as they have their own cancellation source
+    /// </remarks>
+    public void Return()
+    {
+        if (Stop())
+        {
+            _logger.LogDebug("Returned from macro file {File}", FilePath.Virtual);
+        }
+    }
+
+    /// <summary>
+    /// Cancel the codes this macro has read and close it
+    /// </summary>
+    /// <returns>False if it was stopped already</returns>
+    private bool Stop()
+    {
         if (IsAborted || _disposed)
         {
-            return;
+            return false;
         }
         IsAborted = true;
         _cts.Cancel();
-
         Close();
-        _logger.LogInformation("Aborted macro file {File}", FilePath.Virtual);
+        return true;
     }
 
     /// <summary>

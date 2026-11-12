@@ -111,7 +111,23 @@ system macro's moves are not given the workplace offset, because `homeall.g` and
 machine coordinates.
 
 A macro can take parameters - `MacroRunner.TryRunAsync` seeds the macro's variable set, which is how
-an event macro reads `param.D`/`B`/`P`/`S` and how `M1234 X5` reaches `param.X` in `sys/M1234.g`.
+an event macro reads `param.D`/`B`/`P`/`S`, how `M1234 X5` reaches `param.X` in `sys/M1234.g`, and how `M98 P"macro.g" A"text" S42` reaches `param.A` and `param.S`. M98 passes on every parameter but `P`, which names the file; a parameter keeps its type, so a quoted string stays a string and a number stays a number.
+
+`M98 R1` marks the level it runs on as restartable, and `M98 R0` clears the mark; with `P` present, `R` is a parameter for the macro instead. Every macro starts unmarked, and the mark of the level that called it comes back when it ends. The mark of the current level is published as `inputs[].macroRestartable`, and a pause interrupts a macro only if it and every macro below it on the stack are marked (see [Pausing and resuming a job](pause-and-resume.md)).
+
+`M99` returns from the macro it is in: the codes before it finish, the codes after it are not run, and the code that started the macro carries on as though the macro had reached its end. Outside a macro, including in a job file, `M99` does nothing.
+
+### The machine state stack
+
+Every macro runs on a level of its channel's machine state stack, and so does every `M120` until its `M121`. A level saves the feed rate, relativity, units, plane, inverse time mode, volumetric extrusion and compatibility of the level below it, and they come back when the level is popped. A macro's level starts with inverse time mode and volumetric extrusion off, and an `M120` level with volumetric extrusion off. Each channel's `inputs[]` entry publishes the stack: `stackDepth` counts its levels, `inMacro` is true on any level inside a macro, `macroRestartable` is the current level's `M98 R` mark, and `currentFile` names the macro being run, or the job file on a file channel.
+
+A level belongs to the file that pushed it. When a macro ends, whether it reaches its end, returns with `M99` or is aborted, the levels it left open are popped with its own and the state of the code that called it comes back. `M121` pops only an `M120` level of its own file, and fails with `Pop(): stack underflow on <channel>` when there is none, popping nothing. The levels a job file leaves open are popped when the job ends or is aborted, restoring the state from before them.
+
+The stack holds 10 levels, macro and `M120` levels together. A code that would push an eleventh, whether `M120` or a code that starts a macro, fails with `Push(): stack overflow on <channel>`, and every file on the channel is aborted, the job with them on a file channel, so that a recursion or a loop pushing levels stops rather than failing on every pass.
+
+The startup files `config.g`, `config-override.g` (`M501`) and `dsf-config.g`, and the macros they call, keep the interpreter state they finish with instead of restoring their caller's, apart from the compatibility. When `config.g` finishes at startup, its state is copied to every other channel, so an `M83` in `config.g` makes jobs use relative extrusion too.
+
+While a file is being simulated, `M98`, `M99`, `M120` and `M121` still run, so the simulation takes the same path through the file and its macros.
 
 For `config.g`, DCS injects synthetic codes (machine name, date/time) so the configuration reflects
 the host environment.

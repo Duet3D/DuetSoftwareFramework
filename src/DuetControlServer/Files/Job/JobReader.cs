@@ -286,6 +286,10 @@ internal sealed class JobReader
         _readTask = null;
 
         _codeProcessor.SetJobFile(Channel, null);
+        if (!await _codeProcessor.PopJobLevelsAsync(Channel))
+        {
+            _logger.LogError("The job on {Channel} ended with a macro still on the machine state stack, so the levels the job left open were not popped", Channel);
+        }
         File.Dispose();
     }
 

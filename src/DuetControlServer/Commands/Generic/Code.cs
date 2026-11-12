@@ -484,9 +484,17 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         // No handler recognised this code, so try a macro named after it. This is how a machine adds
         // a code of its own in RepRapFirmware - M1234 runs sys/M1234.g - and it has to be tried
         // before the code is called unsupported, or those machines stop working
-        if (await TryRunCodeMacroAsync())
+        try
         {
-            Result ??= new Message();
+            if (await TryRunCodeMacroAsync())
+            {
+                Result ??= new Message();
+                return true;
+            }
+        }
+        catch (GCodeException e)
+        {
+            Result = new(MessageType.Error, e.Message);
             return true;
         }
 
@@ -537,12 +545,32 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         char letter = Type == CodeType.GCode ? 'G' : 'M';
         string macroName = MinorNumber > 0 ? $"{letter}{MajorNumber}.{MinorNumber}.g" : $"{letter}{MajorNumber}.g";
 
-        // The code's own parameters, by letter, keeping the type the parser gave each one so that
-        // param.S is a string and param.X is a number
+        // A macro standing in for a code the user typed, so it is not a system macro unless the
+        // code that reached here came from one
+        return await _macroRunner.TryRunAsync(Channel, macroName, this, isSystemMacro: false,
+                                              parameters: GetMacroParameters(), cancellationToken: CancellationToken);
+    }
+
+    /// <summary>
+    /// This code's parameters as the macro it starts reads them, <c>param.X</c> for parameter X
+    /// </summary>
+    /// <param name="excluded">Letter that is not passed on, as M98 keeps P for the file name</param>
+    /// <returns>Parameters by letter</returns>
+    /// <remarks>
+    /// Each keeps the type the parser gave it, so that <c>param.S</c> is a string and <c>param.X</c>
+    /// is a number. RepRapFirmware's <c>StringParser::AddParameters</c>
+    /// </remarks>
+    internal Dictionary<string, object?> GetMacroParameters(char? excluded = null)
+    {
         // TODO: pass array parameters too, once a variable can hold an array
         Dictionary<string, object?> parameters = [];
         foreach (CodeParameter parameter in Parameters)
         {
+            if (parameter.Letter == excluded)
+            {
+                continue;
+            }
+
             object? value =
                 parameter.IsNull ? null :
                 parameter.Type == typeof(string) ? (string?)parameter :
@@ -556,11 +584,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
                 parameters[parameter.Letter.ToString()] = value;
             }
         }
-
-        // A macro standing in for a code the user typed, so it is not a system macro unless the
-        // code that reached here came from one
-        return await _macroRunner.TryRunAsync(Channel, macroName, this, isSystemMacro: false,
-                                              parameters: parameters, cancellationToken: CancellationToken);
+        return parameters;
     }
 
     /// <summary>

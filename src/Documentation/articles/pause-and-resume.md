@@ -99,8 +99,8 @@ and the interpreter state belong to the first channel, so a fork of the job neit
 records anything.
 
 **A deferred pause** waits for the job to leave a macro that has not declared itself pausable
-(`M98 R1` from inside the macro, and `ChannelProcessor.CanRestartMacros`, which walks the channel's
-whole macro stack). Abandoning such a macro part-way would
+(`M98 R1` from inside the macro, and `InterpreterStateStack.CanRestartMacros`, which walks every
+level of the channel's machine state stack inside a macro). Abandoning such a macro part-way would
 leave whatever it had already done with no way to put it back. The request is held by the controller
 and the reader arms a barrier on the job file's own stack level, so the code that would have followed
 the macro is cancelled where it would have been started and the pause lands at that boundary.

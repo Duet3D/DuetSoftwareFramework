@@ -38,12 +38,4 @@ public class MacroRunnerTests
         // M291.1 must not be served by M291.g, or a machine defining one would answer for both
         Assert.That(MacroNameFor('M', 291, 1), Is.EqualTo("M291.1.g"));
     }
-
-    [Test]
-    public void MacroNestingIsBounded()
-    {
-        // A macro that calls itself would otherwise push stack levels until the process dies
-        Assert.That(MacroRunner.MaxNesting, Is.GreaterThan(1));
-        Assert.That(MacroRunner.MaxNesting, Is.LessThanOrEqualTo(20));
-    }
 }

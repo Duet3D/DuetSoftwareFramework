@@ -1989,34 +1989,35 @@ internal partial class MCodeHandler
     }
 
     /// <summary>
-    /// M120 and M121: save and restore the interpreter state of this channel
+    /// M120 and M121: push and pop a level of this channel's machine state stack
     /// </summary>
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
+    /// <remarks>
+    /// M121 pops only an M120 level of its own file, never the level of the macro it is in or a level its caller
+    /// pushed. A full stack aborts every file on the channel, as RepRapFirmware's GCodes::Push does, because a loop or
+    /// a recursion pushing levels would only fail again
+    /// </remarks>
     private async ValueTask<Message> HandleStateStackAsync(Commands.Code code, CancellationToken cancellationToken)
     {
+        bool done;
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             InputChannel? input = model.Inputs[code.Channel];
-            if (input is null)
-            {
-                return new Message(MessageType.Error, $"Unknown code channel {code.Channel}");
-            }
-
-            if (code.MajorNumber == 120)
-            {
-                if (!stateStack.TryPush(code.Channel, input))
-                {
-                    return new Message(MessageType.Error, "Push(): stack overflow");
-                }
-            }
-            else if (!stateStack.TryPop(code.Channel, input))
-            {
-                return new Message(MessageType.Error, "Pop(): stack underflow");
-            }
+            done = code.MajorNumber == 120 ? stateStack.TryPushLocal(code.Channel, input) : stateStack.TryPopLocal(code.Channel, input);
         }
-        return new Message();
+
+        if (done)
+        {
+            return new Message();
+        }
+        if (code.MajorNumber == 121)
+        {
+            return new Message(MessageType.Error, InterpreterStateStack.UnderflowError(code.Channel));
+        }
+        await codeProcessor.AbortAllFilesAsync(code.Channel, cancellationToken);
+        return new Message(MessageType.Error, InterpreterStateStack.OverflowError(code.Channel));
     }
 
     /// <summary>

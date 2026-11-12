@@ -32,12 +32,13 @@ public class MacroStateTests : BenchFixture
     public async Task ConfigRetainsInterpreterState()
     {
         // config.g sets the feed rate (before G93, so F is stored not read as a duration), the
-        // relativity and the time mode itself, and a sub-macro sets the rest; all must remain
+        // relativity and the time mode itself, and a sub-macro sets the rest; all must remain. G93
+        // comes after the sub-macro, which starts in G94 and hands that back up as config.g's own
         await using Bench bench = await Bench.With(Machines.Xye, """
                 G1 F1234
                 G91
-                G93
                 M98 P"0:/macros/config-sub.g"
+                G93
                 """).WithSd(sd =>
             {
                 sd.WriteMacro("config-sub.g", "M83\nG20\n");
@@ -86,6 +87,37 @@ public class MacroStateTests : BenchFixture
             Assert.That(httpChannel.DrivesRelative, Is.True, "the M83 in dsf-config.g's sub-macro is retained");
             Assert.That(httpChannel.DistanceUnit, Is.EqualTo(DistanceUnit.Inch), "the G20 in dsf-config.g's sub-macro is retained");
         });
+    }
+
+    /// <summary>
+    /// The interpreter state config.g finishes with at startup is every channel's, so an M83 in config.g makes the
+    /// jobs and the web interface use relative extrusion too
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>CheckFinishedRunningConfigFile</c> copies the state of the finished config.g to every other
+    /// channel with <c>CopyStateFrom</c>. That leaves the compatibility out, which M555 sets and is not implemented yet
+    /// </remarks>
+    [Test]
+    public async Task ConfigStateReachesEveryChannel()
+    {
+        await using Bench bench = await Bench.StartAsync(Machines.Xye, """
+            M83
+            G91
+            G20
+            G1 F1234
+            """);
+
+        foreach (CodeChannel channel in new[] { CodeChannel.HTTP, CodeChannel.File, CodeChannel.Daemon })
+        {
+            InputChannel input = (await bench.Host.ReadModelAsync(model => model.Inputs[channel]))!;
+            Assert.Multiple(() =>
+            {
+                Assert.That(input.DrivesRelative, Is.True, $"{channel} has config.g's M83");
+                Assert.That(input.AxesRelative, Is.True, $"{channel} has config.g's G91");
+                Assert.That(input.DistanceUnit, Is.EqualTo(DistanceUnit.Inch), $"{channel} has config.g's G20");
+                Assert.That(input.FeedRate, Is.EqualTo(1234.0).Within(1e-3), $"{channel} has config.g's feed rate");
+            });
+        }
     }
 
     /// <summary>

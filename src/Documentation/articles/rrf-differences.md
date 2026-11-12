@@ -355,7 +355,7 @@ the first move.
 | M906, M913 and M917 are one handler; M665, M666 and M669 are another | They differ only in which quantity they address, which is true in RRF too. Which parameters mean what is the geometry's business |
 | Rotary delta and five-bar SCARA are built with defaults | Nothing in the object model configures them yet, so the engines take RRF's and the M669 documentation's values rather than inventing a home for the settings |
 | Hangprinter uses the constant-spool-radius model | Line buildup and flex compensation need `move.kinematics` fields that do not exist; this is the branch RRF itself takes when the buildup factor is zero |
-| The interpreter state stack is capped at 10, macro nesting at 10 | RRF caps its own stack; a macro looping over `M120` without `M121` would otherwise grow it without bound |
+| `config-override.g` (`M501`) and `dsf-config.g` keep the interpreter state they finish with, as `config.g` does | They configure the machine the same way `config.g` does, so an `M83` in them is the machine's setting afterwards. RRF keeps the state of `config.g` alone and restores its caller's state after `M501` |
 
 ### 5.1 There are no default axes, so X, Y and Z are found by letter
 
@@ -408,6 +408,10 @@ A `GCodeException` is thrown if the value is below the minimum (`0.0f`)
 `M140` and `M141` stop at a refused `H` (an invalid heater number, a heater a tool uses, or a heater of the other kind of slot) and leave the slot and its heaters as they were. RepRapFirmware reports the refusal but goes on to apply `S` and `R` to the slot's existing heaters, and a heater switched on successfully there replaces the error with success.
 
 When `M140`, `M141`, `M190` or `M191` switches on several heaters of a slot, every heater's reply is reported, with the worst result. RepRapFirmware reports only the last heater's result, so a heater that failed to switch on is not reported if a later one succeeds.
+
+`M121` pops only an `M120` level of its own file. With none to pop it is an error, `Pop(): stack underflow on <channel>`, and nothing is popped. RepRapFirmware reports the underflow as a message and replies OK, and an `M121` in a macro with no `M120` of its own pops the macro's level instead, which ends the macro but lets the lines it had already read run on. DSF never lets an `M121` reach a level its own file did not push.
+
+A code that would push an eleventh level on its channel's stack, `M120` or any code that starts a macro, fails with `Push(): stack overflow on <channel>` as its own error reply. Every file on the channel is aborted, as in RepRapFirmware, which reports the overflow as a separate message and replies OK to the code.
 
 An expansion board that asks for a firmware block past the end of the file gets one `ErrBadOffset` response, and the bad offset is reported. RepRapFirmware's `HandleFirmwareBlockRequest` goes on to answer the same request with `ErrNoFile` and to report a missing file, because the request is still unserved when it reaches that test. The file exists, so DSF stops at the first answer. The update fails in both.
 

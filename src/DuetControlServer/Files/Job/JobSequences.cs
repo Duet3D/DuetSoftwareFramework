@@ -126,6 +126,17 @@ internal sealed class JobSequences(
         // resurrect.g has already done the machine's setup. It only reinstates the restart state.
         // fromStart is whether M26 set a position, as GCodes2.cpp's M24 tests fileOffsetToPrint
         bool fromStart = (state.Stream(0)?.Reader.Position ?? 0) == 0;
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            // RepRapFirmware's StartPrinting names the print file as the file channel's current file
+            foreach (JobStream stream in state.Streams)
+            {
+                if (model.Inputs[stream.Channel] is InputChannel input)
+                {
+                    input.CurrentFile = stream.Reader.File.FilePath.Virtual;
+                }
+            }
+        }
         if (fromStart)
         {
             await macroRunner.TryRunAsync(CodeChannel.File, "start.g", cancellationToken: cancellationToken);

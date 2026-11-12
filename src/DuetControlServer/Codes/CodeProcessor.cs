@@ -26,8 +26,10 @@ namespace DuetControlServer.Codes;
 /// <param name="model">Object model</param>
 /// <param name="lifetime">Application lifetime</param>
 /// <param name="serviceProvider">Service provider</param>
+/// <param name="stateStack">Machine state stack of every channel</param>
 [DiagnosticsPriority(0)]
-public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel model, IHostApplicationLifetime lifetime, IServiceProvider serviceProvider) : IDiagnostics
+public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel model, IHostApplicationLifetime lifetime, IServiceProvider serviceProvider,
+                                  InterpreterStateStack stateStack) : IDiagnostics
 {
     /// <summary>
     /// Lock around the files being written
@@ -112,7 +114,24 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     /// </summary>
     /// <param name="channel">Code channel</param>
     /// <returns>True if no macro on the channel refuses to be interrupted</returns>
-    public bool CanRestartMacros(CodeChannel channel) => Processors.Value[(int)channel].CanRestartMacros;
+    /// <remarks>
+    /// A pause abandons the macros it unwinds, so one that cannot be restarted must not be interrupted part-way - the
+    /// pause waits until the channel is back out of it instead. <c>M98 R1</c> is what marks one restartable
+    /// </remarks>
+    public bool CanRestartMacros(CodeChannel channel) => stateStack.CanRestartMacros(channel);
+
+    /// <summary>
+    /// Pop the machine state levels a job file left open, now that it has ended
+    /// </summary>
+    /// <param name="channel">Channel the job ran on</param>
+    /// <returns>False if a macro is still running on the channel, which leaves its stack as it was</returns>
+    public async Task<bool> PopJobLevelsAsync(CodeChannel channel)
+    {
+        using (await model.AccessReadWriteAsync(lifetime.ApplicationStopping))
+        {
+            return stateStack.PopBaseLevels(channel, model.Inputs[channel]);
+        }
+    }
 
     /// <summary>
     /// Whether a channel is running any macro at all

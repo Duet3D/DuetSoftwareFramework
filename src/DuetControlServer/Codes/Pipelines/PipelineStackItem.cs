@@ -72,11 +72,14 @@ public sealed class PipelineStackItem
                 try
                 {
                     if (pipeline.Stage != PipelineStage.Executed &&
-                        (code.CancellationToken.IsCancellationRequested || File?.HoldAtNextCode == true))
+                        (code.CancellationToken.IsCancellationRequested || File?.HoldAtNextCode == true ||
+                         (pipeline.Stage <= PipelineStage.ProcessInternally && File is MacroFile { IsAborted: true })))
                     {
                         // Do not deal with cancelled codes, nor with the codes of a file a pause is
                         // waiting to reach the end of: the barrier belongs in the dispatch path, so
-                        // that the code after the macro is cancelled where it would have been started
+                        // that the code after the macro is cancelled where it would have been started.
+                        // A macro's codes run under the channel's token, so the ones it read ahead of
+                        // an abort or M99 are dropped here, before they execute
                         codeProcessor.CancelCode(code);
                     }
                     else if (pipeline.Stage == PipelineStage.ProcessInternally &&

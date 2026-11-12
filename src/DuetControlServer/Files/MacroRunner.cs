@@ -19,7 +19,9 @@ namespace DuetControlServer.Files;
 /// A macro executes on a stack level of its own: it is pushed onto the channel's pipeline before the
 /// first of its codes is read, and popped when the last one has finished. That is what makes a flush
 /// inside a macro wait for the macro's own codes rather than for whatever started it, and what lets a
-/// macro call another one without the two interleaving.
+/// macro call another one without the two interleaving. It also pushes a level on the channel's
+/// <see cref="InterpreterStateStack"/>, which saves its caller's interpreter state and counts towards
+/// the stack's depth.
 /// </para>
 /// <para>
 /// Macros used to be opened because RepRapFirmware asked for one over SPI, and nothing has asked
@@ -31,23 +33,16 @@ namespace DuetControlServer.Files;
 /// <param name="fileFactory">Creates the macro file</param>
 /// <param name="filePathResolver">Resolves the macro's physical path</param>
 /// <param name="model">Object model</param>
+/// <param name="stateStack">Machine state stack the macro's level is pushed on</param>
 /// <param name="logger">Logger</param>
 public sealed class MacroRunner(
     CodeProcessor codeProcessor,
     FileFactory fileFactory,
     FilePathResolver filePathResolver,
     Model.ObjectModel model,
+    InterpreterStateStack stateStack,
     ILogger<MacroRunner> logger)
 {
-    /// <summary>
-    /// How deeply macros may nest before a macro is refused
-    /// </summary>
-    /// <remarks>
-    /// A macro that calls itself would otherwise push stack levels until the process runs out of
-    /// memory. RepRapFirmware caps its own stack for the same reason
-    /// </remarks>
-    public const int MaxNesting = 10;
-
     /// <summary>
     /// Run a macro file and wait for it to finish
     /// </summary>
@@ -59,6 +54,7 @@ public sealed class MacroRunner(
     /// <param name="parameters">Parameters the macro can read as <c>param.name</c>, if any</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True if the macro was found and run, false if there is no such file</returns>
+    /// <exception cref="GCodeException">The channel's stack is full, so every file on the channel was aborted</exception>
     /// <remarks>
     /// <para>
     /// A missing macro is not an error here. Most of the macros the machine runs are optional - a
@@ -80,13 +76,6 @@ public sealed class MacroRunner(
                                              IReadOnlyDictionary<string, object?>? parameters = null,
                                              CancellationToken cancellationToken = default)
     {
-        if (codeProcessor.GetStackDepth(channel) >= MaxNesting)
-        {
-            logger.LogError("Refusing to start macro file {File} on channel {Channel}: macros are nested {Depth} deep",
-                            fileName, channel, MaxNesting);
-            return false;
-        }
-
         string physicalFile = await filePathResolver.ToPhysicalAsync(fileName, directory, cancellationToken);
         if (!File.Exists(physicalFile))
         {
@@ -109,29 +98,25 @@ public sealed class MacroRunner(
             macro.Variables.SetParameters(parameters);
         }
 
-        // The stack level has to exist before the macro starts reading, because its codes are routed
-        // to the level whose file they belong to
+        bool pushed;
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            pushed = stateStack.TryPushMacro(channel, model.Inputs[channel], macro, fileName);
+        }
+        if (!pushed)
+        {
+            // A recursion or a loop pushing levels would only fail again, so everything on the channel stops here, as
+            // RepRapFirmware's GCodes::Push aborts the print
+            macro.Dispose();
+            logger.LogError("Refusing to start macro file {File} on channel {Channel}: its stack is full", fileName, channel);
+            await codeProcessor.AbortAllFilesAsync(channel, cancellationToken);
+            throw new GCodeException(InterpreterStateStack.OverflowError(channel));
+        }
+
+        // The pipeline level has to exist before the macro starts reading, because its codes are
+        // routed to the level whose file they belong to
         codeProcessor.Push(channel, macro);
         await PublishMacroRestartedAsync(channel, cancellationToken);
-
-        // A macro carries its own copy of the caller's interpreter state, as RepRapFirmware pushes a
-        // GCodeMachineState frame: the feed rate, relativity, units, plane and time mode a macro
-        // changes are restored when it ends rather than leaking to the caller. The startup files -
-        // config.g, config-override.g (M501), dsf-config.g and anything they call - are the
-        // exception, so an M83 in config.g sticks. RepRapFirmware's CheckFinishedRunningConfigFile
-        // copies config.g's state up; the others keep the same rule here. IsExecutingConfig covers
-        // the sub-macros, whose own flags are not set but which run while the counter is up
-        InterpreterStateStack.SavedState? savedState = null;
-        if (!macro.IsConfig && !macro.IsConfigOverride && !macro.IsDsfConfig && !model.IsExecutingConfig)
-        {
-            using (await model.AccessReadWriteAsync(cancellationToken))
-            {
-                if (model.Inputs[channel] is InputChannel input)
-                {
-                    savedState = InterpreterStateStack.Capture(input);
-                }
-            }
-        }
 
         try
         {
@@ -146,13 +131,28 @@ public sealed class MacroRunner(
             // runner's to pop and the level on top now belongs to someone else
             codeProcessor.PopIfCurrent(channel, macro);
 
-            if (savedState is InterpreterStateStack.SavedState saved)
+            // The startup files - config.g, config-override.g (M501), dsf-config.g and anything they
+            // call - keep the interpreter state they finish with, so an M83 in config.g sticks.
+            // RepRapFirmware's CheckFinishedRunningConfigFile does so for config.g; the others keep
+            // the same rule here. IsExecutingConfig covers the macros they call
+            bool keepState = macro.IsConfig || macro.IsConfigOverride || macro.IsDsfConfig || model.IsExecutingConfig;
+            using (await model.AccessReadWriteAsync(CancellationToken.None))
             {
-                using (await model.AccessReadWriteAsync(CancellationToken.None))
+                InputChannel? input = model.Inputs[channel];
+                if (!stateStack.PopMacro(channel, input, macro, keepState))
                 {
-                    if (model.Inputs[channel] is InputChannel input)
+                    logger.LogError("Macro file {File} on channel {Channel} has no level on the machine state stack to pop", fileName, channel);
+                }
+                if (macro.IsConfig && channel == CodeChannel.Trigger && input is not null)
+                {
+                    // config.g at startup sets the state every channel starts with, as RepRapFirmware's
+                    // CheckFinishedRunningConfigFile copies it to every other channel
+                    foreach (InputChannel? other in model.Inputs)
                     {
-                        InterpreterStateStack.Restore(input, saved);
+                        if (other is not null && !ReferenceEquals(other, input))
+                        {
+                            InterpreterStateStack.CopyConfigState(input, other);
+                        }
                     }
                 }
             }

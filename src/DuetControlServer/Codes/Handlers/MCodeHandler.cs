@@ -108,9 +108,7 @@ internal partial class MCodeHandler(
     /// </remarks>
     public async ValueTask<Message> ProcessAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        // TODO RRF skips M-codes while simulating on every channel, and still runs M20-M37, M82/M83, M98/M99,
-        // M111, M112, M120/M121, M200, M204, M205, M207, M572, M593, M997 and M999 (GCodes2.cpp HandleMcode)
-        if (code.IsFromFileChannel && jobController.State.IsSimulating && code.MajorNumber is not 0 and not 1 and not 2)
+        if (IsSkippedWhileSimulating(code))
         {
             // Ignore most M-codes from files in simulation mode...
             return new Message();
@@ -128,13 +126,26 @@ internal partial class MCodeHandler(
     public CodeClass? Classify(DuetAPI.Commands.Code code)
     {
         CodeClass? codeClass = Rows.Classify(code);
-        if (codeClass is not null && code.IsFromFileChannel && jobController.State.IsSimulating &&
-            code.MajorNumber is not 0 and not 1 and not 2)
+        if (codeClass is not null && IsSkippedWhileSimulating(code))
         {
             return CodeClass.Immediate;
         }
         return codeClass;
     }
+
+    /// <summary>
+    /// Whether a code is ignored because it comes from a file that is being simulated
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <returns>True if the code does nothing</returns>
+    /// <remarks>
+    /// The codes that end the job still run, and so do the ones that run macros and keep the machine state stack,
+    /// without which the simulation would follow a different path through the file
+    /// </remarks>
+    private bool IsSkippedWhileSimulating(DuetAPI.Commands.Code code)
+        // TODO RRF skips M-codes while simulating on every channel, and still runs M20-M37, M82/M83, M111, M112, M200,
+        // M204, M205, M207, M572, M593, M997 and M999 (GCodes2.cpp HandleMcode)
+        => code.IsFromFileChannel && jobController.State.IsSimulating && code.MajorNumber is not (0 or 1 or 2 or 98 or 99 or 120 or 121);
 
     /// <summary>
     /// Whether a drive-configuration code names a drive to change rather than only asking for a
@@ -200,9 +211,10 @@ internal partial class MCodeHandler(
         { 85, CodeClass.Immediate, (h, c, ct) => h.HandleIdleTimeoutAsync(c, ct) }, // a timer setting with no relation to pending codes
         // Set steps per mm; a bare M92 is a report, which DWC polls mid-print
         { 92, FlushAndStandstillWhenSettingDrives, (h, c, ct) => h.HandleStepsPerMmAsync(c, ct) },
-        // Flag current macro file as (not) pausable
-        { 98, CodeClass.Immediate, (h, c, ct) => h.HandleMacroPausableAsync(c, ct) }, // M98 P starts the macro on its own stack level; the handler flushes inline first
-        // TODO M99: return from the current macro, and do nothing outside one (RRF FileMacroCyclesReturn, regression case m99-return-from-macro)
+        // Call a macro, or flag the current level as (not) restartable
+        { 98, CodeClass.Immediate, (h, c, ct) => h.HandleMacroCallAsync(c, ct) }, // M98 P starts the macro on its own stack level; the handler flushes inline first
+        // Return from the current macro: the codes before it must finish, and the ones after it are cancelled
+        { 99, CodeClass.Flush, (h, c, ct) => h.HandleMacroReturnAsync(c, ct) },
         // Set extruder temperature without waiting
         { 104, CodeClass.Deferred, (h, c, ct) => h.HandleToolTemperatureAsync(c, wait: false, ct) },
         // Report temperatures
@@ -1120,51 +1132,67 @@ internal partial class MCodeHandler(
     }
 
     /// <summary>
-    /// M98: flag the current macro file as (not) pausable
+    /// M98: call a macro, or flag the current level as (not) restartable
     /// </summary>
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>The result, or null to let the code carry on</returns>
-    private async ValueTask<Message> HandleMacroPausableAsync(Commands.Code code, CancellationToken cancellationToken)
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// P takes precedence over R, which is then one of the parameters the macro reads. RepRapFirmware's
+    /// GCodes2.cpp case 98
+    /// </remarks>
+    private async ValueTask<Message> HandleMacroCallAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        // R on its own flags the macro that is already running rather than starting a new one
-        if (code.TryGetInt('R', out int rParam) && !code.HasParameter('P'))
-        {
-            if (!await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
-            {
-                throw new OperationCanceledException();
-            }
-
-            // TODO RRF also sets inputs[].macroRestartable (even outside a macro, as m98-macro-pause-flag records),
-            // and R1 releases a held pause at once (CheckForDeferredPause) rather than when the macro ends
-            if (codeProcessor.GetCurrentFile(code.Channel) is MacroFile currentMacro)
-            {
-                using (await currentMacro.LockAsync(cancellationToken))
-                {
-                    currentMacro.IsPausable = rParam == 1;
-                }
-            }
-            return new Message();
-        }
-
-        if (!code.TryGetString('P', out string? fileName))
-        {
-            return new Message(MessageType.Error, "Filename expected");
-        }
-
         if (!await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
         {
             throw new OperationCanceledException();
         }
 
-        // A macro named without a directory is looked up in the system directory, which is what makes
-        // M98 P"homex.g" find sys/homex.g the way it does in RepRapFirmware
-        // M98 is the user invoking a macro, not the firmware asking for one, so workplace offsets
-        // and the speed and extrusion overrides still apply to the moves inside it
-        if (!await macroRunner.TryRunAsync(code.Channel, fileName, code, isSystemMacro: false,
-                                           cancellationToken: cancellationToken))
+        if (code.TryGetString('P', out string? fileName))
         {
-            return new Message(MessageType.Error, $"Macro file {fileName} not found");
+            // A macro named without a directory is looked up in the system directory, which is what makes
+            // M98 P"homex.g" find sys/homex.g the way it does in RepRapFirmware
+            // M98 is the user invoking a macro, not the firmware asking for one, so workplace offsets
+            // and the speed and extrusion overrides still apply to the moves inside it
+            if (!await macroRunner.TryRunAsync(code.Channel, fileName, code, isSystemMacro: false,
+                                            parameters: code.GetMacroParameters(excluded: 'P'),
+                                            cancellationToken: cancellationToken))
+            {
+                return new Message(MessageType.Error, $"Macro file {fileName} not found");
+            }
+        }
+        else if (code.TryGetInt('R', out int restartable))
+        {
+            // A pause held for a macro to end is not released here: RepRapFirmware's CheckForDeferredPause
+            // acts only outside a macro, where no pause is held
+            using (await model.AccessReadWriteAsync(cancellationToken))
+            {
+                stateStack.SetMacroRestartable(code.Channel, model.Inputs[code.Channel], restartable == 1);
+            }
+        }
+        else
+        {
+            return new Message(MessageType.Error, "No P or R parameter");
+        }
+
+        return new Message();
+    }
+
+    /// <summary>
+    /// M99: return from the macro the code is in, and do nothing outside one
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>RepRapFirmware's GCodes::FileMacroCyclesReturn</remarks>
+    private async ValueTask<Message> HandleMacroReturnAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        if (code.File is MacroFile macro)
+        {
+            using (await macro.LockAsync(cancellationToken))
+            {
+                macro.Return();
+            }
         }
         return new Message();
     }

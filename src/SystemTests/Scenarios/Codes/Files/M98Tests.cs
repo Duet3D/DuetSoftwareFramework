@@ -26,7 +26,6 @@ public class M98Tests : BenchFixture
     /// RRF truth: GCodes2.cpp case 98, DoFileMacroWithParameters, and GCodeBuffer::PushState and PopState for the
     /// stack depth. Regression: m98-call-macro
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task RunsTheMacroToItsEnd()
     {
@@ -58,7 +57,6 @@ public class M98Tests : BenchFixture
     /// assigns the name the macro was started with; and <c>macroRestartable</c> is the flag
     /// GCodes2.cpp case 98 sets from R, reporting it through <c>reprap.InputsUpdated()</c>
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task ReportsTheMacroStateInsideTheMacro()
     {
@@ -156,7 +154,6 @@ public class M98Tests : BenchFixture
 
     /// <summary>With P present, R is a parameter for the macro like any other letter rather than the restartable flag</summary>
     /// <remarks>RRF truth: GCodes2.cpp case 98 tests P before R, and AddParameters passes R on</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task RWithPIsAParameterNotTheFlag()
     {
@@ -188,7 +185,6 @@ public class M98Tests : BenchFixture
     /// reports the overflow as a message and replies OK to the M98 that overflowed; DSF refuses that M98 with an error,
     /// which a macro reports as a message
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task NestingBeyondTheStackLimitAbortsEveryMacro()
     {
@@ -217,7 +213,6 @@ public class M98Tests : BenchFixture
 
     /// <summary>A macro starts with inverse time mode off whatever its caller uses, and the caller's mode is restored after it</summary>
     /// <remarks>RRF truth: the GCodeMachineState copy constructor keeps inverseTimeMode only when withinSameFile</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task AMacroStartsWithInverseTimeModeOff()
     {
@@ -232,6 +227,24 @@ public class M98Tests : BenchFixture
             Assert.That(await bench.Host.GlobalFlagAsync("inverseTime"), Is.False, "the macro started in G94");
             Assert.That(await bench.Host.ReadInputAsync(input => input.InverseTimeMode), Is.True, "the caller is back in G93");
         });
+    }
+
+    /// <summary>M98 in a file that is being simulated still runs the macro, so the simulation follows the file's path</summary>
+    /// <remarks>RRF truth: GCodes2.cpp HandleMcode runs M98 while simulating, where it skips most M-codes</remarks>
+    [Test]
+    public async Task RunsTheMacroWhileSimulating()
+    {
+        await using Bench bench = await Bench.StartAsync("global ran = 0\nglobal depth = -1");
+        int file = await bench.Host.InputIndexAsync(CodeChannel.File);
+        bench.Host.Sd.WriteSys("drt-sim.g", $"""
+            set global.ran = global.ran + 1
+            set global.depth = inputs[{file}].stackDepth
+            """);
+        bench.Host.Sd.WriteGCode("sim.gcode", "M98 P\"drt-sim.g\"\n");
+
+        await bench.Host.ExecuteCodeAsync("M37 P\"0:/gcodes/sim.gcode\" F0");
+        await bench.Host.WaitForGlobalAsync("ran", 1);
+        Assert.That(await bench.Host.GlobalAsync("depth"), Is.EqualTo(1), "the macro ran one stack level deep");
     }
 
     /// <summary>A macro that is not there is an error, quoting the name as it was given</summary>
@@ -252,7 +265,6 @@ public class M98Tests : BenchFixture
 
     /// <summary>M98 with neither P nor R is an error</summary>
     /// <remarks>RRF truth: GCodes2.cpp case 98, the final else. Regression: error-missing-parameters-system-2</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task NoPOrRIsAnError()
     {
@@ -271,7 +283,6 @@ public class M98Tests : BenchFixture
     /// clearing macroRestartable for a new file, PopState restoring the caller's state, and GCodeBuffer.cpp's
     /// macroRestartable object model entry. Regression: m98-macro-pause-flag
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task RSetsTheRestartableFlagOfItsOwnLevel()
     {

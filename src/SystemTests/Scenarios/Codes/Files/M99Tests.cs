@@ -17,7 +17,6 @@ public class M99Tests : BenchFixture
     /// RRF truth: GCodes2.cpp case 99, FileMacroCyclesReturn popping the macro's machine state. Regression:
     /// m99-return-from-macro
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task ReturnsFromTheMacro()
     {
@@ -42,7 +41,6 @@ public class M99Tests : BenchFixture
 
     /// <summary>M99 in a nested macro returns from that macro alone: the macro that called it carries on</summary>
     /// <remarks>RRF truth: FileMacroCyclesReturn closes the current file and pops one machine state</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task ReturnsFromTheInnermostMacroOnly()
     {
@@ -77,7 +75,6 @@ public class M99Tests : BenchFixture
 
     /// <summary>M99 inside a loop and a conditional block still returns from the whole macro</summary>
     /// <remarks>RRF truth: FileMacroCyclesReturn closes the file whatever block it is in; blocks are BlockStates within one machine state</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task ReturnsFromInsideABlock()
     {
@@ -104,7 +101,6 @@ public class M99Tests : BenchFixture
 
     /// <summary>The M120 levels a macro has open when it reaches M99 are discarded with it, and the caller's state is restored</summary>
     /// <remarks>RRF truth: FileMacroCyclesReturn pops every machine state down to and including the macro's own</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task DiscardsTheMacrosOpenM120Levels()
     {
@@ -129,7 +125,6 @@ public class M99Tests : BenchFixture
 
     /// <summary>M99 outside a macro does nothing and replies nothing</summary>
     /// <remarks>RRF truth: FileMacroCyclesReturn acts only if IsDoingFileMacro</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task DoesNothingOutsideAMacro()
     {
