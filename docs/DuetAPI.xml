@@ -17874,6 +17874,34 @@
             Constructor of this class
             </summary>
         </member>
+        <member name="T:DuetAPI.Utility.JsonFloatExtensions">
+            <summary>
+            Extension methods to read single-precision floats that stay serializable.
+            RepRapFirmware reports large values with few significant digits, so a value just below the float maximum may be
+            rounded beyond it. Such a number is parsed as infinity, which cannot be written as JSON again.
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonFloatExtensions.GetFiniteSingle(System.Text.Json.Utf8JsonReader@)">
+            <summary>
+            Read a float from a JSON reader and clamp it to the finite float range
+            </summary>
+            <param name="reader">JSON reader</param>
+            <returns>Finite float value</returns>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonFloatExtensions.GetFiniteSingle(System.Text.Json.JsonElement)">
+            <summary>
+            Read a float from a JSON element and clamp it to the finite float range
+            </summary>
+            <param name="element">JSON element</param>
+            <returns>Finite float value</returns>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonFloatExtensions.Clamp(System.Single)">
+            <summary>
+            Clamp an infinite value to the finite float range
+            </summary>
+            <param name="value">Value to clamp</param>
+            <returns>Finite float value or NaN</returns>
+        </member>
         <member name="T:DuetAPI.Utility.JsonHelper">
             <summary>
             Helper class for JSON serialization, deserialization, patch creation and patch application
