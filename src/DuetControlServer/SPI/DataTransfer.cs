@@ -299,7 +299,10 @@ namespace DuetControlServer.SPI
                     }
 
                     _logger.Debug(e, "Lost connection to Duet");
+
+                    // The TX header buffer may still hold a protocol version adopted from a bad header, so rewrite it as well
                     _txHeader.ProtocolVersion = Consts.ProtocolVersion;
+                    WriteCRC();
                     _waitingForFirstTransfer = true;
 
                     // Without this the retry guard above keeps throwing without exchanging anything
@@ -339,11 +342,12 @@ namespace DuetControlServer.SPI
                 return null;
             }
 
-            // Header
-            _rxPointer += Serialization.Reader.ReadPacketHeader(_rxBuffer[_rxPointer..].Span, out _lastPacket);
+            // Header. Only the data of this transfer is valid, the rest of the buffer may hold data of an earlier one
+            ReadOnlyMemory<byte> transferData = _rxBuffer[.._rxHeader.DataLength];
+            _rxPointer += Serialization.Reader.ReadPacketHeader(transferData[_rxPointer..].Span, out _lastPacket);
 
             // Packet data
-            _packetData = _rxBuffer.Slice(_rxPointer, _lastPacket.Length);
+            _packetData = transferData.Slice(_rxPointer, _lastPacket.Length);
             int padding = 4 - (_lastPacket.Length % 4);
             _rxPointer += _lastPacket.Length + ((padding == 4) ? 0 : padding);
 
@@ -1749,11 +1753,13 @@ namespace DuetControlServer.SPI
                     {
                         _logger.Warn("Bad data CRC32 (expected 0x{0:x8}, got 0x{1:x8})", _rxHeader.ChecksumData32, crc32);
                         responseCode = ExchangeResponse(TransferResponse.BadDataChecksum);
+
+                        // RRF sends its data again when either side reports a bad data checksum, so exchange the data again whether RRF got ours or not
                         if (responseCode == TransferResponse.BadDataChecksum)
                         {
                             _logger.Warn("Note: RepRapFirmware didn't receive valid data either (code 0x{0:x8})", responseCode);
                         }
-                        else
+                        else if (responseCode != TransferResponse.Success)
                         {
                             if (responseCode == TransferResponse.BadResponse)
                             {
