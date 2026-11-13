@@ -301,11 +301,11 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// <param name="simulating">Whether the file is being simulated</param>
     /// <param name="fromJobFile">Whether the job file being printed is selecting this file</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <returns>Task that completes when the firmware has been told about the file, to be awaited after releasing the lock</returns>
     /// <remarks>
     /// This class has to be locked when this method is called
     /// </remarks>
-    public async Task SelectFileAsync(string virtualFile, string physicalFile, bool simulating = false, bool fromJobFile = false, CancellationToken cancellationToken = default)
+    public async Task<Task> SelectFileAsync(string virtualFile, string physicalFile, bool simulating = false, bool fromJobFile = false, CancellationToken cancellationToken = default)
     {
         // Analyze and open the file
         GCodeFileInfo info = await _fileInfoParser.ParseAsync(physicalFile, true);
@@ -322,12 +322,12 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                 _pendingFile = file;
                 _pendingFileInfo = info;
                 _pendingFileSimulating = simulating;
-                return;
+                return Task.CompletedTask;
             }
             await _finished.WaitAsync(_lifetime.ApplicationStopping);
         }
 
-        await ApplyFileSelectionAsync(file, info, simulating, cancellationToken);
+        return await ApplyFileSelectionAsync(file, info, simulating, cancellationToken);
     }
 
     /// <summary>
@@ -337,8 +337,8 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// <param name="info">Information about the file</param>
     /// <param name="simulating">Whether the file is being simulated</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    private async Task ApplyFileSelectionAsync(CodeFile file, GCodeFileInfo info, bool simulating, CancellationToken cancellationToken = default)
+    /// <returns>Task that completes when the firmware has been told about the file, to be awaited after releasing the lock</returns>
+    private async Task<Task> ApplyFileSelectionAsync(CodeFile file, GCodeFileInfo info, bool simulating, CancellationToken cancellationToken = default)
     {
         // Update the state
         IsCancelled = IsAborted = IsStoppedByCode = false;
@@ -353,8 +353,8 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
         }
 
         // Notify RepRapFirmware and start processing the file in the background
-        await _linkInterface.SetPrintFileInfo(cancellationToken);
         _logger.LogInformation("Selected file {File}", file.FilePath.Virtual);
+        return await _linkInterface.SetPrintFileInfo(cancellationToken);
     }
 
     /// <summary>
@@ -382,25 +382,40 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Message result</returns>
+    /// <remarks>
+    /// This class must not be locked when this method is called. Copying the channel state takes the channel
+    /// locks, which the link task holds while it waits for this class to abort or pause a job
+    /// </remarks>
     public async Task<Message> ForkAsync(CancellationToken cancellationToken)
     {
-        if (_file is null)
+        using (await LockAsync(cancellationToken))
         {
-            return new Message(MessageType.Error, "No file is selected");
+            if (_file is null)
+            {
+                return new Message(MessageType.Error, "No file is selected");
+            }
+
+            // Ignore the command if already forked
+            if (_file2 is not null)
+            {
+                return new Message();
+            }
         }
 
-        // Ignore the command if already forked
-        if (_file2 is null)
-        {
-            // Copy the stack in case this is invoked from a macro file.
-            // We need to pass the macro file position as well if applicable to resume the second macro file from the right position
-            await _linkInterface.CopyStateAsync(CodeChannel.File, CodeChannel.File2, cancellationToken);
+        // Copy the stack in case this is invoked from a macro file.
+        // We need to pass the macro file position as well if applicable to resume the second macro file from the right position
+        await _linkInterface.CopyStateAsync(CodeChannel.File, CodeChannel.File2, cancellationToken);
 
-            // Start printing using the second file channel if applicable.
-            // Lock the file here because the copy constructor accesses file.NextFilePosition
-            using (await _file.LockAsync(cancellationToken))
+        using (await LockAsync(cancellationToken))
+        {
+            if (_file is not null && _file2 is null)
             {
-                _file2 = _fileFactory.Create(_file, CodeChannel.File2);
+                // Start printing using the second file channel if applicable.
+                // Lock the file here because the copy constructor accesses file.NextFilePosition
+                using (await _file.LockAsync(cancellationToken))
+                {
+                    _file2 = _fileFactory.Create(_file, CodeChannel.File2);
+                }
             }
         }
         return new Message();
@@ -820,6 +835,7 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                     }
                 }
 
+                Task fileInfoSent = Task.CompletedTask;
                 using (await LockAsync(stoppingToken))
                 {
                     // We are no longer printing a file...
@@ -837,11 +853,12 @@ public class JobProcessor : BackgroundService, IAsyncDiagnostics
                     // Select the file that the job just finished asked for with M23 or M32
                     if (_pendingFile is not null)
                     {
-                        await ApplyFileSelectionAsync(_pendingFile, _pendingFileInfo!, _pendingFileSimulating, stoppingToken);
+                        fileInfoSent = await ApplyFileSelectionAsync(_pendingFile, _pendingFileInfo!, _pendingFileSimulating, stoppingToken);
                         _pendingFile = null;
                         _pendingFileInfo = null;
                     }
                 }
+                await fileInfoSent;
             } while (!stoppingToken.IsCancellationRequested);
         }
         catch (OperationCanceledException)

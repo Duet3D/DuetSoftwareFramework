@@ -372,17 +372,19 @@ public sealed partial class LinkInterface(
     /// Update the print file info in the firmware
     /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <returns>Task that completes when the print file info has been sent</returns>
     /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    public async Task SetPrintFileInfo(CancellationToken cancellationToken = default)
+    /// <remarks>
+    /// The returned task must not be awaited while the job processor is locked, because the link task
+    /// needs that lock to abort or pause a job before it gets to send the print file info
+    /// </remarks>
+    public async Task<Task> SetPrintFileInfo(CancellationToken cancellationToken = default)
     {
-        Task task;
         using (await PrintStateLock.LockAsync(cancellationToken))
         {
             SetPrintInfoRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            task = SetPrintInfoRequest.Task;
+            return SetPrintInfoRequest.Task.WaitAsync(cancellationToken);
         }
-        await task.WaitAsync(cancellationToken);
     }
 
     /// <summary>

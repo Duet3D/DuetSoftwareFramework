@@ -114,7 +114,7 @@ public static class Firmware
         try
         {
             // Get a stream containing the binary content
-            if (Path.GetExtension(filename) == ".uf2")
+            if (Path.GetExtension(filename).Equals(".uf2", StringComparison.OrdinalIgnoreCase))
             {
                 await using FileStream fs = new(filename, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize);
                 firmwareFile = await UnpackUF2Async(fs);

@@ -240,7 +240,7 @@ public sealed class CodeInterception : IProcessor
                 }
 
                 int asteriskIndex = filter.IndexOf('*');
-                if (asteriskIndex >= 0 && filter[..asteriskIndex].Equals(shortCodeString[..asteriskIndex], StringComparison.InvariantCultureIgnoreCase))
+                if (asteriskIndex >= 0 && shortCodeString.AsSpan().StartsWith(filter.AsSpan(0, asteriskIndex), StringComparison.InvariantCultureIgnoreCase))
                 {
                     return true;
                 }

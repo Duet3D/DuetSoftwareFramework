@@ -59,6 +59,9 @@ public class USB : IDiagnostics, ILinkAdapter
     private PacketHeader _lastPacket;
     private ReadOnlyMemory<byte> _packetData;
 
+    // Keep track of packets being resent to avoid getting out-of-order
+    private readonly List<Protocol.SbcRequests.Request> _packetsBeingResent = [];
+
     /// <summary>
     /// Currently-used protocol version
     /// </summary>
@@ -252,8 +255,11 @@ public class USB : IDiagnostics, ILinkAdapter
     /// </summary>
     /// <param name="connecting">Whether this an initial connection is being established</param>
     /// <param name="cancellationToken">Cancellation token to cancel the transfer</param>
-    public void PerformFullTransfer(bool connecting = false, CancellationToken cancellationToken = default)
+    /// <returns>Whether the pending packets have been sent. If not, they may have been discarded</returns>
+    public bool PerformFullTransfer(bool connecting = false, CancellationToken cancellationToken = default)
     {
+        _packetsBeingResent.Clear();
+
         // Attempt reconnection if needed (but not during initial connection)
         if (_needsReconnect && !connecting)
         {
@@ -277,7 +283,7 @@ public class USB : IDiagnostics, ILinkAdapter
                 // cancelled here, otherwise the waiter deadlocks because it is only cancellable on shutdown
                 _hadReset = true;
                 _consecutiveFailures = 0;
-                return;
+                return false;
             }
             catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
             {
@@ -290,7 +296,7 @@ public class USB : IDiagnostics, ILinkAdapter
                 }
                 _logger.LogDebug("USB: Reconnection failed ({Error}), will retry ({Attempt}/{Max})", ex.Message, _consecutiveFailures, _settings.MaxSbcRetries);
                 Thread.Sleep(500);
-                return;
+                return false;
             }
         }
 
@@ -359,6 +365,7 @@ public class USB : IDiagnostics, ILinkAdapter
             _txBuffer = _txBuffer.Next ?? _txBuffers.First!;
             _rxPointer = _txPointer = 0;
             _packetId = 0;
+            return true;
         }
         catch (Exception e) when (e is OperationCanceledException or TimeoutException or IOException or InvalidOperationException)
         {
@@ -401,6 +408,7 @@ public class USB : IDiagnostics, ILinkAdapter
             {
                 throw new OperationCanceledException("Maximum number of USB transfer retries exceeded");
             }
+            return false;
         }
     }
 
@@ -712,11 +720,9 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <param name="sbcRequest">Content of the packet to resend</param>
     public void ResendPacket(PacketHeader packet, out Protocol.SbcRequests.Request sbcRequest)
     {
-        // USB transfers are sequential: the firmware sees our data before composing its response, so a
-        // resend request always refers to the exchange that was just sent. That buffer is the previous
-        // one because the transfer routine has already rotated to the next buffer at this point (unlike
-        // SPI, where the full-duplex pipeline makes resend requests refer to the transfer before that)
-        Span<byte> buffer = (_txBuffer.Previous ?? _txBuffers.Last!).Value.Span;
+        // The firmware sends the length of its response before it reads our data, so a resend request refers to
+        // the transfer before the last one. With three buffers in rotation that is the next one
+        Span<byte> buffer = (_txBuffer.Next ?? _txBuffers.First!).Value.Span;
 
         PacketHeader header;
         int headerSize = Marshal.SizeOf<PacketHeader>();
@@ -730,6 +736,13 @@ public class USB : IDiagnostics, ILinkAdapter
                 sbcRequest = (Protocol.SbcRequests.Request)header.Request;
                 WritePacket(sbcRequest, header.Length);
                 buffer.Slice(headerSize, header.Length).CopyTo(GetWriteBuffer(header.Length));
+
+                // Keep track of it
+                if (sbcRequest != Protocol.SbcRequests.Request.LockAllMovementSystemsAndWaitForStandstill &&
+                    !_packetsBeingResent.Contains(sbcRequest))
+                {
+                    _packetsBeingResent.Add(sbcRequest);
+                }
                 return;
             }
 
@@ -781,6 +794,12 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteCode(Code code)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.Code))
+        {
+            return false;
+        }
+
         // Attempt to serialize the code first
         Span<byte> span = stackalloc byte[_settings.MaxCodeBufferSize];
         int codeLength = Protocol.Writer.WriteCode(span, code, ProtocolVersion);
@@ -806,6 +825,12 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteGetObjectModel(string key, string flags)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.GetObjectModel))
+        {
+            return false;
+        }
+
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WriteGetObjectModel(span, key, flags);
@@ -829,6 +854,12 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WritePrintFileInfo(GCodeFileInfo info)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.SetPrintFileInfo))
+        {
+            return false;
+        }
+
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WritePrintFileInfo(span, info);
@@ -852,6 +883,12 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WritePrintStopped(PrintStoppedReason reason)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.PrintStopped))
+        {
+            return false;
+        }
+
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.PrintStoppedHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -872,6 +909,12 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteMacroCompleted(CodeChannel channel, bool error)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.MacroCompleted))
+        {
+            return false;
+        }
+
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.MacroCompleteHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -908,6 +951,12 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteUnlock(CodeChannel channel)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.Unlock))
+        {
+            return false;
+        }
+
         int dataLength = Marshal.SizeOf<CodeChannelHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -1295,6 +1344,12 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <returns>Whether the firmware has been written successfully</returns>
     public bool WriteFileChunk(Span<byte> data, long fileLength)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.FileChunk))
+        {
+            return false;
+        }
+
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WriteFileChunk(span, data, fileLength);
@@ -1319,6 +1374,12 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <returns>Whether the evaluation request has been written successfully</returns>
     public bool WriteEvaluateExpression(CodeChannel channel, string expression)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.EvaluateExpression))
+        {
+            return false;
+        }
+
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WriteEvaluateExpression(span, channel, expression);
@@ -1343,6 +1404,12 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <returns>Whether the firmware has been written successfully</returns>
     public bool WriteMessage(MessageTypeFlags flags, string message)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.Message))
+        {
+            return false;
+        }
+
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WriteMessage(span, flags, message);
@@ -1366,6 +1433,12 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteMacroStarted(CodeChannel channel)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.MacroStarted))
+        {
+            return false;
+        }
+
         int dataLength = Marshal.SizeOf<CodeChannelHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -1384,6 +1457,12 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteInvalidateChannel(CodeChannel channel)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.InvalidateChannel))
+        {
+            return false;
+        }
+
         int dataLength = Marshal.SizeOf<CodeChannelHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -1405,6 +1484,12 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteSetVariable(CodeChannel channel, bool createVariable, string varName, string expression)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.SetVariable))
+        {
+            return false;
+        }
+
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WriteSetVariable(span, channel, createVariable, varName, expression);
@@ -1429,6 +1514,12 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <returns>True if the packet could be written</returns>
     public bool WriteDeleteLocalVariable(CodeChannel channel, string varName)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.DeleteLocalVariable))
+        {
+            return false;
+        }
+
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WriteDeleteLocalVariable(span, channel, varName);
@@ -1452,6 +1543,12 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteCheckFileExistsResult(bool exists)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.CheckFileExistsResult))
+        {
+            return false;
+        }
+
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.BooleanHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -1470,6 +1567,12 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteFileDeleteResult(bool success)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.FileDeleteResult))
+        {
+            return false;
+        }
+
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.BooleanHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -1489,6 +1592,12 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteFileListResult(IList<FileSystemInfo> entries, bool endOfList)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.FileListResult))
+        {
+            return false;
+        }
+
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WriteFileList(span, entries, endOfList);
@@ -1513,6 +1622,12 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteOpenFileResult(uint fileHandle, long length)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.OpenFileResult))
+        {
+            return false;
+        }
+
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WriteOpenFileResult(span, fileHandle, length);
@@ -1537,6 +1652,12 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteFileReadResult(Span<byte> data, int bytesRead)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.FileReadResult))
+        {
+            return false;
+        }
+
         // Serialize the request first to see how much space it requires
         Span<byte> span = stackalloc byte[_bufferSize - Marshal.SizeOf<PacketHeader>()];
         int dataLength = Protocol.Writer.WriteFileReadResult(span, data, bytesRead);
@@ -1560,6 +1681,12 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteFileWriteResult(bool success)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.FileWriteResult))
+        {
+            return false;
+        }
+
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.BooleanHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -1578,6 +1705,12 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteFileSeekResult(bool success)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.FileSeekResult))
+        {
+            return false;
+        }
+
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.BooleanHeader>();
         if (!CanWritePacket(dataLength))
         {
@@ -1596,6 +1729,12 @@ public class USB : IDiagnostics, ILinkAdapter
     /// <returns>If the packet could be written</returns>
     public bool WriteFileTruncateResult(bool success)
     {
+        // Don't send a new request if another one is still pending
+        if (_packetsBeingResent.Contains(Protocol.SbcRequests.Request.FileTruncateResult))
+        {
+            return false;
+        }
+
         int dataLength = Marshal.SizeOf<Protocol.SbcRequests.BooleanHeader>();
         if (!CanWritePacket(dataLength))
         {

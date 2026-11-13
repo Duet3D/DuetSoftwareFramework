@@ -2,6 +2,7 @@ using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Codes;
+using DuetControlServer.Link;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Nito.AsyncEx;
@@ -19,12 +20,14 @@ namespace DuetControlServer.Model;
 /// </summary>
 /// <param name="codeFactory">Factory to create code instances</param>
 /// <param name="expressions">Expression evaluator</param>
+/// <param name="linkInterface">Link interface</param>
 /// <param name="model">Object model</param>
 /// <param name="observer">Object model observer</param>
 /// <param name="logger">Logger</param>
 public sealed class SbcTriggerService(
     CodeFactory codeFactory,
     Codes.Meta.Expressions expressions,
+    LinkInterface linkInterface,
     ObjectModel model,
     Observer observer,
     ILogger<SbcTriggerService> logger) : BackgroundService
@@ -259,13 +262,26 @@ public sealed class SbcTriggerService(
                     if (fire && await IsTriggerConditionMetAsync(state.Condition, stoppingToken))
                     {
                         logger.LogInformation("SBC trigger {Number} fired (expression: '{Expression}')", triggerNum, state.Expression);
-                        Commands.Code triggerCode = codeFactory.Create();
-                        triggerCode.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
-                        triggerCode.Channel = CodeChannel.Trigger;
-                        triggerCode.Type = CodeType.MCode;
-                        triggerCode.MajorNumber = 98;
-                        triggerCode.Parameters = [new('P', $"trigger{triggerNum}.g")];
-                        _ = triggerCode.ExecuteAsync();
+                        if (triggerNum == 0)
+                        {
+                            // Trigger 0 is an emergency stop. Request it from the link directly so that it cannot wait behind other codes
+                            await linkInterface.EmergencyStopAsync(stoppingToken);
+                            using (await model.AccessReadWriteAsync(stoppingToken))
+                            {
+                                model.State.Status = MachineStatus.Halted;
+                            }
+                        }
+                        else
+                        {
+                            // Let the firmware activate the trigger so that trigger 1 pauses the print and the others run their macro
+                            Commands.Code triggerCode = codeFactory.Create();
+                            triggerCode.Flags = CodeFlags.IsInternallyProcessed | CodeFlags.Asynchronous;
+                            triggerCode.Channel = CodeChannel.Trigger;
+                            triggerCode.Type = CodeType.MCode;
+                            triggerCode.MajorNumber = 582;
+                            triggerCode.Parameters = [new('T', triggerNum), new('S', 1)];
+                            _ = triggerCode.ExecuteAsync();
+                        }
                     }
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

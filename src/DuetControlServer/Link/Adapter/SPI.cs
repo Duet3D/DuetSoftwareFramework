@@ -221,7 +221,8 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// </summary>
     /// <param name="connecting">Whether this an initial connection is being established</param>
     /// <param name="cancellationToken">Cancellation token to cancel the transfer</param>
-    public void PerformFullTransfer(bool connecting = false, CancellationToken cancellationToken = default)
+    /// <returns>Whether the pending packets have been sent. If not, they may have been discarded</returns>
+    public bool PerformFullTransfer(bool connecting = false, CancellationToken cancellationToken = default)
     {
         _packetsBeingResent.Clear();
         _lastTransferNumber = _rxHeader.SequenceNumber;
@@ -319,7 +320,7 @@ public class SPI : IDiagnostics, ILinkAdapter
                 _txBuffer = _txBuffer.Next ?? _txBuffers.First!;
                 _rxPointer = _txPointer = 0;
                 _packetId = 0;
-                break;
+                return true;
             }
             catch (OperationCanceledException e)
             {
@@ -344,6 +345,7 @@ public class SPI : IDiagnostics, ILinkAdapter
                 _connected = false;
             }
         }
+        return false;
     }
 
     /// <summary>

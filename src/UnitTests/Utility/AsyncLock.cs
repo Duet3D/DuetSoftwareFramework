@@ -93,4 +93,20 @@ public class AsyncLockTests
         // The lock must still be obtainable after a waiter gave up
         using (await asyncLock.LockAsync(new CancellationTokenSource(TimeSpan.FromSeconds(5)).Token)) { }
     }
+
+    [Test]
+    public async Task CancelledTokenStillAcquiresFreeLock()
+    {
+        DuetSharedLibrary.AsyncLock asyncLock = new();
+        using CancellationTokenSource cts = new();
+        await cts.CancelAsync();
+
+        using (asyncLock.Lock(cts.Token)) { }
+        using (await asyncLock.LockAsync(cts.Token))
+        {
+            // A lock that is held must still refuse a cancelled token
+            Assert.That(() => asyncLock.Lock(cts.Token), Throws.InstanceOf<OperationCanceledException>());
+            Assert.That(async () => await asyncLock.LockAsync(cts.Token), Throws.InstanceOf<OperationCanceledException>());
+        }
+    }
 }

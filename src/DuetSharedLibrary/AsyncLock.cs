@@ -9,7 +9,9 @@ namespace DuetSharedLibrary;
 /// </summary>
 /// <remarks>
 /// Uncontended acquisitions do not allocate, which matters because some of these locks are taken per G-code.
-/// Both <see cref="Lock"/> and <see cref="LockAsync"/> queue on the same waiter list, so waiters are served in FIFO order
+/// Both <see cref="Lock"/> and <see cref="LockAsync"/> queue on the same waiter list, so waiters are served in FIFO order.
+/// A free lock is acquired even if the cancellation token is already cancelled, so cleanup code running during
+/// cancellation can still take locks; the token only aborts a wait
 /// </remarks>
 public sealed class AsyncLock
 {
@@ -45,7 +47,10 @@ public sealed class AsyncLock
     /// </remarks>
     public Releaser Lock(CancellationToken cancellationToken = default)
     {
-        _semaphore.WaitAsync(cancellationToken).GetAwaiter().GetResult();
+        if (!_semaphore.Wait(0))
+        {
+            _semaphore.WaitAsync(cancellationToken).GetAwaiter().GetResult();
+        }
         return new Releaser(_semaphore);
     }
 
@@ -57,7 +62,10 @@ public sealed class AsyncLock
     /// <exception cref="OperationCanceledException">Lock has not been acquired</exception>
     public async ValueTask<Releaser> LockAsync(CancellationToken cancellationToken = default)
     {
-        await _semaphore.WaitAsync(cancellationToken);
+        if (!_semaphore.Wait(0))
+        {
+            await _semaphore.WaitAsync(cancellationToken);
+        }
         return new Releaser(_semaphore);
     }
 }

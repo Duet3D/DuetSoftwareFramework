@@ -30,7 +30,8 @@ public interface ILinkAdapter
     /// </summary>
     /// <param name="connecting">Whether this an initial connection is being established</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
-    void PerformFullTransfer(bool connecting = false, CancellationToken cancellationToken = default);
+    /// <returns>Whether the pending packets have been sent. If not, they may have been discarded</returns>
+    bool PerformFullTransfer(bool connecting = false, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Get the maximum time between two full transfers

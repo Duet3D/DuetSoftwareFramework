@@ -359,7 +359,16 @@ public class RepRapFirmwareEndpoints
         {
             if (!string.IsNullOrWhiteSpace(name))
             {
-                string resolvedPath = await EndpointHelper.ResolvePathAsync(settings.SocketPath, name);
+                string resolvedPath;
+                using (CommandConnection connection = await EndpointHelper.BuildConnectionAsync(settings.SocketPath))
+                {
+                    resolvedPath = await connection.ResolvePathAsync(name);
+                    if (await EndpointHelper.IsVolumeRootAsync(connection, name, resolvedPath))
+                    {
+                        EndpointHelper.LogWarning(logger, $"Refusing to delete volume root directory {name} (resolved to {resolvedPath})");
+                        return Results.Text("{\"err\":1}", "application/json");
+                    }
+                }
 
                 if (Directory.Exists(resolvedPath))
                 {

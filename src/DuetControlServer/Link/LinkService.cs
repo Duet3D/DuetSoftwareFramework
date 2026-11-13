@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Text.Unicode;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
@@ -262,19 +264,6 @@ public sealed class LinkService(
             bool skipChannels = false;
             using (linkInterface.FirmwareActionLock.Lock(stoppingToken))
             {
-                // Check if an emergency stop has been requested
-                if (linkInterface.FirmwareHaltRequest is not null)
-                {
-                    InvalidateCodes();
-                    if (linkAdapter.WriteEmergencyStop())
-                    {
-                        logger.LogWarning("Emergency stop");
-                        linkInterface.FirmwareHaltRequest.SetResult();
-                        linkInterface.FirmwareHaltRequest = null;
-                    }
-                    skipChannels = true;
-                }
-
                 // Check if a firmware reset has been requested
                 if (linkInterface.FirmwareResetRequest is not null)
                 {
@@ -375,6 +364,19 @@ public sealed class LinkService(
                 }
             }
             linkInterface.BytesReserved = 0;
+
+            // Check if an emergency stop has been requested. The packets above were sent by RRF before the stop,
+            // so the stacks may only be invalidated once they have been processed
+            bool emergencyStopWritten = false;
+            using (linkInterface.FirmwareActionLock.Lock(stoppingToken))
+            {
+                if (linkInterface.FirmwareHaltRequest is not null)
+                {
+                    InvalidateCodes();
+                    emergencyStopWritten = linkAdapter.WriteEmergencyStop();
+                    skipChannels = true;
+                }
+            }
 
             // Process pending codes, macro files and requests for resource locks/unlocks as well as flush requests
             if (!skipChannels)
@@ -514,8 +516,16 @@ public sealed class LinkService(
                 }
             }
 
-            // Do another full SPI transfer
-            linkAdapter.PerformFullTransfer(cancellationToken: lifetime.ApplicationStopped);
+            // Do another full SPI transfer. If it fails, the emergency stop request remains pending and is written again
+            if (linkAdapter.PerformFullTransfer(cancellationToken: lifetime.ApplicationStopped) && emergencyStopWritten)
+            {
+                logger.LogWarning("Emergency stop");
+                using (linkInterface.FirmwareActionLock.Lock(lifetime.ApplicationStopped))
+                {
+                    linkInterface.FirmwareHaltRequest?.SetResult();
+                    linkInterface.FirmwareHaltRequest = null;
+                }
+            }
         }
         while (!stoppingToken.IsCancellationRequested);
     }
@@ -632,7 +642,8 @@ public sealed class LinkService(
                 }
                 else
                 {
-                    query.Tcs.SetResult(json.ToArray());
+                    // RRF cuts long strings by bytes, which may leave an incomplete UTF-8 sequence that cannot be serialized again
+                    query.Tcs.SetResult(Utf8.IsValid(json) ? json.ToArray() : Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(json)));
                 }
             }
             else
@@ -1085,6 +1096,11 @@ public sealed class LinkService(
         try
         {
             string physicalFile = filePathResolver.ToPhysical(filename);
+            if (filePathResolver.IsVolumeRoot(physicalFile))
+            {
+                throw new IOException("Cannot delete the root directory of a volume");
+            }
+
             if (Directory.Exists(physicalFile))
             {
                 Directory.Delete(physicalFile, recursive);
