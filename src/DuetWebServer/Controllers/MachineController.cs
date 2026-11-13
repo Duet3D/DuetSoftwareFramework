@@ -588,7 +588,6 @@ namespace DuetWebServer.Controllers
         /// <returns>
         /// HTTP status code:
         /// (204) File or directory deleted
-        /// (403) Root directory of a volume cannot be deleted
         /// (404) File not found
         /// (500) Generic error
         /// (502) Incompatible DCS version
@@ -608,7 +607,7 @@ namespace DuetWebServer.Controllers
                 if (await FilePath.IsVolumeRootAsync(connection, filename, resolvedPath))
                 {
                     LogWarning($"Refusing to delete {filename} because it is the root directory of a volume");
-                    return StatusCode(403, "Cannot delete the root directory of a volume");
+                    return StatusCode(500, "Cannot delete the root directory of a volume");
                 }
 
                 if (Directory.Exists(resolvedPath))
