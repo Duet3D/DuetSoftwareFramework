@@ -5837,6 +5837,15 @@
             Information about the mainboard, which is always the first item of the boards array
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.MainBoard.CanSplitAddress">
+            <summary>
+            Lowest CAN address served by CAN0 or null if CAN0 has no expansion boards assigned
+            </summary>
+            <remarks>
+            Lower addresses and the firmware update address 126 stay on CAN1.
+            Only boards with two CAN buses (6HC and 6XD) support this
+            </remarks>
+        </member>
         <member name="P:DuetAPI.ObjectModel.MainBoard.DirectDisplay">
             <summary>
             Details about a connected display or null if none is connected
