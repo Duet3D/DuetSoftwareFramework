@@ -277,11 +277,11 @@ namespace DuetControlServer.Files
         /// <param name="fileName">File to print</param>
         /// <param name="physicalFile">Physical file to print</param>
         /// <param name="simulating">Whether the file is being simulated</param>
-        /// <returns>Asynchronous task</returns>
+        /// <returns>Task that completes when the firmware has been told about the new file</returns>
         /// <remarks>
-        /// This class has to be locked when this method is called
+        /// This class has to be locked when this method is called. The returned task must only be awaited once the lock has been released
         /// </remarks>
-        public static async Task SelectFile(string fileName, string physicalFile, bool simulating = false, bool fromJobFile = false)
+        public static async Task<Task> SelectFile(string fileName, string physicalFile, bool simulating = false, bool fromJobFile = false)
         {
             // Analyze and open the file
             GCodeFileInfo info = await InfoParser.Parse(physicalFile, true);
@@ -298,12 +298,12 @@ namespace DuetControlServer.Files
                     _pendingFile = file;
                     _pendingFileInfo = info;
                     _pendingFileSimulating = simulating;
-                    return;
+                    return Task.CompletedTask;
                 }
                 await _finished.WaitAsync(Program.CancellationToken);
             }
 
-            await ApplyFileSelection(file, info, simulating);
+            return await ApplyFileSelection(file, info, simulating);
         }
 
         /// <summary>
@@ -312,8 +312,8 @@ namespace DuetControlServer.Files
         /// <param name="file">File to print</param>
         /// <param name="info">Information about the file</param>
         /// <param name="simulating">Whether the file is being simulated</param>
-        /// <returns>Asynchronous task</returns>
-        private static async Task ApplyFileSelection(CodeFile file, GCodeFileInfo info, bool simulating)
+        /// <returns>Task that completes when the firmware has been told about the new file</returns>
+        private static async Task<Task> ApplyFileSelection(CodeFile file, GCodeFileInfo info, bool simulating)
         {
             // Update the state
             IsCancelled = IsAborted = false;
@@ -328,8 +328,8 @@ namespace DuetControlServer.Files
             }
 
             // Notify RepRapFirmware and start processing the file in the background
-            await SPI.Interface.SetPrintFileInfo();
             _logger.Info("Selected file {0}", file.FileName);
+            return await SPI.Interface.SetPrintFileInfo();
         }
 
         /// <summary>
@@ -355,26 +355,42 @@ namespace DuetControlServer.Files
         /// <summary>
         /// Fork the file being processed to execute concurrently
         /// </summary>
+        /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Message result</returns>
-        public static async Task<Message> ForkAsync()
+        /// <remarks>
+        /// This class must not be locked when this method is called
+        /// </remarks>
+        public static async Task<Message> ForkAsync(CancellationToken cancellationToken)
         {
-            if (_file is null)
+            using (await LockAsync(cancellationToken))
             {
-                return new Message(MessageType.Error, "No file is selected");
+                if (_file is null)
+                {
+                    return new Message(MessageType.Error, "No file is selected");
+                }
+
+                // Ignore the command if already forked
+                if (_file2 is not null)
+                {
+                    return new Message();
+                }
             }
 
-            // Ignore the command if already forked
-            if (_file2 is null)
-            {
-                // Copy the stack in case this is invoked from a macro file.
-                // We need to pass the macro file position as well if applicable to resume the second macro file from the right position
-                await SPI.Interface.CopyStateAsync(CodeChannel.File, CodeChannel.File2);
+            // Copy the stack in case this is invoked from a macro file.
+            // We need to pass the macro file position as well if applicable to resume the second macro file from the right position.
+            // The SPI task locks the channels before it locks this class, so this class must not be locked while they are acquired
+            await SPI.Interface.CopyStateAsync(CodeChannel.File, CodeChannel.File2);
 
-                // Start printing using the second file channel if applicable.
-                // Lock the file here because the copy constructor accesses file.NextFilePosition
-                using (await _file.LockAsync())
+            using (await LockAsync(cancellationToken))
+            {
+                if (_file is not null && _file2 is null)
                 {
-                    _file2 = new(_file, CodeChannel.File2);
+                    // Start printing using the second file channel if applicable.
+                    // Lock the file here because the copy constructor accesses file.NextFilePosition
+                    using (await _file.LockAsync())
+                    {
+                        _file2 = new(_file, CodeChannel.File2);
+                    }
                 }
             }
             return new Message();
@@ -763,6 +779,7 @@ namespace DuetControlServer.Files
                     }
                 }
 
+                Task fileInfoSent = Task.CompletedTask;
                 using (await LockAsync())
                 {
                     // We are no longer printing a file...
@@ -780,11 +797,12 @@ namespace DuetControlServer.Files
                     // Select the file that the job just finished asked for with M23 or M32
                     if (_pendingFile is not null)
                     {
-                        await ApplyFileSelection(_pendingFile, _pendingFileInfo!, _pendingFileSimulating);
+                        fileInfoSent = await ApplyFileSelection(_pendingFile, _pendingFileInfo!, _pendingFileSimulating);
                         _pendingFile = null;
                         _pendingFileInfo = null;
                     }
                 }
+                await fileInfoSent;
             }
             while (!Program.CancellationToken.IsCancellationRequested);
         }

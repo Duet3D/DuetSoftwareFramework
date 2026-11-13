@@ -249,5 +249,55 @@ namespace UnitTests.Machine
             string serializedModel = newModel.ToString();
             Assert.That(serializedModel, Is.EqualTo(jsonText));
         }
+
+        [Test]
+        public void FloatBeyondRangeStaysSerializable()
+        {
+            // RRF reports a value just below the float maximum with four significant digits, which rounds it beyond the float range
+            byte[] json = Encoding.UTF8.GetBytes("{\"heat\":{\"coldExtrudeTemperature\":3.403e+38},\"move\":{\"axes\":[{\"babystep\":-3.403e+38}]}}");
+
+            ObjectModel model = new();
+            using (JsonDocument parsedJson = JsonDocument.Parse(json))
+            {
+                model.UpdateFromJson(parsedJson.RootElement, false);
+            }
+            Assert.That(model.Heat.ColdExtrudeTemperature, Is.EqualTo(float.MaxValue));
+            Assert.That(model.Move.Axes[0].Babystep, Is.EqualTo(float.MinValue));
+            Assert.That(() => model.ToString(), Throws.Nothing);
+
+            Utf8JsonReader reader = new(json);
+            reader.Read();
+            ObjectModel readerModel = new();
+            readerModel.UpdateFromJsonReader(ref reader, false);
+            Assert.That(readerModel.Heat.ColdExtrudeTemperature, Is.EqualTo(float.MaxValue));
+            Assert.That(readerModel.Move.Axes[0].Babystep, Is.EqualTo(float.MinValue));
+            Assert.That(() => readerModel.ToString(), Throws.Nothing);
+        }
+
+        [Test]
+        public void InvalidUtf8InGlobalStaysSerializable()
+        {
+            // RRF cuts strings by bytes, so a global may hold an incomplete UTF-8 sequence
+            byte[] json = [.. Encoding.UTF8.GetBytes("{\"global\":{\"c\":\""), 0xC3, .. Encoding.UTF8.GetBytes("\"}}")];
+
+            ObjectModel model = new();
+            using (JsonDocument parsedJson = JsonDocument.Parse(json))
+            {
+                model.UpdateFromJson(parsedJson.RootElement, false);
+                AssertGlobalIsReplacementCharacter(model);
+            }
+
+            Utf8JsonReader reader = new(json);
+            reader.Read();
+            ObjectModel readerModel = new();
+            readerModel.UpdateFromJsonReader(ref reader, false);
+            AssertGlobalIsReplacementCharacter(readerModel);
+        }
+
+        static void AssertGlobalIsReplacementCharacter(ObjectModel model)
+        {
+            using JsonDocument serializedModel = JsonDocument.Parse(model.ToString());
+            Assert.That(serializedModel.RootElement.GetProperty("global").GetProperty("c").GetString(), Is.EqualTo(((char)0xFFFD).ToString()));
+        }
     }
 }

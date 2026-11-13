@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Unicode;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.Commands;
@@ -379,9 +380,12 @@ namespace DuetControlServer.SPI
         /// <summary>
         /// Update the print file info in the firmware
         /// </summary>
-        /// <returns>Asynchronous task</returns>
+        /// <returns>Task that completes when the print file info has been sent</returns>
+        /// <remarks>
+        /// The returned task must not be awaited while the job processor is locked, because the SPI task that completes it takes that lock too
+        /// </remarks>
         /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-        public static async Task SetPrintFileInfo()
+        public static async Task<Task> SetPrintFileInfo()
         {
             Program.CancellationToken.ThrowIfCancellationRequested();
             if (Settings.NoSpi)
@@ -389,13 +393,11 @@ namespace DuetControlServer.SPI
                 throw new InvalidOperationException("Not connected over SPI");
             }
 
-            Task task;
             using (await _printStateLock.LockAsync(Program.CancellationToken))
             {
                 _setPrintInfoRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                task = _setPrintInfoRequest.Task;
+                return _setPrintInfoRequest.Task;
             }
-            await task;
         }
 
         /// <summary>
@@ -689,19 +691,6 @@ namespace DuetControlServer.SPI
                 bool blockTask = false, skipChannels = false;
                 using (_firmwareActionLock.Lock(Program.CancellationToken))
                 {
-                    // Check if an emergency stop has been requested
-                    if (_firmwareHaltRequest is not null)
-                    {
-                        InvalidateCodes();
-                        if (DataTransfer.WriteEmergencyStop())
-                        {
-                            _logger.Warn("Emergency stop");
-                            _firmwareHaltRequest.SetResult();
-                            _firmwareHaltRequest = null;
-                        }
-                        skipChannels = true;
-                    }
-
                     // Check if a firmware reset has been requested
                     if (_firmwareResetRequest is not null)
                     {
@@ -811,6 +800,24 @@ namespace DuetControlServer.SPI
                     }
                 }
                 _bytesReserved = 0;
+
+                // Check if an emergency stop has been requested. The packets above were sent by RRF before the stop,
+                // so the stacks may only be invalidated once they have been processed
+                TaskCompletionSource? writtenHaltRequest = null;
+                using (_firmwareActionLock.Lock(Program.CancellationToken))
+                {
+                    if (_firmwareHaltRequest is not null)
+                    {
+                        InvalidateCodes();
+                        if (DataTransfer.WriteEmergencyStop())
+                        {
+                            _logger.Warn("Emergency stop");
+                            writtenHaltRequest = _firmwareHaltRequest;
+                            _firmwareHaltRequest = null;
+                        }
+                        skipChannels = true;
+                    }
+                }
 
                 // Process pending codes, macro files and requests for resource locks/unlocks as well as flush requests
                 if (!skipChannels)
@@ -929,6 +936,7 @@ namespace DuetControlServer.SPI
 
                 // Do another full SPI transfer
                 DataTransfer.PerformFullTransfer();
+                writtenHaltRequest?.SetResult();
             }
             while (!Program.CancellationToken.IsCancellationRequested);
         }
@@ -1057,7 +1065,8 @@ namespace DuetControlServer.SPI
                         }
                         else
                         {
-                            query.Tcs.SetResult(json.ToArray());
+                            // RRF cuts strings by bytes, so a string may end in an incomplete UTF-8 sequence, which System.Text.Json refuses to read
+                            query.Tcs.SetResult(Utf8.IsValid(json) ? json.ToArray() : Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(json)));
                         }
                     }
                     else if (!Program.CancellationToken.IsCancellationRequested)
@@ -1509,6 +1518,11 @@ namespace DuetControlServer.SPI
             try
             {
                 string physicalFile = FilePath.ToPhysical(filename);
+                if (FilePath.IsVolumeRoot(physicalFile))
+                {
+                    throw new IOException("Cannot delete the root directory of a volume");
+                }
+
                 if (Directory.Exists(physicalFile))
                 {
                     Directory.Delete(physicalFile, recursive);

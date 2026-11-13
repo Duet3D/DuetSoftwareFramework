@@ -12,6 +12,7 @@ using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetAPIClient;
 using DuetWebServer.Singletons;
+using DuetWebServer.Utility;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -587,6 +588,7 @@ namespace DuetWebServer.Controllers
         /// <returns>
         /// HTTP status code:
         /// (204) File or directory deleted
+        /// (403) Root directory of a volume cannot be deleted
         /// (404) File not found
         /// (500) Generic error
         /// (502) Incompatible DCS version
@@ -601,7 +603,13 @@ namespace DuetWebServer.Controllers
             string resolvedPath = "n/a";
             try
             {
-                resolvedPath = await ResolvePath(filename);
+                using CommandConnection connection = await BuildConnection();
+                resolvedPath = await connection.ResolvePath(filename);
+                if (await FilePath.IsVolumeRootAsync(connection, filename, resolvedPath))
+                {
+                    LogWarning($"Refusing to delete {filename} because it is the root directory of a volume");
+                    return StatusCode(403, "Cannot delete the root directory of a volume");
+                }
 
                 if (Directory.Exists(resolvedPath))
                 {

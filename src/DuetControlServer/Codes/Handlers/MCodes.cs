@@ -201,14 +201,16 @@ namespace DuetControlServer.Codes.Handlers
                                 return new Message(MessageType.Error, $"Could not find file {fileName}");
                             }
 
+                            Task fileInfoSent;
                             using (await JobProcessor.LockAsync(code.CancellationToken))
                             {
                                 if (!code.IsFromFileChannel && (JobProcessor.IsProcessing || JobProcessor.IsPaused))
                                 {
                                     return new Message(MessageType.Error, "Cannot set file to print, because a file is already being printed");
                                 }
-                                await JobProcessor.SelectFile(fileName, physicalFile, false, code.IsFromFileChannel);
+                                fileInfoSent = await JobProcessor.SelectFile(fileName, physicalFile, false, code.IsFromFileChannel);
                             }
+                            await fileInfoSent;
 
                             // Reassign the code's cancellation token so the job that just selected the next file still gets this code's reply
                             if (code.IsFromFileChannel)
@@ -458,6 +460,7 @@ namespace DuetControlServer.Codes.Handlers
                                 return new Message(MessageType.Error, $"GCode file \"{fileName}\" not found");
                             }
 
+                            Task fileInfoSent;
                             using (await JobProcessor.LockAsync(code.CancellationToken))
                             {
                                 if (!code.IsFromFileChannel && (JobProcessor.IsProcessing || JobProcessor.IsPaused))
@@ -465,11 +468,12 @@ namespace DuetControlServer.Codes.Handlers
                                     return new Message(MessageType.Error, "Cannot set file to simulate, because a file is already being printed");
                                 }
 
-                                await JobProcessor.SelectFile(fileName, physicalFile, true, code.IsFromFileChannel);
+                                fileInfoSent = await JobProcessor.SelectFile(fileName, physicalFile, true, code.IsFromFileChannel);
                                 // F0 suppresses writing the simulated time back to the file; absent or F1 updates it, as in standalone mode
                                 JobProcessor.UpdateSimulatedTime = code.GetInt('F', 1) == 1;
                                 // Simulation is started when M37 has been processed by the firmware
                             }
+                            await fileInfoSent;
                         }
 
                         // Let RRF do everything else
@@ -805,6 +809,11 @@ namespace DuetControlServer.Codes.Handlers
                     if (await Processor.FlushAsync(code))
                     {
                         string path = code.GetString('P'), physicalPath = await FilePath.ToPhysicalAsync(path);
+                        if (await FilePath.IsVolumeRootAsync(physicalPath))
+                        {
+                            return new Message(MessageType.Error, $"Cannot delete {path} because it is the root directory of a volume");
+                        }
+
                         try
                         {
                             if (Directory.Exists(physicalPath))
@@ -1013,13 +1022,10 @@ namespace DuetControlServer.Codes.Handlers
                             }
 
                             // Try to fork the file and report an error if anything went wrong
-                            using (await JobProcessor.LockAsync(code.CancellationToken))
+                            Message result = await JobProcessor.ForkAsync(code.CancellationToken);
+                            if (result.Type != MessageType.Success)
                             {
-                                Message result = await JobProcessor.ForkAsync();
-                                if (result.Type != MessageType.Success)
-                                {
-                                    return result;
-                                }
+                                return result;
                             }
                         }
 
@@ -1133,6 +1139,12 @@ namespace DuetControlServer.Codes.Handlers
                                 physicalFirmwareFile = fallbackFirmwareFile;
                             }
 
+                            // IAP erases the flash before it receives the firmware image, so an empty file would brick the board
+                            if (new FileInfo(physicalFirmwareFile).Length == 0)
+                            {
+                                return new Message(MessageType.Error, $"Firmware file {firmwareFile} is empty");
+                            }
+
                             // Stop all the plugins
                             Commands.StopPlugins stopCommand = new();
                             await stopCommand.Execute();
@@ -1140,7 +1152,7 @@ namespace DuetControlServer.Codes.Handlers
                             // Flash the firmware
                             await using FileStream iapStream = new(physicalIapFile, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
                             await using FileStream firmwareStream = new(physicalFirmwareFile, FileMode.Open, FileAccess.Read, FileShare.Read, Settings.FileBufferSize);
-                            if (Path.GetExtension(firmwareFile) == ".uf2")
+                            if (Path.GetExtension(firmwareFile).Equals(".uf2", StringComparison.OrdinalIgnoreCase))
                             {
                                 await using MemoryStream unpackedFirmwareStream = await Firmware.UnpackUF2(firmwareStream);
                                 await SPI.Interface.UpdateFirmware(iapStream, unpackedFirmwareStream);
@@ -1248,7 +1260,7 @@ namespace DuetControlServer.Codes.Handlers
 
                 // Diagnostics
                 case 122:
-                    if (code.GetInt('B', 0) == 0 && code.GetInt('P', 0) == 0 && code.GetUnprecedentedString() != "DSF" && !string.IsNullOrEmpty(code.Result.Content))
+                    if (code.GetParameter('B') is not { IsExpression: true } && code.GetParameter('P') is not { IsExpression: true } && code.GetInt('B', 0) == 0 && code.GetInt('P', 0) == 0 && code.GetUnprecedentedString() != "DSF" && !string.IsNullOrEmpty(code.Result.Content))
                     {
                         // Append our own diagnostics to RRF's M122 output
                         await Diagnostics(code.Result);

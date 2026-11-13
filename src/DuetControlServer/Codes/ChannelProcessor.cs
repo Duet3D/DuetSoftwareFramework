@@ -281,7 +281,7 @@ namespace DuetControlServer.Codes
         {
             foreach (Pipelines.PipelineBase pipeline in _pipelines)
             {
-                if (code.Stage == PipelineStage.Executed || pipeline.Stage > code.Stage)
+                if (pipeline.Stage > code.Stage)
                 {
                     //Logger.Debug("Flushing codes on stage {0} for {1}", pipeline.Stage, code);
                     if (!await pipeline.FlushAsync(code, evaluateExpressions, evaluateAll))

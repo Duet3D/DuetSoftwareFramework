@@ -13,6 +13,7 @@ using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetAPIClient;
 using DuetWebServer.Singletons;
+using DuetWebServer.Utility;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -426,7 +427,13 @@ namespace DuetWebServer.Controllers
             {
                 if (!string.IsNullOrWhiteSpace(name))
                 {
-                    string resolvedPath = await ResolvePath(name);
+                    using CommandConnection connection = await BuildConnection();
+                    string resolvedPath = await connection.ResolvePath(name);
+                    if (await FilePath.IsVolumeRootAsync(connection, name, resolvedPath))
+                    {
+                        LogWarning($"Refusing to delete {name} because it is the root directory of a volume");
+                        return Content("{\"err\":1}", "application/json");
+                    }
 
                     if (Directory.Exists(resolvedPath))
                     {

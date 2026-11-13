@@ -76,6 +76,7 @@ namespace DuetControlServer.Codes.Pipelines
                         catch (Exception e)
                         {
                             pipeline.Processor.Logger.Error(e, "Failed to process code in stage {0}", pipeline.Stage);
+                            code.SetException(e);
                         }
 
                         // Code processed, see if there is more to do

@@ -1,8 +1,10 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
+using DuetAPI.ObjectModel;
 
 namespace DuetControlServer.Files
 {
@@ -40,7 +42,7 @@ namespace DuetControlServer.Files
         /// Regex to obtain a drive number from a RRF-style path
         /// </summary>
         /// <returns></returns>
-        [GeneratedRegex(@"^(\d+):/*(.*)")]
+        [GeneratedRegex(@"^(\d+):/*(.*)", RegexOptions.Singleline)]
         private static partial Regex _generateDriveRegex();
 
         /// <summary>
@@ -49,72 +51,126 @@ namespace DuetControlServer.Files
         private static readonly Regex _driveRegex = _generateDriveRegex();
 
         /// <summary>
+        /// Combine a drive root with the given path segments and normalize the result. Leading slashes of the segments
+        /// are stripped so that absolute-looking inputs are treated as drive-relative, and the normalized result must
+        /// not escape the root (e.g. via ..)
+        /// </summary>
+        /// <param name="root">Physical root directory the result must remain in</param>
+        /// <param name="segments">Path segments to combine</param>
+        /// <returns>Normalized physical path</returns>
+        /// <exception cref="ArgumentException">Resulting path escapes the root directory</exception>
+        private static string CombineContained(string root, params string[] segments)
+        {
+            string fullRoot = Path.GetFullPath(root);
+            string result = Path.GetFullPath(Path.Combine([fullRoot, .. segments.Select(segment => segment.TrimStart('/'))]));
+            if (result != fullRoot && !result.StartsWith(fullRoot.EndsWith('/') ? fullRoot : fullRoot + '/', StringComparison.Ordinal))
+            {
+                throw new ArgumentException($"Path {string.Join('/', segments)} escapes the volume root directory");
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Get the physical root directory of the given drive number
+        /// </summary>
+        /// <param name="driveNumber">Drive number</param>
+        /// <returns>Physical root directory</returns>
+        /// <exception cref="ArgumentException">Invalid drive index</exception>
+        private static string GetDrivePath(int driveNumber)
+        {
+            if (driveNumber == 0)
+            {
+                return Settings.BaseDirectory;
+            }
+
+            using (Model.Provider.AccessReadOnly())
+            {
+                if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
+                {
+                    return Model.Provider.Get.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
+                }
+            }
+            throw new ArgumentException("Invalid drive index");
+        }
+
+        /// <summary>
+        /// Get the physical root directory of the given drive number asynchronously
+        /// </summary>
+        /// <param name="driveNumber">Drive number</param>
+        /// <returns>Physical root directory</returns>
+        /// <exception cref="ArgumentException">Invalid drive index</exception>
+        private static async Task<string> GetDrivePathAsync(int driveNumber)
+        {
+            if (driveNumber == 0)
+            {
+                return Settings.BaseDirectory;
+            }
+
+            using (await Model.Provider.AccessReadOnlyAsync())
+            {
+                if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
+                {
+                    return Model.Provider.Get.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
+                }
+            }
+            throw new ArgumentException("Invalid drive index");
+        }
+
+        /// <summary>
+        /// Get the virtual directory path for the given well-known directory
+        /// </summary>
+        /// <param name="directory">Well-known directory</param>
+        /// <returns>Virtual directory path</returns>
+        private static string GetDirectoryPath(FileDirectory directory)
+        {
+            using (Model.Provider.AccessReadOnly())
+            {
+                return directory switch
+                {
+                    FileDirectory.Filaments => Model.Provider.Get.Directories.Filaments,
+                    FileDirectory.Firmware => Model.Provider.Get.Directories.Firmware,
+                    FileDirectory.GCodes => Model.Provider.Get.Directories.GCodes,
+                    FileDirectory.Macros => Model.Provider.Get.Directories.Macros,
+                    FileDirectory.Menu => Model.Provider.Get.Directories.Menu,
+                    FileDirectory.System => Model.Provider.Get.Directories.System,
+                    FileDirectory.Web => Model.Provider.Get.Directories.Web,
+                    _ => Model.Provider.Get.Directories.System,
+                };
+            }
+        }
+
+        /// <summary>
+        /// Get the virtual directory path for the given well-known directory asynchronously
+        /// </summary>
+        /// <param name="directory">Well-known directory</param>
+        /// <returns>Virtual directory path</returns>
+        private static async Task<string> GetDirectoryPathAsync(FileDirectory directory)
+        {
+            using (await Model.Provider.AccessReadOnlyAsync())
+            {
+                return directory switch
+                {
+                    FileDirectory.Filaments => Model.Provider.Get.Directories.Filaments,
+                    FileDirectory.Firmware => Model.Provider.Get.Directories.Firmware,
+                    FileDirectory.GCodes => Model.Provider.Get.Directories.GCodes,
+                    FileDirectory.Macros => Model.Provider.Get.Directories.Macros,
+                    FileDirectory.Menu => Model.Provider.Get.Directories.Menu,
+                    FileDirectory.System => Model.Provider.Get.Directories.System,
+                    FileDirectory.Web => Model.Provider.Get.Directories.Web,
+                    _ => Model.Provider.Get.Directories.System,
+                };
+            }
+        }
+
+        /// <summary>
         /// Resolve a RepRapFirmware/FatFs-style file path to a physical file path.
         /// The first drive (0:/) is reserved for usage with the base directory as specified in the settings
         /// </summary>
         /// <param name="filePath">File path to resolve</param>
         /// <param name="directory">Directory containing filePath if it is not absolute is specified</param>
         /// <returns>Resolved file path</returns>
-        public static string ToPhysical(string filePath, FileDirectory directory)
-        {
-            filePath = filePath.Replace('\\', '/');
-
-            Match match = _driveRegex.Match(filePath);
-            if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
-            {
-                if (driveNumber == 0)
-                {
-                    return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), match.Groups[2].Value);
-                }
-
-                using (Model.Provider.AccessReadOnly())
-                {
-                    if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
-                    {
-                        string? path = Model.Provider.Get.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
-                        return Path.Combine(path, match.Groups[2].Value);
-                    }
-                }
-
-                throw new ArgumentException("Invalid drive index");
-            }
-
-            if (!filePath.StartsWith('/'))
-            {
-                string directoryPath;
-                using (Model.Provider.AccessReadOnly())
-                {
-                    directoryPath = directory switch
-                    {
-                        FileDirectory.Filaments => Model.Provider.Get.Directories.Filaments,
-                        FileDirectory.Firmware => Model.Provider.Get.Directories.Firmware,
-                        FileDirectory.GCodes => Model.Provider.Get.Directories.GCodes,
-                        FileDirectory.Macros => Model.Provider.Get.Directories.Macros,
-                        FileDirectory.Menu => Model.Provider.Get.Directories.Menu,
-                        FileDirectory.System => Model.Provider.Get.Directories.System,
-                        FileDirectory.Web => Model.Provider.Get.Directories.Web,
-                        _ => Model.Provider.Get.Directories.System,
-                    };
-
-                    match = _driveRegex.Match(directoryPath);
-                    if (match.Success && int.TryParse(match.Groups[1].Value, out driveNumber))
-                    {
-                        if (driveNumber == 0)
-                        {
-                            directoryPath = Path.Combine(Path.GetFullPath(Settings.BaseDirectory), match.Groups[2].Value);
-                        }
-
-                        if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
-                        {
-                            string? path = Model.Provider.Get.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
-                            directoryPath = Path.Combine(path, match.Groups[2].Value);
-                        }
-                    }
-                }
-                return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), directoryPath, filePath);
-            }
-            return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), filePath.StartsWith('/') ? filePath[1..] : filePath);
-        }
+        /// <exception cref="ArgumentException">Invalid drive index or the path escapes the volume root directory</exception>
+        public static string ToPhysical(string filePath, FileDirectory directory) => ToPhysical(filePath, GetDirectoryPath(directory));
 
         /// <summary>
         /// Resolve a RepRapFirmware/FatFs-style file path to a physical file path asynchronously.
@@ -123,65 +179,10 @@ namespace DuetControlServer.Files
         /// <param name="filePath">File path to resolve</param>
         /// <param name="directory">Directory containing filePath if it is not absolute is specified</param>
         /// <returns>Resolved file path</returns>
+        /// <exception cref="ArgumentException">Invalid drive index or the path escapes the volume root directory</exception>
         public static async Task<string> ToPhysicalAsync(string filePath, FileDirectory directory)
         {
-            filePath = filePath.Replace('\\', '/');
-
-            Match match = _driveRegex.Match(filePath);
-            if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
-            {
-                if (driveNumber == 0)
-                {
-                    return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), match.Groups[2].Value);
-                }
-
-                using (await Model.Provider.AccessReadOnlyAsync())
-                {
-                    if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
-                    {
-                        string? path = Model.Provider.Get.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
-                        return Path.Combine(path, match.Groups[2].Value);
-                    }
-                }
-
-                throw new ArgumentException("Invalid drive index");
-            }
-
-            if (!filePath.StartsWith('/'))
-            {
-                string directoryPath;
-                using (await Model.Provider.AccessReadOnlyAsync())
-                {
-                    directoryPath = directory switch
-                    {
-                        FileDirectory.Filaments => Model.Provider.Get.Directories.Filaments,
-                        FileDirectory.Firmware => Model.Provider.Get.Directories.Firmware,
-                        FileDirectory.GCodes => Model.Provider.Get.Directories.GCodes,
-                        FileDirectory.Macros => Model.Provider.Get.Directories.Macros,
-                        FileDirectory.Menu => Model.Provider.Get.Directories.Menu,
-                        FileDirectory.System => Model.Provider.Get.Directories.System,
-                        FileDirectory.Web => Model.Provider.Get.Directories.Web,
-                        _ => Model.Provider.Get.Directories.System,
-                    };
-
-                    match = _driveRegex.Match(directoryPath);
-                    if (match.Success && int.TryParse(match.Groups[1].Value, out driveNumber))
-                    {
-                        if (driveNumber == 0)
-                        {
-                            directoryPath = Path.Combine(Path.GetFullPath(Settings.BaseDirectory), match.Groups[2].Value);
-                        }
-
-                        if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
-                        {
-                            string? path = Model.Provider.Get.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
-                            directoryPath = Path.Combine(path, match.Groups[2].Value);
-                        }
-                    }
-                }
-                return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), directoryPath, filePath);
-            }
-            return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), filePath.StartsWith('/') ? filePath[1..] : filePath);
+            return await ToPhysicalAsync(filePath, await GetDirectoryPathAsync(directory));
         }
 
         /// <summary>
@@ -191,6 +192,7 @@ namespace DuetControlServer.Files
         /// <param name="filePath">File path to resolve</param>
         /// <param name="directory">Directory containing filePath if it is not absolute is specified</param>
         /// <returns>Resolved file path</returns>
+        /// <exception cref="ArgumentException">Invalid drive index or the path escapes the volume root directory</exception>
         public static string ToPhysical(string filePath, string? directory = null)
         {
             filePath = filePath.Replace('\\', '/');
@@ -198,21 +200,7 @@ namespace DuetControlServer.Files
             Match match = _driveRegex.Match(filePath);
             if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
             {
-                if (driveNumber == 0)
-                {
-                    return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), match.Groups[2].Value);
-                }
-
-                using (Model.Provider.AccessReadOnly())
-                {
-                    if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
-                    {
-                        string? path = Model.Provider.Get.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
-                        return Path.Combine(path, match.Groups[2].Value);
-                    }
-                }
-
-                throw new ArgumentException("Invalid drive index");
+                return CombineContained(GetDrivePath(driveNumber), match.Groups[2].Value);
             }
 
             if (directory is not null && !filePath.StartsWith('/'))
@@ -220,24 +208,11 @@ namespace DuetControlServer.Files
                 match = _driveRegex.Match(directory);
                 if (match.Success && int.TryParse(match.Groups[1].Value, out driveNumber))
                 {
-                    if (driveNumber == 0)
-                    {
-                        directory = Path.Combine(Path.GetFullPath(Settings.BaseDirectory), match.Groups[2].Value);
-                    }
-
-                    using (Model.Provider.AccessReadOnly())
-                    {
-                        if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
-                        {
-                            string? path = Model.Provider.Get.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
-                            directory = Path.Combine(path, match.Groups[2].Value);
-                        }
-                    }
+                    return CombineContained(GetDrivePath(driveNumber), match.Groups[2].Value, filePath);
                 }
-
-                return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), directory, filePath);
+                return CombineContained(Settings.BaseDirectory, directory, filePath);
             }
-            return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), filePath.StartsWith('/') ? filePath[1..] : filePath);
+            return CombineContained(Settings.BaseDirectory, filePath);
         }
 
         /// <summary>
@@ -247,6 +222,7 @@ namespace DuetControlServer.Files
         /// <param name="filePath">File path to resolve</param>
         /// <param name="directory">Directory containing filePath if it is not absolute is specified</param>
         /// <returns>Resolved file path</returns>
+        /// <exception cref="ArgumentException">Invalid drive index or the path escapes the volume root directory</exception>
         public static async Task<string> ToPhysicalAsync(string filePath, string? directory = null)
         {
             filePath = filePath.Replace('\\', '/');
@@ -254,21 +230,7 @@ namespace DuetControlServer.Files
             Match match = _driveRegex.Match(filePath);
             if (match.Success && int.TryParse(match.Groups[1].Value, out int driveNumber))
             {
-                if (driveNumber == 0)
-                {
-                    return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), match.Groups[2].Value);
-                }
-
-                using (await Model.Provider.AccessReadOnlyAsync())
-                {
-                    if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
-                    {
-                        string? path = Model.Provider.Get.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
-                        return Path.Combine(path, match.Groups[2].Value);
-                    }
-                }
-
-                throw new ArgumentException("Invalid drive index");
+                return CombineContained(await GetDrivePathAsync(driveNumber), match.Groups[2].Value);
             }
 
             if (directory is not null && !filePath.StartsWith('/'))
@@ -276,25 +238,71 @@ namespace DuetControlServer.Files
                 match = _driveRegex.Match(directory);
                 if (match.Success && int.TryParse(match.Groups[1].Value, out driveNumber))
                 {
-                    if (driveNumber == 0)
-                    {
-                        directory = Path.Combine(Path.GetFullPath(Settings.BaseDirectory), match.Groups[2].Value);
-                    }
+                    return CombineContained(await GetDrivePathAsync(driveNumber), match.Groups[2].Value, filePath);
+                }
+                return CombineContained(Settings.BaseDirectory, directory, filePath);
+            }
+            return CombineContained(Settings.BaseDirectory, filePath);
+        }
 
-                    using (await Model.Provider.AccessReadOnlyAsync())
+        /// <summary>
+        /// Check if a physical path is the root directory of a volume
+        /// </summary>
+        /// <param name="physicalPath">Physical path to check</param>
+        /// <returns>Whether the path is the base directory or the root directory of a mounted volume</returns>
+        public static bool IsVolumeRoot(string physicalPath)
+        {
+            physicalPath = NormalizePath(physicalPath);
+            if (physicalPath == NormalizePath(Settings.BaseDirectory))
+            {
+                return true;
+            }
+
+            using (Model.Provider.AccessReadOnly())
+            {
+                foreach (Volume volume in Model.Provider.Get.Volumes)
+                {
+                    if (volume.Path is not null && physicalPath == NormalizePath(volume.Path))
                     {
-                        if (driveNumber > 0 && driveNumber < Model.Provider.Get.Volumes.Count)
-                        {
-                            string? path = Model.Provider.Get.Volumes[driveNumber].Path ?? throw new ArgumentException("Invalid drive index");
-                            directory = Path.Combine(path, match.Groups[2].Value);
-                        }
+                        return true;
                     }
                 }
-
-                return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), directory, filePath);
             }
-            return Path.Combine(Path.GetFullPath(Settings.BaseDirectory), filePath.StartsWith('/') ? filePath[1..] : filePath);
+            return false;
         }
+
+        /// <summary>
+        /// Check if a physical path is the root directory of a volume asynchronously
+        /// </summary>
+        /// <param name="physicalPath">Physical path to check</param>
+        /// <returns>Whether the path is the base directory or the root directory of a mounted volume</returns>
+        public static async Task<bool> IsVolumeRootAsync(string physicalPath)
+        {
+            physicalPath = NormalizePath(physicalPath);
+            if (physicalPath == NormalizePath(Settings.BaseDirectory))
+            {
+                return true;
+            }
+
+            using (await Model.Provider.AccessReadOnlyAsync())
+            {
+                foreach (Volume volume in Model.Provider.Get.Volumes)
+                {
+                    if (volume.Path is not null && physicalPath == NormalizePath(volume.Path))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Resolve relative segments of a physical path and strip the trailing directory separator
+        /// </summary>
+        /// <param name="physicalPath">Physical path to normalize</param>
+        /// <returns>Normalized path</returns>
+        private static string NormalizePath(string physicalPath) => Path.TrimEndingDirectorySeparator(Path.GetFullPath(physicalPath));
 
         /// <summary>
         /// Convert a physical ile path to a RRF-style file path.

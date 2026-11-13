@@ -139,8 +139,8 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
                             "int" => new("newIntValue", "GetInt32()"),
                             "string" => new("newStringValue", "GetString()!"),
                             "char" => new("newCharValue", "GetString()![0]"),
-                            "float" => new("newFloatValue", "GetSingle()"),
-                            "float[]" => new("newFloatArrayValue", "EnumerateArray().Select(e => e.GetSingle()).ToArray()"),
+                            "float" => new("newFloatValue", "GetFiniteSingle()"),
+                            "float[]" => new("newFloatArrayValue", "EnumerateArray().Select(e => e.GetFiniteSingle()).ToArray()"),
                             "int[]" => new("newIntArrayValue", "EnumerateArray().Select(e => e.GetInt32()).ToArray()"),
                             "DriverId" => new("newDriverIdValue", "GetString()!"),
                             _ => null
@@ -319,7 +319,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
                                 "int" => "GetInt32()",
                                 "bool" => "ValueKind == JsonValueKind.Number ? jsonProperty.Value.GetInt32() != 0 : jsonProperty.Value.GetBoolean()",
                                 "double" => "GetDouble()",
-                                "float" => "GetSingle()",
+                                "float" => "GetFiniteSingle()",
                                 "long" => "GetInt64()",
                                 "ulong" => "GetUInt64()",
                                 "uint" => "GetUInt32()",
@@ -382,7 +382,7 @@ namespace DuetAPI.SourceGenerators.ObjectModel.ModelObject
                                 writer.WriteLine("else");
                                 writer.WriteLine("{");
                                 writer.Indent++;
-                                writer.WriteLine($"{prop.Identifier.ValueText} = jsonProperty.Value.GetSingle();");
+                                writer.WriteLine($"{prop.Identifier.ValueText} = jsonProperty.Value.GetFiniteSingle();");
                                 writer.Indent--;
                                 writer.WriteLine("}");
                                 writer.Indent--;
