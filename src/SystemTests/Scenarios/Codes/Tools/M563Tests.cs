@@ -489,7 +489,10 @@ public class M563Tests : BenchFixture
         $"M563 P0 D-1 H-1 R{Spindle}",
     ];
 
-    /// <summary>A redefinition that is refused still deletes the tool it was replacing</summary>
+    /// <summary>
+    /// A redefinition that is refused still deletes the tool it was replacing: the tool is
+    /// deselected, its heaters are switched off and it is removed
+    /// </summary>
     /// <remarks>
     /// GCodes::ManageTool deselects and runs Tool::DeleteTool before Tool::Create validates the new
     /// definition, so when Create returns null the old tool is already gone
@@ -498,13 +501,19 @@ public class M563Tests : BenchFixture
     [Test]
     public async Task M563RefusedRedefinitionDeletesOldTool()
     {
-        await using Bench bench = await Bench.StartAsync(Machines.Xye, "M563 P0 D0 S\"Old\"");
+        await using Bench bench = await Bench.StartAsync(Machines.Xye, HeaterConfig, $"M563 P0 D0 H{HeaterNumber} S\"Old\"\nT0");
+        DcsTestHost host = bench.Host;
+        Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(0), "T0 selects the tool before the redefinition");
 
-        string reply = (await bench.Host.ExecuteCodeAsync("M563 P0 D1")).Trim();
+        string reply = (await host.ExecuteCodeAsync("M563 P0 D1")).Trim();
         Assert.Multiple(async () =>
         {
             Assert.That(reply, Does.StartWith("Error"), "drive 1 does not exist (RRF Tool::Create)");
-            Assert.That(await bench.Host.ReadModelAsync(model => model.Tools.Count), Is.Zero, "the old tool 0 was deleted before the new one was refused (RRF GCodes::ManageTool)");
+            Assert.That(await host.ReadModelAsync(model => model.Tools.Count), Is.Zero, "the old tool 0 was deleted before the new one was refused (RRF GCodes::ManageTool)");
+            Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(-1), "the old tool was deselected (RRF GCodes::ManageTool SelectTool(-1))");
+            Assert.That(bench.CanMaster.CanMessages<CanMessageSetHeaterTemperatureV1>().Select(m => (m.Board, (int)m.Message.HeaterNumber, m.Message.Command, m.Message.Function)),
+                        Is.EqualTo(new[] { (Machines.DriverBoard, HeaterNumber, CanMessageSetHeaterTemperatureV1.CommandOff, (byte)HeaterFunction.Tool) }),
+                        "the old tool's heater is switched off on its board (RRF Tool::DeleteTool)");
         });
     }
 
