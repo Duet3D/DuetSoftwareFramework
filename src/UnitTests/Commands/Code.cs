@@ -1767,7 +1767,7 @@ public class Code
     }
 
     /// <summary>
-    /// An enumeration that does not start at zero, to hold the refusal to naming the right end
+    /// An enumeration that does not start at zero, to hold the refusal to listing its members in order
     /// </summary>
     private enum Offset
     {
@@ -1776,15 +1776,16 @@ public class Code
         Above = 1
     }
 
+    /// <summary>The refusal of a value that names no member of <see cref="Shade"/></summary>
+    private static string ShadeValues(char letter) => $"valid parameter values for '{letter}' are 0, 1, 2";
+
     /// <summary>
     /// GetEnum and TryGetEnum read a parameter as one of an enumeration's members, and refuse a
-    /// value that names none of them the way every other limited read refuses one
+    /// value that names none of them by listing the values that do
     /// </summary>
     /// <remarks>
-    /// The enumeration is the limits, so the wording is RepRapFirmware's for
-    /// <c>GCodeBuffer::GetLimitedUIValue</c>: "too low" below the lowest member and "too high" above
-    /// the highest. A default is returned as it stands, as it is for the numeric accessors, because
-    /// it comes from the caller rather than from the line
+    /// A default is returned as it stands, as it is for the numeric accessors, because it comes from
+    /// the caller rather than from the line
     /// </remarks>
     [Test]
     public void EnumAccessors()
@@ -1802,19 +1803,19 @@ public class Code
                             Is.EqualTo('Q'), "with no default the letter has to be there");
 
                 Assert.That(Assert.Throws<GCodeException>(() => code.GetEnum<Shade>('T'))!.Message,
-                            Is.EqualTo("parameter 'T' too high"), "a value above every member is too high");
+                            Is.EqualTo(ShadeValues('T')), "a value above every member lists the members");
                 Assert.That(Assert.Throws<GCodeException>(() => code.GetEnum<Shade>('U'))!.Message,
-                            Is.EqualTo("parameter 'U' too low"), "and one below every member is too low");
+                            Is.EqualTo(ShadeValues('U')), "and so does one below every member");
 
                 Assert.That(code.GetEnum<Shade>('Q', (Shade)9), Is.EqualTo((Shade)9),
                             "the limits are about the line, so they do not reach the default");
 
-                // An enumeration whose lowest member is negative moves the line between the two
+                // An enumeration with a negative member lists it first
                 Assert.That(Assert.Throws<GCodeException>(() => code.GetEnum<Offset>('U'))!.Message,
-                            Is.EqualTo("parameter 'U' too low"), "-2 is below Offset.Below");
+                            Is.EqualTo("valid parameter values for 'U' are -1, 0, 1"), "-2 is below Offset.Below");
                 Assert.That(code.GetEnum<Offset>('S'), Is.EqualTo(Offset.Above), "and 1 is a member of it");
                 Assert.That(Assert.Throws<GCodeException>(() => code.GetEnum<Offset>('T'))!.Message,
-                            Is.EqualTo("parameter 'T' too high"), "while 3 is above Offset.Above");
+                            Is.EqualTo("valid parameter values for 'T' are -1, 0, 1"), "while 3 is above Offset.Above");
 
                 Assert.That(Assert.Throws<GCodeException>(() => code.GetEnum<Shade>('V'))!.Message,
                             Is.EqualTo("expected number after 'V'"),
@@ -1835,7 +1836,7 @@ public class Code
                 Assert.That(nullableAbsent, Is.Null, "the nullable form says nothing was there rather than zero");
 
                 Assert.That(Assert.Throws<GCodeException>(() => code.TryGetEnum('T', out Shade _))!.Message,
-                            Is.EqualTo("parameter 'T' too high"),
+                            Is.EqualTo(ShadeValues('T')),
                             "the Try form is about whether the letter is there, not about whether its value is usable");
             });
         }
@@ -1867,9 +1868,9 @@ public class Code
                             Is.EqualTo('Q'), "with no default the letter has to be there");
 
                 Assert.That(Assert.Throws<GCodeException>(() => code.GetEnumArray<Shade>('T', 2))!.Message,
-                            Is.EqualTo("parameter 'T' too high"), "an item above every member refuses the list");
+                            Is.EqualTo(ShadeValues('T')), "an item above every member refuses the list");
                 Assert.That(Assert.Throws<GCodeException>(() => code.GetEnumArray<Shade>('U', 2))!.Message,
-                            Is.EqualTo("parameter 'U' too low"), "and so does one below every member");
+                            Is.EqualTo(ShadeValues('U')), "and so does one below every member");
                 Assert.That(Assert.Throws<GCodeException>(
                                 () => code.GetEnumArray<Shade>('T', 2, errorString: value => $"Invalid shade {value}"))!.Message,
                             Is.EqualTo("Invalid shade 3"),
@@ -1906,7 +1907,7 @@ public class Code
                 Assert.That(padded, Is.EqualTo(new[] { Shade.Dim, Shade.Dim, Shade.Dim }));
 
                 Assert.That(Assert.Throws<GCodeException>(() => code.TryGetEnumArray('T', 2, out Shade[]? _))!.Message,
-                            Is.EqualTo("parameter 'T' too high"),
+                            Is.EqualTo(ShadeValues('T')),
                             "the Try form is about whether the letter is there, not about whether its values are usable");
                 Assert.That(Assert.Throws<GCodeException>(() => code.TryGetEnumArray('S', 2, out Shade[]? _))!.Message,
                             Is.EqualTo("array too long for parameter 'S'"));
@@ -1982,7 +1983,7 @@ public class Code
             Assert.That(code.GetEnumArray<Shade>('T', 3, ignoreInvalid: true), Is.Empty,
                         "a list of nothing it recognises comes back empty rather than refused");
             Assert.That(Assert.Throws<GCodeException>(() => code.GetEnumArray<Shade>('S', 3))!.Message,
-                        Is.EqualTo("parameter 'S' too high"), "without it the list is refused as it stands");
+                        Is.EqualTo(ShadeValues('S')), "without it the list is refused as it stands");
 
             Assert.That(code.TryGetEnumArray('S', 3, out Shade[]? seen, ignoreInvalid: true), Is.True);
             Assert.That(seen, Is.EqualTo(new[] { Shade.Off, Shade.Bright }));
