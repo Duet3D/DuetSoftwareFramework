@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -9,6 +8,7 @@ using DuetAPI.ObjectModel;
 using DuetAPI.Commands;
 using DuetControlServer.Files;
 using DuetControlServer.Link.Protocol.Shared;
+using DuetControlServer.Model;
 using Microsoft.Extensions.Logging;
 
 namespace DuetControlServer.Codes.Handlers;
@@ -16,6 +16,10 @@ namespace DuetControlServer.Codes.Handlers;
 /// <summary>
 /// M500: write the settings a machine calibrates for itself into config-override.g
 /// </summary>
+/// <remarks>
+/// RepRapFirmware's <c>GCodes::WriteConfigOverrideFile</c>, whose sections and their order this
+/// follows. M501 runs the file, so every line is a comment or a code
+/// </remarks>
 internal partial class MCodeHandler
 {
     /// <summary>
@@ -49,12 +53,14 @@ internal partial class MCodeHandler
     {
         bool saveToolOffsets = false;
         bool saveProbeValues = false;
+        bool saveRotation = false;
         if (code.TryGetEnumArray('P', MaxSaveOptions, out ConfigOverrideSaveOption[]? requested, ignoreInvalid: true)) // Invalid values ignored as per RRF
         {
             foreach (ConfigOverrideSaveOption value in requested)
             {
                 saveToolOffsets |= value == ConfigOverrideSaveOption.SaveToolOffsets;
                 saveProbeValues |= value == ConfigOverrideSaveOption.SaveProbeValues;
+                saveRotation |= value == ConfigOverrideSaveOption.SaveCoordinateRotation;
             }
         }
 
@@ -65,12 +71,19 @@ internal partial class MCodeHandler
 
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            AppendKinematicsCalibration(builder);
+            using (planner.Lock())
+            {
+                planner.Parameters.Geometry.AppendCalibration(builder);
+            }
             AppendHeaterModels(builder);
             AppendProbedAxisLimits(builder);
             AppendProbeValues(builder, saveProbeValues);
             AppendToolOffsets(builder, saveToolOffsets);
             AppendWorkplaceOffsets(builder);
+            if (saveRotation)
+            {
+                AppendCoordinateRotation(builder);
+            }
         }
 
         string physicalPath = await filePathResolver.ToPhysicalAsync(FilePathResolver.ConfigOverrideFile,
@@ -82,43 +95,26 @@ internal partial class MCodeHandler
         catch (Exception e)
         {
             logger.LogError(e, "Could not write {File}", FilePathResolver.ConfigOverrideFile);
+
+            // A file cut short would load half the settings, as RepRapFirmware's DeleteSysFile prevents
+            try
+            {
+                if (File.Exists(physicalPath))
+                {
+                    File.Delete(physicalPath);
+                }
+            }
+            catch (Exception deleteError)
+            {
+                logger.LogDebug(deleteError, "Could not delete the incomplete {File}", FilePathResolver.ConfigOverrideFile);
+            }
             return new Message(MessageType.Error,
                                $"Failed to write file {FilePathResolver.ConfigOverrideFile}: {e.Message}");
         }
 
-        // TODO warn when config.g contains no M501, as RepRapFirmware does. It tracks that with
-        // m501SeenInConfigFile, set only while config.g is the file being run; nothing here knows
-        // which macro a code came from, and a flag meaning "M501 ran at some point" would stay quiet
-        // in exactly the case the warning exists for - a machine that saves settings it never loads
-        return new Message();
-    }
-
-    /// <summary>
-    /// The geometry's own calibration, which is what an auto-calibration produced
-    /// </summary>
-    /// <remarks>
-    /// A delta's calibration is the whole point of config-override.g: the tower positions and endstop
-    /// corrections G32 works out cannot be known in advance, so config.g cannot contain them. The
-    /// geometry reports itself in the form M665 and M666 take, which is the same report a bare M665
-    /// gives - reporting from the authoritative side
-    /// </remarks>
-    private void AppendKinematicsCalibration(StringBuilder builder)
-    {
-        StringBuilder report = new();
-        bool any = false;
-        foreach (int mCode in (int[])[665, 666, 669])
-        {
-            report.Clear();
-            if (planner.Parameters.Geometry.AppendReport(report, mCode))
-            {
-                if (!any)
-                {
-                    builder.AppendLine("; Kinematics parameters");
-                    any = true;
-                }
-                builder.AppendLine(report.ToString());
-            }
-        }
+        return configOverride.LoadedByConfig
+               ? new Message()
+               : new Message(MessageType.Warning, "No M501 command was executed in config.g");
     }
 
     /// <summary>
@@ -143,32 +139,38 @@ internal partial class MCodeHandler
     /// Axis limits that were measured rather than configured
     /// </summary>
     /// <remarks>
-    /// Only the axes a <c>G1 H3</c> actually measured. An axis whose limit came from config.g's M208
-    /// is already in config.g, and writing it again would mean the override silently winning if the
-    /// two ever disagreed
+    /// RepRapFirmware's <c>Move::WriteMoveParameters</c>: only the limits marked probed, which a
+    /// <c>G1 H3</c> or config-override.g set. A limit config.g set is already in config.g
     /// </remarks>
     private void AppendProbedAxisLimits(StringBuilder builder)
     {
-        AppendAxisLimits(builder, minima: true);
-        AppendAxisLimits(builder, minima: false);
+        bool anyProbed = false;
+        foreach (Axis axis in model.Move.Axes)
+        {
+            anyProbed |= axis.MinProbed || axis.MaxProbed;
+        }
+
+        if (anyProbed)
+        {
+            builder.AppendLine("; Probed axis limits");
+            AppendAxisLimits(builder, minima: true);
+            AppendAxisLimits(builder, minima: false);
+        }
     }
 
     private void AppendAxisLimits(StringBuilder builder, bool minima)
     {
         StringBuilder line = new();
-        for (int axis = 0; axis < model.Move.Axes.Count; axis++)
+        foreach (Axis axis in model.Move.Axes)
         {
-            Axis axisConfig = model.Move.Axes[axis];
-            if (minima ? axisConfig.MinProbed : axisConfig.MaxProbed)
+            if (minima ? axis.MinProbed : axis.MaxProbed)
             {
-                line.Append(CultureInfo.InvariantCulture,
-                            $" {axisConfig.Letter}{(minima ? axisConfig.Min : axisConfig.Max):F2}");
+                line.Append(CultureInfo.InvariantCulture, $" {axis.Letter}{(minima ? axis.Min : axis.Max):F2}");
             }
         }
 
         if (line.Length > 0)
         {
-            builder.AppendLine("; Probed axis limits");
             builder.AppendLine(CultureInfo.InvariantCulture, $"M208 S{(minima ? 1 : 0)}{line}");
         }
     }
@@ -177,8 +179,12 @@ internal partial class MCodeHandler
     /// The Z probe trigger heights and offsets
     /// </summary>
     /// <param name="builder">Destination</param>
-    /// <param name="always">Whether to write them even where they were not measured</param>
-    private void AppendProbeValues(StringBuilder builder, bool always)
+    /// <param name="p31">Whether M500 was given P31, which marks every probe as saved from now on</param>
+    /// <remarks>
+    /// RepRapFirmware's <c>EndstopsManager::WriteZProbeParameters</c> and
+    /// <c>ZProbe::WriteParameters</c>. A probe is written once P31 or config-override.g has marked it
+    /// </remarks>
+    private void AppendProbeValues(StringBuilder builder, bool p31)
     {
         bool any = false;
         for (int probeNumber = 0; probeNumber < model.Sensors.Probes.Count; probeNumber++)
@@ -187,7 +193,11 @@ internal partial class MCodeHandler
             {
                 continue;
             }
-            if (!always && probe.Type == ProbeType.None)
+            if (p31)
+            {
+                configOverride.SaveProbe(probe);
+            }
+            if (!configOverride.IsProbeSaved(probe))
             {
                 continue;
             }
@@ -210,7 +220,7 @@ internal partial class MCodeHandler
                                 $" {model.Move.Axes[axis].Letter}{probe.Offsets[axis]:F1}");
                 }
             }
-            line.Append(CultureInfo.InvariantCulture, $" Z{probe.TriggerHeight:F3}");
+            line.Append(CultureInfo.InvariantCulture, $" Z{probe.TriggerHeight:F2}");
             builder.AppendLine(line.ToString());
         }
     }
@@ -219,10 +229,10 @@ internal partial class MCodeHandler
     /// The tool offsets
     /// </summary>
     /// <param name="builder">Destination</param>
-    /// <param name="always">Whether to write them even where they were not probed</param>
+    /// <param name="always">Whether to write every offset of every tool, which is what P10 asks for</param>
     /// <remarks>
-    /// Without P10 only the offsets a tool-setting probe measured are written, because an offset
-    /// typed into config.g belongs there. <c>tools[].offsetsProbed</c> is the bitmap that says which
+    /// RepRapFirmware's <c>GCodes::WriteToolParameters</c>. Without P10 only the axes in
+    /// <c>tools[].offsetsProbed</c> are written, because an offset typed into config.g belongs there
     /// </remarks>
     private void AppendToolOffsets(StringBuilder builder, bool always)
     {
@@ -236,18 +246,19 @@ internal partial class MCodeHandler
 
             if (!any)
             {
-                builder.AppendLine("; Tool offsets");
+                builder.AppendLine("; Probed tool offsets");
                 any = true;
             }
 
             StringBuilder line = new();
             line.Append(CultureInfo.InvariantCulture, $"G10 P{tool.Number}");
-            for (int axis = 0; axis < model.Move.Axes.Count && axis < tool.Offsets.Count; axis++)
+            for (int axis = 0; axis < model.Move.Axes.Count; axis++)
             {
-                if (always || (tool.OffsetsProbed & (1 << axis)) != 0)
+                Axis axisConfig = model.Move.Axes[axis];
+                if (axisConfig.Visible && (always || (tool.OffsetsProbed & (1 << axis)) != 0))
                 {
-                    line.Append(CultureInfo.InvariantCulture,
-                                $" {model.Move.Axes[axis].Letter}{tool.Offsets[axis]:F2}");
+                    float offset = axis < tool.Offsets.Count ? tool.Offsets[axis] : 0.0f;
+                    line.Append(CultureInfo.InvariantCulture, $" {axisConfig.Letter}{offset:F3}");
                 }
             }
             builder.AppendLine(line.ToString());
@@ -258,42 +269,43 @@ internal partial class MCodeHandler
     /// The workplace coordinate offsets
     /// </summary>
     /// <remarks>
-    /// Written as <c>G10 L2</c>, and numbered from one because that is how G54 to G59.3 are numbered.
-    /// A workplace whose offsets are all zero is skipped: it is the machine coordinate system, and
-    /// writing it would be writing nothing
+    /// RepRapFirmware's <c>GCodes::WriteWorkplaceCoordinates</c>: every workplace on every visible
+    /// axis, numbered from one as G10 L2 numbers them. A workplace of zeros is written too, so that
+    /// M501 puts it back over whatever config.g set
     /// </remarks>
     private void AppendWorkplaceOffsets(StringBuilder builder)
     {
-        bool any = false;
-        int numWorkplaces = 0;
-        foreach (Axis axis in model.Move.Axes)
+        builder.AppendLine("; Workplace coordinates");
+        for (int workplace = 0; workplace < MachineLimits.NumWorkplaces; workplace++)
         {
-            numWorkplaces = Math.Max(numWorkplaces, axis.WorkplaceOffsets.Count);
-        }
-
-        for (int workplace = 0; workplace < numWorkplaces; workplace++)
-        {
-            StringBuilder line = new();
-            bool nonZero = false;
-            for (int axis = 0; axis < model.Move.Axes.Count; axis++)
+            builder.Append(CultureInfo.InvariantCulture, $"G10 L2 P{workplace + 1}");
+            foreach (Axis axis in model.Move.Axes)
             {
-                Axis axisConfig = model.Move.Axes[axis];
-                float offset = workplace < axisConfig.WorkplaceOffsets.Count
-                               ? axisConfig.WorkplaceOffsets[workplace]
-                               : 0.0f;
-                line.Append(CultureInfo.InvariantCulture, $" {axisConfig.Letter}{offset:F2}");
-                nonZero |= offset != 0.0f;
-            }
-
-            if (nonZero)
-            {
-                if (!any)
+                if (axis.Visible)
                 {
-                    builder.AppendLine("; Workplace coordinates");
-                    any = true;
+                    float offset = workplace < axis.WorkplaceOffsets.Count ? axis.WorkplaceOffsets[workplace] : 0.0f;
+                    builder.Append(CultureInfo.InvariantCulture, $" {axis.Letter}{offset:F2}");
                 }
-                builder.AppendLine(CultureInfo.InvariantCulture, $"G10 L2 P{workplace + 1}{line}");
             }
+            builder.AppendLine();
+        }
+    }
+
+    /// <summary>
+    /// The G68 rotation of the first motion system, or G69 if there is none
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>GCodes::WriteCoordinateRotation</c></remarks>
+    private void AppendCoordinateRotation(StringBuilder builder)
+    {
+        MoveRotation? rotation = model.Move.MotionSystems.Count > 0 ? model.Move.MotionSystems[0].Rotation : null;
+        if (rotation is { Angle: not 0.0f })
+        {
+            builder.AppendLine(CultureInfo.InvariantCulture,
+                               $"G68 X{rotation.Centre[0]:F3} Y{rotation.Centre[1]:F3} R{rotation.Angle:F2}");
+        }
+        else
+        {
+            builder.AppendLine("G69");
         }
     }
 }

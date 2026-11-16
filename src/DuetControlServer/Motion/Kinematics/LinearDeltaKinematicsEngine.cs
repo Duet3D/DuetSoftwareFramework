@@ -537,6 +537,22 @@ internal sealed class LinearDeltaKinematicsEngine : KinematicsEngine
         return base.AppendReport(builder, mCode);
     }
 
+    /// <inheritdoc />
+    /// <remarks>RepRapFirmware's <c>LinearDeltaKinematics::WriteCalibrationParameters</c></remarks>
+    public override void AppendCalibration(StringBuilder builder)
+    {
+        builder.AppendLine("; Delta parameters");
+        builder.Append("M665 ");
+        for (int tower = 0; tower < NumTowers; tower++)
+        {
+            builder.Append(CultureInfo.InvariantCulture, $"{(tower == 0 ? 'L' : ':')}{_diagonals[tower]:F3}");
+        }
+        builder.AppendLine(CultureInfo.InvariantCulture,
+                           $" R{Radius:F3} H{HomedHeight:F3} B{PrintRadius:F1} X{_angleCorrections[TowerA]:F3} Y{_angleCorrections[TowerB]:F3} Z{_angleCorrections[TowerC]:F3}");
+        builder.AppendLine(CultureInfo.InvariantCulture,
+                           $"M666 X{_endstopAdjustments[TowerA]:F3} Y{_endstopAdjustments[TowerB]:F3} Z{_endstopAdjustments[TowerC]:F3} A{XTilt * 100.0f:F2} B{YTilt * 100.0f:F2}");
+    }
+
     /// <summary>The letters M665 and M666 use for the first three towers</summary>
     private static readonly char[] TowerLetters = ['X', 'Y', 'Z'];
 

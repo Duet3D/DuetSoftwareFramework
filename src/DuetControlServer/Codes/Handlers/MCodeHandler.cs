@@ -57,6 +57,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="coldExtrusion">The cold extrusion interlock M302 configures</param>
 /// <param name="sensorManager">The temperature sensors the machine has</param>
 /// <param name="toolManager">The tools the machine has, and which one is selected</param>
+/// <param name="configOverride">Where the settings config-override.g holds came from, for M500 and M501</param>
 /// <param name="settings">Settings</param>
 internal partial class MCodeHandler(
     CodeProcessor codeProcessor,
@@ -88,6 +89,7 @@ internal partial class MCodeHandler(
     Heat.ColdExtrusionInterlock coldExtrusion,
     Heat.SensorManager sensorManager,
     Tools.ToolManager toolManager,
+    ConfigOverrideTracker configOverride,
     IOptions<Settings> settings) : ICodeHandler
 {
     private MessageLoggerProvider? _messageLoggerProvider;
@@ -1601,13 +1603,25 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     /// <remarks>
     /// config-override.g is a macro like any other - it holds the M-codes M500 wrote - so loading it
-    /// is running it
+    /// is running it. RepRapFirmware's GCodes2.cpp case 501
     /// </remarks>
     private async ValueTask<Message> HandleLoadConfigOverrideAsync(Commands.Code code, CancellationToken cancellationToken)
     {
+        // An M501 inside the file it loads would run it again
+        // TODO also do nothing while M502 runs config.g, once M502 is implemented
+        if (code.Flags.HasFlag(CodeFlags.IsFromConfigOverride))
+        {
+            return new Message();
+        }
+
+        if (code.File is MacroFile { IsRunningConfig: true })
+        {
+            configOverride.NoteLoadedByConfig();
+        }
+
         if (!await macroRunner.TryRunAsync(code.Channel, FilePathResolver.ConfigOverrideFile, code, cancellationToken: cancellationToken))
         {
-            return new Message(MessageType.Error, $"Macro file {FilePathResolver.ConfigOverrideFile} not found");
+            return new Message(MessageType.Warning, $"Macro file {FilePathResolver.ConfigOverrideFile} not found");
         }
         return new Message();
     }

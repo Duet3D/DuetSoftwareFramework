@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using DuetAPI.ObjectModel;
@@ -160,6 +162,77 @@ public class KinematicsRoundTripTests
             Assert.That(projected.TTAccMax, Is.EqualTo(90.75f));
         });
     }
+
+    [Test]
+    public void TheDeltaCalibrationM500WritesConfiguresTheSameDelta()
+    {
+        // M501 runs what M500 wrote against whatever delta is configured; what comes out has to be the
+        // delta that was saved, which is the only thing the calibration is for. Each value fits the
+        // precision RRF writes it to, B to one decimal
+        KinematicsEngine saved = Configure(["M669 K3", "M665 L210.125:211.5:212 R150.5 B120.5 H300.75 X0.1 Y0.2 Z-0.3",
+                                            "M666 X0.11 Y-0.22 Z0.33 A1.5 B-2.5"]);
+        string[] written = CodeLines(Calibration(saved));
+        KinematicsEngine loaded = Configure(["M669 K3", .. written]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(written, Has.Length.EqualTo(2), "an M665 and an M666");
+            Assert.That(Serialize(KinematicsAxes.Reported<OmKinematics>(loaded)),
+                        Is.EqualTo(Serialize(KinematicsAxes.Reported<OmKinematics>(saved))));
+        });
+    }
+
+    [Test]
+    public void TheDeltaCalibrationIsRrfsCodes()
+    {
+        // RepRapFirmware's LinearDeltaKinematics::WriteCalibrationParameters, to the digit
+        KinematicsEngine delta = Configure(["M669 K3", "M665 L300 R150 B120 H350 X0.5 Y-0.5 Z0.25", "M666 X0.1 Y-0.2 Z0.3 A0.5 B-0.25"]);
+
+        Assert.That(Calibration(delta), Is.EqualTo("; Delta parameters\n"
+                                                    + "M665 L300.000:300.000:300.000 R150.000 H350.000 B120.0 X0.500 Y-0.500 Z0.250\n"
+                                                    + "M666 X0.100 Y-0.200 Z0.300 A0.50 B-0.25\n"));
+    }
+
+    [Test]
+    public void TheRotaryDeltaCalibrationIsRrfsCodes()
+    {
+        // RepRapFirmware's RotaryDeltaKinematics::WriteCalibrationParameters, from its defaults
+        KinematicsEngine rotary = Configure(["M669 K10"]);
+
+        Assert.That(Calibration(rotary), Is.EqualTo("; Rotary delta parameters\n"
+                                                     + "M669 K10 R50.00 B80.0 A-45.00:45.00 X0.00 Y0.00 Z0.00 U100.00:100.00:100.00 L200.00:200.00:200.00 H250.00:250.00:250.00\n"
+                                                     + "M666 X0.000 Y0.000 Z0.000\n"));
+    }
+
+    [TestCase("M669 K0")]
+    [TestCase("M669 K1")]
+    [TestCase("M669 K4")]
+    [TestCase("M669 K6")]
+    [TestCase("M669 K7")]
+    [TestCase("M669 K9")]
+    [TestCase("M669 K11")]
+    public void AGeometryWithoutCalibrationWritesNothing(string selection)
+    {
+        // Kinematics::WriteCalibrationParameters writes nothing; only the deltas override it (and
+        // the hangprinter, whose configuration is not ported yet)
+        Assert.That(Calibration(Configure([selection])), Is.Empty);
+    }
+
+    /// <summary>
+    /// What a geometry writes into config-override.g
+    /// </summary>
+    private static string Calibration(KinematicsEngine engine)
+    {
+        StringBuilder builder = new();
+        engine.AppendCalibration(builder);
+        return builder.ToString().Replace("\r\n", "\n");
+    }
+
+    /// <summary>
+    /// The lines of written G-code that are codes rather than comments
+    /// </summary>
+    private static string[] CodeLines(string written)
+        => [.. written.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Where(line => !line.StartsWith(';'))];
 
     /// <summary>
     /// Run a sequence of configuring codes against a fresh machine

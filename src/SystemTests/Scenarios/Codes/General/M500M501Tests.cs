@@ -74,7 +74,6 @@ public class M500M501Tests : BenchFixture
     /// not override it, Cartesian among them. A line of report text in the file would be an
     /// unknown code every time M501 ran it
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M500WritesOnlyCodesAndComments()
     {
@@ -153,7 +152,6 @@ public class M500M501Tests : BenchFixture
     /// is clear. Reference m500-store-parameters: all four codes answer
     /// "Warning: M500: No M501 command was executed in config.g"
     /// </remarks>
-    [Category("KnownGap")]
     [TestCase("M500")]
     [TestCase("M500 P10")]
     [TestCase("M500 P31")]
@@ -211,7 +209,6 @@ public class M500M501Tests : BenchFixture
     /// next startup, which is what the warning is about
     /// </summary>
     /// <remarks>RRF truth: GCodes2.cpp case 501 sets m501SeenInConfigFile only while runningConfigFile</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M500StillWarnsAfterAnM501OutsideConfigG()
     {
@@ -242,7 +239,6 @@ public class M500M501Tests : BenchFixture
     /// H%.3f B%.1f X%.3f Y%.3f Z%.3f" and "M666 X%.3f Y%.3f Z%.3f A%.2f B%.2f", the tilts in
     /// percent as M666 takes them
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M500WritesLinearDeltaCalibration()
     {
@@ -261,7 +257,6 @@ public class M500M501Tests : BenchFixture
     /// M501 puts a saved delta calibration back over a changed one
     /// </summary>
     /// <remarks>RRF truth: GCodes2.cpp case 501 runs the M665 and M666 M500 wrote</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M501RestoresLinearDeltaCalibration()
     {
@@ -316,7 +311,6 @@ public class M500M501Tests : BenchFixture
     /// RRF truth: GCodes4.cpp sets the axis limit with byProbing for a G1 H3 move, which sets
     /// axisMaximaProbed (move.axes[].maxProbed); Move::WriteAxisLimits writes "M208 S0 X%.2f"
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M500WritesALimitG1H3Measured()
     {
@@ -342,7 +336,6 @@ public class M500M501Tests : BenchFixture
     /// RRF truth: GCodes2.cpp case 208 passes runningM501 to Move::ConfigureAxisLimits as byProbing,
     /// so the axes M208 names in config-override.g get minProbed or maxProbed
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M501MarksTheLimitsItSetsAsProbed()
     {
@@ -382,7 +375,6 @@ public class M500M501Tests : BenchFixture
     /// RRF truth: EndstopsManager::WriteZProbeParameters writes a probe only once saveToConfigOverride
     /// is set, which only P31 and loading through M501 do
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M500LeavesTheProbeOutWithoutP31()
     {
@@ -488,7 +480,6 @@ public class M500M501Tests : BenchFixture
     /// round trip and overwrites a live change
     /// </summary>
     /// <remarks>RRF truth: GCodes2.cpp case 501 runs the G31 M500 wrote; the trigger height is sensors.probes[].triggerHeight</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M501RestoresTheProbe()
     {
@@ -528,7 +519,6 @@ public class M500M501Tests : BenchFixture
     /// P10 writes every tool's offsets on every axis, to three decimals
     /// </summary>
     /// <remarks>RRF truth: GCodes::WriteToolParameters, "G10 P%d" then " %c%.3f" for each visible axis</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M500P10WritesEveryToolOffset()
     {
@@ -546,7 +536,6 @@ public class M500M501Tests : BenchFixture
     /// RRF truth: GCodes::SetOrReportOffsets passes runningM501 to Tool::SetOffset as byProbing,
     /// which sets the axis in tools[].offsetsProbed; WriteToolParameters then writes that axis
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M501MarksTheToolOffsetsItSetsAsProbed()
     {
@@ -564,10 +553,42 @@ public class M500M501Tests : BenchFixture
     }
 
     /// <summary>
+    /// A macro config-override.g calls is loading it too, so what the macro sets is marked probed
+    /// </summary>
+    /// <remarks>RRF truth: Push copies runningM501 to the macro's machine state</remarks>
+    [Test]
+    public async Task M501MarksWhatAMacroItCallsSets()
+    {
+        await using Bench bench = await Bench.With(Machines.Xyze, ToolConfig)
+                                             .WithSd(sd =>
+                                             {
+                                                 sd.WriteSys("config-override.g", "M98 P\"tool-offsets.g\"\n");
+                                                 sd.WriteSys("tool-offsets.g", "G10 P0 Z0.5\n");
+                                             })
+                                             .StartAsync();
+
+        await bench.Host.ExecuteCodeAsync("M501");
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Tools[0]!.OffsetsProbed), Is.EqualTo(1 << 2),
+                    "tools[0].offsetsProbed has the Z bit the macro's G10 set");
+    }
+
+    /// <summary>
+    /// P10 writes the visible axes only
+    /// </summary>
+    /// <remarks>RRF truth: GCodes::WriteToolParameters loops over GetVisibleAxes</remarks>
+    [Test]
+    public async Task M500P10LeavesHiddenAxesOut()
+    {
+        await using Bench bench = await Bench.StartAsync(Machines.Xyze, ToolConfig, $"M584 U{Expansion.Driver(Machines.DriverBoard, 4)} P3");
+
+        string[] toolLines = CodeLines(await SaveAsync(bench, "M500 P10")).Where(line => Regex.IsMatch(line, @"^G10 P\d")).ToArray();
+        Assert.That(toolLines, Has.None.Contain(" U"), "the hidden U axis has no offset written");
+    }
+
+    /// <summary>
     /// M501 puts saved tool offsets back over changed ones
     /// </summary>
     /// <remarks>RRF truth: GCodes2.cpp case 501 runs the G10 M500 P10 wrote</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M501RestoresToolOffsets()
     {
@@ -592,16 +613,15 @@ public class M500M501Tests : BenchFixture
     /// axis for all NumCoordinateSystems (9). Writing the zero ones is what makes M501 put back a
     /// workplace that was cleared after config.g set it
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M500WritesEveryWorkplace()
     {
         await using Bench bench = await Bench.StartAsync(Machines.Xyz);
-        await bench.Host.ExecuteCodeAsync("G10 L2 P2 X5 Y6 Z7.125");
+        await bench.Host.ExecuteCodeAsync("G10 L2 P2 X5 Y6 Z7.25");
 
         string written = await SaveAsync(bench);
         string[] expected = Enumerable.Range(1, 9)
-                                      .Select(workplace => workplace == 2 ? "G10 L2 P2 X5.00 Y6.00 Z7.13" : $"G10 L2 P{workplace} X0.00 Y0.00 Z0.00")
+                                      .Select(workplace => workplace == 2 ? "G10 L2 P2 X5.00 Y6.00 Z7.25" : $"G10 L2 P{workplace} X0.00 Y0.00 Z0.00")
                                       .ToArray();
         Assert.That(written, Does.Contain("; Workplace coordinates\n" + string.Join('\n', expected) + "\n"),
                     "all nine workplaces in order (RRF GCodes::WriteWorkplaceCoordinates)");
@@ -611,7 +631,6 @@ public class M500M501Tests : BenchFixture
     /// A hidden axis has no workplace offset written
     /// </summary>
     /// <remarks>RRF truth: GCodes::WriteWorkplaceCoordinates iterates numVisibleAxes</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M500LeavesHiddenAxesOutOfWorkplaces()
     {
@@ -633,7 +652,6 @@ public class M500M501Tests : BenchFixture
     /// Reference m501-read-stored-parameters: the file holds "G10 L2 P2 X5 Y6 Z7", M501 replies
     /// with nothing and move.axes[*].workplaceOffsets[1] become 5, 6 and 7
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M501AppliesWorkplaceOffsets()
     {
@@ -654,7 +672,6 @@ public class M500M501Tests : BenchFixture
     /// What M500 writes, M501 reads back: the saved workplace replaces a changed one
     /// </summary>
     /// <remarks>RRF truth: GCodes2.cpp case 501 runs the G10 L2 WriteWorkplaceCoordinates wrote</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M501RestoresWhatM500Saved()
     {
@@ -676,7 +693,6 @@ public class M500M501Tests : BenchFixture
     /// P68 writes the coordinate rotation, as G69 when there is none
     /// </summary>
     /// <remarks>RRF truth: GCodes::WriteCoordinateRotation, "G69" when g68Angle is 0</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M500P68WritesG69WithoutRotation()
     {
@@ -758,7 +774,6 @@ public class M500M501Tests : BenchFixture
     /// warning. Reference error-missing-parameters-system-2: "Warning: Macro file
     /// config-override.g not found"
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M501WarnsWhenTheFileIsMissing()
     {
@@ -773,7 +788,6 @@ public class M500M501Tests : BenchFixture
     /// An M501 inside config-override.g does nothing, so the file does not run itself again
     /// </summary>
     /// <remarks>RRF truth: GCodes2.cpp case 501 does nothing while runningM501 is set</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M501InsideConfigOverrideIsIgnored()
     {

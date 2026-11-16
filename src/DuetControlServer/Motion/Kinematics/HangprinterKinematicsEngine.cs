@@ -102,6 +102,10 @@ internal sealed class HangprinterKinematicsEngine : KinematicsEngine
         }
     }
 
+    // TODO override AppendCalibration (RRF HangprinterKinematics::WriteCalibrationParameters) once M669 K6
+    // and M666 configure this geometry, writing each code on its own line: RRF's own writer drops the
+    // newline between them
+
     /// <inheritdoc />
     /// <remarks>Each motor has its own endstop, so a homing move addresses the motors directly</remarks>
     public override bool HomesIndividualDrives => true;

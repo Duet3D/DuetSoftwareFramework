@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Threading;
 using System;
+using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using DuetAPI;
@@ -492,10 +493,14 @@ internal partial class MCodeHandler
                     return new Message(MessageType.Error, $"{axis.Letter} axis maximum must be greater than minimum");
                 }
 
-                // TODO RRF marks a limit set from config-override.g as probed (minProbed/maxProbed, via runningM501),
-                // which is what makes M500 write it back; CodeFlags.IsFromConfigOverride says when
+                // A limit config-override.g sets is one M500 has to write back, as RRF's runningM501 marks it
+                bool fromConfigOverride = code.Flags.HasFlag(CodeFlags.IsFromConfigOverride);
+                bool minGiven = values.Length >= 2 || setMin;
+                bool maxGiven = values.Length >= 2 || !setMin;
                 axis.Min = min;
                 axis.Max = max;
+                axis.MinProbed |= fromConfigOverride && minGiven;
+                axis.MaxProbed |= fromConfigOverride && maxGiven;
             }
 
             if (!seen)

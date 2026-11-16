@@ -417,6 +417,16 @@ internal abstract class KinematicsEngine
     }
 
     /// <summary>
+    /// Append the codes that set what an auto-calibration of this geometry works out, for M500
+    /// </summary>
+    /// <param name="builder">Builder to append whole lines to, a comment naming the geometry first</param>
+    /// <remarks>
+    /// RepRapFirmware's <c>Kinematics::WriteCalibrationParameters</c>, which writes nothing for a
+    /// geometry that has no calibration
+    /// </remarks>
+    public virtual void AppendCalibration(StringBuilder builder) { }
+
+    /// <summary>
     /// Apply a code parameter to a value, leaving it alone if the code did not carry it
     /// </summary>
     /// <param name="code">The code</param>

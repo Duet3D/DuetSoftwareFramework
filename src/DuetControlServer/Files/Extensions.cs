@@ -29,6 +29,7 @@ public static partial class ServiceCollectionExtensions
             .AddSingleton<Job.JobSequences>()
             .AddSingleton<FileFactory>()
             .AddSingleton<MacroRunner>()
+            .AddSingleton<ConfigOverrideTracker>()
             .AddSingleton<JobMonitor>()
             .AddHostedService((provider) => provider.GetRequiredService<Job.JobController>())
             .AddHostedService((provider) => provider.GetRequiredService<JobMonitor>());

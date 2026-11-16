@@ -1,3 +1,4 @@
+using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link;
 using DuetControlServer.Motion;
@@ -121,6 +122,11 @@ internal sealed partial class GCodeHandler
             if (!seen)
             {
                 reports.Add(new Message(MessageType.Success, DescribeProbeParameters(probeNumber, probe, model.Move)));
+            }
+            else if (code.Flags.HasFlag(CodeFlags.IsFromConfigOverride))
+            {
+                // Loaded from config-override.g, so M500 writes it back (RRF ZProbe::HandleG31)
+                configOverride.SaveProbe(probe);
             }
         }
 

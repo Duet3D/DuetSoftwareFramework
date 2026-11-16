@@ -416,4 +416,23 @@ internal sealed class RotaryDeltaKinematicsEngine : KinematicsEngine
     /// <inheritdoc />
     /// <remarks>All three towers, because a delta has no axis that moves a motor of its own</remarks>
     public override uint AxesToHomeBeforeProbing => Axes.XyzBitmap;
+
+    /// <inheritdoc />
+    /// <remarks>RepRapFirmware's <c>RotaryDeltaKinematics::WriteCalibrationParameters</c></remarks>
+    public override void AppendCalibration(StringBuilder builder)
+    {
+        // TODO M501 cannot load this back until Configure reads M669 K10 and M666 for a rotary delta
+        builder.AppendLine("; Rotary delta parameters");
+        builder.Append(CultureInfo.InvariantCulture,
+                       $"M669 K10 R{Radius:F2} B{PrintRadius:F1} A{MinArmAngle:F2}:{MaxArmAngle:F2} X{_angleCorrections[TowerA]:F2} Y{_angleCorrections[TowerB]:F2} Z{_angleCorrections[TowerC]:F2}");
+        AppendPerTower(builder, 'U', _armLengths);
+        AppendPerTower(builder, 'L', _rodLengths);
+        AppendPerTower(builder, 'H', _bearingHeights);
+        builder.AppendLine();
+        builder.AppendLine(CultureInfo.InvariantCulture,
+                           $"M666 X{_endstopAdjustments[TowerA]:F3} Y{_endstopAdjustments[TowerB]:F3} Z{_endstopAdjustments[TowerC]:F3}");
+
+        static void AppendPerTower(StringBuilder builder, char letter, float[] values)
+            => builder.Append(CultureInfo.InvariantCulture, $" {letter}{values[TowerA]:F2}:{values[TowerB]:F2}:{values[TowerC]:F2}");
+    }
 }

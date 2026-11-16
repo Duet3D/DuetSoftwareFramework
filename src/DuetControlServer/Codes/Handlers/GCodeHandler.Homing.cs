@@ -292,14 +292,16 @@ internal sealed partial class GCodeHandler
         float stoppedAt = planner.Builder.StartCoordinates[axis];
         Axis axisConfig = model.Move.Axes[axis];
 
-        // TODO RRF also sets minProbed/maxProbed for the limit it measured (GCodes4.cpp), so M500 saves it
+        // Marked probed, as RRF's GCodes4.cpp marks it, so that M500 saves it
         if (highEnd)
         {
             axisConfig.Max = stoppedAt;
+            axisConfig.MaxProbed = true;
         }
         else
         {
             axisConfig.Min = stoppedAt;
+            axisConfig.MinProbed = true;
         }
 
         planner.Parameters.SetAxisLimits(axis, axisConfig.Min, axisConfig.Max);

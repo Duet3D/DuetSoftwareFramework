@@ -44,6 +44,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="toolManager">The selected tool, whose offsets and axis mapping the transform needs</param>
 /// <param name="moveInterpreter">Turns a movement code into the move the engine is asked to run</param>
 /// <param name="eventLogger">Writes out what a board said while a code was still running</param>
+/// <param name="configOverride">Which probes M500 writes, which a G31 from config-override.g marks</param>
 /// <param name="logger">Logger</param>
 internal sealed partial class GCodeHandler(
     Model.ObjectModel model,
@@ -58,6 +59,7 @@ internal sealed partial class GCodeHandler(
     Tools.ToolManager toolManager,
     MoveInterpreter moveInterpreter,
     Utility.EventLogger eventLogger,
+    Files.ConfigOverrideTracker configOverride,
     ILogger<GCodeHandler> logger) : ICodeHandler
 {
 

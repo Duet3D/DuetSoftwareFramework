@@ -105,8 +105,8 @@ Macros are started by DCS itself - nothing asks it to run one from outside any m
 | `<letter><number>.g` | A code no handler recognised - how a machine adds a code of its own |
 | `heater-fault.g`, `driver-stall.g`, `controller-disconnect.g`, ... | An [event](rrf-differences.md#4-events), on the `Autopause` channel |
 
-Codes from a macro are flagged `IsFromMacro`, plus `IsNestedMacro`, `IsFromConfig` or
-`IsFromSystemMacro` as applicable. `IsFromSystemMacro` is load-bearing rather than informational: a
+Codes from a macro are flagged `IsFromMacro`, plus `IsNestedMacro`, `IsFromConfig`, `IsFromConfigOverride` or
+`IsFromSystemMacro` as applicable. `IsFromConfigOverride` covers `config-override.g` run by `M501` and every macro it calls. `IsFromSystemMacro` is load-bearing rather than informational: a
 system macro's moves are not given the workplace offset, because `homeall.g` and friends work in
 machine coordinates.
 
@@ -128,8 +128,11 @@ The startup files `config.g`, `config-override.g` (`M501`) and `dsf-config.g`, a
 
 While a file is being simulated, `M98`, `M99`, `M120` and `M121` still run, so the simulation takes the same path through the file and its macros.
 
-For `config.g`, DCS injects synthetic codes (machine name, date/time) so the configuration reflects
-the host environment.
+For `config.g`, DCS injects synthetic codes (machine name, date/time) so the configuration reflects the host environment.
+
+### config-override.g
+
+`M500` writes `sys/config-override.g` and `M501` runs it, so that what a machine measured about itself survives a restart when `config.g` ends with `M501`. Each `M500` replaces the whole file, which holds, in order:
 
 ## File info parsing
 
@@ -148,4 +151,4 @@ thumbnail data and file fragments on demand.
 - [G-code flow](gcode-flow.md) - the pipeline these files feed, and the flow-control details
 - [Pausing and resuming a job](pause-and-resume.md) - what a pause does to the loop above
 - [Object model](object-model.md) - the `Job`, `Directories`, and `Volumes` keys
-- [Differences from RepRapFirmware](rrf-differences.md) - including what `M500` writes and what it does not
+- [Differences from RepRapFirmware](rrf-differences.md)

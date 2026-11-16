@@ -56,7 +56,7 @@ public enum CodeFlags : int
     IsFromConfig = 1 << 5,
 
     /// <summary>
-    /// Code comes from config-override.g
+    /// Code comes from config-override.g run by M501, or from a macro it called
     /// </summary>
     IsFromConfigOverride = 1 << 6,
 

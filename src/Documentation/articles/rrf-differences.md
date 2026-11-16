@@ -360,6 +360,7 @@ the first move.
 | Rotary delta and five-bar SCARA are built with defaults | Nothing in the object model configures them yet, so the engines take RRF's and the M669 documentation's values rather than inventing a home for the settings |
 | Hangprinter uses the constant-spool-radius model | Line buildup and flex compensation need `move.kinematics` fields that do not exist; this is the branch RRF itself takes when the buildup factor is zero |
 | `config-override.g` (`M501`) and `dsf-config.g` keep the interpreter state they finish with, as `config.g` does | They configure the machine the same way `config.g` does, so an `M83` in them is the machine's setting afterwards. RRF keeps the state of `config.g` alone and restores its caller's state after `M501` |
+| `G10 L2` and `G10 L20` take a rotary axis's origin in degrees under `G20` | RRF converts every axis from inches, rotary ones included, while its moves leave a rotary axis in degrees. DSF follows the moves, as its `G10 P` tool offsets already do, so the same number means the same angle in a move and in a workplace |
 
 ### 5.1 There are no default axes, so X, Y and Z are found by letter
 

@@ -75,6 +75,18 @@ public sealed class MacroFile : CodeFile, IDisposable
     public bool IsDsfConfig { get; }
 
     /// <summary>
+    /// Whether this file is config.g at startup or a macro it called
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>runningConfigFile</c>, which is what an M501 has to run under to count as loading the file at startup</remarks>
+    public bool IsRunningConfig { get; }
+
+    /// <summary>
+    /// Whether this file is config-override.g run by M501 or a macro it called
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>runningM501</c>, which Push copies to every macro below it</remarks>
+    public bool IsLoadingConfigOverride { get; }
+
+    /// <summary>
     /// Indicates if the macro was ever started
     /// </summary>
     public bool WasStarted { get; private set; }
@@ -154,6 +166,10 @@ public sealed class MacroFile : CodeFile, IDisposable
         IsNested = true;
         IsConfigOverride = startCode is { Type: CodeType.MCode, MajorNumber: 501 } && (filePath.Virtual == FilePathResolver.ConfigOverrideFile);
         IsDsfConfig = filePath.Virtual == FilePathResolver.DsfConfigFile;
+
+        MacroFile? parent = startCode.File as MacroFile;
+        IsRunningConfig = parent?.IsRunningConfig == true;
+        IsLoadingConfigOverride = IsConfigOverride || parent?.IsLoadingConfigOverride == true;
     }
 
     /// <summary>
@@ -190,6 +206,7 @@ public sealed class MacroFile : CodeFile, IDisposable
         {
             IsConfig = true;
         }
+        IsRunningConfig = IsConfig;
     }
 
     /// <summary>
@@ -216,6 +233,8 @@ public sealed class MacroFile : CodeFile, IDisposable
         IsConfig = copyFrom.IsConfig;
         IsConfigOverride = copyFrom.IsConfigOverride;
         IsDsfConfig = copyFrom.IsDsfConfig;
+        IsRunningConfig = copyFrom.IsRunningConfig;
+        IsLoadingConfigOverride = copyFrom.IsLoadingConfigOverride;
         IsAborted = copyFrom.IsAborted;
 
         _codeProcessor = copyFrom._codeProcessor;
@@ -324,7 +343,7 @@ public sealed class MacroFile : CodeFile, IDisposable
             result.CancellationToken = CancellationToken;
             result.Flags |= CodeFlags.Asynchronous | CodeFlags.IsFromMacro;
             if (IsConfig) { result.Flags |= CodeFlags.IsFromConfig; }
-            if (IsConfigOverride) { result.Flags |= CodeFlags.IsFromConfigOverride; }
+            if (IsLoadingConfigOverride) { result.Flags |= CodeFlags.IsFromConfigOverride; }
             if (IsNested) { result.Flags |= CodeFlags.IsNestedMacro; }
             if (IsSystemMacro) { result.Flags |= CodeFlags.IsFromSystemMacro; }
             result.SourceConnection = SourceConnection;
