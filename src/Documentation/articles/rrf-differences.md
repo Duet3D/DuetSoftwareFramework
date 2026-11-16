@@ -195,7 +195,7 @@ and the levels DuetCANMaster holds so that a move armed on an input that closed 
 flight is stopped before it starts.
 
 The same difference explains the other direction. `SwitchEndstop::AppendDetails` asks each board what
-its pin is called — `actionReturnPinName` — every time `M119` is rendered, and two of RepRapFirmware's
+its pin is called — `actionReturnPinName` — every time `M574` reports the configuration, and two of RepRapFirmware's
 three callers of that action actually want the current level it also returns. DSF answers both from
 memory: the pin name is the string that was given to `M574`, and the level is already live.
 
@@ -256,6 +256,9 @@ That adds fields RepRapFirmware does not keep, does not report, or both:
 | `sensors.analog[].type` of an expansion board's sensor | RepRapFirmware reports every expansion board's sensor as `remote` (`RemoteSensor::GetShortSensorType`, "TODO save the actual type"). Here it is the type `M308 Y` gave, such as `thermistor` or `linearanalog`, because a sensor cannot be recreated without it |
 | `sensors.analog[].offsetAdj` and `.slopeAdj` of an expansion board's sensor | `M308 U` and `V` go to the board, which applies them, and RepRapFirmware then clears its own copy (`ClearAdjustments`) and reports 0. Here they record what the board was sent |
 | `sensors.analog[].r25`, `.beta`, `.c`, `.rRef`, `.lowReading`, `.highReading`, `.adcLowOffset`, `.adcHighOffset`, `.filtered`, `.mainsFrequency`, `.wires`, `.thermocoupleType`, `.objectMix`, `.auxMix` and `.radiationExponent` of an expansion board's sensor | RepRapFirmware sends the rest of `M308` to the board and keeps none of it. Each field holds what its letter set for the sensor's type: `B` and `C` are a thermistor's `beta` and `c` but a linear analog sensor's `lowReading` and `highReading`, `L` and `H` are a thermistor's ADC corrections, and a thermopile sensor's `T`, `B` and `C` describe its environment thermistor while `F`, `W` and `R` are its `objectMix`, `auxMix` and `radiationExponent` |
+| `move.extruders[].endstopInput` | `M574 E` binds a general purpose input to an extruder as its filament endstop. RepRapFirmware keeps the binding in `EndstopsManager::extruderGpinNumbers` and shows it only in the `M574` reply |
+
+**`move.compensation.probeGrid` holds the grid as `M557` defined it.** RepRapFirmware reports `mins`, `maxs`, `spacings` and `radius` rounded to one decimal place, so a spacing worked out from a point count, which is scaled by 0.9999 to keep the last point inside the range (9.999 for `P3` over 20 mm), reads 10.0. DSF keeps the exact values, which are what `G29` probes at.
 
 **`HeaterMonitorCondition` enum value matches the `C` param values of `M143`.** This removes the need to have converters between the OM and gcode parameter and makes error messages more clear and consistent.
 
@@ -289,6 +292,7 @@ divergence between it and the object model refuses the move rather than being cl
 | A driver claimed by an axis *and* an extruder | Same. Here the first claim wins — axes are walked before extruders — and any further claim is recorded and logged, because last-writer-wins was a real fault that corrupted the reverse map |
 | `M669 K6` with parameters | Hangprinter's anchors need array handling the other geometries do not, so it says so rather than accepting the parameters and behaving as something else |
 | Homing two axes whose coupling sets overlap | See §2.1 |
+| `M574` naming more switches than an axis may have drivers (`MaxDriversPerAxis`) | Watches the first `MaxDriversPerAxis` and silently ignores the rest, where an over-long list is refused everywhere else (an `M584` array, for one) |
 
 And one thing DSF allows that RRF does not: **`M584 X` releases the drivers of X.** RRF never shrinks
 its axis count, so a drive refused a driver had no way to give one up. The axis stays in `move.axes[]`
@@ -415,11 +419,23 @@ A sensor `M308` creates is `notReady` until its first reading, and times out if 
 
 `M140` and `M141` stop at a refused `H` (an invalid heater number, a heater a tool uses, or a heater of the other kind of slot) and leave the slot and its heaters as they were. RepRapFirmware reports the refusal but goes on to apply `S` and `R` to the slot's existing heaters, and a heater switched on successfully there replaces the error with success.
 
+A refused `M557` leaves `move.compensation.probeGrid` as it was. RepRapFirmware does the same for refusals it finds while reading the parameters, but a definition its grid check rejects (spacing too small, range too small, too many points) is written into the grid before the check, so the refused values are reported and the previous grid is gone until the next good `M557`. `M557` also refuses a point count `P` below 2, where RepRapFirmware divides the range by `P - 1` and accepts `P1` with an infinite spacing, and a third axis range, where RepRapFirmware's two-axis check is off by one, so the third range replaces the second axis' range under the second axis' letter.
+
 When `M140`, `M141`, `M190` or `M191` switches on several heaters of a slot, every heater's reply is reported, with the worst result. RepRapFirmware reports only the last heater's result, so a heater that failed to switch on is not reported if a later one succeeds.
+
+When `M915` names drivers on several boards and one board refuses, the remaining boards are still sent the settings, and every board's reply is reported with the worst result. RepRapFirmware's `GetSetRemoteDriverStallParameters` stops at the first board that does not reply OK, leaving the later boards untold, whereas `SetRemoteDriverValues` and `SetRemoteDriverStates`, which `M92`, `M350`, `M572`, `M906`, `M913`, `M917` and `M17`/`M18` use, tell every board. DSF does what those codes do.
 
 `M121` pops only an `M120` level of its own file. With none to pop it is an error, `Pop(): stack underflow on <channel>`, and nothing is popped. RepRapFirmware reports the underflow as a message and replies OK, and an `M121` in a macro with no `M120` of its own pops the macro's level instead, which ends the macro but lets the lines it had already read run on. DSF never lets an `M121` reach a level its own file did not push.
 
 A code that would push an eleventh level on its channel's stack, `M120` or any code that starts a macro, fails with `Push(): stack overflow on <channel>` as its own error reply. Every file on the channel is aborted, as in RepRapFirmware, which reports the overflow as a separate message and replies OK to the code.
+
+`M558` keeps a probe whose board created the input monitor with a warning, and passes the warning on. RepRapFirmware's `RemoteZProbe::Create` keeps the handle for a warning, but `EndstopsManager::HandleM558` then deletes the new probe for any result other than success, so a board's warning leaves no probe.
+
+`G30` goes on probing when the probe's board accepts the request to watch it with a warning, and passes the warning on. RepRapFirmware's `RemoteZProbe::SetProbing` fails on any result other than success, so a board's warning fails the `G30` with "failed to enable probe", where elsewhere a warning counts as done.
+
+`G30 S-3` whose probe never triggers leaves `sensors.probes[].triggerHeight` as it was, as a failed plain `G30` leaves the Z datum. RepRapFirmware still calls `SetTriggerHeight(GetLastStoppedHeight())`, writing the height at which an earlier probe stopped.
+
+`G30 S-2` whose probe never triggers leaves the selected tool's Z offset and `tools[].offsetsProbed` as they were. RepRapFirmware still calls `SetOffset(Z_AXIS, -g30zHeightError, true)`, writing an offset of 0 and marking it probed.
 
 An expansion board that asks for a firmware block past the end of the file gets one `ErrBadOffset` response, and the bad offset is reported. RepRapFirmware's `HandleFirmwareBlockRequest` goes on to answer the same request with `ErrNoFile` and to report a missing file, because the request is still unserved when it reaches that test. The file exists, so DSF stops at the first answer. The update fails in both.
 
