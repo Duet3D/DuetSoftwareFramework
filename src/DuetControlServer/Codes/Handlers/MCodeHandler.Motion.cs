@@ -533,7 +533,7 @@ internal partial class MCodeHandler
 
             foreach (Axis axis in move.Axes)
             {
-                if (code.TryGetInt(axis.Letter, out int microstepping, min: 0))
+                if (code.TryGetInt(axis.Letter, out int microstepping, min: 1))
                 {
                     uint previousMicrostepping = (uint)axis.Microstepping.Value;
                     axis.Microstepping.Value = microstepping;
@@ -554,7 +554,7 @@ internal partial class MCodeHandler
             int eCount = move.Extruders.Count;
             // One value applies to every extruder, as RepRapFirmware reads it (GCodes2.cpp case 350,
             // eCount = numExtruders with padding)
-            if (code.TryGetIntArray('E', eCount, out int[]? extruderValues, pad: true, min: 0))
+            if (code.TryGetIntArray('E', eCount, out int[]? extruderValues, pad: true, min: 1))
             {
                 for (int i = 0; i < eCount; i++)
                 {

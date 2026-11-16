@@ -400,10 +400,11 @@ Added minimum array limits to the following gcodes:
 - `M201`/`M201.1` - acceleration
 - `M203` - max feedrate
 - `M205`/`M566` - jerk
+- `M350` - microstepping
 - `M563` - define tool
 - `M572` - pressure advance
 - `M906`/`M913`/`M917` - motor current & standstill current
-A `GCodeException` is thrown if the value is below the minimum (`0.0f`)
+A `GCodeException` is thrown if the value is below the minimum (typically `0.0f`)
 
 `M140` and `M141` stop at a refused `H` (an invalid heater number, a heater a tool uses, or a heater of the other kind of slot) and leave the slot and its heaters as they were. RepRapFirmware reports the refusal but goes on to apply `S` and `R` to the slot's existing heaters, and a heater switched on successfully there replaces the error with success.
 
