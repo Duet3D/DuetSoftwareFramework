@@ -559,12 +559,6 @@ internal partial class MCodeHandler
                 for (int i = 0; i < eCount; i++)
                 {
                     int microstepping = extruderValues[i];
-                    if (microstepping < 0)
-                    {
-                        // Negative values are how a mixing configuration skips an extruder it does
-                        // not want to change
-                        continue;
-                    }
 
                     Extruder extruder = move.Extruders[i];
                     uint previousMicrostepping = (uint)extruder.Microstepping.Value;
