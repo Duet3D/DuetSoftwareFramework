@@ -23,4 +23,10 @@ internal static class Expansion
 
     /// <summary>The placeholder port that puts a pinless sensor (mcu-temp, drivers) on a board, e.g. 1.dummy</summary>
     public static string Dummy(byte board) => $"{board}.dummy";
+
+    /// <summary>The source of a current sensor, the heater current a tool board measures, e.g. 1.heater</summary>
+    public static string HeaterCurrent(byte board) => $"{board}.heater";
+
+    /// <summary>An additional output of a sensor on a board, e.g. 1.s2.1 for output 1 of sensor 2</summary>
+    public static string SensorOutput(byte board, int sensor, int output) => $"{board}.s{sensor}.{output}";
 }

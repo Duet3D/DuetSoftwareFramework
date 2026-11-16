@@ -312,8 +312,8 @@ internal partial class MCodeHandler
         public bool SeenCommon { get; private init; }
 
         private float? _offsetAdj, _slopeAdj;
-        private float? _r25, _beta, _c, _rRef, _lowReading, _highReading;
-        private int? _adcLowOffset, _adcHighOffset, _mainsFrequency, _wires;
+        private float? _r25, _beta, _c, _rRef, _lowReading, _highReading, _radiationExponent;
+        private int? _adcLowOffset, _adcHighOffset, _mainsFrequency, _wires, _objectMix, _auxMix;
         private bool? _filtered;
         private string? _thermocoupleType;
         private bool _clearAdcOffsets;
@@ -323,6 +323,12 @@ internal partial class MCodeHandler
         /// </summary>
         /// <remarks>RepRapFirmware's <c>Thermistor::ConfigureLParam</c> and <c>ConfigureHParam</c></remarks>
         private const int MeasureAdcOffset = 999;
+
+        /// <summary>
+        /// Range of a thermopile sensor's radiation exponent, outside which its board ignores R
+        /// </summary>
+        /// <remarks>Duet3Expansion's <c>TPiS_1T_1086_L5_5::Configure</c></remarks>
+        private const float MinRadiationExponent = 3.8f, MaxRadiationExponent = 4.4f;
 
         /// <summary>
         /// Read the settings of a sensor of the given type from a code
@@ -353,9 +359,7 @@ internal partial class MCodeHandler
                     settings._rRef = OptionalFloat(code, 'R');
                     if (type == AnalogSensorType.Thermistor)
                     {
-                        settings._beta = OptionalFloat(code, 'B');
-                        settings._c = OptionalFloat(code, 'C') ?? (settings._beta is not null ? 0.0f : null);
-                        settings._r25 = OptionalFloat(code, 'T');
+                        settings.ReadThermistorCurve(code);
                     }
                     // TODO L999 and H999 make the board measure the correction, which only its reply states
                     settings._adcLowOffset = OptionalInt(code, 'L') is int low and not MeasureAdcOffset ? low : null;
@@ -378,8 +382,29 @@ internal partial class MCodeHandler
                     settings._thermocoupleType = code.TryGetString('K', out string? thermocoupleType) ? thermocoupleType : null;
                     settings._mainsFrequency = OptionalInt(code, 'F');
                     break;
+
+                case AnalogSensorType.ThermopileObject:
+                    // Duet3Expansion's TPiS_1T_1086_L5_5::Configure: T, B and C describe the environment thermistor
+                    settings.ReadThermistorCurve(code);
+                    settings._objectMix = OptionalInt(code, 'F');
+                    settings._auxMix = OptionalInt(code, 'W');
+                    settings._radiationExponent = OptionalFloat(code, 'R') is float exponent
+                                                  and >= MinRadiationExponent and <= MaxRadiationExponent ? exponent : null;
+                    break;
             }
             return settings;
+        }
+
+        /// <summary>
+        /// Read a thermistor's T, B and C, where B without C sets C to zero
+        /// </summary>
+        /// <param name="code">The code</param>
+        /// <remarks>RepRapFirmware's <c>Thermistor::Configure</c></remarks>
+        private void ReadThermistorCurve(Commands.Code code)
+        {
+            _beta = OptionalFloat(code, 'B');
+            _c = OptionalFloat(code, 'C') ?? (_beta is not null ? 0.0f : null);
+            _r25 = OptionalFloat(code, 'T');
         }
 
         private static float? OptionalFloat(Commands.Code code, char letter)
@@ -417,6 +442,9 @@ internal partial class MCodeHandler
             sensor.Wires = _wires ?? sensor.Wires;
             sensor.Filtered = _filtered ?? sensor.Filtered;
             sensor.ThermocoupleType = _thermocoupleType ?? sensor.ThermocoupleType;
+            sensor.ObjectMix = _objectMix ?? sensor.ObjectMix;
+            sensor.AuxMix = _auxMix ?? sensor.AuxMix;
+            sensor.RadiationExponent = _radiationExponent ?? sensor.RadiationExponent;
         }
     }
 

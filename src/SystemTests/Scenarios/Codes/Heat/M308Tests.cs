@@ -152,6 +152,11 @@ public class M308Tests : BenchFixture
         new(Expansion.SpiCs(Machines.DriverBoard, 0), "thermocouple-max31856", AnalogSensorType.MAX31856, "thermocouplemax31856"),
         new(Expansion.Dummy(Machines.DriverBoard), "mcu-temp", AnalogSensorType.McuTemp, "mcutemp"),
         new(Expansion.Dummy(Machines.DriverBoard), "drivers", AnalogSensorType.Drivers, "drivers"),
+        new(Expansion.Dummy(Machines.DriverBoard), "board-temp", AnalogSensorType.BoardTemp, "boardtemp"),
+        new(Expansion.HeaterCurrent(Machines.DriverBoard), "current", AnalogSensorType.Current, "current"),
+        new(Expansion.Dummy(Machines.DriverBoard), "thermopile_tpis.object", AnalogSensorType.ThermopileObject, "thermopiletpis.object"),
+        new(Expansion.SensorOutput(Machines.DriverBoard, 1, 1), "thermopile_tpis.ambient", AnalogSensorType.ThermopileAmbient, "thermopiletpis.ambient"),
+        new(Expansion.SensorOutput(Machines.DriverBoard, 1, 2), "thermopile_tpis.environment", AnalogSensorType.ThermopileEnvironment, "thermopiletpis.environment"),
     ];
 
     /// <summary>
@@ -217,6 +222,45 @@ public class M308Tests : BenchFixture
             Assert.That(sensor?.Beta, Is.Null, "a linear analog sensor has no beta");
             Assert.That(sensor?.C, Is.Null, "nor a Steinhart-Hart C");
             Assert.That(sensor?.Filtered, Is.True, "F1 is sensors.analog[2].filtered");
+        });
+    }
+
+    /// <summary>
+    /// A thermopile sensor's environment thermistor curve, its output mixes and its radiation exponent reach the board
+    /// as written and are recorded; an exponent the board ignores is not
+    /// </summary>
+    /// <remarks>
+    /// Duet3Expansion's TPiS_1T_1086_L5_5::Configure reads T, B and C for the environment thermistor (B without C
+    /// sets C to 0), F and W as the object and auxiliary mixes in 256ths, and R as the radiation exponent only when
+    /// it lies between 3.8 and 4.4
+    /// </remarks>
+    [TestCase(4.0f, 4.0f)]
+    [TestCase(5.0f, null)]
+    public async Task M308RecordsTheThermopileSettings(float exponent, float? recorded)
+    {
+        const float r25 = 100000.0f, beta = 4100.0f;
+        const int objectMix = 200, auxMix = 56;
+        await using Bench bench = await Bench.StartAsync();
+
+        await bench.Host.ExecuteCodeAsync(Invariant(
+            $"M308 S{SensorNumber} P\"{Expansion.Dummy(Machines.DriverBoard)}\" Y\"thermopile_tpis.object\" T{r25} B{beta} F{objectMix} W{auxMix} R{exponent}"));
+
+        (_, CanMessageM308V1 sent) = bench.CanMaster.LastCanMessage<CanMessageM308V1>();
+        AnalogSensor? sensor = await bench.Host.ReadModelAsync(model => SensorAt(model, SensorNumber));
+        Assert.Multiple(() =>
+        {
+            Assert.That(sent.T, Is.EqualTo(r25).Within(1e-3), "T is sent as written");
+            Assert.That(sent.B, Is.EqualTo(beta).Within(1e-3), "B is sent as written");
+            Assert.That(sent.F, Is.EqualTo(objectMix), "F is sent as written");
+            Assert.That(sent.W, Is.EqualTo(auxMix), "W is sent as written");
+            Assert.That(sent.R, Is.EqualTo(exponent).Within(1e-3), "R is sent whether or not the board takes it");
+            Assert.That(sensor?.Type, Is.EqualTo(AnalogSensorType.ThermopileObject));
+            Assert.That(sensor?.R25, Is.EqualTo(r25).Within(1e-3), "T is the environment thermistor's r25");
+            Assert.That(sensor?.Beta, Is.EqualTo(beta).Within(1e-3), "B is its beta");
+            Assert.That(sensor?.C, Is.Zero, "and B without C sets its C to 0");
+            Assert.That(sensor?.ObjectMix, Is.EqualTo(objectMix), "F is sensors.analog[].objectMix");
+            Assert.That(sensor?.AuxMix, Is.EqualTo(auxMix), "W is sensors.analog[].auxMix");
+            Assert.That(sensor?.RadiationExponent, Is.EqualTo(recorded), "R is sensors.analog[].radiationExponent when the board takes it");
         });
     }
 

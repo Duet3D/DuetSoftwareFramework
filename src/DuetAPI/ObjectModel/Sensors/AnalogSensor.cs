@@ -32,7 +32,20 @@ public partial class AnalogSensor : ModelObject, IStaticModelObject
     private int? _adcLowOffset;
 
     /// <summary>
-    /// Beta value of this sensor (if applicable)
+    /// Share of a thermopile sensor's auxiliary output mixed into its reading, in 256ths, or null if not set
+    /// </summary>
+    /// <remarks>
+    /// See also M308 W
+    /// </remarks>
+    public int? AuxMix
+    {
+        get => _auxMix;
+        set => SetPropertyValue(ref _auxMix, value);
+    }
+    private int? _auxMix;
+
+    /// <summary>
+    /// Beta value of a thermistor, or of a thermopile sensor's environment thermistor (if applicable)
     /// </summary>
     public float? Beta
     {
@@ -42,7 +55,7 @@ public partial class AnalogSensor : ModelObject, IStaticModelObject
     private float? _beta;
 
     /// <summary>
-    /// C value of this sensor
+    /// Steinhart-Hart C value of a thermistor, or of a thermopile sensor's environment thermistor
     /// </summary>
     public float? C
     {
@@ -119,6 +132,19 @@ public partial class AnalogSensor : ModelObject, IStaticModelObject
     private string? _name;
 
     /// <summary>
+    /// Share of a thermopile sensor's object output mixed into its reading, in 256ths, or null if not set
+    /// </summary>
+    /// <remarks>
+    /// See also M308 F
+    /// </remarks>
+    public int? ObjectMix
+    {
+        get => _objectMix;
+        set => SetPropertyValue(ref _objectMix, value);
+    }
+    private int? _objectMix;
+
+    /// <summary>
     /// Offset adjustment (in K)
     /// </summary>
     /// <remarks>
@@ -142,7 +168,7 @@ public partial class AnalogSensor : ModelObject, IStaticModelObject
     private string? _port;
 
     /// <summary>
-    /// Resistance of this sensor at 25C
+    /// Resistance at 25C of a thermistor, or of a thermopile sensor's environment thermistor
     /// </summary>
     public float? R25
     {
@@ -150,6 +176,19 @@ public partial class AnalogSensor : ModelObject, IStaticModelObject
         set => SetPropertyValue(ref _r25, value);
     }
     private float? _r25;
+
+    /// <summary>
+    /// Radiation exponent of a thermopile sensor, or null if not set
+    /// </summary>
+    /// <remarks>
+    /// See also M308 R
+    /// </remarks>
+    public float? RadiationExponent
+    {
+        get => _radiationExponent;
+        set => SetPropertyValue(ref _radiationExponent, value);
+    }
+    private float? _radiationExponent;
 
     /// <summary>
     /// Series resistance of this sensor channel (only applicable for thermistors)

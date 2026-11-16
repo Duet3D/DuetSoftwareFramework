@@ -1,3 +1,5 @@
+using System;
+using System.Text.Json;
 using DuetAPI.ObjectModel;
 using DuetAPI.Utility;
 using NUnit.Framework;
@@ -31,7 +33,26 @@ public class ReducedStringTests
     [TestCase("mcu-temp", AnalogSensorType.McuTemp)]
     [TestCase("mcutemp", AnalogSensorType.McuTemp)]
     [TestCase("drivers", AnalogSensorType.Drivers)]
+    [TestCase("board-temp", AnalogSensorType.BoardTemp)]
+    [TestCase("current", AnalogSensorType.Current)]
+    [TestCase("thermopile_tpis.object", AnalogSensorType.ThermopileObject)]
+    [TestCase("Thermopile-TPiS.Ambient", AnalogSensorType.ThermopileAmbient)]
+    [TestCase("thermopiletpis.environment", AnalogSensorType.ThermopileEnvironment)]
     [TestCase("no such sensor", AnalogSensorType.Unknown)]
     public void ASensorTypeIsMatchedInItsReducedForm(string name, AnalogSensorType type)
         => Assert.That(AnalogSensorTypeConverter.Parse(name), Is.EqualTo(type));
+
+    /// <summary>
+    /// Every sensor type has a name in the object model that reads back as the same type, so that a type added to the
+    /// enumeration without one is caught
+    /// </summary>
+    [Test]
+    public void EverySensorTypeRoundTripsThroughItsObjectModelName()
+    {
+        foreach (AnalogSensorType type in Enum.GetValues<AnalogSensorType>())
+        {
+            string json = JsonSerializer.Serialize(type);
+            Assert.That(JsonSerializer.Deserialize<AnalogSensorType>(json), Is.EqualTo(type), json);
+        }
+    }
 }
